@@ -17,6 +17,8 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
   children: ReactNode;
   /** Wraps the body in a column with gaps (approval cards). */
   stacked?: boolean;
+  /** Muted, right-aligned on the header line (e.g. the receipt check). */
+  aside?: ReactNode;
 }
 
 /** A chat line: avatar, author, time and text. Agents are told apart by the avatar only. */
@@ -30,6 +32,7 @@ export function Message({
   agent,
   children,
   stacked,
+  aside,
   className,
   ...rest
 }: MessageProps) {
@@ -51,7 +54,9 @@ export function Message({
           <span className="ac-msg__author">{author}</span>
           <span className="ac-msg__time">{time}</span>
           {meta && <span className="ac-msg__meta">{meta}</span>}
+          {aside && !grouped && <span className="ac-msg__aside">{aside}</span>}
         </div>
+        {aside && grouped && <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>}
         {children}
       </div>
     </article>

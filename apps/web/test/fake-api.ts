@@ -48,9 +48,11 @@ export interface FakeState {
   memories: Memory[];
   proposals: Proposal[];
   reactions: Record<string, ReactionCount[]>;
+  autoReply: Record<string, boolean>;
   dms: { channelId: string; with: { type: "person" | "agent"; id: string; name: string; handle: string | null } }[];
   calls: { method: string; args: unknown[] }[];
   context?: string;
+  defaultCredentialId?: string | null;
   /** Make `chat.post` fail (optimistic send tests). */
   failPosts?: boolean;
   /** `chat.post` waits for this (to see the pending state). */
@@ -210,7 +212,8 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
       run("run-1", ADA_ID, "@ada o login está devolvendo 401", 1240, 0.004, 62),
       run("run-2", ADA_ID, "revisa o PR #39 da Marina", 6880, 0.021, 60 * 24),
     ],
-    platformKey: true,
+    platformKey: false,
+    defaultCredentialId: "cred-1",
     online: new Set(["u-walter"]),
     memories: [
       memory(
@@ -293,6 +296,7 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
     ],
     reactions: {},
     dms: [],
+    autoReply: {},
     calls: [],
     ...overrides,
   };
@@ -532,7 +536,7 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
       settings: async () => ({
         name: "Acme",
         context: state.context ?? "",
-        defaultCredentialId: null,
+        defaultCredentialId: state.defaultCredentialId ?? null,
         routerModel: null,
         summaryModel: null,
         timezone: "America/Sao_Paulo",
@@ -540,10 +544,11 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
       updateSettings: async (orgId, input) => {
         log("orgs.updateSettings", orgId, input);
         if (input.context !== undefined) state.context = input.context;
+        if (input.defaultCredentialId !== undefined) state.defaultCredentialId = input.defaultCredentialId;
         return {
           name: input.name ?? "Acme",
           context: state.context ?? "",
-          defaultCredentialId: input.defaultCredentialId ?? null,
+          defaultCredentialId: state.defaultCredentialId ?? null,
           routerModel: null,
           summaryModel: null,
           timezone: input.timezone ?? "America/Sao_Paulo",
@@ -649,6 +654,7 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
             inputUsdPerMTok: 0.1,
             outputUsdPerMTok: 0.5,
           },
+          { id: "gpt-5", label: "GPT-5", provider: "openai", inputUsdPerMTok: 1.25, outputUsdPerMTok: 10 },
         ],
       }),
       credentials: async () => state.credentials,
@@ -656,7 +662,7 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
         log("agents.addCredential", orgId, { ...input, apiKey: "[redacted]" });
         const cred: Credential = {
           id: id("cred"),
-          provider: "anthropic",
+          provider: input.provider,
           label: input.label,
           keyHint: input.apiKey.slice(-4),
           createdAt: NOW.toISOString(),
@@ -694,15 +700,23 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
           channels,
         };
       },
-      channels: async () => [],
+      channels: async (_orgId, agentId) =>
+        Object.entries(state.channelMembers)
+          .filter(([, ms]) => ms.some((m) => m.type === "agent" && m.id === agentId))
+          .map(([cid]) => ({
+            id: cid,
+            name: state.channels.find((c) => c.id === cid)?.name ?? "",
+            autoReply: state.autoReply[`${agentId}:${cid}`] ?? true,
+          })),
       setChannels: async (orgId, agentId, channels) => {
         log("agents.setChannels", orgId, agentId, channels);
         for (const c of channels) {
           const list = state.channelMembers[c.channelId] ?? [];
           state.channelMembers[c.channelId] = list;
-          list.push({ type: "agent", id: agentId });
+          if (!list.some((m) => m.type === "agent" && m.id === agentId)) list.push({ type: "agent", id: agentId });
+          if (c.autoReply !== undefined) state.autoReply[`${agentId}:${c.channelId}`] = c.autoReply;
         }
-        return channels.map((c) => ({ id: c.channelId, name: "", autoReply: c.autoReply ?? false }));
+        return channels.map((c) => ({ id: c.channelId, name: "", autoReply: c.autoReply ?? true }));
       },
       runs: async (_orgId, filter = {}) => state.runs.filter((r) => !filter.agentId || r.agentId === filter.agentId),
       run: async (_orgId, runId) => {
@@ -797,7 +811,7 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
                 id: m.id,
                 name: state.agents.find((a) => a.id === m.id)?.name ?? "",
                 handle: state.agents.find((a) => a.id === m.id)?.handle ?? null,
-                autoReply: true,
+                autoReply: state.autoReply[`${m.id}:${channelId}`] ?? true,
                 joinedAt: NOW.toISOString(),
               }
             : {
@@ -809,6 +823,11 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
                 joinedAt: NOW.toISOString(),
               },
         ),
+      removeMember: async (orgId, channelId, member) => {
+        log("chat.removeMember", orgId, channelId, member);
+        const id = "agentId" in member ? member.agentId : member.userId;
+        state.channelMembers[channelId] = (state.channelMembers[channelId] ?? []).filter((m) => m.id !== id);
+      },
       addMember: async (orgId, channelId, member) => {
         log("chat.addMember", orgId, channelId, member);
         const list = state.channelMembers[channelId] ?? [];

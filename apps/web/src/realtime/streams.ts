@@ -95,9 +95,16 @@ export function applyChannelEvent(state: StreamsState, event: ChannelEvent): Str
       const m = event.message;
       if (!m?.agentRunId) return state;
       const next = finish(state, m.agentRunId);
-      return m.author?.type === "agent" && m.author.id && m.threadId
-        ? settleProvisional(next, m.author.id, m.threadId)
-        : next;
+      if (m.author?.type !== "agent" || !m.author.id) return next;
+      if (m.threadId) return settleProvisional(next, m.author.id, m.threadId);
+      // Flat reply (DMs): it answers the latest message, whatever thread we guessed.
+      const agentId = m.author.id;
+      const runs = Object.fromEntries(
+        Object.entries(next.runs).filter(
+          ([, r]) => !(r.provisional && r.agentId === agentId && r.channelId === m.channelId),
+        ),
+      );
+      return { ...next, runs };
     }
     case "agent.run": {
       let s = state;

@@ -6,10 +6,12 @@ import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useDecideProposal, useProposals } from "@/api/queries";
-import type { MemoryUpdate } from "@/api/types";
+import type { AgentQuestion, MemoryUpdate } from "@/api/types";
 import { useDirectory } from "@/hooks/useDirectory";
 import { agentGrammar } from "@/lib/grammar";
 import { useToast } from "@/lib/toast";
+import { useLive, useLiveStore } from "@/realtime/context";
+import { useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
 
 /**
@@ -164,6 +166,70 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
           </Link>
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * An agent's question (`ask_user`): neutral card in the thread with the
+ * choices as buttons, or "Responder" to answer in the composer.
+ */
+export function QuestionCard({ question }: { question: AgentQuestion }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const api = useApi();
+  const dir = useDirectory(org.id);
+  const live = useLiveStore();
+  const actions = useChannelActions();
+  const current = useLive((s) => s.questions[question.id]) ?? question;
+  const answer = useMutation({
+    mutationFn: (choice: string) => api.questions.answer(org.id, question.id, { choice }),
+    onSuccess: (res, choice) =>
+      live.answered({ ...current, status: "answered", answer: res.answer ?? choice, answeredByUserId: me.user.id }),
+  });
+  const name = dir.agentById.get(question.agentId)?.name ?? t("channel.unknownAgent");
+  const done = current.status === "answered";
+  const who = current.answeredByUserId === me.user.id ? null : dir.memberById.get(current.answeredByUserId ?? "")?.name;
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
+    <div
+      className={done ? "ac-approval ac-approval--done" : "ac-approval"}
+      role="group"
+      aria-label={t("question.group", { agent: name })}
+    >
+      <div className="ac-approval__head">
+        <span className="ac-approval__who">
+          <Trans i18nKey="question.asks" values={{ agent: name }} components={{ b: <b /> }} />
+        </span>
+        {done ? (
+          <Chip icon="check" tone="done">
+            {t("question.chipDone")}
+          </Chip>
+        ) : (
+          <Chip icon="waiting" tone="waiting">
+            {t("question.chip")}
+          </Chip>
+        )}
+      </div>
+      <p className="ac-approval__title">{current.text}</p>
+      {done ? (
+        <p className="small muted" style={{ margin: 0 }}>
+          {who
+            ? t("question.answered", { name: who, answer: current.answer ?? "" })
+            : t("question.answeredByYou", { answer: current.answer ?? "" })}
+        </p>
+      ) : (
+        <div className="ac-approval__actions">
+          {(current.choices ?? []).map((choice) => (
+            <Button key={choice} size="sm" disabled={answer.isPending} onClick={() => answer.mutate(choice)}>
+              {choice}
+            </Button>
+          ))}
+          <Button variant="ghost" size="sm" onClick={() => actions?.focusComposer()}>
+            {t("question.answer")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

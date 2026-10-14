@@ -3,6 +3,7 @@ import type {
   AgentChannel,
   AgentDetail,
   AgentInput,
+  AgentQuestion,
   AgentUsage,
   Approval,
   AuthConfig,
@@ -90,7 +91,19 @@ export interface ApiClient {
     archive(orgId: string, agentId: string): Promise<void>;
     models(): Promise<{ models: Model[]; defaultModel: string }>;
     credentials(orgId: string): Promise<Credential[]>;
-    addCredential(orgId: string, input: { provider: "anthropic"; label: string; apiKey: string }): Promise<Credential>;
+    addCredential(
+      orgId: string,
+      input: {
+        provider: string;
+        label: string;
+        apiKey: string;
+        /** Anthropic: workspace id for keys not scoped to one. */
+        workspaceId?: string | null;
+        /** OpenAI: organization and project (expected; the backend is adding OpenAI). */
+        organizationId?: string | null;
+        projectId?: string | null;
+      },
+    ): Promise<Credential>;
     /** Replaces the key, keeping the id (agents keep using it). */
     rotateCredential(
       orgId: string,
@@ -132,6 +145,7 @@ export interface ApiClient {
     roster(orgId: string, channelId: string): Promise<RosterMember[]>;
     members(orgId: string, channelId: string): Promise<ChannelMember[]>;
     addMember(orgId: string, channelId: string, member: { userId: string } | { agentId: string }): Promise<void>;
+    removeMember(orgId: string, channelId: string, member: { userId: string } | { agentId: string }): Promise<void>;
     messages(
       orgId: string,
       channelId: string,
@@ -218,6 +232,10 @@ export interface ApiClient {
     open(orgId: string, target: DmTarget): Promise<{ channelId: string }>;
     /** Marks a channel or DM read up to now. */
     markRead(orgId: string, channelId: string): Promise<void>;
+  };
+  questions: {
+    /** Answers an agent's question with a choice or free text. */
+    answer(orgId: string, questionId: string, input: { choice?: string; text?: string }): Promise<AgentQuestion>;
   };
   invites: {
     /** Org-wide link: whoever joins with it becomes a member (7 days). */

@@ -746,3 +746,31 @@ p {
 .channel__pill .ac-new-messages {
   bottom: 8px;
 }
+
+/* Unread: bold label + neutral count (attention amber is only for what waits on a person) */
+.sidebar__item[data-unread="true"] .sidebar__item-label {
+  font-weight: 600;
+}
+.sidebar__unread {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--action);
+  color: var(--on-action);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sidebar__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 4px;
+}
+.sidebar__label-row .sidebar__label {
+  padding-bottom: 0;
+}

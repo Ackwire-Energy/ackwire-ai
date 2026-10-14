@@ -10,6 +10,7 @@ import {
   Field,
   Input,
   List,
+  Select,
   Textarea,
 } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
@@ -37,6 +38,7 @@ import { useOrg } from "@/components/org-context";
 import { formatShortDate, formatUsd, relativeTime } from "@/lib/format";
 import { navigateAway } from "@/lib/navigate";
 import { can } from "@/lib/permissions";
+import { isProviderId, keyLooksValid, PROVIDERS, type ProviderId, providerLabel } from "@/lib/providers";
 import { connectorDescription } from "@/lib/scopes";
 import { useToast } from "@/lib/toast";
 
@@ -472,12 +474,12 @@ function KeysSection() {
                 <span className="list-col">
                   <span style={{ fontWeight: 600 }}>{c.label}</span>
                   <span className="small muted">
-                    {t("settings.keyEndsIn", { hint: c.keyHint })} ·{" "}
+                    {providerLabel(c.provider)} · {t("settings.keyEndsIn", { hint: c.keyHint })} ·{" "}
                     {t("settings.keyAdded", { when: relativeTime(t, i18n.language, c.createdAt) })}
                   </span>
                 </span>
                 {isDefault ? (
-                  <Chip icon="check">{t("settings.defaultKey")}</Chip>
+                  <Chip icon="check">{t("settings.default")}</Chip>
                 ) : (
                   <Button
                     variant="ghost"
@@ -496,10 +498,18 @@ function KeysSection() {
                     variant="ghost"
                     size="sm"
                     className="ac-btn--danger"
+                    disabled={isDefault}
+                    title={isDefault ? t("settings.removeDefaultBlocked") : undefined}
+                    aria-describedby={isDefault ? `default-note-${c.id}` : undefined}
                     onClick={() => setDialog({ type: "remove", cred: c })}
                   >
                     {t("settings.remove")}
                   </Button>
+                  {isDefault && (
+                    <span id={`default-note-${c.id}`} className="ac-visually-hidden">
+                      {t("settings.removeDefaultBlocked")}
+                    </span>
+                  )}
                 </div>
               </div>
             );
@@ -553,14 +563,19 @@ function KeyDialog({
   const rotate = useRotateCredential(org.id);
   const [label, setLabel] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [provider, setProvider] = useState<ProviderId>("anthropic");
+  const [workspaceId, setWorkspaceId] = useState("");
   const [touched, setTouched] = useState(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset the form each time it opens
   useEffect(() => {
     setLabel("");
     setApiKey("");
+    setWorkspaceId("");
+    setProvider(cred && isProviderId(cred.provider) ? cred.provider : "anthropic");
     setTouched(false);
   }, [mode, cred]);
-  const error = touched && apiKey.trim().length < 8 ? t("settings.keyInvalid") : undefined;
+  const valid = keyLooksValid(provider, apiKey);
+  const error = touched && !valid ? t(`onboarding.keyInvalid.${provider}`) : undefined;
   const pending = add.isPending || rotate.isPending;
   return (
     <Dialog
@@ -575,7 +590,7 @@ function KeyDialog({
         onSubmit={(e) => {
           e.preventDefault();
           setTouched(true);
-          if (apiKey.trim().length < 8) return;
+          if (!valid) return;
           if (mode === "rotate" && cred) {
             rotate.mutate(
               { id: cred.id, apiKey: apiKey.trim() },
@@ -588,13 +603,27 @@ function KeyDialog({
             );
           } else {
             add.mutate(
-              { provider: "anthropic", label: label.trim() || "Anthropic", apiKey: apiKey.trim() },
+              {
+                provider,
+                label: label.trim() || providerLabel(provider),
+                apiKey: apiKey.trim(),
+                ...(provider === "anthropic" && workspaceId.trim() ? { workspaceId: workspaceId.trim() } : {}),
+              },
               { onSuccess: onClose },
             );
           }
         }}
       >
         <DialogBody>
+          {mode === "add" && (
+            <Field label={t("settings.provider")} id="key-provider">
+              <Select
+                value={provider}
+                onValueChange={setProvider}
+                options={PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
+              />
+            </Field>
+          )}
           {mode === "add" && (
             <Field label={t("settings.keyLabel")} id="key-label">
               <Input
@@ -608,11 +637,20 @@ function KeyDialog({
             <Input
               type="password"
               autoComplete="off"
-              placeholder="sk-ant-…"
+              placeholder={PROVIDERS.find((p) => p.id === provider)?.placeholder}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
             />
           </Field>
+          {mode === "add" && provider === "anthropic" && (
+            <Field
+              label={t("onboarding.anthropicWorkspace")}
+              id="key-ws-set"
+              help={t("onboarding.anthropicWorkspaceHelp")}
+            >
+              <Input value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} autoComplete="off" />
+            </Field>
+          )}
         </DialogBody>
         <DialogFooter>
           <Button onClick={onClose}>{t("common.cancel")}</Button>

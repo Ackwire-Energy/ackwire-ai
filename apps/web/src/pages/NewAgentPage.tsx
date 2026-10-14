@@ -25,12 +25,17 @@ import {
   useMembers,
   useModels,
   usePlatformKey,
+  useSettings,
 } from "@/api/queries";
 import type { Agent, Credential, Model } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { joinNames } from "@/lib/format";
 import { can } from "@/lib/permissions";
+import { modelChoices, providerLabel } from "@/lib/providers";
 import { handleFrom, parseAmount } from "@/lib/text";
+
+/** Select value for "Sem responsável" (the API takes `ownerUserId: null`). */
+export const NO_OWNER = "__none__";
 
 export const ROLE_IDS = ["dev", "ops", "qa", "pm", "custom"] as const;
 export type RoleId = (typeof ROLE_IDS)[number];
@@ -45,16 +50,53 @@ export function modelDescription(t: TFunction, locale: string, model: Model) {
   return t("newAgent.modelDesc.other", { input: fmt(model.inputUsdPerMTok), output: fmt(model.outputUsdPerMTok) });
 }
 
-/** Key choices: the organization's live credentials, then the platform key. */
-export function keyOptions(t: TFunction, credentials: Credential[], platform = true): SelectOption[] {
+/** Value of the "Chave padrão do workspace" option (the API takes `credentialId: null`). */
+export const DEFAULT_KEY = "__default__";
+
+/**
+ * Key choices: the workspace default first (with its masked hint), then the
+ * other stored keys.
+ */
+export function keyOptions(t: TFunction, credentials: Credential[], defaultId: string | null): SelectOption[] {
+  const live = credentials.filter((c) => !c.revokedAt);
+  const def = live.find((c) => c.id === defaultId);
   return [
-    ...credentials
-      .filter((c) => !c.revokedAt)
-      .map((c) => ({ value: c.id, label: c.label, description: t("newAgent.orgKeyDesc", { hint: c.keyHint }) })),
-    ...(platform
-      ? [{ value: "platform", label: t("newAgent.platformKey"), description: t("newAgent.platformKeyDesc") }]
-      : []),
+    {
+      value: DEFAULT_KEY,
+      label: t("newAgent.defaultKey"),
+      description: def
+        ? t("newAgent.defaultKeyDesc", { provider: providerLabel(def.provider), hint: def.keyHint })
+        : undefined,
+    },
+    ...live
+      .filter((c) => c.id !== defaultId)
+      .map((c) => ({
+        value: c.id,
+        label: c.label,
+        description: t("newAgent.otherKeyDesc", { provider: providerLabel(c.provider), hint: c.keyHint }),
+      })),
   ];
+}
+
+/** Models grouped by provider; those without a key are disabled and say why. */
+export function modelOptions(
+  t: TFunction,
+  locale: string,
+  models: Model[],
+  credentials: Credential[],
+  platform: boolean,
+): SelectOption[] {
+  return modelChoices(models, credentials, platform).flatMap(([provider, choices]) =>
+    choices.map(({ model, available }) => ({
+      value: model.id,
+      label: model.label,
+      group: providerLabel(provider),
+      disabled: !available,
+      description: available
+        ? modelDescription(t, locale, model)
+        : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
+    })),
+  );
 }
 
 /** Connector toggles of "Onde trabalha e com o quê": one per connector, granting its non-gated scopes. */
@@ -84,6 +126,7 @@ export function NewAgentPage() {
   const connectors = { data: activeConnections };
   const create = useCreateAgent(org.id);
   const platform = usePlatformKey(org.id);
+  const settings = useSettings(org.id);
 
   const [role, setRole] = useState<RoleId>("qa");
   const [name, setName] = useState("");
@@ -100,12 +143,18 @@ export function NewAgentPage() {
     [channels.data, dmChannels],
   );
   useEffect(() => {
-    if (!model && models.data) setModel(models.data.defaultModel);
-  }, [model, models.data]);
+    if (model || !models.data || !credentials.data) return;
+    // The deployment's default, unless the workspace has no key for its provider.
+    const usable = modelOptions(t, i18n.language, models.data.models, credentials.data, platform.data ?? false).filter(
+      (o) => !o.disabled,
+    );
+    setModel(
+      usable.find((o) => o.value === models.data.defaultModel)?.value ?? usable[0]?.value ?? models.data.defaultModel,
+    );
+  }, [model, models.data, credentials.data, platform.data, t, i18n.language]);
   useEffect(() => {
-    if (!key && credentials.data && platform.data !== undefined)
-      setKey(keyOptions(t, credentials.data, platform.data)[0]?.value);
-  }, [key, credentials.data, platform.data, t]);
+    if (!key) setKey(DEFAULT_KEY);
+  }, [key]);
   useEffect(() => {
     // Defaults like the screen: the channels you're in and the read-only connectors.
     setOn((prev) => {
@@ -147,8 +196,8 @@ export function NewAgentPage() {
       role: role === "custom" ? "" : t(`newAgent.roles.${role}.name`),
       instructions,
       model,
-      ownerUserId: owner,
-      credentialId: key && key !== "platform" ? key : null,
+      ownerUserId: owner === NO_OWNER ? null : owner,
+      credentialId: key && key !== DEFAULT_KEY ? key : null,
       monthlyBudgetUsd: amount,
     });
     const joined = myChannels.filter((c) => on[`ch:${c.id}`]);
@@ -214,16 +263,17 @@ export function NewAgentPage() {
     );
   }
 
-  const ownerOptions: SelectOption[] = (members.data ?? []).map((m) => ({
-    value: m.userId,
-    label: m.name,
-    description: t(`roles.${m.role}`),
-  }));
-  const modelOptions: SelectOption[] = (models.data?.models ?? []).map((m) => ({
-    value: m.id,
-    label: m.label,
-    description: modelDescription(t, i18n.language, m),
-  }));
+  const ownerOptions: SelectOption[] = [
+    ...(members.data ?? []).map((m) => ({ value: m.userId, label: m.name, description: t(`roles.${m.role}`) })),
+    { value: NO_OWNER, label: t("newAgent.noOwnerOption"), description: t("newAgent.noOwnerHelp") },
+  ];
+  const modelSelect = modelOptions(
+    t,
+    i18n.language,
+    models.data?.models ?? [],
+    credentials.data ?? [],
+    platform.data ?? false,
+  );
   const toggles = [
     ...myChannels.map((c) => ({ id: `ch:${c.id}`, label: `#${c.name}` })),
     ...(connectors.data ?? []).map((c) => ({
@@ -267,7 +317,11 @@ export function NewAgentPage() {
                 placeholder={t("newAgent.namePlaceholder")}
               />
             </Field>
-            <Field label={t("newAgent.owner")} id="ag-owner" help={t("newAgent.ownerHelp")}>
+            <Field
+              label={t("newAgent.owner")}
+              id="ag-owner"
+              help={owner === NO_OWNER ? t("newAgent.noOwnerHelp") : t("newAgent.ownerHelp")}
+            >
               <Select value={owner} onValueChange={setOwner} options={ownerOptions} />
             </Field>
           </div>
@@ -283,13 +337,13 @@ export function NewAgentPage() {
         </h2>
         <div className="grid-fields">
           <Field label={t("newAgent.model")} id="ag-model">
-            <Select value={model} onValueChange={setModel} options={modelOptions} />
+            <Select value={model} onValueChange={setModel} options={modelSelect} />
           </Field>
           <Field label={t("newAgent.key")} id="ag-key">
             <Select
               value={key}
               onValueChange={setKey}
-              options={keyOptions(t, credentials.data ?? [], platform.data ?? false)}
+              options={keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null)}
               placeholder={t("newAgent.noKeys")}
             />
           </Field>

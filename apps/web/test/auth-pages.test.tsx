@@ -134,14 +134,39 @@ describe("Onboarding", () => {
         .getByRole("button", { name: /Ada · Dev/ })
         .getAttribute("aria-pressed"),
     ).toBe("true");
-    await act(async () => fireEvent.click(screen().getByRole("radio", { name: /Chave da Acme Saúde/ })));
+    // The workspace key is required; the platform key isn't offered by this server.
+    expect(screen().getByRole("heading", { name: "Chave de API do seu workspace" })).toBeTruthy();
+    expect(screen().queryByRole("button", { name: /Usar a chave do agentes/ })).toBeNull();
     expect(screen().getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(true);
-    await type("Chave da API da Anthropic", "sk-ant-api-123456");
+    expect(document.body.textContent).toContain("Começa com Claude Sonnet 5.5.");
+    await type("Chave da API da Anthropic", "sk-errado");
+    expect(screen().getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(true);
+    await act(async () => fireEvent.blur(screen().getByLabelText("Chave da API da Anthropic")));
+    expect(document.body.textContent).toContain("As chaves da Anthropic começam com sk-ant-.");
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Avançado" })));
+    await type("ID do workspace da Anthropic", "wrkspc_01ABC");
+    await type("Chave da API da Anthropic", "sk-ant-api03-abcdefghijklmnop");
     await next();
-    await settle(4);
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "agents.addCredential")?.args[1]).toEqual({
+      provider: "anthropic",
+      label: "Anthropic",
+      apiKey: "[redacted]",
+      workspaceId: "wrkspc_01ABC",
+    });
+    // It becomes the workspace default key; the agent uses it (credentialId null) with the suggested model.
+    const cred = state.credentials[state.credentials.length - 1];
+    expect(state.calls.find((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({
+      defaultCredentialId: cred?.id,
+    });
     const created = state.calls.find((c) => c.method === "agents.create")?.args[1] as Record<string, unknown>;
-    expect(created).toMatchObject({ name: "Ada", handle: "ada", role: "Dev" });
-    expect(created.credentialId).toBeTruthy();
+    expect(created).toMatchObject({
+      name: "Ada",
+      handle: "ada",
+      role: "Dev",
+      model: "claude-sonnet-5-5",
+      credentialId: null,
+    });
     expect(state.calls.some((c) => c.method === "chat.addMember")).toBe(true);
 
     expect(screen().getByText("Ada já está esperando no #general. Chame quem vai trabalhar com ela.")).toBeTruthy();

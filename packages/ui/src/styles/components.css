@@ -1583,3 +1583,22 @@ a.ac-list__row:focus-visible {
   transform: translateX(-50%);
   box-shadow: var(--overlay);
 }
+
+/* Right edge of the header line (receipts): muted */
+.ac-msg__aside {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+.ac-msg__aside--floating {
+  position: absolute;
+  top: 0;
+  right: 16px;
+}
+.ac-msg__aside .ac-receipt {
+  margin-top: 0;
+}

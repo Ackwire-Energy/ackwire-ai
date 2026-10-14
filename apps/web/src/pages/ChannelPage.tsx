@@ -2,9 +2,11 @@ import {
   Avatar,
   AvatarStack,
   Button,
+  Checkbox,
   Composer,
   DayDivider,
   Dialog,
+  DialogFooter,
   DialogSearchList,
   EmptyState,
   Field,
@@ -13,11 +15,13 @@ import {
   Message,
   MessageText,
 } from "@agenteschat/ui";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { memo, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ApiError } from "@/api/http";
+import { keys } from "@/api/keys";
 import {
   sendHelpers,
   useApproval,
@@ -31,13 +35,22 @@ import {
   useThreads,
   useUpdateChannel,
 } from "@/api/queries";
-import type { Agent, Approval, Channel, Member, MemoryUpdate, Message as MessageType } from "@/api/types";
+import type {
+  Agent,
+  AgentQuestion,
+  Approval,
+  Channel,
+  Member,
+  MemoryUpdate,
+  Message as MessageType,
+} from "@/api/types";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
 import { buildTimeline, mergeTimeline, threadRootsToLoad } from "@/chat/timeline";
 import { InlineApproval } from "@/components/ApprovalItem";
-import { InlineProposal, MemoryChangeCard } from "@/components/ChatCards";
+import { InlineProposal, MemoryChangeCard, QuestionCard } from "@/components/ChatCards";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
+import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
 import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageReceipts } from "@/components/MessageReceipts";
 import { useOrg } from "@/components/org-context";
@@ -217,6 +230,7 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
       retry(local);
     },
     resend: (body) => send(body),
+    focusComposer: () => composer.current?.focus(),
     channelAgents,
   };
 
@@ -549,7 +563,8 @@ const TimelineMessage = memo(function TimelineMessage({
   const memoryUpdates = Array.isArray(meta.memoryUpdates)
     ? (meta.memoryUpdates as MemoryUpdate[]).filter(isMemoryUpdate)
     : [];
-  const card = approvalId || proposalId || memoryUpdates.length > 0;
+  const question = isQuestion(meta.question) ? meta.question : null;
+  const card = approvalId || proposalId || memoryUpdates.length > 0 || question;
   const feedback = m.author.type === "agent" && !card && !m.local;
   return (
     <Message
@@ -569,6 +584,7 @@ const TimelineMessage = memo(function TimelineMessage({
       author={name}
       time={<time dateTime={m.createdAt}>{formatTime(i18n.language, m.createdAt)}</time>}
       meta={m.local === "pending" ? t("channel.sending") : undefined}
+      aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} /> : undefined}
       stacked={Boolean(card)}
     >
       {(m.body.trim() || !card) && (
@@ -589,13 +605,19 @@ const TimelineMessage = memo(function TimelineMessage({
       {proposalId && <InlineProposal proposalId={proposalId} />}
       {agent &&
         memoryUpdates.map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
-      {m.author.type === "person" && !m.local && <MessageReceipts message={m} />}
+      {question && <QuestionCard question={question} />}
       {feedback && (
         <MessageFeedback messageId={m.id} agentName={agent?.name ?? t("channel.unknownAgent")} active={active} />
       )}
     </Message>
   );
 });
+
+function isQuestion(v: unknown): v is AgentQuestion {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.id === "string" && typeof o.text === "string" && typeof o.agentId === "string";
+}
 
 function isMemoryUpdate(v: unknown): v is MemoryUpdate {
   if (!v || typeof v !== "object") return false;
@@ -631,7 +653,7 @@ function MessageApproval({
   return <InlineApproval approval={approval} agent={agent} members={members} />;
 }
 
-/** "Detalhes do canal": who is here (roster), and the topic for admins. */
+/** "Detalhes do canal": topic, and members (people and agents) with "Responde sem menção" per agent. */
 function ChannelDetails({
   open,
   onOpenChange,
@@ -643,20 +665,47 @@ function ChannelDetails({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
   const dir = useDirectory(org.id);
   const roster = useRoster(org.id, channel.id, open && channel.isMember);
   const update = useUpdateChannel(org.id, channel.id);
+  // The channel's creator may too, but the API doesn't say who created it yet: admins only.
   const editable = can(org.role, "configure");
   const [q, setQ] = useState("");
   const [topic, setTopic] = useState(channel.topic);
+  const [adding, setAdding] = useState(false);
   useEffect(() => {
     if (open) setTopic(channel.topic);
   }, [open, channel.topic]);
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: keys.roster(org.id, channel.id) });
+    void qc.invalidateQueries({ queryKey: keys.channelMembers(org.id, channel.id) });
+  };
+  const remove = useMutation({
+    mutationFn: (member: { userId: string } | { agentId: string }) => api.chat.removeMember(org.id, channel.id, member),
+    onSuccess: refresh,
+  });
+  const autoReply = useMutation({
+    mutationFn: async ({ agentId, on }: { agentId: string; on: boolean }) => {
+      // PUT replaces the agent's channel list: keep the others as they are.
+      const current = await api.agents.channels(org.id, agentId);
+      const next = current.some((c) => c.id === channel.id)
+        ? current.map((c) => ({ channelId: c.id, autoReply: c.id === channel.id ? on : c.autoReply }))
+        : [
+            ...current.map((c) => ({ channelId: c.id, autoReply: c.autoReply })),
+            { channelId: channel.id, autoReply: on },
+          ];
+      return api.agents.setChannels(org.id, agentId, next);
+    },
+    onSuccess: refresh,
+  });
   const needle = q.trim().toLowerCase();
   const rows = (roster.data ?? [])
     .map((m) => ({
       key: `${m.type}-${m.id}`,
       kind: m.type,
+      id: m.id,
       name: m.name,
       sub: m.type === "agent" ? `@${m.handle ?? ""}` : (dir.memberById.get(m.id)?.email ?? ""),
       image: m.type === "person" ? (dir.memberById.get(m.id)?.image ?? null) : null,
@@ -664,54 +713,167 @@ function ChannelDetails({
       autoReply: m.autoReply,
     }))
     .filter((r) => !needle || `${r.name} ${r.sub}`.toLowerCase().includes(needle));
+  const inChannel = new Set((roster.data ?? []).map((m) => `${m.type}:${m.id}` as PickKey));
+  return (
+    <>
+      <Dialog
+        open={open && !adding}
+        onOpenChange={onOpenChange}
+        title={t("channel.detailsTitle", { channel: channel.name })}
+        description={editable ? undefined : channel.topic || t("channel.noTopic")}
+        closeLabel={t("common.close")}
+      >
+        {editable && (
+          <form
+            className="ac-dialog__tools row row--end"
+            onSubmit={(e) => {
+              e.preventDefault();
+              update.mutate({ topic: topic.trim() });
+            }}
+          >
+            <Field label={t("channel.topic")} id={`topic-${channel.id}`} style={{ flex: "1 1 260px" }}>
+              <Input
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder={t("channel.topicPlaceholder")}
+              />
+            </Field>
+            <Button type="submit" disabled={update.isPending || topic.trim() === channel.topic}>
+              {t("channel.saveTopic")}
+            </Button>
+          </form>
+        )}
+        <div className="ac-dialog__tools row" style={{ justifyContent: "space-between" }}>
+          <span className="ac-eyebrow">{t("channelMembers.title")}</span>
+          {editable && (
+            <Button size="sm" icon="plus" onClick={() => setAdding(true)}>
+              {t("channelMembers.add")}
+            </Button>
+          )}
+        </div>
+        <DialogSearchList
+          query={q}
+          onQueryChange={setQ}
+          searchLabel={t("channel.detailsSearch")}
+          searchPlaceholder={t("channel.detailsSearch")}
+          isEmpty={roster.isSuccess && rows.length === 0}
+          emptyText={t("channel.detailsEmpty", { q })}
+        >
+          {rows.map((r) => (
+            <div key={r.key} className="member-row">
+              <Avatar kind={r.kind} size="sm" name={r.name} imageUrl={r.image} initials={r.initials} />
+              <span className="list-col">
+                <span style={{ fontWeight: 600 }}>{r.name}</span>
+                <span className="small muted">{r.sub}</span>
+              </span>
+              {r.kind === "agent" && (
+                <label htmlFor={`auto-${r.id}`} className="row small" style={{ gap: 6 }}>
+                  <Checkbox
+                    id={`auto-${r.id}`}
+                    aria-label={t("channelMembers.autoReplyFor", { name: r.name })}
+                    checked={Boolean(r.autoReply)}
+                    disabled={!editable || autoReply.isPending}
+                    onCheckedChange={(on) => autoReply.mutate({ agentId: r.id, on })}
+                  />
+                  {t("channelMembers.autoReply")}
+                </label>
+              )}
+              {editable && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  icon="close"
+                  aria-label={t("channelMembers.remove", { name: r.name })}
+                  disabled={remove.isPending}
+                  onClick={() => remove.mutate(r.kind === "agent" ? { agentId: r.id } : { userId: r.id })}
+                />
+              )}
+            </div>
+          ))}
+        </DialogSearchList>
+        <DialogFooter note={editable ? undefined : t("channelMembers.readOnly")} />
+      </Dialog>
+      <AddMembersDialog
+        open={open && adding}
+        onClose={() => setAdding(false)}
+        channel={channel}
+        exclude={inChannel}
+        onAdded={refresh}
+      />
+    </>
+  );
+}
+
+/** Adds people and agents to a channel (searchable, our checkboxes). */
+function AddMembersDialog({
+  open,
+  onClose,
+  channel,
+  exclude,
+  onAdded,
+}: {
+  open: boolean;
+  onClose: () => void;
+  channel: Channel;
+  exclude: Set<PickKey>;
+  onAdded: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const api = useApi();
+  const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<Set<PickKey>>(new Set());
+  useEffect(() => {
+    if (open) {
+      setQ("");
+      setSelected(new Set());
+    }
+  }, [open]);
+  const rows = useMemberRows(q, exclude);
+  const add = useMutation({
+    mutationFn: async () => {
+      for (const key of selected) await api.chat.addMember(org.id, channel.id, memberOf(key));
+    },
+    onSuccess: () => {
+      onAdded();
+      onClose();
+    },
+  });
   return (
     <Dialog
       open={open}
-      onOpenChange={onOpenChange}
-      title={t("channel.detailsTitle", { channel: channel.name })}
-      description={editable ? undefined : channel.topic || t("channel.noTopic")}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("channelMembers.addTitle", { channel: channel.name })}
       closeLabel={t("common.close")}
     >
-      {editable && (
-        <form
-          className="ac-dialog__tools row row--end"
-          onSubmit={(e) => {
-            e.preventDefault();
-            update.mutate({ topic: topic.trim() });
-          }}
-        >
-          <Field label={t("channel.topic")} id={`topic-${channel.id}`} style={{ flex: "1 1 260px" }}>
-            <Input
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder={t("channel.topicPlaceholder")}
-            />
-          </Field>
-          <Button type="submit" disabled={update.isPending || topic.trim() === channel.topic}>
-            {t("channel.saveTopic")}
-          </Button>
-        </form>
-      )}
       <DialogSearchList
         query={q}
         onQueryChange={setQ}
-        searchLabel={t("channel.detailsSearch")}
-        searchPlaceholder={t("channel.detailsSearch")}
-        isEmpty={roster.isSuccess && rows.length === 0}
-        emptyText={t("channel.detailsEmpty", { q })}
+        searchLabel={t("channelMembers.addSearch")}
+        searchPlaceholder={t("channelMembers.addSearch")}
+        isEmpty={rows.length === 0}
+        emptyText={t("channelMembers.addEmpty", { q })}
       >
-        {rows.map((r) => (
-          <div key={r.key} className="member-row">
-            <Avatar kind={r.kind} size="sm" name={r.name} imageUrl={r.image} initials={r.initials} />
-            <span className="list-col">
-              <span style={{ fontWeight: 600 }}>{r.name}</span>
-              <span className="small muted">{r.sub}</span>
-            </span>
-            {r.autoReply && <span className="small muted">{t("channel.autoReply")}</span>}
-          </div>
-        ))}
+        <MemberPickerRows
+          rows={rows}
+          selected={selected}
+          onToggle={(key, on) =>
+            setSelected((prev) => {
+              const next = new Set(prev);
+              if (on) next.add(key);
+              else next.delete(key);
+              return next;
+            })
+          }
+        />
       </DialogSearchList>
-      <div style={{ height: 20 }} />
+      <DialogFooter bar>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
+        <Button variant="primary" disabled={selected.size === 0 || add.isPending} onClick={() => add.mutate()}>
+          {t("channelMembers.addConfirm", { count: selected.size })}
+        </Button>
+      </DialogFooter>
     </Dialog>
   );
 }

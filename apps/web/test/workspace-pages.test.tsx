@@ -323,7 +323,7 @@ describe("Criar agente", () => {
   test("role presets, validation, and creation in the chosen channels", async () => {
     const { state } = await go("agents/new");
     expect(screen().getByRole("heading", { level: 1, name: "Criar agente" })).toBeTruthy();
-    const create = () => screen().getByRole("button", { name: /^Criar / });
+    const create = () => screen().getByRole("button", { name: /^Criar (agente|Íris)$/ });
     expect(create().textContent).toBe("Criar agente");
     expect(create().hasAttribute("disabled")).toBe(true);
     await click(screen().getByRole("button", { name: /^Dev/ }));
@@ -346,7 +346,8 @@ describe("Criar agente", () => {
       role: "Dev",
       model: "claude-sonnet-5-5",
       ownerUserId: "u-walter",
-      credentialId: "cred-1",
+      // "Chave padrão do workspace".
+      credentialId: null,
       monthlyBudgetUsd: 25,
     });
     expect(state.calls.find((c) => c.method === "agents.setChannels")?.args[2]).toEqual([{ channelId: ENG_ID }]);

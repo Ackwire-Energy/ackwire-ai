@@ -13,6 +13,7 @@ import {
   Icon,
   Input,
   Meter,
+  Select,
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -25,11 +26,14 @@ import {
   useCatalog,
   useChannels,
   useConnections,
+  useCredentials,
   useMemory,
   useModels,
+  usePlatformKey,
   useProposals,
   useRuns,
   useSetAgentScopes,
+  useSettings,
   useUpdateAgent,
 } from "@/api/queries";
 import type { Agent } from "@/api/types";
@@ -40,6 +44,7 @@ import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
 import { type ScopeGroup, scopeGroups, scopeSummary, searchGroups, toggleGrant } from "@/lib/scopes";
 import { parseAmount } from "@/lib/text";
+import { DEFAULT_KEY, keyOptions, modelOptions, NO_OWNER } from "./NewAgentPage";
 
 /** Validates the budget dialog: a positive number ("40", "40,5"). */
 export function budgetError(t: TFunction, value: string) {
@@ -147,6 +152,8 @@ function AgentProfile({ agent }: { agent: Agent }) {
               }}
             />
           </Field>
+          <OwnerField agent={agent} editable={editable} />
+          <ModelAndKeyFields agent={agent} editable={editable} />
         </Card>
 
         <Card aria-labelledby="sec-budget">
@@ -216,6 +223,72 @@ function AgentProfile({ agent }: { agent: Agent }) {
 }
 
 /** Built-in scopes + the scopes of the organization's connections. */
+/** "Responsável" on the profile: a member or "Sem responsável" (admins then get alerts and approve). */
+function OwnerField({ agent, editable }: { agent: Agent; editable: boolean }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const update = useUpdateAgent(org.id, agent.id);
+  const value = agent.ownerUserId ?? NO_OWNER;
+  const options = [
+    ...dir.members.map((m) => ({ value: m.userId, label: m.name, description: t(`roles.${m.role}`) })),
+    { value: NO_OWNER, label: t("newAgent.noOwnerOption") },
+  ];
+  return (
+    <Field
+      label={t("newAgent.owner")}
+      id={`owner-${agent.id}`}
+      help={value === NO_OWNER ? t("newAgent.noOwnerHelp") : t("newAgent.ownerHelp")}
+    >
+      <Select
+        value={value}
+        onValueChange={(v) => update.mutate({ ownerUserId: v === NO_OWNER ? null : v })}
+        options={options}
+        disabled={!editable || update.isPending}
+      />
+    </Field>
+  );
+}
+
+/** Model (grouped by provider; no key = disabled) and key (workspace default or another stored key). */
+function ModelAndKeyFields({ agent, editable }: { agent: Agent; editable: boolean }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const update = useUpdateAgent(org.id, agent.id);
+  const detail = useAgentDetail(org.id, agent.id);
+  const models = useModels();
+  const credentials = useCredentials(org.id, can(org.role, "manage_credentials"));
+  const settings = useSettings(org.id);
+  const platform = usePlatformKey(org.id);
+  const credentialId = detail.data?.credentialId ?? null;
+  return (
+    <div className="grid-fields">
+      <Field label={t("newAgent.model")} id={`model-${agent.id}`}>
+        <Select
+          value={agent.model}
+          onValueChange={(model) => update.mutate({ model })}
+          options={modelOptions(
+            t,
+            i18n.language,
+            models.data?.models ?? [],
+            credentials.data ?? [],
+            platform.data ?? false,
+          )}
+          disabled={!editable || update.isPending}
+        />
+      </Field>
+      <Field label={t("newAgent.key")} id={`key-${agent.id}`}>
+        <Select
+          value={credentialId && credentialId !== settings.data?.defaultCredentialId ? credentialId : DEFAULT_KEY}
+          onValueChange={(v) => update.mutate({ credentialId: v === DEFAULT_KEY ? null : v })}
+          options={keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null)}
+          disabled={!editable || update.isPending}
+        />
+      </Field>
+    </div>
+  );
+}
+
 function useScopeGroups(orgId: string): ScopeGroup[] | undefined {
   const { t } = useTranslation();
   const catalog = useCatalog();

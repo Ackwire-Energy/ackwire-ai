@@ -164,6 +164,13 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         (await request<{ members: ChannelMember[] }>(`${org(orgId)}/channels/${enc(channelId)}/members`)).members,
       addMember: (orgId, channelId, member) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/members`, { json: member }),
+      removeMember: (orgId, channelId, member) =>
+        request<void>(
+          "agentId" in member
+            ? `${org(orgId)}/channels/${enc(channelId)}/members/agents/${enc(member.agentId)}`
+            : `${org(orgId)}/channels/${enc(channelId)}/members/people/${enc(member.userId)}`,
+          { method: "DELETE" },
+        ),
       messages: async (orgId, channelId, options = {}) =>
         (
           await request<{ messages: Message[] }>(`${org(orgId)}/channels/${enc(channelId)}/messages`, {

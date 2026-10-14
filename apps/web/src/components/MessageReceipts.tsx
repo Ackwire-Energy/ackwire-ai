@@ -12,7 +12,7 @@ import { useOrg } from "./org-context";
 export function receiptIcon(view: ReceiptView): IconName {
   const kind = view.status?.kind;
   if (kind === "failed") return "alert";
-  if (kind === "claimed" || kind === "waiting") return "waiting";
+  if (kind === "claimed" || kind === "waiting" || kind === "asking") return "waiting";
   if (kind === "handled") return "checks";
   return "check";
 }

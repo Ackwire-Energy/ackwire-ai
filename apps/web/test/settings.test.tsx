@@ -105,22 +105,53 @@ describe("Configurações da organização", () => {
     expect(connect.textContent).toContain("Use um endereço que comece com https://.");
   });
 
-  test("provider keys: rotate keeps the key, delete asks first; usage by kind", async () => {
+  test("provider keys: default marked; rotate keeps the key; the default can't be deleted; usage by kind", async () => {
     const { state } = await go();
-    const keys = screen().getByRole("region", { name: "Chaves de provedor" });
-    expect(keys.textContent).toContain("Anthropic da Acme");
-    expect(keys.textContent).toContain("Termina em 7f2a");
-    expect(keys.textContent).toContain("A chave do agentes também está disponível neste servidor.");
-    await click(within(keys).getByRole("button", { name: "Trocar a chave" }));
+    const keys = () => screen().getByRole("region", { name: "Chaves de provedor" });
+    expect(keys().textContent).toContain("Anthropic da Acme");
+    expect(keys().textContent).toContain("Anthropic · Termina em 7f2a");
+    expect(keys().textContent).toContain("Padrão do workspace");
+    // Platform key not offered by this server: not mentioned.
+    expect(keys().textContent).not.toContain("chave do agentes");
+    const del = within(keys()).getByRole("button", { name: "Apagar" });
+    expect(del.hasAttribute("disabled")).toBe(true);
+    expect(keys().textContent).toContain("Escolha outra chave padrão antes de apagar esta.");
+    await click(within(keys()).getByRole("button", { name: "Trocar a chave" }));
     const rotate = screen().getByRole("dialog", { name: "Trocar a chave Anthropic da Acme" });
-    await type(within(rotate).getByLabelText("Chave da API"), "sk-ant-new-9999");
+    await type(within(rotate).getByLabelText("Chave da API"), "sk-ant-api03-new-key-9999");
     await click(within(rotate).getByRole("button", { name: "Trocar a chave" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.rotateCredential")?.args[1]).toBe("cred-1");
-    expect(screen().getByRole("region", { name: "Chaves de provedor" }).textContent).toContain("Termina em 9999");
-    await click(
-      within(screen().getByRole("region", { name: "Chaves de provedor" })).getByRole("button", { name: "Apagar" }),
-    );
+    expect(keys().textContent).toContain("Termina em 9999");
+
+    // Another provider's key, then make it the default and delete the old one.
+    await click(within(keys()).getByRole("button", { name: "Adicionar chave" }));
+    const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
+    const trigger = within(add).getByRole("combobox", { name: "Provedor" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    await act(async () => fireEvent.click(screen().getByRole("option", { name: "OpenAI" })));
+    await settle();
+    await type(within(add).getByLabelText("Chave da API"), "sk-ant-errado-0000000000");
+    await click(within(add).getByRole("button", { name: "Salvar chave" }));
+    expect(add.textContent).toContain("As chaves da OpenAI começam com sk-.");
+    await type(within(add).getByLabelText("Chave da API"), "sk-proj-abcdefghijklmnop1234");
+    await click(within(add).getByRole("button", { name: "Salvar chave" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.addCredential")?.args[1]).toMatchObject({
+      provider: "openai",
+      label: "OpenAI",
+    });
+    const openaiRow = within(keys()).getByText("OpenAI").closest(".ac-list__row") as HTMLElement;
+    await click(within(openaiRow).getByRole("button", { name: "Tornar padrão" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "orgs.updateSettings").at(-1)?.args[1]).toEqual({
+      defaultCredentialId: state.credentials[1]?.id,
+    });
+    const anthropicRow = within(keys()).getByText("Anthropic da Acme").closest(".ac-list__row") as HTMLElement;
+    const delOld = within(anthropicRow).getByRole("button", { name: "Apagar" });
+    expect(delOld.hasAttribute("disabled")).toBe(false);
+    await click(delOld);
     await click(
       within(screen().getByRole("dialog", { name: /Apagar a chave/ })).getByRole("button", { name: "Apagar" }),
     );
@@ -129,6 +160,8 @@ describe("Configurações da organização", () => {
     const usage = screen().getByRole("region", { name: "Uso deste mês" });
     expect(usage.textContent).toContain("Agentes154 chamadasUS$ 15,40");
     expect(usage.textContent).toContain("Roteador80 chamadasUS$ 0,50");
+    // Jev / the router's own key is internal: never in the UI.
+    expect(document.body.textContent).not.toMatch(/jev|typesafe/i);
   });
 
   test("members see settings read-only, without keys or usage", async () => {

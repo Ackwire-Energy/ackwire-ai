@@ -6,7 +6,7 @@ import type { ChannelEvent, Message, RunStatus } from "@/api/types";
  * `message.routed` / `message.claimed` / `message.handled`, plus the run
  * events we already get (a run's `threadId` is the message it answers).
  */
-export type ReceiptPhase = "seen" | "picked" | "claimed" | "waiting" | "handled" | "failed";
+export type ReceiptPhase = "seen" | "picked" | "claimed" | "waiting" | "asking" | "handled" | "failed";
 
 export interface MessageReceipt {
   /** The router decided (so "nobody picked it" is final). */
@@ -30,7 +30,15 @@ const phaseOf = (status: RunStatus | "done" | "failed" | "waiting_approval"): Re
           ? "failed"
           : "handled";
 
-const RANK: Record<ReceiptPhase, number> = { seen: 0, picked: 1, claimed: 2, waiting: 2, handled: 3, failed: 3 };
+const RANK: Record<ReceiptPhase, number> = {
+  seen: 0,
+  picked: 1,
+  claimed: 2,
+  waiting: 2,
+  asking: 2,
+  handled: 3,
+  failed: 3,
+};
 
 function set(
   state: ReceiptsState,
@@ -116,6 +124,11 @@ export function applyReceiptEvent(state: ReceiptsState, event: ChannelEvent): Re
       return set(state, event.threadId, event.agentId, "claimed", true);
     case "run.finished":
       return set(state, event.threadId, event.agentId, phaseOf(event.status), event.status === "waiting_approval");
+    case "question.asked":
+      // The agent waits for the person: "Theo está esperando sua resposta".
+      return event.threadId ? set(state, event.threadId, event.question.agentId, "asking", true) : state;
+    case "question.answered":
+      return event.threadId ? set(state, event.threadId, event.question.agentId, "claimed", true) : state;
     case "message.created": {
       const m = event.message;
       if (m?.author?.type === "agent" && m.author.id && m.threadId && !m.meta?.approvalId) {
@@ -133,7 +146,7 @@ export interface ReceiptView {
   seen: string[];
   /** Main status, or null when there is nothing to say yet. */
   status:
-    | { kind: "picked" | "claimed" | "waiting" | "handled" | "failed"; agents: string[] }
+    | { kind: "picked" | "claimed" | "waiting" | "asking" | "handled" | "failed"; agents: string[] }
     | { kind: "nobody" }
     | null;
   /** Everyone who answered answered: the row can shrink to avatars. */
@@ -144,7 +157,7 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
   if (!receipt || receipt.agents.length === 0) return { seen: [], status: null, done: false };
   const seen = receipt.agents.map(([id]) => id);
   const with_ = (phase: ReceiptPhase) => receipt.agents.filter(([, p]) => p === phase).map(([id]) => id);
-  for (const kind of ["failed", "waiting", "claimed", "picked"] as const) {
+  for (const kind of ["failed", "asking", "waiting", "claimed", "picked"] as const) {
     const agents = with_(kind);
     if (agents.length) return { seen, status: { kind, agents }, done: false };
   }

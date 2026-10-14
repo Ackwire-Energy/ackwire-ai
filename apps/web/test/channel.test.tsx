@@ -176,7 +176,7 @@ describe("Canal", () => {
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
-    expect(dialog.textContent).toContain("responde sem menção");
+    expect(dialog.textContent).toContain("Responde sem menção");
     expect(dialog.textContent).toContain("João");
     expect(dialog.textContent).toContain("@atlas");
     await act(async () =>

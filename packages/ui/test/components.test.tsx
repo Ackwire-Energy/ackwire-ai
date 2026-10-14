@@ -311,3 +311,21 @@ describe("Diff", () => {
     expect(add?.textContent).toBe("+Adicionado: novo");
   });
 });
+
+describe("Message aside", () => {
+  test("sits on the header line, or floats for grouped messages", () => {
+    const { container } = render(
+      <>
+        <Message author="João" time="10:42" aside={<span>✓</span>}>
+          <MessageText>oi</MessageText>
+        </Message>
+        <Message author="João" time="10:43" grouped aside={<span>✓✓</span>}>
+          <MessageText>de novo</MessageText>
+        </Message>
+      </>,
+    );
+    const [first, second] = Array.from(container.querySelectorAll("article"));
+    expect(first?.querySelector(".ac-msg__head .ac-msg__aside")?.textContent).toBe("✓");
+    expect(second?.querySelector(".ac-msg__aside--floating")?.textContent).toBe("✓✓");
+  });
+});

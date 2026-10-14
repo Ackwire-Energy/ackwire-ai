@@ -8,6 +8,8 @@ export interface ChannelActions {
   insertMention: (handle: string) => void;
   retry: (local: MessageType) => void;
   resend: (body: string) => void;
+  /** "Responder" on an agent's question: type the answer in the composer. */
+  focusComposer: () => void;
   channelAgents: Agent[];
 }
 export const ChannelActionsContext = createContext<ChannelActions | null>(null);

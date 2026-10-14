@@ -65,9 +65,12 @@ export interface InvitationPreview {
 
 export interface Credential {
   id: string;
-  provider: "anthropic";
+  /** "anthropic", "openai", … */
+  provider: string;
   label: string;
   keyHint: string;
+  /** Last characters of the Anthropic workspace the key is scoped to, if set. */
+  workspaceIdHint?: string | null;
   createdAt: string;
   revokedAt: string | null;
 }
@@ -102,6 +105,8 @@ export interface Model {
   provider: string;
   inputUsdPerMTok: number;
   outputUsdPerMTok: number;
+  /** The workspace can use it (has a key for the provider). Expected from the backend; derived until then. */
+  available?: boolean;
 }
 
 export interface AgentUsage {
@@ -215,6 +220,13 @@ export type ChannelEvent =
       agentId: string;
       runId?: string;
       status?: "done" | "failed" | "waiting_approval";
+    }
+  /** An agent asked a person something and waits (expected: `ask_user` tool; shape to confirm). */
+  | {
+      type: "question.asked" | "question.answered";
+      channelId: string;
+      threadId: string | null;
+      question: AgentQuestion;
     }
   /** An agent changed its memory because a person asked (with an undo), or proposed a change. */
   | {
@@ -578,4 +590,24 @@ export interface DirectMessage {
   with: { type: AuthorType; id: string; name: string; handle: string | null };
   lastMessage: { id: string; body: string; createdAt: string; authorType: string } | null;
   unread: number;
+}
+
+/**
+ * A question an agent asked (`ask_user`). Expected shape, to confirm when the
+ * backend lands it: carried by `question.asked` and by the question message
+ * (`meta.question` or `meta.questionId`).
+ */
+export interface AgentQuestion {
+  id: string;
+  agentId: string;
+  channelId: string;
+  /** The person message the agent's run answers (receipts: "esperando sua resposta"). */
+  threadId: string | null;
+  messageId: string | null;
+  text: string;
+  /** Buttons to answer with; null = free answer in the composer. */
+  choices: string[] | null;
+  status: "open" | "answered";
+  answer: string | null;
+  answeredByUserId: string | null;
 }

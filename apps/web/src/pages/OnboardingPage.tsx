@@ -4,10 +4,9 @@ import {
   Button,
   Card,
   Field,
+  Icon,
   Input,
   OptionCard,
-  RadioCard,
-  RadioGroup,
   Select,
   Steps,
   Textarea,
@@ -19,8 +18,10 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
+import { useModels } from "@/api/queries";
 import type { Role } from "@/api/types";
 import { CenteredLayout } from "@/components/AuthLayout";
+import { keyLooksValid, PROVIDERS, type ProviderId, providerLabel, suggestModel } from "@/lib/providers";
 import { handleFrom, isEmail, slugify } from "@/lib/text";
 import { useToast } from "@/lib/toast";
 
@@ -57,14 +58,21 @@ export function OnboardingPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
+  const models = useModels();
 
   const [step, setStep] = useState(1);
   const [org, setOrg] = useState("");
   const [size, setSize] = useState("small");
   const [context, setContext] = useState("");
   const [preset, setPreset] = useState<Preset>("theo");
-  const [key, setKey] = useState<"platform" | "own">("platform");
+  // The workspace key: a provider's key (required), or the platform key where the server offers one.
+  const [key, setKey] = useState<ProviderId | "platform">("anthropic");
   const [apiKey, setApiKey] = useState("");
+  const [advanced, setAdvanced] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState("");
+  const [openaiOrg, setOpenaiOrg] = useState("");
+  const [openaiProject, setOpenaiProject] = useState("");
+  const [keyTouched, setKeyTouched] = useState(false);
   const [invites, setInvites] = useState<InviteDraft[]>([]);
   const [draft, setDraft] = useState("");
   const [draftRole, setDraftRole] = useState<Role>("member");
@@ -72,7 +80,7 @@ export function OnboardingPage() {
   const [copied, setCopied] = useState(false);
   const [created, setCreated] = useState<{ orgId: string; generalChannelId: string } | null>(null);
   const [agentCreated, setAgentCreated] = useState(false);
-  const [platform, setPlatform] = useState(true);
+  const [platform, setPlatform] = useState(false);
 
   const orgName = org.trim() || t("onboarding.yourCompany");
   const presetInfo = (p: Preset) => ({
@@ -100,7 +108,7 @@ export function OnboardingPage() {
       // The platform key is only offered where the server has one (Cloud).
       const available = await api.agents.platformKeyAvailable(next.orgId).catch(() => false);
       setPlatform(available);
-      if (!available) setKey("own");
+      if (!available) setKey((k) => (k === "platform" ? "anthropic" : k));
       await qc.invalidateQueries({ queryKey: keys.me });
       return next;
     },
@@ -109,22 +117,30 @@ export function OnboardingPage() {
   const saveAgent = useMutation({
     mutationFn: async () => {
       if (!created || agentCreated) return;
-      let credentialId: string | null = null;
-      if (key === "own") {
+      let provider: string = "anthropic";
+      if (key !== "platform") {
+        provider = key;
         const cred = await api.agents.addCredential(created.orgId, {
-          provider: "anthropic",
-          label: "Anthropic",
+          provider: key,
+          label: providerLabel(key),
           apiKey: apiKey.trim(),
+          ...(key === "anthropic" && workspaceId.trim() ? { workspaceId: workspaceId.trim() } : {}),
+          ...(key === "openai" && openaiOrg.trim() ? { organizationId: openaiOrg.trim() } : {}),
+          ...(key === "openai" && openaiProject.trim() ? { projectId: openaiProject.trim() } : {}),
         });
-        credentialId = cred.id;
+        // Every agent, the router, summaries and reflection use the workspace default key.
+        await api.orgs.updateSettings(created.orgId, { defaultCredentialId: cred.id });
       }
+      const models = await qc.fetchQuery({ queryKey: keys.models, queryFn: () => api.agents.models() });
       const role = PRESET_ROLE[preset];
       const agent = await api.agents.create(created.orgId, {
         name: chosen.name,
         handle: handleFrom(chosen.name),
         role: chosen.role,
         instructions: role ? t(`newAgent.roles.${role}.instructions`) : chosen.desc,
-        credentialId,
+        model: suggestModel(models.models, provider, models.defaultModel),
+        // null = the workspace default key.
+        credentialId: null,
       });
       await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: agent.id });
       setAgentCreated(true);
@@ -174,7 +190,8 @@ export function OnboardingPage() {
   };
 
   const busy = saveOrg.isPending || saveAgent.isPending || finish.isPending;
-  const blocked = (step === 1 && !org.trim()) || (step === 3 && key === "own" && apiKey.trim().length < 8);
+  const keyOk = key === "platform" || keyLooksValid(key, apiKey);
+  const blocked = (step === 1 && !org.trim()) || (step === 3 && !keyOk);
   const roleOptions = [
     { value: "member" as Role, label: t("roles.member"), description: t("roles.memberDesc") },
     { value: "admin" as Role, label: t("roles.admin"), description: t("roles.adminDesc") },
@@ -256,45 +273,97 @@ export function OnboardingPage() {
                 );
               })}
             </div>
-            <fieldset style={{ margin: 0, padding: 0, border: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-              <legend className="ac-field__label" style={{ padding: 0, marginBottom: 8 }} id="key-legend">
-                {t("onboarding.keyQuestion")}
-              </legend>
-              <RadioGroup
-                value={key}
-                onValueChange={setKey}
-                aria-labelledby="key-legend"
-                style={{ display: "flex", flexDirection: "column", gap: 8 }}
-              >
+            <section aria-labelledby="key-title" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="stack-4">
+                <h2 id="key-title" className="section-title">
+                  {t("onboarding.workspaceKeyTitle")}
+                </h2>
+                <span className="small muted">{t("onboarding.workspaceKeyHelp")}</span>
+              </div>
+              {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+              <div className="grid-options" role="group" aria-label={t("onboarding.provider")}>
+                {PROVIDERS.map((p) => (
+                  <OptionCard key={p.id} pressed={key === p.id} onClick={() => setKey(p.id)}>
+                    <span className="ac-option__title">{p.label}</span>
+                  </OptionCard>
+                ))}
                 {platform && (
-                  <RadioCard
-                    value="platform"
-                    id="key-platform"
-                    checked={key === "platform"}
-                    title={t("onboarding.platformKey")}
-                    description={t("onboarding.platformKeyDesc")}
-                  />
+                  <OptionCard pressed={key === "platform"} onClick={() => setKey("platform")}>
+                    <span className="ac-option__text">
+                      <span className="ac-option__title">{t("onboarding.platformChoice")}</span>
+                      <span className="ac-option__desc">{t("onboarding.platformKeyDesc")}</span>
+                    </span>
+                  </OptionCard>
                 )}
-                <RadioCard
-                  value="own"
-                  id="key-own"
-                  checked={key === "own"}
-                  title={t("onboarding.ownKey", { org: orgName })}
-                  description={t("onboarding.ownKeyDesc")}
-                />
-              </RadioGroup>
-              {key === "own" && (
-                <Field label={t("onboarding.apiKey")} id="key-value">
-                  <Input
-                    type="password"
-                    placeholder="sk-ant-…"
-                    autoComplete="off"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                  />
-                </Field>
+              </div>
+              {key !== "platform" && (
+                <>
+                  <Field
+                    label={t("onboarding.keyFor", { provider: providerLabel(key) })}
+                    id="key-value"
+                    error={keyTouched && !keyOk ? t(`onboarding.keyInvalid.${key}`) : undefined}
+                  >
+                    <Input
+                      type="password"
+                      placeholder={PROVIDERS.find((p) => p.id === key)?.placeholder}
+                      autoComplete="off"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      onBlur={() => setKeyTouched(apiKey.trim().length > 0)}
+                    />
+                  </Field>
+                  <div>
+                    <Button variant="ghost" size="sm" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>
+                      <Icon
+                        name="chevronDown"
+                        size={16}
+                        style={advanced ? { transform: "rotate(180deg)" } : undefined}
+                      />
+                      {t("onboarding.advanced")}
+                    </Button>
+                  </div>
+                  {advanced && key === "anthropic" && (
+                    <Field
+                      label={t("onboarding.anthropicWorkspace")}
+                      id="key-ws"
+                      help={t("onboarding.anthropicWorkspaceHelp")}
+                    >
+                      <Input value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} autoComplete="off" />
+                    </Field>
+                  )}
+                  {advanced && key === "openai" && (
+                    <div className="grid-fields">
+                      <Field label={t("onboarding.openaiOrg")} id="key-org" help={t("onboarding.optional")}>
+                        <Input value={openaiOrg} onChange={(e) => setOpenaiOrg(e.target.value)} placeholder="org-…" />
+                      </Field>
+                      <Field label={t("onboarding.openaiProject")} id="key-project" help={t("onboarding.optional")}>
+                        <Input
+                          value={openaiProject}
+                          onChange={(e) => setOpenaiProject(e.target.value)}
+                          placeholder="proj_…"
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </>
               )}
-            </fieldset>
+              {models.data && (
+                <span className="small muted">
+                  {t("onboarding.suggestedModel", {
+                    model:
+                      models.data.models.find(
+                        (m) =>
+                          m.id ===
+                          suggestModel(
+                            models.data.models,
+                            key === "platform" ? "anthropic" : key,
+                            models.data.defaultModel,
+                          ),
+                      )?.label ?? "",
+                  })}
+                </span>
+              )}
+            </section>
           </>
         )}
 

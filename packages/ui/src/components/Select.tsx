@@ -8,6 +8,8 @@ export interface SelectOption<V extends string = string> {
   label: string;
   description?: ReactNode;
   disabled?: boolean;
+  /** Consecutive options with the same group get a heading (e.g. the model provider). */
+  group?: string;
 }
 
 export interface SelectProps<V extends string = string> {
@@ -23,6 +25,31 @@ export interface SelectProps<V extends string = string> {
   className?: string;
   /** Accessible name of the listbox; defaults to `aria-label`. */
   listLabel?: string;
+}
+
+function renderItem<V extends string>(o: SelectOption<V>) {
+  return (
+    <RSelect.Item key={o.value} value={o.value} disabled={o.disabled} className="ac-menu__item">
+      <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="m5.5 10.5 3 3 6-7" />
+      </svg>
+      <span className="ac-menu__label">
+        <RSelect.ItemText>{o.label}</RSelect.ItemText>
+        {o.description && <span className="ac-menu__desc">{o.description}</span>}
+      </span>
+    </RSelect.Item>
+  );
+}
+
+/** Runs of consecutive options by `group` (ungrouped ones keep their place). */
+function groupOptions<V extends string>(options: SelectOption<V>[]) {
+  const out: [string | undefined, SelectOption<V>[]][] = [];
+  for (const o of options) {
+    const last = out[out.length - 1];
+    if (last && last[0] === o.group) last[1].push(o);
+    else out.push([o.group, [o]]);
+  }
+  return out;
 }
 
 /**
@@ -68,17 +95,16 @@ export function Select<V extends string = string>({
             aria-label={listLabel ?? rest["aria-label"]}
           >
             <RSelect.Viewport>
-              {options.map((o) => (
-                <RSelect.Item key={o.value} value={o.value} disabled={o.disabled} className="ac-menu__item">
-                  <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
-                    <path d="m5.5 10.5 3 3 6-7" />
-                  </svg>
-                  <span className="ac-menu__label">
-                    <RSelect.ItemText>{o.label}</RSelect.ItemText>
-                    {o.description && <span className="ac-menu__desc">{o.description}</span>}
-                  </span>
-                </RSelect.Item>
-              ))}
+              {groupOptions(options).map(([group, items]) =>
+                group ? (
+                  <RSelect.Group key={group}>
+                    <RSelect.Label className="ac-menu__heading">{group}</RSelect.Label>
+                    {items.map(renderItem)}
+                  </RSelect.Group>
+                ) : (
+                  items.map(renderItem)
+                ),
+              )}
             </RSelect.Viewport>
           </RSelect.Content>
         </RSelect.Portal>

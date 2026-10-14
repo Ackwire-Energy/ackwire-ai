@@ -4,7 +4,7 @@ import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, 
 import { useTranslation } from "react-i18next";
 import { keys } from "@/api/keys";
 import { cacheApproval, cacheMessage } from "@/api/queries";
-import type { Agent, BudgetEvent, ChannelEvent, MemoryUpdate, Message } from "@/api/types";
+import type { Agent, AgentQuestion, BudgetEvent, ChannelEvent, MemoryUpdate, Message } from "@/api/types";
 import { formatUsd } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { type ConnectionStatus, RealtimeConnection, realtimeUrl, type SocketFactory } from "./connection";
@@ -26,6 +26,8 @@ export interface LiveState {
   streams: StreamsState;
   receipts: ReceiptsState;
   typing: TypingState;
+  /** Latest state of agent questions (answered elsewhere, or by us). */
+  questions: Record<string, AgentQuestion>;
   /** `memory.updated` cards per channel (live; they aren't in the message list). */
   memory: Record<string, LiveMemoryCard[]>;
 }
@@ -52,14 +54,15 @@ export function createStreamsStore(
   now: () => number = () => Date.now(),
   provisionalTtlMs = PROVISIONAL_TTL_MS,
 ) {
-  let state: LiveState = { streams: initial, receipts: {}, typing: {}, memory: {} };
+  let state: LiveState = { streams: initial, receipts: {}, typing: {}, memory: {}, questions: {} };
   const listeners = new Set<() => void>();
   const set = (next: LiveState) => {
     if (
       next.streams === state.streams &&
       next.receipts === state.receipts &&
       next.typing === state.typing &&
-      next.memory === state.memory
+      next.memory === state.memory &&
+      next.questions === state.questions
     )
       return;
     state = next;
@@ -94,7 +97,12 @@ export function createStreamsStore(
       if (event.type === "message.created" && event.message?.author?.type === "person" && event.message.author.id) {
         typing = stopTyping(typing, event.channelId, event.message.author.id);
       }
+      const questions =
+        event.type === "question.asked" || event.type === "question.answered"
+          ? { ...state.questions, [event.question.id]: event.question }
+          : state.questions;
       set({
+        questions,
         memory,
         streams: applyChannelEvent(state.streams, event),
         receipts: applyReceiptEvent(
@@ -152,6 +160,9 @@ export function createStreamsStore(
       set({ ...state, streams: dropProvisional(state.streams, threads), receipts });
       return [...new Set(stale.map((r) => r.channelId))];
     },
+    /** Our own answer, before (or instead of) the server's event. */
+    answered: (question: AgentQuestion) =>
+      set({ ...state, questions: { ...state.questions, [question.id]: question } }),
     dismiss: (runId: string) => set({ ...state, streams: dismissRun(state.streams, runId) }),
     subscribe: (listener: () => void) => {
       listeners.add(listener);

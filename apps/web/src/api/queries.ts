@@ -142,8 +142,7 @@ export function useAddCredential(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { provider: "anthropic"; label: string; apiKey: string }) =>
-      api.agents.addCredential(orgId, input),
+    mutationFn: (input: Parameters<ApiClient["agents"]["addCredential"]>[1]) => api.agents.addCredential(orgId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.credentials(orgId) }),
   });
 }
