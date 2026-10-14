@@ -148,7 +148,7 @@ function wrap(runs: Run[], size: number, width: number): Run[][] {
   return lines.length > 0 ? lines : [[]];
 }
 
-type Block =
+export type MarkdownBlock =
   | { type: "heading"; level: number; text: string }
   | { type: "paragraph"; text: string }
   | { type: "list"; ordered: boolean; items: string[] }
@@ -165,9 +165,9 @@ const cells = (line: string) =>
     .map((c) => c.trim());
 
 /** Block-level Markdown, enough for reports and plans. */
-export function parseMarkdown(markdown: string): Block[] {
+export function parseMarkdown(markdown: string): MarkdownBlock[] {
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
-  const blocks: Block[] = [];
+  const blocks: MarkdownBlock[] = [];
   let i = 0;
   while (i < lines.length) {
     const line = lines[i] ?? "";
@@ -255,7 +255,7 @@ class Canvas {
     for (const r of runs) {
       if (!r.text) continue;
       this.ops.push(
-        `BT /${r.font} ${size} Tf ${cursor.toFixed(2)} ${baseline.toFixed(2)} Td (${escape(r.text)}) Tj ET`,
+        `BT /${r.font} ${size} Tf ${cursor.toFixed(2)} ${baseline.toFixed(2)} Td (${escapePdfString(r.text)}) Tj ET`,
       );
       cursor += textWidth(r.text, r.font, size);
     }
@@ -287,7 +287,7 @@ class Canvas {
   }
 }
 
-function escape(text: string) {
+function escapePdfString(text: string) {
   return String.fromCharCode(...toWinAnsi(text))
     .replace(/\\/g, "\\\\")
     .replace(/\(/g, "\\(")
@@ -352,13 +352,15 @@ export function markdownToPdf(markdown: string, options: { title?: string } = {}
       case "code": {
         const size = 9.5;
         const leading = 12.5;
+        // Monospace: split long lines by character count, keeping every space.
+        const perLine = Math.floor((CONTENT_WIDTH - 16) / ((600 * size) / 1000));
         for (const raw of block.lines.length > 0 ? block.lines : [""]) {
-          const lines = wrap([{ text: raw.replace(/ /g, " ") || " ", font: "F3" }], size, CONTENT_WIDTH - 16);
-          for (const line of lines) {
+          const text = raw.replace(/\t/g, "  ");
+          for (let at = 0; at === 0 || at < text.length; at += perLine) {
             c.ensure(leading);
             c.rect(PAGE.margin, c.y - leading, CONTENT_WIDTH, leading, 0.95, true);
             c.y -= leading;
-            c.text(line, PAGE.margin + 8, c.y + 3, size);
+            c.text([{ text: text.slice(at, at + perLine), font: "F3" }], PAGE.margin + 8, c.y + 3, size);
           }
         }
         c.y -= 9;
@@ -406,7 +408,7 @@ function writePdf(pages: string[][], title: string): Uint8Array {
       ),
     );
   }
-  const info = add(`<< /Title (${escape(title)}) /Producer (agentes.chat) >>`);
+  const info = add(`<< /Title (${escapePdfString(title)}) /Producer (agentes.chat) >>`);
   objects[catalog - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
   objects[pagesId - 1] =
     `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;

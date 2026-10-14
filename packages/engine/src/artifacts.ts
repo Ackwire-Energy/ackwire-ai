@@ -5,6 +5,7 @@ import { recordAudit } from "./audit";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { can, getMembership } from "./organizations";
+import { markdownToPdf } from "./pdf";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 
 const { artifacts, artifactVersions, channels, channelMembers } = schema;
@@ -201,6 +202,13 @@ function excerptOf(content: ArtifactContent): string {
 export function tableToCsv(columns: string[], rows: string[][]): string {
   const cell = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   return [columns, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
+}
+
+/** A Markdown table (for PDF export of tables). */
+function tableToMarkdown(columns: string[], rows: string[][]): string {
+  const cell = (v: string) => v.replace(/\|/g, "/").replace(/\n/g, " ");
+  const line = (r: string[]) => `| ${columns.map((_, i) => cell(r[i] ?? "")).join(" | ")} |`;
+  return [line(columns), `| ${columns.map(() => "---").join(" | ")} |`, ...rows.map(line)].join("\n");
 }
 
 /** One unified patch with `diff --git` headers per file. */
@@ -592,7 +600,7 @@ export async function artifactFile(
   userId: string,
   orgId: string,
   artifactId: string,
-  options: { version?: number; format?: "csv" | "patch" } = {},
+  options: { version?: number; format?: "csv" | "patch" | "pdf" } = {},
 ): Promise<{ body: Uint8Array; contentType: string; filename: string }> {
   const a = await readable(deps, { type: "person", userId }, orgId, artifactId);
   const v = await versionRow(deps.db, a, options.version);
@@ -602,6 +610,17 @@ export async function artifactFile(
     if (content.kind !== "table") throw new ValidationError("CSV export is for tables");
     const body = new TextEncoder().encode(tableToCsv(content.columns, content.rows));
     return { body, contentType: "text/csv; charset=utf-8", filename: fileName(a, v.version, "csv") };
+  }
+  if (options.format === "pdf") {
+    const markdown =
+      content.kind === "document"
+        ? content.markdown
+        : content.kind === "table"
+          ? tableToMarkdown(content.columns, content.rows)
+          : null;
+    if (markdown === null) throw new ValidationError("PDF export is for documents and tables");
+    const body = markdownToPdf(markdown, { title: a.title });
+    return { body, contentType: "application/pdf", filename: fileName(a, v.version, "pdf") };
   }
   if (options.format === "patch") {
     if (content.kind !== "diff") throw new ValidationError("Patch export is for diffs");

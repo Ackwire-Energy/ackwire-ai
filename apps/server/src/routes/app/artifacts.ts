@@ -226,7 +226,7 @@ export function artifactRoutes(deps: AppDeps) {
     const format = c.req.query("format");
     const file = await artifactFile(artifacts(), c.get("user").id, c.req.param("orgId"), c.req.param("artifactId"), {
       version: version ? Number(version) : undefined,
-      format: format === "csv" || format === "patch" ? format : undefined,
+      format: format === "csv" || format === "patch" || format === "pdf" ? format : undefined,
     });
     return new Response(file.body, {
       status: 200,
