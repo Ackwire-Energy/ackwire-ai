@@ -20,3 +20,4 @@ The product-level decision log (in Portuguese) is `docs/planejamento.md`; these 
 | [0012](0012-budget-reservation-and-usage.md) | Budget reservation, usage kinds (`agent`/`router`/`embedding`/`summary`), partial usage on stream failure |
 | [0013](0013-router.md) | Router: code picks candidates, a `RouterStrategy` scores, policy decides; decisions stored |
 | [0014](0014-live-subscription-revocation.md) | Membership changes revoke live WebSocket subscriptions |
+| [0015](0015-tool-gateway-and-approvals.md) | Tool Gateway, scopes and approvals bound to the action hash; runs as resumable tool loops |

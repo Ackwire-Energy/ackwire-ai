@@ -1,10 +1,12 @@
+import type { PubSub } from "@agenteschat/adapters";
 import { type Database, ensureMessagePartitions } from "@agenteschat/db";
-import { type JobHandlers, processOutbox } from "@agenteschat/engine";
+import { expireApprovals, type JobHandlers, processOutbox } from "@agenteschat/engine";
 import type { Logger } from "./logger";
 
 export interface WorkerDeps {
   db: Database;
   handlers: JobHandlers;
+  pubsub: PubSub;
   log: Logger;
   workerId?: string;
 }
@@ -13,6 +15,7 @@ export interface WorkerDeps {
 export const WORKER_INTERVALS_MS = {
   outbox: 1_000,
   partitions: 24 * 3600_000,
+  approvals: 60_000,
 };
 
 /**
@@ -76,6 +79,11 @@ export function startWorkers(deps: WorkerDeps) {
   every("partitions", WORKER_INTERVALS_MS.partitions, async () => {
     const created = await ensureMessagePartitions(db);
     if (created > 0) log.info("created message partitions", { created });
+  });
+
+  every("approvals", WORKER_INTERVALS_MS.approvals, async () => {
+    const expired = await expireApprovals({ db, pubsub: deps.pubsub });
+    if (expired > 0) log.info("approvals expired", { expired });
   });
 
   return {

@@ -1,4 +1,5 @@
 import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
+import type { ApprovalView } from "./approvals";
 import type { MessageView } from "./messages";
 import type { RunStatus } from "./runs";
 
@@ -29,7 +30,9 @@ export type ChannelEvent =
       agentId: string;
       status: RunStatus;
       error?: string;
-    };
+    }
+  /** A sensitive action waits for a person (`approval.created`) or was decided/expired (`approval.decided`). */
+  | { type: "approval.created" | "approval.decided"; channelId: string; approval: ApprovalView };
 
 const INLINE_LIMIT = 6000;
 

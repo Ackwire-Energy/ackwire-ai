@@ -11,7 +11,7 @@ import {
 } from "@agenteschat/adapters";
 import { ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
 import { createDatabase, ensureMessagePartitions } from "@agenteschat/db";
-import { createJobHandlers, createLocalKeyWrapper, createModelGateway } from "@agenteschat/engine";
+import { createJobHandlers, createLocalKeyWrapper, createModelGateway, createToolGateway } from "@agenteschat/engine";
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createAnthropicProvider } from "@agenteschat/providers";
 import { createApp } from "./app";
@@ -76,8 +76,11 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     providers: modelProviders,
     platformCredentials: adapters.platformCredentials,
   });
+  const tools = createToolGateway({ sources: [] });
   const handlers = createJobHandlers({
     db: database.db,
+    tools,
+    maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     gateway,
     pubsub: adapters.pubsub,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
@@ -85,7 +88,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     maxHops: config.AGENT_MAX_HOPS,
     router: { enabled: config.ROUTER_ENABLED, model: config.ROUTER_MODEL, minScore: config.ROUTER_MIN_SCORE },
   });
-  const workers = startWorkers({ db: database.db, handlers, log });
+  const workers = startWorkers({ db: database.db, handlers, pubsub: adapters.pubsub, log });
 
   const auth = createAuth({ db: database.db, config, log });
   const webDir = resolve(config.WEB_DIR);

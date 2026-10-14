@@ -21,6 +21,7 @@ export type Permission =
   | "configure" // organization name and context
   | "manage_agents" // create, edit and archive agents; set budgets
   | "manage_credentials" // add and revoke provider API keys
+  | "manage_connectors" // connect MCP servers (GitHub, Sentry…) for the organization
   | "view_usage" // tokens and cost of every agent
   | "manage_members" // invite, remove, change roles (except owners)
   | "manage_owners"; // grant/revoke owner
@@ -31,6 +32,7 @@ const ADMIN: Permission[] = [
   "configure",
   "manage_agents",
   "manage_credentials",
+  "manage_connectors",
   "view_usage",
   "manage_members",
 ];

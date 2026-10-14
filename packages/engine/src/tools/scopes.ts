@@ -98,7 +98,8 @@ export async function setAgentScopes(
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
   if (!agent) throw new NotFoundError("Agent not found");
   for (const grant of grants) {
-    const problem = (await builtinOnly(db, orgId, grant)) ?? (grant.connectionId ? await validate(db, orgId, grant) : null);
+    const problem =
+      (await builtinOnly(db, orgId, grant)) ?? (grant.connectionId ? await validate(db, orgId, grant) : null);
     if (problem) throw new ValidationError(problem);
   }
   await db.transaction(async (tx) => {

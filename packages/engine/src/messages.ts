@@ -20,6 +20,8 @@ export interface MessageView {
   body: string;
   mentionedAgentIds: string[];
   agentRunId: string | null;
+  /** Structured attachments: `{ approvalId }` for an approval card. */
+  meta: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -31,6 +33,7 @@ export const messageView = (m: Message): MessageView => ({
   body: m.body,
   mentionedAgentIds: m.mentionedAgentIds,
   agentRunId: m.agentRunId,
+  meta: m.meta,
   createdAt: m.createdAt.toISOString(),
 });
 
@@ -53,6 +56,7 @@ export interface NewMessage {
   threadId?: string | null;
   author: MessageAuthor;
   body: string;
+  meta?: Record<string, unknown>;
 }
 
 /**
@@ -110,6 +114,7 @@ export async function insertMessage(tx: Executor, input: NewMessage): Promise<Me
       hop: input.author.type === "agent" ? input.author.hop : 0,
       body,
       mentionedAgentIds,
+      meta: input.meta ?? {},
     })
     .returning();
   if (!message) throw new Error("message insert returned nothing");

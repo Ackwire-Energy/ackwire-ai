@@ -10,6 +10,7 @@ import { apiError, domainErrorResponse, validationHook } from "./http/errors";
 import { createLogger, type Logger } from "./logger";
 import { accountRoutes } from "./routes/app/account";
 import { agentRoutes } from "./routes/app/agents";
+import { approvalRoutes } from "./routes/app/approvals";
 import { channelRoutes } from "./routes/app/channels";
 import { chatRoutes } from "./routes/app/chat";
 import { registerHealth } from "./routes/health";
@@ -66,6 +67,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", agentRoutes(deps));
     api.route("/app", chatRoutes(deps));
     api.route("/app", channelRoutes(deps));
+    api.route("/app", approvalRoutes(deps));
   }
 
   for (const module of options.modules) {

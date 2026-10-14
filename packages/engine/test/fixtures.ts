@@ -17,7 +17,9 @@ import {
   createLocalKeyWrapper,
   createModelGateway,
   createOrganization,
+  createToolGateway,
   type MemberRole,
+  type ToolSource,
 } from "../src";
 
 export const SECRET = "test-secret-".padEnd(48, "x");
@@ -44,6 +46,8 @@ export async function setup(
     reply?: Parameters<typeof createFakeProvider>[0];
     budgetNanoUsd?: number | null;
     platform?: PlatformCredentials;
+    /** Tool sources for the Tool Gateway (none = agents only chat). */
+    toolSources?: ToolSource[];
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -82,7 +86,17 @@ export async function setup(
     providers: { anthropic: provider },
     platformCredentials: options.platform ?? noPlatformCredentials,
   });
-  const jobDeps = { db, gateway, pubsub, maxOutputTokens: 1000, contextMessages: 30, maxHops: 3, deltaFlushMs: 0 };
+  const tools = options.toolSources ? createToolGateway({ sources: options.toolSources }) : undefined;
+  const jobDeps = {
+    db,
+    gateway,
+    pubsub,
+    maxOutputTokens: 1000,
+    contextMessages: 30,
+    maxHops: 3,
+    deltaFlushMs: 0,
+    tools,
+  };
   const handlers = createJobHandlers(jobDeps);
 
   /** Records every event published to a channel. */
@@ -104,6 +118,7 @@ export async function setup(
     provider,
     pubsub,
     gateway,
+    tools,
     handlers,
     jobDeps,
     listen,

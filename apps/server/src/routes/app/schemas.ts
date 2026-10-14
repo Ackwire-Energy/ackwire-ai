@@ -67,6 +67,9 @@ export const Message = z
     body: z.string(),
     mentionedAgentIds: z.array(z.uuid()),
     agentRunId: z.uuid().nullable(),
+    meta: z
+      .record(z.string(), z.unknown())
+      .openapi({ description: "Attachments, e.g. `{ approvalId }` on an approval card (see /approvals)." }),
     createdAt: z.string(),
   })
   .openapi("Message");

@@ -8,7 +8,14 @@ import {
 } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
 import { createTestDatabase } from "@agenteschat/db/testing";
-import { createJobHandlers, createLocalKeyWrapper, createModelGateway, drainOutbox } from "@agenteschat/engine";
+import {
+  createJobHandlers,
+  createLocalKeyWrapper,
+  createModelGateway,
+  createToolGateway,
+  drainOutbox,
+  type ToolSource,
+} from "@agenteschat/engine";
 import { createFakeProvider } from "@agenteschat/providers/testing";
 import { createApp } from "../src/app";
 import { createAuth } from "../src/auth";
@@ -22,7 +29,11 @@ export const ORIGIN = "http://localhost:3000";
  * and the fake model provider. No `.env`, no network.
  */
 export async function createTestServer(
-  options: { env?: Record<string, string>; reply?: Parameters<typeof createFakeProvider>[0] } = {},
+  options: {
+    env?: Record<string, string>;
+    reply?: Parameters<typeof createFakeProvider>[0];
+    toolSources?: ToolSource[];
+  } = {},
 ) {
   const { db, close } = await createTestDatabase();
   const config = testConfig({ PUBLIC_URL: ORIGIN, ...options.env });
@@ -43,8 +54,10 @@ export async function createTestServer(
     providers: { anthropic: provider },
     platformCredentials: noPlatformCredentials,
   });
+  const tools = createToolGateway({ sources: options.toolSources ?? [] });
   const handlers = createJobHandlers({
     db,
+    tools,
     gateway,
     pubsub: adapters.pubsub,
     maxOutputTokens: 1000,

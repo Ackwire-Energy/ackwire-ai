@@ -1,4 +1,5 @@
 export * from "./agents";
+export * from "./approvals";
 export * from "./channels";
 export * from "./context";
 export * from "./credentials";
@@ -14,4 +15,8 @@ export * from "./organizations";
 export * from "./outbox";
 export * from "./router";
 export * from "./runs";
+export * from "./tools/gateway";
+export * from "./tools/json-schema";
+export * from "./tools/scopes";
+export * from "./tools/types";
 export * from "./usage";

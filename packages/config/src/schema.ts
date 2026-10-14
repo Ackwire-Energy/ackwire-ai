@@ -146,6 +146,11 @@ export const envVars = {
     description: "Upper bound on tokens an agent may generate in one reply.",
     section: "Agents",
   },
+  AGENT_MAX_TOOL_TURNS: {
+    schema: z.coerce.number().int().min(1).max(200).default(25),
+    description: "Maximum model calls in one agent run (each tool round trip is one). Stops runaway tool loops.",
+    section: "Agents",
+  },
   AGENT_CONTEXT_MESSAGES: {
     schema: z.coerce.number().int().min(1).max(500).default(30),
     description: "How many recent channel (or thread) messages are included in an agent's context.",
