@@ -274,10 +274,11 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
                 })}
               >
                 {stack.map((m) =>
-                  "handle" in m ? (
-                    <Avatar key={m.id} kind="agent" size="sm" name={m.name} initials={dir.agentInitials(m.id)} />
-                  ) : (
+                  // People have `userId`; agents don't (both have `handle` now).
+                  "userId" in m ? (
                     <Avatar key={m.userId} size="sm" name={m.name} imageUrl={m.image} />
+                  ) : (
+                    <Avatar key={m.id} kind="agent" size="sm" name={m.name} initials={dir.agentInitials(m.id)} />
                   ),
                 )}
               </AvatarStack>

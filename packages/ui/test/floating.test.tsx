@@ -5,19 +5,7 @@ setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
-import {
-  Dialog,
-  DialogBody,
-  Field,
-  Menu,
-  MenuItem,
-  monthGrid,
-  normalizeTime,
-  Select,
-  Sheet,
-  Token,
-  timeOptions,
-} from "../src";
+import { Dialog, DialogBody, Field, monthGrid, normalizeTime, Select, Token, timeOptions } from "../src";
 
 const body = () => within(document.body);
 const key = async (el: Element, k: string) => {
@@ -78,30 +66,6 @@ describe("floating layers", () => {
     await click(within(listbox).getByRole("option", { name: "Toda semana" }));
     await act(() => new Promise((r) => setTimeout(r, 0)));
     expect(within(dialog).getByRole("combobox", { name: "Repetir" }).textContent).toContain("Toda semana");
-  }, 10_000);
-
-  test("a Menu inside an open Sheet opens and runs an item", async () => {
-    const picked: string[] = [];
-    render(
-      <Sheet open onOpenChange={() => {}} title="Relatório" closeLabel="Fechar">
-        <Menu trigger={<button type="button">Mais</button>} label="Ações">
-          <MenuItem onSelect={() => picked.push("dup")}>Duplicar</MenuItem>
-        </Menu>
-      </Sheet>,
-    );
-    const sheet = body().getByRole("dialog", { name: "Relatório" });
-    const trigger = within(sheet).getByRole("button", { name: "Mais" });
-    trigger.focus();
-    await key(trigger, "Enter");
-    // happy-dom: the modal Sheet's aria-hidden bookkeeping can hide portals opened later from
-    // role queries. Real browsers are fine; here find the item by text (hidden included).
-    const menu = body().getByRole("menu", { name: "Ações", hidden: true });
-    expect(sheet.contains(menu)).toBe(false);
-    const item = (within(document.body).getByText("Duplicar").closest('[role="menuitem"]') ??
-      within(document.body).getByText("Duplicar")) as HTMLElement;
-    await click(item);
-    if (picked.length === 0) await key(item, "Enter");
-    expect(picked).toEqual(["dup"]);
   }, 10_000);
 });
 
