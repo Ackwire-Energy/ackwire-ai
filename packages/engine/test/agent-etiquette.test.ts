@@ -6,6 +6,7 @@ import {
   buildRunContext,
   createAgent,
   createJevMentionClassifier,
+  createJobHandlers,
   drainOutbox,
   isShortFollowUp,
   mentionIntent,
@@ -45,6 +46,8 @@ describe("an agent's @mention of another agent", () => {
     expect(mentionIntent("Como o @jorge disse, está tudo certo.", "jorge")).toBe("reference");
     expect(mentionIntent("O @jorge já fez o deploy.", "jorge")).toBe("reference");
     expect(mentionIntent("Não sei as permissões dele, pergunte a @jorge.", "jorge")).toBe("reference");
+    expect(mentionIntent("Fale com o @theo ou o @jorge.", "theo")).toBe("reference");
+    expect(mentionIntent("Fale com o @theo ou o @jorge.", "jorge")).toBe("reference");
     expect(mentionIntent("Vou alinhar isso com @jorge depois.", "jorge")).toBe("unclear");
   });
 
@@ -70,7 +73,7 @@ describe("an agent's @mention of another agent", () => {
     expect(runs.map((r) => r.hop)).toEqual([1, 1, 2]);
   });
 
-  test("Jev decides the unclear cases", async () => {
+  test("Jev judges each mentioned agent in one request", async () => {
     const seen: string[] = [];
     const classify = createJevMentionClassifier({
       apiKey: "tk",
@@ -79,18 +82,18 @@ describe("an agent's @mention of another agent", () => {
         seen.push(String(init?.body));
         return Response.json({
           model: "jev-1",
-          answers: { asks: { type: "noul", noul: 0.83 } },
+          answers: { asks_0: { type: "noul", noul: 0.83 } },
           usage: { input_tokens: 50 },
         });
       }) as unknown as typeof fetch,
     });
-    const p = await classify({
+    const scores = await classify({
       orgId: "o",
       body: "Vou alinhar isso com @jorge depois.",
       author: "@dev",
-      target: { handle: "jorge", name: "Jorge", role: null },
+      targets: [{ agentId: "a1", handle: "jorge", name: "Jorge", role: null }],
     });
-    expect(p).toBeCloseTo(0.83);
+    expect(scores.get("a1")).toBeCloseTo(0.83);
     expect(seen[0]).toContain("@jorge");
   });
 });
@@ -156,4 +159,92 @@ test("an agent knows what the other agents here can do and points to them", asyn
   expect(prompt).toContain("Arquivos (Drive)");
   expect(prompt).toContain("pergunte a @qa");
   expect(prompt).not.toMatch(/Dev \(@dev, [^)]*\):/); // not itself
+});
+
+describe("Jev judges every agent-to-agent mention (the 20:35 loop)", () => {
+  /** Fake TypeSafe: mention judgements by the mentioned agent's handle; routing questions answered low. */
+  function fakeJev(asks: Record<string, number>) {
+    const requests: Record<string, unknown>[] = [];
+    const fetcher = (async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as {
+        questions: Record<string, { instructions: { agent?: { handle: string } } }>;
+      };
+      requests.push(body);
+      const answers: Record<string, unknown> = {};
+      for (const [key, q] of Object.entries(body.questions)) {
+        const noul = key.startsWith("asks_") ? (asks[q.instructions.agent?.handle ?? ""] ?? 0) : 0.1;
+        answers[key] = { type: "noul", noul };
+      }
+      return Response.json({ model: "jev-1", answers, usage: { input_tokens: 100, output_tokens: 5 } });
+    }) as unknown as typeof fetch;
+    return { fetcher, requests };
+  }
+
+  test("a question to three agents gets one answer each and at most one hand-off; decisions are recorded", async () => {
+    f = await setup({
+      reply: (req) => {
+        const system = systemText(req.system);
+        const last = JSON.stringify(req.messages.at(-1)?.content);
+        if (system.includes("You are Dev (@dev)")) return { chunks: ["Não sei, fale com o @qa ou o @ops."] };
+        if (system.includes("You are QA (@qa)")) return { chunks: ["@ops você consegue ver os logs?"] };
+        // Ops: first its own answer to the person, then (if asked by QA) a reply that tries to hand back.
+        return {
+          chunks: [
+            last.includes("você consegue ver os logs") ? "@dev @qa sim, já vi, pode seguir?" : "Eu vejo os logs, @qa.",
+          ],
+        };
+      },
+    });
+    await addQa();
+    const ops = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ops", handle: "ops", role: "Infra", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ops.id });
+    const jev = fakeJev({ "@ops": 0.9, "@qa": 0.2, "@dev": 0.2 });
+    const handlers = createJobHandlers({
+      ...f.jobDeps,
+      router: {
+        enabled: true,
+        model: "claude-haiku-5-5",
+        jev: { apiKey: "tk", fetch: jev.fetcher },
+        mentionThreshold: 0.6,
+      },
+    });
+
+    // A person's @mentions always start the mentioned agents.
+    await post("@dev @qa @ops quem consegue ver os logs de produção?");
+    await drainOutbox(f.db, handlers);
+
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs.filter((r) => r.hop === 1)).toHaveLength(3); // one answer per addressed agent
+    expect(runs.filter((r) => r.hop === 2).map((r) => r.agentId)).toEqual([ops.id]); // QA → Ops, once
+    expect(runs.filter((r) => r.hop >= 3)).toEqual([]);
+
+    const decisions = await f.db.select().from(schema.routingDecisions);
+    const strategies = decisions.map((d) => d.strategy).sort();
+    expect(strategies).toContain("mention-rules"); // Dev's "fale com o @qa ou o @ops": references, no Jev call
+    expect(strategies.filter((s) => s === "jev-mention").length).toBeGreaterThanOrEqual(2);
+    expect(
+      decisions.find((d) => d.strategy === "jev-mention" && d.selectedAgentIds.length === 1)?.selectedAgentIds,
+    ).toEqual([ops.id]);
+  });
+
+  test("without Jev only explicit requests hand off", async () => {
+    f = await setup({
+      reply: (req) =>
+        systemText(req.system).includes("You are Dev (@dev)")
+          ? { chunks: ["Vou alinhar isso com @qa depois."] }
+          : { chunks: ["ok"] },
+    });
+    await addQa();
+    await post("@dev e os testes?");
+    await drainOutbox(f.db, f.handlers);
+    expect((await f.db.select().from(schema.agentRuns)).map((r) => r.hop)).toEqual([1]);
+    const [decision] = await f.db.select().from(schema.routingDecisions);
+    expect(decision).toMatchObject({ strategy: "mention-rules", selectedAgentIds: [] });
+  });
 });

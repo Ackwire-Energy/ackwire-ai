@@ -351,7 +351,7 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
       [`POST ${org}/connectors/custom`]: { status: 200, body: { status: "needs_key" } },
       [`PUT ${org}/connectors/custom/s1/tools`]: { status: 200, body: { id: "s1" } },
       [`POST ${org}/invite-links`]: { status: 201, body: { url: "https://x/invite/t", expiresAt: "t" } },
-      [`POST /api/app/invitations/tok/request-new`]: { status: 204 },
+      "POST /api/app/invitations/tok/request-new": { status: 204 },
     });
     const api = createHttpApi(fetch);
     expect((await api.calendar.range("o1", "2026-10-12", "2026-10-19")).events).toEqual([]);
