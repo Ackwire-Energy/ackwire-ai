@@ -11,6 +11,7 @@ import { artifactRoutes } from "./routes/app/artifacts";
 import { channelRoutes } from "./routes/app/channels";
 import { chatRoutes } from "./routes/app/chat";
 import { connectorRoutes } from "./routes/app/connectors";
+import { customConnectorRoutes } from "./routes/app/connectors-custom";
 import type { AppDeps } from "./routes/app/context";
 import { dmRoutes } from "./routes/app/dms";
 import { inviteRoutes } from "./routes/app/invites";
@@ -74,6 +75,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", chatRoutes(deps));
     api.route("/app", channelRoutes(deps));
     api.route("/app", approvalRoutes(deps));
+    api.route("/app", customConnectorRoutes(deps));
     api.route("/app", connectorRoutes(deps));
     api.route("/app", managementRoutes(deps));
     api.route("/app", knowledgeRoutes(deps));

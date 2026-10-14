@@ -1,11 +1,14 @@
 import { createHash } from "node:crypto";
 import type { KeyWrapper } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, eq, isNull, schema, sql } from "@agenteschat/db";
 import { caches } from "../cache";
 import { openSecret, randomToken, sealSecret, sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
+import type { ResolveHost } from "../net-guard";
 import { requirePermission } from "../organizations";
 import { CONNECTOR_CATALOG, type ConnectorDefinition } from "./catalog";
+import { beginMcpOAuth, storeCustomConnection } from "./custom";
+import { clientCredentials, getOAuthClient, type McpOAuthDeps, probeMcpServer } from "./oauth-mcp";
 
 const { connectorConnections, oauthStates, agentScopes } = schema;
 
@@ -30,6 +33,8 @@ export interface ConnectorDeps {
   publicUrl: string;
   /** Injected in tests; real network otherwise. */
   http?: typeof fetch;
+  /** DNS for the SSRF guard (tests: fake). */
+  resolveHost?: ResolveHost;
   now?: () => Date;
 }
 
@@ -83,6 +88,7 @@ async function storeConnection(
     secret: ConnectionSecret | null;
     tokenExpiresAt?: Date | null;
     accountLabel?: string | null;
+    oauthClientId?: string | null;
   },
 ): Promise<ConnectorConnection> {
   const def = connectorDefinition(input.connector);
@@ -117,6 +123,7 @@ async function storeConnection(
         kekId: sealed?.kekId ?? null,
         tokenExpiresAt: input.tokenExpiresAt ?? null,
         accountLabel: input.accountLabel ?? null,
+        oauthClientId: input.oauthClientId ?? null,
         createdByUserId: input.actorId,
       })
       .returning();
@@ -158,7 +165,14 @@ export async function listConnections(db: Database, actorId: string, orgId: stri
   return db
     .select()
     .from(connectorConnections)
-    .where(and(eq(connectorConnections.orgId, orgId), isNull(connectorConnections.revokedAt)))
+    .where(
+      and(
+        eq(connectorConnections.orgId, orgId),
+        isNull(connectorConnections.revokedAt),
+        // Custom servers have their own endpoints (`…/connectors/custom`).
+        sql`${connectorConnections.connector} not like 'custom:%'`,
+      ),
+    )
     .orderBy(asc(connectorConnections.createdAt));
 }
 
@@ -230,8 +244,16 @@ export async function startOAuth(
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const def = connectorDefinition(connector);
   const app = deps.oauthApps?.[connector];
-  if (!def.oauth || !app) throw new ValidationError(`OAuth for ${def.label} is not configured on this server`);
   const serverUrl = checkServerUrl(options.serverUrl ?? def.serverUrl ?? "");
+  if (!def.oauth || !app) {
+    // A catalog entry without a fixed OAuth app uses the server's own MCP OAuth (discovery + registration).
+    const native =
+      def.auth.includes("oauth") && !def.oauth
+        ? await nativeAuthorizeUrl(deps, actorId, orgId, connector, serverUrl, options.returnTo)
+        : null;
+    if (native) return { authorizeUrl: native, state: "" };
+    throw new ValidationError(`OAuth for ${def.label} is not configured on this server`);
+  }
   const returnTo = options.returnTo?.startsWith("/") && !options.returnTo.startsWith("//") ? options.returnTo : "/";
   const state = randomToken(32);
   const verifier = randomToken(48);
@@ -276,12 +298,18 @@ interface TokenResponse {
   error_description?: string;
 }
 
-async function tokenRequest(deps: ConnectorDeps, url: string, form: Record<string, string>): Promise<TokenResponse> {
+async function tokenRequest(
+  deps: ConnectorDeps,
+  url: string,
+  form: Record<string, string | undefined>,
+): Promise<TokenResponse> {
   const http = deps.http ?? fetch;
   const res = await http(url, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
-    body: new URLSearchParams(form).toString(),
+    body: new URLSearchParams(
+      Object.entries(form).filter((e): e is [string, string] => typeof e[1] === "string"),
+    ).toString(),
   });
   const body = (await res.json().catch(() => ({}))) as TokenResponse;
   if (!res.ok || body.error || !body.access_token) {
@@ -318,6 +346,7 @@ export async function completeOAuth(
   // Still an admin? (Roles can change during the round trip.)
   await requirePermission(deps.db, user.id, row.orgId, "manage_connectors");
 
+  if (row.oauthClientId) return completeMcpOAuth(deps, user, row, input.code, at);
   const def = connectorDefinition(row.connector);
   const app = deps.oauthApps?.[row.connector];
   if (!def.oauth || !app) throw new ValidationError(`OAuth for ${def.label} is not configured on this server`);
@@ -355,7 +384,24 @@ export async function connectionHeaders(deps: ConnectorDeps, c: ConnectorConnect
   if (!secret) return {};
   if (secret.apiKey) return { authorization: `Bearer ${secret.apiKey}` };
   const at = deps.now?.() ?? new Date();
-  if (c.tokenExpiresAt && c.tokenExpiresAt.getTime() - at.getTime() < 60_000 && secret.refreshToken) {
+  const expiring = c.tokenExpiresAt && c.tokenExpiresAt.getTime() - at.getTime() < 60_000 && secret.refreshToken;
+  if (expiring && c.oauthClientId && secret.refreshToken) {
+    const client = await getOAuthClient(deps.db, c.oauthClientId);
+    if (client) {
+      const token = await tokenRequest(deps, client.tokenEndpoint, {
+        grant_type: "refresh_token",
+        refresh_token: secret.refreshToken,
+        ...(await clientCredentials(deps.keyWrappers, client)),
+      });
+      const next: ConnectionSecret = {
+        accessToken: token.access_token,
+        refreshToken: token.refresh_token ?? secret.refreshToken,
+      };
+      await resealTokens(deps, c, next, token.expires_in, at);
+      return { authorization: `Bearer ${next.accessToken}` };
+    }
+  }
+  if (expiring && secret.refreshToken && !c.connector.startsWith("custom:")) {
     const def = connectorDefinition(c.connector);
     const app = deps.oauthApps?.[c.connector];
     if (def.oauth && app) {
@@ -407,6 +453,11 @@ export const connectorGrantValidator = async (
       ),
     );
   if (!c) return "connectionId is not an active connection of this organization";
+  if (c.connector.startsWith("custom:")) {
+    return grant.scope === `custom:${c.id}:read` || grant.scope === `custom:${c.id}:write`
+      ? null
+      : `Unknown scope ${grant.scope} for this server`;
+  }
   const def = CONNECTOR_CATALOG[c.connector];
   const [prefix, scope] = grant.scope.split(":");
   if (!def || prefix !== c.connector || !scope || !def.scopes[scope]) {
@@ -414,3 +465,99 @@ export const connectorGrantValidator = async (
   }
   return null;
 };
+
+async function resealTokens(
+  deps: ConnectorDeps,
+  c: ConnectorConnection,
+  next: ConnectionSecret,
+  expiresIn: number | undefined,
+  at: Date,
+) {
+  const wrapper = deps.keyWrappers[0];
+  if (!wrapper) throw new Error("no key wrapper");
+  const sealed = await sealSecret(wrapper, JSON.stringify(next), aadFor(c.orgId, c.id));
+  await deps.db
+    .update(connectorConnections)
+    .set({
+      secretCiphertext: sealed.ciphertext,
+      wrappedDataKey: sealed.wrappedDataKey,
+      kekId: sealed.kekId,
+      tokenExpiresAt: expiresIn ? new Date(at.getTime() + expiresIn * 1000) : null,
+      updatedAt: at,
+    })
+    .where(eq(connectorConnections.id, c.id));
+  caches.connections.delete(`${c.orgId}:active`);
+}
+
+/** Catalog connector without a registered app: the server's own MCP OAuth, if it has one. */
+async function nativeAuthorizeUrl(
+  deps: ConnectorDeps & McpOAuthDeps,
+  actorId: string,
+  orgId: string,
+  connector: string,
+  serverUrl: string,
+  returnTo?: string,
+) {
+  const probe = await probeMcpServer(deps, serverUrl).catch(() => null);
+  if (probe?.kind !== "oauth") return null;
+  return beginMcpOAuth(deps, actorId, orgId, {
+    connector,
+    serverUrl,
+    resource: probe.resource,
+    issuer: probe.issuer,
+    scopes: probe.scopes,
+    returnTo,
+  });
+}
+
+/** Callback of an MCP-native authorization: token with PKCE and `resource`, then the connection. */
+async function completeMcpOAuth(
+  deps: ConnectorDeps,
+  user: { id: string },
+  row: typeof oauthStates.$inferSelect,
+  code: string,
+  at: Date,
+): Promise<{ connection: ConnectorConnection; returnTo: string }> {
+  const client = row.oauthClientId ? await getOAuthClient(deps.db, row.oauthClientId) : null;
+  if (!client) throw new ValidationError("The authorization server registration is missing");
+  const verifier = await openSecret(
+    deps.keyWrappers,
+    { ciphertext: row.verifierCiphertext, wrappedDataKey: row.wrappedDataKey, kekId: row.kekId },
+    stateAad(row.orgId, row.id),
+  );
+  const token = await tokenRequest(deps, client.tokenEndpoint, {
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: oauthRedirectUri(deps.publicUrl),
+    code_verifier: verifier,
+    ...(row.resource ? { resource: row.resource } : {}),
+    ...(await clientCredentials(deps.keyWrappers, client)),
+  });
+  const secret = { accessToken: token.access_token, refreshToken: token.refresh_token };
+  const tokenExpiresAt = token.expires_in ? new Date(at.getTime() + token.expires_in * 1000) : null;
+  const serverUrl = row.serverUrl ?? "";
+  if (row.connector === "custom") {
+    const connection = await storeCustomConnection(deps, {
+      orgId: row.orgId,
+      actorId: user.id,
+      serverUrl,
+      label: row.label ?? new URL(serverUrl).hostname,
+      authType: "oauth",
+      secret,
+      tokenExpiresAt,
+      oauthClientId: client.id,
+    });
+    return { connection, returnTo: row.returnTo };
+  }
+  const connection = await storeConnection(deps, {
+    orgId: row.orgId,
+    actorId: user.id,
+    connector: row.connector,
+    authType: "oauth",
+    serverUrl: checkServerUrl(serverUrl),
+    secret,
+    tokenExpiresAt,
+    oauthClientId: client.id,
+  });
+  return { connection, returnTo: row.returnTo };
+}

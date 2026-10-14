@@ -93,6 +93,7 @@ export async function createTestServer(
       extras: {
         http: options.http,
         mcpConnect: options.mcpConnect,
+        resolveHost: options.resolveHost,
         embed: engine.gateway.embed,
         storage: engine.storage,
         artifacts: engine.artifacts,

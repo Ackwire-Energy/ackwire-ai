@@ -44,7 +44,7 @@ test("a valid PDF with Portuguese text, standard fonts, and pages as needed", ()
   expect(pdf).toContain("(Relatório de março)");
   expect(pdf).toContain("/BaseFont /Helvetica-Bold");
   expect(pdf).toContain("/BaseFont /Courier");
-  expect(pdf).toContain("(\u0097 ação )"); // em dash in WinAnsi
+  expect(pdf).toContain("(20% \u0097 ação )"); // em dash and accents in WinAnsi
   expect(pdf).toContain("/Count 1");
   checkXref(pdf);
 

@@ -127,6 +127,13 @@
       "when": 1792018354403,
       "tag": "0017_default_drive_scopes",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792018829928,
+      "tag": "0018_custom_mcp",
+      "breakpoints": true
     }
   ]
 }

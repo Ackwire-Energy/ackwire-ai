@@ -74,11 +74,15 @@ export function DatePicker({
   const outOfRange = (d: Date) => Boolean((minD && d < minD) || (maxD && d > maxD));
 
   // Focus follows the roving day while the grid is open.
+  // Focus follows the roving day while the grid is open. Keyed on the day's
+  // string, not the Date object, and only moves focus when it isn't there
+  // already: no focus/re-render ping-pong.
+  const focusKey = ymd(focus);
   useEffect(() => {
     if (!open) return;
-    const el = grid.current?.querySelector<HTMLButtonElement>(`[data-day="${ymd(focus)}"]`);
-    el?.focus();
-  }, [open, focus]);
+    const el = grid.current?.querySelector<HTMLButtonElement>(`[data-day="${focusKey}"]`);
+    if (el && document.activeElement !== el) el.focus();
+  }, [open, focusKey]);
 
   const label = selected
     ? new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(

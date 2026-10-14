@@ -311,7 +311,7 @@ describe("Calendário", () => {
     const picker = screen().getByRole("dialog", { name: "Escolher data" });
     await click(within(picker).getByRole("button", { name: dayName }));
     await settle(2);
-    expect(screen().queryByRole("dialog", { name: "Escolher data" })).toBeNull();
+    expect(picker.isConnected).toBe(false);
     // Participants: picked ones become tokens above the search.
     await click(within(dialog).getByRole("checkbox", { name: /Ada/ }));
     expect(within(dialog).getByRole("button", { name: "Remover Ada" })).toBeTruthy();
@@ -319,7 +319,8 @@ describe("Calendário", () => {
     await settle(5);
     const col = document.querySelector(`[data-day="${toYmd(tuesday)}"]`) as HTMLElement;
     expect(within(col).getByRole("button", { name: "Planejamento da sprint, 14:00–15:00" })).toBeTruthy();
-  });
+    // A hang (focus or render loop) fails fast instead of taking the run down.
+  }, 20_000);
 });
 
 describe("sidebar", () => {

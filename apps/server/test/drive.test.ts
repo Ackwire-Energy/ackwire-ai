@@ -100,6 +100,13 @@ test("Drive API: create, new version, versions, download link, file, delete", as
   expect(page.headers.get("content-disposition")).toContain("attachment");
   expect(page.headers.get("content-security-policy")).toBe("sandbox");
 
+  const doc = (await (
+    await api("/artifacts", { json: { title: "Plano", content: { kind: "document", markdown: "# Plano\n\n- um" } } })
+  ).json()) as { id: string };
+  const pdf = await api(`/artifacts/${doc.id}/file?format=pdf`);
+  expect(pdf.headers.get("content-type")).toBe("application/pdf");
+  expect(new TextDecoder().decode((await pdf.arrayBuffer()).slice(0, 5))).toBe("%PDF-");
+
   expect((await api(`/artifacts/${a.id}`, { method: "DELETE" })).status).toBe(204);
   expect((await api(`/artifacts/${a.id}`)).status).toBe(404);
 });

@@ -60,7 +60,13 @@ export function TimeSelect({ value, onChange, step = 15, id, disabled, className
   const [active, setActive] = useState(-1);
   const list = useRef<HTMLDivElement>(null);
   const options = useMemo(() => timeOptions(step), [step]);
-  useEffect(() => setDraft(value), [value]);
+  // Follow the value from outside only when it really changes.
+  const lastValue = useRef(value);
+  useEffect(() => {
+    if (lastValue.current === value) return;
+    lastValue.current = value;
+    setDraft(value);
+  }, [value]);
 
   // Open near the current value; typed digits jump to the first match.
   const typed = draft.replace(/\D/g, "");
@@ -76,16 +82,18 @@ export function TimeSelect({ value, onChange, step = 15, id, disabled, className
   useEffect(() => {
     if (!open) return;
     const i = active >= 0 ? active : anchorIndex;
+    const box = list.current?.parentElement;
+    // Only scroll a list that actually scrolls (never in layout-less test DOMs).
+    if (!box || box.scrollHeight <= box.clientHeight) return;
     list.current?.querySelector(`[data-index="${i}"]`)?.scrollIntoView?.({ block: "nearest" });
   }, [open, active, anchorIndex]);
 
   const commit = (next: string | null) => {
-    if (next) {
-      onChange(next);
-      setDraft(next);
-    } else setDraft(value);
-    setOpen(false);
-    setActive(-1);
+    if (next && next !== value) onChange(next);
+    const shown = next ?? value;
+    if (shown !== draft) setDraft(shown);
+    if (open) setOpen(false);
+    if (active !== -1) setActive(-1);
   };
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -107,7 +115,12 @@ export function TimeSelect({ value, onChange, step = 15, id, disabled, className
   const optionId = (i: number) => `${listId}-${i}`;
 
   return (
-    <RPopover.Root open={open} onOpenChange={setOpen}>
+    <RPopover.Root
+      open={open}
+      onOpenChange={(o) => {
+        if (o !== open) setOpen(o);
+      }}
+    >
       <RPopover.Anchor asChild>
         <input
           type="text"
@@ -127,12 +140,17 @@ export function TimeSelect({ value, onChange, step = 15, id, disabled, className
           value={draft}
           onChange={(e) => {
             setDraft(e.target.value);
-            setActive(-1);
-            setOpen(true);
+            if (active !== -1) setActive(-1);
+            if (!open) setOpen(true);
           }}
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            if (!open) setOpen(true);
+          }}
           onKeyDown={onKey}
-          onBlur={() => commit(normalizeTime(draft))}
+          onBlur={() => {
+            // Only when something changed: a blur must never reopen or re-render in a loop.
+            if (open || draft !== value) commit(normalizeTime(draft));
+          }}
         />
       </RPopover.Anchor>
       <RPopover.Portal>

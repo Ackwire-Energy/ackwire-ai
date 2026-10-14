@@ -4,12 +4,15 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { ToolDefinition, ToolSource } from "../tools/types";
 import { CONNECTOR_CATALOG, connectorScope, fillTitle } from "./catalog";
 import { activeConnections, type ConnectorConnection, type ConnectorDeps, connectionHeaders } from "./connections";
+import { classifiedTools, customScope, isCustom, type ToolAccess } from "./custom";
 
 /** A tool as an MCP server lists it. */
 export interface McpTool {
   name: string;
   description?: string;
   inputSchema: Record<string, unknown>;
+  /** The server's `readOnlyHint` annotation, when it sends one. */
+  readOnlyHint?: boolean | null;
 }
 
 export interface McpCallResult {
@@ -42,6 +45,7 @@ export async function mcpSessionOver(transport: Transport): Promise<McpSession> 
             name: t.name,
             description: t.description,
             inputSchema: t.inputSchema as Record<string, unknown>,
+            readOnlyHint: (t.annotations as { readOnlyHint?: boolean } | undefined)?.readOnlyHint ?? null,
           });
         }
         cursor = res.nextCursor;
@@ -101,11 +105,63 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
     return tools;
   }
 
+  /** A custom server's tools that an admin classified (hidden until then). */
+  async function customToolsOf(connection: ConnectorConnection): Promise<ToolDefinition[]> {
+    const classified = await classifiedTools(deps.db, connection.id);
+    if (classified.length === 0) return [];
+    let listed: McpTool[];
+    try {
+      listed = await serverTools(connection);
+    } catch {
+      return [];
+    }
+    const byName = new Map(listed.map((t) => [t.name, t]));
+    const prefix =
+      connection.label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/g, "")
+        .slice(0, 24) || "mcp";
+    return classified.flatMap((row): ToolDefinition[] => {
+      const tool = byName.get(row.name);
+      const access = row.access as ToolAccess;
+      if (!tool) return [];
+      return [
+        {
+          name: exposedToolName(prefix, tool.name),
+          description: `[${connection.label}] ${row.label}: ${tool.description ?? tool.name}`.slice(0, 1024),
+          inputSchema: tool.inputSchema?.type === "object" ? tool.inputSchema : { type: "object" },
+          scope: customScope(connection.id, access),
+          connectionId: connection.id,
+          sensitive: access === "approval",
+          describe: (input) => ({
+            title: `${connection.label}: ${row.label}`,
+            detail: `${tool.name} · ${Object.entries(input)
+              .map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
+              .join(" · ")}`,
+          }),
+          execute: async (input) => {
+            const result = await withSession(connection, (s) => s.callTool(tool.name, input));
+            return {
+              content: result.content,
+              isError: result.isError,
+              data: { connector: "custom", serverId: connection.id, tool: tool.name, isError: result.isError },
+            };
+          },
+        },
+      ];
+    });
+  }
+
   return {
     name: "connectors",
     async tools(ctx) {
       const out: ToolDefinition[] = [];
       for (const connection of await activeConnections(ctx.db, ctx.orgId)) {
+        if (isCustom(connection)) {
+          out.push(...(await customToolsOf(connection)));
+          continue;
+        }
         const def = CONNECTOR_CATALOG[connection.connector];
         if (!def) continue;
         let listed: McpTool[];

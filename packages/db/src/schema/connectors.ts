@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
@@ -31,6 +31,10 @@ export const connectorConnections = pgTable(
     tokenExpiresAt: timestamp({ withTimezone: true }),
     /** Account on the other side, e.g. the GitHub org, for display. */
     accountLabel: text(),
+    /** Custom servers: when an admin last saved the tool classification (null = nothing exposed yet). */
+    reviewedAt: timestamp({ withTimezone: true }),
+    /** MCP-native OAuth: the client registered with the server's authorization server (`oauth_clients`). */
+    oauthClientId: uuid(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -66,9 +70,65 @@ export const oauthStates = pgTable(
     serverUrl: text(),
     /** Where the web app wants to land afterwards (a path on our origin). */
     returnTo: text().notNull().default("/"),
+    /** MCP-native OAuth: the registered client, the protected resource (RFC 8707) and the label to give the connection. */
+    oauthClientId: uuid(),
+    resource: text(),
+    label: text(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     usedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.orgId)],
+);
+
+/**
+ * OAuth clients agentes.chat registered with an MCP server's authorization
+ * server (Dynamic Client Registration, RFC 7591), one per org and issuer.
+ * A client secret, when the server issues one, is sealed like other secrets.
+ */
+export const oauthClients = pgTable(
+  "oauth_clients",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    issuer: text().notNull(),
+    authorizationEndpoint: text().notNull(),
+    tokenEndpoint: text().notNull(),
+    clientId: text().notNull(),
+    secretCiphertext: text(),
+    wrappedDataKey: text(),
+    kekId: text(),
+    /** Scopes to ask for (from the protected resource metadata), space separated. */
+    scope: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("oauth_clients_org_issuer").on(t.orgId, t.issuer)],
+);
+
+/**
+ * Tools of a custom MCP server and how an admin classified each one:
+ * `read`, `write`, or `approval` (write that always asks a person). Null =
+ * not classified yet: never shown to agents.
+ */
+export const customTools = pgTable(
+  "custom_tools",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid().notNull(),
+    connectionId: uuid()
+      .notNull()
+      .references(() => connectorConnections.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    description: text().notNull().default(""),
+    readOnlyHint: boolean(),
+    access: text(),
+    /** Shown to people (approval cards, permissions), in pt-BR. */
+    label: text().notNull().default(""),
+    firstSeenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** The server stopped listing it. */
+    removedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [unique().on(t.connectionId, t.name), index().on(t.orgId)],
 );

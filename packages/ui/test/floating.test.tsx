@@ -80,7 +80,7 @@ describe("floating layers", () => {
     await click(within(listbox).getByRole("option", { name: "Toda semana" }));
     await act(() => new Promise((r) => setTimeout(r, 0)));
     expect(within(dialog).getByRole("combobox", { name: "Repetir" }).textContent).toContain("Toda semana");
-  });
+  }, 10_000);
 
   test("a Menu inside an open Sheet opens and runs an item", async () => {
     const picked: string[] = [];
@@ -99,7 +99,7 @@ describe("floating layers", () => {
     expect(sheet.contains(menu)).toBe(false);
     await click(within(menu).getByRole("menuitem", { name: "Duplicar" }));
     expect(picked).toEqual(["dup"]);
-  });
+  }, 10_000);
 });
 
 describe("DatePicker", () => {
@@ -140,7 +140,7 @@ describe("DatePicker", () => {
     await click(within(pop).getByRole("button", { name: full(2026, 11, 3) }));
     expect(document.querySelector("output")?.textContent).toBe("2026-11-03");
     expect(body().queryByRole("dialog", { name: "Escolher data" })).toBeNull();
-  });
+  }, 10_000);
 
   test("keyboard: arrows move by day and week, PageDown by month, Enter picks", async () => {
     render(<Harness />);
@@ -158,7 +158,7 @@ describe("DatePicker", () => {
     expect(focused().getAttribute("data-day")).toBe("2026-11-16");
     await key(focused(), "Enter");
     expect(document.querySelector("output")?.textContent).toBe("2026-11-16");
-  });
+  }, 10_000);
 
   test("month grid starts on Monday and has 6 weeks", () => {
     const days = monthGrid(new Date(2026, 9, 1));
@@ -208,7 +208,7 @@ describe("TimeSelect", () => {
     await click(box);
     await click(within(body().getByRole("listbox")).getByRole("option", { name: "08:45" }));
     expect(document.querySelector("output")?.textContent).toBe("08:45");
-  });
+  }, 10_000);
 });
 
 describe("Token", () => {

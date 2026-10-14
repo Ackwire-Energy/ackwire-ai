@@ -5,9 +5,11 @@ import {
   type ConnectorDeps,
   completeOAuth,
   connectionView,
+  connectOverHttp,
   connectorGrantValidator,
   createApiKeyConnection,
   getAgent,
+  isCustom,
   listAgentScopes,
   listConnections,
   NotFoundError,
@@ -15,6 +17,7 @@ import {
   revokeConnection,
   setAgentScopes,
   startOAuth,
+  syncCustomTools,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
@@ -78,6 +81,7 @@ export function connectorRoutes(deps: AppDeps) {
     oauthApps,
     publicUrl: config.PUBLIC_URL,
     http: deps.extras?.http,
+    resolveHost: deps.extras?.resolveHost,
   };
 
   app.openapi(
@@ -246,6 +250,10 @@ export function connectorRoutes(deps: AppDeps) {
           state: q.state,
           code: q.code,
         });
+        if (isCustom(connection)) {
+          const connect = deps.extras?.mcpConnect ?? connectOverHttp;
+          await syncCustomTools({ ...connectorDeps, connect }, connection).catch(() => {});
+        }
         const sep = returnTo.includes("?") ? "&" : "?";
         return c.redirect(`${base}${returnTo}${sep}connected=${encodeURIComponent(connection.connector)}`, 302);
       } catch (error) {

@@ -1,4 +1,4 @@
-import type { ArtifactDeps, McpConnect, ModelGateway, StorageDeps } from "@agenteschat/engine";
+import type { ArtifactDeps, McpConnect, ModelGateway, ResolveHost, StorageDeps } from "@agenteschat/engine";
 
 /**
  * Backend services the app API needs beyond the core deps (owned by the
@@ -10,6 +10,8 @@ export interface AppExtras {
   http?: typeof fetch;
   /** How to open MCP sessions (tests: in-process servers). */
   mcpConnect?: McpConnect;
+  /** DNS for the SSRF guard on URLs people type (tests: fake). */
+  resolveHost?: ResolveHost;
   /** Query embeddings for search (the Model Gateway's `embed`, which records usage). */
   embed?: ModelGateway["embed"];
   /** Org storage settings and the blob resolver (Drive, artifacts). */
