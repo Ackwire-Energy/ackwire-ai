@@ -89,11 +89,13 @@ export async function eligibleChannelAgents(
 export async function dispatchMentions(
   db: Database,
   input: { orgId: string; messageId: string },
-  options: { maxHops: number },
+  options: { maxHops: number; onlyAgentIds?: string[] },
 ): Promise<DispatchResult> {
   const message = await getMessage(db, input.orgId, input.messageId);
   if (!message) return { runs: [], skipped: "message_missing" };
-  const candidates = message.mentionedAgentIds.filter((id) => id !== message.authorAgentId);
+  const candidates = message.mentionedAgentIds.filter(
+    (id) => id !== message.authorAgentId && (!options.onlyAgentIds || options.onlyAgentIds.includes(id)),
+  );
   if (candidates.length === 0) return { runs: [], skipped: "no_mentions" };
   if (message.hop >= options.maxHops) return { runs: [], skipped: "hop_limit" };
 
@@ -124,4 +126,50 @@ export async function dispatchDm(
   const agentIds = (await dmAgents(db, message.orgId, message.channelId)).map((a) => a.id);
   const runs = await db.transaction((tx) => createAgentRuns(tx, message, agentIds, "dm"));
   return { runs, agentIds };
+}
+
+/** How an agent's message refers to another agent. */
+export type MentionIntent = "request" | "reference" | "unclear";
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Does an agent's message ask the mentioned agent to do or answer something
+ * ("@jorge pode revisar?"), or only mention it ("o @jorge disse…")? Cheap,
+ * by code; `unclear` goes to a classifier when there is one, else it doesn't
+ * trigger the other agent.
+ */
+export function mentionIntent(body: string, handle: string): MentionIntent {
+  const h = escapeRe(handle.toLowerCase());
+  const sentences = body
+    .toLowerCase()
+    .split(/(?<=[.!?\n])/)
+    .filter((s) => new RegExp(`@${h}(?![\\w-])`).test(s));
+  if (sentences.length === 0) return "reference";
+  let result: MentionIntent = "unclear";
+  for (const raw of sentences) {
+    const s = raw.trim();
+    const reference =
+      new RegExp(
+        `\\b(fale|fala|falar|converse|pergunte|pergunta|perguntar|chame|chama|procure|talk to|ask|check with)\\s+(com\\s+)?((o|a|ao|à)\\s+)?@${h}\\b`,
+      ).test(s) ||
+      new RegExp(
+        `(\\b(o|a|do|da|pelo|pela|com o|com a|como o|como a|segundo o|segundo a|conforme|que o|que a|the|by|from|like)\\s+@${h}\\b)`,
+      ).test(s) ||
+      new RegExp(
+        `@${h}\\s+(j[aá]\\s+)?(disse|falou|comentou|mencionou|explicou|respondeu|fez|tinha|tem|est[aá]|sugeriu|said|mentioned|did|has)(?=[\\s,.!?;:]|$)`,
+      ).test(s);
+    if (reference) {
+      if (result === "unclear") result = "reference";
+      continue;
+    }
+    const addressed = new RegExp(`^@${h}\\b[,:]?`).test(s);
+    const asks =
+      s.endsWith("?") ||
+      new RegExp(
+        `@${h}[,:]?\\s+(pode|poderia|consegue|conseguiria|voc[eê]|vc|por favor|revisa|revise|faz|fa[cç]a|olha|veja|confirma|confirme|verifica|verifique|assume|cuida|can you|could you|please)(?=[\\s,.!?;:]|$)`,
+      ).test(s);
+    if (asks || addressed) return "request";
+  }
+  return result;
 }

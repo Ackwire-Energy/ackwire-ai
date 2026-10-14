@@ -104,7 +104,8 @@ function PersonCard({ userId }: { userId: string }) {
   const member = dir.memberById.get(userId);
   const name = person?.name ?? member?.name ?? t("channel.unknownPerson");
   const role = person?.role ?? member?.role;
-  const timezone = settings.data?.timezone;
+  // The person's own zone (the API falls back to the workspace's).
+  const timezone = person?.timezone ?? member?.timezone ?? settings.data?.timezone;
   let localTime: string | null = null;
   try {
     localTime = new Intl.DateTimeFormat(i18n.language, {

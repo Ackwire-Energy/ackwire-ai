@@ -4,11 +4,11 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { nextCronRun, parseSchedulePhrase } from "@/api/mock/planning";
 import { toYmd } from "@/lib/format";
 import { mondayOf } from "@/pages/CalendarPage";
 import { splitCriteria } from "@/pages/IssuesPage";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { nextCronRun, parseSchedulePhrase } from "./fakes/planning";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -135,7 +135,7 @@ describe("Issue detail", () => {
     expect(within(aside).getByRole("combobox", { name: "Status" }).textContent).toContain("Em andamento");
     expect(within(aside).getByRole("combobox", { name: "Responsável" }).textContent).toContain("Ada");
     const activity = screen().getByRole("region", { name: "Atividade" });
-    expect(activity.textContent).toContain("Walter pediu à Ada para implementar");
+    expect(activity.textContent).toContain("Walter pediu a Ada para implementar");
   });
 
   test("comment and change the status", async () => {
@@ -150,7 +150,7 @@ describe("Issue detail", () => {
     const aside = screen().getByRole("complementary", { name: "Detalhes da issue" });
     await pick(within(aside).getByRole("combobox", { name: "Status" }), "Em revisão");
     await settle(4);
-    expect(screen().getByRole("region", { name: "Atividade" }).textContent).toContain("mudou o status para em revisão");
+    expect(screen().getByRole("region", { name: "Atividade" }).textContent).toContain("mudou o status para Em revisão");
   });
 
   test("a missing issue says so", async () => {

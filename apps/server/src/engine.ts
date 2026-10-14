@@ -131,6 +131,7 @@ export function buildEngine(o: EngineOptions) {
       model: config.ROUTER_MODEL,
       cheapModels: { openai: config.OPENAI_CHEAP_MODEL },
       minScore: config.ROUTER_MIN_SCORE,
+      mentionThreshold: config.ROUTER_MENTION_THRESHOLD,
       // Jev is the default when its (platform) key is set, unless ROUTER_STRATEGY=llm.
       ...(config.TYPESAFE_API_KEY && (config.ROUTER_STRATEGY ?? "jev") === "jev"
         ? { jev: { apiKey: config.TYPESAFE_API_KEY, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }

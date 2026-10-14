@@ -213,7 +213,7 @@ export async function listMembers(db: Database, orgId: string) {
   }));
 }
 
-export const HANDLE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,31}$/;
+export const PERSON_HANDLE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,31}$/;
 
 /** "Ana Souza" → "ana"; "João" → "joao"; falls back to the email's local part. */
 export function handleBase(name: string, email: string) {
@@ -266,7 +266,7 @@ export async function updateMyProfile(
   const set: { handle?: string; timezone?: string | null } = {};
   if (input.handle !== undefined) {
     const handle = input.handle.trim().replace(/^@/, "").toLowerCase();
-    if (!HANDLE_PATTERN.test(handle)) {
+    if (!PERSON_HANDLE_PATTERN.test(handle)) {
       throw new ValidationError("handle: 2 a 32 letras minúsculas, números, - ou _");
     }
     const [agent] = await db

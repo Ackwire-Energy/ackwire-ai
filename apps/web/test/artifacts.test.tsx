@@ -143,6 +143,9 @@ describe("artifact viewer", () => {
     await settle(3);
     expect(saved[0]?.name).toBe("relatorio-de-incidente-checkout.md");
     expect(saved[0]?.url.startsWith("data:text/markdown")).toBe(true);
+    await click(within(dialog).getByRole("button", { name: "Baixar PDF" }));
+    expect(saved[1]?.name).toBe("relatorio-de-incidente-checkout.pdf");
+    expect(saved[1]?.url).toBe(`/api/app/organizations/${ORG_ID}/artifacts/${a.document.id}/file?version=2&format=pdf`);
     await click(within(dialog).getByRole("button", { name: "Copiar link" }));
     await settle(2);
     expect(copied[0]).toBe(`http://localhost:3000/org/${ORG_ID}/drive?artifact=${a.document.id}`);
@@ -150,7 +153,7 @@ describe("artifact viewer", () => {
   });
 
   test("table: sticky header, sort and Baixar CSV", async () => {
-    await openChannel();
+    const { a } = await openChannel();
     const dialog = await openCard("Pedidos mais comuns nos reviews");
     const firstColumn = () =>
       within(dialog)
@@ -171,7 +174,8 @@ describe("artifact viewer", () => {
     expect(firstColumn()[0]).toBe("Exportar em PDF");
     await click(within(dialog).getByRole("button", { name: "Baixar CSV" }));
     expect(saved[0]?.name).toBe("pedidos-mais-comuns-nos-reviews.csv");
-    expect(decodeURIComponent(saved[0]?.url ?? "")).toContain('Pedido,Menções,Nota média\nModo offline,31,"2,6"');
+    // The server converts (`GET …/artifacts/{id}/file?format=csv`).
+    expect(saved[0]?.url).toBe(`/api/app/organizations/${ORG_ID}/artifacts/${a.table.id}/file?version=1&format=csv`);
   });
 
   test("diff: unified and side by side, per file, neutral style", async () => {

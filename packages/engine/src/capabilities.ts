@@ -28,6 +28,12 @@ const firstSentence = (s: string) => {
   return one.length > 140 ? `${one.slice(0, 137)}…` : one;
 };
 
+/** Short, human summary of what a set of scopes allows ("Arquivos (Drive), GitHub"), for other agents' context. */
+export function summarizeScopes(scopes: string[]) {
+  const groups = [...new Set(scopes.map((scope) => groupOf({ scope })))].filter((g) => g !== GROUPS[""]);
+  return groups.length > 0 ? groups.join(", ") : "só conversa";
+}
+
 /**
  * The "what you can do" section of an agent's system prompt, built from the
  * tools it was actually granted for this run (so it can't drift from its

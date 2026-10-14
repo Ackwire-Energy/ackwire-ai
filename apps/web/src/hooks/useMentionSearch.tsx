@@ -3,7 +3,6 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChannelMember } from "@/api/types";
 import { useOrg } from "@/components/org-context";
-import { handleFrom } from "@/lib/text";
 import { useDirectory } from "./useDirectory";
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -46,7 +45,7 @@ export function useMentionSearch(members?: ChannelMember[]) {
         ...dir.members
           .filter((m) => m.userId !== me.user.id)
           .map((m) => {
-            const handle = handleFrom(m.name);
+            const handle = m.handle;
             return {
               key: `person:${m.userId}`,
               insert: handle,
@@ -54,8 +53,8 @@ export function useMentionSearch(members?: ChannelMember[]) {
               description: `@${handle}`,
               leading: <Avatar kind="person" size="xs" name={m.name} imageUrl={m.image} />,
               inChannel: inChannel("person", m.userId),
-              rank: fold(m.name).startsWith(q) || handle.startsWith(q) ? 0 : 1,
-              hay: `${fold(m.name)} ${handle} ${fold(m.email)}`,
+              rank: fold(m.name).startsWith(q) || fold(handle).startsWith(q) ? 0 : 1,
+              hay: `${fold(m.name)} ${fold(handle)} ${fold(m.email)}`,
             };
           }),
       ];

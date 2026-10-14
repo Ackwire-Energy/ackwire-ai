@@ -156,16 +156,8 @@ function Activity({ issue }: { issue: Issue }) {
   const actors = useActors();
   const [text, setText] = useState("");
   const mentionSearch = useMentionSearch();
-  const eventText = (a: IssueActivity) => {
-    if (a.event === "agent_asked") {
-      const name = actors.name({ type: "agent", id: a.text });
-      return t("issues.event.agent_asked", { to: agentGrammar(t, name).to, name });
-    }
-    if (a.event === "status_changed") {
-      return t("issues.event.status_changed", { status: t(`issues.status.${a.text as IssueStatus}`).toLowerCase() });
-    }
-    return t("issues.event.other", { text: a.text });
-  };
+  // The backend writes the event in words ("pediu a Ada para implementar").
+  const eventText = (a: IssueActivity) => a.text;
   const list = activity.data ?? [];
   return (
     <section aria-labelledby="act" className="stack-4" style={{ gap: 4 }}>

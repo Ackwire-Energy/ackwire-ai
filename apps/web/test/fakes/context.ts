@@ -1,15 +1,9 @@
 /**
- * ─── MOCK ────────────────────────────────────────────────────────────────────
- * In-memory stand-ins for backend features that have no endpoint yet. They
- * live only in the browser tab (lost on reload) and never talk to a model,
- * MCP server or connector. Each file lists the endpoint it is waiting for;
- * replace the mock with an HTTP call in `src/api/index.ts` when it lands.
- *
- * Left today: the org-wide invite link, "ask for a new invitation", custom
- * MCP servers, storage, artifacts, issues, routines and the calendar.
- * ─────────────────────────────────────────────────────────────────────────────
+ * In-memory stand-ins used by the tests' fake backend (test/fake-api.ts) for
+ * the newer endpoints: artifacts, storage, issues/routines/calendar and custom
+ * MCP servers. Same shapes as apps/server/src/routes/app/*; nothing here ships.
  */
-import type { Agent, Channel, Me, Member } from "../types";
+import type { Agent, Channel, Me, Member } from "@/api/types";
 
 export interface MockContext {
   seed: boolean;

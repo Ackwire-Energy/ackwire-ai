@@ -1,6 +1,6 @@
 /**
- * MOCK — artifacts (documents, tables, diffs, diagrams, HTML pages).
- * Waiting for (shapes in `api/types.ts`):
+ * Test fake — artifacts (documents, tables, diffs, diagrams, HTML pages).
+ * Mirrors these endpoints (shapes in `api/types.ts`):
  * - `GET    /api/app/organizations/{orgId}/artifacts?q&kind&channelId&authorType&authorId` → Artifact[] (newest update first)
  * - `GET    …/artifacts/{id}?version=` → ArtifactDetail (content of that version)
  * - `GET    …/artifacts/{id}/versions` → ArtifactVersion[] (newest first)
@@ -9,12 +9,12 @@
  * - channel events `artifact.created` / `artifact.updated` `{ artifact }`, and `meta.artifacts: [{ id, version }]` on agent messages.
  * Seeded in development only; lost on reload.
  */
-import type { MockedApi } from "../client";
-import type { Artifact, ArtifactAuthor, ArtifactContent, ArtifactDetail, ArtifactVersion } from "../types";
+import type { ApiClient } from "@/api/client";
+import type { Artifact, ArtifactAuthor, ArtifactContent, ArtifactDetail, ArtifactVersion } from "@/api/types";
 import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg } from "./context";
 
 interface Stored {
-  meta: Omit<Artifact, "canEdit">;
+  meta: Omit<Artifact, "canEdit" | "untrusted">;
   versions: (ArtifactVersion & { content: ArtifactContent })[];
 }
 
@@ -45,7 +45,7 @@ export function serializeContent(content: ArtifactContent): { text: string; type
   }
 }
 
-export function createMockArtifacts(ctx: MockContext): MockedApi["artifacts"] {
+export function createMockArtifacts(ctx: MockContext): ApiClient["artifacts"] {
   const store = perOrg(async (orgId) => {
     const list: Stored[] = [];
     if (!ctx.seed) return list;
@@ -91,7 +91,11 @@ export function createMockArtifacts(ctx: MockContext): MockedApi["artifacts"] {
     if (!s) throw new MockNotFoundError("Arquivo não encontrado.");
     return s;
   };
-  const view = (s: Stored): Artifact => ({ ...clone(s.meta), canEdit: editable(s.meta.kind) });
+  const view = (s: Stored): Artifact => ({
+    ...clone(s.meta),
+    canEdit: editable(s.meta.kind),
+    untrusted: s.meta.kind === "html",
+  });
   const detail = (s: Stored, version?: number): ArtifactDetail => {
     const v = s.versions.find((x) => x.version === (version ?? s.meta.version));
     if (!v) throw new MockNotFoundError("Versão não encontrada.");
@@ -115,6 +119,13 @@ export function createMockArtifacts(ctx: MockContext): MockedApi["artifacts"] {
     },
     get: async (orgId, id, version) => detail(await find(orgId, id), version),
     versions: async (orgId, id) => (await find(orgId, id)).versions.map(({ content: _c, ...v }) => clone(v)).reverse(),
+    fileUrl: (orgId, id, options = {}) => {
+      const params = new URLSearchParams();
+      if (options.version) params.set("version", String(options.version));
+      if (options.format) params.set("format", options.format);
+      const qs = params.toString();
+      return `/api/app/organizations/${orgId}/artifacts/${id}/file${qs ? `?${qs}` : ""}`;
+    },
     download: async (orgId, id, version) => {
       const { text, type } = serializeContent(detail(await find(orgId, id), version).content);
       return {

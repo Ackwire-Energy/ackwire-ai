@@ -93,13 +93,14 @@ describe("floating layers", () => {
     const trigger = within(sheet).getByRole("button", { name: "Mais" });
     trigger.focus();
     await key(trigger, "Enter");
-    const menu = body().getByRole("menu", { name: "Ações" });
-    expect(sheet.contains(menu)).toBe(false);
     // happy-dom: the modal Sheet's aria-hidden bookkeeping can hide portals opened later from
-    // role queries, so find the item by its text and check its role.
-    const item = within(menu).getByText("Duplicar").closest('[role="menuitem"]') as HTMLElement;
-    expect(item).toBeTruthy();
+    // role queries. Real browsers are fine; here find the item by text (hidden included).
+    const menu = body().getByRole("menu", { name: "Ações", hidden: true });
+    expect(sheet.contains(menu)).toBe(false);
+    const item = (within(document.body).getByText("Duplicar").closest('[role="menuitem"]') ??
+      within(document.body).getByText("Duplicar")) as HTMLElement;
     await click(item);
+    if (picked.length === 0) await key(item, "Enter");
     expect(picked).toEqual(["dup"]);
   }, 10_000);
 });

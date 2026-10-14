@@ -2,10 +2,11 @@ import { and, asc, type Database, desc, eq, inArray, isNull, lte, ne, schema, sq
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import { caches } from "./cache";
+import { summarizeScopes } from "./capabilities";
 import type { Message } from "./messages";
 import type { AgentRun } from "./runs";
 
-const { messages, users, agents, channels, channelMembers, organizations } = schema;
+const { messages, users, agents, channels, channelMembers, organizations, agentScopes } = schema;
 
 export interface RunContext {
   system: SystemBlock[];
@@ -92,14 +93,47 @@ export async function buildRunContext(
     authorNames(db, history),
     caches.channelMembers.getOrLoad(`${run.orgId}:${run.channelId}`, () =>
       db
-        .select({ userName: users.name, agentName: agents.name, agentHandle: agents.handle })
+        .select({
+          userName: users.name,
+          agentId: agents.id,
+          agentName: agents.name,
+          agentHandle: agents.handle,
+          agentRole: agents.role,
+        })
         .from(channelMembers)
         .leftJoin(users, eq(users.id, channelMembers.userId))
         .leftJoin(agents, eq(agents.id, channelMembers.agentId))
         .where(eq(channelMembers.channelId, run.channelId))
         .orderBy(asc(channelMembers.createdAt)),
-    ) as Promise<{ userName: string | null; agentName: string | null; agentHandle: string | null }[]>,
+    ) as Promise<
+      {
+        userName: string | null;
+        agentId: string | null;
+        agentName: string | null;
+        agentHandle: string | null;
+        agentRole: string | null;
+      }[]
+    >,
   ]);
+  // What the other agents here can do, so this one never answers for them.
+  const others = members.filter((m) => m.agentId && m.agentId !== agent.id);
+  const otherScopes = others.length
+    ? await db
+        .select({ agentId: agentScopes.agentId, scope: agentScopes.scope })
+        .from(agentScopes)
+        .where(
+          inArray(
+            agentScopes.agentId,
+            others.map((m) => m.agentId as string),
+          ),
+        )
+    : [];
+  const otherAgents = others
+    .map((m) => {
+      const scopes = otherScopes.filter((s) => s.agentId === m.agentId).map((s) => s.scope);
+      return `${m.agentName} (@${m.agentHandle}${m.agentRole ? `, ${m.agentRole}` : ""}): ${summarizeScopes(scopes)}`;
+    })
+    .join("; ");
   const memberList = members
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
     .join(", ");
@@ -144,7 +178,11 @@ export async function buildRunContext(
       text:
         channel.kind === "dm"
           ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
-          : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying in a thread. Members: ${memberList}.`,
+          : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying in a thread. Members: ${memberList}.${
+              otherAgents
+                ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or suggest asking it (e.g. "pergunte a @${others[0]?.agentHandle}").`
+                : ""
+            }`,
     },
   ];
   const systemChars = system.reduce((n, b) => n + b.text.length, 0);

@@ -219,6 +219,43 @@ describe("Message", () => {
     expect(second?.querySelector(".ac-avatar")).toBeNull();
     expect(second?.querySelector(".ac-visually-hidden")?.textContent).toContain("Atlas");
   });
+
+  test("first and grouped messages share one text edge: a fixed avatar column or an equal gutter", async () => {
+    const { container } = render(
+      <>
+        <Message avatar={<Avatar kind="agent" name="Jorge" />} author="Jorge" time="10:02" agent>
+          <MessageText>Primeiro parágrafo.</MessageText>
+          <MessageText>Segundo parágrafo.</MessageText>
+          <div className="card">cartão</div>
+        </Message>
+        <Message author="Jorge" time="10:03" grouped>
+          <MessageText>continua</MessageText>
+        </Message>
+      </>,
+    );
+    const [first, second] = Array.from(container.querySelectorAll("article"));
+    // DOM order: avatar column (or gutter) first, then the text column with header, text and cards.
+    expect(Array.from(first?.children ?? []).map((c) => c.className)).toEqual(["ac-msg__avatar", "ac-msg__body"]);
+    expect(first?.querySelector(".ac-msg__avatar .ac-avatar")).not.toBeNull();
+    const body1 = first?.querySelector(".ac-msg__body");
+    expect(Array.from(body1?.children ?? []).map((c) => c.className)).toEqual([
+      "ac-msg__head",
+      "ac-msg__text",
+      "ac-msg__text",
+      "card",
+    ]);
+    expect(Array.from(second?.children ?? []).map((c) => c.className)).toEqual(["ac-msg__gutter", "ac-msg__body"]);
+    // The gutter shows the time on hover; screen readers get it from the hidden header.
+    const gutter = second?.querySelector(".ac-msg__gutter");
+    expect(gutter?.getAttribute("aria-hidden")).toBe("true");
+    expect(gutter?.textContent).toBe("10:03");
+    // CSS: top-aligned row, and the avatar column and the gutter have the same fixed width.
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-msg")).toContain("align-items: flex-start");
+    expect(rule(".ac-msg__avatar,\n.ac-msg__gutter")).toContain("flex: 0 0 36px");
+    expect(rule(".ac-msg__avatar")).toContain("align-self: flex-start");
+  });
 });
 
 describe("Menu", () => {

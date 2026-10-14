@@ -65,9 +65,8 @@ import type {
 
 /**
  * Everything the web app asks the backend. `createApiClient` (./index.ts)
- * wires the real HTTP implementation (./http-client.ts) for what the server
- * exposes and in-memory mocks (./mock) for what it doesn't yet. Tests pass a
- * fake. Components never call `fetch` directly.
+ * wires the HTTP implementation (./http-client.ts); tests pass a fake
+ * (test/fake-api.ts). Components never call `fetch` directly.
  */
 export interface ApiClient {
   system: { health(): Promise<Health> };
@@ -210,7 +209,6 @@ export interface ApiClient {
     set(orgId: string, agentId: string, grants: ScopeGrant[]): Promise<ScopeGrant[]>;
   };
 
-  // ── Mock-backed until the backend has endpoints (see src/api/mock) ──────────
   memory: {
     list(orgId: string, agentId: string): Promise<Memory[]>;
     edit(orgId: string, memoryId: string, text: string): Promise<Memory>;
@@ -292,6 +290,8 @@ export interface ApiClient {
     versions(orgId: string, id: string): Promise<ArtifactVersion[]>;
     /** Short-lived signed URL for the stored file. */
     download(orgId: string, id: string, version?: number): Promise<{ url: string; expiresAt: string }>;
+    /** Same-origin URL of the file as an attachment, optionally converted (CSV, .patch, PDF). */
+    fileUrl(orgId: string, id: string, options?: { version?: number; format?: "csv" | "patch" | "pdf" }): string;
     create(
       orgId: string,
       input: { title: string; channelId?: string | null; content: ArtifactContent },
@@ -322,22 +322,5 @@ export interface ApiClient {
   };
 }
 
-/** The part of the client the HTTP backend implements today. */
-export type HttpApi = Pick<
-  ApiClient,
-  | "system"
-  | "account"
-  | "orgs"
-  | "agents"
-  | "chat"
-  | "approvals"
-  | "connectors"
-  | "scopes"
-  | "search"
-  | "memory"
-  | "proposals"
-  | "dms"
-  | "questions"
->;
-/** The part still served by in-memory mocks. */
-export type MockedApi = Omit<ApiClient, keyof HttpApi>;
+/** Everything is served by the HTTP backend (apps/server/src/routes/app). */
+export type HttpApi = ApiClient;

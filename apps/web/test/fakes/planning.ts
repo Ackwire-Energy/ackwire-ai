@@ -1,6 +1,6 @@
 /**
- * MOCK — issues, routines and calendar (D28; backend phase 6).
- * Waiting for (shapes in `api/types.ts`):
+ * Test fake — issues, routines and calendar (D28; backend phase 6).
+ * Mirrors these endpoints (shapes in `api/types.ts`):
  * - Issues: `GET …/issues?q`, `GET …/issues/{number}`, `POST …/issues`, `PATCH …/issues/{id}`,
  *   `PUT …/issues/{id}/criteria/{criterionId} { done }`, `GET|POST …/issues/{id}/activity`,
  *   `POST …/issues/{id}/ask-agent { agentId }` (assigns, moves to "Em andamento", starts the run).
@@ -10,7 +10,7 @@
  *   `POST …/calendar/events`, `POST …/calendar/proposals/{id}/confirm|dismiss`.
  * Nothing runs: "Rodar agora" and "Pedir à Ada" only change local state. Seeded in development only.
  */
-import type { MockedApi } from "../client";
+import type { ApiClient } from "@/api/client";
 import type {
   Actor,
   CalendarEvent,
@@ -20,7 +20,7 @@ import type {
   Routine,
   RoutineRun,
   ScheduleParse,
-} from "../types";
+} from "@/api/types";
 import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg } from "./context";
 
 const DAYS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
@@ -101,7 +101,7 @@ interface Store {
   proposals: CalendarProposal[];
 }
 
-export function createMockPlanning(ctx: MockContext): Pick<MockedApi, "issues" | "routines" | "calendar"> {
+export function createMockPlanning(ctx: MockContext): Pick<ApiClient, "issues" | "routines" | "calendar"> {
   const me = async (): Promise<Actor> => ({ type: "person", id: (await ctx.lookup.me())?.user.id ?? "me" });
   const store = perOrg<Store>(async (orgId) => {
     const s: Store = { issues: [], activity: new Map(), routines: [], runs: new Map(), events: [], proposals: [] };
@@ -134,6 +134,7 @@ export function createMockPlanning(ctx: MockContext): Pick<MockedApi, "issues" |
       criteria: [],
       createdBy: person(0),
       source: { type: "manual" },
+      channelId: null,
       pullRequests: [],
       artifacts: [],
       createdAt: minutesAgo(now, 3000 - n),
@@ -183,6 +184,7 @@ export function createMockPlanning(ctx: MockContext): Pick<MockedApi, "issues" |
         ].map((text) => ({ id: mockId("crit"), text, done: false })),
         createdBy: person(1),
         source: channel ? { type: "message", channelId: channel, messageId: "m-1" } : { type: "manual" },
+        channelId: channel,
       }),
       issue({
         title: "Tabela de concorrentes atualizada",
@@ -277,8 +279,11 @@ export function createMockPlanning(ctx: MockContext): Pick<MockedApi, "issues" |
     const event = (over: Partial<CalendarEvent> & Pick<CalendarEvent, "title" | "start" | "end">): CalendarEvent => ({
       id: mockId("ev"),
       description: "",
+      allDay: false,
+      timezone: "America/Sao_Paulo",
       recurrence: "none",
       participants: [],
+      rsvp: [],
       channelId: null,
       issueId: null,
       createdBy: person(0),
@@ -308,6 +313,7 @@ export function createMockPlanning(ctx: MockContext): Pick<MockedApi, "issues" |
       end: at(3, 15, 45),
       participants: [person(0), person(1), person(2)],
       note: "livre para todos",
+      status: "pending",
     });
     return s;
   });
@@ -363,6 +369,7 @@ export function createMockPlanning(ctx: MockContext): Pick<MockedApi, "issues" |
           criteria: (input.criteria ?? []).map((text) => ({ id: mockId("crit"), text, done: false })),
           createdBy: await me(),
           source: { type: "manual" },
+          channelId: null,
           pullRequests: [],
           artifacts: [],
           createdAt: at,
@@ -375,7 +382,20 @@ export function createMockPlanning(ctx: MockContext): Pick<MockedApi, "issues" |
         const i = await findIssue(orgId, id);
         const author = await me();
         if (patch.status && patch.status !== i.status) {
-          await log(orgId, i, { kind: "event", author, event: "status_changed", text: patch.status });
+          // Same words as the backend (packages/engine/src/issues.ts).
+          const words = {
+            todo: "A fazer",
+            in_progress: "Em andamento",
+            in_review: "Em revisão",
+            done: "Concluída",
+            canceled: "Cancelada",
+          };
+          await log(orgId, i, {
+            kind: "event",
+            author,
+            event: "status_changed",
+            text: `mudou o status para ${words[patch.status]}`,
+          });
         }
         Object.assign(i, patch, { updatedAt: ctx.now().toISOString() });
         return clone(i);
@@ -394,7 +414,13 @@ export function createMockPlanning(ctx: MockContext): Pick<MockedApi, "issues" |
         const i = await findIssue(orgId, id);
         i.assignee = { type: "agent", id: agentId };
         i.status = "in_progress";
-        await log(orgId, i, { kind: "event", author: await me(), event: "agent_asked", text: agentId });
+        const agentName = (await ctx.lookup.agents(orgId)).find((a) => a.id === agentId)?.name ?? "o agente";
+        await log(orgId, i, {
+          kind: "event",
+          author: await me(),
+          event: "agent_asked",
+          text: `pediu a ${agentName} para implementar`,
+        });
         return clone(i);
       },
     },
@@ -458,7 +484,7 @@ export function createMockPlanning(ctx: MockContext): Pick<MockedApi, "issues" |
         const a = new Date(from);
         const b = new Date(to);
         const inRange = (iso: string) => new Date(iso) >= a && new Date(iso) < b;
-        const routines: Awaited<ReturnType<MockedApi["calendar"]["range"]>>["routines"] = [];
+        const routines: Awaited<ReturnType<ApiClient["calendar"]["range"]>>["routines"] = [];
         for (const r of s.routines) {
           if (!r.active || r.trigger.type !== "schedule") continue;
           let next = nextCronRun(r.trigger.cron, new Date(a.getTime() - 60_000));
@@ -497,8 +523,13 @@ export function createMockPlanning(ctx: MockContext): Pick<MockedApi, "issues" |
           description: input.description ?? "",
           start: input.start,
           end: input.end,
+          allDay: input.allDay ?? false,
+          timezone: input.timezone ?? "America/Sao_Paulo",
           recurrence: input.recurrence,
           participants: input.participants,
+          rsvp: input.participants
+            .filter((p) => p.type === "person")
+            .map((p) => ({ ...p, status: "needs_action" as const })),
           channelId: input.channelId ?? null,
           issueId: input.issueId ?? null,
           createdBy: await me(),
@@ -517,8 +548,11 @@ export function createMockPlanning(ctx: MockContext): Pick<MockedApi, "issues" |
           description: "",
           start: p.start,
           end: p.end,
+          allDay: false,
+          timezone: "America/Sao_Paulo",
           recurrence: "none",
           participants: [...p.participants, { type: "agent", id: p.agentId }],
+          rsvp: [],
           channelId: null,
           issueId: null,
           createdBy: await me(),

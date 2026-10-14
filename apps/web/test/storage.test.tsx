@@ -5,8 +5,8 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { keys } from "@/api/keys";
-import { createMockStorage } from "@/api/mock/storage";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { createMockStorage } from "./fakes/storage";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());

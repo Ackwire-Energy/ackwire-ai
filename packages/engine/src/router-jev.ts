@@ -58,6 +58,7 @@ export function createJevRouterStrategy(options: {
           name: c.name,
           role: c.role || null,
           about: c.about || null,
+          can: c.can ?? null,
         })),
       };
       const questions: Record<string, unknown> = {
@@ -75,9 +76,15 @@ export function createJevRouterStrategy(options: {
         questions[`agent_${i}`] = {
           type: "noul",
           instructions: {
-            agent: { handle: `@${c.handle}`, name: c.name, role: c.role || null, about: c.about || null },
+            agent: {
+              handle: `@${c.handle}`,
+              name: c.name,
+              role: c.role || null,
+              about: c.about || null,
+              can: c.can ?? null,
+            },
             question:
-              "Should `agent` reply to `latest_message`? Yes when the message addresses this agent, fits its role, or follows up on a conversation this agent was just part of (see `agent_just_talking`).",
+              "Should `agent` reply to `latest_message`? Yes when the message addresses this agent, fits its role and what it `can` do, or follows up on a conversation this agent was just part of (see `agent_just_talking`). No when it can't actually help with this.",
           },
           criteria: {
             true: "This agent is the one who should answer.",
@@ -85,6 +92,17 @@ export function createJevRouterStrategy(options: {
           },
         };
       });
+      if (input.thread.length > 0) {
+        questions.already_answered = {
+          type: "noul",
+          instructions:
+            "Has an AI agent in `recent_messages` already answered what `latest_message` asks, so another agent's answer would just repeat it?",
+          criteria: {
+            true: "An agent already answered this; a second answer would be a duplicate.",
+            false: "It is a new question or request that nobody answered yet.",
+          },
+        };
+      }
       if (input.candidates.length >= 2) {
         const criteria: Record<string, string> = {};
         for (const c of input.candidates)
@@ -129,6 +147,7 @@ export function createJevRouterStrategy(options: {
       return {
         agents: scores,
         needsAgent: clamp(answers.needs_agent?.noul),
+        ...(answers.already_answered ? { alreadyAnswered: clamp(answers.already_answered.noul) } : {}),
         reason:
           choice && choice !== NONE
             ? `jev: best @${choice} (confidence ${(answers.best_agent?.confidence ?? 0).toFixed(2)})`
@@ -157,5 +176,73 @@ export function withFallback(primary: RouterStrategy, fallback: RouterStrategy):
         };
       }
     },
+  };
+}
+
+/**
+ * Jev as the judge of an agent's @mentions: for each mentioned agent, is the
+ * message asking it to do or answer something now (not just naming it)? One
+ * request, one Noul per agent. Returns the probability per agent id.
+ */
+export function createJevMentionClassifier(options: {
+  apiKey: string;
+  recordUsage(usage: JevUsage): Promise<void>;
+  baseURL?: string;
+  model?: string;
+  timeoutMs?: number;
+  fetch?: typeof fetch;
+}) {
+  const http = options.fetch ?? fetch;
+  const base = (options.baseURL ?? "https://api.typesafe.ai").replace(/\/$/, "");
+  return async (input: {
+    orgId: string;
+    body: string;
+    author: string;
+    recent?: { from: string; text: string }[];
+    targets: { agentId: string; handle: string; name: string; role: string | null; can?: string }[];
+  }): Promise<Map<string, number>> => {
+    const questions: Record<string, unknown> = {};
+    input.targets.forEach((t, i) => {
+      questions[`asks_${i}`] = {
+        type: "noul",
+        instructions: {
+          agent: { handle: `@${t.handle}`, name: t.name, role: t.role, can: t.can ?? null },
+          question:
+            "Is `message` asking `agent` to do something or to answer something now (a hand-off or a direct question), rather than naming it, quoting it, or telling a person to talk to it?",
+        },
+        criteria: {
+          true: "It hands work or a question to that agent, to act on now.",
+          false: "It only names the agent (what it said, did or can do, or 'talk to @agent').",
+        },
+      };
+    });
+    const res = await http(`${base}/v1/systemone`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${options.apiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        state: {
+          message: { from: input.author, from_an_agent: true, text: input.body.slice(0, 4000) },
+          recent_messages: (input.recent ?? []).map((m) => ({ from: m.from, text: m.text.slice(0, 600) })),
+        },
+        model: options.model ?? "jev-latest",
+        questions,
+      }),
+      signal: AbortSignal.timeout(options.timeoutMs ?? 2000),
+    });
+    if (!res.ok) throw new Error(`TypeSafe answered ${res.status}`);
+    const body = (await res.json()) as {
+      model?: string;
+      answers?: Record<string, JevAnswer>;
+      usage?: { input_tokens?: number; output_tokens?: number };
+    };
+    await options
+      .recordUsage({
+        orgId: input.orgId,
+        model: body.model ?? options.model ?? "jev-latest",
+        inputTokens: body.usage?.input_tokens ?? 0,
+        outputTokens: body.usage?.output_tokens ?? 0,
+      })
+      .catch(() => {});
+    return new Map(input.targets.map((t, i) => [t.agentId, clamp(body.answers?.[`asks_${i}`]?.noul)]));
   };
 }

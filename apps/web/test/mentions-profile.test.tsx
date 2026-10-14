@@ -112,7 +112,7 @@ describe("profile card", () => {
     expect(c.textContent).toContain("João");
     expect(c.textContent).toContain("Admin");
     expect(c.textContent).toContain("Hora local");
-    expect(c.textContent).toContain("America/Sao_Paulo");
+    expect(c.textContent).toContain("Europe/Lisbon");
     expect(within(c).getByRole("link", { name: "Mensagem direta" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/dm/person/u-joao`,
     );

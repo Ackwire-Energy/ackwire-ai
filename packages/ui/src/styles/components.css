@@ -370,18 +370,42 @@ textarea.ac-input {
   margin-left: -6px;
 }
 
-/* Message */
+/* Message: a fixed avatar column at the top, the text column beside it. */
 .ac-msg {
   display: flex;
+  align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
 }
 .ac-msg--grouped {
   padding-top: 0;
 }
-.ac-msg--grouped .ac-msg__gutter {
+.ac-msg__avatar,
+.ac-msg__gutter {
+  flex: 0 0 36px;
   width: 36px;
-  flex: none;
+  display: flex;
+  justify-content: center;
+}
+.ac-msg__avatar {
+  /* Top of the avatar on the author line, never centered on a long message. */
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.ac-msg__avatar > * {
+  align-self: flex-start;
+}
+.ac-msg__gutter-time {
+  font-size: 11px;
+  line-height: 22px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  visibility: hidden;
+}
+.ac-msg--grouped:hover .ac-msg__gutter-time,
+.ac-msg--grouped:focus-within .ac-msg__gutter-time {
+  visibility: visible;
 }
 .ac-msg__body {
   min-width: 0;

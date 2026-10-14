@@ -107,7 +107,7 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
   expect((await f.db.select().from(schema.outbox)).every((j) => j.status === "done")).toBe(true);
 });
 
-test("agents mentioning each other stop at the per-thread hop limit", async () => {
+test("agents answer each other at most once in a row without a person", async () => {
   f = await setup({
     reply: (req) => ({ chunks: [systemText(req.system).includes("@dev)") ? "@qa over to you" : "@dev back to you"] }),
   });
@@ -124,19 +124,19 @@ test("agents mentioning each other stop at the per-thread hop limit", async () =
   await drainOutbox(f.db, f.handlers);
 
   const replies = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id })).slice(1);
-  expect(replies.map((m) => m.body)).toEqual(["@qa over to you", "@dev back to you", "@qa over to you"]); // maxHops = 3
-  expect(f.provider.calls).toHaveLength(3);
+  // Dev hands off to QA once; QA's hand-back doesn't start another round.
+  expect(replies.map((m) => m.body)).toEqual(["@qa over to you", "@dev back to you"]);
+  expect(f.provider.calls).toHaveLength(2);
   const runs = await f.db.select().from(schema.agentRuns).orderBy(asc(schema.agentRuns.hop));
   expect(runs.map((r) => [r.hop, r.status])).toEqual([
     [1, "done"],
     [2, "done"],
-    [3, "done"],
   ]);
 
   // A person posting in the thread resets the counter.
   await post(f, "@dev one more", root.id);
   await drainOutbox(f.db, f.handlers);
-  expect(f.provider.calls.length).toBeGreaterThan(3);
+  expect(f.provider.calls.length).toBeGreaterThan(2);
 });
 
 test("transient provider failures retry the job; the run completes on a later attempt", async () => {

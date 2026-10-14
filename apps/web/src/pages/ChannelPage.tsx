@@ -63,7 +63,6 @@ import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { artifactRefs } from "@/lib/artifacts";
 import { dayLabel, formatTime, joinNames } from "@/lib/format";
 import { can } from "@/lib/permissions";
-import { handleFrom } from "@/lib/text";
 import { useToast } from "@/lib/toast";
 import {
   useChannelRealtime,
@@ -578,7 +577,7 @@ const TimelineMessage = memo(function TimelineMessage({
   const name = dir.authorName(m.author);
   const renderMention = (handle: string, key: string) => {
     const a = dir.agentByHandle.get(handle.toLowerCase());
-    const p = a ? undefined : dir.members.find((x) => handleFrom(x.name) === handle.toLowerCase());
+    const p = a ? undefined : dir.memberByHandle.get(handle.toLowerCase());
     if (!a && !p) return <Mention key={key}>@{handle}</Mention>;
     const actor = a ? { type: "agent" as const, id: a.id } : { type: "person" as const, id: p?.userId ?? "" };
     const shown = a?.name ?? p?.name ?? handle;

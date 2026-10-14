@@ -1,9 +1,9 @@
 import type { EmailSender, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
-import { and, count, eq, queryTrace, schema } from "@agenteschat/db";
+import { and, count, eq, inArray, queryTrace, schema } from "@agenteschat/db";
 import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
-import { dispatchDm, dispatchMentions } from "./dispatch";
+import { dispatchDm, dispatchMentions, mentionIntent } from "./dispatch";
 import { sendQueuedEmail } from "./email";
 import { publishChannelEvent } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
@@ -16,7 +16,7 @@ import {
   resolveRouterModel,
   routeMessage,
 } from "./router";
-import { createJevRouterStrategy, jevCostNanoUsd, withFallback } from "./router-jev";
+import { createJevMentionClassifier, createJevRouterStrategy, jevCostNanoUsd, withFallback } from "./router-jev";
 import { executeRoutineRun } from "./routines";
 import type { AgentRun } from "./runs";
 import { indexSource, reindexOrg } from "./search";
@@ -55,6 +55,8 @@ export interface JobDeps extends RunExecutorDeps {
     /** Cheap model per other provider (e.g. `{ openai: "gpt-6-luna" }`), used when the org's default key is theirs. */
     cheapModels?: Record<string, string>;
     minScore?: number;
+    /** Jev probability needed for an agent's @mention of another agent to start it (default 0.6). */
+    mentionThreshold?: number;
     /** Replaces the core LLM strategy (e.g. an optional external classifier). */
     strategy?: RouterStrategy;
     /** TypeSafe Jev as the strategy, with the LLM one as fallback (platform key, never per org). */
@@ -106,6 +108,100 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     maxHops: deps.maxHops,
   };
 
+  // An agent's @mention starts the other agent only when it asks it to act now (code fast path, then Jev).
+  const mentionThreshold = router.mentionThreshold ?? 0.6;
+  const classifyMention = jev
+    ? createJevMentionClassifier({
+        apiKey: jev.apiKey,
+        timeoutMs: jev.timeoutMs,
+        fetch: jev.fetch,
+        baseURL: jev.baseURL,
+        recordUsage: async (u) => {
+          await deps.gateway.recordExternalUsage({
+            orgId: u.orgId,
+            kind: "router",
+            provider: "typesafe",
+            model: u.model,
+            inputTokens: u.inputTokens,
+            outputTokens: u.outputTokens,
+            costNanoUsd: jevCostNanoUsd(u.inputTokens),
+          });
+        },
+      })
+    : null;
+  /**
+   * Which agents an agent's @mentions actually hand off to. Obvious
+   * references ("como o @x disse", "fale com o @x") never do; then Jev judges
+   * each mentioned agent ("is this asking it to act now?") against the
+   * threshold. Without Jev only explicit requests count. Every decision is
+   * recorded in `routing_decisions` for audit.
+   */
+  async function delegatedAgents(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>) {
+    const targets = await deps.db
+      .select({
+        id: schema.agents.id,
+        handle: schema.agents.handle,
+        name: schema.agents.name,
+        role: schema.agents.role,
+      })
+      .from(schema.agents)
+      .where(inArray(schema.agents.id, message.mentionedAgentIds));
+    const others = targets.filter((t) => t.id !== message.authorAgentId);
+    const intents = new Map(others.map((t) => [t.id, mentionIntent(message.body, t.handle)]));
+    const toJudge = others.filter((t) => intents.get(t.id) !== "reference");
+    const scores = new Map<string, number>();
+    let strategy = "mention-rules";
+    let error: string | null = null;
+    if (classifyMention && toJudge.length > 0) {
+      const [author] = message.authorAgentId
+        ? await deps.db
+            .select({ handle: schema.agents.handle })
+            .from(schema.agents)
+            .where(eq(schema.agents.id, message.authorAgentId))
+        : [];
+      try {
+        const judged = await classifyMention({
+          orgId: message.orgId,
+          body: message.body,
+          author: author ? `@${author.handle}` : "agent",
+          targets: toJudge.map((t) => ({ agentId: t.id, handle: t.handle, name: t.name, role: t.role || null })),
+        });
+        for (const [id, p] of judged) scores.set(id, p);
+        strategy = "jev-mention";
+      } catch (e) {
+        error = e instanceof Error ? e.message.slice(0, 300) : String(e);
+      }
+    }
+    const allowed = others
+      .filter((t) => {
+        if (intents.get(t.id) === "reference") return false;
+        const p = scores.get(t.id);
+        if (p !== undefined) return p >= mentionThreshold;
+        return intents.get(t.id) === "request"; // no Jev (or it failed): explicit requests only
+      })
+      .map((t) => t.id);
+    await deps.db
+      .insert(schema.routingDecisions)
+      .values({
+        orgId: message.orgId,
+        channelId: message.channelId,
+        messageId: message.id,
+        strategy,
+        candidates: others.map((t) => ({
+          agentId: t.id,
+          score: scores.get(t.id) ?? (intents.get(t.id) === "request" ? 1 : 0),
+        })),
+        selectedAgentIds: allowed,
+        reason: others
+          .map((t) => `@${t.handle}: ${intents.get(t.id)}`)
+          .join(", ")
+          .slice(0, 500),
+        error,
+      })
+      .onConflictDoNothing();
+    return allowed;
+  }
+
   return {
     "message.posted": async (job, ctx) => {
       const input = { orgId: orgOf(job), messageId: String(job.payload.messageId) };
@@ -142,8 +238,13 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
         if (message.mentionedAgentIds.length > 0) {
-          const res = await dispatchMentions(deps.db, input, { maxHops: deps.maxHops });
-          await routed("mention", message.mentionedAgentIds, res.runs);
+          // Agents answer each other at most once in a row: a reply to an agent's request can't hand off again.
+          if (message.hop >= 2) return routed("none", message.mentionedAgentIds, [], "agent_chain_cap");
+          const allowed = await delegatedAgents(message);
+          const res = allowed.length
+            ? await dispatchMentions(deps.db, input, { maxHops: deps.maxHops, onlyAgentIds: allowed })
+            : { runs: [] };
+          await routed("mention", message.mentionedAgentIds, res.runs, allowed.length ? undefined : "reference_only");
         }
         return;
       }

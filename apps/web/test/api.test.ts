@@ -226,3 +226,145 @@ describe("HTTP client: management (phase 4)", () => {
     expect(calls[4]?.init.body).toBe('{"channels":[{"channelId":"c1"}]}');
   });
 });
+
+describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, invites (no mocks left)", () => {
+  const org = "/api/app/organizations/o1";
+  const artifact = { id: "a1", kind: "document", title: "Relatório", version: 2, untrusted: false };
+
+  test("artifacts: list with filters, get by version, versions, save a version, download, file URL, delete", async () => {
+    const { fetch, calls } = fakeFetch({
+      [`${org}/artifacts?q=rel&kind=document&channelId=c1&authorType=agent&authorId=ag`]: {
+        status: 200,
+        body: { artifacts: [artifact] },
+      },
+      [`${org}/artifacts/a1?version=1`]: { status: 200, body: { ...artifact, shownVersion: 1 } },
+      [`${org}/artifacts/a1/versions`]: { status: 200, body: { versions: [{ version: 2 }, { version: 1 }] } },
+      [`POST ${org}/artifacts/a1/versions`]: { status: 409, body: { error: { code: "conflict", message: "Stale" } } },
+      [`${org}/artifacts/a1/download`]: { status: 200, body: { url: "https://bucket/x?sig", expiresAt: "t" } },
+      [`DELETE ${org}/artifacts/a1`]: { status: 204 },
+    });
+    const api = createHttpApi(fetch);
+    expect(
+      await api.artifacts.list("o1", {
+        q: "rel",
+        kind: "document",
+        channelId: "c1",
+        author: { type: "agent", id: "ag" },
+      }),
+    ).toEqual([artifact] as never);
+    expect((await api.artifacts.get("o1", "a1", 1)).shownVersion).toBe(1);
+    expect((await api.artifacts.versions("o1", "a1")).map((v) => v.version)).toEqual([2, 1]);
+    const stale = await api.artifacts
+      .update("o1", "a1", { content: { kind: "document", markdown: "x" }, baseVersion: 1, note: "n" })
+      .catch((e) => e);
+    expect(stale).toMatchObject({ status: 409 });
+    expect(JSON.parse(String(calls[3]?.init.body))).toEqual({
+      content: { kind: "document", markdown: "x" },
+      baseVersion: 1,
+      note: "n",
+    });
+    expect((await api.artifacts.download("o1", "a1")).url).toBe("https://bucket/x?sig");
+    expect(api.artifacts.fileUrl("o1", "a1", { version: 2, format: "pdf" })).toBe(
+      `${org}/artifacts/a1/file?version=2&format=pdf`,
+    );
+    expect(api.artifacts.fileUrl("o1", "a1")).toBe(`${org}/artifacts/a1/file`);
+    await api.artifacts.remove("o1", "a1");
+    expect(calls.at(-1)?.init.method).toBe("DELETE");
+  });
+
+  test("storage: get, test, save, migrate and migration status", async () => {
+    const config = { kind: "agentes", s3: null, migration: null };
+    const s3 = { endpoint: "https://r2", region: "auto", bucket: "b", prefix: null, pathStyle: true };
+    const { fetch, calls } = fakeFetch({
+      [`${org}/storage`]: { status: 200, body: config },
+      [`POST ${org}/storage/test`]: { status: 200, body: { ok: true, steps: [] } },
+      [`PUT ${org}/storage`]: { status: 200, body: { ...config, kind: "s3" } },
+      [`POST ${org}/storage/migrate`]: { status: 200, body: { status: "running", copied: 0, total: 3, error: null } },
+      [`${org}/storage/migration`]: { status: 200, body: null },
+    });
+    const api = createHttpApi(fetch);
+    expect(await api.storage.get("o1")).toEqual(config as never);
+    expect((await api.storage.test("o1", s3)).ok).toBe(true);
+    expect((await api.storage.save("o1", { kind: "s3", s3 })).kind).toBe("s3");
+    expect((await api.storage.migrate("o1")).status).toBe("running");
+    expect(await api.storage.migration("o1")).toBeNull();
+    expect(calls.map((c) => `${c.init.method} ${c.url}`)).toEqual([
+      `GET ${org}/storage`,
+      `POST ${org}/storage/test`,
+      `PUT ${org}/storage`,
+      `POST ${org}/storage/migrate`,
+      `GET ${org}/storage/migration`,
+    ]);
+  });
+
+  test("issues and routines", async () => {
+    const issue = { id: "i1", number: 131 };
+    const { fetch, calls } = fakeFetch({
+      [`${org}/issues?q=wa`]: { status: 200, body: { issues: [issue] } },
+      [`${org}/issues/by-number/131`]: { status: 200, body: issue },
+      [`PATCH ${org}/issues/i1`]: { status: 200, body: issue },
+      [`PUT ${org}/issues/i1/criteria/c1`]: { status: 200, body: issue },
+      [`${org}/issues/i1/activity`]: { status: 200, body: { activity: [] } },
+      [`POST ${org}/issues/i1/comments`]: { status: 201, body: { id: "x" } },
+      [`POST ${org}/issues/i1/ask-agent`]: { status: 200, body: issue },
+      [`${org}/routines`]: { status: 200, body: { routines: [] } },
+      [`POST ${org}/routines/parse-schedule`]: { status: 200, body: { ok: false, error: "?" } },
+      [`PATCH ${org}/routines/r1`]: { status: 200, body: { id: "r1" } },
+      [`POST ${org}/routines/r1/run`]: { status: 200, body: { id: "r1" } },
+      [`${org}/routines/r1/runs`]: { status: 200, body: { runs: [{ id: "run" }] } },
+    });
+    const api = createHttpApi(fetch);
+    expect(await api.issues.list("o1", { q: "wa" })).toEqual([issue] as never);
+    expect((await api.issues.get("o1", 131)).id).toBe("i1");
+    await api.issues.update("o1", "i1", { status: "done" });
+    await api.issues.setCriterion("o1", "i1", "c1", true);
+    expect(await api.issues.activity("o1", "i1")).toEqual([]);
+    await api.issues.comment("o1", "i1", "oi");
+    await api.issues.askAgent("o1", "i1", "ag");
+    expect(await api.routines.list("o1")).toEqual([]);
+    expect(await api.routines.parseSchedule("o1", "quando der")).toEqual({ ok: false, error: "?" });
+    await api.routines.setActive("o1", "r1", false);
+    await api.routines.runNow("o1", "r1");
+    expect((await api.routines.runs("o1", "r1"))[0]?.id).toBe("run");
+    const bodies = calls.filter((c) => c.init.method !== "GET").map((c) => c.init.body);
+    expect(bodies).toEqual([
+      '{"status":"done"}',
+      '{"done":true}',
+      '{"text":"oi"}',
+      '{"agentId":"ag"}',
+      '{"phrase":"quando der"}',
+      '{"active":false}',
+      "{}",
+    ]);
+  });
+
+  test("calendar, custom MCP and invites", async () => {
+    const { fetch, calls } = fakeFetch({
+      [`${org}/calendar?from=2026-10-12&to=2026-10-19`]: {
+        status: 200,
+        body: { events: [], routines: [], deadlines: [], proposals: [] },
+      },
+      [`POST ${org}/calendar/events`]: { status: 201, body: { id: "e1" } },
+      [`POST ${org}/calendar/proposals/p1/confirm`]: { status: 200, body: { id: "e2" } },
+      [`POST ${org}/calendar/proposals/p1/dismiss`]: { status: 204 },
+      [`${org}/connectors/custom`]: { status: 200, body: { servers: [] } },
+      [`POST ${org}/connectors/custom`]: { status: 200, body: { status: "needs_key" } },
+      [`PUT ${org}/connectors/custom/s1/tools`]: { status: 200, body: { id: "s1" } },
+      [`POST ${org}/invite-links`]: { status: 201, body: { url: "https://x/invite/t", expiresAt: "t" } },
+      [`POST /api/app/invitations/tok/request-new`]: { status: 204 },
+    });
+    const api = createHttpApi(fetch);
+    expect((await api.calendar.range("o1", "2026-10-12", "2026-10-19")).events).toEqual([]);
+    await api.calendar.create("o1", { title: "x", start: "a", end: "b", recurrence: "none", participants: [] });
+    expect((await api.calendar.confirmProposal("o1", "p1")).id).toBe("e2");
+    await api.calendar.dismissProposal("o1", "p1");
+    expect(await api.customConnectors.list("o1")).toEqual([]);
+    expect(await api.customConnectors.connect("o1", { serverUrl: "https://mcp", returnTo: "/" })).toEqual({
+      status: "needs_key",
+    });
+    await api.customConnectors.saveTools("o1", "s1", { label: "x", tools: [] });
+    expect((await api.invites.createLink("o1")).url).toBe("https://x/invite/t");
+    await api.invites.requestNew("tok");
+    expect(calls.every((c) => c.init.method === "GET" || c.init.body !== undefined)).toBe(true);
+  });
+});

@@ -1,8 +1,4 @@
-/**
- * Types of the private web-app API (`/api/app/*`, apps/server/src/routes/app),
- * plus the types of the features whose endpoints don't exist yet (marked
- * "mock" — see `src/api/mock`).
- */
+/** Types of the private web-app API (`/api/app/*`, apps/server/src/routes/app). */
 
 export type Role = "owner" | "admin" | "member";
 export type Edition = "selfhost" | "cloud";
@@ -48,6 +44,10 @@ export interface Member {
   image: string | null;
   role: Role;
   joinedAt: string;
+  /** `@ana`: unique in the organization; mentions resolve by it. */
+  handle: string;
+  /** IANA zone (the organization's if the person didn't pick one). */
+  timezone: string;
 }
 
 export interface Invitation {
@@ -245,7 +245,7 @@ export type UserEvent =
   | BudgetEvent
   | { type: string };
 
-// ── Mock-backed (no backend endpoint yet) ────────────────────────────────────
+// ── Approvals, connectors, scopes ─────────────────────────────────────────────
 
 export type ApprovalStatus = "pending" | "approved" | "refused" | "expired";
 
@@ -400,6 +400,8 @@ export interface Person {
   joinedAt: string;
   lastSeenAt: string | null;
   online: boolean;
+  handle: string;
+  timezone: string;
 }
 
 export interface InvitationWithStatus {
@@ -512,7 +514,7 @@ export interface BudgetEvent {
   budgetNanoUsd: number;
 }
 
-// ── Custom MCP servers (mock until the backend lands, after phase 5) ─────────
+// ── Custom MCP servers (apps/server/src/routes/app/connectors-custom.ts) ─────
 
 /** How a tool of a custom server may be used. `null` = not classified yet (hidden from agents). */
 export type ToolAccess = "read" | "write" | "approval";
@@ -685,6 +687,8 @@ export interface Artifact {
   updatedAt: string;
   /** The viewer may save new versions (documents and tables only). */
   canEdit: boolean;
+  /** HTML: render only in a sandboxed iframe (we always do). */
+  untrusted: boolean;
 }
 
 export interface ArtifactVersion {
@@ -757,6 +761,8 @@ export interface Issue {
     | { type: "forum"; threadId: string }
     | { type: "agent"; agentId: string }
     | { type: "webhook"; provider: string };
+  /** The channel it lives in (from a message, or chosen). */
+  channelId: string | null;
   pullRequests: { number: number; url: string; openedBy: Actor | null }[];
   artifacts: { id: string; title: string; createdBy: Actor }[];
   createdAt: string;
@@ -842,8 +848,12 @@ export interface CalendarEvent {
   description: string;
   start: string;
   end: string;
+  allDay: boolean;
+  timezone: string;
   recurrence: Recurrence;
   participants: Actor[];
+  /** Each invited person's answer. */
+  rsvp: (Actor & { status: "needs_action" | "accepted" | "declined" })[];
   channelId: string | null;
   issueId: string | null;
   createdBy: Actor;
@@ -859,6 +869,7 @@ export interface CalendarProposal {
   participants: Actor[];
   /** "livre para todos". */
   note: string | null;
+  status: "pending" | "confirmed" | "dismissed";
 }
 
 export interface CalendarRange {
@@ -875,6 +886,9 @@ export interface CalendarEventInput {
   description?: string;
   start: string;
   end: string;
+  allDay?: boolean;
+  /** IANA zone of the times (defaults to the workspace's). */
+  timezone?: string;
   recurrence: Recurrence;
   participants: Actor[];
   channelId?: string | null;

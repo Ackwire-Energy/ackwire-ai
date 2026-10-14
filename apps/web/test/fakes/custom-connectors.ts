@@ -1,6 +1,6 @@
 /**
- * MOCK — custom MCP servers ("Conectar outro servidor MCP").
- * Waiting for (backend, after phase 5):
+ * Test fake — custom MCP servers ("Conectar outro servidor MCP").
+ * Mirrors these endpoints:
  * - GET    /api/app/organizations/{orgId}/connectors/custom
  * - POST   /api/app/organizations/{orgId}/connectors/custom { serverUrl, apiKey?, label?, returnTo }
  *          → { status: "connected", server } | { status: "oauth", authorizeUrl } | { status: "needs_key" }
@@ -11,8 +11,8 @@
  * tool set, needs an API key unless the URL contains "oauth", and gains one
  * new tool on the first refresh.
  */
-import type { MockedApi } from "../client";
-import type { CustomServer, CustomTool } from "../types";
+import type { ApiClient } from "@/api/client";
+import type { CustomServer, CustomTool } from "@/api/types";
 import { clone, type MockContext, MockNotFoundError, mockId } from "./context";
 
 const TOOLS: [name: string, description: string, readOnly: boolean | null][] = [
@@ -33,7 +33,7 @@ const tool = ([name, description, readOnly]: [string, string, boolean | null], n
   firstSeenAt: now.toISOString(),
 });
 
-export function createMockCustomConnectors(ctx: MockContext): MockedApi["customConnectors"] {
+export function createMockCustomConnectors(ctx: MockContext): ApiClient["customConnectors"] {
   const byOrg = new Map<string, CustomServer[]>();
   const refreshed = new Set<string>();
   const list = (orgId: string) => {

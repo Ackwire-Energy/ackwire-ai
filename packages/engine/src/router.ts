@@ -1,12 +1,14 @@
-import { and, type Database, desc, eq, isNull, lte, ne, schema } from "@agenteschat/db";
+import { and, type Database, desc, eq, inArray, isNull, lte, ne, schema } from "@agenteschat/db";
 import { cheapModelOf, ProviderError } from "@agenteschat/providers";
+import { summarizeScopes } from "./capabilities";
 import { createAgentRuns } from "./dispatch";
 import { MissingCredentialError, ValidationError } from "./errors";
 import type { ModelGateway } from "./gateway";
 import { getMessage } from "./messages";
 import type { AgentRun } from "./runs";
 
-const { agents, channelMembers, channels, messages, users, routingDecisions, organizationSettings } = schema;
+const { agents, agentScopes, channelMembers, channels, messages, users, routingDecisions, organizationSettings } =
+  schema;
 
 /** An agent the router may pick: already filtered by code (channel member, active, auto-reply on). */
 export interface RoutingCandidate {
@@ -16,6 +18,8 @@ export interface RoutingCandidate {
   role: string;
   /** First part of the agent's instructions, so the strategy knows what it does. */
   about: string;
+  /** What its granted scopes let it do ("Arquivos (Drive), GitHub"), so "should it answer" weighs whether it can help. */
+  can?: string;
 }
 
 export interface RoutingInput {
@@ -34,6 +38,8 @@ export interface RoutingResult {
   agents: { agentId: string; score: number }[];
   /** Probability that the message needs any agent at all, when the strategy computes one. */
   needsAgent?: number;
+  /** Probability that another agent in the thread already answered it (duplicates are suppressed). */
+  alreadyAnswered?: number;
   reason?: string;
   /** Usage record of the call the strategy made, if any. */
   usageRecordId?: string;
@@ -55,6 +61,9 @@ export interface RouterStrategy {
   readonly name: string;
   decide(input: RoutingInput): Promise<RoutingResult>;
 }
+
+/** Above this "already answered by another agent" probability, the router picks nobody. */
+export const ALREADY_ANSWERED_THRESHOLD = 0.7;
 
 export interface RouterPolicy {
   /** Minimum score to be picked. */
@@ -336,6 +345,18 @@ export async function routeMessage(
     about: r.instructions.slice(0, 300),
   }));
   if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
+  const granted = await db
+    .select({ agentId: agentScopes.agentId, scope: agentScopes.scope })
+    .from(agentScopes)
+    .where(
+      inArray(
+        agentScopes.agentId,
+        candidates.map((c) => c.agentId),
+      ),
+    );
+  for (const c of candidates) {
+    c.can = summarizeScopes(granted.filter((g) => g.agentId === c.agentId).map((g) => g.scope));
+  }
 
   const [channel] = await db
     .select({ id: channels.id, name: channels.name, topic: channels.topic })
@@ -344,6 +365,7 @@ export async function routeMessage(
   if (!channel) return { runs: [], skipped: "message_missing" };
   const history = await db
     .select({
+      id: messages.id,
       body: messages.body,
       userName: users.name,
       agentHandle: agents.handle,
@@ -377,19 +399,37 @@ export async function routeMessage(
   const windowMs = deps.policy.continuityWindowMs ?? DEFAULT_ROUTER_POLICY.continuityWindowMs;
   const recent = history.filter((m) => message.createdAt.getTime() - m.createdAt.getTime() <= windowMs);
   const candidateIds = new Set(candidates.map((c) => c.agentId));
+  // The agent this person last talked to: the one they addressed in their previous message, else the
+  // first agent that answered it (in its thread, for top-level messages), else whoever spoke last here.
   let continuityAgentId: string | null = null;
-  for (const m of recent) {
-    if (m.authorAgentId && candidateIds.has(m.authorAgentId)) {
-      continuityAgentId = m.authorAgentId;
-      break;
+  const previous = recent.find((m) => m.authorUserId && m.authorUserId === message.authorUserId);
+  if (previous) {
+    const addressed = previous.mentionedAgentIds.filter((id) => candidateIds.has(id));
+    if (addressed.length === 1) continuityAgentId = addressed[0] ?? null;
+    else {
+      const answers: { authorAgentId: string | null; createdAt: Date }[] = message.threadId
+        ? recent.filter((m) => m.createdAt > previous.createdAt && m.authorAgentId)
+        : await db
+            .select({ authorAgentId: messages.authorAgentId, createdAt: messages.createdAt })
+            .from(messages)
+            .where(
+              and(
+                eq(messages.orgId, message.orgId),
+                eq(messages.threadId, previous.id),
+                isNull(messages.deletedAt),
+                lte(messages.createdAt, message.createdAt),
+              ),
+            )
+            .orderBy(desc(messages.createdAt))
+            .limit(20);
+      const first = answers
+        .filter((m) => m.authorAgentId && candidateIds.has(m.authorAgentId))
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+      continuityAgentId = first?.authorAgentId ?? null;
     }
-    if (m.authorUserId === message.authorUserId) {
-      const addressed = m.mentionedAgentIds.filter((id) => candidateIds.has(id));
-      if (addressed.length === 1) {
-        continuityAgentId = addressed[0] ?? null;
-        break;
-      }
-    }
+  }
+  if (!continuityAgentId) {
+    continuityAgentId = recent.find((m) => m.authorAgentId && candidateIds.has(m.authorAgentId))?.authorAgentId ?? null;
   }
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
 
@@ -426,7 +466,18 @@ export async function routeMessage(
     return { runs: [], selected: [], seenBy: candidates.map((c) => c.agentId) };
   }
 
-  const selected = selectAgents(candidates, result, deps.policy, { continuityAgentId });
+  // A short follow-up without a mention ("e agora?") goes only to the agent the person was talking to,
+  // unless it clearly speaks to several.
+  const followUp =
+    continuityAgentId !== null && isShortFollowUp(message.body) && !addressesSeveral(message.body, candidates);
+  // Another agent already answered this in the thread: don't pile on with a second answer.
+  const duplicate = !followUp && (result.alreadyAnswered ?? 0) >= ALREADY_ANSWERED_THRESHOLD;
+  const selected =
+    followUp && continuityAgentId
+      ? [continuityAgentId]
+      : duplicate
+        ? []
+        : selectAgents(candidates, result, deps.policy, { continuityAgentId });
   const runs = await db.transaction(async (tx) => {
     const [decision] = await tx
       .insert(routingDecisions)
@@ -441,7 +492,10 @@ export async function routeMessage(
         })),
         needsAgentScore: result.needsAgent ?? null,
         selectedAgentIds: selected,
-        reason: result.reason ?? null,
+        reason:
+          [result.reason, duplicate ? "already answered by another agent" : null, followUp ? "follow-up" : null]
+            .filter(Boolean)
+            .join("; ") || null,
         usageRecordId: result.usageRecordId ?? null,
       })
       .onConflictDoNothing()
@@ -457,4 +511,24 @@ export async function routeMessage(
     reason: result.reason,
     continuityAgentId,
   };
+}
+
+/** "e agora?", "e aí?", "pode seguir", "and now?": short, no mention. */
+export function isShortFollowUp(body: string) {
+  const text = body.trim();
+  if (!text || text.includes("@")) return false;
+  return text.length <= 60 && text.split(/\s+/).length <= 8;
+}
+
+/** "vocês", "todos", "ambos", or the names of two or more of the agents. */
+export function addressesSeveral(body: string, candidates: Pick<RoutingCandidate, "name" | "handle">[]) {
+  const text = body.toLowerCase();
+  if (/\b(voc[eê]s|todos|todas|ambos|ambas|cada um|everyone|both|all of you|you all)\b/.test(text)) return true;
+  const named = candidates.filter((c) => {
+    const names = [c.name.toLowerCase(), c.handle.toLowerCase()].filter((n) => n.length >= 2);
+    return names.some((n) =>
+      new RegExp(`(^|[^\\p{L}\\d])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\p{L}\\d]|$)`, "u").test(text),
+    );
+  });
+  return named.length >= 2;
 }

@@ -12,6 +12,9 @@ export function useDirectory(orgId: string) {
     const agentById = new Map<string, Agent>((agents.data ?? []).map((a) => [a.id, a]));
     const agentByHandle = new Map<string, Agent>((agents.data ?? []).map((a) => [a.handle.toLowerCase(), a]));
     const memberById = new Map<string, Member>((members.data ?? []).map((m) => [m.userId, m]));
+    const memberByHandle = new Map<string, Member>(
+      (members.data ?? []).filter((m) => m.handle).map((m) => [m.handle.toLowerCase(), m]),
+    );
     const authorName = (author: Message["author"]) =>
       author.type === "agent"
         ? (agentById.get(author.id ?? "")?.name ?? t("channel.unknownAgent"))
@@ -26,14 +29,16 @@ export function useDirectory(orgId: string) {
       initials.set(a.id, value);
     }
     const agentInitials = (agentId: string) => initials.get(agentId);
-    /** `@ada` → "Ada" (agents); unknown handles stay as typed. */
-    const mentionName = (handle: string) => agentByHandle.get(handle.toLowerCase())?.name ?? null;
+    /** `@ada` → "Ada", `@joao` → "João"; unknown handles stay as typed. */
+    const mentionName = (handle: string) =>
+      agentByHandle.get(handle.toLowerCase())?.name ?? memberByHandle.get(handle.toLowerCase())?.name ?? null;
     return {
       agents: agents.data ?? [],
       members: members.data ?? [],
       agentById,
       agentByHandle,
       memberById,
+      memberByHandle,
       authorName,
       mentionName,
       agentInitials,

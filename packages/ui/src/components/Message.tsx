@@ -48,7 +48,14 @@ export function Message({
       aria-busy={streaming || undefined}
       {...rest}
     >
-      {grouped ? <span className="ac-msg__gutter" /> : avatar}
+      {grouped ? (
+        // Same width as the avatar column; the time shows here on hover (it's also in the hidden header).
+        <span className="ac-msg__gutter" aria-hidden="true">
+          <span className="ac-msg__gutter-time">{time}</span>
+        </span>
+      ) : (
+        <span className="ac-msg__avatar">{avatar}</span>
+      )}
       <div className="ac-msg__body" style={stacked ? { display: "flex", flexDirection: "column", gap: 8 } : undefined}>
         <div className={grouped ? "ac-visually-hidden" : "ac-msg__head"}>
           <span className="ac-msg__author">{author}</span>

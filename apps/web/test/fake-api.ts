@@ -1,6 +1,5 @@
 import type { ApiClient, HttpApi } from "@/api/client";
 import { ApiError } from "@/api/http";
-import { createMockApi } from "@/api/mock";
 import type {
   Agent,
   AgentQuestion,
@@ -21,6 +20,11 @@ import type {
   Run,
   ScopeGrant,
 } from "@/api/types";
+import { createMockArtifacts } from "./fakes/artifacts";
+import type { MockContext } from "./fakes/context";
+import { createMockCustomConnectors } from "./fakes/custom-connectors";
+import { createMockPlanning } from "./fakes/planning";
+import { createMockStorage } from "./fakes/storage";
 
 export const NOW = new Date("2026-10-14T13:44:00.000Z");
 export const ORG_ID = "00000000-0000-4000-8000-000000000001";
@@ -71,6 +75,8 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
     image: null,
     role: "owner",
     joinedAt: minutesAgo(60 * 24 * 30),
+    handle: "walter",
+    timezone: "America/Sao_Paulo",
   };
   const joao: Member = {
     userId: "u-joao",
@@ -79,6 +85,8 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
     image: null,
     role: "admin",
     joinedAt: minutesAgo(60 * 24 * 20),
+    handle: "joao",
+    timezone: "Europe/Lisbon",
   };
   const agent = (id: string, name: string, role: string, owner: string, budget: number | null): Agent => ({
     id,
@@ -473,8 +481,11 @@ export const CATALOG: ConnectorCatalog = {
 let n = 0;
 const id = (prefix: string) => `${prefix}-${++n}`;
 
-/** The HTTP half of the client, over `FakeState`. Records every call in `state.calls`. */
-export function createFakeHttpApi(state: FakeState): HttpApi {
+/** Served by the in-memory fakes in `test/fakes` (same shapes as the server). */
+type FakedParts = "invites" | "storage" | "artifacts" | "issues" | "routines" | "calendar" | "customConnectors";
+
+/** The core of the fake backend, over `FakeState`. Records every call in `state.calls`. */
+export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   const log = (method: string, ...args: unknown[]): void => {
     state.calls.push({ method, args });
   };
@@ -1087,18 +1098,33 @@ function newInvitation(email: string, role: Role): InvitationWithStatus {
 /** Full client: fake HTTP + the real in-memory mocks (seeded like development). */
 export function createFakeApi(state: FakeState = seedState(), options: { seed?: boolean } = {}): ApiClient {
   const http = createFakeHttpApi(state);
-  const mocks = createMockApi(
-    {
-      seed: options.seed ?? true,
-      now: () => new Date(),
-      lookup: {
-        me: () => http.account.me(),
-        agents: (orgId) => http.agents.list(orgId),
-        channels: (orgId) => http.chat.channels(orgId),
-        members: (orgId) => http.orgs.members(orgId),
+  const ctx: MockContext = {
+    seed: options.seed ?? true,
+    now: () => new Date(),
+    lookup: {
+      me: () => http.account.me(),
+      agents: (orgId) => http.agents.list(orgId),
+      channels: (orgId) => http.chat.channels(orgId),
+      members: (orgId) => http.orgs.members(orgId),
+    },
+  };
+  return {
+    ...http,
+    invites: {
+      createLink: async (orgId) => {
+        state.calls.push({ method: "invites.createLink", args: [orgId] });
+        return {
+          url: `http://localhost:3000/invite/link-${state.calls.length}`,
+          expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+        };
+      },
+      requestNew: async (token) => {
+        state.calls.push({ method: "invites.requestNew", args: [token] });
       },
     },
-    () => "http://localhost:3000",
-  );
-  return { ...http, ...mocks };
+    storage: createMockStorage(),
+    artifacts: createMockArtifacts(ctx),
+    ...createMockPlanning(ctx),
+    customConnectors: createMockCustomConnectors(ctx),
+  };
 }

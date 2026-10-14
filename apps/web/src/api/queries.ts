@@ -585,7 +585,7 @@ export function useCorrectMessage(orgId: string) {
   });
 }
 
-// ── Mock-backed features ────────────────────────────────────────────────────
+// ── Invites, custom MCP ─────────────────────────────────────────────────────
 
 export const useCustomServers = (orgId: string) => {
   const api = useApi();

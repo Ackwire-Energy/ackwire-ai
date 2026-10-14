@@ -1,6 +1,6 @@
 /**
- * MOCK — file storage ("Configurações → Armazenamento").
- * Waiting for:
+ * Test fake — file storage ("Configurações → Armazenamento").
+ * Mirrors these endpoints:
  * - `GET  /api/app/organizations/{orgId}/storage` → StorageConfig
  * - `PUT  …/storage` `{ kind: "agentes" } | { kind: "s3", s3: S3Input }` (s3 needs a passing test of the same settings)
  * - `POST …/storage/test` S3Input → `{ ok, steps: [{ step: "write" | "read" | "list" | "delete", ok, error? }] }`
@@ -9,8 +9,8 @@
  * write step; with "lista" the list step; with "instavel" the copy stops at
  * half once (resume continues).
  */
-import type { MockedApi } from "../client";
-import type { S3Input, StorageConfig, StorageMigration, StorageStep, StorageTestResult } from "../types";
+import type { ApiClient } from "@/api/client";
+import type { S3Input, StorageConfig, StorageMigration, StorageStep, StorageTestResult } from "@/api/types";
 import { clone } from "./context";
 
 const STEPS: StorageStep[] = ["write", "read", "list", "delete"];
@@ -18,7 +18,7 @@ const TOTAL = 120;
 const sig = (s: S3Input) => JSON.stringify([s.endpoint, s.region, s.bucket, s.prefix ?? "", s.pathStyle]);
 const hint = (v: string | undefined, prev?: string) => (v ? v.slice(-4) : (prev ?? ""));
 
-export function createMockStorage(): MockedApi["storage"] {
+export function createMockStorage(): ApiClient["storage"] {
   const configs = new Map<string, StorageConfig>();
   const passed = new Map<string, string>();
   const flakyDone = new Set<string>();

@@ -7,18 +7,27 @@ import type {
   AgentQuestion,
   AgentUsage,
   Approval,
+  Artifact,
+  ArtifactDetail,
+  ArtifactVersion,
   AuthConfig,
   BatchInviteResult,
+  CalendarEvent,
+  CalendarRange,
   Channel,
   ChannelMember,
   Connection,
   ConnectorCatalog,
   Credential,
+  CustomConnectStart,
+  CustomServer,
   DirectMessage,
   Health,
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
+  Issue,
+  IssueActivity,
   Me,
   Member,
   Memory,
@@ -31,10 +40,16 @@ import type {
   Proposal,
   ReactionCount,
   RosterMember,
+  Routine,
+  RoutineRun,
   Run,
   RunStep,
+  ScheduleParse,
   ScopeGrant,
   SearchHit,
+  StorageConfig,
+  StorageMigration,
+  StorageTestResult,
   UsageReport,
 } from "./types";
 
@@ -228,6 +243,99 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       list: async (orgId) => (await request<{ dms: DirectMessage[] }>(`${org(orgId)}/dms`)).dms,
       open: (orgId, target) => request<{ channelId: string }>(`${org(orgId)}/dms`, { json: target }),
       markRead: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/read`, { json: {} }),
+    },
+    invites: {
+      createLink: (orgId) => request<{ url: string; expiresAt: string }>(`${org(orgId)}/invite-links`, { json: {} }),
+      requestNew: (token) => request<void>(`/api/app/invitations/${enc(token)}/request-new`, { json: {} }),
+    },
+    storage: {
+      get: (orgId) => request<StorageConfig>(`${org(orgId)}/storage`),
+      test: (orgId, input) => request<StorageTestResult>(`${org(orgId)}/storage/test`, { json: input }),
+      save: (orgId, input) => request<StorageConfig>(`${org(orgId)}/storage`, { method: "PUT", json: input }),
+      migrate: (orgId) => request<StorageMigration>(`${org(orgId)}/storage/migrate`, { json: {} }),
+      migration: (orgId) => request<StorageMigration | null>(`${org(orgId)}/storage/migration`),
+    },
+    artifacts: {
+      list: async (orgId, filters = {}) =>
+        (
+          await request<{ artifacts: Artifact[] }>(`${org(orgId)}/artifacts`, {
+            query: {
+              q: filters.q,
+              kind: filters.kind,
+              channelId: filters.channelId,
+              authorType: filters.author?.type,
+              authorId: filters.author?.id,
+            },
+          })
+        ).artifacts,
+      get: (orgId, id, version) =>
+        request<ArtifactDetail>(`${org(orgId)}/artifacts/${enc(id)}`, { query: { version } }),
+      versions: async (orgId, id) =>
+        (await request<{ versions: ArtifactVersion[] }>(`${org(orgId)}/artifacts/${enc(id)}/versions`)).versions,
+      download: (orgId, id, version) =>
+        request<{ url: string; expiresAt: string }>(`${org(orgId)}/artifacts/${enc(id)}/download`, {
+          query: { version },
+        }),
+      fileUrl: (orgId, id, options = {}) => {
+        const params = new URLSearchParams();
+        if (options.version) params.set("version", String(options.version));
+        if (options.format) params.set("format", options.format);
+        const qs = params.toString();
+        return `${org(orgId)}/artifacts/${enc(id)}/file${qs ? `?${qs}` : ""}`;
+      },
+      create: (orgId, input) => request<ArtifactDetail>(`${org(orgId)}/artifacts`, { json: input }),
+      update: (orgId, id, input) =>
+        request<ArtifactDetail>(`${org(orgId)}/artifacts/${enc(id)}/versions`, { json: input }),
+      remove: (orgId, id) => request<void>(`${org(orgId)}/artifacts/${enc(id)}`, { method: "DELETE" }),
+    },
+    issues: {
+      list: async (orgId, filters = {}) =>
+        (await request<{ issues: Issue[] }>(`${org(orgId)}/issues`, { query: { q: filters.q } })).issues,
+      get: (orgId, number) => request<Issue>(`${org(orgId)}/issues/by-number/${number}`),
+      create: (orgId, input) => request<Issue>(`${org(orgId)}/issues`, { json: input }),
+      update: (orgId, id, patch) => request<Issue>(`${org(orgId)}/issues/${enc(id)}`, { method: "PATCH", json: patch }),
+      setCriterion: (orgId, id, criterionId, done) =>
+        request<Issue>(`${org(orgId)}/issues/${enc(id)}/criteria/${enc(criterionId)}`, {
+          method: "PUT",
+          json: { done },
+        }),
+      activity: async (orgId, id) =>
+        (await request<{ activity: IssueActivity[] }>(`${org(orgId)}/issues/${enc(id)}/activity`)).activity,
+      comment: (orgId, id, text) =>
+        request<IssueActivity>(`${org(orgId)}/issues/${enc(id)}/comments`, { json: { text } }),
+      askAgent: (orgId, id, agentId) =>
+        request<Issue>(`${org(orgId)}/issues/${enc(id)}/ask-agent`, { json: { agentId } }),
+    },
+    routines: {
+      list: async (orgId) => (await request<{ routines: Routine[] }>(`${org(orgId)}/routines`)).routines,
+      parseSchedule: (orgId, phrase) =>
+        request<ScheduleParse>(`${org(orgId)}/routines/parse-schedule`, { json: { phrase } }),
+      create: (orgId, input) => request<Routine>(`${org(orgId)}/routines`, { json: input }),
+      setActive: (orgId, id, active) =>
+        request<Routine>(`${org(orgId)}/routines/${enc(id)}`, { method: "PATCH", json: { active } }),
+      runNow: (orgId, id) => request<Routine>(`${org(orgId)}/routines/${enc(id)}/run`, { json: {} }),
+      runs: async (orgId, id) => (await request<{ runs: RoutineRun[] }>(`${org(orgId)}/routines/${enc(id)}/runs`)).runs,
+    },
+    calendar: {
+      range: (orgId, from, to) => request<CalendarRange>(`${org(orgId)}/calendar`, { query: { from, to } }),
+      create: (orgId, input) => request<CalendarEvent>(`${org(orgId)}/calendar/events`, { json: input }),
+      confirmProposal: (orgId, id) =>
+        request<CalendarEvent>(`${org(orgId)}/calendar/proposals/${enc(id)}/confirm`, { json: {} }),
+      dismissProposal: (orgId, id) =>
+        request<void>(`${org(orgId)}/calendar/proposals/${enc(id)}/dismiss`, { json: {} }),
+    },
+    customConnectors: {
+      list: async (orgId) => (await request<{ servers: CustomServer[] }>(`${org(orgId)}/connectors/custom`)).servers,
+      connect: (orgId, input) => request<CustomConnectStart>(`${org(orgId)}/connectors/custom`, { json: input }),
+      refresh: (orgId, serverId) =>
+        request<CustomServer>(`${org(orgId)}/connectors/custom/${enc(serverId)}/refresh`, { json: {} }),
+      saveTools: (orgId, serverId, input) =>
+        request<CustomServer>(`${org(orgId)}/connectors/custom/${enc(serverId)}/tools`, {
+          method: "PUT",
+          json: input,
+        }),
+      disconnect: (orgId, serverId) =>
+        request<void>(`${org(orgId)}/connectors/custom/${enc(serverId)}`, { method: "DELETE" }),
     },
     questions: {
       answer: (orgId, questionId, input) =>

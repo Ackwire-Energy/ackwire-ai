@@ -13,8 +13,7 @@ import { routeTree } from "./routeTree.gen";
 const i18n = createI18n(savedLocale());
 document.documentElement.lang = i18n.language;
 const toasts = createToastStore();
-// Demo data for the mock-backed features only in development (src/api/mock).
-const api = createApiClient({ seed: import.meta.env.DEV });
+const api = createApiClient();
 
 /** A 401 anywhere means the session ended: back to sign-in, then here again. */
 function onUnauthorized() {

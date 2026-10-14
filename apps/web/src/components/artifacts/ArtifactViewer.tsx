@@ -6,7 +6,7 @@ import { useArtifact, useArtifactVersions, useChannels, useSaveArtifact } from "
 import type { ArtifactAuthor, ArtifactContent, ArtifactDetail } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { fileName, KIND_ICON, toCsv } from "@/lib/artifacts";
+import { fileName, KIND_ICON } from "@/lib/artifacts";
 import { relativeTime } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { ArtifactContentView, TableEditor } from "./views";
@@ -98,21 +98,37 @@ export function ArtifactViewer({
   };
   const actions = a && (
     <>
-      {a.content.kind === "table" && (
+      {a.kind === "table" && (
         <Button
           size="sm"
           variant="ghost"
           icon="download"
-          onClick={() => {
-            if (a.content.kind !== "table") return;
-            const csv = toCsv(a.content.columns, a.content.rows);
-            fileSaver.save(`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`, fileName(a.title, a.content));
-          }}
+          onClick={() =>
+            fileSaver.save(
+              api.artifacts.fileUrl(org.id, a.id, { version: a.shownVersion, format: "csv" }),
+              fileName(a.title, a.content),
+            )
+          }
         >
           {t("artifacts.downloadCsv")}
         </Button>
       )}
-      {a.content.kind !== "table" && (
+      {a.kind === "document" && (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="download"
+          onClick={() =>
+            fileSaver.save(
+              api.artifacts.fileUrl(org.id, a.id, { version: a.shownVersion, format: "pdf" }),
+              fileName(a.title, a.content).replace(/\.md$/, ".pdf"),
+            )
+          }
+        >
+          {t("artifacts.downloadPdf")}
+        </Button>
+      )}
+      {a.kind !== "table" && (
         <Button size="sm" variant="ghost" icon="download" onClick={() => void download()}>
           {t("artifacts.download")}
         </Button>

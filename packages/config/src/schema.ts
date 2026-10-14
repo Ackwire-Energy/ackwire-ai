@@ -176,6 +176,12 @@ export const envVars = {
     description: "Minimum router score (0–1) for an agent to answer a message without mentions.",
     section: "Agents",
   },
+  ROUTER_MENTION_THRESHOLD: {
+    schema: z.coerce.number().min(0).max(1).default(0.6),
+    description:
+      "When an agent @mentions another, minimum Jev probability (0–1) that it is asking that agent to act now for it to answer.",
+    section: "Agents",
+  },
   AGENT_MAX_OUTPUT_TOKENS: {
     schema: z.coerce.number().int().min(256).max(128_000).default(16_000),
     description: "Upper bound on tokens an agent may generate in one reply.",
