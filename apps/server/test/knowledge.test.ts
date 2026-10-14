@@ -20,10 +20,10 @@ test("knowledge API: search, context items (add, pin, edit), reactions, correcti
   };
   expect(search.hits.map((h) => h.snippet)).toContain("Builds run on Jenkins.");
   // Message hits say where they are and who wrote them.
-  const reply = search.hits.find((h) => h.snippet === "Builds run on Jenkins.");
-  expect(reply).toMatchObject({ kind: "message", author: { type: "agent", id: agentId, name: "Dev" } });
-  expect(reply?.messageId).toBeTruthy();
-  expect(reply?.threadId).toBeTruthy();
+  const replyHit = search.hits.find((h) => h.snippet === "Builds run on Jenkins.");
+  expect(replyHit).toMatchObject({ kind: "message", author: { type: "agent", id: agentId, name: "Dev" } });
+  expect(replyHit?.messageId).toBeTruthy();
+  expect(replyHit?.threadId).toBeTruthy();
 
   const created = await api("/context-items", { json: { kind: "fact", content: "Our CI is Buildkite", pinned: true } });
   expect(created.status).toBe(201);

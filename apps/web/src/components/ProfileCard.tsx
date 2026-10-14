@@ -177,7 +177,7 @@ function AgentCardBody({ agent }: { agent: Agent }) {
   const groups = useScopeGroups(org.id);
   const seesSpend = can(org.role, "view_usage") || agent.ownerUserId === me.user.id;
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : null;
-  const model = models.data?.find((m) => m.id === agent.model)?.label ?? agent.model;
+  const model = models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model;
   const summary = groups && grants.data ? scopeSummary(groups, grants.data, t("agent.noPermission")) : null;
   const allowed = summary?.rows.filter((r) => r.granted !== t("agent.noPermission")).slice(0, 3) ?? [];
   return (

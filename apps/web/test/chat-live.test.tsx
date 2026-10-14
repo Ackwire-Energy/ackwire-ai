@@ -17,7 +17,7 @@ const open = async (state = seedState(), path = `c/${ENG_ID}`) => {
   await settle(2);
   return { ...r, socket, state };
 };
-const composer = () => screen().getByRole("textbox", { name: /Mensagem para/ });
+const composer = () => screen().getByRole("combobox", { name: /Mensagem para/ });
 const sendText = async (text: string) => {
   await act(async () => fireEvent.change(composer(), { target: { value: text } }));
   await act(async () => fireEvent.keyDown(composer(), { key: "Enter" }));

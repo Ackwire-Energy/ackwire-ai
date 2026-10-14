@@ -15,6 +15,7 @@ import { customConnectorRoutes } from "./routes/app/connectors-custom";
 import type { AppDeps } from "./routes/app/context";
 import { dmRoutes } from "./routes/app/dms";
 import { inviteRoutes } from "./routes/app/invites";
+import { issueRoutes } from "./routes/app/issues";
 import { knowledgeRoutes } from "./routes/app/knowledge";
 import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
@@ -85,6 +86,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", inviteRoutes(deps));
     api.route("/app", storageRoutes(deps));
     api.route("/app", artifactRoutes(deps));
+    api.route("/app", issueRoutes(deps));
   }
 
   for (const module of options.modules) {

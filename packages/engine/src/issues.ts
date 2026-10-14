@@ -347,7 +347,7 @@ export async function updateIssue(
   const author = actorOf(actor);
   const set: Partial<typeof issues.$inferInsert> = { updatedAt: new Date() };
   const events: { text: string; event: string; data?: Record<string, unknown> }[] = [];
-  if (patch.title !== undefined && patch.title.trim() && patch.title.trim() !== current.title) {
+  if (patch.title?.trim() && patch.title.trim() !== current.title) {
     set.title = patch.title.trim().slice(0, 300);
     events.push({ text: "renomeou a issue", event: "renamed" });
   }

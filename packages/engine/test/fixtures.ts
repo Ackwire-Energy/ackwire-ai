@@ -22,6 +22,7 @@ import {
   createBlobStoreResolver,
   createContextToolSource,
   createCredential,
+  createIssueToolSource,
   createJobHandlers,
   createLocalKeyWrapper,
   createModelGateway,
@@ -64,6 +65,8 @@ export async function setup(
     askUser?: boolean;
     /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
     artifactTools?: boolean;
+    /** Add the issue tools (create_issue, comment_issue…). */
+    issueTools?: boolean;
     /** Fake embeddings (hybrid search). Off: full-text only, no embedding usage rows. */
     embeddings?: boolean;
   } = {},
@@ -136,6 +139,7 @@ export async function setup(
   const sources = [
     ...(options.askUser ? [createAskUserToolSource()] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
+    ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
     ...(options.contextTools ? [createContextToolSource(context)] : []),
     ...(options.toolSources ?? []),
   ];

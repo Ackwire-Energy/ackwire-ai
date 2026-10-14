@@ -7,6 +7,7 @@ import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "@/api/typ
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { useArtifactViewer } from "@/components/artifacts/ArtifactViewer";
 import { useOrg } from "@/components/org-context";
+import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { dueLabel, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { useToast } from "@/lib/toast";
@@ -154,6 +155,7 @@ function Activity({ issue }: { issue: Issue }) {
   const action = useIssueAction(org.id);
   const actors = useActors();
   const [text, setText] = useState("");
+  const mentionSearch = useMentionSearch();
   const eventText = (a: IssueActivity) => {
     if (a.event === "agent_asked") {
       const name = actors.name({ type: "agent", id: a.text });
@@ -205,6 +207,7 @@ function Activity({ issue }: { issue: Issue }) {
         label={t("issues.comment")}
         placeholder={t("issues.commentPlaceholder")}
         sendLabel={t("issues.send")}
+        mentions={{ search: mentionSearch, listLabel: t("mentions.list") }}
         disabled={action.isPending}
         onSend={(body) => {
           if (!body) return;

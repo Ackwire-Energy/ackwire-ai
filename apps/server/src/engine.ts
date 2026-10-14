@@ -9,6 +9,7 @@ import {
   createBlobStoreResolver,
   createConnectorToolSource,
   createContextToolSource,
+  createIssueToolSource,
   createJobHandlers,
   createModelGateway,
   createToolGateway,
@@ -101,6 +102,7 @@ export function buildEngine(o: EngineOptions) {
     sources: [
       createAskUserToolSource(),
       createArtifactToolSource(artifacts),
+      createIssueToolSource({ db, pubsub: adapters.pubsub }),
       createContextToolSource(context),
       createConnectorToolSource(connectorDeps),
       ...(o.toolSources ?? []),

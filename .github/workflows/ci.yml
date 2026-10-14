@@ -23,12 +23,16 @@ jobs:
       - name: Lint and format
         run: bun run lint
       - name: Boundaries (core must not import cloud/ or ee/)
+        if: success() || failure()
         run: bun run check:boundaries
       - name: Typecheck
+        if: success() || failure()
         run: bun run typecheck
       - name: Test
+        if: success() || failure()
         run: bun test
       - name: Build web and server
+        if: success() || failure()
         run: bun run build
       - name: Isolated new-event test (diagnostic, non-blocking)
         if: always()

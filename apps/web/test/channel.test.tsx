@@ -44,7 +44,7 @@ describe("Canal", () => {
 
   test("the composer posts with Enter and the message appears once (HTTP + event)", async () => {
     const { socket, state } = await open();
-    const box = screen().getByRole("textbox", { name: "Mensagem para #eng" });
+    const box = screen().getByRole("combobox", { name: "Mensagem para #eng" });
     expect(box.getAttribute("placeholder")).toBe("Mensagem para #eng · use @ para chamar um agente");
     await act(async () => fireEvent.change(box, { target: { value: "@atlas acompanha o deploy?" } }));
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
@@ -168,7 +168,7 @@ describe("Canal", () => {
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Entrar no #eng" })));
     await settle(4);
     expect(state.calls.some((c) => c.method === "chat.join")).toBe(true);
-    expect(screen().getByRole("textbox", { name: "Mensagem para #eng" })).toBeTruthy();
+    expect(screen().getByRole("combobox", { name: "Mensagem para #eng" })).toBeTruthy();
   });
 
   test("channel details: searchable list of people and agents", async () => {

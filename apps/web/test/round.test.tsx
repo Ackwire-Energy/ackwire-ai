@@ -279,7 +279,7 @@ describe("agent questions (ask_user)", () => {
     expect(card.textContent).toContain("Faço o deploy agora ou depois das 18h?");
     expect(card.querySelector(".ac-chip--waiting")?.textContent).toBe("Esperando resposta");
     await click(within(card).getByRole("button", { name: "Responder" }));
-    expect(document.activeElement).toBe(screen().getByRole("textbox", { name: /Mensagem para/ }));
+    expect(document.activeElement).toBe(screen().getByRole("combobox", { name: /Mensagem para/ }));
     await click(within(card).getByRole("button", { name: "Depois das 18h" }));
     await settle(4);
     expect(card.textContent).toContain("Você respondeu: Depois das 18h");
@@ -332,7 +332,7 @@ describe("flat DM replies", () => {
   test("an agent reply without a thread lands in the timeline and clears the typing bar", async () => {
     const { socket, state } = await go(`dm/agent/${ADA_ID}`);
     await settle(4);
-    const composer = screen().getByRole("textbox", { name: /Mensagem para/ });
+    const composer = screen().getByRole("combobox", { name: /Mensagem para/ });
     await act(async () => fireEvent.change(composer, { target: { value: "oi" } }));
     await act(async () => fireEvent.keyDown(composer, { key: "Enter" }));
     expect(document.querySelector(".ac-typing__text")?.textContent).toBe("Ada está digitando…");

@@ -140,9 +140,9 @@ describe("Issue detail", () => {
 
   test("comment and change the status", async () => {
     await go("issues/131");
-    await type(screen().getByRole("textbox", { name: "Comentar na issue" }), "Começo amanhã.");
+    await type(screen().getByRole("combobox", { name: "Comentar na issue" }), "Começo amanhã.");
     await act(async () =>
-      fireEvent.keyDown(screen().getByRole("textbox", { name: "Comentar na issue" }), { key: "Enter" }),
+      fireEvent.keyDown(screen().getByRole("combobox", { name: "Comentar na issue" }), { key: "Enter" }),
     );
     await settle(5);
     const activity = screen().getByRole("region", { name: "Atividade" });
