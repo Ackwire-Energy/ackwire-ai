@@ -35,6 +35,8 @@ export const organizationMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: memberRoleEnum().notNull(),
+    /** Last time a WebSocket connection of this person to this organization closed (or opened). */
+    lastSeenAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.orgId, t.userId] }), index().on(t.userId)],

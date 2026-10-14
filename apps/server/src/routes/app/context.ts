@@ -5,6 +5,7 @@ import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
 import { type Auth, type SessionUser, sessionUser } from "../../auth";
 import { apiError, errorResponse, validationHook } from "../../http/errors";
+import type { AppExtras } from "./extras";
 
 export interface AppDeps {
   db: Database;
@@ -13,6 +14,8 @@ export interface AppDeps {
   adapters: Adapters;
   /** Wakes the in-process workers after something was enqueued (lower latency than the poll interval). */
   wakeWorkers?: () => void;
+  /** Backend services (see `extras.ts`). */
+  extras?: AppExtras;
 }
 
 export type AppEnv = { Variables: { user: SessionUser } };

@@ -15,7 +15,17 @@ export interface EnvVarDefinition {
   /** Shown in `.env.example`. Write it for a self-hoster, not for us. */
   description: string;
   /** Grouping used in `.env.example`. */
-  section: "Server" | "Database" | "Security" | "Sign-in" | "Agents" | "Observability";
+  section:
+    | "Server"
+    | "Database"
+    | "Security"
+    | "Sign-in"
+    | "Agents"
+    | "Connectors"
+    | "Search"
+    | "Storage"
+    | "Sandbox"
+    | "Observability";
   /** Example value for docs. Never a real secret. */
   example?: string;
   /** Secret values are never logged and are masked in diagnostics. */
@@ -161,6 +171,54 @@ export const envVars = {
     description:
       "Maximum consecutive agent replies in one thread without a person posting. Stops agents from triggering each other forever.",
     section: "Agents",
+  },
+  CONNECTOR_GITHUB_CLIENT_ID: {
+    schema: z.string().optional(),
+    description:
+      "Client id of the GitHub OAuth app used to connect GitHub for agents (not sign-in). Set together with `CONNECTOR_GITHUB_CLIENT_SECRET`. Redirect URI: `{PUBLIC_URL}/api/app/connectors/oauth/callback`. Without it, GitHub can still be connected with an API key.",
+    section: "Connectors",
+  },
+  CONNECTOR_GITHUB_CLIENT_SECRET: {
+    schema: z.string().optional(),
+    description: "Client secret of the GitHub OAuth app for the GitHub connector.",
+    section: "Connectors",
+    secret: true,
+  },
+  CONNECTOR_SENTRY_CLIENT_ID: {
+    schema: z.string().optional(),
+    description:
+      "Client id of the Sentry integration used to connect Sentry for agents (not sign-in). Set together with `CONNECTOR_SENTRY_CLIENT_SECRET`. Redirect URI: `{PUBLIC_URL}/api/app/connectors/oauth/callback`. Without it, Sentry can still be connected with an API key.",
+    section: "Connectors",
+  },
+  CONNECTOR_SENTRY_CLIENT_SECRET: {
+    schema: z.string().optional(),
+    description: "Client secret of the Sentry integration for the Sentry connector.",
+    section: "Connectors",
+    secret: true,
+  },
+  CONNECTOR_LINEAR_CLIENT_ID: {
+    schema: z.string().optional(),
+    description:
+      "Client id of the Linear OAuth app used to connect Linear for agents (not sign-in). Set together with `CONNECTOR_LINEAR_CLIENT_SECRET`. Redirect URI: `{PUBLIC_URL}/api/app/connectors/oauth/callback`. Without it, Linear can still be connected with an API key.",
+    section: "Connectors",
+  },
+  CONNECTOR_LINEAR_CLIENT_SECRET: {
+    schema: z.string().optional(),
+    description: "Client secret of the Linear OAuth app for the Linear connector.",
+    section: "Connectors",
+    secret: true,
+  },
+  CONNECTOR_GOOGLE_CLIENT_ID: {
+    schema: z.string().optional(),
+    description:
+      "Client id of the Google OAuth client used to connect Google Drive for agents (not sign-in). Set together with `CONNECTOR_GOOGLE_CLIENT_SECRET`. Redirect URI: `{PUBLIC_URL}/api/app/connectors/oauth/callback`. Without it, Google Drive can still be connected with an API key.",
+    section: "Connectors",
+  },
+  CONNECTOR_GOOGLE_CLIENT_SECRET: {
+    schema: z.string().optional(),
+    description: "Client secret of the Google OAuth client for the Google Drive connector.",
+    section: "Connectors",
+    secret: true,
   },
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),

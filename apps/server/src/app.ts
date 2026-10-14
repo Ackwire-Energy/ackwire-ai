@@ -1,11 +1,7 @@
-import type { Adapters } from "@agenteschat/adapters";
-import type { Config } from "@agenteschat/config";
-import type { Database } from "@agenteschat/db";
 import type { AgentesModule, Edition, ModuleContext } from "@agenteschat/modules";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import { serveStatic } from "hono/bun";
-import type { Auth } from "./auth";
 import { apiError, domainErrorResponse, validationHook } from "./http/errors";
 import { createLogger, type Logger } from "./logger";
 import { accountRoutes } from "./routes/app/account";
@@ -13,6 +9,8 @@ import { agentRoutes } from "./routes/app/agents";
 import { approvalRoutes } from "./routes/app/approvals";
 import { channelRoutes } from "./routes/app/channels";
 import { chatRoutes } from "./routes/app/chat";
+import { connectorRoutes } from "./routes/app/connectors";
+import type { AppDeps } from "./routes/app/context";
 import { registerHealth } from "./routes/health";
 
 export interface AppOptions {
@@ -23,7 +21,7 @@ export interface AppOptions {
   /** Needed when modules register routes. */
   moduleContext?: ModuleContext;
   /** Database, auth and adapters. Without them only system routes are mounted (some tests). */
-  services?: { db: Database; auth: Auth; config: Config; adapters: Adapters; wakeWorkers?: () => void };
+  services?: AppDeps;
   /** Directory with the built web app (Vite SPA). Skipped when absent. */
   webDir?: string;
   log?: Logger;
@@ -68,6 +66,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", chatRoutes(deps));
     api.route("/app", channelRoutes(deps));
     api.route("/app", approvalRoutes(deps));
+    api.route("/app", connectorRoutes(deps));
   }
 
   for (const module of options.modules) {

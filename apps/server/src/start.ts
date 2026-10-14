@@ -9,9 +9,15 @@ import {
   noPlatformCredentials,
   postgresJsNotifier,
 } from "@agenteschat/adapters";
-import { ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
+import { ConfigError, connectorOAuthApps, loadConfig, redactConfig } from "@agenteschat/config";
 import { createDatabase, ensureMessagePartitions } from "@agenteschat/db";
-import { createJobHandlers, createLocalKeyWrapper, createModelGateway, createToolGateway } from "@agenteschat/engine";
+import {
+  createConnectorToolSource,
+  createJobHandlers,
+  createLocalKeyWrapper,
+  createModelGateway,
+  createToolGateway,
+} from "@agenteschat/engine";
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createAnthropicProvider } from "@agenteschat/providers";
 import { createApp } from "./app";
@@ -76,7 +82,17 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     providers: modelProviders,
     platformCredentials: adapters.platformCredentials,
   });
-  const tools = createToolGateway({ sources: [] });
+  const keyWrappers = [adapters.keyWrapper, ...adapters.legacyKeyWrappers];
+  const tools = createToolGateway({
+    sources: [
+      createConnectorToolSource({
+        db: database.db,
+        keyWrappers,
+        oauthApps: connectorOAuthApps(config),
+        publicUrl: config.PUBLIC_URL,
+      }),
+    ],
+  });
   const handlers = createJobHandlers({
     db: database.db,
     tools,

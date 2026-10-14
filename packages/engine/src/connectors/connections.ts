@@ -35,7 +35,8 @@ export interface ConnectorDeps {
 const aadFor = (orgId: string, id: string) => `connector-connection|${orgId}|${id}`;
 const stateAad = (orgId: string, id: string) => `oauth-state|${orgId}|${id}`;
 export const OAUTH_STATE_TTL_MS = 10 * 60_000;
-export const oauthRedirectUri = (publicUrl: string) => `${publicUrl.replace(/\/$/, "")}/api/app/connectors/oauth/callback`;
+export const oauthRedirectUri = (publicUrl: string) =>
+  `${publicUrl.replace(/\/$/, "")}/api/app/connectors/oauth/callback`;
 
 export function connectorDefinition(id: string): ConnectorDefinition {
   const def = CONNECTOR_CATALOG[id];
@@ -213,12 +214,13 @@ export async function startOAuth(
   actorId: string,
   orgId: string,
   connector: string,
-  options: { returnTo?: string } = {},
+  options: { returnTo?: string; serverUrl?: string } = {},
 ): Promise<{ authorizeUrl: string; state: string }> {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const def = connectorDefinition(connector);
   const app = deps.oauthApps?.[connector];
   if (!def.oauth || !app) throw new ValidationError(`OAuth for ${def.label} is not configured on this server`);
+  const serverUrl = checkServerUrl(options.serverUrl ?? def.serverUrl ?? "");
   const returnTo = options.returnTo?.startsWith("/") && !options.returnTo.startsWith("//") ? options.returnTo : "/";
   const state = randomToken(32);
   const verifier = randomToken(48);
@@ -236,6 +238,7 @@ export async function startOAuth(
     verifierCiphertext: sealed.ciphertext,
     wrappedDataKey: sealed.wrappedDataKey,
     kekId: sealed.kekId,
+    serverUrl,
     returnTo,
     expiresAt: new Date((deps.now?.() ?? new Date()).getTime() + OAUTH_STATE_TTL_MS),
   });
@@ -271,7 +274,9 @@ async function tokenRequest(deps: ConnectorDeps, url: string, form: Record<strin
   });
   const body = (await res.json().catch(() => ({}))) as TokenResponse;
   if (!res.ok || body.error || !body.access_token) {
-    throw new ValidationError(`The provider refused the authorization: ${body.error_description ?? body.error ?? res.status}`);
+    throw new ValidationError(
+      `The provider refused the authorization: ${body.error_description ?? body.error ?? res.status}`,
+    );
   }
   return body;
 }
@@ -286,8 +291,12 @@ export async function completeOAuth(
   input: { state: string; code: string },
 ): Promise<{ connection: ConnectorConnection; returnTo: string }> {
   const at = deps.now?.() ?? new Date();
-  const [row] = await deps.db.select().from(oauthStates).where(eq(oauthStates.stateHash, sha256(input.state)));
-  if (!row || row.usedAt || row.expiresAt <= at) throw new ConflictError("This authorization link is invalid or expired");
+  const [row] = await deps.db
+    .select()
+    .from(oauthStates)
+    .where(eq(oauthStates.stateHash, sha256(input.state)));
+  if (!row || row.usedAt || row.expiresAt <= at)
+    throw new ConflictError("This authorization link is invalid or expired");
   if (row.userId !== user.id) throw new ForbiddenError("Finish connecting with the account that started it");
   const claimed = await deps.db
     .update(oauthStates)
@@ -319,7 +328,7 @@ export async function completeOAuth(
     actorId: user.id,
     connector: row.connector,
     authType: "oauth",
-    serverUrl: checkServerUrl(def.serverUrl ?? "https://invalid.example"),
+    serverUrl: checkServerUrl(row.serverUrl ?? def.serverUrl ?? ""),
     secret: { accessToken: token.access_token, refreshToken: token.refresh_token },
     tokenExpiresAt: token.expires_in ? new Date(at.getTime() + token.expires_in * 1000) : null,
   });
@@ -367,3 +376,29 @@ export async function connectionHeaders(deps: ConnectorDeps, c: ConnectorConnect
   }
   return secret.accessToken ? { authorization: `Bearer ${secret.accessToken}` } : {};
 }
+
+/** Validates a connector grant: the connection is active in the org and the scope is in its catalog. */
+export const connectorGrantValidator = async (
+  db: Database,
+  orgId: string,
+  grant: { connectionId: string | null; scope: string },
+): Promise<string | null> => {
+  if (!grant.connectionId) return null;
+  const [c] = await db
+    .select()
+    .from(connectorConnections)
+    .where(
+      and(
+        eq(connectorConnections.id, grant.connectionId),
+        eq(connectorConnections.orgId, orgId),
+        isNull(connectorConnections.revokedAt),
+      ),
+    );
+  if (!c) return "connectionId is not an active connection of this organization";
+  const def = CONNECTOR_CATALOG[c.connector];
+  const [prefix, scope] = grant.scope.split(":");
+  if (!def || prefix !== c.connector || !scope || !def.scopes[scope]) {
+    return `Unknown scope ${grant.scope} for ${c.connector}`;
+  }
+  return null;
+};

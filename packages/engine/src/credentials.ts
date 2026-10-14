@@ -2,7 +2,7 @@ import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { isKnownProvider, type ProviderId } from "@agenteschat/providers";
 import { openSecret, sealSecret } from "./crypto";
-import { NotFoundError, ValidationError } from "./errors";
+import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { requirePermission } from "./organizations";
 
 const { providerCredentials } = schema;
@@ -115,4 +115,72 @@ export async function decryptCredential(
     aadFor(orgId, row.id),
   );
   return { provider: row.provider as ProviderId, apiKey };
+}
+
+/**
+ * Replaces the key of a credential, keeping its id (agents keep pointing at
+ * it). The old ciphertext is overwritten; usage history is untouched.
+ */
+export async function rotateCredential(
+  db: Database,
+  keyWrapper: KeyWrapper,
+  actorId: string,
+  orgId: string,
+  credentialId: string,
+  input: { apiKey: string; label?: string },
+): Promise<CredentialSummary> {
+  await requirePermission(db, actorId, orgId, "manage_credentials");
+  const apiKey = input.apiKey.trim();
+  if (apiKey.length < 8) throw new ValidationError("apiKey looks too short");
+  const sealed = await sealSecret(keyWrapper, apiKey, aadFor(orgId, credentialId));
+  const [row] = await db
+    .update(providerCredentials)
+    .set({
+      secretCiphertext: sealed.ciphertext,
+      wrappedDataKey: sealed.wrappedDataKey,
+      kekId: sealed.kekId,
+      keyHint: apiKey.slice(-4),
+      ...(input.label ? { label: input.label } : {}),
+    })
+    .where(
+      and(
+        eq(providerCredentials.id, credentialId),
+        eq(providerCredentials.orgId, orgId),
+        isNull(providerCredentials.revokedAt),
+      ),
+    )
+    .returning();
+  if (!row) throw new NotFoundError("Credential not found");
+  return summary(row);
+}
+
+/**
+ * Deletes a credential for good (the sealed key is gone). Refused while
+ * agents use it: they would silently fall back to the platform key.
+ */
+export async function deleteCredential(db: Database, actorId: string, orgId: string, credentialId: string) {
+  await requirePermission(db, actorId, orgId, "manage_credentials");
+  const users = await db
+    .select({ handle: schema.agents.handle })
+    .from(schema.agents)
+    .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.credentialId, credentialId), isNull(schema.agents.archivedAt)));
+  if (users.length > 0) {
+    throw new ConflictError(`In use by ${users.map((u) => `@${u.handle}`).join(", ")}. Point them at another key first.`);
+  }
+  const deleted = await db
+    .delete(providerCredentials)
+    .where(and(eq(providerCredentials.id, credentialId), eq(providerCredentials.orgId, orgId)))
+    .returning({ id: providerCredentials.id });
+  if (deleted.length === 0) throw new NotFoundError("Credential not found");
+}
+
+/** How many active agents use each credential. */
+export async function credentialUsage(db: Database, orgId: string) {
+  const rows = await db
+    .select({ credentialId: schema.agents.credentialId })
+    .from(schema.agents)
+    .where(and(eq(schema.agents.orgId, orgId), isNull(schema.agents.archivedAt)));
+  const counts = new Map<string, number>();
+  for (const r of rows) if (r.credentialId) counts.set(r.credentialId, (counts.get(r.credentialId) ?? 0) + 1);
+  return counts;
 }

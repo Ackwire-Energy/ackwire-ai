@@ -2,6 +2,7 @@ import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { getMembership, requirePermission } from "./organizations";
+import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
 
 const { agents, providerCredentials } = schema;
 
@@ -64,6 +65,13 @@ export async function createAgent(
       .values({ ...values, orgId, ownerUserId: input.ownerUserId === undefined ? actorId : input.ownerUserId })
       .returning();
     if (!agent) throw new Error("agent insert returned nothing");
+    // Every agent may read context and keep its own notes; everything else is granted explicitly.
+    await grantScopes(
+      db,
+      orgId,
+      agent.id,
+      DEFAULT_AGENT_SCOPES.map((scope) => ({ connectionId: null, scope })),
+    );
     return agent;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`@${values.handle} is already taken`);

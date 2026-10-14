@@ -21,10 +21,26 @@ export async function createTestDatabase(): Promise<{ db: Database; close: () =>
   const serverUrl = process.env.TEST_DATABASE_URL;
   if (serverUrl) return createOnServer(serverUrl);
 
-  const client = new PGlite({ extensions: { vector } });
+  const client = new PGlite({ extensions: { vector }, loadDataDir: await migratedTemplate() });
   const db = drizzlePglite(client, { schema, casing: "snake_case" });
-  await migratePglite(db, { migrationsFolder });
   return { db: db as unknown as Database, close: () => client.close(), pglite: client };
+}
+
+/**
+ * Migrations run once per test process into a template database whose data
+ * directory is then loaded by every fresh database (much faster than
+ * migrating each time).
+ */
+let template: Promise<Blob> | undefined;
+function migratedTemplate(): Promise<Blob> {
+  template ??= (async () => {
+    const client = new PGlite({ extensions: { vector } });
+    await migratePglite(drizzlePglite(client, { schema, casing: "snake_case" }), { migrationsFolder });
+    const dump = await client.dumpDataDir("none");
+    await client.close();
+    return dump;
+  })();
+  return template;
 }
 
 async function createOnServer(serverUrl: string) {

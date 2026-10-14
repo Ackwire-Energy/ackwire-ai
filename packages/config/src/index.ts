@@ -1,5 +1,6 @@
 import { type Config, configSchema, envVars } from "./schema";
 
+export { connectorOAuthApps } from "./connectors";
 export { type Config, type EnvVarDefinition, type EnvVarName, envVars } from "./schema";
 
 export class ConfigError extends Error {

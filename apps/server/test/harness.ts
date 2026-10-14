@@ -6,14 +6,16 @@ import {
   createPostgresSearchResolver,
   noPlatformCredentials,
 } from "@agenteschat/adapters";
-import { testConfig } from "@agenteschat/config";
+import { connectorOAuthApps, testConfig } from "@agenteschat/config";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
+  createConnectorToolSource,
   createJobHandlers,
   createLocalKeyWrapper,
   createModelGateway,
   createToolGateway,
   drainOutbox,
+  type McpConnect,
   type ToolSource,
 } from "@agenteschat/engine";
 import { createFakeProvider } from "@agenteschat/providers/testing";
@@ -33,6 +35,10 @@ export async function createTestServer(
     env?: Record<string, string>;
     reply?: Parameters<typeof createFakeProvider>[0];
     toolSources?: ToolSource[];
+    /** In-process MCP servers for the connector tool source. */
+    mcpConnect?: McpConnect;
+    /** Fake outbound HTTP (OAuth token endpoints). */
+    http?: typeof fetch;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -54,7 +60,17 @@ export async function createTestServer(
     providers: { anthropic: provider },
     platformCredentials: noPlatformCredentials,
   });
-  const tools = createToolGateway({ sources: options.toolSources ?? [] });
+  const connectorSource = createConnectorToolSource({
+    db,
+    keyWrappers: [adapters.keyWrapper],
+    oauthApps: connectorOAuthApps(config),
+    publicUrl: config.PUBLIC_URL,
+    http: options.http,
+    connect: options.mcpConnect,
+  });
+  const tools = createToolGateway({
+    sources: [...(options.toolSources ?? []), ...(options.mcpConnect ? [connectorSource] : [])],
+  });
   const handlers = createJobHandlers({
     db,
     tools,
@@ -72,7 +88,7 @@ export async function createTestServer(
     version: "test",
     modules: [],
     pingDatabase: async () => {},
-    services: { db, auth, config, adapters },
+    services: { db, auth, config, adapters, extras: { http: options.http, mcpConnect: options.mcpConnect } },
     log,
   });
   const realtime = createRealtime({ db, auth, config, log, ...adapters });
