@@ -206,7 +206,7 @@ describe("Memória e propostas", () => {
     expect(screen().getByRole("link", { name: "O que a Ada sabe" })).toBeTruthy();
     const detail = screen().getByRole("article");
     expect(detail.textContent).toContain("Ada propõe · instruções da Ada");
-    expect(detail.querySelector(".ac-chip--waiting")?.textContent).toBe("Aguardando João");
+    expect(detail.querySelector(".ac-chip--waiting")?.textContent).toBe("Aguardando você");
     const added = detail.querySelectorAll(".ac-diff__line--add");
     const removed = detail.querySelectorAll(".ac-diff__line--del");
     expect(added.length).toBe(2);
@@ -220,6 +220,47 @@ describe("Memória e propostas", () => {
     expect(screen().getByRole("article").querySelector(".ac-chip--done")?.textContent).toBe("Aceita por você · agora");
     const accepted = await r.services.api.proposals.list(ORG_ID);
     expect(accepted.find((p) => p.agentId === ADA_ID)?.after).toBe("Programa em branches, nunca direto na main.");
+  });
+});
+
+describe("Memória e propostas (fase 5)", () => {
+  test("verified and unverified memories carry a chip with an icon", async () => {
+    await go(`agents/${ADA_ID}/memory`);
+    const verified = screen().getByRole("article", { name: /Não suportar mais o Internet Explorer/ });
+    expect(verified.querySelector(".ac-chip--done")?.textContent).toBe("Verificado");
+    const unverified = screen().getByRole("article", { name: /tokens de 15 minutos/ });
+    const chip = Array.from(unverified.querySelectorAll(".ac-chip")).find((c) => c.textContent === "Não verificado");
+    expect(chip?.querySelector("svg.ac-icon")).not.toBeNull();
+  });
+
+  test("pin calls PATCH /memories/{id}", async () => {
+    const { state } = await go(`agents/${ADA_ID}/memory`);
+    const row = screen().getByRole("article", { name: /tokens de 15 minutos/ });
+    await click(within(row).getByRole("button", { name: "Fixar" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "memory.patch")?.args).toEqual([ORG_ID, "mem-5", { pinned: true }]);
+  });
+
+  test("a stale proposal: accepting returns 409, the page explains and refreshes", async () => {
+    const state = seedState();
+    const r = await go(`proposals?agent=${ADA_ID}`, state);
+    // The text changed on the server after the page loaded.
+    const first = state.proposals[0];
+    if (first) first.stale = true;
+    await click(screen().getByRole("button", { name: "Aceitar mudança" }));
+    await settle(6);
+    expect(document.body.textContent).toContain("Esta proposta ficou velha");
+    expect(screen().getByRole("article").textContent).toContain("Ficou velha");
+    expect(screen().queryByRole("button", { name: "Aceitar mudança" })).toBeNull();
+    expect(r.state.calls.some((c) => c.method === "proposals.accept")).toBe(true);
+  });
+
+  test("proposals you can't decide have no actions", async () => {
+    const state = seedState();
+    for (const p of state.proposals) p.canDecide = false;
+    await go(`proposals?agent=${ADA_ID}`, state);
+    expect(screen().getByRole("article").querySelector(".ac-chip--waiting")?.textContent).toBe("Aguardando João");
+    expect(screen().queryByRole("button", { name: "Aceitar mudança" })).toBeNull();
   });
 });
 

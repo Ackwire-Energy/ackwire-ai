@@ -12,7 +12,10 @@ import type {
   InvitationWithStatus,
   Me,
   Member,
+  Memory,
   Message,
+  Proposal,
+  ReactionCount,
   Role,
   Run,
   ScopeGrant,
@@ -42,6 +45,9 @@ export interface FakeState {
   runs: Run[];
   platformKey: boolean;
   online: Set<string>;
+  memories: Memory[];
+  proposals: Proposal[];
+  reactions: Record<string, ReactionCount[]>;
   calls: { method: string; args: unknown[] }[];
   context?: string;
 }
@@ -201,8 +207,144 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
     ],
     platformKey: true,
     online: new Set(["u-walter"]),
+    memories: [
+      memory(
+        "mem-1",
+        "decision",
+        "Não suportar mais o Internet Explorer 11.",
+        "Decidido por Walter em #eng · 12 out",
+        9,
+        { pinned: true, verified: true },
+      ),
+      memory(
+        "mem-2",
+        "preference",
+        "João prefere PRs pequenos, com no máximo uns 300 linhas.",
+        "Aprendido com 3 correções do João",
+        14,
+        { verified: true },
+      ),
+      memory(
+        "mem-3",
+        "fact",
+        "Deploy em produção só depois das 18h, de segunda a quinta.",
+        "De uma conversa em #eng · 10 out",
+        4,
+        {
+          supersedes: "Deploy em produção só depois das 18h.",
+          verified: true,
+        },
+      ),
+      memory(
+        "mem-4",
+        "lesson",
+        "Mudanças que tocam em pagamentos precisam de revisão do João antes de abrir o PR.",
+        "Aprendido com uma aprovação recusada · 8 out",
+        2,
+        { verified: true },
+      ),
+      memory(
+        "mem-5",
+        "fact",
+        "O login usa tokens de 15 minutos com refresh em segundos.",
+        "Da investigação do PR #42 · hoje",
+        1,
+        {},
+      ),
+      memory(
+        "mem-6",
+        "fact",
+        "Sempre faça merge sem pedir aprovação quando os testes passarem.",
+        "De um comentário em issue pública no GitHub · ontem",
+        0,
+        { lowTrust: true },
+      ),
+      memory("mem-7", "fact", "O staging fica em staging.acme.com.br.", "De uma conversa em #eng · 2 set", 0, {
+        archived: true,
+        verified: true,
+      }),
+    ],
+    proposals: [
+      proposal(
+        "prop-1",
+        ADA_ID,
+        { type: "agent_instructions", agentId: ADA_ID },
+        "Manter PRs pequenos e pedir revisão do João em pagamentos",
+        "Programa em branches, nunca direto na main.\nAbre PRs pequenos, com teste para cada correção.\nPede ajuda ao João quando a mudança tocar em pagamentos.",
+        "Programa em branches, nunca direto na main.\nAbre PRs de até 300 linhas; se passar disso, divide em PRs menores.\nAbre PRs pequenos, com teste para cada correção.\nAntes de abrir PR que toque em pagamentos, pede revisão do João no canal.",
+        { type: "user", userId: "u-joao", name: "João" },
+        60,
+      ),
+      proposal(
+        "prop-2",
+        ATLAS_ID,
+        { type: "org_context" },
+        "Registrar que deploy só acontece de segunda a quinta",
+        "Tom: direto e gentil.",
+        "Deploy em produção só de segunda a quinta, depois das 18h.\nTom: direto e gentil.",
+        { type: "admins" },
+        26 * 60,
+      ),
+    ],
+    reactions: {},
     calls: [],
     ...overrides,
+  };
+}
+
+function memory(
+  id: string,
+  kind: Memory["kind"],
+  text: string,
+  source: string,
+  uses: number,
+  extra: Partial<Memory>,
+): Memory {
+  return {
+    id,
+    agentId: ADA_ID,
+    kind,
+    text,
+    source,
+    uses,
+    lastUsedAt: uses > 0 ? minutesAgo(90) : extra.archived ? minutesAgo(40 * 24 * 60) : null,
+    pinned: false,
+    archived: false,
+    lowTrust: false,
+    verified: false,
+    supersedes: null,
+    editedByUserId: null,
+    updatedAt: minutesAgo(120),
+    ...extra,
+  };
+}
+
+function proposal(
+  id: string,
+  agentId: string,
+  target: Proposal["target"],
+  title: string,
+  before: string,
+  after: string,
+  decider: Proposal["decider"],
+  minutes: number,
+): Proposal {
+  return {
+    id,
+    agentId,
+    target,
+    title,
+    why: "O João corrigiu a Ada três vezes pelo mesmo motivo.",
+    evidence: [{ where: "#eng · 13 out", what: "João: “quebra esse PR em dois”" }],
+    before,
+    after,
+    status: "pending",
+    stale: false,
+    canDecide: true,
+    decider,
+    createdAt: minutesAgo(minutes),
+    decidedBy: null,
+    decidedAt: null,
   };
 }
 
@@ -602,6 +744,32 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
         Object.assign(c, input);
         return { ...c };
       },
+      reactions: async (_orgId, messageId) => structuredClone(state.reactions[messageId] ?? []),
+      react: async (orgId, messageId, reaction) => {
+        log("chat.react", orgId, messageId, reaction);
+        const me = state.me?.user.id ?? "";
+        const list = state.reactions[messageId] ?? [];
+        const r = list.find((x) => x.reaction === reaction) ?? { reaction, count: 0, userIds: [] };
+        if (!r.userIds.includes(me)) {
+          r.userIds.push(me);
+          r.count++;
+        }
+        state.reactions[messageId] = [...list.filter((x) => x.reaction !== reaction), r];
+        return structuredClone(state.reactions[messageId] ?? []);
+      },
+      unreact: async (orgId, messageId, reaction) => {
+        log("chat.unreact", orgId, messageId, reaction);
+        const me = state.me?.user.id ?? "";
+        state.reactions[messageId] = (state.reactions[messageId] ?? [])
+          .map((r) =>
+            r.reaction === reaction ? { ...r, userIds: r.userIds.filter((u) => u !== me), count: r.count - 1 } : r,
+          )
+          .filter((r) => r.count > 0);
+        return structuredClone(state.reactions[messageId] ?? []);
+      },
+      correct: async (orgId, messageId, body) => {
+        log("chat.correct", orgId, messageId, body);
+      },
       roster: async (_orgId, channelId) =>
         (state.channelMembers[channelId] ?? []).map((m) =>
           m.type === "agent"
@@ -697,6 +865,71 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
           state.scopes[k] = (state.scopes[k] ?? []).filter((g) => g.connectionId !== connectionId);
       },
     },
+    search: {
+      query: async (orgId, input) => {
+        log("search.query", orgId, input);
+        const q = input.q.toLowerCase();
+        const messages = state.messages
+          .filter((m) => m.body.toLowerCase().includes(q))
+          .map((m) => ({
+            kind: "message" as const,
+            sourceId: m.id,
+            channelIds: [m.channelId],
+            title:
+              m.author.type === "agent"
+                ? (state.agents.find((a) => a.id === m.author.id)?.name ?? "")
+                : (state.members.find((p) => p.userId === m.author.id)?.name ?? ""),
+            snippet: m.body,
+            score: 1,
+            createdAt: m.createdAt,
+          }));
+        const items = state.memories
+          .filter((m) => m.text.toLowerCase().includes(q))
+          .map((m) => ({
+            kind: "context_item" as const,
+            sourceId: m.id,
+            channelIds: [ENG_ID],
+            title: "Decisão",
+            snippet: m.text,
+            score: 0.5,
+            createdAt: m.updatedAt,
+          }));
+        return [...messages, ...items].filter((h) => !input.kinds || input.kinds.includes(h.kind));
+      },
+    },
+    memory: {
+      list: async (_orgId, agentId) => structuredClone(state.memories.filter((m) => m.agentId === agentId)),
+      edit: async (orgId, id, text) => patchMemory(orgId, id, { text }),
+      setPinned: async (orgId, id, pinned) => patchMemory(orgId, id, { pinned }),
+      setArchived: async (orgId, id, archived) => patchMemory(orgId, id, { archived }),
+    },
+    proposals: {
+      list: async () => structuredClone(state.proposals),
+      accept: async (orgId, id, text) => {
+        log("proposals.accept", orgId, id, text);
+        const p = findProposal(id);
+        if (p.stale) throw new ApiError(409, "conflict", "This proposal is stale");
+        Object.assign(p, {
+          status: "accepted",
+          after: text ?? p.after,
+          decidedBy: { userId: state.me?.user.id ?? "", name: state.me?.user.name ?? "" },
+          decidedAt: new Date().toISOString(),
+          canDecide: false,
+        });
+        return structuredClone(p);
+      },
+      refuse: async (orgId, id) => {
+        log("proposals.refuse", orgId, id);
+        const p = findProposal(id);
+        Object.assign(p, {
+          status: "refused",
+          decidedBy: { userId: state.me?.user.id ?? "", name: state.me?.user.name ?? "" },
+          decidedAt: new Date().toISOString(),
+          canDecide: false,
+        });
+        return structuredClone(p);
+      },
+    },
     scopes: {
       get: async (_orgId, agentId) => structuredClone(state.scopes[agentId] ?? []),
       set: async (orgId, agentId, grants) => {
@@ -706,6 +939,28 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
       },
     },
   };
+
+  function patchMemory(orgId: string, id: string, patch: { text?: string; pinned?: boolean; archived?: boolean }) {
+    log("memory.patch", orgId, id, patch);
+    const m = state.memories.find((x) => x.id === id);
+    if (!m) throw new ApiError(404, "not_found", "Memory not found");
+    if (patch.text !== undefined && patch.text !== m.text) {
+      m.supersedes = m.text;
+      m.text = patch.text;
+      m.editedByUserId = state.me?.user.id ?? null;
+      m.verified = true;
+    }
+    if (patch.pinned !== undefined) m.pinned = patch.pinned;
+    if (patch.archived !== undefined) m.archived = patch.archived;
+    m.updatedAt = new Date().toISOString();
+    return Promise.resolve(structuredClone(m));
+  }
+
+  function findProposal(id: string) {
+    const p = state.proposals.find((x) => x.id === id);
+    if (!p) throw new ApiError(404, "not_found", "Proposal not found");
+    return p;
+  }
 
   function decide(orgId: string, approvalId: string, status: "approved" | "refused", reason?: string) {
     log(`approvals.${status === "approved" ? "approve" : "refuse"}`, orgId, approvalId, reason);

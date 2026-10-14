@@ -5,10 +5,8 @@
  * MCP server or connector. Each file lists the endpoint it is waiting for;
  * replace the mock with an HTTP call in `src/api/index.ts` when it lands.
  *
- * With `seed: true` (development builds) they start with the demo data of
- * the approved screens (docs/design/telas), attached to the organization's
- * real agents and members. Production builds start empty, so nobody sees
- * invented memories or proposals.
+ * Left today: the org-wide invite link, "ask for a new invitation" and
+ * custom MCP servers. They start empty in every build.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import type { Agent, Channel, Me, Member } from "../types";

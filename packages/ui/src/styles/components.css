@@ -1368,3 +1368,45 @@ a.ac-list__row:focus-visible {
 .ac-btn--cut {
   border-bottom-left-radius: var(--radius-cut);
 }
+
+/* Message actions (feedback on agent replies): revealed on hover or keyboard focus */
+.ac-msg {
+  position: relative;
+}
+.ac-msg__actions {
+  position: absolute;
+  top: -12px;
+  right: 16px;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--overlay);
+  opacity: 0;
+  pointer-events: none;
+}
+.ac-msg:hover .ac-msg__actions,
+.ac-msg:focus-within .ac-msg__actions,
+.ac-msg__actions[data-open="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.ac-msg__actions .ac-btn[aria-pressed="true"] {
+  background: var(--surface-sunken);
+}
+.ac-msg__reaction-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+@media (hover: none) {
+  .ac-msg__actions {
+    position: static;
+    opacity: 1;
+    pointer-events: auto;
+    margin-top: var(--space-1);
+    width: max-content;
+    box-shadow: none;
+  }
+}

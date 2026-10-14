@@ -1,39 +1,24 @@
 import { describe, expect, test } from "bun:test";
-import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { createFakeApi, ORG_ID } from "./fake-api";
 
-/** The only mocks left: memory, proposals, the org-wide invite link and "ask for a new invitation". */
-describe("mock: memory", () => {
-  test("seeded for the first agent only; editing keeps the replaced text", async () => {
-    const api = createFakeApi();
-    const list = await api.memory.list(ORG_ID, ADA_ID);
-    expect(list).toHaveLength(7);
-    expect(await api.memory.list(ORG_ID, ATLAS_ID)).toEqual([]);
-    const fact = list.find((m) => m.kind === "fact" && !m.supersedes && !m.archived && !m.lowTrust);
-    const edited = await api.memory.edit(ORG_ID, fact?.id ?? "", "Novo texto.");
-    expect(edited.text).toBe("Novo texto.");
-    expect(edited.supersedes).toBe(fact?.text ?? "");
-    expect(edited.editedByUserId).toBe("u-walter");
-    expect((await api.memory.setPinned(ORG_ID, edited.id, true)).pinned).toBe(true);
-    expect((await api.memory.setArchived(ORG_ID, edited.id, true)).archived).toBe(true);
-  });
-
-  test("production builds start empty", async () => {
-    expect(await createFakeApi(seedState(), { seed: false }).memory.list(ORG_ID, ADA_ID)).toEqual([]);
-  });
-});
-
-describe("mock: proposals and invites", () => {
-  test("proposals: accept with an edited text, refuse", async () => {
-    const api = createFakeApi();
-    const [p1, p2] = await api.proposals.list(ORG_ID);
-    expect(p1?.decider).toEqual({ type: "user", userId: "u-joao", name: "João" });
-    expect(p2?.target).toEqual({ type: "org_context" });
-    const accepted = await api.proposals.accept(ORG_ID, p1?.id ?? "", "Texto final");
-    expect(accepted).toMatchObject({ status: "accepted", after: "Texto final" });
-    expect((await api.proposals.refuse(ORG_ID, p2?.id ?? "")).status).toBe("refused");
-  });
-
+/** Mocks left: the org-wide invite link, "ask for a new invitation" and custom MCP servers (custom-mcp.test.tsx). */
+describe("remaining mocks", () => {
   test("org-wide invite link", async () => {
     expect((await createFakeApi().invites.createLink(ORG_ID)).url).toStartWith("http://localhost:3000/invite/");
+  });
+
+  test("custom MCP: needs a key unless the server supports OAuth; nothing classified at first", async () => {
+    const api = createFakeApi();
+    expect(await api.customConnectors.connect(ORG_ID, { serverUrl: "https://mcp.x.com", returnTo: "/" })).toEqual({
+      status: "needs_key",
+    });
+    const res = await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://mcp.x.com",
+      apiKey: "chave-123456",
+      returnTo: "/",
+    });
+    if (res.status !== "connected") throw new Error("expected connected");
+    expect(res.server.tools.every((t) => t.access === null)).toBe(true);
+    expect(res.server.reviewedAt).toBeNull();
   });
 });

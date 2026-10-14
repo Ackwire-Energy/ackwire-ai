@@ -134,6 +134,15 @@ function MemoryView({ agent }: { agent: Agent }) {
             <div className="row">
               <Chip icon={KIND_ICON[m.kind]}>{t(`memory.kinds.${m.kind}`)}</Chip>
               {m.pinned && <Chip icon="pin">{t("memory.pinned")}</Chip>}
+              {m.verified ? (
+                <Chip icon="check" tone="done" title={t("memory.verifiedTitle")}>
+                  {t("memory.verified")}
+                </Chip>
+              ) : (
+                <Chip icon="info" title={t("memory.unverifiedTitle")}>
+                  {t("memory.unverified")}
+                </Chip>
+              )}
               {m.lowTrust && (
                 <Chip icon="alert" tone="waiting">
                   {t("memory.lowTrust")}

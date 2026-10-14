@@ -28,11 +28,14 @@ import type {
   OrgSettings,
   Person,
   Proposal,
+  ReactionCount,
   Role,
   RosterMember,
   Run,
   RunStep,
   ScopeGrant,
+  SearchHit,
+  SearchKind,
   ToolAccess,
   UsageReport,
 } from "./types";
@@ -133,6 +136,11 @@ export interface ApiClient {
       options?: { threadId?: string; before?: string; limit?: number },
     ): Promise<Message[]>;
     post(orgId: string, channelId: string, input: { body: string; threadId?: string | null }): Promise<Message>;
+    reactions(orgId: string, messageId: string): Promise<ReactionCount[]>;
+    react(orgId: string, messageId: string, reaction: string): Promise<ReactionCount[]>;
+    unreact(orgId: string, messageId: string, reaction: string): Promise<ReactionCount[]>;
+    /** Corrects an agent's reply: it becomes a lesson for that agent. */
+    correct(orgId: string, messageId: string, body: string): Promise<void>;
   };
 
   approvals: {
@@ -153,6 +161,9 @@ export interface ApiClient {
     /** Returns the provider URL to open; the server redirects back to `returnTo`. */
     startOAuth(orgId: string, connector: string, input: { returnTo: string; serverUrl?: string }): Promise<string>;
     disconnect(orgId: string, connectionId: string): Promise<void>;
+  };
+  search: {
+    query(orgId: string, input: { q: string; kinds?: SearchKind[]; limit?: number }): Promise<SearchHit[]>;
   };
   scopes: {
     get(orgId: string, agentId: string): Promise<ScopeGrant[]>;
@@ -203,7 +214,17 @@ export interface ApiClient {
 /** The part of the client the HTTP backend implements today. */
 export type HttpApi = Pick<
   ApiClient,
-  "system" | "account" | "orgs" | "agents" | "chat" | "approvals" | "connectors" | "scopes"
+  | "system"
+  | "account"
+  | "orgs"
+  | "agents"
+  | "chat"
+  | "approvals"
+  | "connectors"
+  | "scopes"
+  | "search"
+  | "memory"
+  | "proposals"
 >;
 /** The part still served by in-memory mocks. */
 export type MockedApi = Omit<ApiClient, keyof HttpApi>;

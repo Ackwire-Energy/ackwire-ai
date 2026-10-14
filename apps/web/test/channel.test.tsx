@@ -185,6 +185,49 @@ describe("Canal", () => {
     expect(dialog.textContent).toContain("Ninguém encontrado com “zzz”.");
   });
 
+  test("agent replies: 👍/👎 toggle with the API and Corrigir resposta sends a correction", async () => {
+    const { state } = await open();
+    const reply = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Achei a causa")) as HTMLElement;
+    await act(async () => fireEvent.mouseEnter(reply));
+    const bar = within(reply).getByRole("toolbar", { name: "Ações da mensagem de Ada" });
+    const up = within(bar).getByRole("button", { name: "Útil" });
+    expect(up.getAttribute("aria-pressed")).toBe("false");
+    await act(async () => fireEvent.click(up));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "chat.react")?.args).toEqual([ORG_ID, "m-2", "+1"]);
+    expect(within(bar).getByRole("button", { name: "Útil" }).getAttribute("aria-pressed")).toBe("true");
+    // 👎 replaces 👍.
+    await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Não ajudou" })));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "chat.unreact")?.args).toEqual([ORG_ID, "m-2", "+1"]);
+    expect(state.calls.filter((c) => c.method === "chat.react").at(-1)?.args[2]).toBe("-1");
+    await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Corrigir resposta" })));
+    const dialog = screen().getByRole("dialog", { name: "Corrigir a resposta da Ada" });
+    await act(async () =>
+      fireEvent.change(within(dialog).getByLabelText("Como deveria ser"), {
+        target: { value: "O token expira em 15 min." },
+      }),
+    );
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Enviar correção" })));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "chat.correct")?.args).toEqual([
+      ORG_ID,
+      "m-2",
+      "O token expira em 15 min.",
+    ]);
+    expect(document.body.textContent).toContain("Correção enviada. A Ada vai aprender com ela.");
+  });
+
+  test("people's messages have no feedback toolbar", async () => {
+    await open();
+    const ask = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("o login está devolvendo 401")) as HTMLElement;
+    expect(within(ask).queryByRole("toolbar")).toBeNull();
+  });
+
   test("admins edit the channel topic from the details", async () => {
     const { state } = await open();
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));

@@ -3,7 +3,7 @@ import { upsertMessage } from "@/chat/timeline";
 import type { ApiClient } from "./client";
 import { useApi } from "./context";
 import { keys } from "./keys";
-import type { AgentInput, Approval, Message, OrgSettings, Role, ScopeGrant, ToolAccess } from "./types";
+import type { AgentInput, Approval, Message, OrgSettings, Role, ScopeGrant, SearchKind, ToolAccess } from "./types";
 
 /**
  * React Query hooks over the `ApiClient`. Reads are cached per organization;
@@ -459,6 +459,47 @@ export function useUpdateChannel(orgId: string, channelId: string) {
   });
 }
 
+// ── Knowledge (phase 5) ─────────────────────────────────────────────────────
+
+export const useSearch = (orgId: string, q: string, kinds: SearchKind[]) => {
+  const api = useApi();
+  const text = q.trim();
+  return useQuery({
+    queryKey: keys.search(orgId, text, kinds.join(",")),
+    queryFn: () => api.search.query(orgId, { q: text, kinds, limit: 50 }),
+    enabled: text.length > 0,
+    placeholderData: (previous) => previous,
+  });
+};
+
+/** Reactions on one message, loaded when its actions are shown or used. */
+export const useReactions = (orgId: string, messageId: string, enabled: boolean) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.reactions(orgId, messageId),
+    queryFn: () => api.chat.reactions(orgId, messageId),
+    enabled,
+    staleTime: 30_000,
+  });
+};
+
+export function useToggleReaction(orgId: string, messageId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reaction, on }: { reaction: string; on: boolean }) =>
+      on ? api.chat.react(orgId, messageId, reaction) : api.chat.unreact(orgId, messageId, reaction),
+    onSuccess: (reactions) => qc.setQueryData(keys.reactions(orgId, messageId), reactions),
+  });
+}
+
+export function useCorrectMessage(orgId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: ({ messageId, body }: { messageId: string; body: string }) => api.chat.correct(orgId, messageId, body),
+  });
+}
+
 // ── Mock-backed features ────────────────────────────────────────────────────
 
 export const useCustomServers = (orgId: string) => {
@@ -494,6 +535,8 @@ export function useCustomServerAction(orgId: string) {
     }),
   };
 }
+
+// ── Memory and proposals (phase 5) ──────────────────────────────────────────
 
 export const useMemory = (orgId: string, agentId: string) => {
   const api = useApi();
@@ -531,6 +574,8 @@ export function useDecideProposal(orgId: string) {
       input.decision === "accept"
         ? api.proposals.accept(orgId, input.id, input.text)
         : api.proposals.refuse(orgId, input.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+    // The page explains a stale proposal (409) itself.
+    meta: { silent: true },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
   });
 }

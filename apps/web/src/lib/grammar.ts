@@ -19,5 +19,6 @@ export function agentGrammar(t: TFunction, name: string) {
     to: t(f ? "grammar.toF" : "grammar.toM"),
     pronoun: t(f ? "grammar.pronounF" : "grammar.pronounM"),
     hers: t(f ? "grammar.hersF" : "grammar.hersM"),
+    for: t(f ? "grammar.forF" : "grammar.forM"),
   };
 }

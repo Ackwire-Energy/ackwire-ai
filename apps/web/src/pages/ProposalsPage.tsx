@@ -1,13 +1,15 @@
-import { Avatar, Button, Card, Chip, Diff, diffLines, EmptyState, Field, Icon, Textarea } from "@agenteschat/ui";
+import { Alert, Avatar, Button, Card, Chip, Diff, diffLines, EmptyState, Field, Icon, Textarea } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { ApiError } from "@/api/http";
 import { useDecideProposal, useProposals } from "@/api/queries";
 import type { Proposal } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { relativeTime, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
+import { useToast } from "@/lib/toast";
 
 /** Pending first, then decided; newest first inside each. */
 export function sortProposals(list: Proposal[]) {
@@ -28,6 +30,12 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
+  const [staleError, setStaleError] = useState<string | null>(null);
+  const toast = useToast();
+  const onDecideError = (error: unknown) => {
+    if (error instanceof ApiError && error.status === 409) setStaleError(t("proposals.staleError"));
+    else toast.show(error instanceof Error ? error.message : t("common.unknownError"), "error");
+  };
 
   const preferred = list.find((p) => p.agentId === agentId && p.status === "pending") ?? list[0];
   const current = list.find((p) => p.id === selected) ?? preferred;
@@ -38,6 +46,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
   // Switching proposals (or a new version of one) resets the editor.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the proposal id on purpose
   useEffect(() => {
+    setStaleError(null);
     setEditing(false);
     setDraft(current?.after ?? "");
   }, [current?.id, current?.after]);
@@ -49,13 +58,15 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
       ? t("proposals.targetContext", { org: org.name })
       : t("proposals.targetInstructions", agentGrammar(t, agentName(p.target.agentId)));
   const statusText = (p: Proposal) =>
-    p.status === "pending"
-      ? p.decider.type === "user"
-        ? t("proposals.waitingFor", { name: p.decider.name })
-        : t("proposals.waitingAdmin")
-      : p.status === "accepted"
-        ? t("proposals.accepted")
-        : t("proposals.refused");
+    p.stale
+      ? t("proposals.stale")
+      : p.status === "pending"
+        ? p.decider.type === "user"
+          ? t("proposals.waitingFor", { name: p.decider.name })
+          : t("proposals.waitingAdmin")
+        : p.status === "accepted"
+          ? t("proposals.accepted")
+          : t("proposals.refused");
   const decisionText = (p: Proposal) => {
     const when = p.decidedAt ? whenAt(t, i18n.language, p.decidedAt) : t("common.now");
     const mine = p.decidedBy?.userId === me.user.id;
@@ -127,9 +138,11 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                   components={{ b: <b style={{ color: "var(--ink)" }} /> }}
                 />
               </span>
-              {current.status === "pending" ? (
+              {current.stale ? (
+                <Chip icon="close">{t("proposals.stale")}</Chip>
+              ) : current.status === "pending" ? (
                 <Chip icon="waiting" tone="waiting">
-                  {statusText(current)}
+                  {current.canDecide ? t("approval.waitingYou") : statusText(current)}
                 </Chip>
               ) : current.status === "accepted" ? (
                 <Chip icon="check" tone="done">
@@ -161,7 +174,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
             <section aria-label={t("proposals.changeLabel")} className="section section--tight">
               <div className="row">
                 <span className="ac-eyebrow spacer">{t("proposals.change", { target: targetLabel(current) })}</span>
-                {current.status === "pending" && (
+                {current.status === "pending" && current.canDecide && (
                   <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
                     {editing ? t("proposals.viewDiff") : t("proposals.editFirst")}
                   </Button>
@@ -187,24 +200,33 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
               )}
             </section>
 
-            {current.status === "pending" && (
+            {staleError && <Alert>{staleError}</Alert>}
+            {current.stale && (
+              <p className="small muted" style={{ margin: 0 }}>
+                {t("proposals.staleNote")}
+              </p>
+            )}
+            {current.status === "pending" && current.canDecide && !current.stale && (
               <div className="proposals__actions">
                 <Button
                   variant="primary"
                   disabled={decide.isPending || !draft.trim()}
                   onClick={() =>
-                    decide.mutate({
-                      id: current.id,
-                      decision: "accept",
-                      text: editing && draft !== current.after ? draft : undefined,
-                    })
+                    decide.mutate(
+                      {
+                        id: current.id,
+                        decision: "accept",
+                        text: editing && draft !== current.after ? draft : undefined,
+                      },
+                      { onError: onDecideError },
+                    )
                   }
                 >
                   {editing ? t("proposals.acceptEdited") : t("proposals.accept")}
                 </Button>
                 <Button
                   disabled={decide.isPending}
-                  onClick={() => decide.mutate({ id: current.id, decision: "refuse" })}
+                  onClick={() => decide.mutate({ id: current.id, decision: "refuse" }, { onError: onDecideError })}
                 >
                   {t("proposals.refuse")}
                 </Button>

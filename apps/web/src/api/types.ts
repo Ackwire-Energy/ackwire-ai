@@ -139,7 +139,29 @@ export interface Message {
   agentRunId: string | null;
   /** Attachments, e.g. `{ approvalId }` on an approval card. */
   meta?: Record<string, unknown>;
+  /** Echo of the id the client sent, to reconcile an optimistic message (expected from the backend). */
+  clientId?: string | null;
+  /** Agent receipts on a person's message (expected from the backend). */
+  receipts?: MessageReceipts;
   createdAt: string;
+}
+
+/**
+ * Which agents saw a message and who picked it up. Expected shape (the
+ * backend is adding `receipts` to the list API and `message.routed` /
+ * `message.claimed` / `message.handled` events; adjust when it lands).
+ */
+export interface MessageReceipts {
+  /** Agents that saw it (router candidates, mentioned agents). */
+  seenBy: string[];
+  /** Agents that will answer. */
+  pickedBy: string[];
+  /** Agents answering now. */
+  claimedBy?: string[];
+  /** Agents that answered. */
+  handledBy?: string[];
+  /** The router decided: if nobody picked it, nobody will answer. */
+  routed?: boolean;
 }
 
 export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "failed";
@@ -165,7 +187,17 @@ export type ChannelEvent =
       status: RunStatus;
       error?: string;
     }
-  | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval };
+  | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
+  // ── Expected from the backend (chat latency batch); names and shapes to confirm ──
+  /** The agent started: thinking (no text yet) or typing (text streaming). */
+  | { type: "agent.thinking" | "agent.typing"; channelId: string; threadId: string; runId: string; agentId: string }
+  /** The agent stopped without a message (e.g. nothing to say), or the run finished. */
+  | { type: "agent.idle" | "run.finished"; channelId: string; threadId: string; runId: string; agentId: string; status?: RunStatus }
+  /** A person is typing. */
+  | { type: "typing"; channelId: string; userId: string; threadId?: string | null }
+  /** The router decided who answers a message. */
+  | { type: "message.routed"; channelId: string; messageId: string; seenBy: string[]; pickedBy: string[] }
+  | { type: "message.claimed" | "message.handled"; channelId: string; messageId: string; agentId: string };
 
 /** Events for one person (`{ type: "event", scope: "user" }` frames), e.g. approvals they can decide. */
 export type UserEvent =
@@ -263,6 +295,8 @@ export interface Memory {
   archived: boolean;
   /** Came from an external, untrusted source (e.g. a public GitHub comment). */
   lowTrust: boolean;
+  /** Backed by an outcome or a person; agent claims alone are not. */
+  verified: boolean;
   /** The text this one replaced, if any. */
   supersedes: string | null;
   /** Set when a person edited it ("Editado por você · agora"). */
@@ -282,6 +316,10 @@ export interface Proposal {
   before: string;
   after: string;
   status: ProposalStatus;
+  /** The text changed since it was proposed: it can no longer be accepted. */
+  stale: boolean;
+  /** You are the agent's owner or an admin (org context: admins). */
+  canDecide: boolean;
   /** Who can decide: the agent's owner for instructions, admins for the org context. */
   decider: { type: "user"; userId: string; name: string } | { type: "admins" };
   createdAt: string;
@@ -467,3 +505,35 @@ export type CustomConnectStart =
   | { status: "connected"; server: CustomServer }
   | { status: "oauth"; authorizeUrl: string }
   | { status: "needs_key" };
+
+// ── Knowledge (phase 5: apps/server/src/routes/app/knowledge.ts) ─────────────
+
+export type SearchKind = "message" | "context_item" | "issue" | "forum_topic" | "forum_reply" | "file";
+
+export interface SearchHit {
+  kind: SearchKind;
+  /** The message id, context item id, … */
+  sourceId: string;
+  channelIds: string[];
+  title: string;
+  snippet: string;
+  score: number;
+  createdAt: string;
+}
+
+export interface ReactionCount {
+  /** `+1` / `-1` on agent replies are feedback for the agent. */
+  reaction: string;
+  count: number;
+  userIds: string[];
+}
+
+/** A memory change an agent made from a conversation (expected in `message.meta.memoryChange`). */
+export interface MemoryChange {
+  action: "remembered" | "forgotten" | "updated";
+  memoryId: string;
+  agentId: string;
+  text: string;
+  /** For "updated": the text before. */
+  previous?: string | null;
+}

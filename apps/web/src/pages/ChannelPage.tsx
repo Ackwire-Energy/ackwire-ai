@@ -28,10 +28,11 @@ import {
   useThreads,
   useUpdateChannel,
 } from "@/api/queries";
-import type { Agent, Approval, Channel, Member } from "@/api/types";
+import type { Agent, Approval, Channel, Member, Message as MessageType } from "@/api/types";
 import { MessageBody } from "@/chat/MessageBody";
 import { buildTimeline, mergeTimeline, threadRootsToLoad } from "@/chat/timeline";
 import { InlineApproval } from "@/components/ApprovalItem";
+import { MessageFeedback } from "@/components/MessageFeedback";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { dayLabel, formatTime, joinNames } from "@/lib/format";
@@ -68,7 +69,6 @@ function ChannelView({ channel }: { channel: Channel }) {
   const messages = useMessages(org.id, channel.id, isMember);
   const roots = useMemo(() => threadRootsToLoad(messages.data ?? []), [messages.data]);
   const threads = useThreads(org.id, channel.id, isMember ? roots : []);
-  const approvals = useApprovals(org.id);
   const runs = useStreams((s) => runsInChannel(s, channel.id));
   const dismissRun = useDismissRun();
   const status = useConnectionStatus();
@@ -204,45 +204,8 @@ function ChannelView({ channel }: { channel: Channel }) {
               switch (item.kind) {
                 case "day":
                   return <DayDivider key={item.key}>{dayLabel(t, i18n.language, item.iso)}</DayDivider>;
-                case "message": {
-                  const m = item.message;
-                  const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
-                  const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
-                  const name = dir.authorName(m.author);
-                  const approvalId = typeof m.meta?.approvalId === "string" ? m.meta.approvalId : null;
-                  return (
-                    <Message
-                      key={item.key}
-                      agent={m.author.type === "agent"}
-                      grouped={item.grouped}
-                      avatar={
-                        <Avatar
-                          kind={m.author.type}
-                          name={name}
-                          imageUrl={person?.image}
-                          initials={agent ? dir.agentInitials(agent.id) : undefined}
-                        />
-                      }
-                      author={name}
-                      time={<time dateTime={m.createdAt}>{formatTime(i18n.language, m.createdAt)}</time>}
-                      stacked={approvalId !== null}
-                    >
-                      {(m.body.trim() || !approvalId) && (
-                        <MessageText>
-                          <MessageBody body={m.body} resolveMention={dir.mentionName} />
-                        </MessageText>
-                      )}
-                      {approvalId && (
-                        <MessageApproval
-                          approvalId={approvalId}
-                          listed={approvals.data?.find((a) => a.id === approvalId)}
-                          agent={agent}
-                          members={dir.memberById}
-                        />
-                      )}
-                    </Message>
-                  );
-                }
+                case "message":
+                  return <TimelineMessage key={item.key} message={item.message} grouped={item.grouped} />;
                 case "run": {
                   const run = item.run;
                   const agent = dir.agentById.get(run.agentId);
@@ -323,6 +286,56 @@ function ChannelView({ channel }: { channel: Channel }) {
 
       <ChannelDetails open={detailsOpen} onOpenChange={setDetailsOpen} channel={channel} />
     </main>
+  );
+}
+
+/** One message row; agent replies get feedback actions (👍/👎, "Corrigir resposta"). */
+function TimelineMessage({ message: m, grouped }: { message: MessageType; grouped: boolean }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const approvals = useApprovals(org.id);
+  const [active, setActive] = useState(false);
+  const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
+  const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
+  const name = dir.authorName(m.author);
+  const approvalId = typeof m.meta?.approvalId === "string" ? m.meta.approvalId : null;
+  const feedback = m.author.type === "agent" && !approvalId;
+  return (
+    <Message
+      agent={m.author.type === "agent"}
+      grouped={grouped}
+      onMouseEnter={feedback ? () => setActive(true) : undefined}
+      onFocus={feedback ? () => setActive(true) : undefined}
+      avatar={
+        <Avatar
+          kind={m.author.type}
+          name={name}
+          imageUrl={person?.image}
+          initials={agent ? dir.agentInitials(agent.id) : undefined}
+        />
+      }
+      author={name}
+      time={<time dateTime={m.createdAt}>{formatTime(i18n.language, m.createdAt)}</time>}
+      stacked={approvalId !== null}
+    >
+      {(m.body.trim() || !approvalId) && (
+        <MessageText>
+          <MessageBody body={m.body} resolveMention={dir.mentionName} />
+        </MessageText>
+      )}
+      {approvalId && (
+        <MessageApproval
+          approvalId={approvalId}
+          listed={approvals.data?.find((a) => a.id === approvalId)}
+          agent={agent}
+          members={dir.memberById}
+        />
+      )}
+      {feedback && (
+        <MessageFeedback messageId={m.id} agentName={agent?.name ?? t("channel.unknownAgent")} active={active} />
+      )}
+    </Message>
   );
 }
 

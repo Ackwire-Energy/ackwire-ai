@@ -19,16 +19,20 @@ import type {
   InvitationWithStatus,
   Me,
   Member,
+  Memory,
   Message,
   Model,
   Organization,
   OrgOverview,
   OrgSettings,
   Person,
+  Proposal,
+  ReactionCount,
   RosterMember,
   Run,
   RunStep,
   ScopeGrant,
+  SearchHit,
   UsageReport,
 } from "./types";
 
@@ -135,6 +139,24 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       join: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/join`, { json: {} }),
       update: (orgId, channelId, input) =>
         request<Channel>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "PATCH", json: input }),
+      reactions: async (orgId, messageId) =>
+        (await request<{ reactions: ReactionCount[] }>(`${org(orgId)}/messages/${enc(messageId)}/reactions`)).reactions,
+      react: async (orgId, messageId, reaction) =>
+        (
+          await request<{ reactions: ReactionCount[] }>(`${org(orgId)}/messages/${enc(messageId)}/reactions`, {
+            json: { reaction },
+          })
+        ).reactions,
+      unreact: async (orgId, messageId, reaction) =>
+        (
+          await request<{ reactions: ReactionCount[] }>(`${org(orgId)}/messages/${enc(messageId)}/reactions`, {
+            method: "DELETE",
+            query: { reaction },
+          })
+        ).reactions,
+      correct: async (orgId, messageId, body) => {
+        await request<unknown>(`${org(orgId)}/messages/${enc(messageId)}/correction`, { json: { body } });
+      },
       roster: async (orgId, channelId) =>
         (await request<{ members: RosterMember[] }>(`${org(orgId)}/channels/${enc(channelId)}/roster`)).members,
       members: async (orgId, channelId) =>
@@ -171,6 +193,30 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         ).authorizeUrl,
       disconnect: (orgId, connectionId) =>
         request<void>(`${org(orgId)}/connectors/${enc(connectionId)}`, { method: "DELETE" }),
+    },
+    search: {
+      query: async (orgId, input) =>
+        (
+          await request<{ hits: SearchHit[] }>(`${org(orgId)}/search`, {
+            query: { q: input.q, kinds: input.kinds?.join(","), limit: input.limit },
+          })
+        ).hits,
+    },
+    memory: {
+      list: async (orgId, agentId) =>
+        (await request<{ memories: Memory[] }>(`${org(orgId)}/agents/${enc(agentId)}/memories`)).memories,
+      edit: (orgId, id, text) =>
+        request<Memory>(`${org(orgId)}/memories/${enc(id)}`, { method: "PATCH", json: { text } }),
+      setPinned: (orgId, id, pinned) =>
+        request<Memory>(`${org(orgId)}/memories/${enc(id)}`, { method: "PATCH", json: { pinned } }),
+      setArchived: (orgId, id, archived) =>
+        request<Memory>(`${org(orgId)}/memories/${enc(id)}`, { method: "PATCH", json: { archived } }),
+    },
+    proposals: {
+      list: async (orgId) => (await request<{ proposals: Proposal[] }>(`${org(orgId)}/proposals`)).proposals,
+      accept: (orgId, id, text) =>
+        request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/accept`, { json: text === undefined ? {} : { text } }),
+      refuse: (orgId, id) => request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/refuse`, { json: {} }),
     },
     scopes: {
       get: async (orgId, agentId) =>
