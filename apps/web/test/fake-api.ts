@@ -48,8 +48,13 @@ export interface FakeState {
   memories: Memory[];
   proposals: Proposal[];
   reactions: Record<string, ReactionCount[]>;
+  dms: { channelId: string; with: { type: "person" | "agent"; id: string; name: string; handle: string | null } }[];
   calls: { method: string; args: unknown[] }[];
   context?: string;
+  /** Make `chat.post` fail (optimistic send tests). */
+  failPosts?: boolean;
+  /** `chat.post` waits for this (to see the pending state). */
+  holdPosts?: Promise<void>;
 }
 
 /** A small in-memory backend with the data of the approved screens ("Acme"). */
@@ -287,6 +292,7 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
       ),
     ],
     reactions: {},
+    dms: [],
     calls: [],
     ...overrides,
   };
@@ -728,8 +734,21 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
     },
     chat: {
       channels: async () => state.channels,
-      createChannel: async () => {
-        throw new Error("not used");
+      createChannel: async (orgId, input) => {
+        log("chat.createChannel", orgId, input);
+        if (state.channels.some((c) => c.name === input.name))
+          throw new ApiError(409, "conflict", `#${input.name} already exists`);
+        const channel: Channel = {
+          id: id("chan"),
+          name: input.name,
+          topic: input.topic ?? "",
+          visibility: input.visibility ?? "public",
+          isMember: true,
+          createdAt: new Date().toISOString(),
+        };
+        state.channels.push(channel);
+        state.channelMembers[channel.id] = [{ type: "person", id: state.me?.user.id ?? "" }];
+        return channel;
       },
       join: async (orgId, channelId) => {
         log("chat.join", orgId, channelId);
@@ -806,16 +825,23 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
       },
       post: async (orgId, channelId, input) => {
         log("chat.post", orgId, channelId, input);
+        if (state.holdPosts) await state.holdPosts;
+        if (state.failPosts) throw new ApiError(503, "unavailable", "Try again");
         const message: Message = {
-          id: id("msg"),
+          id: input.clientId ? `srv-${input.clientId}` : id("msg"),
           channelId,
           threadId: input.threadId ?? null,
           author: { type: "person", id: state.me?.user.id ?? null },
           body: input.body,
           mentionedAgentIds: [],
           agentRunId: null,
+          clientId: input.clientId ?? null,
           createdAt: new Date().toISOString(),
         };
+        message.mentionedAgentIds = state.agents
+          .filter((a) => input.body.toLowerCase().includes(`@${a.handle}`))
+          .filter((a) => (state.channelMembers[channelId] ?? []).some((m) => m.type === "agent" && m.id === a.id))
+          .map((a) => a.id);
         state.messages.push(message);
         return message;
       },
@@ -902,6 +928,34 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
       edit: async (orgId, id, text) => patchMemory(orgId, id, { text }),
       setPinned: async (orgId, id, pinned) => patchMemory(orgId, id, { pinned }),
       setArchived: async (orgId, id, archived) => patchMemory(orgId, id, { archived }),
+      revert: async (orgId, id) => {
+        log("memory.revert", orgId, id);
+      },
+    },
+    dms: {
+      list: async () => state.dms.map((d) => ({ ...d, lastMessage: null, unread: 0 })),
+      open: async (orgId, target) => {
+        log("dms.open", orgId, target);
+        const existing = state.dms.find((d) =>
+          "agentId" in target ? d.with.id === target.agentId : d.with.id === target.userId,
+        );
+        if (existing) return { channelId: existing.channelId };
+        const channelId = id("dm");
+        const agent = "agentId" in target ? state.agents.find((a) => a.id === target.agentId) : undefined;
+        const person = "userId" in target ? state.members.find((m) => m.userId === target.userId) : undefined;
+        state.channelMembers[channelId] = [
+          { type: "person", id: state.me?.user.id ?? "" },
+          agent ? { type: "agent", id: agent.id } : { type: "person", id: person?.userId ?? "" },
+        ];
+        state.dms.push({
+          channelId,
+          with: agent
+            ? { type: "agent", id: agent.id, name: agent.name, handle: agent.handle }
+            : { type: "person", id: person?.userId ?? "", name: person?.name ?? "", handle: null },
+        });
+        return { channelId };
+      },
+      markRead: async () => {},
     },
     proposals: {
       list: async () => structuredClone(state.proposals),

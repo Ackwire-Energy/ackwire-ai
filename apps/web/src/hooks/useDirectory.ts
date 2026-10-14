@@ -32,6 +32,7 @@ export function useDirectory(orgId: string) {
       agents: agents.data ?? [],
       members: members.data ?? [],
       agentById,
+      agentByHandle,
       memberById,
       authorName,
       mentionName,

@@ -135,6 +135,11 @@ export class RealtimeConnection {
     };
   }
 
+  /** Tells the channel we're typing (call it throttled: see `typingThrottle`). */
+  sendTyping(channelId: string) {
+    this.send({ type: "typing", channelId });
+  }
+
   onStatus(listener: (status: ConnectionStatus) => void) {
     this.statusListeners.add(listener);
     return () => {

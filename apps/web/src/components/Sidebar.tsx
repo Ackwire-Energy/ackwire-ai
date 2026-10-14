@@ -12,7 +12,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { useChannels, useOverview } from "@/api/queries";
+import { useChannels, useDms, useOverview } from "@/api/queries";
 import { useAuth } from "@/auth/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type LocaleCode, locales, setLocale } from "@/i18n";
@@ -35,6 +35,13 @@ export function Sidebar() {
   const pending = overview.data?.approvalsWaitingForMe ?? 0;
   const people = dir.members.filter((m) => m.userId !== me.user.id);
   const spent = overview.data ? overview.data.myAgentsSpendUsd : null;
+  const dms = useDms(orgId);
+  const dmChannels = new Set((dms.data ?? []).map((d) => d.channelId));
+  // Agents I talk to directly (people are listed below anyway).
+  const agentDms = (dms.data ?? [])
+    .filter((d) => d.with.type === "agent")
+    .map((d) => dir.agentById.get(d.with.id))
+    .filter((a): a is NonNullable<typeof a> => Boolean(a));
 
   return (
     <nav className="sidebar" aria-label={t("shell.nav")}>
@@ -87,12 +94,19 @@ export function Sidebar() {
 
       <div className="sidebar__group">
         <span className="sidebar__label">{t("shell.channels")}</span>
-        {(channels.data ?? []).map((c) => (
-          <Link key={c.id} to="/org/$orgId/c/$channelId" params={{ orgId, channelId: c.id }} className="sidebar__item">
-            <Icon name="channel" className="sidebar__channel-icon" />
-            <span className="sidebar__item-label">{c.name}</span>
-          </Link>
-        ))}
+        {(channels.data ?? [])
+          .filter((c) => !dmChannels.has(c.id))
+          .map((c) => (
+            <Link
+              key={c.id}
+              to="/org/$orgId/c/$channelId"
+              params={{ orgId, channelId: c.id }}
+              className="sidebar__item"
+            >
+              <Icon name="channel" className="sidebar__channel-icon" />
+              <span className="sidebar__item-label">{c.name}</span>
+            </Link>
+          ))}
       </div>
 
       {dir.agents.length > 0 && (
@@ -101,7 +115,7 @@ export function Sidebar() {
           {dir.agents.map((a) => (
             <Link
               key={a.id}
-              to="/org/$orgId/agents/$agentId"
+              to="/org/$orgId/dm/agent/$agentId"
               params={{ orgId, agentId: a.id }}
               className="sidebar__item"
             >
@@ -119,13 +133,30 @@ export function Sidebar() {
         </div>
       )}
 
-      {people.length > 0 && (
+      {(people.length > 0 || agentDms.length > 0) && (
         <div className="sidebar__group">
           <span className="sidebar__label">{t("shell.directMessages")}</span>
+          {agentDms.map((a) => (
+            <Link
+              key={a.id}
+              to="/org/$orgId/dm/agent/$agentId"
+              params={{ orgId, agentId: a.id }}
+              className="sidebar__item"
+            >
+              <Avatar
+                kind="agent"
+                name={a.name}
+                initials={dir.agentInitials(a.id)}
+                size="sm"
+                running={running.has(a.id)}
+              />
+              <span className="sidebar__item-label">{a.name}</span>
+            </Link>
+          ))}
           {people.map((m) => (
             <Link
               key={m.userId}
-              to="/org/$orgId/dm/$userId"
+              to="/org/$orgId/dm/person/$userId"
               params={{ orgId, userId: m.userId }}
               className="sidebar__item"
             >

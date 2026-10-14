@@ -1410,3 +1410,56 @@ a.ac-list__row:focus-visible {
     box-shadow: none;
   }
 }
+
+/* Tiny avatar (receipts under a message): same shapes, 18px */
+.ac-avatar--xs {
+  width: 18px;
+  height: 18px;
+  font-size: 9px;
+}
+.ac-avatar--xs.ac-avatar--agent {
+  border-radius: 5px;
+  border-bottom-left-radius: var(--radius-cut);
+}
+
+/* Optimistic message: pending is quieter; failed keeps its words */
+.ac-msg--pending .ac-msg__text {
+  color: var(--ink-muted);
+}
+
+/* Agent receipts under a person's message: muted, small; only the avatars carry color */
+.ac-receipt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-1);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+.ac-receipt__avatars {
+  display: inline-flex;
+  gap: 2px;
+}
+.ac-receipt[data-done="true"] .ac-receipt__text {
+  display: none;
+}
+.ac-receipt[data-done="true"]:hover .ac-receipt__text,
+.ac-receipt[data-done="true"]:focus-within .ac-receipt__text {
+  display: inline;
+}
+.ac-receipt__action {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ac-receipt__action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-cut);
+}

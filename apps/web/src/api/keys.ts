@@ -35,6 +35,7 @@ export const keys = {
   roster: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "roster"] as const,
   memory: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory"] as const,
   proposals: (orgId: string) => ["org", orgId, "proposals"] as const,
+  dms: (orgId: string) => ["org", orgId, "dms"] as const,
   search: (orgId: string, q: string, kinds: string) => ["org", orgId, "search", q, kinds] as const,
   reactions: (orgId: string, messageId: string) => ["org", orgId, "reactions", messageId] as const,
 };

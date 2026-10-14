@@ -204,24 +204,87 @@ export function useAddChannelMember(orgId: string) {
   });
 }
 
-/** Puts a message in the right cache: the channel list, or its thread. */
+/** Puts a message in the right cache: the channel list, or its thread. Replaces the optimistic copy (same `clientId`). */
 export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: string, message: Message) {
-  if (message.threadId) {
-    qc.setQueryData<Message[]>(keys.thread(orgId, message.channelId, message.threadId), (list) =>
-      upsertMessage(list, message),
-    );
-  } else {
-    qc.setQueryData<Message[]>(keys.messages(orgId, message.channelId), (list) => upsertMessage(list, message));
-  }
+  const key = message.threadId
+    ? keys.thread(orgId, message.channelId, message.threadId)
+    : keys.messages(orgId, message.channelId);
+  qc.setQueryData<Message[]>(key, (list) => {
+    const rest = message.clientId ? list?.filter((m) => !(m.local && m.clientId === message.clientId)) : list;
+    return upsertMessage(rest, message);
+  });
 }
 
-export function usePostMessage(orgId: string, channelId: string) {
+const newClientId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
+/**
+ * Sends a message optimistically: it appears at once (`local: "pending"`),
+ * is replaced by the server's copy (matched by `clientId`, from the response
+ * or the WebSocket, whichever comes first), or turns `failed` with a retry.
+ */
+export function usePostMessage(
+  orgId: string,
+  channelId: string,
+  options: {
+    me: { id: string };
+    /** Agents the text mentions (client-side guess, for the instant "pensando…" row). */
+    mentioned?: (body: string) => string[];
+    onSent?: (message: Message, local: Message) => void;
+    onOptimistic?: (local: Message) => void;
+  },
+) {
   const api = useApi();
   const qc = useQueryClient();
+  const key = keys.messages(orgId, channelId);
   return useMutation({
-    mutationFn: (body: string) => api.chat.post(orgId, channelId, { body }),
-    onSuccess: (message) => cacheMessage(qc, orgId, message),
+    meta: { silent: true },
+    mutationFn: ({ body, clientId }: { body: string; clientId: string }) =>
+      api.chat.post(orgId, channelId, { body, clientId }),
+    onMutate: ({ body, clientId }) => {
+      const local: Message = {
+        id: `local-${clientId}`,
+        channelId,
+        threadId: null,
+        author: { type: "person", id: options.me.id },
+        body,
+        mentionedAgentIds: options.mentioned?.(body) ?? [],
+        agentRunId: null,
+        meta: {},
+        clientId,
+        local: "pending",
+        createdAt: new Date().toISOString(),
+      };
+      qc.setQueryData<Message[]>(key, (list) =>
+        upsertMessage(
+          list?.filter((m) => m.id !== local.id),
+          local,
+        ),
+      );
+      options.onOptimistic?.(local);
+      return { local };
+    },
+    onSuccess: (message, { clientId }, ctx) => {
+      const echoed = { ...message, clientId: message.clientId ?? clientId };
+      cacheMessage(qc, orgId, echoed);
+      if (ctx?.local) options.onSent?.(echoed, ctx.local);
+    },
+    onError: (_error, { clientId }) => {
+      qc.setQueryData<Message[]>(key, (list) =>
+        list?.map((m) => (m.local && m.clientId === clientId ? { ...m, local: "failed" as const } : m)),
+      );
+    },
   });
+}
+
+/** `send(body)` for a new message; `retry(local)` for one that failed. */
+export function sendHelpers(mutation: ReturnType<typeof usePostMessage>) {
+  return {
+    send: (body: string) => mutation.mutate({ body, clientId: newClientId() }),
+    retry: (local: Message) => mutation.mutate({ body: local.body, clientId: local.clientId ?? newClientId() }),
+  };
 }
 
 // ── Approvals ───────────────────────────────────────────────────────────────
@@ -458,6 +521,13 @@ export function useUpdateChannel(orgId: string, channelId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
   });
 }
+
+// ── Direct messages ─────────────────────────────────────────────────────────
+
+export const useDms = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.dms(orgId), queryFn: () => api.dms.list(orgId), staleTime: 30_000 });
+};
 
 // ── Knowledge (phase 5) ─────────────────────────────────────────────────────
 

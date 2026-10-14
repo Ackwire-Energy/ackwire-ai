@@ -1,37 +1,127 @@
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import {
-  createContext,
-  type ReactNode,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { keys } from "@/api/keys";
 import { cacheApproval, cacheMessage } from "@/api/queries";
-import type { Agent, BudgetEvent, ChannelEvent } from "@/api/types";
+import type { Agent, BudgetEvent, ChannelEvent, MemoryUpdate, Message } from "@/api/types";
 import { formatUsd } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { type ConnectionStatus, RealtimeConnection, realtimeUrl, type SocketFactory } from "./connection";
-import { applyChannelEvent, dismissRun, emptyStreams, type StreamsState } from "./streams";
+import { applyReceiptEvent, type ReceiptsState, seedReceipt } from "./receipts";
+import { applyChannelEvent, dismissRun, emptyStreams, expectReply, type LiveRun, type StreamsState } from "./streams";
+import { applyTyping, stopTyping, type TypingState, typingThrottle } from "./typing";
 
-/** A small external store for live runs, shared by the channel and the sidebar. */
-export function createStreamsStore(initial: StreamsState = emptyStreams) {
-  let state = initial;
+/** Live state shared by the channel and the sidebar: runs, receipts and who is typing. */
+export interface LiveState {
+  streams: StreamsState;
+  receipts: ReceiptsState;
+  typing: TypingState;
+  /** `memory.updated` cards per channel (live; they aren't in the message list). */
+  memory: Record<string, LiveMemoryCard[]>;
+}
+
+export interface LiveMemoryCard {
+  key: string;
+  agentId: string;
+  threadId: string;
+  update: MemoryUpdate;
+}
+
+/** A small external store; components subscribe to slices of it (`useLive`). */
+export function createStreamsStore(initial: StreamsState = emptyStreams, now: () => number = () => Date.now()) {
+  let state: LiveState = { streams: initial, receipts: {}, typing: {}, memory: {} };
   const listeners = new Set<() => void>();
-  const set = (next: StreamsState) => {
-    if (next === state) return;
+  const set = (next: LiveState) => {
+    if (
+      next.streams === state.streams &&
+      next.receipts === state.receipts &&
+      next.typing === state.typing &&
+      next.memory === state.memory
+    )
+      return;
     state = next;
     for (const l of listeners) l();
   };
   return {
     get: () => state,
-    apply: (event: ChannelEvent) => set(applyChannelEvent(state, event)),
-    dismiss: (runId: string) => set(dismissRun(state, runId)),
+    apply: (event: ChannelEvent) => {
+      let typing = state.typing;
+      if (event.type === "user.typing") typing = applyTyping(typing, event.channelId, event.userId, now(), event.ttlMs);
+      const memory =
+        event.type === "memory.updated"
+          ? {
+              ...state.memory,
+              [event.channelId]: [
+                ...(state.memory[event.channelId] ?? []).filter(
+                  (m) => m.key !== `${event.runId}:${event.update.itemId}`,
+                ),
+                {
+                  key: `${event.runId}:${event.update.itemId}`,
+                  agentId: event.agentId,
+                  threadId: event.threadId,
+                  update: event.update,
+                },
+              ],
+            }
+          : state.memory;
+      if (event.type === "message.created" && event.message?.author?.type === "person" && event.message.author.id) {
+        typing = stopTyping(typing, event.channelId, event.message.author.id);
+      }
+      set({
+        memory,
+        streams: applyChannelEvent(state.streams, event),
+        receipts: applyReceiptEvent(
+          event.type === "message.created" && event.message
+            ? seedReceipt(state.receipts, event.message)
+            : state.receipts,
+          event,
+        ),
+        typing,
+      });
+    },
+    /** Person messages loaded over HTTP: start their receipts. */
+    seed: (messages: Message[]) => {
+      let receipts = state.receipts;
+      for (const m of messages) receipts = seedReceipt(receipts, m);
+      set({ ...state, receipts });
+    },
+    /** Right after sending: provisional "pensando…" rows and receipts for the agents we mentioned. */
+    expect: (channelId: string, messageId: string, agentIds: string[]) => {
+      let streams = state.streams;
+      let receipts = state.receipts;
+      for (const agentId of agentIds) {
+        streams = expectReply(streams, { channelId, threadId: messageId, agentId });
+        receipts = applyReceiptEvent(receipts, {
+          type: "message.routed",
+          channelId,
+          messageId,
+          seenBy: [agentId],
+          pickedBy: [agentId],
+        });
+      }
+      // Not decided yet: the router may still pick someone.
+      const r = receipts[messageId];
+      if (r) receipts = { ...receipts, [messageId]: { ...r, routed: false } };
+      set({ ...state, streams, receipts });
+    },
+    /** The optimistic message got its server id: move its "pensando…" rows and receipts there. */
+    retarget: (fromId: string, toId: string) => {
+      const runs: Record<string, LiveRun> = {};
+      for (const [id, r] of Object.entries(state.streams.runs)) {
+        if (r.provisional && r.threadId === fromId) {
+          const moved = { ...r, threadId: toId, runId: `pending:${r.agentId}:${toId}` };
+          runs[moved.runId] = moved;
+        } else runs[id] = r;
+      }
+      const { [fromId]: moving, ...receipts } = state.receipts;
+      set({
+        ...state,
+        streams: { ...state.streams, runs },
+        receipts: moving && !receipts[toId] ? { ...receipts, [toId]: moving } : receipts,
+      });
+    },
+    dismiss: (runId: string) => set({ ...state, streams: dismissRun(state.streams, runId) }),
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => {
@@ -148,10 +238,47 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
   }, [connection, enabled, orgId, channelId, qc, streams]);
 }
 
-export function useStreams<T>(select: (state: StreamsState) => T): T {
-  const { streams } = useRealtime();
-  const state = useSyncExternalStore(streams.subscribe, streams.get, streams.get);
-  return select(state);
+/**
+ * Subscribes to a slice of the live store; re-renders only when that slice
+ * changes (`isEqual`), so a streaming delta re-renders the streaming row, not
+ * the whole timeline.
+ */
+export function useLive<T>(select: (state: LiveState) => T, isEqual: (a: T, b: T) => boolean = Object.is): T {
+  const { streams: store } = useRealtime();
+  const selectRef = useRef(select);
+  selectRef.current = select;
+  const [value, setValue] = useState(() => select(store.get()));
+  const valueRef = useRef(value);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the selector and isEqual are read through refs
+  useEffect(() => {
+    const check = () => {
+      const next = selectRef.current(store.get());
+      if (!isEqual(valueRef.current, next)) {
+        valueRef.current = next;
+        setValue(() => next);
+      }
+    };
+    check();
+    return store.subscribe(check);
+  }, [store]);
+  return value;
+}
+
+export function useStreams<T>(select: (state: StreamsState) => T, isEqual?: (a: T, b: T) => boolean): T {
+  return useLive((s) => select(s.streams), isEqual);
+}
+
+export function useLiveStore() {
+  return useRealtime().streams;
+}
+
+/** Throttled "I'm typing" for a channel. */
+export function useTypingSender(channelId: string) {
+  const { connection } = useRealtime();
+  const throttle = useMemo(() => typingThrottle(), []);
+  return () => {
+    if (connection && throttle(Date.now())) connection.sendTyping(channelId);
+  };
 }
 
 export function useDismissRun() {

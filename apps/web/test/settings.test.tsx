@@ -165,3 +165,29 @@ describe("budget alerts over the WebSocket", () => {
     );
   });
 });
+
+describe("Buscar no workspace", () => {
+  test("search as you type: results grouped by kind, with channel and author, linking to the channel", async () => {
+    const { state } = await go(seedState(), "search");
+    const box = screen().getByRole("searchbox", { name: "Buscar" });
+    expect(document.body.textContent).toContain("Busque mensagens, decisões, fatos e resumos");
+    await type(box, "login");
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "search.query")?.args[1]).toEqual({
+      q: "login",
+      kinds: ["message", "context_item"],
+      limit: 50,
+    });
+    const messages = screen().getByRole("region", { name: "Mensagens" });
+    const link = within(messages).getAllByRole("link")[0] as HTMLElement;
+    expect(link.textContent).toContain("o login está devolvendo 401");
+    expect(link.textContent).toContain("João · em #eng");
+    expect(link.getAttribute("href")).toBe(`/org/${ORG_ID}/c/00000000-0000-4000-8000-0000000000c2`);
+    expect(screen().getByRole("region", { name: "Contexto" }).textContent).toContain("tokens de 15 minutos");
+    await type(box, "nada-disso");
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    await settle(4);
+    expect(document.body.textContent).toContain("Nada encontrado com “nada-disso”.");
+  });
+});

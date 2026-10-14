@@ -27,10 +27,11 @@ import { Route as OrgOrgIdSearchRouteImport } from './routes/org.$orgId.search'
 import { Route as OrgOrgIdSettingsRouteImport } from './routes/org.$orgId.settings'
 import { Route as OrgOrgIdAgentsNewRouteImport } from './routes/org.$orgId.agents.new'
 import { Route as OrgOrgIdCChannelIdRouteImport } from './routes/org.$orgId.c.$channelId'
-import { Route as OrgOrgIdDmUserIdRouteImport } from './routes/org.$orgId.dm.$userId'
 import { Route as OrgOrgIdThreadsThreadIdRouteImport } from './routes/org.$orgId.threads.$threadId'
 import { Route as OrgOrgIdAgentsAgentIdIndexRouteImport } from './routes/org.$orgId.agents.$agentId.index'
 import { Route as OrgOrgIdAgentsAgentIdMemoryRouteImport } from './routes/org.$orgId.agents.$agentId.memory'
+import { Route as OrgOrgIdDmAgentAgentIdRouteImport } from './routes/org.$orgId.dm.agent.$agentId'
+import { Route as OrgOrgIdDmPersonUserIdRouteImport } from './routes/org.$orgId.dm.person.$userId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -122,11 +123,6 @@ const OrgOrgIdCChannelIdRoute = OrgOrgIdCChannelIdRouteImport.update({
   path: '/c/$channelId',
   getParentRoute: () => OrgOrgIdRoute,
 } as any)
-const OrgOrgIdDmUserIdRoute = OrgOrgIdDmUserIdRouteImport.update({
-  id: '/dm/$userId',
-  path: '/dm/$userId',
-  getParentRoute: () => OrgOrgIdRoute,
-} as any)
 const OrgOrgIdThreadsThreadIdRoute = OrgOrgIdThreadsThreadIdRouteImport.update({
   id: '/threads/$threadId',
   path: '/threads/$threadId',
@@ -144,6 +140,16 @@ const OrgOrgIdAgentsAgentIdMemoryRoute =
     path: '/agents/$agentId/memory',
     getParentRoute: () => OrgOrgIdRoute,
   } as any)
+const OrgOrgIdDmAgentAgentIdRoute = OrgOrgIdDmAgentAgentIdRouteImport.update({
+  id: '/dm/agent/$agentId',
+  path: '/dm/agent/$agentId',
+  getParentRoute: () => OrgOrgIdRoute,
+} as any)
+const OrgOrgIdDmPersonUserIdRoute = OrgOrgIdDmPersonUserIdRouteImport.update({
+  id: '/dm/person/$userId',
+  path: '/dm/person/$userId',
+  getParentRoute: () => OrgOrgIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -164,9 +170,10 @@ export interface FileRoutesByFullPath {
   '/org/$orgId/': typeof OrgOrgIdIndexRoute
   '/org/$orgId/agents/new': typeof OrgOrgIdAgentsNewRoute
   '/org/$orgId/c/$channelId': typeof OrgOrgIdCChannelIdRoute
-  '/org/$orgId/dm/$userId': typeof OrgOrgIdDmUserIdRoute
   '/org/$orgId/threads/$threadId': typeof OrgOrgIdThreadsThreadIdRoute
   '/org/$orgId/agents/$agentId/memory': typeof OrgOrgIdAgentsAgentIdMemoryRoute
+  '/org/$orgId/dm/agent/$agentId': typeof OrgOrgIdDmAgentAgentIdRoute
+  '/org/$orgId/dm/person/$userId': typeof OrgOrgIdDmPersonUserIdRoute
   '/org/$orgId/agents/$agentId/': typeof OrgOrgIdAgentsAgentIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -187,9 +194,10 @@ export interface FileRoutesByTo {
   '/org/$orgId': typeof OrgOrgIdIndexRoute
   '/org/$orgId/agents/new': typeof OrgOrgIdAgentsNewRoute
   '/org/$orgId/c/$channelId': typeof OrgOrgIdCChannelIdRoute
-  '/org/$orgId/dm/$userId': typeof OrgOrgIdDmUserIdRoute
   '/org/$orgId/threads/$threadId': typeof OrgOrgIdThreadsThreadIdRoute
   '/org/$orgId/agents/$agentId/memory': typeof OrgOrgIdAgentsAgentIdMemoryRoute
+  '/org/$orgId/dm/agent/$agentId': typeof OrgOrgIdDmAgentAgentIdRoute
+  '/org/$orgId/dm/person/$userId': typeof OrgOrgIdDmPersonUserIdRoute
   '/org/$orgId/agents/$agentId': typeof OrgOrgIdAgentsAgentIdIndexRoute
 }
 export interface FileRoutesById {
@@ -212,9 +220,10 @@ export interface FileRoutesById {
   '/org/$orgId/': typeof OrgOrgIdIndexRoute
   '/org/$orgId/agents/new': typeof OrgOrgIdAgentsNewRoute
   '/org/$orgId/c/$channelId': typeof OrgOrgIdCChannelIdRoute
-  '/org/$orgId/dm/$userId': typeof OrgOrgIdDmUserIdRoute
   '/org/$orgId/threads/$threadId': typeof OrgOrgIdThreadsThreadIdRoute
   '/org/$orgId/agents/$agentId/memory': typeof OrgOrgIdAgentsAgentIdMemoryRoute
+  '/org/$orgId/dm/agent/$agentId': typeof OrgOrgIdDmAgentAgentIdRoute
+  '/org/$orgId/dm/person/$userId': typeof OrgOrgIdDmPersonUserIdRoute
   '/org/$orgId/agents/$agentId/': typeof OrgOrgIdAgentsAgentIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -238,9 +247,10 @@ export interface FileRouteTypes {
     | '/org/$orgId/'
     | '/org/$orgId/agents/new'
     | '/org/$orgId/c/$channelId'
-    | '/org/$orgId/dm/$userId'
     | '/org/$orgId/threads/$threadId'
     | '/org/$orgId/agents/$agentId/memory'
+    | '/org/$orgId/dm/agent/$agentId'
+    | '/org/$orgId/dm/person/$userId'
     | '/org/$orgId/agents/$agentId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -261,9 +271,10 @@ export interface FileRouteTypes {
     | '/org/$orgId'
     | '/org/$orgId/agents/new'
     | '/org/$orgId/c/$channelId'
-    | '/org/$orgId/dm/$userId'
     | '/org/$orgId/threads/$threadId'
     | '/org/$orgId/agents/$agentId/memory'
+    | '/org/$orgId/dm/agent/$agentId'
+    | '/org/$orgId/dm/person/$userId'
     | '/org/$orgId/agents/$agentId'
   id:
     | '__root__'
@@ -285,9 +296,10 @@ export interface FileRouteTypes {
     | '/org/$orgId/'
     | '/org/$orgId/agents/new'
     | '/org/$orgId/c/$channelId'
-    | '/org/$orgId/dm/$userId'
     | '/org/$orgId/threads/$threadId'
     | '/org/$orgId/agents/$agentId/memory'
+    | '/org/$orgId/dm/agent/$agentId'
+    | '/org/$orgId/dm/person/$userId'
     | '/org/$orgId/agents/$agentId/'
   fileRoutesById: FileRoutesById
 }
@@ -429,13 +441,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgOrgIdCChannelIdRouteImport
       parentRoute: typeof OrgOrgIdRoute
     }
-    '/org/$orgId/dm/$userId': {
-      id: '/org/$orgId/dm/$userId'
-      path: '/dm/$userId'
-      fullPath: '/org/$orgId/dm/$userId'
-      preLoaderRoute: typeof OrgOrgIdDmUserIdRouteImport
-      parentRoute: typeof OrgOrgIdRoute
-    }
     '/org/$orgId/threads/$threadId': {
       id: '/org/$orgId/threads/$threadId'
       path: '/threads/$threadId'
@@ -457,6 +462,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgOrgIdAgentsAgentIdMemoryRouteImport
       parentRoute: typeof OrgOrgIdRoute
     }
+    '/org/$orgId/dm/agent/$agentId': {
+      id: '/org/$orgId/dm/agent/$agentId'
+      path: '/dm/agent/$agentId'
+      fullPath: '/org/$orgId/dm/agent/$agentId'
+      preLoaderRoute: typeof OrgOrgIdDmAgentAgentIdRouteImport
+      parentRoute: typeof OrgOrgIdRoute
+    }
+    '/org/$orgId/dm/person/$userId': {
+      id: '/org/$orgId/dm/person/$userId'
+      path: '/dm/person/$userId'
+      fullPath: '/org/$orgId/dm/person/$userId'
+      preLoaderRoute: typeof OrgOrgIdDmPersonUserIdRouteImport
+      parentRoute: typeof OrgOrgIdRoute
+    }
   }
 }
 
@@ -472,9 +491,10 @@ interface OrgOrgIdRouteChildren {
   OrgOrgIdIndexRoute: typeof OrgOrgIdIndexRoute
   OrgOrgIdAgentsNewRoute: typeof OrgOrgIdAgentsNewRoute
   OrgOrgIdCChannelIdRoute: typeof OrgOrgIdCChannelIdRoute
-  OrgOrgIdDmUserIdRoute: typeof OrgOrgIdDmUserIdRoute
   OrgOrgIdThreadsThreadIdRoute: typeof OrgOrgIdThreadsThreadIdRoute
   OrgOrgIdAgentsAgentIdMemoryRoute: typeof OrgOrgIdAgentsAgentIdMemoryRoute
+  OrgOrgIdDmAgentAgentIdRoute: typeof OrgOrgIdDmAgentAgentIdRoute
+  OrgOrgIdDmPersonUserIdRoute: typeof OrgOrgIdDmPersonUserIdRoute
   OrgOrgIdAgentsAgentIdIndexRoute: typeof OrgOrgIdAgentsAgentIdIndexRoute
 }
 
@@ -490,9 +510,10 @@ const OrgOrgIdRouteChildren: OrgOrgIdRouteChildren = {
   OrgOrgIdIndexRoute: OrgOrgIdIndexRoute,
   OrgOrgIdAgentsNewRoute: OrgOrgIdAgentsNewRoute,
   OrgOrgIdCChannelIdRoute: OrgOrgIdCChannelIdRoute,
-  OrgOrgIdDmUserIdRoute: OrgOrgIdDmUserIdRoute,
   OrgOrgIdThreadsThreadIdRoute: OrgOrgIdThreadsThreadIdRoute,
   OrgOrgIdAgentsAgentIdMemoryRoute: OrgOrgIdAgentsAgentIdMemoryRoute,
+  OrgOrgIdDmAgentAgentIdRoute: OrgOrgIdDmAgentAgentIdRoute,
+  OrgOrgIdDmPersonUserIdRoute: OrgOrgIdDmPersonUserIdRoute,
   OrgOrgIdAgentsAgentIdIndexRoute: OrgOrgIdAgentsAgentIdIndexRoute,
 }
 

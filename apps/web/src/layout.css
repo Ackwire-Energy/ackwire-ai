@@ -725,3 +725,12 @@ p {
   gap: var(--space-2);
   margin-top: var(--space-1);
 }
+
+/* "Marina está digitando…" above the composer (keeps its height so the box doesn't jump) */
+.channel__typing {
+  margin: 0 4px 4px;
+  min-height: 16px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}

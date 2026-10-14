@@ -49,7 +49,9 @@ describe("Canal", () => {
     await act(async () => fireEvent.change(box, { target: { value: "@atlas acompanha o deploy?" } }));
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
     await settle(4);
-    expect(state.calls.find((c) => c.method === "chat.post")?.args[2]).toEqual({ body: "@atlas acompanha o deploy?" });
+    expect(state.calls.find((c) => c.method === "chat.post")?.args[2]).toMatchObject({
+      body: "@atlas acompanha o deploy?",
+    });
     const posted = state.messages[state.messages.length - 1];
     await act(async () =>
       socket.push({

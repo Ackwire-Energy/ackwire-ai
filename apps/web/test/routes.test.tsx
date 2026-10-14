@@ -58,9 +58,7 @@ describe("route guards", () => {
       ["issues", "Issues"],
       ["drive", "Drive"],
       ["forum", "Fórum"],
-      ["search", "Buscar no workspace"],
       ["threads/x", "Threads"],
-      ["dm/u-joao", "Mensagem direta com João"],
     ] as const) {
       await renderApp(`/org/${ORG_ID}/${path}`, { api: createFakeApi() });
       await settle();

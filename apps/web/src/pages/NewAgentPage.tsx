@@ -21,6 +21,7 @@ import {
   useConnections,
   useCreateAgent,
   useCredentials,
+  useDms,
   useMembers,
   useModels,
   usePlatformKey,
@@ -76,6 +77,8 @@ export function NewAgentPage() {
   const models = useModels();
   const credentials = useCredentials(org.id, allowed);
   const channels = useChannels(org.id);
+  const dms = useDms(org.id);
+  const dmChannels = useMemo(() => new Set((dms.data ?? []).map((d) => d.channelId)), [dms.data]);
   const connections = useConnections(org.id);
   const activeConnections = useMemo(() => connections.data?.filter((c) => !c.revokedAt), [connections.data]);
   const connectors = { data: activeConnections };
@@ -92,7 +95,10 @@ export function NewAgentPage() {
   const [on, setOn] = useState<Record<string, boolean>>({});
   const [created, setCreated] = useState<{ agent: Agent; channels: { id: string; name: string }[] } | null>(null);
 
-  const myChannels = useMemo(() => (channels.data ?? []).filter((c) => c.isMember), [channels.data]);
+  const myChannels = useMemo(
+    () => (channels.data ?? []).filter((c) => c.isMember && !dmChannels.has(c.id)),
+    [channels.data, dmChannels],
+  );
   useEffect(() => {
     if (!model && models.data) setModel(models.data.defaultModel);
   }, [model, models.data]);

@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useLayoutEffect, useRef } from "react";
+import { type KeyboardEvent, useImperativeHandle, useLayoutEffect, useRef } from "react";
 import { cx } from "../cx";
 import { Button } from "./Button";
 
@@ -16,6 +16,8 @@ export interface ComposerProps {
   disabled?: boolean;
   id?: string;
   className?: string;
+  /** Lets the parent focus the box or insert text (e.g. "Chamar um agente"). */
+  textareaRef?: React.Ref<HTMLTextAreaElement>;
 }
 
 /** The chat message box: attach on the left, send (primary, icon only) on the right, focus on the whole box. */
@@ -31,8 +33,10 @@ export function Composer({
   disabled,
   id,
   className,
+  textareaRef,
 }: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  useImperativeHandle(textareaRef, () => ref.current as HTMLTextAreaElement, []);
 
   // Grow with the text, up to the CSS max-height.
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure whenever the text changes
@@ -47,6 +51,8 @@ export function Composer({
     const text = value.trim();
     if (!text || disabled) return;
     onSend(text);
+    // Keep typing: focus stays in the box (also after clicking the send button).
+    ref.current?.focus();
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {

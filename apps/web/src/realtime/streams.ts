@@ -1,19 +1,28 @@
 import type { ChannelEvent, RunStatus } from "@/api/types";
 
 /**
- * Live agent runs per channel, built from `agent.run` and `agent.delta`
- * events. Deltas are ordered by `seq` and never persisted: the final
+ * Live agent runs per channel, from `agent.run`, `agent.delta` and (expected
+ * from the backend) `agent.thinking` / `agent.typing` / `agent.idle` /
+ * `run.finished`. Deltas are ordered by `seq` and never persisted: the final
  * `message.created` (with `agentRunId`) replaces the streaming text.
+ *
+ * A row can also start *before* the server says anything: right after you
+ * mention an agent, `expectReply` adds a provisional "thinking" row that the
+ * first real event for that agent and thread replaces.
  */
+export type LiveStatus = RunStatus | "thinking";
+
 export interface LiveRun {
   runId: string;
   agentId: string;
   channelId: string;
   threadId: string;
-  status: RunStatus;
+  status: LiveStatus;
   text: string;
   lastSeq: number;
   error?: string;
+  /** Added by the client on send; no server event yet. */
+  provisional?: boolean;
 }
 
 export interface StreamsState {
@@ -24,56 +33,110 @@ export interface StreamsState {
 
 export const emptyStreams: StreamsState = { runs: {}, finished: {} };
 
+const provisionalId = (agentId: string, threadId: string) => `pending:${agentId}:${threadId}`;
+
+/** Shows "Ada está pensando…" right away for an agent that was mentioned or picked. */
+export function expectReply(state: StreamsState, event: { channelId: string; threadId: string; agentId: string }) {
+  const input = { channelId: event.channelId, threadId: event.threadId, agentId: event.agentId };
+  const runId = provisionalId(input.agentId, input.threadId);
+  const alreadyLive = Object.values(state.runs).some(
+    (r) => !r.provisional && r.agentId === input.agentId && r.threadId === input.threadId,
+  );
+  if (alreadyLive || state.runs[runId]) return state;
+  const run: LiveRun = { ...input, runId, status: "thinking", text: "", lastSeq: 0, provisional: true };
+  return { ...state, runs: { ...state.runs, [runId]: run } };
+}
+
+/** Drops the provisional row of an agent/thread once the server reports on it. */
+function settleProvisional(state: StreamsState, agentId: string, threadId: string): StreamsState {
+  const id = provisionalId(agentId, threadId);
+  if (!state.runs[id]) return state;
+  const { [id]: _p, ...runs } = state.runs;
+  return { ...state, runs };
+}
+
+function upsert(
+  state: StreamsState,
+  event: { runId: string; agentId: string; channelId: string; threadId: string },
+  patch: Partial<LiveRun>,
+) {
+  const base = settleProvisional(state, event.agentId, event.threadId);
+  const current = base.runs[event.runId];
+  const next: LiveRun = {
+    runId: event.runId,
+    agentId: event.agentId,
+    channelId: event.channelId,
+    threadId: event.threadId,
+    status: "running",
+    text: "",
+    lastSeq: 0,
+    ...current,
+    ...patch,
+  };
+  return { ...base, runs: { ...base.runs, [event.runId]: next } };
+}
+
+/** A run resumed after an approval streams again, from a fresh text. */
+function reopen(state: StreamsState, runId: string): StreamsState {
+  if (!state.finished[runId]) return state;
+  const { [runId]: _f, ...finished } = state.finished;
+  return { ...state, finished };
+}
+
 export function applyChannelEvent(state: StreamsState, event: ChannelEvent): StreamsState {
   switch (event.type) {
     case "message.created": {
-      const runId = event.message?.agentRunId;
-      if (!runId) return state;
-      return finish(state, runId);
+      const m = event.message;
+      if (!m?.agentRunId) return state;
+      const next = finish(state, m.agentRunId);
+      return m.author?.type === "agent" && m.author.id && m.threadId
+        ? settleProvisional(next, m.author.id, m.threadId)
+        : next;
     }
     case "agent.run": {
-      if (state.finished[event.runId]) {
-        // A run resumed after an approval streams again, from a fresh text.
+      let s = state;
+      if (s.finished[event.runId]) {
         if (event.status !== "running") return state;
-        const { [event.runId]: _f, ...finished } = state.finished;
-        state = { ...state, finished };
+        s = reopen(s, event.runId);
       }
-      const current = state.runs[event.runId];
       if (event.status === "done") {
-        // The message event normally comes first; either way the run is over.
-        return current ? finish(state, event.runId) : state;
+        const settled = settleProvisional(s, event.agentId, event.threadId);
+        return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
       }
-      const next: LiveRun = current
-        ? { ...current, status: event.status, error: event.error }
-        : {
-            runId: event.runId,
-            agentId: event.agentId,
-            channelId: event.channelId,
-            threadId: event.threadId,
-            status: event.status,
-            text: "",
-            lastSeq: 0,
-            error: event.error,
-          };
-      return { ...state, runs: { ...state.runs, [event.runId]: next } };
+      // Started but nothing written yet: thinking.
+      const current = s.runs[event.runId];
+      const status: LiveStatus =
+        (event.status === "running" || event.status === "queued") && !current?.text ? "thinking" : event.status;
+      return upsert(s, event, { status, error: event.error });
+    }
+    case "agent.thinking": {
+      // Announced at post time, before the run exists.
+      if (event.runId === null) return expectReply(state, event);
+      const s = reopen(state, event.runId);
+      return upsert(s, { ...event, runId: event.runId }, { status: "thinking" });
+    }
+    case "agent.typing": {
+      const s = reopen(state, event.runId);
+      if (s.finished[event.runId]) return state;
+      return upsert(s, event, { status: "running" });
+    }
+    case "agent.idle": {
+      const settled = settleProvisional(state, event.agentId, event.threadId);
+      // A failure is reported by run.finished; keep a failed row visible.
+      if (settled.runs[event.runId]?.status === "failed") return settled;
+      return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
+    }
+    case "run.finished": {
+      const settled = settleProvisional(state, event.agentId, event.threadId);
+      if (event.status === "failed") return upsert(settled, event, { status: "failed", error: event.error });
+      // done: the message replaces the row; waiting_approval: the approval card does.
+      return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
     }
     case "agent.delta": {
       if (state.finished[event.runId]) return state;
       const current = state.runs[event.runId];
       if (current && event.seq <= current.lastSeq) return state;
-      const base: LiveRun = current ?? {
-        runId: event.runId,
-        agentId: event.agentId,
-        channelId: event.channelId,
-        threadId: event.threadId,
-        status: "running",
-        text: "",
-        lastSeq: 0,
-      };
-      return {
-        ...state,
-        runs: { ...state.runs, [event.runId]: { ...base, text: base.text + event.text, lastSeq: event.seq } },
-      };
+      return upsert(state, event, { status: "running", text: (current?.text ?? "") + event.text, lastSeq: event.seq });
     }
     default:
       return state;
@@ -98,6 +161,6 @@ export const runsInChannel = (state: StreamsState, channelId: string) =>
 export const runningAgents = (state: StreamsState) =>
   new Set(
     Object.values(state.runs)
-      .filter((r) => r.status === "running" || r.status === "queued")
+      .filter((r) => r.status === "running" || r.status === "queued" || r.status === "thinking")
       .map((r) => r.agentId),
   );

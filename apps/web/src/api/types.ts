@@ -143,25 +143,16 @@ export interface Message {
   clientId?: string | null;
   /** Agent receipts on a person's message (expected from the backend). */
   receipts?: MessageReceipts;
+  /** Client only: an optimistic message waiting for the server, or one that failed to send. */
+  local?: "pending" | "failed";
   createdAt: string;
 }
 
-/**
- * Which agents saw a message and who picked it up. Expected shape (the
- * backend is adding `receipts` to the list API and `message.routed` /
- * `message.claimed` / `message.handled` events; adjust when it lands).
- */
+/** Which agents saw a person's message, picked it up, and how their runs ended. */
 export interface MessageReceipts {
-  /** Agents that saw it (router candidates, mentioned agents). */
   seenBy: string[];
-  /** Agents that will answer. */
   pickedBy: string[];
-  /** Agents answering now. */
-  claimedBy?: string[];
-  /** Agents that answered. */
-  handledBy?: string[];
-  /** The router decided: if nobody picked it, nobody will answer. */
-  routed?: boolean;
+  handled: { agentId: string; status: RunStatus }[];
 }
 
 export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "failed";
@@ -188,16 +179,52 @@ export type ChannelEvent =
       error?: string;
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
-  // ── Expected from the backend (chat latency batch); names and shapes to confirm ──
-  /** The agent started: thinking (no text yet) or typing (text streaming). */
-  | { type: "agent.thinking" | "agent.typing"; channelId: string; threadId: string; runId: string; agentId: string }
-  /** The agent stopped without a message (e.g. nothing to say), or the run finished. */
-  | { type: "agent.idle" | "run.finished"; channelId: string; threadId: string; runId: string; agentId: string; status?: RunStatus }
-  /** A person is typing. */
-  | { type: "typing"; channelId: string; userId: string; threadId?: string | null }
-  /** The router decided who answers a message. */
-  | { type: "message.routed"; channelId: string; messageId: string; seenBy: string[]; pickedBy: string[] }
-  | { type: "message.claimed" | "message.handled"; channelId: string; messageId: string; agentId: string };
+  // ── Chat latency batch (packages/engine/src/events.ts) ──────────────────────
+  /** An agent will answer: show "thinking" at once. `runId` is null when announced at post time. */
+  | { type: "agent.thinking"; channelId: string; threadId: string; agentId: string; runId: string | null }
+  /** The agent's first words arrived. */
+  | { type: "agent.typing"; channelId: string; threadId: string; agentId: string; runId: string }
+  /** The agent stopped (done, failed or waiting for approval). */
+  | { type: "agent.idle"; channelId: string; threadId: string; agentId: string; runId: string }
+  | {
+      type: "run.finished";
+      channelId: string;
+      threadId: string;
+      agentId: string;
+      runId: string;
+      status: "done" | "failed" | "waiting_approval";
+      error?: string;
+    }
+  /** A person is typing; drop it after `ttlMs`. */
+  | { type: "user.typing"; channelId: string; threadId: string | null; userId: string; ttlMs: number }
+  /** Who saw a message and who will answer. */
+  | {
+      type: "message.routed";
+      channelId: string;
+      messageId: string;
+      seenBy: string[];
+      pickedBy: string[];
+      strategy?: "mention" | "dm" | "router" | "none";
+      reason?: string;
+    }
+  | { type: "message.claimed"; channelId: string; messageId: string; agentId: string; runId?: string }
+  | {
+      type: "message.handled";
+      channelId: string;
+      messageId: string;
+      agentId: string;
+      runId?: string;
+      status?: "done" | "failed" | "waiting_approval";
+    }
+  /** An agent changed its memory because a person asked (with an undo), or proposed a change. */
+  | {
+      type: "memory.updated";
+      channelId: string;
+      threadId: string;
+      agentId: string;
+      runId: string;
+      update: MemoryUpdate;
+    };
 
 /** Events for one person (`{ type: "event", scope: "user" }` frames), e.g. approvals they can decide. */
 export type UserEvent =
@@ -528,12 +555,27 @@ export interface ReactionCount {
   userIds: string[];
 }
 
-/** A memory change an agent made from a conversation (expected in `message.meta.memoryChange`). */
-export interface MemoryChange {
-  action: "remembered" | "forgotten" | "updated";
-  memoryId: string;
-  agentId: string;
+/** A memory change an agent made because a person asked, or a proposal it made (`memory.updated`). */
+export interface MemoryUpdate {
+  action: "remembered" | "forgot" | "updated" | "proposed";
+  itemId: string;
   text: string;
-  /** For "updated": the text before. */
-  previous?: string | null;
+  previousText?: string | null;
+  requestedByUserId: string;
+  /** Undo: `POST …/memories/{itemId}/revert`. Absent for proposals. */
+  undo?: { method: "POST"; path: string };
+  /** For `proposed`: the proposal to decide inline. */
+  proposalId?: string;
+  canDecide?: boolean;
+}
+
+/** Who a direct message is with. */
+export type DmTarget = { agentId: string } | { userId: string };
+
+/** A direct conversation (`GET …/dms`). */
+export interface DirectMessage {
+  channelId: string;
+  with: { type: AuthorType; id: string; name: string; handle: string | null };
+  lastMessage: { id: string; body: string; createdAt: string; authorType: string } | null;
+  unread: number;
 }

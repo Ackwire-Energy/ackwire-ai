@@ -13,6 +13,7 @@ import type {
   Connection,
   ConnectorCatalog,
   Credential,
+  DirectMessage,
   Health,
   Invitation,
   InvitationPreview,
@@ -211,6 +212,14 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         request<Memory>(`${org(orgId)}/memories/${enc(id)}`, { method: "PATCH", json: { pinned } }),
       setArchived: (orgId, id, archived) =>
         request<Memory>(`${org(orgId)}/memories/${enc(id)}`, { method: "PATCH", json: { archived } }),
+      revert: async (orgId, id) => {
+        await request<unknown>(`${org(orgId)}/memories/${enc(id)}/revert`, { json: {} });
+      },
+    },
+    dms: {
+      list: async (orgId) => (await request<{ dms: DirectMessage[] }>(`${org(orgId)}/dms`)).dms,
+      open: (orgId, target) => request<{ channelId: string }>(`${org(orgId)}/dms`, { json: target }),
+      markRead: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/read`, { json: {} }),
     },
     proposals: {
       list: async (orgId) => (await request<{ proposals: Proposal[] }>(`${org(orgId)}/proposals`)).proposals,

@@ -8,7 +8,8 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   /** Display name; initials are derived from it unless `initials` is given. */
   name: string;
   initials?: string;
-  size?: "sm" | "md" | "lg";
+  /** 18 (receipts), 24, 36 (default) or 56px. */
+  size?: "xs" | "sm" | "md" | "lg";
   imageUrl?: string | null;
   /** Agent is executing: draws the `agent` ring. */
   running?: boolean;

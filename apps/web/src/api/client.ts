@@ -14,6 +14,8 @@ import type {
   Credential,
   CustomConnectStart,
   CustomServer,
+  DirectMessage,
+  DmTarget,
   Health,
   Invitation,
   InvitationPreview,
@@ -135,7 +137,11 @@ export interface ApiClient {
       channelId: string,
       options?: { threadId?: string; before?: string; limit?: number },
     ): Promise<Message[]>;
-    post(orgId: string, channelId: string, input: { body: string; threadId?: string | null }): Promise<Message>;
+    post(
+      orgId: string,
+      channelId: string,
+      input: { body: string; threadId?: string | null; clientId?: string },
+    ): Promise<Message>;
     reactions(orgId: string, messageId: string): Promise<ReactionCount[]>;
     react(orgId: string, messageId: string, reaction: string): Promise<ReactionCount[]>;
     unreact(orgId: string, messageId: string, reaction: string): Promise<ReactionCount[]>;
@@ -176,6 +182,8 @@ export interface ApiClient {
     edit(orgId: string, memoryId: string, text: string): Promise<Memory>;
     setPinned(orgId: string, memoryId: string, pinned: boolean): Promise<Memory>;
     setArchived(orgId: string, memoryId: string, archived: boolean): Promise<Memory>;
+    /** Undoes a change the agent made from the chat (`update.undo.path`). */
+    revert(orgId: string, memoryId: string): Promise<void>;
   };
   proposals: {
     list(orgId: string): Promise<Proposal[]>;
@@ -203,6 +211,14 @@ export interface ApiClient {
     ): Promise<CustomServer>;
     disconnect(orgId: string, serverId: string): Promise<void>;
   };
+  dms: {
+    /** My direct conversations, with unread counts. */
+    list(orgId: string): Promise<DirectMessage[]>;
+    /** The DM channel with a person or an agent, created on first use. */
+    open(orgId: string, target: DmTarget): Promise<{ channelId: string }>;
+    /** Marks a channel or DM read up to now. */
+    markRead(orgId: string, channelId: string): Promise<void>;
+  };
   invites: {
     /** Org-wide link: whoever joins with it becomes a member (7 days). */
     createLink(orgId: string): Promise<{ url: string; expiresAt: string }>;
@@ -225,6 +241,7 @@ export type HttpApi = Pick<
   | "search"
   | "memory"
   | "proposals"
+  | "dms"
 >;
 /** The part still served by in-memory mocks. */
 export type MockedApi = Omit<ApiClient, keyof HttpApi>;
