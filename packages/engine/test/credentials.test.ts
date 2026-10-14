@@ -25,6 +25,7 @@ test("decrypts for its own organization only", async () => {
   expect(await decryptCredential(f.db, [f.keyWrapper], f.org.id, f.credential.id)).toEqual({
     provider: "anthropic",
     apiKey: "sk-ant-test-key-1234",
+    options: {},
   });
   const [other] = await f.db.insert(schema.organizations).values({ name: "Other" }).returning();
   expect(await decryptCredential(f.db, [f.keyWrapper], other?.id ?? "", f.credential.id)).toBeNull();

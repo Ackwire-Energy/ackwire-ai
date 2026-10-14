@@ -23,6 +23,7 @@ import type { RunStatus } from "./runs";
  * database is the source of truth; events only tell clients what changed.
  * Documented for the web app in docs/adr/0010-realtime.md.
  */
+/** `threadId` null on agent events = the main timeline (DMs are flat). */
 export type ChannelEvent =
   /** A message was committed. `message` is omitted when too large for pub/sub: fetch it by id. */
   | { type: "message.created"; channelId: string; messageId: string; message?: MessageView }
@@ -30,7 +31,7 @@ export type ChannelEvent =
   | {
       type: "agent.delta";
       channelId: string;
-      threadId: string;
+      threadId: string | null;
       runId: string;
       agentId: string;
       seq: number;
@@ -40,7 +41,7 @@ export type ChannelEvent =
   | {
       type: "agent.run";
       channelId: string;
-      threadId: string;
+      threadId: string | null;
       runId: string;
       agentId: string;
       status: RunStatus;
@@ -51,18 +52,18 @@ export type ChannelEvent =
    * show "thinking" right away. `runId` is null when announced at post time,
    * before the run exists.
    */
-  | { type: "agent.thinking"; channelId: string; threadId: string; agentId: string; runId: string | null }
+  | { type: "agent.thinking"; channelId: string; threadId: string | null; agentId: string; runId: string | null }
   /** The agent's first words arrived (switch "thinking" to "typing"). */
-  | { type: "agent.typing"; channelId: string; threadId: string; agentId: string; runId: string }
+  | { type: "agent.typing"; channelId: string; threadId: string | null; agentId: string; runId: string }
   /** The agent stopped (done, failed or waiting for approval). */
-  | { type: "agent.idle"; channelId: string; threadId: string; agentId: string; runId: string }
+  | { type: "agent.idle"; channelId: string; threadId: string | null; agentId: string; runId: string }
   | {
       type: "run.finished";
       channelId: string;
-      threadId: string;
+      threadId: string | null;
       agentId: string;
       runId: string;
-      status: "done" | "failed" | "waiting_approval";
+      status: "done" | "failed" | "waiting_approval" | "waiting_input";
       error?: string;
     }
   /** A person is typing (client frame `typing`). Clients drop it after `ttlMs`. */
@@ -84,23 +85,30 @@ export type ChannelEvent =
       messageId: string;
       agentId: string;
       runId: string;
-      status: "done" | "failed" | "waiting_approval";
+      status: "done" | "failed" | "waiting_approval" | "waiting_input";
     }
   /** An agent changed its memory because a person asked (with an undo). */
   | {
       type: "memory.updated";
       channelId: string;
-      threadId: string;
+      threadId: string | null;
       agentId: string;
       runId: string;
       update: MemoryUpdate;
+    }
+  /** Channel membership changed (agents carry `autoReply`). */
+  | {
+      type: "channel.member_added" | "channel.member_removed" | "channel.member_updated";
+      channelId: string;
+      member: { type: "person" | "agent"; id: string; autoReply?: boolean };
     }
   /** A sensitive action waits for a person (`approval.created`) or was decided/expired (`approval.decided`). */
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: ApprovalView };
 
 const INLINE_LIMIT = 6000;
 
-export async function publishChannelEvent(pubsub: PubSub, event: ChannelEvent): Promise<void> {
+export async function publishChannelEvent(pubsub: PubSub | undefined, event: ChannelEvent): Promise<void> {
+  if (!pubsub) return;
   try {
     await pubsub.publish(channelTopic(event.channelId), event);
   } catch {

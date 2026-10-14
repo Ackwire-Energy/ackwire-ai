@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNull, or, schema } from "@agenteschat/db";
 import { caches } from "./cache";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
-import { publishOrgEvent } from "./events";
+import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 
 const { channels, channelMembers, agents, organizationMembers, organizations } = schema;
@@ -120,31 +120,113 @@ export async function joinChannel(db: Database, userId: string, orgId: string, c
   await db.insert(channelMembers).values({ orgId, channelId, userId }).onConflictDoNothing();
 }
 
-/** A channel member adds a person or an agent of the same organization. */
+/**
+ * Adds a person or an agent of the same organization to a channel. Allowed
+ * for the channel's creator and admins; adding an agent also needs an admin
+ * or the agent's owner (an agent works only where they allowed it).
+ * `autoReply` (agents): the router may pick it here without a mention.
+ * Members see `channel.member_added`; an added person also gets it on their
+ * own topic so the channel shows up in their sidebar. The router reads
+ * members from the database, so it sees the change on the next message.
+ */
 export async function addChannelMember(
   db: Database,
   actorId: string,
   orgId: string,
   channelId: string,
-  member: { userId: string } | { agentId: string },
+  member: { userId: string } | { agentId: string; autoReply?: boolean },
+  options: { pubsub?: PubSub } = {},
 ) {
-  const { channel } = await requireChannelAccess(db, actorId, orgId, channelId);
+  // Admins manage members of any channel, also private ones they're not in.
+  const membership = await getMembership(db, actorId, orgId);
+  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const [channel] = await db
+    .select()
+    .from(channels)
+    .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId), isNull(channels.archivedAt)));
+  if (!channel) throw new NotFoundError("Channel not found");
   if (channel.kind === "dm") throw new ValidationError("A direct conversation keeps its participants");
+  if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+    throw new ForbiddenError("Only the channel's creator or an admin can add members");
+  }
   if ("userId" in member) {
     if (!(await getMembership(db, member.userId, orgId))) {
       throw new ValidationError("That person is not a member of this organization");
     }
     await db.insert(channelMembers).values({ orgId, channelId, userId: member.userId }).onConflictDoNothing();
     caches.channelMembers.delete(`${orgId}:${channelId}`);
-  } else {
-    const [agent] = await db
-      .select({ id: agents.id })
-      .from(agents)
-      .where(and(eq(agents.id, member.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
-    if (!agent) throw new ValidationError("That agent does not exist in this organization");
-    await db.insert(channelMembers).values({ orgId, channelId, agentId: member.agentId }).onConflictDoNothing();
-    caches.scopes.delete(`${orgId}:${member.agentId}:visible`);
+    const event = {
+      type: "channel.member_added" as const,
+      channelId,
+      member: { type: "person" as const, id: member.userId },
+    };
+    await publishChannelEvent(options.pubsub, event);
+    await publishUserEvent(options.pubsub, orgId, member.userId, event);
+    return;
   }
+  const [agent] = await db
+    .select({ id: agents.id, ownerUserId: agents.ownerUserId })
+    .from(agents)
+    .where(and(eq(agents.id, member.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
+  if (!agent) throw new ValidationError("That agent does not exist in this organization");
+  if (agent.ownerUserId !== actorId && !can(membership.role, "manage_agents")) {
+    throw new ForbiddenError("Only an admin or the agent's owner can add this agent to a channel");
+  }
+  const autoReply = member.autoReply ?? true;
+  await db
+    .insert(channelMembers)
+    .values({ orgId, channelId, agentId: member.agentId, autoReply })
+    .onConflictDoUpdate({ target: [channelMembers.channelId, channelMembers.agentId], set: { autoReply } });
+  caches.channelMembers.delete(`${orgId}:${channelId}`);
+  caches.scopes.deletePrefix(`${orgId}:${member.agentId}:visible`);
+  await publishChannelEvent(options.pubsub, {
+    type: "channel.member_added",
+    channelId,
+    member: { type: "agent", id: member.agentId, autoReply },
+  });
+}
+
+/**
+ * Turns an agent's auto-reply in one channel on or off (creator, admin or
+ * the agent's owner). Off: it answers there only when @mentioned.
+ */
+export async function setChannelAgentAutoReply(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  channelId: string,
+  agentId: string,
+  autoReply: boolean,
+  options: { pubsub?: PubSub } = {},
+) {
+  const membership = await getMembership(db, actorId, orgId);
+  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const [row] = await db
+    .select({ createdBy: channels.createdByUserId, ownerUserId: agents.ownerUserId })
+    .from(channelMembers)
+    .innerJoin(channels, eq(channels.id, channelMembers.channelId))
+    .innerJoin(agents, eq(agents.id, channelMembers.agentId))
+    .where(
+      and(
+        eq(channelMembers.orgId, orgId),
+        eq(channelMembers.channelId, channelId),
+        eq(channelMembers.agentId, agentId),
+      ),
+    );
+  if (!row) throw new NotFoundError("That agent is not in this channel");
+  if (row.createdBy !== actorId && row.ownerUserId !== actorId && !can(membership.role, "manage_members")) {
+    throw new ForbiddenError("Only the channel's creator, an admin or the agent's owner can change this");
+  }
+  await db
+    .update(channelMembers)
+    .set({ autoReply })
+    .where(and(eq(channelMembers.channelId, channelId), eq(channelMembers.agentId, agentId)));
+  caches.channelMembers.delete(`${orgId}:${channelId}`);
+  await publishChannelEvent(options.pubsub, {
+    type: "channel.member_updated",
+    channelId,
+    member: { type: "agent", id: agentId, autoReply },
+  });
 }
 
 export async function listChannelMembers(db: Database, actorId: string, orgId: string, channelId: string) {
@@ -192,10 +274,21 @@ export async function removeChannelMember(
       ),
     );
   caches.channelMembers.delete(`${orgId}:${channelId}`);
-  if ("agentId" in member) caches.scopes.delete(`${orgId}:${member.agentId}:visible`);
+  if ("agentId" in member) caches.scopes.deletePrefix(`${orgId}:${member.agentId}:visible`);
+  const removed = {
+    type: "channel.member_removed" as const,
+    channelId,
+    member:
+      "userId" in member
+        ? { type: "person" as const, id: member.userId }
+        : { type: "agent" as const, id: member.agentId },
+  };
+  // Revoke first, so the removed person's subscription ends before the channel hears about it.
   if ("userId" in member) {
     await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: member.userId, channelId });
+    await publishUserEvent(options.pubsub, orgId, member.userId, removed);
   }
+  await publishChannelEvent(options.pubsub, removed);
 }
 
 /** Archives a channel (creator or admin). Live subscriptions to it end at once. `general` can't be archived. */

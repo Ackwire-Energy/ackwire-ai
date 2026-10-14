@@ -6,7 +6,7 @@ import { sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError } from "../errors";
 import { publishUserEvent } from "../events";
 import { can, requirePermission } from "../organizations";
-import { type ContextItem, checkContent } from "./items";
+import { type ContextItem, checkContent, consolidateItem } from "./items";
 
 const { contextProposals, contextItems, agents, organizations, organizationMembers } = schema;
 
@@ -229,9 +229,39 @@ export async function decideProposal(
   });
   if (decided.agentId) caches.agents.delete(`${orgId}:${decided.agentId}`);
   caches.orgs.delete(`${orgId}:`);
+  if (decided.status === "rejected") await recordRefusal(db, actorId, decided);
   if (decided.status === "stale")
     throw new ConflictError("The text changed since this was proposed; it can't be applied");
   return decided;
+}
+
+/**
+ * A refused proposal becomes a lesson ("don't propose this again"), so the
+ * agent learns from the refusal instead of proposing the same change later.
+ * Best effort: the decision stands even if the lesson can't be stored.
+ */
+async function recordRefusal(db: Database, actorId: string, p: Proposal) {
+  const added = p.diff
+    .split("\n")
+    .filter((l) => l.startsWith("+"))
+    .map((l) => l.slice(1).trim())
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 400);
+  if (!added) return;
+  await consolidateItem(db, {
+    orgId: p.orgId,
+    kind: "lesson",
+    scopeType: p.agentId ? "agent" : "org",
+    agentId: p.agentId,
+    subject: `recusado: ${added.slice(0, 100)}`,
+    content: `Uma pessoa recusou esta mudança; não a proponha de novo: ${added}`,
+    trust: "high",
+    evidence: [{ type: "human", ref: p.id, at: new Date().toISOString() }],
+    confidence: 0.9,
+    createdByKind: "person",
+    createdById: actorId,
+  }).catch(() => {});
 }
 
 /**

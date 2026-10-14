@@ -45,6 +45,12 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
         ),
       );
     if (!cred) throw new ValidationError("credentialId does not belong to this organization");
+    const model = input.model ? MODEL_CATALOG[input.model] : undefined;
+    if (model && model.provider !== cred.provider) {
+      throw new ValidationError(
+        `The model ${input.model} is from ${model.provider}, but this key is from ${cred.provider}`,
+      );
+    }
   }
   if (input.ownerUserId && !(await getMembership(db, input.ownerUserId, orgId))) {
     throw new ValidationError("ownerUserId must be a member of this organization");

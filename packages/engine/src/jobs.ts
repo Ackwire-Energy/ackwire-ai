@@ -46,8 +46,10 @@ export interface JobDeps extends RunExecutorDeps {
   router?: {
     /** Off = only @mentions start runs. */
     enabled: boolean;
-    /** Deployment default (ROUTER_MODEL); an org may override it in its settings. */
+    /** Anthropic cheap model (ROUTER_MODEL); an org may override it in its settings. */
     model: string;
+    /** Cheap model per other provider (e.g. `{ openai: "gpt-6-luna" }`), used when the org's default key is theirs. */
+    cheapModels?: Record<string, string>;
     minScore?: number;
     /** Replaces the core LLM strategy (e.g. an optional external classifier). */
     strategy?: RouterStrategy;
@@ -67,7 +69,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
   const router = deps.router ?? { enabled: false, model: "" };
   const llm = createLlmRouterStrategy({
     gateway: deps.gateway,
-    resolveModel: (orgId) => resolveRouterModel(deps.db, orgId, router.model),
+    resolveModel: (orgId) => resolveRouterModel(deps.db, orgId, router.model, router.cheapModels),
   });
   const jev = router.jev;
   const strategy =

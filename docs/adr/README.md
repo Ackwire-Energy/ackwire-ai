@@ -23,3 +23,4 @@ The product-level decision log (in Portuguese) is `docs/planejamento.md`; these 
 | [0015](0015-tool-gateway-and-approvals.md) | Tool Gateway, scopes and approvals bound to the action hash; runs as resumable tool loops |
 | [0016](0016-connectors.md) | Connectors in two layers over MCP: org connections (sealed, OAuth with state + PKCE), our scope catalog, agent grants |
 | [0017](0017-search-and-context.md) | Search (hybrid Postgres, visibility in SQL), context items, and a self-improving memory loop with outcomes, trust weighting and a human gate |
+| [0018](0018-providers-and-default-keys.md) | Several model providers (OpenAI adapter on the Responses API); the workspace default key per provider; one resolution order |

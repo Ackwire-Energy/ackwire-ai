@@ -51,6 +51,7 @@ export function chatRoutes(deps: AppDeps) {
             topic: r.topic,
             visibility: r.visibility,
             isMember: r.isMember,
+            createdByUserId: r.createdByUserId,
             createdAt: r.createdAt.toISOString(),
           })),
         },
@@ -87,6 +88,7 @@ export function chatRoutes(deps: AppDeps) {
           topic: r.topic,
           visibility: r.visibility,
           isMember: true,
+          createdByUserId: r.createdByUserId,
           createdAt: r.createdAt.toISOString(),
         },
         201,
@@ -136,16 +138,27 @@ export function chatRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/channels/{channelId}/members",
       tags,
       security,
-      summary: "Add a person or an agent to a channel",
+      summary: "Add a person or an agent to a channel (creator or admin; an agent also needs an admin or its owner)",
       request: {
         params: ChannelParams,
-        body: body(z.union([z.object({ userId: z.string() }), z.object({ agentId: z.uuid() })])),
+        body: body(
+          z.union([
+            z.object({ userId: z.string() }),
+            z.object({
+              agentId: z.uuid(),
+              autoReply: z
+                .boolean()
+                .optional()
+                .openapi({ description: "Answers here without a mention (router). Default true." }),
+            }),
+          ]),
+        ),
       },
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
-      await addChannelMember(db, c.get("user").id, orgId, channelId, c.req.valid("json"));
+      await addChannelMember(db, c.get("user").id, orgId, channelId, c.req.valid("json"), { pubsub: adapters.pubsub });
       return c.body(null, 204);
     },
   );

@@ -10,7 +10,7 @@ import {
 } from "@agenteschat/providers";
 import { getAgentCached } from "./agents";
 import { publishApproval } from "./approvals";
-import { buildRunContext } from "./context";
+import { buildRunContext, getChannelCached } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
@@ -71,7 +71,8 @@ export interface Transcript {
 /** Errors that will not get better by retrying: the run fails right away with a readable reason. */
 const userFacing = (error: unknown): string | null => {
   if (error instanceof BudgetExceededError) return "budget_exceeded";
-  if (error instanceof MissingCredentialError) return "missing_credential";
+  // The message says what to do ("Configure uma chave da API…"); the UI shows it as is.
+  if (error instanceof MissingCredentialError) return error.message;
   if (error instanceof ValidationError || error instanceof NotFoundError) return error.message;
   if (error instanceof ProviderError && !error.retryable) return `provider_error: ${error.message}`;
   return null;
@@ -147,7 +148,11 @@ async function executeRunInner(
   // status is `running` here.
   prof.mark("claim");
   const claimedAt = Date.now();
-  const where = { channelId: run.channelId, threadId: run.threadRootId, agentId: run.agentId, runId: run.id };
+  // DMs are flat: a reply to a top-level DM message goes in the main timeline, not a thread.
+  const channelRow = await getChannelCached(db, run.orgId, run.channelId);
+  const replyThreadId: string | null =
+    channelRow?.kind === "dm" && run.threadRootId === run.triggerMessageId ? null : run.threadRootId;
+  const where = { channelId: run.channelId, threadId: replyThreadId, agentId: run.agentId, runId: run.id };
   await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where });
   await publishChannelEvent(deps.pubsub, {
     type: "message.claimed",
@@ -174,7 +179,7 @@ async function executeRunInner(
   const event = (status: RunStatus, error?: string): ChannelEvent => ({
     type: "agent.run",
     channelId: run.channelId,
-    threadId: run.threadRootId,
+    threadId: replyThreadId,
     runId: run.id,
     agentId: run.agentId,
     status,
@@ -315,7 +320,7 @@ async function executeRunInner(
       inputSchema: t.inputSchema,
     }));
 
-    const deltas = createDeltaPublisher(deps.pubsub, run, deps.deltaFlushMs ?? 50, transcript.deltaSeq, {
+    const deltas = createDeltaPublisher(deps.pubsub, run, replyThreadId, deps.deltaFlushMs ?? 50, transcript.deltaSeq, {
       event: { type: "agent.typing", ...where },
       onFirst: () => deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id }),
     });
@@ -408,12 +413,12 @@ async function executeRunInner(
       const posted = await db.transaction(async (tx) => {
         const out: Message[] = [];
         const said = unpostedText(t);
-        if (said) out.push(await postAgentMessage(tx, run, said, takeMemoryUpdates(t)));
+        if (said) out.push(await postAgentMessage(tx, run, replyThreadId, said, takeMemoryUpdates(t)));
         t.postedUpTo = t.messages.length;
         t.postedCount += out.length + waiting.length;
         const cards: Approval[] = [];
         for (const approval of waiting) {
-          const card = await postAgentMessage(tx, run, `Requesting approval: ${approval.title}`, {
+          const card = await postAgentMessage(tx, run, replyThreadId, `Requesting approval: ${approval.title}`, {
             approvalId: approval.id,
           });
           out.push(card);
@@ -445,7 +450,7 @@ async function executeRunInner(
     if (!text && !anythingPosted) return fail("empty_reply");
     const t = transcript;
     const reply = await db.transaction(async (tx) => {
-      const message = text ? await postAgentMessage(tx, run, text, takeMemoryUpdates(t)) : null;
+      const message = text ? await postAgentMessage(tx, run, replyThreadId, text, takeMemoryUpdates(t)) : null;
       t.postedUpTo = t.messages.length;
       if (message) t.postedCount++;
       if (message) {
@@ -479,11 +484,17 @@ function unpostedText(t: Transcript): string {
     .join("\n\n");
 }
 
-function postAgentMessage(tx: Executor, run: AgentRun, body: string, meta?: Record<string, unknown>) {
+function postAgentMessage(
+  tx: Executor,
+  run: AgentRun,
+  threadId: string | null,
+  body: string,
+  meta?: Record<string, unknown>,
+) {
   return insertMessage(tx, {
     orgId: run.orgId,
     channelId: run.channelId,
-    threadId: run.threadRootId,
+    threadId,
     author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
     body,
     meta,
@@ -498,6 +509,7 @@ function postAgentMessage(tx: Executor, run: AgentRun, body: string, meta?: Reco
 function createDeltaPublisher(
   pubsub: PubSub,
   run: AgentRun,
+  threadId: string | null,
   flushMs: number,
   startSeq = 0,
   first?: { event: ChannelEvent; onFirst?: () => void },
@@ -518,7 +530,7 @@ function createDeltaPublisher(
       const evt: ChannelEvent = {
         type: "agent.delta",
         channelId: run.channelId,
-        threadId: run.threadRootId,
+        threadId,
         runId: run.id,
         agentId: run.agentId,
         seq: seq++,

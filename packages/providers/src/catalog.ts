@@ -24,6 +24,7 @@ export interface TokenPrices {
  */
 export const PROVIDERS = {
   anthropic: { label: "Anthropic" },
+  openai: { label: "OpenAI" },
 } as const satisfies Record<string, { label: string }>;
 
 export type ProviderId = keyof typeof PROVIDERS;
@@ -38,6 +39,12 @@ export interface ModelInfo {
   longContext?: { aboveInputTokens: number; prices: TokenPrices };
   /** Ask the API to retry a refused request on a fallback model (Anthropic `fallbacks: "default"`). */
   serverSideFallback: boolean;
+  /** Takes a reasoning `effort` (OpenAI reasoning models). */
+  reasoning?: boolean;
+  /** The provider's small, cheap model (router fallback, summaries, reflection). */
+  cheap?: boolean;
+  /** Suggested for new agents of that provider. */
+  recommended?: boolean;
 }
 
 export const MODEL_CATALOG: Record<string, ModelInfo> = {
@@ -52,6 +59,7 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     label: "Claude Sonnet 5.5",
     prices: { input: 2000, output: 10000, cacheRead: 200, cacheWrite: 2500 },
     serverSideFallback: true,
+    recommended: true,
   },
   "claude-haiku-5-5": {
     provider: "anthropic",
@@ -59,8 +67,31 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     prices: { input: 100, output: 500, cacheRead: 10, cacheWrite: 125 },
     longContext: { aboveInputTokens: 100_000, prices: { input: 500, output: 2500, cacheRead: 50, cacheWrite: 625 } },
     serverSideFallback: false,
+    cheap: true,
+  },
+  // OpenAI, Standard tier, checked on developers.openai.com/api/docs/pricing (2026-10-14).
+  // TODO: the page lists long-context prices but not the threshold; add `longContext` once known.
+  "gpt-6-sol": {
+    provider: "openai",
+    label: "GPT-6 Sol",
+    prices: { input: 2000, output: 10000, cacheRead: 200, cacheWrite: 2500 },
+    serverSideFallback: false,
+    reasoning: true,
+    recommended: true,
+  },
+  "gpt-6-luna": {
+    provider: "openai",
+    label: "GPT-6 Luna",
+    prices: { input: 100, output: 500, cacheRead: 10, cacheWrite: 125 },
+    serverSideFallback: false,
+    reasoning: true,
+    cheap: true,
   },
 };
+
+/** The cheap model of a provider (router fallback, summaries), from the catalog. */
+export const cheapModelOf = (provider: string) =>
+  Object.entries(MODEL_CATALOG).find(([, m]) => m.provider === provider && m.cheap)?.[0] ?? null;
 
 export const isKnownModel = (model: string) => Object.hasOwn(MODEL_CATALOG, model);
 

@@ -2,7 +2,7 @@ import { and, arrayContained, type Database, desc, eq, inArray, isNull, or, sche
 import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
 import { can, getMembership } from "../organizations";
-import { agentVisibleChannels, indexSource, searchVisible } from "../search";
+import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { type ContextItem, consolidateItem, getContextItems, supersede } from "./items";
 import { proposeChange } from "./proposals";
@@ -24,10 +24,12 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
  * Built-in tools over the organization's context (D9 layers 2–4, D13), all
  * through the Tool Gateway: `search_context`, `get_summary`, `expand`
  * (`context:read`), `remember`, `forget` (`memory:write`). Search and
- * expand only see the agent's channels, resolved at call time (D11).
+ * expand only see the run's channel and the agent's public channels,
+ * resolved at call time (D11): other private channels and DMs stay out.
  */
 export function createContextToolSource(deps: ContextDeps): ToolSource {
-  const visible = (db: Database, orgId: string, agentId: string) => agentVisibleChannels(db, orgId, agentId);
+  const visible = (ctx: { db: Database; orgId: string; agentId: string; channelId: string }) =>
+    agentSearchChannels(ctx.db, ctx.orgId, ctx.agentId, ctx.channelId);
 
   const tools: ToolDefinition[] = [
     {
@@ -52,7 +54,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         const hits = await searchVisible(deps, {
           orgId: ctx.orgId,
           text: str(input.query),
-          visibleChannelIds: await visible(ctx.db, ctx.orgId, ctx.agentId),
+          visibleChannelIds: await visible(ctx),
           kinds: Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined,
           limit: typeof input.limit === "number" ? input.limit : 8,
         });
@@ -89,7 +91,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           .select({ channelId: messages.channelId })
           .from(messages)
           .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, threadId)));
-        if (!root || !(await visible(ctx.db, ctx.orgId, ctx.agentId)).includes(root.channelId)) {
+        if (!root || !(await visible(ctx)).includes(root.channelId)) {
           return { content: "Thread not found.", isError: true };
         }
         const summary = await ensureThreadSummary(deps, ctx.orgId, threadId, { force: true });
@@ -109,7 +111,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         additionalProperties: false,
       },
       async execute(input, ctx) {
-        const allowed = await visible(ctx.db, ctx.orgId, ctx.agentId);
+        const allowed = await visible(ctx);
         const id = str(input.item_id);
         if (!/^[0-9a-f-]{36}$/i.test(id)) return { content: "Not found.", isError: true };
         const [item] = await getContextItems(ctx.db, ctx.orgId, [id]);
@@ -384,14 +386,7 @@ function memoryResult(ctx: ToolContext, content: string, update: MemoryUpdate) {
 
 /** Channels whose content may be injected into a run in `channelId`: that channel and public channels the agent is in. */
 async function injectableChannels(db: Database, orgId: string, agentId: string, channelId: string) {
-  const mine = await agentVisibleChannels(db, orgId, agentId);
-  const publicOnes = mine.length
-    ? await db
-        .select({ id: channels.id })
-        .from(channels)
-        .where(and(eq(channels.orgId, orgId), inArray(channels.id, mine), eq(channels.visibility, "public")))
-    : [];
-  return [...new Set([channelId, ...publicOnes.map((c) => c.id)])];
+  return [...new Set([channelId, ...(await agentSearchChannels(db, orgId, agentId, channelId))])];
 }
 
 /**

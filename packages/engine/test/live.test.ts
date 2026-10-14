@@ -205,7 +205,11 @@ describe("memory changes on request", () => {
     const [archived] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, itemId));
     expect(archived?.status).toBe("archived");
     // The confirmation is in the chat, with the structured update for the card.
-    const reply = (await listMessages(f.db, f.owner.id, f.org.id, dm.id, { threadId: ask.id })).at(-1);
+    // DMs are flat: the reply is in the main timeline, right after the request.
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, dm.id);
+    expect(timeline.map((m) => m.id)).toContain(ask.id);
+    const reply = timeline.at(-1);
+    expect(reply?.threadId).toBeNull();
     expect(reply?.body).toBe("Pronto.");
     expect(reply?.meta.memoryUpdates).toEqual([expect.objectContaining({ action: "forgot", itemId })]);
 

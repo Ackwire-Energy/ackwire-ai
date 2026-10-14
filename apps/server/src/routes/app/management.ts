@@ -1,6 +1,7 @@
 import {
   agentDetail,
   agentView,
+  availableProviders,
   getOrgSettings,
   getRun,
   inviteMany,
@@ -8,6 +9,7 @@ import {
   listInvitationsWithStatus,
   listMembers,
   listRuns,
+  makeDefaultCredential,
   orgOverview,
   queueInvitationEmail,
   requirePermission,
@@ -17,7 +19,7 @@ import {
   updateOrgSettings,
   usageReport,
 } from "@agenteschat/engine";
-import { nanoUsdToUsd } from "@agenteschat/providers";
+import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
 import { Credential, Role } from "./schemas";
@@ -31,7 +33,13 @@ const Settings = z
     context: z
       .string()
       .openapi({ description: "Shared with every agent of the organization (start of every prompt)." }),
-    defaultCredentialId: z.uuid().nullable().openapi({ description: "Key that pays for router and summaries." }),
+    defaultCredentialId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: "Legacy single default key (kept for compatibility). Prefer `defaultCredentialIds`." }),
+    defaultCredentialIds: z.record(z.string(), z.uuid()).openapi({
+      description: "Default key per provider (`{ anthropic, openai }`): agents without a key, router, summaries.",
+    }),
     routerModel: z.string().nullable().openapi({ description: "Null = the deployment's ROUTER_MODEL." }),
     summaryModel: z.string().nullable().openapi({ description: "Null = the deployment's SUMMARY_MODEL." }),
     timezone: z.string().openapi({ example: "America/Sao_Paulo" }),
@@ -147,6 +155,7 @@ export function managementRoutes(deps: AppDeps) {
             name: z.string().trim().min(1).max(100).optional(),
             context: z.string().max(20_000).optional(),
             defaultCredentialId: z.uuid().nullable().optional(),
+            defaultCredentialIds: z.record(z.enum(["anthropic", "openai"]), z.uuid().nullable()).optional(),
             routerModel: ModelId.nullable().optional(),
             summaryModel: ModelId.nullable().optional(),
             timezone: z.string().max(64).optional(),
@@ -346,6 +355,8 @@ export function managementRoutes(deps: AppDeps) {
             apiKey: z.string().min(8).max(500),
             label: z.string().max(80).optional(),
             workspaceId: z.string().max(128).nullable().optional(),
+            organization: z.string().max(128).nullable().optional(),
+            project: z.string().max(128).nullable().optional(),
           }),
         ),
       },
@@ -361,6 +372,23 @@ export function managementRoutes(deps: AppDeps) {
         credentialId,
         c.req.valid("json"),
       );
+      return c.json({ ...row, createdAt: row.createdAt.toISOString(), revokedAt: iso(row.revokedAt) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/credentials/{credentialId}/make-default",
+      tags: ["Agents"],
+      security,
+      summary: 'Make this key its provider\'s default for the workspace ("Tornar padrão")',
+      request: { params: OrgParams.extend({ credentialId: z.uuid() }), body: body(z.object({})) },
+      responses: { 200: json(Credential), ...errors },
+    }),
+    async (c) => {
+      const { orgId, credentialId } = c.req.valid("param");
+      const row = await makeDefaultCredential(db, c.get("user").id, orgId, credentialId);
       return c.json({ ...row, createdAt: row.createdAt.toISOString(), revokedAt: iso(row.revokedAt) }, 200);
     },
   );
@@ -384,6 +412,67 @@ export function managementRoutes(deps: AppDeps) {
         ? await pc.available(orgId, provider)
         : (await pc.resolve(orgId, provider)) !== null;
       return c.json({ available }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/models",
+      tags: ["Agents"],
+      security,
+      summary: "Models, with whether this workspace can use them (it has a key for the provider, or the platform does)",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            models: z.array(
+              z.object({
+                id: z.string(),
+                label: z.string(),
+                provider: z.string(),
+                available: z.boolean(),
+                recommended: z.boolean().openapi({ description: "Suggested for new agents of an available provider." }),
+                cheap: z.boolean(),
+                inputUsdPerMTok: z.number(),
+                outputUsdPerMTok: z.number(),
+              }),
+            ),
+            providers: z.array(
+              z.object({ id: z.string(), label: z.string(), hasKey: z.boolean(), platform: z.boolean() }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      await requirePermission(db, c.get("user").id, orgId, "read");
+      const providerIds = Object.keys(PROVIDERS);
+      const access = await availableProviders(db, orgId, adapters.platformCredentials, providerIds);
+      const usable = (p: string) => Boolean(access.get(p)?.own || access.get(p)?.platform);
+      return c.json(
+        {
+          models: Object.entries(MODEL_CATALOG).map(([id, m]) => ({
+            id,
+            label: m.label,
+            provider: m.provider,
+            available: usable(m.provider),
+            recommended: usable(m.provider) && m.recommended === true,
+            cheap: m.cheap === true,
+            inputUsdPerMTok: m.prices.input / 1000,
+            outputUsdPerMTok: m.prices.output / 1000,
+          })),
+          providers: providerIds.map((id) => ({
+            id,
+            label: (PROVIDERS as Record<string, { label: string }>)[id]?.label ?? id,
+            hasKey: access.get(id)?.own ?? false,
+            platform: access.get(id)?.platform ?? false,
+          })),
+        },
+        200,
+      );
     },
   );
 
@@ -479,7 +568,7 @@ export function managementRoutes(deps: AppDeps) {
         params: OrgParams,
         query: z.object({
           agentId: z.uuid().optional(),
-          status: z.enum(["queued", "running", "waiting_approval", "done", "failed"]).optional(),
+          status: z.enum(["queued", "running", "waiting_approval", "waiting_input", "done", "failed"]).optional(),
           before: z.iso.datetime().optional(),
           since: z.iso.datetime().optional(),
           limit: z.coerce.number().int().min(1).max(200).optional(),

@@ -56,7 +56,7 @@ export async function createTestServer(
     db,
     config,
     adapters,
-    modelProviders: { anthropic: provider },
+    modelProviders: { anthropic: provider, openai: provider },
     toolSources: options.toolSources,
     mcpConnect: options.mcpConnect,
     http: options.http,

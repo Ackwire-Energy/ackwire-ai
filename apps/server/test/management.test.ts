@@ -90,3 +90,32 @@ test("management API: settings, overview, people, invitations, credentials, agen
   });
   expect(await set.json()).toEqual({ channels: [{ id: channelId, name: "general", autoReply: false }] });
 });
+
+test("channel members API: add an agent with autoReply off, turn it on, roster shows it", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const room = (await (await api("/channels", { json: { name: "squad", visibility: "private" } })).json()) as {
+    id: string;
+  };
+  expect((await api(`/channels/${room.id}/members`, { json: { agentId, autoReply: false } })).status).toBe(204);
+  const roster = async () =>
+    ((await (await api(`/channels/${room.id}/roster`)).json()) as { members: { autoReply: boolean | null }[] }).members;
+  expect((await roster()).map((m) => m.autoReply)).toContain(false);
+  const res = await api(`/channels/${room.id}/members/agents/${agentId}`, {
+    method: "PATCH",
+    json: { autoReply: true },
+  });
+  expect(res.status).toBe(204);
+  expect((await roster()).map((m) => m.autoReply)).not.toContain(false);
+  expect(
+    (
+      await api(`/channels/${room.id}/members/agents/${crypto.randomUUID()}`, {
+        method: "PATCH",
+        json: { autoReply: true },
+      })
+    ).status,
+  ).toBe(404);
+});

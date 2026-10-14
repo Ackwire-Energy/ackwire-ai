@@ -69,7 +69,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
       );
     return channel;
   });
-  if ("agentId" in target) caches.scopes.delete(`${orgId}:${target.agentId}:visible`);
+  if ("agentId" in target) caches.scopes.deletePrefix(`${orgId}:${target.agentId}:visible`);
   const channel = created ?? (await existing()); // a concurrent open won the race
   if (!channel) throw new Error("could not open the conversation");
   return channel;

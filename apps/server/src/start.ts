@@ -15,7 +15,7 @@ import { ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
 import { createDatabase, ensureMessagePartitions } from "@agenteschat/db";
 import { createLocalKeyWrapper, enableCaches } from "@agenteschat/engine";
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
-import { createAnthropicProvider } from "@agenteschat/providers";
+import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/providers";
 import { createApp } from "./app";
 import { createAuth } from "./auth";
 import { buildEngine } from "./engine";
@@ -78,6 +78,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   const base = { config, db: database.db, edition, version };
   const { adapters, modelProviders, overridden } = await resolveAdapters(modules, base, defaults, {
     anthropic: createAnthropicProvider(),
+    openai: createOpenAIProvider(),
   });
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
   const ctx: ModuleContext = { ...base, adapters };

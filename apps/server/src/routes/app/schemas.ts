@@ -24,7 +24,7 @@ export const Invitation = z
 export const Credential = z
   .object({
     id: z.uuid(),
-    provider: z.enum(["anthropic"]),
+    provider: z.enum(["anthropic", "openai"]),
     label: z.string(),
     keyHint: z.string().openapi({ description: "Last 4 characters of the key. The key itself is never returned." }),
     workspaceIdHint: z
@@ -32,6 +32,10 @@ export const Credential = z
       .nullable()
       .optional()
       .openapi({ description: "Last characters of the workspace the key is scoped to, if set." }),
+    isDefault: z
+      .boolean()
+      .optional()
+      .openapi({ description: "The workspace's default key (agents without their own key, router, summaries)." }),
     createdAt: z.string(),
     revokedAt: z.string().nullable(),
   })
@@ -59,6 +63,11 @@ export const Channel = z
     topic: z.string(),
     visibility: z.enum(["public", "private"]),
     isMember: z.boolean(),
+    createdByUserId: z
+      .string()
+      .nullable()
+      .optional()
+      .openapi({ description: "The channel's creator: may manage its members, like admins." }),
     createdAt: z.string(),
   })
   .openapi("Channel");
@@ -80,7 +89,7 @@ export const Message = z
         handled: z.array(
           z.object({
             agentId: z.uuid(),
-            status: z.enum(["queued", "running", "waiting_approval", "done", "failed"]),
+            status: z.enum(["queued", "running", "waiting_approval", "waiting_input", "done", "failed"]),
           }),
         ),
       })

@@ -54,7 +54,7 @@ export function buildEngine(o: EngineOptions) {
     providers: o.modelProviders,
     platformCredentials: adapters.platformCredentials,
     onBudgetThreshold: async (e) => {
-      await notifyOwnerOnBudget(adapters.pubsub)(e);
+      await notifyOwnerOnBudget(adapters.pubsub, db)(e);
       await queueBudgetEmail(db, config.PUBLIC_URL, e);
     },
     embeddings,
@@ -64,6 +64,7 @@ export function buildEngine(o: EngineOptions) {
     gateway,
     search: adapters.search,
     summaryModel: config.SUMMARY_MODEL,
+    cheapModels: { openai: config.OPENAI_CHEAP_MODEL },
     pubsub: adapters.pubsub,
     reflect: {
       everyMessages: config.REFLECT_EVERY_MESSAGES,
@@ -100,6 +101,7 @@ export function buildEngine(o: EngineOptions) {
     router: {
       enabled: config.ROUTER_ENABLED,
       model: config.ROUTER_MODEL,
+      cheapModels: { openai: config.OPENAI_CHEAP_MODEL },
       minScore: config.ROUTER_MIN_SCORE,
       // Jev is the default when its (platform) key is set, unless ROUTER_STRATEGY=llm.
       ...(config.TYPESAFE_API_KEY && (config.ROUTER_STRATEGY ?? "jev") === "jev"

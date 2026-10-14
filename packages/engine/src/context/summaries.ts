@@ -2,6 +2,7 @@ import type { PubSub, SearchIndexResolver } from "@agenteschat/adapters";
 import { and, asc, type Database, desc, eq, gte, inArray, isNull, lt, schema } from "@agenteschat/db";
 import type { ModelGateway } from "../gateway";
 import type { Message } from "../messages";
+import { cheapModelForOrg } from "../router";
 import { type ContextItem, insertContextItem, supersede } from "./items";
 
 const { messages, users, agents, contextItems, organizationSettings } = schema;
@@ -10,18 +11,24 @@ export interface ContextDeps {
   db: Database;
   gateway: ModelGateway;
   search: SearchIndexResolver;
-  /** Deployment default (SUMMARY_MODEL); an org may override it. */
+  /** Anthropic summary model (SUMMARY_MODEL); an org may override it. */
   summaryModel: string;
+  /** Cheap model per other provider, when the org's default key is theirs. */
+  cheapModels?: Record<string, string>;
   pubsub?: PubSub;
   reflect?: { maxPerThread?: number; everyMessages?: number; idleMinutes?: number };
 }
 
-export async function resolveSummaryModel(deps: Pick<ContextDeps, "db" | "summaryModel">, orgId: string) {
+export async function resolveSummaryModel(
+  deps: Pick<ContextDeps, "db" | "summaryModel" | "cheapModels">,
+  orgId: string,
+) {
   const [row] = await deps.db
     .select({ model: organizationSettings.summaryModel })
     .from(organizationSettings)
     .where(eq(organizationSettings.orgId, orgId));
-  return row?.model ?? deps.summaryModel;
+  if (row?.model) return row.model;
+  return cheapModelForOrg(deps.db, orgId, { anthropic: deps.summaryModel, ...deps.cheapModels });
 }
 
 /** Content from outside the org (webhooks, system notices) is untrusted. */

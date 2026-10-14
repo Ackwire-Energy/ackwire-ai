@@ -78,6 +78,27 @@
       "when": 1792012713794,
       "tag": "0010_usage_billed_to",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792013168715,
+      "tag": "0011_credential_options",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792013415243,
+      "tag": "0012_default_credentials_per_provider",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792014781871,
+      "tag": "0013_agent_questions",
+      "breakpoints": true
     }
   ]
 }

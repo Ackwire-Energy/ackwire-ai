@@ -7,14 +7,16 @@ export type RunStatus = AgentRun["status"];
 
 /**
  * Allowed transitions of `agent_runs.status` (docs/adr/0008-agent-runs.md):
- * `queued → running → (waiting_approval → running)* → done | failed`.
+ * `queued → running → ((waiting_approval | waiting_input) → running)* → done | failed`.
  * `done` and `failed` are terminal. Suspending for an approval is a status
  * change; resuming is enqueueing a new `agent_run.execute` job.
  */
 export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
   queued: ["running", "failed"],
-  running: ["waiting_approval", "done", "failed"],
+  running: ["waiting_approval", "waiting_input", "done", "failed"],
   waiting_approval: ["running", "failed"],
+  /** Waiting for a person to answer an `ask_user` question (or for it to expire). */
+  waiting_input: ["running", "failed"],
   done: [],
   failed: [],
 };

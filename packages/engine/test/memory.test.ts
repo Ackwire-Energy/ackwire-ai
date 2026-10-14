@@ -3,6 +3,7 @@ import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText, textOf } from "@agenteschat/providers";
 import {
+  addChannelMember,
   addReaction,
   applyReactionFeedback,
   attributeSubject,
@@ -759,5 +760,36 @@ describe("outcomes and agent-to-agent signals", () => {
     expect(new Set(lesson?.evidence.map((e) => e.type))).toEqual(new Set(["agent", "self"]));
     await consolidateOrg(f.context, f.org.id);
     expect(await listProposals(f.db, f.owner.id, f.org.id)).toEqual([]);
+  });
+});
+
+describe("explicit search privacy", () => {
+  test("search_context sees the run's channel and public channels, not other private channels", async () => {
+    f = await setup({
+      contextTools: true,
+      reply: (req) => {
+        const last = JSON.stringify(req.messages.at(-1)?.content);
+        if (last.includes("tool_result") || last.includes("No results")) return { chunks: ["ok"] };
+        return last.includes("find it")
+          ? { chunks: [], toolUses: [{ name: "search_context", input: { query: "pineapple" } }] }
+          : { chunks: ["noted"] };
+      },
+    });
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
+    await addChannelMember(f.db, f.owner.id, f.org.id, secret.id, { agentId: f.agent.id });
+    await post(f, "@dev the code word is pineapple", undefined, secret.id);
+    await drainOutbox(f.db, f.handlers);
+    const searches = async () =>
+      (await f.db.select().from(schema.agentRunSteps))
+        .filter((s) => s.kind === "tool_result" && (s.data as { name: string }).name === "search_context")
+        .map((s) => (s.data as { content: string }).content);
+
+    await post(f, "@dev find it");
+    await drainOutbox(f.db, f.handlers);
+    expect(await searches()).toEqual(["No results."]);
+
+    await post(f, "@dev find it", undefined, secret.id);
+    await drainOutbox(f.db, f.handlers);
+    expect((await searches()).at(-1)).toContain("pineapple");
   });
 });

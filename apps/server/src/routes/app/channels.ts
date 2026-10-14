@@ -3,6 +3,7 @@ import {
   channelMembersDetail,
   removeChannelMember,
   requireChannelAccess,
+  setChannelAgentAutoReply,
   updateChannel,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -83,6 +84,34 @@ export function channelRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/channels/{channelId}/members/agents/{agentId}",
+      tags,
+      security,
+      summary: "Turn an agent's auto-reply in this channel on or off (creator, admin or the agent's owner)",
+      request: {
+        params: ChannelParams.extend({ agentId: z.uuid() }),
+        body: body(z.object({ autoReply: z.boolean() })),
+      },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId, agentId } = c.req.valid("param");
+      await setChannelAgentAutoReply(
+        db,
+        c.get("user").id,
+        orgId,
+        channelId,
+        agentId,
+        c.req.valid("json").autoReply,
+        opts,
+      );
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "delete",
       path: "/organizations/{orgId}/channels/{channelId}",
       tags,
@@ -127,6 +156,7 @@ export function channelRoutes(deps: AppDeps) {
           topic: r.topic,
           visibility: r.visibility,
           isMember: true,
+          createdByUserId: r.createdByUserId,
           createdAt: r.createdAt.toISOString(),
         },
         200,

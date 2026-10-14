@@ -3,6 +3,7 @@ import { isKnownModel } from "@agenteschat/providers";
 import { getAgent } from "./agents";
 import { caches } from "./cache";
 import { CHANNEL_NAME_PATTERN } from "./channels";
+import { invalidateDefaults } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { agentBudgetState } from "./gateway";
 import { can, getMembership, requirePermission } from "./organizations";
@@ -30,6 +31,8 @@ export interface OrgSettings {
   name: string;
   context: string;
   defaultCredentialId: string | null;
+  /** Default key per provider. */
+  defaultCredentialIds: Record<string, string>;
   routerModel: string | null;
   summaryModel: string | null;
   timezone: string;
@@ -44,6 +47,7 @@ export async function getOrgSettings(db: Database, actorId: string, orgId: strin
     name: org.name,
     context: org.context,
     defaultCredentialId: s?.defaultCredentialId ?? null,
+    defaultCredentialIds: (s?.defaultCredentialIds ?? {}) as Record<string, string>,
     routerModel: s?.routerModel ?? null,
     summaryModel: s?.summaryModel ?? null,
     timezone: s?.timezone ?? "UTC",
@@ -64,7 +68,9 @@ export async function updateOrgSettings(
   db: Database,
   actorId: string,
   orgId: string,
-  input: Partial<OrgSettings>,
+  input: Partial<Omit<OrgSettings, "defaultCredentialIds">> & {
+    defaultCredentialIds?: Partial<Record<string, string | null>>;
+  },
 ): Promise<OrgSettings> {
   await requirePermission(db, actorId, orgId, "configure");
   if (input.name !== undefined && input.name.trim() === "") throw new ValidationError("name can't be empty");
@@ -73,6 +79,22 @@ export async function updateOrgSettings(
   }
   if (input.timezone !== undefined && !isValidTimeZone(input.timezone))
     throw new ValidationError("timezone must be an IANA time zone");
+  for (const [provider, id] of Object.entries(input.defaultCredentialIds ?? {})) {
+    if (!id) continue;
+    const [cred] = await db
+      .select({ provider: providerCredentials.provider })
+      .from(providerCredentials)
+      .where(
+        and(
+          eq(providerCredentials.id, id),
+          eq(providerCredentials.orgId, orgId),
+          isNull(providerCredentials.revokedAt),
+        ),
+      );
+    if (!cred) throw new ValidationError(`defaultCredentialIds.${provider} does not belong to this organization`);
+    if (cred.provider !== provider)
+      throw new ValidationError(`defaultCredentialIds.${provider} is a ${cred.provider} key`);
+  }
   if (input.defaultCredentialId) {
     const [cred] = await db
       .select({ id: providerCredentials.id })
@@ -98,6 +120,13 @@ export async function updateOrgSettings(
     }
     const settings = {
       ...(input.defaultCredentialId !== undefined ? { defaultCredentialId: input.defaultCredentialId } : {}),
+      ...(input.defaultCredentialIds !== undefined
+        ? {
+            defaultCredentialIds: Object.fromEntries(
+              Object.entries(input.defaultCredentialIds).filter(([, v]) => Boolean(v)),
+            ) as Record<string, string>,
+          }
+        : {}),
       ...(input.routerModel !== undefined ? { routerModel: input.routerModel } : {}),
       ...(input.summaryModel !== undefined ? { summaryModel: input.summaryModel } : {}),
       ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
@@ -110,6 +139,7 @@ export async function updateOrgSettings(
     }
   });
   caches.orgs.delete(`${orgId}:`);
+  invalidateDefaults(orgId);
   return getOrgSettings(db, actorId, orgId);
 }
 
@@ -236,7 +266,7 @@ export async function setAgentChannels(
     }
   });
   caches.channelMembers.deletePrefix(`${orgId}:`);
-  caches.scopes.delete(`${orgId}:${agentId}:visible`);
+  caches.scopes.deletePrefix(`${orgId}:${agentId}:visible`);
   return listAgentChannels(db, orgId, agentId);
 }
 
@@ -277,6 +307,8 @@ export async function updateChannel(
       .returning();
     if (!row) throw new NotFoundError("Channel not found");
     caches.channels.delete(`${orgId}:${channelId}`);
+    // What agents may search depends on visibility (agentSearchChannels).
+    if (input.visibility !== undefined) caches.scopes.deletePrefix(`${orgId}:`);
     return row;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`#${name} already exists`);

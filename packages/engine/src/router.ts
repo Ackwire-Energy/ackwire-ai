@@ -1,5 +1,5 @@
 import { and, type Database, desc, eq, isNull, lte, ne, schema } from "@agenteschat/db";
-import { ProviderError } from "@agenteschat/providers";
+import { cheapModelOf, ProviderError } from "@agenteschat/providers";
 import { createAgentRuns } from "./dispatch";
 import { MissingCredentialError, ValidationError } from "./errors";
 import type { ModelGateway } from "./gateway";
@@ -230,13 +230,43 @@ export function parseRouterOutput(text: string): {
   }
 }
 
-/** Router model for an organization: its override, else the deployment default. */
-export async function resolveRouterModel(db: Database, orgId: string, fallback: string) {
+/** Router model for an organization: its override, else the cheap model of its default key's provider. */
+export async function resolveRouterModel(
+  db: Database,
+  orgId: string,
+  fallback: string,
+  cheapModels: Record<string, string> = {},
+) {
   const [row] = await db
     .select({ model: organizationSettings.routerModel })
     .from(organizationSettings)
     .where(eq(organizationSettings.orgId, orgId));
-  return row?.model ?? fallback;
+  if (row?.model) return row.model;
+  return cheapModelForOrg(db, orgId, { anthropic: fallback, ...cheapModels });
+}
+
+/**
+ * The cheap model to use for an org's own calls (router fallback, summaries,
+ * reflection): the configured one for the provider of the org's default key
+ * (or its newest key), else the catalog's cheap model for that provider.
+ */
+export async function cheapModelForOrg(db: Database, orgId: string, perProvider: Record<string, string>) {
+  const [settings] = await db
+    .select({ provider: schema.providerCredentials.provider })
+    .from(organizationSettings)
+    .innerJoin(schema.providerCredentials, eq(schema.providerCredentials.id, organizationSettings.defaultCredentialId))
+    .where(and(eq(organizationSettings.orgId, orgId), isNull(schema.providerCredentials.revokedAt)));
+  let provider = settings?.provider;
+  if (!provider) {
+    const [newest] = await db
+      .select({ provider: schema.providerCredentials.provider })
+      .from(schema.providerCredentials)
+      .where(and(eq(schema.providerCredentials.orgId, orgId), isNull(schema.providerCredentials.revokedAt)))
+      .orderBy(desc(schema.providerCredentials.createdAt))
+      .limit(1);
+    provider = newest?.provider ?? "anthropic";
+  }
+  return perProvider[provider] ?? cheapModelOf(provider) ?? perProvider.anthropic ?? "claude-haiku-5-5";
 }
 
 export interface RouterDeps {

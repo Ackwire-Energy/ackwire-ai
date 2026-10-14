@@ -165,6 +165,25 @@ async function loadAgentChannels(db: Database, orgId: string, agentId: string) {
   return rows.map((r) => r.id);
 }
 
+/**
+ * Channels an agent's explicit search (`search_context`, `expand`) may read:
+ * its public channels plus the run's own channel. Other private channels and
+ * DMs it belongs to stay out, so a question in one place can't pull private
+ * conversations from another.
+ */
+export async function agentSearchChannels(db: Database, orgId: string, agentId: string, currentChannelId: string) {
+  const rows = (await caches.scopes.getOrLoad(`${orgId}:${agentId}:visible-kind`, async () =>
+    db
+      .select({ id: channelMembers.channelId, visibility: channels.visibility, kind: channels.kind })
+      .from(channelMembers)
+      .innerJoin(channels, eq(channels.id, channelMembers.channelId))
+      .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId), isNull(channels.archivedAt))),
+  )) as { id: string; visibility: string; kind: string }[];
+  return rows
+    .filter((r) => r.id === currentChannelId || (r.visibility === "public" && r.kind === "channel"))
+    .map((r) => r.id);
+}
+
 /** Channels a person can read: the ones they belong to. */
 export async function userVisibleChannels(db: Database, orgId: string, userId: string) {
   const rows = await db

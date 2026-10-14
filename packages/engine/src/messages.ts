@@ -57,7 +57,7 @@ export const messageView = (m: Message): MessageView => ({
 export interface Receipts {
   seenBy: string[];
   pickedBy: string[];
-  handled: { agentId: string; status: "queued" | "running" | "waiting_approval" | "done" | "failed" }[];
+  handled: { agentId: string; status: "queued" | "running" | "waiting_approval" | "waiting_input" | "done" | "failed" }[];
 }
 
 /**
@@ -286,7 +286,8 @@ export async function postPersonMessage(
   // Right after the commit, before any routing: the sender's optimistic copy reconciles by `clientId`.
   await publishMessageCreated(deps.pubsub, view);
   if (runs.length > 0) {
-    const threadId = message.threadId ?? message.id;
+    // DMs are flat: replies to a top-level DM message go in the main timeline.
+    const threadId = message.threadId ?? (channel.kind === "dm" ? null : message.id);
     await publishChannelEvent(deps.pubsub, {
       type: "message.routed",
       channelId,

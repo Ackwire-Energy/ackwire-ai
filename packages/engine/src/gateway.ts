@@ -14,12 +14,14 @@ import {
   type ModelUsage,
   maxCostNanoUsd,
   outputTokensWithin,
+  PROVIDERS,
   ProviderError,
   promptChars,
   type SystemPrompt,
   type ToolSpec,
 } from "@agenteschat/providers";
 import { type Agent, getAgent } from "./agents";
+import { caches } from "./cache";
 import { decryptCredential } from "./credentials";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
@@ -118,65 +120,111 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     return p;
   };
 
-  async function agentKey(agent: Agent, provider: string) {
-    if (agent.credentialId) {
-      const credential = await decryptCredential(db, deps.keyWrappers, agent.orgId, agent.credentialId);
-      if (!credential) throw new MissingCredentialError("The agent's provider credential was revoked or deleted");
-      if (credential.provider !== provider) throw new MissingCredentialError("Credential is for another provider");
-      return {
-        apiKey: credential.apiKey,
-        workspaceId: credential.workspaceId,
-        credentialId: agent.credentialId as string | null,
-      };
+  type Key = {
+    apiKey: string;
+    workspaceId?: string;
+    organization?: string;
+    project?: string;
+    credentialId: string | null;
+  };
+  const label = (provider: string) => (PROVIDERS as Record<string, { label: string }>)[provider]?.label ?? provider;
+  const noKey = (provider: string) =>
+    new MissingCredentialError(`Configure uma chave da API da ${label(provider)} nas configurações do workspace`);
+  const keyOf = (c: Awaited<ReturnType<typeof decryptCredential>>, credentialId: string | null): Key | null =>
+    c
+      ? {
+          apiKey: c.apiKey,
+          workspaceId: c.workspaceId,
+          organization: c.options?.organization,
+          project: c.options?.project,
+          credentialId,
+        }
+      : null;
+
+  /**
+   * One resolution order for every call: the agent's own credential → the
+   * org's default for that provider (the default credential when it is of
+   * that provider, else the org's newest key of that provider) → the platform
+   * key for that provider, only if configured. Never a silent failure.
+   */
+  async function resolveKey(orgId: string, provider: string, agentCredentialId?: string | null): Promise<Key> {
+    if (agentCredentialId) {
+      const credential = await decryptCredential(db, deps.keyWrappers, orgId, agentCredentialId);
+      if (!credential) {
+        throw new MissingCredentialError(
+          "A chave da API deste agente foi revogada; escolha outra nas configurações do agente",
+        );
+      }
+      if (credential.provider !== provider) {
+        throw new MissingCredentialError(
+          `O modelo deste agente é da ${label(provider)}, mas a chave escolhida é da ${label(credential.provider)}`,
+        );
+      }
+      return keyOf(credential, agentCredentialId) as Key;
     }
-    const platform = await deps.platformCredentials.resolve(agent.orgId, provider);
-    if (!platform) throw new MissingCredentialError("Add a provider API key to this agent");
+    const defaultId = await orgDefaultCredentialId(orgId, provider);
+    if (defaultId) {
+      const credential = await decryptCredential(db, deps.keyWrappers, orgId, defaultId);
+      if (credential && credential.provider === provider) return keyOf(credential, defaultId) as Key;
+    }
+    const platform = await deps.platformCredentials.resolve(orgId, provider);
+    if (!platform) throw noKey(provider);
     return { apiKey: platform.apiKey, workspaceId: platform.workspaceId, credentialId: null };
   }
 
-  /** Org calls: the org's default credential, else its newest active one for the provider, else the platform key. */
-  async function orgKey(orgId: string, provider: string) {
-    const [settings] = await db.select().from(organizationSettings).where(eq(organizationSettings.orgId, orgId));
-    const candidates: string[] = [];
-    if (settings?.defaultCredentialId) candidates.push(settings.defaultCredentialId);
-    const newest = await db
-      .select({ id: providerCredentials.id })
-      .from(providerCredentials)
-      .where(
-        and(
-          eq(providerCredentials.orgId, orgId),
-          eq(providerCredentials.provider, provider),
-          isNull(providerCredentials.revokedAt),
-        ),
-      )
-      .orderBy(desc(providerCredentials.createdAt))
-      .limit(1);
-    if (newest[0]) candidates.push(newest[0].id);
-    for (const id of candidates) {
-      const credential = await decryptCredential(db, deps.keyWrappers, orgId, id);
-      if (credential && credential.provider === provider)
-        return { apiKey: credential.apiKey, workspaceId: credential.workspaceId, credentialId: id };
-    }
-    const platform = await deps.platformCredentials.resolve(orgId, provider);
-    if (!platform) throw new MissingCredentialError("Add a provider API key to this organization");
-    return { apiKey: platform.apiKey, workspaceId: platform.workspaceId, credentialId: null as string | null };
+  /** The org's default credential for a provider (cached; invalidated when keys or settings change). */
+  async function orgDefaultCredentialId(orgId: string, provider: string): Promise<string | null> {
+    return (await caches.credentials.getOrLoad(`${orgId}:default:${provider}`, async () => {
+      const [settings] = await db
+        .select({
+          perProvider: organizationSettings.defaultCredentialIds,
+          id: organizationSettings.defaultCredentialId,
+          provider: providerCredentials.provider,
+        })
+        .from(organizationSettings)
+        .leftJoin(
+          providerCredentials,
+          and(
+            eq(providerCredentials.id, organizationSettings.defaultCredentialId),
+            isNull(providerCredentials.revokedAt),
+          ),
+        )
+        .where(eq(organizationSettings.orgId, orgId));
+      const perProvider = (settings?.perProvider ?? {}) as Partial<Record<string, string>>;
+      if (perProvider[provider]) return perProvider[provider] as string;
+      if (settings?.id && settings.provider === provider) return settings.id;
+      const [newest] = await db
+        .select({ id: providerCredentials.id })
+        .from(providerCredentials)
+        .where(
+          and(
+            eq(providerCredentials.orgId, orgId),
+            eq(providerCredentials.provider, provider),
+            isNull(providerCredentials.revokedAt),
+          ),
+        )
+        .orderBy(desc(providerCredentials.createdAt))
+        .limit(1);
+      return newest?.id ?? null;
+    })) as string | null;
   }
+
+  const agentKey = (agent: Agent, provider: string) => resolveKey(agent.orgId, provider, agent.credentialId);
+  const orgKey = (orgId: string, provider: string) => resolveKey(orgId, provider, null);
 
   /** Usage of a stream that failed midway: what the provider reported, else counted or estimated. */
   async function partialUsage(
     error: ProviderError,
     provider: ModelProvider,
     request: ModelRequest,
-    key: { apiKey: string; workspaceId?: string },
+    key: { apiKey: string; workspaceId?: string; organization?: string; project?: string },
   ): Promise<ModelUsage | null> {
     const p = error.partial;
     if (!p) return null;
     let inputTokens = p.inputTokens;
     if (inputTokens === null) {
       try {
-        inputTokens = provider.countTokens
-          ? await provider.countTokens(request, { apiKey: key.apiKey, workspaceId: key.workspaceId })
-          : null;
+        inputTokens = provider.countTokens ? await provider.countTokens(request, key) : null;
       } catch {
         inputTokens = null;
       }
@@ -467,6 +515,8 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         result = await provider.stream(request, {
           apiKey: key.apiKey,
           workspaceId: key.workspaceId,
+          organization: key.organization,
+          project: key.project,
           onDelta: call.onDelta,
         });
       } catch (error) {
@@ -626,15 +676,32 @@ export async function agentBudgetState(db: Database, orgId: string, agentId: str
   return { spentNanoUsd: row?.spentNanoUsd ?? 0, reservedNanoUsd: row?.reservedNanoUsd ?? 0 };
 }
 
-/** Budget hook that tells the agent's owner over the WebSocket (`budget.warning` / `budget.exhausted`). */
-export function notifyOwnerOnBudget(pubsub: PubSub): NonNullable<ModelGatewayDeps["onBudgetThreshold"]> {
+/**
+ * Budget hook that tells the agent's owner over the WebSocket
+ * (`budget.warning` / `budget.exhausted`); an agent without an owner tells
+ * the organization's admins.
+ */
+export function notifyOwnerOnBudget(pubsub: PubSub, db?: Database): NonNullable<ModelGatewayDeps["onBudgetThreshold"]> {
   return async ({ agent, level, spentNanoUsd, budgetNanoUsd }) => {
-    if (!agent.ownerUserId) return;
-    await publishUserEvent(pubsub, agent.orgId, agent.ownerUserId, {
-      type: `budget.${level}`,
-      agentId: agent.id,
-      spentNanoUsd,
-      budgetNanoUsd,
-    });
+    const recipients = agent.ownerUserId ? [agent.ownerUserId] : db ? await adminIds(db, agent.orgId) : [];
+    for (const userId of recipients) {
+      await publishUserEvent(pubsub, agent.orgId, userId, {
+        type: `budget.${level}`,
+        agentId: agent.id,
+        spentNanoUsd,
+        budgetNanoUsd,
+      });
+    }
   };
+}
+
+/** Owners and admins of an organization (who decides when an agent has no owner). */
+export async function adminIds(db: Database, orgId: string) {
+  const rows = await db
+    .select({ userId: schema.organizationMembers.userId })
+    .from(schema.organizationMembers)
+    .where(
+      and(eq(schema.organizationMembers.orgId, orgId), sql`${schema.organizationMembers.role} in ('owner', 'admin')`),
+    );
+  return rows.map((r) => r.userId);
 }

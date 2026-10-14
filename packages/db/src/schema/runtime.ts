@@ -59,13 +59,14 @@ export const outbox = pgTable(
 
 /**
  * Durable state machine of one agent turn (docs/adr/0008-agent-runs.md):
- * `queued → running → (waiting_approval → running)* → done | failed`.
+ * `queued → running → ((waiting_approval | waiting_input) → running)* → done | failed`.
  * Suspending is a status change; resuming is enqueueing a new job.
  */
 export const agentRunStatusEnum = pgEnum("agent_run_status", [
   "queued",
   "running",
   "waiting_approval",
+  "waiting_input",
   "done",
   "failed",
 ]);
@@ -340,5 +341,47 @@ export const agentScopes = pgTable(
   (t) => [
     foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
     unique().on(t.agentId, t.connectionId, t.scope).nullsNotDistinct(),
+  ],
+);
+
+export const agentQuestionStatusEnum = pgEnum("agent_question_status", ["open", "answered", "expired"]);
+
+/**
+ * A question an agent asked a person (`ask_user`). The run waits
+ * (`waiting_input`) until someone answers in the thread or through the API,
+ * or the question expires; the answer goes back to the model as the tool
+ * result.
+ */
+export const agentQuestions = pgTable(
+  "agent_questions",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    runId: uuid()
+      .notNull()
+      .references(() => agentRuns.id, { onDelete: "cascade" }),
+    agentId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    /** Thread it was asked in; null = the main timeline (flat DMs). */
+    threadId: uuid(),
+    /** The chat message carrying the question. */
+    messageId: uuid(),
+    toolUseId: text().notNull(),
+    text: text().notNull(),
+    choices: text().array(),
+    status: agentQuestionStatusEnum().notNull().default("open"),
+    answer: text(),
+    answeredByUserId: text(),
+    answeredAt: timestamp({ withTimezone: true }),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    unique().on(t.runId, t.toolUseId),
+    index().on(t.channelId, t.status),
+    index().on(t.expiresAt).where(sql`${t.status} = 'open'`),
   ],
 );

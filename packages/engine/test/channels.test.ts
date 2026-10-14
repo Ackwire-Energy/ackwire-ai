@@ -1,18 +1,23 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { orgTopic, type RealtimeEvent } from "@agenteschat/adapters";
+import { orgTopic, type RealtimeEvent, userTopic } from "@agenteschat/adapters";
 import { schema } from "@agenteschat/db";
 import {
   addChannelMember,
   archiveChannel,
   ConflictError,
+  createAgent,
   createChannel,
   ForbiddenError,
   joinChannel,
   listChannels,
   NotFoundError,
+  postPersonMessage,
+  type RouterStrategy,
   removeChannelMember,
   removeMember,
   requireChannelAccess,
+  routeMessage,
+  setChannelAgentAutoReply,
   ValidationError,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
@@ -109,4 +114,79 @@ test("archiving a channel: creator or admin; access ends and subscribers are tol
   await archiveChannel(f.db, f.owner.id, f.org.id, eng.id, { pubsub: f.pubsub });
   await expect(requireChannelAccess(f.db, member.id, f.org.id, eng.id)).rejects.toBeInstanceOf(NotFoundError);
   expect(events).toEqual([{ type: "channel.archived", orgId: f.org.id, channelId: eng.id }]);
+});
+
+test("adding members: creator or admin; agents need an admin or their owner; events and auto-reply", async () => {
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const pub = { pubsub: f.pubsub };
+  const room = await createChannel(f.db, bia.id, f.org.id, { name: "squad", visibility: "private" });
+  const events = f.listen(room.id);
+  const caioEvents: string[] = [];
+  f.pubsub.subscribe(userTopic(f.org.id, caio.id), (e) => caioEvents.push(e.type));
+
+  // The creator adds a person; that person can't add others.
+  await addChannelMember(f.db, bia.id, f.org.id, room.id, { userId: caio.id }, pub);
+  expect(caioEvents).toEqual(["channel.member_added"]);
+  await expect(addChannelMember(f.db, caio.id, f.org.id, room.id, { userId: f.owner.id })).rejects.toBeInstanceOf(
+    ForbiddenError,
+  );
+  // The creator can't add an agent owned by someone else; the agent's owner (or an admin) can.
+  const own = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Bot", handle: "bot", ownerUserId: bia.id },
+    { model: "claude-haiku-5-5" },
+  );
+  await expect(addChannelMember(f.db, bia.id, f.org.id, room.id, { agentId: f.agent.id })).rejects.toBeInstanceOf(
+    ForbiddenError,
+  );
+  await addChannelMember(f.db, bia.id, f.org.id, room.id, { agentId: own.id, autoReply: false }, pub);
+  await addChannelMember(f.db, f.owner.id, f.org.id, room.id, { agentId: f.agent.id }, pub);
+  await Bun.sleep(5);
+  expect(
+    events.filter((e) => e.type === "channel.member_added").map((e) => (e as unknown as { member: unknown }).member),
+  ).toEqual([
+    { type: "person", id: caio.id },
+    { type: "agent", id: own.id, autoReply: false },
+    { type: "agent", id: f.agent.id, autoReply: true },
+  ]);
+
+  // The router sees auto-reply changes on the next message.
+  const seen: string[][] = [];
+  const strategy: RouterStrategy = {
+    name: "fixed",
+    async decide(input) {
+      seen.push(input.candidates.map((c) => c.handle).sort());
+      return { agents: input.candidates.map((c) => ({ agentId: c.agentId, score: 0 })), reason: "t" };
+    },
+  };
+  const route = async () => {
+    const m = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, room.id, {
+      body: "alguém viu o build?",
+    });
+    return routeMessage(
+      { db: f.db, strategy, policy: { minScore: 0.5, maxAgents: 2, maxHops: 3 } },
+      {
+        orgId: f.org.id,
+        messageId: m.id,
+      },
+    );
+  };
+  await route();
+  await expect(setChannelAgentAutoReply(f.db, caio.id, f.org.id, room.id, own.id, true)).rejects.toBeInstanceOf(
+    ForbiddenError,
+  );
+  await setChannelAgentAutoReply(f.db, bia.id, f.org.id, room.id, own.id, true, pub);
+  await route();
+  expect(seen).toEqual([["dev"], ["bot", "dev"]]);
+  await Bun.sleep(5);
+  expect(events.some((e) => e.type === "channel.member_updated")).toBe(true);
+
+  await removeChannelMember(f.db, bia.id, f.org.id, room.id, { agentId: own.id }, pub);
+  await route();
+  expect(seen.at(-1)).toEqual(["dev"]);
+  await Bun.sleep(5);
+  expect(events.some((e) => e.type === "channel.member_removed")).toBe(true);
 });

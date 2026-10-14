@@ -1,6 +1,7 @@
 import { EmailError, type EmailSender } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { approverIds } from "./approvals";
+import { adminIds } from "./gateway";
 import { enqueue, PermanentJobError } from "./outbox";
 
 const { users, organizations, agents, approvals } = schema;
@@ -181,7 +182,7 @@ export async function sendQueuedEmail(sender: EmailSender, payload: Record<strin
   }
 }
 
-/** The 80%/100% budget email to the agent's owner (once per agent, month and level). */
+/** The 80%/100% budget email to the agent's owner, or the admins without one (once per agent, month and level). */
 export async function queueBudgetEmail(
   db: Database,
   publicUrl: string,
@@ -192,18 +193,20 @@ export async function queueBudgetEmail(
     budgetNanoUsd: number;
   },
 ) {
-  if (!e.agent.ownerUserId) return;
-  const [owner] = await db.select({ email: users.email }).from(users).where(eq(users.id, e.agent.ownerUserId));
+  // The owner, or the org's admins when the agent has none.
+  const recipientIds = e.agent.ownerUserId ? [e.agent.ownerUserId] : await adminIds(db, e.agent.orgId);
+  if (recipientIds.length === 0) return;
+  const recipients = await db.select({ email: users.email }).from(users).where(inArray(users.id, recipientIds));
   const [org] = await db
     .select({ name: organizations.name })
     .from(organizations)
     .where(eq(organizations.id, e.agent.orgId));
-  if (!owner || !org) return;
+  if (recipients.length === 0 || !org) return;
   const month = new Date().toISOString().slice(0, 7);
   await queueEmail(db, {
     orgId: e.agent.orgId,
     key: `budget:${e.agent.id}:${month}:${e.level}`,
-    to: [owner.email],
+    to: recipients.map((r) => r.email),
     template: {
       kind: "budget",
       level: e.level,

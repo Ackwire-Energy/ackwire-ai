@@ -265,11 +265,15 @@ test("no credential: core has no platform key; a module can provide one", async 
   await expect(call(f)).rejects.toBeInstanceOf(MissingCredentialError);
   await f.close();
 
+  // Resolution order: agent key → org key for the provider → platform key.
   f = await setup({ platform: { resolve: async () => ({ apiKey: "platform-key" }) } });
   await f.db.update(schema.agents).set({ credentialId: null }).where(eq(schema.agents.id, f.agent.id));
   await call(f);
-  expect(f.provider.calls[0]?.apiKey).toBe("platform-key");
-  expect((await f.db.select().from(schema.usageRecords))[0]?.credentialId).toBeNull();
+  expect(f.provider.calls[0]?.apiKey).toBe("sk-ant-test-key-1234"); // the org's key comes first
+  await revokeCredential(f.db, f.owner.id, f.org.id, f.credential.id);
+  await call(f);
+  expect(f.provider.calls[1]?.apiKey).toBe("platform-key");
+  expect((await f.db.select().from(schema.usageRecords))[1]?.credentialId).toBeNull();
 });
 
 test("provider errors propagate and record no usage", async () => {
@@ -302,6 +306,7 @@ test("workspace-scoped keys: the credential's workspace id (and the platform's) 
   expect(listed?.workspaceIdHint).toBe("_01abc");
   expect(JSON.stringify(listed)).not.toContain("sk-ant");
   await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { credentialId: null });
+  await revokeCredential(f.db, f.owner.id, f.org.id, f.credential.id); // no org key left → platform
   await call(f);
   expect(f.provider.calls[1]).toMatchObject({ apiKey: "sk-platform-key", workspaceId: "wrkspc_platform" });
   expect((await f.db.select().from(schema.usageRecords)).map((u) => u.orgId)).toEqual([f.org.id, f.org.id]);

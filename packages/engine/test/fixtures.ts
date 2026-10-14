@@ -86,12 +86,13 @@ export async function setup(
   await addChannelMember(db, owner.id, org.id, general.id, { agentId: agent.id });
 
   const provider: FakeProvider = createFakeProvider(options.reply);
+  const openaiProvider: FakeProvider = createFakeProvider(options.reply);
   const pubsub = createMemoryPubSub();
   const embeddings = createFakeEmbeddings();
   const gateway = createModelGateway({
     db,
     keyWrappers: [keyWrapper],
-    providers: { anthropic: provider },
+    providers: { anthropic: provider, openai: openaiProvider },
     platformCredentials: options.platform ?? noPlatformCredentials,
     embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,
   });
@@ -137,6 +138,7 @@ export async function setup(
     credential,
     agent,
     provider,
+    openaiProvider,
     pubsub,
     gateway,
     tools,

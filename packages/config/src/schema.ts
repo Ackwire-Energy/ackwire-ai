@@ -165,6 +165,12 @@ export const envVars = {
     description: "Timeout for a Jev router call; after it the LLM router decides.",
     section: "Agents",
   },
+  OPENAI_CHEAP_MODEL: {
+    schema: modelId.default("gpt-6-luna"),
+    description:
+      "Cheap OpenAI model for the organization's own calls (router fallback, summaries, reflection) when its default key is an OpenAI key.",
+    section: "Agents",
+  },
   ROUTER_MIN_SCORE: {
     schema: z.coerce.number().min(0).max(1).default(0.5),
     description: "Minimum router score (0–1) for an agent to answer a message without mentions.",

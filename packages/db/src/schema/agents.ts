@@ -1,4 +1,4 @@
-import { bigint, index, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, index, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
@@ -31,6 +31,8 @@ export const providerCredentials = pgTable(
      * `anthropic-workspace-id` for keys not scoped to a workspace. Not secret.
      */
     workspaceId: text(),
+    /** Other provider options sent with calls, e.g. OpenAI `{ organization, project }`. Not secret. */
+    options: jsonb().$type<{ organization?: string; project?: string }>().notNull().default({}),
     /** Last 4 characters of the key, so people can tell keys apart. */
     keyHint: text().notNull(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
@@ -91,6 +93,8 @@ export const organizationSettings = pgTable("organization_settings", {
    * then the platform key (Cloud).
    */
   defaultCredentialId: uuid().references(() => providerCredentials.id, { onDelete: "set null" }),
+  /** The default key per provider (`{ anthropic: id, openai: id }`); wins over `default_credential_id`. */
+  defaultCredentialIds: jsonb().$type<Partial<Record<string, string>>>().notNull().default({}),
   /** Router model for this organization (catalog id). Null = `ROUTER_MODEL` of the deployment. */
   routerModel: text(),
   /** Model that writes thread/period summaries. Null = `SUMMARY_MODEL` of the deployment. */
