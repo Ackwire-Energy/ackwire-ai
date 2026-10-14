@@ -349,6 +349,8 @@ export const en: Translations = {
     chip: "Waiting for an answer",
     chipDone: "Answered",
     group: "Question from {{agent}}",
+    alreadyAnswered: "Someone already answered this question.",
+    failed: "Couldn't send the answer. Try again.",
   },
   approval: {
     expiredChip: "Expired · {{when}}",

@@ -354,6 +354,8 @@ export const ptBR = {
     chip: "Esperando resposta",
     chipDone: "Respondida",
     group: "Pergunta de {{agent}}",
+    alreadyAnswered: "Alguém já respondeu esta pergunta.",
+    failed: "Não foi possível enviar a resposta. Tente de novo.",
   },
   approval: {
     expiredChip: "Expirou · {{when}}",

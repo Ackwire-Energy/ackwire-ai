@@ -5,8 +5,8 @@
  * MCP server or connector. Each file lists the endpoint it is waiting for;
  * replace the mock with an HTTP call in `src/api/index.ts` when it lands.
  *
- * Left today: the org-wide invite link, "ask for a new invitation" and
- * custom MCP servers. They start empty in every build.
+ * Left today: the org-wide invite link, "ask for a new invitation", custom
+ * MCP servers, storage, artifacts, issues, routines and the calendar.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import type { Agent, Channel, Me, Member } from "../types";

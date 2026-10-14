@@ -3,6 +3,7 @@ import { ApiError } from "@/api/http";
 import { createMockApi } from "@/api/mock";
 import type {
   Agent,
+  AgentQuestion,
   Approval,
   Channel,
   ChannelMember,
@@ -975,6 +976,22 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
         return { channelId };
       },
       markRead: async () => {},
+    },
+    questions: {
+      // Same rules as the server: the choice must be one of the options; answering twice is 409.
+      answer: async (orgId, questionId, input) => {
+        log("questions.answer", orgId, questionId, input);
+        const msg = state.messages.find((m) => (m.meta?.question as AgentQuestion | undefined)?.id === questionId);
+        const q = msg?.meta?.question as AgentQuestion | undefined;
+        if (!q) throw new ApiError(404, "not_found", "Question not found");
+        if (q.status === "answered") throw new ApiError(409, "conflict", "This question was already answered");
+        if (input.choice && q.choices && !q.choices.includes(input.choice)) {
+          throw new ApiError(400, "invalid_choice", "Pick one of the options");
+        }
+        const answer = input.choice && input.text ? `${input.choice} (${input.text})` : (input.choice ?? input.text ?? null);
+        Object.assign(q, { status: "answered", answer, answeredByUserId: state.me?.user.id ?? null });
+        return structuredClone(q);
+      },
     },
     proposals: {
       list: async () => structuredClone(state.proposals),

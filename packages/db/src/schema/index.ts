@@ -4,4 +4,5 @@ export * from "./chat";
 export * from "./connectors";
 export * from "./context";
 export * from "./runtime";
+export * from "./storage";
 export * from "./tenancy";

@@ -182,10 +182,15 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const live = useLiveStore();
   const actions = useChannelActions();
   const current = useLive((s) => s.questions[question.id]) ?? question;
+  const [error, setError] = useState<string | null>(null);
   const answer = useMutation({
     mutationFn: (choice: string) => api.questions.answer(org.id, question.id, { choice }),
-    onSuccess: (res, choice) =>
-      live.answered({ ...current, status: "answered", answer: res.answer ?? choice, answeredByUserId: me.user.id }),
+    // Errors are explained on the card.
+    meta: { silent: true },
+    onMutate: () => setError(null),
+    onSuccess: (res, choice) => live.answered({ ...res, answer: res.answer ?? choice }),
+    onError: (err) =>
+      setError((err as { status?: number }).status === 409 ? t("question.alreadyAnswered") : t("question.failed")),
   });
   const name = dir.agentById.get(question.agentId)?.name ?? t("channel.unknownAgent");
   const done = current.status === "answered";
@@ -229,6 +234,11 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
             {t("question.answer")}
           </Button>
         </div>
+      )}
+      {error && !done && (
+        <p className="small muted" role="alert" style={{ margin: 0 }}>
+          {error}
+        </p>
       )}
     </div>
   );

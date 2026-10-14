@@ -234,7 +234,7 @@ describe("models by provider and the default key", () => {
   });
 });
 
-describe("agent questions (mock until ask_user lands)", () => {
+describe("agent questions (ask_user)", () => {
   test("choices answer it; 'Responder' focuses the composer; the receipt waits for your answer", async () => {
     const state = seedState();
     const question = {
@@ -284,6 +284,47 @@ describe("agent questions (mock until ask_user lands)", () => {
     await settle(4);
     expect(card.textContent).toContain("Você respondeu: Depois das 18h");
     expect(card.querySelector(".ac-chip--done")?.textContent).toBe("Respondida");
+    expect(state.calls.find((c) => c.method === "questions.answer")?.args).toEqual([
+      ORG_ID,
+      "q1",
+      { choice: "Depois das 18h" },
+    ]);
+  });
+
+  test("a question someone already answered (409) is explained on the card", async () => {
+    const state = seedState();
+    const question = {
+      id: "q2",
+      agentId: ADA_ID,
+      channelId: ENG_ID,
+      threadId: "m-1",
+      messageId: "msg-q2",
+      text: "Uso a branch main ou staging?",
+      choices: ["main", "staging"],
+      status: "open",
+      answer: null,
+      answeredByUserId: null,
+    };
+    state.messages.push({
+      id: "msg-q2",
+      channelId: ENG_ID,
+      threadId: "m-1",
+      author: { type: "agent", id: ADA_ID },
+      body: "",
+      mentionedAgentIds: [],
+      agentRunId: "r-q2",
+      meta: { question: { ...question } },
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    await settle();
+    // Someone else answers on the server first; this tab still shows it open.
+    const stored = state.messages.find((m) => m.id === "msg-q2")?.meta?.question as { status: string };
+    stored.status = "answered";
+    const card = screen().getByRole("group", { name: "Pergunta de Ada" });
+    await click(within(card).getByRole("button", { name: "staging" }));
+    await settle(4);
+    expect(within(card).getByRole("alert").textContent).toBe("Alguém já respondeu esta pergunta.");
   });
 });
 

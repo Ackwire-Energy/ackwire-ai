@@ -4,7 +4,6 @@ import type { MockContext } from "./context";
 import { createMockCustomConnectors } from "./custom-connectors";
 import { createMockInvites } from "./misc";
 import { createMockPlanning } from "./planning";
-import { createMockQuestions } from "./questions";
 import { createMockStorage } from "./storage";
 
 export type { MockContext } from "./context";
@@ -13,7 +12,6 @@ export type { MockContext } from "./context";
 export function createMockApi(ctx: MockContext, origin: () => string = () => window.location.origin): MockedApi {
   return {
     invites: createMockInvites(ctx, origin),
-    questions: createMockQuestions(ctx),
     storage: createMockStorage(),
     artifacts: createMockArtifacts(ctx),
     ...createMockPlanning(ctx),

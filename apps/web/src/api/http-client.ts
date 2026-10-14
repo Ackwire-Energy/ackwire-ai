@@ -4,6 +4,7 @@ import type {
   Agent,
   AgentChannel,
   AgentDetail,
+  AgentQuestion,
   AgentUsage,
   Approval,
   AuthConfig,
@@ -227,6 +228,10 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       list: async (orgId) => (await request<{ dms: DirectMessage[] }>(`${org(orgId)}/dms`)).dms,
       open: (orgId, target) => request<{ channelId: string }>(`${org(orgId)}/dms`, { json: target }),
       markRead: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/read`, { json: {} }),
+    },
+    questions: {
+      answer: (orgId, questionId, input) =>
+        request<AgentQuestion>(`${org(orgId)}/questions/${enc(questionId)}/answer`, { json: input }),
     },
     proposals: {
       list: async (orgId) => (await request<{ proposals: Proposal[] }>(`${org(orgId)}/proposals`)).proposals,

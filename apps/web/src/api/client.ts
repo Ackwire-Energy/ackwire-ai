@@ -337,6 +337,7 @@ export type HttpApi = Pick<
   | "memory"
   | "proposals"
   | "dms"
+  | "questions"
 >;
 /** The part still served by in-memory mocks. */
 export type MockedApi = Omit<ApiClient, keyof HttpApi>;
