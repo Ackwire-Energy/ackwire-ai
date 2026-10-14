@@ -12,6 +12,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgent } from "../agents";
+import { caches } from "../cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { can, requirePermission } from "../organizations";
 import { enqueueIndex, userVisibleChannels } from "../search";
@@ -164,6 +165,7 @@ export async function insertContextItem(tx: Executor, input: NewContextItem): Pr
     .returning();
   if (!row) throw new Error("context item insert returned nothing");
   await enqueueIndex(tx, { orgId: input.orgId, kind: "context_item", sourceId: row.id });
+  caches.contextPresence.delete(`${input.orgId}:`);
   return row;
 }
 

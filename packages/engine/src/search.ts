@@ -1,5 +1,6 @@
 import type { SearchDocument, SearchHit, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, gt, isNull, schema } from "@agenteschat/db";
+import { caches } from "./cache";
 import type { ModelGateway } from "./gateway";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -149,7 +150,13 @@ export function registerReindexSource(kind: SearchKind, list: (db: Database, org
 }
 
 /** Channels an agent can see: the ones it belongs to (resolved at query time, D11). */
-export async function agentVisibleChannels(db: Database, orgId: string, agentId: string) {
+export async function agentVisibleChannels(db: Database, orgId: string, agentId: string): Promise<string[]> {
+  return caches.scopes.getOrLoad(`${orgId}:${agentId}:visible`, () => loadAgentChannels(db, orgId, agentId)) as Promise<
+    string[]
+  >;
+}
+
+async function loadAgentChannels(db: Database, orgId: string, agentId: string) {
   const rows = await db
     .select({ id: channelMembers.channelId })
     .from(channelMembers)

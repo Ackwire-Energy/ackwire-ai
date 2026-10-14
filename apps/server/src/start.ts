@@ -13,7 +13,7 @@ import {
 } from "@agenteschat/adapters";
 import { ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
 import { createDatabase, ensureMessagePartitions } from "@agenteschat/db";
-import { createLocalKeyWrapper } from "@agenteschat/engine";
+import { createLocalKeyWrapper, enableCaches } from "@agenteschat/engine";
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createAnthropicProvider } from "@agenteschat/providers";
 import { createApp } from "./app";
@@ -82,12 +82,15 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
   const ctx: ModuleContext = { ...base, adapters };
 
+  // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
+  enableCaches();
   const engine = buildEngine({
     db: database.db,
     config,
     adapters,
     modelProviders,
     onTiming: (name, ms, attrs) => log.info("latency", { metric: name, ms, ...attrs }),
+    onRunProfile: (p) => log.debug("run profile", p),
   });
   const workers = startWorkers({
     db: database.db,

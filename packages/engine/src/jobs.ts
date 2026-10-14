@@ -1,5 +1,5 @@
 import type { EmailSender, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
-import { and, count, eq, schema } from "@agenteschat/db";
+import { and, count, eq, queryTrace, schema } from "@agenteschat/db";
 import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
@@ -106,19 +106,25 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           });
         }
       };
-      if (message.mentionedAgentIds.length > 0) {
-        const res = await dispatchMentions(deps.db, input, { maxHops: deps.maxHops });
-        await routed("mention", message.mentionedAgentIds, res.runs);
+      if (message.authorType !== "person") {
+        // Agents' mentions go through the hop limit here; a person's mentions and DMs already
+        // started their runs in the same statement as the message (postPersonMessage).
+        if (message.mentionedAgentIds.length > 0) {
+          const res = await dispatchMentions(deps.db, input, { maxHops: deps.maxHops });
+          await routed("mention", message.mentionedAgentIds, res.runs);
+        }
         return;
       }
-      if (message.authorType !== "person") return;
+      if (message.mentionedAgentIds.length > 0) {
+        await dispatchMentions(deps.db, input, { maxHops: deps.maxHops }); // no-op unless inserted elsewhere
+        return;
+      }
       const [channel] = await deps.db
         .select({ kind: schema.channels.kind })
         .from(schema.channels)
         .where(eq(schema.channels.id, message.channelId));
       if (channel?.kind === "dm") {
-        const res = await dispatchDm(deps.db, message, { maxHops: deps.maxHops });
-        await routed("dm", res.agentIds, res.runs);
+        await dispatchDm(deps.db, message, { maxHops: deps.maxHops }); // idempotent safety net
         return;
       }
       if (!router.enabled) return routed("none", [], []);
@@ -127,7 +133,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       await routed(res.seenBy ? "router" : "none", res.seenBy ?? [], res.runs, res.reason);
     },
     "agent_run.execute": async (job, ctx) => {
-      await executeRun(deps, String(job.payload.runId), ctx);
+      // Counted per run (statements per stage go into the run profile).
+      await queryTrace.run({ count: 0 }, () => executeRun(deps, String(job.payload.runId), ctx));
     },
     "search.index": async (job) => {
       if (!deps.search) return;

@@ -55,5 +55,9 @@ Run lint, typecheck, tests and boundaries before declaring work done.
 - Credentials and crypto: `packages/engine/src/credentials.ts`, `crypto.ts`. Model catalog and prices: `packages/providers/src/catalog.ts`; Anthropic adapter `anthropic.ts`; fake for tests `fake.ts` (`@agenteschat/providers/testing`).
 - Adapters (search, pub/sub, presence, rate limiter, key wrapper, platform credentials): `packages/adapters/src`. Module API: `packages/modules/src/index.ts`.
 - DB schema: `packages/db/src/schema/*`; migrations `packages/db/migrations` (0000 is hand-edited for `messages` partitioning, ADR 0009). Import Drizzle operators from `@agenteschat/db`, never `drizzle-orm` directly.
+- Tools and approvals: `packages/engine/src/tools/*` (Tool Gateway, scopes, JSON Schema), `approvals.ts`; runs are tool loops with an append-only transcript (`executor.ts`). Connectors (MCP): `src/connectors/*`. Router: `router.ts` (`RouterStrategy`).
+- Search and memory: `search.ts` + `packages/adapters/src/search.ts` (hybrid Postgres); `src/context/*` (items, summaries, reflect, consolidate, feedback, proposals, outcomes, agent tools). DMs: `dms.ts`. Email: `email.ts` + `packages/adapters/src/email.ts` (MillionSend, via outbox).
+- Hot path: message insert is one SQL statement that also starts mention/DM runs (`insertMessageWithRuns`); per-process caches in `cache.ts` (on in the server, off in tests); per-run query/stage profile (`profile.ts`, `@agenteschat/db` `queryTrace`). `bun run smoke` checks a real environment.
+- Progress log for the user (Portuguese): `docs/backend-progress.md`.
 - Test helpers: `packages/db/test/pglite.ts`, `packages/engine/test/fixtures.ts`, `apps/server/test/harness.ts`.
 - Frontend (`apps/web`, `packages/ui`) is a separate workstream; the server serves the built SPA from `WEB_DIR`.

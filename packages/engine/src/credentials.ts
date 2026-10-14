@@ -1,6 +1,7 @@
 import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { isKnownProvider, type ProviderId } from "@agenteschat/providers";
+import { caches } from "./cache";
 import { openSecret, sealSecret } from "./crypto";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { requirePermission } from "./organizations";
@@ -97,6 +98,7 @@ export async function revokeCredential(db: Database, actorId: string, orgId: str
     )
     .returning();
   if (!row) throw new NotFoundError("Credential not found");
+  caches.credentials.delete(`${orgId}:${credentialId}`);
 }
 
 /**
@@ -109,16 +111,20 @@ export async function decryptCredential(
   orgId: string,
   credentialId: string,
 ): Promise<{ provider: ProviderId; apiKey: string; workspaceId?: string } | null> {
-  const [row] = await db
-    .select()
-    .from(providerCredentials)
-    .where(
-      and(
-        eq(providerCredentials.id, credentialId),
-        eq(providerCredentials.orgId, orgId),
-        isNull(providerCredentials.revokedAt),
-      ),
-    );
+  // The row (ciphertext) is cached; the key is decrypted per call and never cached.
+  const row = (await caches.credentials.getOrLoad(`${orgId}:${credentialId}`, async () => {
+    const [r] = await db
+      .select()
+      .from(providerCredentials)
+      .where(
+        and(
+          eq(providerCredentials.id, credentialId),
+          eq(providerCredentials.orgId, orgId),
+          isNull(providerCredentials.revokedAt),
+        ),
+      );
+    return r ?? null;
+  })) as typeof providerCredentials.$inferSelect | null;
   if (!row) return null;
   const apiKey = await openSecret(
     keyWrappers,
@@ -163,6 +169,7 @@ export async function rotateCredential(
     )
     .returning();
   if (!row) throw new NotFoundError("Credential not found");
+  caches.credentials.delete(`${orgId}:${credentialId}`);
   return summary(row);
 }
 
@@ -192,6 +199,7 @@ export async function deleteCredential(db: Database, actorId: string, orgId: str
     .where(and(eq(providerCredentials.id, credentialId), eq(providerCredentials.orgId, orgId)))
     .returning({ id: providerCredentials.id });
   if (deleted.length === 0) throw new NotFoundError("Credential not found");
+  caches.credentials.delete(`${orgId}:${credentialId}`);
 }
 
 /** How many active agents use each credential. */

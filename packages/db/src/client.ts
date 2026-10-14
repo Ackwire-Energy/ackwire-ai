@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import * as schema from "./schema";
+import { tracingLogger } from "./trace";
 
 /**
  * Driver-agnostic database handle. Production uses postgres.js; tests use an
@@ -35,7 +36,7 @@ export function createDatabase(options: DatabaseOptions) {
     // Silence "relation already exists, skipping" notices from migrations.
     onnotice: () => {},
   });
-  const db = drizzle(client, { schema, casing: "snake_case" });
+  const db = drizzle(client, { schema, casing: "snake_case", logger: tracingLogger });
   return {
     db: db as unknown as Database,
     /** Raw postgres.js client, for LISTEN/NOTIFY (see `@agenteschat/adapters`). */

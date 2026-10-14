@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
-import { buildRunContext, dispatchMentions, type Message, postPersonMessage, toTurns } from "../src";
+import { buildRunContext, type Message, postPersonMessage, toTurns } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 const msg = (over: Partial<Message>): Message =>
@@ -42,7 +42,7 @@ test("system prompt carries org context, agent instructions and channel; history
   await post("earlier top-level message");
   const root = await post("root question");
   const trigger = await post("@dev what do you think?", root.id);
-  const { runs } = await dispatchMentions(f.db, { orgId: f.org.id, messageId: trigger.id }, { maxHops: 3 });
+  const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
   const run = runs[0];
   if (!run) throw new Error("no run");
   const ctx = await buildRunContext(f.db, run, f.agent, { maxMessages: 30 });
@@ -73,7 +73,7 @@ test("history is capped at maxMessages, keeping the most recent", async () => {
   const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
     body: "@dev go",
   });
-  const { runs } = await dispatchMentions(f.db, { orgId: f.org.id, messageId: trigger.id }, { maxHops: 3 });
+  const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
   const ctx = await buildRunContext(f.db, runs[0] as NonNullable<(typeof runs)[0]>, f.agent, { maxMessages: 3 });
   expect(ctx.messages[0]?.content).toBe("[ana]: m3\n\n[ana]: m4\n\n[ana]: @dev go");
 });

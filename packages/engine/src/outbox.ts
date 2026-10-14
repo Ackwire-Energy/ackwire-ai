@@ -1,4 +1,4 @@
-import { and, asc, type Database, type Executor, eq, lt, lte, or, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
 
 const { outbox } = schema;
 
@@ -60,36 +60,24 @@ export interface ClaimOptions {
 export async function claimJobs(db: Database, options: ClaimOptions): Promise<OutboxJob[]> {
   const now = options.now ?? new Date();
   const leaseUntil = new Date(now.getTime() + (options.leaseMs ?? DEFAULT_LEASE_MS));
-  const claimed = await db.transaction(async (tx) => {
-    const due = await tx
-      .select({ id: outbox.id })
-      .from(outbox)
-      .where(
-        or(
-          and(eq(outbox.status, "pending"), lte(outbox.nextAttemptAt, now)),
-          and(eq(outbox.status, "processing"), lt(outbox.lockedUntil, now)),
-        ),
-      )
-      .orderBy(asc(outbox.nextAttemptAt))
-      .limit(options.batchSize ?? 20)
-      .for("update", { skipLocked: true });
-    if (due.length === 0) return [];
-    return tx
-      .update(outbox)
-      .set({
-        status: "processing",
-        attempts: sql`${outbox.attempts} + 1`,
-        lockedUntil: leaseUntil,
-        lockedBy: options.workerId,
-      })
-      .where(
-        sql`${outbox.id} in (${sql.join(
-          due.map((d) => sql`${d.id}`),
-          sql`, `,
-        )})`,
-      )
-      .returning();
-  });
+  // One statement (no transaction round trips): lock due rows, skipping locked ones, and lease them.
+  const claimed = await db
+    .update(outbox)
+    .set({
+      status: "processing",
+      attempts: sql`${outbox.attempts} + 1`,
+      lockedUntil: leaseUntil,
+      lockedBy: options.workerId,
+    })
+    .where(
+      sql`${outbox.id} in (select ${outbox.id} from ${outbox}
+        where (${outbox.status} = 'pending' and ${outbox.nextAttemptAt} <= ${now.toISOString()}::timestamptz)
+           or (${outbox.status} = 'processing' and ${outbox.lockedUntil} < ${now.toISOString()}::timestamptz)
+        order by ${outbox.nextAttemptAt}
+        limit ${options.batchSize ?? 20}
+        for update skip locked)`,
+    )
+    .returning();
 
   // A job whose lease expired after its final attempt is not retried again.
   const runnable: OutboxJob[] = [];

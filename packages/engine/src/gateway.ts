@@ -1,5 +1,5 @@
 import type { KeyWrapper, PlatformCredentials, PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, gte, isNull, lt, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, gte, isNull, lt, rowsOf, schema, sql } from "@agenteschat/db";
 import {
   costNanoUsd,
   type EmbeddingProvider,
@@ -51,6 +51,8 @@ export const BUDGET_WARNING_RATIO = 0.8;
 export interface GatewayCall {
   orgId: string;
   agentId: string;
+  /** The agent row, when the caller already has it (saves a lookup). */
+  agent?: Agent;
   runId?: string;
   system: SystemPrompt;
   messages: ModelMessage[];
@@ -235,9 +237,40 @@ export function createModelGateway(deps: ModelGatewayDeps) {
    * this month, under a row lock. Returns the reservation and the output cap
    * that fits. Throws BudgetExceededError when nothing useful fits.
    */
-  async function reserve(agent: Agent, model: string, promptTokens: number, maxTokens: number) {
+  async function reserve(
+    agent: Agent,
+    model: string,
+    promptTokens: number,
+    maxTokens: number,
+  ): Promise<{
+    reservation: Pick<typeof budgetReservations.$inferSelect, "id" | "agentId" | "periodStart"> | null;
+    maxTokens: number;
+  }> {
+    // No budget: nothing to reserve; the counter is updated when the call settles.
+    if (agent.monthlyBudgetNanoUsd === null) return { reservation: null, maxTokens };
     const at = now();
     const period = periodOf(at);
+    // Fast path, one statement: the worst case fits under the budget → reserve it atomically.
+    const amount = maxCostNanoUsd(model, promptTokens, maxTokens);
+    const id = Bun.randomUUIDv7();
+    const fast = rowsOf<{ ok: number }>(
+      await db.execute(sql`with upd as (
+          update ${agentBudgetPeriods}
+          set reserved_nano_usd = reserved_nano_usd + ${amount}, updated_at = now()
+          where agent_id = ${agent.id} and period_start = ${period}::date
+            and spent_nano_usd + reserved_nano_usd + ${amount} <= ${agent.monthlyBudgetNanoUsd}
+          returning agent_id
+        ), res as (
+          insert into ${budgetReservations} (id, org_id, agent_id, period_start, amount_nano_usd, expires_at, created_at)
+          select ${id}::uuid, ${agent.orgId}::uuid, ${agent.id}::uuid, ${period}::date, ${amount},
+                 ${new Date(at.getTime() + RESERVATION_TTL_MS).toISOString()}::timestamptz, now()
+          from upd
+          returning id
+        )
+        select count(*)::int as ok from res`),
+    );
+    if (Number(fast[0]?.ok ?? 0) > 0) return { reservation: { id, agentId: agent.id, periodStart: period }, maxTokens };
+    // Slow path (first call of the month, expired reservations, or the cap must shrink): locked transaction.
     return db.transaction(async (tx) => {
       await tx
         .insert(agentBudgetPeriods)
@@ -304,7 +337,24 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   }
 
   /** Releases a reservation and adds `actual` to the spent counter, in the caller's transaction. */
-  async function settle(tx: Executor, reservation: typeof budgetReservations.$inferSelect, actual: number) {
+  async function settle(
+    tx: Executor,
+    reservation: Pick<typeof budgetReservations.$inferSelect, "id" | "agentId" | "periodStart"> | null,
+    actual: number,
+    agent?: Agent,
+  ) {
+    if (!reservation) {
+      if (!agent) return actual;
+      const [row] = await tx
+        .insert(agentBudgetPeriods)
+        .values({ orgId: agent.orgId, agentId: agent.id, periodStart: periodOf(now()), spentNanoUsd: actual })
+        .onConflictDoUpdate({
+          target: [agentBudgetPeriods.agentId, agentBudgetPeriods.periodStart],
+          set: { spentNanoUsd: sql`${agentBudgetPeriods.spentNanoUsd} + ${actual}`, updatedAt: now() },
+        })
+        .returning({ spent: agentBudgetPeriods.spentNanoUsd });
+      return row?.spent ?? actual;
+    }
     const [released] = await tx
       .delete(budgetReservations)
       .where(eq(budgetReservations.id, reservation.id))
@@ -326,6 +376,50 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     return updated[0]?.spent ?? actual;
   }
 
+  /**
+   * After a successful agent call, one statement: the usage record, the
+   * reservation released and the spend counter updated (no transaction
+   * round trips; a remote database costs one round trip here).
+   */
+  async function settleCall(input: {
+    agent: Agent;
+    reservation: Pick<typeof budgetReservations.$inferSelect, "id" | "agentId" | "periodStart"> | null;
+    runId?: string;
+    credentialId: string | null;
+    provider: string;
+    model: string;
+    usage: ModelUsage;
+  }) {
+    const { agent, usage } = input;
+    const pricedModel = isKnownModel(input.model) ? input.model : agent.model;
+    const cost = costNanoUsd(pricedModel, usage);
+    const id = Bun.randomUUIDv7();
+    const period = input.reservation?.periodStart ?? periodOf(now());
+    const at = now().toISOString();
+    const rows = rowsOf<{ spent: string | number }>(
+      await db.execute(sql`with d as (
+          delete from ${budgetReservations} where id = ${input.reservation?.id ?? null}::uuid returning amount_nano_usd
+        ), u as (
+          insert into ${usageRecords} (id, org_id, agent_id, kind, run_id, credential_id, provider, model, requested_model,
+            input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_nano_usd, partial, created_at)
+          values (${id}::uuid, ${agent.orgId}::uuid, ${agent.id}::uuid, 'agent', ${input.runId ?? null}::uuid,
+            ${input.credentialId}::uuid, ${input.provider}, ${input.model}, ${agent.model}, ${usage.inputTokens},
+            ${usage.outputTokens}, ${usage.cacheReadTokens}, ${usage.cacheWriteTokens}, ${cost}, false, ${at}::timestamptz)
+          returning id
+        ), p as (
+          insert into ${agentBudgetPeriods} (org_id, agent_id, period_start, spent_nano_usd, reserved_nano_usd, updated_at)
+          values (${agent.orgId}::uuid, ${agent.id}::uuid, ${period}::date, ${cost}, 0, now())
+          on conflict (agent_id, period_start) do update set
+            spent_nano_usd = ${agentBudgetPeriods}.spent_nano_usd + excluded.spent_nano_usd,
+            reserved_nano_usd = greatest(0, ${agentBudgetPeriods}.reserved_nano_usd - coalesce((select amount_nano_usd from d), 0)),
+            updated_at = now()
+          returning spent_nano_usd
+        )
+        select (select spent_nano_usd from p) as spent, (select count(*) from u) as inserted`),
+    );
+    return { record: { id, cost }, spent: Number(rows[0]?.spent ?? cost) };
+  }
+
   /** Tells the agent's owner when spend crosses 80% and 100% of the budget (once each per month). */
   async function checkThresholds(agent: Agent, spent: number, actual: number) {
     const budget = agent.monthlyBudgetNanoUsd;
@@ -345,7 +439,10 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   return {
     /** An agent's model call (runs). Streams deltas through `onDelta`. */
     async stream(call: GatewayCall): Promise<GatewayResult> {
-      const agent = await getAgent(db, call.orgId, call.agentId);
+      const agent =
+        call.agent && call.agent.id === call.agentId && call.agent.orgId === call.orgId
+          ? call.agent
+          : await getAgent(db, call.orgId, call.agentId);
       if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
       const info = MODEL_CATALOG[agent.model];
       if (!info) throw new ValidationError(`Model ${agent.model} is not in the catalog`);
@@ -391,25 +488,19 @@ export function createModelGateway(deps: ModelGatewayDeps) {
             });
             actual = record.cost;
           }
-          await settle(tx, reservation, actual);
+          await settle(tx, reservation, actual, agent);
         });
         throw error;
       }
 
-      const { record, spent } = await db.transaction(async (tx) => {
-        const r = await recordUsage(tx, {
-          orgId: call.orgId,
-          agentId: agent.id,
-          kind: "agent",
-          runId: call.runId,
-          credentialId: key.credentialId,
-          provider: info.provider,
-          model: result.model,
-          requestedModel: agent.model,
-          usage: result.usage,
-          partial: false,
-        });
-        return { record: r, spent: await settle(tx, reservation, r.cost) };
+      const { record, spent } = await settleCall({
+        agent,
+        reservation,
+        runId: call.runId,
+        credentialId: key.credentialId,
+        provider: info.provider,
+        model: result.model,
+        usage: result.usage,
       });
       await checkThresholds(agent, spent, record.cost);
       return { ...result, usageRecordId: record.id, costNanoUsd: record.cost, maxTokens };

@@ -1,4 +1,5 @@
 import { and, asc, type Database, type Executor, eq, isNull, schema } from "@agenteschat/db";
+import { caches } from "../cache";
 import { NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
 
@@ -34,6 +35,12 @@ export const grantKey = (connectionId: string | null | undefined, scope: string)
 
 /** The agent's grants, read from the database (never from a prompt). */
 export async function grantedScopeKeys(db: Executor, orgId: string, agentId: string): Promise<Set<string>> {
+  return caches.scopes.getOrLoad(`${orgId}:${agentId}`, () => loadScopeKeys(db, orgId, agentId)) as Promise<
+    Set<string>
+  >;
+}
+
+async function loadScopeKeys(db: Executor, orgId: string, agentId: string): Promise<Set<string>> {
   const rows = await db
     .select({ connectionId: agentScopes.connectionId, scope: agentScopes.scope })
     .from(agentScopes)
@@ -102,6 +109,7 @@ export async function setAgentScopes(
       (await builtinOnly(db, orgId, grant)) ?? (grant.connectionId ? await validate(db, orgId, grant) : null);
     if (problem) throw new ValidationError(problem);
   }
+  caches.scopes.delete(`${orgId}:${agentId}`);
   await db.transaction(async (tx) => {
     await tx.delete(agentScopes).where(and(eq(agentScopes.orgId, orgId), eq(agentScopes.agentId, agentId)));
     const unique = new Map(grants.map((g) => [grantKey(g.connectionId, g.scope), g]));
@@ -117,11 +125,13 @@ export async function setAgentScopes(
       );
     }
   });
+  caches.scopes.delete(`${orgId}:${agentId}`);
 }
 
 /** Adds grants without permission checks: for internal setup (new agents, tests). */
 export async function grantScopes(db: Executor, orgId: string, agentId: string, grants: ScopeGrant[]) {
   if (grants.length === 0) return;
+  caches.scopes.delete(`${orgId}:${agentId}`);
   await db
     .insert(agentScopes)
     .values(grants.map((g) => ({ orgId, agentId, connectionId: g.connectionId, scope: g.scope })))

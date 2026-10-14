@@ -7,6 +7,7 @@ import { migrate as migratePostgres } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { type Database, migrationsFolder } from "../src/client";
 import * as schema from "../src/schema";
+import { tracingLogger } from "../src/trace";
 
 /**
  * Fresh database with all migrations applied, for tests.
@@ -22,7 +23,7 @@ export async function createTestDatabase(): Promise<{ db: Database; close: () =>
   if (serverUrl) return createOnServer(serverUrl);
 
   const client = new PGlite({ extensions: { vector }, loadDataDir: await migratedTemplate() });
-  const db = drizzlePglite(client, { schema, casing: "snake_case" });
+  const db = drizzlePglite(client, { schema, casing: "snake_case", logger: tracingLogger });
   return { db: db as unknown as Database, close: () => client.close(), pglite: client };
 }
 
@@ -51,7 +52,7 @@ async function createOnServer(serverUrl: string) {
   const url = new URL(serverUrl);
   url.pathname = `/${name}`;
   const client = postgres(url.toString(), { max: 5, onnotice: () => {} });
-  const db = drizzlePostgres(client, { schema, casing: "snake_case" });
+  const db = drizzlePostgres(client, { schema, casing: "snake_case", logger: tracingLogger });
   await migratePostgres(db, { migrationsFolder });
 
   return {

@@ -31,7 +31,7 @@ test("emails go through the outbox: invitation (create, batch, resend) and passw
   };
   await owner(`/api/app/organizations/${orgId}/invitations/${all.invitations[0]?.id}/resend`, { json: {} });
   await t.drain();
-  expect(t.email.sent.map((m) => m.to[0])).toEqual(["ana@example.com", "bia@example.com", "ana@example.com"]);
+  expect(t.email.sent.map((m) => m.to[0]).sort()).toEqual(["ana@example.com", "ana@example.com", "bia@example.com"]);
   expect(new Set(t.email.sent.map((m) => m.idempotencyKey)).size).toBe(3);
 
   const reset = await browser(t)("/api/auth/request-password-reset", {

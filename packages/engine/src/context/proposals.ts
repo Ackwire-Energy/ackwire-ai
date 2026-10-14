@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, inArray, schema } from "@agenteschat/db";
 import { getAgent } from "../agents";
+import { caches } from "../cache";
 import { sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError } from "../errors";
 import { publishUserEvent } from "../events";
@@ -226,6 +227,8 @@ export async function decideProposal(
     if (!row) throw new Error("proposal update returned nothing");
     return row;
   });
+  if (decided.agentId) caches.agents.delete(`${orgId}:${decided.agentId}`);
+  caches.orgs.delete(`${orgId}:`);
   if (decided.status === "stale")
     throw new ConflictError("The text changed since this was proposed; it can't be applied");
   return decided;

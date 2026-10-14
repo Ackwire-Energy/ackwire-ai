@@ -32,9 +32,10 @@ describe("send path", () => {
       clientId: "tmp-123",
     });
     expect(view.clientId).toBe("tmp-123");
-    expect(events.map((e) => e.type)).toEqual(["message.created", "agent.thinking"]);
+    expect(events.map((e) => e.type)).toEqual(["message.created", "message.routed", "agent.thinking"]);
     expect(events[0]).toMatchObject({ message: { clientId: "tmp-123" } });
-    expect(events[1]).toMatchObject({ agentId: f.agent.id, runId: null });
+    const [run] = await f.db.select().from(schema.agentRuns);
+    expect(events[2]).toMatchObject({ agentId: f.agent.id, runId: run?.id });
   });
 
   test("timings are reported (trigger → claim, claim → first delta, run)", async () => {
@@ -122,7 +123,7 @@ describe("DMs", () => {
     const m = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dm.id, {
       body: "what's up?",
     });
-    expect(events.map((e) => e.type)).toEqual(["message.created", "agent.thinking"]);
+    expect(events.map((e) => e.type)).toEqual(["message.created", "message.routed", "agent.thinking"]);
     await drainOutbox(f.db, f.handlers);
     const [run] = await f.db.select().from(schema.agentRuns);
     expect(run).toMatchObject({ trigger: "dm", status: "done", channelId: dm.id });

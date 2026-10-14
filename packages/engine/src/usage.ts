@@ -47,3 +47,19 @@ export async function usageSummary(db: Database, actorId: string, orgId: string,
     costNanoUsd: Number(r.costNanoUsd),
   }));
 }
+
+/**
+ * Recomputes an agent's spend counter for this month from its usage records
+ * (when a budget is set or changed, so earlier spend counts). Open
+ * reservations are kept.
+ */
+export async function resyncBudgetCounter(db: Database, orgId: string, agentId: string, now = new Date()) {
+  const spent = await agentSpendThisMonth(db, orgId, agentId, now);
+  await db
+    .insert(schema.agentBudgetPeriods)
+    .values({ orgId, agentId, periodStart: monthStartUtc(now).toISOString().slice(0, 10), spentNanoUsd: spent })
+    .onConflictDoUpdate({
+      target: [schema.agentBudgetPeriods.agentId, schema.agentBudgetPeriods.periodStart],
+      set: { spentNanoUsd: spent, updatedAt: now },
+    });
+}

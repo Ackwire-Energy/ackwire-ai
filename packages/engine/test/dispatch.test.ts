@@ -20,15 +20,26 @@ describe("dispatchMentions", () => {
 
   const post = (body: string) =>
     postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body });
+  const qa = () =>
+    createAgent(f.db, f.owner.id, f.org.id, { name: "QA", handle: "qa" }, { model: "claude-sonnet-5-5" });
 
-  test("message and outbox event commit together; only mentioned channel members are resolved", async () => {
+  test("one statement: message, its jobs and the mentioned member's run; non-members are not resolved", async () => {
     await createAgent(f.db, f.owner.id, f.org.id, { name: "QA", handle: "qa" }, { model: "claude-sonnet-5-5" }); // not in #general
     const message = await post("@dev and @qa please look");
     expect(message.mentionedAgentIds).toEqual([f.agent.id]);
+    const [run] = await f.db.select().from(schema.agentRuns);
+    expect(run).toMatchObject({
+      agentId: f.agent.id,
+      trigger: "mention",
+      hop: 1,
+      threadRootId: message.id,
+      status: "queued",
+    });
     const jobs = await f.db.select().from(schema.outbox);
-    expect(jobs.map((j) => [j.kind, j.payload])).toEqual([
-      ["search.index", { kind: "message", sourceId: message.id }],
+    expect(jobs.map((j) => [j.kind, j.payload]).sort()).toEqual([
+      ["agent_run.execute", { runId: run?.id }],
       ["message.posted", { messageId: message.id }],
+      ["search.index", { kind: "message", sourceId: message.id }],
     ]);
   });
 
@@ -49,11 +60,21 @@ describe("dispatchMentions", () => {
   });
 
   test("creates one run per agent and is idempotent", async () => {
-    const message = await post("@dev hi");
+    const root = await post("start");
+    const other = await qa();
+    const message = await f.db.transaction((tx) =>
+      insertMessage(tx, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        threadId: root.id,
+        author: { type: "agent", agentId: other.id, runId: crypto.randomUUID(), hop: 1 },
+        body: "@dev your turn",
+      }),
+    );
     const first = await dispatchMentions(f.db, { orgId: f.org.id, messageId: message.id }, { maxHops: 3 });
     const again = await dispatchMentions(f.db, { orgId: f.org.id, messageId: message.id }, { maxHops: 3 });
     expect(first.runs.map((r) => [r.agentId, r.hop, r.threadRootId, r.status])).toEqual([
-      [f.agent.id, 1, message.id, "queued"],
+      [f.agent.id, 2, root.id, "queued"],
     ]);
     expect(again.runs).toEqual([]);
     expect(await f.db.select().from(schema.agentRuns)).toHaveLength(1);
@@ -105,7 +126,17 @@ describe("dispatchMentions", () => {
   });
 
   test("archived agents are skipped at dispatch time", async () => {
-    const message = await post("@dev hi");
+    const root = await post("start");
+    const other = await qa();
+    const message = await f.db.transaction((tx) =>
+      insertMessage(tx, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        threadId: root.id,
+        author: { type: "agent", agentId: other.id, runId: crypto.randomUUID(), hop: 1 },
+        body: "@dev hi",
+      }),
+    );
     await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, f.agent.id));
     expect((await dispatchMentions(f.db, { orgId: f.org.id, messageId: message.id }, { maxHops: 3 })).runs).toEqual([]);
   });

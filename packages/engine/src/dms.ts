@@ -1,4 +1,5 @@
 import { and, type Database, desc, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { getMembership, requirePermission } from "./organizations";
@@ -68,6 +69,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
       );
     return channel;
   });
+  if ("agentId" in target) caches.scopes.delete(`${orgId}:${target.agentId}:visible`);
   const channel = created ?? (await existing()); // a concurrent open won the race
   if (!channel) throw new Error("could not open the conversation");
   return channel;

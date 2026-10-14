@@ -1,5 +1,6 @@
 export * from "./agents";
 export * from "./approvals";
+export * from "./cache";
 export * from "./channels";
 export * from "./connectors/catalog";
 export * from "./connectors/connections";
@@ -27,6 +28,7 @@ export * from "./management";
 export * from "./messages";
 export * from "./organizations";
 export * from "./outbox";
+export * from "./profile";
 export * from "./router";
 export * from "./runs";
 export * from "./search";

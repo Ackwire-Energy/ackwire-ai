@@ -108,3 +108,30 @@ test("memory rate limiter uses fixed windows", async () => {
   t = 1000;
   expect((await rl.consume("k", rule)).remaining).toBe(1);
 });
+
+test("postgres pub/sub: publish doesn't wait for the database; a tick's events go out in one statement, in order", async () => {
+  const { createPostgresPubSub } = await import("../src");
+  let listener: ((p: string) => void) | null = null;
+  const statements: string[][] = [];
+  const pubsub = await createPostgresPubSub({
+    listen: async (_c, on) => {
+      listener = on;
+      return async () => {};
+    },
+    notify: async (_c, p) => {
+      statements.push([p]);
+      listener?.(p);
+    },
+    notifyMany: async (_c, ps) => {
+      statements.push(ps);
+      for (const p of ps) listener?.(p);
+    },
+  });
+  const got: unknown[] = [];
+  pubsub.subscribe("t", (e) => got.push(e.n));
+  for (const n of [1, 2, 3]) await pubsub.publish("t", { type: "x", n });
+  expect(statements).toEqual([]); // nothing sent yet: publishing never waited
+  await pubsub.close?.();
+  expect(statements).toHaveLength(1);
+  expect(got).toEqual([1, 2, 3]);
+});

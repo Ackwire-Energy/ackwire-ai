@@ -71,7 +71,39 @@ test("concurrent calls reserve the worst case atomically and can't overshoot the
     budgetNanoUsd: worst * 2,
     reply: () => ({ chunks: ["x"], usage: { inputTokens: 2, outputTokens: 1 } }),
   });
-  const calls = await Promise.allSettled([1, 2, 3, 4, 5].map(() => call(f, [], 300)));
+  // Hold every model call open until all five tried to reserve: reservations overlap for real.
+  let release: () => void = () => {};
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  const held = createModelGateway({
+    db: f.db,
+    keyWrappers: [f.keyWrapper],
+    platformCredentials: noPlatformCredentials,
+    providers: {
+      anthropic: {
+        id: "anthropic",
+        stream: async (req, opts) => {
+          await gate;
+          return f.provider.stream(req, opts);
+        },
+      },
+    },
+  });
+  const attempts = [1, 2, 3, 4, 5].map(() =>
+    held.stream({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      system: "sys",
+      messages: [{ role: "user", content: "hello" }],
+      maxTokens: 300,
+      onDelta: () => {},
+    }),
+  );
+  const settled = Promise.allSettled(attempts);
+  await Bun.sleep(100);
+  release();
+  const calls = await settled;
   expect(calls.filter((c) => c.status === "fulfilled")).toHaveLength(2);
   for (const c of calls.filter((c) => c.status === "rejected")) {
     expect((c as PromiseRejectedResult).reason).toBeInstanceOf(BudgetExceededError);

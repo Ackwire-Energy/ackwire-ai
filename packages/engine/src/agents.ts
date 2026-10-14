@@ -1,8 +1,10 @@
 import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
+import { caches } from "./cache";
 import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { getMembership, requirePermission } from "./organizations";
 import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
+import { resyncBudgetCounter } from "./usage";
 
 const { agents, providerCredentials } = schema;
 
@@ -72,6 +74,8 @@ export async function createAgent(
       agent.id,
       DEFAULT_AGENT_SCOPES.map((scope) => ({ connectionId: null, scope })),
     );
+    // The month's counter exists from the start, so the first call reserves in one statement.
+    if (agent.monthlyBudgetNanoUsd !== null) await resyncBudgetCounter(db, orgId, agent.id);
     return agent;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`@${values.handle} is already taken`);
@@ -94,6 +98,8 @@ export async function updateAgent(
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
     .returning();
   if (!agent) throw new NotFoundError("Agent not found");
+  caches.agents.delete(`${orgId}:${agentId}`);
+  if (input.monthlyBudgetNanoUsd !== undefined) await resyncBudgetCounter(db, orgId, agentId);
   return agent;
 }
 
@@ -103,6 +109,7 @@ export async function archiveAgent(db: Database, actorId: string, orgId: string,
     .update(agents)
     .set({ archivedAt: new Date() })
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+  caches.agents.delete(`${orgId}:${agentId}`);
 }
 
 export async function listAgents(db: Database, actorId: string, orgId: string): Promise<Agent[]> {
@@ -135,3 +142,8 @@ export const agentView = (a: Agent) => ({
   monthlyBudgetNanoUsd: a.monthlyBudgetNanoUsd,
   createdAt: a.createdAt,
 });
+
+/** `getAgent` through the per-process cache (run path). */
+export function getAgentCached(db: Database, orgId: string, agentId: string): Promise<Agent | null> {
+  return caches.agents.getOrLoad(`${orgId}:${agentId}`, () => getAgent(db, orgId, agentId)) as Promise<Agent | null>;
+}

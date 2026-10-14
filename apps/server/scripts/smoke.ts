@@ -29,6 +29,7 @@ import {
   createLocalKeyWrapper,
   createOrganization,
   drainOutbox,
+  enableCaches,
   postPersonMessage,
 } from "@agenteschat/engine";
 import { createAnthropicProvider } from "@agenteschat/providers";
@@ -68,7 +69,12 @@ try {
       anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
     }),
   };
+  enableCaches();
+  let profile: unknown = null;
   const engine = buildEngine({
+    onRunProfile: (p) => {
+      profile = p;
+    },
     db,
     config: { ...config, ROUTER_ENABLED: false },
     adapters,
@@ -108,12 +114,21 @@ try {
   step(`using ${credential ? "the org's own key" : "the platform key"}${orgWorkspace ? " with a workspace id" : ""}`);
 
   let streamed = "";
+  let firstDeltaAt = 0;
+  const seen = new Map<string, number>();
+  const postedAt = { t: 0 };
   pubsub.subscribe(channelTopic(general.id), (e: { type: string; text?: unknown }) => {
+    seen.set(e.type, (seen.get(e.type) ?? 0) + 1);
+    if (e.type === "agent.thinking" && !seen.has("thinking@")) {
+      seen.set("thinking@", Date.now() - postedAt.t);
+    }
     if (e.type === "agent.delta") {
+      if (!firstDeltaAt) firstDeltaAt = Date.now();
       streamed += String(e.text);
       process.stdout.write(String(e.text));
     }
   });
+  postedAt.t = Date.now();
   await postPersonMessage({ db, pubsub }, userId, orgId, general.id, { body: "@smoke say hello to the team" });
 
   step("running workers (real model call)");
@@ -134,7 +149,20 @@ try {
     .where(eq(schema.messages.id, run.replyMessageId ?? ""));
   const usage = await db.select().from(schema.usageRecords).where(eq(schema.usageRecords.orgId, orgId));
   step("reply saved");
-  console.log(JSON.stringify({ reply: reply?.body, streamedChars: streamed.length }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        reply: reply?.body,
+        streamedChars: streamed.length,
+        postToThinkingMs: seen.get("thinking@") ?? null,
+        postToFirstDeltaMs: firstDeltaAt ? firstDeltaAt - postedAt.t : null,
+        events: Object.fromEntries([...seen].filter(([k]) => !k.endsWith("@"))),
+      },
+      null,
+      2,
+    ),
+  );
+  console.log("run profile:", JSON.stringify(profile, null, 2));
   console.log(
     JSON.stringify(
       usage.map((u) => ({

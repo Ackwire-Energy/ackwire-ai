@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, gt, isNull, schema, sql } from "@agenteschat/db";
+import { caches } from "./cache";
 import { randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError } from "./errors";
 import { publishOrgEvent } from "./events";
@@ -103,6 +104,7 @@ export async function updateOrganization(
 ) {
   await requirePermission(db, actorId, orgId, "configure");
   const [row] = await db.update(organizations).set(input).where(eq(organizations.id, orgId)).returning();
+  caches.orgs.delete(`${orgId}:`);
   return row;
 }
 

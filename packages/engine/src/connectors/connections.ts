@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
+import { caches } from "../cache";
 import { openSecret, randomToken, sealSecret, sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
@@ -123,6 +124,8 @@ async function storeConnection(
     if (previous) {
       await tx.update(agentScopes).set({ connectionId: row.id }).where(eq(agentScopes.connectionId, previous.id));
     }
+    caches.connections.delete(`${input.orgId}:active`);
+    caches.scopes.deletePrefix(`${input.orgId}:`);
     return row;
   });
 }
@@ -177,9 +180,17 @@ export async function revokeConnection(db: Database, actorId: string, orgId: str
     if (!row) throw new NotFoundError("Connection not found");
     await tx.delete(agentScopes).where(eq(agentScopes.connectionId, connectionId));
   });
+  caches.connections.delete(`${orgId}:active`);
+  caches.scopes.deletePrefix(`${orgId}:`);
 }
 
 export async function activeConnections(db: Database, orgId: string) {
+  return caches.connections.getOrLoad(`${orgId}:active`, () => loadActiveConnections(db, orgId)) as Promise<
+    ConnectorConnection[]
+  >;
+}
+
+async function loadActiveConnections(db: Database, orgId: string) {
   return db
     .select()
     .from(connectorConnections)
@@ -371,6 +382,7 @@ export async function connectionHeaders(deps: ConnectorDeps, c: ConnectorConnect
           updatedAt: at,
         })
         .where(eq(connectorConnections.id, c.id));
+      caches.connections.delete(`${c.orgId}:active`);
       return { authorization: `Bearer ${next.accessToken}` };
     }
   }

@@ -11,6 +11,7 @@ import {
   type McpConnect,
   notifyOwnerOnBudget,
   queueBudgetEmail,
+  type RunExecutorDeps,
   type ToolSource,
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
@@ -28,6 +29,8 @@ export interface EngineOptions {
   deltaFlushMs?: number;
   /** Latency measurements from runs (logged by the server). */
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
+  /** Per-run stage breakdown (debug log). */
+  onRunProfile?: RunExecutorDeps["onRunProfile"];
 }
 
 /**
@@ -91,6 +94,7 @@ export function buildEngine(o: EngineOptions) {
     maxHops: config.AGENT_MAX_HOPS,
     deltaFlushMs: o.deltaFlushMs,
     onTiming: o.onTiming,
+    onRunProfile: o.onRunProfile,
     router: { enabled: config.ROUTER_ENABLED, model: config.ROUTER_MODEL, minScore: config.ROUTER_MIN_SCORE },
   });
   return { gateway, tools, context, handlers, connectorDeps };

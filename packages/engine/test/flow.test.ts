@@ -19,9 +19,11 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
 
   // 1. A person posts a message mentioning the agent. Message and outbox event are one transaction.
   const question = await post(f, "@dev can you look at the failing build?");
-  expect((await f.db.select().from(schema.outbox)).map((j) => [j.kind, j.status])).toEqual([
-    ["search.index", "pending"],
+  // …and, in the same statement, the mentioned agent's run and its job.
+  expect((await f.db.select().from(schema.outbox)).map((j) => [j.kind, j.status]).sort()).toEqual([
+    ["agent_run.execute", "pending"],
     ["message.posted", "pending"],
+    ["search.index", "pending"],
   ]);
 
   // 2–7. Workers claim the event, create the run, build context, call the gateway, stream, persist.
@@ -47,8 +49,7 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
   // then the claim, typing on the first delta, the stream, the reply, and the finish + receipt.
   expect(events.map((e) => e.type)).toEqual([
     "message.created",
-    "agent.thinking", // at post time (runId null)
-    "message.routed",
+    "message.routed", // at post time: the run was created with the message
     "agent.thinking", // run created
     "agent.thinking", // run claimed
     "message.claimed",
@@ -63,14 +64,13 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
     "run.finished",
     "message.handled",
   ]);
-  expect(events[1]).toMatchObject({ agentId: f.agent.id, runId: null, threadId: question.id });
-  expect(events[2]).toMatchObject({
+  expect(events[1]).toMatchObject({
     messageId: question.id,
     seenBy: [f.agent.id],
     pickedBy: [f.agent.id],
     strategy: "mention",
   });
-  expect(events[3]).toMatchObject({ runId: run?.id });
+  expect(events[2]).toMatchObject({ agentId: f.agent.id, runId: run?.id, threadId: question.id });
   expect(events.at(-1)).toMatchObject({ type: "message.handled", messageId: question.id, status: "done" });
   const deltas = events.filter((e) => e.type === "agent.delta");
   expect(deltas.map((e) => e.text).join("")).toBe("Sure, I'll check the build.");

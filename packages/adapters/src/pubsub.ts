@@ -68,6 +68,8 @@ export function createMemoryPubSub(): PubSub {
 export interface PgNotifier {
   listen(channel: string, onPayload: (payload: string) => void): Promise<() => Promise<void>>;
   notify(channel: string, payload: string): Promise<void>;
+  /** Several notifications in one statement (one round trip), in order. Optional. */
+  notifyMany?(channel: string, payloads: string[]): Promise<void>;
 }
 
 /** Postgres rejects NOTIFY payloads of 8000 bytes or more. */
@@ -97,15 +99,41 @@ export async function createPostgresPubSub(notifier: PgNotifier): Promise<PubSub
       // Ignore malformed payloads from other software on the same channel.
     }
   });
+  // Publishing doesn't wait for the database: events queue in order and go out
+  // together in one statement per tick (a remote database costs one round trip
+  // per batch, not per event). Delivery stays best effort, as before.
+  let queue: string[] = [];
+  let flushing: Promise<void> = Promise.resolve();
+  let scheduled = false;
+  const flush = () => {
+    scheduled = false;
+    const batch = queue;
+    queue = [];
+    if (batch.length === 0) return;
+    flushing = flushing
+      .then(async () => {
+        if (notifier.notifyMany && batch.length > 1) await notifier.notifyMany(PG_CHANNEL, batch);
+        else for (const payload of batch) await notifier.notify(PG_CHANNEL, payload);
+      })
+      .catch(() => {});
+  };
   return {
     async publish(topic, event) {
       const payload = JSON.stringify({ t: topic, e: event });
       const bytes = Buffer.byteLength(payload);
       if (bytes > MAX_NOTIFY_BYTES) throw new PayloadTooLargeError(bytes);
-      await notifier.notify(PG_CHANNEL, payload);
+      queue.push(payload);
+      if (!scheduled) {
+        scheduled = true;
+        setTimeout(flush, 0); // after awaited publishes of this tick have queued too
+      }
     },
     subscribe: (topic, handler) => registry.add(topic, handler),
-    close: () => unlisten(),
+    close: async () => {
+      flush();
+      await flushing;
+      await unlisten();
+    },
   };
 }
 
@@ -113,6 +141,7 @@ export async function createPostgresPubSub(notifier: PgNotifier): Promise<PubSub
 export function postgresJsNotifier(client: {
   listen(channel: string, fn: (payload: string) => void): Promise<{ unlisten(): Promise<void> }>;
   notify(channel: string, payload: string): Promise<unknown>;
+  unsafe?(query: string, params: string[]): Promise<unknown>;
 }): PgNotifier {
   return {
     async listen(channel, onPayload) {
@@ -121,6 +150,14 @@ export function postgresJsNotifier(client: {
     },
     async notify(channel, payload) {
       await client.notify(channel, payload);
+    },
+    async notifyMany(channel, payloads) {
+      if (!client.unsafe) {
+        for (const p of payloads) await client.notify(channel, p);
+        return;
+      }
+      const calls = payloads.map((_, i) => `pg_notify($1, $${i + 2})`).join(", ");
+      await client.unsafe(`select ${calls}`, [channel, ...payloads]);
     },
   };
 }

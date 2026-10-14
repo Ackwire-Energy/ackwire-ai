@@ -1,6 +1,7 @@
 import { and, asc, type Database, desc, eq, gte, inArray, isNull, lt, schema, sql } from "@agenteschat/db";
 import { isKnownModel } from "@agenteschat/providers";
 import { getAgent } from "./agents";
+import { caches } from "./cache";
 import { CHANNEL_NAME_PATTERN } from "./channels";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { agentBudgetState } from "./gateway";
@@ -108,6 +109,7 @@ export async function updateOrgSettings(
         .onConflictDoUpdate({ target: organizationSettings.orgId, set: { ...settings, updatedAt: new Date() } });
     }
   });
+  caches.orgs.delete(`${orgId}:`);
   return getOrgSettings(db, actorId, orgId);
 }
 
@@ -233,6 +235,8 @@ export async function setAgentChannels(
         .onConflictDoNothing();
     }
   });
+  caches.channelMembers.deletePrefix(`${orgId}:`);
+  caches.scopes.delete(`${orgId}:${agentId}:visible`);
   return listAgentChannels(db, orgId, agentId);
 }
 
@@ -272,6 +276,7 @@ export async function updateChannel(
       .where(eq(channels.id, channelId))
       .returning();
     if (!row) throw new NotFoundError("Channel not found");
+    caches.channels.delete(`${orgId}:${channelId}`);
     return row;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`#${name} already exists`);

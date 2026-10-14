@@ -1,6 +1,7 @@
-import { and, asc, type Database, desc, eq, inArray, isNull, lte, ne, schema } from "@agenteschat/db";
+import { and, asc, type Database, desc, eq, inArray, isNull, lte, ne, schema, sql } from "@agenteschat/db";
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
+import { caches } from "./cache";
 import type { Message } from "./messages";
 import type { AgentRun } from "./runs";
 
@@ -24,46 +25,57 @@ export async function buildRunContext(
   db: Database,
   run: AgentRun,
   agent: Agent,
-  options: { maxMessages: number; toolsAvailable?: boolean },
+  options: { maxMessages: number; toolsAvailable?: boolean; trigger?: Message },
 ): Promise<RunContext> {
-  // Independent lookups go out together (the database may be remote).
+  // Independent lookups go out together (the database may be remote); org,
+  // channel and members come from the per-process cache when enabled.
   const scope = and(eq(messages.orgId, run.orgId), eq(messages.channelId, run.channelId), isNull(messages.deletedAt));
-  const [[org], [channel], [trigger], [root]] = await Promise.all([
-    db.select().from(organizations).where(eq(organizations.id, run.orgId)),
-    db
-      .select()
-      .from(channels)
-      .where(and(eq(channels.id, run.channelId), eq(channels.orgId, run.orgId))),
-    db
-      .select()
-      .from(messages)
-      .where(and(eq(messages.id, run.triggerMessageId), eq(messages.orgId, run.orgId))),
-    db
-      .select()
-      .from(messages)
-      .where(and(scope, eq(messages.id, run.threadRootId))),
+  const [org, channel, triggerRows] = await Promise.all([
+    getOrgCached(db, run.orgId),
+    getChannelCached(db, run.orgId, run.channelId),
+    options.trigger
+      ? Promise.resolve([options.trigger])
+      : db
+          .select()
+          .from(messages)
+          .where(and(eq(messages.id, run.triggerMessageId), eq(messages.orgId, run.orgId))),
   ]);
+  const trigger = triggerRows[0];
   if (!org || !channel || !trigger) throw new Error("run context is incomplete (org, channel or trigger missing)");
 
   const upToTrigger = lte(messages.createdAt, trigger.createdAt);
-  const [thread, before] = await Promise.all([
+  const rootIsTrigger = run.threadRootId === trigger.id;
+  const rootTime = rootIsTrigger
+    ? sql`${trigger.createdAt.toISOString()}::timestamptz`
+    : sql`(select ${messages.createdAt} from ${messages} where ${messages.id} = ${run.threadRootId} and ${messages.orgId} = ${run.orgId})`;
+  const [rootRows, thread, before] = await Promise.all([
+    rootIsTrigger
+      ? Promise.resolve([trigger])
+      : db
+          .select()
+          .from(messages)
+          .where(and(scope, eq(messages.id, run.threadRootId))),
     db
       .select()
       .from(messages)
       .where(and(scope, eq(messages.threadId, run.threadRootId), upToTrigger))
       .orderBy(desc(messages.createdAt), desc(messages.id))
       .limit(options.maxMessages),
-    root
-      ? db
-          .select()
-          .from(messages)
-          .where(
-            and(scope, isNull(messages.threadId), lte(messages.createdAt, root.createdAt), ne(messages.id, root.id)),
-          )
-          .orderBy(desc(messages.createdAt), desc(messages.id))
-          .limit(Math.max(1, options.maxMessages - 1))
-      : Promise.resolve([] as Message[]),
+    db
+      .select()
+      .from(messages)
+      .where(
+        and(
+          scope,
+          isNull(messages.threadId),
+          sql`${messages.createdAt} <= ${rootTime}`,
+          ne(messages.id, run.threadRootId),
+        ),
+      )
+      .orderBy(desc(messages.createdAt), desc(messages.id))
+      .limit(Math.max(1, options.maxMessages - 1)),
   ]);
+  const root = rootRows[0];
   // The thread comes first; earlier channel messages fill what's left.
   before.splice(Math.max(0, options.maxMessages - thread.length - 1));
   const history: Message[] = [...before.reverse(), ...(root ? [root] : []), ...thread.reverse()];
@@ -71,13 +83,15 @@ export async function buildRunContext(
 
   const [names, members] = await Promise.all([
     authorNames(db, history),
-    db
-      .select({ userName: users.name, agentName: agents.name, agentHandle: agents.handle })
-      .from(channelMembers)
-      .leftJoin(users, eq(users.id, channelMembers.userId))
-      .leftJoin(agents, eq(agents.id, channelMembers.agentId))
-      .where(eq(channelMembers.channelId, run.channelId))
-      .orderBy(asc(channelMembers.createdAt)),
+    caches.channelMembers.getOrLoad(`${run.orgId}:${run.channelId}`, () =>
+      db
+        .select({ userName: users.name, agentName: agents.name, agentHandle: agents.handle })
+        .from(channelMembers)
+        .leftJoin(users, eq(users.id, channelMembers.userId))
+        .leftJoin(agents, eq(agents.id, channelMembers.agentId))
+        .where(eq(channelMembers.channelId, run.channelId))
+        .orderBy(asc(channelMembers.createdAt)),
+    ) as Promise<{ userName: string | null; agentName: string | null; agentHandle: string | null }[]>,
   ]);
   const memberList = members
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
@@ -132,19 +146,39 @@ async function authorNames(db: Database, history: Message[]) {
   const userIds = [...new Set(history.flatMap((m) => (m.authorUserId ? [m.authorUserId] : [])))];
   const agentIds = [...new Set(history.flatMap((m) => (m.authorAgentId ? [m.authorAgentId] : [])))];
   const names = new Map<string, string>();
-  if (userIds.length > 0) {
-    for (const u of await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, userIds))) {
-      names.set(u.id, u.name);
-    }
-  }
-  if (agentIds.length > 0) {
-    const rows = await db
-      .select({ id: agents.id, name: agents.name, handle: agents.handle })
-      .from(agents)
-      .where(inArray(agents.id, agentIds));
-    for (const a of rows) names.set(a.id, `${a.name} (@${a.handle})`);
-  }
+  const [userRows, agentRows] = await Promise.all([
+    userIds.length > 0
+      ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, userIds))
+      : Promise.resolve([]),
+    agentIds.length > 0
+      ? db
+          .select({ id: agents.id, name: agents.name, handle: agents.handle })
+          .from(agents)
+          .where(inArray(agents.id, agentIds))
+      : Promise.resolve([]),
+  ]);
+  for (const u of userRows) names.set(u.id, u.name);
+  for (const a of agentRows) names.set(a.id, `${a.name} (@${a.handle})`);
   return names;
+}
+
+/** Organization row through the per-process cache. */
+export function getOrgCached(db: Database, orgId: string) {
+  return caches.orgs.getOrLoad(`${orgId}:`, async () => {
+    const [row] = await db.select().from(organizations).where(eq(organizations.id, orgId));
+    return row ?? null;
+  }) as Promise<typeof organizations.$inferSelect | null>;
+}
+
+/** Channel row through the per-process cache. */
+export function getChannelCached(db: Database, orgId: string, channelId: string) {
+  return caches.channels.getOrLoad(`${orgId}:${channelId}`, async () => {
+    const [row] = await db
+      .select()
+      .from(channels)
+      .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
+    return row ?? null;
+  }) as Promise<typeof channels.$inferSelect | null>;
 }
 
 /**

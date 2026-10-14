@@ -73,7 +73,7 @@ describe("outbox delivery", () => {
     await queueEmail(f.db, input);
     await queueEmail(f.db, { ...input, orgId: null, key: "k2" });
     await drainOutbox(f.db, handlers);
-    expect(sender.sent.map((m) => m.idempotencyKey)).toEqual(["k1", "k2"]);
+    expect(sender.sent.map((m) => m.idempotencyKey).sort()).toEqual(["k1", "k2"]);
     const failing = { id: "x", delivers: true, send: async () => Promise.reject(new EmailError("bad", false, 422)) };
     await expect(sendQueuedEmail(failing, { key: "k", to: ["a@b.c"], template: input.template })).rejects.toThrow(
       "bad",

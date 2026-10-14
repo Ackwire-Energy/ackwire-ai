@@ -1,13 +1,24 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, desc, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  inArray,
+  isNull,
+  lt,
+  rowsOf,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { requireChannelAccess } from "./channels";
-import { dmAgents } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { can } from "./organizations";
-import { enqueue } from "./outbox";
 
-const { messages, agents, channelMembers } = schema;
+const { messages, agents, channelMembers, channels, agentRuns, outbox } = schema;
 
 export type Message = typeof messages.$inferSelect;
 
@@ -114,75 +125,132 @@ export interface NewMessage {
  * (`postPersonMessage`, the run executor) do them.
  */
 export async function insertMessage(tx: Executor, input: NewMessage): Promise<Message> {
+  return (await insertMessageWithRuns(tx, input, { startRuns: false })).message;
+}
+
+interface RawMessage {
+  id: string;
+  created_at: Date | string;
+  org_id: string;
+  channel_id: string;
+  thread_id: string | null;
+  author_type: Message["authorType"];
+  author_user_id: string | null;
+  author_agent_id: string | null;
+  body: string;
+  mentioned_agent_ids: string[] | string | null;
+  hop: number;
+  agent_run_id: string | null;
+  meta: Record<string, unknown> | string | null;
+  edited_at: Date | string | null;
+  deleted_at: Date | string | null;
+  runs: { id: string; agentId: string }[] | string | null;
+}
+
+const asDate = (v: Date | string | null) => (v === null ? null : v instanceof Date ? v : new Date(v));
+const parseUuidArray = (v: string[] | string | null) =>
+  Array.isArray(v) ? v : v ? v.replace(/^{|}$/g, "").split(",").filter(Boolean) : [];
+const parseJson = <T>(v: T | string | null, fallback: T): T =>
+  typeof v === "string" ? (JSON.parse(v) as T) : (v ?? fallback);
+
+/**
+ * Writes a message in ONE statement (the database may be far away): thread
+ * check, mention resolution (active agents that are members of the
+ * channel; an agent never mentions itself), the message, its outbox rows
+ * (`search.index`, `message.posted`), and, with `startRuns` for a person's
+ * message, the runs of the agents that will surely answer (mentioned ones,
+ * or the agent of a DM) with their `agent_run.execute` jobs. Atomic like a
+ * transaction. No permission checks: callers do them.
+ */
+export async function insertMessageWithRuns(
+  tx: Executor,
+  input: NewMessage,
+  options: { startRuns: boolean },
+): Promise<{ message: Message; runs: { id: string; agentId: string }[] }> {
   const body = input.body.trim();
   if (body === "") throw new ValidationError("Message is empty");
   if (body.length > MAX_MESSAGE_LENGTH)
     throw new ValidationError(`Message is longer than ${MAX_MESSAGE_LENGTH} characters`);
-
-  if (input.threadId) {
-    const [root] = await tx
-      .select({ id: messages.id })
-      .from(messages)
-      .where(
-        and(
-          eq(messages.id, input.threadId),
-          eq(messages.orgId, input.orgId),
-          eq(messages.channelId, input.channelId),
-          isNull(messages.threadId),
-        ),
-      );
-    if (!root) throw new ValidationError("threadId must be a top-level message of this channel");
-  }
-
-  const handles = parseMentionHandles(body);
-  const mentioned =
-    handles.length === 0
-      ? []
-      : await tx
-          .select({ id: agents.id })
-          .from(agents)
-          .innerJoin(
-            channelMembers,
-            and(eq(channelMembers.agentId, agents.id), eq(channelMembers.channelId, input.channelId)),
-          )
-          .where(and(eq(agents.orgId, input.orgId), inArray(agents.handle, handles), isNull(agents.archivedAt)));
-  const self = input.author.type === "agent" ? input.author.agentId : null;
-  const mentionedAgentIds = mentioned.map((a) => a.id).filter((id) => id !== self);
-
-  const [message] = await tx
-    .insert(messages)
-    .values({
-      orgId: input.orgId,
-      channelId: input.channelId,
-      threadId: input.threadId ?? null,
-      authorType: input.author.type,
-      authorUserId: input.author.type === "person" ? input.author.userId : null,
-      authorAgentId: input.author.type === "agent" ? input.author.agentId : null,
-      agentRunId: input.author.type === "agent" ? input.author.runId : null,
-      hop: input.author.type === "agent" ? input.author.hop : 0,
-      body,
-      mentionedAgentIds,
-      meta: input.meta ?? {},
-    })
-    .returning();
-  if (!message) throw new Error("message insert returned nothing");
-
-  await enqueue(tx, {
-    orgId: input.orgId,
-    kind: "search.index",
-    payload: { kind: "message", sourceId: message.id },
-    dedupeKey: `search.index:message:${message.id}`,
-  });
-  // Mentions start runs; a person's message without mentions goes to the router.
-  if (mentionedAgentIds.length > 0 || input.author.type === "person") {
-    await enqueue(tx, {
-      orgId: input.orgId,
-      kind: "message.posted",
-      payload: { messageId: message.id },
-      dedupeKey: `message.posted:${message.id}`,
-    });
-  }
-  return message;
+  const handles = `{${parseMentionHandles(body).join(",")}}`; // handles match [a-z0-9_-]: safe as an array literal
+  const id = Bun.randomUUIDv7();
+  const person = input.author.type === "person";
+  const userId = input.author.type === "person" ? input.author.userId : null;
+  const agentId = input.author.type === "agent" ? input.author.agentId : null;
+  const runId = input.author.type === "agent" ? input.author.runId : null;
+  const hop = input.author.type === "agent" ? input.author.hop : 0;
+  const threadId = input.threadId ?? null;
+  const startRuns = options.startRuns && person;
+  const rows = rowsOf<RawMessage>(
+    await tx.execute(sql`with mentioned as (
+        select a.id from ${agents} a
+        join ${channelMembers} cm on cm.agent_id = a.id and cm.channel_id = ${input.channelId}::uuid
+        where a.org_id = ${input.orgId}::uuid and a.archived_at is null
+          and a.handle = any(${handles}::text[])
+          and a.id is distinct from ${agentId}::uuid
+      ), m as (
+        insert into ${messages} (id, created_at, org_id, channel_id, thread_id, author_type, author_user_id,
+          author_agent_id, agent_run_id, hop, body, mentioned_agent_ids, meta)
+        select ${id}::uuid, now(), ${input.orgId}::uuid, ${input.channelId}::uuid, ${threadId}::uuid,
+          ${input.author.type}::author_type, ${userId}, ${agentId}::uuid, ${runId}::uuid, ${hop}, ${body},
+          coalesce((select array_agg(id) from mentioned), '{}'::uuid[]), ${JSON.stringify(input.meta ?? {})}::jsonb
+        where ${threadId}::uuid is null or exists (
+          select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
+            and r.channel_id = ${input.channelId}::uuid and r.thread_id is null)
+        returning *
+      ), answering as (
+        select a.id as agent_id, case when exists (select 1 from mentioned) then 'mention' else 'dm' end as trig
+        from ${agents} a
+        join ${channelMembers} cm on cm.agent_id = a.id and cm.channel_id = ${input.channelId}::uuid
+        where ${startRuns}::boolean and a.org_id = ${input.orgId}::uuid and a.archived_at is null
+          and (a.id in (select id from mentioned)
+            or (not exists (select 1 from mentioned) and exists (
+              select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
+      ), runs as (
+        insert into ${agentRuns} (id, org_id, agent_id, channel_id, thread_root_id, trigger_message_id, trigger, hop)
+        select gen_random_uuid(), ${input.orgId}::uuid, an.agent_id, ${input.channelId}::uuid,
+          coalesce(${threadId}::uuid, ${id}::uuid), ${id}::uuid, an.trig::agent_run_trigger, ${hop} + 1
+        from answering an where exists (select 1 from m)
+        on conflict do nothing
+        returning id, agent_id
+      ), jobs as (
+        insert into ${outbox} (id, org_id, kind, payload, dedupe_key, max_attempts)
+        select gen_random_uuid(), ${input.orgId}::uuid, 'agent_run.execute', jsonb_build_object('runId', r.id),
+          'agent_run.execute:' || r.id, 4 from runs r
+        union all
+        select gen_random_uuid(), ${input.orgId}::uuid, 'search.index',
+          jsonb_build_object('kind', 'message', 'sourceId', m.id), 'search.index:message:' || m.id, 8 from m
+        union all
+        select gen_random_uuid(), ${input.orgId}::uuid, 'message.posted', jsonb_build_object('messageId', m.id),
+          'message.posted:' || m.id, 8 from m
+          where m.author_type = 'person' or cardinality(m.mentioned_agent_ids) > 0
+        on conflict do nothing
+        returning id
+      )
+      select m.*,
+        coalesce((select json_agg(json_build_object('id', r.id, 'agentId', r.agent_id)) from runs r), '[]'::json) as runs,
+        (select count(*) from jobs)::int as jobs
+      from m`),
+  );
+  const row = rows[0];
+  if (!row) throw new ValidationError("threadId must be a top-level message of this channel");
+  const message: Message = {
+    id: row.id,
+    createdAt: asDate(row.created_at) as Date,
+    orgId: row.org_id,
+    channelId: row.channel_id,
+    threadId: row.thread_id,
+    authorType: row.author_type,
+    authorUserId: row.author_user_id,
+    authorAgentId: row.author_agent_id,
+    body: row.body,
+    mentionedAgentIds: parseUuidArray(row.mentioned_agent_ids),
+    hop: row.hop,
+    agentRunId: row.agent_run_id,
+    meta: parseJson(row.meta, {}),
+    editedAt: asDate(row.edited_at),
+    deletedAt: asDate(row.deleted_at),
+  };
+  return { message, runs: parseJson(row.runs, []) };
 }
 
 /**
@@ -201,28 +269,41 @@ export async function postPersonMessage(
   const { channel, membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
   if (!can(membership.role, "post")) throw new ForbiddenError();
   const clientId = input.clientId?.trim().slice(0, 64) || null;
-  const message = await deps.db.transaction((tx) =>
-    insertMessage(tx, {
+  // One statement: the message, its jobs, and the runs of agents that will surely answer.
+  const { message, runs } = await insertMessageWithRuns(
+    deps.db,
+    {
       orgId,
       channelId,
       threadId: input.threadId,
       author: { type: "person", userId },
       body: input.body,
       meta: clientId ? { clientId } : undefined,
-    }),
+    },
+    { startRuns: true },
   );
   const view = messageView(message);
   // Right after the commit, before any routing: the sender's optimistic copy reconciles by `clientId`.
   await publishMessageCreated(deps.pubsub, view);
-  // Agents that will surely answer show "thinking" at once (the run doesn't exist yet: runId null).
-  const threadId = message.threadId ?? message.id;
-  const answering = message.mentionedAgentIds.length
-    ? message.mentionedAgentIds
-    : channel.kind === "dm"
-      ? (await dmAgents(deps.db, orgId, channelId)).map((a) => a.id)
-      : [];
-  for (const agentId of answering) {
-    await publishChannelEvent(deps.pubsub, { type: "agent.thinking", channelId, threadId, agentId, runId: null });
+  if (runs.length > 0) {
+    const threadId = message.threadId ?? message.id;
+    await publishChannelEvent(deps.pubsub, {
+      type: "message.routed",
+      channelId,
+      messageId: message.id,
+      seenBy: message.mentionedAgentIds.length > 0 ? message.mentionedAgentIds : runs.map((r) => r.agentId),
+      pickedBy: runs.map((r) => r.agentId),
+      strategy: channel.kind === "dm" && message.mentionedAgentIds.length === 0 ? "dm" : "mention",
+    });
+    for (const run of runs) {
+      await publishChannelEvent(deps.pubsub, {
+        type: "agent.thinking",
+        channelId,
+        threadId,
+        agentId: run.agentId,
+        runId: run.id,
+      });
+    }
   }
   return view;
 }

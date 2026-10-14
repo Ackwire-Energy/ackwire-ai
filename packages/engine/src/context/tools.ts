@@ -1,4 +1,5 @@
 import { and, arrayContained, type Database, desc, eq, inArray, isNull, or, schema } from "@agenteschat/db";
+import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
 import { can, getMembership } from "../organizations";
 import { agentVisibleChannels, indexSource, searchVisible } from "../search";
@@ -407,6 +408,16 @@ export async function retrieveForRun(
   input: { orgId: string; agentId: string; channelId: string; text: string; budgetChars?: number },
 ): Promise<{ text: string; itemIds: string[] }> {
   const { db } = deps;
+  // An org with no memory yet (most early ones) costs one cached lookup, not five queries.
+  const hasAny = (await caches.contextPresence.getOrLoad(`${input.orgId}:`, async () => {
+    const [row] = await db
+      .select({ id: contextItems.id })
+      .from(contextItems)
+      .where(and(eq(contextItems.orgId, input.orgId), eq(contextItems.status, "active")))
+      .limit(1);
+    return Boolean(row);
+  })) as boolean;
+  if (!hasAny) return { text: "", itemIds: [] };
   const allowed = await injectableChannels(db, input.orgId, input.agentId, input.channelId);
   const base = and(
     eq(contextItems.orgId, input.orgId),
@@ -415,24 +426,26 @@ export async function retrieveForRun(
     arrayContained(contextItems.channelIds, allowed),
     or(isNull(contextItems.agentId), eq(contextItems.agentId, input.agentId)),
   );
-  const pinned = await db
-    .select()
-    .from(contextItems)
-    .where(and(base, eq(contextItems.pinned, true)))
-    .orderBy(desc(contextItems.updatedAt))
-    .limit(20);
-  const own = await db
-    .select()
-    .from(contextItems)
-    .where(and(base, eq(contextItems.agentId, input.agentId)))
-    .orderBy(desc(contextItems.verified), desc(contextItems.relevance), desc(contextItems.updatedAt))
-    .limit(15);
-  const shared = await db
-    .select()
-    .from(contextItems)
-    .where(and(base, isNull(contextItems.agentId), eq(contextItems.kind, "lesson")))
-    .orderBy(desc(contextItems.relevance))
-    .limit(10);
+  const [pinned, own, shared] = await Promise.all([
+    db
+      .select()
+      .from(contextItems)
+      .where(and(base, eq(contextItems.pinned, true)))
+      .orderBy(desc(contextItems.updatedAt))
+      .limit(20),
+    db
+      .select()
+      .from(contextItems)
+      .where(and(base, eq(contextItems.agentId, input.agentId)))
+      .orderBy(desc(contextItems.verified), desc(contextItems.relevance), desc(contextItems.updatedAt))
+      .limit(15),
+    db
+      .select()
+      .from(contextItems)
+      .where(and(base, isNull(contextItems.agentId), eq(contextItems.kind, "lesson")))
+      .orderBy(desc(contextItems.relevance))
+      .limit(10),
+  ]);
   let searched: ContextItem[] = [];
   if (input.text.trim()) {
     const hits = await searchVisible(deps, {

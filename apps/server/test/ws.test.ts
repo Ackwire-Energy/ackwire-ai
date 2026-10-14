@@ -156,7 +156,6 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
   const events = c.frames.filter((f) => f.type === "event").map((f) => f.event as Record<string, unknown>);
   expect(events.map((e) => e.type)).toEqual([
     "message.created",
-    "agent.thinking",
     "message.routed",
     "agent.thinking",
     "agent.thinking",
@@ -178,7 +177,7 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
       .map((e) => e.text)
       .join(""),
   ).toBe("Hello there");
-  const reply = events[11] as { message: { body: string; threadId: string; author: { type: string; id: string } } };
+  const reply = events[10] as { message: { body: string; threadId: string; author: { type: string; id: string } } };
   expect(reply.message).toMatchObject({
     body: "Hello there",
     threadId: posted.id,

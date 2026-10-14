@@ -123,41 +123,40 @@ export function createPostgresSearchResolver(db: Database): SearchIndexResolver 
           };
           const anyWords = [...new Set(text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [])].slice(0, 30);
           const useAny = q.match === "any" && anyWords.length > 0;
-          if (text && (q.match !== "any" || useAny)) {
-            const query = useAny
-              ? sql`to_tsquery('simple', ${anyWords.join(" | ")})`
-              : sql`websearch_to_tsquery('simple', ${text})`;
-            add(
-              await db
-                .select()
-                .from(t)
-                .where(and(scope, sql`${t.tsv} @@ ${query}`))
-                .orderBy(desc(sql`ts_rank_cd(${t.tsv}, ${query})`), desc(t.sourceCreatedAt))
-                .limit(50),
-            );
-          }
-          if (q.embedding) {
-            const vec = sql`${vectorLiteral(q.embedding)}::vector`;
-            const rows = rowsOf<{ id: string }>(
-              await db.execute(sql`select ${t.id} as id from ${t}
-                where ${scope} and ${t.embedding} is not null
-                  and ${t.embedding} <=> ${vec} < ${q.maxDistance ?? 0.75}
-                order by ${t.embedding} <=> ${vec} limit 50`),
-            );
-            if (rows.length > 0) {
-              const full = await db
-                .select()
-                .from(t)
-                .where(
-                  inArray(
-                    t.id,
-                    rows.map((r) => r.id),
-                  ),
-                );
-              const byId = new Map(full.map((r) => [r.id, r]));
-              add(rows.flatMap((r) => (byId.get(r.id) ? [byId.get(r.id) as typeof t.$inferSelect] : [])));
-            }
-          }
+          // Full-text and vector rankings run in parallel (one round trip each, not in sequence).
+          const textRows =
+            text && (q.match !== "any" || useAny)
+              ? (() => {
+                  const query = useAny
+                    ? sql`to_tsquery('simple', ${anyWords.join(" | ")})`
+                    : sql`websearch_to_tsquery('simple', ${text})`;
+                  return db
+                    .select()
+                    .from(t)
+                    .where(and(scope, sql`${t.tsv} @@ ${query}`))
+                    .orderBy(desc(sql`ts_rank_cd(${t.tsv}, ${query})`), desc(t.sourceCreatedAt))
+                    .limit(50);
+                })()
+              : Promise.resolve([]);
+          const vectorRows = q.embedding
+            ? (async () => {
+                const vec = sql`${vectorLiteral(q.embedding ?? [])}::vector`;
+                // One statement: nearest ids with their rows (no second fetch).
+                const ids = rowsOf<{ id: string }>(
+                  await db.execute(sql`select ${t.id} as id from ${t}
+                    where ${scope} and ${t.embedding} is not null
+                      and ${t.embedding} <=> ${vec} < ${q.maxDistance ?? 0.75}
+                    order by ${t.embedding} <=> ${vec} limit 50`),
+                ).map((r) => r.id);
+                if (ids.length === 0) return [];
+                const full = await db.select().from(t).where(inArray(t.id, ids));
+                const byId = new Map(full.map((r) => [r.id, r]));
+                return ids.flatMap((id) => (byId.get(id) ? [byId.get(id) as typeof t.$inferSelect] : []));
+              })()
+            : Promise.resolve([]);
+          const [byText, byVector] = await Promise.all([textRows, vectorRows]);
+          add(byText);
+          add(byVector);
           const now = Date.now();
           return [...ranks.values()]
             .map(({ score, row }) => {

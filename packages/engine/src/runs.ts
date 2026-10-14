@@ -38,7 +38,7 @@ export async function transitionRun(
   runId: string,
   from: RunStatus,
   to: RunStatus,
-  patch: { error?: string | null; replyMessageId?: string } = {},
+  patch: { error?: string | null; replyMessageId?: string; transcript?: Record<string, unknown> } = {},
 ): Promise<AgentRun | null> {
   if (!canTransition(from, to)) throw new InvalidRunTransitionError(from, to);
   const now = new Date();

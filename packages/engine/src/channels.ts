@@ -1,10 +1,11 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNull, or, schema } from "@agenteschat/db";
+import { caches } from "./cache";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
-import { can, getMembership, requirePermission } from "./organizations";
+import { can, getMembership, type Membership, requirePermission } from "./organizations";
 
-const { channels, channelMembers, agents } = schema;
+const { channels, channelMembers, agents, organizationMembers, organizations } = schema;
 
 export type Channel = typeof channels.$inferSelect;
 
@@ -83,16 +84,27 @@ export async function isChannelMember(db: Database, orgId: string, channelId: st
  * organization, and the user is a member of the channel.
  */
 export async function requireChannelAccess(db: Database, userId: string, orgId: string, channelId: string) {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
-  const [channel] = await db
-    .select()
-    .from(channels)
-    .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
+  // One round trip: membership of the org, the channel, and membership of the channel.
+  const [row] = await db
+    .select({
+      role: organizationMembers.role,
+      orgName: organizations.name,
+      channel: channels,
+      memberId: channelMembers.id,
+    })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+    .leftJoin(channels, and(eq(channels.id, channelId), eq(channels.orgId, orgId)))
+    .leftJoin(
+      channelMembers,
+      and(eq(channelMembers.channelId, channelId), eq(channelMembers.orgId, orgId), eq(channelMembers.userId, userId)),
+    )
+    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.orgId, orgId)));
+  if (!row) throw new ForbiddenError("You are not a member of this organization");
+  const channel = row.channel;
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
-  if (!(await isChannelMember(db, orgId, channelId, userId))) {
-    throw new ForbiddenError("Join this channel first");
-  }
+  if (!row.memberId) throw new ForbiddenError("Join this channel first");
+  const membership: Membership = { orgId, orgName: row.orgName, role: row.role };
   return { channel, membership };
 }
 
@@ -123,6 +135,7 @@ export async function addChannelMember(
       throw new ValidationError("That person is not a member of this organization");
     }
     await db.insert(channelMembers).values({ orgId, channelId, userId: member.userId }).onConflictDoNothing();
+    caches.channelMembers.delete(`${orgId}:${channelId}`);
   } else {
     const [agent] = await db
       .select({ id: agents.id })
@@ -130,6 +143,7 @@ export async function addChannelMember(
       .where(and(eq(agents.id, member.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
     if (!agent) throw new ValidationError("That agent does not exist in this organization");
     await db.insert(channelMembers).values({ orgId, channelId, agentId: member.agentId }).onConflictDoNothing();
+    caches.scopes.delete(`${orgId}:${member.agentId}:visible`);
   }
 }
 
@@ -177,6 +191,8 @@ export async function removeChannelMember(
         "userId" in member ? eq(channelMembers.userId, member.userId) : eq(channelMembers.agentId, member.agentId),
       ),
     );
+  caches.channelMembers.delete(`${orgId}:${channelId}`);
+  if ("agentId" in member) caches.scopes.delete(`${orgId}:${member.agentId}:visible`);
   if ("userId" in member) {
     await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: member.userId, channelId });
   }
@@ -202,5 +218,6 @@ export async function archiveChannel(
   }
   if (channel.name === "general") throw new ValidationError("#general can't be archived");
   await db.update(channels).set({ archivedAt: new Date() }).where(eq(channels.id, channelId));
+  caches.channels.delete(`${orgId}:${channelId}`);
   await publishOrgEvent(options.pubsub, { type: "channel.archived", orgId, channelId });
 }
