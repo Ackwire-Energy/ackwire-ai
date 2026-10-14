@@ -8,8 +8,17 @@ import type { Agent, BudgetEvent, ChannelEvent, MemoryUpdate, Message } from "@/
 import { formatUsd } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { type ConnectionStatus, RealtimeConnection, realtimeUrl, type SocketFactory } from "./connection";
-import { applyReceiptEvent, type ReceiptsState, seedReceipt } from "./receipts";
-import { applyChannelEvent, dismissRun, emptyStreams, expectReply, type LiveRun, type StreamsState } from "./streams";
+import { applyReceiptEvent, guessReceipt, type ReceiptsState, seedReceipt } from "./receipts";
+import {
+  applyChannelEvent,
+  dismissRun,
+  dropProvisional,
+  emptyStreams,
+  expectReply,
+  type LiveRun,
+  type StreamsState,
+  staleProvisional,
+} from "./streams";
 import { applyTyping, stopTyping, type TypingState, typingThrottle } from "./typing";
 
 /** Live state shared by the channel and the sidebar: runs, receipts and who is typing. */
@@ -29,7 +38,20 @@ export interface LiveMemoryCard {
 }
 
 /** A small external store; components subscribe to slices of it (`useLive`). */
-export function createStreamsStore(initial: StreamsState = emptyStreams, now: () => number = () => Date.now()) {
+export const PROVISIONAL_TTL_MS = 20_000;
+
+/** The agent's message now carries its memory cards (`meta.memoryUpdates`): drop the live ones. */
+function dropMemoryOfRun(memory: LiveState["memory"], channelId: string, runId: string) {
+  const list = memory[channelId];
+  if (!list) return memory;
+  return { ...memory, [channelId]: list.filter((c) => !c.key.startsWith(`${runId}:`)) };
+}
+
+export function createStreamsStore(
+  initial: StreamsState = emptyStreams,
+  now: () => number = () => Date.now(),
+  provisionalTtlMs = PROVISIONAL_TTL_MS,
+) {
   let state: LiveState = { streams: initial, receipts: {}, typing: {}, memory: {} };
   const listeners = new Set<() => void>();
   const set = (next: LiveState) => {
@@ -64,7 +86,11 @@ export function createStreamsStore(initial: StreamsState = emptyStreams, now: ()
                 },
               ],
             }
-          : state.memory;
+          : event.type === "message.created" &&
+              event.message?.agentRunId &&
+              Array.isArray(event.message.meta?.memoryUpdates)
+            ? dropMemoryOfRun(state.memory, event.channelId, event.message.agentRunId)
+            : state.memory;
       if (event.type === "message.created" && event.message?.author?.type === "person" && event.message.author.id) {
         typing = stopTyping(typing, event.channelId, event.message.author.id);
       }
@@ -90,19 +116,9 @@ export function createStreamsStore(initial: StreamsState = emptyStreams, now: ()
     expect: (channelId: string, messageId: string, agentIds: string[]) => {
       let streams = state.streams;
       let receipts = state.receipts;
-      for (const agentId of agentIds) {
-        streams = expectReply(streams, { channelId, threadId: messageId, agentId });
-        receipts = applyReceiptEvent(receipts, {
-          type: "message.routed",
-          channelId,
-          messageId,
-          seenBy: [agentId],
-          pickedBy: [agentId],
-        });
-      }
-      // Not decided yet: the router may still pick someone.
-      const r = receipts[messageId];
-      if (r) receipts = { ...receipts, [messageId]: { ...r, routed: false } };
+      for (const agentId of agentIds)
+        streams = expectReply(streams, { channelId, threadId: messageId, agentId }, now());
+      receipts = guessReceipt(receipts, messageId, agentIds);
       set({ ...state, streams, receipts });
     },
     /** The optimistic message got its server id: move its "pensando…" rows and receipts there. */
@@ -120,6 +136,21 @@ export function createStreamsStore(initial: StreamsState = emptyStreams, now: ()
         streams: { ...state.streams, runs },
         receipts: moving && !receipts[toId] ? { ...receipts, [toId]: moving } : receipts,
       });
+    },
+    /**
+     * Safety net: a "pensando…" the server never confirmed (no event for
+     * `PROVISIONAL_TTL_MS`) is dropped, with its unconfirmed receipt. Returns
+     * the channels to resync over HTTP.
+     */
+    sweep: (at = now()): string[] => {
+      const stale = staleProvisional(state.streams, at, provisionalTtlMs);
+      if (stale.length === 0) return [];
+      const threads = new Set(stale.map((r) => r.threadId));
+      const receipts = Object.fromEntries(
+        Object.entries(state.receipts).filter(([id, r]) => !(threads.has(id) && !r.confirmed)),
+      );
+      set({ ...state, streams: dropProvisional(state.streams, threads), receipts });
+      return [...new Set(stale.map((r) => r.channelId))];
     },
     dismiss: (runId: string) => set({ ...state, streams: dismissRun(state.streams, runId) }),
     subscribe: (listener: () => void) => {
@@ -205,6 +236,16 @@ export function RealtimeProvider({
       setConnection(null);
     };
   }, [orgId, createSocket, qc]);
+
+  // Resync what the server never confirmed instead of spinning forever.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      for (const channelId of streams.sweep()) {
+        void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [streams, qc, orgId]);
 
   return <RealtimeContext.Provider value={{ connection, streams }}>{children}</RealtimeContext.Provider>;
 }

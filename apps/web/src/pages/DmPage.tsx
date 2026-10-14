@@ -94,6 +94,7 @@ export function DmPage({ target }: { target: DmTarget }) {
       chrome={{
         header,
         composerTarget: name,
+        dmAgentId: agent?.id,
         emptyText: agent ? t("dm.emptyAgent", agentGrammar(t, agent.name)) : t("dm.emptyPerson", { name }),
       }}
     />

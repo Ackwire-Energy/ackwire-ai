@@ -734,3 +734,15 @@ p {
   line-height: 16px;
   color: var(--ink-muted);
 }
+
+/* Newest at the bottom: short channels sit right above the composer */
+.channel__spacer {
+  flex: 1 0 auto;
+}
+.channel__pill {
+  position: relative;
+  height: 0;
+}
+.channel__pill .ac-new-messages {
+  bottom: 8px;
+}

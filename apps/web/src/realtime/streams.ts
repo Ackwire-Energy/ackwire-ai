@@ -13,6 +13,8 @@ import type { ChannelEvent, RunStatus } from "@/api/types";
 export type LiveStatus = RunStatus | "thinking";
 
 export interface LiveRun {
+  /** When a provisional row was added (for the safety timeout). */
+  since?: number;
   runId: string;
   agentId: string;
   channelId: string;
@@ -36,14 +38,18 @@ export const emptyStreams: StreamsState = { runs: {}, finished: {} };
 const provisionalId = (agentId: string, threadId: string) => `pending:${agentId}:${threadId}`;
 
 /** Shows "Ada está pensando…" right away for an agent that was mentioned or picked. */
-export function expectReply(state: StreamsState, event: { channelId: string; threadId: string; agentId: string }) {
+export function expectReply(
+  state: StreamsState,
+  event: { channelId: string; threadId: string; agentId: string },
+  now = Date.now(),
+) {
   const input = { channelId: event.channelId, threadId: event.threadId, agentId: event.agentId };
   const runId = provisionalId(input.agentId, input.threadId);
   const alreadyLive = Object.values(state.runs).some(
     (r) => !r.provisional && r.agentId === input.agentId && r.threadId === input.threadId,
   );
   if (alreadyLive || state.runs[runId]) return state;
-  const run: LiveRun = { ...input, runId, status: "thinking", text: "", lastSeq: 0, provisional: true };
+  const run: LiveRun = { ...input, runId, status: "thinking", text: "", lastSeq: 0, provisional: true, since: now };
   return { ...state, runs: { ...state.runs, [runId]: run } };
 }
 
@@ -132,6 +138,16 @@ export function applyChannelEvent(state: StreamsState, event: ChannelEvent): Str
       // done: the message replaces the row; waiting_approval: the approval card does.
       return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
     }
+    case "message.routed": {
+      // Agents the router didn't pick won't answer: drop their "pensando…".
+      const picked = new Set(event.pickedBy);
+      const runs = Object.fromEntries(
+        Object.entries(state.runs).filter(
+          ([, r]) => !(r.provisional && r.threadId === event.messageId && !picked.has(r.agentId)),
+        ),
+      );
+      return Object.keys(runs).length === Object.keys(state.runs).length ? state : { ...state, runs };
+    }
     case "agent.delta": {
       if (state.finished[event.runId]) return state;
       const current = state.runs[event.runId];
@@ -164,3 +180,16 @@ export const runningAgents = (state: StreamsState) =>
       .filter((r) => r.status === "running" || r.status === "queued" || r.status === "thinking")
       .map((r) => r.agentId),
   );
+
+/** Provisional rows older than `maxAgeMs` (no server event since): their message ids, to resync. */
+export function staleProvisional(state: StreamsState, now: number, maxAgeMs: number) {
+  return Object.values(state.runs).filter((r) => r.provisional && now - (r.since ?? now) >= maxAgeMs);
+}
+
+/** Drops provisional rows of these threads. */
+export function dropProvisional(state: StreamsState, threadIds: Set<string>): StreamsState {
+  const runs = Object.fromEntries(
+    Object.entries(state.runs).filter(([, r]) => !(r.provisional && threadIds.has(r.threadId))),
+  );
+  return { ...state, runs };
+}

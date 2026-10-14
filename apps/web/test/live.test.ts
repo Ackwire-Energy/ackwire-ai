@@ -100,3 +100,64 @@ describe("receipts", () => {
     expect(receiptView(seeded.m1)).toMatchObject({ seen: ["ada", "atlas"], status: { kind: "handled" } });
   });
 });
+
+describe("server confirmation and the safety timeout", () => {
+  test("message.routed is authoritative: a guessed 'picked' falls back to 'seen' and the provisional row goes", async () => {
+    const { guessReceipt } = await import("@/realtime/receipts");
+    let r = guessReceipt({}, "m1", ["theo"]);
+    expect(receiptView(r.m1).status?.kind).toBe("picked");
+    expect(r.m1?.confirmed).toBe(false);
+    r = applyReceiptEvent(r, {
+      type: "message.routed",
+      channelId: "c",
+      messageId: "m1",
+      seenBy: ["theo"],
+      pickedBy: [],
+    });
+    expect(receiptView(r.m1).status).toEqual({ kind: "nobody" });
+    let s = expectReply(emptyStreams, { channelId: "c", threadId: "m1", agentId: "theo" });
+    s = applyChannelEvent(s, {
+      type: "message.routed",
+      channelId: "c",
+      messageId: "m1",
+      seenBy: ["theo"],
+      pickedBy: [],
+    });
+    expect(runsInChannel(s, "c")).toEqual([]);
+  });
+
+  test("an unconfirmed 'pensando…' is dropped after 20 s and its channel resyncs", async () => {
+    const { createStreamsStore, PROVISIONAL_TTL_MS } = await import("@/realtime/context");
+    let now = 1000;
+    const store = createStreamsStore(undefined, () => now);
+    store.expect("c1", "m1", ["theo"]);
+    expect(runsInChannel(store.get().streams, "c1")).toHaveLength(1);
+    now += PROVISIONAL_TTL_MS - 1;
+    expect(store.sweep()).toEqual([]);
+    now += 2;
+    expect(store.sweep()).toEqual(["c1"]);
+    expect(runsInChannel(store.get().streams, "c1")).toEqual([]);
+    expect(store.get().receipts.m1).toBeUndefined();
+  });
+
+  test("server receipts from a refetch replace the client's guess", () => {
+    const guessed = applyReceiptEvent(
+      {},
+      { type: "agent.thinking", channelId: "c", threadId: "x", agentId: "a", runId: null },
+    );
+    expect(guessed.x?.confirmed).toBe(true);
+    const local = seedReceipt({}, {
+      id: "m1",
+      author: { type: "person", id: "u" },
+      mentionedAgentIds: ["theo"],
+    } as unknown as Message);
+    expect(local.m1?.confirmed).toBe(false);
+    const fromServer = seedReceipt(local, {
+      id: "m1",
+      author: { type: "person", id: "u" },
+      mentionedAgentIds: ["theo"],
+      receipts: { seenBy: ["theo"], pickedBy: [], handled: [] },
+    } as unknown as Message);
+    expect(receiptView(fromServer.m1).status).toEqual({ kind: "nobody" });
+  });
+});

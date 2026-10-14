@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -88,32 +88,55 @@ describe("optimistic send", () => {
   });
 });
 
-describe("agent activity in the channel", () => {
-  test("mention → 'Atlas está pensando…' at once → streaming text with the cursor → final message", async () => {
+const typingBar = () => document.querySelector(".ac-typing") as HTMLElement;
+/** The bar's words (without avatar initials); "" when nobody is typing. */
+const bar = () => ({ textContent: typingBar().querySelector(".ac-typing__text")?.textContent ?? "" });
+const lastPerson = (state: ReturnType<typeof seedState>) => state.messages[state.messages.length - 1];
+
+describe("typing bar above the composer", () => {
+  test("mention → 'Atlas está digitando…' in the bar (not a message row); first words → message at the end; bar clears", async () => {
     const { socket, state } = await open();
     await sendText("@atlas olha o deploy");
-    expect(screen().getByText("Atlas está pensando…")).toBeTruthy();
-    const thinkingRow = screen().getByText("Atlas está pensando…").closest("article");
-    expect(thinkingRow?.querySelector(".ac-avatar--running")).not.toBeNull();
+    expect(bar().textContent).toBe("Atlas está digitando…");
+    expect(typingBar().querySelectorAll(".ac-typing__dots span")).toHaveLength(3);
+    expect(typingBar().querySelector(".ac-avatar--agent")).not.toBeNull();
+    // Not a row in the timeline.
+    expect(rowsWith("Atlas está")).toHaveLength(0);
     await settle(4);
-    const root = state.messages[state.messages.length - 1];
-    const run = { threadId: root?.id, runId: "r-live", agentId: ATLAS_ID };
+    const run = { threadId: lastPerson(state)?.id, runId: "r-live", agentId: ATLAS_ID };
     await push(socket, { type: "agent.thinking", ...run });
-    expect(screen().getAllByText("Atlas está pensando…")).toHaveLength(1);
+    expect(bar().textContent).toBe("Atlas está digitando…");
     await push(socket, { type: "agent.typing", ...run });
     await push(socket, { type: "agent.delta", ...run, seq: 1, text: "Deploy ok" });
     await settle();
-    expect(document.querySelector(".ac-msg--streaming")?.textContent).toContain("Deploy ok");
+    const streaming = document.querySelector(".ac-msg--streaming") as HTMLElement;
+    expect(streaming.textContent).toContain("Deploy ok");
+    // It's the last row of the timeline, and the bar is empty again.
+    const rows = screen().getAllByRole("article");
+    expect(rows[rows.length - 1]).toBe(streaming);
+    expect(bar().textContent).toBe("");
     await push(socket, { type: "agent.idle", ...run });
     await settle();
     expect(document.querySelector(".ac-msg--streaming")).toBeNull();
   });
 
-  test("people typing show above the composer; our typing frames are throttled", async () => {
-    const { socket } = await open();
+  test("groups agents and people: 'Atlas e João estão digitando…'; our typing frames are throttled", async () => {
+    const { socket, state } = await open();
+    await sendText("@atlas tudo certo?");
+    await settle(2);
     await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
     await settle();
-    expect(document.querySelector(".channel__typing")?.textContent).toBe("João está digitando…");
+    expect(bar().textContent).toBe("Atlas e João estão digitando…");
+    await push(socket, {
+      type: "agent.delta",
+      threadId: lastPerson(state)?.id,
+      runId: "r-g",
+      agentId: ATLAS_ID,
+      seq: 1,
+      text: "Sim",
+    });
+    await settle();
+    expect(bar().textContent).toBe("João está digitando…");
     for (const v of ["o", "oi", "oi ", "oi j"])
       await act(async () => fireEvent.change(composer(), { target: { value: v } }));
     expect(socket.sent.filter((f) => (f as { type: string }).type === "typing")).toEqual([
@@ -122,20 +145,61 @@ describe("agent activity in the channel", () => {
   });
 });
 
-describe("receipts under a person's message", () => {
-  test("picked → answering → waiting approval → answered; text equivalent for screen readers", async () => {
+describe("bottom anchoring", () => {
+  test("short channels sit above the composer; new rows follow while at the bottom; scrolled up shows 'Novas mensagens'", async () => {
+    const { socket } = await open();
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    expect(log.firstElementChild?.className).toBe("channel__spacer");
+    // happy-dom has no layout: fake a tall scroll area.
+    Object.defineProperty(log, "scrollHeight", { configurable: true, value: 2000 });
+    Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+    await sendText("primeira");
+    await settle(3);
+    expect(log.scrollTop).toBe(2000);
+    // The person scrolls up.
+    log.scrollTop = 100;
+    await act(async () => fireEvent.scroll(log));
+    await push(socket, {
+      type: "message.created",
+      messageId: "m-new",
+      message: {
+        id: "m-new",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person", id: "u-joao" },
+        body: "chegou algo novo",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+    await settle();
+    expect(log.scrollTop).toBe(100);
+    const pill = screen().getByRole("button", { name: /Novas mensagens/ });
+    await act(async () => fireEvent.click(pill));
+    expect(log.scrollTop).toBe(2000);
+    expect(screen().queryByRole("button", { name: /Novas mensagens/ })).toBeNull();
+  });
+});
+
+describe("receipts: a check with a popover", () => {
+  const checkOf = (text: string) => rowsWith(text)[0]?.querySelector(".ac-receipt__check") as HTMLButtonElement;
+  const icon = (b: HTMLElement) => b.querySelector("path")?.getAttribute("d");
+
+  test("one check (will answer) → clock (answering, waiting) → two checks (answered); popover lists each agent", async () => {
     const { socket, state } = await open();
     await sendText("@ada e o login?");
     await settle(4);
-    const root = state.messages[state.messages.length - 1];
-    const receipt = () => rowsWith("e o login?")[0]?.querySelector(".ac-receipt") as HTMLElement;
-    expect(receipt().getAttribute("aria-label")).toBe("Vista por Ada; Ada vai responder");
-    expect(receipt().querySelectorAll(".ac-avatar--agent")).toHaveLength(1);
+    const root = lastPerson(state);
+    const check = () => checkOf("e o login?");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada vai responder");
+    expect(icon(check())).toBe("m5.5 10.5 3 3 6-7");
     const run = { threadId: root?.id, runId: "r-rc", agentId: ADA_ID };
     await push(socket, { type: "agent.run", ...run, status: "running" });
-    expect(receipt().textContent).toContain("Ada está respondendo");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está respondendo");
     await push(socket, { type: "agent.run", ...run, status: "waiting_approval" });
-    expect(receipt().textContent).toContain("Ada está esperando aprovação");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada está esperando aprovação");
+    expect(icon(check())).toBe("M10 6v4l2.6 1.8");
     await push(socket, {
       type: "message.handled",
       messageId: root?.id,
@@ -143,18 +207,31 @@ describe("receipts under a person's message", () => {
       runId: "r-rc",
       status: "done",
     });
-    expect(receipt().getAttribute("aria-label")).toBe("Vista por Ada; Ada respondeu");
-    expect(receipt().getAttribute("data-done")).toBe("true");
+    expect(check().getAttribute("aria-label")).toBe("Vista por Ada; Ada respondeu");
+    expect(icon(check())).toBe("m2.5 10.5 3 3 6-7M9 13l.5.5 6-7");
+    // Keyboard-openable popover; Esc closes.
+    check().focus();
+    await act(async () => fireEvent.click(check()));
+    const pop = screen().getByRole("dialog", { name: "Agentes" });
+    expect(pop.textContent).toContain("Ada");
+    expect(pop.textContent).toContain("Respondeu");
+    expect(pop.querySelector(".ac-avatar--agent")).not.toBeNull();
+    await act(async () => fireEvent.keyDown(pop, { key: "Escape" }));
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    expect(screen().queryByRole("dialog", { name: "Agentes" })).toBeNull();
   });
 
-  test("failed offers 'Tentar de novo'; nobody picked offers 'Chamar um agente'", async () => {
+  test("failure: alert icon + 'Não conseguiu responder · Tentar de novo'; nobody: 'Chamar um agente'", async () => {
     const { socket, state } = await open();
     await sendText("alguém viu o erro?");
     await settle(4);
-    const root = state.messages[state.messages.length - 1];
+    const root = lastPerson(state);
     const receipt = () => rowsWith("alguém viu o erro?")[0]?.querySelector(".ac-receipt") as HTMLElement;
     await push(socket, { type: "message.routed", messageId: root?.id, seenBy: [ADA_ID, ATLAS_ID], pickedBy: [] });
-    expect(receipt().getAttribute("aria-label")).toBe("Vista por Ada e Atlas; Nenhum agente vai responder");
+    expect(checkOf("alguém viu o erro?").getAttribute("aria-label")).toBe(
+      "Vista por Ada e Atlas; Nenhum agente vai responder",
+    );
+    expect(receipt().textContent).toContain("Nenhum agente vai responder ·");
     await act(async () => {
       const call = within(receipt()).getByRole("button", { name: "Chamar um agente" });
       call.focus();
@@ -165,13 +242,70 @@ describe("receipts under a person's message", () => {
     expect((composer() as HTMLTextAreaElement).value).toBe("@atlas ");
 
     await push(socket, { type: "message.claimed", messageId: root?.id, agentId: ATLAS_ID });
-    await push(socket, { type: "run.finished", threadId: root?.id, runId: "r-f", agentId: ATLAS_ID, status: "failed" });
-    expect(receipt().textContent).toContain("Atlas não conseguiu responder");
+    await push(socket, { type: "message.handled", messageId: root?.id, agentId: ATLAS_ID, status: "failed" });
+    expect(icon(checkOf("alguém viu o erro?"))).toBe("M10 6.5v4M10 13.5v.01");
+    expect(receipt().textContent).toContain("Não conseguiu responder ·");
     await act(async () => fireEvent.click(within(receipt()).getByRole("button", { name: "Tentar de novo" })));
     await settle(4);
     expect(
       state.calls.filter((c) => c.method === "chat.post").map((c) => (c.args[2] as { body: string }).body),
     ).toEqual(["alguém viu o erro?", "alguém viu o erro?"]);
+  });
+});
+
+describe("regression: the router picks nobody (production #general, 'oi' after 'oi @Theo')", () => {
+  test("a mention answered, then a no-mention message: no thinking shown, receipt says nobody", async () => {
+    // #general with exactly one person and one agent: it is NOT a DM.
+    const state = seedState();
+    state.channelMembers[GENERAL_ID] = [
+      { type: "person", id: "u-walter" },
+      { type: "agent", id: ADA_ID },
+    ];
+    const { socket } = await open(state, `c/${GENERAL_ID}`);
+    const pushG = (e: Record<string, unknown>) => push(socket, e, GENERAL_ID);
+
+    await sendText("oi @ada");
+    await settle(4);
+    const first = lastPerson(state);
+    expect(bar().textContent).toBe("Ada está digitando…");
+    const run = { threadId: first?.id, runId: "r-1st", agentId: ADA_ID };
+    await pushG({ type: "agent.delta", ...run, seq: 1, text: "Oi!" });
+    await pushG({
+      type: "message.created",
+      messageId: "reply-1",
+      message: {
+        id: "reply-1",
+        channelId: GENERAL_ID,
+        threadId: first?.id,
+        author: { type: "agent", id: ADA_ID },
+        body: "Oi, tudo bem?",
+        mentionedAgentIds: [],
+        agentRunId: "r-1st",
+        createdAt: new Date().toISOString(),
+      },
+    });
+    await pushG({ type: "message.handled", messageId: first?.id, agentId: ADA_ID, runId: "r-1st", status: "done" });
+    await settle();
+    expect(bar().textContent).toBe("");
+
+    await sendText("oi");
+    // No mention: nothing is assumed before the router decides.
+    expect(bar().textContent).toBe("");
+    await settle(4);
+    const second = lastPerson(state);
+    expect(second?.body).toBe("oi");
+    expect(rowsWith("oi")[0] && rowsWith("oi").at(-1)?.querySelector(".ac-receipt")).toBeNull();
+    await pushG({ type: "message.routed", messageId: second?.id, seenBy: [ADA_ID], pickedBy: [], strategy: "router" });
+    await settle();
+    expect(bar().textContent).toBe("");
+    const receipt = rowsWith("oi").at(-1)?.querySelector(".ac-receipt") as HTMLElement;
+    expect(receipt.textContent).toContain("Nenhum agente vai responder");
+    expect(receipt.querySelector(".ac-receipt__check")?.getAttribute("aria-label")).toBe(
+      "Vista por Ada; Nenhum agente vai responder",
+    );
+    // The first message keeps its own receipt.
+    const firstReceipt = rowsWith("oi @Ada")[0]?.querySelector(".ac-receipt__check");
+    expect(firstReceipt?.getAttribute("aria-label")).toBe("Vista por Ada; Ada respondeu");
   });
 });
 
@@ -198,7 +332,7 @@ describe("direct messages with an agent", () => {
         .map((l) => l.getAttribute("href")),
     ).toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
     await sendText("lembra que deploy é só de segunda a quinta");
-    expect(screen().getByText("Ada está pensando…")).toBeTruthy();
+    expect(bar().textContent).toBe("Ada está digitando…");
   });
 });
 
@@ -230,6 +364,36 @@ describe("memory changes and proposals in the chat", () => {
     expect(state.calls.find((c) => c.method === "memory.revert")?.args).toEqual([ORG_ID, "mem-5"]);
     expect(card.textContent).toContain("Desfeito");
     expect(within(card).queryByRole("button", { name: "Desfazer" })).toBeNull();
+  });
+
+  test("after a reload, cards come from meta.memoryUpdates on the agent's message", async () => {
+    const state = seedState();
+    state.messages.push({
+      id: "msg-mem",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "Pronto, esqueci.",
+      mentionedAgentIds: [],
+      agentRunId: "r-mem",
+      meta: {
+        memoryUpdates: [
+          {
+            action: "forgot",
+            itemId: "mem-7",
+            text: "O staging fica em staging.acme.com.br.",
+            requestedByUserId: "u-walter",
+            undo: { method: "POST", path: "/x" },
+          },
+        ],
+      },
+      createdAt: new Date().toISOString(),
+    });
+    await open(state);
+    const card = screen().getByRole("group", { name: "Memória atualizada por Ada" });
+    expect(card.textContent).toContain("Ada esqueceu");
+    expect(card.querySelector(".struck")?.textContent).toBe("O staging fica em staging.acme.com.br.");
+    expect(within(card).getByRole("button", { name: "Desfazer" })).toBeTruthy();
   });
 
   test("a proposed change (memory.updated, proposed) shows the proposal inline", async () => {

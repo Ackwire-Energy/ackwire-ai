@@ -1463,3 +1463,123 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-cut);
 }
+
+/* Popover (receipts): same surface as menus */
+.ac-popover {
+  min-width: 220px;
+  max-width: 320px;
+  padding: var(--space-2);
+  gap: var(--space-1);
+}
+.ac-popover:focus {
+  outline: none;
+}
+.ac-popover__title {
+  padding: 4px 6px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.ac-popover__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 6px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.ac-popover__row-status {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+/* Typing bar above the composer: tiny avatars + "Theo está digitando…" + three dots */
+.ac-typing {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  margin: 0 4px 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+.ac-typing__avatars {
+  display: inline-flex;
+  gap: 2px;
+}
+.ac-typing__dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.ac-typing__dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--ink-muted);
+  opacity: 0.4;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-typing__dots span {
+    animation: ac-typing-dot 1.2s ease-in-out infinite;
+  }
+  .ac-typing__dots span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .ac-typing__dots span:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+}
+@keyframes ac-typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* Receipt check under a person's message */
+.ac-receipt__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.ac-receipt__check .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+.ac-receipt__check:hover {
+  color: var(--ink);
+}
+.ac-receipt__check:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-receipt__check[data-state-kind="failed"] {
+  color: var(--danger);
+}
+
+/* "Novas mensagens ↓" when the person scrolled up */
+.ac-new-messages {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-2);
+  transform: translateX(-50%);
+  box-shadow: var(--overlay);
+}

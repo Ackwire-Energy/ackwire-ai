@@ -11,6 +11,8 @@ export type ReceiptPhase = "seen" | "picked" | "claimed" | "waiting" | "handled"
 export interface MessageReceipt {
   /** The router decided (so "nobody picked it" is final). */
   routed: boolean;
+  /** Something came from the server (event or list receipts). False = only the client's guess after a mention. */
+  confirmed?: boolean;
   /** Agent id → phase, in the order they appeared. */
   agents: [agentId: string, phase: ReceiptPhase][];
 }
@@ -36,11 +38,15 @@ function set(
   agentId: string,
   phase: ReceiptPhase,
   force = false,
+  confirmed = true,
 ): ReceiptsState {
-  const current = state[messageId] ?? { routed: false, agents: [] };
+  const base = state[messageId] ?? { routed: false, agents: [] };
+  const current = { ...base, confirmed: Boolean(base.confirmed || confirmed) };
   const existing = current.agents.find(([id]) => id === agentId);
   // Never move back (a late "seen" doesn't undo "respondeu"), except a new run starting again.
-  if (existing && !force && RANK[phase] < RANK[existing[1]]) return state;
+  if (existing && !force && RANK[phase] < RANK[existing[1]]) {
+    return current.confirmed === base.confirmed ? state : { ...state, [messageId]: current };
+  }
   const agents = existing
     ? current.agents.map(([id, p]) => [id, id === agentId ? phase : p] as [string, ReceiptPhase])
     : [...current.agents, [agentId, phase] as [string, ReceiptPhase]];
@@ -49,9 +55,12 @@ function set(
 
 /** Seeds a person's message: server receipts, else the agents it mentions (they will answer). */
 export function seedReceipt(state: ReceiptsState, message: Message): ReceiptsState {
-  if (message.author?.type !== "person" || state[message.id]) return state;
+  if (message.author?.type !== "person") return state;
+  const existing = state[message.id];
   const r = message.receipts;
-  let next = state;
+  // Server receipts replace a local guess; otherwise keep what we have.
+  if (existing && (existing.confirmed || !r)) return state;
+  let next: ReceiptsState = existing ? { ...state, [message.id]: { routed: false, agents: [] } } : state;
   if (r) {
     for (const id of r.seenBy) next = set(next, message.id, id, "seen");
     for (const id of r.pickedBy) next = set(next, message.id, id, "picked");
@@ -60,18 +69,37 @@ export function seedReceipt(state: ReceiptsState, message: Message): ReceiptsSta
     const current = next[message.id] ?? { routed: false, agents: [] };
     return { ...next, [message.id]: { ...current, routed: true } };
   }
-  for (const id of message.mentionedAgentIds) next = set(next, message.id, id, "picked");
+  // A mention: the server resolved it, so that agent will answer.
+  for (const id of message.mentionedAgentIds) next = set(next, message.id, id, "picked", false, false);
+  return next;
+}
+
+/** The client's guess right after an explicit @mention or an agent DM (not confirmed; times out). */
+export function guessReceipt(state: ReceiptsState, messageId: string, agentIds: string[]): ReceiptsState {
+  let next = state;
+  for (const id of agentIds) next = set(next, messageId, id, "picked", false, false);
   return next;
 }
 
 export function applyReceiptEvent(state: ReceiptsState, event: ChannelEvent): ReceiptsState {
   switch (event.type) {
     case "message.routed": {
-      let next = state;
+      // The router's decision wins over any guess: agents not picked only "saw" it.
+      const picked = new Set(event.pickedBy);
+      const before = state[event.messageId];
+      let next: ReceiptsState = before
+        ? {
+            ...state,
+            [event.messageId]: {
+              ...before,
+              agents: before.agents.map(([id, p]) => [id, p === "picked" && !picked.has(id) ? "seen" : p]),
+            },
+          }
+        : state;
       for (const id of event.seenBy) next = set(next, event.messageId, id, "seen");
       for (const id of event.pickedBy) next = set(next, event.messageId, id, "picked");
       const current = next[event.messageId] ?? { routed: false, agents: [] };
-      return { ...next, [event.messageId]: { ...current, routed: true } };
+      return { ...next, [event.messageId]: { ...current, routed: true, confirmed: true } };
     }
     case "message.claimed":
       return set(state, event.messageId, event.agentId, "claimed");

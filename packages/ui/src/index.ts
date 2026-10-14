@@ -19,6 +19,7 @@ export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { Mention } from "./components/Mention";
 export { Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "./components/Menu";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
+export { Popover } from "./components/Popover";
 export { Select, type SelectOption, type SelectProps } from "./components/Select";
 export { Alert, Card, EmptyState, type EmptyStateProps, List, Meter, OptionCard, Steps } from "./components/Surfaces";
 export { type TabItem, TabPanel, Tabs } from "./components/Tabs";
