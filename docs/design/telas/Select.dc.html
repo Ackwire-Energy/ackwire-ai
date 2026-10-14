@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Select</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentes/tokens.css">
+<link rel="stylesheet" href="ds/agentes/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{rootClass}}" onKeyDown="{{onKey}}" style="font-family: var(--font-sans); color: var(--ink); width: 100%">
+  <button id="{{triggerId}}" class="ac-select__trigger" type="button" aria-haspopup="listbox" aria-expanded="{{expanded}}" aria-label="{{ariaLabel}}" onClick="{{toggle}}">
+    <span class="ac-select__value">{{currentLabel}}</span>
+    <svg class="ac-select__chev" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"></path></svg>
+  </button>
+  <sc-if value="{{open}}" hint-placeholder-val="{{false}}">
+    <button class="ac-select__scrim" type="button" tabindex="-1" aria-label="Fechar lista" onClick="{{close}}"></button>
+    <div class="ac-menu" role="listbox" aria-label="{{listLabel}}">
+      <sc-for list="{{items}}" as="o" hint-placeholder-count="3">
+        <button class="ac-menu__item" type="button" role="option" aria-selected="{{o.selected}}" onClick="{{o.pick}}">
+          <svg class="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 10.5 3 3 6-7"></path></svg>
+          <span class="ac-menu__label">{{o.label}}<sc-if value="{{o.desc}}" hint-placeholder-val="{{false}}"><span class="ac-menu__desc">{{o.desc}}</span></sc-if></span>
+        </button>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"options":{"editor":null},"value":{"editor":"text","default":"Membro"},"triggerId":{"editor":"text","default":"select"},"ariaLabel":{"editor":"text","default":""},"size":{"editor":"enum","options":["md","sm"],"default":"md"},"onChange":{"editor":null},"$preview":{"width":320,"height":260}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: true, value: null };
+  }
+  componentDidMount() { if (this.props.options) this.setState({ open: false }); }
+  renderVals() {
+    const raw = this.props.options || ['Membro', 'Admin', 'Dono'];
+    const opts = raw.map((o) => typeof o === 'string' ? { value: o, label: o } : o);
+    const value = this.state.value ?? this.props.value ?? (opts[0] && opts[0].value);
+    const current = opts.find((o) => o.value === value) || opts[0] || { label: '' };
+    const close = () => this.setState({ open: false });
+    return {
+      rootClass: 'ac-select' + ((this.props.size ?? 'md') === 'sm' ? ' ac-select--sm' : ''),
+      triggerId: this.props.triggerId ?? 'select',
+      ariaLabel: this.props.ariaLabel || undefined,
+      listLabel: this.props.ariaLabel || 'Opções',
+      currentLabel: current.label,
+      open: this.state.open,
+      expanded: this.state.open ? 'true' : 'false',
+      toggle: () => this.setState({ open: !this.state.open }),
+      close,
+      onKey: (e) => { if (e.key === 'Escape') close(); },
+      items: opts.map((o) => ({ label: o.label, desc: o.desc || '', selected: o.value === value ? 'true' : 'false',
+        pick: () => { this.setState({ value: o.value, open: false }); if (this.props.onChange) this.props.onChange(o.value); } }))
+    };
+  }
+}
+</script>
+</body>
+</html>

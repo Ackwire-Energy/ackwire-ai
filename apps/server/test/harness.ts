@@ -1,0 +1,142 @@
+import {
+  type Adapters,
+  createMemoryPresence,
+  createMemoryPubSub,
+  createMemoryRateLimiter,
+  createPostgresSearchResolver,
+  noPlatformCredentials,
+} from "@agenteschat/adapters";
+import { testConfig } from "@agenteschat/config";
+import { createTestDatabase } from "@agenteschat/db/testing";
+import { createJobHandlers, createLocalKeyWrapper, createModelGateway, drainOutbox } from "@agenteschat/engine";
+import { createFakeProvider } from "@agenteschat/providers/testing";
+import { createApp } from "../src/app";
+import { createAuth } from "../src/auth";
+import { createLogger } from "../src/logger";
+import { createRealtime, type SocketData } from "../src/realtime/ws";
+
+export const ORIGIN = "http://localhost:3000";
+
+/**
+ * The whole server wired like `start.ts`, but on PGlite, in-memory adapters
+ * and the fake model provider. No `.env`, no network.
+ */
+export async function createTestServer(
+  options: { env?: Record<string, string>; reply?: Parameters<typeof createFakeProvider>[0] } = {},
+) {
+  const { db, close } = await createTestDatabase();
+  const config = testConfig({ PUBLIC_URL: ORIGIN, ...options.env });
+  const log = createLogger("error");
+  const adapters: Adapters = {
+    search: createPostgresSearchResolver(db),
+    pubsub: createMemoryPubSub(),
+    presence: createMemoryPresence(),
+    rateLimiter: createMemoryRateLimiter(),
+    keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
+    legacyKeyWrappers: [],
+    platformCredentials: noPlatformCredentials,
+  };
+  const provider = createFakeProvider(options.reply);
+  const gateway = createModelGateway({
+    db,
+    keyWrappers: [adapters.keyWrapper],
+    providers: { anthropic: provider },
+    platformCredentials: noPlatformCredentials,
+  });
+  const handlers = createJobHandlers({
+    db,
+    gateway,
+    pubsub: adapters.pubsub,
+    maxOutputTokens: 1000,
+    contextMessages: 30,
+    maxHops: 3,
+    deltaFlushMs: 0,
+  });
+  const auth = createAuth({ db, config, log });
+  const app = createApp({
+    edition: "selfhost",
+    version: "test",
+    modules: [],
+    pingDatabase: async () => {},
+    services: { db, auth, config, adapters },
+    log,
+  });
+  const realtime = createRealtime({ db, auth, config, log, ...adapters });
+  return { db, close, config, adapters, provider, app, auth, realtime, drain: () => drainOutbox(db, handlers) };
+}
+
+export type TestServer = Awaited<ReturnType<typeof createTestServer>>;
+
+/** Starts a real Bun server on a random port (needed for WebSocket tests). */
+export function listen(t: TestServer) {
+  return Bun.serve<SocketData>({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: (req, srv) =>
+      new URL(req.url).pathname === t.realtime.path ? t.realtime.upgrade(req, srv) : t.app.fetch(req),
+    websocket: t.realtime.websocket,
+  });
+}
+
+/** Minimal browser over `app.request`: keeps cookies and sends our Origin. */
+export function browser(t: TestServer) {
+  let cookie = "";
+  const request = async (path: string, init: { method?: string; json?: unknown; origin?: string | null } = {}) => {
+    const headers = new Headers();
+    if (cookie) headers.set("cookie", cookie);
+    if (init.origin !== null) headers.set("origin", init.origin ?? ORIGIN);
+    if (init.json !== undefined) headers.set("content-type", "application/json");
+    const res = await t.app.request(path, {
+      method: init.method ?? (init.json !== undefined ? "POST" : "GET"),
+      headers,
+      body: init.json !== undefined ? JSON.stringify(init.json) : undefined,
+    });
+    for (const c of res.headers.getSetCookie?.() ?? []) {
+      const [pair] = c.split(";");
+      if (!pair) continue;
+      const [name] = pair.split("=");
+      const rest = cookie
+        .split("; ")
+        .filter((p) => p && !p.startsWith(`${name}=`))
+        .join("; ");
+      cookie = [rest, pair].filter(Boolean).join("; ");
+    }
+    return res;
+  };
+  return Object.assign(request, { cookie: () => cookie });
+}
+
+export type Browser = ReturnType<typeof browser>;
+
+export async function signUp(b: Browser, email: string) {
+  const res = await b("/api/auth/sign-up/email", {
+    json: { email, password: "correct horse battery", name: email.split("@")[0] },
+  });
+  if (res.status !== 200) throw new Error(`sign-up failed: ${res.status} ${await res.text()}`);
+  return res;
+}
+
+/** Owner with an organization, a credential and an agent `@dev` in #general. */
+export async function seedOrg(b: Browser) {
+  const created = (await (
+    await b("/api/app/organizations", { json: { name: "Acme", context: "Acme builds rockets." } })
+  ).json()) as {
+    organization: { id: string };
+    generalChannelId: string;
+  };
+  const orgId = created.organization.id;
+  const credential = (await (
+    await b(`/api/app/organizations/${orgId}/credentials`, {
+      json: { provider: "anthropic", label: "main", apiKey: "sk-ant-api-secret-9876" },
+    })
+  ).json()) as { id: string };
+  const agent = (await (
+    await b(`/api/app/organizations/${orgId}/agents`, {
+      json: { name: "Dev", handle: "dev", credentialId: credential.id, monthlyBudgetUsd: 50 },
+    })
+  ).json()) as { id: string };
+  await b(`/api/app/organizations/${orgId}/channels/${created.generalChannelId}/members`, {
+    json: { agentId: agent.id },
+  });
+  return { orgId, channelId: created.generalChannelId, credentialId: credential.id, agentId: agent.id };
+}

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Criar agente</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentes/tokens.css">
+<link rel="stylesheet" href="ds/agentes/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div data-theme="{{theme}}" style="display: flex; flex-wrap: wrap; min-height: 900px; height: 100vh; background: var(--surface); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 22px">
+  <dc-import name="Sidebar" active="novo" hint-size="272px,100%" style="flex: 0 0 272px"></dc-import>
+
+  <main style="flex: 999 1 560px; min-width: 0; height: 100%; overflow-y: auto">
+    <div style="max-width: 720px; margin: 0 auto; padding: 32px 24px; display: flex; flex-direction: column; gap: 24px">
+
+      <sc-if value="{{editing}}" hint-placeholder-val="{{true}}">
+        <header style="display: flex; flex-direction: column; gap: 4px">
+          <h1 style="margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.015em">Criar agente</h1>
+          <p style="margin: 0; color: var(--ink-muted)">Um colega novo para o time. Ele entra nos canais que você escolher e só faz o que você permitir.</p>
+        </header>
+
+        <section aria-labelledby="q-role" style="display: flex; flex-direction: column; gap: 12px">
+          <h2 id="q-role" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">Qual vai ser o papel?</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px">
+            <sc-for list="{{roles}}" as="r" hint-placeholder-count="5">
+              <button type="button" onClick="{{r.pick}}" aria-pressed="{{r.pressed}}" style="{{r.style}}">
+                <span style="font-weight: 600">{{r.name}}</span>
+                <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted)">{{r.desc}}</span>
+              </button>
+            </sc-for>
+          </div>
+        </section>
+
+        <section aria-labelledby="q-who" style="display: flex; flex-direction: column; gap: 16px">
+          <h2 id="q-who" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">Quem é</h2>
+          <div style="display: flex; gap: 16px; align-items: flex-start">
+            <span class="ac-avatar ac-avatar--lg ac-avatar--agent" aria-hidden="true">{{initial}}</span>
+            <div style="flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px">
+              <div class="ac-field">
+                <label class="ac-field__label" for="ag-name">Nome</label>
+                <input id="ag-name" class="ac-input" value="{{name}}" onChange="{{onName}}" placeholder="Ex.: Iris">
+                <span class="ac-field__help">Como o time vai chamar no chat: @{{handle}}</span>
+              </div>
+              <div class="ac-field">
+                <label class="ac-field__label" for="ag-owner">Responsável</label>
+                <dc-import name="Select" trigger-id="ag-owner" options="{{ownerOptions}}" value="Walter" hint-size="100%,36px"></dc-import>
+                <span class="ac-field__help">Recebe os avisos de orçamento e aprova as ações sensíveis.</span>
+              </div>
+            </div>
+          </div>
+          <div class="ac-field">
+            <label class="ac-field__label" for="ag-instr">Instruções</label>
+            <textarea id="ag-instr" class="ac-input" rows="4" style="height: auto; padding: 10px 12px; line-height: 22px; resize: vertical">{{instructions}}</textarea>
+            <span class="ac-field__help">Escreva como para um colega novo: o que fazer, o que evitar, a quem pedir ajuda.</span>
+          </div>
+        </section>
+
+        <section aria-labelledby="q-model" style="display: flex; flex-direction: column; gap: 12px">
+          <h2 id="q-model" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">Modelo e custo</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px">
+            <div class="ac-field">
+              <label class="ac-field__label" for="ag-model">Modelo</label>
+              <dc-import name="Select" trigger-id="ag-model" options="{{modelOptions}}" value="sonnet" hint-size="100%,36px"></dc-import>
+            </div>
+            <div class="ac-field">
+              <label class="ac-field__label" for="ag-key">Chave</label>
+              <dc-import name="Select" trigger-id="ag-key" options="{{keyOptions}}" value="acme" hint-size="100%,36px"></dc-import>
+            </div>
+            <div class="ac-field">
+              <label class="ac-field__label" for="ag-budget">Orçamento mensal (US$)</label>
+              <input id="ag-budget" class="ac-input" value="{{budget}}" onChange="{{onBudget}}" inputmode="decimal" aria-invalid="{{budgetInvalid}}">
+              <sc-if value="{{budgetError}}" hint-placeholder-val="{{false}}"><span class="ac-field__error">Use um valor maior que zero.</span></sc-if>
+              <sc-if value="{{budgetOk}}" hint-placeholder-val="{{true}}"><span class="ac-field__help">Ao atingir o limite, o agente para e avisa.</span></sc-if>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="q-where" style="display: flex; flex-direction: column; gap: 12px">
+          <h2 id="q-where" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">Onde trabalha e com o quê</h2>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <sc-for list="{{toggles}}" as="t" hint-placeholder-count="6">
+              <label for="{{t.id}}" style="{{t.style}}">
+                <input id="{{t.id}}" type="checkbox" class="ac-check" checked="{{t.on}}" onChange="{{t.toggle}}" style="margin: 0">
+                <span>{{t.label}}</span>
+              </label>
+            </sc-for>
+          </div>
+          <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted)">Merge, deploy e rollback sempre viram pedido de aprovação, mesmo com o conector liberado.</span>
+        </section>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--line)">
+          <a class="ac-btn" href="Main.dc.html" style="text-decoration: none">Cancelar</a>
+          <button class="ac-btn ac-btn--primary" type="button" onClick="{{create}}" disabled="{{cannotCreate}}">Criar {{displayName}}</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{created}}" hint-placeholder-val="{{false}}">
+        <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 16px; padding: 32px; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 16px">
+          <span class="ac-avatar ac-avatar--lg ac-avatar--agent ac-avatar--running" aria-hidden="true">{{initial}}</span>
+          <h1 style="margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.015em">{{displayName}} entrou no time</h1>
+          <p style="margin: 0; color: var(--ink-muted); max-width: 60ch">Já está em #eng e #produto. Mencione @{{handle}} numa conversa para começar. Você recebe os avisos de orçamento e os pedidos de aprovação.</p>
+          <div style="display: flex; gap: 8px">
+            <a class="ac-btn ac-btn--primary" href="Main.dc.html" style="text-decoration: none">Ir para o #eng</a>
+            <button class="ac-btn" type="button" onClick="{{reset}}">Criar outro agente</button>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["claro","escuro"],"default":"claro"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { role: 'qa', name: 'Iris', budget: '25', created: false, on: { eng: true, produto: true, geral: false, github: true, sentry: true, drive: false } };
+  }
+  renderVals() {
+    const ROLES = [
+      { id: 'dev', name: 'Dev', desc: 'Programa, revisa PRs e investiga bugs.', instr: 'Programa em branches e abre PRs pequenos, com teste para cada correção.' },
+      { id: 'ops', name: 'Ops', desc: 'Monitora erros, filas e deploys.', instr: 'Acompanha erros e deploys e escreve relatórios de incidente.' },
+      { id: 'qa', name: 'QA', desc: 'Testa fluxos e reproduz bugs relatados.', instr: 'Reproduz cada bug relatado antes de abrir issue. Escreve passos claros e anexa evidências.' },
+      { id: 'pm', name: 'PM', desc: 'Organiza tarefas, resumos e o fórum.', instr: 'Organiza tarefas, resume discussões longas e mantém o roadmap atualizado.' },
+      { id: 'custom', name: 'Do zero', desc: 'Você escreve tudo.', instr: '' }
+    ];
+    const s = this.state;
+    const pressedStyle = (on) => 'display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 12px; font: inherit; cursor: pointer; border-radius: 10px; border-bottom-left-radius: 2px; color: var(--ink); border: 1px solid ' + (on ? 'var(--ink)' : 'var(--line)') + '; background: ' + (on ? 'var(--surface-sunken)' : 'var(--surface-raised)') + ';';
+    const roles = ROLES.map((r) => ({ ...r, pressed: s.role === r.id ? 'true' : 'false', style: pressedStyle(s.role === r.id), pick: () => this.setState({ role: r.id }) }));
+    const role = ROLES.find((r) => r.id === s.role) || ROLES[0];
+    const name = s.name || '';
+    const displayName = name.trim() || 'agente';
+    const n = parseFloat(String(s.budget).replace(',', '.'));
+    const budgetError = !(n > 0);
+    const chipStyle = (on) => 'display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border-radius: 6px; font-size: 14px; cursor: pointer; color: var(--ink); border: 1px solid ' + (on ? 'var(--ink)' : 'var(--line-strong)') + '; background: ' + (on ? 'var(--surface-sunken)' : 'var(--surface-raised)') + ';';
+    const T = [['eng', '#eng'], ['produto', '#produto'], ['geral', '#geral'], ['github', 'GitHub: ler e abrir PRs'], ['sentry', 'Sentry: ler erros'], ['drive', 'Drive: criar relatórios']];
+    const toggles = T.map(([id, label]) => ({ id: 'tg-' + id, label, on: !!s.on[id], style: chipStyle(!!s.on[id]),
+      toggle: () => this.setState({ on: Object.assign({}, s.on, { [id]: !s.on[id] }) }) }));
+    return {
+      theme: (this.props.tema ?? 'claro') === 'escuro' ? 'dark' : 'light',
+      roles, toggles,
+      ownerOptions: [{ value: 'Walter', label: 'Walter', desc: 'Founder' }, { value: 'João', label: 'João', desc: 'Backend' }, { value: 'Marina', label: 'Marina', desc: 'Design' }],
+      modelOptions: [{ value: 'sonnet', label: 'Claude Sonnet 5.5', desc: 'Recomendado para a maioria' }, { value: 'opus', label: 'Claude Opus 5.5', desc: 'Tarefas longas e difíceis' }, { value: 'haiku', label: 'Claude Haiku 5.5', desc: 'Rápido e barato' }],
+      keyOptions: [{ value: 'acme', label: 'Anthropic da Acme', desc: 'Termina em 7f2a' }, { value: 'platform', label: 'Chave do agentes', desc: 'Uso entra na fatura' }],
+      instructions: role.instr,
+      name, displayName,
+      handle: (name.trim() || 'agente').toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, ''),
+      initial: (name.trim()[0] || 'A').toUpperCase(),
+      onName: (e) => this.setState({ name: e.target.value }),
+      budget: s.budget,
+      onBudget: (e) => this.setState({ budget: e.target.value }),
+      budgetError, budgetOk: !budgetError, budgetInvalid: budgetError ? 'true' : 'false',
+      cannotCreate: budgetError || !name.trim(),
+      editing: !s.created, created: s.created,
+      create: () => this.setState({ created: true }),
+      reset: () => this.setState({ created: false, name: '' })
+    };
+  }
+}
+</script>
+</body>
+</html>

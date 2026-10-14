@@ -1,0 +1,331 @@
+import {
+  acceptInvitation,
+  changeMemberRole,
+  countUsers,
+  createInvitation,
+  createOrganization,
+  getOrganization,
+  listInvitations,
+  listMembers,
+  listMemberships,
+  previewInvitation,
+  removeMember,
+  requirePermission,
+  revokeInvitation,
+  updateOrganization,
+} from "@agenteschat/engine";
+import { createRoute, z } from "@hono/zod-openapi";
+import { authUiConfig } from "../../auth";
+import { apiError } from "../../http/errors";
+import {
+  type AppDeps,
+  body,
+  createAppRouter,
+  errors,
+  iso,
+  json,
+  noContent,
+  OrgParams,
+  requireSession,
+  security,
+} from "./context";
+import { Invitation, Member, Organization, Role } from "./schemas";
+
+const tags = ["Account"];
+const Name = z.string().trim().min(1).max(100);
+const Context = z.string().max(20_000).openapi({ description: "Shared with every agent of the organization." });
+
+/** Account, organizations, members and invitations. */
+export function accountRoutes(deps: AppDeps) {
+  const { db, config } = deps;
+  const app = createAppRouter(deps);
+  const session = requireSession(deps.auth);
+  for (const path of ["/me", "/organizations", "/organizations/*", "/invitations/:token/accept"])
+    app.use(path, session);
+
+  // ── Public ────────────────────────────────────────────────────────────────
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/auth-config",
+      tags,
+      summary: "Sign-in options for the login page",
+      responses: {
+        200: json(
+          z.object({
+            socialProviders: z.object({ google: z.boolean(), github: z.boolean() }),
+            signupOpen: z
+              .boolean()
+              .openapi({ description: "Offer the sign-up form (invited people can always sign up)." }),
+            firstRun: z.boolean().openapi({ description: "No account exists yet: show first-run setup." }),
+          }),
+        ),
+      },
+    }),
+    async (c) => {
+      const users = await countUsers(db);
+      return c.json(
+        { ...authUiConfig(config), signupOpen: config.ALLOW_SIGNUP || users === 0, firstRun: users === 0 },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/invitations/{token}",
+      tags,
+      summary: "Preview an invitation",
+      request: { params: z.object({ token: z.string() }) },
+      responses: { 200: json(z.object({ orgName: z.string(), email: z.string(), role: Role })), 404: errors[404] },
+    }),
+    async (c) => {
+      const invitation = await previewInvitation(db, c.req.valid("param").token);
+      return invitation ? c.json(invitation, 200) : apiError(c, 404, "not_found", "Invitation not found or expired");
+    },
+  );
+
+  // ── Signed in ─────────────────────────────────────────────────────────────
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/me",
+      tags,
+      security,
+      summary: "The signed-in person and their organizations",
+      responses: {
+        200: json(
+          z.object({
+            user: z.object({ id: z.string(), name: z.string(), email: z.string(), image: z.string().nullable() }),
+            organizations: z.array(Organization),
+          }),
+        ),
+        401: errors[401],
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const memberships = await listMemberships(db, user.id);
+      return c.json(
+        {
+          user: { id: user.id, name: user.name, email: user.email, image: user.image ?? null },
+          organizations: memberships.map((m) => ({ id: m.orgId, name: m.orgName, role: m.role })),
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations",
+      tags,
+      security,
+      summary: "Create an organization (you become its owner)",
+      request: { body: body(z.object({ name: Name, context: Context.optional() })) },
+      responses: {
+        201: json(z.object({ organization: Organization, generalChannelId: z.uuid() }), "Created"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const input = c.req.valid("json");
+      const { organization, general } = await createOrganization(db, c.get("user").id, input);
+      return c.json(
+        {
+          organization: {
+            id: organization.id,
+            name: organization.name,
+            role: "owner" as const,
+            context: organization.context,
+          },
+          generalChannelId: general.id,
+        },
+        201,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}",
+      tags,
+      security,
+      summary: "An organization you belong to",
+      request: { params: OrgParams },
+      responses: { 200: json(Organization), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const membership = await requirePermission(db, c.get("user").id, orgId, "read");
+      const org = await getOrganization(db, orgId);
+      return c.json({ id: orgId, name: membership.orgName, role: membership.role, context: org?.context ?? "" }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}",
+      tags,
+      security,
+      summary: "Rename or change the organization context",
+      request: { params: OrgParams, body: body(z.object({ name: Name.optional(), context: Context.optional() })) },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      await updateOrganization(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"));
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/members",
+      tags,
+      security,
+      summary: "People in the organization",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ members: z.array(Member) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      await requirePermission(db, c.get("user").id, orgId, "read");
+      const members = await listMembers(db, orgId);
+      return c.json({ members: members.map((m) => ({ ...m, joinedAt: m.joinedAt.toISOString() })) }, 200);
+    },
+  );
+
+  const MemberParams = OrgParams.extend({ userId: z.string() });
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/members/{userId}",
+      tags,
+      security,
+      summary: "Change a member's role",
+      request: { params: MemberParams, body: body(z.object({ role: Role })) },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, userId } = c.req.valid("param");
+      await changeMemberRole(db, c.get("user").id, orgId, userId, c.req.valid("json").role);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/members/{userId}",
+      tags,
+      security,
+      summary: "Remove a member (or leave)",
+      request: { params: MemberParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, userId } = c.req.valid("param");
+      await removeMember(db, c.get("user").id, orgId, userId);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/invitations",
+      tags,
+      security,
+      summary: "Pending invitations",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ invitations: z.array(Invitation) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      await requirePermission(db, c.get("user").id, orgId, "manage_members");
+      const rows = await listInvitations(db, orgId);
+      return c.json(
+        {
+          invitations: rows.map((i) => ({
+            id: i.id,
+            email: i.email,
+            role: i.role,
+            expiresAt: i.expiresAt.toISOString(),
+          })),
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/invitations",
+      tags,
+      security,
+      summary: "Invite someone by email",
+      description: "Returns the invitation link to share. Only a hash of its token is stored.",
+      request: { params: OrgParams, body: body(z.object({ email: z.email(), role: Role })) },
+      responses: { 201: json(z.object({ invitation: Invitation, url: z.string() }), "Created"), ...errors },
+    }),
+    async (c) => {
+      const { invitation, token } = await createInvitation(
+        db,
+        c.get("user").id,
+        c.req.valid("param").orgId,
+        c.req.valid("json"),
+      );
+      const url = `${config.PUBLIC_URL.replace(/\/$/, "")}/invite/${token}`;
+      return c.json(
+        {
+          invitation: {
+            id: invitation.id,
+            email: invitation.email,
+            role: invitation.role,
+            expiresAt: iso(invitation.expiresAt) ?? "",
+          },
+          url,
+        },
+        201,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/invitations/{invitationId}",
+      tags,
+      security,
+      summary: "Revoke an invitation",
+      request: { params: OrgParams.extend({ invitationId: z.uuid() }) },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, invitationId } = c.req.valid("param");
+      await revokeInvitation(db, c.get("user").id, orgId, invitationId);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/invitations/{token}/accept",
+      tags,
+      security,
+      summary: "Accept an invitation (signed in with the invited email)",
+      request: { params: z.object({ token: z.string() }) },
+      responses: { 200: json(z.object({ orgId: z.uuid() })), ...errors },
+    }),
+    async (c) => c.json(await acceptInvitation(db, c.get("user"), c.req.valid("param").token), 200),
+  );
+
+  return app;
+}

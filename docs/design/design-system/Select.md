@@ -1,0 +1,3 @@
+# Select
+
+Seleção de uma opção numa lista curta, com gatilho e lista próprios: nunca use o `<select>` nativo do sistema. O gatilho (`ac-select__trigger`) é um `<button aria-haspopup="listbox">` com o valor atual e a seta; aberto, mostra `ac-menu` (`role="listbox"`) logo abaixo, com cada opção como `<button role="option" aria-selected>`, check na escolhida e descrição opcional (`ac-menu__desc`). Fecha ao escolher, com Esc e ao clicar fora (`ac-select__scrim`). O consumidor fornece as opções, o valor e o rótulo (um `<label for>` apontando para o gatilho, ou `aria-label`). Tamanhos: 36px e `ac-select--sm` (32px) em tabelas. Para mais de ~12 opções, use uma lista com busca num diálogo.

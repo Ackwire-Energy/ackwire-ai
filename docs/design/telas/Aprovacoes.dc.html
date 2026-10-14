@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Aprovações</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentes/tokens.css">
+<link rel="stylesheet" href="ds/agentes/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div data-theme="{{theme}}" style="display: flex; flex-wrap: wrap; min-height: 900px; height: 100vh; background: var(--surface); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 22px">
+  <dc-import name="Sidebar" active="aprovacoes" hint-size="272px,100%" style="flex: 0 0 272px"></dc-import>
+
+  <main style="flex: 999 1 560px; min-width: 0; height: 100%; overflow-y: auto">
+    <div style="max-width: 860px; margin: 0 auto; padding: 32px 24px; display: flex; flex-direction: column; gap: 24px">
+      <header style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.015em">Aprovações</h1>
+        <p style="margin: 0; color: var(--ink-muted)">Ações sensíveis que os agentes querem fazer. Nada acontece sem a decisão de uma pessoa.</p>
+      </header>
+
+      <div role="tablist" aria-label="Filtro" style="display: flex; gap: 4px; border-bottom: 1px solid var(--line)">
+        <button role="tab" type="button" aria-selected="{{tabPending}}" onClick="{{showPending}}" style="{{tabPendingStyle}}">Pendentes <span style="font-variant-numeric: tabular-nums">{{pendingCount}}</span></button>
+        <button role="tab" type="button" aria-selected="{{tabDone}}" onClick="{{showDone}}" style="{{tabDoneStyle}}">Decididas <span style="font-variant-numeric: tabular-nums">{{doneCount}}</span></button>
+      </div>
+
+      <sc-if value="{{emptyPending}}" hint-placeholder-val="{{false}}">
+        <div style="padding: 40px 24px; text-align: center; color: var(--ink-muted); border: 1px dashed var(--line); border-radius: 10px">Nenhuma aprovação pendente. Quando um agente pedir algo sensível, aparece aqui e no canal.</div>
+      </sc-if>
+
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <sc-for list="{{visible}}" as="r" hint-placeholder-count="2">
+          <article class="ac-approval" style="max-width: none" aria-label="{{r.title}}">
+            <div class="ac-approval__head">
+              <span class="ac-avatar ac-avatar--sm ac-avatar--agent" aria-hidden="true">{{r.initial}}</span>
+              <span class="ac-approval__who"><b>{{r.agent}}</b> em <a href="{{r.href}}" style="color: var(--ink)">{{r.channel}}</a> · {{r.when}}</span>
+              <sc-if value="{{r.isPending}}" hint-placeholder-val="{{true}}">
+                <span class="ac-chip ac-chip--waiting"><svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="M10 6v4l2.6 1.8"></path></svg>{{r.expires}}</span>
+              </sc-if>
+              <sc-if value="{{r.isApproved}}" hint-placeholder-val="{{false}}">
+                <span class="ac-chip ac-chip--done"><svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 10.5 3 3 6-7"></path></svg>{{r.decision}}</span>
+              </sc-if>
+              <sc-if value="{{r.isRefused}}" hint-placeholder-val="{{false}}">
+                <span class="ac-chip"><svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"></path></svg>{{r.decision}}</span>
+              </sc-if>
+            </div>
+            <p class="ac-approval__title">{{r.title}}</p>
+            <p class="ac-approval__detail">{{r.detail}}</p>
+            <sc-if value="{{r.isPending}}" hint-placeholder-val="{{true}}">
+              <div class="ac-approval__actions">
+                <button class="ac-btn ac-btn--primary ac-btn--sm" type="button" onClick="{{r.approve}}">{{r.cta}}</button>
+                <button class="ac-btn ac-btn--sm" type="button" onClick="{{r.refuse}}">Recusar</button>
+                <a class="ac-btn ac-btn--ghost ac-btn--sm" href="{{r.href}}" style="text-decoration: none">Ver no canal</a>
+              </div>
+            </sc-if>
+          </article>
+        </sc-for>
+      </div>
+
+      <p style="margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted)">Quem pode aprovar: o responsável pelo agente e os admins da organização. Pedidos expiram em 24 h sem decisão.</p>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["claro","escuro"],"default":"claro"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      tab: 'pending',
+      decisions: { r3: 'approved', r4: 'refused' }
+    };
+  }
+  renderVals() {
+    const base = [
+      { id: 'r1', agent: 'Ada', initial: 'A', channel: '#eng', href: 'Main.dc.html', when: 'há 2 min', expires: 'Expira em 23 h', cta: 'Aprovar merge',
+        title: 'Fazer merge do PR #42 em main', detail: 'github.merge · agentes-chat/app · PR 42 · testes passando' },
+      { id: 'r2', agent: 'Atlas', initial: 'At', channel: '#eng', href: 'Main.dc.html', when: 'há 14 min', expires: 'Expira em 22 h', cta: 'Aprovar deploy',
+        title: 'Fazer deploy da versão 1.8.2 em produção', detail: 'vercel.deploy · app · produção · 3 commits desde 1.8.1' },
+      { id: 'r3', agent: 'Atlas', initial: 'At', channel: '#eng', href: 'Main.dc.html', when: 'ontem', expires: '', cta: '',
+        title: 'Fazer rollback da 1.8.0 para 1.7.9', detail: 'vercel.rollback · app · produção', decisionText: 'Aprovado por João · ontem 18:02' },
+      { id: 'r4', agent: 'Theo', initial: 'T', channel: '#produto', href: '#', when: 'ontem', expires: '', cta: '',
+        title: 'Publicar o roadmap do trimestre no fórum', detail: 'forum.publish · tópico novo · visível para toda a org', decisionText: 'Recusado por Walter · ontem 11:40' }
+    ];
+    const d = this.state.decisions;
+    const rows = base.map((r) => {
+      const status = d[r.id] || 'pending';
+      const decision = r.decisionText || (status === 'approved' ? 'Aprovado por você · agora' : 'Recusado por você · agora');
+      return Object.assign({}, r, {
+        status, decision,
+        isPending: status === 'pending', isApproved: status === 'approved', isRefused: status === 'refused',
+        approve: () => this.setState({ decisions: Object.assign({}, d, { [r.id]: 'approved' }) }),
+        refuse: () => this.setState({ decisions: Object.assign({}, d, { [r.id]: 'refused' }) })
+      });
+    });
+    const pending = rows.filter((r) => r.isPending);
+    const done = rows.filter((r) => !r.isPending);
+    const tab = this.state.tab;
+    const tabBase = 'font: inherit; font-size: 14px; font-weight: 600; padding: 8px 12px; margin-bottom: -1px; background: transparent; border: 0; border-bottom: 2px solid ';
+    return {
+      theme: (this.props.tema ?? 'claro') === 'escuro' ? 'dark' : 'light',
+      tabPending: tab === 'pending' ? 'true' : 'false',
+      tabDone: tab === 'done' ? 'true' : 'false',
+      tabPendingStyle: tabBase + (tab === 'pending' ? 'var(--ink); color: var(--ink);' : 'transparent; color: var(--ink-muted);') + ' cursor: pointer;',
+      tabDoneStyle: tabBase + (tab === 'done' ? 'var(--ink); color: var(--ink);' : 'transparent; color: var(--ink-muted);') + ' cursor: pointer;',
+      showPending: () => this.setState({ tab: 'pending' }),
+      showDone: () => this.setState({ tab: 'done' }),
+      pendingCount: pending.length,
+      doneCount: done.length,
+      visible: tab === 'pending' ? pending : done,
+      emptyPending: tab === 'pending' && pending.length === 0
+    };
+  }
+}
+</script>
+</body>
+</html>

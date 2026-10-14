@@ -1,0 +1,180 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { authorizeSubscription, parseClientFrame } from "../src/realtime/ws";
+import { browser, createTestServer, listen, ORIGIN, seedOrg, signUp, type TestServer } from "./harness";
+
+describe("parseClientFrame", () => {
+  test("accepts subscribe/unsubscribe with a uuid and ping; rejects the rest", () => {
+    const id = "0193a2b4-0000-7000-8000-000000000000";
+    expect(parseClientFrame(JSON.stringify({ type: "subscribe", channelId: id }))).toEqual({
+      type: "subscribe",
+      channelId: id,
+    });
+    expect(parseClientFrame('{"type":"ping"}')).toEqual({ type: "ping" });
+    expect(parseClientFrame('{"type":"subscribe","channelId":"general"}')).toBeNull();
+    expect(parseClientFrame("not json")).toBeNull();
+    expect(parseClientFrame(JSON.stringify({ type: "subscribe", channelId: id, pad: "x".repeat(5000) }))).toBeNull();
+  });
+});
+
+let t: TestServer;
+let server: ReturnType<typeof listen>;
+beforeEach(async () => {
+  t = await createTestServer({ env: { ALLOW_SIGNUP: "true" }, reply: () => ({ chunks: ["Hel", "lo ", "there"] }) });
+  server = listen(t);
+});
+afterEach(async () => {
+  await server.stop(true);
+  await t.close();
+});
+
+const wsUrl = (orgId: string) => `ws://127.0.0.1:${server.port}/api/ws?orgId=${orgId}`;
+
+/** Opens a socket and collects frames. Resolves once `ready` arrives, rejects if refused. */
+function connect(url: string, headers: Record<string, string>) {
+  const frames: Record<string, unknown>[] = [];
+  const ws = new WebSocket(url, { headers } as unknown as string[]);
+  const waiters: { pred: (f: Record<string, unknown>) => boolean; resolve: (f: Record<string, unknown>) => void }[] =
+    [];
+  ws.onmessage = (e) => {
+    const frame = JSON.parse(String(e.data)) as Record<string, unknown>;
+    frames.push(frame);
+    for (const w of [...waiters])
+      if (w.pred(frame)) {
+        waiters.splice(waiters.indexOf(w), 1);
+        w.resolve(frame);
+      }
+  };
+  const next = (pred: (f: Record<string, unknown>) => boolean, ms = 5000) =>
+    new Promise<Record<string, unknown>>((resolve, reject) => {
+      const found = frames.find(pred);
+      if (found) return resolve(found);
+      waiters.push({ pred, resolve });
+      setTimeout(() => reject(new Error(`timeout; frames: ${JSON.stringify(frames)}`)), ms);
+    });
+  const opened = new Promise<void>((resolve, reject) => {
+    ws.onopen = () => resolve();
+    ws.onerror = () => reject(new Error("refused"));
+    ws.onclose = (e) => reject(new Error(`closed ${e.code}`));
+  });
+  return { ws, frames, next, opened, send: (f: unknown) => ws.send(JSON.stringify(f)) };
+}
+
+/** Upgrade status for refused connections (plain HTTP request with upgrade headers). */
+async function upgradeStatus(url: string, headers: Record<string, string>) {
+  const res = await fetch(url.replace("ws://", "http://"), {
+    headers: {
+      ...headers,
+      connection: "Upgrade",
+      upgrade: "websocket",
+      "sec-websocket-version": "13",
+      "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==",
+    },
+  });
+  return res.status;
+}
+
+test("upgrade requires a session, our Origin and org membership", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  expect(await upgradeStatus(wsUrl(orgId), { origin: ORIGIN })).toBe(401);
+  expect(await upgradeStatus(wsUrl(orgId), { origin: "https://evil.example", cookie: owner.cookie() })).toBe(403);
+  expect(await upgradeStatus(`ws://127.0.0.1:${server.port}/api/ws`, { origin: ORIGIN, cookie: owner.cookie() })).toBe(
+    400,
+  );
+  const stranger = browser(t);
+  await signUp(stranger, "stranger@example.com");
+  expect(await upgradeStatus(wsUrl(orgId), { origin: ORIGIN, cookie: stranger.cookie() })).toBe(403);
+});
+
+test("subscriptions are limited to channels the person belongs to, in the connection's org", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const priv = (await (
+    await owner(`/api/app/organizations/${orgId}/channels`, { json: { name: "secret", visibility: "private" } })
+  ).json()) as { id: string };
+
+  // Another person in the same org who is not in #secret.
+  const { url } = (await (
+    await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "ana@example.com", role: "member" } })
+  ).json()) as { url: string };
+  const ana = browser(t);
+  await signUp(ana, "ana@example.com");
+  await ana(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
+  // And an outsider with an org of their own.
+  const eve = browser(t);
+  await signUp(eve, "eve@example.com");
+  const eveOrg = (await (await eve("/api/app/organizations", { json: { name: "Eve Inc" } })).json()) as {
+    organization: { id: string };
+  };
+
+  const a = connect(wsUrl(orgId), { origin: ORIGIN, cookie: ana.cookie() });
+  await a.opened;
+  await a.next((f) => f.type === "ready");
+  a.send({ type: "subscribe", channelId });
+  expect(await a.next((f) => f.channelId === channelId)).toEqual({ type: "subscribed", channelId });
+  a.send({ type: "subscribe", channelId: priv.id });
+  expect(await a.next((f) => f.channelId === priv.id)).toEqual({
+    type: "error",
+    code: "forbidden",
+    channelId: priv.id,
+  });
+  a.ws.close();
+
+  const e = connect(wsUrl(eveOrg.organization.id), { origin: ORIGIN, cookie: eve.cookie() });
+  await e.opened;
+  e.send({ type: "subscribe", channelId });
+  expect(await e.next((f) => f.channelId === channelId)).toEqual({ type: "error", code: "not_found", channelId });
+  e.ws.close();
+
+  expect(await authorizeSubscription(t.db, (await meId(eve)) ?? "", orgId, channelId)).toBe("forbidden");
+});
+
+async function meId(b: ReturnType<typeof browser>) {
+  return ((await (await b("/api/app/me")).json()) as { user: { id: string } }).user.id;
+}
+
+test("end to end: a subscriber sees the message, the streamed deltas and the agent's reply", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  const c = connect(wsUrl(orgId), { origin: ORIGIN, cookie: owner.cookie() });
+  await c.opened;
+  c.send({ type: "subscribe", channelId });
+  await c.next((f) => f.type === "subscribed");
+
+  const posted = (await (
+    await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, { json: { body: "@dev hi" } })
+  ).json()) as { id: string };
+  await t.drain();
+
+  const done = await c.next(
+    (f) => f.type === "event" && (f.event as { type: string; status?: string }).status === "done",
+  );
+  expect(done).toMatchObject({ channelId, event: { type: "agent.run", agentId } });
+  const events = c.frames.filter((f) => f.type === "event").map((f) => f.event as Record<string, unknown>);
+  expect(events.map((e) => e.type)).toEqual([
+    "message.created",
+    "agent.run",
+    "agent.delta",
+    "agent.delta",
+    "agent.delta",
+    "message.created",
+    "agent.run",
+  ]);
+  expect(
+    events
+      .filter((e) => e.type === "agent.delta")
+      .map((e) => e.text)
+      .join(""),
+  ).toBe("Hello there");
+  const reply = events[5] as { message: { body: string; threadId: string; author: { type: string; id: string } } };
+  expect(reply.message).toMatchObject({
+    body: "Hello there",
+    threadId: posted.id,
+    author: { type: "agent", id: agentId },
+  });
+  expect(await t.adapters.presence.online(orgId)).toHaveLength(1);
+  c.ws.close();
+});

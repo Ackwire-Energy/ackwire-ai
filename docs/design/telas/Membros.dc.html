@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Membros e convites</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentes/tokens.css">
+<link rel="stylesheet" href="ds/agentes/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div data-theme="{{theme}}" style="display: flex; flex-wrap: wrap; min-height: 900px; height: 100vh; background: var(--surface); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 22px">
+  <dc-import name="Sidebar" active="membros" hint-size="272px,100%" style="flex: 0 0 272px"></dc-import>
+
+  <main style="flex: 999 1 560px; min-width: 0; height: 100%; overflow-y: auto">
+    <div style="max-width: 920px; margin: 0 auto; padding: 32px 24px; display: flex; flex-direction: column; gap: 28px">
+      <header style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.015em">Membros</h1>
+        <p style="margin: 0; color: var(--ink-muted)">Quem faz parte da Acme: {{peopleCount}} pessoas e 4 agentes.</p>
+      </header>
+
+      <section aria-labelledby="sec-invite" style="display: flex; flex-direction: column; gap: 12px; padding: 20px; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 10px">
+        <h2 id="sec-invite" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">Convidar pessoas</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end">
+          <div class="ac-field" style="flex: 1 1 280px">
+            <label class="ac-field__label" for="m-email">E-mails, separados por vírgula</label>
+            <input id="m-email" class="ac-input" value="{{draft}}" onChange="{{onDraft}}" onKeyDown="{{onKey}}" placeholder="nome@acme.com.br, outra@acme.com.br">
+          </div>
+          <div class="ac-field" style="flex: 0 1 150px">
+            <label class="ac-field__label" for="m-role">Papel</label>
+            <dc-import name="Select" trigger-id="m-role" options="{{roleOptions}}" value="Membro" on-change="{{onRole}}" hint-size="100%,36px"></dc-import>
+          </div>
+          <button class="ac-btn ac-btn--primary" type="button" onClick="{{invite}}">Convidar</button>
+        </div>
+        <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted)">Admins gerenciam membros, agentes, conectores e chaves. Membros conversam, criam issues e aprovam ações dos agentes de que são responsáveis.</span>
+      </section>
+
+      <sc-if value="{{hasPending}}" hint-placeholder-val="{{true}}">
+        <section aria-labelledby="sec-pending" style="display: flex; flex-direction: column; gap: 8px">
+          <h2 id="sec-pending" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">Convites pendentes</h2>
+          <div style="display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised)">
+            <sc-for list="{{pending}}" as="p" hint-placeholder-count="2">
+              <div style="{{p.rowStyle}}">
+                <span style="flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere">{{p.email}}</span>
+                <span style="flex: 0 0 72px; font-size: 13px; color: var(--ink-muted)">{{p.role}}</span>
+                <span style="flex: 0 1 180px; font-size: 13px; color: var(--ink-muted)">{{p.status}}</span>
+                <div style="display: flex; gap: 4px">
+                  <button class="ac-btn ac-btn--ghost ac-btn--sm" type="button" onClick="{{p.resend}}">{{p.resendLabel}}</button>
+                  <button class="ac-btn ac-btn--ghost ac-btn--sm" type="button" onClick="{{p.revoke}}" style="color: var(--danger)">Revogar</button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </sc-if>
+
+      <section aria-labelledby="sec-people" style="display: flex; flex-direction: column; gap: 8px">
+        <h2 id="sec-people" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">Pessoas</h2>
+        <div style="display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised)">
+          <sc-for list="{{people}}" as="m" hint-placeholder-count="4">
+            <div style="{{m.rowStyle}}">
+              <span class="ac-avatar ac-avatar--sm" aria-hidden="true">{{m.initial}}</span>
+              <span style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column">
+                <span style="font-weight: 600">{{m.name}}{{m.you}}</span>
+                <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted); overflow-wrap: anywhere">{{m.email}}</span>
+              </span>
+              <span style="flex: 0 1 160px; font-size: 13px; color: var(--ink-muted)">{{m.seen}}</span>
+              <sc-if value="{{m.isOwner}}" hint-placeholder-val="{{false}}">
+                <span title="Uma organização sempre tem um dono" style="flex: 0 0 130px; font-size: 14px; font-weight: 600">Dono</span>
+              </sc-if>
+              <sc-if value="{{m.notOwner}}" hint-placeholder-val="{{true}}">
+                <div style="flex: 0 0 130px; width: 130px"><dc-import name="Select" trigger-id="{{m.selectId}}" aria-label="{{m.roleLabel}}" options="{{roleOptions}}" value="{{m.roleValue}}" size="sm" hint-size="130px,32px"></dc-import></div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section aria-labelledby="sec-agents" style="display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+          <h2 id="sec-agents" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">Agentes</h2>
+          <a href="NovoAgente.dc.html" style="font-size: 14px; font-weight: 600; color: var(--ink)">Criar agente</a>
+        </div>
+        <div style="display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised)">
+          <sc-for list="{{agents}}" as="a" hint-placeholder-count="4">
+            <a href="{{a.href}}" style="{{a.rowStyle}}">
+              <span class="ac-avatar ac-avatar--sm ac-avatar--agent" aria-hidden="true">{{a.initial}}</span>
+              <span style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column">
+                <span style="font-weight: 600">{{a.name}} · {{a.role}}</span>
+                <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted)">Responsável: {{a.owner}}</span>
+              </span>
+              <span style="flex: 0 1 220px; font-size: 13px; color: var(--ink-muted); font-variant-numeric: tabular-nums">{{a.budget}}</span>
+            </a>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["claro","escuro"],"default":"claro"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { draft: '', role: 'Membro', resent: {},
+      pending: [
+        { email: 'carla@acme.com.br', role: 'Membro', status: 'Enviado há 2 dias · expira em 5' },
+        { email: 'rafa@acme.com.br', role: 'Admin', status: 'Expirou ontem' }
+      ] };
+  }
+  renderVals() {
+    const s = this.state;
+    const row = (first) => 'display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 16px; color: var(--ink); text-decoration: none;' + (first ? '' : ' border-top: 1px solid var(--line);');
+    const people = [
+      { name: 'Walter', you: ' (você)', email: 'walter@acme.com.br', seen: 'Ativo agora', owner: true },
+      { name: 'Marina', you: '', email: 'marina@acme.com.br', seen: 'Ativa há 12 min', admin: true },
+      { name: 'João', you: '', email: 'joao@acme.com.br', seen: 'Ativo há 1 h', admin: false },
+      { name: 'Beatriz', you: '', email: 'bia@acme.com.br', seen: 'Ativa ontem', admin: false }
+    ].map((m, i) => ({ ...m, initial: m.name[0], isOwner: !!m.owner, notOwner: !m.owner, roleValue: m.admin ? 'Admin' : 'Membro', roleLabel: 'Papel de ' + m.name, selectId: 'role-' + i, rowStyle: row(i === 0) }));
+    const agents = [
+      { name: 'Ada', role: 'Dev', initial: 'A', owner: 'João', budget: 'US$ 12,30 de US$ 40 em outubro', href: 'Agente.dc.html' },
+      { name: 'Atlas', role: 'Ops', initial: 'At', owner: 'João', budget: 'US$ 3,10 de US$ 20 em outubro', href: '#' },
+      { name: 'Theo', role: 'PM', initial: 'T', owner: 'Walter', budget: 'US$ 2,80 de US$ 15 em outubro', href: '#' },
+      { name: 'Lia', role: 'Pesquisa', initial: 'L', owner: 'Marina', budget: 'US$ 0,20 de US$ 15 em outubro', href: '#' }
+    ].map((a, i) => ({ ...a, rowStyle: row(i === 0) }));
+    const pending = s.pending.map((p, i) => ({ ...p, rowStyle: row(i === 0),
+      status: s.resent[p.email] ? 'Reenviado agora · expira em 7 dias' : p.status,
+      resendLabel: s.resent[p.email] ? 'Reenviado' : 'Reenviar',
+      resend: () => this.setState({ resent: Object.assign({}, s.resent, { [p.email]: true }) }),
+      revoke: () => this.setState({ pending: s.pending.filter((x) => x.email !== p.email) }) }));
+    const invite = () => {
+      const emails = (s.draft || '').split(',').map((x) => x.trim()).filter((x) => /.+@.+\..+/.test(x));
+      if (!emails.length) return;
+      this.setState({ draft: '', pending: emails.map((email) => ({ email, role: s.role, status: 'Enviado agora · expira em 7 dias' })).concat(s.pending) });
+    };
+    return {
+      theme: (this.props.tema ?? 'claro') === 'escuro' ? 'dark' : 'light',
+      people, agents, pending, peopleCount: people.length,
+      hasPending: pending.length > 0,
+      draft: s.draft,
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+      onKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); invite(); } },
+      onRole: (v) => this.setState({ role: v }),
+      roleOptions: [{ value: 'Membro', label: 'Membro', desc: 'Conversa, cria issues, aprova os próprios agentes' }, { value: 'Admin', label: 'Admin', desc: 'Também gerencia membros, agentes e chaves' }],
+      invite
+    };
+  }
+}
+</script>
+</body>
+</html>

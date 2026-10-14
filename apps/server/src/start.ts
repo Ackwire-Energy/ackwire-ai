@@ -1,0 +1,130 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import {
+  type Adapters,
+  createMemoryPresence,
+  createMemoryRateLimiter,
+  createPostgresPubSub,
+  createPostgresSearchResolver,
+  noPlatformCredentials,
+  postgresJsNotifier,
+} from "@agenteschat/adapters";
+import { ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
+import { createDatabase, ensureMessagePartitions } from "@agenteschat/db";
+import { createJobHandlers, createLocalKeyWrapper, createModelGateway } from "@agenteschat/engine";
+import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
+import { createAnthropicProvider } from "@agenteschat/providers";
+import { createApp } from "./app";
+import { createAuth } from "./auth";
+import { createLogger } from "./logger";
+import { createRealtime, type SocketData } from "./realtime/ws";
+import { version } from "./version";
+import { startWorkers } from "./workers";
+
+export interface StartOptions {
+  edition: Edition;
+  modules?: AgentesModule[];
+}
+
+/**
+ * Boots an agentes.chat server: config → database → migrations → adapters
+ * (core defaults, then module overrides) → HTTP + WebSocket → workers.
+ * Shared by the self-hosted entrypoint (`src/main.ts`) and the Cloud
+ * entrypoint in the private `agentes-chat-cloud` repo; only `modules` differ.
+ */
+export async function startServer({ edition, modules = [] }: StartOptions) {
+  let config: ReturnType<typeof loadConfig>;
+  try {
+    config = loadConfig();
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      console.error(`${error.message}\n\nCopy .env.example to .env and fill in the required values.`);
+      process.exit(1);
+    }
+    throw error;
+  }
+
+  const log = createLogger(config.LOG_LEVEL);
+  log.info("starting agentes.chat", { version, edition, config: redactConfig(config) });
+
+  const database = createDatabase({ url: config.DATABASE_URL, poolMax: config.DATABASE_POOL_MAX });
+  if (config.RUN_MIGRATIONS_ON_BOOT) {
+    log.info("applying database migrations");
+    await database.migrate();
+  }
+  await ensureMessagePartitions(database.db);
+
+  const defaults: Adapters = {
+    search: createPostgresSearchResolver(database.db),
+    pubsub: await createPostgresPubSub(postgresJsNotifier(database.client)),
+    presence: createMemoryPresence(),
+    rateLimiter: createMemoryRateLimiter(),
+    keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
+    legacyKeyWrappers: [],
+    platformCredentials: noPlatformCredentials,
+  };
+  const base = { config, db: database.db, edition, version };
+  const { adapters, modelProviders, overridden } = await resolveAdapters(modules, base, defaults, {
+    anthropic: createAnthropicProvider(),
+  });
+  if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
+  const ctx: ModuleContext = { ...base, adapters };
+
+  const gateway = createModelGateway({
+    db: database.db,
+    keyWrappers: [adapters.keyWrapper, ...adapters.legacyKeyWrappers],
+    providers: modelProviders,
+    platformCredentials: adapters.platformCredentials,
+  });
+  const handlers = createJobHandlers({
+    db: database.db,
+    gateway,
+    pubsub: adapters.pubsub,
+    maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
+    contextMessages: config.AGENT_CONTEXT_MESSAGES,
+    maxHops: config.AGENT_MAX_HOPS,
+  });
+  const workers = startWorkers({ db: database.db, handlers, log });
+
+  const auth = createAuth({ db: database.db, config, log });
+  const webDir = resolve(config.WEB_DIR);
+  const app = createApp({
+    edition,
+    version,
+    modules,
+    moduleContext: ctx,
+    services: { db: database.db, auth, config, adapters, wakeWorkers: workers.wake },
+    log,
+    pingDatabase: database.ping,
+    webDir: existsSync(webDir) ? webDir : undefined,
+  });
+  if (!existsSync(webDir)) log.warn("web app not found; serving API only", { webDir });
+
+  const realtime = createRealtime({ db: database.db, auth, config, log, ...adapters });
+  const server = Bun.serve<SocketData>({
+    hostname: config.HOST,
+    port: config.PORT,
+    fetch: (req, srv) => (new URL(req.url).pathname === realtime.path ? realtime.upgrade(req, srv) : app.fetch(req)),
+    websocket: realtime.websocket,
+  });
+  log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
+
+  for (const module of modules) await module.onStart?.(ctx);
+
+  let stopping = false;
+  const shutdown = async (signal: string) => {
+    if (stopping) return;
+    stopping = true;
+    log.info("shutting down", { signal });
+    workers.stop();
+    await server.stop();
+    for (const module of modules) await module.onStop?.();
+    await adapters.pubsub.close?.();
+    await database.close();
+    process.exit(0);
+  };
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.on("SIGINT", () => void shutdown("SIGINT"));
+
+  return { server, config };
+}

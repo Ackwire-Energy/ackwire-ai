@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Onboarding</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentes/tokens.css">
+<link rel="stylesheet" href="ds/agentes/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div data-theme="{{theme}}" style="min-height: 900px; height: 100vh; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 28px; padding: 40px 16px; background: var(--surface); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 22px">
+  <span style="display: inline-flex; align-items: center; gap: 0.16em; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; line-height: 1">
+    <svg viewBox="0 0 32 32" aria-hidden="true" style="width: 1.25em; height: 1.25em"><path style="fill: var(--agent)" d="M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H3.5A1.5 1.5 0 0 1 2 28.5V10a8 8 0 0 1 8-8z"/><path style="fill: var(--on-agent)" d="M11.2 12.5a1.3 1.3 0 0 1 2.6 0v5a1.3 1.3 0 0 1-2.6 0zM18.2 12.5a1.3 1.3 0 0 1 2.6 0v5a1.3 1.3 0 0 1-2.6 0z"/></svg>
+    <span>agentes</span>
+  </span>
+
+  <div style="width: 100%; max-width: 600px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; padding: 32px; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 16px">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; gap: 4px" aria-hidden="true">
+        <sc-for list="{{bars}}" as="b" hint-placeholder-count="4"><span style="{{b.style}}"></span></sc-for>
+      </div>
+      <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-muted)">Passo {{stepNumber}} de 4 · {{stepName}}</span>
+    </div>
+
+    <sc-if value="{{s1}}" hint-placeholder-val="{{true}}">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.015em; text-wrap: balance">Crie o espaço do seu time</h1>
+        <p style="margin: 0; color: var(--ink-muted)">Pessoas e agentes vão trabalhar juntos aqui. Você pode criar outras organizações depois.</p>
+      </div>
+      <div class="ac-field">
+        <label class="ac-field__label" for="org-name">Nome da organização</label>
+        <input id="org-name" class="ac-input" value="{{org}}" onChange="{{onOrg}}" placeholder="Ex.: Acme">
+      </div>
+      <div class="ac-field">
+        <label class="ac-field__label" for="org-slug">Endereço</label>
+        <div style="display: flex; align-items: center; height: 36px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-raised); overflow: hidden">
+          <span style="padding: 0 2px 0 12px; color: var(--ink-muted)">agentes.chat/</span>
+          <input id="org-slug" value="{{slug}}" readonly style="flex: 1; min-width: 0; height: 100%; border: 0; outline: none; font: inherit; color: var(--ink); background: transparent">
+        </div>
+      </div>
+      <div class="ac-field">
+        <label class="ac-field__label" for="org-size">Tamanho do time</label>
+        <dc-import name="Select" trigger-id="org-size" options="{{sizeOptions}}" value="2 a 10 pessoas" hint-size="100%,36px"></dc-import>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{s2}}" hint-placeholder-val="{{false}}">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.015em; text-wrap: balance">Conte aos agentes sobre a {{orgName}}</h1>
+        <p style="margin: 0; color: var(--ink-muted)">Esse texto entra em toda conversa de todos os agentes. Dá para mudar depois.</p>
+      </div>
+      <div class="ac-field">
+        <label class="ac-field__label" for="org-ctx">Contexto da organização</label>
+        <textarea id="org-ctx" class="ac-input" rows="7" style="height: auto; padding: 10px 12px; line-height: 22px; resize: vertical">A {{orgName}} faz um app de gestão para clínicas. Clientes são donos de clínicas pequenas, pouco técnicos. Prioridade do trimestre: estabilidade do login e do agendamento. Tom: direto e gentil. Nunca prometer prazos a clientes sem falar com o Walter.</textarea>
+        <span class="ac-field__help">O que a empresa faz, para quem, o que importa agora e o que nunca fazer.</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{s3}}" hint-placeholder-val="{{false}}">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.015em; text-wrap: balance">Chame o primeiro agente</h1>
+        <p style="margin: 0; color: var(--ink-muted)">Escolha um papel. Instruções, permissões e orçamento ficam editáveis depois.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px">
+        <sc-for list="{{roles}}" as="r" hint-placeholder-count="4">
+          <button type="button" onClick="{{r.pick}}" aria-pressed="{{r.pressed}}" style="{{r.style}}">
+            <span class="ac-avatar ac-avatar--agent" aria-hidden="true">{{r.initial}}</span>
+            <span style="display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 0">
+              <span style="font-weight: 600">{{r.name}} · {{r.role}}</span>
+              <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted)">{{r.desc}}</span>
+            </span>
+          </button>
+        </sc-for>
+      </div>
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend class="ac-field__label" style="padding: 0; margin-bottom: 8px">Qual chave o agente usa?</legend>
+        <label for="key-platform" style="{{keyPlatformStyle}}">
+          <input id="key-platform" type="radio" class="ac-radio" name="key" checked="{{usePlatform}}" onChange="{{pickPlatform}}">
+          <span style="display: flex; flex-direction: column"><b>Chave do agentes</b><span style="font-size: 13px; line-height: 18px; color: var(--ink-muted)">Mais simples. O uso entra na sua fatura, com US$ 5 grátis para testar.</span></span>
+        </label>
+        <label for="key-own" style="{{keyOwnStyle}}">
+          <input id="key-own" type="radio" class="ac-radio" name="key" checked="{{useOwn}}" onChange="{{pickOwn}}">
+          <span style="display: flex; flex-direction: column"><b>Chave da {{orgName}}</b><span style="font-size: 13px; line-height: 18px; color: var(--ink-muted)">Use sua conta da Anthropic. A chave fica cifrada e nunca aparece no navegador.</span></span>
+        </label>
+        <sc-if value="{{useOwn}}" hint-placeholder-val="{{false}}">
+          <div class="ac-field">
+            <label class="ac-field__label" for="key-value">Chave da API da Anthropic</label>
+            <input id="key-value" class="ac-input" type="password" placeholder="sk-ant-…" autocomplete="off">
+          </div>
+        </sc-if>
+      </fieldset>
+    </sc-if>
+
+    <sc-if value="{{s4}}" hint-placeholder-val="{{false}}">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.015em; text-wrap: balance">Convide o time</h1>
+        <p style="margin: 0; color: var(--ink-muted)">{{agentName}} já está esperando no #geral. Chame quem vai trabalhar com {{agentPronoun}}.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <sc-for list="{{invites}}" as="i" hint-placeholder-count="2">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; border: 1px solid var(--line); border-radius: 6px">
+            <span class="ac-avatar ac-avatar--sm" aria-hidden="true">{{i.initial}}</span>
+            <span style="flex: 1; min-width: 0; overflow-wrap: anywhere">{{i.email}}</span>
+            <span style="font-size: 13px; color: var(--ink-muted)">{{i.role}}</span>
+            <button class="ac-btn ac-btn--ghost ac-btn--icon ac-btn--sm" type="button" aria-label="Remover {{i.email}}" onClick="{{i.remove}}" style="width: 28px"><svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true" style="width: 16px; height: 16px"><path d="m6 6 8 8M14 6l-8 8"></path></svg></button>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end">
+        <div class="ac-field" style="flex: 1 1 240px">
+          <label class="ac-field__label" for="inv-new">E-mail</label>
+          <input id="inv-new" class="ac-input" type="email" value="{{draft}}" onChange="{{onDraft}}" onKeyDown="{{onKey}}" placeholder="nome@empresa.com.br">
+        </div>
+        <div class="ac-field" style="flex: 0 1 140px">
+          <label class="ac-field__label" for="inv-role">Papel</label>
+          <dc-import name="Select" trigger-id="inv-role" options="{{roleOptions}}" value="Membro" on-change="{{onRole}}" hint-size="100%,36px"></dc-import>
+        </div>
+        <button class="ac-btn" type="button" onClick="{{add}}">Adicionar</button>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; border-radius: 10px; background: var(--surface)">
+        <span style="flex: 1 1 240px; min-width: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted)">Ou mande o link de convite. Quem entrar por ele vira membro; vale por 7 dias.</span>
+        <button class="ac-btn ac-btn--sm" type="button" onClick="{{copy}}">{{copyLabel}}</button>
+      </div>
+    </sc-if>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 4px">
+      <sc-if value="{{canBack}}" hint-placeholder-val="{{false}}"><button class="ac-btn" type="button" onClick="{{back}}">Voltar</button></sc-if>
+      <span style="flex: 1"></span>
+      <sc-if value="{{s4}}" hint-placeholder-val="{{false}}"><a href="Main.dc.html" style="font-size: 14px; color: var(--ink-muted); margin-right: 8px">Pular por agora</a></sc-if>
+      <sc-if value="{{notLast}}" hint-placeholder-val="{{true}}"><button class="ac-btn ac-btn--primary" type="button" onClick="{{next}}" disabled="{{blocked}}">Continuar</button></sc-if>
+      <sc-if value="{{s4}}" hint-placeholder-val="{{false}}"><a class="ac-btn ac-btn--primary" href="Main.dc.html" style="text-decoration: none">{{finishLabel}}</a></sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["claro","escuro"],"default":"claro"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 1, org: 'Acme', role: 'theo', key: 'platform', draft: '', newRole: 'Membro', copied: false,
+      invites: [{ email: 'marina@acme.com.br', role: 'Admin' }, { email: 'joao@acme.com.br', role: 'Membro' }] };
+  }
+  renderVals() {
+    const s = this.state;
+    const org = s.org || '';
+    const orgName = org.trim() || 'sua empresa';
+    const NAMES = ['Organização', 'Contexto', 'Primeiro agente', 'Convites'];
+    const bars = [1, 2, 3, 4].map((n) => ({ style: 'flex: 1; height: 4px; border-radius: 999px; background: ' + (n <= s.step ? 'var(--ink)' : 'var(--line)') + ';' }));
+    const ROLES = [
+      { id: 'theo', name: 'Theo', role: 'PM', initial: 'T', desc: 'Organiza tarefas, resume conversas e cuida do fórum.' },
+      { id: 'ada', name: 'Ada', role: 'Dev', initial: 'A', desc: 'Programa em branches, revisa PRs e investiga bugs.' },
+      { id: 'lia', name: 'Lia', role: 'Pesquisa', initial: 'L', desc: 'Pesquisa mercado, concorrentes e feedback.' },
+      { id: 'atlas', name: 'Atlas', role: 'Ops', initial: 'At', desc: 'Monitora erros, filas e deploys.' }
+    ];
+    const card = (on) => 'display: flex; gap: 12px; align-items: flex-start; padding: 12px; font: inherit; color: var(--ink); cursor: pointer; border-radius: 10px; border: 1px solid ' + (on ? 'var(--ink)' : 'var(--line)') + '; background: ' + (on ? 'var(--surface-sunken)' : 'var(--surface-raised)') + ';';
+    const roles = ROLES.map((r) => ({ ...r, pressed: s.role === r.id ? 'true' : 'false', style: card(s.role === r.id), pick: () => this.setState({ role: r.id }) }));
+    const chosen = ROLES.find((r) => r.id === s.role) || ROLES[0];
+    const radio = (on) => 'display: flex; gap: 10px; align-items: flex-start; padding: 12px; cursor: pointer; border-radius: 10px; border: 1px solid ' + (on ? 'var(--ink)' : 'var(--line)') + '; background: ' + (on ? 'var(--surface-sunken)' : 'var(--surface-raised)') + ';';
+    const add = () => {
+      const email = (s.draft || '').trim();
+      if (!/.+@.+\..+/.test(email)) return;
+      this.setState({ invites: s.invites.concat([{ email, role: s.newRole }]), draft: '' });
+    };
+    const invites = s.invites.map((i, idx) => ({ ...i, initial: i.email[0].toUpperCase(),
+      remove: () => this.setState({ invites: s.invites.filter((_, j) => j !== idx) }) }));
+    const n = s.invites.length;
+    return {
+      theme: (this.props.tema ?? 'claro') === 'escuro' ? 'dark' : 'light',
+      bars, stepNumber: s.step, stepName: NAMES[s.step - 1],
+      s1: s.step === 1, s2: s.step === 2, s3: s.step === 3, s4: s.step === 4,
+      org, orgName,
+      slug: org.trim().toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'seu-time',
+      onOrg: (e) => this.setState({ org: e.target.value }),
+      roles, agentName: chosen.name, agentPronoun: chosen.id === 'ada' || chosen.id === 'lia' ? 'ela' : 'ele',
+      usePlatform: s.key === 'platform', useOwn: s.key === 'own',
+      keyPlatformStyle: radio(s.key === 'platform'), keyOwnStyle: radio(s.key === 'own'),
+      pickPlatform: () => this.setState({ key: 'platform' }), pickOwn: () => this.setState({ key: 'own' }),
+      invites, draft: s.draft,
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+      onKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } },
+      onRole: (v) => this.setState({ newRole: v }),
+      sizeOptions: ['Só eu, por enquanto', '2 a 10 pessoas', '11 a 50 pessoas', 'Mais de 50'],
+      roleOptions: [{ value: 'Membro', label: 'Membro', desc: 'Conversa, cria issues, aprova os próprios agentes' }, { value: 'Admin', label: 'Admin', desc: 'Também gerencia membros, agentes e chaves' }],
+      add,
+      copy: () => this.setState({ copied: true }),
+      copyLabel: s.copied ? 'Link copiado' : 'Copiar link de convite',
+      finishLabel: n > 0 ? 'Enviar ' + n + (n === 1 ? ' convite' : ' convites') + ' e entrar' : 'Entrar na ' + orgName,
+      blocked: s.step === 1 && !org.trim(),
+      canBack: s.step > 1, notLast: s.step < 4,
+      next: () => this.setState({ step: Math.min(4, s.step + 1) }),
+      back: () => this.setState({ step: Math.max(1, s.step - 1) })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+import { z } from "zod";
+
+/**
+ * Every environment variable agentes.chat reads is declared here, exactly once.
+ *
+ * This list is the single source of truth for:
+ * - runtime validation (see `loadConfig`)
+ * - `.env.example` (`bun run docs:env`)
+ *
+ * Adding a variable anywhere else is a bug (docs/adr/0004-configuration.md).
+ */
+export interface EnvVarDefinition {
+  /** Zod schema that parses the raw string value. Include `.default()` for optional vars. */
+  schema: z.ZodType;
+  /** Shown in `.env.example`. Write it for a self-hoster, not for us. */
+  description: string;
+  /** Grouping used in `.env.example`. */
+  section: "Server" | "Database" | "Security" | "Sign-in" | "Agents" | "Observability";
+  /** Example value for docs. Never a real secret. */
+  example?: string;
+  /** Secret values are never logged and are masked in diagnostics. */
+  secret?: boolean;
+}
+
+/** Claude model ids accepted as defaults. Prices live in `@agenteschat/providers` (`MODEL_CATALOG`). */
+const modelId = z.string().regex(/^[a-z0-9][a-z0-9.-]*$/, "must be a model id such as claude-sonnet-5-5");
+
+export const envVars = {
+  NODE_ENV: {
+    schema: z.enum(["development", "test", "production"]).default("development"),
+    description: "Runtime mode. Use `production` for any real deployment.",
+    section: "Server",
+    example: "production",
+  },
+  HOST: {
+    schema: z.string().default("0.0.0.0"),
+    description: "Interface the HTTP server binds to.",
+    section: "Server",
+  },
+  PORT: {
+    schema: z.coerce.number().int().min(1).max(65535).default(3000),
+    description: "Port the HTTP and WebSocket server listens on.",
+    section: "Server",
+  },
+  PUBLIC_URL: {
+    schema: z.url().default("http://localhost:3000"),
+    description:
+      "Public base URL of this instance, without a trailing slash. Used for sign-in callbacks, invitation links and the allowed browser origin.",
+    section: "Server",
+    example: "https://chat.example.com",
+  },
+  WEB_DIR: {
+    schema: z.string().default("./public"),
+    description:
+      "Directory containing the built web app (single-page app). Served by this server when it exists; otherwise only the API runs.",
+    section: "Server",
+  },
+  DATABASE_URL: {
+    schema: z.string().regex(/^postgres(ql)?:\/\//, "must be a postgres:// or postgresql:// URL"),
+    description:
+      "PostgreSQL connection string (PostgreSQL 15 or newer with the `vector` extension available). Add `?sslmode=require` for managed databases that require TLS.",
+    section: "Database",
+    example: "postgres://agenteschat:password@db.example.com:5432/agenteschat?sslmode=require",
+    secret: true,
+  },
+  DATABASE_POOL_MAX: {
+    schema: z.coerce.number().int().min(1).default(10),
+    description: "Maximum number of open connections per agentes.chat process.",
+    section: "Database",
+  },
+  RUN_MIGRATIONS_ON_BOOT: {
+    schema: z.stringbool().default(true),
+    description:
+      "Apply pending database migrations when the server starts. Disable only if you run migrations as a separate deployment step.",
+    section: "Database",
+  },
+  AGENTES_SECRET: {
+    schema: z.string().min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`"),
+    description:
+      "Master secret. Session signing and the key that encrypts stored provider credentials (API keys of model providers) derive from it. Generate with `openssl rand -base64 48`. **Changing it makes stored credentials unreadable.** Back it up.",
+    section: "Security",
+    example: "<output of openssl rand -base64 48>",
+    secret: true,
+  },
+  ALLOW_SIGNUP: {
+    schema: z.stringbool().default(false),
+    description:
+      "Let anyone create an account. When off (default), only the **first** account can sign up (it becomes owner of the installation) and everyone else needs an invitation. Keep it off on a self-hosted instance reachable from the internet.",
+    section: "Sign-in",
+  },
+  TRUSTED_PROXIES: {
+    schema: z.string().optional(),
+    description:
+      "Comma-separated IPs/CIDRs of your reverse proxies (load balancer, Cloudflare…). Used to find the real client IP for sign-in rate limiting. Leave empty if agentes.chat is reached directly.",
+    section: "Sign-in",
+    example: "10.0.0.0/8,172.16.0.0/12",
+  },
+  GOOGLE_CLIENT_ID: {
+    schema: z.string().optional(),
+    description:
+      "Enables “Sign in with Google” when set together with `GOOGLE_CLIENT_SECRET`. Redirect URI: `{PUBLIC_URL}/api/auth/callback/google`.",
+    section: "Sign-in",
+  },
+  GOOGLE_CLIENT_SECRET: {
+    schema: z.string().optional(),
+    description: "OAuth client secret for Google sign-in.",
+    section: "Sign-in",
+    secret: true,
+  },
+  GITHUB_CLIENT_ID: {
+    schema: z.string().optional(),
+    description:
+      "Enables “Sign in with GitHub” when set together with `GITHUB_CLIENT_SECRET`. Callback URL: `{PUBLIC_URL}/api/auth/callback/github`.",
+    section: "Sign-in",
+  },
+  GITHUB_CLIENT_SECRET: {
+    schema: z.string().optional(),
+    description: "OAuth client secret for GitHub sign-in.",
+    section: "Sign-in",
+    secret: true,
+  },
+  AGENT_DEFAULT_MODEL: {
+    schema: modelId.default("claude-sonnet-5-5"),
+    description: "Model used by new agents unless one is chosen explicitly.",
+    section: "Agents",
+  },
+  ROUTER_MODEL: {
+    schema: modelId.default("claude-haiku-5-5"),
+    description:
+      "Small, fixed model that will decide which agents answer a message (router). Reserved: the router is not enabled yet, only explicit @mentions trigger agents.",
+    section: "Agents",
+  },
+  AGENT_MAX_OUTPUT_TOKENS: {
+    schema: z.coerce.number().int().min(256).max(128_000).default(16_000),
+    description: "Upper bound on tokens an agent may generate in one reply.",
+    section: "Agents",
+  },
+  AGENT_CONTEXT_MESSAGES: {
+    schema: z.coerce.number().int().min(1).max(500).default(30),
+    description: "How many recent channel (or thread) messages are included in an agent's context.",
+    section: "Agents",
+  },
+  AGENT_MAX_HOPS: {
+    schema: z.coerce.number().int().min(1).max(20).default(3),
+    description:
+      "Maximum consecutive agent replies in one thread without a person posting. Stops agents from triggering each other forever.",
+    section: "Agents",
+  },
+  LOG_LEVEL: {
+    schema: z.enum(["debug", "info", "warn", "error"]).default("info"),
+    description: "Minimum log level written to stdout.",
+    section: "Observability",
+  },
+} satisfies Record<string, EnvVarDefinition>;
+
+export type EnvVarName = keyof typeof envVars;
+
+export const configSchema = z.object(
+  Object.fromEntries(Object.entries(envVars).map(([key, def]) => [key, def.schema])) as {
+    [K in EnvVarName]: (typeof envVars)[K]["schema"];
+  },
+);
+
+export type Config = z.infer<typeof configSchema>;

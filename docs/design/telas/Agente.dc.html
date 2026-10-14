@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Agente: Ada</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentes/tokens.css">
+<link rel="stylesheet" href="ds/agentes/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div data-theme="{{theme}}" style="position: relative; display: flex; flex-wrap: wrap; min-height: 900px; height: 100vh; background: var(--surface); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 22px">
+  <dc-import name="Sidebar" active="ada" hint-size="272px,100%" style="flex: 0 0 272px"></dc-import>
+
+  <main style="flex: 999 1 560px; min-width: 0; height: 100%; overflow-y: auto">
+    <div style="max-width: 960px; margin: 0 auto; padding: 32px 24px; display: flex; flex-direction: column; gap: 24px">
+      <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+        <span class="ac-avatar ac-avatar--lg ac-avatar--agent" aria-hidden="true">A</span>
+        <div style="flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 2px">
+          <h1 style="margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.015em">Ada</h1>
+          <span style="color: var(--ink-muted)">Dev · responde a <b style="color: var(--ink)">João</b> · Sonnet 5.5 com a chave da Acme</span>
+        </div>
+        <div style="display: flex; gap: 8px">
+          <a class="ac-btn" href="Main.dc.html" style="text-decoration: none">Abrir no #eng</a>
+          <button class="ac-btn ac-btn--primary" type="button" onClick="{{save}}">{{saveLabel}}</button>
+        </div>
+      </header>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; align-items: start">
+        <section aria-labelledby="sec-instr" style="display: flex; flex-direction: column; gap: 12px; padding: 20px; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 10px">
+          <h2 id="sec-instr" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">Instruções</h2>
+          <div class="ac-field">
+            <label class="ac-field__label" for="instr">Como a Ada trabalha</label>
+            <textarea id="instr" class="ac-input" rows="6" style="height: auto; padding: 10px 12px; line-height: 22px; resize: vertical">Programa em branches, nunca direto na main. Abre PRs pequenos, com teste para cada correção. Explica a causa antes da solução. Pede ajuda ao João quando a mudança tocar em pagamentos.</textarea>
+            <span class="ac-field__help">O contexto da Acme entra antes destas instruções em toda conversa.</span>
+          </div>
+        </section>
+
+        <section aria-labelledby="sec-budget" style="display: flex; flex-direction: column; gap: 12px; padding: 20px; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 10px">
+          <h2 id="sec-budget" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">Orçamento de outubro</h2>
+          <div style="display: flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums">
+            <span style="font-size: 28px; line-height: 34px; font-weight: 700">US$ 12,30</span>
+            <span style="color: var(--ink-muted)">de US$ {{budget}}</span>
+          </div>
+          <div role="meter" aria-label="Orçamento usado" aria-valuemin="0" aria-valuemax="{{budget}}" aria-valuenow="12.3" style="height: 8px; border-radius: 999px; background: var(--surface-sunken); overflow: hidden">
+            <div style="{{meterStyle}}"></div>
+          </div>
+          <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted)">142 execuções · 3,1 mi de tokens · aviso ao João em 80%.</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <button class="ac-btn ac-btn--sm" type="button" onClick="{{openRuns}}">Ver execuções</button>
+            <button class="ac-btn ac-btn--sm" type="button" onClick="{{openBudget}}">Ajustar orçamento</button>
+          </div>
+        </section>
+      </div>
+
+      <section aria-labelledby="sec-perm" style="display: flex; flex-direction: column; gap: 12px; padding: 20px; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 10px">
+        <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px">
+          <div style="flex: 1 1 280px; display: flex; flex-direction: column; gap: 2px">
+            <h2 id="sec-perm" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">O que a Ada pode fazer</h2>
+            <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted)">{{permSummary}}</span>
+          </div>
+          <button class="ac-btn ac-btn--sm" type="button" onClick="{{openPerms}}">Editar permissões</button>
+        </div>
+        <div style="display: flex; flex-direction: column">
+          <sc-for list="{{connectorRows}}" as="c" hint-placeholder-count="4">
+            <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 10px 0; border-top: 1px solid var(--line)">
+              <span style="flex: 0 0 96px; font-weight: 600">{{c.name}}</span>
+              <span style="flex: 1 1 240px; min-width: 0; color: var(--ink-muted)">{{c.granted}}</span>
+              <sc-if value="{{c.hasApproval}}" hint-placeholder-val="{{false}}">
+                <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--attention); font-weight: 600"><svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true" style="width: 14px; height: 14px"><circle cx="10" cy="10" r="7"></circle><path d="M10 6v4l2.6 1.8"></path></svg>{{c.approvalText}}</span>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <sc-if value="{{dialogOpen}}" hint-placeholder-val="{{false}}">
+    <div onClick="{{close}}" style="position: absolute; inset: 0; background: rgba(10, 10, 10, 0.4)"></div>
+    <div role="dialog" aria-modal="true" aria-labelledby="dlg-title" onKeyDown="{{dialogKey}}" style="{{dialogStyle}}">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 20px 20px 12px">
+        <h2 id="dlg-title" style="margin: 0; flex: 1; font-size: 18px; line-height: 24px; font-weight: 650">{{dialogTitle}}</h2>
+        <button class="ac-btn ac-btn--ghost ac-btn--icon ac-btn--sm" type="button" aria-label="Fechar" onClick="{{close}}" style="width: 28px"><svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true" style="width: 16px; height: 16px"><path d="m6 6 8 8M14 6l-8 8"></path></svg></button>
+      </div>
+
+      <sc-if value="{{isRuns}}" hint-placeholder-val="{{false}}">
+        <div style="padding: 0 20px 8px; display: flex; flex-wrap: wrap; gap: 8px">
+          <label for="runs-q" style="position: relative; flex: 1 1 260px; display: flex">
+            <svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true" style="position: absolute; left: 10px; top: 8px; color: var(--ink-muted)"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 4.2 4.2"></path></svg>
+            <input id="runs-q" class="ac-input" placeholder="Buscar por canal, PR ou assunto" aria-label="Buscar execuções" value="{{runsQ}}" onChange="{{onRunsQ}}" style="padding-left: 36px">
+          </label>
+        </div>
+        <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0 20px">
+          <sc-for list="{{runs}}" as="run" hint-placeholder-count="6">
+            <div style="display: flex; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums">
+              <span style="flex: 0 0 84px; font-size: 13px; color: var(--ink-muted)">{{run.when}}</span>
+              <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+                <span>{{run.what}}</span>
+                <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted)">{{run.where}} · {{run.tokens}}</span>
+              </span>
+              <span style="font-size: 13px">{{run.cost}}</span>
+            </div>
+          </sc-for>
+          <sc-if value="{{runsEmpty}}" hint-placeholder-val="{{false}}"><p style="margin: 0; padding: 24px 0; text-align: center; color: var(--ink-muted)">Nenhuma execução com “{{runsQ}}”.</p></sc-if>
+        </div>
+        <div style="padding: 12px 20px 20px; font-size: 13px; color: var(--ink-muted); border-top: 1px solid var(--line)">Mostrando {{runsCount}} de 142 execuções de outubro.</div>
+      </sc-if>
+
+      <sc-if value="{{isBudget}}" hint-placeholder-val="{{false}}">
+        <div style="padding: 0 20px; display: flex; flex-direction: column; gap: 12px">
+          <div class="ac-field">
+            <label class="ac-field__label" for="bud-v">Limite mensal (US$)</label>
+            <input id="bud-v" class="ac-input" inputmode="decimal" value="{{budgetDraft}}" onChange="{{onBudgetDraft}}">
+            <span class="ac-field__help">Ao atingir o limite, a Ada para e avisa no canal. O João recebe um aviso em 80%.</span>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; padding: 20px">
+          <button class="ac-btn" type="button" onClick="{{close}}">Cancelar</button>
+          <button class="ac-btn ac-btn--primary" type="button" onClick="{{applyBudget}}">Salvar limite</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isPerms}}" hint-placeholder-val="{{false}}">
+        <div style="padding: 0 20px 8px">
+          <label for="perm-q" style="position: relative; display: flex">
+            <svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true" style="position: absolute; left: 10px; top: 8px; color: var(--ink-muted)"><circle cx="8.8" cy="8.8" r="5.3"></circle><path d="m12.8 12.8 4.2 4.2"></path></svg>
+            <input id="perm-q" class="ac-input" placeholder="Buscar permissão ou conector" aria-label="Buscar permissões" value="{{permQ}}" onChange="{{onPermQ}}" style="padding-left: 36px">
+          </label>
+        </div>
+        <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0 20px">
+          <sc-for list="{{permGroups}}" as="g" hint-placeholder-count="3">
+            <div style="display: flex; flex-direction: column; padding: 8px 0 4px">
+              <span style="padding: 8px 0 4px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-muted)">{{g.name}} · {{g.note}}</span>
+              <sc-for list="{{g.scopes}}" as="s" hint-placeholder-count="2">
+                <label for="{{s.id}}" style="display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); cursor: pointer">
+                  <input id="{{s.id}}" type="checkbox" class="ac-check" checked="{{s.on}}" disabled="{{s.locked}}" onChange="{{s.toggle}}">
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+                    <span>{{s.label}}</span>
+                    <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted)">{{s.desc}}</span>
+                  </span>
+                  <sc-if value="{{s.locked}}" hint-placeholder-val="{{false}}">
+                    <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--attention); font-weight: 600; white-space: nowrap"><svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true" style="width: 14px; height: 14px"><circle cx="10" cy="10" r="7"></circle><path d="M10 6v4l2.6 1.8"></path></svg>pede aprovação</span>
+                  </sc-if>
+                </label>
+              </sc-for>
+            </div>
+          </sc-for>
+          <sc-if value="{{permEmpty}}" hint-placeholder-val="{{false}}"><p style="margin: 0; padding: 24px 0; text-align: center; color: var(--ink-muted)">Nada encontrado com “{{permQ}}”.</p></sc-if>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; padding: 12px 20px 20px; border-top: 1px solid var(--line)">
+          <span style="flex: 1; font-size: 13px; color: var(--ink-muted)">Merge, deploy e rollback sempre pedem aprovação.</span>
+          <button class="ac-btn ac-btn--primary" type="button" onClick="{{close}}">Concluir</button>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["claro","escuro"],"default":"claro"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { off: { 'drive-write': true, 'gh-issues-write': true }, saved: false, dialog: null, runsQ: '', permQ: '', budget: 40, budgetDraft: '40' };
+  }
+  renderVals() {
+    const s = this.state;
+    const close = () => this.setState({ dialog: null });
+    const CONN = [
+      { name: 'GitHub', note: 'agentes-chat/app, agentes-chat/site', scopes: [
+        { id: 'gh-read', label: 'Ler código e issues', desc: 'Repositórios e issues liberados para a Acme.' },
+        { id: 'gh-pr', label: 'Abrir e comentar PRs', desc: 'Sempre em branch própria, nunca na main.' },
+        { id: 'gh-issues-write', label: 'Criar e fechar issues', desc: 'Inclui rótulos e responsáveis.' },
+        { id: 'gh-merge', label: 'Fazer merge', desc: 'Cada merge vira um pedido de aprovação no chat.', locked: true } ] },
+      { name: 'Sentry', note: 'projeto app', scopes: [
+        { id: 'sentry-read', label: 'Ler erros e eventos', desc: 'Stack traces, frequência e releases.' } ] },
+      { name: 'Sandbox', note: 'execução isolada', scopes: [
+        { id: 'sandbox-run', label: 'Rodar testes e scripts', desc: 'Num ambiente descartável, sem acesso à produção.' } ] },
+      { name: 'Drive', note: 'arquivos da Acme', scopes: [
+        { id: 'drive-read', label: 'Ler arquivos', desc: 'Relatórios, tabelas e organograma.' },
+        { id: 'drive-write', label: 'Criar relatórios e diffs', desc: 'Arquivos novos ficam na pasta da Ada.' } ] }
+    ];
+    const isOn = (sc) => sc.locked ? true : !s.off[sc.id];
+    const connectorRows = CONN.map((c) => {
+      const on = c.scopes.filter((sc) => isOn(sc) && !sc.locked).map((sc) => sc.label.toLowerCase());
+      const appr = c.scopes.filter((sc) => sc.locked).map((sc) => sc.label.toLowerCase());
+      return { name: c.name, granted: on.length ? on.join(', ') : 'Nenhuma permissão', hasApproval: appr.length > 0, approvalText: appr.length ? appr.join(', ') + ' pede aprovação' : '' };
+    });
+    const total = CONN.reduce((n, c) => n + c.scopes.length, 0);
+    const granted = CONN.reduce((n, c) => n + c.scopes.filter(isOn).length, 0);
+    const q = (s.permQ || '').toLowerCase();
+    const permGroups = CONN.map((c) => ({ name: c.name, note: c.note,
+      scopes: c.scopes.filter((sc) => !q || (c.name + ' ' + sc.label + ' ' + sc.desc).toLowerCase().includes(q)).map((sc) => ({ ...sc, on: isOn(sc), locked: !!sc.locked,
+        toggle: () => this.setState({ off: Object.assign({}, s.off, { [sc.id]: !s.off[sc.id] }), saved: false }) })) })).filter((g) => g.scopes.length);
+    const RUNS = [
+      { when: 'hoje 10:44', what: 'Pediu aprovação para o merge do PR #42', where: '#eng', tokens: '310 tokens', cost: 'US$ 0,001' },
+      { when: 'hoje 10:43', what: 'Investigou o 401 no login', where: '#eng', tokens: '1.240 tokens', cost: 'US$ 0,004' },
+      { when: 'ontem', what: 'Revisou o PR #39 de Marina', where: '#eng', tokens: '6.880 tokens', cost: 'US$ 0,021' },
+      { when: 'ontem', what: 'Explicou a fila de e-mails', where: 'thread em #eng', tokens: '2.110 tokens', cost: 'US$ 0,007' },
+      { when: '12 out', what: 'Explicou o fluxo de convites', where: 'DM João', tokens: '2.950 tokens', cost: 'US$ 0,009' },
+      { when: '11 out', what: 'Abriu o PR #37: timeout do agendamento', where: '#eng', tokens: '18.400 tokens', cost: 'US$ 0,058' },
+      { when: '10 out', what: 'Resumiu os erros da semana no Sentry', where: '#eng', tokens: '9.700 tokens', cost: 'US$ 0,030' }
+    ];
+    const rq = (s.runsQ || '').toLowerCase();
+    const runs = RUNS.filter((r) => !rq || (r.what + ' ' + r.where).toLowerCase().includes(rq));
+    const d = s.dialog;
+    const width = d === 'budget' ? 440 : 600;
+    return {
+      theme: (this.props.tema ?? 'claro') === 'escuro' ? 'dark' : 'light',
+      save: () => this.setState({ saved: true }),
+      saveLabel: s.saved ? 'Salvo' : 'Salvar alterações',
+      budget: s.budget.toFixed(2).replace('.', ','),
+      meterStyle: 'width: ' + Math.min(100, Math.round(12.3 / s.budget * 100)) + '%; height: 100%; background: var(--ink); border-radius: 999px;',
+      connectorRows,
+      permSummary: granted + ' de ' + total + ' permissões liberadas em 4 conectores da Acme.',
+      openRuns: () => this.setState({ dialog: 'runs' }),
+      openBudget: () => this.setState({ dialog: 'budget', budgetDraft: String(s.budget) }),
+      openPerms: () => this.setState({ dialog: 'perms' }),
+      dialogOpen: !!d, isRuns: d === 'runs', isBudget: d === 'budget', isPerms: d === 'perms',
+      dialogTitle: d === 'runs' ? 'Execuções da Ada' : d === 'budget' ? 'Orçamento mensal' : 'Permissões da Ada',
+      dialogStyle: 'position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(' + width + 'px, calc(100% - 32px)); max-height: min(640px, calc(100% - 64px)); display: flex; flex-direction: column; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--overlay);',
+      dialogKey: (e) => { if (e.key === 'Escape') close(); },
+      close,
+      runsQ: s.runsQ, onRunsQ: (e) => this.setState({ runsQ: e.target.value }),
+      runs, runsCount: runs.length, runsEmpty: runs.length === 0,
+      budgetDraft: s.budgetDraft, onBudgetDraft: (e) => this.setState({ budgetDraft: e.target.value }),
+      applyBudget: () => { const v = parseFloat(String(s.budgetDraft).replace(',', '.')); if (v > 0) this.setState({ budget: v, dialog: null, saved: false }); },
+      permQ: s.permQ, onPermQ: (e) => this.setState({ permQ: e.target.value }),
+      permGroups, permEmpty: permGroups.length === 0
+    };
+  }
+}
+</script>
+</body>
+</html>

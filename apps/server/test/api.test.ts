@@ -1,0 +1,178 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { schema } from "@agenteschat/db";
+import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+
+let t: TestServer;
+beforeEach(async () => {
+  t = await createTestServer();
+});
+afterEach(() => t.close());
+
+describe("sign-up policy (self-host)", () => {
+  test("first account signs up; then sign-up closes", async () => {
+    const anon = browser(t);
+    expect(await (await anon("/api/app/auth-config")).json()).toMatchObject({ signupOpen: true, firstRun: true });
+    await signUp(browser(t), "owner@example.com");
+    expect(await (await anon("/api/app/auth-config")).json()).toMatchObject({ signupOpen: false, firstRun: false });
+    const res = await browser(t)("/api/auth/sign-up/email", {
+      json: { email: "stranger@example.com", password: "correct horse battery", name: "s" },
+    });
+    expect(res.status).toBe(403);
+    expect(JSON.stringify(await res.json())).toContain("Sign-up is closed");
+  });
+
+  test("ALLOW_SIGNUP=true keeps it open", async () => {
+    await t.close();
+    t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
+    await signUp(browser(t), "a@example.com");
+    await signUp(browser(t), "b@example.com");
+  });
+
+  test("an invited email can sign up and join", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const { url } = (await (
+      await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "ana@example.com", role: "member" } })
+    ).json()) as { url: string };
+    const ana = browser(t);
+    await signUp(ana, "ana@example.com");
+    const token = url.split("/invite/")[1];
+    expect((await ana(`/api/app/invitations/${token}/accept`, { json: {} })).status).toBe(200);
+    const me = (await (await ana("/api/app/me")).json()) as { organizations: { id: string; role: string }[] };
+    expect(me.organizations).toEqual([{ id: orgId, name: "Acme", role: "member" }] as never);
+  });
+});
+
+describe("app API protections", () => {
+  test("requires a session", async () => {
+    expect((await browser(t)("/api/app/me")).status).toBe(401);
+  });
+
+  test("CSRF: writes need our Origin and JSON", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    expect(
+      (await owner("/api/app/organizations", { json: { name: "X" }, origin: "https://evil.example" })).status,
+    ).toBe(403);
+    expect((await owner("/api/app/organizations", { json: { name: "X" }, origin: null })).status).toBe(403);
+    const form = await t.app.request("/api/app/organizations", {
+      method: "POST",
+      headers: {
+        origin: "http://localhost:3000",
+        cookie: owner.cookie(),
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: "name=X",
+    });
+    expect(form.status).toBe(415);
+  });
+
+  test("validation errors use the error shape", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const res = await owner("/api/app/organizations", { json: { name: "" } });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("invalid_request");
+  });
+});
+
+describe("organizations, agents and credentials", () => {
+  test("credentials are never returned, not even to owners", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const list = await (await owner(`/api/app/organizations/${orgId}/credentials`)).text();
+    expect(list).toContain("9876");
+    expect(list).not.toContain("sk-ant-api-secret");
+    const agents = await (await owner(`/api/app/organizations/${orgId}/agents`)).json();
+    expect(agents).toMatchObject({
+      agents: [{ handle: "dev", model: "claude-sonnet-5-5", hasCredential: true, monthlyBudgetUsd: 50 }],
+    });
+    const rows = await t.db.select().from(schema.providerCredentials);
+    expect(JSON.stringify(rows)).not.toContain("sk-ant-api-secret");
+  });
+
+  test("members can chat but can't manage agents or credentials", async () => {
+    await t.close();
+    t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const ana = browser(t);
+    await signUp(ana, "ana@example.com");
+    const { url } = (await (
+      await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "ana@example.com", role: "member" } })
+    ).json()) as { url: string };
+    await ana(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
+    expect((await ana(`/api/app/organizations/${orgId}/agents`, { json: { name: "X", handle: "xx" } })).status).toBe(
+      403,
+    );
+    expect((await ana(`/api/app/organizations/${orgId}/credentials`)).status).toBe(403);
+    expect((await ana(`/api/app/organizations/${orgId}/usage`)).status).toBe(403);
+    expect((await ana(`/api/app/organizations/${orgId}/agents`)).status).toBe(200);
+  });
+
+  test("unknown models are rejected", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const res = await owner(`/api/app/organizations/${orgId}/agents`, {
+      json: { name: "X", handle: "xx", model: "gpt-5" },
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("chat over HTTP", () => {
+  test("post a mention, workers run the agent, the reply appears in the thread, usage is billed", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId, channelId, agentId } = await seedOrg(owner);
+    const posted = await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, {
+      json: { body: "@dev status?" },
+    });
+    expect(posted.status).toBe(201);
+    const message = (await posted.json()) as { id: string; mentionedAgentIds: string[] };
+    expect(message.mentionedAgentIds).toEqual([agentId]);
+
+    await t.drain();
+    const thread = (await (
+      await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages?threadId=${message.id}`)
+    ).json()) as {
+      messages: { author: { type: string }; body: string }[];
+    };
+    expect(thread.messages.map((m) => [m.author.type, m.body])).toEqual([
+      ["person", "@dev status?"],
+      ["agent", "Echo: [owner]: @dev status?."],
+    ]);
+    expect(t.provider.calls[0]?.apiKey).toBe("sk-ant-api-secret-9876");
+    const usage = (await (await owner(`/api/app/organizations/${orgId}/usage`)).json()) as {
+      usage: { calls: number; costUsd: number }[];
+    };
+    expect(usage.usage[0]?.calls).toBe(1);
+    expect(usage.usage[0]?.costUsd).toBeGreaterThan(0);
+  });
+
+  test("organizations are isolated: another org's owner can't read or post", async () => {
+    await t.close();
+    t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
+    const a = browser(t);
+    await signUp(a, "a@example.com");
+    const { orgId, channelId } = await seedOrg(a);
+    const b = browser(t);
+    await signUp(b, "b@example.com");
+    const other = (await (await b("/api/app/organizations", { json: { name: "Other" } })).json()) as {
+      organization: { id: string };
+    };
+
+    expect((await b(`/api/app/organizations/${orgId}/channels/${channelId}/messages`)).status).toBe(403);
+    expect(
+      (await b(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, { json: { body: "hi" } })).status,
+    ).toBe(403);
+    // Using their own org id with A's channel id doesn't help either.
+    expect((await b(`/api/app/organizations/${other.organization.id}/channels/${channelId}/messages`)).status).toBe(
+      404,
+    );
+  });
+});

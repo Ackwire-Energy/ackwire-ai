@@ -1,0 +1,34 @@
+{
+  "name": "@agenteschat/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "dev": "bun --env-file=../../.env --watch src/main.ts",
+    "start": "bun --env-file=../../.env src/main.ts",
+    "build": "bun build src/main.ts --target=bun --outdir=dist --sourcemap=linked"
+  },
+  "dependencies": {
+    "@agenteschat/adapters": "workspace:*",
+    "@agenteschat/config": "workspace:*",
+    "@agenteschat/db": "workspace:*",
+    "@agenteschat/engine": "workspace:*",
+    "@agenteschat/modules": "workspace:*",
+    "@agenteschat/providers": "workspace:*",
+    "@hono/zod-openapi": "^1.6.3",
+    "@scalar/hono-api-reference": "^0.12.9",
+    "better-auth": "^1.7.7",
+    "hono": "^4.13.13",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  },
+  "license": "AGPL-3.0-only"
+}
