@@ -1,0 +1,35 @@
+import type { ReactNode } from "react";
+import { Icon } from "../icons/Icon";
+
+/** A picked item (a participant, a member) with a button to remove it. */
+export function Token({
+  children,
+  leading,
+  removeLabel,
+  onRemove,
+}: {
+  children: ReactNode;
+  /** E.g. a small avatar. */
+  leading?: ReactNode;
+  /** "Remover Ada". */
+  removeLabel: string;
+  onRemove: () => void;
+}) {
+  return (
+    <span className="ac-token">
+      {leading}
+      <span className="ac-token__label">{children}</span>
+      <button type="button" className="ac-token__remove" aria-label={removeLabel} onClick={onRemove}>
+        <Icon name="close" size={14} />
+      </button>
+    </span>
+  );
+}
+
+export function TokenList({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <ul className="ac-tokens" aria-label={label}>
+      {children}
+    </ul>
+  );
+}

@@ -12,6 +12,7 @@ export { Button, type ButtonProps, type ButtonVariant } from "./components/Butto
 export { Checkbox, CheckboxPill, type CheckboxProps, Radio, RadioCard, RadioGroup } from "./components/Checkbox";
 export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge } from "./components/Chip";
 export { Composer, type ComposerProps } from "./components/Composer";
+export { DatePicker, type DatePickerProps, monthGrid, parseYmd, ymd } from "./components/DatePicker";
 export { Dialog, DialogBody, DialogFooter, type DialogProps, DialogSearchList } from "./components/Dialog";
 export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";
 export { AffixInput, Field, type FieldProps, Input, SearchInput, Textarea, useFieldControl } from "./components/Field";
@@ -24,5 +25,7 @@ export { Select, type SelectOption, type SelectProps } from "./components/Select
 export { Sheet, type SheetProps } from "./components/Sheet";
 export { Alert, Card, EmptyState, type EmptyStateProps, List, Meter, OptionCard, Steps } from "./components/Surfaces";
 export { type TabItem, TabPanel, Tabs } from "./components/Tabs";
+export { normalizeTime, TimeSelect, type TimeSelectProps, timeOptions } from "./components/TimeSelect";
+export { Token, TokenList } from "./components/Token";
 export { cx } from "./cx";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";

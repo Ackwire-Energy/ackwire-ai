@@ -1,4 +1,5 @@
-import { Avatar, Checkbox } from "@agenteschat/ui";
+import { Avatar, Checkbox, SearchInput, Token, TokenList } from "@agenteschat/ui";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useOrg } from "./org-context";
@@ -81,3 +82,86 @@ export function MemberPickerRows({
 /** "person:u1" → { userId: "u1" }; "agent:a1" → { agentId: "a1" }. */
 export const memberOf = (key: PickKey) =>
   key.startsWith("agent:") ? { agentId: key.slice(6) } : { userId: key.slice(7) };
+
+/**
+ * Pick people and agents inside a form: the picked ones as tokens (with
+ * remove), then the search box, then the matching rows right under it in
+ * their own short scroll area.
+ */
+export function PeoplePicker({
+  label,
+  searchLabel,
+  help,
+  emptyText,
+  selected,
+  onChange,
+}: {
+  label: string;
+  searchLabel: string;
+  help?: string;
+  emptyText: string;
+  selected: Set<PickKey>;
+  onChange: (next: Set<PickKey>) => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const [query, setQuery] = useState("");
+  const rows = useMemberRows(query);
+  const all = useMemberRows("");
+  const picked = all.filter((r) => selected.has(r.key));
+  const toggle = (key: PickKey, on: boolean) => {
+    const next = new Set(selected);
+    if (on) next.add(key);
+    else next.delete(key);
+    onChange(next);
+  };
+  const helpId = `${searchLabel.replace(/\W+/g, "-")}-help`;
+  return (
+    <div className="people-picker">
+      <span className="ac-field__label">{label}</span>
+      {picked.length > 0 && (
+        <TokenList label={label}>
+          {picked.map((r) => (
+            <li key={r.key}>
+              <Token
+                leading={
+                  <Avatar
+                    kind={r.kind}
+                    size="xs"
+                    name={r.name}
+                    initials={r.kind === "agent" ? dir.agentInitials(r.id) : undefined}
+                  />
+                }
+                removeLabel={t("common.removeName", { name: r.name })}
+                onRemove={() => toggle(r.key, false)}
+              >
+                {r.name}
+              </Token>
+            </li>
+          ))}
+        </TokenList>
+      )}
+      <SearchInput
+        aria-label={searchLabel}
+        placeholder={searchLabel}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        aria-describedby={help ? helpId : undefined}
+      />
+      {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
+      <div className="people-picker__results" role="region" aria-label={searchLabel}>
+        {rows.length === 0 ? (
+          <p className="small muted">{emptyText}</p>
+        ) : (
+          <MemberPickerRows rows={rows} selected={selected} onToggle={toggle} />
+        )}
+      </div>
+      {help && (
+        <span id={helpId} className="ac-field__help">
+          {help}
+        </span>
+      )}
+    </div>
+  );
+}

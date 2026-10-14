@@ -1717,3 +1717,141 @@ a.ac-list__row:focus-visible {
 .ac-msg__aside .ac-receipt {
   margin-top: 0;
 }
+
+/* Date picker (our month grid in a popover; never the native input) */
+.ac-date__trigger .ac-icon {
+  color: var(--ink-muted);
+}
+.ac-date__placeholder {
+  color: var(--ink-muted);
+}
+.ac-date {
+  min-width: 0;
+  width: 280px;
+  max-height: none;
+  padding: var(--space-2);
+  gap: var(--space-2);
+}
+.ac-date__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.ac-date__title {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+.ac-date__title::first-letter {
+  text-transform: uppercase;
+}
+.ac-date__grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.ac-date__wd {
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-align: center;
+}
+.ac-date__grid td {
+  padding: 1px;
+  text-align: center;
+}
+.ac-date__day {
+  width: 100%;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  cursor: pointer;
+}
+.ac-date__day:hover {
+  background: var(--surface-sunken);
+}
+.ac-date__day[data-outside] {
+  color: var(--ink-muted);
+}
+.ac-date__day[data-today] {
+  border-color: var(--line-strong);
+}
+.ac-date__day[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--surface-raised);
+  font-weight: 600;
+}
+.ac-date__day:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-date__day:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Time select (type or pick 15-minute steps) */
+.ac-time {
+  font-variant-numeric: tabular-nums;
+}
+.ac-time__list {
+  min-width: var(--radix-popover-trigger-width, 120px);
+  max-height: 240px;
+}
+.ac-time__option[data-active],
+.ac-time__option:hover {
+  background: var(--surface-sunken);
+}
+
+/* Picked items with a remove button (participants, members) */
+.ac-tokens {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ac-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px 0 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  font-size: 13px;
+  color: var(--ink);
+}
+.ac-token__label {
+  white-space: nowrap;
+}
+.ac-token__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.ac-token__remove:hover {
+  color: var(--ink);
+  background: var(--surface-raised);
+}
+.ac-token__remove:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

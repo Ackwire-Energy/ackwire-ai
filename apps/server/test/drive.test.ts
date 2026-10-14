@@ -79,7 +79,7 @@ test("Drive API: create, new version, versions, download link, file, delete", as
     json: { content: { kind: "table", columns: ["mês"], rows: [] }, baseVersion: 1 },
   });
   expect(stale.status).toBe(409);
-  const versions = (await (await api(`/artifacts/${a.id}/versions`)).json()) as { versions: { note: string }[] };
+  const versions = (await (await api(`/artifacts/${a.id}/versions`)).json()) as { versions: { note: string | null }[] };
   expect(versions.versions.map((v) => v.note)).toEqual(["fev", null]);
   const old = (await (await api(`/artifacts/${a.id}?version=1`)).json()) as { content: { rows: string[][] } };
   expect(old.content.rows).toEqual([["jan", "10"]]);
