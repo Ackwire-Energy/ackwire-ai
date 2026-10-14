@@ -1,7 +1,15 @@
-import { channelTopic, type Presence, type PubSub, type RateLimiter, type Unsubscribe } from "@agenteschat/adapters";
+import {
+  channelTopic,
+  orgTopic,
+  type Presence,
+  type PubSub,
+  type RateLimiter,
+  type Unsubscribe,
+  userTopic,
+} from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
-import { ForbiddenError, getMembership, NotFoundError, requireChannelAccess } from "@agenteschat/engine";
+import { ForbiddenError, getMembership, NotFoundError, type OrgEvent, requireChannelAccess } from "@agenteschat/engine";
 import { type Auth, type SessionUser, sessionUser } from "../auth";
 import type { Logger } from "../logger";
 import { allowedOrigins } from "../routes/app/context";
@@ -15,9 +23,15 @@ import { allowedOrigins } from "../routes/app/context";
  *   checks the channel belongs to that org and the person is a member of it
  *   (`requireChannelAccess`, the same check as the HTTP API) before
  *   forwarding the channel's events.
- * - Server → client frames: `ready`, `subscribed`, `unsubscribed`, `error`,
- *   and channel events (`message.created`, `agent.delta`, `agent.run`)
- *   wrapped as `{"type":"event","channelId":…,"event":{…}}`.
+ * - Server → client frames: `ready`, `subscribed`, `unsubscribed` (with a
+ *   `reason` when the server dropped it: `revoked`, `archived`), `error`, and
+ *   channel events (`message.created`, `agent.delta`, `agent.run`,
+ *   `approval.*`) wrapped as `{"type":"event","channelId":…,"event":{…}}`.
+ *   Events for this person only (approvals waiting for them, DMs) arrive as
+ *   `{"type":"event","scope":"user","event":{…}}`.
+ * - Membership changes take effect at once: leaving (or being removed from) a
+ *   channel drops that subscription; leaving the organization closes the
+ *   socket with code 4403.
  */
 export interface RealtimeDeps {
   db: Database;
@@ -34,6 +48,10 @@ export interface SocketData {
   user: SessionUser;
   orgId: string;
   subscriptions: Map<string, Unsubscribe>;
+  /** Org and user topic listeners. */
+  system: Unsubscribe[];
+  /** Channels being authorized right now; a revocation during the check marks them. */
+  pending: Map<string, { revoked: boolean }>;
 }
 
 export type ClientFrame = { type: "subscribe" | "unsubscribe"; channelId: string } | { type: "ping" };
@@ -96,7 +114,14 @@ export function createRealtime(deps: RealtimeDeps) {
       if (!user) return new Response("Sign in to continue", { status: 401 });
       if (!(await getMembership(deps.db, user.id, orgId)))
         return new Response("Not a member of this organization", { status: 403 });
-      const data: SocketData = { connectionId: crypto.randomUUID(), user, orgId, subscriptions: new Map() };
+      const data: SocketData = {
+        connectionId: crypto.randomUUID(),
+        user,
+        orgId,
+        subscriptions: new Map(),
+        system: [],
+        pending: new Map(),
+      };
       return server.upgrade(req, { data }) ? undefined : new Response("WebSocket upgrade failed", { status: 400 });
     },
 
@@ -104,6 +129,34 @@ export function createRealtime(deps: RealtimeDeps) {
       maxPayloadLength: 16 * 1024,
       idleTimeout: 120,
       async open(ws: Bun.ServerWebSocket<SocketData>) {
+        const { orgId, user } = ws.data;
+        const drop = (channelId: string, reason: string) => {
+          const pending = ws.data.pending.get(channelId);
+          if (pending) pending.revoked = true;
+          const off = ws.data.subscriptions.get(channelId);
+          if (!off) return;
+          off();
+          ws.data.subscriptions.delete(channelId);
+          if (ws.readyState === 1) send(ws, { type: "unsubscribed", channelId, reason });
+        };
+        ws.data.system.push(
+          deps.pubsub.subscribe(orgTopic(orgId), (raw) => {
+            const event = raw as unknown as OrgEvent;
+            if (event.type === "channel.archived") return drop(event.channelId, "archived");
+            if (event.type !== "membership.revoked" || event.userId !== user.id) return;
+            if (event.channelId) return drop(event.channelId, "revoked");
+            for (const channelId of [...ws.data.subscriptions.keys(), ...ws.data.pending.keys()])
+              drop(channelId, "revoked");
+            if (ws.readyState === 1) {
+              send(ws, { type: "error", code: "membership_revoked" });
+              // Closed outside the publisher's call stack (in-memory pub/sub delivers synchronously).
+              ws.close(4403, "membership revoked");
+            }
+          }),
+          deps.pubsub.subscribe(userTopic(orgId, user.id), (event) => {
+            if (ws.readyState === 1) send(ws, { type: "event", scope: "user", event });
+          }),
+        );
         await deps.presence.connect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);
         send(ws, { type: "ready", orgId: ws.data.orgId, userId: ws.data.user.id });
       },
@@ -123,8 +176,18 @@ export function createRealtime(deps: RealtimeDeps) {
         if (ws.data.subscriptions.has(channelId)) return send(ws, { type: "subscribed", channelId });
         if (ws.data.subscriptions.size >= MAX_SUBSCRIPTIONS)
           return send(ws, { type: "error", code: "too_many_subscriptions", channelId });
-        const denied = await authorizeSubscription(deps.db, ws.data.user.id, ws.data.orgId, channelId);
+        const check = { revoked: false };
+        ws.data.pending.set(channelId, check);
+        let denied: string | null;
+        try {
+          denied = await authorizeSubscription(deps.db, ws.data.user.id, ws.data.orgId, channelId);
+        } finally {
+          ws.data.pending.delete(channelId);
+        }
+        // A revocation that arrived while we were checking wins over a stale "allowed".
+        if (!denied && check.revoked) denied = "forbidden";
         if (denied) return send(ws, { type: "error", code: denied, channelId });
+        if (ws.data.subscriptions.has(channelId)) return send(ws, { type: "subscribed", channelId });
         const off = deps.pubsub.subscribe(channelTopic(channelId), (event) => {
           if (ws.readyState === 1) send(ws, { type: "event", channelId, event });
         });
@@ -134,6 +197,8 @@ export function createRealtime(deps: RealtimeDeps) {
       async close(ws: Bun.ServerWebSocket<SocketData>) {
         for (const off of ws.data.subscriptions.values()) off();
         ws.data.subscriptions.clear();
+        for (const off of ws.data.system) off();
+        ws.data.system = [];
         await deps.presence.disconnect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);
       },
     },

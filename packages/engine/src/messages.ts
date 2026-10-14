@@ -56,8 +56,8 @@ export interface NewMessage {
 }
 
 /**
- * Writes a message and its `message.posted` outbox event in the caller's
- * transaction. Mentions resolve to active agents that are members of the
+ * Writes a message and its `message.posted` outbox event (mentions or router)
+ * in the caller's transaction. Mentions resolve to active agents that are members of the
  * channel; an agent never mentions itself. No permission checks: callers
  * (`postPersonMessage`, the run executor) do them.
  */
@@ -114,7 +114,8 @@ export async function insertMessage(tx: Executor, input: NewMessage): Promise<Me
     .returning();
   if (!message) throw new Error("message insert returned nothing");
 
-  if (mentionedAgentIds.length > 0) {
+  // Mentions start runs; a person's message without mentions goes to the router.
+  if (mentionedAgentIds.length > 0 || input.author.type === "person") {
     await enqueue(tx, {
       orgId: input.orgId,
       kind: "message.posted",

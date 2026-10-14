@@ -1,12 +1,16 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
+  date,
   foreignKey,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
+  real,
   text,
   timestamp,
   unique,
@@ -66,7 +70,7 @@ export const agentRunStatusEnum = pgEnum("agent_run_status", [
   "done",
   "failed",
 ]);
-export const agentRunTriggerEnum = pgEnum("agent_run_trigger", ["mention"]);
+export const agentRunTriggerEnum = pgEnum("agent_run_trigger", ["mention", "router"]);
 
 export const agentRuns = pgTable(
   "agent_runs",
@@ -86,6 +90,15 @@ export const agentRuns = pgTable(
     status: agentRunStatusEnum().notNull().default("queued"),
     error: text(),
     replyMessageId: uuid(),
+    /**
+     * The conversation sent to the model, appended to turn by turn (system,
+     * messages, pending tool calls). Lets a run resume after an approval with
+     * exactly the history it had (append-only, so provider thinking blocks and
+     * prompt caches stay valid). See docs/adr/0015-tool-gateway-and-approvals.md.
+     */
+    transcript: jsonb().$type<Record<string, unknown>>(),
+    /** Model calls made so far (capped by AGENT_MAX_TOOL_TURNS). */
+    turns: integer().notNull().default(0),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),
@@ -100,7 +113,15 @@ export const agentRuns = pgTable(
   ],
 );
 
-export const agentRunStepKindEnum = pgEnum("agent_run_step_kind", ["context", "model_call", "message", "error"]);
+export const agentRunStepKindEnum = pgEnum("agent_run_step_kind", [
+  "context",
+  "model_call",
+  "message",
+  "error",
+  "tool_call",
+  "tool_result",
+  "approval",
+]);
 
 /** What a run did, step by step: audit trail and the base for resuming after approvals. */
 export const agentRunSteps = pgTable(
@@ -121,9 +142,13 @@ export const agentRunSteps = pgTable(
   (t) => [unique().on(t.runId, t.seq)],
 );
 
+export const usageKindEnum = pgEnum("usage_kind", ["agent", "router", "embedding", "summary"]);
+
 /**
  * One row per model call, written by the Model Gateway only. Same numbers in
  * both editions; Cloud turns them into invoices and plan limits.
+ * `agent_id` is null for calls made for the organization rather than an agent
+ * (router, embeddings, summaries); `kind` tells them apart.
  */
 export const usageRecords = pgTable(
   "usage_records",
@@ -132,7 +157,8 @@ export const usageRecords = pgTable(
       .primaryKey()
       .$defaultFn(() => Bun.randomUUIDv7()),
     orgId: uuid().notNull(),
-    agentId: uuid().notNull(),
+    agentId: uuid(),
+    kind: usageKindEnum().notNull().default("agent"),
     runId: uuid().references(() => agentRuns.id, { onDelete: "set null" }),
     /** Null when the platform key paid (Cloud). */
     credentialId: uuid().references(() => providerCredentials.id, { onDelete: "set null" }),
@@ -146,10 +172,166 @@ export const usageRecords = pgTable(
     cacheWriteTokens: integer().notNull().default(0),
     /** Cost in nano-USD (1e-9 USD), computed from `MODEL_CATALOG` at call time. */
     costNanoUsd: bigint({ mode: "number" }).notNull(),
+    /**
+     * The stream failed midway: tokens are what the provider reported before
+     * failing, or counted/estimated (docs/adr/0012-budget-reservation-and-usage.md).
+     */
+    partial: boolean().notNull().default(false),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
     index().on(t.orgId, t.agentId, t.createdAt),
+    index().on(t.orgId, t.createdAt),
+  ],
+);
+
+/**
+ * Per-agent spend counter for one calendar month (UTC). The Model Gateway
+ * reserves the worst-case cost of a call here (row lock) before calling and
+ * settles to the actual cost after, so concurrent runs can't overshoot the
+ * budget (docs/adr/0012-budget-reservation-and-usage.md).
+ */
+export const agentBudgetPeriods = pgTable(
+  "agent_budget_periods",
+  {
+    orgId: uuid().notNull(),
+    agentId: uuid().notNull(),
+    periodStart: date({ mode: "string" }).notNull(),
+    spentNanoUsd: bigint({ mode: "number" }).notNull().default(0),
+    reservedNanoUsd: bigint({ mode: "number" }).notNull().default(0),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.agentId, t.periodStart] }),
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+  ],
+);
+
+/** An open reservation. Released on settle, or when it expires (a worker died mid-call). */
+export const budgetReservations = pgTable(
+  "budget_reservations",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    agentId: uuid().notNull(),
+    periodStart: date({ mode: "string" }).notNull(),
+    amountNanoUsd: bigint({ mode: "number" }).notNull(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    index().on(t.agentId, t.expiresAt),
+  ],
+);
+
+/**
+ * What the router decided for one message without mentions (docs/adr/0013-router.md):
+ * which strategy ranked the candidates, every candidate's score, and who was
+ * picked after policy (threshold, at most 2, hop limit). Kept to compare
+ * strategies over time.
+ */
+export const routingDecisions = pgTable(
+  "routing_decisions",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    messageId: uuid().notNull(),
+    /** Strategy name, e.g. `llm` (core) or another implementation's name. */
+    strategy: text().notNull(),
+    candidates: jsonb().$type<{ agentId: string; score: number }[]>().notNull(),
+    /** Need-any-agent probability, when the strategy reports one. */
+    needsAgentScore: real(),
+    selectedAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    reason: text(),
+    /** Set when the strategy failed; nobody is picked. */
+    error: text(),
+    usageRecordId: uuid(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.messageId), index().on(t.orgId, t.createdAt)],
+);
+
+export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "refused", "expired"]);
+
+/**
+ * A sensitive action an agent wants to take (D4, docs/adr/0015). Bound to the
+ * exact action: `action_hash` = SHA-256 of the canonical JSON of (tool,
+ * scope, connection, params); only that is ever executed. Who may decide:
+ * the agent's owner (`owner_user_id`, snapshot at creation) and org admins.
+ */
+export const approvals = pgTable(
+  "approvals",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    runId: uuid()
+      .notNull()
+      .references(() => agentRuns.id, { onDelete: "cascade" }),
+    agentId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    threadRootId: uuid().notNull(),
+    /** The chat message showing the request (a card). */
+    messageId: uuid(),
+    /** Tool-use id in the run's transcript, to answer the model. */
+    toolUseId: text().notNull(),
+    tool: text().notNull(),
+    scope: text().notNull(),
+    connectionId: uuid(),
+    params: jsonb().$type<Record<string, unknown>>().notNull(),
+    actionHash: text().notNull(),
+    /** Human summary, e.g. "Merge PR #42 into main". */
+    title: text().notNull(),
+    detail: text().notNull().default(""),
+    status: approvalStatusEnum().notNull().default("pending"),
+    ownerUserId: text(),
+    decidedByUserId: text(),
+    decidedAt: timestamp({ withTimezone: true }),
+    /** Why it was refused (fed back to the model and to agent lessons). */
+    reason: text(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    /** Set once when the approved action runs: never twice. */
+    executedAt: timestamp({ withTimezone: true }),
+    result: jsonb().$type<Record<string, unknown>>(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    unique().on(t.runId, t.toolUseId),
+    index().on(t.orgId, t.status, t.createdAt),
+    index().on(t.expiresAt).where(sql`${t.status} = 'pending'`),
+  ],
+);
+
+/**
+ * What an agent may do: one row per granted scope (D7, docs/adr/0015).
+ * `connection_id` null = a built-in tool scope (e.g. `context:read`);
+ * otherwise a scope of one org connector connection (e.g. `github:pr.merge`).
+ * The Tool Gateway checks this table on every call; prompts never matter.
+ */
+export const agentScopes = pgTable(
+  "agent_scopes",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    agentId: uuid().notNull(),
+    connectionId: uuid(),
+    scope: text().notNull(),
+    grantedByUserId: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    unique().on(t.agentId, t.connectionId, t.scope).nullsNotDistinct(),
   ],
 );

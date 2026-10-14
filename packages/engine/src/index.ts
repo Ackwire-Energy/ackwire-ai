@@ -12,5 +12,6 @@ export * from "./jobs";
 export * from "./messages";
 export * from "./organizations";
 export * from "./outbox";
+export * from "./router";
 export * from "./runs";
 export * from "./usage";

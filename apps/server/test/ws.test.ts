@@ -23,7 +23,9 @@ beforeEach(async () => {
   server = listen(t);
 });
 afterEach(async () => {
-  await server.stop(true);
+  // Bun 1.3 never resolves stop(true) after the server itself closed a socket
+  // whose client lives in the same process; don't wait on it forever.
+  await Promise.race([server.stop(true), Bun.sleep(500)]);
   await t.close();
 });
 
@@ -177,4 +179,51 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
   });
   expect(await t.adapters.presence.online(orgId)).toHaveLength(1);
   c.ws.close();
+});
+
+test("membership changes drop live subscriptions at once (channel, then organization)", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const { url } = (await (
+    await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "ana@example.com", role: "member" } })
+  ).json()) as { url: string };
+  const ana = browser(t);
+  await signUp(ana, "ana@example.com");
+  await ana(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
+  const anaId = (await meId(ana)) ?? "";
+  const other = (await (
+    await owner(`/api/app/organizations/${orgId}/channels`, { json: { name: "random" } })
+  ).json()) as { id: string };
+  await ana(`/api/app/organizations/${orgId}/channels/${other.id}/join`, { json: {} });
+
+  const a = connect(wsUrl(orgId), { origin: ORIGIN, cookie: ana.cookie() });
+  await a.opened;
+  const closed = new Promise<number>((resolve) => a.ws.addEventListener("close", (e) => resolve(e.code)));
+  a.send({ type: "subscribe", channelId });
+  a.send({ type: "subscribe", channelId: other.id });
+  await a.next((f) => f.type === "subscribed" && f.channelId === channelId);
+  await a.next((f) => f.type === "subscribed" && f.channelId === other.id);
+
+  // Removed from #general: that subscription ends now, and its events stop.
+  const removed = await owner(`/api/app/organizations/${orgId}/channels/${channelId}/members/people/${anaId}`, {
+    method: "DELETE",
+  });
+  expect(removed.status).toBe(204);
+  expect(await a.next((f) => f.type === "unsubscribed" && f.channelId === channelId)).toEqual({
+    type: "unsubscribed",
+    channelId,
+    reason: "revoked",
+  });
+  await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, { json: { body: "after removal" } });
+  await owner(`/api/app/organizations/${orgId}/channels/${other.id}/messages`, { json: { body: "still here" } });
+  const stillHere = await a.next((f) => f.type === "event" && f.channelId === other.id);
+  expect(stillHere).toMatchObject({ event: { type: "message.created" } });
+  expect(a.frames.some((f) => f.type === "event" && f.channelId === channelId)).toBe(false);
+
+  // Removed from the organization: every subscription ends and the socket closes.
+  expect((await owner(`/api/app/organizations/${orgId}/members/${anaId}`, { method: "DELETE" })).status).toBe(204);
+  expect(await closed).toBe(4403);
+  expect(a.frames).toContainEqual({ type: "unsubscribed", channelId: other.id, reason: "revoked" });
+  expect(a.frames).toContainEqual({ type: "error", code: "membership_revoked" });
 });

@@ -1,6 +1,8 @@
+import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, gt, isNull, schema, sql } from "@agenteschat/db";
 import { randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError } from "./errors";
+import { publishOrgEvent } from "./events";
 
 const { organizations, organizationMembers, organizationInvitations, channels, channelMembers, users } = schema;
 
@@ -205,7 +207,13 @@ export async function changeMemberRole(
 }
 
 /** Removes a member (or lets a member leave). The last owner can't leave. */
-export async function removeMember(db: Database, actorId: string, orgId: string, targetUserId: string) {
+export async function removeMember(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  targetUserId: string,
+  options: { pubsub?: PubSub } = {},
+) {
   const target = await getMembership(db, targetUserId, orgId);
   if (!target) return;
   if (actorId !== targetUserId) {
@@ -226,6 +234,8 @@ export async function removeMember(db: Database, actorId: string, orgId: string,
       .delete(channelMembers)
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
   });
+  // Their open WebSocket connections lose every subscription now, not on reconnect.
+  await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId });
 }
 
 // ── Invitations ──────────────────────────────────────────────────────────────

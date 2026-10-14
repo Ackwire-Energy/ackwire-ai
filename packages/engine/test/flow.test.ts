@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import type { RealtimeEvent } from "@agenteschat/adapters";
 import { asc, eq, schema } from "@agenteschat/db";
-import { ProviderError } from "@agenteschat/providers";
+import { ProviderError, systemText } from "@agenteschat/providers";
 import { createAgent, drainOutbox, listMessages, postPersonMessage } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
@@ -37,8 +37,8 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
 
   // The model saw org context, agent instructions and the conversation.
   const request = f.provider.calls[0]?.request;
-  expect(request?.system).toContain("Acme builds rockets.");
-  expect(request?.system).toContain("Answer briefly.");
+  expect(systemText(request?.system ?? "")).toContain("Acme builds rockets.");
+  expect(systemText(request?.system ?? "")).toContain("Answer briefly.");
   expect(request?.messages.at(-1)).toEqual({ role: "user", content: "[ana]: @dev can you look at the failing build?" });
 
   // Deltas went out through PubSub to channel subscribers, in order, then the final message.
@@ -88,7 +88,7 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
 
 test("agents mentioning each other stop at the per-thread hop limit", async () => {
   f = await setup({
-    reply: (req) => ({ chunks: [req.system.includes("@dev)") ? "@qa over to you" : "@dev back to you"] }),
+    reply: (req) => ({ chunks: [systemText(req.system).includes("@dev)") ? "@qa over to you" : "@dev back to you"] }),
   });
   const qa = await createAgent(
     f.db,

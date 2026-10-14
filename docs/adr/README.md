@@ -17,3 +17,6 @@ The product-level decision log (in Portuguese) is `docs/planejamento.md`; these 
 | [0009](0009-messages-partitioning.md) | `messages` partitioned by month |
 | [0010](0010-realtime.md) | Real-time over native Bun WebSocket and a `PubSub` adapter |
 | [0011](0011-technology-stack.md) | Technology stack |
+| [0012](0012-budget-reservation-and-usage.md) | Budget reservation, usage kinds (`agent`/`router`/`embedding`/`summary`), partial usage on stream failure |
+| [0013](0013-router.md) | Router: code picks candidates, a `RouterStrategy` scores, policy decides; decisions stored |
+| [0014](0014-live-subscription-revocation.md) | Membership changes revoke live WebSocket subscriptions |

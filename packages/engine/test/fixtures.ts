@@ -28,7 +28,7 @@ export async function addUser(db: Database, name: string) {
   return { id, name, email: `${name}-${id.slice(-8)}@example.com` };
 }
 
-export async function addMember(db: Database, orgId: string, role: MemberRole, name = role) {
+export async function addMember(db: Database, orgId: string, role: MemberRole, name: string = role) {
   const user = await addUser(db, name);
   await db.insert(schema.organizationMembers).values({ orgId, userId: user.id, role });
   return user;

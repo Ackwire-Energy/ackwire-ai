@@ -1,6 +1,8 @@
+import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNull, or, schema } from "@agenteschat/db";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
-import { getMembership, requirePermission } from "./organizations";
+import { publishOrgEvent } from "./events";
+import { can, getMembership, requirePermission } from "./organizations";
 
 const { channels, channelMembers, agents } = schema;
 
@@ -85,7 +87,7 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
     .select()
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
-  if (!channel) throw new NotFoundError("Channel not found");
+  if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
   if (!(await isChannelMember(db, orgId, channelId, userId))) {
     throw new ForbiddenError("Join this channel first");
   }
@@ -137,4 +139,65 @@ export async function listChannelMembers(db: Database, actorId: string, orgId: s
   return rows.map((r) =>
     r.userId ? { type: "person" as const, id: r.userId } : { type: "agent" as const, id: r.agentId ?? "" },
   );
+}
+
+/**
+ * Removes a person or an agent from a channel. Allowed for yourself (leave),
+ * the channel's creator, and admins. Publishes `membership.revoked` so open
+ * WebSocket subscriptions of that person end immediately.
+ */
+export async function removeChannelMember(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  channelId: string,
+  member: { userId: string } | { agentId: string },
+  options: { pubsub?: PubSub } = {},
+) {
+  const membership = await getMembership(db, actorId, orgId);
+  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const [channel] = await db
+    .select()
+    .from(channels)
+    .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
+  if (!channel) throw new NotFoundError("Channel not found");
+  const self = "userId" in member && member.userId === actorId;
+  if (!self && channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+    throw new ForbiddenError("Only the channel's creator or an admin can remove members");
+  }
+  await db
+    .delete(channelMembers)
+    .where(
+      and(
+        eq(channelMembers.orgId, orgId),
+        eq(channelMembers.channelId, channelId),
+        "userId" in member ? eq(channelMembers.userId, member.userId) : eq(channelMembers.agentId, member.agentId),
+      ),
+    );
+  if ("userId" in member) {
+    await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: member.userId, channelId });
+  }
+}
+
+/** Archives a channel (creator or admin). Live subscriptions to it end at once. `general` can't be archived. */
+export async function archiveChannel(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  channelId: string,
+  options: { pubsub?: PubSub } = {},
+) {
+  const membership = await getMembership(db, actorId, orgId);
+  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const [channel] = await db
+    .select()
+    .from(channels)
+    .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
+  if (!channel) throw new NotFoundError("Channel not found");
+  if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+    throw new ForbiddenError("Only the channel's creator or an admin can archive it");
+  }
+  if (channel.name === "general") throw new ValidationError("#general can't be archived");
+  await db.update(channels).set({ archivedAt: new Date() }).where(eq(channels.id, channelId));
+  await publishOrgEvent(options.pubsub, { type: "channel.archived", orgId, channelId });
 }

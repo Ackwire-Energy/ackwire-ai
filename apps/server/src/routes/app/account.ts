@@ -230,7 +230,7 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, userId } = c.req.valid("param");
-      await removeMember(db, c.get("user").id, orgId, userId);
+      await removeMember(db, c.get("user").id, orgId, userId, { pubsub: deps.adapters.pubsub });
       return c.body(null, 204);
     },
   );

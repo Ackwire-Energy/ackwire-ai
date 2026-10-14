@@ -1,8 +1,6 @@
-import { bigint, index, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, index, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
-
-export const modelProviderEnum = pgEnum("model_provider", ["anthropic"]);
 
 /**
  * API keys of model providers, owned by the organization (BYOK). Never
@@ -19,7 +17,8 @@ export const providerCredentials = pgTable(
     orgId: uuid()
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    provider: modelProviderEnum().notNull(),
+    /** Provider id from `PROVIDERS` in `@agenteschat/providers` (text, so new providers need no migration). */
+    provider: text().notNull(),
     label: text().notNull(),
     /** `v1.<iv>.<ciphertext>.<tag>` of the API key, under the data key. */
     secretCiphertext: text().notNull(),
@@ -71,3 +70,27 @@ export const agents = pgTable(
   },
   (t) => [unique().on(t.orgId, t.handle), unique().on(t.orgId, t.id)],
 );
+
+/**
+ * Organization-wide settings that reference other tables (kept out of
+ * `organizations` to avoid a schema import cycle). One row per organization,
+ * created on first write.
+ */
+export const organizationSettings = pgTable("organization_settings", {
+  orgId: uuid()
+    .primaryKey()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  /**
+   * Credential that pays for calls made for the organization rather than an
+   * agent: router, summaries. Null = newest active credential of the provider,
+   * then the platform key (Cloud).
+   */
+  defaultCredentialId: uuid().references(() => providerCredentials.id, { onDelete: "set null" }),
+  /** Router model for this organization (catalog id). Null = `ROUTER_MODEL` of the deployment. */
+  routerModel: text(),
+  /** Model that writes thread/period summaries. Null = `SUMMARY_MODEL` of the deployment. */
+  summaryModel: text(),
+  /** IANA time zone used as the default for routines, e.g. `America/Sao_Paulo`. */
+  timezone: text().notNull().default("UTC"),
+  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});

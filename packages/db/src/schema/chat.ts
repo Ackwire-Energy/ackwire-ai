@@ -1,9 +1,11 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   foreignKey,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -46,6 +48,11 @@ export const channelMembers = pgTable(
     channelId: uuid().notNull(),
     userId: text().references(() => users.id, { onDelete: "cascade" }),
     agentId: uuid().references(() => agents.id, { onDelete: "cascade" }),
+    /**
+     * Agents only: the router may pick this agent for messages without a
+     * mention in this channel. Off = the agent answers only when @mentioned here.
+     */
+    autoReply: boolean().notNull().default(true),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -94,6 +101,8 @@ export const messages = pgTable(
     hop: integer().notNull().default(0),
     /** The run that produced this message (agent messages only). */
     agentRunId: uuid(),
+    /** Structured attachments, e.g. `{ "approvalId": "…" }` for an approval card. */
+    meta: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     editedAt: timestamp({ withTimezone: true }),
     deletedAt: timestamp({ withTimezone: true }),
   },

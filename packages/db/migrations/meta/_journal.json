@@ -15,6 +15,20 @@
       "when": 1791997073323,
       "tag": "0001_messages_partitions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792000018885,
+      "tag": "0002_gateway_router",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792001273585,
+      "tag": "0003_tool_gateway",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,9 @@ import type { ModelUsage } from "./types";
 /**
  * Prices in nano-USD per token (1e-9 USD), i.e. USD per million tokens × 1000,
  * so every cost is an exact integer. First-party Anthropic API list prices as
- * of 2026-10; cache writes use the 5-minute rate (1.25 × input).
+ * of 2026-10 (checked against the claude-api reference, cached 2026-10-06);
+ * cache reads are listed per model (Opus 5.5 and Sonnet 5.5: $0.20/MTok),
+ * cache writes use the 5-minute rate (1.25 × input).
  * Update this table when prices change: usage records store the computed cost,
  * so history is never repriced.
  */
@@ -14,8 +16,22 @@ export interface TokenPrices {
   cacheWrite: number;
 }
 
+/**
+ * Model providers agentes.chat can talk to. Adding one (e.g. `openai`) is an
+ * entry here, catalog rows with its prices, and an adapter implementing
+ * `ModelProvider`; the database stores the provider id as text, so no
+ * migration is needed.
+ */
+export const PROVIDERS = {
+  anthropic: { label: "Anthropic" },
+} as const satisfies Record<string, { label: string }>;
+
+export type ProviderId = keyof typeof PROVIDERS;
+
+export const isKnownProvider = (id: string): id is ProviderId => Object.hasOwn(PROVIDERS, id);
+
 export interface ModelInfo {
-  provider: "anthropic";
+  provider: ProviderId;
   label: string;
   prices: TokenPrices;
   /** Prices for the whole request when its prompt exceeds `aboveInputTokens`. */
@@ -60,6 +76,29 @@ export function costNanoUsd(model: string, usage: ModelUsage): number {
     usage.cacheReadTokens * p.cacheRead +
     usage.cacheWriteTokens * p.cacheWrite
   );
+}
+
+/**
+ * Upper bound of a call's cost, for budget reservations: every prompt token at
+ * the most expensive input rate (a cache write), every allowed output token
+ * at the output rate, long-context prices when the prompt may cross the threshold.
+ */
+export function maxCostNanoUsd(model: string, promptTokens: number, maxOutputTokens: number): number {
+  const info = MODEL_CATALOG[model];
+  if (!info) throw new Error(`unknown model ${model}`);
+  const p =
+    info.longContext && promptTokens > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices;
+  return promptTokens * Math.max(p.input, p.cacheWrite) + maxOutputTokens * p.output;
+}
+
+/** Output tokens that fit in `nanoUsd` after paying for the prompt (worst case), or 0. */
+export function outputTokensWithin(model: string, promptTokens: number, nanoUsd: number): number {
+  const info = MODEL_CATALOG[model];
+  if (!info) throw new Error(`unknown model ${model}`);
+  const p =
+    info.longContext && promptTokens > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices;
+  const left = nanoUsd - promptTokens * Math.max(p.input, p.cacheWrite);
+  return left <= 0 ? 0 : Math.floor(left / p.output);
 }
 
 export const nanoUsdToUsd = (nano: number) => nano / 1e9;

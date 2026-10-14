@@ -83,6 +83,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
     maxHops: config.AGENT_MAX_HOPS,
+    router: { enabled: config.ROUTER_ENABLED, model: config.ROUTER_MODEL, minScore: config.ROUTER_MIN_SCORE },
   });
   const workers = startWorkers({ db: database.db, handlers, log });
 

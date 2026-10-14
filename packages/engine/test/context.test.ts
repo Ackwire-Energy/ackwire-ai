@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
+import { systemText } from "@agenteschat/providers";
 import { buildRunContext, dispatchMentions, type Message, postPersonMessage, toTurns } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
@@ -45,10 +46,10 @@ test("system prompt carries org context, agent instructions and channel; history
   const run = runs[0];
   if (!run) throw new Error("no run");
   const ctx = await buildRunContext(f.db, run, f.agent, { maxMessages: 30 });
-  expect(ctx.system).toContain("Acme builds rockets.");
-  expect(ctx.system).toContain("Answer briefly.");
-  expect(ctx.system).toContain("#general");
-  expect(ctx.system).toContain("Dev (@dev, agent)");
+  expect(systemText(ctx.system)).toContain("Acme builds rockets.");
+  expect(systemText(ctx.system)).toContain("Answer briefly.");
+  expect(systemText(ctx.system)).toContain("#general");
+  expect(systemText(ctx.system)).toContain("Dev (@dev, agent)");
   expect(ctx.messages).toEqual([
     {
       role: "user",

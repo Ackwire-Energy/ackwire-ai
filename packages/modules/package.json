@@ -19,5 +19,5 @@
     "@hono/zod-openapi": "^1.6.3"
   },
   "devDependencies": {},
-  "license": "AGPL-3.0-only"
+  "license": "UNLICENSED"
 }

@@ -21,6 +21,12 @@ export interface PubSub {
 /** Topic of everything happening in one channel. */
 export const channelTopic = (channelId: string) => `channel:${channelId}`;
 
+/** Server-side organization events (membership changes). Never forwarded to clients as is. */
+export const orgTopic = (orgId: string) => `org:${orgId}`;
+
+/** Events for one person in one organization (approvals waiting for them, DMs). */
+export const userTopic = (orgId: string, userId: string) => `user:${orgId}:${userId}`;
+
 function deliver(handlers: Set<(event: RealtimeEvent) => void> | undefined, event: RealtimeEvent) {
   for (const handler of handlers ?? []) {
     try {

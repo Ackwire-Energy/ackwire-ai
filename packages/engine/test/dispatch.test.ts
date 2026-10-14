@@ -29,9 +29,20 @@ describe("dispatchMentions", () => {
     expect(jobs.map((j) => [j.kind, j.payload])).toEqual([["message.posted", { messageId: message.id }]]);
   });
 
-  test("messages without mentions enqueue nothing", async () => {
-    await post("hello everyone");
-    expect(await f.db.select().from(schema.outbox)).toHaveLength(0);
+  test("a person's message without mentions goes to the router; an agent's does not", async () => {
+    const message = await post("hello everyone");
+    expect((await f.db.select().from(schema.outbox)).map((j) => [j.kind, j.payload])).toEqual([
+      ["message.posted", { messageId: message.id }],
+    ]);
+    await f.db.transaction((tx) =>
+      insertMessage(tx, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "agent", agentId: f.agent.id, runId: crypto.randomUUID(), hop: 1 },
+        body: "just saying",
+      }),
+    );
+    expect(await f.db.select().from(schema.outbox)).toHaveLength(1);
   });
 
   test("creates one run per agent and is idempotent", async () => {

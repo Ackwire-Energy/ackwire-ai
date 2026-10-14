@@ -1,4 +1,4 @@
-import { channelTopic, type PubSub } from "@agenteschat/adapters";
+import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
 import type { MessageView } from "./messages";
 import type { RunStatus } from "./runs";
 
@@ -49,4 +49,34 @@ export async function publishMessageCreated(pubsub: PubSub, message: MessageView
     messageId: message.id,
     ...(inline ? { message } : {}),
   });
+}
+
+/**
+ * Organization events, consumed by the WebSocket server (not sent to clients
+ * verbatim). A membership change drops the affected subscriptions at once
+ * instead of waiting for a reconnect (docs/adr/0010-realtime.md).
+ */
+export type OrgEvent =
+  /** `userId` left or was removed: from one channel (`channelId`), or from the whole organization. */
+  | { type: "membership.revoked"; orgId: string; userId: string; channelId?: string }
+  /** The channel is gone for everyone. */
+  | { type: "channel.archived"; orgId: string; channelId: string };
+
+export async function publishOrgEvent(pubsub: PubSub | undefined, event: OrgEvent): Promise<void> {
+  if (!pubsub) return;
+  try {
+    await pubsub.publish(orgTopic(event.orgId), event);
+  } catch {
+    // Best effort; access is still re-checked on every subscribe and HTTP request.
+  }
+}
+
+/** An event for one person (forwarded to every connection they have open in that organization). */
+export type UserEvent = { type: string; [key: string]: unknown };
+
+export async function publishUserEvent(pubsub: PubSub | undefined, orgId: string, userId: string, event: UserEvent) {
+  if (!pubsub) return;
+  try {
+    await pubsub.publish(userTopic(orgId, userId), event);
+  } catch {}
 }

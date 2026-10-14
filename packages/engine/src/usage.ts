@@ -39,7 +39,7 @@ export async function usageSummary(db: Database, actorId: string, orgId: string,
     .where(and(eq(usageRecords.orgId, orgId), gte(usageRecords.createdAt, since)))
     .groupBy(usageRecords.agentId, agents.handle);
   return rows.map((r) => ({
-    agentId: r.agentId,
+    agentId: r.agentId ?? "",
     handle: r.handle,
     calls: r.calls,
     inputTokens: Number(r.inputTokens),

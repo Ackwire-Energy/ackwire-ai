@@ -1,12 +1,11 @@
 import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
+import { isKnownProvider, type ProviderId } from "@agenteschat/providers";
 import { openSecret, sealSecret } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { requirePermission } from "./organizations";
 
 const { providerCredentials } = schema;
-
-export type ProviderId = (typeof schema.modelProviderEnum.enumValues)[number];
 
 /** Associated data binding a sealed key to its organization and row. */
 const aadFor = (orgId: string, credentialId: string) => `provider-credential|${orgId}|${credentialId}`;
@@ -23,7 +22,7 @@ export interface CredentialSummary {
 
 const summary = (row: typeof providerCredentials.$inferSelect): CredentialSummary => ({
   id: row.id,
-  provider: row.provider,
+  provider: row.provider as ProviderId,
   label: row.label,
   keyHint: row.keyHint,
   createdAt: row.createdAt,
@@ -39,6 +38,7 @@ export async function createCredential(
   input: { provider: ProviderId; label: string; apiKey: string },
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
+  if (!isKnownProvider(input.provider)) throw new ValidationError(`Unknown provider ${input.provider}`);
   const apiKey = input.apiKey.trim();
   if (apiKey.length < 8) throw new ValidationError("apiKey looks too short");
   const id = crypto.randomUUID();
@@ -114,5 +114,5 @@ export async function decryptCredential(
     { ciphertext: row.secretCiphertext, wrappedDataKey: row.wrappedDataKey, kekId: row.kekId },
     aadFor(orgId, row.id),
   );
-  return { provider: row.provider, apiKey };
+  return { provider: row.provider as ProviderId, apiKey };
 }

@@ -124,10 +124,21 @@ export const envVars = {
     description: "Model used by new agents unless one is chosen explicitly.",
     section: "Agents",
   },
+  ROUTER_ENABLED: {
+    schema: z.stringbool().default(true),
+    description:
+      "Let the router pick which agents (at most 2) answer messages that mention nobody. Off = agents answer only when @mentioned.",
+    section: "Agents",
+  },
   ROUTER_MODEL: {
     schema: modelId.default("claude-haiku-5-5"),
     description:
-      "Small, fixed model that will decide which agents answer a message (router). Reserved: the router is not enabled yet, only explicit @mentions trigger agents.",
+      "Small, fixed model that scores which agents should answer a message without mentions (router). Any model in the catalog; an organization can override it in its settings. Billed to the organization's default provider key.",
+    section: "Agents",
+  },
+  ROUTER_MIN_SCORE: {
+    schema: z.coerce.number().min(0).max(1).default(0.5),
+    description: "Minimum router score (0–1) for an agent to answer a message without mentions.",
     section: "Agents",
   },
   AGENT_MAX_OUTPUT_TOKENS: {

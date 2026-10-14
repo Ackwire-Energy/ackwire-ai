@@ -51,6 +51,7 @@ export async function createTestServer(
     contextMessages: 30,
     maxHops: 3,
     deltaFlushMs: 0,
+    router: { enabled: config.ROUTER_ENABLED, model: config.ROUTER_MODEL, minScore: config.ROUTER_MIN_SCORE },
   });
   const auth = createAuth({ db, config, log });
   const app = createApp({

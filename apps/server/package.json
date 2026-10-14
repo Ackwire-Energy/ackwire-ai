@@ -30,5 +30,5 @@
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8"
   },
-  "license": "AGPL-3.0-only"
+  "license": "UNLICENSED"
 }
