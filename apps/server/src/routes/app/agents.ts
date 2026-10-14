@@ -4,6 +4,7 @@ import {
   archiveAgent,
   createAgent,
   createCredential,
+  deleteCredential,
   listAgents,
   listCredentials,
   revokeCredential,
@@ -150,13 +151,18 @@ export function agentRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/credentials/{credentialId}",
       tags,
       security,
-      summary: "Revoke a provider API key",
-      request: { params: OrgParams.extend({ credentialId: z.uuid() }) },
+      summary: "Revoke a provider API key (or delete it for good with ?purge=true)",
+      description: "Purging is refused while agents use the key, so they never fall back to the platform key silently.",
+      request: {
+        params: OrgParams.extend({ credentialId: z.uuid() }),
+        query: z.object({ purge: z.stringbool().optional() }),
+      },
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
       const { orgId, credentialId } = c.req.valid("param");
-      await revokeCredential(db, c.get("user").id, orgId, credentialId);
+      if (c.req.valid("query").purge) await deleteCredential(db, c.get("user").id, orgId, credentialId);
+      else await revokeCredential(db, c.get("user").id, orgId, credentialId);
       return c.body(null, 204);
     },
   );

@@ -18,6 +18,8 @@ export interface KeyWrapper {
  */
 export interface PlatformCredentials {
   resolve(orgId: string, provider: string): Promise<{ apiKey: string } | null>;
+  /** Whether a platform key exists for this org and provider, without fetching it. Defaults to `resolve !== null`. */
+  available?(orgId: string, provider: string): Promise<boolean>;
 }
 
 export const noPlatformCredentials: PlatformCredentials = { resolve: async () => null };

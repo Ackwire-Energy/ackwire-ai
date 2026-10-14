@@ -167,6 +167,7 @@ export async function listMembers(db: Database, orgId: string) {
       image: users.image,
       role: organizationMembers.role,
       joinedAt: organizationMembers.createdAt,
+      lastSeenAt: organizationMembers.lastSeenAt,
     })
     .from(organizationMembers)
     .innerJoin(users, eq(users.id, organizationMembers.userId))
@@ -365,4 +366,113 @@ export async function acceptInvitation(
       .where(eq(organizationInvitations.id, invitation.id));
     return { orgId: invitation.orgId };
   });
+}
+
+/** Marks a person as seen now in an organization (WebSocket connect/disconnect). */
+export async function touchLastSeen(db: Database, orgId: string, userId: string, at = new Date()) {
+  await db
+    .update(organizationMembers)
+    .set({ lastSeenAt: at })
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+}
+
+export type InviteOutcome =
+  | { email: string; status: "invited"; invitationId: string; token: string }
+  | { email: string; status: "already_member" | "invalid_email" | "already_invited"; invitationId?: string };
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Invites several people at once (the Members screen takes a comma-separated
+ * list). Each email gets its own outcome; pending invitations are not
+ * duplicated (resend them instead).
+ */
+export async function inviteMany(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  input: { emails: string[]; role: MemberRole },
+  now = new Date(),
+): Promise<InviteOutcome[]> {
+  await requirePermission(db, actorId, orgId, "manage_members");
+  const emails = [...new Set(input.emails.map((e) => e.trim().toLowerCase()).filter(Boolean))].slice(0, 100);
+  const out: InviteOutcome[] = [];
+  for (const email of emails) {
+    if (!EMAIL.test(email)) {
+      out.push({ email, status: "invalid_email" });
+      continue;
+    }
+    const [pending] = await db
+      .select({ id: organizationInvitations.id })
+      .from(organizationInvitations)
+      .where(
+        and(
+          eq(organizationInvitations.orgId, orgId),
+          eq(organizationInvitations.email, email),
+          isNull(organizationInvitations.acceptedAt),
+          gt(organizationInvitations.expiresAt, now),
+        ),
+      );
+    if (pending) {
+      out.push({ email, status: "already_invited", invitationId: pending.id });
+      continue;
+    }
+    try {
+      const { invitation, token } = await createInvitation(db, actorId, orgId, { email, role: input.role }, now);
+      out.push({ email, status: "invited", invitationId: invitation.id, token });
+    } catch (error) {
+      if (error instanceof ConflictError) out.push({ email, status: "already_member" });
+      else throw error;
+    }
+  }
+  return out;
+}
+
+/** Sends an invitation again: a new token (the old link stops working) and a fresh 7-day expiry. */
+export async function resendInvitation(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  invitationId: string,
+  now = new Date(),
+) {
+  const actor = await requirePermission(db, actorId, orgId, "manage_members");
+  const [existing] = await db
+    .select()
+    .from(organizationInvitations)
+    .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)));
+  if (!existing || existing.acceptedAt) throw new ConflictError("This invitation can't be resent");
+  if (existing.role === "owner" && !can(actor.role, "manage_owners"))
+    throw new ForbiddenError("Only owners can invite owners");
+  const token = randomToken(32);
+  const [invitation] = await db
+    .update(organizationInvitations)
+    .set({
+      tokenHash: sha256(token),
+      expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
+      invitedByUserId: actorId,
+    })
+    .where(eq(organizationInvitations.id, invitationId))
+    .returning();
+  if (!invitation) throw new ConflictError("This invitation can't be resent");
+  return { invitation, token };
+}
+
+/** Invitations not yet accepted, expired ones included, with their status. */
+export async function listInvitationsWithStatus(db: Database, actorId: string, orgId: string, now = new Date()) {
+  await requirePermission(db, actorId, orgId, "manage_members");
+  const rows = await db
+    .select()
+    .from(organizationInvitations)
+    .where(and(eq(organizationInvitations.orgId, orgId), isNull(organizationInvitations.acceptedAt)))
+    .orderBy(asc(organizationInvitations.createdAt));
+  return rows.map((i) => ({
+    id: i.id,
+    email: i.email,
+    role: i.role,
+    status: i.expiresAt > now ? ("pending" as const) : ("expired" as const),
+    expiresAt: i.expiresAt,
+    createdAt: i.createdAt,
+    invitedByUserId: i.invitedByUserId,
+  }));
 }

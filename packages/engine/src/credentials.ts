@@ -163,9 +163,17 @@ export async function deleteCredential(db: Database, actorId: string, orgId: str
   const users = await db
     .select({ handle: schema.agents.handle })
     .from(schema.agents)
-    .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.credentialId, credentialId), isNull(schema.agents.archivedAt)));
+    .where(
+      and(
+        eq(schema.agents.orgId, orgId),
+        eq(schema.agents.credentialId, credentialId),
+        isNull(schema.agents.archivedAt),
+      ),
+    );
   if (users.length > 0) {
-    throw new ConflictError(`In use by ${users.map((u) => `@${u.handle}`).join(", ")}. Point them at another key first.`);
+    throw new ConflictError(
+      `In use by ${users.map((u) => `@${u.handle}`).join(", ")}. Point them at another key first.`,
+    );
   }
   const deleted = await db
     .delete(providerCredentials)

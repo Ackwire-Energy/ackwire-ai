@@ -13,6 +13,7 @@ export * from "./events";
 export * from "./executor";
 export * from "./gateway";
 export * from "./jobs";
+export * from "./management";
 export * from "./messages";
 export * from "./organizations";
 export * from "./outbox";

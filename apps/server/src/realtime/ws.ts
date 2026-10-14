@@ -9,7 +9,14 @@ import {
 } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
-import { ForbiddenError, getMembership, NotFoundError, type OrgEvent, requireChannelAccess } from "@agenteschat/engine";
+import {
+  ForbiddenError,
+  getMembership,
+  NotFoundError,
+  type OrgEvent,
+  requireChannelAccess,
+  touchLastSeen,
+} from "@agenteschat/engine";
 import { type Auth, type SessionUser, sessionUser } from "../auth";
 import type { Logger } from "../logger";
 import { allowedOrigins } from "../routes/app/context";
@@ -158,6 +165,7 @@ export function createRealtime(deps: RealtimeDeps) {
           }),
         );
         await deps.presence.connect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);
+        await touchLastSeen(deps.db, orgId, user.id).catch(() => {});
         send(ws, { type: "ready", orgId: ws.data.orgId, userId: ws.data.user.id });
       },
       async message(ws: Bun.ServerWebSocket<SocketData>, raw: string | Buffer): Promise<void> {
@@ -200,6 +208,7 @@ export function createRealtime(deps: RealtimeDeps) {
         for (const off of ws.data.system) off();
         ws.data.system = [];
         await deps.presence.disconnect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);
+        await touchLastSeen(deps.db, ws.data.orgId, ws.data.user.id).catch(() => {});
       },
     },
   };

@@ -17,6 +17,7 @@ import {
   createLocalKeyWrapper,
   createModelGateway,
   createToolGateway,
+  notifyOwnerOnBudget,
 } from "@agenteschat/engine";
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createAnthropicProvider } from "@agenteschat/providers";
@@ -81,6 +82,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     keyWrappers: [adapters.keyWrapper, ...adapters.legacyKeyWrappers],
     providers: modelProviders,
     platformCredentials: adapters.platformCredentials,
+    onBudgetThreshold: notifyOwnerOnBudget(adapters.pubsub),
   });
   const keyWrappers = [adapters.keyWrapper, ...adapters.legacyKeyWrappers];
   const tools = createToolGateway({

@@ -1,4 +1,4 @@
-import type { KeyWrapper, PlatformCredentials } from "@agenteschat/adapters";
+import type { KeyWrapper, PlatformCredentials, PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gte, isNull, lt, schema, sql } from "@agenteschat/db";
 import {
   costNanoUsd,
@@ -20,6 +20,7 @@ import {
 import { type Agent, getAgent } from "./agents";
 import { decryptCredential } from "./credentials";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
+import { publishUserEvent } from "./events";
 import { monthStartUtc } from "./usage";
 
 const { usageRecords, agentBudgetPeriods, budgetReservations, providerCredentials, organizationSettings } = schema;
@@ -31,7 +32,16 @@ export interface ModelGatewayDeps {
   providers: Record<string, ModelProvider>;
   platformCredentials: PlatformCredentials;
   now?: () => Date;
+  /** Called when an agent's monthly spend crosses 80% (`warning`) or 100% (`exhausted`) of its budget. */
+  onBudgetThreshold?(event: {
+    agent: Agent;
+    level: "warning" | "exhausted";
+    spentNanoUsd: number;
+    budgetNanoUsd: number;
+  }): Promise<void> | void;
 }
+
+export const BUDGET_WARNING_RATIO = 0.8;
 
 /** A model call made by an agent: billed to the agent's credential and budget. */
 export interface GatewayCall {
@@ -288,7 +298,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       .delete(budgetReservations)
       .where(eq(budgetReservations.id, reservation.id))
       .returning({ amount: budgetReservations.amountNanoUsd });
-    await tx
+    const updated = await tx
       .update(agentBudgetPeriods)
       .set({
         spentNanoUsd: sql`${agentBudgetPeriods.spentNanoUsd} + ${actual}`,
@@ -300,7 +310,25 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           eq(agentBudgetPeriods.agentId, reservation.agentId),
           eq(agentBudgetPeriods.periodStart, reservation.periodStart),
         ),
-      );
+      )
+      .returning({ spent: agentBudgetPeriods.spentNanoUsd });
+    return updated[0]?.spent ?? actual;
+  }
+
+  /** Tells the agent's owner when spend crosses 80% and 100% of the budget (once each per month). */
+  async function checkThresholds(agent: Agent, spent: number, actual: number) {
+    const budget = agent.monthlyBudgetNanoUsd;
+    if (budget === null || budget <= 0 || !deps.onBudgetThreshold) return;
+    const before = spent - actual;
+    for (const [level, ratio] of [
+      ["exhausted", 1],
+      ["warning", BUDGET_WARNING_RATIO],
+    ] as const) {
+      if (before < budget * ratio && spent >= budget * ratio) {
+        await deps.onBudgetThreshold({ agent, level, spentNanoUsd: spent, budgetNanoUsd: budget });
+        return;
+      }
+    }
   }
 
   return {
@@ -353,7 +381,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         throw error;
       }
 
-      const record = await db.transaction(async (tx) => {
+      const { record, spent } = await db.transaction(async (tx) => {
         const r = await recordUsage(tx, {
           orgId: call.orgId,
           agentId: agent.id,
@@ -366,9 +394,9 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           usage: result.usage,
           partial: false,
         });
-        await settle(tx, reservation, r.cost);
-        return r;
+        return { record: r, spent: await settle(tx, reservation, r.cost) };
       });
+      await checkThresholds(agent, spent, record.cost);
       return { ...result, usageRecordId: record.id, costNanoUsd: record.cost, maxTokens };
     },
 
@@ -425,4 +453,17 @@ export async function agentBudgetState(db: Database, orgId: string, agentId: str
       ),
     );
   return { spentNanoUsd: row?.spentNanoUsd ?? 0, reservedNanoUsd: row?.reservedNanoUsd ?? 0 };
+}
+
+/** Budget hook that tells the agent's owner over the WebSocket (`budget.warning` / `budget.exhausted`). */
+export function notifyOwnerOnBudget(pubsub: PubSub): NonNullable<ModelGatewayDeps["onBudgetThreshold"]> {
+  return async ({ agent, level, spentNanoUsd, budgetNanoUsd }) => {
+    if (!agent.ownerUserId) return;
+    await publishUserEvent(pubsub, agent.orgId, agent.ownerUserId, {
+      type: `budget.${level}`,
+      agentId: agent.id,
+      spentNanoUsd,
+      budgetNanoUsd,
+    });
+  };
 }

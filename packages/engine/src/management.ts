@@ -1,0 +1,486 @@
+import { and, asc, type Database, desc, eq, gte, inArray, isNull, lt, schema, sql } from "@agenteschat/db";
+import { isKnownModel } from "@agenteschat/providers";
+import { getAgent } from "./agents";
+import { CHANNEL_NAME_PATTERN } from "./channels";
+import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
+import { agentBudgetState } from "./gateway";
+import { can, getMembership, requirePermission } from "./organizations";
+import { monthStartUtc } from "./usage";
+
+const {
+  organizations,
+  organizationSettings,
+  organizationMembers,
+  agents,
+  channels,
+  channelMembers,
+  agentRuns,
+  agentRunSteps,
+  usageRecords,
+  messages,
+  approvals,
+  providerCredentials,
+  users,
+} = schema;
+
+// ── Organization settings ────────────────────────────────────────────────────
+
+export interface OrgSettings {
+  name: string;
+  context: string;
+  defaultCredentialId: string | null;
+  routerModel: string | null;
+  summaryModel: string | null;
+  timezone: string;
+}
+
+export async function getOrgSettings(db: Database, actorId: string, orgId: string): Promise<OrgSettings> {
+  await requirePermission(db, actorId, orgId, "read");
+  const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId));
+  if (!org) throw new NotFoundError("Organization not found");
+  const [s] = await db.select().from(organizationSettings).where(eq(organizationSettings.orgId, orgId));
+  return {
+    name: org.name,
+    context: org.context,
+    defaultCredentialId: s?.defaultCredentialId ?? null,
+    routerModel: s?.routerModel ?? null,
+    summaryModel: s?.summaryModel ?? null,
+    timezone: s?.timezone ?? "UTC",
+  };
+}
+
+export const isValidTimeZone = (tz: string) => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Updates name, context (goes into every agent's prompt) and settings. Admins (`configure`). */
+export async function updateOrgSettings(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  input: Partial<OrgSettings>,
+): Promise<OrgSettings> {
+  await requirePermission(db, actorId, orgId, "configure");
+  if (input.name !== undefined && input.name.trim() === "") throw new ValidationError("name can't be empty");
+  for (const model of [input.routerModel, input.summaryModel]) {
+    if (model && !isKnownModel(model)) throw new ValidationError(`Unknown model ${model}`);
+  }
+  if (input.timezone !== undefined && !isValidTimeZone(input.timezone))
+    throw new ValidationError("timezone must be an IANA time zone");
+  if (input.defaultCredentialId) {
+    const [cred] = await db
+      .select({ id: providerCredentials.id })
+      .from(providerCredentials)
+      .where(
+        and(
+          eq(providerCredentials.id, input.defaultCredentialId),
+          eq(providerCredentials.orgId, orgId),
+          isNull(providerCredentials.revokedAt),
+        ),
+      );
+    if (!cred) throw new ValidationError("defaultCredentialId does not belong to this organization");
+  }
+  await db.transaction(async (tx) => {
+    if (input.name !== undefined || input.context !== undefined) {
+      await tx
+        .update(organizations)
+        .set({
+          ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+          ...(input.context !== undefined ? { context: input.context } : {}),
+        })
+        .where(eq(organizations.id, orgId));
+    }
+    const settings = {
+      ...(input.defaultCredentialId !== undefined ? { defaultCredentialId: input.defaultCredentialId } : {}),
+      ...(input.routerModel !== undefined ? { routerModel: input.routerModel } : {}),
+      ...(input.summaryModel !== undefined ? { summaryModel: input.summaryModel } : {}),
+      ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
+    };
+    if (Object.keys(settings).length > 0) {
+      await tx
+        .insert(organizationSettings)
+        .values({ orgId, ...settings })
+        .onConflictDoUpdate({ target: organizationSettings.orgId, set: { ...settings, updatedAt: new Date() } });
+    }
+  });
+  return getOrgSettings(db, actorId, orgId);
+}
+
+/** Counts for the sidebar: people, agents, what my agents spent this month, approvals waiting for me. */
+export async function orgOverview(db: Database, actorId: string, orgId: string, now = new Date()) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const [people] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(organizationMembers)
+    .where(eq(organizationMembers.orgId, orgId));
+  const [agentCount] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)));
+  const [mine] = await db
+    .select({ cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)` })
+    .from(usageRecords)
+    .innerJoin(agents, eq(agents.id, usageRecords.agentId))
+    .where(
+      and(
+        eq(usageRecords.orgId, orgId),
+        eq(agents.ownerUserId, actorId),
+        gte(usageRecords.createdAt, monthStartUtc(now)),
+      ),
+    );
+  const admin = can(membership.role, "manage_agents");
+  const [pending] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(approvals)
+    .where(
+      and(
+        eq(approvals.orgId, orgId),
+        eq(approvals.status, "pending"),
+        admin ? undefined : eq(approvals.ownerUserId, actorId),
+      ),
+    );
+  return {
+    name: membership.orgName,
+    role: membership.role,
+    people: people?.n ?? 0,
+    agents: agentCount?.n ?? 0,
+    myAgentsSpendNanoUsd: Number(mine?.cost ?? 0),
+    approvalsWaitingForMe: pending?.n ?? 0,
+  };
+}
+
+// ── Agents ───────────────────────────────────────────────────────────────────
+
+/** An agent with its spend, runs and channels this month (Agent screen). */
+export async function agentDetail(db: Database, actorId: string, orgId: string, agentId: string, now = new Date()) {
+  await requirePermission(db, actorId, orgId, "read");
+  const agent = await getAgent(db, orgId, agentId);
+  if (!agent) throw new NotFoundError("Agent not found");
+  const since = monthStartUtc(now);
+  const [usage] = await db
+    .select({
+      cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)`,
+      tokens: sql<string>`coalesce(sum(${usageRecords.inputTokens} + ${usageRecords.outputTokens} + ${usageRecords.cacheReadTokens} + ${usageRecords.cacheWriteTokens}), 0)`,
+    })
+    .from(usageRecords)
+    .where(and(eq(usageRecords.orgId, orgId), eq(usageRecords.agentId, agentId), gte(usageRecords.createdAt, since)));
+  const [runs] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(agentRuns)
+    .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.agentId, agentId), gte(agentRuns.createdAt, since)));
+  const [pending] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(approvals)
+    .where(and(eq(approvals.agentId, agentId), eq(approvals.status, "pending")));
+  const channelsOf = await listAgentChannels(db, orgId, agentId);
+  const budget = await agentBudgetState(db, orgId, agentId, now);
+  return {
+    agent,
+    month: {
+      since,
+      spentNanoUsd: Number(usage?.cost ?? 0),
+      reservedNanoUsd: budget.reservedNanoUsd,
+      tokens: Number(usage?.tokens ?? 0),
+      runs: runs?.n ?? 0,
+    },
+    pendingApprovals: pending?.n ?? 0,
+    channels: channelsOf,
+  };
+}
+
+export async function listAgentChannels(db: Database, orgId: string, agentId: string) {
+  return db
+    .select({ id: channels.id, name: channels.name, autoReply: channelMembers.autoReply })
+    .from(channelMembers)
+    .innerJoin(channels, eq(channels.id, channelMembers.channelId))
+    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId), isNull(channels.archivedAt)))
+    .orderBy(asc(channels.name));
+}
+
+/**
+ * Sets where an agent works: the channels it belongs to and, per channel,
+ * whether the router may pick it without a mention. Admins (`manage_agents`).
+ */
+export async function setAgentChannels(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  agentId: string,
+  input: { channelId: string; autoReply?: boolean }[],
+) {
+  await requirePermission(db, actorId, orgId, "manage_agents");
+  const agent = await getAgent(db, orgId, agentId);
+  if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
+  const ids = [...new Set(input.map((c) => c.channelId))];
+  if (ids.length > 0) {
+    const found = await db
+      .select({ id: channels.id })
+      .from(channels)
+      .where(and(eq(channels.orgId, orgId), inArray(channels.id, ids), isNull(channels.archivedAt)));
+    if (found.length !== ids.length) throw new ValidationError("Every channel must belong to this organization");
+  }
+  await db.transaction(async (tx) => {
+    await tx.delete(channelMembers).where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId)));
+    for (const c of input) {
+      await tx
+        .insert(channelMembers)
+        .values({ orgId, channelId: c.channelId, agentId, autoReply: c.autoReply ?? true })
+        .onConflictDoNothing();
+    }
+  });
+  return listAgentChannels(db, orgId, agentId);
+}
+
+// ── Channels ─────────────────────────────────────────────────────────────────
+
+/** Renames a channel or changes its topic or visibility (creator or admin). */
+export async function updateChannel(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  channelId: string,
+  input: { name?: string; topic?: string; visibility?: "public" | "private" },
+) {
+  const membership = await getMembership(db, actorId, orgId);
+  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const [channel] = await db
+    .select()
+    .from(channels)
+    .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId), isNull(channels.archivedAt)));
+  if (!channel) throw new NotFoundError("Channel not found");
+  if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+    throw new ForbiddenError("Only the channel's creator or an admin can change it");
+  }
+  const name = input.name?.trim().toLowerCase();
+  if (name !== undefined && !CHANNEL_NAME_PATTERN.test(name))
+    throw new ValidationError("channel name: lower-case letters, digits, - or _ (max 80)");
+  if (channel.name === "general" && name !== undefined && name !== "general")
+    throw new ValidationError("#general can't be renamed");
+  try {
+    const [row] = await db
+      .update(channels)
+      .set({
+        ...(name !== undefined ? { name } : {}),
+        ...(input.topic !== undefined ? { topic: input.topic } : {}),
+        ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
+      })
+      .where(eq(channels.id, channelId))
+      .returning();
+    if (!row) throw new NotFoundError("Channel not found");
+    return row;
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new ConflictError(`#${name} already exists`);
+    throw error;
+  }
+}
+
+/** Members of a channel with names, for the channel details panel. */
+export async function channelMembersDetail(db: Database, orgId: string, channelId: string) {
+  return db
+    .select({
+      userId: channelMembers.userId,
+      agentId: channelMembers.agentId,
+      autoReply: channelMembers.autoReply,
+      userName: users.name,
+      agentName: agents.name,
+      agentHandle: agents.handle,
+      joinedAt: channelMembers.createdAt,
+    })
+    .from(channelMembers)
+    .leftJoin(users, eq(users.id, channelMembers.userId))
+    .leftJoin(agents, eq(agents.id, channelMembers.agentId))
+    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId)))
+    .orderBy(asc(channelMembers.createdAt));
+}
+
+// ── Runs and usage ───────────────────────────────────────────────────────────
+
+/** Who may see runs and usage: admins (`view_usage`), or the agent's owner for that agent. */
+async function requireUsageAccess(db: Database, actorId: string, orgId: string, agentId?: string) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  if (can(membership.role, "view_usage")) return;
+  if (agentId) {
+    const agent = await getAgent(db, orgId, agentId);
+    if (agent?.ownerUserId === actorId) return;
+  }
+  throw new ForbiddenError();
+}
+
+export interface RunSummary {
+  id: string;
+  agentId: string;
+  channelId: string;
+  threadId: string;
+  trigger: string;
+  status: string;
+  error: string | null;
+  /** First part of the message that started the run. */
+  what: string;
+  turns: number;
+  inputTokens: number;
+  outputTokens: number;
+  costNanoUsd: number;
+  createdAt: Date;
+  finishedAt: Date | null;
+}
+
+/** Run history, newest first, with tokens and cost from the usage records of each run. */
+export async function listRuns(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  options: { agentId?: string; runId?: string; status?: string; before?: Date; since?: Date; limit?: number } = {},
+): Promise<RunSummary[]> {
+  await requireUsageAccess(db, actorId, orgId, options.agentId);
+  const limit = Math.min(options.limit ?? 50, 200);
+  const rows = await db
+    .select()
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        options.agentId ? eq(agentRuns.agentId, options.agentId) : undefined,
+        options.runId ? eq(agentRuns.id, options.runId) : undefined,
+        options.status ? sql`${agentRuns.status}::text = ${options.status}` : undefined,
+        options.before ? lt(agentRuns.createdAt, options.before) : undefined,
+        options.since ? gte(agentRuns.createdAt, options.since) : undefined,
+      ),
+    )
+    .orderBy(desc(agentRuns.createdAt))
+    .limit(limit);
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+  const usage = await db
+    .select({
+      runId: usageRecords.runId,
+      input: sql<string>`sum(${usageRecords.inputTokens} + ${usageRecords.cacheReadTokens} + ${usageRecords.cacheWriteTokens})`,
+      output: sql<string>`sum(${usageRecords.outputTokens})`,
+      cost: sql<string>`sum(${usageRecords.costNanoUsd})`,
+    })
+    .from(usageRecords)
+    .where(and(eq(usageRecords.orgId, orgId), inArray(usageRecords.runId, ids)))
+    .groupBy(usageRecords.runId);
+  const byRun = new Map(usage.map((u) => [u.runId, u]));
+  const triggers = await db
+    .select({ id: messages.id, body: messages.body })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, orgId),
+        inArray(
+          messages.id,
+          rows.map((r) => r.triggerMessageId),
+        ),
+      ),
+    );
+  const bodies = new Map(triggers.map((t) => [t.id, t.body]));
+  return rows.map((r) => {
+    const u = byRun.get(r.id);
+    return {
+      id: r.id,
+      agentId: r.agentId,
+      channelId: r.channelId,
+      threadId: r.threadRootId,
+      trigger: r.trigger,
+      status: r.status,
+      error: r.error,
+      what: (bodies.get(r.triggerMessageId) ?? "").slice(0, 200),
+      turns: r.turns,
+      inputTokens: Number(u?.input ?? 0),
+      outputTokens: Number(u?.output ?? 0),
+      costNanoUsd: Number(u?.cost ?? 0),
+      createdAt: r.createdAt,
+      finishedAt: r.finishedAt,
+    };
+  });
+}
+
+/** One run with its steps (audit trail). */
+export async function getRun(db: Database, actorId: string, orgId: string, runId: string) {
+  const [run] = await db
+    .select()
+    .from(agentRuns)
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
+  if (!run) throw new NotFoundError("Run not found");
+  await requireUsageAccess(db, actorId, orgId, run.agentId);
+  const [summary] = await listRuns(db, actorId, orgId, { agentId: run.agentId, runId });
+  const steps = await db
+    .select({
+      seq: agentRunSteps.seq,
+      kind: agentRunSteps.kind,
+      data: agentRunSteps.data,
+      createdAt: agentRunSteps.createdAt,
+    })
+    .from(agentRunSteps)
+    .where(eq(agentRunSteps.runId, runId))
+    .orderBy(asc(agentRunSteps.seq));
+  return { run: summary, steps };
+}
+
+/**
+ * Usage of the organization since `since` (default: this month): totals by
+ * kind (agent, router, embedding, summary) and per agent with budgets.
+ */
+export async function usageReport(db: Database, actorId: string, orgId: string, options: { since?: Date } = {}) {
+  await requirePermission(db, actorId, orgId, "view_usage");
+  const since = options.since ?? monthStartUtc(new Date());
+  const byKind = await db
+    .select({
+      kind: usageRecords.kind,
+      calls: sql<number>`count(*)::int`,
+      inputTokens: sql<string>`sum(${usageRecords.inputTokens} + ${usageRecords.cacheReadTokens} + ${usageRecords.cacheWriteTokens})`,
+      outputTokens: sql<string>`sum(${usageRecords.outputTokens})`,
+      cost: sql<string>`sum(${usageRecords.costNanoUsd})`,
+      partial: sql<number>`count(*) filter (where ${usageRecords.partial})::int`,
+    })
+    .from(usageRecords)
+    .where(and(eq(usageRecords.orgId, orgId), gte(usageRecords.createdAt, since)))
+    .groupBy(usageRecords.kind);
+  const perAgent = await db
+    .select({
+      agentId: agents.id,
+      handle: agents.handle,
+      name: agents.name,
+      budget: agents.monthlyBudgetNanoUsd,
+      calls: sql<number>`count(${usageRecords.id})::int`,
+      inputTokens: sql<string>`coalesce(sum(${usageRecords.inputTokens} + ${usageRecords.cacheReadTokens} + ${usageRecords.cacheWriteTokens}), 0)`,
+      outputTokens: sql<string>`coalesce(sum(${usageRecords.outputTokens}), 0)`,
+      cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)`,
+    })
+    .from(agents)
+    .leftJoin(
+      usageRecords,
+      and(eq(usageRecords.agentId, agents.id), gte(usageRecords.createdAt, since), eq(usageRecords.orgId, orgId)),
+    )
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
+    .groupBy(agents.id, agents.handle, agents.name, agents.monthlyBudgetNanoUsd)
+    .orderBy(asc(agents.handle));
+  const kinds = byKind.map((k) => ({
+    kind: k.kind,
+    calls: k.calls,
+    partialCalls: k.partial,
+    inputTokens: Number(k.inputTokens),
+    outputTokens: Number(k.outputTokens),
+    costNanoUsd: Number(k.cost),
+  }));
+  return {
+    since,
+    totalNanoUsd: kinds.reduce((n, k) => n + k.costNanoUsd, 0),
+    byKind: kinds,
+    agents: perAgent.map((a) => ({
+      agentId: a.agentId,
+      handle: a.handle,
+      name: a.name,
+      calls: a.calls,
+      inputTokens: Number(a.inputTokens),
+      outputTokens: Number(a.outputTokens),
+      costNanoUsd: Number(a.cost),
+      monthlyBudgetNanoUsd: a.budget,
+    })),
+  };
+}
