@@ -116,6 +116,8 @@ export const messages = pgTable(
     body: text().notNull(),
     /** Agents explicitly @mentioned in `body` (resolved at write time). */
     mentionedAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** People mentioned by handle (`@ana`) who are members of the channel. */
+    mentionedUserIds: text().array().notNull().default(sql`'{}'::text[]`),
     /**
      * Consecutive agent replies leading to this message in its thread: 0 for a
      * person's message, trigger hop + 1 for an agent's. Enforces AGENT_MAX_HOPS.

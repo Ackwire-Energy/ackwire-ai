@@ -15,7 +15,7 @@ import {
 } from "@agenteschat/db";
 import { requireChannelAccess } from "./channels";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent, publishMessageCreated } from "./events";
+import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
 
@@ -32,6 +32,8 @@ export interface MessageView {
   author: { type: "person" | "agent"; id: string | null };
   body: string;
   mentionedAgentIds: string[];
+  /** People mentioned by handle (`@ana`) who are in the channel. */
+  mentionedUserIds: string[];
   agentRunId: string | null;
   /** Structured attachments: `{ approvalId }`, `{ memoryUpdates }`, `{ clientId }`. */
   meta: Record<string, unknown>;
@@ -60,6 +62,7 @@ export const messageView = (m: Message): MessageView => ({
   author: { type: m.authorType, id: m.authorType === "person" ? m.authorUserId : m.authorAgentId },
   body: m.body,
   mentionedAgentIds: m.mentionedAgentIds,
+  mentionedUserIds: m.mentionedUserIds,
   agentRunId: m.agentRunId,
   meta: m.meta,
   clientId: typeof m.meta.clientId === "string" ? m.meta.clientId : null,
@@ -154,6 +157,7 @@ interface RawMessage {
   author_agent_id: string | null;
   body: string;
   mentioned_agent_ids: string[] | string | null;
+  mentioned_user_ids: string[] | string | null;
   hop: number;
   agent_run_id: string | null;
   meta: Record<string, unknown> | string | null;
@@ -202,6 +206,11 @@ export async function insertMessageWithRuns(
         where a.org_id = ${input.orgId}::uuid and a.archived_at is null
           and a.handle = any(${handles}::text[])
           and a.id is distinct from ${agentId}::uuid
+      ), mentioned_people as (
+        select om.user_id from ${schema.organizationMembers} om
+        join ${channelMembers} pcm on pcm.user_id = om.user_id and pcm.channel_id = ${input.channelId}::uuid
+        where om.org_id = ${input.orgId}::uuid and om.handle = any(${handles}::text[])
+          and om.user_id is distinct from ${userId}
       ), answered as (
         -- A person's reply where an agent asked something (same channel and thread) answers it.
         update ${agentQuestions} q set status = 'answered', answer = ${body}, answered_by_user_id = ${userId},
@@ -219,10 +228,11 @@ export async function insertMessageWithRuns(
         returning q.id, q.run_id, q.agent_id
       ), m as (
         insert into ${messages} (id, created_at, org_id, channel_id, thread_id, author_type, author_user_id,
-          author_agent_id, agent_run_id, hop, body, mentioned_agent_ids, meta)
+          author_agent_id, agent_run_id, hop, body, mentioned_agent_ids, mentioned_user_ids, meta)
         select ${id}::uuid, now(), ${input.orgId}::uuid, ${input.channelId}::uuid, ${threadId}::uuid,
           ${input.author.type}::author_type, ${userId}, ${agentId}::uuid, ${runId}::uuid, ${hop}, ${body},
           coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
+          coalesce((select array_agg(user_id) from mentioned_people), '{}'::text[]),
           ${JSON.stringify(input.meta ?? {})}::jsonb
             || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
         where ${threadId}::uuid is null or exists (
@@ -280,6 +290,7 @@ export async function insertMessageWithRuns(
     authorAgentId: row.author_agent_id,
     body: row.body,
     mentionedAgentIds: parseUuidArray(row.mentioned_agent_ids),
+    mentionedUserIds: parseUuidArray(row.mentioned_user_ids),
     hop: row.hop,
     agentRunId: row.agent_run_id,
     meta: parseJson(row.meta, {}),
@@ -327,6 +338,16 @@ export async function postPersonMessage(
   const view = messageView(message);
   // Right after the commit, before any routing: the sender's optimistic copy reconciles by `clientId`.
   await publishMessageCreated(deps.pubsub, view);
+  // People mentioned by handle hear about it on their own topic (notifications).
+  for (const mentioned of message.mentionedUserIds) {
+    await publishUserEvent(deps.pubsub, orgId, mentioned, {
+      type: "mention",
+      channelId,
+      messageId: message.id,
+      threadId: message.threadId,
+      byUserId: userId,
+    });
+  }
   const answers = message.meta.answersQuestionId;
   if (typeof answers === "string") await afterReplyAnswered(deps, orgId, answers);
   if (runs.length > 0) {

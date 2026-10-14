@@ -16,6 +16,7 @@ import {
   resendInvitation,
   rotateCredential,
   setAgentChannels,
+  updateMyProfile,
   updateOrgSettings,
   usageReport,
 } from "@agenteschat/engine";
@@ -57,6 +58,10 @@ const Person = z
     joinedAt: z.string(),
     lastSeenAt: z.string().nullable(),
     online: z.boolean(),
+    handle: z.string().openapi({ description: "`@ana`: unique in the organization; mentions resolve by it." }),
+    timezone: z
+      .string()
+      .openapi({ description: "The person's time zone (the organization's if they didn't pick one)." }),
   })
   .openapi("Person");
 
@@ -224,6 +229,35 @@ export function managementRoutes(deps: AppDeps) {
             online: online.has(m.userId),
           })),
         },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/me",
+      tags: ["Members"],
+      security,
+      summary: "Change your handle or time zone in this organization",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            handle: z.string().max(40).optional(),
+            timezone: z.string().max(64).nullable().optional().openapi({ description: "Null = the organization's." }),
+          }),
+        ),
+      },
+      responses: { 200: json(Person), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const me = await updateMyProfile(db, c.get("user").id, orgId, c.req.valid("json"));
+      const online = new Set(await adapters.presence.online(orgId));
+      return c.json(
+        { ...me, joinedAt: me.joinedAt.toISOString(), lastSeenAt: iso(me.lastSeenAt), online: online.has(me.userId) },
         200,
       );
     },

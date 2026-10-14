@@ -6,7 +6,12 @@ import { type Fixture, setup } from "./fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
 let f: Fixture;
-afterEach(() => f?.close());
+afterEach(async () => {
+  // Some tests don't set up a database: close each one once.
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
 
 test("capabilities come from the granted tools, grouped, with what needs approval", () => {
   const text = describeCapabilities([

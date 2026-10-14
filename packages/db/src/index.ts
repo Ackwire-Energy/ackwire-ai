@@ -26,5 +26,6 @@ export {
   sum,
 } from "drizzle-orm";
 export * from "./client";
+export * from "./migration-guard";
 export * as schema from "./schema";
 export * from "./trace";

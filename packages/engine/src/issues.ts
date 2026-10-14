@@ -6,6 +6,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishOrgEvent } from "./events";
 import { getMessage, postPersonMessage } from "./messages";
 import { can, getMembership } from "./organizations";
+import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 
 const { issues, issueActivity, issueCounters, channels, channelMembers, artifacts } = schema;
@@ -273,6 +274,10 @@ export async function createIssue(
   });
   const view = await one(db, row);
   await announce(deps.pubsub, orgId, view, "issue.created");
+  await fireRoutineEvent(deps, orgId, "issue.created", {
+    summary: `Nova issue #${view.number}: ${view.title}`,
+    issueId: view.id,
+  }).catch(() => 0);
   return view;
 }
 

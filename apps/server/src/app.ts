@@ -8,6 +8,7 @@ import { accountRoutes } from "./routes/app/account";
 import { agentRoutes } from "./routes/app/agents";
 import { approvalRoutes } from "./routes/app/approvals";
 import { artifactRoutes } from "./routes/app/artifacts";
+import { calendarRoutes } from "./routes/app/calendar";
 import { channelRoutes } from "./routes/app/channels";
 import { chatRoutes } from "./routes/app/chat";
 import { connectorRoutes } from "./routes/app/connectors";
@@ -20,8 +21,10 @@ import { knowledgeRoutes } from "./routes/app/knowledge";
 import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
 import { questionRoutes } from "./routes/app/questions";
+import { routineRoutes } from "./routes/app/routines";
 import { storageRoutes } from "./routes/app/storage";
 import { registerHealth } from "./routes/health";
+import { registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
 
 export interface AppOptions {
   edition: Edition;
@@ -46,6 +49,7 @@ export interface AppOptions {
  * - `/api/health`         health probe
  * - `/api/auth/*`         Better Auth (sign-up, sign-in, sessions, OAuth callbacks)
  * - `/api/app/*`          private API of the web app (cookie session + CSRF)
+ * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - everything else       web app (single-page app), when built
@@ -87,6 +91,10 @@ export function createApp(options: AppOptions) {
     api.route("/app", storageRoutes(deps));
     api.route("/app", artifactRoutes(deps));
     api.route("/app", issueRoutes(deps));
+    api.route("/app", routineRoutes(deps));
+    api.route("/app", calendarRoutes(deps));
+    api.route("/app", webhookAdminRoutes(deps));
+    registerWebhookReceiver(api, deps);
   }
 
   for (const module of options.modules) {

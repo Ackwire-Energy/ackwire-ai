@@ -21,6 +21,11 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
     description: "Criar relatórios, tabelas, organogramas, diffs e páginas no Drive.",
   },
   "issues:read": { label: "Ler issues", description: "Listar e ler issues." },
+  "calendar:read": { label: "Ver agenda", description: "Ver eventos e horários livres." },
+  "calendar:write": {
+    label: "Propor eventos",
+    description: "Sugerir eventos; quem pediu confirma antes de qualquer convite.",
+  },
   "issues:write": { label: "Issues", description: "Criar e atualizar issues." },
   "sandbox:exec": { label: "Rodar código", description: "Rodar comandos num ambiente isolado." },
 };

@@ -33,6 +33,8 @@ const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOStri
 
 export interface FakeState {
   me: Me | null;
+  /** Questions someone else answered on the server (this tab still shows them open). */
+  answeredElsewhere?: Set<string>;
   members: Member[];
   agents: Agent[];
   channels: Channel[];
@@ -984,7 +986,9 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
         const msg = state.messages.find((m) => (m.meta?.question as AgentQuestion | undefined)?.id === questionId);
         const q = msg?.meta?.question as AgentQuestion | undefined;
         if (!q) throw new ApiError(404, "not_found", "Question not found");
-        if (q.status === "answered") throw new ApiError(409, "conflict", "This question was already answered");
+        if (q.status === "answered" || state.answeredElsewhere?.has(questionId)) {
+          throw new ApiError(409, "conflict", "This question was already answered");
+        }
         if (input.choice && q.choices && !q.choices.includes(input.choice)) {
           throw new ApiError(400, "invalid_choice", "Pick one of the options");
         }

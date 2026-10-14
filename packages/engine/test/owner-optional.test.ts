@@ -14,7 +14,12 @@ import {
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
-afterEach(() => f?.close());
+afterEach(async () => {
+  // Some tests don't set up a database: close each one once.
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
 
 const unowned = async () => {
   await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { ownerUserId: null });

@@ -14,7 +14,7 @@ import {
   postgresJsNotifier,
 } from "@agenteschat/adapters";
 import { type Config, ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
-import { createDatabase, type Database, ensureMessagePartitions } from "@agenteschat/db";
+import { createDatabase, type Database, ensureMessagePartitions, MigrationMismatchError } from "@agenteschat/db";
 import { createLocalKeyWrapper, enableCaches } from "@agenteschat/engine";
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/providers";
@@ -55,7 +55,16 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   const database = createDatabase({ url: config.DATABASE_URL, poolMax: config.DATABASE_POOL_MAX });
   if (config.RUN_MIGRATIONS_ON_BOOT) {
     log.info("applying database migrations");
-    await database.migrate();
+    try {
+      await database.migrate();
+    } catch (error) {
+      if (error instanceof MigrationMismatchError) {
+        // Never re-run or skip a changed migration against a real database.
+        log.error("refusing to migrate: the database's migrations don't match this build", { reason: error.message });
+        process.exit(1);
+      }
+      throw error;
+    }
   }
   await ensureMessagePartitions(database.db);
 
@@ -119,7 +128,12 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
       config,
       adapters,
       wakeWorkers: workers.wakeAll,
-      extras: { embed: engine.gateway.embed, storage: engine.storage, artifacts: engine.artifacts },
+      extras: {
+        embed: engine.gateway.embed,
+        storage: engine.storage,
+        artifacts: engine.artifacts,
+        context: engine.context,
+      },
     },
     log,
     pingDatabase: database.ping,

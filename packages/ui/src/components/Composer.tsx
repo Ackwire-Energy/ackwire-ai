@@ -143,9 +143,11 @@ export function Composer({
         setActive((current + step + items.length) % items.length);
         return;
       }
-      if (e.key === "Enter" || e.key === "Tab") {
+      const item = items[current];
+      // Already typed in full ("oi @ada" + Enter): Enter sends; Tab still completes.
+      const typedInFull = item && token && item.insert.toLowerCase() === token.query.toLowerCase();
+      if (e.key === "Tab" || (e.key === "Enter" && !typedInFull)) {
         e.preventDefault();
-        const item = items[current];
         if (item) pick(item);
         return;
       }

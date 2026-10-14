@@ -3,7 +3,12 @@ import { artifactFile, createArtifact, markdownToPdf, parseMarkdown } from "../s
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
-afterEach(() => f?.close());
+afterEach(async () => {
+  // Some tests don't set up a database: close each one once.
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
 
 const latin1 = (bytes: Uint8Array) => Array.from(bytes, (b) => String.fromCharCode(b)).join("");
 

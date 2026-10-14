@@ -319,8 +319,7 @@ describe("agent questions (ask_user)", () => {
     await go(`c/${ENG_ID}`, state);
     await settle();
     // Someone else answers on the server first; this tab still shows it open.
-    const stored = state.messages.find((m) => m.id === "msg-q2")?.meta?.question as { status: string };
-    stored.status = "answered";
+    state.answeredElsewhere = new Set(["q2"]);
     const card = screen().getByRole("group", { name: "Pergunta de Ada" });
     await click(within(card).getByRole("button", { name: "staging" }));
     await settle(4);

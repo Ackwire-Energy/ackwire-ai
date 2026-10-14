@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, gt, isNull, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
 import { randomToken, sha256 } from "./crypto";
-import { ConflictError, ForbiddenError } from "./errors";
+import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 
 const {
@@ -94,6 +94,7 @@ export async function createOrganization(db: Database, userId: string, input: { 
       .returning();
     if (!organization) throw new Error("organization insert returned nothing");
     await tx.insert(organizationMembers).values({ orgId: organization.id, userId, role: "owner" });
+    await assignHandle(tx, organization.id, userId);
     const [general] = await tx
       .insert(channels)
       .values({ orgId: organization.id, name: "general", createdByUserId: userId })
@@ -179,21 +180,126 @@ export async function onUserCreated(db: Database, userId: string) {
 
 // ── Members ──────────────────────────────────────────────────────────────────
 
+/** Members with their handle and time zone (the org's when they didn't pick one). */
 export async function listMembers(db: Database, orgId: string) {
-  return db
-    .select({
-      userId: users.id,
-      name: users.name,
-      email: users.email,
-      image: users.image,
-      role: organizationMembers.role,
-      joinedAt: organizationMembers.createdAt,
-      lastSeenAt: organizationMembers.lastSeenAt,
-    })
+  const query = () =>
+    db
+      .select({
+        userId: users.id,
+        name: users.name,
+        email: users.email,
+        image: users.image,
+        role: organizationMembers.role,
+        joinedAt: organizationMembers.createdAt,
+        lastSeenAt: organizationMembers.lastSeenAt,
+        handle: organizationMembers.handle,
+        ownTimezone: organizationMembers.timezone,
+        orgTimezone: schema.organizationSettings.timezone,
+      })
+      .from(organizationMembers)
+      .innerJoin(users, eq(users.id, organizationMembers.userId))
+      .leftJoin(schema.organizationSettings, eq(schema.organizationSettings.orgId, organizationMembers.orgId))
+      .where(eq(organizationMembers.orgId, orgId))
+      .orderBy(asc(organizationMembers.createdAt));
+  let rows = await query();
+  if (rows.some((r) => !r.handle)) {
+    for (const r of rows) if (!r.handle) await assignHandle(db, orgId, r.userId);
+    rows = await query();
+  }
+  return rows.map(({ ownTimezone, orgTimezone, handle, ...r }) => ({
+    ...r,
+    handle: handle ?? "",
+    timezone: ownTimezone ?? orgTimezone ?? "UTC",
+  }));
+}
+
+export const HANDLE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,31}$/;
+
+/** "Ana Souza" → "ana"; "João" → "joao"; falls back to the email's local part. */
+export function handleBase(name: string, email: string) {
+  const slug = (s: string) =>
+    s
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+  const first = slug(name.trim().split(/\s+/)[0] ?? "");
+  const local = slug(email.split("@")[0] ?? "");
+  const base = (first.length >= 2 ? first : local.length >= 2 ? local : "pessoa").slice(0, 24);
+  return base;
+}
+
+/** Gives a member a handle unique in the org (`ana`, `ana-2`…), unless they have one. */
+export async function assignHandle(db: Executor, orgId: string, userId: string) {
+  const [row] = await db
+    .select({ handle: organizationMembers.handle, name: users.name, email: users.email })
     .from(organizationMembers)
     .innerJoin(users, eq(users.id, organizationMembers.userId))
-    .where(eq(organizationMembers.orgId, orgId))
-    .orderBy(asc(organizationMembers.createdAt));
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  if (!row || row.handle) return row?.handle ?? null;
+  const base = handleBase(row.name, row.email);
+  const taken = new Set(
+    (
+      await db
+        .select({ handle: organizationMembers.handle })
+        .from(organizationMembers)
+        .where(and(eq(organizationMembers.orgId, orgId), sql`${organizationMembers.handle} like ${`${base}%`}`))
+    ).map((r) => r.handle),
+  );
+  let handle = base;
+  for (let n = 2; taken.has(handle); n++) handle = `${base}-${n}`;
+  await db
+    .update(organizationMembers)
+    .set({ handle })
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  return handle;
+}
+
+/** A person changes their own handle (unique in the org, not an agent's) or time zone (null = the org's). */
+export async function updateMyProfile(
+  db: Database,
+  userId: string,
+  orgId: string,
+  input: { handle?: string; timezone?: string | null },
+) {
+  await requirePermission(db, userId, orgId, "read");
+  const set: { handle?: string; timezone?: string | null } = {};
+  if (input.handle !== undefined) {
+    const handle = input.handle.trim().replace(/^@/, "").toLowerCase();
+    if (!HANDLE_PATTERN.test(handle)) {
+      throw new ValidationError("handle: 2 a 32 letras minúsculas, números, - ou _");
+    }
+    const [agent] = await db
+      .select({ id: schema.agents.id })
+      .from(schema.agents)
+      .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.handle, handle), isNull(schema.agents.archivedAt)));
+    if (agent) throw new ConflictError(`@${handle} já é de um agente`);
+    const [other] = await db
+      .select({ userId: organizationMembers.userId })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.handle, handle)));
+    if (other && other.userId !== userId) throw new ConflictError(`@${handle} já está em uso`);
+    set.handle = handle;
+  }
+  if (input.timezone !== undefined) {
+    if (input.timezone !== null) {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: input.timezone });
+      } catch {
+        throw new ValidationError("timezone must be an IANA time zone");
+      }
+    }
+    set.timezone = input.timezone;
+  }
+  if (Object.keys(set).length > 0) {
+    await db
+      .update(organizationMembers)
+      .set(set)
+      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  }
+  const me = (await listMembers(db, orgId)).find((m) => m.userId === userId);
+  if (!me) throw new ForbiddenError("You are not a member of this organization");
+  return me;
 }
 
 async function ownerCount(db: Pick<Database, "select">, orgId: string) {
@@ -432,6 +538,7 @@ export async function acceptInvitation(
 /** Adds a person to an organization (keeping an existing role) and to `general`. */
 async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
   await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
+  await assignHandle(tx, orgId, userId);
   const [general] = await tx
     .select({ id: channels.id })
     .from(channels)

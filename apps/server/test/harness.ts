@@ -97,6 +97,7 @@ export async function createTestServer(
         embed: engine.gateway.embed,
         storage: engine.storage,
         artifacts: engine.artifacts,
+        context: engine.context,
       },
     },
     log,

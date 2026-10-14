@@ -14,6 +14,8 @@ const { users, organizations, agents, approvals } = schema;
 export type EmailTemplate =
   | { kind: "invitation"; orgName: string; inviterName: string; url: string; role: string }
   | { kind: "password_reset"; url: string }
+  /** Someone invited you to an event (in-app too). `when` is already formatted in your time zone. */
+  | { kind: "calendar_invite"; orgName: string; inviterName: string; title: string; when: string; url: string }
   /** Someone opened an expired invitation and asked for a new one. `email` is empty for an org link. */
   | { kind: "invite_request"; orgName: string; email: string; url: string }
   | { kind: "verify_email"; url: string }
@@ -98,6 +100,18 @@ export function renderEmail(t: EmailTemplate): { subject: string; html: string; 
         ),
       };
     }
+    case "calendar_invite":
+      return {
+        subject: `${t.inviterName} convidou você: ${t.title}`,
+        ...layout(
+          t.title,
+          [
+            `${esc(t.inviterName)} convidou você para <strong>${esc(t.title)}</strong> em ${esc(t.orgName)}.`,
+            esc(t.when),
+          ],
+          { label: "Ver no calendário", url: t.url },
+        ),
+      };
     case "password_reset":
       return {
         subject: "Redefinir sua senha do agentes",

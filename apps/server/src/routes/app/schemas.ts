@@ -14,6 +14,8 @@ export const Member = z
     image: z.string().nullable(),
     role: Role,
     joinedAt: z.string(),
+    handle: z.string(),
+    timezone: z.string(),
   })
   .openapi("Member");
 
@@ -83,6 +85,7 @@ const MessageBase = z.object({
   author: z.object({ type: z.enum(["person", "agent"]), id: z.string().nullable() }),
   body: z.string(),
   mentionedAgentIds: z.array(z.uuid()),
+  mentionedUserIds: z.array(z.string()).openapi({ description: "People mentioned by handle who are in the channel." }),
   agentRunId: z.uuid().nullable(),
   clientId: z.string().nullable().openapi({ description: "Echo of the sender's `clientId`." }),
   receipts: z

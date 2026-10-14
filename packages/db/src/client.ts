@@ -4,6 +4,7 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import { assertMigrationsMatch } from "./migration-guard";
 import * as schema from "./schema";
 import { tracingLogger } from "./trace";
 
@@ -41,8 +42,15 @@ export function createDatabase(options: DatabaseOptions) {
     db: db as unknown as Database,
     /** Raw postgres.js client, for LISTEN/NOTIFY (see `@agenteschat/adapters`). */
     client,
-    /** Applies pending migrations. Safe to run concurrently: drizzle takes an advisory lock. */
-    migrate: () => migrate(db, { migrationsFolder }),
+    /**
+     * Applies pending migrations, after checking that the applied ones are
+     * exactly this build's (`assertMigrationsMatch`). Safe to run
+     * concurrently: drizzle takes an advisory lock.
+     */
+    migrate: async () => {
+      await assertMigrationsMatch(db as unknown as Database, migrationsFolder);
+      await migrate(db, { migrationsFolder });
+    },
     /** Cheap connectivity check for health endpoints. */
     ping: async () => {
       await client`select 1`;

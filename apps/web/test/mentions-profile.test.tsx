@@ -45,9 +45,9 @@ describe("@mention autocomplete", () => {
     expect(options[1]?.textContent).toContain("Atlas");
     expect(options[0]?.textContent).toContain("@ada · Agente · Dev");
     expect(list.textContent).toContain("Neste canal");
-    expect(box.getAttribute("aria-activedescendant")).toBe(options[0]?.id);
+    expect(box.getAttribute("aria-activedescendant")).toBe(options[0]?.id ?? null);
     await keyDown(box, "ArrowDown");
-    expect(box.getAttribute("aria-activedescendant")).toBe(options[1]?.id);
+    expect(box.getAttribute("aria-activedescendant")).toBe(options[1]?.id ?? null);
     await keyDown(box, "Enter");
     expect(composer().value).toBe("oi @atlas ");
     expect(screen().queryByRole("listbox", { name: "Pessoas e agentes" })).toBeNull();

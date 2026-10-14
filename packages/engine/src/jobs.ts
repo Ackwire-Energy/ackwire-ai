@@ -17,6 +17,7 @@ import {
   routeMessage,
 } from "./router";
 import { createJevRouterStrategy, jevCostNanoUsd, withFallback } from "./router-jev";
+import { executeRoutineRun } from "./routines";
 import type { AgentRun } from "./runs";
 import { indexSource, reindexOrg } from "./search";
 import { runMigration, type StorageDeps } from "./storage";
@@ -190,6 +191,12 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         messageId: String(job.payload.messageId),
         reaction: String(job.payload.reaction),
       });
+    },
+    "routine.run": async (job) => {
+      await executeRoutineRun(
+        { db: deps.db, pubsub: deps.pubsub, context: deps.context },
+        String(job.payload.routineRunId),
+      );
     },
     "storage.migrate": async (job) => {
       if (!deps.storage) throw new PermanentJobError("no storage configured");

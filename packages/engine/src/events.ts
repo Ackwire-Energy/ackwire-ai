@@ -1,6 +1,7 @@
 import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
 import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
+import type { CalendarEventView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
 import type { MessageView } from "./messages";
 
@@ -109,6 +110,8 @@ export type ChannelEvent =
   /** An issue of this channel was created or changed, or got a comment. */
   | { type: "issue.created" | "issue.updated"; channelId: string; issue: IssueView }
   | { type: "issue.comment"; channelId: string; issueId: string; activity: IssueActivityView }
+  /** An event of this channel's calendar was created. */
+  | { type: "calendar.event_created"; channelId: string; event: CalendarEventView }
   /** A file was created or got a new version (Drive preview card). */
   | { type: "artifact.created" | "artifact.updated"; channelId: string; artifact: ArtifactView }
   /** Channel membership changed (agents carry `autoReply`). */

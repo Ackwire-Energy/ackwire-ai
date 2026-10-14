@@ -1,4 +1,4 @@
-import { index, integer, pgEnum, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, integer, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 
 /**
@@ -37,9 +37,17 @@ export const organizationMembers = pgTable(
     role: memberRoleEnum().notNull(),
     /** Last time a WebSocket connection of this person to this organization closed (or opened). */
     lastSeenAt: timestamp({ withTimezone: true }),
+    /** `@ana` in this organization: unique per org, from the name without accents, editable. */
+    handle: text(),
+    /** The person's IANA time zone ("hora local"); null = the organization's. */
+    timezone: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.orgId, t.userId] }), index().on(t.userId)],
+  (t) => [
+    primaryKey({ columns: [t.orgId, t.userId] }),
+    index().on(t.userId),
+    uniqueIndex("organization_members_org_handle").on(t.orgId, t.handle),
+  ],
 );
 
 /**

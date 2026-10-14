@@ -29,7 +29,12 @@ import {
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
-afterEach(() => f?.close());
+afterEach(async () => {
+  // Some tests don't set up a database: close each one once.
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
 
 const DRIVE = ["drive:read", "drive:write"].map((scope) => ({ connectionId: null, scope }));
 const last = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.content);

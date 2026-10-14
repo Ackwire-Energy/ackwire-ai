@@ -41,7 +41,13 @@ export function ProfileTrigger({
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
   };
-  useEffect(() => clear, []);
+  // Drop a pending hover timer on unmount.
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
   const hoverable = (e: PointerEvent) => e.pointerType === "mouse" || e.pointerType === "pen";
   const later = (next: boolean, ms: number) => {
     clear();
