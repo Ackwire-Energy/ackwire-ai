@@ -5,6 +5,7 @@ import {
   enqueue,
   enqueueIdleReflections,
   expireApprovals,
+  expireQuestions,
   type JobHandlers,
   processOutbox,
   queueApprovalDigests,
@@ -102,6 +103,11 @@ export function startWorkers(deps: WorkerDeps) {
   every("approvals", WORKER_INTERVALS_MS.approvals, async () => {
     const expired = await expireApprovals({ db, pubsub: deps.pubsub });
     if (expired > 0) log.info("approvals expired", { expired });
+  });
+
+  every("questions", WORKER_INTERVALS_MS.approvals, async () => {
+    const expired = await expireQuestions({ db, pubsub: deps.pubsub });
+    if (expired > 0) log.info("agent questions expired", { expired });
   });
 
   const digest = deps.approvalDigest;

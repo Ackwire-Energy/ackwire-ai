@@ -147,6 +147,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         await dispatchMentions(deps.db, input, { maxHops: deps.maxHops }); // no-op unless inserted elsewhere
         return;
       }
+      // An answer to an agent's question resumes that run; nobody else is routed.
+      if (typeof message.meta.answersQuestionId === "string") return;
       const [channel] = await deps.db
         .select({ kind: schema.channels.kind })
         .from(schema.channels)

@@ -957,6 +957,16 @@ textarea.ac-input {
   line-height: 18px;
   color: var(--ink-muted);
 }
+.ac-option__aside {
+  margin-left: auto;
+  flex: none;
+}
+.ac-option[data-disabled] {
+  cursor: not-allowed;
+}
+.ac-option[data-disabled] .ac-option__text {
+  opacity: 0.55;
+}
 .ac-pill {
   display: inline-flex;
   align-items: center;
@@ -1339,6 +1349,89 @@ a.ac-list__row:focus-visible {
 .ac-diff__line--del .ac-diff__text {
   color: var(--ink-muted);
   text-decoration: line-through;
+}
+
+.ac-diff--code .ac-diff__line {
+  padding: 2px 12px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+.ac-diff--code .ac-diff__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ac-diff__line--gap {
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+}
+
+/* Side panel (artifact viewer) */
+.ac-sheet {
+  position: fixed;
+  z-index: 41;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(960px, 100%);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-raised);
+  color: var(--ink);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--overlay);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 22px;
+}
+.ac-sheet:focus {
+  outline: none;
+}
+.ac-sheet__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.ac-sheet__icon {
+  display: inline-flex;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.ac-sheet__heading {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ac-sheet__title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.ac-sheet__subtitle {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ac-sheet__actions {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ac-sheet__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px 24px;
 }
 
 /* Selectable list item in a side list (from telas/Propostas) */

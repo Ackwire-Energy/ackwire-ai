@@ -16,6 +16,7 @@ export interface MemoryUpdate {
   canDecide?: boolean;
 }
 
+import type { AgentQuestion } from "./questions";
 import type { RunStatus } from "./runs";
 
 /**
@@ -95,6 +96,13 @@ export type ChannelEvent =
       agentId: string;
       runId: string;
       update: MemoryUpdate;
+    }
+  /** An agent asked a person something (`ask_user`), or the question was answered or expired. */
+  | {
+      type: "question.asked" | "question.answered";
+      channelId: string;
+      threadId: string | null;
+      question: AgentQuestion;
     }
   /** Channel membership changed (agents carry `autoReply`). */
   | {

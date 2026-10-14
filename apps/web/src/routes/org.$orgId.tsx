@@ -3,6 +3,7 @@ import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { requireUser } from "@/app/guards";
+import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { membershipIn } from "@/lib/guards";
@@ -48,10 +49,12 @@ function OrgLayout() {
   return (
     <OrgProvider org={membership} me={me}>
       <RealtimeProvider orgId={membership.id}>
-        <div className="shell">
-          <Sidebar />
-          <Outlet />
-        </div>
+        <ArtifactViewerProvider>
+          <div className="shell">
+            <Sidebar />
+            <Outlet />
+          </div>
+        </ArtifactViewerProvider>
       </RealtimeProvider>
     </OrgProvider>
   );

@@ -79,7 +79,17 @@ export function accountRoutes(deps: AppDeps) {
       tags,
       summary: "Preview an invitation",
       request: { params: z.object({ token: z.string() }) },
-      responses: { 200: json(z.object({ orgName: z.string(), email: z.string(), role: Role })), 404: errors[404] },
+      responses: {
+        200: json(
+          z.object({
+            orgName: z.string(),
+            email: z.string().openapi({ description: "Empty for an org-wide invite link." }),
+            role: Role,
+            kind: z.enum(["email", "link"]),
+          }),
+        ),
+        404: errors[404],
+      },
     }),
     async (c) => {
       const invitation = await previewInvitation(db, c.req.valid("param").token);

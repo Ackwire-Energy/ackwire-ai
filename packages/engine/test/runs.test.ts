@@ -23,6 +23,9 @@ describe("state machine", () => {
         "running->failed",
         "waiting_approval->running",
         "waiting_approval->failed",
+        "running->waiting_input",
+        "waiting_input->running",
+        "waiting_input->failed",
       ].sort(),
     );
   });

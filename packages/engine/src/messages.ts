@@ -17,8 +17,9 @@ import { requireChannelAccess } from "./channels";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { can } from "./organizations";
+import { afterReplyAnswered } from "./questions";
 
-const { messages, agents, channelMembers, channels, agentRuns, outbox } = schema;
+const { messages, agents, channelMembers, channels, agentRuns, outbox, agentQuestions } = schema;
 
 export type Message = typeof messages.$inferSelect;
 
@@ -57,7 +58,10 @@ export const messageView = (m: Message): MessageView => ({
 export interface Receipts {
   seenBy: string[];
   pickedBy: string[];
-  handled: { agentId: string; status: "queued" | "running" | "waiting_approval" | "waiting_input" | "done" | "failed" }[];
+  handled: {
+    agentId: string;
+    status: "queued" | "running" | "waiting_approval" | "waiting_input" | "done" | "failed";
+  }[];
 }
 
 /**
@@ -187,12 +191,29 @@ export async function insertMessageWithRuns(
         where a.org_id = ${input.orgId}::uuid and a.archived_at is null
           and a.handle = any(${handles}::text[])
           and a.id is distinct from ${agentId}::uuid
+      ), answered as (
+        -- A person's reply where an agent asked something (same channel and thread) answers it.
+        update ${agentQuestions} q set status = 'answered', answer = ${body}, answered_by_user_id = ${userId},
+          answered_at = now()
+        where ${person}::boolean and q.status = 'open' and q.id = (
+            select oq.id from ${agentQuestions} oq
+            where oq.org_id = ${input.orgId}::uuid and oq.channel_id = ${input.channelId}::uuid
+              and oq.status = 'open' and oq.expires_at > now()
+              and oq.thread_id is not distinct from ${threadId}::uuid
+            order by oq.created_at desc limit 1)
+          and (not exists (select 1 from mentioned) or q.agent_id in (select id from mentioned))
+          and (${threadId}::uuid is null or exists (
+            select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
+              and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))
+        returning q.id, q.run_id, q.agent_id
       ), m as (
         insert into ${messages} (id, created_at, org_id, channel_id, thread_id, author_type, author_user_id,
           author_agent_id, agent_run_id, hop, body, mentioned_agent_ids, meta)
         select ${id}::uuid, now(), ${input.orgId}::uuid, ${input.channelId}::uuid, ${threadId}::uuid,
           ${input.author.type}::author_type, ${userId}, ${agentId}::uuid, ${runId}::uuid, ${hop}, ${body},
-          coalesce((select array_agg(id) from mentioned), '{}'::uuid[]), ${JSON.stringify(input.meta ?? {})}::jsonb
+          coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
+          ${JSON.stringify(input.meta ?? {})}::jsonb
+            || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
         where ${threadId}::uuid is null or exists (
           select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
             and r.channel_id = ${input.channelId}::uuid and r.thread_id is null)
@@ -202,8 +223,9 @@ export async function insertMessageWithRuns(
         from ${agents} a
         join ${channelMembers} cm on cm.agent_id = a.id and cm.channel_id = ${input.channelId}::uuid
         where ${startRuns}::boolean and a.org_id = ${input.orgId}::uuid and a.archived_at is null
+          and a.id not in (select agent_id from answered)
           and (a.id in (select id from mentioned)
-            or (not exists (select 1 from mentioned) and exists (
+            or (not exists (select 1 from mentioned) and not exists (select 1 from answered) and exists (
               select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
       ), runs as (
         insert into ${agentRuns} (id, org_id, agent_id, channel_id, thread_root_id, trigger_message_id, trigger, hop)
@@ -216,6 +238,9 @@ export async function insertMessageWithRuns(
         insert into ${outbox} (id, org_id, kind, payload, dedupe_key, max_attempts)
         select gen_random_uuid(), ${input.orgId}::uuid, 'agent_run.execute', jsonb_build_object('runId', r.id),
           'agent_run.execute:' || r.id, 4 from runs r
+        union all
+        select gen_random_uuid(), ${input.orgId}::uuid, 'agent_run.execute', jsonb_build_object('runId', a.run_id),
+          'agent_run.execute:' || a.run_id || ':question:' || a.id, 4 from answered a
         union all
         select gen_random_uuid(), ${input.orgId}::uuid, 'search.index',
           jsonb_build_object('kind', 'message', 'sourceId', m.id), 'search.index:message:' || m.id, 8 from m
@@ -285,6 +310,8 @@ export async function postPersonMessage(
   const view = messageView(message);
   // Right after the commit, before any routing: the sender's optimistic copy reconciles by `clientId`.
   await publishMessageCreated(deps.pubsub, view);
+  const answers = message.meta.answersQuestionId;
+  if (typeof answers === "string") await afterReplyAnswered(deps, orgId, answers);
   if (runs.length > 0) {
     // DMs are flat: replies to a top-level DM message go in the main timeline.
     const threadId = message.threadId ?? (channel.kind === "dm" ? null : message.id);

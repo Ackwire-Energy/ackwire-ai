@@ -278,6 +278,10 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "approval.created" || event.type === "approval.decided") {
         cacheApproval(qc, orgId, event.approval);
       }
+      if (event.type === "artifact.created" || event.type === "artifact.updated") {
+        // Cards, the open viewer and Drive refetch: the new version is the latest.
+        void qc.invalidateQueries({ queryKey: keys.artifacts(orgId) });
+      }
       if (event.type === "message.created") {
         if (event.message) cacheMessage(qc, orgId, event.message);
         else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });

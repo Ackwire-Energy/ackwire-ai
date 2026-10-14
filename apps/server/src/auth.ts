@@ -20,8 +20,16 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
   const { db, config, log } = deps;
   const emailEnabled = deps.emailDelivers === true;
 
-  const assertSignupAllowed = async (email: string) => {
-    if (!(await isSignupAllowed(db, email, config.ALLOW_SIGNUP))) {
+  /**
+   * Emails cleared by an org invite link in the sign-up request (header
+   * `x-invite-token`), for the user-create hook of the same request.
+   */
+  const clearedByLink = new Map<string, number>();
+  const assertSignupAllowed = async (email: string, inviteToken?: string | null) => {
+    const key = email.toLowerCase();
+    const cleared = clearedByLink.get(key);
+    if (cleared !== undefined && cleared > Date.now()) return;
+    if (!(await isSignupAllowed(db, email, config.ALLOW_SIGNUP, new Date(), inviteToken))) {
       throw new APIError("FORBIDDEN", {
         message: "Sign-up is closed on this agentes.chat instance. Ask an organization owner for an invitation.",
       });
@@ -136,7 +144,13 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path !== "/sign-up/email") return;
         const email = (ctx.body as { email?: unknown } | undefined)?.email;
-        if (typeof email === "string") await assertSignupAllowed(email);
+        if (typeof email !== "string") return;
+        const inviteToken = ctx.headers?.get("x-invite-token")?.trim() || null;
+        await assertSignupAllowed(email, inviteToken);
+        if (inviteToken) {
+          for (const [k, until] of clearedByLink) if (until <= Date.now()) clearedByLink.delete(k);
+          clearedByLink.set(email.toLowerCase(), Date.now() + 60_000);
+        }
       }),
     },
     databaseHooks: {

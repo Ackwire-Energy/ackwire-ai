@@ -14,6 +14,8 @@ const { users, organizations, agents, approvals } = schema;
 export type EmailTemplate =
   | { kind: "invitation"; orgName: string; inviterName: string; url: string; role: string }
   | { kind: "password_reset"; url: string }
+  /** Someone opened an expired invitation and asked for a new one. `email` is empty for an org link. */
+  | { kind: "invite_request"; orgName: string; email: string; url: string }
   | { kind: "verify_email"; url: string }
   | {
       kind: "budget";
@@ -79,6 +81,20 @@ export function renderEmail(t: EmailTemplate): { subject: string; html: string; 
             "O convite vale por 7 dias. Use este mesmo endereço de e-mail para aceitar.",
           ],
           { label: "Aceitar convite", url: t.url },
+        ),
+      };
+    }
+    case "invite_request": {
+      const who = t.email ? esc(t.email) : "Alguém com o link de convite";
+      return {
+        subject: `Pedido de novo convite para ${t.orgName}`,
+        ...layout(
+          `Pedido de novo convite para ${t.orgName}`,
+          [
+            `${who} tentou entrar em <strong>${esc(t.orgName)}</strong>, mas o convite expirou e pediu um novo.`,
+            "Se fizer sentido, envie um convite novo na página de membros.",
+          ],
+          { label: "Abrir membros", url: t.url },
         ),
       };
     }

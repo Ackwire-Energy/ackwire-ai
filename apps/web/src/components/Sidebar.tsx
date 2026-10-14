@@ -78,6 +78,14 @@ export function Sidebar() {
           <Icon name="issues" />
           <span className="sidebar__item-label">{t("shell.issues")}</span>
         </Link>
+        <Link to="/org/$orgId/routines" params={{ orgId }} className="sidebar__item">
+          <Icon name="routines" />
+          <span className="sidebar__item-label">{t("shell.routines")}</span>
+        </Link>
+        <Link to="/org/$orgId/calendar" params={{ orgId }} className="sidebar__item">
+          <Icon name="calendar" />
+          <span className="sidebar__item-label">{t("shell.calendar")}</span>
+        </Link>
         <Link to="/org/$orgId/forum" params={{ orgId }} className="sidebar__item">
           <Icon name="message" />
           <span className="sidebar__item-label">{t("shell.forum")}</span>

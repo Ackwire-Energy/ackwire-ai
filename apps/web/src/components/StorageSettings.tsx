@@ -1,0 +1,388 @@
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Chip,
+  Dialog,
+  DialogFooter,
+  Field,
+  Icon,
+  type IconName,
+  Input,
+  List,
+  Meter,
+  RadioCard,
+  RadioGroup,
+} from "@agenteschat/ui";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useSaveStorage, useStartMigration, useStorage, useStorageMigration, useTestStorage } from "@/api/queries";
+import type { S3Input, StorageConfig, StorageTestResult } from "@/api/types";
+import { useOrg } from "@/components/org-context";
+import { can } from "@/lib/permissions";
+import { useToast } from "@/lib/toast";
+
+type Choice = "agentes" | "s3";
+
+interface Form {
+  endpoint: string;
+  region: string;
+  bucket: string;
+  prefix: string;
+  pathStyle: boolean;
+  accessKeyId: string;
+  secretAccessKey: string;
+}
+
+const emptyForm: Form = {
+  endpoint: "",
+  region: "",
+  bucket: "",
+  prefix: "",
+  pathStyle: false,
+  accessKeyId: "",
+  secretAccessKey: "",
+};
+
+const formFrom = (c: StorageConfig | undefined): Form =>
+  c?.s3
+    ? {
+        ...emptyForm,
+        endpoint: c.s3.endpoint,
+        region: c.s3.region,
+        bucket: c.s3.bucket,
+        prefix: c.s3.prefix ?? "",
+        pathStyle: c.s3.pathStyle,
+      }
+    : emptyForm;
+
+/** What the backend gets; blank keys mean "keep the saved ones". */
+export function toS3Input(f: Form): S3Input {
+  const input: S3Input = {
+    endpoint: f.endpoint.trim(),
+    region: f.region.trim(),
+    bucket: f.bucket.trim(),
+    prefix: f.prefix.trim() || null,
+    pathStyle: f.pathStyle,
+  };
+  if (f.accessKeyId.trim()) input.accessKeyId = f.accessKeyId.trim();
+  if (f.secretAccessKey.trim()) input.secretAccessKey = f.secretAccessKey.trim();
+  return input;
+}
+
+const STEP_ICON: Record<"ok" | "failed" | "skipped", IconName> = { ok: "check", failed: "close", skipped: "info" };
+
+/** Settings → Armazenamento (admins only): our storage or the workspace's own S3-compatible bucket. */
+export function StorageSection() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const admin = can(org.role, "configure");
+  const storage = useStorage(org.id, admin);
+  const [choice, setChoice] = useState<Choice>("agentes");
+  useEffect(() => {
+    if (storage.data) setChoice(storage.data.kind);
+  }, [storage.data]);
+  if (!admin) return null;
+  const config = storage.data;
+  return (
+    <Card aria-labelledby="sec-storage">
+      <div className="stack-4" style={{ gap: 2 }}>
+        <h2 id="sec-storage" className="ac-card__title">
+          {t("storage.title")}
+        </h2>
+        <span className="small muted">{t("storage.subtitle")}</span>
+      </div>
+      {config && (
+        <>
+          <RadioGroup
+            value={choice}
+            onValueChange={(v) => setChoice(v as Choice)}
+            aria-label={t("storage.options")}
+            className="stack-4"
+            style={{ gap: 8 }}
+          >
+            {(["agentes", "s3"] as const).map((k) => (
+              <RadioCard
+                key={k}
+                value={k}
+                id={`storage-${k}`}
+                checked={choice === k}
+                title={t(`storage.${k}`)}
+                description={t(`storage.${k}Text`)}
+                aside={config.kind === k ? <Chip icon="check">{t("storage.current")}</Chip> : undefined}
+              />
+            ))}
+            {(["gdrive", "onedrive"] as const).map((k) => (
+              <RadioCard
+                key={k}
+                value={k}
+                id={`storage-${k}`}
+                checked={false}
+                disabled
+                title={t(`storage.${k}`)}
+                aside={<Chip icon="waiting">{t("storage.soon")}</Chip>}
+              />
+            ))}
+          </RadioGroup>
+          {config.kind === "s3" && <InUse config={config} />}
+          {choice === "s3" && <BucketForm config={config} />}
+        </>
+      )}
+    </Card>
+  );
+}
+
+function InUse({ config }: { config: StorageConfig }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const save = useSaveStorage(org.id);
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <div className="stack-4" style={{ gap: 12 }}>
+      <Alert tone="neutral">{t("storage.switchedNotice")}</Alert>
+      {config.s3 && (
+        <p className="small muted">{t("storage.inUse", { bucket: config.s3.bucket, endpoint: config.s3.endpoint })}</p>
+      )}
+      <CopyFiles config={config} />
+      <div className="row">
+        <Button variant="ghost" onClick={() => setConfirm(true)}>
+          {t("storage.back")}
+        </Button>
+      </div>
+      <Dialog
+        open={confirm}
+        onOpenChange={setConfirm}
+        title={t("storage.backTitle")}
+        description={t("storage.backText")}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogFooter>
+          <Button onClick={() => setConfirm(false)}>{t("common.cancel")}</Button>
+          <Button
+            variant="primary"
+            disabled={save.isPending}
+            onClick={() =>
+              save.mutate(
+                { kind: "agentes" },
+                {
+                  onSuccess: () => {
+                    setConfirm(false);
+                    toast.show(t("storage.backDone"));
+                  },
+                },
+              )
+            }
+          >
+            {t("storage.back")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+    </div>
+  );
+}
+
+function CopyFiles({ config }: { config: StorageConfig }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const start = useStartMigration(org.id);
+  const status = useStorageMigration(org.id, true);
+  const m = status.data ?? config.migration;
+  if (!m) {
+    return (
+      <div className="row" style={{ alignItems: "center", gap: 12 }}>
+        <span className="small muted" style={{ flex: "1 1 240px" }}>
+          {t("storage.copyText")}
+        </span>
+        <Button disabled={start.isPending} onClick={() => start.mutate()}>
+          {t("storage.copy")}
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="stack-4" style={{ gap: 8 }}>
+      <Meter value={m.copied} max={m.total} label={t("storage.copyProgress")} />
+      <p className="small" role="status">
+        {m.status === "done"
+          ? t("storage.copyDone", { total: m.total })
+          : m.status === "failed"
+            ? t("storage.copyFailed", { copied: m.copied, total: m.total })
+            : t("storage.copying", { copied: m.copied, total: m.total })}
+      </p>
+      {m.status === "failed" && (
+        <>
+          {m.error && <Alert>{m.error}</Alert>}
+          <div className="row">
+            <Button disabled={start.isPending} onClick={() => start.mutate()}>
+              {t("storage.resume")}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function BucketForm({ config }: { config: StorageConfig }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const test = useTestStorage(org.id);
+  const save = useSaveStorage(org.id);
+  const [form, setForm] = useState<Form>(() => formFrom(config));
+  const [touched, setTouched] = useState(false);
+  // The settings the last test ran with, and its result.
+  const [tested, setTested] = useState<{ sig: string; result: StorageTestResult } | null>(null);
+  const saved = config.s3;
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const input = toS3Input(form);
+  const sig = JSON.stringify(input);
+  const missing = (v: string) => touched && !v.trim();
+  const keysMissing = !saved && (!input.accessKeyId || !input.secretAccessKey);
+  const complete = input.endpoint && input.region && input.bucket && !keysMissing;
+  const current = tested?.sig === sig ? tested.result : null;
+  const stale = tested !== null && tested.sig !== sig;
+  const runTest = () => {
+    setTouched(true);
+    if (!complete) return;
+    test.mutate(input, { onSuccess: (result) => setTested({ sig, result }) });
+  };
+  return (
+    <form
+      className="stack-4"
+      style={{ gap: 12 }}
+      aria-label={t("storage.s3")}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!current?.ok) return;
+        save.mutate(
+          { kind: "s3", s3: input },
+          {
+            onSuccess: () => {
+              setForm((f) => ({ ...f, accessKeyId: "", secretAccessKey: "" }));
+              setTested(null);
+              setTouched(false);
+              toast.show(t("storage.activated"));
+            },
+          },
+        );
+      }}
+    >
+      <div className="grid-fields">
+        <Field
+          label={t("storage.endpoint")}
+          id="st-endpoint"
+          help={t("storage.endpointHelp")}
+          error={missing(form.endpoint) ? t("storage.required") : undefined}
+        >
+          <Input
+            value={form.endpoint}
+            onChange={(e) => set("endpoint", e.target.value)}
+            placeholder="https://"
+            autoComplete="off"
+          />
+        </Field>
+        <Field
+          label={t("storage.region")}
+          id="st-region"
+          error={missing(form.region) ? t("storage.required") : undefined}
+        >
+          <Input value={form.region} onChange={(e) => set("region", e.target.value)} autoComplete="off" />
+        </Field>
+        <Field
+          label={t("storage.bucket")}
+          id="st-bucket"
+          error={missing(form.bucket) ? t("storage.required") : undefined}
+        >
+          <Input value={form.bucket} onChange={(e) => set("bucket", e.target.value)} autoComplete="off" />
+        </Field>
+        <Field label={t("storage.prefix")} id="st-prefix" help={t("storage.prefixHelp")}>
+          <Input value={form.prefix} onChange={(e) => set("prefix", e.target.value)} autoComplete="off" />
+        </Field>
+        <Field
+          label={t("storage.accessKey")}
+          id="st-access"
+          help={saved ? t("storage.savedHint", { hint: saved.accessKeyIdHint }) : undefined}
+          error={touched && keysMissing && !input.accessKeyId ? t("storage.keysRequired") : undefined}
+        >
+          <Input
+            type="password"
+            value={form.accessKeyId}
+            onChange={(e) => set("accessKeyId", e.target.value)}
+            autoComplete="off"
+          />
+        </Field>
+        <Field
+          label={t("storage.secret")}
+          id="st-secret"
+          help={saved ? t("storage.savedHint", { hint: saved.secretHint }) : undefined}
+          error={touched && keysMissing && !input.secretAccessKey ? t("storage.keysRequired") : undefined}
+        >
+          <Input
+            type="password"
+            value={form.secretAccessKey}
+            onChange={(e) => set("secretAccessKey", e.target.value)}
+            autoComplete="off"
+          />
+        </Field>
+      </div>
+      <div className="row" style={{ alignItems: "flex-start", gap: 8 }}>
+        <Checkbox
+          id="st-path"
+          checked={form.pathStyle}
+          onCheckedChange={(v) => set("pathStyle", v)}
+          aria-describedby="st-path-help"
+        />
+        <span className="list-col" style={{ gap: 2 }}>
+          <label htmlFor="st-path">{t("storage.pathStyle")}</label>
+          <span id="st-path-help" className="small muted">
+            {t("storage.pathStyleHelp")}
+          </span>
+        </span>
+      </div>
+      {current && <TestSteps result={current} />}
+      {stale && <p className="small muted">{t("storage.retestNeeded")}</p>}
+      <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+        <Button type="button" disabled={test.isPending} onClick={runTest}>
+          {test.isPending ? t("storage.testing") : t("storage.test")}
+        </Button>
+        <Button type="submit" variant="primary" disabled={!current?.ok || save.isPending}>
+          {config.kind === "s3" ? t("storage.saveBucket") : t("storage.activate")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function TestSteps({ result }: { result: StorageTestResult }) {
+  const { t } = useTranslation();
+  return (
+    <section className="stack-4" style={{ gap: 8 }} aria-label={t("storage.steps")}>
+      <List>
+        {result.steps.map((s) => {
+          const state = s.ok ? "ok" : s.error ? "failed" : "skipped";
+          return (
+            <div key={s.step} className="ac-list__row" data-step={s.step}>
+              <span className="row" style={{ gap: 8, flex: 1, alignItems: "flex-start" }}>
+                <Icon name={STEP_ICON[state]} aria-hidden="true" />
+                <span className="list-col">
+                  <span style={{ fontWeight: 600 }}>{t(`storage.step.${s.step}`)}</span>
+                  {s.error && <span className="small muted">{s.error}</span>}
+                </span>
+              </span>
+              <Chip icon={STEP_ICON[state]}>
+                {t(
+                  state === "ok" ? "storage.stepOk" : state === "failed" ? "storage.stepFailed" : "storage.stepSkipped",
+                )}
+              </Chip>
+            </div>
+          );
+        })}
+      </List>
+      {result.ok ? <Alert tone="neutral">{t("storage.testPassed")}</Alert> : <Alert>{t("storage.testFailed")}</Alert>}
+    </section>
+  );
+}

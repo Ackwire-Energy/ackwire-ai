@@ -48,6 +48,7 @@ import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
 import { buildTimeline, mergeTimeline, threadRootsToLoad } from "@/chat/timeline";
 import { InlineApproval } from "@/components/ApprovalItem";
+import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { InlineProposal, MemoryChangeCard, QuestionCard } from "@/components/ChatCards";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
@@ -55,6 +56,7 @@ import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageReceipts } from "@/components/MessageReceipts";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { artifactRefs } from "@/lib/artifacts";
 import { dayLabel, formatTime, joinNames } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import {
@@ -564,6 +566,7 @@ const TimelineMessage = memo(function TimelineMessage({
     ? (meta.memoryUpdates as MemoryUpdate[]).filter(isMemoryUpdate)
     : [];
   const question = isQuestion(meta.question) ? meta.question : null;
+  const artifacts = m.author.type === "agent" ? artifactRefs(meta) : [];
   const card = approvalId || proposalId || memoryUpdates.length > 0 || question;
   const feedback = m.author.type === "agent" && !card && !m.local;
   return (
@@ -606,6 +609,13 @@ const TimelineMessage = memo(function TimelineMessage({
       {agent &&
         memoryUpdates.map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
       {question && <QuestionCard question={question} />}
+      {artifacts.length > 0 && (
+        <div className="artifact-cards">
+          {artifacts.map((r) => (
+            <ArtifactCard key={`${r.id}@${r.version}`} artifact={r} />
+          ))}
+        </div>
+      )}
       {feedback && (
         <MessageFeedback messageId={m.id} agentName={agent?.name ?? t("channel.unknownAgent")} active={active} />
       )}

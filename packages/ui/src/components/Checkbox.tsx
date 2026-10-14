@@ -91,20 +91,31 @@ export function RadioCard({
   checked,
   title,
   description,
+  disabled,
+  aside,
 }: {
   value: string;
   id: string;
   checked: boolean;
   title: ReactNode;
   description?: ReactNode;
+  disabled?: boolean;
+  /** Trailing content, e.g. an "Em breve" chip. */
+  aside?: ReactNode;
 }) {
   return (
-    <label htmlFor={id} className="ac-option" data-state={checked ? "checked" : "unchecked"}>
-      <Radio value={value} id={id} />
+    <label
+      htmlFor={id}
+      className="ac-option"
+      data-state={checked ? "checked" : "unchecked"}
+      data-disabled={disabled ? "" : undefined}
+    >
+      <Radio value={value} id={id} disabled={disabled} />
       <span className="ac-option__text">
         <span className="ac-option__title">{title}</span>
         {description && <span className="ac-option__desc">{description}</span>}
       </span>
+      {aside && <span className="ac-option__aside">{aside}</span>}
     </label>
   );
 }

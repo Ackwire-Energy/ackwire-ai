@@ -55,8 +55,6 @@ describe("route guards", () => {
 
   test("linked-only screens render designed empty states", async () => {
     for (const [path, title] of [
-      ["issues", "Issues"],
-      ["drive", "Drive"],
       ["forum", "Fórum"],
       ["threads/x", "Threads"],
     ] as const) {

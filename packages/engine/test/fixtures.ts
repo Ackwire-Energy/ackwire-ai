@@ -14,6 +14,7 @@ import {
   addChannelMember,
   type ContextDeps,
   createAgent,
+  createAskUserToolSource,
   createContextToolSource,
   createCredential,
   createJobHandlers,
@@ -53,6 +54,8 @@ export async function setup(
     toolSources?: ToolSource[];
     /** Add the built-in context tools (search_context, remember…) to the tool sources. */
     contextTools?: boolean;
+    /** Add the built-in `ask_user` tool. */
+    askUser?: boolean;
     /** Fake embeddings (hybrid search). Off: full-text only, no embedding usage rows. */
     embeddings?: boolean;
   } = {},
@@ -105,7 +108,11 @@ export async function setup(
     pubsub,
     reflect: { everyMessages: 1000, idleMinutes: 120, maxPerThread: 5 },
   };
-  const sources = [...(options.contextTools ? [createContextToolSource(context)] : []), ...(options.toolSources ?? [])];
+  const sources = [
+    ...(options.askUser ? [createAskUserToolSource()] : []),
+    ...(options.contextTools ? [createContextToolSource(context)] : []),
+    ...(options.toolSources ?? []),
+  ];
   const tools = sources.length > 0 ? createToolGateway({ sources }) : undefined;
   const jobDeps = {
     db,

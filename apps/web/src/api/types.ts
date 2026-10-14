@@ -165,6 +165,7 @@ export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "fa
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
 export type ChannelEvent =
   | { type: "message.created"; channelId: string; messageId: string; message?: Message }
+  | ArtifactEvent
   | {
       type: "agent.delta";
       channelId: string;
@@ -610,4 +611,272 @@ export interface AgentQuestion {
   status: "open" | "answered";
   answer: string | null;
   answeredByUserId: string | null;
+}
+
+// ── File storage (expected: `GET/PUT …/storage`, `POST …/storage/test`, `…/storage/migrate`) ──
+
+export type StorageKind = "agentes" | "s3";
+
+/** What an admin types for "Seu próprio bucket". Keys empty = keep the stored ones. */
+export interface S3Input {
+  endpoint: string;
+  region: string;
+  bucket: string;
+  prefix: string | null;
+  pathStyle: boolean;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+}
+
+export interface StorageConfig {
+  kind: StorageKind;
+  /** The bucket in use (keys never come back: only their last characters). */
+  s3: (Omit<S3Input, "accessKeyId" | "secretAccessKey"> & { accessKeyIdHint: string; secretHint: string }) | null;
+  migration: StorageMigration | null;
+}
+
+export type StorageStep = "write" | "read" | "list" | "delete";
+
+export interface StorageTestResult {
+  ok: boolean;
+  steps: { step: StorageStep; ok: boolean; error?: string | null }[];
+}
+
+export interface StorageMigration {
+  status: "running" | "failed" | "done";
+  copied: number;
+  total: number;
+  error?: string | null;
+}
+
+// ── Artifacts (expected: `…/artifacts`, events `artifact.created` / `artifact.updated`, `meta.artifacts`) ──
+
+export type ArtifactKind = "document" | "table" | "diff" | "diagram" | "html";
+
+export interface ArtifactAuthor {
+  type: "agent" | "person";
+  id: string;
+}
+
+/** One file of a code change: a unified patch (`@@ -1,3 +1,4 @@` hunks). */
+export interface ArtifactDiffFile {
+  path: string;
+  patch: string;
+}
+
+export type ArtifactContent =
+  | { kind: "document"; markdown: string }
+  | { kind: "table"; columns: string[]; rows: string[][] }
+  | { kind: "diff"; files: ArtifactDiffFile[] }
+  | { kind: "diagram"; mermaid: string }
+  | { kind: "html"; html: string };
+
+export interface Artifact {
+  id: string;
+  kind: ArtifactKind;
+  title: string;
+  /** Latest version number (1, 2, …). */
+  version: number;
+  channelId: string | null;
+  threadId: string | null;
+  createdBy: ArtifactAuthor;
+  updatedBy: ArtifactAuthor;
+  createdAt: string;
+  updatedAt: string;
+  /** The viewer may save new versions (documents and tables only). */
+  canEdit: boolean;
+}
+
+export interface ArtifactVersion {
+  version: number;
+  author: ArtifactAuthor;
+  /** "Corrigi os números de março". */
+  note: string | null;
+  createdAt: string;
+}
+
+/** An artifact at one version, with its content. */
+export interface ArtifactDetail extends Artifact {
+  /** The version shown (may be older than `version`). */
+  shownVersion: number;
+  content: ArtifactContent;
+}
+
+/** `message.meta.artifacts`: what the agent created or changed in that reply. */
+export interface ArtifactRef {
+  id: string;
+  version: number;
+}
+
+export interface ArtifactFilters {
+  q?: string;
+  kind?: ArtifactKind;
+  channelId?: string;
+  author?: ArtifactAuthor;
+}
+
+/** Channel event: an artifact was created or got a new version. */
+export type ArtifactEvent = {
+  type: "artifact.created" | "artifact.updated";
+  channelId: string;
+  artifact: Artifact;
+};
+
+// ── Issues, routines and calendar (D28; expected with backend phase 6) ──────
+
+/** A person or an agent (issues, routines, calendar). */
+export type Actor = ArtifactAuthor;
+
+export type IssueStatus = "todo" | "in_progress" | "in_review" | "done" | "canceled";
+export type IssuePriority = "low" | "normal" | "high";
+
+export interface IssueCriterion {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface Issue {
+  id: string;
+  /** Per organization: #131. */
+  number: number;
+  title: string;
+  description: string;
+  status: IssueStatus;
+  priority: IssuePriority;
+  assignee: Actor | null;
+  labels: string[];
+  /** Day only, `YYYY-MM-DD`. */
+  dueDate: string | null;
+  criteria: IssueCriterion[];
+  createdBy: Actor;
+  /** Where it came from: "a partir de uma mensagem no #produto". */
+  source:
+    | { type: "manual" }
+    | { type: "message"; channelId: string; messageId: string }
+    | { type: "forum"; threadId: string }
+    | { type: "agent"; agentId: string }
+    | { type: "webhook"; provider: string };
+  pullRequests: { number: number; url: string; openedBy: Actor | null }[];
+  artifacts: { id: string; title: string; createdBy: Actor }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IssueActivity {
+  id: string;
+  kind: "comment" | "event";
+  author: Actor;
+  /** Comment body, or the event in words ("pediu à Ada para implementar"). */
+  text: string;
+  /** Machine form of an event (`status_changed`, `assigned`, `agent_asked`, …). */
+  event?: string;
+  createdAt: string;
+}
+
+export interface IssueInput {
+  title: string;
+  description?: string;
+  criteria?: string[];
+  assignee?: Actor | null;
+  priority?: IssuePriority;
+  dueDate?: string | null;
+  labels?: string[];
+}
+
+export type IssuePatch = Partial<
+  Pick<Issue, "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "labels">
+>;
+
+export type RoutineEvent = "sentry.issue_created" | "github.pr_opened" | "issue.created" | "deploy.succeeded";
+
+export type RoutineTrigger =
+  | { type: "schedule"; phrase: string; cron: string; timezone: string; description: string }
+  | { type: "event"; event: RoutineEvent };
+
+export type RoutineTarget = { type: "channel"; channelId: string } | { type: "dm" } | { type: "artifact" };
+
+export interface Routine {
+  id: string;
+  name: string;
+  agentId: string;
+  prompt: string;
+  target: RoutineTarget;
+  trigger: RoutineTrigger;
+  active: boolean;
+  /** Null when paused or event-driven. */
+  nextRunAt: string | null;
+  running: boolean;
+  lastRun: RoutineRun | null;
+  monthCostUsd: number;
+  createdAt: string;
+}
+
+export interface RoutineRun {
+  id: string;
+  at: string;
+  status: "ok" | "failed" | "skipped";
+  /** "Resumo postado no #geral", "Orçamento do mês esgotado". */
+  summary: string;
+  costUsd: number;
+}
+
+export interface RoutineInput {
+  name?: string;
+  agentId: string;
+  prompt: string;
+  target: RoutineTarget;
+  trigger: { type: "schedule"; phrase: string } | { type: "event"; event: RoutineEvent };
+}
+
+/** Natural language → cron, in the workspace time zone (the backend decides). */
+export type ScheduleParse =
+  | { ok: true; cron: string; description: string; timezone: string }
+  | { ok: false; error: string };
+
+export type Recurrence = "none" | "weekdays" | "weekly" | "monthly";
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string;
+  start: string;
+  end: string;
+  recurrence: Recurrence;
+  participants: Actor[];
+  channelId: string | null;
+  issueId: string | null;
+  createdBy: Actor;
+}
+
+/** An agent's suggested slot; a person confirms before anyone is invited. */
+export interface CalendarProposal {
+  id: string;
+  agentId: string;
+  title: string;
+  start: string;
+  end: string;
+  participants: Actor[];
+  /** "livre para todos". */
+  note: string | null;
+}
+
+export interface CalendarRange {
+  events: CalendarEvent[];
+  /** Scheduled routine runs in the range. */
+  routines: { routineId: string; name: string; agentId: string; at: string; target: RoutineTarget }[];
+  /** Issues due in the range (all-day). */
+  deadlines: { issueId: string; number: number; title: string; date: string }[];
+  proposals: CalendarProposal[];
+}
+
+export interface CalendarEventInput {
+  title: string;
+  description?: string;
+  start: string;
+  end: string;
+  recurrence: Recurrence;
+  participants: Actor[];
+  channelId?: string | null;
+  issueId?: string | null;
 }

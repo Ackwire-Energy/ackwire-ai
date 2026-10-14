@@ -12,9 +12,11 @@ import { chatRoutes } from "./routes/app/chat";
 import { connectorRoutes } from "./routes/app/connectors";
 import type { AppDeps } from "./routes/app/context";
 import { dmRoutes } from "./routes/app/dms";
+import { inviteRoutes } from "./routes/app/invites";
 import { knowledgeRoutes } from "./routes/app/knowledge";
 import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
+import { questionRoutes } from "./routes/app/questions";
 import { registerHealth } from "./routes/health";
 
 export interface AppOptions {
@@ -75,6 +77,8 @@ export function createApp(options: AppOptions) {
     api.route("/app", knowledgeRoutes(deps));
     api.route("/app", memoryRoutes(deps));
     api.route("/app", dmRoutes(deps));
+    api.route("/app", questionRoutes(deps));
+    api.route("/app", inviteRoutes(deps));
   }
 
   for (const module of options.modules) {

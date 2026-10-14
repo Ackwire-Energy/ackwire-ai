@@ -3,6 +3,7 @@ import { type Config, connectorOAuthApps } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
   type ContextDeps,
+  createAskUserToolSource,
   createConnectorToolSource,
   createContextToolSource,
   createJobHandlers,
@@ -81,7 +82,12 @@ export function buildEngine(o: EngineOptions) {
     connect: o.mcpConnect,
   };
   const tools = createToolGateway({
-    sources: [createContextToolSource(context), createConnectorToolSource(connectorDeps), ...(o.toolSources ?? [])],
+    sources: [
+      createAskUserToolSource(),
+      createContextToolSource(context),
+      createConnectorToolSource(connectorDeps),
+      ...(o.toolSources ?? []),
+    ],
   });
   const handlers = createJobHandlers({
     db,

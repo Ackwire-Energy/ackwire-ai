@@ -21,6 +21,8 @@ export interface ToolOutput {
   data?: Record<string, unknown>;
   /** Ground truth this call produced (tests passed, PR merged…), recorded by the gateway. */
   outcome?: { kind: OutcomeKind; subject?: string; summary?: string; details?: Record<string, unknown> };
+  /** Built-in `ask_user` only: suspend the run until a person answers this question. */
+  waitForAnswer?: { text: string; choices: string[] | null };
 }
 
 /**
@@ -34,7 +36,10 @@ export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: JsonSchema;
-  /** Scope the agent must hold, e.g. `context:read` or `github:pr.merge`. */
+  /**
+   * Scope the agent must hold, e.g. `context:read` or `github:pr.merge`.
+   * Empty only for built-in tools every agent has (`ask_user`).
+   */
   scope: string;
   /** Org connector connection the scope belongs to; null/undefined for built-in tools. */
   connectionId?: string | null;

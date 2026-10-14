@@ -6,8 +6,16 @@ import type {
   AgentQuestion,
   AgentUsage,
   Approval,
+  Artifact,
+  ArtifactContent,
+  ArtifactDetail,
+  ArtifactFilters,
+  ArtifactVersion,
   AuthConfig,
   BatchInviteResult,
+  CalendarEvent,
+  CalendarEventInput,
+  CalendarRange,
   Channel,
   ChannelMember,
   Connection,
@@ -21,6 +29,10 @@ import type {
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
+  Issue,
+  IssueActivity,
+  IssueInput,
+  IssuePatch,
   Me,
   Member,
   Memory,
@@ -34,11 +46,19 @@ import type {
   ReactionCount,
   Role,
   RosterMember,
+  Routine,
+  RoutineInput,
+  RoutineRun,
   Run,
   RunStep,
+  S3Input,
+  ScheduleParse,
   ScopeGrant,
   SearchHit,
   SearchKind,
+  StorageConfig,
+  StorageMigration,
+  StorageTestResult,
   ToolAccess,
   UsageReport,
 } from "./types";
@@ -236,6 +256,63 @@ export interface ApiClient {
   questions: {
     /** Answers an agent's question with a choice or free text. */
     answer(orgId: string, questionId: string, input: { choice?: string; text?: string }): Promise<AgentQuestion>;
+  };
+  issues: {
+    list(orgId: string, filters?: { q?: string }): Promise<Issue[]>;
+    get(orgId: string, number: number): Promise<Issue>;
+    create(orgId: string, input: IssueInput): Promise<Issue>;
+    update(orgId: string, id: string, patch: IssuePatch): Promise<Issue>;
+    setCriterion(orgId: string, id: string, criterionId: string, done: boolean): Promise<Issue>;
+    activity(orgId: string, id: string): Promise<IssueActivity[]>;
+    comment(orgId: string, id: string, text: string): Promise<IssueActivity>;
+    /** "Pedir à Ada para implementar": assigns the agent and starts a run on the issue. */
+    askAgent(orgId: string, id: string, agentId: string): Promise<Issue>;
+  };
+  routines: {
+    list(orgId: string): Promise<Routine[]>;
+    parseSchedule(orgId: string, phrase: string): Promise<ScheduleParse>;
+    create(orgId: string, input: RoutineInput): Promise<Routine>;
+    setActive(orgId: string, id: string, active: boolean): Promise<Routine>;
+    runNow(orgId: string, id: string): Promise<Routine>;
+    runs(orgId: string, id: string): Promise<RoutineRun[]>;
+  };
+  calendar: {
+    /** Events, routine runs, issue deadlines and proposals between `from` and `to` (ISO). */
+    range(orgId: string, from: string, to: string): Promise<CalendarRange>;
+    create(orgId: string, input: CalendarEventInput): Promise<CalendarEvent>;
+    /** Confirms an agent's proposal: creates the event and invites the people. */
+    confirmProposal(orgId: string, id: string): Promise<CalendarEvent>;
+    dismissProposal(orgId: string, id: string): Promise<void>;
+  };
+  artifacts: {
+    /** Everything the viewer can see, newest update first. */
+    list(orgId: string, filters?: ArtifactFilters): Promise<Artifact[]>;
+    /** One artifact at `version` (default: latest), with content. */
+    get(orgId: string, id: string, version?: number): Promise<ArtifactDetail>;
+    versions(orgId: string, id: string): Promise<ArtifactVersion[]>;
+    /** Short-lived signed URL for the stored file. */
+    download(orgId: string, id: string, version?: number): Promise<{ url: string; expiresAt: string }>;
+    create(
+      orgId: string,
+      input: { title: string; channelId?: string | null; content: ArtifactContent },
+    ): Promise<ArtifactDetail>;
+    /** Always a new version. `baseVersion` stale → 409. */
+    update(
+      orgId: string,
+      id: string,
+      input: { content: ArtifactContent; note?: string | null; baseVersion: number; title?: string },
+    ): Promise<ArtifactDetail>;
+    remove(orgId: string, id: string): Promise<void>;
+  };
+  storage: {
+    get(orgId: string): Promise<StorageConfig>;
+    /** Checks a bucket: write, read, list and delete a test object. */
+    test(orgId: string, input: S3Input): Promise<StorageTestResult>;
+    /** Switches storage. `s3` requires a passing test of the same settings. */
+    save(orgId: string, input: { kind: "agentes" } | { kind: "s3"; s3: S3Input }): Promise<StorageConfig>;
+    /** Starts (or resumes) copying existing files to the bucket. */
+    migrate(orgId: string): Promise<StorageMigration>;
+    migration(orgId: string): Promise<StorageMigration | null>;
   };
   invites: {
     /** Org-wide link: whoever joins with it becomes a member (7 days). */

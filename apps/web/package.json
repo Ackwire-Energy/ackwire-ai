@@ -28,6 +28,7 @@
     "@tanstack/react-router": "^1.170.41",
     "better-auth": "^1.7.7",
     "i18next": "^26.4.2",
+    "mermaid": "^11.17.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-i18next": "^17.0.15"

@@ -29,7 +29,11 @@ const MAX_RESULT_CHARS = 50_000;
 export type ToolCall = { toolUseId: string; name: string; input: Record<string, unknown> };
 export type Approval = typeof approvals.$inferSelect;
 
-export type InvokeResult = { type: "result"; output: ToolOutput } | { type: "approval"; approval: Approval };
+export type InvokeResult =
+  | { type: "result"; output: ToolOutput }
+  | { type: "approval"; approval: Approval }
+  /** `ask_user`: the executor posts the question and suspends the run. */
+  | { type: "question"; text: string; choices: string[] | null };
 
 /**
  * The only way an agent's tool call runs (D2, docs/adr/0015). For each call:
@@ -59,7 +63,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
   async function list(ctx: ToolContext): Promise<ToolDefinition[]> {
     const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
     return [...(await allTools(ctx)).values()]
-      .filter((t) => granted.has(grantKey(t.connectionId, t.scope)))
+      .filter((t) => (t.scope === "" && !t.connectionId) || granted.has(grantKey(t.connectionId, t.scope)))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -104,7 +108,8 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
 
       const tool = (await allTools(ctx)).get(call.name);
       if (!tool) return finish({ content: `Unknown tool ${call.name}`, isError: true });
-      if (!(await hasScope(ctx.db, ctx.orgId, ctx.agentId, tool.connectionId, tool.scope))) {
+      const builtIn = tool.scope === "" && !tool.connectionId;
+      if (!builtIn && !(await hasScope(ctx.db, ctx.orgId, ctx.agentId, tool.connectionId, tool.scope))) {
         return finish({ content: `Not allowed: this agent lacks the scope ${tool.scope}`, isError: true });
       }
       const problems = validateJson(tool.inputSchema, call.input);
@@ -147,7 +152,11 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         await addRunStep(ctx.db, step, "approval", { approvalId: row.id, toolUseId: call.toolUseId, title: row.title });
         return { type: "approval", approval: row };
       }
-      return finish(await run(tool, call.input, ctx));
+      const output = await run(tool, call.input, ctx);
+      if (builtIn && output.waitForAnswer && output.waitForAnswer.text) {
+        return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices };
+      }
+      return finish(output);
     },
 
     /**

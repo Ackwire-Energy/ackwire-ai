@@ -20,11 +20,20 @@ import type { ModelGateway } from "./gateway";
 import { insertMessage, type Message, messageView } from "./messages";
 import { PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
+import {
+  type AgentQuestionRow,
+  ASK_USER_TOOL,
+  publishQuestion,
+  QUESTION_TTL_MS,
+  questionResult,
+  questionView,
+  syncQuestionMessage,
+} from "./questions";
 import { type AgentRun, addRunStep, type RunStatus, transitionRun } from "./runs";
 import type { Approval, ToolGateway } from "./tools/gateway";
 import type { ToolContext } from "./tools/types";
 
-const { agentRuns, approvals } = schema;
+const { agentRuns, approvals, agentQuestions } = schema;
 
 export interface RunExecutorDeps {
   db: Database;
@@ -62,9 +71,16 @@ export interface Transcript {
   deltaSeq: number;
   /** Memory changes made by tools, not yet attached to a posted message (`meta.memoryUpdates`). */
   memoryUpdates?: MemoryUpdate[];
-  /** Tool calls of the last assistant turn while some wait for approval. */
+  /** Tool calls of the last assistant turn while some wait for approval or an answer. */
   pending?: {
-    calls: { toolUseId: string; name: string; approvalId?: string; result?: { content: string; isError: boolean } }[];
+    calls: {
+      toolUseId: string;
+      name: string;
+      approvalId?: string;
+      /** `ask_user`: the question this call waits on. */
+      questionId?: string;
+      result?: { content: string; isError: boolean };
+    }[];
   };
 }
 
@@ -134,13 +150,20 @@ async function executeRunInner(
     if (!loaded) throw new PermanentJobError(`agent run ${runId} not found`);
     run = loaded;
     if (run.status === "done" || run.status === "failed" || run.status === "queued") return;
-    if (run.status === "waiting_approval") {
-      const [stillPending] = await db
-        .select({ id: approvals.id })
-        .from(approvals)
-        .where(and(eq(approvals.runId, run.id), eq(approvals.status, "pending")));
-      if (stillPending) return; // resumes when the last decision comes in
-      const resumed = await transitionRun(db, run.id, "waiting_approval", "running");
+    if (run.status === "waiting_approval" || run.status === "waiting_input") {
+      const [stillPending, stillOpen] = await Promise.all([
+        db
+          .select({ id: approvals.id })
+          .from(approvals)
+          .where(and(eq(approvals.runId, run.id), eq(approvals.status, "pending"))),
+        db
+          .select({ id: agentQuestions.id })
+          .from(agentQuestions)
+          .where(and(eq(agentQuestions.runId, run.id), eq(agentQuestions.status, "open"))),
+      ]);
+      // Resumes when the last decision or answer comes in.
+      if (stillPending.length > 0 || stillOpen.length > 0) return;
+      const resumed = await transitionRun(db, run.id, run.status, "running");
       if (!resumed) return;
       run = resumed;
     }
@@ -162,7 +185,7 @@ async function executeRunInner(
     runId: run.id,
   });
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
-  const finished = async (status: "done" | "failed" | "waiting_approval", error?: string) => {
+  const finished = async (status: "done" | "failed" | "waiting_approval" | "waiting_input", error?: string) => {
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
     await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, status, ...(error ? { error } : {}) });
     await publishChannelEvent(deps.pubsub, {
@@ -238,6 +261,7 @@ async function executeRunInner(
       buildRunContext(db, run, agent, {
         maxMessages: deps.contextMessages,
         toolsAvailable: tools.length > 0,
+        askUser: tools.some((t) => t.name === ASK_USER_TOOL),
         trigger,
       }),
       contextDeps
@@ -289,7 +313,17 @@ async function executeRunInner(
     const blocks: ContentBlock[] = [];
     for (const call of transcript.pending.calls) {
       let result = call.result;
-      if (!result && call.approvalId) {
+      if (!result && call.questionId) {
+        const [question] = await db.select().from(agentQuestions).where(eq(agentQuestions.id, call.questionId));
+        result = { isError: false, ...questionResult(question) };
+        await addRunStep(db, run, "tool_result", {
+          toolUseId: call.toolUseId,
+          name: call.name,
+          isError: false,
+          content: result.content.slice(0, 4000),
+          data: { questionId: call.questionId },
+        });
+      } else if (!result && call.approvalId) {
         const [approval] = await db.select().from(approvals).where(eq(approvals.id, call.approvalId));
         if (approval?.status === "approved" && deps.tools) {
           const output = await deps.tools.executeApproved(ctx, approval);
@@ -374,6 +408,7 @@ async function executeRunInner(
     if (result.stopReason === "tool_use" && toolUses.length > 0 && deps.tools) {
       const calls: NonNullable<Transcript["pending"]>["calls"] = [];
       const waiting: Approval[] = [];
+      const asks: { id: string; toolUseId: string; text: string; choices: string[] | null }[] = [];
       for (const use of toolUses) {
         const outcome = await deps.tools.invoke(ctx, { toolUseId: use.id, name: use.name, input: use.input });
         const update =
@@ -385,6 +420,10 @@ async function executeRunInner(
         if (outcome.type === "approval") {
           calls.push({ toolUseId: use.id, name: use.name, approvalId: outcome.approval.id });
           waiting.push(outcome.approval);
+        } else if (outcome.type === "question") {
+          const questionId = Bun.randomUUIDv7();
+          calls.push({ toolUseId: use.id, name: use.name, questionId });
+          asks.push({ id: questionId, toolUseId: use.id, text: outcome.text, choices: outcome.choices });
         } else {
           calls.push({
             toolUseId: use.id,
@@ -393,7 +432,7 @@ async function executeRunInner(
           });
         }
       }
-      if (waiting.length === 0) {
+      if (waiting.length === 0 && asks.length === 0) {
         transcript.messages.push({
           role: "user",
           content: calls.map((c) => ({
@@ -407,7 +446,7 @@ async function executeRunInner(
         continue;
       }
 
-      // Suspend: post what the agent said so far and one card per approval, then wait.
+      // Suspend: post what the agent said so far, one card per approval and each question, then wait.
       transcript.pending = { calls };
       const t = transcript;
       const posted = await db.transaction(async (tx) => {
@@ -415,8 +454,44 @@ async function executeRunInner(
         const said = unpostedText(t);
         if (said) out.push(await postAgentMessage(tx, run, replyThreadId, said, takeMemoryUpdates(t)));
         t.postedUpTo = t.messages.length;
-        t.postedCount += out.length + waiting.length;
+        t.postedCount += out.length + waiting.length + asks.length;
         const cards: Approval[] = [];
+        const questions: AgentQuestionRow[] = [];
+        for (const ask of asks) {
+          const id = ask.id;
+          const [inserted] = await tx
+            .insert(agentQuestions)
+            .values({
+              id,
+              orgId: run.orgId,
+              runId: run.id,
+              agentId: run.agentId,
+              channelId: run.channelId,
+              threadId: replyThreadId,
+              toolUseId: ask.toolUseId,
+              text: ask.text,
+              choices: ask.choices,
+              expiresAt: new Date(Date.now() + QUESTION_TTL_MS),
+            })
+            .onConflictDoNothing()
+            .returning();
+          if (!inserted) continue;
+          const message = await postAgentMessage(tx, run, replyThreadId, ask.text, {
+            questionId: id,
+            question: questionView(inserted),
+          });
+          out.push(message);
+          const [linked] = await tx
+            .update(agentQuestions)
+            .set({ messageId: message.id })
+            .where(eq(agentQuestions.id, id))
+            .returning();
+          if (linked) {
+            await syncQuestionMessage(tx, linked);
+            message.meta = { ...message.meta, question: questionView(linked) };
+            questions.push(linked);
+          }
+        }
         for (const approval of waiting) {
           const card = await postAgentMessage(tx, run, replyThreadId, `Requesting approval: ${approval.title}`, {
             approvalId: approval.id,
@@ -430,15 +505,22 @@ async function executeRunInner(
           if (linked) cards.push(linked);
         }
         await saveTranscript(tx, t);
-        const suspended = await transitionRun(tx, run.id, "running", "waiting_approval");
+        const suspended = await transitionRun(
+          tx,
+          run.id,
+          "running",
+          asks.length > 0 ? "waiting_input" : "waiting_approval",
+        );
         if (!suspended) throw new PermanentJobError("run changed state while executing");
-        return { messages: out, cards };
+        return { messages: out, cards, questions };
       });
       prof.mark("persist");
       for (const m of posted.messages) await publishMessageCreated(deps.pubsub, messageView(m));
       for (const card of posted.cards) await publishApproval(deps, card, "approval.created");
-      await publishChannelEvent(deps.pubsub, event("waiting_approval"));
-      await finished("waiting_approval");
+      for (const q of posted.questions) await publishQuestion(deps.pubsub, q, "question.asked");
+      const waitingFor = asks.length > 0 ? "waiting_input" : "waiting_approval";
+      await publishChannelEvent(deps.pubsub, event(waitingFor));
+      await finished(waitingFor);
       return;
     }
 

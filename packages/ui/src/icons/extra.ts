@@ -63,4 +63,53 @@ export const extraIcons = {
   ],
   /** "Corrigir resposta". */
   edit: [["path", { d: "M4 16l1-4 8-8 3 3-8 8zM12 5l3 3" }]],
+  /** Artifacts (from the prototype's Drive icons, redrawn on the 20px grid): document. */
+  document: [["path", { d: "M6 3h6l3.5 3.5V17H6zM12 3v3.5h3.5M8.5 10h4M8.5 12.5h4M8.5 15h2.5" }]],
+  /** Artifacts: table. */
+  table: [
+    ["rect", { x: "3.5", y: "4.5", width: "13", height: "11", rx: "1.5" }],
+    ["path", { d: "M3.5 8.5h13M3.5 12h13M8 4.5v11" }],
+  ],
+  /** Artifacts: code change (diff). */
+  code: [["path", { d: "M7.5 6.5 4 10l3.5 3.5M12.5 6.5 16 10l-3.5 3.5" }]],
+  /** Artifacts: diagram. */
+  diagram: [
+    ["rect", { x: "7.5", y: "2.5", width: "5", height: "3.5", rx: "1" }],
+    ["rect", { x: "2.5", y: "13.5", width: "5", height: "3.5", rx: "1" }],
+    ["rect", { x: "12.5", y: "13.5", width: "5", height: "3.5", rx: "1" }],
+    ["path", { d: "M10 6v3M5 13.5V11h10v2.5" }],
+  ],
+  /** Artifacts: HTML page. */
+  page: [
+    ["rect", { x: "3", y: "4", width: "14", height: "12", rx: "2" }],
+    ["path", { d: "M3 7.5h14" }],
+  ],
+  /** Sidebar.dc.html: Rotinas (clock with a refresh arrow). */
+  routines: [
+    ["path", { d: "M16 10a6 6 0 1 1-1.8-4.3" }],
+    ["path", { d: "M16 4v3h-3" }],
+    ["path", { d: "M10 7v3l2 1.5" }],
+  ],
+  /** Sidebar.dc.html: Calendário. */
+  calendar: [
+    ["path", { d: "M6 3.5h8a3 3 0 0 1 3 3V14a3 3 0 0 1-3 3H3V6.5a3 3 0 0 1 3-3z" }],
+    ["path", { d: "M3 8h14M7 2v3M13 2v3" }],
+  ],
+  /** Rotinas.dc.html: event trigger. */
+  bolt: [["path", { d: "M11 3 5 11h5l-1 6 6-8h-5z" }]],
+  /** Issues.dc.html: high priority. */
+  arrowUp: [["path", { d: "M10 15V5M5.5 9.5 10 5l4.5 4.5" }]],
+  /** Calendario.dc.html: next week. */
+  chevronRight: [["path", { d: "m8 5 5 5-5 5" }]],
+  /** "Baixar". */
+  download: [["path", { d: "M10 3.5v9M6 9l4 4 4-4M4.5 16.5h11" }]],
+  /** "Copiar link". */
+  link: [
+    [
+      "path",
+      {
+        d: "M8.5 11.5a3 3 0 0 0 4.2 0l2.3-2.3a3 3 0 0 0-4.2-4.2l-1 1M11.5 8.5a3 3 0 0 0-4.2 0L5 10.8A3 3 0 0 0 9.2 15l1-1",
+      },
+    ],
+  ],
 } satisfies Record<string, IconShape[]>;

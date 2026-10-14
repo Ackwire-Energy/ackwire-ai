@@ -3,7 +3,23 @@ import { upsertMessage } from "@/chat/timeline";
 import type { ApiClient } from "./client";
 import { useApi } from "./context";
 import { keys } from "./keys";
-import type { AgentInput, Approval, Message, OrgSettings, Role, ScopeGrant, SearchKind, ToolAccess } from "./types";
+import type {
+  AgentInput,
+  Approval,
+  ArtifactContent,
+  ArtifactFilters,
+  CalendarEventInput,
+  IssueInput,
+  IssuePatch,
+  Message,
+  OrgSettings,
+  Role,
+  RoutineInput,
+  S3Input,
+  ScopeGrant,
+  SearchKind,
+  ToolAccess,
+} from "./types";
 
 /**
  * React Query hooks over the `ApiClient`. Reads are cached per organization;
@@ -646,5 +662,221 @@ export function useDecideProposal(orgId: string) {
     // The page explains a stale proposal (409) itself.
     meta: { silent: true },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+  });
+}
+
+export const useStorage = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.storage(orgId), queryFn: () => api.storage.get(orgId), enabled });
+};
+
+export function useTestStorage(orgId: string) {
+  const api = useApi();
+  return useMutation({ mutationFn: (input: S3Input) => api.storage.test(orgId, input) });
+}
+
+export function useSaveStorage(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { kind: "agentes" } | { kind: "s3"; s3: S3Input }) => api.storage.save(orgId, input),
+    onSuccess: (config) => {
+      qc.setQueryData(keys.storage(orgId), config);
+      qc.removeQueries({ queryKey: keys.storageMigration(orgId) });
+    },
+  });
+}
+
+/** Copy status; polls while the copy runs. */
+export const useStorageMigration = (orgId: string, enabled: boolean) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.storageMigration(orgId),
+    queryFn: () => api.storage.migration(orgId),
+    enabled,
+    refetchInterval: (q) => (q.state.data?.status === "running" ? 1500 : false),
+    refetchIntervalInBackground: true,
+  });
+};
+
+export function useStartMigration(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.storage.migrate(orgId),
+    onSuccess: (m) => qc.setQueryData(keys.storageMigration(orgId), m),
+  });
+}
+
+export const useArtifacts = (orgId: string, filters: ArtifactFilters) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.artifactList(orgId, filters),
+    queryFn: () => api.artifacts.list(orgId, filters),
+    placeholderData: (prev) => prev,
+  });
+};
+
+/** One artifact at a version (latest when omitted). */
+export const useArtifact = (orgId: string, id: string | null, version?: number) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.artifact(orgId, id ?? "", version),
+    queryFn: () => api.artifacts.get(orgId, id ?? "", version),
+    enabled: Boolean(id),
+    // Old versions never change.
+    staleTime: version ? Number.POSITIVE_INFINITY : 0,
+  });
+};
+
+export const useArtifactVersions = (orgId: string, id: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.artifactVersions(orgId, id ?? ""),
+    queryFn: () => api.artifacts.versions(orgId, id ?? ""),
+    enabled: Boolean(id),
+  });
+};
+
+export function useSaveArtifact(orgId: string, id: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { content: ArtifactContent; note?: string | null; baseVersion: number }) =>
+      api.artifacts.update(orgId, id, input),
+    // The viewer explains a stale version (409) itself.
+    meta: { silent: true },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.artifacts(orgId) }),
+  });
+}
+
+// ── Issues ───────────────────────────────────────────────────────────────────
+
+export const useIssues = (orgId: string, q = "") => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.issueList(orgId, q),
+    queryFn: () => api.issues.list(orgId, q ? { q } : {}),
+    placeholderData: (prev) => prev,
+  });
+};
+
+export const useIssue = (orgId: string, number: number) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.issue(orgId, number), queryFn: () => api.issues.get(orgId, number) });
+};
+
+export const useIssueActivity = (orgId: string, id: string | undefined) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.issueActivity(orgId, id ?? ""),
+    queryFn: () => api.issues.activity(orgId, id ?? ""),
+    enabled: Boolean(id),
+  });
+};
+
+export function useIssueAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      action:
+        | { type: "create"; input: IssueInput }
+        | { type: "update"; id: string; patch: IssuePatch }
+        | { type: "criterion"; id: string; criterionId: string; done: boolean }
+        | { type: "comment"; id: string; text: string }
+        | { type: "ask"; id: string; agentId: string },
+    ): Promise<unknown> => {
+      switch (action.type) {
+        case "create":
+          return api.issues.create(orgId, action.input);
+        case "update":
+          return api.issues.update(orgId, action.id, action.patch);
+        case "criterion":
+          return api.issues.setCriterion(orgId, action.id, action.criterionId, action.done);
+        case "comment":
+          return api.issues.comment(orgId, action.id, action.text);
+        case "ask":
+          return api.issues.askAgent(orgId, action.id, action.agentId);
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
+    },
+  });
+}
+
+// ── Routines ─────────────────────────────────────────────────────────────────
+
+export const useRoutines = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.routines(orgId), queryFn: () => api.routines.list(orgId) });
+};
+
+export const useRoutineRuns = (orgId: string, id: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.routineRuns(orgId, id ?? ""),
+    queryFn: () => api.routines.runs(orgId, id ?? ""),
+    enabled: Boolean(id),
+  });
+};
+
+export const useScheduleParse = (orgId: string, phrase: string, enabled: boolean) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["org", orgId, "routines", "parse", phrase] as const,
+    queryFn: () => api.routines.parseSchedule(orgId, phrase),
+    enabled,
+    placeholderData: (prev) => prev,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+};
+
+export function useRoutineAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      action:
+        | { type: "create"; input: RoutineInput }
+        | { type: "active"; id: string; active: boolean }
+        | { type: "run"; id: string },
+    ): Promise<unknown> => {
+      if (action.type === "create") return api.routines.create(orgId, action.input);
+      if (action.type === "active") return api.routines.setActive(orgId, action.id, action.active);
+      return api.routines.runNow(orgId, action.id);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
+    },
+  });
+}
+
+// ── Calendar ─────────────────────────────────────────────────────────────────
+
+export const useCalendar = (orgId: string, from: string, to: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.calendarRange(orgId, from),
+    queryFn: () => api.calendar.range(orgId, from, to),
+    placeholderData: (prev) => prev,
+  });
+};
+
+export function useCalendarAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      action: { type: "create"; input: CalendarEventInput } | { type: "confirm" | "dismiss"; id: string },
+    ): Promise<unknown> => {
+      if (action.type === "create") return api.calendar.create(orgId, action.input);
+      if (action.type === "confirm") return api.calendar.confirmProposal(orgId, action.id);
+      return api.calendar.dismissProposal(orgId, action.id);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.calendar(orgId) }),
   });
 }

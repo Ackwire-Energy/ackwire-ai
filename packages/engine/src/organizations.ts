@@ -1,11 +1,19 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, gt, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, gt, isNull, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
 import { randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError } from "./errors";
 import { publishOrgEvent } from "./events";
 
-const { organizations, organizationMembers, organizationInvitations, channels, channelMembers, users } = schema;
+const {
+  organizations,
+  organizationMembers,
+  organizationInvitations,
+  organizationInviteLinks,
+  channels,
+  channelMembers,
+  users,
+} = schema;
 
 export type MemberRole = "owner" | "admin" | "member";
 
@@ -123,12 +131,23 @@ export async function countUsers(db: Database): Promise<number> {
 /**
  * Self-hosted sign-up policy: the first account may always register (there is
  * no other way in); after that, only with ALLOW_SIGNUP or a pending
- * invitation for that email. Open sign-up on a reachable server would let
+ * invitation for that email (or from a valid org invite link). Open sign-up on a reachable server would let
  * anyone create organizations (and spend model credits) on it.
  */
-export async function isSignupAllowed(db: Database, email: string, allowSignup: boolean, now = new Date()) {
+export async function isSignupAllowed(
+  db: Database,
+  email: string,
+  allowSignup: boolean,
+  now = new Date(),
+  /** The token of an org invite link the person is signing up from. */
+  inviteToken?: string | null,
+) {
   if (allowSignup) return true;
   if ((await countUsers(db)) === 0) return true;
+  if (inviteToken) {
+    const link = await findInviteLink(db, inviteToken);
+    if (link && !link.link.revokedAt && link.link.expiresAt > now) return true;
+  }
   const [invite] = await db
     .select({ id: organizationInvitations.id })
     .from(organizationInvitations)
@@ -310,7 +329,38 @@ export async function revokeInvitation(db: Database, actorId: string, orgId: str
     .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)));
 }
 
-/** What the invite page shows before signing in. */
+/**
+ * An organization-wide invite link (admins): whoever opens it signed in joins
+ * as a member, for 7 days. Uses the same `/invite/{token}` page and accept
+ * endpoint as email invitations.
+ */
+export async function createInviteLink(db: Database, actorId: string, orgId: string, now = new Date()) {
+  await requirePermission(db, actorId, orgId, "manage_members");
+  const token = randomToken(32);
+  const [link] = await db
+    .insert(organizationInviteLinks)
+    .values({
+      orgId,
+      role: "member",
+      tokenHash: sha256(token),
+      createdByUserId: actorId,
+      expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
+    })
+    .returning();
+  if (!link) throw new Error("invite link insert returned nothing");
+  return { link, token };
+}
+
+async function findInviteLink(db: Database, token: string) {
+  const [row] = await db
+    .select({ link: organizationInviteLinks, orgName: organizations.name })
+    .from(organizationInviteLinks)
+    .innerJoin(organizations, eq(organizations.id, organizationInviteLinks.orgId))
+    .where(eq(organizationInviteLinks.tokenHash, sha256(token)));
+  return row ?? null;
+}
+
+/** What the invite page shows before signing in (`email` is empty for an org link). */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
   const [row] = await db
     .select({
@@ -323,8 +373,13 @@ export async function previewInvitation(db: Database, token: string, now = new D
     .from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
     .where(eq(organizationInvitations.tokenHash, sha256(token)));
-  if (!row || row.acceptedAt || row.expiresAt <= now) return null;
-  return { orgName: row.orgName, email: row.email, role: row.role };
+  if (!row) {
+    const link = await findInviteLink(db, token);
+    if (!link || link.link.revokedAt || link.link.expiresAt <= now) return null;
+    return { orgName: link.orgName, email: "", role: link.link.role, kind: "link" as const };
+  }
+  if (row.acceptedAt || row.expiresAt <= now) return null;
+  return { orgName: row.orgName, email: row.email, role: row.role, kind: "email" as const };
 }
 
 /** Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`. */
@@ -340,7 +395,24 @@ export async function acceptInvitation(
       .from(organizationInvitations)
       .where(eq(organizationInvitations.tokenHash, sha256(token)))
       .for("update");
-    if (!invitation || invitation.acceptedAt || invitation.expiresAt <= now) {
+    if (!invitation) {
+      // An org-wide link: any signed-in person joins as its role.
+      const [link] = await tx
+        .select()
+        .from(organizationInviteLinks)
+        .where(eq(organizationInviteLinks.tokenHash, sha256(token)))
+        .for("update");
+      if (!link || link.revokedAt || link.expiresAt <= now) {
+        throw new ConflictError("This invitation is invalid or has expired");
+      }
+      await joinOrganization(tx, link.orgId, user.id, link.role);
+      await tx
+        .update(organizationInviteLinks)
+        .set({ uses: sql`${organizationInviteLinks.uses} + 1` })
+        .where(eq(organizationInviteLinks.id, link.id));
+      return { orgId: link.orgId };
+    }
+    if (invitation.acceptedAt || invitation.expiresAt <= now) {
       throw new ConflictError("This invitation is invalid or has expired");
     }
     if (invitation.email !== user.email.toLowerCase()) {
@@ -348,26 +420,25 @@ export async function acceptInvitation(
         `This invitation was sent to ${invitation.email}. Sign in with that address to accept it.`,
       );
     }
-    await tx
-      .insert(organizationMembers)
-      .values({ orgId: invitation.orgId, userId: user.id, role: invitation.role })
-      .onConflictDoNothing();
-    const [general] = await tx
-      .select({ id: channels.id })
-      .from(channels)
-      .where(and(eq(channels.orgId, invitation.orgId), eq(channels.name, "general")));
-    if (general) {
-      await tx
-        .insert(channelMembers)
-        .values({ orgId: invitation.orgId, channelId: general.id, userId: user.id })
-        .onConflictDoNothing();
-    }
+    await joinOrganization(tx, invitation.orgId, user.id, invitation.role);
     await tx
       .update(organizationInvitations)
       .set({ acceptedAt: now })
       .where(eq(organizationInvitations.id, invitation.id));
     return { orgId: invitation.orgId };
   });
+}
+
+/** Adds a person to an organization (keeping an existing role) and to `general`. */
+async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
+  await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
+  const [general] = await tx
+    .select({ id: channels.id })
+    .from(channels)
+    .where(and(eq(channels.orgId, orgId), eq(channels.name, "general")));
+  if (general) {
+    await tx.insert(channelMembers).values({ orgId, channelId: general.id, userId }).onConflictDoNothing();
+  }
 }
 
 /** Marks a person as seen now in an organization (WebSocket connect/disconnect). */

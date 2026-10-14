@@ -92,3 +92,24 @@ export function joinNames(names: string[], and: string) {
 
 /** Short model label for message meta: "Claude Sonnet 5.5" → "sonnet 5.5". */
 export const shortModel = (label: string) => label.replace(/^Claude\s+/i, "").toLowerCase();
+
+/** `YYYY-MM-DD` (a day, no time zone) → noon local time, so it never shifts a day. */
+export const dateOnly = (ymd: string) => new Date(`${ymd}T12:00:00`);
+
+export const toYmd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Due date: "hoje", "24 out". */
+export function dueLabel(t: TFunction, locale: string, ymd: string, now = new Date()) {
+  const iso = dateOnly(ymd).toISOString();
+  return daysBetween(iso, now) === 0 ? t("common.today").toLowerCase() : formatShortDate(locale, iso);
+}
+
+/** "24/10" or "24/10/2026" → `YYYY-MM-DD` (this year when omitted); null when invalid. */
+export function parseDayInput(value: string, now = new Date()): string | null {
+  const m = value.trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/);
+  if (!m) return null;
+  const d = new Date(Number(m[3] ?? now.getFullYear()), Number(m[2]) - 1, Number(m[1]));
+  if (d.getDate() !== Number(m[1]) || d.getMonth() !== Number(m[2]) - 1) return null;
+  return toYmd(d);
+}

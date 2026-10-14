@@ -112,8 +112,11 @@ export function listen(t: TestServer) {
 /** Minimal browser over `app.request`: keeps cookies and sends our Origin. */
 export function browser(t: TestServer) {
   let cookie = "";
-  const request = async (path: string, init: { method?: string; json?: unknown; origin?: string | null } = {}) => {
-    const headers = new Headers();
+  const request = async (
+    path: string,
+    init: { method?: string; json?: unknown; origin?: string | null; headers?: Record<string, string> } = {},
+  ) => {
+    const headers = new Headers(init.headers);
     if (cookie) headers.set("cookie", cookie);
     if (init.origin !== null) headers.set("origin", init.origin ?? ORIGIN);
     if (init.json !== undefined) headers.set("content-type", "application/json");
@@ -139,9 +142,10 @@ export function browser(t: TestServer) {
 
 export type Browser = ReturnType<typeof browser>;
 
-export async function signUp(b: Browser, email: string) {
+export async function signUp(b: Browser, email: string, options: { inviteToken?: string } = {}) {
   const res = await b("/api/auth/sign-up/email", {
     json: { email, password: "correct horse battery", name: email.split("@")[0] },
+    headers: options.inviteToken ? { "x-invite-token": options.inviteToken } : undefined,
   });
   if (res.status !== 200) throw new Error(`sign-up failed: ${res.status} ${await res.text()}`);
   return res;

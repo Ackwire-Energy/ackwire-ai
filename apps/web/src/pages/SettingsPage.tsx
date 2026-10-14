@@ -35,6 +35,7 @@ import {
 import type { Connection, ConnectorDef, Credential, CustomServer } from "@/api/types";
 import { ConnectCustomDialog, CustomServerRow, ReviewToolsDialog } from "@/components/CustomMcp";
 import { useOrg } from "@/components/org-context";
+import { StorageSection } from "@/components/StorageSettings";
 import { formatShortDate, formatUsd, relativeTime } from "@/lib/format";
 import { navigateAway } from "@/lib/navigate";
 import { can } from "@/lib/permissions";
@@ -74,6 +75,7 @@ export function SettingsPage({ connected }: { connected?: string }) {
       <OrgSection />
       <ConnectorsSection />
       <KeysSection />
+      <StorageSection />
       <UsageSection />
     </div>
   );

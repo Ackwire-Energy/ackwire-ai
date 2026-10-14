@@ -1,4 +1,4 @@
-import { index, pgEnum, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, integer, pgEnum, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 
 /**
@@ -64,4 +64,27 @@ export const organizationInvitations = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.orgId), index().on(t.email)],
+);
+
+/**
+ * An organization-wide invite link: anyone signed in who opens it joins as
+ * `role` (member) until it expires (7 days) or is revoked. Only the token's
+ * hash is stored.
+ */
+export const organizationInviteLinks = pgTable(
+  "organization_invite_links",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    role: memberRoleEnum().notNull().default("member"),
+    tokenHash: text().notNull().unique(),
+    createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    revokedAt: timestamp({ withTimezone: true }),
+    uses: integer().notNull().default(0),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.orgId)],
 );

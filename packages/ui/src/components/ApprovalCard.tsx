@@ -9,7 +9,7 @@ export interface ApprovalCardProps extends Omit<HTMLAttributes<HTMLElement>, "ti
   /** Who asks, e.g. <><b>Ada</b> pede aprovação</>. */
   who: ReactNode;
   /** Chip text: "Aguardando você", "Expira em 23 h", "Aprovado por você · agora". */
-  statusLabel: ReactNode;
+  statusLabel?: ReactNode;
   /** The action in human words: "Fazer merge do PR #42 em main". Omitted on the compact decided card. */
   title?: ReactNode;
   /** Exact detail (tool, target, expiry). */
@@ -53,9 +53,11 @@ export function ApprovalCard({
       <div className="ac-approval__head">
         {avatar}
         <span className="ac-approval__who">{who}</span>
-        <Chip icon={icon} tone={tone}>
-          {statusLabel}
-        </Chip>
+        {statusLabel && (
+          <Chip icon={icon} tone={tone}>
+            {statusLabel}
+          </Chip>
+        )}
       </div>
       {title && <p className="ac-approval__title">{title}</p>}
       {detail && <p className="ac-approval__detail">{detail}</p>}

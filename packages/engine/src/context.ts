@@ -25,7 +25,7 @@ export async function buildRunContext(
   db: Database,
   run: AgentRun,
   agent: Agent,
-  options: { maxMessages: number; toolsAvailable?: boolean; trigger?: Message },
+  options: { maxMessages: number; toolsAvailable?: boolean; askUser?: boolean; trigger?: Message },
 ): Promise<RunContext> {
   // Independent lookups go out together (the database may be remote); org,
   // channel and members come from the per-process cache when enabled.
@@ -119,8 +119,13 @@ export async function buildRunContext(
           options.toolsAvailable
             ? "- Use your tools when they help. Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome."
             : "- You can only write chat messages for now; you cannot run tools or take actions outside this conversation. Say so if asked.",
+          options.askUser
+            ? "- When a request is ambiguous, key information is missing, or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait. Don't ask about simple requests you can just do, and never ask more than you need."
+            : "",
           "- Reply with the message text only, without an author prefix. Mention another agent with @handle only when you need it to act.",
-        ].join("\n"),
+        ]
+          .filter(Boolean)
+          .join("\n"),
       ]
         .filter(Boolean)
         .join("\n\n"),

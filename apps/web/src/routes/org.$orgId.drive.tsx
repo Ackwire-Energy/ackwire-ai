@@ -1,15 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
-import { EmptyPage } from "@/components/EmptyPage";
 import { Main } from "@/components/Main";
+import { DrivePage } from "@/pages/DrivePage";
 
-/** Linked from the sidebar; not built yet. Designed empty state. */
+/** Drive: every artifact the viewer can see. `?artifact=…&v=…` opens one (shared links). */
 export const Route = createFileRoute("/org/$orgId/drive")({
+  validateSearch: (search: Record<string, unknown>): { artifact?: string; v?: number } => ({
+    artifact: typeof search.artifact === "string" ? search.artifact : undefined,
+    v: typeof search.v === "number" && search.v > 0 ? search.v : undefined,
+  }),
   component: function Page() {
-    const { t } = useTranslation();
+    const { artifact, v } = Route.useSearch();
     return (
       <Main>
-        <EmptyPage icon="drive" title={t("empty.drive.title")} text={t("empty.drive.text")} />
+        <DrivePage open={artifact ? { id: artifact, version: v } : undefined} />
       </Main>
     );
   },

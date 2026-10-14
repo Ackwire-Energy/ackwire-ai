@@ -92,7 +92,12 @@ describe("invitations", () => {
       .where(eq(schema.organizationInvitations.id, invitation.id));
     expect(row?.tokenHash).toBe(sha256(token));
     expect(JSON.stringify(row)).not.toContain(token);
-    expect(await previewInvitation(f.db, token)).toEqual({ orgName: "Acme", email: "bia@example.com", role: "member" });
+    expect(await previewInvitation(f.db, token)).toEqual({
+      orgName: "Acme",
+      email: "bia@example.com",
+      role: "member",
+      kind: "email",
+    });
 
     const wrong = await addUser(f.db, "carl");
     await expect(acceptInvitation(f.db, wrong, token)).rejects.toBeInstanceOf(ForbiddenError);

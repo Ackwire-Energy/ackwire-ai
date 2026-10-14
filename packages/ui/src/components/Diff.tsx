@@ -48,16 +48,19 @@ export function Diff({
   lines,
   addedLabel,
   removedLabel,
+  code,
   "aria-label": ariaLabel,
 }: {
   lines: DiffLine[];
   addedLabel: string;
   removedLabel: string;
+  /** Real code: monospace, whitespace kept. */
+  code?: boolean;
   "aria-label"?: string;
 }) {
   return (
     // biome-ignore lint/a11y/useSemanticElements: a figure-like group of lines
-    <div className="ac-diff" role="group" aria-label={ariaLabel}>
+    <div className={code ? "ac-diff ac-diff--code" : "ac-diff"} role="group" aria-label={ariaLabel}>
       {lines.map((l, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: lines can repeat; order is the identity
         <div key={i} className={`ac-diff__line${l.kind === "same" ? "" : ` ac-diff__line--${l.kind}`}`}>

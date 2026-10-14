@@ -26,3 +26,15 @@
 
 - **Router (D5, roadmap step 2):** a new job kind run after `message.posted` for messages without mentions; it calls the gateway with `ROUTER_MODEL` and reuses the run creation of `dispatchMentions` (extract it into a shared helper then). It may only pick agents that are channel members; it never grants permissions. `usage_records.agent_id` will need to become nullable (or a "router" pseudo-agent) for router calls.
 - **Tool Gateway and approvals (D2, D4):** a `tool_call` step kind; sensitive actions create an approval bound to a hash of (action + params), move the run to `waiting_approval`, and the approval grant enqueues `agent_run.execute` again.
+
+## Addendum (2026-10-14): waiting for a person's answer
+
+`ask_user` is a built-in tool (no scope; it goes through the Tool Gateway
+like every other tool). Instead of running, the gateway hands the question to
+the executor, which posts it in the run's thread (`meta.question`), stores an
+`agent_questions` row and moves the run to `waiting_input`. The run resumes
+(a new `agent_run.execute` job) when a person answers through
+`POST …/questions/{id}/answer`, replies in the same thread (detected in the
+same statement that writes the reply; that reply starts no other run), or
+after 24 hours, when the model is told nobody answered. A run waiting on
+both an approval and a question resumes only when neither is pending.
