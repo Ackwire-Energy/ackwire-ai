@@ -25,6 +25,8 @@ export interface RoutingInput {
   /** Recent messages before this one in the same thread (or channel), oldest first. */
   thread: { author: string; body: string }[];
   candidates: RoutingCandidate[];
+  /** Handle of the agent this person was just talking to (conversation continuity), if any. */
+  continuityHandle?: string | null;
 }
 
 export interface RoutingResult {
@@ -35,6 +37,8 @@ export interface RoutingResult {
   reason?: string;
   /** Usage record of the call the strategy made, if any. */
   usageRecordId?: string;
+  /** Which strategy actually decided (e.g. a fallback), when it isn't the configured one. */
+  strategy?: string;
 }
 
 /**
@@ -58,21 +62,57 @@ export interface RouterPolicy {
   /** At most this many agents answer one message. */
   maxAgents: number;
   maxHops: number;
+  /**
+   * Conversation continuity: the agent this person was just talking to needs
+   * only this score (a follow-up without a mention usually goes to it).
+   */
+  continuityMinScore?: number;
+  /** A channel with exactly one agent: a message to the room needs only this score. */
+  singleAgentMinScore?: number;
+  /** How recent the exchange must be to count as continuity. */
+  continuityWindowMs?: number;
 }
 
-export const DEFAULT_ROUTER_POLICY: Omit<RouterPolicy, "maxHops"> = { minScore: 0.5, maxAgents: 2 };
+export const DEFAULT_ROUTER_POLICY = {
+  minScore: 0.5,
+  maxAgents: 2,
+  continuityMinScore: 0.3,
+  singleAgentMinScore: 0.35,
+  /** How recent the exchange must be to count as continuity. */
+  continuityWindowMs: 10 * 60_000,
+};
 
-/** Applies policy to a strategy's scores: candidates only, threshold, best first, at most `maxAgents`. */
-export function selectAgents(candidates: RoutingCandidate[], result: RoutingResult, policy: RouterPolicy): string[] {
-  if (result.needsAgent !== undefined && result.needsAgent < policy.minScore) return [];
+/**
+ * Applies policy to a strategy's scores (all in code): candidates only, a
+ * threshold per agent (lower for the agent the person was just talking to,
+ * and for the only agent of the channel), best first, at most `maxAgents`.
+ * A low need-any-agent score means nobody, unless continuity holds.
+ */
+export function selectAgents(
+  candidates: RoutingCandidate[],
+  result: RoutingResult,
+  policy: RouterPolicy,
+  context: { continuityAgentId?: string | null } = {},
+): string[] {
   const allowed = new Set(candidates.map((c) => c.agentId));
+  const single = candidates.length === 1;
+  const thresholdOf = (agentId: string) => {
+    let t = policy.minScore;
+    if (single) t = Math.min(t, policy.singleAgentMinScore ?? t);
+    if (agentId === context.continuityAgentId) t = Math.min(t, policy.continuityMinScore ?? t);
+    return t;
+  };
   const best = new Map<string, number>();
   for (const { agentId, score } of result.agents) {
     if (!allowed.has(agentId) || !Number.isFinite(score)) continue;
     best.set(agentId, Math.max(best.get(agentId) ?? 0, score));
   }
+  const continuing =
+    context.continuityAgentId && (best.get(context.continuityAgentId) ?? 0) >= thresholdOf(context.continuityAgentId);
+  const needGate = single ? Math.min(policy.minScore, policy.singleAgentMinScore ?? policy.minScore) : policy.minScore;
+  if (result.needsAgent !== undefined && result.needsAgent < needGate && !continuing) return [];
   return [...best]
-    .filter(([, score]) => score >= policy.minScore)
+    .filter(([agentId, score]) => score >= thresholdOf(agentId))
     .sort((a, b) => b[1] - a[1])
     .slice(0, policy.maxAgents)
     .map(([agentId]) => agentId);
@@ -124,10 +164,14 @@ export function createLlmRouterStrategy(deps: {
         .map((c) => `- @${c.handle}: ${c.name}${c.role ? `, ${c.role}` : ""}${c.about ? `. ${c.about}` : ""}`)
         .join("\n");
       const history = input.thread.map((m) => `[${m.author}]: ${m.body.slice(0, 500)}`).join("\n");
+      const continuity = input.continuityHandle
+        ? `This person was just talking with @${input.continuityHandle}; a follow-up without a mention is usually for it.`
+        : "";
       const prompt = [
         `Channel #${input.channel.name}${input.channel.topic ? ` (topic: ${input.channel.topic})` : ""}.`,
         `Agents:\n${agentsText}`,
         history ? `<history>\n${history}\n</history>` : "",
+        continuity,
         `<message>\n[${input.message.author}]: ${input.message.body.slice(0, 4000)}\n</message>`,
       ]
         .filter(Boolean)
@@ -207,6 +251,8 @@ export interface RouteResult {
   selected?: string[];
   /** Candidates the strategy evaluated (receipts: "seen by"). */
   seenBy?: string[];
+  /** The agent this person was just talking to, if continuity applied. */
+  continuityAgentId?: string | null;
   reason?: string;
 }
 
@@ -267,7 +313,15 @@ export async function routeMessage(
     .where(and(eq(channels.id, message.channelId), eq(channels.orgId, message.orgId)));
   if (!channel) return { runs: [], skipped: "message_missing" };
   const history = await db
-    .select({ body: messages.body, userName: users.name, agentHandle: agents.handle })
+    .select({
+      body: messages.body,
+      userName: users.name,
+      agentHandle: agents.handle,
+      authorAgentId: messages.authorAgentId,
+      authorUserId: messages.authorUserId,
+      mentionedAgentIds: messages.mentionedAgentIds,
+      createdAt: messages.createdAt,
+    })
     .from(messages)
     .leftJoin(users, eq(users.id, messages.authorUserId))
     .leftJoin(agents, eq(agents.id, messages.authorAgentId))
@@ -288,6 +342,27 @@ export async function routeMessage(
     ? await db.select({ name: users.name }).from(users).where(eq(users.id, message.authorUserId))
     : [];
 
+  // Conversation continuity: within the window, the agent that spoke last here, or the one this
+  // person addressed in their previous message, is who a follow-up without a mention is for.
+  const windowMs = deps.policy.continuityWindowMs ?? DEFAULT_ROUTER_POLICY.continuityWindowMs;
+  const recent = history.filter((m) => message.createdAt.getTime() - m.createdAt.getTime() <= windowMs);
+  const candidateIds = new Set(candidates.map((c) => c.agentId));
+  let continuityAgentId: string | null = null;
+  for (const m of recent) {
+    if (m.authorAgentId && candidateIds.has(m.authorAgentId)) {
+      continuityAgentId = m.authorAgentId;
+      break;
+    }
+    if (m.authorUserId === message.authorUserId) {
+      const addressed = m.mentionedAgentIds.filter((id) => candidateIds.has(id));
+      if (addressed.length === 1) {
+        continuityAgentId = addressed[0] ?? null;
+        break;
+      }
+    }
+  }
+  const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
+
   let result: RoutingResult;
   try {
     result = await deps.strategy.decide({
@@ -299,6 +374,7 @@ export async function routeMessage(
         body: m.body,
       })),
       candidates,
+      continuityHandle,
     });
   } catch (error) {
     const permanent =
@@ -320,7 +396,7 @@ export async function routeMessage(
     return { runs: [], selected: [], seenBy: candidates.map((c) => c.agentId) };
   }
 
-  const selected = selectAgents(candidates, result, deps.policy);
+  const selected = selectAgents(candidates, result, deps.policy, { continuityAgentId });
   const runs = await db.transaction(async (tx) => {
     const [decision] = await tx
       .insert(routingDecisions)
@@ -328,7 +404,7 @@ export async function routeMessage(
         orgId: message.orgId,
         channelId: message.channelId,
         messageId: message.id,
-        strategy: deps.strategy.name,
+        strategy: result.strategy ?? deps.strategy.name,
         candidates: candidates.map((c) => ({
           agentId: c.agentId,
           score: result.agents.find((a) => a.agentId === c.agentId)?.score ?? 0,
@@ -344,5 +420,11 @@ export async function routeMessage(
     return createAgentRuns(tx, message, selected, "router");
   });
   if (!runs) return { runs: [], skipped: "already_routed" };
-  return { runs, selected, seenBy: candidates.map((c) => c.agentId), reason: result.reason };
+  return {
+    runs,
+    selected,
+    seenBy: candidates.map((c) => c.agentId),
+    reason: result.reason,
+    continuityAgentId,
+  };
 }

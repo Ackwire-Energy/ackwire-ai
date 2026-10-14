@@ -549,6 +549,9 @@ export function managementRoutes(deps: AppDeps) {
           z.object({
             since: z.string(),
             totalUsd: z.number(),
+            platformBilled: z
+              .object({ calls: z.number(), costUsd: z.number() })
+              .openapi({ description: "Calls our platform pays for (e.g. the router's Jev model); not in the total." }),
             byKind: z.array(
               z.object({
                 kind: z.enum(["agent", "router", "embedding", "summary"]),
@@ -585,6 +588,7 @@ export function managementRoutes(deps: AppDeps) {
         {
           since: r.since.toISOString(),
           totalUsd: nanoUsdToUsd(r.totalNanoUsd),
+          platformBilled: { calls: r.platformBilled.calls, costUsd: nanoUsdToUsd(r.platformBilled.costNanoUsd) },
           byKind: r.byKind.map(({ costNanoUsd, ...k }) => ({ ...k, costUsd: nanoUsdToUsd(costNanoUsd) })),
           agents: r.agents.map(({ costNanoUsd, monthlyBudgetNanoUsd, ...a }) => ({
             ...a,

@@ -506,6 +506,39 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       return { ...result, usageRecordId: record.id, costNanoUsd: record.cost, maxTokens };
     },
 
+    /**
+     * Usage of a non-model service called for an org (e.g. the Jev router):
+     * recorded like every call, with its kind and provider, billed to the platform.
+     */
+    async recordExternalUsage(input: {
+      orgId: string;
+      kind: "router";
+      provider: string;
+      model: string;
+      inputTokens: number;
+      outputTokens: number;
+      costNanoUsd: number;
+    }) {
+      const [row] = await db
+        .insert(usageRecords)
+        .values({
+          orgId: input.orgId,
+          agentId: null,
+          kind: input.kind,
+          credentialId: null,
+          provider: input.provider,
+          model: input.model,
+          requestedModel: input.model,
+          inputTokens: input.inputTokens,
+          outputTokens: input.outputTokens,
+          costNanoUsd: input.costNanoUsd,
+          billedTo: "platform",
+          createdAt: now(),
+        })
+        .returning({ id: usageRecords.id });
+      return row?.id ?? null;
+    },
+
     /** Whether embeddings are available (else search falls back to full-text only). */
     hasEmbeddings: () => deps.embeddings !== undefined,
 

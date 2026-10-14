@@ -444,8 +444,15 @@ export async function usageReport(db: Database, actorId: string, orgId: string, 
       partial: sql<number>`count(*) filter (where ${usageRecords.partial})::int`,
     })
     .from(usageRecords)
-    .where(and(eq(usageRecords.orgId, orgId), gte(usageRecords.createdAt, since)))
+    .where(and(eq(usageRecords.orgId, orgId), gte(usageRecords.createdAt, since), eq(usageRecords.billedTo, "org")))
     .groupBy(usageRecords.kind);
+  // Calls our platform pays for (e.g. the Jev router) are reported apart, never in the org's total.
+  const [platform] = await db
+    .select({ calls: sql<number>`count(*)::int`, cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)` })
+    .from(usageRecords)
+    .where(
+      and(eq(usageRecords.orgId, orgId), gte(usageRecords.createdAt, since), eq(usageRecords.billedTo, "platform")),
+    );
   const perAgent = await db
     .select({
       agentId: agents.id,
@@ -477,6 +484,7 @@ export async function usageReport(db: Database, actorId: string, orgId: string, 
     since,
     totalNanoUsd: kinds.reduce((n, k) => n + k.costNanoUsd, 0),
     byKind: kinds,
+    platformBilled: { calls: platform?.calls ?? 0, costNanoUsd: Number(platform?.cost ?? 0) },
     agents: perAgent.map((a) => ({
       agentId: a.agentId,
       handle: a.handle,

@@ -176,6 +176,12 @@ export const usageRecords = pgTable(
      * failing, or counted/estimated (docs/adr/0012-budget-reservation-and-usage.md).
      */
     partial: boolean().notNull().default(false),
+    /**
+     * Who pays: `org` (its own key) or `platform` (our keys: the platform model
+     * key, or internal services such as the Jev router). Org usage reports
+     * keep platform-billed rows apart.
+     */
+    billedTo: text().notNull().default("org"),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

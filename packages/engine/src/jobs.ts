@@ -16,6 +16,7 @@ import {
   resolveRouterModel,
   routeMessage,
 } from "./router";
+import { createJevRouterStrategy, jevCostNanoUsd, withFallback } from "./router-jev";
 import type { AgentRun } from "./runs";
 import { indexSource, reindexOrg } from "./search";
 
@@ -50,6 +51,8 @@ export interface JobDeps extends RunExecutorDeps {
     minScore?: number;
     /** Replaces the core LLM strategy (e.g. an optional external classifier). */
     strategy?: RouterStrategy;
+    /** TypeSafe Jev as the strategy, with the LLM one as fallback (platform key, never per org). */
+    jev?: { apiKey: string; timeoutMs?: number; fetch?: typeof fetch; baseURL?: string };
   };
 }
 
@@ -62,15 +65,38 @@ const orgOf = (job: OutboxJob) => {
 /** Every outbox job kind the core knows. Modules can add more through the server's worker options. */
 export function createJobHandlers(deps: JobDeps): JobHandlers {
   const router = deps.router ?? { enabled: false, model: "" };
+  const llm = createLlmRouterStrategy({
+    gateway: deps.gateway,
+    resolveModel: (orgId) => resolveRouterModel(deps.db, orgId, router.model),
+  });
+  const jev = router.jev;
   const strategy =
     router.strategy ??
-    createLlmRouterStrategy({
-      gateway: deps.gateway,
-      resolveModel: (orgId) => resolveRouterModel(deps.db, orgId, router.model),
-    });
+    (jev
+      ? withFallback(
+          createJevRouterStrategy({
+            apiKey: jev.apiKey,
+            timeoutMs: jev.timeoutMs,
+            fetch: jev.fetch,
+            baseURL: jev.baseURL,
+            recordUsage: async (u) => {
+              await deps.gateway.recordExternalUsage({
+                orgId: u.orgId,
+                kind: "router",
+                provider: "typesafe",
+                model: u.model,
+                inputTokens: u.inputTokens,
+                outputTokens: u.outputTokens,
+                costNanoUsd: jevCostNanoUsd(u.inputTokens),
+              });
+            },
+          }),
+          llm,
+        )
+      : llm);
   const policy = {
+    ...DEFAULT_ROUTER_POLICY,
     minScore: router.minScore ?? DEFAULT_ROUTER_POLICY.minScore,
-    maxAgents: DEFAULT_ROUTER_POLICY.maxAgents,
     maxHops: deps.maxHops,
   };
 

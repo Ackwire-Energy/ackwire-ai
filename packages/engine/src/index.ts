@@ -30,6 +30,7 @@ export * from "./organizations";
 export * from "./outbox";
 export * from "./profile";
 export * from "./router";
+export * from "./router-jev";
 export * from "./runs";
 export * from "./search";
 export * from "./tools/gateway";

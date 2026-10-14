@@ -29,6 +29,8 @@ export interface EngineOptions {
   deltaFlushMs?: number;
   /** Latency measurements from runs (logged by the server). */
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
+  /** Tests: fake TypeSafe transport. */
+  jevFetch?: typeof fetch;
   /** Per-run stage breakdown (debug log). */
   onRunProfile?: RunExecutorDeps["onRunProfile"];
 }
@@ -95,7 +97,15 @@ export function buildEngine(o: EngineOptions) {
     deltaFlushMs: o.deltaFlushMs,
     onTiming: o.onTiming,
     onRunProfile: o.onRunProfile,
-    router: { enabled: config.ROUTER_ENABLED, model: config.ROUTER_MODEL, minScore: config.ROUTER_MIN_SCORE },
+    router: {
+      enabled: config.ROUTER_ENABLED,
+      model: config.ROUTER_MODEL,
+      minScore: config.ROUTER_MIN_SCORE,
+      // Jev is the default when its (platform) key is set, unless ROUTER_STRATEGY=llm.
+      ...(config.TYPESAFE_API_KEY && (config.ROUTER_STRATEGY ?? "jev") === "jev"
+        ? { jev: { apiKey: config.TYPESAFE_API_KEY, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }
+        : {}),
+    },
   });
   return { gateway, tools, context, handlers, connectorDeps };
 }

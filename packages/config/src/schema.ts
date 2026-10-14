@@ -147,6 +147,24 @@ export const envVars = {
       "Small, fixed model that scores which agents should answer a message without mentions (router). Any model in the catalog; an organization can override it in its settings. Billed to the organization's default provider key.",
     section: "Agents",
   },
+  ROUTER_STRATEGY: {
+    schema: z.enum(["jev", "llm"]).optional(),
+    description:
+      "How the router scores agents: `jev` (TypeSafe Jev, needs `TYPESAFE_API_KEY`; falls back to `llm` on error or timeout) or `llm` (a structured-output call with `ROUTER_MODEL`). Default: `jev` when `TYPESAFE_API_KEY` is set, else `llm`.",
+    section: "Agents",
+  },
+  TYPESAFE_API_KEY: {
+    schema: z.string().optional(),
+    description:
+      "Platform key for TypeSafe Jev (router). Internal: never per organization, never exposed by the API. Jev usage is recorded per organization as `router` usage billed to the platform.",
+    section: "Agents",
+    secret: true,
+  },
+  JEV_TIMEOUT_MS: {
+    schema: z.coerce.number().int().min(200).max(30_000).default(2000),
+    description: "Timeout for a Jev router call; after it the LLM router decides.",
+    section: "Agents",
+  },
   ROUTER_MIN_SCORE: {
     schema: z.coerce.number().min(0).max(1).default(0.5),
     description: "Minimum router score (0–1) for an agent to answer a message without mentions.",
