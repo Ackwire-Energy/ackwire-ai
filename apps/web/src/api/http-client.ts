@@ -2,19 +2,34 @@ import type { HttpApi } from "./client";
 import { ApiError, createRequester, enc, type FetchLike } from "./http";
 import type {
   Agent,
+  AgentChannel,
+  AgentDetail,
   AgentUsage,
+  Approval,
   AuthConfig,
+  BatchInviteResult,
   Channel,
   ChannelMember,
+  Connection,
+  ConnectorCatalog,
   Credential,
   Health,
   Invitation,
   InvitationPreview,
+  InvitationWithStatus,
   Me,
   Member,
   Message,
   Model,
   Organization,
+  OrgOverview,
+  OrgSettings,
+  Person,
+  RosterMember,
+  Run,
+  RunStep,
+  ScopeGrant,
+  UsageReport,
 } from "./types";
 
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
@@ -64,6 +79,18 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       previewInvitation: (token) => nullOn(404, () => request<InvitationPreview>(`/api/app/invitations/${enc(token)}`)),
       acceptInvitation: (token) =>
         request<{ orgId: string }>(`/api/app/invitations/${enc(token)}/accept`, { json: {} }),
+      settings: (orgId) => request<OrgSettings>(`${org(orgId)}/settings`),
+      updateSettings: (orgId, input) =>
+        request<OrgSettings>(`${org(orgId)}/settings`, { method: "PATCH", json: input }),
+      overview: (orgId) => request<OrgOverview>(`${org(orgId)}/overview`),
+      people: async (orgId) => (await request<{ people: Person[] }>(`${org(orgId)}/people`)).people,
+      allInvitations: async (orgId) =>
+        (await request<{ invitations: InvitationWithStatus[] }>(`${org(orgId)}/invitations/all`)).invitations,
+      inviteMany: async (orgId, input) =>
+        (await request<{ results: BatchInviteResult[] }>(`${org(orgId)}/invitations/batch`, { json: input })).results,
+      resendInvitation: (orgId, id) =>
+        request<{ url: string; expiresAt: string }>(`${org(orgId)}/invitations/${enc(id)}/resend`, { json: {} }),
+      usageReport: (orgId, since) => request<UsageReport>(`${org(orgId)}/usage/report`, { query: { since } }),
     },
     agents: {
       list: async (orgId) => (await request<{ agents: Agent[] }>(`${org(orgId)}/agents`)).agents,
@@ -75,6 +102,28 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       credentials: async (orgId) =>
         (await request<{ credentials: Credential[] }>(`${org(orgId)}/credentials`)).credentials,
       addCredential: (orgId, input) => request<Credential>(`${org(orgId)}/credentials`, { json: input }),
+      rotateCredential: (orgId, id, input) =>
+        request<Credential>(`${org(orgId)}/credentials/${enc(id)}/rotate`, { json: input }),
+      removeCredential: (orgId, id, purge) =>
+        request<void>(`${org(orgId)}/credentials/${enc(id)}`, {
+          method: "DELETE",
+          query: { purge: purge ? "true" : undefined },
+        }),
+      platformKeyAvailable: async (orgId) =>
+        (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
+      detail: (orgId, agentId) => request<AgentDetail>(`${org(orgId)}/agents/${enc(agentId)}`),
+      channels: async (orgId, agentId) =>
+        (await request<{ channels: AgentChannel[] }>(`${org(orgId)}/agents/${enc(agentId)}/channels`)).channels,
+      setChannels: async (orgId, agentId, channels) =>
+        (
+          await request<{ channels: AgentChannel[] }>(`${org(orgId)}/agents/${enc(agentId)}/channels`, {
+            method: "PUT",
+            json: { channels },
+          })
+        ).channels,
+      runs: async (orgId, filter = {}) =>
+        (await request<{ runs: Run[] }>(`${org(orgId)}/runs`, { query: filter })).runs,
+      run: (orgId, runId) => request<{ run: Run; steps: RunStep[] }>(`${org(orgId)}/runs/${enc(runId)}`),
       usage: async (orgId) => {
         const res = await nullOn(403, () => request<{ usage: AgentUsage[] }>(`${org(orgId)}/usage`));
         return res ? res.usage : null;
@@ -84,6 +133,10 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       channels: async (orgId) => (await request<{ channels: Channel[] }>(`${org(orgId)}/channels`)).channels,
       createChannel: (orgId, input) => request<Channel>(`${org(orgId)}/channels`, { json: input }),
       join: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/join`, { json: {} }),
+      update: (orgId, channelId, input) =>
+        request<Channel>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "PATCH", json: input }),
+      roster: async (orgId, channelId) =>
+        (await request<{ members: RosterMember[] }>(`${org(orgId)}/channels/${enc(channelId)}/roster`)).members,
       members: async (orgId, channelId) =>
         (await request<{ members: ChannelMember[] }>(`${org(orgId)}/channels/${enc(channelId)}/members`)).members,
       addMember: (orgId, channelId, member) =>
@@ -96,6 +149,39 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         ).messages,
       post: (orgId, channelId, input) =>
         request<Message>(`${org(orgId)}/channels/${enc(channelId)}/messages`, { json: input }),
+    },
+    approvals: {
+      list: async (orgId, filter = {}) =>
+        (await request<{ approvals: Approval[] }>(`${org(orgId)}/approvals`, { query: filter })).approvals,
+      get: (orgId, id) => request<Approval>(`${org(orgId)}/approvals/${enc(id)}`),
+      approve: (orgId, id, reason) =>
+        request<Approval>(`${org(orgId)}/approvals/${enc(id)}/approve`, { json: reason ? { reason } : {} }),
+      refuse: (orgId, id, reason) =>
+        request<Approval>(`${org(orgId)}/approvals/${enc(id)}/refuse`, { json: reason ? { reason } : {} }),
+    },
+    connectors: {
+      catalog: () => request<ConnectorCatalog>("/api/app/connectors/catalog"),
+      list: async (orgId) => (await request<{ connections: Connection[] }>(`${org(orgId)}/connectors`)).connections,
+      connectWithKey: (orgId, input) => request<Connection>(`${org(orgId)}/connectors`, { json: input }),
+      startOAuth: async (orgId, connector, input) =>
+        (
+          await request<{ authorizeUrl: string }>(`${org(orgId)}/connectors/${enc(connector)}/oauth/start`, {
+            json: input,
+          })
+        ).authorizeUrl,
+      disconnect: (orgId, connectionId) =>
+        request<void>(`${org(orgId)}/connectors/${enc(connectionId)}`, { method: "DELETE" }),
+    },
+    scopes: {
+      get: async (orgId, agentId) =>
+        (await request<{ scopes: ScopeGrant[] }>(`${org(orgId)}/agents/${enc(agentId)}/scopes`)).scopes,
+      set: async (orgId, agentId, grants) =>
+        (
+          await request<{ scopes: ScopeGrant[] }>(`${org(orgId)}/agents/${enc(agentId)}/scopes`, {
+            method: "PUT",
+            json: { scopes: grants },
+          })
+        ).scopes,
     },
   };
 }

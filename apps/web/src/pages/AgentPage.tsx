@@ -20,40 +20,26 @@ import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
-  useAgentChannels,
+  useAgentDetail,
+  useAgentScopes,
+  useCatalog,
   useChannels,
+  useConnections,
   useMemory,
   useModels,
-  usePermissions,
   useProposals,
   useRuns,
-  useSetPermissions,
+  useSetAgentScopes,
   useUpdateAgent,
-  useUsage,
 } from "@/api/queries";
-import type { Agent, AgentPermissions } from "@/api/types";
+import type { Agent } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { formatInt, formatMonth, formatTokensShort, formatUsd, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
+import { type ScopeGroup, scopeGroups, scopeSummary, searchGroups, toggleGrant } from "@/lib/scopes";
 import { parseAmount } from "@/lib/text";
-
-/** "ler código e issues, abrir e comentar PRs" per connector, plus the approval-gated scopes. */
-export function permissionRows(perms: AgentPermissions, none: string) {
-  const granted = new Set(perms.granted);
-  return perms.connectors.map((c) => {
-    const on = c.scopes.filter((s) => !s.requiresApproval && granted.has(s.id)).map((s) => s.label.toLowerCase());
-    const gated = c.scopes.filter((s) => s.requiresApproval).map((s) => s.label.toLowerCase());
-    return { id: c.id, name: c.name, granted: on.length ? on.join(", ") : none, gated };
-  });
-}
-
-export function permissionCounts(perms: AgentPermissions) {
-  const granted = new Set(perms.granted);
-  const all = perms.connectors.flatMap((c) => c.scopes);
-  return { total: all.length, granted: all.filter((s) => s.requiresApproval || granted.has(s.id)).length };
-}
 
 /** Validates the budget dialog: a positive number ("40", "40,5"). */
 export function budgetError(t: TFunction, value: string) {
@@ -83,19 +69,17 @@ function AgentProfile({ agent }: { agent: Agent }) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const models = useModels();
-  const usage = useUsage(org.id);
+  const detail = useAgentDetail(org.id, agent.id);
   const channels = useChannels(org.id);
   const update = useUpdateAgent(org.id, agent.id);
   const editable = can(org.role, "manage_agents");
   const g = agentGrammar(t, agent.name);
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const modelLabel = models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model;
-  const mine = channels.data?.filter((c) => c.isMember) ?? [];
-  const memberships = useAgentChannels(
-    org.id,
-    mine.map((c) => c.id),
-  );
-  const home = mine.find((_c, i) => memberships[i]?.data?.some((m) => m.type === "agent" && m.id === agent.id));
+  // "Abrir no #canal": the first of the agent's channels you're in.
+  const home = detail.data?.channels
+    .map((ac) => channels.data?.find((c) => c.id === ac.id && c.isMember))
+    .find((c) => c !== undefined);
   const month = formatMonth(i18n.language, new Date());
 
   const [instructions, setInstructions] = useState(agent.instructions);
@@ -103,9 +87,9 @@ function AgentProfile({ agent }: { agent: Agent }) {
   const [dialog, setDialog] = useState<null | "runs" | "budget" | "perms">(null);
   useEffect(() => setInstructions(agent.instructions), [agent.instructions]);
 
-  const u = usage.data?.find((x) => x.agentId === agent.id);
-  const spent = u?.costUsd ?? 0;
-  const tokens = (u?.inputTokens ?? 0) + (u?.outputTokens ?? 0);
+  const spent = detail.data?.spentThisMonthUsd ?? 0;
+  const tokens = detail.data?.tokensThisMonth ?? 0;
+  const runs = detail.data?.runsThisMonth ?? 0;
   const key = agent.hasCredential ? t("agent.withOrgKey", { org: org.name }) : t("agent.withPlatformKey");
 
   return (
@@ -169,7 +153,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
           <h2 id="sec-budget" className="ac-card__title">
             {t("agent.budgetTitle", { month })}
           </h2>
-          {usage.data === null ? (
+          {detail.isError ? (
             <span className="small muted">{t("agent.usageHidden")}</span>
           ) : (
             <>
@@ -187,12 +171,12 @@ function AgentProfile({ agent }: { agent: Agent }) {
               <span className="small muted">
                 {owner
                   ? t("agent.budgetStats", {
-                      runs: t("agent.runsCount", { count: u?.calls ?? 0 }),
+                      runs: t("agent.runsCount", { count: runs }),
                       tokens: t("agent.tokensCount", { tokens: formatTokensShort(t, i18n.language, tokens) }),
                       owner: t("agent.toOwner", { owner: owner.name, to: agentGrammar(t, owner.name).to }),
                     })
                   : t("agent.budgetStatsNoOwner", {
-                      runs: t("agent.runsCount", { count: u?.calls ?? 0 }),
+                      runs: t("agent.runsCount", { count: runs }),
                       tokens: t("agent.tokensCount", { tokens: formatTokensShort(t, i18n.language, tokens) }),
                     })}
               </span>
@@ -218,7 +202,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
         open={dialog === "runs"}
         onOpenChange={(o) => setDialog(o ? "runs" : null)}
         agent={agent}
-        totalCalls={u?.calls}
+        totalRuns={runs}
       />
       <BudgetDialog
         open={dialog === "budget"}
@@ -231,14 +215,27 @@ function AgentProfile({ agent }: { agent: Agent }) {
   );
 }
 
+/** Built-in scopes + the scopes of the organization's connections. */
+function useScopeGroups(orgId: string): ScopeGroup[] | undefined {
+  const { t } = useTranslation();
+  const catalog = useCatalog();
+  const connections = useConnections(orgId);
+  return useMemo(
+    () =>
+      catalog.data && connections.data
+        ? scopeGroups(t, catalog.data, connections.data, { name: t("agent.builtinName"), note: t("agent.builtinNote") })
+        : undefined,
+    [catalog.data, connections.data, t],
+  );
+}
+
 function PermissionsSection({ agent, editable, onEdit }: { agent: Agent; editable: boolean; onEdit: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const perms = usePermissions(org.id, agent.id);
+  const groups = useScopeGroups(org.id);
+  const grants = useAgentScopes(org.id, agent.id);
   const g = agentGrammar(t, agent.name);
-  const rows = perms.data ? permissionRows(perms.data, t("agent.noPermission")) : [];
-  const counts = perms.data ? permissionCounts(perms.data) : { total: 0, granted: 0 };
-  const connectors = perms.data?.connectors.length ?? 0;
+  const summary = groups && grants.data ? scopeSummary(groups, grants.data, t("agent.noPermission")) : null;
   return (
     <Card aria-labelledby="sec-perm">
       <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
@@ -246,21 +243,32 @@ function PermissionsSection({ agent, editable, onEdit }: { agent: Agent; editabl
           <h2 id="sec-perm" className="ac-card__title">
             {t("agent.permissionsTitle", g)}
           </h2>
-          <span className="small muted">
-            {connectors > 0
-              ? t("agent.permissionsSummary", { ...counts, connectors, org: org.name })
-              : t("agent.permissionsNone", { org: org.name })}
-          </span>
+          {summary && (
+            <span className="small muted">
+              {summary.connectors > 0
+                ? t("agent.permissionsSummary", { ...summary, count: summary.connectors, org: org.name })
+                : t("agent.permissionsSummaryBuiltin", { ...summary, org: org.name })}
+            </span>
+          )}
         </div>
-        {editable && connectors > 0 && (
-          <Button size="sm" onClick={onEdit}>
-            {t("agent.editPermissions")}
-          </Button>
-        )}
+        <div className="row">
+          {can(org.role, "manage_agents") && summary?.connectors === 0 && (
+            <Button asChild size="sm" variant="ghost">
+              <Link to="/org/$orgId/settings" params={{ orgId: org.id }}>
+                {t("agent.connectHint")}
+              </Link>
+            </Button>
+          )}
+          {editable && summary && (
+            <Button size="sm" onClick={onEdit}>
+              {t("agent.editPermissions")}
+            </Button>
+          )}
+        </div>
       </div>
-      {rows.length > 0 && (
+      {summary && (
         <div>
-          {rows.map((r) => (
+          {summary.rows.map((r) => (
             <div key={r.id} className="connector-row">
               <span className="connector-row__name">{r.name}</span>
               <span className="connector-row__granted">{r.granted}</span>
@@ -327,22 +335,27 @@ function RunsDialog({
   open,
   onOpenChange,
   agent,
-  totalCalls,
+  totalRuns,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agent: Agent;
-  totalCalls: number | undefined;
+  totalRuns: number;
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const runs = useRuns(org.id, agent.id, open);
+  const channels = useChannels(org.id);
   const [q, setQ] = useState("");
   const g = agentGrammar(t, agent.name);
   const needle = q.trim().toLowerCase();
-  const list = runs.data?.runs ?? [];
-  const shown = list.filter((r) => !needle || `${r.summary} ${r.where}`.toLowerCase().includes(needle));
-  const total = Math.max(totalCalls ?? 0, runs.data?.total ?? 0);
+  const where = (channelId: string) => {
+    const name = channels.data?.find((c) => c.id === channelId)?.name;
+    return name ? `#${name}` : "";
+  };
+  const list = runs.data ?? [];
+  const shown = list.filter((r) => !needle || `${r.what} ${where(r.channelId)}`.toLowerCase().includes(needle));
+  const total = Math.max(totalRuns, list.length);
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={t("agent.runsTitle", g)} closeLabel={t("common.close")}>
       <DialogSearchList
@@ -350,16 +363,23 @@ function RunsDialog({
         onQueryChange={setQ}
         searchLabel={t("agent.runsSearch")}
         searchPlaceholder={t("agent.runsPlaceholder")}
-        isEmpty={shown.length === 0}
+        isEmpty={runs.isSuccess && shown.length === 0}
         emptyText={list.length === 0 ? t("agent.runsNone") : t("agent.runsEmpty", { q })}
       >
         {shown.map((r) => (
           <div key={r.id} className="run-row">
-            <span className="run-row__when">{whenAt(t, i18n.language, r.at)}</span>
+            <span className="run-row__when">{whenAt(t, i18n.language, r.createdAt)}</span>
             <span className="run-row__what">
-              <span>{r.summary}</span>
+              <span>{r.what || t("agent.runNoText")}</span>
               <span className="small muted">
-                {r.where} · {t("agent.runTokens", { tokens: formatInt(i18n.language, r.tokens) })}
+                {[
+                  where(r.channelId),
+                  t("agent.runTokens", { tokens: formatInt(i18n.language, r.inputTokens + r.outputTokens) }),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                {r.status === "failed" && ` · ${t("agent.runFailed")}`}
+                {r.status === "waiting_approval" && ` · ${t("channel.waitingApproval")}`}
               </span>
             </span>
             <span className="small">{formatUsd(t, i18n.language, r.costUsd)}</span>
@@ -454,24 +474,16 @@ function PermissionsDialog({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const perms = usePermissions(org.id, agent.id);
-  const set = useSetPermissions(org.id, agent.id);
+  const groups = useScopeGroups(org.id) ?? [];
+  const grants = useAgentScopes(org.id, agent.id);
+  const set = useSetAgentScopes(org.id, agent.id);
   const [q, setQ] = useState("");
   const g = agentGrammar(t, agent.name);
-  const granted = useMemo(() => new Set(perms.data?.granted ?? []), [perms.data]);
-  const needle = q.trim().toLowerCase();
-  const groups = (perms.data?.connectors ?? [])
-    .map((c) => ({
-      ...c,
-      scopes: c.scopes.filter((s) => !needle || `${c.name} ${s.label} ${s.description}`.toLowerCase().includes(needle)),
-    }))
-    .filter((c) => c.scopes.length > 0);
-  const toggle = (scopeId: string, on: boolean) => {
-    const next = new Set(granted);
-    if (on) next.add(scopeId);
-    else next.delete(scopeId);
-    set.mutate([...next]);
-  };
+  const granted = useMemo(
+    () => new Set((grants.data ?? []).map((x) => `${x.connectionId ?? ""}|${x.scope}`)),
+    [grants.data],
+  );
+  const shown = searchGroups(groups, q);
   return (
     <Dialog
       open={open}
@@ -484,29 +496,29 @@ function PermissionsDialog({
         onQueryChange={setQ}
         searchLabel={t("agent.permSearch")}
         searchPlaceholder={t("agent.permPlaceholder")}
-        isEmpty={groups.length === 0}
+        isEmpty={shown.length === 0}
         emptyText={t("agent.permEmpty", { q })}
       >
-        {groups.map((c) => (
-          <div key={c.id} className="scope-group">
+        {shown.map((group) => (
+          <div key={group.id} className="scope-group">
             <span className="ac-eyebrow scope-group__label">
-              {c.name} · {c.note}
+              {group.name} · {group.note}
             </span>
-            {c.scopes.map((s) => {
-              const id = `scope-${c.id}-${s.id}`;
+            {group.scopes.map((s) => {
+              const id = `scope-${s.key.replace(/[^a-zA-Z0-9]/g, "-")}`;
               return (
-                <label key={s.id} htmlFor={id} className="scope-row">
+                <label key={s.key} htmlFor={id} className="scope-row">
                   <Checkbox
                     id={id}
-                    checked={s.requiresApproval ? true : granted.has(s.id)}
-                    disabled={s.requiresApproval}
-                    onCheckedChange={(on) => toggle(s.id, on)}
+                    checked={granted.has(s.key)}
+                    disabled={set.isPending}
+                    onCheckedChange={(on) => set.mutate(toggleGrant(grants.data ?? [], s.grant, on))}
                   />
                   <span className="scope-row__text">
                     <span>{s.label}</span>
                     <span className="small muted">{s.description}</span>
                   </span>
-                  {s.requiresApproval && <AttentionNote>{t("agent.asksApprovalShort")}</AttentionNote>}
+                  {s.sensitive && <AttentionNote>{t("agent.asksApprovalShort")}</AttentionNote>}
                 </label>
               );
             })}

@@ -52,6 +52,8 @@ export function ApprovalsPage() {
               approval={a}
               agent={dir.agentById.get(a.agentId)}
               channel={channels.data?.find((c) => c.id === a.channelId)}
+              members={dir.memberById}
+              initials={dir.agentInitials(a.agentId)}
             />
           ))}
         </TabPanel>

@@ -1,25 +1,37 @@
 import type {
   Agent,
+  AgentChannel,
+  AgentDetail,
   AgentInput,
-  AgentPermissions,
-  AgentRunSummary,
   AgentUsage,
   Approval,
   AuthConfig,
+  BatchInviteResult,
   Channel,
   ChannelMember,
+  Connection,
+  ConnectorCatalog,
   Credential,
   Health,
   Invitation,
   InvitationPreview,
+  InvitationWithStatus,
   Me,
   Member,
   Memory,
   Message,
   Model,
   Organization,
+  OrgOverview,
+  OrgSettings,
+  Person,
   Proposal,
   Role,
+  RosterMember,
+  Run,
+  RunStep,
+  ScopeGrant,
+  UsageReport,
 } from "./types";
 
 /**
@@ -51,6 +63,17 @@ export interface ApiClient {
     /** `null` when invalid or expired. */
     previewInvitation(token: string): Promise<InvitationPreview | null>;
     acceptInvitation(token: string): Promise<{ orgId: string }>;
+    settings(orgId: string): Promise<OrgSettings>;
+    updateSettings(orgId: string, input: Partial<Omit<OrgSettings, "name">> & { name?: string }): Promise<OrgSettings>;
+    overview(orgId: string): Promise<OrgOverview>;
+    /** Members with presence. */
+    people(orgId: string): Promise<Person[]>;
+    /** Invitations not accepted yet, pending or expired. */
+    allInvitations(orgId: string): Promise<InvitationWithStatus[]>;
+    inviteMany(orgId: string, input: { emails: string[]; role: Role }): Promise<BatchInviteResult[]>;
+    /** New link (the old one stops working), 7 more days. */
+    resendInvitation(orgId: string, invitationId: string): Promise<{ url: string; expiresAt: string }>;
+    usageReport(orgId: string, since?: string): Promise<UsageReport>;
   };
   agents: {
     list(orgId: string): Promise<Agent[]>;
@@ -60,6 +83,28 @@ export interface ApiClient {
     models(): Promise<{ models: Model[]; defaultModel: string }>;
     credentials(orgId: string): Promise<Credential[]>;
     addCredential(orgId: string, input: { provider: "anthropic"; label: string; apiKey: string }): Promise<Credential>;
+    /** Replaces the key, keeping the id (agents keep using it). */
+    rotateCredential(
+      orgId: string,
+      credentialId: string,
+      input: { apiKey: string; label?: string },
+    ): Promise<Credential>;
+    /** Revokes, or deletes for good with `purge` (refused while an agent uses it). */
+    removeCredential(orgId: string, credentialId: string, purge?: boolean): Promise<void>;
+    /** Whether this server offers the platform key (Cloud). */
+    platformKeyAvailable(orgId: string): Promise<boolean>;
+    detail(orgId: string, agentId: string): Promise<AgentDetail>;
+    channels(orgId: string, agentId: string): Promise<AgentChannel[]>;
+    setChannels(
+      orgId: string,
+      agentId: string,
+      channels: { channelId: string; autoReply?: boolean }[],
+    ): Promise<AgentChannel[]>;
+    runs(
+      orgId: string,
+      filter?: { agentId?: string; status?: string; before?: string; since?: string; limit?: number },
+    ): Promise<Run[]>;
+    run(orgId: string, runId: string): Promise<{ run: Run; steps: RunStep[] }>;
     /** This month's usage per agent; `null` without the `view_usage` permission. */
     usage(orgId: string): Promise<AgentUsage[] | null>;
   };
@@ -70,6 +115,13 @@ export interface ApiClient {
       input: { name: string; topic?: string; visibility?: "public" | "private" },
     ): Promise<Channel>;
     join(orgId: string, channelId: string): Promise<void>;
+    update(
+      orgId: string,
+      channelId: string,
+      input: { name?: string; topic?: string; visibility?: "public" | "private" },
+    ): Promise<Channel>;
+    /** Members with names; agents carry `autoReply`. */
+    roster(orgId: string, channelId: string): Promise<RosterMember[]>;
     members(orgId: string, channelId: string): Promise<ChannelMember[]>;
     addMember(orgId: string, channelId: string, member: { userId: string } | { agentId: string }): Promise<void>;
     messages(
@@ -80,20 +132,31 @@ export interface ApiClient {
     post(orgId: string, channelId: string, input: { body: string; threadId?: string | null }): Promise<Message>;
   };
 
-  // ── Mock-backed until the backend has endpoints (see src/api/mock) ──────────
   approvals: {
-    list(orgId: string): Promise<Approval[]>;
-    decide(orgId: string, approvalId: string, decision: "approved" | "refused"): Promise<Approval>;
+    list(orgId: string, filter?: { status?: "pending" | "decided"; agentId?: string }): Promise<Approval[]>;
+    get(orgId: string, approvalId: string): Promise<Approval>;
+    approve(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
+    refuse(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
   };
-  permissions: {
-    get(orgId: string, agentId: string): Promise<AgentPermissions>;
-    set(orgId: string, agentId: string, granted: string[]): Promise<AgentPermissions>;
-    /** Connectors the organization has connected (for "Criar agente"). */
-    connectors(orgId: string): Promise<AgentPermissions["connectors"]>;
+  connectors: {
+    /** Connectors agentes.chat knows, with their scopes, plus the built-in scopes. */
+    catalog(): Promise<ConnectorCatalog>;
+    /** The organization's connections (no secrets). */
+    list(orgId: string): Promise<Connection[]>;
+    connectWithKey(
+      orgId: string,
+      input: { connector: string; apiKey: string; serverUrl?: string; label?: string },
+    ): Promise<Connection>;
+    /** Returns the provider URL to open; the server redirects back to `returnTo`. */
+    startOAuth(orgId: string, connector: string, input: { returnTo: string; serverUrl?: string }): Promise<string>;
+    disconnect(orgId: string, connectionId: string): Promise<void>;
   };
-  runs: {
-    list(orgId: string, agentId: string): Promise<{ runs: AgentRunSummary[]; total: number }>;
+  scopes: {
+    get(orgId: string, agentId: string): Promise<ScopeGrant[]>;
+    set(orgId: string, agentId: string, grants: ScopeGrant[]): Promise<ScopeGrant[]>;
   };
+
+  // ── Mock-backed until the backend has endpoints (see src/api/mock) ──────────
   memory: {
     list(orgId: string, agentId: string): Promise<Memory[]>;
     edit(orgId: string, memoryId: string, text: string): Promise<Memory>;
@@ -111,13 +174,12 @@ export interface ApiClient {
     /** Expired invitation: ask the inviter for a new one. */
     requestNew(token: string): Promise<void>;
   };
-  presence: {
-    /** Last activity per user id (ISO); missing = unknown. */
-    list(orgId: string): Promise<Record<string, string>>;
-  };
 }
 
 /** The part of the client the HTTP backend implements today. */
-export type HttpApi = Pick<ApiClient, "system" | "account" | "orgs" | "agents" | "chat">;
+export type HttpApi = Pick<
+  ApiClient,
+  "system" | "account" | "orgs" | "agents" | "chat" | "approvals" | "connectors" | "scopes"
+>;
 /** The part still served by in-memory mocks. */
 export type MockedApi = Omit<ApiClient, keyof HttpApi>;

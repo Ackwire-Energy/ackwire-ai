@@ -148,3 +148,35 @@ describe("live agent runs (streaming)", () => {
     expect(runningAgents(s).size).toBe(0);
   });
 });
+
+describe("user events and resumed runs", () => {
+  test("user-scope frames reach onUserEvent, not channel listeners", () => {
+    const { factory, last } = fakeSockets();
+    const conn = new RealtimeConnection({ url: "ws://x", createSocket: factory, pingMs: 0 });
+    const user: unknown[] = [];
+    const channel: unknown[] = [];
+    conn.onUserEvent((e) => user.push(e));
+    conn.subscribe("c1", (e) => channel.push(e));
+    conn.start();
+    last().open();
+    const budget = { type: "budget.warning", agentId: "a", spentNanoUsd: 32e9, budgetNanoUsd: 40e9 };
+    last().push({ type: "event", scope: "user", event: budget });
+    expect(user).toEqual([budget]);
+    expect(channel).toEqual([]);
+  });
+
+  test("a run resumed after an approval streams again", () => {
+    const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "ada" };
+    let s = applyChannelEvent(emptyStreams, { type: "agent.delta", ...base, seq: 1, text: "Vou pedir aprovação." });
+    s = applyChannelEvent(s, {
+      type: "message.created",
+      channelId: "c1",
+      messageId: "m2",
+      message: { id: "m2", agentRunId: "r1" } as Message,
+    });
+    expect(runsInChannel(s, "c1")).toEqual([]);
+    s = applyChannelEvent(s, { type: "agent.run", ...base, status: "running" });
+    s = applyChannelEvent(s, { type: "agent.delta", ...base, seq: 1, text: "Merge feito." });
+    expect(runsInChannel(s, "c1")[0]?.text).toBe("Merge feito.");
+  });
+});

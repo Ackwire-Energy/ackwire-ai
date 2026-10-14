@@ -7,29 +7,35 @@ import {
   Dialog,
   DialogSearchList,
   EmptyState,
+  Field,
   Icon,
+  Input,
   Message,
   MessageText,
 } from "@agenteschat/ui";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/api/http";
 import {
+  useApproval,
   useApprovals,
   useChannelMembers,
   useChannels,
   useJoinChannel,
   useMessages,
   usePostMessage,
+  useRoster,
   useThreads,
+  useUpdateChannel,
 } from "@/api/queries";
-import type { Agent, Channel, Member } from "@/api/types";
+import type { Agent, Approval, Channel, Member } from "@/api/types";
 import { MessageBody } from "@/chat/MessageBody";
 import { buildTimeline, mergeTimeline, threadRootsToLoad } from "@/chat/timeline";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { dayLabel, formatTime, joinNames } from "@/lib/format";
+import { can } from "@/lib/permissions";
 import { useChannelRealtime, useConnectionStatus, useDismissRun, useStreams } from "@/realtime/context";
 import { runsInChannel } from "@/realtime/streams";
 
@@ -100,10 +106,10 @@ function ChannelView({ channel }: { channel: Channel }) {
           messages.data ?? [],
           threads.map((q) => q.data),
         ),
-        (approvals.data ?? []).filter((a) => a.channelId === channel.id),
+        [],
         runs,
       ),
-    [messages.data, threads, approvals.data, channel.id, runs],
+    [messages.data, threads, runs],
   );
 
   // Keep the newest message in view while the person is at the bottom.
@@ -203,6 +209,7 @@ function ChannelView({ channel }: { channel: Channel }) {
                   const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
                   const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
                   const name = dir.authorName(m.author);
+                  const approvalId = typeof m.meta?.approvalId === "string" ? m.meta.approvalId : null;
                   return (
                     <Message
                       key={item.key}
@@ -218,26 +225,21 @@ function ChannelView({ channel }: { channel: Channel }) {
                       }
                       author={name}
                       time={<time dateTime={m.createdAt}>{formatTime(i18n.language, m.createdAt)}</time>}
+                      stacked={approvalId !== null}
                     >
-                      <MessageText>
-                        <MessageBody body={m.body} resolveMention={dir.mentionName} />
-                      </MessageText>
-                    </Message>
-                  );
-                }
-                case "approval": {
-                  const agent = dir.agentById.get(item.approval.agentId);
-                  const name = agent?.name ?? t("channel.unknownAgent");
-                  return (
-                    <Message
-                      key={item.key}
-                      agent
-                      stacked
-                      avatar={<Avatar kind="agent" name={name} initials={dir.agentInitials(item.approval.agentId)} />}
-                      author={name}
-                      time={formatTime(i18n.language, item.approval.createdAt)}
-                    >
-                      <InlineApproval approval={item.approval} agent={agent} />
+                      {(m.body.trim() || !approvalId) && (
+                        <MessageText>
+                          <MessageBody body={m.body} resolveMention={dir.mentionName} />
+                        </MessageText>
+                      )}
+                      {approvalId && (
+                        <MessageApproval
+                          approvalId={approvalId}
+                          listed={approvals.data?.find((a) => a.id === approvalId)}
+                          agent={agent}
+                          members={dir.memberById}
+                        />
+                      )}
                     </Message>
                   );
                 }
@@ -319,61 +321,107 @@ function ChannelView({ channel }: { channel: Channel }) {
         </>
       )}
 
-      <ChannelDetails
-        open={detailsOpen}
-        onOpenChange={setDetailsOpen}
-        channel={channel}
-        people={channelPeople}
-        agents={channelAgents}
-      />
+      <ChannelDetails open={detailsOpen} onOpenChange={setDetailsOpen} channel={channel} />
     </main>
   );
 }
 
-/** "Detalhes do canal": who is here, in a searchable list. */
+/** The card of a message with `meta.approvalId`: from the approvals list, or fetched by id. */
+function MessageApproval({
+  approvalId,
+  listed,
+  agent,
+  members,
+}: {
+  approvalId: string;
+  listed: Approval | undefined;
+  agent: Agent | undefined;
+  members: Map<string, Member>;
+}) {
+  const { org } = useOrg();
+  const one = useApproval(org.id, approvalId, !listed);
+  const approval = listed ?? one.data;
+  if (!approval) return null;
+  return <InlineApproval approval={approval} agent={agent} members={members} />;
+}
+
+/** "Detalhes do canal": who is here (roster), and the topic for admins. */
 function ChannelDetails({
   open,
   onOpenChange,
   channel,
-  people,
-  agents,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   channel: Channel;
-  people: Member[];
-  agents: Agent[];
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const roster = useRoster(org.id, channel.id, open && channel.isMember);
+  const update = useUpdateChannel(org.id, channel.id);
+  const editable = can(org.role, "configure");
   const [q, setQ] = useState("");
+  const [topic, setTopic] = useState(channel.topic);
+  useEffect(() => {
+    if (open) setTopic(channel.topic);
+  }, [open, channel.topic]);
   const needle = q.trim().toLowerCase();
-  const rows = [
-    ...people.map((p) => ({ key: p.userId, kind: "person" as const, name: p.name, sub: p.email, image: p.image })),
-    ...agents.map((a) => ({ key: a.id, kind: "agent" as const, name: a.name, sub: `@${a.handle}`, image: null })),
-  ].filter((r) => !needle || `${r.name} ${r.sub}`.toLowerCase().includes(needle));
+  const rows = (roster.data ?? [])
+    .map((m) => ({
+      key: `${m.type}-${m.id}`,
+      kind: m.type,
+      name: m.name,
+      sub: m.type === "agent" ? `@${m.handle ?? ""}` : (dir.memberById.get(m.id)?.email ?? ""),
+      image: m.type === "person" ? (dir.memberById.get(m.id)?.image ?? null) : null,
+      initials: m.type === "agent" ? dir.agentInitials(m.id) : undefined,
+      autoReply: m.autoReply,
+    }))
+    .filter((r) => !needle || `${r.name} ${r.sub}`.toLowerCase().includes(needle));
   return (
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
       title={t("channel.detailsTitle", { channel: channel.name })}
-      description={channel.topic || t("channel.noTopic")}
+      description={editable ? undefined : channel.topic || t("channel.noTopic")}
       closeLabel={t("common.close")}
     >
+      {editable && (
+        <form
+          className="ac-dialog__tools row row--end"
+          onSubmit={(e) => {
+            e.preventDefault();
+            update.mutate({ topic: topic.trim() });
+          }}
+        >
+          <Field label={t("channel.topic")} id={`topic-${channel.id}`} style={{ flex: "1 1 260px" }}>
+            <Input
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder={t("channel.topicPlaceholder")}
+            />
+          </Field>
+          <Button type="submit" disabled={update.isPending || topic.trim() === channel.topic}>
+            {t("channel.saveTopic")}
+          </Button>
+        </form>
+      )}
       <DialogSearchList
         query={q}
         onQueryChange={setQ}
         searchLabel={t("channel.detailsSearch")}
         searchPlaceholder={t("channel.detailsSearch")}
-        isEmpty={rows.length === 0}
+        isEmpty={roster.isSuccess && rows.length === 0}
         emptyText={t("channel.detailsEmpty", { q })}
       >
         {rows.map((r) => (
           <div key={r.key} className="member-row">
-            <Avatar kind={r.kind} size="sm" name={r.name} imageUrl={r.image} />
+            <Avatar kind={r.kind} size="sm" name={r.name} imageUrl={r.image} initials={r.initials} />
             <span className="list-col">
               <span style={{ fontWeight: 600 }}>{r.name}</span>
               <span className="small muted">{r.sub}</span>
             </span>
+            {r.autoReply && <span className="small muted">{t("channel.autoReply")}</span>}
           </div>
         ))}
       </DialogSearchList>

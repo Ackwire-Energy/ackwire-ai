@@ -2,9 +2,16 @@ import { Avatar, Button, Card, Field, Input, List, Select, type SelectOption } f
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useApi } from "@/api/context";
-import { useChangeRole, useInvitations, useInvite, usePresence, useRevokeInvitation, useUsage } from "@/api/queries";
-import type { Invitation, Role } from "@/api/types";
+import {
+  useAllInvitations,
+  useChangeRole,
+  useInviteMany,
+  usePeople,
+  useResendInvitation,
+  useRevokeInvitation,
+  useUsage,
+} from "@/api/queries";
+import type { InvitationWithStatus, Role } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { formatMonth, formatShortDate, formatUsd, relativeTime, timeLeft } from "@/lib/format";
@@ -12,35 +19,34 @@ import { can } from "@/lib/permissions";
 import { parseEmails } from "@/lib/text";
 import { useToast } from "@/lib/toast";
 
-const DAY = 86_400_000;
-const INVITE_TTL_DAYS = 7;
-
-/** "Enviado há 2 dias · expira em 5 dias" (sent time = expiry − 7 days). */
+/** "Enviado há 2 dias · expira em 5 dias" / "Expirou ontem". */
 export function invitationStatus(
   t: Parameters<typeof timeLeft>[0],
   locale: string,
-  invitation: Invitation,
+  invitation: InvitationWithStatus,
   now = new Date(),
 ) {
-  const sentAt = new Date(new Date(invitation.expiresAt).getTime() - INVITE_TTL_DAYS * DAY).toISOString();
-  const left = timeLeft(t, invitation.expiresAt, now) ?? "";
-  if (now.getTime() - new Date(sentAt).getTime() < 60_000) return t("members.sentNow");
-  return t("members.sentAgo", { ago: relativeTime(t, locale, sentAt, now), left });
+  const left = timeLeft(t, invitation.expiresAt, now);
+  if (invitation.status === "expired" || !left) {
+    return t("members.expiredAgo", { when: relativeTime(t, locale, invitation.expiresAt, now) });
+  }
+  if (now.getTime() - new Date(invitation.createdAt).getTime() < 60_000) return t("members.sentNow");
+  return t("members.sentAgo", { ago: relativeTime(t, locale, invitation.createdAt, now), left });
 }
 
 /** telas/Membros.dc.html */
 export function MembersPage() {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
-  const api = useApi();
   const toast = useToast();
   const dir = useDirectory(org.id);
   const manage = can(org.role, "manage_members");
-  const invitations = useInvitations(org.id, manage);
-  const invite = useInvite(org.id);
+  const invitations = useAllInvitations(org.id, manage);
+  const inviteMany = useInviteMany(org.id);
+  const resendOne = useResendInvitation(org.id);
   const revoke = useRevokeInvitation(org.id);
   const changeRole = useChangeRole(org.id);
-  const presence = usePresence(org.id);
+  const peopleQuery = usePeople(org.id);
   const usage = useUsage(org.id);
   const [draft, setDraft] = useState("");
   const [role, setRole] = useState<Role>("member");
@@ -65,26 +71,20 @@ export function MembersPage() {
       return;
     }
     setError(null);
-    let ok = 0;
-    for (const email of emails) {
-      try {
-        const res = await invite.mutateAsync({ email, role });
-        setLinks((prev) => ({ ...prev, [res.invitation.email]: res.url }));
-        ok++;
-      } catch {
-        // The toast already says why (e.g. already a member).
-      }
-    }
-    if (ok > 0) {
-      setDraft("");
-      toast.show(t("members.invited", { count: ok }));
-    }
+    const results = await inviteMany.mutateAsync({ emails, role });
+    const links: Record<string, string> = {};
+    for (const r of results) if (r.url) links[r.email] = r.url;
+    setLinks((prev) => ({ ...prev, ...links }));
+    const invited = results.filter((r) => r.status === "invited").length;
+    const problems = results.flatMap((r) => (r.status === "invited" ? [] : [{ ...r, status: r.status }]));
+    if (invited > 0) toast.show(t("members.invited", { count: invited }));
+    for (const p of problems) toast.show(t(`members.batch.${p.status}`, { email: p.email }), "error");
+    if (problems.length === 0) setDraft("");
+    else setDraft(problems.map((p) => p.email).join(", "));
   };
 
-  /** No resend endpoint: revoke and create a new invitation (new link, 7 more days). */
-  const resend = async (inv: Invitation) => {
-    await api.orgs.revokeInvitation(org.id, inv.id);
-    const res = await invite.mutateAsync({ email: inv.email, role: inv.role });
+  const resend = async (inv: InvitationWithStatus) => {
+    const res = await resendOne.mutateAsync(inv.id);
     setLinks((prev) => ({ ...prev, [inv.email]: res.url }));
     setResent((prev) => ({ ...prev, [inv.email]: true }));
   };
@@ -100,7 +100,7 @@ export function MembersPage() {
     setCopied(email);
   };
 
-  const people = dir.members;
+  const people = peopleQuery.data ?? [];
   const pending = invitations.data ?? [];
 
   return (
@@ -142,7 +142,7 @@ export function MembersPage() {
             <Field label={t("members.role")} id="m-role" style={{ flex: "0 1 150px" }}>
               <Select value={role} onValueChange={setRole} options={roleOptions.filter((o) => o.value !== "owner")} />
             </Field>
-            <Button variant="primary" onClick={() => void send()} disabled={invite.isPending}>
+            <Button variant="primary" onClick={() => void send().catch(() => {})} disabled={inviteMany.isPending}>
               {t("members.invite")}
             </Button>
           </div>
@@ -191,7 +191,6 @@ export function MembersPage() {
         <List>
           {people.map((m) => {
             const isMe = m.userId === me.user.id;
-            const seen = presence.data?.[m.userId];
             const editable = manage && !isMe && (m.role !== "owner" || can(org.role, "manage_owners"));
             return (
               <div key={m.userId} className="ac-list__row">
@@ -206,9 +205,11 @@ export function MembersPage() {
                   </span>
                 </span>
                 <span className="small muted" style={{ flex: "0 1 160px" }}>
-                  {seen && Date.now() - new Date(seen).getTime() < 5 * 60_000
+                  {m.online
                     ? t("members.activeNow")
-                    : t("members.joined", { when: formatShortDate(i18n.language, m.joinedAt) })}
+                    : m.lastSeenAt
+                      ? t("members.seen", { when: relativeTime(t, i18n.language, m.lastSeenAt) })
+                      : t("members.joined", { when: formatShortDate(i18n.language, m.joinedAt) })}
                 </span>
                 {editable ? (
                   <div style={{ flex: "0 0 130px", width: 130 }}>

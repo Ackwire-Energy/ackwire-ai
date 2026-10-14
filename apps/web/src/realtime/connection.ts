@@ -1,4 +1,4 @@
-import type { ChannelEvent } from "@/api/types";
+import type { ChannelEvent, UserEvent } from "@/api/types";
 
 /**
  * WebSocket client for `/api/ws?orgId=` (apps/server/src/realtime/ws.ts,
@@ -14,7 +14,8 @@ export type ServerFrame =
   | { type: "subscribed" | "unsubscribed"; channelId: string }
   | { type: "error"; code: string; channelId?: string }
   | { type: "pong" }
-  | { type: "event"; channelId: string; event: ChannelEvent };
+  | { type: "event"; channelId: string; event: ChannelEvent }
+  | { type: "event"; scope: "user"; event: UserEvent };
 
 export type ConnectionStatus = "idle" | "connecting" | "open" | "reconnecting" | "closed";
 
@@ -73,6 +74,7 @@ export class RealtimeConnection {
   private readonly statusListeners = new Set<(status: ConnectionStatus) => void>();
   private readonly reconnectListeners = new Set<() => void>();
   private readonly errorListeners = new Set<(code: string, channelId?: string) => void>();
+  private readonly userListeners = new Set<(event: UserEvent) => void>();
   private attempt = 0;
   private retryTimer: unknown = null;
   private pingTimer: unknown = null;
@@ -148,6 +150,14 @@ export class RealtimeConnection {
     };
   }
 
+  /** Events for the signed-in person (e.g. an approval they can decide), whatever channel they're in. */
+  onUserEvent(listener: (event: UserEvent) => void) {
+    this.userListeners.add(listener);
+    return () => {
+      this.userListeners.delete(listener);
+    };
+  }
+
   onError(listener: (code: string, channelId?: string) => void) {
     this.errorListeners.add(listener);
     return () => {
@@ -187,7 +197,9 @@ export class RealtimeConnection {
 
   private handle(frame: ServerFrame | null) {
     if (!frame) return;
-    if (frame.type === "event") {
+    if (frame.type === "event" && "scope" in frame) {
+      for (const l of this.userListeners) l(frame.event);
+    } else if (frame.type === "event") {
       const set = this.listeners.get(frame.channelId);
       if (!set) return;
       for (const l of [...set]) l(frame.event);

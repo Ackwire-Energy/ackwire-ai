@@ -3,7 +3,7 @@ import { upsertMessage } from "@/chat/timeline";
 import type { ApiClient } from "./client";
 import { useApi } from "./context";
 import { keys } from "./keys";
-import type { AgentInput, Message, Role } from "./types";
+import type { AgentInput, Approval, Message, OrgSettings, Role, ScopeGrant } from "./types";
 
 /**
  * React Query hooks over the `ApiClient`. Reads are cached per organization;
@@ -94,11 +94,6 @@ export function useRevokeInvitation(orgId: string) {
   });
 }
 
-export const usePresence = (orgId: string) => {
-  const api = useApi();
-  return useQuery({ queryKey: keys.presence(orgId), queryFn: () => api.presence.list(orgId), staleTime: 60_000 });
-};
-
 // ── Agents ──────────────────────────────────────────────────────────────────
 
 export const useAgents = (orgId: string) => {
@@ -136,7 +131,10 @@ export function useUpdateAgent(orgId: string, agentId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Partial<Omit<AgentInput, "handle">>) => api.agents.update(orgId, agentId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.agents(orgId) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, agentId) });
+    },
   });
 }
 
@@ -163,18 +161,6 @@ export const useChannelMembers = (orgId: string, channelId: string, enabled = tr
     staleTime: 30_000,
   });
 };
-
-/** Which channels each agent belongs to (only channels the person is in can be listed). */
-export function useAgentChannels(orgId: string, channelIds: string[]) {
-  const api = useApi();
-  return useQueries({
-    queries: channelIds.map((channelId) => ({
-      queryKey: keys.channelMembers(orgId, channelId),
-      queryFn: () => api.chat.members(orgId, channelId),
-      staleTime: 30_000,
-    })),
-  });
-}
 
 export const useMessages = (orgId: string, channelId: string, enabled = true) => {
   const api = useApi();
@@ -238,46 +224,242 @@ export function usePostMessage(orgId: string, channelId: string) {
   });
 }
 
-// ── Mock-backed features ────────────────────────────────────────────────────
+// ── Approvals ───────────────────────────────────────────────────────────────
 
+/** Every approval you can see (pending and decided); `canDecide` says if you may act. */
 export const useApprovals = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.approvals(orgId), queryFn: () => api.approvals.list(orgId), staleTime: 15_000 });
 };
 
+/** One approval (inline card when it isn't in the list yet). */
+export const useApproval = (orgId: string, approvalId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.approval(orgId, approvalId),
+    queryFn: () => api.approvals.get(orgId, approvalId),
+    enabled,
+  });
+};
+
+/** Puts a fresh approval in the caches (decision responses, WebSocket events). */
+export function cacheApproval(qc: ReturnType<typeof useQueryClient>, orgId: string, approval: Approval) {
+  qc.setQueryData<Approval[]>(keys.approvals(orgId), (list) => {
+    if (!list) return list;
+    const previous = list.find((a) => a.id === approval.id);
+    // Channel events don't know who is asking: keep our own `canDecide` until it's decided.
+    const merged =
+      previous && approval.status === "pending" ? { ...approval, canDecide: previous.canDecide } : approval;
+    return previous ? list.map((a) => (a.id === approval.id ? merged : a)) : [merged, ...list];
+  });
+  qc.setQueryData<Approval>(keys.approval(orgId, approval.id), (prev) =>
+    prev && approval.status === "pending" ? { ...approval, canDecide: prev.canDecide } : approval,
+  );
+}
+
 export function useDecideApproval(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, decision }: { id: string; decision: "approved" | "refused" }) =>
-      api.approvals.decide(orgId, id, decision),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.approvals(orgId) }),
+    mutationFn: ({ id, decision, reason }: { id: string; decision: "approve" | "refuse"; reason?: string }) =>
+      decision === "approve" ? api.approvals.approve(orgId, id, reason) : api.approvals.refuse(orgId, id, reason),
+    onSuccess: (approval) => {
+      cacheApproval(qc, orgId, approval);
+      void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
+    },
   });
 }
 
-export const usePermissions = (orgId: string, agentId: string) => {
+// ── Connectors and agent scopes ─────────────────────────────────────────────
+
+export const useCatalog = () => {
   const api = useApi();
-  return useQuery({ queryKey: keys.permissions(orgId, agentId), queryFn: () => api.permissions.get(orgId, agentId) });
+  return useQuery({ queryKey: keys.catalog, queryFn: () => api.connectors.catalog(), staleTime: 10 * 60_000 });
 };
 
-export const useConnectors = (orgId: string) => {
+export const useConnections = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.connectors(orgId), queryFn: () => api.permissions.connectors(orgId) });
+  return useQuery({ queryKey: keys.connections(orgId), queryFn: () => api.connectors.list(orgId), staleTime: 30_000 });
 };
 
-export function useSetPermissions(orgId: string, agentId: string) {
+export function useConnectWithKey(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (granted: string[]) => api.permissions.set(orgId, agentId, granted),
-    onSuccess: (data) => qc.setQueryData(keys.permissions(orgId, agentId), data),
+    mutationFn: (input: { connector: string; apiKey: string; serverUrl?: string; label?: string }) =>
+      api.connectors.connectWithKey(orgId, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
   });
 }
 
+export function useStartOAuth(orgId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: ({ connector, returnTo, serverUrl }: { connector: string; returnTo: string; serverUrl?: string }) =>
+      api.connectors.startOAuth(orgId, connector, { returnTo, serverUrl }),
+  });
+}
+
+export function useDisconnect(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (connectionId: string) => api.connectors.disconnect(orgId, connectionId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.connections(orgId) });
+      // Agents lose the scopes of that connection.
+      void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "org" && q.queryKey[4] === "scopes" });
+    },
+  });
+}
+
+export const useAgentScopes = (orgId: string, agentId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.scopes(orgId, agentId), queryFn: () => api.scopes.get(orgId, agentId) });
+};
+
+export function useSetAgentScopes(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (grants: ScopeGrant[]) => api.scopes.set(orgId, agentId, grants),
+    onSuccess: (grants) => qc.setQueryData(keys.scopes(orgId, agentId), grants),
+  });
+}
+
+// ── Management (phase 4) ────────────────────────────────────────────────────
+
+export const useOverview = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.overview(orgId), queryFn: () => api.orgs.overview(orgId), staleTime: 30_000 });
+};
+
+export const useSettings = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.settings(orgId), queryFn: () => api.orgs.settings(orgId) });
+};
+
+export function useUpdateSettings(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Partial<OrgSettings>) => api.orgs.updateSettings(orgId, input),
+    onSuccess: (settings) => {
+      qc.setQueryData(keys.settings(orgId), settings);
+      void qc.invalidateQueries({ queryKey: keys.me });
+      void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+    },
+  });
+}
+
+export const usePeople = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.people(orgId), queryFn: () => api.orgs.people(orgId), staleTime: 30_000 });
+};
+
+export const useAllInvitations = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.allInvitations(orgId), queryFn: () => api.orgs.allInvitations(orgId), enabled });
+};
+
+export function useInviteMany(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { emails: string[]; role: Role }) => api.orgs.inviteMany(orgId, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+export function useResendInvitation(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (invitationId: string) => api.orgs.resendInvitation(orgId, invitationId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+export const useUsageReport = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.usageReport(orgId), queryFn: () => api.orgs.usageReport(orgId), enabled });
+};
+
+export const usePlatformKey = (orgId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.platformKey(orgId),
+    queryFn: () => api.agents.platformKeyAvailable(orgId),
+    staleTime: 10 * 60_000,
+  });
+};
+
+export function useRotateCredential(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, apiKey }: { id: string; apiKey: string }) => api.agents.rotateCredential(orgId, id, { apiKey }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.credentials(orgId) }),
+  });
+}
+
+export function useRemoveCredential(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, purge }: { id: string; purge?: boolean }) => api.agents.removeCredential(orgId, id, purge),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.credentials(orgId) }),
+  });
+}
+
+export const useAgentDetail = (orgId: string, agentId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentDetail(orgId, agentId),
+    queryFn: () => api.agents.detail(orgId, agentId),
+    staleTime: 15_000,
+  });
+};
+
+/** An agent's runs this month (newest first). */
 export const useRuns = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.runs(orgId, agentId), queryFn: () => api.runs.list(orgId, agentId), enabled });
+  return useQuery({
+    queryKey: keys.runs(orgId, agentId),
+    queryFn: () => api.agents.runs(orgId, { agentId, limit: 200 }),
+    enabled,
+  });
 };
+
+export const useRun = (orgId: string, runId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.run(orgId, runId ?? ""),
+    queryFn: () => api.agents.run(orgId, runId ?? ""),
+    enabled: runId !== null,
+  });
+};
+
+export const useRoster = (orgId: string, channelId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.roster(orgId, channelId),
+    queryFn: () => api.chat.roster(orgId, channelId),
+    enabled,
+    staleTime: 30_000,
+  });
+};
+
+export function useUpdateChannel(orgId: string, channelId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name?: string; topic?: string }) => api.chat.update(orgId, channelId, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+  });
+}
+
+// ── Mock-backed features ────────────────────────────────────────────────────
 
 export const useMemory = (orgId: string, agentId: string) => {
   const api = useApi();

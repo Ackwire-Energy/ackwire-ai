@@ -7,8 +7,8 @@
  *
  * With `seed: true` (development builds) they start with the demo data of
  * the approved screens (docs/design/telas), attached to the organization's
- * real agents, channels and members so links work. Production builds start
- * empty, so nobody sees invented approvals or permissions.
+ * real agents and members. Production builds start empty, so nobody sees
+ * invented memories or proposals.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import type { Agent, Channel, Me, Member } from "../types";

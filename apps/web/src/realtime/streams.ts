@@ -32,7 +32,12 @@ export function applyChannelEvent(state: StreamsState, event: ChannelEvent): Str
       return finish(state, runId);
     }
     case "agent.run": {
-      if (state.finished[event.runId]) return state;
+      if (state.finished[event.runId]) {
+        // A run resumed after an approval streams again, from a fresh text.
+        if (event.status !== "running") return state;
+        const { [event.runId]: _f, ...finished } = state.finished;
+        state = { ...state, finished };
+      }
       const current = state.runs[event.runId];
       if (event.status === "done") {
         // The message event normally comes first; either way the run is over.

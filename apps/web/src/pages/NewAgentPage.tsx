@@ -16,7 +16,15 @@ import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { useChannels, useConnectors, useCreateAgent, useCredentials, useMembers, useModels } from "@/api/queries";
+import {
+  useChannels,
+  useConnections,
+  useCreateAgent,
+  useCredentials,
+  useMembers,
+  useModels,
+  usePlatformKey,
+} from "@/api/queries";
 import type { Agent, Credential, Model } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { joinNames } from "@/lib/format";
@@ -37,19 +45,26 @@ export function modelDescription(t: TFunction, locale: string, model: Model) {
 }
 
 /** Key choices: the organization's live credentials, then the platform key. */
-export function keyOptions(t: TFunction, credentials: Credential[]): SelectOption[] {
+export function keyOptions(t: TFunction, credentials: Credential[], platform = true): SelectOption[] {
   return [
     ...credentials
       .filter((c) => !c.revokedAt)
       .map((c) => ({ value: c.id, label: c.label, description: t("newAgent.orgKeyDesc", { hint: c.keyHint }) })),
-    { value: "platform", label: t("newAgent.platformKey"), description: t("newAgent.platformKeyDesc") },
+    ...(platform
+      ? [{ value: "platform", label: t("newAgent.platformKey"), description: t("newAgent.platformKeyDesc") }]
+      : []),
   ];
 }
 
 /** Connector toggles of "Onde trabalha e com o quê": one per connector, granting its non-gated scopes. */
-const CONNECTOR_TOGGLES = ["github", "sentry", "drive", "sandbox"] as const;
-const isKnownConnector = (id: string): id is (typeof CONNECTOR_TOGGLES)[number] =>
-  (CONNECTOR_TOGGLES as readonly string[]).includes(id);
+export const CONNECTOR_DEFAULT_SCOPES: Record<string, string[]> = {
+  github: ["github:repo.read", "github:pr.read", "github:pr.write"],
+  sentry: ["sentry:issues.read"],
+  linear: ["linear:issues.read", "linear:issues.write"],
+  drive: ["drive:files.read", "drive:files.write"],
+};
+const isKnownConnector = (id: string): id is "github" | "sentry" | "linear" | "drive" =>
+  Object.hasOwn(CONNECTOR_DEFAULT_SCOPES, id);
 
 /** telas/NovoAgente.dc.html */
 export function NewAgentPage() {
@@ -61,8 +76,11 @@ export function NewAgentPage() {
   const models = useModels();
   const credentials = useCredentials(org.id, allowed);
   const channels = useChannels(org.id);
-  const connectors = useConnectors(org.id);
+  const connections = useConnections(org.id);
+  const activeConnections = useMemo(() => connections.data?.filter((c) => !c.revokedAt), [connections.data]);
+  const connectors = { data: activeConnections };
   const create = useCreateAgent(org.id);
+  const platform = usePlatformKey(org.id);
 
   const [role, setRole] = useState<RoleId>("qa");
   const [name, setName] = useState("");
@@ -79,18 +97,19 @@ export function NewAgentPage() {
     if (!model && models.data) setModel(models.data.defaultModel);
   }, [model, models.data]);
   useEffect(() => {
-    if (!key && credentials.data) setKey(keyOptions(t, credentials.data)[0]?.value);
-  }, [key, credentials.data, t]);
+    if (!key && credentials.data && platform.data !== undefined)
+      setKey(keyOptions(t, credentials.data, platform.data)[0]?.value);
+  }, [key, credentials.data, platform.data, t]);
   useEffect(() => {
     // Defaults like the screen: the channels you're in and the read-only connectors.
     setOn((prev) => {
       const next = { ...prev };
       for (const c of myChannels) if (next[`ch:${c.id}`] === undefined) next[`ch:${c.id}`] = c.name !== "general";
-      for (const c of connectors.data ?? [])
-        if (next[`co:${c.id}`] === undefined) next[`co:${c.id}`] = c.id !== "drive";
+      for (const c of activeConnections ?? [])
+        if (next[`co:${c.id}`] === undefined) next[`co:${c.id}`] = c.connector !== "drive";
       return next;
     });
-  }, [myChannels, connectors.data]);
+  }, [myChannels, activeConnections]);
 
   if (!allowed) {
     return (
@@ -127,11 +146,21 @@ export function NewAgentPage() {
       monthlyBudgetUsd: amount,
     });
     const joined = myChannels.filter((c) => on[`ch:${c.id}`]);
-    for (const c of joined) await api.chat.addMember(org.id, c.id, { agentId: agent.id });
-    const scopes = (connectors.data ?? [])
+    if (joined.length > 0) {
+      await api.agents.setChannels(
+        org.id,
+        agent.id,
+        joined.map((c) => ({ channelId: c.id })),
+      );
+    }
+    const extra = (connectors.data ?? [])
       .filter((c) => on[`co:${c.id}`])
-      .flatMap((c) => c.scopes.filter((s) => !s.requiresApproval).map((s) => s.id));
-    await api.permissions.set(org.id, agent.id, scopes);
+      .flatMap((c) => (CONNECTOR_DEFAULT_SCOPES[c.connector] ?? []).map((scope) => ({ connectionId: c.id, scope })));
+    if (extra.length > 0) {
+      // New agents start with the built-in defaults; add the chosen connector scopes.
+      const current = await api.scopes.get(org.id, agent.id);
+      await api.scopes.set(org.id, agent.id, [...current, ...extra]);
+    }
     setCreated({ agent, channels: joined.map((c) => ({ id: c.id, name: c.name })) });
   };
 
@@ -193,7 +222,7 @@ export function NewAgentPage() {
     ...myChannels.map((c) => ({ id: `ch:${c.id}`, label: `#${c.name}` })),
     ...(connectors.data ?? []).map((c) => ({
       id: `co:${c.id}`,
-      label: isKnownConnector(c.id) ? t(`newAgent.connectors.${c.id}`) : c.name,
+      label: isKnownConnector(c.connector) ? t(`newAgent.connectors.${c.connector}`) : c.label,
     })),
   ];
 
@@ -251,7 +280,12 @@ export function NewAgentPage() {
             <Select value={model} onValueChange={setModel} options={modelOptions} />
           </Field>
           <Field label={t("newAgent.key")} id="ag-key">
-            <Select value={key} onValueChange={setKey} options={keyOptions(t, credentials.data ?? [])} />
+            <Select
+              value={key}
+              onValueChange={setKey}
+              options={keyOptions(t, credentials.data ?? [], platform.data ?? false)}
+              placeholder={t("newAgent.noKeys")}
+            />
           </Field>
           <Field
             label={t("newAgent.budget")}

@@ -72,6 +72,7 @@ export function OnboardingPage() {
   const [copied, setCopied] = useState(false);
   const [created, setCreated] = useState<{ orgId: string; generalChannelId: string } | null>(null);
   const [agentCreated, setAgentCreated] = useState(false);
+  const [platform, setPlatform] = useState(true);
 
   const orgName = org.trim() || t("onboarding.yourCompany");
   const presetInfo = (p: Preset) => ({
@@ -90,12 +91,16 @@ export function OnboardingPage() {
   const saveOrg = useMutation({
     mutationFn: async () => {
       if (created) {
-        await api.orgs.update(created.orgId, { name: org.trim(), context });
+        await api.orgs.updateSettings(created.orgId, { name: org.trim(), context });
         return created;
       }
       const res = await api.orgs.create({ name: org.trim(), context });
       const next = { orgId: res.organization.id, generalChannelId: res.generalChannelId };
       setCreated(next);
+      // The platform key is only offered where the server has one (Cloud).
+      const available = await api.agents.platformKeyAvailable(next.orgId).catch(() => false);
+      setPlatform(available);
+      if (!available) setKey("own");
       await qc.invalidateQueries({ queryKey: keys.me });
       return next;
     },
@@ -261,13 +266,15 @@ export function OnboardingPage() {
                 aria-labelledby="key-legend"
                 style={{ display: "flex", flexDirection: "column", gap: 8 }}
               >
-                <RadioCard
-                  value="platform"
-                  id="key-platform"
-                  checked={key === "platform"}
-                  title={t("onboarding.platformKey")}
-                  description={t("onboarding.platformKeyDesc")}
-                />
+                {platform && (
+                  <RadioCard
+                    value="platform"
+                    id="key-platform"
+                    checked={key === "platform"}
+                    title={t("onboarding.platformKey")}
+                    description={t("onboarding.platformKeyDesc")}
+                  />
+                )}
                 <RadioCard
                   value="own"
                   id="key-own"

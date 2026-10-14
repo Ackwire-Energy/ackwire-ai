@@ -45,6 +45,13 @@ declare module "@tanstack/react-router" {
   }
 }
 
+// The connector OAuth callback reports failures as `/?connector_error=…`.
+const connectorError = new URLSearchParams(window.location.search).get("connector_error");
+if (connectorError) {
+  toasts.show(i18n.t("connectors.errorToast", { reason: connectorError }), "error");
+  window.history.replaceState(null, "", window.location.pathname);
+}
+
 const services: AppServices = { api, auth: createBetterAuthClient(), queryClient, i18n, toasts };
 
 const root = document.getElementById("root");

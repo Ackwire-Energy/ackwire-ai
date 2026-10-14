@@ -137,6 +137,8 @@ export interface Message {
   body: string;
   mentionedAgentIds: string[];
   agentRunId: string | null;
+  /** Attachments, e.g. `{ approvalId }` on an approval card. */
+  meta?: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -162,62 +164,88 @@ export type ChannelEvent =
       agentId: string;
       status: RunStatus;
       error?: string;
-    };
+    }
+  | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval };
+
+/** Events for one person (`{ type: "event", scope: "user" }` frames), e.g. approvals they can decide. */
+export type UserEvent =
+  | { type: "approval.created" | "approval.decided"; approval: Approval }
+  | BudgetEvent
+  | { type: string };
 
 // ── Mock-backed (no backend endpoint yet) ────────────────────────────────────
 
-export type ApprovalStatus = "pending" | "approved" | "refused";
+export type ApprovalStatus = "pending" | "approved" | "refused" | "expired";
 
-/** A sensitive action waiting for a person (mock: approvals belong to the Tool Gateway workstream). */
+/** A sensitive action waiting for a person (apps/server/src/routes/app/approvals.ts). */
 export interface Approval {
   id: string;
+  runId: string;
   agentId: string;
-  channelId: string | null;
-  /** Human words: "Fazer merge do PR #42 em main". */
+  channelId: string;
+  threadId: string;
+  /** The approval card in the chat. */
+  messageId: string | null;
+  tool: string;
+  scope: string;
+  /** "Merge PR #42 into main" (from the connector catalog). */
   title: string;
-  /** Exact detail: "github.merge · agentes-chat/app · PR 42 · testes passando". */
   detail: string;
-  /** Verb for the primary button: "merge" → "Aprovar merge". */
-  action: "merge" | "deploy" | "rollback" | "publish" | "other";
-  /** Where to review the change ("Ver diff"), when there is one. */
-  diffUrl: string | null;
+  /** Exactly what will run if approved. */
+  params: Record<string, unknown>;
   status: ApprovalStatus;
-  createdAt: string;
   expiresAt: string;
-  decidedBy: { userId: string; name: string } | null;
+  createdAt: string;
+  decidedByUserId: string | null;
   decidedAt: string | null;
+  reason: string | null;
+  /** You are the agent's owner or an admin, and it is pending. */
+  canDecide: boolean;
 }
 
-export interface Scope {
+export interface ScopeInfo {
   id: string;
   label: string;
   description: string;
-  /** Always becomes an approval request (merge, deploy, rollback). */
-  requiresApproval?: boolean;
+  /** Using it always becomes an approval request. */
+  sensitive: boolean;
 }
 
-export interface Connector {
+/** A connector agentes.chat knows (catalog). */
+export interface ConnectorDef {
   id: string;
-  name: string;
-  /** What the organization connected: "agentes-chat/app, agentes-chat/site". */
-  note: string;
-  scopes: Scope[];
+  label: string;
+  description: string;
+  auth: ("oauth" | "api_key")[];
+  /** The server has an OAuth app for it (else: API key only). */
+  oauthConfigured: boolean;
+  needsServerUrl: boolean;
+  scopes: ScopeInfo[];
+  tools: { name: string; scope: string; sensitive: boolean }[];
 }
 
-export interface AgentPermissions {
-  connectors: Connector[];
-  /** Granted scope ids (approval-gated scopes are always granted, and always ask). */
-  granted: string[];
+export interface ConnectorCatalog {
+  connectors: ConnectorDef[];
+  builtinScopes: ScopeInfo[];
 }
 
-export interface AgentRunSummary {
+/** The organization's connection to a connector (no secrets). */
+export interface Connection {
   id: string;
-  at: string;
-  summary: string;
-  /** "#eng", "thread em #eng", "DM João". */
-  where: string;
-  tokens: number;
-  costUsd: number;
+  connector: string;
+  label: string;
+  serverUrl: string;
+  authType: string;
+  accountLabel: string | null;
+  tokenExpiresAt: string | null;
+  createdAt: string;
+  revokedAt: string | null;
+}
+
+/** One permission of an agent: a built-in scope (`connectionId: null`) or a connection's scope. */
+export interface ScopeGrant {
+  connectionId: string | null;
+  scope: string;
 }
 
 export type MemoryKind = "fact" | "decision" | "lesson" | "preference";
@@ -259,4 +287,149 @@ export interface Proposal {
   createdAt: string;
   decidedBy: { userId: string; name: string } | null;
   decidedAt: string | null;
+}
+
+// ── Management (apps/server/src/routes/app/management.ts) ────────────────────
+
+export interface OrgSettings {
+  name: string;
+  /** Shared with every agent of the organization (start of every prompt). */
+  context: string;
+  /** Key that pays for router and summaries. */
+  defaultCredentialId: string | null;
+  routerModel: string | null;
+  summaryModel: string | null;
+  timezone: string;
+}
+
+/** Sidebar counts. */
+export interface OrgOverview {
+  name: string;
+  role: Role;
+  people: number;
+  agents: number;
+  /** This month's spend of the agents you own. */
+  myAgentsSpendUsd: number;
+  approvalsWaitingForMe: number;
+}
+
+export interface Person {
+  userId: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: Role;
+  joinedAt: string;
+  lastSeenAt: string | null;
+  online: boolean;
+}
+
+export interface InvitationWithStatus {
+  id: string;
+  email: string;
+  role: Role;
+  status: "pending" | "expired";
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface BatchInviteResult {
+  email: string;
+  status: "invited" | "already_member" | "invalid_email" | "already_invited";
+  invitationId?: string;
+  url?: string;
+}
+
+export interface AgentChannel {
+  id: string;
+  name: string;
+  /** Answers without a mention in this channel. */
+  autoReply: boolean;
+}
+
+export interface AgentDetail {
+  id: string;
+  name: string;
+  handle: string;
+  role: string;
+  instructions: string;
+  model: string;
+  ownerUserId: string | null;
+  /** Null = platform key (Cloud). */
+  credentialId: string | null;
+  monthlyBudgetUsd: number | null;
+  spentThisMonthUsd: number;
+  /** Held for calls in flight. */
+  reservedUsd: number;
+  tokensThisMonth: number;
+  runsThisMonth: number;
+  pendingApprovals: number;
+  channels: AgentChannel[];
+  createdAt: string;
+}
+
+export interface Run {
+  id: string;
+  agentId: string;
+  channelId: string;
+  threadId: string;
+  trigger: string;
+  status: string;
+  error: string | null;
+  /** Start of the message that started the run. */
+  what: string;
+  turns: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface RunStep {
+  seq: number;
+  kind: string;
+  data: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface UsageReport {
+  since: string;
+  totalUsd: number;
+  byKind: {
+    kind: "agent" | "router" | "embedding" | "summary";
+    calls: number;
+    partialCalls: number;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+  }[];
+  agents: {
+    agentId: string;
+    handle: string;
+    name: string;
+    calls: number;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+    monthlyBudgetUsd: number | null;
+  }[];
+}
+
+export interface RosterMember {
+  type: AuthorType;
+  id: string;
+  name: string;
+  handle: string | null;
+  /** Agents: answers without a mention here. */
+  autoReply: boolean | null;
+  joinedAt: string;
+}
+
+/** `budget.warning` (80%) / `budget.exhausted` (100%), sent to the agent's owner. */
+export interface BudgetEvent {
+  type: "budget.warning" | "budget.exhausted";
+  agentId: string;
+  spentNanoUsd: number;
+  budgetNanoUsd: number;
 }

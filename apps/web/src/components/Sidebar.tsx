@@ -12,7 +12,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { useApprovals, useChannels, useUsage } from "@/api/queries";
+import { useChannels, useOverview } from "@/api/queries";
 import { useAuth } from "@/auth/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type LocaleCode, locales, setLocale } from "@/i18n";
@@ -30,12 +30,11 @@ export function Sidebar() {
   const orgId = org.id;
   const dir = useDirectory(orgId);
   const channels = useChannels(orgId);
-  const approvals = useApprovals(orgId);
-  const usage = useUsage(orgId);
+  const overview = useOverview(orgId);
   const running = useStreams(runningAgents);
-  const pending = (approvals.data ?? []).filter((a) => a.status === "pending").length;
+  const pending = overview.data?.approvalsWaitingForMe ?? 0;
   const people = dir.members.filter((m) => m.userId !== me.user.id);
-  const spent = usage.data ? usage.data.reduce((sum, u) => sum + u.costUsd, 0) : null;
+  const spent = overview.data ? overview.data.myAgentsSpendUsd : null;
 
   return (
     <nav className="sidebar" aria-label={t("shell.nav")}>
@@ -43,9 +42,13 @@ export function Sidebar() {
         <LogoMark className="sidebar__org-mark" />
         <div className="sidebar__org-text">
           <span className="sidebar__org-name">{org.name}</span>
-          {!dir.loading && (
+          {overview.data && (
             <span className="sidebar__org-meta">
-              {t("shell.summary", { count: dir.members.length, people: dir.members.length, agents: dir.agents.length })}
+              {t("shell.summary", {
+                count: overview.data.people,
+                people: overview.data.people,
+                agents: overview.data.agents,
+              })}
             </span>
           )}
         </div>

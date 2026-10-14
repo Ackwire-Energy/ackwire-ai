@@ -121,18 +121,40 @@ describe("Canal", () => {
     expect(screen().getByRole("alert").textContent).toContain("Atlas não conseguiu responder: budget_exceeded");
   });
 
-  test("the inline approval card: approve shrinks it to one line with who decided", async () => {
-    await open();
-    const card = screen()
-      .getAllByRole("group", { name: "Pedido de aprovação" })
-      .find((g) => g.textContent?.includes("Ada pede aprovação")) as HTMLElement;
+  test("the inline approval card: approve calls the API, shrinks to one line; events update it", async () => {
+    const r0 = await open();
+    const { state, socket } = r0;
+    // The card lives on the agent message with meta.approvalId.
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(card.closest("article")?.textContent).toContain("Ada");
     expect(card.textContent).toContain("Ada pede aprovação");
     expect(card.querySelector(".ac-chip--waiting")?.textContent).toBe("Aguardando você");
-    expect(card.textContent).toContain("Fazer merge do PR #42 em main");
+    expect(card.textContent).toContain("Merge PR #42 into main");
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Aprovar merge" })));
     await settle(4);
-    const done = screen().getAllByRole("group", { name: "Aprovação concluída" });
-    expect(done.some((g) => g.textContent?.includes("Aprovado por você · agora"))).toBe(true);
+    expect(state.calls.find((c) => c.method === "approvals.approve")?.args).toEqual([ORG_ID, "ap-merge", undefined]);
+    const done = screen().getByRole("group", { name: "Aprovação concluída" });
+    expect(done.textContent).toContain("Aprovado por você · agora");
+    // Someone else refuses another approval: the event updates the card live.
+    const deploy = {
+      ...state.approvals[1],
+      status: "refused",
+      decidedByUserId: "u-joao",
+      decidedAt: new Date().toISOString(),
+    };
+    await act(async () =>
+      socket.push({
+        type: "event",
+        channelId: ENG_ID,
+        event: { type: "approval.decided", channelId: ENG_ID, approval: deploy },
+      }),
+    );
+    await settle();
+    const list = (await r0.services.queryClient.getQueryData(["org", ORG_ID, "approvals"])) as {
+      id: string;
+      status: string;
+    }[];
+    expect(list.find((a) => a.id === "ap-deploy")?.status).toBe("refused");
   });
 
   test("not a member of a public channel: join instead of the composer", async () => {
@@ -150,7 +172,9 @@ describe("Canal", () => {
   test("channel details: searchable list of people and agents", async () => {
     await open();
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));
+    await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
+    expect(dialog.textContent).toContain("responde sem menção");
     expect(dialog.textContent).toContain("João");
     expect(dialog.textContent).toContain("@atlas");
     await act(async () =>
@@ -159,5 +183,18 @@ describe("Canal", () => {
       }),
     );
     expect(dialog.textContent).toContain("Ninguém encontrado com “zzz”.");
+  });
+
+  test("admins edit the channel topic from the details", async () => {
+    const { state } = await open();
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));
+    await settle(3);
+    const dialog = screen().getByRole("dialog", { name: "#eng" });
+    await act(async () =>
+      fireEvent.change(within(dialog).getByLabelText("Descrição do canal"), { target: { value: "Código e deploys" } }),
+    );
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Salvar descrição" })));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "chat.update")?.args[2]).toEqual({ topic: "Código e deploys" });
   });
 });

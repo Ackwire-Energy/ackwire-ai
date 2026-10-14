@@ -59,7 +59,6 @@ describe("route guards", () => {
       ["drive", "Drive"],
       ["forum", "Fórum"],
       ["search", "Buscar no workspace"],
-      ["settings", "Configurações da organização"],
       ["threads/x", "Threads"],
       ["dm/u-joao", "Mensagem direta com João"],
     ] as const) {

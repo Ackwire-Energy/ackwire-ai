@@ -1,8 +1,21 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import type { TFunction } from "i18next";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { useTranslation } from "react-i18next";
 import { keys } from "@/api/keys";
-import { cacheMessage } from "@/api/queries";
-import type { ChannelEvent } from "@/api/types";
+import { cacheApproval, cacheMessage } from "@/api/queries";
+import type { Agent, BudgetEvent, ChannelEvent } from "@/api/types";
+import { formatUsd } from "@/lib/format";
+import { useToast } from "@/lib/toast";
 import { type ConnectionStatus, RealtimeConnection, realtimeUrl, type SocketFactory } from "./connection";
 import { applyChannelEvent, dismissRun, emptyStreams, type StreamsState } from "./streams";
 
@@ -42,6 +55,15 @@ const browserSocket: SocketFactory = (url) => new WebSocket(url) as unknown as R
 export const SocketFactoryContext = createContext<SocketFactory>(browserSocket);
 
 /** One WebSocket per organization, opened while the org shell is mounted. */
+/** Text of a budget alert for the agent's owner. */
+export function budgetAlert(t: TFunction, locale: string, event: BudgetEvent, agentName: string) {
+  const spent = formatUsd(t, locale, event.spentNanoUsd / 1e9);
+  const budget = formatUsd(t, locale, event.budgetNanoUsd / 1e9);
+  return event.type === "budget.exhausted"
+    ? t("budget.exhausted", { name: agentName, budget })
+    : t("budget.warning", { name: agentName, spent, budget });
+}
+
 export function RealtimeProvider({
   orgId,
   createSocket: explicit,
@@ -54,19 +76,41 @@ export function RealtimeProvider({
   const fromContext = useContext(SocketFactoryContext);
   const createSocket = explicit ?? fromContext;
   const qc = useQueryClient();
+  const toast = useToast();
+  const { t, i18n } = useTranslation();
   const streams = useMemo(() => createStreamsStore(), []);
   const [connection, setConnection] = useState<RealtimeConnection | null>(null);
+  // Latest `t` without reconnecting when the language changes.
+  const tRef = useRef(t);
+  tRef.current = t;
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one socket per org; toast and language are read live
   useEffect(() => {
     const conn = new RealtimeConnection({ url: realtimeUrl(window.location, orgId), createSocket });
     // Catch up over HTTP after a reconnect: events sent while offline are gone.
     const offReconnect = conn.onReconnect(() => {
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
     });
+    // Approvals I can decide arrive here even when I'm not in that channel (sidebar badge, Aprovações).
+    const offUser = conn.onUserEvent((event) => {
+      if ((event.type === "approval.created" || event.type === "approval.decided") && "approval" in event) {
+        cacheApproval(qc, orgId, event.approval);
+        void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+      }
+      if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
+        const budgetEvent = event as BudgetEvent;
+        const agent = qc.getQueryData<Agent[]>(keys.agents(orgId))?.find((a) => a.id === budgetEvent.agentId);
+        toast.show(budgetAlert(tRef.current, i18n.language, budgetEvent, agent?.name ?? ""), "error");
+        void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, budgetEvent.agentId) });
+        void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+      }
+    });
     conn.start();
     setConnection(conn);
     return () => {
       offReconnect();
+      offUser();
       conn.stop();
       setConnection(null);
     };
@@ -89,6 +133,9 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
     if (!connection || !enabled) return;
     return connection.subscribe(channelId, (event) => {
       streams.apply(event);
+      if (event.type === "approval.created" || event.type === "approval.decided") {
+        cacheApproval(qc, orgId, event.approval);
+      }
       if (event.type === "message.created") {
         if (event.message) cacheMessage(qc, orgId, event.message);
         else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });

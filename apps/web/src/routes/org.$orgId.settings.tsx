@@ -1,15 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
-import { EmptyPage } from "@/components/EmptyPage";
 import { Main } from "@/components/Main";
+import { SettingsPage } from "@/pages/SettingsPage";
 
-/** Linked from the sidebar; not built yet. Designed empty state. */
+/** Organization settings: context, connectors, provider keys, usage. The OAuth callback returns here. */
 export const Route = createFileRoute("/org/$orgId/settings")({
-  component: function Page() {
-    const { t } = useTranslation();
+  validateSearch: (search: Record<string, unknown>): { connected?: string } => ({
+    connected: typeof search.connected === "string" ? search.connected : undefined,
+  }),
+  component: function Settings() {
     return (
       <Main>
-        <EmptyPage icon="settings" title={t("empty.settings.title")} text={t("empty.settings.text")} />
+        <SettingsPage connected={Route.useSearch().connected} />
       </Main>
     );
   },
