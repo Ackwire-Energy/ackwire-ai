@@ -446,7 +446,12 @@ textarea.ac-input {
   padding: 0 3px;
   border-radius: var(--radius-cut);
 }
-.ac-msg--streaming .ac-msg__text::after {
+/* With Markdown blocks, the cursor follows the last block's text. */
+.ac-msg--streaming .ac-msg__text:has(> .md)::after {
+  content: none;
+}
+.ac-msg--streaming .ac-msg__text::after,
+.ac-msg--streaming .ac-msg__text > .md > :last-child::after {
   content: "";
   display: inline-block;
   width: 8px;
@@ -456,7 +461,8 @@ textarea.ac-input {
   background: var(--agent);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .ac-msg--streaming .ac-msg__text::after {
+  .ac-msg--streaming .ac-msg__text::after,
+  .ac-msg--streaming .ac-msg__text > .md > :last-child::after {
     animation: ac-blink 1s steps(2) infinite;
   }
 }

@@ -4,6 +4,7 @@ export * from "./artifact-tools";
 export * from "./artifacts";
 export * from "./audit";
 export * from "./cache";
+export * from "./capabilities";
 export * from "./channels";
 export * from "./connectors/catalog";
 export * from "./connectors/connections";

@@ -291,15 +291,34 @@ describe("Calendário", () => {
     await click(screen().getByRole("button", { name: "Novo evento" }));
     const dialog = screen().getByRole("dialog", { name: "Novo evento" });
     await type(within(dialog).getByLabelText("Título"), "Planejamento da sprint");
-    await type(within(dialog).getByLabelText("Fim"), "09:00");
+    // Our time select: type and confirm with Enter (no native time input).
+    const setTime = async (name: string, value: string) => {
+      const box = within(dialog).getByRole("combobox", { name });
+      await type(box, value);
+      await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
+    };
+    expect(dialog.querySelector('input[type="time"], input[type="date"], select')).toBeNull();
+    await setTime("Fim", "9");
+    expect((within(dialog).getByRole("combobox", { name: "Fim" }) as HTMLInputElement).value).toBe("09:00");
     expect(dialog.textContent).toContain("Use hh:mm, com o fim depois do início.");
     expect(within(dialog).getByRole("button", { name: "Criar evento" }).hasAttribute("disabled")).toBe(true);
-    await type(within(dialog).getByLabelText("Início"), "14:00");
-    await type(within(dialog).getByLabelText("Fim"), "15:00");
+    await setTime("Início", "1400");
+    await setTime("Fim", "15h");
+    // Our date picker: a month grid in a popover.
+    const tuesday = new Date(mondayOf(new Date()).getTime() + 86_400_000 + 3_600_000);
+    const dayName = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(tuesday);
+    await click(within(dialog).getByRole("button", { name: "Dia" }));
+    const picker = screen().getByRole("dialog", { name: "Escolher data" });
+    await click(within(picker).getByRole("button", { name: dayName }));
+    await settle(2);
+    expect(screen().queryByRole("dialog", { name: "Escolher data" })).toBeNull();
+    // Participants: picked ones become tokens above the search.
     await click(within(dialog).getByRole("checkbox", { name: /Ada/ }));
+    expect(within(dialog).getByRole("button", { name: "Remover Ada" })).toBeTruthy();
     await click(within(dialog).getByRole("button", { name: "Criar evento" }));
     await settle(5);
-    expect(screen().getByRole("button", { name: "Planejamento da sprint, 14:00–15:00" })).toBeTruthy();
+    const col = document.querySelector(`[data-day="${toYmd(tuesday)}"]`) as HTMLElement;
+    expect(within(col).getByRole("button", { name: "Planejamento da sprint, 14:00–15:00" })).toBeTruthy();
   });
 });
 

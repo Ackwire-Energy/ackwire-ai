@@ -1691,7 +1691,29 @@ p {
   flex-wrap: wrap;
   gap: 8px 12px;
 }
-.calendar-picker {
+
+/* Participant / member picker inside forms */
+.people-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.people-picker__results {
   max-height: 200px;
-  overflow: auto;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Markdown inside chat messages: compact, line breaks kept (white-space from .ac-msg__text). */
+.md--message {
+  gap: 6px;
+  max-width: none;
+  line-height: inherit;
+}
+.md--message ul,
+.md--message ol {
+  padding-left: 20px;
+}
+.md--message .md__code {
+  margin: 0;
 }

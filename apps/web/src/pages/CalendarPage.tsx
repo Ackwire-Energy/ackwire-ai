@@ -3,13 +3,14 @@ import {
   Button,
   Checkbox,
   Chip,
+  DatePicker,
   Dialog,
   DialogBody,
   DialogFooter,
   Field,
   Input,
-  SearchInput,
   Select,
+  TimeSelect,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -18,7 +19,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { useCalendar, useCalendarAction, useChannels } from "@/api/queries";
 import type { Actor, CalendarRange, Recurrence, RoutineTarget } from "@/api/types";
 import { useActors } from "@/components/actors";
-import { MemberPickerRows, type PickKey, useMemberRows } from "@/components/MemberPicker";
+import { PeoplePicker, type PickKey } from "@/components/MemberPicker";
 import { useOrg } from "@/components/org-context";
 import { formatTime, joinNames, toYmd } from "@/lib/format";
 import { useToast } from "@/lib/toast";
@@ -347,13 +348,7 @@ function NewEventDialog({ open, onClose, monday }: { open: boolean; onClose: () 
   const [start, setStart] = useState("10:00");
   const [end, setEnd] = useState("10:30");
   const [repeat, setRepeat] = useState<Recurrence>("none");
-  const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<Set<PickKey>>(new Set());
-  const rows = useMemberRows(query);
-  const dayOptions = Array.from({ length: 14 }, (_, i) => addDays(monday, i)).map((d) => ({
-    value: toYmd(d),
-    label: dayFull(i18n.language, d),
-  }));
   const at = (hm: string) => {
     const [h, m] = hm.split(":").map(Number);
     const [y, mo, d] = day.split("-").map(Number);
@@ -412,21 +407,26 @@ function NewEventDialog({ open, onClose, monday }: { open: boolean; onClose: () 
           </Field>
           <div className="grid-fields grid-fields--3">
             <Field label={t("calendar.form.day")} id="ne-d">
-              <Select value={day} onValueChange={setDay} options={dayOptions} />
+              <DatePicker
+                value={day}
+                onChange={setDay}
+                locale={i18n.language}
+                labels={{
+                  previousMonth: t("common.previousMonth"),
+                  nextMonth: t("common.nextMonth"),
+                  choose: t("common.chooseDate"),
+                }}
+              />
             </Field>
-            <Field
-              label={t("calendar.form.start")}
-              id="ne-s"
-              error={!timeOk && TIME.test(end) ? t("calendar.form.timeInvalid") : undefined}
-            >
-              <Input value={start} onChange={(e) => setStart(e.target.value)} inputMode="numeric" />
+            <Field label={t("calendar.form.start")} id="ne-s">
+              <TimeSelect value={start} onChange={setStart} />
             </Field>
             <Field
               label={t("calendar.form.end")}
               id="ne-e"
-              error={!TIME.test(end) ? t("calendar.form.timeInvalid") : undefined}
+              error={!timeOk ? t("calendar.form.timeInvalid") : undefined}
             >
-              <Input value={end} onChange={(e) => setEnd(e.target.value)} inputMode="numeric" />
+              <TimeSelect value={end} onChange={setEnd} />
             </Field>
           </div>
           <Field label={t("calendar.form.repeat")} id="ne-r">
@@ -436,27 +436,14 @@ function NewEventDialog({ open, onClose, monday }: { open: boolean; onClose: () 
               options={RECURRENCES.map((r) => ({ value: r, label: t(`calendar.repeat.${r}`) }))}
             />
           </Field>
-          <Field label={t("calendar.form.participants")} id="ne-p" help={t("calendar.form.participantsHelp")}>
-            <SearchInput
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("calendar.form.participantsSearch")}
-            />
-          </Field>
-          <div className="calendar-picker">
-            <MemberPickerRows
-              rows={rows}
-              selected={picked}
-              onToggle={(key, on) =>
-                setPicked((s) => {
-                  const next = new Set(s);
-                  if (on) next.add(key);
-                  else next.delete(key);
-                  return next;
-                })
-              }
-            />
-          </div>
+          <PeoplePicker
+            label={t("calendar.form.participants")}
+            searchLabel={t("calendar.form.participantsSearch")}
+            help={t("calendar.form.participantsHelp")}
+            emptyText={t("calendar.form.participantsEmpty")}
+            selected={picked}
+            onChange={setPicked}
+          />
         </DialogBody>
         <DialogFooter>
           <Button type="button" onClick={onClose}>

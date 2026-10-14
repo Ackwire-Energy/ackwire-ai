@@ -10,6 +10,7 @@ import {
 } from "@agenteschat/providers";
 import { getAgentCached } from "./agents";
 import { publishApproval } from "./approvals";
+import { describeCapabilities } from "./capabilities";
 import { buildRunContext, getChannelCached } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
@@ -264,6 +265,7 @@ async function executeRunInner(
         maxMessages: deps.contextMessages,
         toolsAvailable: tools.length > 0,
         askUser: tools.some((t) => t.name === ASK_USER_TOOL),
+        capabilities: describeCapabilities(tools),
         trigger,
       }),
       contextDeps

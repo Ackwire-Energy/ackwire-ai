@@ -30,6 +30,19 @@ test("toTurns: own messages are assistant turns, others are prefixed user turns,
   ]);
 });
 
+test("toTurns: with older unanswered messages, the one being answered is marked current", () => {
+  const names = new Map([["u1", "Ana"]]);
+  const older = msg({ id: "m1", authorUserId: "u1", body: "alguém viu o deploy?" });
+  const current = msg({ id: "m2", authorUserId: "u1", body: "@theo consegue criar um pdf?" });
+  expect(toTurns([older, current], "me", names, current.id)).toEqual([
+    { role: "user", content: "[Ana]: alguém viu o deploy?\n\n(current message) [Ana]: @theo consegue criar um pdf?" },
+  ]);
+  // Alone, it needs no mark.
+  expect(toTurns([current], "me", names, current.id)).toEqual([
+    { role: "user", content: "[Ana]: @theo consegue criar um pdf?" },
+  ]);
+});
+
 let f: Fixture;
 beforeEach(async () => {
   f = await setup();
@@ -53,7 +66,8 @@ test("system prompt carries org context, agent instructions and channel; history
   expect(ctx.messages).toEqual([
     {
       role: "user",
-      content: "[ana]: earlier top-level message\n\n[ana]: root question\n\n[ana]: @dev what do you think?",
+      content:
+        "[ana]: earlier top-level message\n\n[ana]: root question\n\n(current message) [ana]: @dev what do you think?",
     },
   ]);
   expect(ctx.stats.historyMessages).toBe(3);
@@ -75,5 +89,5 @@ test("history is capped at maxMessages, keeping the most recent", async () => {
   });
   const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
   const ctx = await buildRunContext(f.db, runs[0] as NonNullable<(typeof runs)[0]>, f.agent, { maxMessages: 3 });
-  expect(ctx.messages[0]?.content).toBe("[ana]: m3\n\n[ana]: m4\n\n[ana]: @dev go");
+  expect(ctx.messages[0]?.content).toBe("[ana]: m3\n\n[ana]: m4\n\n(current message) [ana]: @dev go");
 });

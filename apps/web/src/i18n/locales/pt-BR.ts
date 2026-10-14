@@ -9,6 +9,10 @@ export const ptBR = {
   app: { name: "agentes" },
   common: {
     close: "Fechar",
+    removeName: "Remover {{name}}",
+    previousMonth: "Mês anterior",
+    nextMonth: "Próximo mês",
+    chooseDate: "Escolher data",
     cancel: "Cancelar",
     save: "Salvar",
     back: "Voltar",
@@ -892,6 +896,7 @@ export const ptBR = {
       repeat: "Repetir",
       participants: "Participantes",
       participantsSearch: "Buscar pessoas e agentes",
+      participantsEmpty: "Ninguém com esse nome.",
       participantsHelp: "Agentes participantes recebem a pauta e podem preparar um resumo antes.",
       cancel: "Cancelar",
       create: "Criar evento",

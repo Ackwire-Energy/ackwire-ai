@@ -5,6 +5,10 @@ export const en: Translations = {
   app: { name: "agentes" },
   common: {
     close: "Close",
+    removeName: "Remove {{name}}",
+    previousMonth: "Previous month",
+    nextMonth: "Next month",
+    chooseDate: "Choose a date",
     cancel: "Cancel",
     save: "Save",
     back: "Back",
@@ -886,6 +890,7 @@ export const en: Translations = {
       repeat: "Repeat",
       participants: "Participants",
       participantsSearch: "Search people and agents",
+      participantsEmpty: "No one with that name.",
       participantsHelp: "Agents taking part get the agenda and can prepare a summary beforehand.",
       cancel: "Cancel",
       create: "Create event",

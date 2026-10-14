@@ -25,7 +25,14 @@ export async function buildRunContext(
   db: Database,
   run: AgentRun,
   agent: Agent,
-  options: { maxMessages: number; toolsAvailable?: boolean; askUser?: boolean; trigger?: Message },
+  options: {
+    maxMessages: number;
+    toolsAvailable?: boolean;
+    askUser?: boolean;
+    /** "What you can do", built from the granted tools (`describeCapabilities`). */
+    capabilities?: string;
+    trigger?: Message;
+  },
 ): Promise<RunContext> {
   // Independent lookups go out together (the database may be remote); org,
   // channel and members come from the per-process cache when enabled.
@@ -122,6 +129,7 @@ export async function buildRunContext(
           options.askUser
             ? "- When a request is ambiguous, key information is missing, or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait. Don't ask about simple requests you can just do, and never ask more than you need."
             : "",
+          "- Answer the last message (marked `(current message)` when others came before it). Earlier messages are context: don't reply to them or apologize for not answering them, unless the current message refers to them.",
           "- Reply with the message text only, without an author prefix. Mention another agent with @handle only when you need it to act.",
         ]
           .filter(Boolean)
@@ -131,6 +139,7 @@ export async function buildRunContext(
         .join("\n\n"),
       cache: true,
     },
+    ...(options.capabilities ? [{ text: options.capabilities }] : []),
     {
       text:
         channel.kind === "dm"
@@ -142,7 +151,7 @@ export async function buildRunContext(
 
   return {
     system,
-    messages: toTurns(history, agent.id, names),
+    messages: toTurns(history, agent.id, names, trigger.id),
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
   };
 }
@@ -190,20 +199,31 @@ export function getChannelCached(db: Database, orgId: string, channelId: string)
  * Turns channel history into alternating user/assistant turns. The agent's
  * own messages are `assistant`; everything else is `user`, prefixed with the
  * author. Consecutive turns of one role are merged; the list starts and ends
- * with `user` (current models reject assistant prefill).
+ * with `user` (current models reject assistant prefill). When the last turn
+ * holds more than the message being answered (`currentId`), that one is
+ * marked `(current message)`: the others are context only.
  */
-export function toTurns(history: Message[], agentId: string, names: Map<string, string>): ModelMessage[] {
-  const turns: ModelMessage[] = [];
+export function toTurns(
+  history: Message[],
+  agentId: string,
+  names: Map<string, string>,
+  currentId?: string,
+): ModelMessage[] {
+  const turns: { role: "user" | "assistant"; parts: { id: string; text: string }[] }[] = [];
   for (const m of history) {
     const own = m.authorAgentId === agentId;
     const role = own ? "assistant" : "user";
     const authorId = m.authorUserId ?? m.authorAgentId;
-    const content = own ? m.body : `[${(authorId && names.get(authorId)) || "unknown"}]: ${m.body}`;
+    const text = own ? m.body : `[${(authorId && names.get(authorId)) || "unknown"}]: ${m.body}`;
     const last = turns.at(-1);
-    if (last && last.role === role && typeof last.content === "string") last.content += `\n\n${content}`;
-    else turns.push({ role, content });
+    if (last && last.role === role) last.parts.push({ id: m.id, text });
+    else turns.push({ role, parts: [{ id: m.id, text }] });
   }
   while (turns[0]?.role === "assistant") turns.shift();
   while (turns.at(-1)?.role === "assistant") turns.pop();
-  return turns;
+  const final = turns.at(-1);
+  if (final && currentId && final.parts.length > 1) {
+    for (const part of final.parts) if (part.id === currentId) part.text = `(current message) ${part.text}`;
+  }
+  return turns.map((t) => ({ role: t.role, content: t.parts.map((p) => p.text).join("\n\n") }));
 }

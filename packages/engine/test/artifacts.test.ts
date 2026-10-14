@@ -13,12 +13,14 @@ import {
   ForbiddenError,
   getArtifact,
   grantScopes,
+  listAgentScopes,
   listArtifacts,
   listArtifactVersions,
   listMessages,
   NotFoundError,
   postPersonMessage,
   searchVisible,
+  setAgentScopes,
   tableToCsv,
   updateArtifact,
   ValidationError,
@@ -140,9 +142,12 @@ describe("artifacts made by agents", () => {
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  test("without drive:write the agent is refused", async () => {
+  test("new agents can use the Drive by default; without drive:write the agent is refused", async () => {
     f = await setup({ artifactTools: true, reply: driveAgent() });
-    await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "drive:read" }]);
+    const defaults = (await listAgentScopes(f.db, f.org.id, f.agent.id)).map((g) => g.scope);
+    expect(defaults).toEqual(expect.arrayContaining(["context:read", "memory:write", "drive:read", "drive:write"]));
+    // drive:write is a default; an admin revoked it here.
+    await setAgentScopes(f.db, f.owner.id, f.org.id, f.agent.id, [{ connectionId: null, scope: "drive:read" }]);
     await post("@dev faz um relatório de março");
     await drainOutbox(f.db, f.handlers);
     expect(await f.db.select().from(schema.artifacts)).toEqual([]);

@@ -21,8 +21,11 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   "sandbox:exec": { label: "Run code", description: "Run commands in an isolated sandbox." },
 };
 
-/** Granted to every new agent: reading context and keeping its own notes. */
-export const DEFAULT_AGENT_SCOPES = ["context:read", "memory:write"];
+/**
+ * Granted to every new agent: reading context, keeping its own notes, and
+ * reading and writing Drive files (low risk). Admins and owners can revoke them.
+ */
+export const DEFAULT_AGENT_SCOPES = ["context:read", "memory:write", "drive:read", "drive:write"];
 
 export interface ScopeGrant {
   connectionId: string | null;
