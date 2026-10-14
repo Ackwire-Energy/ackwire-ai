@@ -16,7 +16,8 @@ export type OutboxJob = typeof outbox.$inferSelect;
  * Handlers must be idempotent: a job can run more than once (lease expiry).
  */
 export interface EnqueueInput {
-  orgId: string;
+  /** Null only for jobs outside any organization (e.g. a password-reset email). */
+  orgId: string | null;
   kind: string;
   payload: Record<string, unknown>;
   /** Enqueueing the same key twice is a no-op. */

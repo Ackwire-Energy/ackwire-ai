@@ -13,6 +13,7 @@
  */
 import {
   channelTopic,
+  createLogEmailSender,
   createMemoryPresence,
   createMemoryPubSub,
   createMemoryRateLimiter,
@@ -62,6 +63,7 @@ try {
     rateLimiter: createMemoryRateLimiter(),
     keyWrapper,
     legacyKeyWrappers: [],
+    email: createLogEmailSender(() => {}),
     platformCredentials: envPlatformCredentials({
       anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
     }),

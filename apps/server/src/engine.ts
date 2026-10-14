@@ -10,6 +10,7 @@ import {
   createToolGateway,
   type McpConnect,
   notifyOwnerOnBudget,
+  queueBudgetEmail,
   type ToolSource,
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
@@ -47,7 +48,10 @@ export function buildEngine(o: EngineOptions) {
     keyWrappers,
     providers: o.modelProviders,
     platformCredentials: adapters.platformCredentials,
-    onBudgetThreshold: notifyOwnerOnBudget(adapters.pubsub),
+    onBudgetThreshold: async (e) => {
+      await notifyOwnerOnBudget(adapters.pubsub)(e);
+      await queueBudgetEmail(db, config.PUBLIC_URL, e);
+    },
     embeddings,
   });
   const context: ContextDeps = {
@@ -80,6 +84,7 @@ export function buildEngine(o: EngineOptions) {
     tools,
     context,
     search: adapters.search,
+    email: adapters.email,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,

@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   type Adapters,
+  createLogEmailSender,
   createMemoryPresence,
   createMemoryPubSub,
   createMemoryRateLimiter,
@@ -26,6 +27,7 @@ const defaults: Adapters = {
   keyWrapper: { id: "local:v1", wrap: async () => "", unwrap: async () => new Uint8Array() },
   legacyKeyWrappers: [],
   platformCredentials: noPlatformCredentials,
+  email: createLogEmailSender(() => {}),
 };
 const ctx = { config: testConfig(), db: {} as Database, edition: "cloud" as const, version: "test" };
 

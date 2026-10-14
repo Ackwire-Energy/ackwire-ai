@@ -2,8 +2,10 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   type Adapters,
+  createLogEmailSender,
   createMemoryPresence,
   createMemoryRateLimiter,
+  createMillionSendSender,
   createPostgresPubSub,
   createPostgresSearchResolver,
   envPlatformCredentials,
@@ -62,6 +64,13 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     rateLimiter: createMemoryRateLimiter(),
     keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
     legacyKeyWrappers: [],
+    email: config.MILLIONSEND_API_KEY
+      ? createMillionSendSender({
+          apiKey: config.MILLIONSEND_API_KEY,
+          from: config.EMAIL_FROM,
+          replyTo: config.EMAIL_REPLY_TO,
+        })
+      : createLogEmailSender((line, data) => log.info(line, data)),
     platformCredentials: envPlatformCredentials({
       anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
     }),
@@ -85,10 +94,11 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     handlers: engine.handlers,
     pubsub: adapters.pubsub,
     context: engine.context,
+    approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
     log,
   });
 
-  const auth = createAuth({ db: database.db, config, log });
+  const auth = createAuth({ db: database.db, config, log, emailDelivers: adapters.email.delivers });
   const webDir = resolve(config.WEB_DIR);
   const app = createApp({
     edition,

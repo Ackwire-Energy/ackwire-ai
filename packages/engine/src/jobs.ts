@@ -1,13 +1,14 @@
-import type { SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
+import type { EmailSender, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
 import { and, count, eq, schema } from "@agenteschat/db";
 import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { dispatchDm, dispatchMentions } from "./dispatch";
+import { sendQueuedEmail } from "./email";
 import { publishChannelEvent } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { getMessage } from "./messages";
-import { enqueue, type JobHandlers } from "./outbox";
+import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import {
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
@@ -39,6 +40,8 @@ export interface JobDeps extends RunExecutorDeps {
   maxHops: number;
   /** Search index (jobs `search.index`, `search.reindex`). */
   search?: SearchIndexResolver;
+  /** Transactional email (job `email.send`). */
+  email?: EmailSender;
   router?: {
     /** Off = only @mentions start runs. */
     enabled: boolean;
@@ -49,6 +52,12 @@ export interface JobDeps extends RunExecutorDeps {
     strategy?: RouterStrategy;
   };
 }
+
+/** Organization of an org-scoped job (only system jobs such as some emails have none). */
+const orgOf = (job: OutboxJob) => {
+  if (!job.orgId) throw new PermanentJobError(`job ${job.kind} needs an organization`);
+  return job.orgId;
+};
 
 /** Every outbox job kind the core knows. Modules can add more through the server's worker options. */
 export function createJobHandlers(deps: JobDeps): JobHandlers {
@@ -67,7 +76,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
 
   return {
     "message.posted": async (job, ctx) => {
-      const input = { orgId: job.orgId, messageId: String(job.payload.messageId) };
+      const input = { orgId: orgOf(job), messageId: String(job.payload.messageId) };
       const message = await getMessage(deps.db, input.orgId, input.messageId);
       if (!message) return;
       if (deps.context && message.threadId) await maybeEnqueueReflection(deps, message.orgId, message.threadId);
@@ -124,27 +133,31 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (!deps.search) return;
       await indexSource(
         { db: deps.db, search: deps.search, gateway: deps.gateway },
-        { orgId: job.orgId, kind: job.payload.kind as SearchKind, sourceId: String(job.payload.sourceId) },
+        { orgId: orgOf(job), kind: job.payload.kind as SearchKind, sourceId: String(job.payload.sourceId) },
       );
     },
     "search.reindex": async (job) => {
       if (!deps.search) return;
-      await reindexOrg({ db: deps.db, search: deps.search, gateway: deps.gateway }, job.orgId);
+      await reindexOrg({ db: deps.db, search: deps.search, gateway: deps.gateway }, orgOf(job));
     },
     "context.reflect": async (job) => {
       if (!deps.context) return;
-      await reflectThread(deps.context, { orgId: job.orgId, threadRootId: String(job.payload.threadRootId) });
+      await reflectThread(deps.context, { orgId: orgOf(job), threadRootId: String(job.payload.threadRootId) });
     },
     "context.feedback": async (job) => {
       await applyReactionFeedback(deps.db, {
-        orgId: job.orgId,
+        orgId: orgOf(job),
         messageId: String(job.payload.messageId),
         reaction: String(job.payload.reaction),
       });
     },
+    "email.send": async (job) => {
+      if (!deps.email) throw new PermanentJobError("no email sender configured");
+      await sendQueuedEmail(deps.email, job.payload);
+    },
     "context.consolidate": async (job) => {
       if (!deps.context) return;
-      await consolidateOrg(deps.context, job.orgId);
+      await consolidateOrg(deps.context, orgOf(job));
     },
   };
 }

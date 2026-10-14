@@ -1,7 +1,5 @@
 [test]
 # Browser DOM for the web app and design system tests, attached only while
-# those files run (see packages/ui/testing/dom.ts).
-preload = ["./packages/ui/testing/preload.ts", "./packages/ui/testing/preload-done.ts"]
-# The first test of each file migrates a template database (PGlite); on a busy
-# machine that can take longer than Bun's 5 s default.
-timeout = 30000
+# those files run (see packages/ui/testing/dom.ts). The db preload raises the
+# default test timeout (first PGlite migration of each file).
+preload = ["./packages/db/test/preload.ts", "./packages/ui/testing/preload.ts", "./packages/ui/testing/preload-done.ts"]

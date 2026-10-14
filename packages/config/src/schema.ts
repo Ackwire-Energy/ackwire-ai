@@ -25,6 +25,7 @@ export interface EnvVarDefinition {
     | "Search"
     | "Storage"
     | "Sandbox"
+    | "Email"
     | "Observability";
   /** Example value for docs. Never a real secret. */
   example?: string;
@@ -270,6 +271,29 @@ export const envVars = {
     description: "Client secret of the Google OAuth client for the Google Drive connector.",
     section: "Connectors",
     secret: true,
+  },
+  MILLIONSEND_API_KEY: {
+    schema: z.string().optional(),
+    description:
+      "MillionSend API key (transactional email: invitations, password reset, email verification, budget and approval alerts). Without it, emails are written to the log instead of sent, and password reset and email verification stay off.",
+    section: "Email",
+    secret: true,
+  },
+  EMAIL_FROM: {
+    schema: z.string().default("agentes <ola@agentes.chat>"),
+    description:
+      "Sender of transactional emails, e.g. `agentes <ola@agentes.chat>` (the domain must be verified in MillionSend).",
+    section: "Email",
+  },
+  EMAIL_REPLY_TO: {
+    schema: z.string().optional(),
+    description: "Optional Reply-To address for transactional emails.",
+    section: "Email",
+  },
+  APPROVAL_REMINDER_HOURS: {
+    schema: z.coerce.number().min(0.25).max(23).default(4),
+    description: "Email approvers a digest of requests still waiting after this many hours (requests expire at 24 h).",
+    section: "Email",
   },
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),

@@ -89,7 +89,6 @@ export function SearchPage() {
                   ]
                     .filter(Boolean)
                     .join(" · ");
-                  const body = <HitBody snippet={h.snippet} meta={meta} />;
                   return c ? (
                     <Link
                       key={`${h.kind}-${h.sourceId}`}
@@ -97,11 +96,11 @@ export function SearchPage() {
                       params={{ orgId: org.id, channelId: c.id }}
                       className="ac-list__row"
                     >
-                      {body}
+                      <HitBody snippet={h.snippet} meta={meta} />
                     </Link>
                   ) : (
                     <div key={`${h.kind}-${h.sourceId}`} className="ac-list__row">
-                      {body}
+                      <HitBody snippet={h.snippet} meta={meta} />
                     </div>
                   );
                 })}

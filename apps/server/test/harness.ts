@@ -1,5 +1,6 @@
 import {
   type Adapters,
+  createFakeEmailSender,
   createMemoryPresence,
   createMemoryPubSub,
   createMemoryRateLimiter,
@@ -38,6 +39,7 @@ export async function createTestServer(
   const { db, close } = await createTestDatabase();
   const config = testConfig({ PUBLIC_URL: ORIGIN, AGENT_MAX_OUTPUT_TOKENS: "1000", ...options.env });
   const log = createLogger("error");
+  const email = createFakeEmailSender();
   const adapters: Adapters = {
     search: createPostgresSearchResolver(db),
     pubsub: createMemoryPubSub(),
@@ -46,6 +48,7 @@ export async function createTestServer(
     keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
     legacyKeyWrappers: [],
     platformCredentials: noPlatformCredentials,
+    email,
   };
   const provider = createFakeProvider(options.reply);
   const embeddings = createFakeEmbeddings();
@@ -61,7 +64,7 @@ export async function createTestServer(
     deltaFlushMs: 0,
   });
   const { handlers } = engine;
-  const auth = createAuth({ db, config, log });
+  const auth = createAuth({ db, config, log, emailDelivers: true });
   const app = createApp({
     edition: "selfhost",
     version: "test",
@@ -84,6 +87,7 @@ export async function createTestServer(
     adapters,
     provider,
     embeddings,
+    email,
     engine,
     app,
     auth,

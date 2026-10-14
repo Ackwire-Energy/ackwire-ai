@@ -1,6 +1,6 @@
 import type { Config } from "@agenteschat/config";
 import { type Database, schema } from "@agenteschat/db";
-import { deriveSecret, isSignupAllowed, onUserCreated } from "@agenteschat/engine";
+import { deriveSecret, isSignupAllowed, onUserCreated, queueEmail, sha256 } from "@agenteschat/engine";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -16,8 +16,9 @@ import type { Logger } from "./logger";
  * Mounted at `/api/auth/*`. The web app is served from the same origin, so
  * the session is an HttpOnly cookie — no tokens in the browser.
  */
-export function createAuth(deps: { db: Database; config: Config; log: Logger }) {
+export function createAuth(deps: { db: Database; config: Config; log: Logger; emailDelivers?: boolean }) {
   const { db, config, log } = deps;
+  const emailEnabled = deps.emailDelivers === true;
 
   const assertSignupAllowed = async (email: string) => {
     if (!(await isSignupAllowed(db, email, config.ALLOW_SIGNUP))) {
@@ -60,7 +61,52 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger }) 
       minPasswordLength: 8,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
+      // Only when a real email sender is configured (MILLIONSEND_API_KEY); sent through the outbox.
+      ...(emailEnabled
+        ? {
+            sendResetPassword: async ({
+              user,
+              url,
+              token,
+            }: {
+              user: { email: string };
+              url: string;
+              token: string;
+            }) => {
+              await queueEmail(db, {
+                orgId: null,
+                key: `password-reset:${sha256(token)}`,
+                to: [user.email],
+                template: { kind: "password_reset", url },
+              });
+            },
+          }
+        : {}),
     },
+    ...(emailEnabled
+      ? {
+          emailVerification: {
+            sendOnSignUp: true,
+            autoSignInAfterVerification: true,
+            sendVerificationEmail: async ({
+              user,
+              url,
+              token,
+            }: {
+              user: { email: string };
+              url: string;
+              token: string;
+            }) => {
+              await queueEmail(db, {
+                orgId: null,
+                key: `verify-email:${sha256(token)}`,
+                to: [user.email],
+                template: { kind: "verify_email", url },
+              });
+            },
+          },
+        }
+      : {}),
     socialProviders: {
       ...(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET
         ? { google: { clientId: config.GOOGLE_CLIENT_ID, clientSecret: config.GOOGLE_CLIENT_SECRET } }

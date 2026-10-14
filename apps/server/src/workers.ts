@@ -7,6 +7,7 @@ import {
   expireApprovals,
   type JobHandlers,
   processOutbox,
+  queueApprovalDigests,
 } from "@agenteschat/engine";
 import type { Logger } from "./logger";
 
@@ -16,6 +17,8 @@ export interface WorkerDeps {
   pubsub: PubSub;
   /** Memory jobs (idle reflection, nightly consolidation). */
   context?: ContextDeps;
+  /** Approval reminder emails. */
+  approvalDigest?: { publicUrl: string; afterHours: number };
   log: Logger;
   workerId?: string;
 }
@@ -28,6 +31,7 @@ export const WORKER_INTERVALS_MS = {
   outbox: 1_000,
   partitions: 24 * 3600_000,
   approvals: 60_000,
+  approvalDigest: 15 * 60_000,
   reflections: 10 * 60_000,
   consolidation: 24 * 3600_000,
 };
@@ -99,6 +103,14 @@ export function startWorkers(deps: WorkerDeps) {
     const expired = await expireApprovals({ db, pubsub: deps.pubsub });
     if (expired > 0) log.info("approvals expired", { expired });
   });
+
+  const digest = deps.approvalDigest;
+  if (digest) {
+    every("approvalDigest", WORKER_INTERVALS_MS.approvalDigest, async () => {
+      const queued = await queueApprovalDigests(db, digest.publicUrl, digest.afterHours);
+      if (queued > 0) log.info("approval reminder emails queued", { queued });
+    });
+  }
 
   const context = deps.context;
   if (context) {

@@ -9,6 +9,7 @@ import {
   listMembers,
   listRuns,
   orgOverview,
+  queueInvitationEmail,
   requirePermission,
   resendInvitation,
   rotateCredential,
@@ -277,7 +278,20 @@ export function managementRoutes(deps: AppDeps) {
       },
     }),
     async (c) => {
-      const results = await inviteMany(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"));
+      const { orgId } = c.req.valid("param");
+      const results = await inviteMany(db, c.get("user").id, orgId, c.req.valid("json"));
+      for (const r of results) {
+        if (r.status !== "invited") continue;
+        await queueInvitationEmail(db, {
+          orgId,
+          invitationId: r.invitationId,
+          email: r.email,
+          role: c.req.valid("json").role,
+          url: inviteUrl(r.token),
+          inviterId: c.get("user").id,
+        });
+      }
+      deps.wakeWorkers?.();
       return c.json(
         {
           results: results.map((r) =>
@@ -304,6 +318,15 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, invitationId } = c.req.valid("param");
       const { invitation, token } = await resendInvitation(db, c.get("user").id, orgId, invitationId);
+      await queueInvitationEmail(db, {
+        orgId,
+        invitationId,
+        email: invitation.email,
+        role: invitation.role,
+        url: inviteUrl(token),
+        inviterId: c.get("user").id,
+      });
+      deps.wakeWorkers?.();
       return c.json({ url: inviteUrl(token), expiresAt: invitation.expiresAt.toISOString() }, 200);
     },
   );

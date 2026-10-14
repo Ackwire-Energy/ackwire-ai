@@ -17,6 +17,7 @@ export * from "./credentials";
 export * from "./crypto";
 export * from "./dispatch";
 export * from "./dms";
+export * from "./email";
 export * from "./errors";
 export * from "./events";
 export * from "./executor";

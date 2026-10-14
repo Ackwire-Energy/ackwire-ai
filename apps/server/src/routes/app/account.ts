@@ -9,6 +9,7 @@ import {
   listMembers,
   listMemberships,
   previewInvitation,
+  queueInvitationEmail,
   removeMember,
   requirePermission,
   revokeInvitation,
@@ -282,6 +283,15 @@ export function accountRoutes(deps: AppDeps) {
         c.req.valid("json"),
       );
       const url = `${config.PUBLIC_URL.replace(/\/$/, "")}/invite/${token}`;
+      await queueInvitationEmail(db, {
+        orgId: invitation.orgId,
+        invitationId: invitation.id,
+        email: invitation.email,
+        role: invitation.role,
+        url,
+        inviterId: c.get("user").id,
+      });
+      deps.wakeWorkers?.();
       return c.json(
         {
           invitation: {
