@@ -8,9 +8,9 @@
     "ee"
   ],
   "scripts": {
-    "dev": "bun run --filter '@agenteschat/server' dev",
+    "dev": "bun run --filter '@agenteschat/server' --filter '@agenteschat/web' dev",
     "start": "bun run --filter '@agenteschat/server' start",
-    "build": "bun run --filter '@agenteschat/server' build",
+    "build": "bun run --filter '@agenteschat/web' build && bun run --filter '@agenteschat/server' build",
     "test": "bun test",
     "typecheck": "bun run --filter '*' typecheck",
     "lint": "biome check .",

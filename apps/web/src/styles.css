@@ -1,0 +1,10 @@
+/* App styles: fonts, the design system, and page layout. No component visuals here: those live in @agenteschat/ui. */
+@import "@fontsource-variable/onest/index.css";
+@import "@fontsource-variable/martian-mono/index.css";
+@import "@agenteschat/ui/styles.css";
+@import "./layout.css";
+
+:root {
+  --font-sans: "Onest Variable", Onest, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Martian Mono Variable", "Martian Mono", ui-monospace, Menlo, monospace;
+}

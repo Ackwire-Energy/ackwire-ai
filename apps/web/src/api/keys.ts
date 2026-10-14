@@ -1,0 +1,26 @@
+/** React Query keys. Everything under ["org", orgId] is dropped when switching organizations. */
+export const keys = {
+  health: ["health"] as const,
+  authConfig: ["auth-config"] as const,
+  me: ["me"] as const,
+  models: ["models"] as const,
+  invitation: (token: string) => ["invitation", token] as const,
+  org: (orgId: string) => ["org", orgId] as const,
+  members: (orgId: string) => ["org", orgId, "members"] as const,
+  invitations: (orgId: string) => ["org", orgId, "invitations"] as const,
+  agents: (orgId: string) => ["org", orgId, "agents"] as const,
+  credentials: (orgId: string) => ["org", orgId, "credentials"] as const,
+  usage: (orgId: string) => ["org", orgId, "usage"] as const,
+  channels: (orgId: string) => ["org", orgId, "channels"] as const,
+  channelMembers: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "members"] as const,
+  messages: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "messages"] as const,
+  thread: (orgId: string, channelId: string, rootId: string) =>
+    ["org", orgId, "channel", channelId, "thread", rootId] as const,
+  approvals: (orgId: string) => ["org", orgId, "approvals"] as const,
+  permissions: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "permissions"] as const,
+  connectors: (orgId: string) => ["org", orgId, "connectors"] as const,
+  runs: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs"] as const,
+  memory: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory"] as const,
+  proposals: (orgId: string) => ["org", orgId, "proposals"] as const,
+  presence: (orgId: string) => ["org", orgId, "presence"] as const,
+};

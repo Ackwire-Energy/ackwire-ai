@@ -13,6 +13,7 @@ export { Checkbox, CheckboxPill, type CheckboxProps, Radio, RadioCard, RadioGrou
 export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge } from "./components/Chip";
 export { Composer, type ComposerProps } from "./components/Composer";
 export { Dialog, DialogBody, DialogFooter, type DialogProps, DialogSearchList } from "./components/Dialog";
+export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";
 export { AffixInput, Field, type FieldProps, Input, SearchInput, Textarea, useFieldControl } from "./components/Field";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { Mention } from "./components/Mention";

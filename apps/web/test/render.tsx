@@ -1,0 +1,110 @@
+import {
+  createMemoryHistory,
+  createRootRouteWithContext,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from "@tanstack/react-router";
+import { act, render, within } from "@testing-library/react";
+import type { ReactNode } from "react";
+import type { ApiClient } from "@/api/client";
+import { AppProviders, type AppServices } from "@/app/providers";
+import { createQueryClient } from "@/app/query-client";
+import type { RouterContext } from "@/app/router-context";
+import type { AuthClient } from "@/auth/client";
+import { OrgProvider } from "@/components/org-context";
+import { createI18n } from "@/i18n";
+import { createToastStore } from "@/lib/toast";
+import type { SocketFactory } from "@/realtime/connection";
+import { RealtimeProvider } from "@/realtime/context";
+import { routeTree } from "@/routeTree.gen";
+import { createFakeAuth } from "./fake-auth";
+import { fakeSockets } from "./fake-socket";
+
+export function makeServices(
+  api: ApiClient,
+  auth: AuthClient = createFakeAuth().auth,
+  createSocket: SocketFactory = fakeSockets().factory,
+): AppServices {
+  const toasts = createToastStore();
+  const queryClient = createQueryClient({
+    onUnauthorized: () => {},
+    onMutationError: (m) => toasts.show(m, "error"),
+    unknownError: () => "erro",
+  });
+  queryClient.setDefaultOptions({ queries: { retry: false, refetchOnWindowFocus: false } });
+  return { api, auth, queryClient, i18n: createI18n("pt-BR"), toasts, createSocket };
+}
+
+/** Lets pending promises and React updates settle. */
+export async function settle(times = 3) {
+  for (let i = 0; i < times; i++) await act(() => new Promise((r) => setTimeout(r, 0)));
+}
+
+export const screen = () => within(document.body);
+
+/**
+ * Renders one page inside the app providers and a minimal router (for
+ * `<Link>`), optionally inside an organization (sidebar context + realtime).
+ */
+export async function renderPage(
+  node: ReactNode,
+  options: {
+    api: ApiClient;
+    auth?: AuthClient;
+    org?: boolean;
+    createSocket?: SocketFactory;
+    path?: string;
+  },
+) {
+  const services = makeServices(options.api, options.auth);
+  const me = await options.api.account.me();
+  const sockets = fakeSockets();
+  const createSocket = options.createSocket ?? sockets.factory;
+  const content =
+    options.org && me?.organizations[0] ? (
+      <OrgProvider org={me.organizations[0]} me={me}>
+        <RealtimeProvider orgId={me.organizations[0].id} createSocket={createSocket}>
+          {node}
+        </RealtimeProvider>
+      </OrgProvider>
+    ) : (
+      node
+    );
+  const root = createRootRouteWithContext<RouterContext>()({ component: Outlet });
+  const page = createRoute({ getParentRoute: () => root, path: "$", component: () => content });
+  const router = createRouter({
+    routeTree: root.addChildren([page]),
+    history: createMemoryHistory({ initialEntries: [options.path ?? "/page"] }),
+    context: { queryClient: services.queryClient, api: options.api },
+  });
+  const result = render(
+    <AppProviders services={services}>
+      <RouterProvider router={router} />
+    </AppProviders>,
+  );
+  await settle();
+  return { ...result, services, router, sockets };
+}
+
+/** Renders the real app routes (route guards, redirects) at `path`. */
+export async function renderApp(
+  path: string,
+  options: { api: ApiClient; auth?: AuthClient; createSocket?: SocketFactory },
+) {
+  const sockets = fakeSockets();
+  const services = makeServices(options.api, options.auth, options.createSocket ?? sockets.factory);
+  const router = createRouter({
+    routeTree,
+    history: createMemoryHistory({ initialEntries: [path] }),
+    context: { queryClient: services.queryClient, api: options.api },
+  });
+  const result = render(
+    <AppProviders services={services}>
+      <RouterProvider router={router} />
+    </AppProviders>,
+  );
+  await settle(6);
+  return { ...result, services, router, sockets };
+}

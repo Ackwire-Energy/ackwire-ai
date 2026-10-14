@@ -1,0 +1,298 @@
+import {
+  Avatar,
+  Button,
+  Card,
+  CheckboxPill,
+  EmptyState,
+  Field,
+  Input,
+  OptionCard,
+  Select,
+  type SelectOption,
+  Textarea,
+} from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
+import { useChannels, useConnectors, useCreateAgent, useCredentials, useMembers, useModels } from "@/api/queries";
+import type { Agent, Credential, Model } from "@/api/types";
+import { useOrg } from "@/components/org-context";
+import { joinNames } from "@/lib/format";
+import { can } from "@/lib/permissions";
+import { handleFrom, parseAmount } from "@/lib/text";
+
+export const ROLE_IDS = ["dev", "ops", "qa", "pm", "custom"] as const;
+export type RoleId = (typeof ROLE_IDS)[number];
+
+/** Model descriptions of the approved screen, by model family. */
+export function modelDescription(t: TFunction, locale: string, model: Model) {
+  const id = model.id.toLowerCase();
+  if (id.includes("sonnet")) return t("newAgent.modelDesc.sonnet");
+  if (id.includes("opus")) return t("newAgent.modelDesc.opus");
+  if (id.includes("haiku")) return t("newAgent.modelDesc.haiku");
+  const fmt = (n: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n);
+  return t("newAgent.modelDesc.other", { input: fmt(model.inputUsdPerMTok), output: fmt(model.outputUsdPerMTok) });
+}
+
+/** Key choices: the organization's live credentials, then the platform key. */
+export function keyOptions(t: TFunction, credentials: Credential[]): SelectOption[] {
+  return [
+    ...credentials
+      .filter((c) => !c.revokedAt)
+      .map((c) => ({ value: c.id, label: c.label, description: t("newAgent.orgKeyDesc", { hint: c.keyHint }) })),
+    { value: "platform", label: t("newAgent.platformKey"), description: t("newAgent.platformKeyDesc") },
+  ];
+}
+
+/** Connector toggles of "Onde trabalha e com o quê": one per connector, granting its non-gated scopes. */
+const CONNECTOR_TOGGLES = ["github", "sentry", "drive", "sandbox"] as const;
+const isKnownConnector = (id: string): id is (typeof CONNECTOR_TOGGLES)[number] =>
+  (CONNECTOR_TOGGLES as readonly string[]).includes(id);
+
+/** telas/NovoAgente.dc.html */
+export function NewAgentPage() {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const api = useApi();
+  const allowed = can(org.role, "manage_agents");
+  const members = useMembers(org.id);
+  const models = useModels();
+  const credentials = useCredentials(org.id, allowed);
+  const channels = useChannels(org.id);
+  const connectors = useConnectors(org.id);
+  const create = useCreateAgent(org.id);
+
+  const [role, setRole] = useState<RoleId>("qa");
+  const [name, setName] = useState("");
+  const [owner, setOwner] = useState(me.user.id);
+  const [instructions, setInstructions] = useState(t("newAgent.roles.qa.instructions"));
+  const [model, setModel] = useState<string | undefined>(undefined);
+  const [key, setKey] = useState<string | undefined>(undefined);
+  const [budget, setBudget] = useState("25");
+  const [on, setOn] = useState<Record<string, boolean>>({});
+  const [created, setCreated] = useState<{ agent: Agent; channels: { id: string; name: string }[] } | null>(null);
+
+  const myChannels = useMemo(() => (channels.data ?? []).filter((c) => c.isMember), [channels.data]);
+  useEffect(() => {
+    if (!model && models.data) setModel(models.data.defaultModel);
+  }, [model, models.data]);
+  useEffect(() => {
+    if (!key && credentials.data) setKey(keyOptions(t, credentials.data)[0]?.value);
+  }, [key, credentials.data, t]);
+  useEffect(() => {
+    // Defaults like the screen: the channels you're in and the read-only connectors.
+    setOn((prev) => {
+      const next = { ...prev };
+      for (const c of myChannels) if (next[`ch:${c.id}`] === undefined) next[`ch:${c.id}`] = c.name !== "general";
+      for (const c of connectors.data ?? [])
+        if (next[`co:${c.id}`] === undefined) next[`co:${c.id}`] = c.id !== "drive";
+      return next;
+    });
+  }, [myChannels, connectors.data]);
+
+  if (!allowed) {
+    return (
+      <div className="page page--narrow">
+        <header className="page__header">
+          <h1 className="page-title">{t("newAgent.title")}</h1>
+        </header>
+        <EmptyState icon="agent">{t("newAgent.adminsOnly", { org: org.name })}</EmptyState>
+      </div>
+    );
+  }
+
+  const displayName = name.trim() || t("newAgent.defaultName");
+  const handle = handleFrom(name.trim() || t("newAgent.defaultName"));
+  const amount = parseAmount(budget);
+  const budgetInvalid = !(amount > 0);
+  const cannotCreate = budgetInvalid || !name.trim() || create.isPending;
+
+  const pickRole = (id: RoleId) => {
+    setRole(id);
+    setInstructions(t(`newAgent.roles.${id}.instructions`));
+  };
+
+  const submit = async () => {
+    if (cannotCreate) return;
+    const agent = await create.mutateAsync({
+      name: name.trim(),
+      handle,
+      role: role === "custom" ? "" : t(`newAgent.roles.${role}.name`),
+      instructions,
+      model,
+      ownerUserId: owner,
+      credentialId: key && key !== "platform" ? key : null,
+      monthlyBudgetUsd: amount,
+    });
+    const joined = myChannels.filter((c) => on[`ch:${c.id}`]);
+    for (const c of joined) await api.chat.addMember(org.id, c.id, { agentId: agent.id });
+    const scopes = (connectors.data ?? [])
+      .filter((c) => on[`co:${c.id}`])
+      .flatMap((c) => c.scopes.filter((s) => !s.requiresApproval).map((s) => s.id));
+    await api.permissions.set(org.id, agent.id, scopes);
+    setCreated({ agent, channels: joined.map((c) => ({ id: c.id, name: c.name })) });
+  };
+
+  if (created) {
+    const first = created.channels[0];
+    const names = joinNames(
+      created.channels.map((c) => `#${c.name}`),
+      t("newAgent.and"),
+    );
+    return (
+      <div className="page page--narrow">
+        <Card padded as="div" style={{ alignItems: "flex-start", gap: 16 }}>
+          <Avatar kind="agent" size="lg" name={created.agent.name} running />
+          <h1 className="page-title">{t("newAgent.createdTitle", { name: created.agent.name })}</h1>
+          <p className="page-sub" style={{ maxWidth: "60ch" }}>
+            {created.channels.length > 0
+              ? t("newAgent.createdText", { channels: names, handle: created.agent.handle })
+              : t("newAgent.createdTextNoChannels", { name: created.agent.name, handle: created.agent.handle })}
+          </p>
+          <div className="row">
+            {first ? (
+              <Button asChild variant="primary">
+                <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: first.id }}>
+                  {t("newAgent.goTo", { channel: first.name })}
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild variant="primary">
+                <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: created.agent.id }}>
+                  {t("newAgent.openProfile")}
+                </Link>
+              </Button>
+            )}
+            <Button
+              onClick={() => {
+                setCreated(null);
+                setName("");
+              }}
+            >
+              {t("newAgent.createAnother")}
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  const ownerOptions: SelectOption[] = (members.data ?? []).map((m) => ({
+    value: m.userId,
+    label: m.name,
+    description: t(`roles.${m.role}`),
+  }));
+  const modelOptions: SelectOption[] = (models.data?.models ?? []).map((m) => ({
+    value: m.id,
+    label: m.label,
+    description: modelDescription(t, i18n.language, m),
+  }));
+  const toggles = [
+    ...myChannels.map((c) => ({ id: `ch:${c.id}`, label: `#${c.name}` })),
+    ...(connectors.data ?? []).map((c) => ({
+      id: `co:${c.id}`,
+      label: isKnownConnector(c.id) ? t(`newAgent.connectors.${c.id}`) : c.name,
+    })),
+  ];
+
+  return (
+    <div className="page page--narrow">
+      <header className="page__header">
+        <h1 className="page-title">{t("newAgent.title")}</h1>
+        <p className="page-sub">{t("newAgent.subtitle")}</p>
+      </header>
+
+      <section aria-labelledby="q-role" className="section">
+        <h2 id="q-role" className="section-title">
+          {t("newAgent.roleQuestion")}
+        </h2>
+        <div className="grid-options grid-options--sm">
+          {ROLE_IDS.map((id) => (
+            <OptionCard key={id} agent stacked pressed={role === id} onClick={() => pickRole(id)}>
+              <span className="ac-option__title">{t(`newAgent.roles.${id}.name`)}</span>
+              <span className="ac-option__desc">{t(`newAgent.roles.${id}.desc`)}</span>
+            </OptionCard>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="q-who" className="section" style={{ gap: 16 }}>
+        <h2 id="q-who" className="section-title">
+          {t("newAgent.who")}
+        </h2>
+        <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+          <Avatar kind="agent" size="lg" name={displayName} />
+          <div className="grid-fields" style={{ flex: 1 }}>
+            <Field label={t("newAgent.name")} id="ag-name" help={t("newAgent.nameHelp", { handle })}>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t("newAgent.namePlaceholder")}
+              />
+            </Field>
+            <Field label={t("newAgent.owner")} id="ag-owner" help={t("newAgent.ownerHelp")}>
+              <Select value={owner} onValueChange={setOwner} options={ownerOptions} />
+            </Field>
+          </div>
+        </div>
+        <Field label={t("newAgent.instructions")} id="ag-instr" help={t("newAgent.instructionsHelp")}>
+          <Textarea rows={4} value={instructions} onChange={(e) => setInstructions(e.target.value)} />
+        </Field>
+      </section>
+
+      <section aria-labelledby="q-model" className="section">
+        <h2 id="q-model" className="section-title">
+          {t("newAgent.modelAndCost")}
+        </h2>
+        <div className="grid-fields">
+          <Field label={t("newAgent.model")} id="ag-model">
+            <Select value={model} onValueChange={setModel} options={modelOptions} />
+          </Field>
+          <Field label={t("newAgent.key")} id="ag-key">
+            <Select value={key} onValueChange={setKey} options={keyOptions(t, credentials.data ?? [])} />
+          </Field>
+          <Field
+            label={t("newAgent.budget")}
+            id="ag-budget"
+            error={budgetInvalid ? t("newAgent.budgetInvalid") : undefined}
+            help={t("newAgent.budgetHelp")}
+          >
+            <Input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} />
+          </Field>
+        </div>
+      </section>
+
+      <section aria-labelledby="q-where" className="section">
+        <h2 id="q-where" className="section-title">
+          {t("newAgent.where")}
+        </h2>
+        <div className="row">
+          {toggles.map((tg) => (
+            <CheckboxPill
+              key={tg.id}
+              id={`tg-${tg.id.replace(":", "-")}`}
+              checked={Boolean(on[tg.id])}
+              onCheckedChange={(v) => setOn((prev) => ({ ...prev, [tg.id]: v }))}
+            >
+              {tg.label}
+            </CheckboxPill>
+          ))}
+        </div>
+        <span className="small muted">{t("newAgent.whereNote")}</span>
+      </section>
+
+      <div className="row" style={{ justifyContent: "flex-end", paddingTop: 8, borderTop: "1px solid var(--line)" }}>
+        <Button asChild>
+          <Link to="/org/$orgId" params={{ orgId: org.id }}>
+            {t("common.cancel")}
+          </Link>
+        </Button>
+        <Button variant="primary" disabled={cannotCreate} onClick={() => void submit().catch(() => {})}>
+          {t("newAgent.create", { name: displayName })}
+        </Button>
+      </div>
+    </div>
+  );
+}

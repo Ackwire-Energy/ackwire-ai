@@ -39,4 +39,18 @@ export const extraIcons = {
     ["circle", { cx: "13", cy: "6", r: "2" }],
     ["circle", { cx: "7", cy: "14", r: "2" }],
   ],
+  /** Memoria.dc.html: fact. */
+  info: [
+    ["circle", { cx: "10", cy: "10", r: "7" }],
+    ["path", { d: "M10 9v4.5M10 6.5v.01" }],
+  ],
+  /** Memoria.dc.html: preference. */
+  preference: [
+    ["circle", { cx: "8", cy: "7", r: "2.8" }],
+    ["path", { d: "M3 16c.6-2.6 2.5-4 5-4s4.4 1.4 5 4" }],
+  ],
+  /** Memoria.dc.html: "Sempre no contexto". */
+  pin: [["path", { d: "M7 3h6l-1 5 3 3H5l3-3zM10 11v6" }]],
+  /** Memoria.dc.html, Propostas.dc.html: back link. */
+  chevronLeft: [["path", { d: "M12 5 7 10l5 5" }]],
 } satisfies Record<string, IconShape[]>;

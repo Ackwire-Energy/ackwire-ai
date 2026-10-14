@@ -275,3 +275,39 @@ describe("Logo, Icon, Meter", () => {
     expect((meter.firstElementChild as HTMLElement).style.width).toBe("31%");
   });
 });
+
+describe("Diff", () => {
+  test("keeps equal lines, marks removed and added ones", async () => {
+    const { diffLines } = await import("../src");
+    const lines = diffLines(
+      ["Programa em branches.", "Abre PRs pequenos.", "Pede ajuda ao João."],
+      ["Programa em branches.", "Abre PRs de até 300 linhas.", "Abre PRs pequenos.", "Pede revisão do João."],
+    );
+    expect(lines).toEqual([
+      { kind: "same", text: "Programa em branches." },
+      { kind: "add", text: "Abre PRs de até 300 linhas." },
+      { kind: "same", text: "Abre PRs pequenos." },
+      { kind: "del", text: "Pede ajuda ao João." },
+      { kind: "add", text: "Pede revisão do João." },
+    ]);
+  });
+
+  test("renders neutral lines with screen-reader labels", async () => {
+    const { Diff } = await import("../src");
+    const { container } = render(
+      <Diff
+        aria-label="Mudança"
+        addedLabel="Adicionado: "
+        removedLabel="Removido: "
+        lines={[
+          { kind: "del", text: "velho" },
+          { kind: "add", text: "novo" },
+        ]}
+      />,
+    );
+    const [del, add] = Array.from(container.querySelectorAll(".ac-diff__line"));
+    expect(del?.className).toContain("ac-diff__line--del");
+    expect(del?.textContent).toBe("−Removido: velho");
+    expect(add?.textContent).toBe("+Adicionado: novo");
+  });
+});
