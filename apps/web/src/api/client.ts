@@ -12,6 +12,8 @@ import type {
   Connection,
   ConnectorCatalog,
   Credential,
+  CustomConnectStart,
+  CustomServer,
   Health,
   Invitation,
   InvitationPreview,
@@ -31,6 +33,7 @@ import type {
   Run,
   RunStep,
   ScopeGrant,
+  ToolAccess,
   UsageReport,
 } from "./types";
 
@@ -167,6 +170,27 @@ export interface ApiClient {
     list(orgId: string): Promise<Proposal[]>;
     accept(orgId: string, proposalId: string, finalText?: string): Promise<Proposal>;
     refuse(orgId: string, proposalId: string): Promise<Proposal>;
+  };
+  customConnectors: {
+    list(orgId: string): Promise<CustomServer[]>;
+    /**
+     * Connects to an https MCP server. Without `apiKey` the server tries OAuth
+     * (discovery + dynamic client registration); if the MCP server doesn't
+     * support it, answers `needs_key`.
+     */
+    connect(
+      orgId: string,
+      input: { serverUrl: string; apiKey?: string; label?: string; returnTo: string },
+    ): Promise<CustomConnectStart>;
+    /** Lists the server's tools again; new ones come back unclassified. */
+    refresh(orgId: string, serverId: string): Promise<CustomServer>;
+    /** Saves the classification; only classified tools become available to agents. */
+    saveTools(
+      orgId: string,
+      serverId: string,
+      input: { label: string; tools: { name: string; access: ToolAccess; label: string }[] },
+    ): Promise<CustomServer>;
+    disconnect(orgId: string, serverId: string): Promise<void>;
   };
   invites: {
     /** Org-wide link: whoever joins with it becomes a member (7 days). */

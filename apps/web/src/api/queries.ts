@@ -3,7 +3,7 @@ import { upsertMessage } from "@/chat/timeline";
 import type { ApiClient } from "./client";
 import { useApi } from "./context";
 import { keys } from "./keys";
-import type { AgentInput, Approval, Message, OrgSettings, Role, ScopeGrant } from "./types";
+import type { AgentInput, Approval, Message, OrgSettings, Role, ScopeGrant, ToolAccess } from "./types";
 
 /**
  * React Query hooks over the `ApiClient`. Reads are cached per organization;
@@ -460,6 +460,40 @@ export function useUpdateChannel(orgId: string, channelId: string) {
 }
 
 // ── Mock-backed features ────────────────────────────────────────────────────
+
+export const useCustomServers = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.customServers(orgId), queryFn: () => api.customConnectors.list(orgId) });
+};
+
+export function useCustomServerAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const done = () => qc.invalidateQueries({ queryKey: keys.customServers(orgId) });
+  return {
+    connect: useMutation({
+      mutationFn: (input: { serverUrl: string; apiKey?: string; label?: string; returnTo: string }) =>
+        api.customConnectors.connect(orgId, input),
+      onSuccess: done,
+    }),
+    refresh: useMutation({ mutationFn: (id: string) => api.customConnectors.refresh(orgId, id), onSuccess: done }),
+    save: useMutation({
+      mutationFn: ({
+        id,
+        ...input
+      }: {
+        id: string;
+        label: string;
+        tools: { name: string; access: ToolAccess; label: string }[];
+      }) => api.customConnectors.saveTools(orgId, id, input),
+      onSuccess: done,
+    }),
+    disconnect: useMutation({
+      mutationFn: (id: string) => api.customConnectors.disconnect(orgId, id),
+      onSuccess: done,
+    }),
+  };
+}
 
 export const useMemory = (orgId: string, agentId: string) => {
   const api = useApi();

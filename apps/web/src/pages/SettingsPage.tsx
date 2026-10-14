@@ -20,6 +20,8 @@ import {
   useConnections,
   useConnectWithKey,
   useCredentials,
+  useCustomServerAction,
+  useCustomServers,
   useDisconnect,
   usePlatformKey,
   useRemoveCredential,
@@ -29,7 +31,8 @@ import {
   useUpdateSettings,
   useUsageReport,
 } from "@/api/queries";
-import type { Connection, ConnectorDef, Credential } from "@/api/types";
+import type { Connection, ConnectorDef, Credential, CustomServer } from "@/api/types";
+import { ConnectCustomDialog, CustomServerRow, ReviewToolsDialog } from "@/components/CustomMcp";
 import { useOrg } from "@/components/org-context";
 import { formatShortDate, formatUsd, relativeTime } from "@/lib/format";
 import { navigateAway } from "@/lib/navigate";
@@ -143,6 +146,11 @@ function ConnectorsSection() {
   const [adding, setAdding] = useState(false);
   const [connecting, setConnecting] = useState<ConnectorDef | null>(null);
   const [removing, setRemoving] = useState<{ connection: Connection; def: ConnectorDef } | null>(null);
+  const customServers = useCustomServers(org.id);
+  const customActions = useCustomServerAction(org.id);
+  const custom = customServers.data ?? [];
+  const [addingCustom, setAddingCustom] = useState(false);
+  const [reviewing, setReviewing] = useState<CustomServer | null>(null);
   const active = (connections.data ?? []).filter((c) => !c.revokedAt);
   const defOf = (c: Connection) => catalog.data?.connectors.find((d) => d.id === c.connector);
 
@@ -156,12 +164,32 @@ function ConnectorsSection() {
           <span className="small muted">{t("connectors.subtitle", { org: org.name })}</span>
         </div>
         {admin && (
-          <Button size="sm" icon="plus" onClick={() => setAdding(true)}>
-            {t("connectors.add")}
-          </Button>
+          <div className="row">
+            <Button size="sm" onClick={() => setAddingCustom(true)}>
+              {t("customMcp.connectOther")}
+            </Button>
+            <Button size="sm" icon="plus" onClick={() => setAdding(true)}>
+              {t("connectors.add")}
+            </Button>
+          </div>
         )}
       </div>
-      {connections.isSuccess && active.length === 0 && <p className="small muted">{t("connectors.none")}</p>}
+      {connections.isSuccess && active.length === 0 && custom.length === 0 && (
+        <p className="small muted">{t("connectors.none")}</p>
+      )}
+      {custom.length > 0 && (
+        <List aria-label={t("customMcp.custom")}>
+          {custom.map((server) => (
+            <CustomServerRow
+              key={server.id}
+              server={server}
+              admin={admin}
+              onReview={() => setReviewing(server)}
+              onDisconnect={() => customActions.disconnect.mutate(server.id)}
+            />
+          ))}
+        </List>
+      )}
       {active.length > 0 && (
         <List>
           {active.map((c) => {
@@ -201,6 +229,15 @@ function ConnectorsSection() {
         </List>
       )}
 
+      <ConnectCustomDialog
+        open={addingCustom}
+        onOpenChange={setAddingCustom}
+        onConnected={(server) => {
+          setAddingCustom(false);
+          setReviewing(server);
+        }}
+      />
+      <ReviewToolsDialog server={reviewing} onClose={() => setReviewing(null)} />
       <AddConnectorDialog
         open={adding}
         onOpenChange={setAdding}

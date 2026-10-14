@@ -702,3 +702,26 @@ p {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
 }
+
+/* Custom MCP tool classification (same row pattern as the permissions dialog) */
+.tool-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.tool-row__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.tool-row__name {
+  font-size: 13px;
+}
+.tool-row__controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}

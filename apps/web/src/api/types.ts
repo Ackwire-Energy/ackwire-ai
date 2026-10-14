@@ -433,3 +433,37 @@ export interface BudgetEvent {
   spentNanoUsd: number;
   budgetNanoUsd: number;
 }
+
+// ── Custom MCP servers (mock until the backend lands, after phase 5) ─────────
+
+/** How a tool of a custom server may be used. `null` = not classified yet (hidden from agents). */
+export type ToolAccess = "read" | "write" | "approval";
+
+export interface CustomTool {
+  name: string;
+  /** As the server describes it. */
+  description: string;
+  /** The server's `readOnlyHint` annotation, when it sends one. */
+  readOnlyHint: boolean | null;
+  access: ToolAccess | null;
+  /** Shown to people (approval cards, permissions), in pt-BR. */
+  label: string;
+  firstSeenAt: string;
+}
+
+export interface CustomServer {
+  id: string;
+  serverUrl: string;
+  label: string;
+  authType: "oauth" | "api_key";
+  tools: CustomTool[];
+  /** Last time an admin saved the classification; null = never (nothing exposed). */
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+/** What connecting to a URL needs: OAuth (discovery + dynamic client registration) or an API key. */
+export type CustomConnectStart =
+  | { status: "connected"; server: CustomServer }
+  | { status: "oauth"; authorizeUrl: string }
+  | { status: "needs_key" };

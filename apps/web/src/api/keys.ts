@@ -20,6 +20,7 @@ export const keys = {
   approval: (orgId: string, approvalId: string) => ["org", orgId, "approvals", approvalId] as const,
   catalog: ["connector-catalog"] as const,
   connections: (orgId: string) => ["org", orgId, "connections"] as const,
+  customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
   runs: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs"] as const,
   run: (orgId: string, runId: string) => ["org", orgId, "run", runId] as const,
