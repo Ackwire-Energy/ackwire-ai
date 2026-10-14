@@ -147,3 +147,24 @@ describe("Anthropic adapter (scripted transport)", () => {
     });
   });
 });
+
+test("a workspace id is sent as the anthropic-workspace-id header", async () => {
+  const { fetcher, requests } = scripted(
+    sse([
+      start(1),
+      { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 } },
+      { type: "message_stop" },
+    ]),
+  );
+  const provider = createAnthropicProvider({ fetch: fetcher, maxRetries: 0 });
+  await provider.stream(
+    { model: "claude-haiku-5-5", system: "s", messages: [{ role: "user", content: "hi" }], maxTokens: 10 },
+    { apiKey: "k", workspaceId: "wrkspc_123", onDelta: () => {} },
+  );
+  expect(requests[0]?.headers.get("anthropic-workspace-id")).toBe("wrkspc_123");
+  await provider.stream(
+    { model: "claude-haiku-5-5", system: "s", messages: [{ role: "user", content: "hi" }], maxTokens: 10 },
+    { apiKey: "k", onDelta: () => {} },
+  );
+  expect(requests[1]?.headers.get("anthropic-workspace-id")).toBeNull();
+});

@@ -151,19 +151,26 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
   ).json()) as { id: string };
   await t.drain();
 
-  const done = await c.next(
-    (f) => f.type === "event" && (f.event as { type: string; status?: string }).status === "done",
-  );
-  expect(done).toMatchObject({ channelId, event: { type: "agent.run", agentId } });
+  const done = await c.next((f) => f.type === "event" && (f.event as { type: string }).type === "message.handled");
+  expect(done).toMatchObject({ channelId, event: { type: "message.handled", agentId, status: "done" } });
   const events = c.frames.filter((f) => f.type === "event").map((f) => f.event as Record<string, unknown>);
   expect(events.map((e) => e.type)).toEqual([
     "message.created",
+    "agent.thinking",
+    "message.routed",
+    "agent.thinking",
+    "agent.thinking",
+    "message.claimed",
     "agent.run",
+    "agent.typing",
     "agent.delta",
     "agent.delta",
     "agent.delta",
     "message.created",
     "agent.run",
+    "agent.idle",
+    "run.finished",
+    "message.handled",
   ]);
   expect(
     events
@@ -171,7 +178,7 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
       .map((e) => e.text)
       .join(""),
   ).toBe("Hello there");
-  const reply = events[5] as { message: { body: string; threadId: string; author: { type: string; id: string } } };
+  const reply = events[11] as { message: { body: string; threadId: string; author: { type: string; id: string } } };
   expect(reply.message).toMatchObject({
     body: "Hello there",
     threadId: posted.id,

@@ -469,7 +469,11 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       };
       let result: ModelResult;
       try {
-        result = await provider.stream(request, { apiKey: key.apiKey, workspaceId: key.workspaceId, onDelta: () => {} });
+        result = await provider.stream(request, {
+          apiKey: key.apiKey,
+          workspaceId: key.workspaceId,
+          onDelta: () => {},
+        });
       } catch (error) {
         const usage = error instanceof ProviderError ? await partialUsage(error, provider, request, key) : null;
         if (usage) await recordUsage(db, { ...base, model: call.model, usage, partial: true });

@@ -1,4 +1,4 @@
-import { and, type Database, desc, eq, isNull, ne, schema } from "@agenteschat/db";
+import { and, type Database, desc, eq, isNull, lte, ne, schema } from "@agenteschat/db";
 import { ProviderError } from "@agenteschat/providers";
 import { createAgentRuns } from "./dispatch";
 import { MissingCredentialError, ValidationError } from "./errors";
@@ -205,6 +205,9 @@ export interface RouteResult {
   runs: AgentRun[];
   skipped?: "message_missing" | "not_a_person" | "has_mentions" | "hop_limit" | "no_candidates" | "already_routed";
   selected?: string[];
+  /** Candidates the strategy evaluated (receipts: "seen by"). */
+  seenBy?: string[];
+  reason?: string;
 }
 
 /**
@@ -275,6 +278,8 @@ export async function routeMessage(
         isNull(messages.deletedAt),
         message.threadId ? eq(messages.threadId, message.threadId) : isNull(messages.threadId),
         ne(messages.id, message.id),
+        // Only what came before this message.
+        lte(messages.createdAt, message.createdAt),
       ),
     )
     .orderBy(desc(messages.createdAt))
@@ -312,7 +317,7 @@ export async function routeMessage(
         error: error instanceof Error ? error.message.slice(0, 500) : String(error),
       })
       .onConflictDoNothing();
-    return { runs: [], selected: [] };
+    return { runs: [], selected: [], seenBy: candidates.map((c) => c.agentId) };
   }
 
   const selected = selectAgents(candidates, result, deps.policy);
@@ -339,5 +344,5 @@ export async function routeMessage(
     return createAgentRuns(tx, message, selected, "router");
   });
   if (!runs) return { runs: [], skipped: "already_routed" };
-  return { runs, selected };
+  return { runs, selected, seenBy: candidates.map((c) => c.agentId), reason: result.reason };
 }

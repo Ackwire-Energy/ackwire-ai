@@ -1,9 +1,11 @@
+import type { EmailSender } from "./email";
 import type { KeyWrapper, PlatformCredentials } from "./keys";
 import type { Presence } from "./presence";
 import type { PubSub } from "./pubsub";
 import type { RateLimiter } from "./rate-limiter";
 import type { SearchIndexResolver } from "./search";
 
+export * from "./email";
 export * from "./keys";
 export * from "./presence";
 export * from "./pubsub";
@@ -24,4 +26,6 @@ export interface Adapters {
   /** Extra wrappers that can only unwrap (old keys during rotation). */
   legacyKeyWrappers: KeyWrapper[];
   platformCredentials: PlatformCredentials;
+  /** Transactional email (sent from the `email.send` outbox job). */
+  email: EmailSender;
 }

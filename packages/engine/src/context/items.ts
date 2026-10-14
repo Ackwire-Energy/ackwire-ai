@@ -394,3 +394,54 @@ export async function getContextItems(db: Database, orgId: string, ids: string[]
     .from(contextItems)
     .where(and(eq(contextItems.orgId, orgId), inArray(contextItems.id, ids)));
 }
+
+/**
+ * Undoes a memory change made in conversation (the "desfazer" of the
+ * "memória atualizada" card): a forgotten item comes back, an updated one
+ * goes back to its previous version, a newly remembered one is archived.
+ * Anyone in the org who can read the item's channels may undo.
+ */
+export async function revertMemoryChange(db: Database, actorId: string, orgId: string, itemId: string) {
+  const item = await loadItem(db, orgId, itemId);
+  await requirePermission(db, actorId, orgId, "read");
+  const visible = await userVisibleChannels(db, orgId, actorId);
+  if (!item.channelIds.every((c) => visible.includes(c))) throw new NotFoundError("Item not found");
+  const [previous] = await db
+    .select()
+    .from(contextItems)
+    .where(and(eq(contextItems.orgId, orgId), eq(contextItems.supersededBy, item.id)))
+    .orderBy(desc(contextItems.createdAt))
+    .limit(1);
+  return db.transaction(async (tx) => {
+    let restored: ContextItem;
+    if (item.status === "archived" && !item.supersededBy) {
+      const [row] = await tx
+        .update(contextItems)
+        .set({ status: "active", updatedAt: new Date() })
+        .where(eq(contextItems.id, item.id))
+        .returning();
+      restored = row ?? item;
+    } else if (previous) {
+      const [row] = await tx
+        .update(contextItems)
+        .set({ status: "active", supersededBy: null, updatedAt: new Date() })
+        .where(eq(contextItems.id, previous.id))
+        .returning();
+      await tx
+        .update(contextItems)
+        .set({ status: "archived", updatedAt: new Date() })
+        .where(eq(contextItems.id, item.id));
+      restored = row ?? previous;
+    } else {
+      const [row] = await tx
+        .update(contextItems)
+        .set({ status: "archived", updatedAt: new Date() })
+        .where(eq(contextItems.id, item.id))
+        .returning();
+      restored = row ?? item;
+    }
+    for (const id of new Set([item.id, restored.id]))
+      await enqueueIndex(tx, { orgId, kind: "context_item", sourceId: id });
+    return restored;
+  });
+}

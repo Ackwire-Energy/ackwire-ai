@@ -8,6 +8,7 @@ import {
   NotFoundError,
   type Proposal as ProposalRow,
   requirePermission,
+  revertMemoryChange,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
@@ -273,6 +274,24 @@ export function memoryRoutes(deps: AppDeps) {
         pinned: input.pinned,
         archived: input.archived,
       });
+      const [view] = await memoryViews(db, [row]);
+      return c.json(view, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/memories/{memoryId}/revert",
+      tags,
+      security,
+      summary: "Undo a memory change made in conversation (forgotten → back, updated → previous, new → archived)",
+      request: { params: OrgParams.extend({ memoryId: z.uuid() }), body: body(z.object({})) },
+      responses: { 200: json(Memory), ...errors },
+    }),
+    async (c) => {
+      const { orgId, memoryId } = c.req.valid("param");
+      const row = await revertMemoryChange(db, c.get("user").id, orgId, memoryId);
       const [view] = await memoryViews(db, [row]);
       return c.json(view, 200);
     },

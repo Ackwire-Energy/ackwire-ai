@@ -72,6 +72,20 @@ export const Message = z
     body: z.string(),
     mentionedAgentIds: z.array(z.uuid()),
     agentRunId: z.uuid().nullable(),
+    clientId: z.string().nullable().openapi({ description: "Echo of the sender's `clientId`." }),
+    receipts: z
+      .object({
+        seenBy: z.array(z.uuid()),
+        pickedBy: z.array(z.uuid()),
+        handled: z.array(
+          z.object({
+            agentId: z.uuid(),
+            status: z.enum(["queued", "running", "waiting_approval", "done", "failed"]),
+          }),
+        ),
+      })
+      .optional()
+      .openapi({ description: "People's messages: agents that saw it, picked it up, and how their runs ended." }),
     meta: z
       .record(z.string(), z.unknown())
       .openapi({ description: "Attachments, e.g. `{ approvalId }` on an approval card (see /approvals)." }),

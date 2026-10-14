@@ -17,7 +17,8 @@
     "format": "biome check --write .",
     "check:boundaries": "bun scripts/check-boundaries.ts",
     "db:generate": "cd packages/db && bunx drizzle-kit generate --name",
-    "docs:env": "bun run --filter '@agenteschat/config' docs"
+    "docs:env": "bun run --filter '@agenteschat/config' docs",
+    "smoke": "bun --env-file=.env scripts/smoke.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

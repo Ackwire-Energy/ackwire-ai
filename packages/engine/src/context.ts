@@ -26,52 +26,59 @@ export async function buildRunContext(
   agent: Agent,
   options: { maxMessages: number; toolsAvailable?: boolean },
 ): Promise<RunContext> {
-  const [org] = await db.select().from(organizations).where(eq(organizations.id, run.orgId));
-  const [channel] = await db
-    .select()
-    .from(channels)
-    .where(and(eq(channels.id, run.channelId), eq(channels.orgId, run.orgId)));
-  const [trigger] = await db
-    .select()
-    .from(messages)
-    .where(and(eq(messages.id, run.triggerMessageId), eq(messages.orgId, run.orgId)));
+  // Independent lookups go out together (the database may be remote).
+  const scope = and(eq(messages.orgId, run.orgId), eq(messages.channelId, run.channelId), isNull(messages.deletedAt));
+  const [[org], [channel], [trigger], [root]] = await Promise.all([
+    db.select().from(organizations).where(eq(organizations.id, run.orgId)),
+    db
+      .select()
+      .from(channels)
+      .where(and(eq(channels.id, run.channelId), eq(channels.orgId, run.orgId))),
+    db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.id, run.triggerMessageId), eq(messages.orgId, run.orgId))),
+    db
+      .select()
+      .from(messages)
+      .where(and(scope, eq(messages.id, run.threadRootId))),
+  ]);
   if (!org || !channel || !trigger) throw new Error("run context is incomplete (org, channel or trigger missing)");
 
-  const scope = and(eq(messages.orgId, run.orgId), eq(messages.channelId, run.channelId), isNull(messages.deletedAt));
   const upToTrigger = lte(messages.createdAt, trigger.createdAt);
-  const [root] = await db
-    .select()
-    .from(messages)
-    .where(and(scope, eq(messages.id, run.threadRootId)));
-  const thread = await db
-    .select()
-    .from(messages)
-    .where(and(scope, eq(messages.threadId, run.threadRootId), upToTrigger))
-    .orderBy(desc(messages.createdAt), desc(messages.id))
-    .limit(options.maxMessages);
-  const remaining = Math.max(0, options.maxMessages - thread.length - 1);
-  const before =
-    root && remaining > 0
-      ? await db
+  const [thread, before] = await Promise.all([
+    db
+      .select()
+      .from(messages)
+      .where(and(scope, eq(messages.threadId, run.threadRootId), upToTrigger))
+      .orderBy(desc(messages.createdAt), desc(messages.id))
+      .limit(options.maxMessages),
+    root
+      ? db
           .select()
           .from(messages)
           .where(
             and(scope, isNull(messages.threadId), lte(messages.createdAt, root.createdAt), ne(messages.id, root.id)),
           )
           .orderBy(desc(messages.createdAt), desc(messages.id))
-          .limit(remaining)
-      : [];
+          .limit(Math.max(1, options.maxMessages - 1))
+      : Promise.resolve([] as Message[]),
+  ]);
+  // The thread comes first; earlier channel messages fill what's left.
+  before.splice(Math.max(0, options.maxMessages - thread.length - 1));
   const history: Message[] = [...before.reverse(), ...(root ? [root] : []), ...thread.reverse()];
   if (!history.some((m) => m.id === trigger.id)) history.push(trigger);
 
-  const names = await authorNames(db, history);
-  const members = await db
-    .select({ userName: users.name, agentName: agents.name, agentHandle: agents.handle })
-    .from(channelMembers)
-    .leftJoin(users, eq(users.id, channelMembers.userId))
-    .leftJoin(agents, eq(agents.id, channelMembers.agentId))
-    .where(eq(channelMembers.channelId, run.channelId))
-    .orderBy(asc(channelMembers.createdAt));
+  const [names, members] = await Promise.all([
+    authorNames(db, history),
+    db
+      .select({ userName: users.name, agentName: agents.name, agentHandle: agents.handle })
+      .from(channelMembers)
+      .leftJoin(users, eq(users.id, channelMembers.userId))
+      .leftJoin(agents, eq(agents.id, channelMembers.agentId))
+      .where(eq(channelMembers.channelId, run.channelId))
+      .orderBy(asc(channelMembers.createdAt)),
+  ]);
   const memberList = members
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
     .join(", ");
@@ -106,7 +113,10 @@ export async function buildRunContext(
       cache: true,
     },
     {
-      text: `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying in a thread. Members: ${memberList}.`,
+      text:
+        channel.kind === "dm"
+          ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
+          : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying in a thread. Members: ${memberList}.`,
     },
   ];
   const systemChars = system.reduce((n, b) => n + b.text.length, 0);

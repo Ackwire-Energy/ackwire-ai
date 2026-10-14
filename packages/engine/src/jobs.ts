@@ -3,7 +3,8 @@ import { and, count, eq, schema } from "@agenteschat/db";
 import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
-import { dispatchMentions } from "./dispatch";
+import { dispatchDm, dispatchMentions } from "./dispatch";
+import { publishChannelEvent } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { getMessage } from "./messages";
 import { enqueue, type JobHandlers } from "./outbox";
@@ -14,6 +15,7 @@ import {
   resolveRouterModel,
   routeMessage,
 } from "./router";
+import type { AgentRun } from "./runs";
 import { indexSource, reindexOrg } from "./search";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
@@ -69,11 +71,51 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       const message = await getMessage(deps.db, input.orgId, input.messageId);
       if (!message) return;
       if (deps.context && message.threadId) await maybeEnqueueReflection(deps, message.orgId, message.threadId);
+      const routed = async (
+        strategy: "mention" | "dm" | "router" | "none",
+        seenBy: string[],
+        runs: AgentRun[],
+        reason?: string,
+      ) => {
+        const threadId = message.threadId ?? message.id;
+        await publishChannelEvent(deps.pubsub, {
+          type: "message.routed",
+          channelId: message.channelId,
+          messageId: message.id,
+          seenBy,
+          pickedBy: runs.map((r) => r.agentId),
+          strategy,
+          ...(reason ? { reason } : {}),
+        });
+        for (const run of runs) {
+          await publishChannelEvent(deps.pubsub, {
+            type: "agent.thinking",
+            channelId: message.channelId,
+            threadId,
+            agentId: run.agentId,
+            runId: run.id,
+          });
+        }
+      };
       if (message.mentionedAgentIds.length > 0) {
-        await dispatchMentions(deps.db, input, { maxHops: deps.maxHops });
-      } else if (router.enabled) {
-        await routeMessage({ db: deps.db, strategy, policy }, input, ctx);
+        const res = await dispatchMentions(deps.db, input, { maxHops: deps.maxHops });
+        await routed("mention", message.mentionedAgentIds, res.runs);
+        return;
       }
+      if (message.authorType !== "person") return;
+      const [channel] = await deps.db
+        .select({ kind: schema.channels.kind })
+        .from(schema.channels)
+        .where(eq(schema.channels.id, message.channelId));
+      if (channel?.kind === "dm") {
+        const res = await dispatchDm(deps.db, message, { maxHops: deps.maxHops });
+        await routed("dm", res.agentIds, res.runs);
+        return;
+      }
+      if (!router.enabled) return routed("none", [], []);
+      const res = await routeMessage({ db: deps.db, strategy, policy }, input, ctx);
+      if (res.skipped === "already_routed") return;
+      await routed(res.seenBy ? "router" : "none", res.seenBy ?? [], res.runs, res.reason);
     },
     "agent_run.execute": async (job, ctx) => {
       await executeRun(deps, String(job.payload.runId), ctx);

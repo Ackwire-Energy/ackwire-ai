@@ -30,6 +30,9 @@ import { allowedOrigins } from "../routes/app/context";
  *   checks the channel belongs to that org and the person is a member of it
  *   (`requireChannelAccess`, the same check as the HTTP API) before
  *   forwarding the channel's events.
+ * - `{"type":"typing","channelId","threadId"?}` (throttled by the client; the
+ *   server keeps at most one every 2 s) fans out `user.typing` to the channel,
+ *   valid for `ttlMs` (5 s).
  * - Server → client frames: `ready`, `subscribed`, `unsubscribed` (with a
  *   `reason` when the server dropped it: `revoked`, `archived`), `error`, and
  *   channel events (`message.created`, `agent.delta`, `agent.run`,
@@ -61,7 +64,13 @@ export interface SocketData {
   pending: Map<string, { revoked: boolean }>;
 }
 
-export type ClientFrame = { type: "subscribe" | "unsubscribe"; channelId: string } | { type: "ping" };
+export type ClientFrame =
+  | { type: "subscribe" | "unsubscribe"; channelId: string }
+  | { type: "typing"; channelId: string; threadId: string | null }
+  | { type: "ping" };
+
+/** How long a typing indicator lasts without a new `typing` frame. */
+export const TYPING_TTL_MS = 5000;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MAX_SUBSCRIPTIONS = 200;
@@ -69,8 +78,12 @@ export const MAX_SUBSCRIPTIONS = 200;
 export function parseClientFrame(raw: string | Buffer): ClientFrame | null {
   if (raw.length > 4096) return null;
   try {
-    const frame = JSON.parse(String(raw)) as { type?: unknown; channelId?: unknown };
+    const frame = JSON.parse(String(raw)) as { type?: unknown; channelId?: unknown; threadId?: unknown };
     if (frame.type === "ping") return { type: "ping" };
+    if (frame.type === "typing" && typeof frame.channelId === "string" && UUID.test(frame.channelId)) {
+      const threadId = typeof frame.threadId === "string" && UUID.test(frame.threadId) ? frame.threadId : null;
+      return { type: "typing", channelId: frame.channelId, threadId };
+    }
     if (
       (frame.type === "subscribe" || frame.type === "unsubscribe") &&
       typeof frame.channelId === "string" &&
@@ -176,6 +189,25 @@ export function createRealtime(deps: RealtimeDeps) {
         if (frame.type === "ping") return send(ws, { type: "pong" });
 
         const { channelId } = frame;
+        if (frame.type === "typing") {
+          // Only into channels this connection is subscribed to (already authorized); at most every 2 s.
+          if (!ws.data.subscriptions.has(channelId)) return;
+          const t = await deps.rateLimiter.consume(`typing:${ws.data.connectionId}:${channelId}`, {
+            limit: 1,
+            windowMs: 2000,
+          });
+          if (!t.allowed) return;
+          await deps.pubsub
+            .publish(channelTopic(channelId), {
+              type: "user.typing",
+              channelId,
+              threadId: frame.threadId,
+              userId: ws.data.user.id,
+              ttlMs: TYPING_TTL_MS,
+            })
+            .catch(() => {});
+          return;
+        }
         if (frame.type === "unsubscribe") {
           ws.data.subscriptions.get(channelId)?.();
           ws.data.subscriptions.delete(channelId);

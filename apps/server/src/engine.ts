@@ -25,6 +25,8 @@ export interface EngineOptions {
   http?: typeof fetch;
   embeddings?: { provider: EmbeddingProvider; apiKey: string };
   deltaFlushMs?: number;
+  /** Latency measurements from runs (logged by the server). */
+  onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
 }
 
 /**
@@ -83,6 +85,7 @@ export function buildEngine(o: EngineOptions) {
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
     maxHops: config.AGENT_MAX_HOPS,
     deltaFlushMs: o.deltaFlushMs,
+    onTiming: o.onTiming,
     router: { enabled: config.ROUTER_ENABLED, model: config.ROUTER_MODEL, minScore: config.ROUTER_MIN_SCORE },
   });
   return { gateway, tools, context, handlers, connectorDeps };

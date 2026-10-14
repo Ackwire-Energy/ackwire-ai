@@ -437,9 +437,17 @@ describe("context tools through the Tool Gateway", () => {
     expect(results[1]?.content).toContain("can't change permissions");
     expect(results[2]?.content).toContain("credential");
     expect(results[3]?.content).toContain("Ana prefers short status updates");
-    expect(results[4]?.content).toContain("[note]");
+    expect(results[4]?.content).toContain("[fact]");
     const [note] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, rememberedId));
-    expect(note).toMatchObject({ status: "archived", agentId: f.agent.id, createdByKind: "agent" });
+    // Asked by a person: human evidence, attributed to them, with the message as source.
+    expect(note).toMatchObject({
+      status: "archived",
+      agentId: f.agent.id,
+      createdByKind: "person",
+      createdById: f.owner.id,
+      verified: true,
+      trust: "high",
+    });
   });
 });
 

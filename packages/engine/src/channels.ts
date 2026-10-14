@@ -18,6 +18,7 @@ export async function createChannel(
 ): Promise<Channel> {
   await requirePermission(db, actorId, orgId, "create_channels");
   const name = input.name.trim().toLowerCase();
+  if (name.startsWith("dm-")) throw new ValidationError("Channel names can't start with dm-");
   if (!CHANNEL_NAME_PATTERN.test(name)) {
     throw new ValidationError("channel name: lower-case letters, digits, - or _ (max 80)");
   }
@@ -57,6 +58,7 @@ export async function listChannels(db: Database, userId: string, orgId: string) 
       and(
         eq(channels.orgId, orgId),
         isNull(channels.archivedAt),
+        eq(channels.kind, "channel"),
         or(eq(channels.visibility, "public"), inArray(channels.id, mine)),
       ),
     )
@@ -102,7 +104,7 @@ export async function joinChannel(db: Database, userId: string, orgId: string, c
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.visibility !== "public") throw new ForbiddenError("This channel is private");
+  if (channel.visibility !== "public" || channel.kind === "dm") throw new ForbiddenError("This channel is private");
   await db.insert(channelMembers).values({ orgId, channelId, userId }).onConflictDoNothing();
 }
 
@@ -114,7 +116,8 @@ export async function addChannelMember(
   channelId: string,
   member: { userId: string } | { agentId: string },
 ) {
-  await requireChannelAccess(db, actorId, orgId, channelId);
+  const { channel } = await requireChannelAccess(db, actorId, orgId, channelId);
+  if (channel.kind === "dm") throw new ValidationError("A direct conversation keeps its participants");
   if ("userId" in member) {
     if (!(await getMembership(db, member.userId, orgId))) {
       throw new ValidationError("That person is not a member of this organization");

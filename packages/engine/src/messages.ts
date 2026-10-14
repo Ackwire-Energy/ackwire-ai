@@ -1,9 +1,10 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, desc, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { requireChannelAccess } from "./channels";
-import { NotFoundError, ValidationError } from "./errors";
-import { publishMessageCreated } from "./events";
-import { requirePermission } from "./organizations";
+import { dmAgents } from "./dms";
+import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { publishChannelEvent, publishMessageCreated } from "./events";
+import { can } from "./organizations";
 import { enqueue } from "./outbox";
 
 const { messages, agents, channelMembers } = schema;
@@ -20,8 +21,12 @@ export interface MessageView {
   body: string;
   mentionedAgentIds: string[];
   agentRunId: string | null;
-  /** Structured attachments: `{ approvalId }` for an approval card. */
+  /** Structured attachments: `{ approvalId }`, `{ memoryUpdates }`, `{ clientId }`. */
   meta: Record<string, unknown>;
+  /** The sender's own id for the optimistic copy (echoed back). */
+  clientId: string | null;
+  /** Which agents saw it and which answered (in message lists; no router scores). */
+  receipts?: Receipts;
   createdAt: string;
 }
 
@@ -34,8 +39,51 @@ export const messageView = (m: Message): MessageView => ({
   mentionedAgentIds: m.mentionedAgentIds,
   agentRunId: m.agentRunId,
   meta: m.meta,
+  clientId: typeof m.meta.clientId === "string" ? m.meta.clientId : null,
   createdAt: m.createdAt.toISOString(),
 });
+
+export interface Receipts {
+  seenBy: string[];
+  pickedBy: string[];
+  handled: { agentId: string; status: "queued" | "running" | "waiting_approval" | "done" | "failed" }[];
+}
+
+/**
+ * Receipts for messages, from what is already stored: the routing decision
+ * (candidates = seen), mentions, and the runs each message triggered.
+ * Router off or no candidates → empty receipts.
+ */
+export async function receiptsFor(db: Database, orgId: string, list: Message[]): Promise<Map<string, Receipts>> {
+  const out = new Map<string, Receipts>();
+  const ids = list.map((m) => m.id);
+  if (ids.length === 0) return out;
+  const [decisions, runs] = await Promise.all([
+    db
+      .select({ messageId: schema.routingDecisions.messageId, candidates: schema.routingDecisions.candidates })
+      .from(schema.routingDecisions)
+      .where(and(eq(schema.routingDecisions.orgId, orgId), inArray(schema.routingDecisions.messageId, ids))),
+    db
+      .select({
+        triggerMessageId: schema.agentRuns.triggerMessageId,
+        agentId: schema.agentRuns.agentId,
+        status: schema.agentRuns.status,
+      })
+      .from(schema.agentRuns)
+      .where(and(eq(schema.agentRuns.orgId, orgId), inArray(schema.agentRuns.triggerMessageId, ids))),
+  ]);
+  const seen = new Map(decisions.map((d) => [d.messageId, d.candidates.map((c) => c.agentId)]));
+  for (const m of list) {
+    const mine = runs.filter((r) => r.triggerMessageId === m.id);
+    const seenBy = [...new Set([...(seen.get(m.id) ?? []), ...m.mentionedAgentIds, ...mine.map((r) => r.agentId)])];
+    out.set(m.id, {
+      seenBy,
+      pickedBy: mine.map((r) => r.agentId),
+      handled: mine.map((r) => ({ agentId: r.agentId, status: r.status })),
+    });
+  }
+  return out;
+}
 
 /** `@handle` tokens in a message, lower-cased and de-duplicated. Emails (`a@b.c`) are not mentions. */
 export function parseMentionHandles(body: string): string[] {
@@ -147,10 +195,12 @@ export async function postPersonMessage(
   userId: string,
   orgId: string,
   channelId: string,
-  input: { body: string; threadId?: string | null },
+  input: { body: string; threadId?: string | null; clientId?: string | null },
 ): Promise<MessageView> {
-  await requirePermission(deps.db, userId, orgId, "post");
-  await requireChannelAccess(deps.db, userId, orgId, channelId);
+  // One access check (membership + channel) instead of two round trips.
+  const { channel, membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
+  if (!can(membership.role, "post")) throw new ForbiddenError();
+  const clientId = input.clientId?.trim().slice(0, 64) || null;
   const message = await deps.db.transaction((tx) =>
     insertMessage(tx, {
       orgId,
@@ -158,10 +208,22 @@ export async function postPersonMessage(
       threadId: input.threadId,
       author: { type: "person", userId },
       body: input.body,
+      meta: clientId ? { clientId } : undefined,
     }),
   );
   const view = messageView(message);
+  // Right after the commit, before any routing: the sender's optimistic copy reconciles by `clientId`.
   await publishMessageCreated(deps.pubsub, view);
+  // Agents that will surely answer show "thinking" at once (the run doesn't exist yet: runId null).
+  const threadId = message.threadId ?? message.id;
+  const answering = message.mentionedAgentIds.length
+    ? message.mentionedAgentIds
+    : channel.kind === "dm"
+      ? (await dmAgents(deps.db, orgId, channelId)).map((a) => a.id)
+      : [];
+  for (const agentId of answering) {
+    await publishChannelEvent(deps.pubsub, { type: "agent.thinking", channelId, threadId, agentId, runId: null });
+  }
   return view;
 }
 
@@ -197,7 +259,7 @@ export async function listMessages(
       .where(and(scope, eq(messages.threadId, options.threadId)))
       .orderBy(asc(messages.createdAt), asc(messages.id))
       .limit(limit);
-    return [root, ...replies].map(messageView);
+    return withReceipts(db, orgId, [root, ...replies]);
   }
   const rows = await db
     .select()
@@ -205,5 +267,14 @@ export async function listMessages(
     .where(and(scope, isNull(messages.threadId), options.before ? lt(messages.createdAt, options.before) : undefined))
     .orderBy(desc(messages.createdAt), desc(messages.id))
     .limit(limit);
-  return rows.reverse().map(messageView);
+  return withReceipts(db, orgId, rows.reverse());
+}
+
+async function withReceipts(db: Database, orgId: string, list: Message[]): Promise<MessageView[]> {
+  const receipts = await receiptsFor(
+    db,
+    orgId,
+    list.filter((m) => m.authorType === "person"),
+  );
+  return list.map((m) => ({ ...messageView(m), ...(receipts.has(m.id) ? { receipts: receipts.get(m.id) } : {}) }));
 }

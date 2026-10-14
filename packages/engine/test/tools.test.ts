@@ -232,7 +232,8 @@ describe("approval flow (end to end)", () => {
     ]);
     expect(thread[2]?.meta).toEqual({ approvalId: approval?.id });
     expect(events.map((e) => e.type)).toContain("approval.created");
-    expect(events.at(-1)).toMatchObject({ type: "agent.run", status: "waiting_approval" });
+    expect([...events].reverse().find((e) => e.type === "agent.run")).toMatchObject({ status: "waiting_approval" });
+    expect(events.at(-1)).toMatchObject({ type: "message.handled", status: "waiting_approval" });
 
     // A plain member can't decide.
     const member = await addMember(f.db, f.org.id, "member");

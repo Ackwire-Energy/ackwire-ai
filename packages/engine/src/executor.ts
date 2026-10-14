@@ -15,7 +15,7 @@ import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
-import { type ChannelEvent, publishChannelEvent, publishMessageCreated } from "./events";
+import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import type { ModelGateway } from "./gateway";
 import { insertMessage, type Message, messageView } from "./messages";
 import { PermanentJobError } from "./outbox";
@@ -39,6 +39,8 @@ export interface RunExecutorDeps {
   maxToolTurns?: number;
   /** Memory and summaries (D9 layers 3–4). Without it the context is the recent conversation only. */
   context?: ContextDeps;
+  /** Latency measurements (`trigger_to_claim_ms`, `claim_to_first_delta_ms`, `run_ms`), for logs. */
+  onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
 }
 
 /**
@@ -55,6 +57,8 @@ export interface Transcript {
   /** Chat messages this run posted so far. */
   postedCount: number;
   deltaSeq: number;
+  /** Memory changes made by tools, not yet attached to a posted message (`meta.memoryUpdates`). */
+  memoryUpdates?: MemoryUpdate[];
   /** Tool calls of the last assistant turn while some wait for approval. */
   pending?: {
     calls: { toolUseId: string; name: string; approvalId?: string; result?: { content: string; isError: boolean } }[];
@@ -119,6 +123,37 @@ export async function executeRun(deps: RunExecutorDeps, runId: string, options: 
     run = started;
   }
   // status is `running` here.
+  const claimedAt = Date.now();
+  const where = { channelId: run.channelId, threadId: run.threadRootId, agentId: run.agentId, runId: run.id };
+  await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where });
+  await publishChannelEvent(deps.pubsub, {
+    type: "message.claimed",
+    channelId: run.channelId,
+    messageId: run.triggerMessageId,
+    agentId: run.agentId,
+    runId: run.id,
+  });
+  if (loaded.status === "queued") {
+    const [trigger] = await db
+      .select({ createdAt: schema.messages.createdAt })
+      .from(schema.messages)
+      .where(and(eq(schema.messages.orgId, run.orgId), eq(schema.messages.id, run.triggerMessageId)));
+    if (trigger) deps.onTiming?.("trigger_to_claim_ms", claimedAt - trigger.createdAt.getTime(), { runId: run.id });
+  }
+  /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
+  const finished = async (status: "done" | "failed" | "waiting_approval", error?: string) => {
+    await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
+    await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, status, ...(error ? { error } : {}) });
+    await publishChannelEvent(deps.pubsub, {
+      type: "message.handled",
+      channelId: run.channelId,
+      messageId: run.triggerMessageId,
+      agentId: run.agentId,
+      runId: run.id,
+      status,
+    });
+    deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
+  };
 
   const event = (status: RunStatus, error?: string): ChannelEvent => ({
     type: "agent.run",
@@ -133,6 +168,7 @@ export async function executeRun(deps: RunExecutorDeps, runId: string, options: 
     await addRunStep(db, run, "error", { reason });
     await transitionRun(db, run.id, "running", "failed", { error: reason });
     await publishChannelEvent(deps.pubsub, event("failed", reason));
+    await finished("failed", reason);
   };
 
   const agent = await getAgent(db, run.orgId, run.agentId);
@@ -240,7 +276,10 @@ export async function executeRun(deps: RunExecutorDeps, runId: string, options: 
       inputSchema: t.inputSchema,
     }));
 
-    const deltas = createDeltaPublisher(deps.pubsub, run, deps.deltaFlushMs ?? 50, transcript.deltaSeq);
+    const deltas = createDeltaPublisher(deps.pubsub, run, deps.deltaFlushMs ?? 50, transcript.deltaSeq, {
+      event: { type: "agent.typing", ...where },
+      onFirst: () => deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id }),
+    });
     let result: Awaited<ReturnType<ModelGateway["stream"]>>;
     try {
       result = await deps.gateway.stream({
@@ -286,6 +325,12 @@ export async function executeRun(deps: RunExecutorDeps, runId: string, options: 
       const waiting: Approval[] = [];
       for (const use of toolUses) {
         const outcome = await deps.tools.invoke(ctx, { toolUseId: use.id, name: use.name, input: use.input });
+        const update =
+          outcome.type === "result" ? (outcome.output.data?.memoryUpdate as MemoryUpdate | undefined) : undefined;
+        if (update) {
+          transcript.memoryUpdates = [...(transcript.memoryUpdates ?? []), update];
+          await publishChannelEvent(deps.pubsub, { type: "memory.updated", ...where, update });
+        }
         if (outcome.type === "approval") {
           calls.push({ toolUseId: use.id, name: use.name, approvalId: outcome.approval.id });
           waiting.push(outcome.approval);
@@ -317,7 +362,7 @@ export async function executeRun(deps: RunExecutorDeps, runId: string, options: 
       const posted = await db.transaction(async (tx) => {
         const out: Message[] = [];
         const said = unpostedText(t);
-        if (said) out.push(await postAgentMessage(tx, run, said));
+        if (said) out.push(await postAgentMessage(tx, run, said, takeMemoryUpdates(t)));
         t.postedUpTo = t.messages.length;
         t.postedCount += out.length + waiting.length;
         const cards: Approval[] = [];
@@ -341,17 +386,19 @@ export async function executeRun(deps: RunExecutorDeps, runId: string, options: 
       for (const m of posted.messages) await publishMessageCreated(deps.pubsub, messageView(m));
       for (const card of posted.cards) await publishApproval(deps, card, "approval.created");
       await publishChannelEvent(deps.pubsub, event("waiting_approval"));
+      await finished("waiting_approval");
       return;
     }
 
     // Final answer.
     if (result.stopReason === "refusal") return fail("model_refused");
-    const text = unpostedText(transcript);
+    const updates = transcript.memoryUpdates ?? [];
+    const text = unpostedText(transcript) || (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "");
     const anythingPosted = transcript.postedCount > 0;
     if (!text && !anythingPosted) return fail("empty_reply");
     const t = transcript;
     const reply = await db.transaction(async (tx) => {
-      const message = text ? await postAgentMessage(tx, run, text) : null;
+      const message = text ? await postAgentMessage(tx, run, text, takeMemoryUpdates(t)) : null;
       t.postedUpTo = t.messages.length;
       if (message) t.postedCount++;
       await saveTranscript(tx, t);
@@ -367,6 +414,7 @@ export async function executeRun(deps: RunExecutorDeps, runId: string, options: 
     });
     if (reply) await publishMessageCreated(deps.pubsub, messageView(reply));
     await publishChannelEvent(deps.pubsub, event("done"));
+    await finished("done");
     return;
   }
 }
@@ -397,7 +445,14 @@ function postAgentMessage(tx: Executor, run: AgentRun, body: string, meta?: Reco
  * token (each is a NOTIFY on the Postgres adapter). Chunks stay well under the
  * NOTIFY payload limit. `seq` continues across the turns of a run.
  */
-function createDeltaPublisher(pubsub: PubSub, run: AgentRun, flushMs: number, startSeq = 0) {
+function createDeltaPublisher(
+  pubsub: PubSub,
+  run: AgentRun,
+  flushMs: number,
+  startSeq = 0,
+  first?: { event: ChannelEvent; onFirst?: () => void },
+) {
+  let started = false;
   const MAX_CHUNK = 2000;
   let buffer = "";
   let seq = startSeq;
@@ -424,6 +479,12 @@ function createDeltaPublisher(pubsub: PubSub, run: AgentRun, flushMs: number, st
   };
   return {
     push(text: string) {
+      if (text && !started && first) {
+        started = true;
+        first.onFirst?.();
+        // Published in order, before the first delta.
+        pending = pending.then(() => publishChannelEvent(pubsub, first.event));
+      }
       buffer += text;
       if (flushMs === 0 || buffer.length >= MAX_CHUNK) send();
       else timer ??= setTimeout(send, flushMs);
@@ -435,3 +496,18 @@ function createDeltaPublisher(pubsub: PubSub, run: AgentRun, flushMs: number, st
     seq: () => seq,
   };
 }
+
+/** Moves pending memory updates onto the message being posted (the "memória atualizada" card). */
+function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
+  const updates = t.memoryUpdates ?? [];
+  if (updates.length === 0) return undefined;
+  t.memoryUpdates = [];
+  return { memoryUpdates: updates };
+}
+
+const describeUpdate = (u: MemoryUpdate) =>
+  u.action === "proposed"
+    ? `Proposta criada: ${u.text}`
+    : u.action === "forgot"
+      ? `Memória atualizada: esqueci "${u.text}".`
+      : `Memória atualizada: ${u.text}`;

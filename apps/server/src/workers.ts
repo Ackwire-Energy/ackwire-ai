@@ -20,6 +20,9 @@ export interface WorkerDeps {
   workerId?: string;
 }
 
+/** Pub/sub topic that wakes every instance's outbox worker (cross-replica, over LISTEN/NOTIFY). */
+export const WAKE_TOPIC = "system:outbox-wake";
+
 /** How often each background job runs. */
 export const WORKER_INTERVALS_MS = {
   outbox: 1_000,
@@ -117,13 +120,21 @@ export function startWorkers(deps: WorkerDeps) {
     });
   }
 
+  const offWake = deps.pubsub.subscribe(WAKE_TOPIC, () => void ticks.get("outbox")?.());
+
   return {
     /** Process the outbox now instead of waiting for the next interval. */
     wake() {
       void ticks.get("outbox")?.();
     },
+    /** Wake this instance and every other one (after a commit that enqueued work). */
+    wakeAll() {
+      void ticks.get("outbox")?.();
+      void deps.pubsub.publish(WAKE_TOPIC, { type: "wake" }).catch(() => {});
+    },
     stop() {
       stopped = true;
+      offWake();
       for (const timer of timers) clearInterval(timer);
     },
   };

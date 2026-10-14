@@ -19,6 +19,8 @@ import { users } from "./auth";
 import { organizations } from "./tenancy";
 
 export const channelVisibilityEnum = pgEnum("channel_visibility", ["public", "private"]);
+/** `channel`: a named channel. `dm`: a direct conversation (person↔person or person↔agent), participants only. */
+export const channelKindEnum = pgEnum("channel_kind", ["channel", "dm"]);
 
 /** A conversation space. `public`: any member of the organization may join; `private`: invite only. */
 export const channels = pgTable(
@@ -32,11 +34,31 @@ export const channels = pgTable(
     name: text().notNull(),
     topic: text().notNull().default(""),
     visibility: channelVisibilityEnum().notNull().default("public"),
+    kind: channelKindEnum().notNull().default("channel"),
+    /** DMs: the sorted participants (`a:<agentId>|u:<userId>`), unique per org, so a DM is opened, not duplicated. */
+    dmKey: text(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [unique().on(t.orgId, t.name), unique().on(t.orgId, t.id)],
+  (t) => [unique().on(t.orgId, t.name), unique().on(t.orgId, t.id), unique().on(t.orgId, t.dmKey)],
+);
+
+/** Where each person stopped reading a channel (unread counts). */
+export const channelReads = pgTable(
+  "channel_reads",
+  {
+    orgId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastReadAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.channelId, t.userId] }),
+    foreignKey({ columns: [t.orgId, t.channelId], foreignColumns: [channels.orgId, channels.id] }).onDelete("cascade"),
+  ],
 );
 
 /** Who is in a channel: exactly one of `user_id` (person) or `agent_id` (agent). */

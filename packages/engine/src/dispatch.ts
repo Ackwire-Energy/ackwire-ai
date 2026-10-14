@@ -1,4 +1,5 @@
 import { and, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { dmAgents } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
 import type { AgentRun } from "./runs";
@@ -107,4 +108,20 @@ export async function dispatchMentions(
     ),
   );
   return { runs };
+}
+
+/**
+ * A person's message in a DM with an agent: the agent always answers (no
+ * router), within the hop limit. Mentions in a DM go through `dispatchMentions`.
+ */
+export async function dispatchDm(
+  db: Database,
+  message: Message,
+  options: { maxHops: number },
+): Promise<DispatchResult & { agentIds: string[] }> {
+  if (message.authorType !== "person") return { runs: [], agentIds: [] };
+  if (message.hop >= options.maxHops) return { runs: [], skipped: "hop_limit", agentIds: [] };
+  const agentIds = (await dmAgents(db, message.orgId, message.channelId)).map((a) => a.id);
+  const runs = await db.transaction((tx) => createAgentRuns(tx, message, agentIds, "dm"));
+  return { runs, agentIds };
 }

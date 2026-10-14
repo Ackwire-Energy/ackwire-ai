@@ -230,3 +230,56 @@ export async function decideProposal(
     throw new ConflictError("The text changed since this was proposed; it can't be applied");
   return decided;
 }
+
+/**
+ * A proposal an agent makes because a person asked it to change its
+ * instructions or the org context in conversation. The agent never edits
+ * them directly; this goes through the same human gate. Returns the proposal
+ * and whether the requester can accept it inline.
+ */
+export async function proposeChange(
+  deps: { db: Database; pubsub?: PubSub },
+  input: {
+    orgId: string;
+    agentId: string;
+    target: "agent_instructions" | "org_context";
+    change: string;
+    rationale: string;
+    requesterId: string;
+  },
+): Promise<{ proposal: Proposal; canDecide: boolean }> {
+  const { db } = deps;
+  checkContent(input.change);
+  let current: string;
+  if (input.target === "agent_instructions") {
+    const agent = await getAgent(db, input.orgId, input.agentId);
+    if (!agent) throw new NotFoundError("Agent not found");
+    current = agent.instructions;
+  } else {
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, input.orgId));
+    if (!org) throw new NotFoundError("Organization not found");
+    current = org.context;
+  }
+  const proposedText = withLearnedBullet(current, input.change);
+  const [proposal] = await db
+    .insert(contextProposals)
+    .values({
+      orgId: input.orgId,
+      target: input.target,
+      agentId: input.target === "agent_instructions" ? input.agentId : null,
+      baseHash: sha256(current),
+      proposedText,
+      diff: lineDiff(current, proposedText),
+      rationale: input.rationale.slice(0, 1000) || "Asked in conversation.",
+    })
+    .returning();
+  if (!proposal) throw new Error("proposal insert returned nothing");
+  if (deps.pubsub) {
+    for (const userId of await deciders(db, proposal))
+      await publishUserEvent(deps.pubsub, proposal.orgId, userId, {
+        type: "proposal.created",
+        proposalId: proposal.id,
+      });
+  }
+  return { proposal, canDecide: await mayDecide(db, input.requesterId, proposal) };
+}

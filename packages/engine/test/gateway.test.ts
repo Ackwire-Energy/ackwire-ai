@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { noPlatformCredentials } from "@agenteschat/adapters";
+import { envPlatformCredentials, noPlatformCredentials } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { costNanoUsd, maxCostNanoUsd, ProviderError, promptChars } from "@agenteschat/providers";
 import {
@@ -8,8 +8,10 @@ import {
   BudgetExceededError,
   createCredential,
   createModelGateway,
+  listCredentials,
   MissingCredentialError,
   revokeCredential,
+  rotateCredential,
   updateAgent,
   usageSummary,
 } from "../src";
@@ -252,4 +254,29 @@ test("usage summary needs view_usage", async () => {
   const [row] = await usageSummary(f.db, f.owner.id, f.org.id);
   expect(row?.handle).toBe("dev");
   expect(row?.calls).toBe(1);
+});
+
+test("workspace-scoped keys: the credential's workspace id (and the platform's) reaches the provider", async () => {
+  f = await setup({
+    platform: envPlatformCredentials({ anthropic: { apiKey: "sk-platform-key", workspaceId: "wrkspc_platform" } }),
+  });
+  await rotateCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, f.credential.id, {
+    apiKey: "sk-ant-test-key-1234",
+    workspaceId: "wrkspc_01abc",
+  });
+  await call(f);
+  expect(f.provider.calls[0]).toMatchObject({ apiKey: "sk-ant-test-key-1234", workspaceId: "wrkspc_01abc" });
+  const [listed] = await listCredentials(f.db, f.owner.id, f.org.id);
+  expect(listed?.workspaceIdHint).toBe("_01abc");
+  expect(JSON.stringify(listed)).not.toContain("sk-ant");
+  await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { credentialId: null });
+  await call(f);
+  expect(f.provider.calls[1]).toMatchObject({ apiKey: "sk-platform-key", workspaceId: "wrkspc_platform" });
+  expect((await f.db.select().from(schema.usageRecords)).map((u) => u.orgId)).toEqual([f.org.id, f.org.id]);
+  await expect(
+    rotateCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, f.credential.id, {
+      apiKey: "sk-ant-x-12345678",
+      workspaceId: "bad id!",
+    }),
+  ).rejects.toThrow("workspaceId");
 });

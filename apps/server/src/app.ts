@@ -11,6 +11,7 @@ import { channelRoutes } from "./routes/app/channels";
 import { chatRoutes } from "./routes/app/chat";
 import { connectorRoutes } from "./routes/app/connectors";
 import type { AppDeps } from "./routes/app/context";
+import { dmRoutes } from "./routes/app/dms";
 import { knowledgeRoutes } from "./routes/app/knowledge";
 import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
@@ -73,6 +74,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", managementRoutes(deps));
     api.route("/app", knowledgeRoutes(deps));
     api.route("/app", memoryRoutes(deps));
+    api.route("/app", dmRoutes(deps));
   }
 
   for (const module of options.modules) {

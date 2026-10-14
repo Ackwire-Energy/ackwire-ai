@@ -1,6 +1,21 @@
 import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
 import type { ApprovalView } from "./approvals";
 import type { MessageView } from "./messages";
+
+/** What a memory tool changed, for the "memória atualizada" card (persisted in the reply's `meta.memoryUpdates`). */
+export interface MemoryUpdate {
+  action: "remembered" | "forgot" | "updated" | "proposed";
+  itemId: string;
+  text: string;
+  previousText?: string | null;
+  requestedByUserId: string;
+  /** Undo: `POST /api/app/organizations/{orgId}/memories/{itemId}/revert`. Absent for proposals. */
+  undo?: { method: "POST"; path: string };
+  /** For `proposed`: the proposal to accept inline, and whether the requester can decide it. */
+  proposalId?: string;
+  canDecide?: boolean;
+}
+
 import type { RunStatus } from "./runs";
 
 /**
@@ -30,6 +45,55 @@ export type ChannelEvent =
       agentId: string;
       status: RunStatus;
       error?: string;
+    }
+  /**
+   * An agent will answer (mention, DM, router pick, or a run was claimed):
+   * show "thinking" right away. `runId` is null when announced at post time,
+   * before the run exists.
+   */
+  | { type: "agent.thinking"; channelId: string; threadId: string; agentId: string; runId: string | null }
+  /** The agent's first words arrived (switch "thinking" to "typing"). */
+  | { type: "agent.typing"; channelId: string; threadId: string; agentId: string; runId: string }
+  /** The agent stopped (done, failed or waiting for approval). */
+  | { type: "agent.idle"; channelId: string; threadId: string; agentId: string; runId: string }
+  | {
+      type: "run.finished";
+      channelId: string;
+      threadId: string;
+      agentId: string;
+      runId: string;
+      status: "done" | "failed" | "waiting_approval";
+      error?: string;
+    }
+  /** A person is typing (client frame `typing`). Clients drop it after `ttlMs`. */
+  | { type: "user.typing"; channelId: string; threadId: string | null; userId: string; ttlMs: number }
+  /** Who saw a message and who will answer (receipts). No router scores here. */
+  | {
+      type: "message.routed";
+      channelId: string;
+      messageId: string;
+      seenBy: string[];
+      pickedBy: string[];
+      strategy: "mention" | "dm" | "router" | "none";
+      reason?: string;
+    }
+  | { type: "message.claimed"; channelId: string; messageId: string; agentId: string; runId: string }
+  | {
+      type: "message.handled";
+      channelId: string;
+      messageId: string;
+      agentId: string;
+      runId: string;
+      status: "done" | "failed" | "waiting_approval";
+    }
+  /** An agent changed its memory because a person asked (with an undo). */
+  | {
+      type: "memory.updated";
+      channelId: string;
+      threadId: string;
+      agentId: string;
+      runId: string;
+      update: MemoryUpdate;
     }
   /** A sensitive action waits for a person (`approval.created`) or was decided/expired (`approval.decided`). */
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: ApprovalView };

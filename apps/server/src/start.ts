@@ -73,7 +73,13 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
   const ctx: ModuleContext = { ...base, adapters };
 
-  const engine = buildEngine({ db: database.db, config, adapters, modelProviders });
+  const engine = buildEngine({
+    db: database.db,
+    config,
+    adapters,
+    modelProviders,
+    onTiming: (name, ms, attrs) => log.info("latency", { metric: name, ms, ...attrs }),
+  });
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
@@ -94,7 +100,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
       auth,
       config,
       adapters,
-      wakeWorkers: workers.wake,
+      wakeWorkers: workers.wakeAll,
       extras: { embed: engine.gateway.embed },
     },
     log,

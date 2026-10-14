@@ -193,7 +193,17 @@ export function chatRoutes(deps: AppDeps) {
         "@mentioning an agent that is a member of the channel starts an agent run; its reply streams over the WebSocket.",
       request: {
         params: ChannelParams,
-        body: body(z.object({ body: z.string().min(1).max(40_000), threadId: z.uuid().nullable().optional() })),
+        body: body(
+          z.object({
+            body: z.string().min(1).max(40_000),
+            threadId: z.uuid().nullable().optional(),
+            clientId: z
+              .string()
+              .max(64)
+              .optional()
+              .openapi({ description: "Your id for the optimistic copy; echoed back on the message and its event." }),
+          }),
+        ),
       },
       responses: { 201: json(Message, "Created"), 429: errorResponse("Too many messages"), ...errors },
     }),
@@ -202,6 +212,7 @@ export function chatRoutes(deps: AppDeps) {
       const user = c.get("user");
       const limit = await adapters.rateLimiter.consume(`post:${user.id}`, { limit: 30, windowMs: 10_000 });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
+      const started = performance.now();
       const message = await postPersonMessage(
         { db, pubsub: adapters.pubsub },
         user.id,
@@ -209,7 +220,10 @@ export function chatRoutes(deps: AppDeps) {
         channelId,
         c.req.valid("json"),
       );
-      if (message.mentionedAgentIds.length > 0) deps.wakeWorkers?.();
+      // Wake the workers now (router, runs, indexing) instead of waiting for the poll.
+      deps.wakeWorkers?.();
+      // post → `message.created` published (the commit and the event happen inside postPersonMessage).
+      c.header("server-timing", `created;dur=${(performance.now() - started).toFixed(1)}`);
       return c.json(message, 201);
     },
   );

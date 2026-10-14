@@ -43,19 +43,39 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
   expect(request?.messages.at(-1)).toEqual({ role: "user", content: "[ana]: @dev can you look at the failing build?" });
 
   // Deltas went out through PubSub to channel subscribers, in order, then the final message.
+  // Ordering: the message is out first, "thinking" is shown before any routing or model work,
+  // then the claim, typing on the first delta, the stream, the reply, and the finish + receipt.
   expect(events.map((e) => e.type)).toEqual([
     "message.created",
+    "agent.thinking", // at post time (runId null)
+    "message.routed",
+    "agent.thinking", // run created
+    "agent.thinking", // run claimed
+    "message.claimed",
     "agent.run",
+    "agent.typing",
     "agent.delta",
     "agent.delta",
     "agent.delta",
     "message.created",
     "agent.run",
+    "agent.idle",
+    "run.finished",
+    "message.handled",
   ]);
+  expect(events[1]).toMatchObject({ agentId: f.agent.id, runId: null, threadId: question.id });
+  expect(events[2]).toMatchObject({
+    messageId: question.id,
+    seenBy: [f.agent.id],
+    pickedBy: [f.agent.id],
+    strategy: "mention",
+  });
+  expect(events[3]).toMatchObject({ runId: run?.id });
+  expect(events.at(-1)).toMatchObject({ type: "message.handled", messageId: question.id, status: "done" });
   const deltas = events.filter((e) => e.type === "agent.delta");
   expect(deltas.map((e) => e.text).join("")).toBe("Sure, I'll check the build.");
   expect(deltas.map((e) => e.seq)).toEqual([0, 1, 2]);
-  expect(events.at(-1)).toMatchObject({ type: "agent.run", status: "done", runId: run?.id });
+  expect([...events].reverse().find((e) => e.type === "agent.run")).toMatchObject({ status: "done", runId: run?.id });
 
   // The reply is persisted in the thread of the question, authored by the agent.
   const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
@@ -146,7 +166,11 @@ test("an agent over budget fails the run without calling the model", async () =>
   const [run] = await f.db.select().from(schema.agentRuns);
   expect([run?.status, run?.error]).toEqual(["failed", "budget_exceeded"]);
   expect(f.provider.calls).toHaveLength(0);
-  expect(events.at(-1)).toMatchObject({ type: "agent.run", status: "failed", error: "budget_exceeded" });
+  expect([...events].reverse().find((e) => e.type === "agent.run")).toMatchObject({
+    status: "failed",
+    error: "budget_exceeded",
+  });
+  expect(events.at(-1)).toMatchObject({ type: "message.handled", status: "failed" });
   // The job itself succeeded: a failed run is a handled outcome, not a retry.
   expect((await f.db.select().from(schema.outbox)).every((j) => j.status === "done")).toBe(true);
 });

@@ -33,9 +33,8 @@ export const outbox = pgTable(
     id: uuid()
       .primaryKey()
       .$defaultFn(() => Bun.randomUUIDv7()),
-    orgId: uuid()
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Null for jobs that belong to no organization (e.g. a password-reset email). */
+    orgId: uuid().references(() => organizations.id, { onDelete: "cascade" }),
     /** Handler name, e.g. `message.posted` or `agent_run.execute`. */
     kind: text().notNull(),
     payload: jsonb().$type<Record<string, unknown>>().notNull(),
@@ -70,7 +69,7 @@ export const agentRunStatusEnum = pgEnum("agent_run_status", [
   "done",
   "failed",
 ]);
-export const agentRunTriggerEnum = pgEnum("agent_run_trigger", ["mention", "router"]);
+export const agentRunTriggerEnum = pgEnum("agent_run_trigger", ["mention", "router", "dm"]);
 
 export const agentRuns = pgTable(
   "agent_runs",
@@ -298,6 +297,8 @@ export const approvals = pgTable(
     /** Why it was refused (fed back to the model and to agent lessons). */
     reason: text(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
+    /** When approvers were last emailed about it (reminder digest). */
+    remindedAt: timestamp({ withTimezone: true }),
     /** Set once when the approved action runs: never twice. */
     executedAt: timestamp({ withTimezone: true }),
     result: jsonb().$type<Record<string, unknown>>(),
