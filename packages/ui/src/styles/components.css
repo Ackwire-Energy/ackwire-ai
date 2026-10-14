@@ -1,0 +1,1283 @@
+/*
+ * agentes component styles. Ported from docs/design/design-system/bundle.css
+ * (the reference): same classes and values, adapted to the markup Radix
+ * renders (data-state, data-highlighted). Every value comes from tokens.css.
+ * Additions beyond bundle.css are taken from the approved screens in
+ * docs/design/telas and are marked "from telas/<Screen>".
+ */
+
+html {
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink);
+  background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+}
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-mono);
+}
+.ac-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ac-icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Button */
+.ac-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 var(--space-4);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+  color: var(--ink);
+  cursor: pointer;
+}
+.ac-btn:hover {
+  background: var(--surface);
+}
+.ac-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-btn[disabled],
+.ac-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  color: var(--ink-muted);
+  border-color: var(--line);
+  background: var(--surface);
+}
+.ac-btn--primary {
+  background: var(--action);
+  border-color: var(--action);
+  color: var(--on-action);
+}
+.ac-btn--primary:hover {
+  background: var(--action);
+  opacity: 0.88;
+}
+.ac-btn--agent {
+  border-bottom-left-radius: var(--radius-cut);
+}
+.ac-btn--agent .ac-icon {
+  color: var(--agent);
+}
+.ac-btn--danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.ac-btn--ghost {
+  border-color: transparent;
+  background: transparent;
+}
+.ac-btn--ghost:hover {
+  background: var(--surface-sunken);
+}
+.ac-btn--ghost.ac-btn--danger {
+  border-color: transparent;
+}
+.ac-btn--icon {
+  width: 36px;
+  padding: 0;
+}
+.ac-btn--sm {
+  height: 28px;
+  padding: 0 var(--space-3);
+  font-size: 13px;
+}
+.ac-btn--sm.ac-btn--icon {
+  width: 28px;
+  padding: 0;
+}
+.ac-btn--sm .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+.ac-btn--block {
+  width: 100%;
+}
+
+/* Text link (from telas/Entrar, Cadastro) */
+.ac-link {
+  color: var(--ink);
+  font-weight: 600;
+}
+.ac-link--muted {
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+.ac-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-cut);
+}
+
+/* Input */
+.ac-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.ac-field__label {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ac-field__label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.ac-field__help {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ac-field__error {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--danger);
+}
+.ac-input {
+  box-sizing: border-box;
+  height: 36px;
+  width: 100%;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+.ac-input::placeholder {
+  color: var(--ink-muted);
+}
+.ac-input:focus {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.ac-input[readonly] {
+  background: var(--surface);
+  color: var(--ink-muted);
+}
+textarea.ac-input {
+  height: auto;
+  padding: 10px 12px;
+  line-height: 22px;
+  resize: vertical;
+}
+/* Prefixed input, e.g. "agentes.chat/" + slug (from telas/Onboarding) */
+.ac-input-affix {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  box-sizing: border-box;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+.ac-input-affix:focus-within {
+  box-shadow: var(--focus-ring);
+}
+.ac-input-affix__prefix {
+  padding: 0 2px 0 var(--space-3);
+  color: var(--ink-muted);
+}
+.ac-input-affix input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  font: inherit;
+  color: var(--ink);
+  background: transparent;
+}
+/* Search input with a leading icon (from telas/Agente dialogs) */
+.ac-search {
+  position: relative;
+  display: flex;
+  flex: 1 1 260px;
+}
+.ac-search .ac-icon {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+.ac-search .ac-input {
+  padding-left: 36px;
+}
+
+/* Composer */
+.ac-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+}
+.ac-composer:focus-within {
+  box-shadow: var(--focus-ring);
+}
+.ac-composer textarea {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  resize: none;
+  background: transparent;
+  font: inherit;
+  color: var(--ink);
+  padding: var(--space-2);
+  outline: none;
+  max-height: 240px;
+}
+.ac-composer textarea::placeholder {
+  color: var(--ink-muted);
+}
+.ac-composer__hint {
+  margin: 6px 4px 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+
+/* Avatar: people are circles, agents are rounded squares with one cut corner */
+.ac-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--surface-sunken);
+  color: var(--ink);
+  border-radius: var(--radius-full);
+  position: relative;
+  box-sizing: border-box;
+}
+.ac-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.ac-avatar--agent {
+  background: var(--agent);
+  color: var(--on-agent);
+  border-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-cut);
+}
+.ac-avatar--sm {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
+.ac-avatar--sm.ac-avatar--agent {
+  border-radius: var(--radius-sm);
+  border-bottom-left-radius: var(--radius-cut);
+}
+.ac-avatar--lg {
+  width: 56px;
+  height: 56px;
+  font-size: 20px;
+}
+.ac-avatar__presence {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--success);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.ac-avatar--agent .ac-avatar__presence {
+  background: var(--agent);
+}
+.ac-avatar--running::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--agent);
+  border-radius: inherit;
+  border-bottom-left-radius: var(--radius-cut);
+}
+/* Overlapping avatars (from telas/Main header, Convite) */
+.ac-avatar-stack {
+  display: flex;
+  align-items: center;
+}
+.ac-avatar-stack > .ac-avatar {
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.ac-avatar-stack > .ac-avatar + .ac-avatar {
+  margin-left: -6px;
+}
+
+/* Message */
+.ac-msg {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+}
+.ac-msg--grouped {
+  padding-top: 0;
+}
+.ac-msg--grouped .ac-msg__gutter {
+  width: 36px;
+  flex: none;
+}
+.ac-msg__body {
+  min-width: 0;
+  flex: 1;
+}
+.ac-msg__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.ac-msg__author {
+  font-weight: 600;
+}
+.ac-msg__time {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.ac-msg__meta {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.ac-msg__text {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.ac-msg__text code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--surface-sunken);
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-cut);
+}
+.ac-msg__text pre {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  white-space: pre;
+}
+.ac-msg__text pre code {
+  padding: 0;
+  background: transparent;
+}
+.ac-msg__error {
+  margin: 2px 0 0;
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  color: var(--danger);
+  font-size: 14px;
+  line-height: 20px;
+}
+.ac-mention {
+  color: var(--ink);
+  background: var(--surface-sunken);
+  font-weight: 600;
+  padding: 0 3px;
+  border-radius: var(--radius-cut);
+}
+.ac-msg--streaming .ac-msg__text::after {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: var(--agent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-msg--streaming .ac-msg__text::after {
+    animation: ac-blink 1s steps(2) infinite;
+  }
+}
+@keyframes ac-blink {
+  50% {
+    opacity: 0;
+  }
+}
+/* Day divider (from telas/Main) */
+.ac-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.ac-divider::before,
+.ac-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+/* Link card attached to a message, e.g. a PR (from telas/Main) */
+.ac-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 13px;
+}
+.ac-attachment .ac-icon {
+  color: var(--ink-muted);
+}
+
+/* Approval card: a neutral card; the only color is the status chip. Chips carry an icon, never a dot. */
+.ac-approval {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-cut);
+  max-width: 520px;
+  box-sizing: border-box;
+}
+.ac-approval--wide {
+  max-width: none;
+}
+.ac-approval__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.ac-approval__head .ac-chip {
+  margin-left: auto;
+}
+.ac-approval__who {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ac-approval__who b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.ac-approval__who a {
+  color: var(--ink);
+}
+.ac-approval__title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+}
+.ac-approval__detail {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+.ac-approval__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.ac-approval--done {
+  gap: var(--space-2);
+}
+.ac-approval--done .ac-approval__title {
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+
+/* Chip */
+.ac-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 var(--space-2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+.ac-chip--waiting {
+  background: var(--attention-soft);
+  color: var(--attention);
+}
+.ac-chip--done {
+  color: var(--success);
+}
+.ac-chip .ac-icon {
+  width: 14px;
+  height: 14px;
+}
+/* Small attention note: icon + text, no background (from telas/Agente permissions) */
+.ac-note-attention {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--attention);
+  white-space: nowrap;
+}
+.ac-note-attention .ac-icon {
+  width: 14px;
+  height: 14px;
+}
+/* Counter badge (from telas/Sidebar) */
+.ac-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--attention-soft);
+  color: var(--attention);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Logo: the agent mark + the wordmark set in Onest */
+.ac-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.16em;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  line-height: 1;
+  font-size: 24px;
+}
+.ac-logo__mark {
+  width: 1.25em;
+  height: 1.25em;
+  flex: none;
+}
+.ac-logo__body {
+  fill: var(--agent);
+}
+.ac-logo__eyes {
+  fill: var(--on-agent);
+}
+.ac-logo__tld {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+.ac-logo--mono .ac-logo__body {
+  fill: currentColor;
+}
+.ac-logo--mono .ac-logo__eyes {
+  fill: var(--surface);
+}
+.ac-logo__word {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.12em;
+}
+.ac-logo__chat {
+  font-size: 0.36em;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  padding: 0.28em 0.5em 0.34em;
+  margin-top: 0.12em;
+  border-radius: 0.6em;
+  border-bottom-left-radius: 0.12em;
+  background: var(--agent);
+  color: var(--on-agent);
+}
+.ac-logo--mono .ac-logo__chat {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+/* Select: our own trigger + listbox, never the native <select> */
+.ac-select {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.ac-select__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+}
+.ac-select__trigger:hover {
+  border-color: var(--ink-muted);
+}
+.ac-select__trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-select__trigger[aria-expanded="true"] {
+  border-color: var(--ink);
+}
+.ac-select__trigger[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.ac-select__trigger[data-disabled] {
+  cursor: not-allowed;
+  color: var(--ink-muted);
+  border-color: var(--line);
+  background: var(--surface);
+}
+.ac-select__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-select__trigger[data-placeholder] .ac-select__value {
+  color: var(--ink-muted);
+}
+.ac-select__chev {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--ink-muted);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.15s ease;
+}
+.ac-select__trigger[aria-expanded="true"] .ac-select__chev {
+  transform: rotate(180deg);
+}
+.ac-select--sm .ac-select__trigger {
+  height: 32px;
+  font-size: 14px;
+}
+
+/* Menu (listbox of the Select, dropdown menus) */
+.ac-menu {
+  z-index: 20;
+  min-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--overlay);
+  max-height: 280px;
+  overflow-y: auto;
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+.ac-menu--select {
+  min-width: var(--radix-select-trigger-width);
+  max-height: min(280px, var(--radix-select-content-available-height));
+}
+.ac-menu--dropdown {
+  min-width: 200px;
+}
+.ac-menu__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  outline: none;
+  user-select: none;
+}
+.ac-menu__item:hover,
+.ac-menu__item:focus-visible,
+.ac-menu__item[data-highlighted] {
+  background: var(--surface-sunken);
+  outline: none;
+}
+.ac-menu__item[data-disabled] {
+  color: var(--ink-muted);
+  cursor: not-allowed;
+}
+.ac-menu__item--danger {
+  color: var(--danger);
+}
+.ac-menu__item .ac-icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+.ac-menu__check {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  margin-top: 2px;
+  visibility: hidden;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ac-menu__item[aria-selected="true"],
+.ac-menu__item[data-state="checked"] {
+  font-weight: 600;
+}
+.ac-menu__item[aria-selected="true"] .ac-menu__check,
+.ac-menu__item[data-state="checked"] .ac-menu__check {
+  visibility: visible;
+}
+.ac-menu__label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ac-menu__desc {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--ink-muted);
+  white-space: normal;
+}
+.ac-menu__heading {
+  padding: 8px 10px 4px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.ac-menu__separator {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--line);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-select__chev {
+    transition: none;
+  }
+}
+
+/* Checkbox and radio: our own look (Radix renders a button with role checkbox/radio) */
+.ac-check,
+.ac-radio {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  padding: 0;
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface-raised);
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  color: var(--on-action);
+}
+.ac-check {
+  border-radius: 5px;
+}
+.ac-radio {
+  border-radius: 999px;
+}
+.ac-check__mark {
+  width: 10px;
+  height: 10px;
+  background: var(--on-action);
+  clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 22%, 86% 8%, 38% 72%);
+}
+.ac-radio__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--on-action);
+}
+.ac-check[data-state="checked"],
+.ac-radio[data-state="checked"] {
+  background: var(--action);
+  border-color: var(--action);
+}
+.ac-check:focus-visible,
+.ac-radio:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-check[data-disabled],
+.ac-radio[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Selectable cards and pills (from telas/Onboarding, NovoAgente) */
+.ac-option {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  box-sizing: border-box;
+  min-width: 0;
+}
+.ac-option--stacked {
+  flex-direction: column;
+  gap: 2px;
+}
+.ac-option--agent {
+  border-bottom-left-radius: var(--radius-cut);
+}
+.ac-option[aria-pressed="true"],
+.ac-option[data-state="checked"] {
+  border-color: var(--ink);
+  background: var(--surface-sunken);
+}
+.ac-option:focus-visible,
+.ac-option:has(:focus-visible) {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-option__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ac-option__title {
+  font-weight: 600;
+}
+.ac-option__desc {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ac-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+}
+.ac-pill[data-checked="true"] {
+  border-color: var(--ink);
+  background: var(--surface-sunken);
+}
+.ac-pill .ac-check {
+  margin: 0;
+}
+.ac-pill:has(:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+.ac-pill:has(:focus-visible) .ac-check {
+  box-shadow: none;
+}
+
+/* Tabs (from telas/Aprovacoes) */
+.ac-tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+.ac-tab {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 12px;
+  margin-bottom: -1px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.ac-tab[data-state="active"] {
+  border-bottom-color: var(--ink);
+  color: var(--ink);
+}
+.ac-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.ac-tab__count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dialog (from telas/Agente): radius-lg, overlay shadow, scrim */
+.ac-dialog__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(10, 10, 10, 0.4);
+}
+.ac-dialog {
+  position: fixed;
+  z-index: 41;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(var(--ac-dialog-width, 600px), calc(100% - 32px));
+  max-height: min(640px, calc(100% - 64px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-raised);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--overlay);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 22px;
+}
+.ac-dialog:focus {
+  outline: none;
+}
+.ac-dialog__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 20px 20px 12px;
+}
+.ac-dialog__title {
+  margin: 0;
+  flex: 1;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 650;
+}
+.ac-dialog__desc {
+  margin: 0;
+  padding: 0 20px 12px;
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.ac-dialog__tools {
+  padding: 0 20px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.ac-dialog__body {
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.ac-dialog__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 20px;
+}
+.ac-dialog__empty {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  color: var(--ink-muted);
+}
+.ac-dialog__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 20px;
+}
+.ac-dialog__foot--bar {
+  padding: 12px 20px 20px;
+  border-top: 1px solid var(--line);
+}
+.ac-dialog__foot-note {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+/* Meter (from telas/Agente budget) */
+.ac-meter {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.ac-meter__bar {
+  height: 100%;
+  background: var(--ink);
+  border-radius: var(--radius-full);
+}
+
+/* Cards and sections (from telas/Agente, Membros) */
+.ac-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 20px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+.ac-card--padded {
+  padding: 32px;
+  border-radius: var(--radius-lg);
+  gap: 20px;
+}
+.ac-card__title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 650;
+}
+.ac-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+.ac-list__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 16px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.ac-list__row + .ac-list__row {
+  border-top: 1px solid var(--line);
+}
+a.ac-list__row:hover {
+  background: var(--surface);
+}
+a.ac-list__row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Empty state (from telas/Aprovacoes) */
+.ac-empty {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--ink-muted);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+}
+.ac-empty__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+}
+.ac-empty__title {
+  margin: 0 0 var(--space-1);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+}
+.ac-empty__text {
+  margin: 0 auto;
+  max-width: 52ch;
+}
+.ac-empty__actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+/* Inline alert (from telas/Entrar) */
+.ac-alert {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--danger);
+  font-size: 14px;
+  line-height: 20px;
+}
+.ac-alert .ac-icon {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+.ac-alert--neutral {
+  color: var(--ink);
+}
+
+/* Toast (writes that fail or confirm): neutral surface, overlay shadow */
+.ac-toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: min(420px, calc(100% - 32px));
+}
+.ac-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--overlay);
+  font-size: 14px;
+  line-height: 20px;
+}
+.ac-toast--error .ac-icon {
+  color: var(--danger);
+}
+.ac-toast__text {
+  flex: 1;
+}
+
+/* Progress bars (from telas/Onboarding) */
+.ac-steps {
+  display: flex;
+  gap: var(--space-1);
+}
+.ac-steps__bar {
+  flex: 1;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--line);
+}
+.ac-steps__bar[data-done="true"] {
+  background: var(--ink);
+}
+.ac-eyebrow {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}

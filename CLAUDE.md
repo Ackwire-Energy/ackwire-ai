@@ -4,7 +4,7 @@ Protótipo de referência: docs/prototipo/colmeia.html — só para fluxos e con
 
 ## Stack
 Mesma base do Tierbird (D18/D20 em docs/planejamento.md): Bun + Hono + Drizzle, front Vite + React + TanStack, WebSocket nativo do Bun, Better Auth. Postgres é a única dependência no self-host (fila em outbox no Postgres); Redis e Turbopuffer só como módulos da Cloud.
-Open source (AGPL) + Cloud privada que inclui o core como submódulo, como no Tierbird.
+Por enquanto: código fechado, só Cloud (D25 em docs/planejamento.md). Open source entra depois; pendências em "Pendências para o open source" no planejamento. Manter as interfaces/módulos (adaptadores trocáveis), mas sem gastar esforço em self-host agora.
 
 ## Conceitos
 - Organização (multi-tenant): tudo tem org_id. Contexto da org entra no prompt de todos os agentes.

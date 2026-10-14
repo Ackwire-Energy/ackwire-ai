@@ -1,0 +1,60 @@
+/* Copied from docs/design/design-system/tokens.css (a test keeps them in sync). Do not edit here. */
+/* agentes — generated from tokens.json */
+:root,
+[data-theme="light"] {
+  --surface: #f6f6f4;
+  --surface-raised: #ffffff;
+  --surface-sunken: #ebebe8;
+  --line: #dcdcd8;
+  --line-strong: #82827d;
+  --ink: #171716;
+  --ink-muted: #5c5c58;
+  --action: #171716;
+  --on-action: #ffffff;
+  --agent: #0063d1;
+  --on-agent: #ffffff;
+  --agent-soft: #e1edfc;
+  --attention: #8a5300;
+  --on-attention: #ffffff;
+  --attention-soft: #fbeed5;
+  --danger: #b42a20;
+  --success: var(--ink);
+  --focus-ring: 0 0 0 2px #f6f6f4, 0 0 0 4px #171716;
+  --overlay: 0 8px 24px rgba(23, 23, 22, 0.14);
+}
+[data-theme="dark"] {
+  --surface: #131312;
+  --surface-raised: #1b1b1a;
+  --surface-sunken: #0c0c0b;
+  --line: #2c2c2a;
+  --line-strong: #6b6b67;
+  --ink: #ecece9;
+  --ink-muted: #a2a29d;
+  --action: #ecece9;
+  --on-action: #131312;
+  --agent: #5aa8ff;
+  --on-agent: #00203f;
+  --agent-soft: #122640;
+  --attention: #e8a93b;
+  --on-attention: #2a1c00;
+  --attention-soft: #33260e;
+  --danger: #f08a80;
+  --success: var(--ink);
+  --focus-ring: 0 0 0 2px #131312, 0 0 0 4px #ecece9;
+  --overlay: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-cut: 2px;
+  --radius-full: 999px;
+  --font-sans: Onest, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, Menlo, monospace;
+}

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Propostas de melhoria</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/agentes/tokens.css">
+<link rel="stylesheet" href="ds/agentes/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div data-theme="{{theme}}" style="display: flex; flex-wrap: wrap; min-height: 900px; height: 100vh; background: var(--surface); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 22px">
+  <dc-import name="Sidebar" active="ada" hint-size="272px,100%" style="flex: 0 0 272px"></dc-import>
+
+  <main style="flex: 999 1 560px; min-width: 0; height: 100%; overflow-y: auto">
+    <div style="max-width: 1040px; margin: 0 auto; padding: 32px 24px; display: flex; flex-direction: column; gap: 20px">
+      <a href="Memoria.dc.html" style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-muted); text-decoration: none"><svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true" style="width: 16px; height: 16px"><path d="M12 5 7 10l5 5"></path></svg>O que a Ada sabe</a>
+      <header style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.015em">Propostas de melhoria</h1>
+        <p style="margin: 0; color: var(--ink-muted); max-width: 64ch">Quando uma lição se repete, o agente propõe mudar as próprias instruções ou o contexto da Acme. Nada muda sem alguém aceitar.</p>
+      </header>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+        <nav aria-label="Propostas" style="flex: 1 1 260px; max-width: 320px; display: flex; flex-direction: column; gap: 4px">
+          <sc-for list="{{list}}" as="p" hint-placeholder-count="3">
+            <button type="button" onClick="{{p.pick}}" aria-current="{{p.current}}" style="{{p.style}}">
+              <span style="display: flex; align-items: center; gap: 8px">
+                <span class="ac-avatar ac-avatar--sm ac-avatar--agent" aria-hidden="true">{{p.initial}}</span>
+                <span style="font-weight: 600">{{p.agent}}</span>
+                <span style="margin-left: auto; font-size: 12px; color: var(--ink-muted)">{{p.when}}</span>
+              </span>
+              <span style="font-size: 14px; line-height: 20px">{{p.title}}</span>
+              <span style="font-size: 12px; line-height: 16px; color: var(--ink-muted)">{{p.statusText}}</span>
+            </button>
+          </sc-for>
+        </nav>
+
+        <article aria-labelledby="prop-title" style="flex: 999 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 20px; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 10px">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+            <span class="ac-avatar ac-avatar--sm ac-avatar--agent" aria-hidden="true">{{cur.initial}}</span>
+            <span style="font-size: 13px; color: var(--ink-muted)"><b style="color: var(--ink)">{{cur.agent}}</b> propõe · {{cur.target}}</span>
+            <sc-if value="{{isPending}}" hint-placeholder-val="{{true}}"><span class="ac-chip ac-chip--waiting"><svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="M10 6v4l2.6 1.8"></path></svg>{{cur.whoDecides}}</span></sc-if>
+            <sc-if value="{{isAccepted}}" hint-placeholder-val="{{false}}"><span class="ac-chip ac-chip--done"><svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 10.5 3 3 6-7"></path></svg>{{cur.decision}}</span></sc-if>
+            <sc-if value="{{isRefused}}" hint-placeholder-val="{{false}}"><span class="ac-chip"><svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"></path></svg>{{cur.decision}}</span></sc-if>
+          </div>
+          <h2 id="prop-title" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 650">{{cur.title}}</h2>
+
+          <section aria-label="Por quê" style="display: flex; flex-direction: column; gap: 8px">
+            <span style="font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-muted)">Por quê</span>
+            <p style="margin: 0">{{cur.why}}</p>
+            <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px">
+              <sc-for list="{{cur.evidence}}" as="e" hint-placeholder-count="3">
+                <li style="display: flex; gap: 8px; font-size: 14px; line-height: 20px">
+                  <svg class="ac-icon" viewBox="0 0 20 20" aria-hidden="true" style="width: 16px; height: 16px; margin-top: 2px; color: var(--ink-muted)"><path d="M6.5 4h7.5a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H3V7.5A3.5 3.5 0 0 1 6.5 4z"></path></svg>
+                  <span><a href="Main.dc.html" style="color: var(--ink)">{{e.where}}</a> <span style="color: var(--ink-muted)">· {{e.what}}</span></span>
+                </li>
+              </sc-for>
+            </ul>
+          </section>
+
+          <section aria-label="Mudança proposta" style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span style="flex: 1; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-muted)">Mudança em {{cur.targetShort}}</span>
+              <sc-if value="{{canEdit}}" hint-placeholder-val="{{true}}"><button class="ac-btn ac-btn--ghost ac-btn--sm" type="button" onClick="{{toggleEdit}}">{{editLabel}}</button></sc-if>
+            </div>
+            <sc-if value="{{showDiff}}" hint-placeholder-val="{{true}}">
+              <div style="display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 6px; overflow: hidden">
+                <sc-for list="{{cur.lines}}" as="l" hint-placeholder-count="5">
+                  <div style="{{l.style}}">
+                    <span aria-hidden="true" style="flex: 0 0 16px; color: var(--ink-muted); font-weight: 700">{{l.mark}}</span>
+                    <span style="{{l.textStyle}}"><span class="ac-visually-hidden" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">{{l.srLabel}}</span>{{l.text}}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{editingNow}}" hint-placeholder-val="{{false}}">
+              <div class="ac-field">
+                <label class="ac-field__label" for="prop-edit">Texto final das instruções</label>
+                <textarea id="prop-edit" class="ac-input" rows="8" style="height: auto; padding: 10px 12px; line-height: 22px; resize: vertical" onChange="{{onDraft}}">{{draft}}</textarea>
+                <span class="ac-field__help">Você pode ajustar antes de aceitar. A versão anterior fica no histórico.</span>
+              </div>
+            </sc-if>
+          </section>
+
+          <sc-if value="{{isPending}}" hint-placeholder-val="{{true}}">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line)">
+              <button class="ac-btn ac-btn--primary" type="button" onClick="{{accept}}">{{acceptLabel}}</button>
+              <button class="ac-btn" type="button" onClick="{{refuse}}">Recusar</button>
+              <span style="flex: 1 1 200px; font-size: 13px; line-height: 18px; color: var(--ink-muted)">Ao recusar, a Ada guarda o motivo como lição e não propõe isso de novo.</span>
+            </div>
+          </sc-if>
+        </article>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["claro","escuro"],"default":"claro"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { selected: 'p1', status: { p3: 'accepted' }, editing: false, draft: null };
+  }
+  renderVals() {
+    const s = this.state;
+    const P = [
+      { id: 'p1', agent: 'Ada', initial: 'A', when: 'há 1 h', target: 'instruções da Ada', targetShort: 'instruções da Ada', whoDecides: 'Aguardando João',
+        title: 'Manter PRs pequenos e pedir revisão do João em pagamentos',
+        why: 'O João corrigiu a Ada três vezes pelo mesmo motivo e recusou um merge que mexia em pagamentos sem revisão.',
+        evidence: [
+          { where: '#eng · 13 out', what: 'João: “quebra esse PR em dois, tá grande demais”' },
+          { where: '#eng · 11 out', what: 'João: “PR acima de 300 linhas eu não consigo revisar direito”' },
+          { where: 'Aprovação recusada · 8 out', what: 'Merge do PR #31 (cobrança): “precisa passar por mim antes”' }
+        ],
+        before: ['Programa em branches, nunca direto na main.', 'Abre PRs pequenos, com teste para cada correção.', 'Explica a causa antes da solução.', 'Pede ajuda ao João quando a mudança tocar em pagamentos.'],
+        after: ['Programa em branches, nunca direto na main.', 'Abre PRs de até 300 linhas; se passar disso, divide em PRs menores.', 'Abre PRs pequenos, com teste para cada correção.', 'Explica a causa antes da solução.', 'Antes de abrir PR que toque em pagamentos, pede revisão do João no canal.'] },
+      { id: 'p2', agent: 'Theo', initial: 'T', when: 'ontem', target: 'contexto da Acme', targetShort: 'contexto da Acme', whoDecides: 'Aguardando um admin',
+        title: 'Registrar que deploy só acontece de segunda a quinta',
+        why: 'A regra de deploy apareceu em quatro conversas e foi confirmada pelo Walter.',
+        evidence: [
+          { where: '#eng · 10 out', what: 'Walter: “sexta não tem deploy, nem depois das 18h”' },
+          { where: '#geral · 3 out', what: 'Marina perguntou e o João confirmou a regra' }
+        ],
+        before: ['Prioridade do trimestre: estabilidade do login e do agendamento.', 'Tom: direto e gentil.'],
+        after: ['Prioridade do trimestre: estabilidade do login e do agendamento.', 'Deploy em produção só de segunda a quinta, depois das 18h.', 'Tom: direto e gentil.'] },
+      { id: 'p3', agent: 'Lia', initial: 'L', when: '9 out', target: 'instruções da Lia', targetShort: 'instruções da Lia', whoDecides: '', decision: 'Aceita por Marina · 9 out',
+        title: 'Citar a fonte de cada número nas tabelas',
+        why: 'Marina pediu duas vezes a origem dos números de reviews.',
+        evidence: [{ where: '#produto · 8 out', what: 'Marina: “de onde saiu esse 31?”' }],
+        before: ['Monta tabelas com os dados encontrados.'],
+        after: ['Monta tabelas com os dados encontrados e cita a fonte de cada número.'] }
+    ];
+    const status = (id) => s.status[id] || 'pending';
+    const diff = (before, after) => {
+      const lines = [];
+      const b = new Set(before), a = new Set(after);
+      let i = 0, j = 0;
+      while (i < before.length || j < after.length) {
+        if (i < before.length && j < after.length && before[i] === after[j]) { lines.push(['same', before[i]]); i++; j++; }
+        else if (i < before.length && !a.has(before[i])) { lines.push(['del', before[i]]); i++; }
+        else if (j < after.length && !b.has(after[j])) { lines.push(['add', after[j]]); j++; }
+        else if (i < before.length) { lines.push(['same', before[i]]); i++; j = Math.max(j, after.indexOf(before[i - 1]) + 1); }
+        else { lines.push(['add', after[j]]); j++; }
+      }
+      return lines.map(([k, text]) => ({ text,
+        mark: k === 'add' ? '+' : k === 'del' ? '−' : '',
+        srLabel: k === 'add' ? 'Adicionado: ' : k === 'del' ? 'Removido: ' : '',
+        style: 'display: flex; gap: 8px; padding: 6px 12px; font-size: 14px; line-height: 20px;' + (k === 'add' ? ' background: var(--surface-sunken);' : ''),
+        textStyle: 'position: relative; flex: 1; min-width: 0;' + (k === 'add' ? ' font-weight: 600;' : k === 'del' ? ' color: var(--ink-muted); text-decoration: line-through;' : '') }));
+    };
+    const cur0 = P.find((p) => p.id === s.selected) || P[0];
+    const st = status(cur0.id);
+    const cur = Object.assign({}, cur0, { lines: diff(cur0.before, cur0.after),
+      decision: cur0.decision || (st === 'accepted' ? 'Aceita por você · agora' : 'Recusada por você · agora') });
+    const itemStyle = (on) => 'display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px; font: inherit; color: var(--ink); cursor: pointer; border-radius: 10px; border: 1px solid ' + (on ? 'var(--ink)' : 'var(--line)') + '; background: ' + (on ? 'var(--surface-raised)' : 'transparent') + ';';
+    const statusText = (p) => { const x = status(p.id); return x === 'pending' ? p.whoDecides : x === 'accepted' ? 'Aceita' : 'Recusada'; };
+    return {
+      theme: (this.props.tema ?? 'claro') === 'escuro' ? 'dark' : 'light',
+      list: P.map((p) => ({ ...p, statusText: statusText(p), current: p.id === cur.id ? 'true' : 'false', style: itemStyle(p.id === cur.id),
+        pick: () => this.setState({ selected: p.id, editing: false, draft: null }) })),
+      cur,
+      isPending: st === 'pending', isAccepted: st === 'accepted', isRefused: st === 'refused',
+      canEdit: st === 'pending',
+      editingNow: s.editing && st === 'pending', showDiff: !(s.editing && st === 'pending'),
+      editLabel: s.editing ? 'Ver diferenças' : 'Editar antes de aceitar',
+      toggleEdit: () => this.setState({ editing: !s.editing, draft: s.draft ?? cur0.after.join('\n') }),
+      draft: s.draft ?? cur0.after.join('\n'),
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+      acceptLabel: s.editing ? 'Aceitar com ajustes' : 'Aceitar mudança',
+      accept: () => this.setState({ status: Object.assign({}, s.status, { [cur.id]: 'accepted' }), editing: false }),
+      refuse: () => this.setState({ status: Object.assign({}, s.status, { [cur.id]: 'refused' }), editing: false })
+    };
+  }
+}
+</script>
+</body>
+</html>
