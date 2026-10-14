@@ -62,8 +62,8 @@ export function createFakeS3(options: {
       return xmlError(400, "AuthorizationHeaderMalformed", `The region '${region}' is wrong.`);
     }
     const names = f.signedHeaders.split(";");
-    const valueOf = (n: string) => (n === "host" ? url.host : (headers.get(n) ?? ""));
-    const canonicalHeaders = names.map((n) => `${n}:${valueOf(n).trim()}\n`).join("");
+    const headerValue = (n: string) => (n === "host" ? url.host : (headers.get(n) ?? ""));
+    const canonicalHeaders = names.map((n) => `${n}:${headerValue(n).trim()}\n`).join("");
     const pairs: string[] = [];
     for (const [k, v] of url.searchParams.entries()) {
       if (k !== "X-Amz-Signature") pairs.push(`${rfc3986(k)}=${rfc3986(v)}`);
@@ -103,8 +103,8 @@ export function createFakeS3(options: {
     const prefix = url.searchParams.get("prefix") ?? "";
     const max = Number(url.searchParams.get("max-keys") ?? "1000");
     const keys = [...bucket.keys()].filter((k) => k.startsWith(prefix)).slice(0, max);
-    const escape = (k: string) => k.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-    const contents = keys.map((k) => `<Contents><Key>${escape(k)}</Key></Contents>`);
+    const escapeXml = (k: string) => k.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const contents = keys.map((k) => `<Contents><Key>${escapeXml(k)}</Key></Contents>`);
     return `<?xml version="1.0"?><ListBucketResult>${contents.join("")}</ListBucketResult>`;
   }
 

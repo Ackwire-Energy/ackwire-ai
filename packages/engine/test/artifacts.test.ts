@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
-  addChannelMember,
   ARTIFACT_LIMITS,
+  addChannelMember,
   artifactDownload,
   artifactFile,
   createArtifact,
@@ -21,8 +21,8 @@ import {
   searchVisible,
   tableToCsv,
   updateArtifact,
-  validateContent,
   ValidationError,
+  validateContent,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -200,7 +200,14 @@ describe("visibility and editing", () => {
       content: { kind: "table", columns: ["mês", "meta"], rows: [["jan", "10"]] },
     });
     const v2 = await updateArtifact(f.artifactDeps, person(f.owner.id), f.org.id, table.id, {
-      content: { kind: "table", columns: ["mês", "meta"], rows: [["jan", "10"], ["fev", "12, revisada"]] },
+      content: {
+        kind: "table",
+        columns: ["mês", "meta"],
+        rows: [
+          ["jan", "10"],
+          ["fev", "12, revisada"],
+        ],
+      },
       note: "fevereiro",
       baseVersion: 1,
     });
@@ -217,9 +224,7 @@ describe("visibility and editing", () => {
     const other = await addMember(f.db, f.org.id, "member", "caio");
     await expect(deleteArtifact(f.artifactDeps, other.id, f.org.id, table.id)).rejects.toBeInstanceOf(ForbiddenError);
     await deleteArtifact(f.artifactDeps, bia.id, f.org.id, table.id);
-    await expect(getArtifact(f.artifactDeps, person(bia.id), f.org.id, table.id)).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(getArtifact(f.artifactDeps, person(bia.id), f.org.id, table.id)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   test("kinds and sizes are validated", () => {

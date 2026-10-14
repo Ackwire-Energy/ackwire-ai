@@ -48,7 +48,10 @@ const enc = (s: string) =>
 const encodePath = (path: string) => path.split("/").map(enc).join("/");
 
 function amzDates(now: Date) {
-  const iso = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""); // 20261014T120000Z
+  const iso = now
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, ""); // 20261014T120000Z
   return { amzDate: iso, date: iso.slice(0, 8) };
 }
 

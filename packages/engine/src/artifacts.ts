@@ -282,7 +282,6 @@ async function writeBlob(deps: ArtifactDeps, orgId: string, artifactId: string, 
   return { storageConfigId: location.storageConfigId, key, contentType, size: body.byteLength, sha: sha256Hex(body) };
 }
 
-
 /**
  * Creates an artifact (version 1). People create in the Drive (no channel:
  * the whole org sees it) or in a channel they belong to; agents create in
@@ -629,4 +628,3 @@ registerDocumentBuilder("file", async (db, orgId, id) => {
     createdAt: a.createdAt,
   };
 });
-

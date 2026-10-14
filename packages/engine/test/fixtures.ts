@@ -13,8 +13,8 @@ import { type Database, schema } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import { createFakeEmbeddings, createFakeProvider, type FakeProvider } from "@agenteschat/providers/testing";
 import {
-  addChannelMember,
   type ArtifactDeps,
+  addChannelMember,
   type ContextDeps,
   createAgent,
   createArtifactToolSource,

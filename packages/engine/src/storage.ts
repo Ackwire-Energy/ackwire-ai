@@ -462,7 +462,7 @@ export async function startMigration(deps: StorageDeps, actorId: string, orgId: 
 export async function runMigration(deps: StorageDeps, migrationId: string, options: { batch?: number } = {}) {
   const { db } = deps;
   const [m] = await db.select().from(storageMigrations).where(eq(storageMigrations.id, migrationId));
-  if (!m || m.status !== "running") return;
+  if (m?.status !== "running") return;
   const resolver = createBlobStoreResolver(deps);
   const target = await resolver.forOrg(m.orgId);
   if (target.storageConfigId !== m.toStorageConfigId) {

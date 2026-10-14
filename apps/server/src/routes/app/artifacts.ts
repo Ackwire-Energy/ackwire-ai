@@ -198,13 +198,7 @@ export function artifactRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, artifactId } = c.req.valid("param");
-      const saved = await updateArtifact(
-        artifacts(),
-        person(c.get("user").id),
-        orgId,
-        artifactId,
-        c.req.valid("json"),
-      );
+      const saved = await updateArtifact(artifacts(), person(c.get("user").id), orgId, artifactId, c.req.valid("json"));
       return c.json(saved, 200);
     },
   );
