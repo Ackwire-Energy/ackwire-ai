@@ -89,12 +89,7 @@ export function SearchPage() {
                   ]
                     .filter(Boolean)
                     .join(" · ");
-                  const body = (
-                    <span className="list-col">
-                      <span>{h.snippet}</span>
-                      <span className="small muted">{meta}</span>
-                    </span>
-                  );
+                  const body = <HitBody snippet={h.snippet} meta={meta} />;
                   return c ? (
                     <Link
                       key={`${h.kind}-${h.sourceId}`}
@@ -116,5 +111,14 @@ export function SearchPage() {
         </TabPanel>
       </Tabs>
     </div>
+  );
+}
+
+function HitBody({ snippet, meta }: { snippet: string; meta: string }) {
+  return (
+    <span className="list-col">
+      <span>{snippet}</span>
+      <span className="small muted">{meta}</span>
+    </span>
   );
 }
