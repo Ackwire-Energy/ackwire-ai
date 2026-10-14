@@ -101,5 +101,7 @@ export const organizationSettings = pgTable("organization_settings", {
   summaryModel: text(),
   /** IANA time zone used as the default for routines, e.g. `America/Sao_Paulo`. */
   timezone: text().notNull().default("UTC"),
+  /** From onboarding: `solo`, `small`, `medium` or `large`. */
+  teamSize: text(),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

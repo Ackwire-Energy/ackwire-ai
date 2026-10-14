@@ -11,7 +11,13 @@ export { Avatar, type AvatarKind, type AvatarProps, AvatarStack, initialsOf } fr
 export { Button, type ButtonProps, type ButtonVariant } from "./components/Button";
 export { Checkbox, CheckboxPill, type CheckboxProps, Radio, RadioCard, RadioGroup } from "./components/Checkbox";
 export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge } from "./components/Chip";
-export { Composer, type ComposerProps } from "./components/Composer";
+export {
+  Composer,
+  type ComposerMentions,
+  type ComposerProps,
+  type ComposerSuggestion,
+  mentionQuery,
+} from "./components/Composer";
 export { DatePicker, type DatePickerProps, monthGrid, parseYmd, ymd } from "./components/DatePicker";
 export { Dialog, DialogBody, DialogFooter, type DialogProps, DialogSearchList } from "./components/Dialog";
 export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";

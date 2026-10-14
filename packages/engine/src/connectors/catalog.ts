@@ -42,7 +42,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
   github: {
     id: "github",
     label: "GitHub",
-    description: "Repositories, pull requests, issues and Actions.",
+    description: "Repositórios, pull requests, issues e Actions.",
     serverUrl: "https://api.githubcopilot.com/mcp/",
     auth: ["oauth", "api_key"],
     oauth: {
@@ -52,14 +52,17 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       scopeSeparator: " ",
     },
     scopes: {
-      "repo.read": s("Read code", "Read files, commits and search code."),
-      "repo.write": s("Write code", "Create branches and push commits (never to the default branch without a PR)."),
-      "pr.read": s("Read pull requests", "List and read pull requests and their checks."),
-      "pr.write": s("Open pull requests", "Open pull requests and comment on them."),
-      "pr.merge": s("Merge pull requests", "Merge a pull request. Always asks for approval."),
-      "issues.read": s("Read issues", "List and read GitHub issues."),
-      "issues.write": s("Write issues", "Create issues and comment."),
-      "actions.run": s("Run workflows", "Start GitHub Actions workflows (may deploy). Always asks for approval."),
+      "repo.read": s("Ler código", "Ler arquivos e commits e buscar no código."),
+      "repo.write": s("Escrever código", "Criar branches e enviar commits (nunca na branch principal sem PR)."),
+      "pr.read": s("Ler pull requests", "Listar e ler pull requests e seus checks."),
+      "pr.write": s("Abrir pull requests", "Abrir pull requests e comentar neles."),
+      "pr.merge": s("Fazer merge", "Fazer merge de um pull request. Sempre pede aprovação."),
+      "issues.read": s("Ler issues", "Listar e ler issues do GitHub."),
+      "issues.write": s("Escrever issues", "Criar issues e comentar."),
+      "actions.run": s(
+        "Rodar workflows",
+        "Iniciar workflows do GitHub Actions (podem fazer deploy). Sempre pede aprovação.",
+      ),
     },
     tools: {
       get_file_contents: { scope: "repo.read" },
@@ -77,21 +80,25 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       merge_pull_request: {
         scope: "pr.merge",
         sensitive: true,
-        title: "Merge PR #{pullNumber} in {owner}/{repo}",
+        title: "Fazer merge do PR #{pullNumber} em {owner}/{repo}",
         onSuccess: { kind: "pr_merged", subject: "{owner}/{repo}#{pullNumber}" },
       },
       get_issue: { scope: "issues.read" },
       list_issues: { scope: "issues.read" },
       create_issue: { scope: "issues.write" },
       add_issue_comment: { scope: "issues.write" },
-      run_workflow: { scope: "actions.run", sensitive: true, title: "Run workflow {workflow_id} in {owner}/{repo}" },
+      run_workflow: {
+        scope: "actions.run",
+        sensitive: true,
+        title: "Rodar o workflow {workflow_id} em {owner}/{repo}",
+      },
       list_workflow_runs: { scope: "repo.read" },
     },
   },
   sentry: {
     id: "sentry",
     label: "Sentry",
-    description: "Errors, issues and events.",
+    description: "Erros, issues e eventos.",
     serverUrl: "https://mcp.sentry.dev/mcp",
     auth: ["oauth", "api_key"],
     oauth: {
@@ -101,8 +108,8 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       scopeSeparator: " ",
     },
     scopes: {
-      "issues.read": s("Read errors", "Search issues and events and read their details."),
-      "issues.write": s("Triage errors", "Resolve, assign or ignore Sentry issues."),
+      "issues.read": s("Ler erros", "Buscar issues e eventos e ler os detalhes."),
+      "issues.write": s("Triar erros", "Resolver, atribuir ou ignorar issues do Sentry."),
     },
     tools: {
       find_projects: { scope: "issues.read" },
@@ -115,7 +122,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
   linear: {
     id: "linear",
     label: "Linear",
-    description: "Issues, projects and comments.",
+    description: "Issues, projetos e comentários.",
     serverUrl: "https://mcp.linear.app/mcp",
     auth: ["oauth", "api_key"],
     oauth: {
@@ -125,8 +132,8 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       scopeSeparator: ",",
     },
     scopes: {
-      "issues.read": s("Read issues", "List and read Linear issues and projects."),
-      "issues.write": s("Write issues", "Create and update issues and comments."),
+      "issues.read": s("Ler issues", "Listar e ler issues e projetos do Linear."),
+      "issues.write": s("Escrever issues", "Criar e atualizar issues e comentários."),
     },
     tools: {
       list_issues: { scope: "issues.read" },
@@ -140,7 +147,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
   drive: {
     id: "drive",
     label: "Google Drive",
-    description: "Search, read and write documents (any Drive-like MCP server).",
+    description: "Buscar, ler e escrever documentos (qualquer servidor MCP do tipo Drive).",
     serverUrl: null,
     auth: ["oauth", "api_key"],
     oauth: {
@@ -150,16 +157,16 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       scopeSeparator: " ",
     },
     scopes: {
-      "files.read": s("Read documents", "Search and read files."),
-      "files.write": s("Write documents", "Create and edit files."),
-      "files.share": s("Share documents", "Change who can see a file. Always asks for approval."),
+      "files.read": s("Ler documentos", "Buscar e ler arquivos."),
+      "files.write": s("Escrever documentos", "Criar e editar arquivos."),
+      "files.share": s("Compartilhar documentos", "Mudar quem vê um arquivo. Sempre pede aprovação."),
     },
     tools: {
       search_files: { scope: "files.read" },
       read_file: { scope: "files.read" },
       create_file: { scope: "files.write" },
       update_file: { scope: "files.write" },
-      share_file: { scope: "files.share", sensitive: true, title: "Share {fileId} with {email}" },
+      share_file: { scope: "files.share", sensitive: true, title: "Compartilhar {fileId} com {email}" },
     },
   },
 };

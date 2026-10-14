@@ -1,5 +1,5 @@
 import { Popover as RPopover } from "radix-ui";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "../cx";
 import { Icon } from "../icons/Icon";
 import { Button } from "./Button";
@@ -22,11 +22,14 @@ const addMonths = (d: Date, n: number) => {
 };
 const sameDay = (a: Date | null, b: Date | null) => Boolean(a && b && ymd(a) === ymd(b));
 
+/** Hard bound for the grid: 6 weeks × 7 days. */
+const GRID_CELLS = 42;
+
 /** The 6×7 days shown for `month` (weeks start on Monday). */
 export function monthGrid(month: Date): Date[] {
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
   const start = addDays(first, -((first.getDay() + 6) % 7));
-  return Array.from({ length: 42 }, (_, i) => addDays(start, i));
+  return Array.from({ length: GRID_CELLS }, (_, i) => addDays(start, i));
 }
 
 export interface DatePickerProps {
@@ -65,6 +68,8 @@ export function DatePicker({
   ...rest
 }: DatePickerProps) {
   const wiring = useFieldControl({ id });
+  // One formatter per locale, not one per day cell per render.
+  const fullDate = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: "full" }), [locale]);
   const selected = parseYmd(value);
   const [open, setOpen] = useState(false);
   const [focus, setFocus] = useState<Date>(() => selected ?? new Date());
@@ -203,7 +208,7 @@ export function DatePicker({
                           data-today={sameDay(d, new Date()) || undefined}
                           tabIndex={sameDay(d, focus) ? 0 : -1}
                           disabled={outOfRange(d)}
-                          aria-label={new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(d)}
+                          aria-label={fullDate.format(d)}
                           aria-pressed={isSelected}
                           onKeyDown={onKey}
                           onClick={() => pick(d)}

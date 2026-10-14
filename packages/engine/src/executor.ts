@@ -18,6 +18,7 @@ import { itemLabel, retrieveForRun } from "./context/tools";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import type { ModelGateway } from "./gateway";
+import { mirrorReplyToIssue } from "./issues";
 import { insertMessage, type Message, messageView } from "./messages";
 import { PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
@@ -500,7 +501,7 @@ async function executeRunInner(
           }
         }
         for (const approval of waiting) {
-          const card = await postAgentMessage(tx, run, replyThreadId, `Requesting approval: ${approval.title}`, {
+          const card = await postAgentMessage(tx, run, replyThreadId, `Pedido de aprovação: ${approval.title}`, {
             approvalId: approval.id,
           });
           out.push(card);
@@ -558,6 +559,11 @@ async function executeRunInner(
     });
     prof.mark("persist");
     if (reply) await publishMessageCreated(deps.pubsub, messageView(reply));
+    // Asked to implement an issue: the final reply is also a comment on it.
+    const issueId = trigger?.meta.issueId;
+    if (reply && typeof issueId === "string") {
+      await mirrorReplyToIssue({ db, pubsub: deps.pubsub }, run, issueId, reply.body).catch(() => {});
+    }
     await publishChannelEvent(deps.pubsub, event("done"));
     await finished("done");
     prof.mark("events");

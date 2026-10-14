@@ -5,8 +5,10 @@ import { useFieldControl } from "./Field";
 
 /** Every `step` minutes of the day: "00:00", "00:15", … */
 export function timeOptions(step = 15) {
+  // Hard bound: at least 15 minutes between options, so at most 96 of them.
+  const safe = Number.isFinite(step) ? Math.max(15, Math.round(step)) : 15;
   const out: string[] = [];
-  for (let m = 0; m < 24 * 60; m += step) {
+  for (let m = 0; m < 24 * 60 && out.length < 96; m += safe) {
     out.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
   }
   return out;

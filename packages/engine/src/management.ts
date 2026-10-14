@@ -36,7 +36,12 @@ export interface OrgSettings {
   routerModel: string | null;
   summaryModel: string | null;
   timezone: string;
+  /** From onboarding: `solo`, `small`, `medium` or `large`. */
+  teamSize: TeamSize | null;
 }
+
+export const TEAM_SIZES = ["solo", "small", "medium", "large"] as const;
+export type TeamSize = (typeof TEAM_SIZES)[number];
 
 export async function getOrgSettings(db: Database, actorId: string, orgId: string): Promise<OrgSettings> {
   await requirePermission(db, actorId, orgId, "read");
@@ -51,6 +56,7 @@ export async function getOrgSettings(db: Database, actorId: string, orgId: strin
     routerModel: s?.routerModel ?? null,
     summaryModel: s?.summaryModel ?? null,
     timezone: s?.timezone ?? "UTC",
+    teamSize: TEAM_SIZES.includes(s?.teamSize as TeamSize) ? (s?.teamSize as TeamSize) : null,
   };
 }
 
@@ -77,6 +83,7 @@ export async function updateOrgSettings(
   for (const model of [input.routerModel, input.summaryModel]) {
     if (model && !isKnownModel(model)) throw new ValidationError(`Unknown model ${model}`);
   }
+  if (input.teamSize && !TEAM_SIZES.includes(input.teamSize)) throw new ValidationError("invalid teamSize");
   if (input.timezone !== undefined && !isValidTimeZone(input.timezone))
     throw new ValidationError("timezone must be an IANA time zone");
   for (const [provider, id] of Object.entries(input.defaultCredentialIds ?? {})) {
@@ -130,6 +137,7 @@ export async function updateOrgSettings(
       ...(input.routerModel !== undefined ? { routerModel: input.routerModel } : {}),
       ...(input.summaryModel !== undefined ? { summaryModel: input.summaryModel } : {}),
       ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
+      ...(input.teamSize !== undefined ? { teamSize: input.teamSize } : {}),
     };
     if (Object.keys(settings).length > 0) {
       await tx

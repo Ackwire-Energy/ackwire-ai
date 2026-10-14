@@ -228,7 +228,7 @@ describe("approval flow (end to end)", () => {
     expect(thread.map((m) => m.body)).toEqual([
       "@dev merge PR 42 if the tests pass",
       "Let me look at the PR.\n\nTests pass, merging.",
-      "Requesting approval: Merge PR #42 in acme/app",
+      "Pedido de aprovação: Merge PR #42 in acme/app",
     ]);
     expect(thread[2]?.meta).toEqual({ approvalId: approval?.id });
     expect(events.map((e) => e.type)).toContain("approval.created");

@@ -43,6 +43,7 @@ const Settings = z
     routerModel: z.string().nullable().openapi({ description: "Null = the deployment's ROUTER_MODEL." }),
     summaryModel: z.string().nullable().openapi({ description: "Null = the deployment's SUMMARY_MODEL." }),
     timezone: z.string().openapi({ example: "America/Sao_Paulo" }),
+    teamSize: z.enum(["solo", "small", "medium", "large"]).nullable(),
   })
   .openapi("OrgSettings");
 
@@ -159,6 +160,7 @@ export function managementRoutes(deps: AppDeps) {
             routerModel: ModelId.nullable().optional(),
             summaryModel: ModelId.nullable().optional(),
             timezone: z.string().max(64).optional(),
+            teamSize: z.enum(["solo", "small", "medium", "large"]).nullable().optional(),
           }),
         ),
       },

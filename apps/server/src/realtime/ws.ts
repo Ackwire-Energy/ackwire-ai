@@ -163,6 +163,10 @@ export function createRealtime(deps: RealtimeDeps) {
           deps.pubsub.subscribe(orgTopic(orgId), (raw) => {
             const event = raw as unknown as OrgEvent;
             if (event.type === "channel.archived") return drop(event.channelId, "archived");
+            if (event.type === "org.broadcast") {
+              if (ws.readyState === 1) send(ws, { type: "event", scope: "org", event: event.event });
+              return;
+            }
             if (event.type !== "membership.revoked" || event.userId !== user.id) return;
             if (event.channelId) return drop(event.channelId, "revoked");
             for (const channelId of [...ws.data.subscriptions.keys(), ...ws.data.pending.keys()])

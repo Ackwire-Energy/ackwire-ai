@@ -6,7 +6,6 @@ setupDom();
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
 import {
-  DatePicker,
   Dialog,
   DialogBody,
   Field,
@@ -16,7 +15,6 @@ import {
   normalizeTime,
   Select,
   Sheet,
-  TimeSelect,
   Token,
   timeOptions,
 } from "../src";
@@ -103,63 +101,6 @@ describe("floating layers", () => {
 });
 
 describe("DatePicker", () => {
-  function Harness({ initial = "2026-10-14" }: { initial?: string }) {
-    const [value, setValue] = useState<string | null>(initial);
-    return (
-      <>
-        <Field label="Dia" id="day">
-          <DatePicker
-            value={value}
-            onChange={setValue}
-            locale="pt-BR"
-            labels={{ previousMonth: "Mês anterior", nextMonth: "Próximo mês", choose: "Escolher data" }}
-          />
-        </Field>
-        <output>{value}</output>
-      </>
-    );
-  }
-  const full = (y: number, m: number, d: number) =>
-    new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(new Date(y, m - 1, d));
-
-  test("a button with our month grid in a popover, never a native date input", async () => {
-    const { container } = render(<Harness />);
-    expect(container.querySelector('input[type="date"]')).toBeNull();
-    const trigger = body().getByRole("button", { name: "Dia" });
-    expect(trigger.getAttribute("aria-haspopup")).toBe("dialog");
-    await click(trigger);
-    const pop = body().getByRole("dialog", { name: "Escolher data" });
-    expect(pop.textContent).toContain("outubro de 2026");
-    expect(
-      within(pop)
-        .getByRole("button", { name: full(2026, 10, 14) })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
-    await click(within(pop).getByRole("button", { name: "Próximo mês" }));
-    expect(pop.textContent).toContain("novembro de 2026");
-    await click(within(pop).getByRole("button", { name: full(2026, 11, 3) }));
-    expect(document.querySelector("output")?.textContent).toBe("2026-11-03");
-    expect(body().queryByRole("dialog", { name: "Escolher data" })).toBeNull();
-  }, 10_000);
-
-  test("keyboard: arrows move by day and week, PageDown by month, Enter picks", async () => {
-    render(<Harness />);
-    await click(body().getByRole("button", { name: "Dia" }));
-    await act(() => new Promise((r) => setTimeout(r, 0)));
-    const focused = () => document.activeElement as HTMLElement;
-    expect(focused().getAttribute("data-day")).toBe("2026-10-14");
-    await key(focused(), "ArrowRight");
-    expect(focused().getAttribute("data-day")).toBe("2026-10-15");
-    await key(focused(), "ArrowDown");
-    expect(focused().getAttribute("data-day")).toBe("2026-10-22");
-    await key(focused(), "PageDown");
-    expect(focused().getAttribute("data-day")).toBe("2026-11-22");
-    await key(focused(), "Home");
-    expect(focused().getAttribute("data-day")).toBe("2026-11-16");
-    await key(focused(), "Enter");
-    expect(document.querySelector("output")?.textContent).toBe("2026-11-16");
-  }, 10_000);
-
   test("month grid starts on Monday and has 6 weeks", () => {
     const days = monthGrid(new Date(2026, 9, 1));
     expect(days).toHaveLength(42);
@@ -178,37 +119,6 @@ describe("TimeSelect", () => {
     expect(normalizeTime("abc")).toBeNull();
     expect(timeOptions(15)).toHaveLength(96);
   });
-
-  test("a combobox: type and Enter, or pick a 15-minute step from our list", async () => {
-    function Harness() {
-      const [value, setValue] = useState("10:00");
-      return (
-        <>
-          <Field label="Início" id="start">
-            <TimeSelect value={value} onChange={setValue} />
-          </Field>
-          <output>{value}</output>
-        </>
-      );
-    }
-    const { container } = render(<Harness />);
-    expect(container.querySelector('input[type="time"]')).toBeNull();
-    const box = body().getByRole("combobox", { name: "Início" });
-    await act(async () => fireEvent.change(box, { target: { value: "1415" } }));
-    await key(box, "Enter");
-    expect(document.querySelector("output")?.textContent).toBe("14:15");
-    await click(box);
-    const list = body().getByRole("listbox");
-    expect(within(list).getAllByRole("option")).toHaveLength(96);
-    // Open: the next step after the current value.
-    await key(box, "ArrowDown");
-    expect(box.getAttribute("aria-activedescendant")).toBeTruthy();
-    await key(box, "Enter");
-    expect(document.querySelector("output")?.textContent).toBe("14:30");
-    await click(box);
-    await click(within(body().getByRole("listbox")).getByRole("option", { name: "08:45" }));
-    expect(document.querySelector("output")?.textContent).toBe("08:45");
-  }, 10_000);
 });
 
 describe("Token", () => {

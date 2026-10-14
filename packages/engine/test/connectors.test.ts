@@ -241,7 +241,7 @@ describe("MCP tools through the Tool Gateway", () => {
     await drainOutbox(f.db, f.handlers);
     const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
     expect(approval).toMatchObject({
-      title: "Merge PR #42 in acme/app",
+      title: "Fazer merge do PR #42 em acme/app",
       scope: "github:pr.merge",
       tool: "github_merge_pull_request",
     });

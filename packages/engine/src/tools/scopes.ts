@@ -11,14 +11,18 @@ const { agentScopes, agents } = schema;
  */
 export const BUILTIN_SCOPES: Record<string, { label: string; description: string; sensitive?: boolean }> = {
   "context:read": {
-    label: "Read context",
-    description: "Search messages, summaries and facts in the agent's channels.",
+    label: "Ler o contexto",
+    description: "Buscar mensagens, resumos e fatos nos canais do agente.",
   },
-  "memory:write": { label: "Remember", description: "Save and forget its own notes (memories)." },
-  "drive:read": { label: "Read files", description: "Read files in the Drive." },
-  "drive:write": { label: "Write files", description: "Create reports, tables, org charts and diffs in the Drive." },
-  "issues:write": { label: "Issues", description: "Create and update issues." },
-  "sandbox:exec": { label: "Run code", description: "Run commands in an isolated sandbox." },
+  "memory:write": { label: "Lembrar", description: "Guardar e esquecer as próprias notas (memórias)." },
+  "drive:read": { label: "Ler arquivos", description: "Ler arquivos do Drive." },
+  "drive:write": {
+    label: "Escrever arquivos",
+    description: "Criar relatórios, tabelas, organogramas, diffs e páginas no Drive.",
+  },
+  "issues:read": { label: "Ler issues", description: "Listar e ler issues." },
+  "issues:write": { label: "Issues", description: "Criar e atualizar issues." },
+  "sandbox:exec": { label: "Rodar código", description: "Rodar comandos num ambiente isolado." },
 };
 
 /**

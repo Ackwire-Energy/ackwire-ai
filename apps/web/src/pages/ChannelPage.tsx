@@ -12,6 +12,7 @@ import {
   Field,
   Icon,
   Input,
+  Mention,
   Message,
   MessageText,
 } from "@agenteschat/ui";
@@ -24,6 +25,7 @@ import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
 import {
   sendHelpers,
+  useAddChannelMember,
   useApproval,
   useApprovals,
   useChannelMembers,
@@ -55,10 +57,14 @@ import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/compo
 import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageReceipts } from "@/components/MessageReceipts";
 import { useOrg } from "@/components/org-context";
+import { ProfileTrigger } from "@/components/ProfileCard";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { artifactRefs } from "@/lib/artifacts";
 import { dayLabel, formatTime, joinNames } from "@/lib/format";
 import { can } from "@/lib/permissions";
+import { handleFrom } from "@/lib/text";
+import { useToast } from "@/lib/toast";
 import {
   useChannelRealtime,
   useConnectionStatus,
@@ -127,6 +133,9 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
   const sendTyping = useTypingSender(channel.id);
   const [draft, setDraft] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // An agent mentioned from outside the channel: offer to add it.
+  const [offer, setOffer] = useState<string | null>(null);
+  const mentionSearch = useMentionSearch(members.data);
   const composer = useRef<HTMLTextAreaElement>(null);
   useChannelRealtime(org.id, channel.id, isMember);
 
@@ -356,7 +365,15 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
                 }
                 sendLabel={t("channel.send")}
                 attachLabel={t("channel.attach")}
+                mentions={{
+                  search: mentionSearch,
+                  listLabel: t("mentions.list"),
+                  onPick: (item) => {
+                    if (item.note && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
+                  },
+                }}
               />
+              {offer && <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />}
               <p className="ac-composer__hint">
                 {channelAgents.length > 0
                   ? t("channel.footerAgents", { count: channelAgents.length, names: agentNames })
@@ -559,6 +576,23 @@ const TimelineMessage = memo(function TimelineMessage({
   const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
   const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
   const name = dir.authorName(m.author);
+  const renderMention = (handle: string, key: string) => {
+    const a = dir.agentByHandle.get(handle.toLowerCase());
+    const p = a ? undefined : dir.members.find((x) => handleFrom(x.name) === handle.toLowerCase());
+    if (!a && !p) return <Mention key={key}>@{handle}</Mention>;
+    const actor = a ? { type: "agent" as const, id: a.id } : { type: "person" as const, id: p?.userId ?? "" };
+    const shown = a?.name ?? p?.name ?? handle;
+    return (
+      <ProfileTrigger
+        key={key}
+        actor={actor}
+        label={t("profile.of", { name: shown })}
+        className="profile-trigger--mention"
+      >
+        <Mention>@{shown}</Mention>
+      </ProfileTrigger>
+    );
+  };
   const meta = m.meta ?? {};
   const approvalId = typeof meta.approvalId === "string" ? meta.approvalId : null;
   const proposalId = typeof meta.proposalId === "string" ? meta.proposalId : null;
@@ -577,14 +611,32 @@ const TimelineMessage = memo(function TimelineMessage({
       onMouseEnter={feedback ? () => setActive(true) : undefined}
       onFocus={feedback ? () => setActive(true) : undefined}
       avatar={
-        <Avatar
-          kind={m.author.type}
-          name={name}
-          imageUrl={person?.image}
-          initials={agent ? dir.agentInitials(agent.id) : undefined}
-        />
+        m.author.id ? (
+          <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
+            <Avatar
+              kind={m.author.type}
+              name={name}
+              imageUrl={person?.image}
+              initials={agent ? dir.agentInitials(agent.id) : undefined}
+            />
+          </ProfileTrigger>
+        ) : (
+          <Avatar kind={m.author.type} name={name} imageUrl={person?.image} />
+        )
       }
-      author={name}
+      author={
+        m.author.id ? (
+          <ProfileTrigger
+            actor={{ type: m.author.type, id: m.author.id }}
+            label={t("profile.of", { name })}
+            className="profile-trigger--name"
+          >
+            {name}
+          </ProfileTrigger>
+        ) : (
+          name
+        )
+      }
       time={<time dateTime={m.createdAt}>{formatTime(i18n.language, m.createdAt)}</time>}
       meta={m.local === "pending" ? t("channel.sending") : undefined}
       aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} /> : undefined}
@@ -592,7 +644,7 @@ const TimelineMessage = memo(function TimelineMessage({
     >
       {(m.body.trim() || !card) && (
         <MessageText>
-          <MessageBody body={m.body} resolveMention={dir.mentionName} />
+          <MessageBody body={m.body} resolveMention={dir.mentionName} renderMention={renderMention} />
         </MessageText>
       )}
       {m.local === "failed" && (
@@ -897,5 +949,45 @@ export function AgentProfileLink({ agentId, label }: { agentId: string; label: s
         {label}
       </Link>
     </Button>
+  );
+}
+
+/** After "@" picks an agent that isn't in the channel: add it, or say who can. */
+function AddToChannelOffer({ channelId, agentId, onDone }: { channelId: string; agentId: string; onDone: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const add = useAddChannelMember(org.id);
+  const toast = useToast();
+  const name = dir.agentById.get(agentId)?.name ?? t("channel.unknownAgent");
+  const admin = can(org.role, "configure");
+  return (
+    <div className="mention-offer" role="status">
+      <span className="small">{t("mentions.offer", { name })}</span>
+      {admin ? (
+        <Button
+          size="sm"
+          disabled={add.isPending}
+          onClick={() =>
+            add.mutate(
+              { channelId, member: { agentId } },
+              {
+                onSuccess: () => {
+                  toast.show(t("mentions.added", { name }));
+                  onDone();
+                },
+              },
+            )
+          }
+        >
+          {t("mentions.add")}
+        </Button>
+      ) : (
+        <span className="small muted">{t("mentions.askAdmin")}</span>
+      )}
+      <Button size="sm" variant="ghost" onClick={onDone}>
+        {t("mentions.dismiss")}
+      </Button>
+    </div>
   );
 }

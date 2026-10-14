@@ -20,3 +20,11 @@
 
 - Adding a connector is a catalog entry (and optionally OAuth endpoints); no migration.
 - Tool output from MCP servers is untrusted content; it reaches the model only as a tool result.
+
+## Addendum (2026-10-14): MCP-native OAuth and custom servers
+
+**Custom MCP servers by URL.** An admin connects any https MCP server. The URL (and every URL learned from it: protected-resource metadata, authorization server endpoints, registration) passes the SSRF guard of ADR 0019. With an API key it is stored sealed; without one we probe the server: an open server connects at once; a `401` leads to OAuth discovery; otherwise the app asks for a key (`needs_key`). Each custom server is its own `connector_connections` row (`connector = custom:{id}`).
+
+**MCP-native OAuth.** Discovery from `WWW-Authenticate: Bearer resource_metadata=…` or `/.well-known/oauth-protected-resource` (with and without the path), authorization server metadata by RFC 8414 (path insertion) then OpenID discovery, Dynamic Client Registration (RFC 7591, public client, `token_endpoint_auth_method: none`) stored per org and issuer in `oauth_clients` (a secret, if issued, is sealed), and the authorization code flow with state, PKCE S256 and the `resource` indicator (RFC 8707) on both the authorize and token requests. Refresh uses the registered client's token endpoint. Catalog connectors with a fixed OAuth app (GitHub, Sentry, Linear, Google Drive) keep using that app; a catalog entry without one would use the native flow. API keys stay as the last resort.
+
+**Tools of custom servers are hidden until classified.** Every listed tool is stored in `custom_tools` with the server's `readOnlyHint`; an admin classifies each as `read`, `write` or `approval` and gives it a label in Portuguese. Only classified tools are offered, with scopes `custom:{connectionId}:read` (read) or `custom:{connectionId}:write` (write and approval); `approval` tools are sensitive, so every call is an approval request titled "{server}: {tool label}". Re-listing (`refresh`) adds new tools unclassified and marks removed ones.

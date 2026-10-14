@@ -39,7 +39,18 @@ export interface MessageView {
   clientId: string | null;
   /** Which agents saw it and which answered (in message lists; no router scores). */
   receipts?: Receipts;
+  /** Agent messages in lists: model, tokens and cost of the run that wrote it. */
+  usage?: MessageUsage;
+  /** Top-level messages with `include=replies`: thread summary and the latest replies. */
+  replies?: { count: number; lastAt: string | null; latest: MessageView[] };
   createdAt: string;
+}
+
+export interface MessageUsage {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
 }
 
 export const messageView = (m: Message): MessageView => ({
@@ -288,7 +299,13 @@ export async function postPersonMessage(
   userId: string,
   orgId: string,
   channelId: string,
-  input: { body: string; threadId?: string | null; clientId?: string | null },
+  input: {
+    body: string;
+    threadId?: string | null;
+    clientId?: string | null;
+    /** Server-side attachments (e.g. `{ issueId }` when asking an agent to implement an issue). */
+    meta?: Record<string, unknown>;
+  },
 ): Promise<MessageView> {
   // One access check (membership + channel) instead of two round trips.
   const { channel, membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
@@ -303,7 +320,7 @@ export async function postPersonMessage(
       threadId: input.threadId,
       author: { type: "person", userId },
       body: input.body,
-      meta: clientId ? { clientId } : undefined,
+      meta: clientId || input.meta ? { ...(input.meta ?? {}), ...(clientId ? { clientId } : {}) } : undefined,
     },
     { startRuns: true },
   );
@@ -354,7 +371,7 @@ export async function listMessages(
   userId: string,
   orgId: string,
   channelId: string,
-  options: { threadId?: string; before?: Date; limit?: number } = {},
+  options: { threadId?: string; before?: Date; limit?: number; includeReplies?: boolean } = {},
 ): Promise<MessageView[]> {
   await requireChannelAccess(db, userId, orgId, channelId);
   const limit = Math.min(options.limit ?? 50, 200);
@@ -376,14 +393,94 @@ export async function listMessages(
     .where(and(scope, isNull(messages.threadId), options.before ? lt(messages.createdAt, options.before) : undefined))
     .orderBy(desc(messages.createdAt), desc(messages.id))
     .limit(limit);
-  return withReceipts(db, orgId, rows.reverse());
+  const views = await withReceipts(db, orgId, rows.reverse());
+  return options.includeReplies ? withReplies(db, orgId, views) : views;
+}
+
+/** How many replies each thread has, when the last came, and the last three (with usage). */
+async function withReplies(db: Database, orgId: string, roots: MessageView[]): Promise<MessageView[]> {
+  const ids = roots.map((r) => r.id);
+  if (ids.length === 0) return roots;
+  const counts = await db
+    .select({
+      threadId: messages.threadId,
+      n: sql<number>`count(*)::int`,
+      last: sql<string>`max(${messages.createdAt})`,
+    })
+    .from(messages)
+    .where(and(eq(messages.orgId, orgId), inArray(messages.threadId, ids), isNull(messages.deletedAt)))
+    .groupBy(messages.threadId);
+  const recent = await db
+    .select()
+    .from(messages)
+    .where(and(eq(messages.orgId, orgId), inArray(messages.threadId, ids), isNull(messages.deletedAt)))
+    .orderBy(desc(messages.createdAt), desc(messages.id))
+    .limit(Math.min(600, ids.length * 20));
+  const latestByThread = new Map<string, Message[]>();
+  for (const m of recent) {
+    const list = latestByThread.get(m.threadId ?? "") ?? [];
+    if (list.length < 3) list.push(m);
+    latestByThread.set(m.threadId ?? "", list);
+  }
+  const latestViews = await withReceipts(db, orgId, [...latestByThread.values()].flat());
+  const viewById = new Map(latestViews.map((v) => [v.id, v]));
+  const countBy = new Map(counts.map((c) => [c.threadId ?? "", c]));
+  return roots.map((r) => {
+    const c = countBy.get(r.id);
+    const latest = (latestByThread.get(r.id) ?? [])
+      .reverse()
+      .flatMap((m) => (viewById.has(m.id) ? [viewById.get(m.id) as MessageView] : []));
+    return {
+      ...r,
+      replies: { count: c?.n ?? 0, lastAt: c?.last ? new Date(c.last).toISOString() : null, latest },
+    };
+  });
+}
+
+/** Tokens and cost of the runs that wrote these agent messages. */
+async function usageFor(db: Database, orgId: string, list: Message[]) {
+  const runIds = [...new Set(list.flatMap((m) => (m.authorType === "agent" && m.agentRunId ? [m.agentRunId] : [])))];
+  const out = new Map<string, MessageUsage>();
+  if (runIds.length === 0) return out;
+  const u = schema.usageRecords;
+  const rows = await db
+    .select({
+      runId: u.runId,
+      model: sql<string>`max(${u.model})`,
+      input: sql<number>`coalesce(sum(${u.inputTokens} + ${u.cacheReadTokens} + ${u.cacheWriteTokens}), 0)::int`,
+      output: sql<number>`coalesce(sum(${u.outputTokens}), 0)::int`,
+      cost: sql<number>`coalesce(sum(${u.costNanoUsd}), 0)::bigint`,
+    })
+    .from(u)
+    .where(and(eq(u.orgId, orgId), inArray(u.runId, runIds), eq(u.kind, "agent")))
+    .groupBy(u.runId);
+  for (const r of rows) {
+    if (!r.runId) continue;
+    out.set(r.runId, {
+      model: r.model,
+      inputTokens: Number(r.input),
+      outputTokens: Number(r.output),
+      costUsd: Number(r.cost) / 1e9,
+    });
+  }
+  return out;
 }
 
 async function withReceipts(db: Database, orgId: string, list: Message[]): Promise<MessageView[]> {
-  const receipts = await receiptsFor(
-    db,
-    orgId,
-    list.filter((m) => m.authorType === "person"),
-  );
-  return list.map((m) => ({ ...messageView(m), ...(receipts.has(m.id) ? { receipts: receipts.get(m.id) } : {}) }));
+  const [receipts, usage] = await Promise.all([
+    receiptsFor(
+      db,
+      orgId,
+      list.filter((m) => m.authorType === "person"),
+    ),
+    usageFor(db, orgId, list),
+  ]);
+  return list.map((m) => {
+    const runUsage = m.agentRunId ? usage.get(m.agentRunId) : undefined;
+    return {
+      ...messageView(m),
+      ...(receipts.has(m.id) ? { receipts: receipts.get(m.id) } : {}),
+      ...(runUsage ? { usage: runUsage } : {}),
+    };
+  });
 }

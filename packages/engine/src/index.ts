@@ -30,6 +30,8 @@ export * from "./events";
 export * from "./executor";
 export * from "./gateway";
 export * from "./invite-requests";
+export * from "./issue-tools";
+export * from "./issues";
 export * from "./jobs";
 export * from "./management";
 export * from "./messages";

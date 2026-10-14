@@ -119,3 +119,20 @@ test("channel members API: add an agent with autoReply off, turn it on, roster s
     ).status,
   ).toBe(404);
 });
+
+test("onboarding keeps the team size and time zone; settings change them", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const created = (await (
+    await owner("/api/app/organizations", {
+      json: { name: "Beta", teamSize: "small", timezone: "America/Sao_Paulo" },
+    })
+  ).json()) as { organization: { id: string } };
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${created.organization.id}${path}`, init);
+  expect(await (await api("/settings")).json()).toMatchObject({ teamSize: "small", timezone: "America/Sao_Paulo" });
+  expect(await (await api("/settings", { method: "PATCH", json: { teamSize: "medium" } })).json()).toMatchObject({
+    teamSize: "medium",
+  });
+  expect((await api("/settings", { method: "PATCH", json: { teamSize: "huge" } })).status).toBe(400);
+});

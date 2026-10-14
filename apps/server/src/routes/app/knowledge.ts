@@ -6,6 +6,7 @@ import {
   can,
   correctAgentMessage,
   deleteContextItem,
+  describeHits,
   editContextItem,
   enqueue,
   ForbiddenError,
@@ -139,6 +140,9 @@ export function knowledgeRoutes(deps: AppDeps) {
                 snippet: z.string(),
                 score: z.number(),
                 createdAt: z.string(),
+                messageId: z.uuid().nullable().openapi({ description: "Message hits: open it here." }),
+                threadId: z.uuid().nullable(),
+                author: z.object({ type: z.enum(["person", "agent"]), id: z.string(), name: z.string() }).nullable(),
               }),
             ),
           }),
@@ -153,7 +157,8 @@ export function knowledgeRoutes(deps: AppDeps) {
         ?.split(",")
         .map((k) => k.trim())
         .filter((k): k is (typeof SEARCH_KINDS)[number] => (SEARCH_KINDS as readonly string[]).includes(k));
-      const hits = await searchForUser(searchDeps, c.get("user").id, orgId, { text: q.q, kinds, limit: q.limit });
+      const found = await searchForUser(searchDeps, c.get("user").id, orgId, { text: q.q, kinds, limit: q.limit });
+      const hits = await describeHits(db, orgId, found);
       return c.json({ hits: hits.map((h) => ({ ...h, createdAt: h.createdAt.toISOString() })) }, 200);
     },
   );

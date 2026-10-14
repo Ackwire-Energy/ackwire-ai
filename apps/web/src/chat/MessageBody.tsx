@@ -1,5 +1,5 @@
 import { Mention } from "@agenteschat/ui";
-import { useCallback } from "react";
+import { type ReactNode, useCallback } from "react";
 import { Markdown } from "@/lib/markdown";
 
 /**
@@ -10,13 +10,17 @@ import { Markdown } from "@/lib/markdown";
 export function MessageBody({
   body,
   resolveMention,
+  renderMention,
 }: {
   body: string;
   resolveMention?: (handle: string) => string | null;
+  /** Replaces the plain chip (e.g. a chip that opens the profile card). */
+  renderMention?: (handle: string, key: string) => ReactNode;
 }) {
   const mention = useCallback(
-    (handle: string, key: string) => <Mention key={key}>@{resolveMention?.(handle) ?? handle}</Mention>,
-    [resolveMention],
+    (handle: string, key: string) =>
+      renderMention ? renderMention(handle, key) : <Mention key={key}>@{resolveMention?.(handle) ?? handle}</Mention>,
+    [resolveMention, renderMention],
   );
   return <Markdown source={body} variant="message" mention={mention} />;
 }

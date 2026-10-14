@@ -30,3 +30,10 @@ jobs:
         run: bun test
       - name: Build web and server
         run: bun run build
+      - name: Isolated new-event test (diagnostic, non-blocking)
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          RUN_NEW_EVENT: "1"
+        run: test -f apps/web/test/new-event.test.tsx && bun test --timeout 20000 apps/web/test/new-event.test.tsx || true

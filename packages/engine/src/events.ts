@@ -1,6 +1,7 @@
 import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
 import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
+import type { IssueActivityView, IssueView } from "./issues";
 import type { MessageView } from "./messages";
 
 /** What a memory tool changed, for the "memória atualizada" card (persisted in the reply's `meta.memoryUpdates`). */
@@ -105,6 +106,9 @@ export type ChannelEvent =
       threadId: string | null;
       question: AgentQuestion;
     }
+  /** An issue of this channel was created or changed, or got a comment. */
+  | { type: "issue.created" | "issue.updated"; channelId: string; issue: IssueView }
+  | { type: "issue.comment"; channelId: string; issueId: string; activity: IssueActivityView }
   /** A file was created or got a new version (Drive preview card). */
   | { type: "artifact.created" | "artifact.updated"; channelId: string; artifact: ArtifactView }
   /** Channel membership changed (agents carry `autoReply`). */
@@ -146,7 +150,9 @@ export type OrgEvent =
   /** `userId` left or was removed: from one channel (`channelId`), or from the whole organization. */
   | { type: "membership.revoked"; orgId: string; userId: string; channelId?: string }
   /** The channel is gone for everyone. */
-  | { type: "channel.archived"; orgId: string; channelId: string };
+  | { type: "channel.archived"; orgId: string; channelId: string }
+  /** Something every member of the org may see (org-wide issues, calendar): forwarded as `scope: "org"`. */
+  | { type: "org.broadcast"; orgId: string; event: { type: string; [key: string]: unknown } };
 
 export async function publishOrgEvent(pubsub: PubSub | undefined, event: OrgEvent): Promise<void> {
   if (!pubsub) return;

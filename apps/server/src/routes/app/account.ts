@@ -5,6 +5,7 @@ import {
   createInvitation,
   createOrganization,
   getOrganization,
+  isValidTimeZone,
   listInvitations,
   listMembers,
   listMemberships,
@@ -14,6 +15,7 @@ import {
   requirePermission,
   revokeInvitation,
   updateOrganization,
+  updateOrgSettings,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { authUiConfig } from "../../auth";
@@ -135,15 +137,30 @@ export function accountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Create an organization (you become its owner)",
-      request: { body: body(z.object({ name: Name, context: Context.optional() })) },
+      request: {
+        body: body(
+          z.object({
+            name: Name,
+            context: Context.optional(),
+            teamSize: z.enum(["solo", "small", "medium", "large"]).optional(),
+            timezone: z.string().max(64).optional().openapi({ description: "IANA zone, e.g. America/Sao_Paulo." }),
+          }),
+        ),
+      },
       responses: {
         201: json(z.object({ organization: Organization, generalChannelId: z.uuid() }), "Created"),
         ...errors,
       },
     }),
     async (c) => {
-      const input = c.req.valid("json");
+      const { teamSize, timezone, ...input } = c.req.valid("json");
       const { organization, general } = await createOrganization(db, c.get("user").id, input);
+      if (teamSize || (timezone && isValidTimeZone(timezone))) {
+        await updateOrgSettings(db, c.get("user").id, organization.id, {
+          ...(teamSize ? { teamSize } : {}),
+          ...(timezone && isValidTimeZone(timezone) ? { timezone } : {}),
+        });
+      }
       return c.json(
         {
           organization: {

@@ -72,35 +72,45 @@ export const Channel = z
   })
   .openapi("Channel");
 
-export const Message = z
-  .object({
-    id: z.uuid(),
-    channelId: z.uuid(),
-    threadId: z.uuid().nullable(),
-    author: z.object({ type: z.enum(["person", "agent"]), id: z.string().nullable() }),
-    body: z.string(),
-    mentionedAgentIds: z.array(z.uuid()),
-    agentRunId: z.uuid().nullable(),
-    clientId: z.string().nullable().openapi({ description: "Echo of the sender's `clientId`." }),
-    receipts: z
-      .object({
-        seenBy: z.array(z.uuid()),
-        pickedBy: z.array(z.uuid()),
-        handled: z.array(
-          z.object({
-            agentId: z.uuid(),
-            status: z.enum(["queued", "running", "waiting_approval", "waiting_input", "done", "failed"]),
-          }),
-        ),
-      })
-      .optional()
-      .openapi({ description: "People's messages: agents that saw it, picked it up, and how their runs ended." }),
-    meta: z
-      .record(z.string(), z.unknown())
-      .openapi({ description: "Attachments, e.g. `{ approvalId }` on an approval card (see /approvals)." }),
-    createdAt: z.string(),
-  })
-  .openapi("Message");
+const MessageUsage = z
+  .object({ model: z.string(), inputTokens: z.number(), outputTokens: z.number(), costUsd: z.number() })
+  .openapi("MessageUsage", { description: "Agent messages: model, tokens and cost of the run that wrote it." });
+
+const MessageBase = z.object({
+  id: z.uuid(),
+  channelId: z.uuid(),
+  threadId: z.uuid().nullable(),
+  author: z.object({ type: z.enum(["person", "agent"]), id: z.string().nullable() }),
+  body: z.string(),
+  mentionedAgentIds: z.array(z.uuid()),
+  agentRunId: z.uuid().nullable(),
+  clientId: z.string().nullable().openapi({ description: "Echo of the sender's `clientId`." }),
+  receipts: z
+    .object({
+      seenBy: z.array(z.uuid()),
+      pickedBy: z.array(z.uuid()),
+      handled: z.array(
+        z.object({
+          agentId: z.uuid(),
+          status: z.enum(["queued", "running", "waiting_approval", "waiting_input", "done", "failed"]),
+        }),
+      ),
+    })
+    .optional()
+    .openapi({ description: "People's messages: agents that saw it, picked it up, and how their runs ended." }),
+  meta: z
+    .record(z.string(), z.unknown())
+    .openapi({ description: "Attachments, e.g. `{ approvalId }` on an approval card (see /approvals)." }),
+  usage: MessageUsage.optional(),
+  createdAt: z.string(),
+});
+
+export const Message = MessageBase.extend({
+  replies: z
+    .object({ count: z.number(), lastAt: z.string().nullable(), latest: z.array(MessageBase) })
+    .optional()
+    .openapi({ description: "With `include=replies`: the thread's size, last activity and last three replies." }),
+}).openapi("Message");
 
 export const Usage = z
   .object({

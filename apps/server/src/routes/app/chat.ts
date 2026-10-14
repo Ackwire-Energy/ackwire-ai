@@ -179,6 +179,10 @@ export function chatRoutes(deps: AppDeps) {
             .optional()
             .openapi({ description: "Page backwards from this time (top-level messages)." }),
           limit: z.coerce.number().int().min(1).max(200).optional(),
+          include: z
+            .string()
+            .optional()
+            .openapi({ description: "`replies`: add reply count, last activity and the latest replies per thread." }),
         }),
       },
       responses: { 200: json(z.object({ messages: z.array(Message) })), ...errors },
@@ -190,6 +194,7 @@ export function chatRoutes(deps: AppDeps) {
         threadId: q.threadId,
         before: q.before ? new Date(q.before) : undefined,
         limit: q.limit,
+        includeReplies: q.include?.split(",").includes("replies") ?? false,
       });
       return c.json({ messages }, 200);
     },

@@ -23,9 +23,7 @@ import { Trans, useTranslation } from "react-i18next";
 import {
   useAgentDetail,
   useAgentScopes,
-  useCatalog,
   useChannels,
-  useConnections,
   useCredentials,
   useMemory,
   useModels,
@@ -39,10 +37,11 @@ import {
 import type { Agent } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useScopeGroups } from "@/hooks/useScopeGroups";
 import { formatInt, formatMonth, formatTokensShort, formatUsd, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
-import { type ScopeGroup, scopeGroups, scopeSummary, searchGroups, toggleGrant } from "@/lib/scopes";
+import { scopeSummary, searchGroups, toggleGrant } from "@/lib/scopes";
 import { parseAmount } from "@/lib/text";
 import { DEFAULT_KEY, keyOptions, modelOptions, NO_OWNER } from "./NewAgentPage";
 
@@ -286,19 +285,6 @@ function ModelAndKeyFields({ agent, editable }: { agent: Agent; editable: boolea
         />
       </Field>
     </div>
-  );
-}
-
-function useScopeGroups(orgId: string): ScopeGroup[] | undefined {
-  const { t } = useTranslation();
-  const catalog = useCatalog();
-  const connections = useConnections(orgId);
-  return useMemo(
-    () =>
-      catalog.data && connections.data
-        ? scopeGroups(t, catalog.data, connections.data, { name: t("agent.builtinName"), note: t("agent.builtinNote") })
-        : undefined,
-    [catalog.data, connections.data, t],
   );
 }
 

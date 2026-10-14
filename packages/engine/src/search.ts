@@ -1,5 +1,5 @@
 import type { SearchDocument, SearchHit, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, gt, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, schema } from "@agenteschat/db";
 import { caches } from "./cache";
 import type { ModelGateway } from "./gateway";
 import { requirePermission } from "./organizations";
@@ -229,4 +229,48 @@ export async function searchForUser(
 ) {
   await requirePermission(deps.db, userId, orgId, "read");
   return searchVisible(deps, { orgId, ...input, visibleChannelIds: await userVisibleChannels(deps.db, orgId, userId) });
+}
+
+export interface HitSource {
+  /** Message hits: the message, its thread (null = main timeline) and its author. */
+  messageId: string | null;
+  threadId: string | null;
+  author: { type: "person" | "agent"; id: string; name: string } | null;
+}
+
+/** Adds where a message hit lives and who wrote it, so the app can jump to it. */
+export async function describeHits<H extends SearchHit>(
+  db: Database,
+  orgId: string,
+  hits: H[],
+): Promise<(H & HitSource)[]> {
+  const ids = hits.filter((h) => h.kind === "message").map((h) => h.sourceId);
+  const rows = ids.length
+    ? await db
+        .select({
+          id: messages.id,
+          threadId: messages.threadId,
+          authorType: messages.authorType,
+          userId: messages.authorUserId,
+          agentId: messages.authorAgentId,
+          userName: schema.users.name,
+          agentName: schema.agents.name,
+        })
+        .from(messages)
+        .leftJoin(schema.users, eq(schema.users.id, messages.authorUserId))
+        .leftJoin(schema.agents, eq(schema.agents.id, messages.authorAgentId))
+        .where(and(eq(messages.orgId, orgId), inArray(messages.id, ids)))
+    : [];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return hits.map((h) => {
+    const m = h.kind === "message" ? byId.get(h.sourceId) : undefined;
+    if (!m) return { ...h, messageId: null, threadId: null, author: null };
+    const author =
+      m.authorType === "agent" && m.agentId
+        ? { type: "agent" as const, id: m.agentId, name: m.agentName ?? "" }
+        : m.userId
+          ? { type: "person" as const, id: m.userId, name: m.userName ?? "" }
+          : null;
+    return { ...h, messageId: m.id, threadId: m.threadId, author };
+  });
 }
