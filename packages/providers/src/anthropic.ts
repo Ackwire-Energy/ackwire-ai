@@ -37,12 +37,19 @@ import {
 export function createAnthropicProvider(
   options: { baseURL?: string; maxRetries?: number /** Tests only: scripted transport. */; fetch?: typeof fetch } = {},
 ): ModelProvider {
-  const client = (apiKey: string) =>
-    new Anthropic({ apiKey, baseURL: options.baseURL, maxRetries: options.maxRetries ?? 2, fetch: options.fetch });
+  const client = (apiKey: string, workspaceId?: string) =>
+    new Anthropic({
+      apiKey,
+      baseURL: options.baseURL,
+      maxRetries: options.maxRetries ?? 2,
+      fetch: options.fetch,
+      // Keys not scoped to a workspace must name one on every request.
+      ...(workspaceId ? { defaultHeaders: { "anthropic-workspace-id": workspaceId } } : {}),
+    });
 
   return {
     id: "anthropic",
-    async stream(request, { apiKey, onDelta }): Promise<ModelResult> {
+    async stream(request, { apiKey, workspaceId, onDelta }): Promise<ModelResult> {
       const fallback = MODEL_CATALOG[request.model]?.serverSideFallback === true;
       const partial: PartialUsage = {
         inputTokens: null,
@@ -52,7 +59,7 @@ export function createAnthropicProvider(
         outputChars: 0,
       };
       try {
-        const stream = client(apiKey).beta.messages.stream(
+        const stream = client(apiKey, workspaceId).beta.messages.stream(
           {
             model: request.model,
             max_tokens: request.maxTokens,
@@ -110,9 +117,9 @@ export function createAnthropicProvider(
       }
     },
 
-    async countTokens(request, { apiKey }) {
+    async countTokens(request, { apiKey, workspaceId }) {
       try {
-        const result = await client(apiKey).beta.messages.countTokens({
+        const result = await client(apiKey, workspaceId).beta.messages.countTokens({
           model: request.model,
           system: toSystem(request),
           messages: request.messages.map(toMessageParam),

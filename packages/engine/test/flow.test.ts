@@ -20,6 +20,7 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
   // 1. A person posts a message mentioning the agent. Message and outbox event are one transaction.
   const question = await post(f, "@dev can you look at the failing build?");
   expect((await f.db.select().from(schema.outbox)).map((j) => [j.kind, j.status])).toEqual([
+    ["search.index", "pending"],
     ["message.posted", "pending"],
   ]);
 

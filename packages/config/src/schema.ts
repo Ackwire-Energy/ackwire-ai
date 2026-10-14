@@ -172,6 +172,57 @@ export const envVars = {
       "Maximum consecutive agent replies in one thread without a person posting. Stops agents from triggering each other forever.",
     section: "Agents",
   },
+  PLATFORM_ANTHROPIC_API_KEY: {
+    schema: z.string().optional(),
+    description:
+      "Platform Anthropic key (Cloud): organizations without a key of their own, and the onboarding option “Chave do agentes”, use it. Usage is still recorded per organization.",
+    section: "Agents",
+    secret: true,
+  },
+  PLATFORM_ANTHROPIC_WORKSPACE_ID: {
+    schema: z.string().optional(),
+    description:
+      "Workspace id for the platform key, when the key is not scoped to a workspace (sent as `anthropic-workspace-id`).",
+    section: "Agents",
+  },
+  SUMMARY_MODEL: {
+    schema: modelId.default("claude-haiku-5-5"),
+    description:
+      "Model that writes thread and channel summaries and extracts decisions, facts and lessons (reflection). An organization can override it. Billed to the organization (usage kind `summary`).",
+    section: "Agents",
+  },
+  REFLECT_EVERY_MESSAGES: {
+    schema: z.coerce.number().int().min(2).max(500).default(20),
+    description: "Reflect on a thread (extract decisions, facts, lessons) each time it grows by this many replies.",
+    section: "Agents",
+  },
+  REFLECT_IDLE_MINUTES: {
+    schema: z.coerce.number().int().min(5).max(10_080).default(120),
+    description: "Also reflect on a thread once it has been quiet this long.",
+    section: "Agents",
+  },
+  REFLECT_MAX_PER_THREAD: {
+    schema: z.coerce.number().int().min(1).max(100).default(5),
+    description: "Upper bound on reflections per thread (bounds cost and agent-to-agent loops).",
+    section: "Agents",
+  },
+  EMBEDDINGS_PROVIDER: {
+    schema: z.enum(["none", "voyage"]).default("none"),
+    description:
+      "Vector embeddings for search. `none`: full-text search only. `voyage`: Voyage AI (needs `VOYAGE_API_KEY`); usage is recorded per organization (kind `embedding`).",
+    section: "Search",
+  },
+  VOYAGE_API_KEY: {
+    schema: z.string().optional(),
+    description: "Voyage AI API key, used when `EMBEDDINGS_PROVIDER=voyage`.",
+    section: "Search",
+    secret: true,
+  },
+  EMBEDDING_MODEL: {
+    schema: z.string().default("voyage-3.5"),
+    description: "Embedding model (1024 dimensions). After changing it, reindex (`search.reindex`).",
+    section: "Search",
+  },
   CONNECTOR_GITHUB_CLIENT_ID: {
     schema: z.string().optional(),
     description:

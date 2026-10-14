@@ -128,6 +128,12 @@ export function agentRoutes(deps: AppDeps) {
             provider: z.enum(["anthropic"]),
             label: z.string().trim().min(1).max(80),
             apiKey: z.string().min(8).max(500),
+            workspaceId: z
+              .string()
+              .max(128)
+              .nullable()
+              .optional()
+              .openapi({ description: "Anthropic workspace, for keys not scoped to one (`anthropic-workspace-id`)." }),
           }),
         ),
       },

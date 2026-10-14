@@ -1,3 +1,5 @@
+import type { OutcomeKind } from "../context/outcomes";
+
 /**
  * Connector catalog: which MCP servers agentes.chat knows, and how each of
  * their tools maps to one of OUR scopes (D7: MCP has no standard scopes).
@@ -18,6 +20,8 @@ export interface ConnectorTool {
   sensitive?: boolean;
   /** Approval-card title template, e.g. "Merge PR #{pullNumber} in {owner}/{repo}". */
   title?: string;
+  /** Outcome recorded when the call succeeds (ground truth for lessons); `subject` is a template. */
+  onSuccess?: { kind: OutcomeKind; subject: string };
 }
 
 export interface ConnectorDefinition {
@@ -74,6 +78,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
         scope: "pr.merge",
         sensitive: true,
         title: "Merge PR #{pullNumber} in {owner}/{repo}",
+        onSuccess: { kind: "pr_merged", subject: "{owner}/{repo}#{pullNumber}" },
       },
       get_issue: { scope: "issues.read" },
       list_issues: { scope: "issues.read" },

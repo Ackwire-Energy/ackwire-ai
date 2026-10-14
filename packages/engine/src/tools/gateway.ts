@@ -1,4 +1,5 @@
 import { and, eq, schema, sql } from "@agenteschat/db";
+import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { addRunStep } from "../runs";
 import { canonicalJson, validateJson } from "./json-schema";
@@ -65,6 +66,17 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
   async function run(tool: ToolDefinition, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
     try {
       const output = await tool.execute(input, ctx);
+      if (output.outcome) {
+        await recordOutcome(ctx.db, {
+          orgId: ctx.orgId,
+          agentId: ctx.agentId,
+          runId: ctx.runId,
+          channelId: ctx.channelId,
+          threadRootId: ctx.threadRootId,
+          source: "tool",
+          ...output.outcome,
+        }).catch(() => {});
+      }
       return output.content.length > MAX_RESULT_CHARS
         ? { ...output, content: `${output.content.slice(0, MAX_RESULT_CHARS)}\n[truncated]` }
         : output;

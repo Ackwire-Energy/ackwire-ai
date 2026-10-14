@@ -136,6 +136,15 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
                 content: result.content,
                 isError: result.isError,
                 data: { connector: def.id, tool: tool.name, isError: result.isError },
+                ...(mapped.onSuccess && !result.isError
+                  ? {
+                      outcome: {
+                        kind: mapped.onSuccess.kind,
+                        subject: fillTitle(mapped.onSuccess.subject, input),
+                        summary: `${def.label} ${tool.name}`,
+                      },
+                    }
+                  : {}),
               };
             },
           });

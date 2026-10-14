@@ -1,4 +1,5 @@
 import type { Database } from "@agenteschat/db";
+import type { OutcomeKind } from "../context/outcomes";
 import type { JsonSchema } from "./json-schema";
 
 /** Who is calling a tool: always an agent inside a run. */
@@ -16,8 +17,10 @@ export interface ToolOutput {
   /** Text the model sees as the tool result. */
   content: string;
   isError?: boolean;
-  /** Structured result kept in the run steps (and outcome signals), not sent to the model. */
+  /** Structured result kept in the run steps, not sent to the model. */
   data?: Record<string, unknown>;
+  /** Ground truth this call produced (tests passed, PR merged…), recorded by the gateway. */
+  outcome?: { kind: OutcomeKind; subject?: string; summary?: string; details?: Record<string, unknown> };
 }
 
 /**

@@ -1,0 +1,30 @@
+# 0017. Search, derived context and a self-improving memory loop
+
+- Status: Accepted
+- Date: 2026-10-14
+- Implements planejamento D9–D13, D15, D18a, D18c, and the "context that evolves and improves itself" requirement.
+
+## Search
+
+`search_documents` is the core index: one row per message, context item, issue, forum post or file, fed by outbox jobs (`search.index`, `search.reindex`). Full-text uses a generated `tsvector` with the `simple` configuration (Portuguese and English alike); vectors (`vector(1024)`, HNSW cosine) are optional. A query runs both rankings and fuses them with reciprocal-rank fusion plus a small recency bonus; vector hits beyond cosine distance 0.75 are dropped. Visibility travels with each document: `channel_ids` must ALL be visible to the reader (most restrictive of the sources; empty = whole org), enforced in SQL. Readers: a person's channels; an agent's channels, resolved at query time (D11). `SearchIndexResolver.forOrg` lets the Cloud swap the backend per org.
+
+Embeddings go through the Model Gateway (`gateway.embed`, usage kind `embedding`, no agent). Providers: `EmbeddingProvider` (Voyage adapter via REST, optional by env; a deterministic fake for tests). Without one, search is full-text only.
+
+## Context items
+
+`context_items` holds derived context and agent memory in one table: `thread_summary`, `period_summary`, `decision`, `fact`, `preference`, `open_question`, `entity_profile`, plus `note` and `lesson` (owned by an agent, or shared as a team playbook when `agent_id` is null). Items are never overwritten: a new version supersedes the old (`superseded_by`, archived), and only people delete. Each item carries `source_ids`, visibility (`channel_ids`), `trust` (`high` from org members; `low` when any source came from outside the team: webhooks, tool output), `evidence`, `verified`, `confidence`, `relevance`, `recurrence` and `pinned`.
+
+## The loop
+
+1. **Capture** (`context.reflect`, when a thread grows by `REFLECT_EVERY_MESSAGES` or idles for `REFLECT_IDLE_MINUTES`): the summary model reads the thread, reactions on agent replies, and the outcomes of its agents, and returns structured items citing refs (`m3`, `o1`). Code, not the model, derives everything that matters: visibility (the thread's channel), trust (untrusted if any source is), and evidence per source: a person's message is `human`, another agent's message is an `agent` claim, the subject agent's own message is `self`, a recorded outcome about that agent is `outcome`, and people's 👍/👎 on an agent reply are `human`. Items without valid sources, with credentials, or that try to change permissions/approvals are dropped. Usage kind `summary`, billed to the org. Bounded by `REFLECT_MAX_PER_THREAD`; it reads messages and outcomes only (never its own outputs) and posts nothing, so it can't extend agent chains.
+2. **Consolidate** (inline on every write, and `context.consolidate` daily): same subject and near-identical content (word Jaccard ≥ 0.8) merges (evidence united, recurrence +1); a different claim on the same subject supersedes the old one, keeping history. Daily: dedupe, relevance decay for unused items (×0.95 after 7 days), archive below 0.1 after 30 days (pinned never), refresh weekly period summaries of busy channels, entity profiles grow incrementally.
+3. **Learn from feedback**: refused approvals (with the reason) become an `approval_refused` outcome plus a verified lesson; a person's correction of an agent reply becomes a verified lesson; 👍/👎 adjust the relevance of the items the run used and feed the next reflection; edits by people create new versions with human evidence.
+4. **Outcomes** (`outcomes`): ground truth tied to agent, run and step: tool results (e.g. a successful merge records `pr_merged` with the PR as subject), approvals, and webhooks (reverts, rollbacks, error spikes, reopened issues). `attributeSubject` ties a later outcome to the agent behind the earlier one.
+5. **Trust weighting**: outcome > human > agent claim > self-assessment. Verified = at least one outcome or human piece of evidence. Agent claims alone stay `unverified` (used as labeled hints); an agent can't confirm its own lesson; agents agreeing with each other never verifies.
+6. **Promote with a human gate**: a verified, high-trust item seen at least twice (or with confidence ≥ 0.8 and relevance ≥ 0.7) produces a `context_proposals` row: the target text (agent instructions, or the org context for shared items) with a "Learned" bullet, stored as a line diff against the SHA-256 of the current text. The agent's owner or an admin (org context: admins) accepts or rejects; accepting a proposal whose base text changed marks it stale. Nothing is applied automatically.
+7. **Use**: the run's context adds a "What you know" block after the cached prefix (org context + instructions stay first for prompt caching): pinned items always, the agent's own notes and lessons, shared lessons, and items retrieved for the trigger message (hybrid search with any-word matching + relevance), within a character budget. Only items whose every source channel is the run's channel or a public one are injected, so private context never leaks into another channel. Unverified items are labeled hints; untrusted items are labeled data. Inclusions are logged (`context_usage`) and raise relevance. Long threads use their summary instead of the full history.
+8. **Agent tools** (Tool Gateway): `search_context`, `get_summary`, `expand` (`context:read`), `remember`, `forget` (`memory:write`).
+
+## Guardrails
+
+Memory never carries permissions, scopes or secrets: credential-like text and text that tries to bypass approvals or grant permissions are refused at write time (people, agents and reflection alike). Permissions come only from `agent_scopes` and approvals. Low-trust items are never promoted. Everything is listable and editable by people (`/context-items`, `/proposals`).

@@ -6,21 +6,13 @@ import {
   createPostgresSearchResolver,
   noPlatformCredentials,
 } from "@agenteschat/adapters";
-import { connectorOAuthApps, testConfig } from "@agenteschat/config";
+import { testConfig } from "@agenteschat/config";
 import { createTestDatabase } from "@agenteschat/db/testing";
-import {
-  createConnectorToolSource,
-  createJobHandlers,
-  createLocalKeyWrapper,
-  createModelGateway,
-  createToolGateway,
-  drainOutbox,
-  type McpConnect,
-  type ToolSource,
-} from "@agenteschat/engine";
-import { createFakeProvider } from "@agenteschat/providers/testing";
+import { createLocalKeyWrapper, drainOutbox, type McpConnect, type ToolSource } from "@agenteschat/engine";
+import { createFakeEmbeddings, createFakeProvider } from "@agenteschat/providers/testing";
 import { createApp } from "../src/app";
 import { createAuth } from "../src/auth";
+import { buildEngine } from "../src/engine";
 import { createLogger } from "../src/logger";
 import { createRealtime, type SocketData } from "../src/realtime/ws";
 
@@ -39,10 +31,12 @@ export async function createTestServer(
     mcpConnect?: McpConnect;
     /** Fake outbound HTTP (OAuth token endpoints). */
     http?: typeof fetch;
+    /** Use fake embeddings (hybrid search). Off by default: full-text only, and no embedding usage rows. */
+    embeddings?: boolean;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
-  const config = testConfig({ PUBLIC_URL: ORIGIN, ...options.env });
+  const config = testConfig({ PUBLIC_URL: ORIGIN, AGENT_MAX_OUTPUT_TOKENS: "1000", ...options.env });
   const log = createLogger("error");
   const adapters: Adapters = {
     search: createPostgresSearchResolver(db),
@@ -54,45 +48,48 @@ export async function createTestServer(
     platformCredentials: noPlatformCredentials,
   };
   const provider = createFakeProvider(options.reply);
-  const gateway = createModelGateway({
+  const embeddings = createFakeEmbeddings();
+  const engine = buildEngine({
     db,
-    keyWrappers: [adapters.keyWrapper],
-    providers: { anthropic: provider },
-    platformCredentials: noPlatformCredentials,
-  });
-  const connectorSource = createConnectorToolSource({
-    db,
-    keyWrappers: [adapters.keyWrapper],
-    oauthApps: connectorOAuthApps(config),
-    publicUrl: config.PUBLIC_URL,
+    config,
+    adapters,
+    modelProviders: { anthropic: provider },
+    toolSources: options.toolSources,
+    mcpConnect: options.mcpConnect,
     http: options.http,
-    connect: options.mcpConnect,
-  });
-  const tools = createToolGateway({
-    sources: [...(options.toolSources ?? []), ...(options.mcpConnect ? [connectorSource] : [])],
-  });
-  const handlers = createJobHandlers({
-    db,
-    tools,
-    gateway,
-    pubsub: adapters.pubsub,
-    maxOutputTokens: 1000,
-    contextMessages: 30,
-    maxHops: 3,
+    embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,
     deltaFlushMs: 0,
-    router: { enabled: config.ROUTER_ENABLED, model: config.ROUTER_MODEL, minScore: config.ROUTER_MIN_SCORE },
   });
+  const { handlers } = engine;
   const auth = createAuth({ db, config, log });
   const app = createApp({
     edition: "selfhost",
     version: "test",
     modules: [],
     pingDatabase: async () => {},
-    services: { db, auth, config, adapters, extras: { http: options.http, mcpConnect: options.mcpConnect } },
+    services: {
+      db,
+      auth,
+      config,
+      adapters,
+      extras: { http: options.http, mcpConnect: options.mcpConnect, embed: engine.gateway.embed },
+    },
     log,
   });
   const realtime = createRealtime({ db, auth, config, log, ...adapters });
-  return { db, close, config, adapters, provider, app, auth, realtime, drain: () => drainOutbox(db, handlers) };
+  return {
+    db,
+    close,
+    config,
+    adapters,
+    provider,
+    embeddings,
+    engine,
+    app,
+    auth,
+    realtime,
+    drain: () => drainOutbox(db, handlers),
+  };
 }
 
 export type TestServer = Awaited<ReturnType<typeof createTestServer>>;

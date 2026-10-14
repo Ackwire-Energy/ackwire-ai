@@ -26,6 +26,11 @@ export const providerCredentials = pgTable(
     wrappedDataKey: text().notNull(),
     /** Which key-encryption key wrapped the data key, e.g. `local:v1`. Enables rotation. */
     kekId: text().notNull(),
+    /**
+     * Provider account scoping sent with every call, e.g. Anthropic's
+     * `anthropic-workspace-id` for keys not scoped to a workspace. Not secret.
+     */
+    workspaceId: text(),
     /** Last 4 characters of the key, so people can tell keys apart. */
     keyHint: text().notNull(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),

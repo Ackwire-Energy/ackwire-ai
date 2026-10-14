@@ -318,7 +318,13 @@ export function managementRoutes(deps: AppDeps) {
       summary: "Replace a provider key, keeping the same credential (agents keep using it)",
       request: {
         params: OrgParams.extend({ credentialId: z.uuid() }),
-        body: body(z.object({ apiKey: z.string().min(8).max(500), label: z.string().max(80).optional() })),
+        body: body(
+          z.object({
+            apiKey: z.string().min(8).max(500),
+            label: z.string().max(80).optional(),
+            workspaceId: z.string().max(128).nullable().optional(),
+          }),
+        ),
       },
       responses: { 200: json(Credential), ...errors },
     }),

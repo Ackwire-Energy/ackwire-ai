@@ -43,6 +43,20 @@
       "when": 1792002725441,
       "tag": "0005_members_last_seen",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792003179405,
+      "tag": "0006_search_context",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792004462481,
+      "tag": "0007_credential_workspace",
+      "breakpoints": true
     }
   ]
 }

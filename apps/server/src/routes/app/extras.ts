@@ -1,4 +1,4 @@
-import type { McpConnect } from "@agenteschat/engine";
+import type { McpConnect, ModelGateway } from "@agenteschat/engine";
 
 /**
  * Backend services the app API needs beyond the core deps (owned by the
@@ -10,4 +10,6 @@ export interface AppExtras {
   http?: typeof fetch;
   /** How to open MCP sessions (tests: in-process servers). */
   mcpConnect?: McpConnect;
+  /** Query embeddings for search (the Model Gateway's `embed`, which records usage). */
+  embed?: ModelGateway["embed"];
 }

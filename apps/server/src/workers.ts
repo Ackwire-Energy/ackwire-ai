@@ -1,12 +1,21 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { type Database, ensureMessagePartitions } from "@agenteschat/db";
-import { expireApprovals, type JobHandlers, processOutbox } from "@agenteschat/engine";
+import { type Database, ensureMessagePartitions, schema } from "@agenteschat/db";
+import {
+  type ContextDeps,
+  enqueue,
+  enqueueIdleReflections,
+  expireApprovals,
+  type JobHandlers,
+  processOutbox,
+} from "@agenteschat/engine";
 import type { Logger } from "./logger";
 
 export interface WorkerDeps {
   db: Database;
   handlers: JobHandlers;
   pubsub: PubSub;
+  /** Memory jobs (idle reflection, nightly consolidation). */
+  context?: ContextDeps;
   log: Logger;
   workerId?: string;
 }
@@ -16,6 +25,8 @@ export const WORKER_INTERVALS_MS = {
   outbox: 1_000,
   partitions: 24 * 3600_000,
   approvals: 60_000,
+  reflections: 10 * 60_000,
+  consolidation: 24 * 3600_000,
 };
 
 /**
@@ -85,6 +96,26 @@ export function startWorkers(deps: WorkerDeps) {
     const expired = await expireApprovals({ db, pubsub: deps.pubsub });
     if (expired > 0) log.info("approvals expired", { expired });
   });
+
+  const context = deps.context;
+  if (context) {
+    every("reflections", WORKER_INTERVALS_MS.reflections, async () => {
+      const queued = await enqueueIdleReflections(context);
+      if (queued > 0) log.info("idle threads queued for reflection", { queued });
+    });
+    // One consolidation job per organization per day (dedupe key = org + date: replicas don't double it).
+    every("consolidation", WORKER_INTERVALS_MS.consolidation, async () => {
+      const day = new Date().toISOString().slice(0, 10);
+      for (const org of await db.select({ id: schema.organizations.id }).from(schema.organizations)) {
+        await enqueue(db, {
+          orgId: org.id,
+          kind: "context.consolidate",
+          payload: {},
+          dedupeKey: `context.consolidate:${org.id}:${day}`,
+        });
+      }
+    });
+  }
 
   return {
     /** Process the outbox now instead of waiting for the next interval. */

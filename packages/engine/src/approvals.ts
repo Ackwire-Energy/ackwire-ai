@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, inArray, lt, ne, or, schema, sql } from "@agenteschat/db";
+import { learnFromRefusal } from "./context/feedback";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent, publishUserEvent } from "./events";
 import { can, requirePermission } from "./organizations";
@@ -139,6 +140,8 @@ export async function decideApproval(
   });
   if (outcome.row) await publishApproval(deps, outcome.row, "approval.decided");
   if (outcome.error || !outcome.row) throw new ConflictError(outcome.error ?? "approval vanished");
+  // A refusal (with its reason) becomes an outcome and a lesson for the agent.
+  if (outcome.row.status === "refused") await learnFromRefusal(deps, outcome.row).catch(() => null);
   return approvalView(outcome.row);
 }
 

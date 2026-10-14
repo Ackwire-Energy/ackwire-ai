@@ -26,14 +26,17 @@ describe("dispatchMentions", () => {
     const message = await post("@dev and @qa please look");
     expect(message.mentionedAgentIds).toEqual([f.agent.id]);
     const jobs = await f.db.select().from(schema.outbox);
-    expect(jobs.map((j) => [j.kind, j.payload])).toEqual([["message.posted", { messageId: message.id }]]);
+    expect(jobs.map((j) => [j.kind, j.payload])).toEqual([
+      ["search.index", { kind: "message", sourceId: message.id }],
+      ["message.posted", { messageId: message.id }],
+    ]);
   });
 
   test("a person's message without mentions goes to the router; an agent's does not", async () => {
     const message = await post("hello everyone");
-    expect((await f.db.select().from(schema.outbox)).map((j) => [j.kind, j.payload])).toEqual([
-      ["message.posted", { messageId: message.id }],
-    ]);
+    const posted = async () =>
+      (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "message.posted").map((j) => j.payload);
+    expect(await posted()).toEqual([{ messageId: message.id }]);
     await f.db.transaction((tx) =>
       insertMessage(tx, {
         orgId: f.org.id,
@@ -42,7 +45,7 @@ describe("dispatchMentions", () => {
         body: "just saying",
       }),
     );
-    expect(await f.db.select().from(schema.outbox)).toHaveLength(1);
+    expect(await posted()).toHaveLength(1);
   });
 
   test("creates one run per agent and is idempotent", async () => {

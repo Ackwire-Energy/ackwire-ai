@@ -1,6 +1,7 @@
 import {
   channelTopic,
   createMemoryPubSub,
+  createPostgresSearchResolver,
   type KeyWrapper,
   noPlatformCredentials,
   type PlatformCredentials,
@@ -8,10 +9,12 @@ import {
 } from "@agenteschat/adapters";
 import { type Database, schema } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
-import { createFakeProvider, type FakeProvider } from "@agenteschat/providers/testing";
+import { createFakeEmbeddings, createFakeProvider, type FakeProvider } from "@agenteschat/providers/testing";
 import {
   addChannelMember,
+  type ContextDeps,
   createAgent,
+  createContextToolSource,
   createCredential,
   createJobHandlers,
   createLocalKeyWrapper,
@@ -48,6 +51,10 @@ export async function setup(
     platform?: PlatformCredentials;
     /** Tool sources for the Tool Gateway (none = agents only chat). */
     toolSources?: ToolSource[];
+    /** Add the built-in context tools (search_context, remember…) to the tool sources. */
+    contextTools?: boolean;
+    /** Fake embeddings (hybrid search). Off: full-text only, no embedding usage rows. */
+    embeddings?: boolean;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -80,13 +87,25 @@ export async function setup(
 
   const provider: FakeProvider = createFakeProvider(options.reply);
   const pubsub = createMemoryPubSub();
+  const embeddings = createFakeEmbeddings();
   const gateway = createModelGateway({
     db,
     keyWrappers: [keyWrapper],
     providers: { anthropic: provider },
     platformCredentials: options.platform ?? noPlatformCredentials,
+    embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,
   });
-  const tools = options.toolSources ? createToolGateway({ sources: options.toolSources }) : undefined;
+  const search = createPostgresSearchResolver(db);
+  const context: ContextDeps = {
+    db,
+    gateway,
+    search,
+    summaryModel: "claude-haiku-5-5",
+    pubsub,
+    reflect: { everyMessages: 1000, idleMinutes: 120, maxPerThread: 5 },
+  };
+  const sources = [...(options.contextTools ? [createContextToolSource(context)] : []), ...(options.toolSources ?? [])];
+  const tools = sources.length > 0 ? createToolGateway({ sources }) : undefined;
   const jobDeps = {
     db,
     gateway,
@@ -96,6 +115,8 @@ export async function setup(
     maxHops: 3,
     deltaFlushMs: 0,
     tools,
+    context,
+    search,
   };
   const handlers = createJobHandlers(jobDeps);
 
@@ -119,6 +140,9 @@ export async function setup(
     pubsub,
     gateway,
     tools,
+    context,
+    search,
+    embeddings,
     handlers,
     jobDeps,
     listen,

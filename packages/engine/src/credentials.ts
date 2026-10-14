@@ -16,6 +16,8 @@ export interface CredentialSummary {
   provider: ProviderId;
   label: string;
   keyHint: string;
+  /** Last characters of the workspace id the key is scoped to, if one is set. */
+  workspaceIdHint: string | null;
   createdAt: Date;
   revokedAt: Date | null;
 }
@@ -25,9 +27,17 @@ const summary = (row: typeof providerCredentials.$inferSelect): CredentialSummar
   provider: row.provider as ProviderId,
   label: row.label,
   keyHint: row.keyHint,
+  workspaceIdHint: row.workspaceId ? row.workspaceId.slice(-6) : null,
   createdAt: row.createdAt,
   revokedAt: row.revokedAt,
 });
+
+function cleanWorkspaceId(id: string | null | undefined) {
+  const v = id?.trim();
+  if (!v) return null;
+  if (!/^[A-Za-z0-9_-]{4,128}$/.test(v)) throw new ValidationError("workspaceId looks invalid");
+  return v;
+}
 
 /** Stores an org's provider API key, encrypted (envelope encryption). */
 export async function createCredential(
@@ -35,7 +45,7 @@ export async function createCredential(
   keyWrapper: KeyWrapper,
   actorId: string,
   orgId: string,
-  input: { provider: ProviderId; label: string; apiKey: string },
+  input: { provider: ProviderId; label: string; apiKey: string; workspaceId?: string | null },
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
   if (!isKnownProvider(input.provider)) throw new ValidationError(`Unknown provider ${input.provider}`);
@@ -54,6 +64,7 @@ export async function createCredential(
       wrappedDataKey: sealed.wrappedDataKey,
       kekId: sealed.kekId,
       keyHint: apiKey.slice(-4),
+      workspaceId: cleanWorkspaceId(input.workspaceId),
       createdByUserId: actorId,
     })
     .returning();
@@ -97,7 +108,7 @@ export async function decryptCredential(
   keyWrappers: KeyWrapper[],
   orgId: string,
   credentialId: string,
-): Promise<{ provider: ProviderId; apiKey: string } | null> {
+): Promise<{ provider: ProviderId; apiKey: string; workspaceId?: string } | null> {
   const [row] = await db
     .select()
     .from(providerCredentials)
@@ -114,7 +125,7 @@ export async function decryptCredential(
     { ciphertext: row.secretCiphertext, wrappedDataKey: row.wrappedDataKey, kekId: row.kekId },
     aadFor(orgId, row.id),
   );
-  return { provider: row.provider as ProviderId, apiKey };
+  return { provider: row.provider as ProviderId, apiKey, ...(row.workspaceId ? { workspaceId: row.workspaceId } : {}) };
 }
 
 /**
@@ -127,7 +138,7 @@ export async function rotateCredential(
   actorId: string,
   orgId: string,
   credentialId: string,
-  input: { apiKey: string; label?: string },
+  input: { apiKey: string; label?: string; workspaceId?: string | null },
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
   const apiKey = input.apiKey.trim();
@@ -141,6 +152,7 @@ export async function rotateCredential(
       kekId: sealed.kekId,
       keyHint: apiKey.slice(-4),
       ...(input.label ? { label: input.label } : {}),
+      ...(input.workspaceId !== undefined ? { workspaceId: cleanWorkspaceId(input.workspaceId) } : {}),
     })
     .where(
       and(

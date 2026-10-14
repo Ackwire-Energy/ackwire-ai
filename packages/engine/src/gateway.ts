@@ -2,6 +2,8 @@ import type { KeyWrapper, PlatformCredentials, PubSub } from "@agenteschat/adapt
 import { and, type Database, desc, type Executor, eq, gte, isNull, lt, schema, sql } from "@agenteschat/db";
 import {
   costNanoUsd,
+  type EmbeddingProvider,
+  embeddingCostNanoUsd,
   estimateTokens,
   isKnownModel,
   MODEL_CATALOG,
@@ -32,6 +34,8 @@ export interface ModelGatewayDeps {
   providers: Record<string, ModelProvider>;
   platformCredentials: PlatformCredentials;
   now?: () => Date;
+  /** Embeddings for search (optional: without it search is full-text only). */
+  embeddings?: { provider: EmbeddingProvider; apiKey: string };
   /** Called when an agent's monthly spend crosses 80% (`warning`) or 100% (`exhausted`) of its budget. */
   onBudgetThreshold?(event: {
     agent: Agent;
@@ -117,11 +121,15 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       const credential = await decryptCredential(db, deps.keyWrappers, agent.orgId, agent.credentialId);
       if (!credential) throw new MissingCredentialError("The agent's provider credential was revoked or deleted");
       if (credential.provider !== provider) throw new MissingCredentialError("Credential is for another provider");
-      return { apiKey: credential.apiKey, credentialId: agent.credentialId as string | null };
+      return {
+        apiKey: credential.apiKey,
+        workspaceId: credential.workspaceId,
+        credentialId: agent.credentialId as string | null,
+      };
     }
     const platform = await deps.platformCredentials.resolve(agent.orgId, provider);
     if (!platform) throw new MissingCredentialError("Add a provider API key to this agent");
-    return { apiKey: platform.apiKey, credentialId: null };
+    return { apiKey: platform.apiKey, workspaceId: platform.workspaceId, credentialId: null };
   }
 
   /** Org calls: the org's default credential, else its newest active one for the provider, else the platform key. */
@@ -144,11 +152,12 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     if (newest[0]) candidates.push(newest[0].id);
     for (const id of candidates) {
       const credential = await decryptCredential(db, deps.keyWrappers, orgId, id);
-      if (credential && credential.provider === provider) return { apiKey: credential.apiKey, credentialId: id };
+      if (credential && credential.provider === provider)
+        return { apiKey: credential.apiKey, workspaceId: credential.workspaceId, credentialId: id };
     }
     const platform = await deps.platformCredentials.resolve(orgId, provider);
     if (!platform) throw new MissingCredentialError("Add a provider API key to this organization");
-    return { apiKey: platform.apiKey, credentialId: null as string | null };
+    return { apiKey: platform.apiKey, workspaceId: platform.workspaceId, credentialId: null as string | null };
   }
 
   /** Usage of a stream that failed midway: what the provider reported, else counted or estimated. */
@@ -156,14 +165,16 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     error: ProviderError,
     provider: ModelProvider,
     request: ModelRequest,
-    apiKey: string,
+    key: { apiKey: string; workspaceId?: string },
   ): Promise<ModelUsage | null> {
     const p = error.partial;
     if (!p) return null;
     let inputTokens = p.inputTokens;
     if (inputTokens === null) {
       try {
-        inputTokens = provider.countTokens ? await provider.countTokens(request, { apiKey }) : null;
+        inputTokens = provider.countTokens
+          ? await provider.countTokens(request, { apiKey: key.apiKey, workspaceId: key.workspaceId })
+          : null;
       } catch {
         inputTokens = null;
       }
@@ -356,9 +367,13 @@ export function createModelGateway(deps: ModelGatewayDeps) {
 
       let result: ModelResult;
       try {
-        result = await provider.stream(request, { apiKey: key.apiKey, onDelta: call.onDelta });
+        result = await provider.stream(request, {
+          apiKey: key.apiKey,
+          workspaceId: key.workspaceId,
+          onDelta: call.onDelta,
+        });
       } catch (error) {
-        const usage = error instanceof ProviderError ? await partialUsage(error, provider, request, key.apiKey) : null;
+        const usage = error instanceof ProviderError ? await partialUsage(error, provider, request, key) : null;
         await db.transaction(async (tx) => {
           let actual = 0;
           if (usage) {
@@ -400,6 +415,34 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       return { ...result, usageRecordId: record.id, costNanoUsd: record.cost, maxTokens };
     },
 
+    /** Whether embeddings are available (else search falls back to full-text only). */
+    hasEmbeddings: () => deps.embeddings !== undefined,
+
+    /**
+     * Embeds texts for the organization's search index (kind `embedding`,
+     * no agent). Returns null when no embedding provider is configured.
+     */
+    async embed(call: { orgId: string; texts: string[]; inputType: "document" | "query" }) {
+      if (!deps.embeddings || call.texts.length === 0) return null;
+      const { provider, apiKey } = deps.embeddings;
+      const result = await provider.embed(call.texts, { apiKey, inputType: call.inputType });
+      const cost = embeddingCostNanoUsd(result.model, result.tokens);
+      await db.insert(usageRecords).values({
+        orgId: call.orgId,
+        agentId: null,
+        kind: "embedding",
+        credentialId: null,
+        provider: provider.id,
+        model: result.model,
+        requestedModel: provider.model,
+        inputTokens: result.tokens,
+        outputTokens: 0,
+        costNanoUsd: cost,
+        createdAt: now(),
+      });
+      return result;
+    },
+
     /** A call for the organization (router, summaries). Not streamed to anyone; no agent budget. */
     async complete(call: OrgCall): Promise<GatewayResult> {
       const info = MODEL_CATALOG[call.model];
@@ -426,9 +469,9 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       };
       let result: ModelResult;
       try {
-        result = await provider.stream(request, { apiKey: key.apiKey, onDelta: () => {} });
+        result = await provider.stream(request, { apiKey: key.apiKey, workspaceId: key.workspaceId, onDelta: () => {} });
       } catch (error) {
-        const usage = error instanceof ProviderError ? await partialUsage(error, provider, request, key.apiKey) : null;
+        const usage = error instanceof ProviderError ? await partialUsage(error, provider, request, key) : null;
         if (usage) await recordUsage(db, { ...base, model: call.model, usage, partial: true });
         throw error;
       }

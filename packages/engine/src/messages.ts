@@ -119,6 +119,12 @@ export async function insertMessage(tx: Executor, input: NewMessage): Promise<Me
     .returning();
   if (!message) throw new Error("message insert returned nothing");
 
+  await enqueue(tx, {
+    orgId: input.orgId,
+    kind: "search.index",
+    payload: { kind: "message", sourceId: message.id },
+    dedupeKey: `search.index:message:${message.id}`,
+  });
   // Mentions start runs; a person's message without mentions goes to the router.
   if (mentionedAgentIds.length > 0 || input.author.type === "person") {
     await enqueue(tx, {

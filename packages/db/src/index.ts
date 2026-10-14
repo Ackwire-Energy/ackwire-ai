@@ -4,6 +4,9 @@
  */
 export {
   and,
+  arrayContained,
+  arrayContains,
+  arrayOverlaps,
   asc,
   count,
   desc,

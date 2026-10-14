@@ -1,0 +1,196 @@
+import type { PubSub } from "@agenteschat/adapters";
+import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
+import { requireChannelAccess } from "../channels";
+import { NotFoundError, ValidationError } from "../errors";
+import { getMessage } from "../messages";
+import { enqueue } from "../outbox";
+import type { Approval } from "../tools/gateway";
+import { type ConsolidateResult, consolidateItem, looksLikeSecret, touchesPermissions } from "./items";
+import { recordOutcome } from "./outcomes";
+import { proposeFromItem } from "./proposals";
+
+const { messageReactions, contextUsage, contextItems, messages } = schema;
+
+const excerpt = (t: string, n = 120) => (t.length > n ? `${t.slice(0, n - 1)}…` : t).replace(/\s+/g, " ");
+
+/**
+ * A refused approval teaches the agent (with the reason) and is recorded as
+ * an outcome. Verified: a person decided. Called after the decision commits.
+ */
+export async function learnFromRefusal(
+  deps: { db: Database; pubsub?: PubSub },
+  approval: Approval,
+): Promise<ConsolidateResult | null> {
+  if (approval.status !== "refused") return null;
+  const outcome = await recordOutcome(deps.db, {
+    orgId: approval.orgId,
+    kind: "approval_refused",
+    agentId: approval.agentId,
+    runId: approval.runId,
+    subject: `${approval.tool}`,
+    summary: `${approval.title}${approval.reason ? ` — ${approval.reason}` : ""}`,
+    source: "approval",
+    channelId: approval.channelId,
+    threadRootId: approval.threadRootId,
+  });
+  const reason = approval.reason?.trim();
+  if (reason && (looksLikeSecret(reason) || touchesPermissions(reason))) return null;
+  const at = new Date().toISOString();
+  const res = await consolidateItem(deps.db, {
+    orgId: approval.orgId,
+    kind: "lesson",
+    scopeType: "agent",
+    scopeId: approval.agentId,
+    agentId: approval.agentId,
+    subject: `refused ${approval.tool} ${reason ?? ""}`,
+    content: reason
+      ? `"${excerpt(approval.title)}" was refused: ${excerpt(reason, 300)}`
+      : `"${excerpt(approval.title)}" was refused by a person.`,
+    sourceIds: [approval.id, outcome.id],
+    channelIds: [approval.channelId],
+    trust: "high",
+    evidence: [
+      { type: "human", ref: approval.id, at },
+      { type: "outcome", ref: outcome.id, at },
+    ],
+    confidence: 0.9,
+  });
+  await proposeFromItem(deps, res.item);
+  return res;
+}
+
+/**
+ * A person corrects an agent's reply ("edits to an agent's output"): stored
+ * as a verified lesson for that agent, with the reply and the correction as
+ * sources.
+ */
+export async function correctAgentMessage(
+  deps: { db: Database; pubsub?: PubSub },
+  userId: string,
+  orgId: string,
+  messageId: string,
+  correction: string,
+): Promise<ConsolidateResult> {
+  const message = await getMessage(deps.db, orgId, messageId);
+  if (!message || message.deletedAt) throw new NotFoundError("Message not found");
+  await requireChannelAccess(deps.db, userId, orgId, message.channelId);
+  if (message.authorType !== "agent" || !message.authorAgentId)
+    throw new ValidationError("Only agent replies can be corrected");
+  const text = correction.trim();
+  if (!text) throw new ValidationError("The correction is empty");
+  const res = await consolidateItem(deps.db, {
+    orgId,
+    kind: "lesson",
+    scopeType: "agent",
+    scopeId: message.authorAgentId,
+    agentId: message.authorAgentId,
+    subject: `correction ${excerpt(text, 80)}`,
+    content: `A person corrected "${excerpt(message.body)}": ${excerpt(text, 500)}`,
+    sourceIds: [message.id],
+    channelIds: [message.channelId],
+    trust: "high",
+    evidence: [{ type: "human", ref: `${message.id}:${userId}`, at: new Date().toISOString() }],
+    confidence: 0.85,
+    createdByKind: "person",
+    createdById: userId,
+  });
+  await proposeFromItem(deps, res.item);
+  return res;
+}
+
+/** Adds a reaction. 👍/👎 on an agent's reply adjust the relevance of the context it used, via a job. */
+export async function addReaction(db: Database, userId: string, orgId: string, messageId: string, reaction: string) {
+  const message = await getMessage(db, orgId, messageId);
+  if (!message || message.deletedAt) throw new NotFoundError("Message not found");
+  await requireChannelAccess(db, userId, orgId, message.channelId);
+  const emoji = /\p{Extended_Pictographic}/u.test(reaction) && !/\s/.test(reaction) && reaction.length <= 16;
+  if (reaction !== "+1" && reaction !== "-1" && !emoji)
+    throw new ValidationError("reaction must be +1, -1 or an emoji");
+  await db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(messageReactions)
+      .values({ orgId, messageId, userId, reaction })
+      .onConflictDoNothing()
+      .returning({ messageId: messageReactions.messageId });
+    if (inserted.length > 0 && message.authorType === "agent" && (reaction === "+1" || reaction === "-1")) {
+      await enqueue(tx, { orgId, kind: "context.feedback", payload: { messageId, reaction } });
+    }
+  });
+  return listReactions(db, orgId, messageId);
+}
+
+export async function removeReaction(db: Database, userId: string, orgId: string, messageId: string, reaction: string) {
+  await db
+    .delete(messageReactions)
+    .where(
+      and(
+        eq(messageReactions.orgId, orgId),
+        eq(messageReactions.messageId, messageId),
+        eq(messageReactions.userId, userId),
+        eq(messageReactions.reaction, reaction),
+      ),
+    );
+  return listReactions(db, orgId, messageId);
+}
+
+export async function listReactions(db: Database, orgId: string, messageId: string) {
+  const rows = await db
+    .select({ reaction: messageReactions.reaction, userId: messageReactions.userId })
+    .from(messageReactions)
+    .where(and(eq(messageReactions.orgId, orgId), eq(messageReactions.messageId, messageId)));
+  const byReaction = new Map<string, string[]>();
+  for (const r of rows) byReaction.set(r.reaction, [...(byReaction.get(r.reaction) ?? []), r.userId]);
+  return [...byReaction].map(([reaction, userIds]) => ({ reaction, count: userIds.length, userIds }));
+}
+
+/**
+ * Job `context.feedback`: a 👍 raises (a 👎 lowers) the relevance of the
+ * context items the run behind that reply used. The reaction also shows up
+ * in the next reflection of the thread as human feedback.
+ */
+export async function applyReactionFeedback(
+  db: Database,
+  input: { orgId: string; messageId: string; reaction: string },
+) {
+  const [m] = await db
+    .select({ runId: messages.agentRunId })
+    .from(messages)
+    .where(and(eq(messages.orgId, input.orgId), eq(messages.id, input.messageId)));
+  if (!m?.runId) return 0;
+  const used = await db
+    .select({ itemId: contextUsage.itemId })
+    .from(contextUsage)
+    .where(eq(contextUsage.runId, m.runId));
+  if (used.length === 0) return 0;
+  const delta = input.reaction === "+1" ? 0.1 : -0.15;
+  await db
+    .update(contextItems)
+    .set({ relevance: sql`least(1, greatest(0, ${contextItems.relevance} + ${delta}))`, updatedAt: new Date() })
+    .where(
+      and(
+        eq(contextItems.orgId, input.orgId),
+        inArray(
+          contextItems.id,
+          used.map((u) => u.itemId),
+        ),
+      ),
+    );
+  return used.length;
+}
+
+/** Logs which items a run's context included (feeds relevance). */
+export async function recordContextUse(db: Database, orgId: string, runId: string, itemIds: string[]) {
+  if (itemIds.length === 0) return;
+  await db
+    .insert(contextUsage)
+    .values(itemIds.map((itemId) => ({ orgId, runId, itemId })))
+    .onConflictDoNothing();
+  await db
+    .update(contextItems)
+    .set({
+      useCount: sql`${contextItems.useCount} + 1`,
+      relevance: sql`least(1, ${contextItems.relevance} + 0.05)`,
+      lastUsedAt: new Date(),
+    })
+    .where(and(eq(contextItems.orgId, orgId), inArray(contextItems.id, itemIds)));
+}

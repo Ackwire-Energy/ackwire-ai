@@ -9,7 +9,7 @@ const { messages, users, agents, channels, channelMembers, organizations } = sch
 export interface RunContext {
   system: SystemBlock[];
   messages: ModelMessage[];
-  stats: { historyMessages: number; systemChars: number };
+  stats: { historyMessages: number; systemChars: number; truncated: boolean };
 }
 
 /**
@@ -114,7 +114,7 @@ export async function buildRunContext(
   return {
     system,
     messages: toTurns(history, agent.id, names),
-    stats: { historyMessages: history.length, systemChars },
+    stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
   };
 }
 

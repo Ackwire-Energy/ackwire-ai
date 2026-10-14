@@ -1,28 +1,102 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { createPostgresSearchResolver } from "@agenteschat/adapters";
-import { createChannel, postPersonMessage } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { schema } from "@agenteschat/db";
+import {
+  agentVisibleChannels,
+  createChannel,
+  drainOutbox,
+  joinChannel,
+  postPersonMessage,
+  reindexOrg,
+  searchForUser,
+  searchVisible,
+} from "../src";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
-beforeEach(async () => {
-  f = await setup();
-});
-afterEach(() => f.close());
+afterEach(() => f?.close());
 
-test("postgres search stub only returns documents of visible channels in the org", async () => {
-  const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
-  const deps = { db: f.db, pubsub: f.pubsub };
-  await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "launch window is friday" });
-  await postPersonMessage(deps, f.owner.id, f.org.id, secret.id, { body: "launch budget is 100%_secret" });
-  const index = await createPostgresSearchResolver(f.db).forOrg(f.org.id);
-  expect(index.backend).toBe("postgres");
-  expect((await index.query({ text: "launch", visibleChannelIds: [f.general.id] })).map((h) => h.snippet)).toEqual([
-    "launch window is friday",
-  ]);
-  expect(await index.query({ text: "launch", visibleChannelIds: [] })).toEqual([]);
-  // LIKE wildcards in the query are literal.
-  expect((await index.query({ text: "100%_", visibleChannelIds: [f.general.id, secret.id] })).length).toBe(1);
-  // Another org sees nothing, even with the channel ids.
-  const other = await createPostgresSearchResolver(f.db).forOrg(crypto.randomUUID());
-  expect(await other.query({ text: "launch", visibleChannelIds: [f.general.id] })).toEqual([]);
+const post = (fx: Fixture, channelId: string, body: string) =>
+  postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, channelId, { body });
+
+describe("search index (Postgres, hybrid)", () => {
+  test("messages are indexed through the outbox; results respect channel visibility and the org", async () => {
+    f = await setup({ embeddings: true });
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
+    await post(f, f.general.id, "launch window is friday after the review");
+    await post(f, secret.id, "launch budget is 100%_secret");
+    await post(f, f.general.id, "lunch menu: lasagna");
+    await drainOutbox(f.db, f.handlers);
+    expect(await f.db.select().from(schema.searchDocuments)).toHaveLength(3);
+    const deps = { db: f.db, search: f.search, gateway: f.gateway };
+
+    const general = await searchVisible(deps, { orgId: f.org.id, text: "launch", visibleChannelIds: [f.general.id] });
+    expect(general.map((h) => h.snippet)).toEqual(["launch window is friday after the review"]);
+    const both = await searchVisible(deps, {
+      orgId: f.org.id,
+      text: "launch",
+      visibleChannelIds: [f.general.id, secret.id],
+    });
+    expect(both).toHaveLength(2);
+    expect(await searchVisible(deps, { orgId: f.org.id, text: "launch", visibleChannelIds: [] })).toEqual([]);
+    // Query syntax is safe (websearch syntax, no injection).
+    expect(
+      await searchVisible(deps, { orgId: f.org.id, text: "100%_' or 1=1 --", visibleChannelIds: [secret.id] }),
+    ).toBeArray();
+    // Another org sees nothing, even with the channel ids.
+    const other = await createPostgresSearchResolver(f.db).forOrg(crypto.randomUUID());
+    expect(await other.query({ text: "launch", visibleChannelIds: [f.general.id] })).toEqual([]);
+    // Embeddings were computed and recorded as usage (kind embedding, no agent).
+    const usage = (await f.db.select().from(schema.usageRecords)).filter((u) => u.kind === "embedding");
+    expect(usage.length).toBeGreaterThanOrEqual(3);
+    expect(usage.every((u) => u.agentId === null && u.orgId === f.org.id)).toBe(true);
+  });
+
+  test("vector similarity finds what full-text misses; without embeddings it falls back to full-text", async () => {
+    f = await setup({ embeddings: true });
+    await post(f, f.general.id, "the deploy pipeline broke on staging");
+    await drainOutbox(f.db, f.handlers);
+    const deps = { db: f.db, search: f.search, gateway: f.gateway };
+    // "pipeline staging deploys" shares words but not the exact phrase; full-text AND would miss "deploys".
+    const hybrid = await searchVisible(deps, {
+      orgId: f.org.id,
+      text: "pipeline staging deploys",
+      visibleChannelIds: [f.general.id],
+    });
+    expect(hybrid.map((h) => h.snippet)).toEqual(["the deploy pipeline broke on staging"]);
+    await f.close();
+
+    f = await setup();
+    await post(f, f.general.id, "the deploy pipeline broke on staging");
+    await drainOutbox(f.db, f.handlers);
+    const textOnly = { db: f.db, search: f.search, gateway: f.gateway };
+    expect(
+      await searchVisible(textOnly, {
+        orgId: f.org.id,
+        text: "pipeline staging deploys",
+        visibleChannelIds: [f.general.id],
+      }),
+    ).toEqual([]);
+    expect(
+      (await searchVisible(textOnly, { orgId: f.org.id, text: "pipeline staging", visibleChannelIds: [f.general.id] }))
+        .length,
+    ).toBe(1);
+  });
+
+  test("a person searches what they can read; an agent what its channels show; reindex rebuilds", async () => {
+    f = await setup();
+    const eng = await createChannel(f.db, f.owner.id, f.org.id, { name: "eng", visibility: "private" });
+    await post(f, eng.id, "postgres upgrade on tuesday");
+    await drainOutbox(f.db, f.handlers);
+    const deps = { db: f.db, search: f.search, gateway: f.gateway };
+    const member = await addMember(f.db, f.org.id, "member");
+    expect(await searchForUser(deps, member.id, f.org.id, { text: "postgres" })).toEqual([]);
+    expect(await searchForUser(deps, f.owner.id, f.org.id, { text: "postgres" })).toHaveLength(1);
+    expect(await agentVisibleChannels(f.db, f.org.id, f.agent.id)).toEqual([f.general.id]);
+    await joinChannel(f.db, member.id, f.org.id, f.general.id);
+
+    await f.db.delete(schema.searchDocuments);
+    expect(await reindexOrg(deps, f.org.id)).toBe(1);
+    expect(await searchForUser(deps, f.owner.id, f.org.id, { text: "postgres" })).toHaveLength(1);
+  });
 });

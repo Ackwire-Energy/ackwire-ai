@@ -6,23 +6,17 @@ import {
   createMemoryRateLimiter,
   createPostgresPubSub,
   createPostgresSearchResolver,
-  noPlatformCredentials,
+  envPlatformCredentials,
   postgresJsNotifier,
 } from "@agenteschat/adapters";
-import { ConfigError, connectorOAuthApps, loadConfig, redactConfig } from "@agenteschat/config";
+import { ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
 import { createDatabase, ensureMessagePartitions } from "@agenteschat/db";
-import {
-  createConnectorToolSource,
-  createJobHandlers,
-  createLocalKeyWrapper,
-  createModelGateway,
-  createToolGateway,
-  notifyOwnerOnBudget,
-} from "@agenteschat/engine";
+import { createLocalKeyWrapper } from "@agenteschat/engine";
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createAnthropicProvider } from "@agenteschat/providers";
 import { createApp } from "./app";
 import { createAuth } from "./auth";
+import { buildEngine } from "./engine";
 import { createLogger } from "./logger";
 import { createRealtime, type SocketData } from "./realtime/ws";
 import { version } from "./version";
@@ -68,7 +62,9 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     rateLimiter: createMemoryRateLimiter(),
     keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
     legacyKeyWrappers: [],
-    platformCredentials: noPlatformCredentials,
+    platformCredentials: envPlatformCredentials({
+      anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
+    }),
   };
   const base = { config, db: database.db, edition, version };
   const { adapters, modelProviders, overridden } = await resolveAdapters(modules, base, defaults, {
@@ -77,36 +73,14 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
   const ctx: ModuleContext = { ...base, adapters };
 
-  const gateway = createModelGateway({
+  const engine = buildEngine({ db: database.db, config, adapters, modelProviders });
+  const workers = startWorkers({
     db: database.db,
-    keyWrappers: [adapters.keyWrapper, ...adapters.legacyKeyWrappers],
-    providers: modelProviders,
-    platformCredentials: adapters.platformCredentials,
-    onBudgetThreshold: notifyOwnerOnBudget(adapters.pubsub),
-  });
-  const keyWrappers = [adapters.keyWrapper, ...adapters.legacyKeyWrappers];
-  const tools = createToolGateway({
-    sources: [
-      createConnectorToolSource({
-        db: database.db,
-        keyWrappers,
-        oauthApps: connectorOAuthApps(config),
-        publicUrl: config.PUBLIC_URL,
-      }),
-    ],
-  });
-  const handlers = createJobHandlers({
-    db: database.db,
-    tools,
-    maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
-    gateway,
+    handlers: engine.handlers,
     pubsub: adapters.pubsub,
-    maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
-    contextMessages: config.AGENT_CONTEXT_MESSAGES,
-    maxHops: config.AGENT_MAX_HOPS,
-    router: { enabled: config.ROUTER_ENABLED, model: config.ROUTER_MODEL, minScore: config.ROUTER_MIN_SCORE },
+    context: engine.context,
+    log,
   });
-  const workers = startWorkers({ db: database.db, handlers, pubsub: adapters.pubsub, log });
 
   const auth = createAuth({ db: database.db, config, log });
   const webDir = resolve(config.WEB_DIR);
@@ -115,7 +89,14 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     version,
     modules,
     moduleContext: ctx,
-    services: { db: database.db, auth, config, adapters, wakeWorkers: workers.wake },
+    services: {
+      db: database.db,
+      auth,
+      config,
+      adapters,
+      wakeWorkers: workers.wake,
+      extras: { embed: engine.gateway.embed },
+    },
     log,
     pingDatabase: database.ping,
     webDir: existsSync(webDir) ? webDir : undefined,

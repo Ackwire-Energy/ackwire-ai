@@ -73,6 +73,8 @@ export interface ModelResult {
 
 export interface StreamOptions {
   apiKey: string;
+  /** Account scoping some providers need (Anthropic: `anthropic-workspace-id`). */
+  workspaceId?: string;
   /** Called with each text fragment as it is generated. */
   onDelta(text: string): void;
 }
@@ -81,7 +83,7 @@ export interface ModelProvider {
   readonly id: string;
   stream(request: ModelRequest, options: StreamOptions): Promise<ModelResult>;
   /** Exact input-token count of a request (provider API). Optional: callers fall back to an estimate. */
-  countTokens?(request: ModelRequest, options: { apiKey: string }): Promise<number>;
+  countTokens?(request: ModelRequest, options: { apiKey: string; workspaceId?: string }): Promise<number>;
 }
 
 /** What the provider had already reported or sent when a stream failed. */

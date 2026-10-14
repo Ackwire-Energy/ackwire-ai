@@ -27,6 +27,11 @@ export const Credential = z
     provider: z.enum(["anthropic"]),
     label: z.string(),
     keyHint: z.string().openapi({ description: "Last 4 characters of the key. The key itself is never returned." }),
+    workspaceIdHint: z
+      .string()
+      .nullable()
+      .optional()
+      .openapi({ description: "Last characters of the workspace the key is scoped to, if set." }),
     createdAt: z.string(),
     revokedAt: z.string().nullable(),
   })
