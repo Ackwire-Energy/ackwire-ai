@@ -2,7 +2,7 @@
 
 Fonte de verdade visual para o frontend. Cópia local dos artifacts:
 - Design system: https://claude.ai/artifact/JfRTQEvU939ZrDxVioM84m
-- Telas e fluxos (protótipo navegável): https://claude.ai/artifact/APnoCywMPyhm2kqHntBF73
+- Telas e fluxos (protótipo navegável): https://claude.ai/artifact/THb3AuEuGX8Ng3qPXumVVa (o anterior saiu do acesso)
 
 ## Conteúdo
 - `design-system/README.md`: regras de uso (cor, forma, tipo, voz). Leia primeiro.
