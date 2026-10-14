@@ -1,0 +1,12 @@
+/*
+ * The one layering scale. Anything that floats uses these, never a raw
+ * number. Floating layers (select lists, menus, popovers, date pickers,
+ * tooltips) sit above dialogs and sheets so they open inside them.
+ */
+:root {
+  --z-sticky: 1;
+  --z-scrim: 40;
+  --z-dialog: 41;
+  --z-floating: 50;
+  --z-toast: 60;
+}

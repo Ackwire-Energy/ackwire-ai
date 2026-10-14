@@ -1,15 +1,23 @@
 import {
   type Adapters,
   createFakeEmailSender,
+  createMemoryBlobStore,
   createMemoryPresence,
   createMemoryPubSub,
   createMemoryRateLimiter,
   createPostgresSearchResolver,
   noPlatformCredentials,
+  type S3Fetch,
 } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
 import { createTestDatabase } from "@agenteschat/db/testing";
-import { createLocalKeyWrapper, drainOutbox, type McpConnect, type ToolSource } from "@agenteschat/engine";
+import {
+  createLocalKeyWrapper,
+  drainOutbox,
+  type McpConnect,
+  type ResolveHost,
+  type ToolSource,
+} from "@agenteschat/engine";
 import { createFakeEmbeddings, createFakeProvider } from "@agenteschat/providers/testing";
 import { createApp } from "../src/app";
 import { createAuth } from "../src/auth";
@@ -34,12 +42,16 @@ export async function createTestServer(
     http?: typeof fetch;
     /** Use fake embeddings (hybrid search). Off by default: full-text only, and no embedding usage rows. */
     embeddings?: boolean;
+    /** Fake S3 server and DNS for org buckets. */
+    s3Fetch?: S3Fetch;
+    resolveHost?: ResolveHost;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
   const config = testConfig({ PUBLIC_URL: ORIGIN, AGENT_MAX_OUTPUT_TOKENS: "1000", ...options.env });
   const log = createLogger("error");
   const email = createFakeEmailSender();
+  const platformBlobs = createMemoryBlobStore();
   const adapters: Adapters = {
     search: createPostgresSearchResolver(db),
     pubsub: createMemoryPubSub(),
@@ -49,6 +61,7 @@ export async function createTestServer(
     legacyKeyWrappers: [],
     platformCredentials: noPlatformCredentials,
     email,
+    platformBlobs,
   };
   const provider = createFakeProvider(options.reply);
   const embeddings = createFakeEmbeddings();
@@ -62,6 +75,8 @@ export async function createTestServer(
     http: options.http,
     embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,
     deltaFlushMs: 0,
+    s3Fetch: options.s3Fetch,
+    resolveHost: options.resolveHost,
   });
   const { handlers } = engine;
   const auth = createAuth({ db, config, log, emailDelivers: true });
@@ -75,7 +90,13 @@ export async function createTestServer(
       auth,
       config,
       adapters,
-      extras: { http: options.http, mcpConnect: options.mcpConnect, embed: engine.gateway.embed },
+      extras: {
+        http: options.http,
+        mcpConnect: options.mcpConnect,
+        embed: engine.gateway.embed,
+        storage: engine.storage,
+        artifacts: engine.artifacts,
+      },
     },
     log,
   });
@@ -88,6 +109,7 @@ export async function createTestServer(
     provider,
     embeddings,
     email,
+    platformBlobs,
     engine,
     app,
     auth,

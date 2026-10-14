@@ -8,7 +8,7 @@ import { type ContextItem, consolidateItem, getContextItems, supersede } from ".
 import { proposeChange } from "./proposals";
 import { type ContextDeps, ensureThreadSummary } from "./summaries";
 
-const { contextItems, messages, channels, outcomes } = schema;
+const { contextItems, messages, outcomes } = schema;
 
 /** How an item is labeled when shown to a model (defense against memory poisoning). */
 export function itemLabel(item: Pick<ContextItem, "kind" | "verified" | "trust">) {

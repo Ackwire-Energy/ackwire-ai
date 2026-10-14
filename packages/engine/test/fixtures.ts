@@ -1,5 +1,7 @@
 import {
   channelTopic,
+  createFakeS3,
+  createMemoryBlobStore,
   createMemoryPubSub,
   createPostgresSearchResolver,
   type KeyWrapper,
@@ -12,9 +14,12 @@ import { createTestDatabase } from "@agenteschat/db/testing";
 import { createFakeEmbeddings, createFakeProvider, type FakeProvider } from "@agenteschat/providers/testing";
 import {
   addChannelMember,
+  type ArtifactDeps,
   type ContextDeps,
   createAgent,
+  createArtifactToolSource,
   createAskUserToolSource,
+  createBlobStoreResolver,
   createContextToolSource,
   createCredential,
   createJobHandlers,
@@ -23,6 +28,7 @@ import {
   createOrganization,
   createToolGateway,
   type MemberRole,
+  type StorageDeps,
   type ToolSource,
 } from "../src";
 
@@ -56,6 +62,8 @@ export async function setup(
     contextTools?: boolean;
     /** Add the built-in `ask_user` tool. */
     askUser?: boolean;
+    /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
+    artifactTools?: boolean;
     /** Fake embeddings (hybrid search). Off: full-text only, no embedding usage rows. */
     embeddings?: boolean;
   } = {},
@@ -108,8 +116,26 @@ export async function setup(
     pubsub,
     reflect: { everyMessages: 1000, idleMinutes: 120, maxPerThread: 5 },
   };
+  // Platform storage in memory; org buckets on a fake S3 server at s3.example.com (DNS faked: public IP).
+  const platformBlobs = createMemoryBlobStore();
+  const s3 = createFakeS3({
+    host: "s3.example.com",
+    region: "us-east-1",
+    accessKeyId: "AKIATEST",
+    secretAccessKey: "secret-test-key-123456",
+    buckets: ["acme-files", "acme-new"],
+  });
+  const storage: StorageDeps = {
+    db,
+    keyWrappers: [keyWrapper],
+    platform: platformBlobs,
+    fetch: s3.fetch,
+    resolveHost: async (host) => (host.endsWith("example.com") ? ["93.184.216.34"] : ["10.0.0.5"]),
+  };
+  const artifactDeps: ArtifactDeps = { db, blobs: createBlobStoreResolver(storage), pubsub };
   const sources = [
     ...(options.askUser ? [createAskUserToolSource()] : []),
+    ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.contextTools ? [createContextToolSource(context)] : []),
     ...(options.toolSources ?? []),
   ];
@@ -125,6 +151,7 @@ export async function setup(
     tools,
     context,
     search,
+    storage,
   };
   const handlers = createJobHandlers(jobDeps);
 
@@ -155,6 +182,10 @@ export async function setup(
     handlers,
     jobDeps,
     listen,
+    platformBlobs,
+    s3,
+    storage,
+    artifactDeps,
   };
 }
 

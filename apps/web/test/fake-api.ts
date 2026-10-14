@@ -988,7 +988,8 @@ export function createFakeHttpApi(state: FakeState): HttpApi {
         if (input.choice && q.choices && !q.choices.includes(input.choice)) {
           throw new ApiError(400, "invalid_choice", "Pick one of the options");
         }
-        const answer = input.choice && input.text ? `${input.choice} (${input.text})` : (input.choice ?? input.text ?? null);
+        const answer =
+          input.choice && input.text ? `${input.choice} (${input.text})` : (input.choice ?? input.text ?? null);
         Object.assign(q, { status: "answered", answer, answeredByUserId: state.me?.user.id ?? null });
         return structuredClone(q);
       },

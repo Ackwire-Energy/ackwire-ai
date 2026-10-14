@@ -1,5 +1,6 @@
 import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
 import type { ApprovalView } from "./approvals";
+import type { ArtifactView } from "./artifacts";
 import type { MessageView } from "./messages";
 
 /** What a memory tool changed, for the "memória atualizada" card (persisted in the reply's `meta.memoryUpdates`). */
@@ -104,6 +105,8 @@ export type ChannelEvent =
       threadId: string | null;
       question: AgentQuestion;
     }
+  /** A file was created or got a new version (Drive preview card). */
+  | { type: "artifact.created" | "artifact.updated"; channelId: string; artifact: ArtifactView }
   /** Channel membership changed (agents carry `autoReply`). */
   | {
       type: "channel.member_added" | "channel.member_removed" | "channel.member_updated";

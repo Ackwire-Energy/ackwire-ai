@@ -163,6 +163,8 @@ export const artifacts = pgTable(
     threadId: uuid(),
     /** `html` is always untrusted: the app renders it only in a sandboxed iframe on another origin. */
     untrusted: boolean().notNull().default(false),
+    /** Text for search (first part of the latest version). */
+    excerpt: text().notNull().default(""),
     currentVersion: integer().notNull().default(1),
     createdByType: text().notNull(),
     createdById: text().notNull(),

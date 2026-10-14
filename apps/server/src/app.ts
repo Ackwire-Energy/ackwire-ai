@@ -7,6 +7,7 @@ import { createLogger, type Logger } from "./logger";
 import { accountRoutes } from "./routes/app/account";
 import { agentRoutes } from "./routes/app/agents";
 import { approvalRoutes } from "./routes/app/approvals";
+import { artifactRoutes } from "./routes/app/artifacts";
 import { channelRoutes } from "./routes/app/channels";
 import { chatRoutes } from "./routes/app/chat";
 import { connectorRoutes } from "./routes/app/connectors";
@@ -17,6 +18,7 @@ import { knowledgeRoutes } from "./routes/app/knowledge";
 import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
 import { questionRoutes } from "./routes/app/questions";
+import { storageRoutes } from "./routes/app/storage";
 import { registerHealth } from "./routes/health";
 
 export interface AppOptions {
@@ -79,6 +81,8 @@ export function createApp(options: AppOptions) {
     api.route("/app", dmRoutes(deps));
     api.route("/app", questionRoutes(deps));
     api.route("/app", inviteRoutes(deps));
+    api.route("/app", storageRoutes(deps));
+    api.route("/app", artifactRoutes(deps));
   }
 
   for (const module of options.modules) {

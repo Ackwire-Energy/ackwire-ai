@@ -17,6 +17,7 @@ import {
   createMemoryPresence,
   createMemoryPubSub,
   createMemoryRateLimiter,
+  createPostgresBlobStore,
   createPostgresSearchResolver,
   envPlatformCredentials,
 } from "@agenteschat/adapters";
@@ -65,6 +66,7 @@ try {
     keyWrapper,
     legacyKeyWrappers: [],
     email: createLogEmailSender(() => {}),
+    platformBlobs: createPostgresBlobStore(db),
     platformCredentials: envPlatformCredentials({
       anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
     }),

@@ -745,7 +745,7 @@ textarea.ac-input {
 
 /* Menu (listbox of the Select, dropdown menus) */
 .ac-menu {
-  z-index: 20;
+  z-index: var(--z-floating);
   min-width: 100%;
   box-sizing: border-box;
   display: flex;
@@ -1030,17 +1030,19 @@ textarea.ac-input {
 .ac-dialog__scrim {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: var(--z-scrim);
   background: rgba(10, 10, 10, 0.4);
 }
 .ac-dialog {
   position: fixed;
-  z-index: 41;
+  z-index: var(--z-dialog);
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
   width: min(var(--ac-dialog-width, 600px), calc(100% - 32px));
-  max-height: min(640px, calc(100% - 64px));
+  /* Fixed head and foot; the body scrolls (viewport minus margins). */
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1055,6 +1057,12 @@ textarea.ac-input {
 }
 .ac-dialog:focus {
   outline: none;
+}
+.ac-dialog__head,
+.ac-dialog__desc,
+.ac-dialog__tools,
+.ac-dialog__foot {
+  flex: none;
 }
 .ac-dialog__head {
   display: flex;
@@ -1243,7 +1251,7 @@ a.ac-list__row:focus-visible {
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: 60;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -1369,7 +1377,7 @@ a.ac-list__row:focus-visible {
 /* Side panel (artifact viewer) */
 .ac-sheet {
   position: fixed;
-  z-index: 41;
+  z-index: var(--z-dialog);
   top: 0;
   right: 0;
   bottom: 0;

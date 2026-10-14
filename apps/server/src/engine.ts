@@ -1,9 +1,12 @@
-import type { Adapters } from "@agenteschat/adapters";
+import type { Adapters, S3Fetch } from "@agenteschat/adapters";
 import { type Config, connectorOAuthApps } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
+  type ArtifactDeps,
   type ContextDeps,
+  createArtifactToolSource,
   createAskUserToolSource,
+  createBlobStoreResolver,
   createConnectorToolSource,
   createContextToolSource,
   createJobHandlers,
@@ -12,7 +15,9 @@ import {
   type McpConnect,
   notifyOwnerOnBudget,
   queueBudgetEmail,
+  type ResolveHost,
   type RunExecutorDeps,
+  type StorageDeps,
   type ToolSource,
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
@@ -32,6 +37,9 @@ export interface EngineOptions {
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
   /** Tests: fake TypeSafe transport. */
   jevFetch?: typeof fetch;
+  /** Tests: fake S3 server and DNS for org buckets. */
+  s3Fetch?: S3Fetch;
+  resolveHost?: ResolveHost;
   /** Per-run stage breakdown (debug log). */
   onRunProfile?: RunExecutorDeps["onRunProfile"];
 }
@@ -81,9 +89,18 @@ export function buildEngine(o: EngineOptions) {
     http: o.http,
     connect: o.mcpConnect,
   };
+  const storage: StorageDeps = {
+    db,
+    keyWrappers,
+    platform: adapters.platformBlobs,
+    fetch: o.s3Fetch,
+    resolveHost: o.resolveHost,
+  };
+  const artifacts: ArtifactDeps = { db, blobs: createBlobStoreResolver(storage), pubsub: adapters.pubsub };
   const tools = createToolGateway({
     sources: [
       createAskUserToolSource(),
+      createArtifactToolSource(artifacts),
       createContextToolSource(context),
       createConnectorToolSource(connectorDeps),
       ...(o.toolSources ?? []),
@@ -97,6 +114,7 @@ export function buildEngine(o: EngineOptions) {
     context,
     search: adapters.search,
     email: adapters.email,
+    storage,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
@@ -115,7 +133,7 @@ export function buildEngine(o: EngineOptions) {
         : {}),
     },
   });
-  return { gateway, tools, context, handlers, connectorDeps };
+  return { gateway, tools, context, handlers, connectorDeps, storage, artifacts };
 }
 
 export type Engine = ReturnType<typeof buildEngine>;

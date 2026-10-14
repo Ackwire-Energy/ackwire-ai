@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  createMemoryBlobStore,
   type Adapters,
   createLogEmailSender,
   createMemoryPresence,
@@ -28,6 +29,7 @@ const defaults: Adapters = {
   legacyKeyWrappers: [],
   platformCredentials: noPlatformCredentials,
   email: createLogEmailSender(() => {}),
+  platformBlobs: createMemoryBlobStore(),
 };
 const ctx = { config: testConfig(), db: {} as Database, edition: "cloud" as const, version: "test" };
 

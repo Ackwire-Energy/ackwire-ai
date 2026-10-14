@@ -153,7 +153,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         return { type: "approval", approval: row };
       }
       const output = await run(tool, call.input, ctx);
-      if (builtIn && output.waitForAnswer && output.waitForAnswer.text) {
+      if (builtIn && output.waitForAnswer?.text) {
         return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices };
       }
       return finish(output);

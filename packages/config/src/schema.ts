@@ -319,6 +319,34 @@ export const envVars = {
     description: "Email approvers a digest of requests still waiting after this many hours (requests expire at 24 h).",
     section: "Email",
   },
+  S3_ENDPOINT: {
+    schema: z.url().optional(),
+    description:
+      "S3-compatible endpoint for platform file storage (artifacts, uploads), e.g. a Cloudflare R2 endpoint. Without S3_ENDPOINT and S3_BUCKET, files are stored in Postgres.",
+    section: "Storage",
+    example: "https://<account>.r2.cloudflarestorage.com",
+  },
+  S3_REGION: {
+    schema: z.string().default("auto"),
+    description: "Region of the platform bucket (`auto` for R2).",
+    section: "Storage",
+  },
+  S3_BUCKET: {
+    schema: z.string().optional(),
+    description: "Bucket for platform file storage. Each organization gets its own key prefix; objects stay private.",
+    section: "Storage",
+  },
+  S3_ACCESS_KEY_ID: {
+    schema: z.string().optional(),
+    description: "Access key id for the platform bucket.",
+    section: "Storage",
+  },
+  S3_SECRET_ACCESS_KEY: {
+    schema: z.string().optional(),
+    description: "Secret access key for the platform bucket.",
+    section: "Storage",
+    secret: true,
+  },
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),
     description: "Minimum log level written to stdout.",

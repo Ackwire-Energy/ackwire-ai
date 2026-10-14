@@ -24,3 +24,4 @@ The product-level decision log (in Portuguese) is `docs/planejamento.md`; these 
 | [0016](0016-connectors.md) | Connectors in two layers over MCP: org connections (sealed, OAuth with state + PKCE), our scope catalog, agent grants |
 | [0017](0017-search-and-context.md) | Search (hybrid Postgres, visibility in SQL), context items, and a self-improving memory loop with outcomes, trust weighting and a human gate |
 | [0018](0018-providers-and-default-keys.md) | Several model providers (OpenAI adapter on the Responses API); the workspace default key per provider; one resolution order |
+| [0019](0019-file-storage-and-artifacts.md) | File storage per organization (S3/R2 or Postgres, own bucket after a passing test, migration, SSRF guard) and artifacts (versions, visibility, untrusted HTML) |

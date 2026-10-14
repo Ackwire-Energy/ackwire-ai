@@ -1,3 +1,4 @@
 /* @agenteschat/ui: tokens + component styles. Fonts are loaded by the app. */
 @import "./tokens.css";
+@import "./layers.css";
 @import "./components.css";

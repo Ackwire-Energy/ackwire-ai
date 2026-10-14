@@ -71,6 +71,8 @@ export interface Transcript {
   deltaSeq: number;
   /** Memory changes made by tools, not yet attached to a posted message (`meta.memoryUpdates`). */
   memoryUpdates?: MemoryUpdate[];
+  /** Artifacts created or changed by tools, not yet attached to a posted message (`meta.artifacts`). */
+  artifacts?: { id: string; version: number }[];
   /** Tool calls of the last assistant turn while some wait for approval or an answer. */
   pending?: {
     calls: {
@@ -413,6 +415,9 @@ async function executeRunInner(
         const outcome = await deps.tools.invoke(ctx, { toolUseId: use.id, name: use.name, input: use.input });
         const update =
           outcome.type === "result" ? (outcome.output.data?.memoryUpdate as MemoryUpdate | undefined) : undefined;
+        const data = outcome.type === "result" ? outcome.output.data : undefined;
+        const artifact = data?.artifact as { id: string; version: number } | undefined;
+        if (artifact) transcript.artifacts = [...(transcript.artifacts ?? []), artifact];
         if (update) {
           transcript.memoryUpdates = [...(transcript.memoryUpdates ?? []), update];
           await publishChannelEvent(deps.pubsub, { type: "memory.updated", ...where, update });
@@ -527,7 +532,9 @@ async function executeRunInner(
     // Final answer.
     if (result.stopReason === "refusal") return fail("model_refused");
     const updates = transcript.memoryUpdates ?? [];
-    const text = unpostedText(transcript) || (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "");
+    const saved = (transcript.artifacts ?? []).length > 0 ? "Arquivo salvo." : "";
+    const text =
+      unpostedText(transcript) || (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "") || saved;
     const anythingPosted = transcript.postedCount > 0;
     if (!text && !anythingPosted) return fail("empty_reply");
     const t = transcript;
@@ -641,12 +648,20 @@ function createDeltaPublisher(
   };
 }
 
-/** Moves pending memory updates onto the message being posted (the "memória atualizada" card). */
+/**
+ * Moves pending memory updates and artifacts onto the message being posted
+ * (the "memória atualizada" and file preview cards).
+ */
 function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const updates = t.memoryUpdates ?? [];
-  if (updates.length === 0) return undefined;
+  const files = t.artifacts ?? [];
+  if (updates.length === 0 && files.length === 0) return undefined;
   t.memoryUpdates = [];
-  return { memoryUpdates: updates };
+  t.artifacts = [];
+  const meta: Record<string, unknown> = {};
+  if (updates.length > 0) meta.memoryUpdates = updates;
+  if (files.length > 0) meta.artifacts = files;
+  return meta;
 }
 
 const describeUpdate = (u: MemoryUpdate) =>

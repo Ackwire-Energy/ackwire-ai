@@ -19,6 +19,7 @@ import {
 import { createJevRouterStrategy, jevCostNanoUsd, withFallback } from "./router-jev";
 import type { AgentRun } from "./runs";
 import { indexSource, reindexOrg } from "./search";
+import { runMigration, type StorageDeps } from "./storage";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
 async function maybeEnqueueReflection(deps: JobDeps, orgId: string, threadId: string) {
@@ -43,6 +44,8 @@ export interface JobDeps extends RunExecutorDeps {
   search?: SearchIndexResolver;
   /** Transactional email (job `email.send`). */
   email?: EmailSender;
+  /** Org storage (job `storage.migrate`). */
+  storage?: StorageDeps;
   router?: {
     /** Off = only @mentions start runs. */
     enabled: boolean;
@@ -187,6 +190,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         messageId: String(job.payload.messageId),
         reaction: String(job.payload.reaction),
       });
+    },
+    "storage.migrate": async (job) => {
+      if (!deps.storage) throw new PermanentJobError("no storage configured");
+      await runMigration(deps.storage, String(job.payload.migrationId));
     },
     "email.send": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");

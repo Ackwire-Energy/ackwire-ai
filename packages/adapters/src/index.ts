@@ -1,3 +1,4 @@
+import type { BlobStore } from "./blob";
 import type { EmailSender } from "./email";
 import type { KeyWrapper, PlatformCredentials } from "./keys";
 import type { Presence } from "./presence";
@@ -5,11 +6,15 @@ import type { PubSub } from "./pubsub";
 import type { RateLimiter } from "./rate-limiter";
 import type { SearchIndexResolver } from "./search";
 
+export * from "./blob";
+export * from "./blob-postgres";
 export * from "./email";
 export * from "./keys";
 export * from "./presence";
 export * from "./pubsub";
 export * from "./rate-limiter";
+export * from "./s3";
+export * from "./s3-fake";
 export * from "./search";
 
 /**
@@ -28,4 +33,9 @@ export interface Adapters {
   platformCredentials: PlatformCredentials;
   /** Transactional email (sent from the `email.send` outbox job). */
   email: EmailSender;
+  /**
+   * Platform file storage (our bucket, or Postgres without one). Orgs with
+   * their own bucket are resolved on top of it by the engine.
+   */
+  platformBlobs: BlobStore;
 }
