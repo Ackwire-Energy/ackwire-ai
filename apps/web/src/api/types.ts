@@ -525,6 +525,8 @@ export interface CustomTool {
   description: string;
   /** The server's `readOnlyHint` annotation, when it sends one. */
   readOnlyHint: boolean | null;
+  /** Our suggestion until an admin decides (read-only → read, destructive/write-like → approval, else write). */
+  suggestedAccess?: ToolAccess | null;
   access: ToolAccess | null;
   /** Shown to people (approval cards, permissions), in pt-BR. */
   label: string;
@@ -893,4 +895,64 @@ export interface CalendarEventInput {
   participants: Actor[];
   channelId?: string | null;
   issueId?: string | null;
+}
+
+// ── Agent access (apps/server/src/routes/app/access.ts) ──────────────────────
+
+/** `granted` explicitly, `inherited` from a broader grant ("all", the connector, the scope), `denied`, `off`. */
+export type AccessState = "granted" | "inherited" | "denied" | "off";
+
+export interface AccessTool {
+  /** As exposed to the model ("github_merge_pull_request"). */
+  name: string;
+  connectionId: string | null;
+  scope: string;
+  /** Always asks a person, whatever the grant. */
+  sensitive: boolean;
+  state: AccessState;
+}
+
+export interface AccessScope {
+  scope: string;
+  /** pt-BR. */
+  label: string;
+  state: AccessState;
+  tools: AccessTool[];
+}
+
+/** `GET …/agents/{id}/access`: built-ins, then connectors with their scopes and tools. */
+export interface AgentAccess {
+  /** "Todas as ferramentas (atuais e futuras)". */
+  all: boolean;
+  builtins: AccessScope[];
+  connectors: {
+    connectionId: string;
+    connector: string;
+    label: string;
+    custom: boolean;
+    state: AccessState;
+    scopes: AccessScope[];
+  }[];
+}
+
+export interface ToolRef {
+  connectionId: string | null;
+  name: string;
+}
+
+/** `PUT …/agents/{id}/access`: replaces the agent's grants. */
+export interface AccessInput {
+  all: boolean;
+  /** Connection id → "all tools of this connector" (also future ones). */
+  connectors: Record<string, boolean>;
+  scopes: { connectionId: string | null; scope: string }[];
+  tools: { allow: ToolRef[]; deny: ToolRef[] };
+}
+
+/** `GET …/access-matrix` (admins): agents × tools, effective state per cell. */
+export interface AccessMatrix {
+  agents: { id: string; name: string; handle: string }[];
+  tools: (Omit<AccessTool, "state"> & { group: string; key: string })[];
+  /** cells[agentId][tool.key]. */
+  cells: Record<string, Record<string, AccessState>>;
 }

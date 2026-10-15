@@ -127,33 +127,44 @@ describe("Agente", () => {
     expect(dialog.textContent).toContain("Nenhuma execução com “nada disso”.");
   });
 
-  test("Editar permissões: built-in + connected scopes, search, toggle saves with PUT", async () => {
+  test("Editar permissões: the tool tree (all tools, connector, deny) saves with PUT …/access", async () => {
     const { state } = await go(`agents/${ADA_ID}`);
     await click(screen().getByRole("button", { name: "Editar permissões" }));
-    await settle();
-    const dialog = screen().getByRole("dialog", { name: "Permissões da Ada" });
-    expect(dialog.textContent).toContain("agentes · permissões embutidas");
-    expect(dialog.textContent).toContain("GitHub · acme");
-    const merge = within(dialog).getByRole("checkbox", { name: /Fazer merge/ });
-    expect(merge.getAttribute("aria-checked")).toBe("true");
-    const prs = within(dialog).getByRole("checkbox", { name: /Abrir e comentar PRs/ });
-    expect(prs.getAttribute("aria-checked")).toBe("false");
-    await click(prs);
     await settle(4);
-    const put = state.calls.filter((c) => c.method === "scopes.set").at(-1)?.args[2] as { scope: string }[];
-    expect(put.map((g) => g.scope)).toContain("github:pr.write");
+    const dialog = screen().getByRole("dialog", { name: "Permissões da Ada" });
+    expect(dialog.textContent).toContain("3 de 13 ferramentas");
+    const memory = within(dialog).getByRole("region", { name: "Memória" });
+    expect(within(memory).getByRole("checkbox", { name: "Memória" }).getAttribute("aria-checked")).toBe("true");
+    const github = within(dialog).getByRole("region", { name: "GitHub" });
+    const merge = within(github).getByRole("checkbox", { name: "github merge pull request" });
+    expect(merge.closest("li")?.textContent).toContain("pede aprovação");
+    // One tool of the connector: the connector checkbox goes indeterminate.
+    await click(within(github).getByRole("checkbox", { name: "github create pull request" }));
+    expect(within(github).getByRole("checkbox", { name: "Todas deste conector" }).getAttribute("aria-checked")).toBe(
+      "mixed",
+    );
+    // All tools: children inherited; deny one.
+    await click(within(dialog).getByRole("switch", { name: "Todas as ferramentas (atuais e futuras)" }));
+    expect(dialog.textContent).toContain("Ações sensíveis continuam pedindo aprovação.");
+    await click(within(github).getByRole("button", { name: "Bloquear github merge pull request" }));
+    expect(merge.closest("li")?.textContent).toContain("Bloqueada");
+    expect(dialog.textContent).toContain("12 de 13 ferramentas");
+    await type(within(dialog).getByRole("searchbox", { name: "Buscar ferramenta" }), "merge");
     expect(
       within(dialog)
-        .getByRole("checkbox", { name: /Abrir e comentar PRs/ })
-        .getAttribute("aria-checked"),
-    ).toBe("true");
-    await type(within(dialog).getByRole("searchbox", { name: "Buscar permissões" }), "lembrar");
-    expect(within(dialog).getAllByRole("checkbox")).toHaveLength(1);
-    await type(within(dialog).getByRole("searchbox", { name: "Buscar permissões" }), "xyz");
-    expect(dialog.textContent).toContain("Nada encontrado com “xyz”.");
-    await click(within(dialog).getByRole("button", { name: "Concluir" }));
-    await settle();
-    expect(screen().getByRole("region", { name: "O que a Ada pode fazer" }).textContent).toContain("5 de 7");
+        .getAllByRole("checkbox")
+        .filter((c) => c.closest("li")),
+    ).toHaveLength(1);
+    await click(within(dialog).getByRole("button", { name: "Salvar permissões" }));
+    await settle(4);
+    const put = state.calls.filter((c) => c.method === "access.set").at(-1)?.args[2] as {
+      all: boolean;
+      tools: { allow: { name: string }[]; deny: { name: string }[] };
+    };
+    expect(put.all).toBe(true);
+    expect(put.tools.deny.map((x) => x.name)).toEqual(["github_merge_pull_request"]);
+    expect(put.tools.allow.map((x) => x.name)).toEqual(["github_create_pull_request"]);
+    expect(screen().getByText("Permissões da Ada salvas.")).toBeTruthy();
   });
 
   test("members see the profile read-only (no edit buttons)", async () => {

@@ -209,6 +209,7 @@ export const ptBR = {
     agentsAnswer_one: "{{names}} responde aqui",
     agentsAnswer_other: "{{names}} respondem aqui",
     composerLabel: "Mensagem para #{{channel}}",
+    composerDm: "Mensagem para {{name}}",
     composerPlaceholder: "Mensagem para #{{channel}} · use @ para chamar um agente",
     send: "Enviar",
     attach: "Anexar arquivo",
@@ -929,6 +930,7 @@ export const ptBR = {
     repeat: { none: "Não repete", weekdays: "Todos os dias úteis", weekly: "Toda semana", monthly: "Todo mês" },
   },
   access: {
+    askGroup: "Perguntar à pessoa",
     allTools: "Todas as ferramentas (atuais e futuras)",
     allToolsNote: "Ações sensíveis continuam pedindo aprovação.",
     search: "Buscar ferramenta",
@@ -955,6 +957,7 @@ export const ptBR = {
       inherited: "liberada por herança",
       denied: "bloqueada",
       off: "sem acesso",
+      partial: "em parte",
     },
     unavailable: "O controle por ferramenta ainda não está disponível neste servidor.",
     legend: "Legenda",
@@ -1198,6 +1201,19 @@ export const ptBR = {
     available_one: "{{count}} ferramenta disponível",
     available_other: "{{count}} ferramentas disponíveis",
     custom: "servidor MCP",
+    cta: "Revisar e liberar ferramentas",
+    ctaText: "Os agentes só usam as ferramentas depois que você revisar.",
+    acceptSuggestion: "Aceitar sugestão",
+    suggestText:
+      "Sugestão: só leitura vira Leitura, o que apaga ou muda vira Sempre pede aprovação, o resto Escrita. Você ainda pode revisar cada uma.",
+    grantTitle: "Quais agentes podem usar o {{name}}?",
+    grantText:
+      "Cada agente marcado recebe todas as ferramentas deste conector, inclusive as que aparecerem depois. O que pede aprovação continua pedindo.",
+    grantNoAgents: "Nenhum agente ainda.",
+    grantLater: "Agora não",
+    grantSave: "Liberar para os escolhidos",
+    granted_one: "{{name}} liberado para {{count}} agente.",
+    granted_other: "{{name}} liberado para {{count}} agentes.",
   },
   searchPage: {
     title: "Buscar no workspace",

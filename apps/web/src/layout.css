@@ -1948,3 +1948,19 @@ p {
   flex-wrap: wrap;
   gap: 12px;
 }
+
+/* Custom MCP: pending review call to action and the suggestion bar */
+.mcp-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 100%;
+}
+.mcp-cta > .small {
+  flex: 1 1 220px;
+}
+.mcp-suggest {
+  align-items: center;
+  padding-top: 4px;
+}

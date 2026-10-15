@@ -4,6 +4,7 @@ import type { ApiClient } from "./client";
 import { useApi } from "./context";
 import { keys } from "./keys";
 import type {
+  AccessInput,
   AgentInput,
   Approval,
   ArtifactContent,
@@ -878,5 +879,41 @@ export function useCalendarAction(orgId: string) {
       return api.calendar.dismissProposal(orgId, action.id);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.calendar(orgId) }),
+  });
+}
+
+// ── Agent access (tool tree) ─────────────────────────────────────────────────
+
+/** The agent's tool tree. `retry: false`: a 404 means the backend doesn't have it yet. */
+export const useAgentAccess = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentAccess(orgId, agentId),
+    queryFn: () => api.access.get(orgId, agentId),
+    enabled,
+    retry: false,
+  });
+};
+
+export const useAccessMatrix = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.accessMatrix(orgId),
+    queryFn: () => api.access.matrix(orgId),
+    enabled,
+    retry: false,
+  });
+};
+
+export function useSetAgentAccess(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, input }: { agentId: string; input: AccessInput }) => api.access.set(orgId, agentId, input),
+    onSuccess: (saved, { agentId }) => {
+      qc.setQueryData(keys.agentAccess(orgId, agentId), saved);
+      void qc.invalidateQueries({ queryKey: keys.accessMatrix(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.scopes(orgId, agentId) });
+    },
   });
 }

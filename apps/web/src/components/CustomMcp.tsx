@@ -1,6 +1,7 @@
 import {
   Alert,
   Button,
+  Checkbox,
   Chip,
   Dialog,
   DialogBody,
@@ -11,11 +12,23 @@ import {
   Select,
   type SelectOption,
 } from "@agenteschat/ui";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useCustomServerAction } from "@/api/queries";
+import { useApi } from "@/api/context";
+import { keys } from "@/api/keys";
+import { useAgents, useCustomServerAction } from "@/api/queries";
 import type { CustomServer, ToolAccess } from "@/api/types";
-import { draftFrom, exposedTools, isHttpsUrl, searchDrafts, type ToolDraft, toolsToReview } from "@/lib/custom-tools";
+import { modelFrom, toInput, treeFromAccess } from "@/lib/access";
+import {
+  draftFrom,
+  exposedTools,
+  isHttpsUrl,
+  searchDrafts,
+  suggestion,
+  type ToolDraft,
+  toolsToReview,
+} from "@/lib/custom-tools";
 import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 import { useOrg } from "./org-context";
@@ -58,7 +71,8 @@ export function ConnectCustomDialog({
         serverUrl: url.trim(),
         label: label.trim() || undefined,
         apiKey: needsKey ? apiKey.trim() : undefined,
-        returnTo: `/org/${org.id}/settings`,
+        // Back from OAuth, the classification opens by itself.
+        returnTo: `/org/${org.id}/settings?review=1`,
       },
       {
         onSuccess: (result) => {
@@ -131,7 +145,16 @@ export function ConnectCustomDialog({
 }
 
 /** Classification: each tool gets Leitura, Escrita or "Sempre pede aprovação" and a pt-BR label. */
-export function ReviewToolsDialog({ server, onClose }: { server: CustomServer | null; onClose: () => void }) {
+export function ReviewToolsDialog({
+  server,
+  onClose,
+  onSaved,
+}: {
+  server: CustomServer | null;
+  onClose: () => void;
+  /** After saving: e.g. "Quais agentes podem usar …?". */
+  onSaved?: (server: CustomServer) => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -148,6 +171,8 @@ export function ReviewToolsDialog({ server, onClose }: { server: CustomServer | 
     setError(null);
   }, [server]);
   if (!server) return null;
+  // Hidden when the backend sends no suggestion (older server).
+  const suggested = suggestion(server);
 
   const options: SelectOption<ToolAccess>[] = (["read", "write", "approval"] as const).map((v) => ({
     value: v,
@@ -167,9 +192,10 @@ export function ReviewToolsDialog({ server, onClose }: { server: CustomServer | 
     save.mutate(
       { id: server.id, label, tools: drafts.map((d) => ({ name: d.name, access: d.access, label: d.label.trim() })) },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
           toast.show(t("customMcp.saved", { name: label }));
-          onClose();
+          if (onSaved) onSaved(saved);
+          else onClose();
         },
       },
     );
@@ -183,6 +209,19 @@ export function ReviewToolsDialog({ server, onClose }: { server: CustomServer | 
       description={t("customMcp.reviewText")}
       closeLabel={t("common.close")}
     >
+      {suggested && (
+        <div className="ac-dialog__tools mcp-suggest">
+          <span className="small muted" style={{ flex: "1 1 240px" }}>
+            {t("customMcp.suggestText")}
+          </span>
+          <Button
+            size="sm"
+            onClick={() => setDrafts((list) => list.map((d) => ({ ...d, access: suggested[d.name] ?? d.access })))}
+          >
+            {t("customMcp.acceptSuggestion")}
+          </Button>
+        </div>
+      )}
       <div className="ac-dialog__tools">
         <Field label={t("customMcp.serverName")} id={`mcp-name-${server.id}`} style={{ flex: "1 1 100%" }}>
           <Input value={name} onChange={(e) => setName(e.target.value)} />
@@ -256,6 +295,7 @@ export function CustomServerRow({
   const { refresh } = useCustomServerAction(org.id);
   const pending = toolsToReview(server);
   const exposed = exposedTools(server).length;
+  const needsReview = !server.reviewedAt || pending > 0;
   return (
     <div className="ac-list__row">
       <span className="list-col">
@@ -278,11 +318,21 @@ export function CustomServerRow({
           {t("customMcp.available", { count: exposed })}
         </Chip>
       )}
+      {admin && needsReview && (
+        <div className="mcp-cta">
+          <span className="small muted">{t("customMcp.ctaText")}</span>
+          <Button variant="primary" size="sm" onClick={onReview}>
+            {t("customMcp.cta")}
+          </Button>
+        </div>
+      )}
       {admin && (
         <div className="row" style={{ gap: 4 }}>
-          <Button variant="ghost" size="sm" onClick={onReview}>
-            {t("customMcp.review")}
-          </Button>
+          {!needsReview && (
+            <Button variant="ghost" size="sm" onClick={onReview}>
+              {t("customMcp.review")}
+            </Button>
+          )}
           <Button variant="ghost" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate(server.id)}>
             {t("customMcp.refresh")}
           </Button>
@@ -292,5 +342,87 @@ export function CustomServerRow({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Right after a classification: "Quais agentes podem usar o himetrica?".
+ * Each checked agent gets "todas deste conector" (also tools that appear later).
+ */
+export function GrantAgentsDialog({ server, onClose }: { server: CustomServer | null; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const agents = useAgents(org.id);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (server) setPicked(new Set());
+  }, [server]);
+  const grant = useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!server) return;
+      for (const agentId of ids) {
+        const access = await api.access.get(org.id, agentId);
+        const input = toInput(modelFrom(access), treeFromAccess(access));
+        // "Todas deste conector", even if the tree doesn't list the server yet.
+        input.connectors[server.id] = true;
+        await api.access.set(org.id, agentId, input);
+      }
+    },
+    onSuccess: (_v, ids) => {
+      void qc.invalidateQueries({ queryKey: keys.access(org.id) });
+      toast.show(t("customMcp.granted", { count: ids.length, name: server?.label ?? "" }));
+      onClose();
+    },
+  });
+  if (!server) return null;
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={t("customMcp.grantTitle", { name: server.label })}
+      description={t("customMcp.grantText")}
+      closeLabel={t("common.close")}
+      width={480}
+    >
+      <DialogBody>
+        {(agents.data ?? []).length === 0 && <p className="small muted">{t("customMcp.grantNoAgents")}</p>}
+        {(agents.data ?? []).map((a) => {
+          const id = `grant-${a.id}`;
+          return (
+            <label key={a.id} htmlFor={id} className="scope-row">
+              <Checkbox
+                id={id}
+                checked={picked.has(a.id)}
+                onCheckedChange={(on) =>
+                  setPicked((s) => {
+                    const next = new Set(s);
+                    if (on) next.add(a.id);
+                    else next.delete(a.id);
+                    return next;
+                  })
+                }
+              />
+              <span className="scope-row__text">
+                <span>{a.name}</span>
+                <span className="small muted">{t("access.allOfConnector")}</span>
+              </span>
+            </label>
+          );
+        })}
+      </DialogBody>
+      <DialogFooter>
+        <Button onClick={onClose}>{t("customMcp.grantLater")}</Button>
+        <Button
+          variant="primary"
+          disabled={picked.size === 0 || grant.isPending}
+          onClick={() => grant.mutate([...picked])}
+        >
+          {t("customMcp.grantSave")}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }

@@ -204,6 +204,7 @@ export const en: Translations = {
     agentsAnswer_one: "{{names}} answers here",
     agentsAnswer_other: "{{names}} answer here",
     composerLabel: "Message #{{channel}}",
+    composerDm: "Message {{name}}",
     composerPlaceholder: "Message #{{channel}} · use @ to call an agent",
     send: "Send",
     attach: "Attach file",
@@ -923,6 +924,7 @@ export const en: Translations = {
     repeat: { none: "Doesn't repeat", weekdays: "Every weekday", weekly: "Every week", monthly: "Every month" },
   },
   access: {
+    askGroup: "Ask a person",
     allTools: "All tools (current and future)",
     allToolsNote: "Sensitive actions still ask for approval.",
     search: "Search tools",
@@ -949,6 +951,7 @@ export const en: Translations = {
       inherited: "allowed by inheritance",
       denied: "blocked",
       off: "no access",
+      partial: "partly",
     },
     unavailable: "Per-tool control isn't available on this server yet.",
     legend: "Legend",
@@ -1190,6 +1193,19 @@ export const en: Translations = {
     available_one: "{{count}} tool available",
     available_other: "{{count}} tools available",
     custom: "MCP server",
+    cta: "Review and enable tools",
+    ctaText: "Agents only use the tools after you review them.",
+    acceptSuggestion: "Accept suggestion",
+    suggestText:
+      "Suggestion: read-only becomes Read, anything that deletes or changes becomes Always asks for approval, the rest Write. You can still review each one.",
+    grantTitle: "Which agents can use {{name}}?",
+    grantText:
+      "Each checked agent gets every tool of this connector, including ones that show up later. What asks for approval still does.",
+    grantNoAgents: "No agents yet.",
+    grantLater: "Not now",
+    grantSave: "Enable for the selected",
+    granted_one: "{{name}} enabled for {{count}} agent.",
+    granted_other: "{{name}} enabled for {{count}} agents.",
   },
   searchPage: {
     title: "Search the workspace",

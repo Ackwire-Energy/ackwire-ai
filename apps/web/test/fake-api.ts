@@ -20,6 +20,7 @@ import type {
   Run,
   ScopeGrant,
 } from "@/api/types";
+import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
 import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
@@ -482,7 +483,15 @@ let n = 0;
 const id = (prefix: string) => `${prefix}-${++n}`;
 
 /** Served by the in-memory fakes in `test/fakes` (same shapes as the server). */
-type FakedParts = "invites" | "storage" | "artifacts" | "issues" | "routines" | "calendar" | "customConnectors";
+type FakedParts =
+  | "access"
+  | "invites"
+  | "storage"
+  | "artifacts"
+  | "issues"
+  | "routines"
+  | "calendar"
+  | "customConnectors";
 
 /** The core of the fake backend, over `FakeState`. Records every call in `state.calls`. */
 export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
@@ -1110,6 +1119,11 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   };
   return {
     ...http,
+    access: createFakeAccess(
+      ctx,
+      (orgId) => http.connectors.list(orgId),
+      (method, ...args) => state.calls.push({ method, args }),
+    ),
     invites: {
       createLink: async (orgId) => {
         state.calls.push({ method: "invites.createLink", args: [orgId] });

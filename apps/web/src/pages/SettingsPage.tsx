@@ -13,7 +13,7 @@ import {
   Select,
   Textarea,
 } from "@agenteschat/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   useAddCredential,
@@ -33,9 +33,11 @@ import {
   useUsageReport,
 } from "@/api/queries";
 import type { Connection, ConnectorDef, Credential, CustomServer } from "@/api/types";
-import { ConnectCustomDialog, CustomServerRow, ReviewToolsDialog } from "@/components/CustomMcp";
+import { AccessMatrixSection } from "@/components/AccessMatrix";
+import { ConnectCustomDialog, CustomServerRow, GrantAgentsDialog, ReviewToolsDialog } from "@/components/CustomMcp";
 import { useOrg } from "@/components/org-context";
 import { StorageSection } from "@/components/StorageSettings";
+import { toolsToReview } from "@/lib/custom-tools";
 import { formatShortDate, formatUsd, relativeTime } from "@/lib/format";
 import { navigateAway } from "@/lib/navigate";
 import { can } from "@/lib/permissions";
@@ -52,7 +54,7 @@ export function searchCatalog(list: ConnectorDef[], query: string) {
 }
 
 /** Organization settings: context, connectors (two-layer, D7), provider keys and usage. */
-export function SettingsPage({ connected }: { connected?: string }) {
+export function SettingsPage({ connected, review }: { connected?: string; review?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -60,11 +62,12 @@ export function SettingsPage({ connected }: { connected?: string }) {
 
   // Back from the OAuth provider: `?connected=github`.
   useEffect(() => {
-    if (!connected || !catalog.data) return;
+    // A custom MCP server opens its classification instead (`?review=1`).
+    if (!connected || !catalog.data || review) return;
     const name = catalog.data.connectors.find((d) => d.id === connected)?.label ?? connected;
     toast.show(t("connectors.connectedToast", { name }));
     window.history.replaceState(null, "", window.location.pathname);
-  }, [connected, catalog.data, toast, t]);
+  }, [connected, catalog.data, review, toast, t]);
 
   return (
     <div className="page page--wide">
@@ -73,7 +76,8 @@ export function SettingsPage({ connected }: { connected?: string }) {
       </header>
       {!can(org.role, "configure") && <p className="page__note">{t("settings.readOnly")}</p>}
       <OrgSection />
-      <ConnectorsSection />
+      <ConnectorsSection review={review} />
+      <AccessMatrixSection />
       <KeysSection />
       <StorageSection />
       <UsageSection />
@@ -139,7 +143,7 @@ function OrgSection() {
   );
 }
 
-function ConnectorsSection() {
+function ConnectorsSection({ review }: { review?: boolean }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const catalog = useCatalog();
@@ -155,6 +159,18 @@ function ConnectorsSection() {
   const custom = customServers.data ?? [];
   const [addingCustom, setAddingCustom] = useState(false);
   const [reviewing, setReviewing] = useState<CustomServer | null>(null);
+  const [granting, setGranting] = useState<CustomServer | null>(null);
+  // Back from a custom server's OAuth: open the classification of the newest pending one.
+  const reviewHandled = useRef(false);
+  useEffect(() => {
+    if (!review || reviewHandled.current || !customServers.data) return;
+    reviewHandled.current = true;
+    const pending = [...customServers.data]
+      .filter((s) => !s.reviewedAt || toolsToReview(s) > 0)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (pending) setReviewing(pending);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [review, customServers.data]);
   const active = (connections.data ?? []).filter((c) => !c.revokedAt);
   const defOf = (c: Connection) => catalog.data?.connectors.find((d) => d.id === c.connector);
 
@@ -241,7 +257,15 @@ function ConnectorsSection() {
           setReviewing(server);
         }}
       />
-      <ReviewToolsDialog server={reviewing} onClose={() => setReviewing(null)} />
+      <ReviewToolsDialog
+        server={reviewing}
+        onClose={() => setReviewing(null)}
+        onSaved={(saved) => {
+          setReviewing(null);
+          setGranting(saved);
+        }}
+      />
+      <GrantAgentsDialog server={granting} onClose={() => setGranting(null)} />
       <AddConnectorDialog
         open={adding}
         onOpenChange={setAdding}

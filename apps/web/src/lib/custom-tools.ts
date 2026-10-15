@@ -10,6 +10,13 @@ import type { CustomServer, CustomTool, ToolAccess } from "@/api/types";
 export const defaultAccess = (tool: Pick<CustomTool, "readOnlyHint">): ToolAccess =>
   tool.readOnlyHint === true ? "read" : "approval";
 
+/** The backend's suggestion for every tool, when it sends one (else null: hide "Aceitar sugestão"). */
+export function suggestion(server: CustomServer): Record<string, ToolAccess> | null {
+  const out: Record<string, ToolAccess> = {};
+  for (const t of server.tools) if (t.suggestedAccess) out[t.name] = t.suggestedAccess;
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 /** `list_tickets` → `List tickets` (starting point for the pt-BR label). */
 export const humanize = (name: string) => {
   const words = name

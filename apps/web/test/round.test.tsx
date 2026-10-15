@@ -364,3 +364,16 @@ describe("flat DM replies", () => {
     expect(rows[rows.length - 1]?.textContent).toContain("Oi! Em que posso ajudar?");
   });
 });
+
+describe("DM composer", () => {
+  test("names the person or agent without '#'; channels keep '#nome'", async () => {
+    await go(`dm/agent/${ADA_ID}`);
+    await settle(4);
+    const box = screen().getByRole("combobox", { name: "Mensagem para Ada" });
+    expect(box.getAttribute("placeholder")).toBe("Mensagem para Ada");
+    cleanup();
+    await go(`c/${ENG_ID}`);
+    const channel = screen().getByRole("combobox", { name: "Mensagem para #eng" });
+    expect(channel.getAttribute("placeholder")).toContain("Mensagem para #eng");
+  });
+});

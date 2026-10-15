@@ -4,9 +4,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { CustomServer } from "@/api/types";
+import type { AccessInput, CustomServer } from "@/api/types";
 import { defaultAccess, draftFrom, exposedTools, humanize, toolsToReview } from "@/lib/custom-tools";
-import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -58,7 +58,8 @@ describe("classification model", () => {
 
 describe("Conectar outro servidor MCP", () => {
   test("URL → API key → classify → save; new tools later ask for review", async () => {
-    await renderApp(`/org/${ORG_ID}/settings`, { api: createFakeApi(seedState()) });
+    const state = seedState();
+    await renderApp(`/org/${ORG_ID}/settings`, { api: createFakeApi(state) });
     await settle(5);
     await click(screen().getByRole("button", { name: "Conectar outro servidor MCP" }));
     const connect = screen().getByRole("dialog", { name: "Conectar outro servidor MCP" });
@@ -99,6 +100,14 @@ describe("Conectar outro servidor MCP", () => {
     );
     await click(within(review).getByRole("button", { name: "Salvar classificação" }));
     await settle(4);
+    // Straight to "who can use it": each checked agent gets the whole connector.
+    const grant = screen().getByRole("dialog", { name: "Quais agentes podem usar o Suporte?" });
+    await click(within(grant).getByRole("checkbox", { name: /Ada/ }));
+    await click(within(grant).getByRole("button", { name: "Liberar para os escolhidos" }));
+    await settle(6);
+    const put = state.calls.find((c) => c.method === "access.set")?.args as [string, string, AccessInput];
+    expect(put[1]).toBe(ADA_ID);
+    expect(Object.values(put[2].connectors)).toContain(true);
     const section = screen().getByRole("region", { name: "Conectores" });
     expect(section.textContent).toContain("5 ferramentas disponíveis");
 
@@ -109,7 +118,9 @@ describe("Conectar outro servidor MCP", () => {
       "1 ferramenta nova para revisar",
     );
     await click(
-      within(screen().getByRole("region", { name: "Conectores" })).getByRole("button", { name: "Revisar ferramentas" }),
+      within(screen().getByRole("region", { name: "Conectores" })).getByRole("button", {
+        name: "Revisar e liberar ferramentas",
+      }),
     );
     const again = screen().getByRole("dialog", { name: "Ferramentas de Suporte" });
     const fresh = within(again).getByText("export_tickets").closest(".tool-row") as HTMLElement;
@@ -134,5 +145,48 @@ describe("Conectar outro servidor MCP", () => {
     await type(within(review).getByLabelText("Nome em português de get_ticket"), " ");
     await click(within(review).getByRole("button", { name: "Salvar classificação" }));
     expect(review.textContent).toContain("Dê um nome em português para cada ferramenta.");
+  });
+
+  test("back from OAuth: the classification opens; the pending card calls to action; Aceitar sugestão", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const res = await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://oauth.himetrica.com",
+      label: "himetrica",
+      returnTo: "/",
+    });
+    if (res.status !== "connected") throw new Error("expected connected");
+    // The backend suggests per tool (read-only → Leitura, destructive → approval, else Escrita).
+    for (const t of res.server.tools) t.suggestedAccess = t.readOnlyHint ? "read" : "write";
+    const list = api.customConnectors.list.bind(api.customConnectors);
+    api.customConnectors.list = async (orgId) =>
+      (await list(orgId)).map((s) =>
+        s.id === res.server.id
+          ? { ...s, tools: s.tools.map((t, i) => ({ ...t, suggestedAccess: res.server.tools[i]?.suggestedAccess })) }
+          : s,
+      );
+    await renderApp(`/org/${ORG_ID}/settings?connected=custom&review=1`, { api });
+    await settle(8);
+    const review = screen().getByRole("dialog", { name: "Ferramentas de himetrica" });
+    await click(within(review).getByRole("button", { name: "Aceitar sugestão" }));
+    expect(within(review).getByRole("combobox", { name: "Uso de get_ticket" }).textContent).toContain("Leitura");
+    await click(within(review).getByRole("button", { name: "Cancelar" }));
+    await settle(2);
+    const section = screen().getByRole("region", { name: "Conectores" });
+    expect(section.textContent).toContain("Os agentes só usam as ferramentas depois que você revisar.");
+    const cta = within(section).getByRole("button", { name: "Revisar e liberar ferramentas" });
+    expect(cta.className).toContain("ac-btn--primary");
+  });
+
+  test("Aceitar sugestão is hidden when the backend sends no suggestion", async () => {
+    await renderApp(`/org/${ORG_ID}/settings`, { api: createFakeApi(seedState()) });
+    await settle(5);
+    await click(screen().getByRole("button", { name: "Conectar outro servidor MCP" }));
+    const connect = screen().getByRole("dialog", { name: "Conectar outro servidor MCP" });
+    await type(within(connect).getByLabelText("Endereço do servidor MCP"), "https://oauth.mcp.example.com");
+    await click(within(connect).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    const review = screen().getByRole("dialog", { name: "Ferramentas de oauth.mcp.example.com" });
+    expect(within(review).queryByRole("button", { name: "Aceitar sugestão" })).toBeNull();
   });
 });

@@ -1,7 +1,9 @@
 import type { HttpApi } from "./client";
 import { ApiError, createRequester, enc, type FetchLike } from "./http";
 import type {
+  AccessMatrix,
   Agent,
+  AgentAccess,
   AgentChannel,
   AgentDetail,
   AgentQuestion,
@@ -243,6 +245,12 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       list: async (orgId) => (await request<{ dms: DirectMessage[] }>(`${org(orgId)}/dms`)).dms,
       open: (orgId, target) => request<{ channelId: string }>(`${org(orgId)}/dms`, { json: target }),
       markRead: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/read`, { json: {} }),
+    },
+    access: {
+      get: (orgId, agentId) => request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`),
+      set: (orgId, agentId, input) =>
+        request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`, { method: "PUT", json: input }),
+      matrix: (orgId) => request<AccessMatrix>(`${org(orgId)}/access-matrix`),
     },
     invites: {
       createLink: (orgId) => request<{ url: string; expiresAt: string }>(`${org(orgId)}/invite-links`, { json: {} }),

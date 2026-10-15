@@ -21,6 +21,7 @@ import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
+  useAgentAccess,
   useAgentDetail,
   useAgentScopes,
   useChannels,
@@ -30,19 +31,23 @@ import {
   usePlatformKey,
   useProposals,
   useRuns,
+  useSetAgentAccess,
   useSetAgentScopes,
   useSettings,
   useUpdateAgent,
 } from "@/api/queries";
-import type { Agent } from "@/api/types";
+import type { Agent, AgentAccess } from "@/api/types";
+import { AccessTree } from "@/components/AccessTree";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useScopeGroups } from "@/hooks/useScopeGroups";
+import { type AccessModel, modelFrom, toInput, treeFromAccess } from "@/lib/access";
 import { formatInt, formatMonth, formatTokensShort, formatUsd, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
 import { scopeSummary, searchGroups, toggleGrant } from "@/lib/scopes";
 import { parseAmount } from "@/lib/text";
+import { useToast } from "@/lib/toast";
 import { DEFAULT_KEY, keyOptions, modelOptions, NO_OWNER } from "./NewAgentPage";
 
 /** Validates the budget dialog: a positive number ("40", "40,5"). */
@@ -522,7 +527,91 @@ function BudgetDialog({
   );
 }
 
+/**
+ * "Editar permissões": the tool tree (`…/agents/{id}/access`). Until the
+ * backend has it (404), the older per-scope list.
+ */
 function PermissionsDialog({
+  open,
+  onOpenChange,
+  agent,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  agent: Agent;
+}) {
+  const { org } = useOrg();
+  const access = useAgentAccess(org.id, agent.id, open);
+  if (access.isError && (access.error as { status?: number }).status === 404) {
+    return <ScopePermissionsDialog open={open} onOpenChange={onOpenChange} agent={agent} />;
+  }
+  return <AccessDialog open={open} onOpenChange={onOpenChange} agent={agent} access={access.data} />;
+}
+
+function AccessDialog({
+  open,
+  onOpenChange,
+  agent,
+  access,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  agent: Agent;
+  access: AgentAccess | undefined;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const save = useSetAgentAccess(org.id);
+  const g = agentGrammar(t, agent.name);
+  const [model, setModel] = useState<AccessModel | null>(null);
+  const tree = useMemo(() => (access ? treeFromAccess(access) : null), [access]);
+  // Start from the server's state each time the dialog opens.
+  useEffect(() => {
+    if (open && access) setModel(modelFrom(access));
+    if (!open) setModel(null);
+  }, [open, access]);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t("agent.permissionsDialog", g)}
+      closeLabel={t("common.close")}
+      width={640}
+    >
+      <DialogBody>
+        {tree && model ? (
+          <AccessTree tree={tree} model={model} onChange={setModel} />
+        ) : (
+          <p className="small muted">{t("common.loading")}</p>
+        )}
+      </DialogBody>
+      <DialogFooter bar note={t("agent.permFooter")}>
+        <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
+        <Button
+          variant="primary"
+          disabled={!model || !tree || save.isPending}
+          onClick={() => {
+            if (!model || !tree) return;
+            save.mutate(
+              { agentId: agent.id, input: toInput(model, tree) },
+              {
+                onSuccess: () => {
+                  toast.show(t("access.saved", g));
+                  onOpenChange(false);
+                },
+              },
+            );
+          }}
+        >
+          {t("access.save")}
+        </Button>
+      </DialogFooter>
+    </Dialog>
+  );
+}
+
+function ScopePermissionsDialog({
   open,
   onOpenChange,
   agent,

@@ -294,7 +294,6 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
     .filter(Boolean)
     .join(" · ");
   const stack = [...channelPeople.slice(0, 2), ...channelAgents.slice(0, 2)];
-  const target = chrome?.composerTarget ?? `#${channel.name}`;
 
   return (
     <ChannelActionsContext.Provider value={actions}>
@@ -421,10 +420,15 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
                   if (v.trim()) sendTyping();
                 }}
                 onSend={onSend}
-                label={t("channel.composerLabel", { channel: target.replace(/^#/, "") })}
-                placeholder={
+                label={
                   chrome?.composerTarget
-                    ? t("channel.composerLabel", { channel: target })
+                    ? t("channel.composerDm", { name: chrome.composerTarget })
+                    : t("channel.composerLabel", { channel: channel.name })
+                }
+                placeholder={
+                  // DMs name the person or agent ("Mensagem para Theo"); channels keep "#nome".
+                  chrome?.composerTarget
+                    ? t("channel.composerDm", { name: chrome.composerTarget })
                     : t("channel.composerPlaceholder", { channel: channel.name })
                 }
                 sendLabel={t("channel.send")}

@@ -1,5 +1,8 @@
 import type {
+  AccessInput,
+  AccessMatrix,
   Agent,
+  AgentAccess,
   AgentChannel,
   AgentDetail,
   AgentInput,
@@ -203,6 +206,13 @@ export interface ApiClient {
   };
   search: {
     query(orgId: string, input: { q: string; kinds?: SearchKind[]; limit?: number }): Promise<SearchHit[]>;
+  };
+  access: {
+    /** The agent's tool tree with each node's state. 404 while the backend doesn't have it. */
+    get(orgId: string, agentId: string): Promise<AgentAccess>;
+    set(orgId: string, agentId: string, input: AccessInput): Promise<AgentAccess>;
+    /** Agents × tools (admins). */
+    matrix(orgId: string): Promise<AccessMatrix>;
   };
   scopes: {
     get(orgId: string, agentId: string): Promise<ScopeGrant[]>;

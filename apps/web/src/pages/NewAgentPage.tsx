@@ -17,6 +17,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import {
+  useAccessMatrix,
+  useCatalog,
   useChannels,
   useConnections,
   useCreateAgent,
@@ -28,7 +30,9 @@ import {
   useSettings,
 } from "@/api/queries";
 import type { Agent, Credential, Model } from "@/api/types";
+import { AccessTree } from "@/components/AccessTree";
 import { useOrg } from "@/components/org-context";
+import { type AccessModel, type Preset, presetModel, toInput, treeFromMatrix } from "@/lib/access";
 import { joinNames } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { modelChoices, providerLabel } from "@/lib/providers";
@@ -136,6 +140,22 @@ export function NewAgentPage() {
   const [key, setKey] = useState<string | undefined>(undefined);
   const [budget, setBudget] = useState("25");
   const [on, setOn] = useState<Record<string, boolean>>({});
+  // "Ferramentas": a preset, then the same tree as "Editar permissões" (only when the backend has it).
+  const accessMatrix = useAccessMatrix(org.id, can(org.role, "configure"));
+  const catalog = useCatalog();
+  const toolTree = useMemo(() => {
+    if (!accessMatrix.data) return null;
+    const scopes = catalog.data?.builtinScopes ?? [];
+    return treeFromMatrix(
+      accessMatrix.data,
+      (scope) => scopes.find((x) => x.id === scope)?.label ?? (scope === "" ? t("access.askGroup") : scope),
+    );
+  }, [accessMatrix.data, catalog.data, t]);
+  const [preset, setPreset] = useState<Preset>("standard");
+  const [access, setAccess] = useState<AccessModel | null>(null);
+  useEffect(() => {
+    if (toolTree && !access) setAccess(presetModel(toolTree, "standard"));
+  }, [toolTree, access]);
   const [created, setCreated] = useState<{ agent: Agent; channels: { id: string; name: string }[] } | null>(null);
 
   const myChannels = useMemo(
@@ -216,6 +236,7 @@ export function NewAgentPage() {
       const current = await api.scopes.get(org.id, agent.id);
       await api.scopes.set(org.id, agent.id, [...current, ...extra]);
     }
+    if (toolTree && access) await api.access.set(org.id, agent.id, toInput(access, toolTree));
     setCreated({ agent, channels: joined.map((c) => ({ id: c.id, name: c.name })) });
   };
 
@@ -376,6 +397,32 @@ export function NewAgentPage() {
         </div>
         <span className="small muted">{t("newAgent.whereNote")}</span>
       </section>
+
+      {toolTree && access && (
+        <section aria-labelledby="q-tools" className="section">
+          <h2 id="q-tools" className="section-title">
+            {t("access.toolsStep")}
+          </h2>
+          <span className="small muted">{t("access.toolsStepText")}</span>
+          <div className="grid-options grid-options--sm">
+            {(["readonly", "standard", "all"] as const).map((p) => (
+              <OptionCard
+                key={p}
+                stacked
+                pressed={preset === p}
+                onClick={() => {
+                  setPreset(p);
+                  setAccess(presetModel(toolTree, p));
+                }}
+              >
+                <span className="ac-option__title">{t(`access.preset.${p}`)}</span>
+                <span className="ac-option__desc">{t(`access.preset.${p}Text`)}</span>
+              </OptionCard>
+            ))}
+          </div>
+          <AccessTree tree={toolTree} model={access} onChange={setAccess} />
+        </section>
+      )}
 
       <div className="row" style={{ justifyContent: "flex-end", paddingTop: 8, borderTop: "1px solid var(--line)" }}>
         <Button asChild>
