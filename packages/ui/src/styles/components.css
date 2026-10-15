@@ -3828,7 +3828,7 @@ a.ac-list__row:focus-visible {
 }
 .ac-sky-burst {
   position: fixed;
-  z-index: 1000;
+  z-index: var(--z-toast);
   image-rendering: pixelated;
   pointer-events: none;
 }

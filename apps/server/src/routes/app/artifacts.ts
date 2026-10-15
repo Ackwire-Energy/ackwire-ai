@@ -103,9 +103,7 @@ const VersionQuery = z.object({ version: z.coerce.number().int().min(1).optional
  */
 export function artifactRoutes(deps: AppDeps) {
   const { db } = deps;
-  const app = createAppRouter(deps, {
-    multipart: (path) => /\/organizations\/[^/]+\/artifacts(\/[^/]+)?\/files$/.test(path),
-  });
+  const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
   // Uploads: refuse what is too large before reading the body.
   const sizeGuard = createMiddleware(async (c, next) => {
