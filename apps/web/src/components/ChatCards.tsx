@@ -12,8 +12,8 @@ import { agentGrammar } from "@/lib/grammar";
 import { useToast } from "@/lib/toast";
 import { useLive, useLiveStore } from "@/realtime/context";
 import { useChannelActions } from "./channel-actions";
-import { CardSky, colorOf } from "./Sky";
 import { useOrg } from "./org-context";
+import { CardSky, colorOf } from "./Sky";
 
 /**
  * "Memória atualizada" in the chat (`memory.updated`): what the agent

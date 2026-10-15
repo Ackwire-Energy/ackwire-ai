@@ -2,6 +2,9 @@ import { type CSSProperties, useId } from "react";
 import { cx } from "../cx";
 import { ditherUrl } from "../sky/dither";
 
+/** The domain in the expanded logo: a brand name, never translated. */
+const TLD = ".chat";
+
 const BODY = "M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H3.5A1.5 1.5 0 0 1 2 28.5V10a8 8 0 0 1 8-8z";
 
 /**
@@ -68,7 +71,7 @@ export function Logo({ variant = "main", mono, size = 24, className, style }: Lo
       {expanded ? (
         <span className="ac-logo__word" aria-hidden="true">
           <span>agentes</span>
-          <span className="ac-logo__chat">.chat</span>
+          <span className="ac-logo__chat">{TLD}</span>
         </span>
       ) : (
         <span aria-hidden="true">agentes</span>

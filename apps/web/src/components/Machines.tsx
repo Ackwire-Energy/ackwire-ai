@@ -313,7 +313,12 @@ export function PairDialog({ open, onClose }: { open: boolean; onClose: () => vo
           }}
         >
           <DialogBody>
-            <Field label={t("machines.name")} id="machine-name" help={t("machines.nameHelp")} error={error ?? undefined}>
+            <Field
+              label={t("machines.name")}
+              id="machine-name"
+              help={t("machines.nameHelp")}
+              error={error ?? undefined}
+            >
               <Input
                 value={name}
                 maxLength={80}
