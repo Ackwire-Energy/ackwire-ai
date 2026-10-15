@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChannelMember } from "@/api/types";
 import { useOrg } from "@/components/org-context";
+import { canTalk } from "@/lib/audience";
 import { useDirectory } from "./useDirectory";
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -26,7 +27,8 @@ export function useMentionSearch(members?: ChannelMember[]) {
       const inChannel = (type: "person" | "agent", id: string) =>
         !members || members.some((m) => m.type === type && m.id === id);
       const rows: Row[] = [
-        ...dir.agents.map((a) => {
+        // Agents that don't answer me aren't offered (the server would skip them anyway).
+        ...dir.agents.filter(canTalk).map((a) => {
           const here = inChannel("agent", a.id);
           return {
             key: `agent:${a.id}`,

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useChannels, useSearch } from "@/api/queries";
 import type { SearchHit, SearchKind } from "@/api/types";
+import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { relativeTime } from "@/lib/format";
 
@@ -62,6 +63,10 @@ export function SearchPage() {
       >
         <TabPanel value={filter}>
           {!q.trim() && <EmptyState icon="search">{t("searchPage.hint")}</EmptyState>}
+          {q.trim() && search.isLoading && <LoadingList count={4} avatar={false} />}
+          {q.trim() && search.isError && !search.data && (
+            <ErrorState error={search.error} onRetry={() => void search.refetch()} />
+          )}
           {q.trim() && search.isSuccess && hits.length === 0 && (
             <EmptyState icon="search">{t("searchPage.empty", { q })}</EmptyState>
           )}

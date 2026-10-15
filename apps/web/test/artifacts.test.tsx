@@ -146,6 +146,11 @@ describe("artifact viewer", () => {
     await click(within(dialog).getByRole("button", { name: "Baixar PDF" }));
     expect(saved[1]?.name).toBe("relatorio-de-incidente-checkout.pdf");
     expect(saved[1]?.url).toBe(`/api/app/organizations/${ORG_ID}/artifacts/${a.document.id}/file?version=2&format=pdf`);
+    await click(within(dialog).getByRole("button", { name: "Baixar DOCX" }));
+    expect(saved[2]?.name).toBe("relatorio-de-incidente-checkout.docx");
+    expect(saved[2]?.url).toBe(
+      `/api/app/organizations/${ORG_ID}/artifacts/${a.document.id}/file?version=2&format=docx`,
+    );
     await click(within(dialog).getByRole("button", { name: "Copiar link" }));
     await settle(2);
     expect(copied[0]).toBe(`http://localhost:3000/org/${ORG_ID}/drive?artifact=${a.document.id}`);

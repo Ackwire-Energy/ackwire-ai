@@ -98,7 +98,13 @@ export function InvitePage({ token }: { token: string }) {
               user.email.toLowerCase() === invitation.email.toLowerCase() ? (
                 <>
                   <p className="page-sub">{t("invite.signedInAs", { email: user.email })}</p>
-                  <Button variant="primary" block disabled={accept.isPending} onClick={() => accept.mutate()}>
+                  <Button
+                    variant="primary"
+                    block
+                    disabled={accept.isPending}
+                    loading={accept.isPending}
+                    onClick={() => accept.mutate()}
+                  >
                     {t("invite.accept", { org: orgName })}
                   </Button>
                 </>
@@ -141,6 +147,7 @@ export function InvitePage({ token }: { token: string }) {
                   variant="primary"
                   block
                   disabled={!name.trim() || !passwordOk || accept.isPending}
+                  loading={accept.isPending}
                 >
                   {t("invite.accept", { org: orgName })}
                 </Button>

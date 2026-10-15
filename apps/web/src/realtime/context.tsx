@@ -4,7 +4,15 @@ import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, 
 import { useTranslation } from "react-i18next";
 import { keys } from "@/api/keys";
 import { cacheApproval, cacheMessage } from "@/api/queries";
-import type { Agent, AgentQuestion, BudgetEvent, ChannelEvent, MemoryUpdate, Message } from "@/api/types";
+import type {
+  Agent,
+  AgentComputer,
+  AgentQuestion,
+  BudgetEvent,
+  ChannelEvent,
+  MemoryUpdate,
+  Message,
+} from "@/api/types";
 import { formatUsd } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { type ConnectionStatus, RealtimeConnection, realtimeUrl, type SocketFactory } from "./connection";
@@ -30,7 +38,32 @@ export interface LiveState {
   questions: Record<string, AgentQuestion>;
   /** `memory.updated` cards per channel (live; they aren't in the message list). */
   memory: Record<string, LiveMemoryCard[]>;
+  /** "O Theo só responde a Walter." per channel: only for me, never stored. */
+  notices: Record<string, LiveNotice[]>;
 }
+
+export interface LiveNotice {
+  key: string;
+  agentId: string;
+  threadId: string | null;
+  messageId: string;
+  text: string;
+}
+
+/** `agent.unavailable` (user scope): my message mentioned an agent that doesn't answer me. */
+export interface AgentUnavailableEvent {
+  type: "agent.unavailable";
+  agentId: string;
+  channelId: string;
+  threadId: string | null;
+  messageId: string;
+  text: string;
+}
+
+export const isAgentUnavailable = (e: { type: string }): e is AgentUnavailableEvent =>
+  e.type === "agent.unavailable" &&
+  typeof (e as AgentUnavailableEvent).agentId === "string" &&
+  typeof (e as AgentUnavailableEvent).channelId === "string";
 
 export interface LiveMemoryCard {
   key: string;
@@ -54,7 +87,7 @@ export function createStreamsStore(
   now: () => number = () => Date.now(),
   provisionalTtlMs = PROVISIONAL_TTL_MS,
 ) {
-  let state: LiveState = { streams: initial, receipts: {}, typing: {}, memory: {}, questions: {} };
+  let state: LiveState = { streams: initial, receipts: {}, typing: {}, memory: {}, questions: {}, notices: {} };
   const listeners = new Set<() => void>();
   const set = (next: LiveState) => {
     if (
@@ -62,7 +95,8 @@ export function createStreamsStore(
       next.receipts === state.receipts &&
       next.typing === state.typing &&
       next.memory === state.memory &&
-      next.questions === state.questions
+      next.questions === state.questions &&
+      next.notices === state.notices
     )
       return;
     state = next;
@@ -102,6 +136,7 @@ export function createStreamsStore(
           ? { ...state.questions, [event.question.id]: event.question }
           : state.questions;
       set({
+        ...state,
         questions,
         memory,
         streams: applyChannelEvent(state.streams, event),
@@ -159,6 +194,17 @@ export function createStreamsStore(
       );
       set({ ...state, streams: dropProvisional(state.streams, threads), receipts });
       return [...new Set(stale.map((r) => r.channelId))];
+    },
+    /** The agent won't answer me: show the notice and drop its "pensando…" on that message. */
+    unavailable: (e: AgentUnavailableEvent) => {
+      const key = `${e.messageId}:${e.agentId}`;
+      const list = (state.notices[e.channelId] ?? []).filter((n) => n.key !== key);
+      const notice = { key, agentId: e.agentId, threadId: e.threadId, messageId: e.messageId, text: e.text };
+      set({
+        ...state,
+        streams: dismissRun(state.streams, `pending:${e.agentId}:${e.messageId}`),
+        notices: { ...state.notices, [e.channelId]: [...list, notice] },
+      });
     },
     /** Our own answer, before (or instead of) the server's event. */
     answered: (question: AgentQuestion) =>
@@ -229,6 +275,14 @@ export function RealtimeProvider({
         cacheApproval(qc, orgId, event.approval);
         void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+      }
+      if (isAgentUnavailable(event)) streams.unavailable(event);
+      // The agent's PC changed (started, stopped, deleted): no more polling needed.
+      if (event.type === "agent.computer" && "agentId" in event && typeof event.agentId === "string") {
+        const computer = (event as { computer?: AgentComputer }).computer;
+        if (computer && typeof computer.status === "string") {
+          qc.setQueryData(keys.computer(orgId, event.agentId), computer);
+        } else void qc.invalidateQueries({ queryKey: keys.computer(orgId, event.agentId) });
       }
       if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
         const budgetEvent = event as BudgetEvent;

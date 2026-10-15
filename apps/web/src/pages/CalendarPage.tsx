@@ -10,7 +10,9 @@ import {
   Field,
   Input,
   Select,
+  Skeleton,
   TimeSelect,
+  useDelayed,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -19,6 +21,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { useCalendar, useCalendarAction, useChannels } from "@/api/queries";
 import type { Actor, CalendarRange, Recurrence, RoutineTarget } from "@/api/types";
 import { useActors } from "@/components/actors";
+import { ErrorState } from "@/components/Loading";
 import { PeoplePicker, type PickKey } from "@/components/MemberPicker";
 import { useOrg } from "@/components/org-context";
 import { formatTime, joinNames, toYmd } from "@/lib/format";
@@ -81,6 +84,8 @@ export function CalendarPage({ today = new Date() }: { today?: Date }) {
   const to = addDays(monday, 7).toISOString();
   const range = useCalendar(org.id, from, to);
   const items = useMemo(() => toItems(range.data), [range.data]);
+  // Loading the week: a few placeholder blocks in the grid (after 150 ms, never a flash).
+  const placeholders = useDelayed(range.isLoading);
   const days = Array.from({ length: DAYS }, (_, i) => addDays(monday, i));
   const sameDay = (iso: string, d: Date) => toYmd(new Date(iso)) === toYmd(d);
   const visible = (it: Item) =>
@@ -168,6 +173,13 @@ export function CalendarPage({ today = new Date() }: { today?: Date }) {
           </div>
           {days.map((d) => (
             <div key={toYmd(d)} className="calendar-grid__col" data-day={toYmd(d)}>
+              {placeholders && d.getDay() % 2 === 1 && (
+                <Skeleton
+                  shape="block"
+                  className="calendar-item calendar-item--skeleton"
+                  style={{ top: (d.getDay() + 1) * HOUR_PX + 2, height: HOUR_PX - 4 }}
+                />
+              )}
               {items
                 .filter((it) => it.kind !== "deadline" && visible(it) && sameDay(it.start, d))
                 .map((it) => {
@@ -194,6 +206,12 @@ export function CalendarPage({ today = new Date() }: { today?: Date }) {
           ))}
         </div>
         <aside className="calendar-aside" aria-label={t("calendar.details")}>
+          {range.isLoading && (
+            <p className="ac-visually-hidden" role="status">
+              {t("common.loadingList")}
+            </p>
+          )}
+          {range.isError && !range.data && <ErrorState error={range.error} onRetry={() => void range.refetch()} />}
           {proposal && <Proposal proposal={proposal} />}
           {current ? <Selected item={current} /> : <p className="small muted">{t("calendar.noSelection")}</p>}
           <p className="small muted">{t("calendar.note")}</p>
@@ -258,6 +276,7 @@ function Proposal({ proposal }: { proposal: CalendarRange["proposals"][number] }
             size="sm"
             variant="primary"
             disabled={action.isPending}
+            loading={action.isPending && action.variables?.type === "confirm"}
             onClick={() =>
               action.mutate(
                 { type: "confirm", id: proposal.id },
@@ -270,6 +289,7 @@ function Proposal({ proposal }: { proposal: CalendarRange["proposals"][number] }
           <Button
             size="sm"
             disabled={action.isPending}
+            loading={action.isPending && action.variables?.type === "dismiss"}
             onClick={() => action.mutate({ type: "dismiss", id: proposal.id })}
           >
             {t("calendar.otherTime")}
@@ -449,7 +469,12 @@ function NewEventDialog({ open, onClose, monday }: { open: boolean; onClose: () 
           <Button type="button" onClick={onClose}>
             {t("calendar.form.cancel")}
           </Button>
-          <Button type="submit" variant="primary" disabled={!title.trim() || !timeOk || action.isPending}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!title.trim() || !timeOk || action.isPending}
+            loading={action.isPending}
+          >
             {t("calendar.form.create")}
           </Button>
         </DialogFooter>

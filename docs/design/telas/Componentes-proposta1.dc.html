@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Componentes do agentes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&amp;family=Martian+Mono:wght@400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5c5c58}a:hover{color:#171716}
+.ag{--surface:#f6f6f4;--raised:#ffffff;--sunken:#ebebe8;--line:#e2e2de;--line-strong:#82827d;--ink:#171716;--muted:#5c5c58;--faint:#8a8a85;--agent:#0063d1;--agent-soft:#e1edfc;--danger:#b42a20;--ok:#1f7a45;--warn:#9a5b00;
+--e1:0 1px 2px rgba(23,23,22,.06),0 0 0 1px rgba(23,23,22,.04);--e2:0 2px 6px rgba(23,23,22,.06),0 8px 24px -8px rgba(23,23,22,.12),0 0 0 1px rgba(23,23,22,.05);--e3:0 12px 40px -12px rgba(23,23,22,.28),0 0 0 1px rgba(23,23,22,.06);
+--hl:inset 0 1px 0 rgba(255,255,255,.14);--ring:0 0 0 2px var(--raised),0 0 0 4px var(--ink);
+font-family:Onest,"Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--surface);transition:background .25s ease,color .25s ease}
+.ag.dark{--surface:#131312;--raised:#1b1b1a;--sunken:#0e0e0d;--line:#2c2c2a;--line-strong:#6b6b67;--ink:#ecece9;--muted:#a2a29d;--faint:#7a7a75;--agent:#5aa8ff;--agent-soft:#122640;--danger:#f08a80;--ok:#5fc48a;--warn:#e0a84a;
+--e1:0 1px 2px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.05);--e2:0 2px 6px rgba(0,0,0,.35),0 10px 28px -10px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06);--e3:0 16px 48px -12px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.08);--hl:inset 0 1px 0 rgba(255,255,255,.08)}
+.sec{background:var(--raised);border-radius:14px;box-shadow:var(--e1);padding:28px;display:flex;flex-direction:column;gap:18px}
+.sec h2{margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em}
+.sec p.lead{margin:-10px 0 0;color:var(--muted);font-size:14px;line-height:1.5}
+.lbl{font-size:12px;color:var(--faint);font-weight:500;letter-spacing:.02em}
+.btn{font:inherit;font-size:14px;font-weight:550;height:38px;padding:0 16px;border-radius:10px;border:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .12s ease,box-shadow .12s ease,background .12s ease,color .12s ease;position:relative;white-space:nowrap}
+.btn:active{transform:scale(.98)}
+.btn:focus-visible{outline:none;box-shadow:var(--ring)}
+.btn-primary{background:var(--ink);color:var(--surface);box-shadow:var(--hl),0 1px 2px rgba(0,0,0,.2),0 4px 12px -4px rgba(0,0,0,.35)}
+.btn-primary:hover{box-shadow:var(--hl),0 1px 2px rgba(0,0,0,.2),0 8px 20px -6px rgba(0,0,0,.45)}
+.btn-primary:active{box-shadow:var(--hl),0 0 0 rgba(0,0,0,0)}
+.btn-secondary{background:var(--raised);color:var(--ink);box-shadow:var(--e1)}
+.btn-secondary:hover{box-shadow:var(--e2)}
+.btn-ghost{background:transparent;color:var(--ink)}
+.btn-ghost:hover{background:var(--sunken)}
+.btn-danger{background:transparent;color:var(--danger);box-shadow:inset 0 0 0 1px var(--line)}
+.btn-danger:hover{background:color-mix(in srgb,var(--danger) 8%,transparent)}
+.btn-icon{width:38px;padding:0;border-radius:999px;background:transparent;color:var(--muted)}
+.btn-icon:hover{background:var(--sunken);color:var(--ink)}
+.btn[disabled]{opacity:.45;cursor:not-allowed;transform:none}
+.spin{width:15px;height:15px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.field{display:flex;flex-direction:column;gap:6px;flex:1;min-width:220px}
+.field label{font-size:13px;font-weight:550}
+.input{font:inherit;font-size:14px;height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);transition:border-color .12s,box-shadow .12s,background .12s;outline:none}
+.input:hover{border-color:var(--line-strong)}
+.input:focus{background:var(--raised);border-color:var(--ink);box-shadow:0 0 0 4px color-mix(in srgb,var(--ink) 10%,transparent)}
+.select{display:flex;align-items:center;justify-content:space-between;cursor:pointer;text-align:left}
+.composer{display:flex;align-items:flex-end;gap:8px;padding:8px 8px 8px 14px;border-radius:14px;background:var(--raised);box-shadow:var(--e2);transition:box-shadow .15s}
+.composer:focus-within{box-shadow:var(--e3)}
+.composer input{flex:1;border:0;outline:none;background:transparent;font:inherit;font-size:15px;color:var(--ink);height:38px}
+.send{width:36px;height:36px;border-radius:10px;border:0;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .18s,color .18s,transform .18s}
+.send.off{background:var(--sunken);color:var(--faint)}
+.send.on{background:var(--ink);color:var(--surface);transform:scale(1.04)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;font-size:12.5px;font-weight:550;background:var(--sunken);color:var(--muted)}
+.chip svg{flex:none}
+.chip.ok{color:var(--ok)}.chip.warn{color:var(--warn)}.chip.err{color:var(--danger)}.chip.agent{background:var(--agent-soft);color:var(--agent)}
+.check{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line-strong);display:inline-flex;align-items:center;justify-content:center;background:var(--raised);transition:background .15s,border-color .15s;cursor:pointer;padding:0}
+.check.on{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.check path{stroke-dasharray:14;stroke-dashoffset:14;transition:stroke-dashoffset .2s ease .03s}
+.check.on path{stroke-dashoffset:0}
+.sw{width:38px;height:22px;border-radius:999px;background:var(--line);border:0;padding:0;position:relative;cursor:pointer;transition:background .2s}
+.sw.on{background:var(--ink)}
+.sw span{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--raised);box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .22s cubic-bezier(.3,.7,.4,1.2)}
+.sw.on span{transform:translateX(16px)}
+.tabs{position:relative;display:inline-flex;padding:4px;border-radius:12px;background:var(--sunken)}
+.tab{position:relative;z-index:1;font:inherit;font-size:13.5px;font-weight:550;height:32px;width:110px;border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:9px;transition:color .15s}
+.tab.on{color:var(--ink)}
+.tabpill{position:absolute;top:4px;left:4px;width:110px;height:32px;border-radius:9px;background:var(--raised);box-shadow:var(--e1);transition:transform .25s cubic-bezier(.3,.7,.3,1)}
+.side{width:248px;background:var(--sunken);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px;position:relative}
+.sitem{position:relative;z-index:1;display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:9px;border:0;background:transparent;font:inherit;font-size:14px;color:var(--muted);cursor:pointer;text-align:left;transition:color .15s}
+.sitem:hover{color:var(--ink)}
+.sitem.on{color:var(--ink);font-weight:600}
+.spill{position:absolute;left:12px;right:12px;height:36px;border-radius:9px;background:var(--raised);box-shadow:var(--e1);transition:transform .25s cubic-bezier(.3,.7,.3,1)}
+.badge{margin-left:auto;font-size:11.5px;font-weight:600;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--ink);color:var(--surface);display:inline-flex;align-items:center;justify-content:center}
+.msg{display:flex;gap:12px;padding:10px 12px;border-radius:12px;position:relative;transition:background .12s}
+.msg:hover{background:color-mix(in srgb,var(--sunken) 60%,transparent)}
+.msg .acts{position:absolute;top:-14px;right:12px;display:flex;gap:2px;padding:3px;border-radius:10px;background:var(--raised);box-shadow:var(--e2);opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s;pointer-events:none}
+.msg:hover .acts{opacity:1;transform:none;pointer-events:auto}
+.acts button{width:30px;height:30px;border-radius:8px;border:0;background:transparent;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.acts button:hover{background:var(--sunken);color:var(--ink)}
+.av{width:36px;height:36px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:14px}
+.av.person{border-radius:50%;background:var(--sunken);color:var(--ink)}
+.av.agent{border-radius:10px 10px 10px 3px;background:var(--agent);color:#fff}
+.mhead{display:flex;align-items:baseline;gap:8px}
+.mname{font-weight:600;font-size:14.5px}
+.mtime{font-size:12px;color:var(--faint)}
+.mtext{font-size:14.5px;line-height:1.6;margin-top:2px}
+.card{background:var(--raised);border-radius:14px;padding:18px;box-shadow:var(--e1);transition:box-shadow .18s,transform .18s;cursor:pointer;display:flex;flex-direction:column;gap:8px;border:0;text-align:left;font:inherit;color:inherit}
+.card:hover{box-shadow:var(--e2);transform:translateY(-1px)}
+.sk{background:linear-gradient(90deg,var(--sunken) 0%,color-mix(in srgb,var(--sunken) 55%,var(--raised)) 45%,var(--sunken) 90%);background-size:200% 100%;animation:sh 1.3s ease-in-out infinite;border-radius:6px}
+@keyframes sh{0%{background-position:150% 0}100%{background-position:-50% 0}}
+.fadein{animation:fi .22s ease both}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.pc{display:flex;align-items:center;gap:16px;padding:16px 18px;border-radius:14px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
+.steps{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--faint)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--line)}
+.dot.done{background:var(--ink)}
+.dot.cur{background:var(--ink);animation:pu 1s ease-in-out infinite}
+@keyframes pu{50%{opacity:.35}}
+.toast{position:fixed;right:28px;bottom:28px;display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;background:var(--ink);color:var(--surface);font-size:14px;box-shadow:var(--e3);animation:fi .25s ease both;z-index:5}
+.code{font-family:"Martian Mono",ui-monospace,monospace;font-size:12.5px;padding:2px 6px;border-radius:6px;background:var(--sunken)}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div class="ag {{themeClass}}" style="min-height: 100vh; box-sizing: border-box; padding: 40px 24px 80px;">
+<div style="max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+<div style="display: flex; align-items: center; gap: 14px;">
+<span class="av agent" style="width: 44px; height: 44px;" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="7.5" cy="10" r="2" fill="#fff"></circle><circle cx="14.5" cy="10" r="2" fill="#fff"></circle></svg></span>
+<div>
+<h1 style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.02em;">Componentes, proposta</h1>
+<div style="color: var(--muted); font-size: 14px; margin-top: 2px;">Mais profundidade, movimento e carregamento. Passe o mouse, clique e teste.</div>
+</div>
+</div>
+<button class="btn btn-secondary" type="button" onClick="{{toggleTheme}}">
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5Z"></path></svg>
+<span>{{themeLabel}}</span>
+</button>
+</div>
+
+<section class="sec">
+<h2>Botões</h2>
+<p class="lead">Leve profundidade no principal, reação ao clique (escala 0,98), anel de foco neutro e carregamento sem mudar a largura.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+<button class="btn btn-primary" type="button" onClick="{{save}}" style="min-width: 132px;">
+<sc-if value="{{saving}}" hint-placeholder-val="{{false}}"><span class="spin" aria-hidden="true"></span><span>Salvando</span></sc-if>
+<sc-if value="{{notSaving}}" hint-placeholder-val="{{true}}"><span>Salvar alterações</span></sc-if>
+</button>
+<button class="btn btn-secondary" type="button">
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>
+<span>Novo agente</span>
+</button>
+<button class="btn btn-ghost" type="button">Cancelar</button>
+<button class="btn btn-danger" type="button">Apagar</button>
+<button class="btn btn-primary" type="button" disabled="disabled">Desabilitado</button>
+<button class="btn btn-icon" type="button" aria-label="Mais ações"><svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><circle cx="4" cy="9" r="1.4"></circle><circle cx="9" cy="9" r="1.4"></circle><circle cx="14" cy="9" r="1.4"></circle></svg></button>
+</div>
+</section>
+
+<section class="sec">
+<h2>Campos e caixa de mensagem</h2>
+<p class="lead">Superfície mais suave, foco que levanta o campo. A caixa de mensagem vira um card flutuante e o enviar muda quando há texto.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 16px;">
+<div class="field"><label for="f-name">Nome do agente</label><input id="f-name" class="input" value="Theo"></div>
+<div class="field"><label for="f-model">Modelo</label><button id="f-model" class="input select" type="button"><span>Claude Haiku 5.5</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m3.5 5.5 3.5 3.5 3.5-3.5"></path></svg></button></div>
+</div>
+<div class="composer">
+<label for="f-msg" style="position: absolute; left: -9999px;">Mensagem para Theo</label>
+<input id="f-msg" placeholder="Mensagem para Theo" value="{{draft}}" onChange="{{onDraft}}">
+<button class="btn btn-icon" type="button" aria-label="Anexar"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12.5 8.5 8 13a3 3 0 0 1-4.2-4.2l5-5a2 2 0 0 1 2.8 2.8l-5 5a1 1 0 0 1-1.4-1.4L9.5 6"></path></svg></button>
+<button class="send {{sendClass}}" type="button" aria-label="Enviar"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"></path></svg></button>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
+<section class="sec">
+<h2>Estados e controles</h2>
+<div class="lbl">Chips de estado, sempre com ícone</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<span class="chip ok"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 7.5 2.5 2.5L11 4.5"></path></svg>Ligado</span>
+<span class="chip"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"></rect></svg>Desligado</span>
+<span class="chip warn"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="7" cy="7" r="5"></circle><path d="M7 4.5V7l1.8 1.2"></path></svg>Aguardando aprovação</span>
+<span class="chip err"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M7 2.5 12.5 12h-11Z"></path><path d="M7 6v2.5"></path></svg>Falhou</span>
+<span class="chip agent"><svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><circle cx="5" cy="7" r="1.3"></circle><circle cx="9" cy="7" r="1.3"></circle></svg>Pessoal · Walter</span>
+</div>
+<div class="lbl">Checkbox e switch animados</div>
+<div style="display: flex; gap: 28px; align-items: center; flex-wrap: wrap;">
+<div style="display: flex; align-items: center; gap: 10px;"><button class="check {{checkClass}}" type="button" onClick="{{toggleCheck}}" aria-label="Ler issues" aria-pressed="{{checked}}"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m2.5 6.2 2.3 2.3 4.7-5"></path></svg></button><span style="font-size: 14px;">Ler issues</span></div>
+<div style="display: flex; align-items: center; gap: 10px;"><button class="sw {{switchClass}}" type="button" onClick="{{toggleSwitch}}" aria-label="Todas as ferramentas" aria-pressed="{{switched}}"><span></span></button><span style="font-size: 14px;">Todas as ferramentas</span></div>
+</div>
+<div class="lbl">Abas com realce que desliza</div>
+<div class="tabs">
+<span class="tabpill" style="transform: translateX({{tabX}}px);" aria-hidden="true"></span>
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="3"><button class="tab {{t.cls}}" type="button" onClick="{{t.pick}}">{{t.label}}</button></sc-for>
+</div>
+</section>
+
+<section class="sec">
+<h2>Barra lateral</h2>
+<p class="lead">O item ativo é um realce que desliza entre os itens.</p>
+<div class="side">
+<span class="spill" style="transform: translateY({{navY}}px); top: 12px;" aria-hidden="true"></span>
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="5"><button class="sitem {{n.cls}}" type="button" onClick="{{n.pick}}"><span style="width: 18px; text-align: center; color: var(--faint);">{{n.mark}}</span><span>{{n.label}}</span><sc-if value="{{n.hasBadge}}" hint-placeholder-val="{{false}}"><span class="badge">{{n.badge}}</span></sc-if></button></sc-for>
+</div>
+</section>
+</div>
+
+<section class="sec">
+<h2>Mensagens</h2>
+<p class="lead">Passe o mouse: aparece um fundo discreto e a barra de ações. O avatar do agente usa o símbolo da marca.</p>
+<div style="display: flex; flex-direction: column; gap: 6px; padding-top: 10px;">
+<div class="msg">
+<span class="av person" aria-hidden="true">W</span>
+<div style="flex: 1; min-width: 0;"><div class="mhead"><span class="mname">Walter</span><span class="mtime">21:39</span></div><div class="mtext">@Theo pega as visitas da semana e monta um relatório</div></div>
+<div class="acts"><button type="button" aria-label="Responder em thread"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 4h10v6H8l-3 2.5V10H3Z"></path></svg></button><button type="button" aria-label="Mais"><svg width="16" height="16" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><circle cx="4" cy="9" r="1.4"></circle><circle cx="9" cy="9" r="1.4"></circle><circle cx="14" cy="9" r="1.4"></circle></svg></button></div>
+</div>
+<div class="msg">
+<span class="av agent" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="6" cy="8.5" r="1.7" fill="#fff"></circle><circle cx="12" cy="8.5" r="1.7" fill="#fff"></circle></svg></span>
+<div style="flex: 1; min-width: 0;"><div class="mhead"><span class="mname">Theo</span><span class="mtime">21:39</span></div><div class="mtext">Pronto. Na semana de 07/10 a 13/10 foram <strong>48 visitantes</strong> (+33%), quase todos vindos do X. O relatório está no Drive.</div></div>
+<div class="acts"><button type="button" aria-label="Útil"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 7v6H3V7Zm0 0 3-4.5c1 0 1.5.7 1.3 1.6L9 6h3.3a1 1 0 0 1 1 1.2l-1 4.8a1 1 0 0 1-1 .8H5"></path></svg></button><button type="button" aria-label="Editar"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m10.5 3 2.5 2.5-7 7H3.5V10Z"></path></svg></button></div>
+</div>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
+<section class="sec">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;"><h2>Carregando a conversa</h2><button class="btn btn-secondary" type="button" onClick="{{reload}}" style="height: 32px; font-size: 13px;">Recarregar</button></div>
+<p class="lead">Skeleton com a forma das mensagens e um brilho suave. Quando chega, as mensagens entram com fade, sem nada pular.</p>
+<div style="display: flex; flex-direction: column; gap: 18px; min-height: 196px;">
+<sc-if value="{{loading}}" hint-placeholder-val="{{true}}">
+<sc-for list="{{skRows}}" as="r" hint-placeholder-count="3"><div style="display: flex; gap: 12px;"><span class="sk" style="width: 36px; height: 36px; border-radius: {{r.radius}}; flex: none;"></span><div style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding-top: 3px;"><span class="sk" style="width: 120px; height: 11px;"></span><span class="sk" style="width: {{r.w1}}; height: 11px;"></span><sc-if value="{{r.two}}" hint-placeholder-val="{{true}}"><span class="sk" style="width: {{r.w2}}; height: 11px;"></span></sc-if></div></div></sc-for>
+</sc-if>
+<sc-if value="{{loaded}}" hint-placeholder-val="{{false}}">
+<div class="fadein" style="display: flex; flex-direction: column; gap: 18px;">
+<div style="display: flex; gap: 12px;"><span class="av person" aria-hidden="true">W</span><div><div class="mhead"><span class="mname">Walter</span><span class="mtime">22:09</span></div><div class="mtext">Monta um relatório em PDF</div></div></div>
+<div style="display: flex; gap: 12px;"><span class="av agent" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="6" cy="8.5" r="1.7" fill="#fff"></circle><circle cx="12" cy="8.5" r="1.7" fill="#fff"></circle></svg></span><div><div class="mhead"><span class="mname">Theo</span><span class="mtime">22:09</span></div><div class="mtext">Feito. Está no Drive como “Relatório semanal de visitas”.</div></div></div>
+</div>
+</sc-if>
+</div>
+</section>
+
+<section class="sec">
+<h2>PC do Theo</h2>
+<p class="lead">Ação longa com etapas: reage na hora, mostra o progresso e confirma no fim.</p>
+<div class="pc">
+<span class="av" style="border-radius: 10px; background: var(--sunken); color: var(--muted);" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="3.5" width="13" height="9" rx="1.5"></rect><path d="M6.5 15h5"></path></svg></span>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><strong style="font-size: 14.5px;">PC do Theo</strong>
+<sc-if value="{{pcNone}}" hint-placeholder-val="{{true}}"><span class="chip">Ainda não criado</span></sc-if>
+<sc-if value="{{pcStarting}}" hint-placeholder-val="{{false}}"><span class="chip"><span class="spin" style="width: 11px; height: 11px; border-width: 1.6px;" aria-hidden="true"></span>Ligando…</span></sc-if>
+<sc-if value="{{pcOn}}" hint-placeholder-val="{{false}}"><span class="chip ok fadein"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 7.5 2.5 2.5L11 4.5"></path></svg>Ligado</span></sc-if>
+</div>
+<sc-if value="{{pcNone}}" hint-placeholder-val="{{true}}"><span style="font-size: 13px; color: var(--muted);">Um computador só do Theo para rodar código e guardar arquivos.</span></sc-if>
+<sc-if value="{{pcStarting}}" hint-placeholder-val="{{false}}"><div class="steps"><sc-for list="{{steps}}" as="s" hint-placeholder-count="3"><span class="dot {{s.cls}}"></span><span style="margin-right: 8px; color: {{s.color}};">{{s.label}}</span></sc-for></div></sc-if>
+<sc-if value="{{pcOn}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: var(--muted);">0,4 GiB usados · US$ 0,02 este mês · <span class="code">/workspace</span></span></sc-if>
+</div>
+<sc-if value="{{pcNone}}" hint-placeholder-val="{{true}}"><button class="btn btn-primary" type="button" onClick="{{startPc}}">Criar PC</button></sc-if>
+<sc-if value="{{pcStarting}}" hint-placeholder-val="{{false}}"><button class="btn btn-secondary" type="button" disabled="disabled">Aguarde</button></sc-if>
+<sc-if value="{{pcOn}}" hint-placeholder-val="{{false}}"><button class="btn btn-ghost" type="button" onClick="{{resetPc}}">Desligar</button></sc-if>
+</div>
+</section>
+</div>
+
+<section class="sec">
+<h2>Cards</h2>
+<p class="lead">Raios consistentes (6/10/14), sombras em camadas que funcionam nos dois temas e leve elevação ao passar o mouse.</p>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+<button class="card" type="button"><span class="chip agent" style="align-self: flex-start;">Skill</span><strong style="font-size: 15px;">Revisão de PR</strong><span style="font-size: 13.5px; color: var(--muted); line-height: 1.5;">Use quando pedirem para revisar um pull request.</span></button>
+<button class="card" type="button"><span class="chip" style="align-self: flex-start;"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 2.5h4.5L11 5v6.5H4Z"></path></svg>Documento</span><strong style="font-size: 15px;">Relatório semanal de visitas</strong><span style="font-size: 13.5px; color: var(--muted);">gerado por Theo · v1</span></button>
+<button class="card" type="button"><span class="chip ok" style="align-self: flex-start;"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 7.5 2.5 2.5L11 4.5"></path></svg>Conectado</span><strong style="font-size: 15px;">himetrica</strong><span style="font-size: 13.5px; color: var(--muted);">servidor MCP · 37 ferramentas</span></button>
+</div>
+</section>
+
+</div>
+<sc-if value="{{toast}}" hint-placeholder-val="{{false}}"><div class="toast" role="status"><svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 7.5 2.5 2.5L11 4.5"></path></svg>PC do Theo ligado</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1360,"height":2400}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { dark: null, saving: false, draft: "", checked: true, switched: false, tab: 0, nav: 1, loading: true, pc: "none", step: 0, toast: false };
+  }
+  componentDidMount() { this.reloadSoon(); }
+  componentWillUnmount() { (this.timers || []).forEach(function (t) { clearTimeout(t); }); }
+  later(fn, ms) { this.timers = this.timers || []; this.timers.push(setTimeout(fn, ms)); }
+  reloadSoon() { var self = this; this.setState({ loading: true }); this.later(function () { self.setState({ loading: false }); }, 1600); }
+  renderVals() {
+    var self = this;
+    var s = this.state;
+    var dark = s.dark === null ? !!this.props.dark : s.dark;
+    var tabLabels = ["Ferramentas", "Skills", "Orçamento"];
+    var navItems = [
+      { label: "Aprovações", mark: "◷" }, { label: "#general", mark: "#", badge: 3 }, { label: "Issues", mark: "▤" },
+      { label: "Theo", mark: "●" }, { label: "Drive", mark: "▢" }
+    ];
+    var stepLabels = ["Criando a máquina", "Preparando o ambiente", "Pronto"];
+    return {
+      themeClass: dark ? "dark" : "",
+      themeLabel: dark ? "Tema claro" : "Tema escuro",
+      toggleTheme: function () { self.setState({ dark: !dark }); },
+      saving: s.saving, notSaving: !s.saving,
+      save: function () { if (s.saving) return; self.setState({ saving: true }); self.later(function () { self.setState({ saving: false }); }, 1400); },
+      draft: s.draft,
+      onDraft: function (e) { self.setState({ draft: e.target.value }); },
+      sendClass: s.draft.trim() ? "on" : "off",
+      checked: s.checked ? "true" : "false", checkClass: s.checked ? "on" : "",
+      toggleCheck: function () { self.setState({ checked: !s.checked }); },
+      switched: s.switched ? "true" : "false", switchClass: s.switched ? "on" : "",
+      toggleSwitch: function () { self.setState({ switched: !s.switched }); },
+      tabX: s.tab * 110,
+      tabs: tabLabels.map(function (l, i) { return { label: l, cls: i === s.tab ? "on" : "", pick: function () { self.setState({ tab: i }); } }; }),
+      navY: s.nav * 38,
+      nav: navItems.map(function (n, i) { return { label: n.label, mark: n.mark, badge: n.badge || "", hasBadge: !!n.badge && i !== s.nav, cls: i === s.nav ? "on" : "", pick: function () { self.setState({ nav: i }); } }; }),
+      loading: s.loading, loaded: !s.loading,
+      reload: function () { self.reloadSoon(); },
+      skRows: [{ radius: "50%", w1: "78%", w2: "52%", two: true }, { radius: "10px 10px 10px 3px", w1: "64%", w2: "40%", two: true }, { radius: "50%", w1: "46%", w2: "0", two: false }],
+      pcNone: s.pc === "none", pcStarting: s.pc === "starting", pcOn: s.pc === "on",
+      steps: stepLabels.map(function (l, i) { return { label: l, cls: i < s.step ? "done" : i === s.step ? "cur" : "", color: i <= s.step ? "var(--ink)" : "var(--faint)" }; }),
+      startPc: function () {
+        self.setState({ pc: "starting", step: 0 });
+        self.later(function () { self.setState({ step: 1 }); }, 1300);
+        self.later(function () { self.setState({ step: 2 }); }, 2600);
+        self.later(function () { self.setState({ pc: "on", toast: true }); }, 3300);
+        self.later(function () { self.setState({ toast: false }); }, 6000);
+      },
+      resetPc: function () { self.setState({ pc: "none", step: 0 }); },
+      toast: s.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

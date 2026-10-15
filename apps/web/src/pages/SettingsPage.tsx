@@ -1,12 +1,10 @@
 import {
-  Alert,
   Button,
   Card,
   Chip,
   Dialog,
   DialogBody,
   DialogFooter,
-  DialogSearchList,
   Field,
   Icon,
   type IconName,
@@ -38,7 +36,9 @@ import {
 import type { Connection, ConnectorDef, Credential, CustomServer, Role } from "@/api/types";
 import { AccessMatrixSection } from "@/components/AccessMatrix";
 import { SandboxSection } from "@/components/AgentComputer";
+import { ConnectorCatalogDialog } from "@/components/ConnectorCatalog";
 import { ConnectCustomDialog, CustomServerRow, GrantAgentsDialog, ReviewToolsDialog } from "@/components/CustomMcp";
+import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
@@ -52,12 +52,9 @@ import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
 
 const isHttps = (v: string) => /^https:\/\/[^\s/]+/.test(v.trim());
-
-/** Connector search over label, id and description. */
-export function searchCatalog(list: ConnectorDef[], query: string) {
-  const q = query.trim().toLowerCase();
-  return q ? list.filter((d) => `${d.label} ${d.id} ${d.description}`.toLowerCase().includes(q)) : list;
-}
+/** Same MCP address, ignoring a trailing slash and case. */
+const sameServer = (a: string | null | undefined, b: string | null | undefined) =>
+  Boolean(a && b) && (a ?? "").replace(/\/+$/, "").toLowerCase() === (b ?? "").replace(/\/+$/, "").toLowerCase();
 
 export type SettingsSection =
   | "general"
@@ -216,7 +213,12 @@ function OrgSection() {
         </Field>
         {editable && (
           <div className="row" style={{ justifyContent: "flex-end" }}>
-            <Button type="submit" variant="primary" disabled={!dirty || !name.trim() || update.isPending}>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!dirty || !name.trim() || update.isPending}
+              loading={update.isPending}
+            >
               {t("settings.save")}
             </Button>
           </div>
@@ -241,6 +243,8 @@ function ConnectorsSection({ review }: { review?: boolean }) {
   const customActions = useCustomServerAction(org.id);
   const custom = customServers.data ?? [];
   const [addingCustom, setAddingCustom] = useState(false);
+  const [customInitial, setCustomInitial] = useState<{ url: string; label: string; needsKey: boolean } | null>(null);
+  const [remotePending, setRemotePending] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<CustomServer | null>(null);
   const [granting, setGranting] = useState<CustomServer | null>(null);
   // Back from a custom server's OAuth: open the classification of the newest pending one.
@@ -268,7 +272,13 @@ function ConnectorsSection({ review }: { review?: boolean }) {
         </div>
         {admin && (
           <div className="row">
-            <Button size="sm" onClick={() => setAddingCustom(true)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                setCustomInitial(null);
+                setAddingCustom(true);
+              }}
+            >
               {t("customMcp.connectOther")}
             </Button>
             <Button size="sm" icon="plus" onClick={() => setAdding(true)}>
@@ -277,6 +287,7 @@ function ConnectorsSection({ review }: { review?: boolean }) {
           </div>
         )}
       </div>
+      {connections.isLoading && <LoadingList count={2} avatar={false} trailing />}
       {connections.isSuccess && active.length === 0 && custom.length === 0 && (
         <p className="small muted">{t("connectors.none")}</p>
       )}
@@ -334,6 +345,7 @@ function ConnectorsSection({ review }: { review?: boolean }) {
 
       <ConnectCustomDialog
         open={addingCustom}
+        initial={customInitial}
         onOpenChange={setAddingCustom}
         onConnected={(server) => {
           setAddingCustom(false);
@@ -349,14 +361,52 @@ function ConnectorsSection({ review }: { review?: boolean }) {
         }}
       />
       <GrantAgentsDialog server={granting} onClose={() => setGranting(null)} />
-      <AddConnectorDialog
+      <ConnectorCatalogDialog
         open={adding}
         onOpenChange={setAdding}
         connectors={catalog.data?.connectors ?? []}
-        connected={new Set(active.map((c) => c.connector))}
+        connected={
+          new Set([
+            ...active.map((c) => c.connector),
+            // An official remote MCP server is connected as a custom server with its address.
+            ...(catalog.data?.connectors ?? [])
+              .filter((d) => d.kind === "remote_mcp" && custom.some((x) => sameServer(x.serverUrl, d.serverUrl)))
+              .map((d) => d.id),
+          ])
+        }
+        pendingId={remotePending}
+        loading={catalog.isLoading}
         onPick={(def) => {
+          if (def.kind !== "remote_mcp" || !def.serverUrl) {
+            setAdding(false);
+            setConnecting(def);
+            return;
+          }
+          // One click: the server tries OAuth; a key if it must; then the same review as a custom server.
+          const serverUrl = def.serverUrl;
+          setRemotePending(def.id);
+          customActions.connect.mutate(
+            { serverUrl, label: def.label, returnTo: `/org/${org.id}/settings?review=1` },
+            {
+              onSettled: () => setRemotePending(null),
+              onSuccess: (result) => {
+                if (result.status === "oauth") navigateAway(result.authorizeUrl);
+                else if (result.status === "needs_key") {
+                  setAdding(false);
+                  setCustomInitial({ url: serverUrl, label: def.label, needsKey: true });
+                  setAddingCustom(true);
+                } else {
+                  setAdding(false);
+                  setReviewing(result.server);
+                }
+              },
+            },
+          );
+        }}
+        onOther={() => {
           setAdding(false);
-          setConnecting(def);
+          setCustomInitial(null);
+          setAddingCustom(true);
         }}
       />
       <ConnectDialog def={connecting} onClose={() => setConnecting(null)} />
@@ -373,6 +423,7 @@ function ConnectorsSection({ review }: { review?: boolean }) {
           <Button
             variant="danger"
             disabled={disconnect.isPending}
+            loading={disconnect.isPending}
             onClick={() => {
               if (!removing) return;
               disconnect.mutate(removing.connection.id, {
@@ -388,58 +439,6 @@ function ConnectorsSection({ review }: { review?: boolean }) {
         </DialogFooter>
       </Dialog>
     </Card>
-  );
-}
-
-/** "Adicionar conector": the catalog in a searchable list. */
-function AddConnectorDialog({
-  open,
-  onOpenChange,
-  connectors,
-  connected,
-  onPick,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  connectors: ConnectorDef[];
-  connected: Set<string>;
-  onPick: (def: ConnectorDef) => void;
-}) {
-  const { t } = useTranslation();
-  const [q, setQ] = useState("");
-  const shown = searchCatalog(connectors, q);
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange} title={t("connectors.addTitle")} closeLabel={t("common.close")}>
-      <DialogSearchList
-        query={q}
-        onQueryChange={setQ}
-        searchLabel={t("connectors.search")}
-        searchPlaceholder={t("connectors.searchPlaceholder")}
-        isEmpty={shown.length === 0}
-        emptyText={t("connectors.empty", { q })}
-      >
-        {shown.map((d) => (
-          <div key={d.id} className="member-row">
-            <span className="list-col">
-              <span style={{ fontWeight: 600 }}>{d.label}</span>
-              <span className="small muted">
-                {connectorDescription(t, d)} · {t("connectors.scopesCount", { count: d.scopes.length })}
-              </span>
-            </span>
-            {connected.has(d.id) ? (
-              <Chip icon="check" tone="done">
-                {t("connectors.connected")}
-              </Chip>
-            ) : (
-              <Button size="sm" onClick={() => onPick(d)}>
-                {t("connectors.connect")}
-              </Button>
-            )}
-          </div>
-        ))}
-      </DialogSearchList>
-      <div style={{ height: 20 }} />
-    </Dialog>
   );
 }
 
@@ -535,7 +534,12 @@ function ConnectDialog({ def, onClose }: { def: ConnectorDef | null; onClose: ()
         <DialogFooter>
           <Button onClick={onClose}>{t("common.cancel")}</Button>
           {canKey && (
-            <Button type="submit" variant={canOAuth ? "default" : "primary"} disabled={withKey.isPending}>
+            <Button
+              type="submit"
+              variant={canOAuth ? "default" : "primary"}
+              disabled={withKey.isPending}
+              loading={withKey.isPending}
+            >
               {t("connectors.saveKey")}
             </Button>
           )}
@@ -573,6 +577,7 @@ function KeysSection() {
         </Button>
       </div>
       {platform.data && <p className="small muted">{t("settings.platformAvailable")}</p>}
+      {credentials.isLoading && <LoadingList count={2} avatar={false} trailing />}
       {credentials.isSuccess && live.length === 0 && <p className="small muted">{t("settings.noKeys")}</p>}
       {live.length > 0 && (
         <List>
@@ -594,6 +599,7 @@ function KeysSection() {
                     variant="ghost"
                     size="sm"
                     disabled={updateSettings.isPending}
+                    loading={updateSettings.isPending}
                     onClick={() => updateSettings.mutate({ defaultCredentialId: c.id })}
                   >
                     {t("settings.makeDefault")}
@@ -643,6 +649,7 @@ function KeysSection() {
           <Button
             variant="danger"
             disabled={remove.isPending}
+            loading={remove.isPending}
             onClick={() => {
               if (dialog?.type !== "remove") return;
               remove.mutate({ id: dialog.cred.id, purge: true }, { onSuccess: () => setDialog(null) });
@@ -783,7 +790,8 @@ function UsageSection() {
       <h2 id="sec-usage" className="ac-card__title">
         {t("settings.usageTitle")}
       </h2>
-      {report.isError && <Alert>{t("common.loadFailed")}</Alert>}
+      {report.isLoading && <LoadingList count={4} avatar={false} trailing />}
+      {report.isError && !report.data && <ErrorState error={report.error} onRetry={() => void report.refetch()} />}
       {report.data && (
         <>
           <span className="small muted">

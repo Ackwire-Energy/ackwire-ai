@@ -29,13 +29,15 @@ import {
   useSettings,
   useSkills,
 } from "@/api/queries";
-import type { Agent, Credential, Model } from "@/api/types";
+import type { Agent, AgentAudience, Credential, Model } from "@/api/types";
 import { AccessTree } from "@/components/AccessTree";
+import { AudienceChoice, audienceValid } from "@/components/AgentAudience";
 import { useOrg } from "@/components/org-context";
 import { SkillPicker } from "@/components/Skills";
 import { useAreaLabel } from "@/hooks/useAreaLabel";
 import { type AccessModel, type Preset, presetModel, toInput, treeFromMatrix } from "@/lib/access";
 import { joinNames } from "@/lib/format";
+import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
 import { modelChoices, providerLabel } from "@/lib/providers";
 import { handleFrom, parseAmount } from "@/lib/text";
@@ -137,6 +139,7 @@ export function NewAgentPage() {
   const [role, setRole] = useState<RoleId>("qa");
   const [name, setName] = useState("");
   const [owner, setOwner] = useState(me.user.id);
+  const [audience, setAudience] = useState<AgentAudience>({ mode: "everyone", userIds: [] });
   const [instructions, setInstructions] = useState(t("newAgent.roles.qa.instructions"));
   const [model, setModel] = useState<string | undefined>(undefined);
   const [key, setKey] = useState<string | undefined>(undefined);
@@ -223,6 +226,9 @@ export function NewAgentPage() {
       instructions,
       model,
       ownerUserId: owner === NO_OWNER ? null : owner,
+      audience: audienceValid(audience, owner === NO_OWNER ? null : owner)
+        ? { mode: audience.mode, userIds: audience.mode === "people" ? audience.userIds : [] }
+        : { mode: "everyone", userIds: [] },
       credentialId: key && key !== DEFAULT_KEY ? key : null,
       monthlyBudgetUsd: amount,
     });
@@ -360,6 +366,16 @@ export function NewAgentPage() {
               <Select value={owner} onValueChange={setOwner} options={ownerOptions} />
             </Field>
           </div>
+        </div>
+        <div className="stack-4" style={{ gap: 8 }}>
+          <span className="ac-field__label">{t("audience.title", agentGrammar(t, displayName))}</span>
+          <AudienceChoice
+            value={audience}
+            onChange={setAudience}
+            ownerUserId={owner === NO_OWNER ? null : owner}
+            agentName={displayName}
+            idPrefix="ag-audience"
+          />
         </div>
         <Field label={t("newAgent.instructions")} id="ag-instr" help={t("newAgent.instructionsHelp")}>
           <Textarea rows={4} value={instructions} onChange={(e) => setInstructions(e.target.value)} />

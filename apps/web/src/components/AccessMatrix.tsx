@@ -17,6 +17,7 @@ import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useAgents } from "@/api/queries";
 import type { AccessState, Agent, AgentAccess } from "@/api/types";
+import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useAreaLabel } from "@/hooks/useAreaLabel";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -139,8 +140,11 @@ export function AccessMatrixSection() {
         )}
       </div>
       {unavailable && <p className="small muted">{t("access.unavailable")}</p>}
+      {(agents.isLoading || (list.length > 0 && access.some((q) => q.isLoading) && !unavailable)) && (
+        <LoadingList count={Math.min(Math.max(list.length, 2), 5)} trailing />
+      )}
       {agents.isSuccess && list.length === 0 && <p className="small muted">{t("access.noAgents")}</p>}
-      {!unavailable && list.length > 0 && (
+      {!unavailable && list.length > 0 && !access.some((q) => q.isLoading) && (
         <List aria-label={t("access.matrixTitle")}>
           {list.map((a, i) => {
             const s = summary({ agent: a, access: access[i]?.data });
@@ -272,7 +276,8 @@ export function AccessMatrixDialog({
         />
       </div>
       <div className="ac-dialog__list">
-        <div className="access-matrix">
+        {access.some((x) => !x) && agents.length > 0 && <LoadingList count={6} avatar={false} />}
+        <div className="access-matrix" hidden={access.some((x) => !x) && agents.length > 0}>
           <table>
             <colgroup>
               <col className="access-matrix__first" />

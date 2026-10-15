@@ -9,7 +9,8 @@ import { isDomain } from "@/components/AgentComputer";
 import { createI18n } from "@/i18n";
 import { countTools, modelFrom, resolve, treeFromAccess } from "@/lib/access";
 import { activityText, toolActivity } from "@/lib/activity";
-import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { busyView, ELAPSED_AFTER_MS, GIVE_UP_MS, PREPARE_AFTER_MS, reached } from "@/lib/computer";
+import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -168,5 +169,76 @@ describe("activity bar: the PC", () => {
     expect(say("run_skill_script")).toBe("Theo está rodando um script de skill…");
     expect(say("share_artifact")).toBe("Theo está trazendo um arquivo…");
     expect(t("settings.kinds.sandbox")).toBe("Sandbox");
+  });
+});
+
+describe("creating the PC feels alive", () => {
+  const deferred = <T,>() => {
+    let resolve!: (v: T) => void;
+    let reject!: (e: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+  const running = {
+    status: "running" as const,
+    diskUsedGib: 0.1,
+    costMonthUsd: 0,
+    createdAt: new Date().toISOString(),
+    lastUsedAt: new Date().toISOString(),
+  };
+
+  test("no PC yet: explanation + Criar; click → Ligando… with the step, then Ligado and a toast", async () => {
+    const api = createFakeApi(seedState());
+    const start = deferred<typeof running>();
+    api.sandbox.start = () => start.promise;
+    await renderApp(`/org/${ORG_ID}/agents/${ATLAS_ID}`, { api });
+    await settle(8);
+    const pc = screen().getByRole("region", { name: "PC do Atlas" });
+    expect(pc.textContent).toContain("Um computador só do Atlas para rodar código e guardar arquivos.");
+    await click(within(pc).getByRole("button", { name: "Criar PC do Atlas" }));
+    expect(pc.textContent).toContain("Ligando…");
+    expect(pc.textContent).toContain("Criando a máquina");
+    expect(within(pc).queryByRole("button", { name: "Criar PC do Atlas" })).toBeNull();
+    expect(within(pc).getByRole("button", { name: "Ações do PC do Atlas" }).hasAttribute("disabled")).toBe(true);
+    await act(async () => start.resolve(running));
+    await settle(4);
+    expect(pc.textContent).toContain("Ligado");
+    expect(pc.textContent).toContain("Pronto");
+    expect(document.body.textContent).toContain("PC do Atlas ligado");
+  });
+
+  test("it fails: the reason inline and Tentar de novo", async () => {
+    const api = createFakeApi(seedState());
+    let calls = 0;
+    api.sandbox.start = async () => {
+      calls += 1;
+      throw new Error("sem cota no provedor");
+    };
+    await renderApp(`/org/${ORG_ID}/agents/${ATLAS_ID}`, { api });
+    await settle(8);
+    const pc = screen().getByRole("region", { name: "PC do Atlas" });
+    await click(within(pc).getByRole("button", { name: "Criar PC do Atlas" }));
+    await settle(4);
+    expect(within(pc).getByRole("alert").textContent).toContain("Não deu para ligar: sem cota no provedor");
+    await click(within(pc).getByRole("button", { name: "Tentar de novo" }));
+    await settle(4);
+    expect(calls).toBe(2);
+  });
+
+  test("steps and elapsed seconds follow the clock (fake time)", () => {
+    const t0 = 1_000_000;
+    expect(busyView("start", t0, t0, true)).toEqual({ step: "creating", elapsed: null, tooLong: false });
+    expect(busyView("start", t0, t0 + ELAPSED_AFTER_MS - 1, true).elapsed).toBeNull();
+    expect(busyView("start", t0, t0 + ELAPSED_AFTER_MS, true).elapsed).toBe(3);
+    expect(busyView("start", t0, t0 + PREPARE_AFTER_MS, true).step).toBe("preparing");
+    expect(busyView("start", t0, t0 + 1000, false).step).toBe("booting");
+    expect(busyView("stop", t0, t0 + 7_400, false)).toEqual({ step: null, elapsed: 7, tooLong: false });
+    expect(busyView("start", t0, t0 + GIVE_UP_MS, true).tooLong).toBe(true);
+    expect(reached("start", "running")).toBe(true);
+    expect(reached("stop", "running")).toBe(false);
+    expect(reached("remove", "none")).toBe(true);
   });
 });

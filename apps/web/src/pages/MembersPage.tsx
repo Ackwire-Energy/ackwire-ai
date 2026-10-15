@@ -12,6 +12,7 @@ import {
   useUsage,
 } from "@/api/queries";
 import type { InvitationWithStatus, Role } from "@/api/types";
+import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { formatMonth, formatShortDate, formatUsd, relativeTime, timeLeft } from "@/lib/format";
@@ -146,7 +147,12 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
             <Field label={t("members.role")} id="m-role" style={{ flex: "0 1 150px" }}>
               <Select value={role} onValueChange={setRole} options={roleOptions.filter((o) => o.value !== "owner")} />
             </Field>
-            <Button variant="primary" onClick={() => void send().catch(() => {})} disabled={inviteMany.isPending}>
+            <Button
+              variant="primary"
+              onClick={() => void send().catch(() => {})}
+              disabled={inviteMany.isPending}
+              loading={inviteMany.isPending}
+            >
               {t("members.invite")}
             </Button>
           </div>
@@ -192,6 +198,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
         <h2 id="sec-people" className="section-title">
           {t("members.people")}
         </h2>
+        {peopleQuery.isLoading && <LoadingList count={3} trailing />}
         <List>
           {people.map((m) => {
             const isMe = m.userId === me.user.id;

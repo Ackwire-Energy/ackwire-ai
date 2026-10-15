@@ -128,6 +128,21 @@ export function ArtifactViewer({
           {t("artifacts.downloadPdf")}
         </Button>
       )}
+      {a.kind === "document" && (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="download"
+          onClick={() =>
+            fileSaver.save(
+              api.artifacts.fileUrl(org.id, a.id, { version: a.shownVersion, format: "docx" }),
+              fileName(a.title, a.content).replace(/\.md$/, ".docx"),
+            )
+          }
+        >
+          {t("artifacts.downloadDocx")}
+        </Button>
+      )}
       {a.kind !== "table" && (
         <Button size="sm" variant="ghost" icon="download" onClick={() => void download()}>
           {t("artifacts.download")}

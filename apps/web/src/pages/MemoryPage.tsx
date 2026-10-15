@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMemory, useMemoryAction, useProposals } from "@/api/queries";
 import type { Agent, Memory, MemoryKind } from "@/api/types";
+import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { daysBetween, relativeTime } from "@/lib/format";
@@ -58,7 +59,13 @@ export function MemoryPage({ agentId }: { agentId: string }) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const agent = dir.agentById.get(agentId);
-  if (dir.loading) return <div className="page" aria-busy="true" />;
+  if (dir.loading) {
+    return (
+      <div className="page page--mid">
+        <LoadingPage rows={5} />
+      </div>
+    );
+  }
   if (!agent) {
     return (
       <div className="page page--mid">

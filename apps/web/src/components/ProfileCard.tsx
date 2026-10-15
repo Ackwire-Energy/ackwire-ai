@@ -7,6 +7,7 @@ import type { Actor, Agent } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useScopeGroups } from "@/hooks/useScopeGroups";
+import { audienceNotice, audienceSummary, canTalk, modeOf } from "@/lib/audience";
 import { formatUsd, relativeTime, shortModel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { scopeSummary } from "@/lib/scopes";
@@ -201,6 +202,12 @@ function AgentCardBody({ agent }: { agent: Agent }) {
       <dl className="profile-card__facts">
         <dt>{t("profile.owner")}</dt>
         <dd>{owner ?? t("profile.noOwner")}</dd>
+        {modeOf(agent) !== "everyone" && (
+          <>
+            <dt>{t("profile.audience")}</dt>
+            <dd>{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name)}</dd>
+          </>
+        )}
         <dt>{t("profile.model")}</dt>
         <dd>{shortModel(model)}</dd>
         <dt>{t("profile.can")}</dt>
@@ -213,6 +220,9 @@ function AgentCardBody({ agent }: { agent: Agent }) {
         </dd>
       </dl>
       {seesSpend && <Spend agent={agent} locale={i18n.language} />}
+      {!canTalk(agent) && (
+        <p className="small muted">{audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name)}</p>
+      )}
       <div className="profile-card__actions">
         <Button asChild size="sm" variant="primary">
           <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>

@@ -237,6 +237,7 @@ p {
 
 /* Workspace shell (telas/Sidebar + main) */
 .shell {
+  position: relative;
   display: flex;
   height: 100vh;
   background: var(--surface);
@@ -487,6 +488,9 @@ p {
   background: var(--surface);
 }
 .channel__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   font-size: 18px;
   line-height: 24px;
@@ -520,6 +524,22 @@ p {
 }
 .channel__empty {
   margin: auto 16px;
+}
+/* "O Theo só responde a Walter.": muted, only for me. */
+.channel__notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 24px;
+  padding: 4px 12px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.channel__notice .ac-icon {
+  flex: none;
+}
+.sidebar__item-meta .audience-chip--compact {
+  font-size: 11px;
 }
 /* First-message suggestions in an empty conversation: neutral buttons that wrap */
 .channel__suggestions {
@@ -2295,4 +2315,303 @@ p {
 }
 .summary-row__action {
   flex: none;
+}
+
+/* The agent's PC: busy chip, step line, inline error. */
+.computer-progress {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.computer-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+}
+.computer-error .ac-icon {
+  flex: none;
+  color: var(--ink-muted);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .computer-chip {
+    animation: computer-chip-in 200ms ease-out;
+  }
+  .computer-chip--busy .ac-icon {
+    animation: computer-spin 900ms linear infinite;
+  }
+}
+@keyframes computer-chip-in {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes computer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* "Adicionar conector": the catalog. Neutral cards; state in a chip. */
+.catalog__tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.catalog__cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.catalog__cat {
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.catalog__cat:hover {
+  color: var(--ink);
+}
+.catalog__cat[aria-pressed="true"] {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.catalog__cat:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.catalog-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.catalog-card {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  grid-template-rows: auto auto;
+  gap: 10px 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+}
+.catalog-card[data-disabled] .catalog-card__text {
+  opacity: 0.7;
+}
+.catalog-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.catalog-card__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.catalog-card__name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalog-card__badge {
+  flex: none;
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--ink-muted);
+}
+.catalog-card__desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalog-card__action {
+  grid-column: 2;
+  display: flex;
+  justify-content: flex-end;
+}
+.connector-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.connector-icon--mono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 650;
+  font-size: 14px;
+}
+.catalog__other {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 20px 20px;
+}
+
+/* Loading placeholders that keep the page layout. */
+.loading-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.loading-page__rows,
+.loading-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.channel__skeleton {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.channel__composer-skeleton {
+  min-height: 52px;
+  align-items: center;
+  padding: 0 var(--space-4);
+  border-color: var(--line);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .channel__messages[data-fresh] .ac-msg,
+  .channel__messages[data-fresh] .ac-divider {
+    animation: content-in 240ms ease-out both;
+  }
+}
+@keyframes content-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.sidebar__item--skeleton {
+  pointer-events: none;
+}
+.loading-cards--tight {
+  margin-top: 0;
+  gap: 8px;
+}
+.calendar-item.calendar-item--skeleton {
+  pointer-events: none;
+  padding: 0;
+  border-color: transparent;
+  background: var(--skeleton);
+}
+.loading-line {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+}
+.catalog-grid--loading {
+  margin-top: 0;
+  flex-direction: row;
+}
+
+/*
+ * Route transitions: only the main column moves (opacity + 4 px), 160 ms.
+ * View Transitions where supported; otherwise the page fades in on mount.
+ * Nothing moves with prefers-reduced-motion.
+ */
+.shell__main {
+  view-transition-name: page;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(page) {
+    animation: page-out 120ms ease-in both;
+  }
+  ::view-transition-new(page) {
+    animation: page-in 160ms ease-out both;
+  }
+  @supports not (view-transition-name: page) {
+    .shell__main {
+      animation: page-in 160ms ease-out both;
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes page-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+/* "Carregando mensagens anteriores…": floats over the top, takes no space (no jump). */
+.channel__older {
+  position: relative;
+  height: 0;
+  z-index: var(--z-sticky);
+}
+.channel__older-pill {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 13px;
+  color: var(--ink-muted);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  box-shadow: var(--overlay);
+  white-space: nowrap;
+}
+/* Long timelines: the browser skips rendering rows far off screen. */
+.channel__messages .ac-msg {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
 }

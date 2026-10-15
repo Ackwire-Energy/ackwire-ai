@@ -53,6 +53,7 @@ function Actions({ approval, secondary }: { approval: Approval; secondary?: Reac
         variant="primary"
         size="sm"
         disabled={decide.isPending}
+        loading={decide.isPending && decide.variables?.decision === "approve"}
         onClick={() => decide.mutate({ id: approval.id, decision: "approve" })}
       >
         {t(`approval.approve.${approvalAction(approval)}`)}
@@ -60,6 +61,7 @@ function Actions({ approval, secondary }: { approval: Approval; secondary?: Reac
       <Button
         size="sm"
         disabled={decide.isPending}
+        loading={decide.isPending && decide.variables?.decision === "refuse"}
         onClick={() => decide.mutate({ id: approval.id, decision: "refuse" })}
       >
         {t("approval.refuse")}

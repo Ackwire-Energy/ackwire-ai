@@ -167,7 +167,7 @@ export function NewChannelDialog({ open, onOpenChange }: { open: boolean; onOpen
         </DialogSearchList>
         <DialogFooter bar note={t("newChannel.selected", { count: selected.size })}>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
-          <Button type="submit" variant="primary" disabled={create.isPending}>
+          <Button type="submit" variant="primary" disabled={create.isPending} loading={create.isPending}>
             {t("newChannel.create", { name: name || "canal" })}
           </Button>
         </DialogFooter>

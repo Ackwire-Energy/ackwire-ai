@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { useIssueAction, useIssues } from "@/api/queries";
 import type { Issue, IssuePriority, IssueStatus } from "@/api/types";
 import { ActorLabel, actorFromKey, NO_ACTOR, useActors } from "@/components/actors";
+import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { dueLabel, parseDayInput } from "@/lib/format";
 import { useToast } from "@/lib/toast";
@@ -97,6 +98,28 @@ export function IssuesPage() {
           </button>
         ))}
       </div>
+      {issues.isLoading &&
+        (view === "board" ? (
+          <div className="issue-board">
+            {BOARD.map((status) => (
+              <section key={status} className="issue-board__col" aria-label={t(`issues.status.${status}`)}>
+                <div className="issue-board__head">
+                  <span className="ac-eyebrow">{t(`issues.status.${status}`)}</span>
+                </div>
+                <LoadingCards count={2} className="loading-cards loading-cards--tight" />
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="issues-page__pad">
+            <LoadingList count={5} avatar={false} trailing />
+          </div>
+        ))}
+      {issues.isError && !issues.data && (
+        <div className="issues-page__pad">
+          <ErrorState error={issues.error} onRetry={() => void issues.refetch()} />
+        </div>
+      )}
       {issues.isSuccess && all.length === 0 && !search && (
         <div className="issues-page__pad">
           <EmptyState icon="issues">{t("issues.empty")}</EmptyState>
@@ -309,7 +332,12 @@ function NewIssueDialog({ open, onClose }: { open: boolean; onClose: () => void 
           <Button type="button" onClick={onClose}>
             {t("issues.form.cancel")}
           </Button>
-          <Button type="submit" variant="primary" disabled={!title.trim() || dueError || action.isPending}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!title.trim() || dueError || action.isPending}
+            loading={action.isPending}
+          >
             {t("issues.form.create")}
           </Button>
         </DialogFooter>

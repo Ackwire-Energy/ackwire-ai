@@ -125,4 +125,11 @@ export const extraIcons = {
       },
     ],
   ],
+  /** Something is in progress (spins unless reduced motion). */
+  spinner: [["path", { d: "M10 3.5a6.5 6.5 0 1 1-6.5 6.5" }]],
+  /** "Quem pode falar": restricted agent. */
+  lock: [
+    ["rect", { x: "4.5", y: "9", width: "11", height: "8", rx: "2" }],
+    ["path", { d: "M7 9V6.5a3 3 0 0 1 6 0V9" }],
+  ],
 } satisfies Record<string, IconShape[]>;

@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import { type HTMLAttributes, type ReactNode, useEffect, useState } from "react";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 
@@ -12,9 +12,17 @@ export function Card({
   return <Tag className={cx("ac-card", padded && "ac-card--padded", className)} {...rest} />;
 }
 
-/** A bordered list of rows (members, invitations, agents). */
+/** How long the first-appearance stagger lasts; rows added later don't animate. */
+export const LIST_STAGGER_MS = 400;
+
+/** A bordered list of rows (members, invitations, agents). Rows rise in, staggered, only when it first appears. */
 export function List({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cx("ac-list", className)} {...rest} />;
+  const [entering, setEntering] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setEntering(false), LIST_STAGGER_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  return <div className={cx("ac-list", entering && "ac-list--stagger", className)} {...rest} />;
 }
 
 export interface EmptyStateProps {

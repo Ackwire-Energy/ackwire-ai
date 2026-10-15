@@ -338,7 +338,11 @@ export interface ApiClient {
     /** Short-lived signed URL for the stored file. */
     download(orgId: string, id: string, version?: number): Promise<{ url: string; expiresAt: string }>;
     /** Same-origin URL of the file as an attachment, optionally converted (CSV, .patch, PDF). */
-    fileUrl(orgId: string, id: string, options?: { version?: number; format?: "csv" | "patch" | "pdf" }): string;
+    fileUrl(
+      orgId: string,
+      id: string,
+      options?: { version?: number; format?: "csv" | "patch" | "pdf" | "docx" },
+    ): string;
     create(
       orgId: string,
       input: { title: string; channelId?: string | null; content: ArtifactContent },

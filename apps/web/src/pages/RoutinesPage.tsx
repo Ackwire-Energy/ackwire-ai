@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 import { useChannels, useRoutineAction, useRoutineRuns, useRoutines, useScheduleParse } from "@/api/queries";
 import type { Routine, RoutineEvent, RoutineTarget } from "@/api/types";
 import { useActors } from "@/components/actors";
+import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { formatUsd, whenAt } from "@/lib/format";
 import { COMMON_TIMEZONES, timezoneLabel } from "@/lib/routines";
@@ -81,6 +82,10 @@ export function RoutinesPage() {
           {t("routines.new")}
         </Button>
       </header>
+      {routines.isLoading && <LoadingCards count={3} />}
+      {routines.isError && !routines.data && (
+        <ErrorState error={routines.error} onRetry={() => void routines.refetch()} />
+      )}
       {routines.isSuccess && list.length === 0 && <EmptyState icon="routines">{t("routines.empty")}</EmptyState>}
       <div className="stack-4" style={{ gap: 12 }}>
         {list.map((r) => (
@@ -148,6 +153,7 @@ function RoutineCard({ routine: r, onRuns }: { routine: Routine; onRuns: () => v
           size="sm"
           variant="ghost"
           disabled={r.running || action.isPending}
+          loading={action.isPending}
           onClick={() => action.mutate({ type: "run", id: r.id })}
         >
           {r.running ? t("routines.running") : t("routines.runNow")}
@@ -172,6 +178,7 @@ function RunsDialog({ routine, onClose }: { routine: Routine | null; onClose: ()
       closeLabel={t("routines.close")}
     >
       <div className="ac-dialog__list">
+        {runs.isLoading && <LoadingList count={3} avatar={false} />}
         {runs.isSuccess && runs.data.length === 0 && <p className="small muted">{t("routines.noRuns")}</p>}
         <List>
           {(runs.data ?? []).map((x) => (

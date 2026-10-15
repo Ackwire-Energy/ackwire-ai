@@ -16,6 +16,8 @@ import {
   MenuItem,
   MenuRadioGroup,
   MenuSeparator,
+  Skeleton,
+  SkeletonGroup,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -23,19 +25,37 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
-import { useChannels, useDms, useOverview } from "@/api/queries";
+import { useChannels, useDms, useOverview, usePrefetchMessages } from "@/api/queries";
 import { useAuth } from "@/auth/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type LocaleCode, locales, setLocale } from "@/i18n";
+import { audienceChip } from "@/lib/audience";
 import { formatUsd } from "@/lib/format";
+import { markOpen } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/SettingsPage";
 import { useStreams } from "@/realtime/context";
 import { runningAgents } from "@/realtime/streams";
+import { AudienceChip } from "./AgentAudience";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { useOrg } from "./org-context";
+
+/** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
+function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boolean; label: string }) {
+  return (
+    <SkeletonGroup label={label}>
+      {Array.from({ length: count }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholders
+        <span key={i} className="sidebar__item sidebar__item--skeleton">
+          <Skeleton shape={avatar ? "square" : "block"} width={avatar ? 24 : 16} height={avatar ? 24 : 16} />
+          <Skeleton width={[96, 72, 112][i % 3]} />
+        </span>
+      ))}
+    </SkeletonGroup>
+  );
+}
 
 /** The workspace sidebar (telas/Sidebar.dc.html). */
 export function Sidebar() {
@@ -54,6 +74,13 @@ export function Sidebar() {
   const dmChannels = new Set((dms.data ?? []).map((d) => d.channelId));
   // Unread per DM partner (agents show it on their "Agentes" row; people under "Mensagens diretas").
   const unreadWith = new Map((dms.data ?? []).map((d) => [d.with.id, d.unread]));
+  // Hover or focus loads the conversation before the click (DMs: once we know their channel).
+  const prefetch = usePrefetchMessages(orgId);
+  const dmWith = new Map((dms.data ?? []).map((d) => [d.with.id, d.channelId]));
+  const prefetchDm = (partnerId: string) => {
+    const channelId = dmWith.get(partnerId);
+    if (channelId) prefetch(channelId);
+  };
 
   return (
     <nav className="sidebar" aria-label={t("shell.nav")}>
@@ -122,6 +149,7 @@ export function Sidebar() {
             onClick={() => setCreatingChannel(true)}
           />
         </div>
+        {channels.isLoading && <SidebarSkeleton count={3} label={t("common.loadingList")} />}
         {(channels.data ?? [])
           .filter((c) => !dmChannels.has(c.id))
           .map((c) => (
@@ -130,6 +158,9 @@ export function Sidebar() {
               to="/org/$orgId/c/$channelId"
               params={{ orgId, channelId: c.id }}
               className="sidebar__item"
+              onMouseEnter={() => prefetch(c.id)}
+              onFocus={() => prefetch(c.id)}
+              onClick={() => markOpen(c.id)}
             >
               <Icon name="channel" className="sidebar__channel-icon" />
               <span className="sidebar__item-label">{c.name}</span>
@@ -137,6 +168,12 @@ export function Sidebar() {
           ))}
       </div>
 
+      {dir.loading && dir.agents.length === 0 && (
+        <div className="sidebar__group">
+          <span className="sidebar__label">{t("shell.agents")}</span>
+          <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />
+        </div>
+      )}
       {dir.agents.length > 0 && (
         <div className="sidebar__group">
           <span className="sidebar__label">{t("shell.agents")}</span>
@@ -146,6 +183,9 @@ export function Sidebar() {
               to="/org/$orgId/dm/agent/$agentId"
               params={{ orgId, agentId: a.id }}
               className="sidebar__item"
+              onMouseEnter={() => prefetchDm(a.id)}
+              onFocus={() => prefetchDm(a.id)}
+              onClick={() => markOpen(dmWith.get(a.id) ?? a.id)}
               data-unread={(unreadWith.get(a.id) ?? 0) > 0}
             >
               <Avatar
@@ -159,7 +199,11 @@ export function Sidebar() {
               {(unreadWith.get(a.id) ?? 0) > 0 ? (
                 <UnreadCount count={unreadWith.get(a.id) ?? 0} />
               ) : (
-                a.role && <span className="sidebar__item-meta">{a.role}</span>
+                (audienceChip(t, a) ?? a.role) && (
+                  <span className="sidebar__item-meta">
+                    {audienceChip(t, a) ? <AudienceChip agent={a} compact /> : a.role}
+                  </span>
+                )
               )}
             </Link>
           ))}
@@ -178,6 +222,9 @@ export function Sidebar() {
                 params={{ orgId, userId: m.userId }}
                 className="sidebar__item"
                 data-unread={unread > 0}
+                onMouseEnter={() => prefetchDm(m.userId)}
+                onFocus={() => prefetchDm(m.userId)}
+                onClick={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
               >
                 <Avatar name={m.name} size="sm" imageUrl={m.image} />
                 <span className="sidebar__item-label">{m.name}</span>
@@ -450,7 +497,7 @@ function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button type="submit" variant="primary" disabled={!zoneOk || save.isPending}>
+          <Button type="submit" variant="primary" disabled={!zoneOk || save.isPending} loading={save.isPending}>
             {t("common.save")}
           </Button>
         </DialogFooter>

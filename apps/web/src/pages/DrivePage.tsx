@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useArtifacts, useChannels } from "@/api/queries";
 import type { ArtifactFilters, ArtifactKind } from "@/api/types";
 import { useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
+import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { ARTIFACT_KINDS, isArtifactKind, KIND_ICON } from "@/lib/artifacts";
@@ -92,6 +93,8 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
           size="sm"
         />
       </div>
+      {list.isLoading && <LoadingList count={5} trailing />}
+      {list.isError && !list.data && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
       {list.isSuccess && rows.length === 0 && !filtered && (
         <EmptyState icon="drive" title={t("drive.emptyTitle")}>
           {t("drive.emptyText")}

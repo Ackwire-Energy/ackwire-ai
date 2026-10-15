@@ -135,6 +135,7 @@ function AskAgent({ issue }: { issue: Issue }) {
         variant="agent"
         icon="agent"
         disabled={action.isPending}
+        loading={action.isPending}
         onClick={() =>
           action.mutate(
             { type: "ask", id: issue.id, agentId: agent.id },

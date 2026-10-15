@@ -40,8 +40,10 @@ import {
 } from "@/api/queries";
 import type { Agent, AgentAccess } from "@/api/types";
 import { AccessTree } from "@/components/AccessTree";
+import { AudienceChip, AudienceRow } from "@/components/AgentAudience";
 import { AgentComputerRow } from "@/components/AgentComputer";
 import { EditDialog } from "@/components/EditDialog";
+import { LoadingLine, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { ManageSkillsDialog } from "@/components/Skills";
 import { useAreaLabel } from "@/hooks/useAreaLabel";
@@ -68,7 +70,13 @@ export function AgentPage({ agentId }: { agentId: string }) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const agent = dir.agentById.get(agentId);
-  if (dir.loading) return <div className="page" aria-busy="true" />;
+  if (dir.loading) {
+    return (
+      <div className="page page--mid">
+        <LoadingPage rows={6} />
+      </div>
+    );
+  }
   if (!agent) {
     return (
       <div className="page page--mid">
@@ -139,6 +147,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
           <span className="agent-head__meta">
             {agent.role && <span>{agent.role}</span>}
             <Chip icon="agent">{modelLabel}</Chip>
+            <AudienceChip agent={agent} />
             <span className="muted">{owner ? t("agent.ownerLine", { name: owner.name }) : t("agent.noOwnerLine")}</span>
           </span>
         </div>
@@ -197,13 +206,17 @@ function AgentProfile({ agent }: { agent: Agent }) {
         </SummaryRow>
 
         <SummaryRow id="sec-mem" title={t("agent.memoryTitle", g)} action={edit(t("agent.knowledge"), "knowledge")}>
-          <span>
-            {t("agent.memorySummary", {
-              facts: t("agent.memoryFacts", { count: facts }),
-              lessons: t("agent.memoryLessons", { count: lessons }),
-            })}
-            {pending.length > 0 && t("agent.memoryProposals", { count: pending.length, who })}
-          </span>
+          {memory.isLoading ? (
+            <LoadingLine width={260} />
+          ) : (
+            <span>
+              {t("agent.memorySummary", {
+                facts: t("agent.memoryFacts", { count: facts }),
+                lessons: t("agent.memoryLessons", { count: lessons }),
+              })}
+              {pending.length > 0 && t("agent.memoryProposals", { count: pending.length, who })}
+            </span>
+          )}
         </SummaryRow>
 
         <SummaryRow id="sec-model" title={t("agent.modelAndKey")} action={edit(t("agent.modelAndKey"), "model")}>
@@ -217,6 +230,8 @@ function AgentProfile({ agent }: { agent: Agent }) {
           <span className="small muted">{owner ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
         </SummaryRow>
 
+        <AudienceRow agent={agent} />
+
         <SummaryRow
           id="sec-perm"
           title={t("agent.permissionsTitle", g)}
@@ -228,7 +243,9 @@ function AgentProfile({ agent }: { agent: Agent }) {
             ) : null
           }
         >
-          {tools ? (
+          {access.isLoading ? (
+            <LoadingLine width={160} />
+          ) : tools ? (
             <span>
               {access.data?.all
                 ? t("agent.toolsAll", { on: tools.on, total: tools.total })
@@ -240,7 +257,9 @@ function AgentProfile({ agent }: { agent: Agent }) {
         </SummaryRow>
 
         <SummaryRow id="sec-skills" title={t("skills.agentTitle")} action={edit(t("skills.agentTitle"), "skills")}>
-          {skills.isError ? (
+          {skills.isLoading ? (
+            <LoadingLine width={200} />
+          ) : skills.isError ? (
             <span className="muted">{t("skills.unavailable")}</span>
           ) : enabledSkills.length > 0 ? (
             <span>
@@ -273,7 +292,9 @@ function AgentProfile({ agent }: { agent: Agent }) {
             </div>
           }
         >
-          {detail.isError ? (
+          {detail.isLoading ? (
+            <LoadingLine width={220} />
+          ) : detail.isError ? (
             <span className="small muted">{t("agent.usageHidden")}</span>
           ) : (
             <>
@@ -699,7 +720,7 @@ function BudgetDialog({
         </DialogBody>
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
-          <Button type="submit" variant="primary" disabled={update.isPending}>
+          <Button type="submit" variant="primary" disabled={update.isPending} loading={update.isPending}>
             {t("agent.saveLimit")}
           </Button>
         </DialogFooter>
@@ -773,6 +794,7 @@ function AccessDialog({
         <Button
           variant="primary"
           disabled={!model || !tree || save.isPending}
+          loading={save.isPending}
           onClick={() => {
             if (!model || !tree) return;
             save.mutate(

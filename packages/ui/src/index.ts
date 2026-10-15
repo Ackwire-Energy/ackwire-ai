@@ -37,7 +37,31 @@ export { DayDivider, Message, type MessageProps, MessageText } from "./component
 export { Popover } from "./components/Popover";
 export { Select, type SelectOption, type SelectProps } from "./components/Select";
 export { Sheet, type SheetProps } from "./components/Sheet";
-export { Alert, Card, EmptyState, type EmptyStateProps, List, Meter, OptionCard, Steps } from "./components/Surfaces";
+export {
+  SKELETON_DELAY_MS,
+  Skeleton,
+  SkeletonCard,
+  SkeletonConversation,
+  SkeletonGroup,
+  SkeletonList,
+  SkeletonMessage,
+  type SkeletonProps,
+  SkeletonRow,
+  Spinner,
+  TopProgress,
+  useDelayed,
+} from "./components/Skeleton";
+export {
+  Alert,
+  Card,
+  EmptyState,
+  type EmptyStateProps,
+  LIST_STAGGER_MS,
+  List,
+  Meter,
+  OptionCard,
+  Steps,
+} from "./components/Surfaces";
 export { type TabItem, TabPanel, Tabs } from "./components/Tabs";
 export { normalizeTime, TimeSelect, type TimeSelectProps, timeOptions } from "./components/TimeSelect";
 export { Token, TokenList } from "./components/Token";

@@ -54,8 +54,8 @@ describe("Configurações da organização", () => {
     const add = screen().getByRole("dialog", { name: "Adicionar conector" });
     expect(add.textContent).toContain("Repositórios, PRs, issues e Actions.");
     await type(within(add).getByRole("searchbox", { name: "Buscar conector" }), "sentry");
-    expect(within(add).getAllByRole("button", { name: "Conectar" })).toHaveLength(1);
-    await click(within(add).getByRole("button", { name: "Conectar" }));
+    expect(within(add).getAllByRole("listitem")).toHaveLength(1);
+    await click(within(add).getByRole("button", { name: "Conectar Sentry" }));
     const connect = screen().getByRole("dialog", { name: "Conectar Sentry" });
     // Sentry has no OAuth app on this server: API key only.
     expect(within(connect).queryByRole("button", { name: "Conectar com Sentry" })).toBeNull();
@@ -80,7 +80,7 @@ describe("Configurações da organização", () => {
     await click(screen().getByRole("button", { name: "Adicionar conector" }));
     const add = screen().getByRole("dialog", { name: "Adicionar conector" });
     await type(within(add).getByRole("searchbox", { name: "Buscar conector" }), "github");
-    await click(within(add).getByRole("button", { name: "Conectar" }));
+    await click(within(add).getByRole("button", { name: "Conectar GitHub" }));
     const connect = screen().getByRole("dialog", { name: "Conectar GitHub" });
     await click(within(connect).getByRole("button", { name: "Conectar com GitHub" }));
     await settle(4);
@@ -97,7 +97,7 @@ describe("Configurações da organização", () => {
     await click(screen().getByRole("button", { name: "Adicionar conector" }));
     const add = screen().getByRole("dialog", { name: "Adicionar conector" });
     await type(within(add).getByRole("searchbox", { name: "Buscar conector" }), "drive");
-    await click(within(add).getByRole("button", { name: "Conectar" }));
+    await click(within(add).getByRole("button", { name: "Conectar Google Drive" }));
     const connect = screen().getByRole("dialog", { name: "Conectar Google Drive" });
     await type(within(connect).getByLabelText("Endereço do servidor MCP"), "http://inseguro");
     await type(within(connect).getByLabelText("Chave de API"), "chave-longa-123");

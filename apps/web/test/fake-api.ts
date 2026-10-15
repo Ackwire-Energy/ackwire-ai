@@ -429,6 +429,8 @@ export const CATALOG: ConnectorCatalog = {
     {
       id: "github",
       label: "GitHub",
+      category: "dev",
+      kind: "oauth_app",
       description: "Repositories, pull requests, issues and Actions.",
       auth: ["oauth", "api_key"],
       oauthConfigured: true,
@@ -454,6 +456,7 @@ export const CATALOG: ConnectorCatalog = {
     {
       id: "sentry",
       label: "Sentry",
+      category: "dev",
       description: "Errors, issues and events.",
       auth: ["oauth", "api_key"],
       oauthConfigured: false,
@@ -464,6 +467,7 @@ export const CATALOG: ConnectorCatalog = {
     {
       id: "drive",
       label: "Google Drive",
+      category: "docs",
       description: "Search, read and write documents (any Drive-like MCP server).",
       auth: ["oauth", "api_key"],
       oauthConfigured: false,
@@ -471,6 +475,48 @@ export const CATALOG: ConnectorCatalog = {
       scopes: [
         { id: "drive:files.read", label: "Read documents", description: "Search and read files.", sensitive: false },
       ],
+      tools: [],
+    },
+    // Official remote MCP servers: one click, then the same review as a custom server.
+    {
+      id: "linear",
+      label: "Linear",
+      category: "product",
+      kind: "remote_mcp",
+      serverUrl: "https://mcp.linear.app/mcp",
+      available: true,
+      description: "Issues, projetos e ciclos.",
+      auth: ["oauth"],
+      oauthConfigured: true,
+      needsServerUrl: false,
+      scopes: [],
+      tools: [],
+    },
+    {
+      id: "notion",
+      label: "Notion",
+      category: "docs",
+      kind: "remote_mcp",
+      serverUrl: "https://mcp.notion.com/mcp",
+      available: true,
+      description: "Páginas e bancos de dados.",
+      auth: ["oauth"],
+      oauthConfigured: true,
+      needsServerUrl: false,
+      scopes: [],
+      tools: [],
+    },
+    {
+      id: "slack",
+      label: "Slack",
+      category: "support",
+      kind: "oauth_app",
+      available: false,
+      description: "Canais e mensagens.",
+      auth: ["oauth"],
+      oauthConfigured: false,
+      needsServerUrl: false,
+      scopes: [],
       tools: [],
     },
   ],
@@ -886,7 +932,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           const root = inChannel.find((m) => m.id === options.threadId);
           return [...(root ? [root] : []), ...inChannel.filter((m) => m.threadId === options.threadId)];
         }
-        return inChannel.filter((m) => m.threadId === null);
+        // Like the server: the latest `limit` before `before`, oldest first.
+        const top = inChannel.filter((m) => m.threadId === null && (!options.before || m.createdAt < options.before));
+        return options.limit ? top.slice(-options.limit) : top;
       },
       post: async (orgId, channelId, input) => {
         log("chat.post", orgId, channelId, input);

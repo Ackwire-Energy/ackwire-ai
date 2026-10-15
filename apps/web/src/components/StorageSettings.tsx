@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSaveStorage, useStartMigration, useStorage, useStorageMigration, useTestStorage } from "@/api/queries";
 import type { S3Input, StorageConfig, StorageTestResult } from "@/api/types";
+import { LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { can } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
@@ -93,6 +94,7 @@ export function StorageSection() {
         </h2>
         <span className="small muted">{t("storage.subtitle")}</span>
       </div>
+      {storage.isLoading && <LoadingCards count={2} />}
       {config && (
         <>
           <RadioGroup
@@ -164,6 +166,7 @@ function InUse({ config }: { config: StorageConfig }) {
           <Button
             variant="primary"
             disabled={save.isPending}
+            loading={save.isPending}
             onClick={() =>
               save.mutate(
                 { kind: "agentes" },
@@ -196,7 +199,7 @@ function CopyFiles({ config }: { config: StorageConfig }) {
         <span className="small muted" style={{ flex: "1 1 240px" }}>
           {t("storage.copyText")}
         </span>
-        <Button disabled={start.isPending} onClick={() => start.mutate()}>
+        <Button disabled={start.isPending} loading={start.isPending} onClick={() => start.mutate()}>
           {t("storage.copy")}
         </Button>
       </div>
@@ -216,7 +219,7 @@ function CopyFiles({ config }: { config: StorageConfig }) {
         <>
           {m.error && <Alert>{m.error}</Alert>}
           <div className="row">
-            <Button disabled={start.isPending} onClick={() => start.mutate()}>
+            <Button disabled={start.isPending} loading={start.isPending} onClick={() => start.mutate()}>
               {t("storage.resume")}
             </Button>
           </div>
@@ -346,10 +349,10 @@ function BucketForm({ config }: { config: StorageConfig }) {
       {current && <TestSteps result={current} />}
       {stale && <p className="small muted">{t("storage.retestNeeded")}</p>}
       <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
-        <Button type="button" disabled={test.isPending} onClick={runTest}>
+        <Button type="button" disabled={test.isPending} loading={test.isPending} onClick={runTest}>
           {test.isPending ? t("storage.testing") : t("storage.test")}
         </Button>
-        <Button type="submit" variant="primary" disabled={!current?.ok || save.isPending}>
+        <Button type="submit" variant="primary" disabled={!current?.ok || save.isPending} loading={save.isPending}>
           {config.kind === "s3" ? t("storage.saveBucket") : t("storage.activate")}
         </Button>
       </div>

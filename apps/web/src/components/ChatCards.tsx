@@ -64,7 +64,7 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
           </Link>
         </Button>
         {!undone && update.undo && (
-          <Button size="sm" disabled={revert.isPending} onClick={() => revert.mutate()}>
+          <Button size="sm" disabled={revert.isPending} loading={revert.isPending} onClick={() => revert.mutate()}>
             {t("memoryCard.undo")}
           </Button>
         )}
@@ -154,6 +154,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
             <Button
               size="sm"
               disabled={decide.isPending}
+              loading={decide.isPending && decide.variables?.decision === "refuse"}
               onClick={() => decide.mutate({ id: p.id, decision: "refuse" }, { onError })}
             >
               {t("proposals.refuse")}
@@ -226,7 +227,13 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       ) : (
         <div className="ac-approval__actions">
           {(current.choices ?? []).map((choice) => (
-            <Button key={choice} size="sm" disabled={answer.isPending} onClick={() => answer.mutate(choice)}>
+            <Button
+              key={choice}
+              size="sm"
+              disabled={answer.isPending}
+              loading={answer.isPending && answer.variables === choice}
+              onClick={() => answer.mutate(choice)}
+            >
               {choice}
             </Button>
           ))}

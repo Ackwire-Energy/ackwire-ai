@@ -298,8 +298,25 @@ export interface ScopeInfo {
   sensitive: boolean;
 }
 
+/** Catalog groups: Desenvolvimento, Produto, Docs, Pagamentos, Marketing, Suporte. */
+export type ConnectorCategory = "dev" | "product" | "docs" | "payments" | "marketing" | "support";
+
 /** A connector agentes.chat knows (catalog). */
 export interface ConnectorDef {
+  /** Expected from the backend's catalog: the group it shows under. */
+  category?: ConnectorCategory;
+  /**
+   * `remote_mcp`: the vendor's official remote MCP server (one click, then the
+   * same review as a custom server); `oauth_app`: our OAuth app (GitHub);
+   * absent: the classic catalog connector.
+   */
+  kind?: "remote_mcp" | "oauth_app";
+  /** The remote MCP endpoint (`remote_mcp`). */
+  serverUrl?: string | null;
+  /** Configured on this server; `false` shows "Em breve". */
+  available?: boolean;
+  /** An official asset URL from the catalog (else a monogram). */
+  iconUrl?: string | null;
   id: string;
   label: string;
   description: string;

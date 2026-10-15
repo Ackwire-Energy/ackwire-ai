@@ -1,10 +1,12 @@
 import { queryOptions, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { upsertMessage } from "@/chat/timeline";
 import type { ApiClient } from "./client";
 import { useApi } from "./context";
 import { keys } from "./keys";
 import type {
   AccessInput,
+  AgentComputer,
   AgentInput,
   Approval,
   ArtifactContent,
@@ -181,14 +183,37 @@ export const useChannelMembers = (orgId: string, channelId: string, enabled = tr
   });
 };
 
+/** Messages per page: the latest page, then older pages on scroll-up. */
+export const MESSAGES_PAGE = 100;
+
+/**
+ * The latest page of a conversation. Cached per channel and fresh for 30 s
+ * (real-time events keep it current), so switching back is instant; then it
+ * revalidates in the background.
+ */
+export const messagesQuery = (api: ApiClient, orgId: string, channelId: string) =>
+  queryOptions({
+    queryKey: keys.messages(orgId, channelId),
+    queryFn: () => api.chat.messages(orgId, channelId, { limit: MESSAGES_PAGE }),
+    staleTime: 30_000,
+  });
+
 export const useMessages = (orgId: string, channelId: string, enabled = true) => {
   const api = useApi();
-  return useQuery({
-    queryKey: keys.messages(orgId, channelId),
-    queryFn: () => api.chat.messages(orgId, channelId, { limit: 100 }),
-    enabled,
-  });
+  return useQuery({ ...messagesQuery(api, orgId, channelId), enabled });
 };
+
+/** Sidebar hover/focus: load a conversation before the click. */
+export function usePrefetchMessages(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useCallback(
+    (channelId: string) => {
+      void qc.prefetchQuery(messagesQuery(api, orgId, channelId));
+    },
+    [api, qc, orgId],
+  );
+}
 
 export function useThreads(orgId: string, channelId: string, rootIds: string[]) {
   const api = useApi();
@@ -1026,13 +1051,17 @@ export function useSaveSandboxSettings(orgId: string) {
   });
 }
 
-export const useComputer = (orgId: string, agentId: string, enabled = true) => {
+/** `pollMs`: refetch this often (while starting or stopping); `false` = no polling. */
+export const useComputer = (orgId: string, agentId: string, enabled = true, pollMs: number | false = false) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.computer(orgId, agentId),
     queryFn: () => api.sandbox.computer(orgId, agentId),
     enabled,
     retry: false,
+    refetchInterval: pollMs,
+    // Polling doesn't show the top progress bar.
+    meta: { quiet: true },
   });
 };
 
@@ -1046,6 +1075,14 @@ export function useComputerAction(orgId: string) {
         : action === "stop"
           ? api.sandbox.stop(orgId, agentId)
           : api.sandbox.remove(orgId, agentId),
-    onSettled: (_d, _e, { agentId }) => qc.invalidateQueries({ queryKey: keys.computer(orgId, agentId) }),
+    onSuccess: (result, { agentId, action }) => {
+      if (action === "remove") {
+        qc.setQueryData<AgentComputer>(keys.computer(orgId, agentId), (old) =>
+          old ? { ...old, status: "none", diskUsedGib: 0, createdAt: null, lastUsedAt: null } : old,
+        );
+      } else if (result && typeof result === "object" && "status" in result) {
+        qc.setQueryData(keys.computer(orgId, agentId), result as AgentComputer);
+      }
+    },
   });
 }

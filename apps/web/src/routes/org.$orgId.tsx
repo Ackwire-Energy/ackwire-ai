@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { requireUser } from "@/app/guards";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
+import { RefetchBar } from "@/components/Loading";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { membershipIn } from "@/lib/guards";
@@ -51,6 +52,7 @@ function OrgLayout() {
       <RealtimeProvider orgId={membership.id}>
         <ArtifactViewerProvider>
           <div className="shell">
+            <RefetchBar />
             <Sidebar />
             <Outlet />
           </div>

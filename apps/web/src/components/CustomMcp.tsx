@@ -19,6 +19,7 @@ import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useAgents, useCustomServerAction } from "@/api/queries";
 import type { CustomServer, ToolAccess } from "@/api/types";
+import { useStepText } from "@/components/Loading";
 import { modelFrom, toInput, treeFromAccess } from "@/lib/access";
 import {
   draftFrom,
@@ -38,10 +39,13 @@ export function ConnectCustomDialog({
   open,
   onOpenChange,
   onConnected,
+  initial,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConnected: (server: CustomServer) => void;
+  /** From the catalog: an official remote MCP server that asked for a key. */
+  initial?: { url: string; label: string; needsKey: boolean } | null;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -51,15 +55,21 @@ export function ConnectCustomDialog({
   const [apiKey, setApiKey] = useState("");
   const [needsKey, setNeedsKey] = useState(false);
   const [touched, setTouched] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset each time it opens
   useEffect(() => {
     if (!open) return;
-    setUrl("");
-    setLabel("");
+    setUrl(initial?.url ?? "");
+    setLabel(initial?.label ?? "");
     setApiKey("");
-    setNeedsKey(false);
+    setNeedsKey(initial?.needsKey ?? false);
     setTouched(false);
   }, [open]);
 
+  const connectStep = useStepText(connect.isPending, [
+    t("customMcp.step.reaching"),
+    t("customMcp.step.tools"),
+    t("customMcp.step.almost"),
+  ]);
   const urlError = touched && !isHttpsUrl(url) ? t("customMcp.urlInvalid") : undefined;
   const keyError = touched && needsKey && apiKey.trim().length < 8 ? t("customMcp.apiKeyInvalid") : undefined;
 
@@ -93,8 +103,8 @@ export function ConnectCustomDialog({
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={t("customMcp.connectTitle")}
-      description={t("customMcp.connectText")}
+      title={initial ? t("connectors.connectTitle", { name: initial.label }) : t("customMcp.connectTitle")}
+      description={initial ? t("connectors.remoteText") : t("customMcp.connectText")}
       closeLabel={t("common.close")}
       width={480}
     >
@@ -133,9 +143,9 @@ export function ConnectCustomDialog({
             </>
           )}
         </DialogBody>
-        <DialogFooter>
+        <DialogFooter note={connectStep}>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
-          <Button type="submit" variant="primary" disabled={connect.isPending}>
+          <Button type="submit" variant="primary" disabled={connect.isPending} loading={connect.isPending}>
             {needsKey ? t("customMcp.connectKey") : t("customMcp.continue")}
           </Button>
         </DialogFooter>
@@ -270,7 +280,7 @@ export function ReviewToolsDialog({
       )}
       <DialogFooter bar note={t("customMcp.saveNote")}>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
-        <Button variant="primary" disabled={save.isPending} onClick={submit}>
+        <Button variant="primary" disabled={save.isPending} loading={save.isPending} onClick={submit}>
           {t("customMcp.save")}
         </Button>
       </DialogFooter>
@@ -333,7 +343,13 @@ export function CustomServerRow({
               {t("customMcp.review")}
             </Button>
           )}
-          <Button variant="ghost" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate(server.id)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={refresh.isPending}
+            loading={refresh.isPending}
+            onClick={() => refresh.mutate(server.id)}
+          >
             {t("customMcp.refresh")}
           </Button>
           <Button variant="ghost" size="sm" className="ac-btn--danger" onClick={onDisconnect}>
@@ -418,6 +434,7 @@ export function GrantAgentsDialog({ server, onClose }: { server: CustomServer | 
         <Button
           variant="primary"
           disabled={picked.size === 0 || grant.isPending}
+          loading={grant.isPending}
           onClick={() => grant.mutate([...picked])}
         >
           {t("customMcp.grantSave")}

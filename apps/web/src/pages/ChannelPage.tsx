@@ -15,15 +15,19 @@ import {
   Mention,
   Message,
   MessageText,
+  Skeleton,
+  SkeletonGroup,
+  SkeletonMessage,
+  Spinner,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { memo, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
 import {
+  MESSAGES_PAGE,
   sendHelpers,
   useAddChannelMember,
   useApproval,
@@ -54,6 +58,7 @@ import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { InlineProposal, MemoryChangeCard, QuestionCard } from "@/components/ChatCards";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
+import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
 import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageReceipts } from "@/components/MessageReceipts";
@@ -64,8 +69,10 @@ import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { activityText, activityVerb, barEntries, isWriting, toolActivity } from "@/lib/activity";
 import { artifactRefs } from "@/lib/artifacts";
+import { audienceNotice, canTalk } from "@/lib/audience";
 import { entersWithMotion, greetingSuggestions, messageUsage, nearBottom, usageLine } from "@/lib/chat";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
+import { reportPainted } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { routineOfMessage } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
@@ -89,6 +96,8 @@ export interface ChannelChrome {
   composerTarget?: string;
   /** A DM with this agent: it answers every message (optimistic "pensando…" is allowed). */
   dmAgentId?: string;
+  /** The agent won't answer me: the composer is off and says why ("O Theo só responde a Walter."). */
+  locked?: string;
   /** Empty conversation: "Diga oi para o Theo". */
   emptyTitle?: string;
   /** Empty conversation: first messages to pick (they go to the composer). */
@@ -96,6 +105,13 @@ export interface ChannelChrome {
 }
 
 const sameRuns = (a: LiveRun[], b: LiveRun[]) => a.length === b.length && a.every((r, i) => r === b[i]);
+
+/** Older messages per scroll-up page. */
+const OLDER_PAGE = 50;
+/** Per channel, for this session: older pages already loaded, channels with no more, and scroll positions. */
+const olderPages = new Map<string, MessageType[]>();
+const olderDone = new Set<string>();
+const scrollPositions = new Map<string, number>();
 
 /** telas/Main.dc.html — a channel with real-time messages, streaming agent replies and inline approvals. */
 export function ChannelPage({
@@ -113,7 +129,7 @@ export function ChannelPage({
   const channels = useChannels(org.id);
   const channel = channels.data?.find((c) => c.id === channelId) ?? fallback;
 
-  if (channels.isPending && !fallback) return <main className="shell__main shell__main--chat" aria-busy="true" />;
+  if (channels.isPending && !fallback) return <ChannelSkeleton />;
   if (!channel) {
     return (
       <main className="shell__main">
@@ -124,6 +140,43 @@ export function ChannelPage({
     );
   }
   return <ChannelView key={channel.id} channel={channel} chrome={chrome} />;
+}
+
+/**
+ * The whole conversation loading (header, messages, composer) with the real
+ * layout, so nothing jumps when it arrives.
+ */
+export function ChannelSkeleton() {
+  const { t } = useTranslation();
+  return (
+    <main className="shell__main shell__main--chat">
+      <SkeletonGroup label={t("common.loadingMessages")} className="channel__skeleton">
+        <header className="channel__header">
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0, flex: 1 }}>
+            <Skeleton width={160} height={16} />
+            <Skeleton width={260} height={10} />
+          </div>
+          <Skeleton width={72} height={28} />
+        </header>
+        <div className="channel__messages">
+          <div className="channel__spacer" aria-hidden="true" />
+          <div className="ac-skeleton-conversation">
+            <SkeletonMessage lines={2} seed={0} />
+            <SkeletonMessage lines={1} grouped seed={1} />
+            <SkeletonMessage lines={3} agent seed={2} />
+            <SkeletonMessage lines={1} seed={3} />
+            <SkeletonMessage lines={2} agent seed={4} />
+          </div>
+        </div>
+        <div className="channel__composer">
+          <div className="ac-composer channel__composer-skeleton" aria-hidden="true">
+            <Skeleton width="36%" />
+          </div>
+          <p className="ac-composer__hint">&nbsp;</p>
+        </div>
+      </SkeletonGroup>
+    </main>
+  );
 }
 
 function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelChrome }) {
@@ -168,7 +221,7 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
   const mentioned = (body: string) =>
     tokenizeBody(body)
       .flatMap((tok) => (tok.type === "mention" ? [dir.agentByHandle.get(tok.handle.toLowerCase())] : []))
-      .filter((a): a is Agent => Boolean(a && channelAgents.some((c) => c.id === a.id)))
+      .filter((a): a is Agent => Boolean(a && canTalk(a) && channelAgents.some((c) => c.id === a.id)))
       .map((a) => a.id);
 
   const post = usePostMessage(org.id, channel.id, {
@@ -179,7 +232,7 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
     onOptimistic: (local) => {
       const agents = local.mentionedAgentIds.length
         ? local.mentionedAgentIds
-        : chrome?.dmAgentId
+        : chrome?.dmAgentId && !chrome.locked
           ? [chrome.dmAgentId]
           : [];
       if (agents.length > 0) live.expect(channel.id, local.id, agents);
@@ -195,28 +248,82 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
     if (isMember && lastId) api.dms.markRead(org.id, channel.id).catch(() => {});
   }, [api, org.id, channel.id, isMember, lastId]);
 
+  // The skeleton was on screen: the real messages fade in (once).
+  const hadSkeleton = useRef(messages.isLoading);
+  const [fresh, setFresh] = useState(false);
+  useEffect(() => {
+    if (!messages.isSuccess || !hadSkeleton.current) return;
+    hadSkeleton.current = false;
+    setFresh(true);
+    const timer = setTimeout(() => setFresh(false), 400);
+    return () => clearTimeout(timer);
+  }, [messages.isSuccess]);
+
   // Person messages loaded over HTTP start their receipts.
   useEffect(() => {
     if (messages.data) live.seed(messages.data);
   }, [messages.data, live]);
 
+  // Older pages, loaded on scroll-up (kept for this session per channel).
+  const [older, setOlder] = useState<MessageType[]>(() => olderPages.get(channel.id) ?? []);
+  const [olderState, setOlderState] = useState<"idle" | "loading" | "done">(() =>
+    olderDone.has(channel.id) ? "done" : "idle",
+  );
+  const anchor = useRef<{ height: number; top: number } | null>(null);
+  const loadOlder = () => {
+    if (olderState !== "idle" || !messages.data) return;
+    const oldest = older[0] ?? messages.data[0];
+    if (!oldest || messages.data.length < MESSAGES_PAGE) {
+      setOlderState("done");
+      return;
+    }
+    setOlderState("loading");
+    api.chat
+      .messages(org.id, channel.id, { before: oldest.createdAt, limit: OLDER_PAGE })
+      .then((page) => {
+        // Keep what's on screen where it is: remember the distance from the bottom.
+        const el = scroller.current;
+        if (el) anchor.current = { height: el.scrollHeight, top: el.scrollTop };
+        setOlder((prev) => {
+          const known = new Set(prev.map((m) => m.id));
+          const next = [...page.filter((m) => !known.has(m.id)), ...prev];
+          olderPages.set(channel.id, next);
+          return next;
+        });
+        if (page.length < OLDER_PAGE) olderDone.add(channel.id);
+        setOlderState(page.length < OLDER_PAGE ? "done" : "idle");
+      })
+      .catch(() => setOlderState("idle"));
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when older rows were prepended
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    const a = anchor.current;
+    if (!el || !a) return;
+    anchor.current = null;
+    el.scrollTop = el.scrollHeight - a.height + a.top;
+  }, [older]);
+
   const timeline = useMemo(
     () =>
       buildTimeline(
         mergeTimeline(
-          messages.data ?? [],
+          [...older, ...(messages.data ?? [])],
           threads.map((q) => q.data),
         ),
         [],
         [],
       ),
-    [messages.data, threads],
+    [older, messages.data, threads],
   );
 
   // Newest at the bottom: follow new messages and streaming text while the person is at the
   // bottom; if they scrolled up, offer "Novas mensagens" instead of jumping.
   const scroller = useRef<HTMLElement>(null);
-  const stick = useRef(true);
+  // Coming back to a channel scrolled up: restore that position (else the bottom).
+  const savedScroll = useRef(scrollPositions.get(channel.id));
+  const stick = useRef(savedScroll.current === undefined);
+  const lastScrollTop = useRef<number | null>(null);
   // A smooth scroll in progress: its intermediate positions don't mean "the person scrolled up".
   const autoScrollUntil = useRef(0);
   const reducedMotion = usePrefersReducedMotion();
@@ -247,6 +354,29 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
     if (stick.current) toBottom(newRow && settled);
     else if (newRow || runCount > 0) setUnseen(true);
   }, [lastKey, runCount, streamSize]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the rows are there
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    const saved = savedScroll.current;
+    if (!el || saved === undefined || timeline.length === 0) return;
+    savedScroll.current = undefined;
+    el.scrollTop = saved;
+  }, [timeline.length > 0]);
+  // Leaving: remember where they were (only when scrolled up).
+  useEffect(
+    () => () => {
+      if (stick.current || lastScrollTop.current === null) scrollPositions.delete(channel.id);
+      else scrollPositions.set(channel.id, lastScrollTop.current);
+    },
+    [channel.id],
+  );
+  // Dev only: "click → first paint of messages".
+  const fromCache = useRef(messages.data !== undefined);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reports once the rows (or an empty channel) are on screen
+  useEffect(() => {
+    if (timeline.length > 0 || messages.isSuccess) reportPainted(channel.id, channel.name, fromCache.current);
+  }, [timeline.length > 0, messages.isSuccess, channel.id, channel.name]);
 
   const onSend = (text: string) => {
     toBottom(true);
@@ -334,7 +464,12 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
               icon="channel"
               title={t("channel.notMemberTitle")}
               actions={
-                <Button variant="primary" onClick={() => join.mutate()} disabled={join.isPending}>
+                <Button
+                  variant="primary"
+                  onClick={() => join.mutate()}
+                  disabled={join.isPending}
+                  loading={join.isPending}
+                >
                   {t("channel.join", { channel: channel.name })}
                 </Button>
               }
@@ -344,13 +479,24 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
           </div>
         ) : (
           <>
+            {olderState === "loading" && (
+              <div className="channel__older" role="status">
+                <span className="channel__older-pill">
+                  <Spinner size={14} />
+                  {t("channel.loadingOlder")}
+                </span>
+              </div>
+            )}
             <section
               ref={scroller}
               className="channel__messages"
+              data-fresh={fresh || undefined}
               aria-label={t("channel.messages")}
               aria-live="polite"
               aria-relevant="additions"
               onScroll={(e) => {
+                lastScrollTop.current = e.currentTarget.scrollTop;
+                if (e.currentTarget.scrollTop < 240) loadOlder();
                 const near = nearBottom(e.currentTarget);
                 if (!near && Date.now() < autoScrollUntil.current) return;
                 stick.current = near;
@@ -359,10 +505,9 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
             >
               {/* Pushes short channels down, next to the composer. */}
               <div className="channel__spacer" aria-hidden="true" />
-              {messages.isError && (
-                <EmptyState icon="alert">
-                  {messages.error instanceof ApiError ? messages.error.message : t("common.loadFailed")}
-                </EmptyState>
+              {messages.isLoading && <LoadingConversation />}
+              {messages.isError && !messages.data && (
+                <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
               )}
               {messages.isSuccess && timeline.length === 0 && streamSize === 0 && (
                 <div className="channel__empty">
@@ -395,6 +540,7 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
               )}
               <Timeline items={timeline} ready={messages.isSuccess} />
               <LiveMemoryCards channelId={channel.id} />
+              <LiveNotices channelId={channel.id} />
               <LiveRuns channelId={channel.id} last={lastMessage} />
             </section>
             {unseen && (
@@ -421,6 +567,7 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
                   if (v.trim()) sendTyping();
                 }}
                 onSend={onSend}
+                disabled={Boolean(chrome?.locked)}
                 label={
                   chrome?.composerTarget
                     ? t("channel.composerDm", { name: chrome.composerTarget })
@@ -444,9 +591,11 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
               />
               {offer && <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />}
               <p className="ac-composer__hint">
-                {channelAgents.length > 0
-                  ? t("channel.footerAgents", { count: channelAgents.length, names: agentNames })
-                  : t("channel.footerNoAgents")}
+                {chrome?.locked
+                  ? chrome.locked
+                  : channelAgents.length > 0
+                    ? t("channel.footerAgents", { count: channelAgents.length, names: agentNames })
+                    : t("channel.footerNoAgents")}
               </p>
             </div>
           </>
@@ -496,6 +645,32 @@ const Timeline = memo(function Timeline({
     </>
   );
 });
+
+/**
+ * "O Theo só responde a Walter.": only I see it (`agent.unavailable`, never
+ * stored), right after my message that mentioned the agent.
+ */
+function LiveNotices({ channelId }: { channelId: string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const notices = useLive((s) => s.notices[channelId]);
+  if (!notices?.length) return null;
+  return (
+    <>
+      {notices.map((n) => {
+        const agent = dir.agentById.get(n.agentId);
+        const known = agent ? audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name) : "";
+        return (
+          <p key={n.key} className="channel__notice" role="status">
+            <Icon name="lock" size={16} />
+            <span>{known || n.text}</span>
+          </p>
+        );
+      })}
+    </>
+  );
+}
 
 /** `memory.updated` cards (live, they aren't in the message list). */
 function LiveMemoryCards({ channelId }: { channelId: string }) {
@@ -987,6 +1162,7 @@ function ChannelDetails({
                   icon="close"
                   aria-label={t("channelMembers.remove", { name: r.name })}
                   disabled={remove.isPending}
+                  loading={remove.isPending}
                   onClick={() => remove.mutate(r.kind === "agent" ? { agentId: r.id } : { userId: r.id })}
                 />
               )}
@@ -1071,7 +1247,12 @@ function AddMembersDialog({
       </DialogSearchList>
       <DialogFooter bar>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
-        <Button variant="primary" disabled={selected.size === 0 || add.isPending} onClick={() => add.mutate()}>
+        <Button
+          variant="primary"
+          disabled={selected.size === 0 || add.isPending}
+          loading={add.isPending}
+          onClick={() => add.mutate()}
+        >
           {t("channelMembers.addConfirm", { count: selected.size })}
         </Button>
       </DialogFooter>
@@ -1107,6 +1288,7 @@ function AddToChannelOffer({ channelId, agentId, onDone }: { channelId: string; 
         <Button
           size="sm"
           disabled={add.isPending}
+          loading={add.isPending}
           onClick={() =>
             add.mutate(
               { channelId, member: { agentId } },

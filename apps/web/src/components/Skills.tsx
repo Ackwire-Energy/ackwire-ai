@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 import { useAgentSkills, useSkill, useSkillAction, useSkills, useSkillUsage } from "@/api/queries";
 import type { Skill, SkillDetail, SkillFile } from "@/api/types";
 import { EditDialog } from "@/components/EditDialog";
+import { LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { joinNames, relativeTime } from "@/lib/format";
 import { Markdown } from "@/lib/markdown";
@@ -114,6 +115,7 @@ export function SkillsSection() {
         )}
       </div>
       {unavailable && <p className="small muted">{t("skills.unavailable")}</p>}
+      {skills.isLoading && <LoadingList count={3} avatar={false} trailing />}
       {skills.isSuccess && list.length === 0 && <p className="small muted">{t("skills.empty")}</p>}
       {list.length > 0 && (
         <List aria-label={t("skills.title")}>
@@ -173,6 +175,11 @@ export function InstallSkillDialog({
   const { org } = useOrg();
   const toast = useToast();
   const action = useSkillAction(org.id);
+  const installStep = useStepText(action.isPending, [
+    t("skills.installStep.fetching"),
+    t("skills.installStep.reading"),
+    t("skills.installStep.saving"),
+  ]);
   const [tab, setTab] = useState<InstallTab>("github");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -280,11 +287,11 @@ export function InstallSkillDialog({
           </Tabs>
           {error && <Alert>{error}</Alert>}
         </DialogBody>
-        <DialogFooter>
+        <DialogFooter note={installStep}>
           <Button type="button" onClick={() => onOpenChange(false)}>
             {t("common.cancel")}
           </Button>
-          <Button type="submit" variant="primary" disabled={action.isPending}>
+          <Button type="submit" variant="primary" disabled={action.isPending} loading={action.isPending}>
             {t("skills.installSubmit")}
           </Button>
         </DialogFooter>
@@ -338,6 +345,7 @@ export function SkillSheet({
                 size="sm"
                 variant="ghost"
                 disabled={action.isPending}
+                loading={action.isPending && action.variables?.type === "reimport"}
                 onClick={() =>
                   action.mutate(
                     { type: "reimport", id: s.id },
@@ -402,6 +410,7 @@ export function SkillSheet({
             <Button
               variant="danger"
               disabled={action.isPending}
+              loading={action.isPending && action.variables?.type === "remove"}
               onClick={() =>
                 action.mutate(
                   { type: "remove", id: s.id },
@@ -489,7 +498,12 @@ function EditSkill({ skill, onDone }: { skill: SkillDetail; onDone: () => void }
         <Button type="button" onClick={onDone}>
           {t("common.cancel")}
         </Button>
-        <Button type="submit" variant="primary" disabled={!form.description.trim() || action.isPending}>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={!form.description.trim() || action.isPending}
+          loading={action.isPending}
+        >
           {t("skills.save")}
         </Button>
       </div>

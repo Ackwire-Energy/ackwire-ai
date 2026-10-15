@@ -145,7 +145,12 @@ function CorrectionDialog({
         </DialogBody>
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
-          <Button type="submit" variant="primary" disabled={!text.trim() || correct.isPending}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!text.trim() || correct.isPending}
+            loading={correct.isPending}
+          >
             {t("channel.sendCorrection")}
           </Button>
         </DialogFooter>

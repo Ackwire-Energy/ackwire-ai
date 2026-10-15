@@ -226,6 +226,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                 </Button>
                 <Button
                   disabled={decide.isPending}
+                  loading={decide.isPending && decide.variables?.decision === "refuse"}
                   onClick={() => decide.mutate({ id: current.id, decision: "refuse" }, { onError: onDecideError })}
                 >
                   {t("proposals.refuse")}

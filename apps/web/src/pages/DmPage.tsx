@@ -1,4 +1,4 @@
-import { Avatar, Button, EmptyState } from "@agenteschat/ui";
+import { Avatar, Button } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -6,11 +6,14 @@ import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useModels } from "@/api/queries";
 import type { DmTarget } from "@/api/types";
+import { AudienceChip } from "@/components/AgentAudience";
+import { ErrorState } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { audienceNotice, canTalk } from "@/lib/audience";
 import { greetingSuggestions } from "@/lib/chat";
 import { agentGrammar } from "@/lib/grammar";
-import { ChannelPage } from "./ChannelPage";
+import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
 /** A direct message with an agent or a person: the channel layout with its own header and empty state. */
 export function DmPage({ target }: { target: DmTarget }) {
@@ -40,18 +43,12 @@ export function DmPage({ target }: { target: DmTarget }) {
     return (
       <main className="shell__main">
         <div className="page page--mid">
-          <EmptyState icon="alert">{dm.error instanceof Error ? dm.error.message : t("common.loadFailed")}</EmptyState>
+          <ErrorState error={dm.error} onRetry={() => void dm.refetch()} />
         </div>
       </main>
     );
   }
-  if (!dm.data || dir.loading) {
-    return (
-      <main className="shell__main shell__main--chat" aria-busy="true">
-        <p className="channel__status">{t("dm.opening")}</p>
-      </main>
-    );
-  }
+  if (!dm.data || dir.loading) return <ChannelSkeleton />;
 
   const owner = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const model = agent ? (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model) : "";
@@ -64,7 +61,10 @@ export function DmPage({ target }: { target: DmTarget }) {
         <Avatar name={name} imageUrl={person?.image} />
       )}
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
-        <h1 className="channel__title">{name}</h1>
+        <h1 className="channel__title">
+          {name}
+          {agent && <AudienceChip agent={agent} />}
+        </h1>
         {agent && (
           <span className="channel__topic">
             {owner ? t("dm.subtitle", { role, owner: owner.name, model }) : t("dm.subtitleNoOwner", { role, model })}
@@ -96,6 +96,7 @@ export function DmPage({ target }: { target: DmTarget }) {
         header,
         composerTarget: name,
         dmAgentId: agent?.id,
+        locked: agent && !canTalk(agent) ? audienceNotice(t, agent, (uid) => dir.memberById.get(uid)?.name) : undefined,
         emptyText: agent ? t("dm.emptyAgent", agentGrammar(t, agent.name)) : t("dm.emptyPerson", { name }),
         emptyTitle: agent ? t("chat.sayHiAgent", agentGrammar(t, agent.name)) : t("chat.sayHiPerson", { name }),
         suggestions: agent ? greetingSuggestions(t, agent.role) : [],
