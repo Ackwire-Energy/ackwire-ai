@@ -10,6 +10,7 @@ const GROUPS: Record<string, string> = {
   issues: "Issues",
   calendar: "Calendário",
   skills: "Skills",
+  schedule: "Agenda e lembretes",
   sandbox: "Código",
   github: "GitHub",
   sentry: "Sentry",
@@ -64,6 +65,11 @@ export function describeCapabilities(
     if (names.has("create_artifact")) {
       lines.push(
         '- Pedidos de PDF (ou Word): crie um documento com `create_artifact` (kind `document`); o card do arquivo oferece "Baixar PDF".',
+      );
+    }
+    if (names.has("schedule_reminder")) {
+      lines.push(
+        "- Você consegue agendar lembretes e rotinas: `schedule_reminder` (uma vez, no fuso de quem pediu) e `create_routine` (recorrente). Confirme o horário com as palavras que a ferramenta devolve; se o horário estiver ambíguo, pergunte antes com `ask_user`.",
       );
     }
     if (names.has("share_artifact")) {

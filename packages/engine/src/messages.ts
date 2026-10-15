@@ -128,7 +128,7 @@ export function parseMentionHandles(body: string): string[] {
 
 export type MessageAuthor =
   | { type: "person"; userId: string }
-  | { type: "agent"; agentId: string; runId: string; hop: number };
+  | { type: "agent"; agentId: string; runId: string | null; hop: number };
 
 export interface NewMessage {
   orgId: string;

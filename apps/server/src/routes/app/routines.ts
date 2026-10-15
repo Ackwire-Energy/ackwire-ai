@@ -18,6 +18,17 @@ const Target = z.union([
   z.object({ type: z.literal("dm") }),
   z.object({ type: z.literal("artifact") }),
 ]);
+/** What routines show: also `conversation` (a thread or DM, from an agent's `schedule_reminder` or `create_routine`). */
+const TargetView = z.union([
+  ...Target.options,
+  z.object({
+    type: z.literal("conversation"),
+    channelId: z.uuid(),
+    threadId: z.uuid().nullable(),
+    reminder: z.boolean().optional().openapi({ description: "A plain reminder (the agent's message, no run)." }),
+    forUserId: z.string().optional(),
+  }),
+]);
 const RoutineRun = z
   .object({
     id: z.uuid(),
@@ -33,7 +44,7 @@ const Routine = z
     name: z.string(),
     agentId: z.uuid(),
     prompt: z.string(),
-    target: Target,
+    target: TargetView,
     trigger: z.union([
       z.object({
         type: z.literal("schedule"),
@@ -43,8 +54,14 @@ const Routine = z
         description: z.string(),
       }),
       z.object({ type: z.literal("event"), event: Event }),
+      z.object({
+        type: z.literal("once"),
+        at: z.string(),
+        timezone: z.string(),
+        description: z.string().openapi({ description: '"amanhã, 16/10, às 09:00 (horário de Brasília)".' }),
+      }),
     ]),
-    active: z.boolean(),
+    active: z.boolean().openapi({ description: "One-off routines are inactive once they fired." }),
     nextRunAt: z.string().nullable(),
     running: z.boolean(),
     lastRun: RoutineRun.nullable(),

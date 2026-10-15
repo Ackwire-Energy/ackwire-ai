@@ -36,6 +36,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
   "calendar:read": ["list_events", "find_free_time"],
   "calendar:write": ["propose_event"],
   "skills:read": ["load_skill", "read_skill_file"],
+  "schedule:write": ["schedule_reminder", "create_routine", "list_reminders", "cancel_reminder"],
   "sandbox:run": [
     "run_code",
     "write_file",
@@ -103,6 +104,10 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   propose_event: { label: "Propor evento", description: "Sugere um evento; quem pediu confirma." },
   load_skill: { label: "Carregar skill", description: "Carrega as instruções de uma skill." },
   read_skill_file: { label: "Ler arquivo de skill", description: "Lê um arquivo de referência de uma skill." },
+  schedule_reminder: { label: "Criar lembrete", description: "Agenda um lembrete nesta conversa, para quem pediu." },
+  create_routine: { label: "Criar rotina", description: "Cria uma rotina recorrente nesta conversa." },
+  list_reminders: { label: "Ver lembretes", description: "Lista os lembretes pendentes de quem pediu." },
+  cancel_reminder: { label: "Cancelar lembrete", description: "Cancela um lembrete de quem pediu." },
   run_code: { label: "Rodar código", description: "Roda Python, Node ou bash no ambiente isolado da conversa." },
   write_file: { label: "Escrever no ambiente", description: "Grava um arquivo no ambiente de código." },
   read_file: { label: "Ler do ambiente", description: "Lê um arquivo do ambiente de código." },

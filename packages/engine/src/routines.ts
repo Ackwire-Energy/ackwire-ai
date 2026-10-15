@@ -7,8 +7,9 @@ import { type ContextDeps, resolveSummaryModel } from "./context/summaries";
 import { nextCronTime } from "./cron";
 import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { publishMessageCreated, publishUserEvent } from "./events";
 import { getOrgSettings } from "./management";
-import { postPersonMessage } from "./messages";
+import { insertMessageWithRuns, messageView, postPersonMessage } from "./messages";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { parseSchedule, type ScheduleParse } from "./schedule";
@@ -16,7 +17,16 @@ import { monthStartUtc } from "./usage";
 
 const { routines, routineRuns, agentRuns, usageRecords, channelMembers, channels } = schema;
 
-export type RoutineTarget = { type: "channel"; channelId: string } | { type: "dm" } | { type: "artifact" };
+export type RoutineTarget =
+  | { type: "channel"; channelId: string }
+  | { type: "dm" }
+  | { type: "artifact" }
+  /**
+   * The conversation it was asked in (a thread, or a DM: `threadId` null).
+   * `reminder`: at the time the agent just posts "Lembrete: …" mentioning
+   * `forUserId` (no run); otherwise the agent is asked, as in any routine.
+   */
+  | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string };
 export const ROUTINE_EVENTS = [
   "sentry.issue_created",
   "github.pr_opened",
@@ -27,7 +37,9 @@ export type RoutineEvent = (typeof ROUTINE_EVENTS)[number];
 
 export type RoutineTrigger =
   | { type: "schedule"; phrase: string; cron: string; timezone: string; description: string }
-  | { type: "event"; event: RoutineEvent };
+  | { type: "event"; event: RoutineEvent }
+  /** A one-off (reminders): fires once at `at`, then the routine is done (inactive). */
+  | { type: "once"; at: string; timezone: string; description: string };
 
 export interface RoutineRunView {
   id: string;
@@ -75,6 +87,14 @@ const targetOf = (r: RoutineRow) => r.target as unknown as RoutineTarget;
 
 function triggerOf(r: RoutineRow): RoutineTrigger {
   if (r.triggerType === "event") return { type: "event", event: (r.event ?? "issue.created") as RoutineEvent };
+  if (r.triggerType === "once") {
+    return {
+      type: "once",
+      at: (r.nextRunAt ?? r.lastRunAt ?? r.createdAt).toISOString(),
+      timezone: r.timezone ?? "UTC",
+      description: r.description ?? "",
+    };
+  }
   return {
     type: "schedule",
     phrase: r.phrase ?? "",
@@ -236,7 +256,7 @@ async function requireRoutineManager(db: Database, actorId: string, orgId: strin
 }
 
 async function checkTarget(db: Database, orgId: string, agentId: string, target: RoutineTarget) {
-  if (target.type !== "channel") return;
+  if (target.type !== "channel" && target.type !== "conversation") return;
   const [row] = await db
     .select({ id: channelMembers.id })
     .from(channelMembers)
@@ -405,7 +425,7 @@ export async function fireDueRoutines(deps: RoutineDeps, now = new Date()) {
       .where(
         and(
           eq(routines.active, true),
-          eq(routines.triggerType, "schedule"),
+          inArray(routines.triggerType, ["schedule", "once"]),
           isNotNull(routines.nextRunAt),
           lte(routines.nextRunAt, now),
         ),
@@ -505,8 +525,58 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
     : "";
   let channelId: string;
   let body: string;
+  const once = routine.triggerType === "once";
+  // A one-off is done once it fired (it stays listed, inactive).
+  const finishOnce = async () => {
+    if (once) {
+      await db
+        .update(routines)
+        .set({ active: false, nextRunAt: null, lastRunAt: new Date(), updatedAt: new Date() })
+        .where(eq(routines.id, routine.id));
+    }
+  };
   try {
-    if (target.type === "channel") {
+    if (target.type === "conversation" && target.reminder) {
+      // A plain reminder: the agent's own message, mentioning the person; no run.
+      const who = target.forUserId ?? creator;
+      const [member] = await db
+        .select({ handle: schema.organizationMembers.handle })
+        .from(schema.organizationMembers)
+        .where(and(eq(schema.organizationMembers.orgId, routine.orgId), eq(schema.organizationMembers.userId, who)));
+      const mention = member?.handle ? `@${member.handle} ` : "";
+      const { message } = await insertMessageWithRuns(
+        db,
+        {
+          orgId: routine.orgId,
+          channelId: target.channelId,
+          threadId: target.threadId,
+          author: { type: "agent", agentId: agent.id, runId: null, hop: 0 },
+          body: `${mention}Lembrete: ${routine.prompt}`,
+          meta: {
+            routineId: routine.id,
+            routineRunId: run.id,
+            routine: { id: routine.id, name: routine.name, runId: run.id },
+            reminder: true,
+          },
+        },
+        { startRuns: false },
+      );
+      await publishMessageCreated(deps.pubsub, messageView(message));
+      for (const userId of message.mentionedUserIds) {
+        await publishUserEvent(deps.pubsub, routine.orgId, userId, {
+          type: "mention",
+          channelId: target.channelId,
+          messageId: message.id,
+          threadId: message.threadId,
+          byAgentId: agent.id,
+        });
+      }
+      await db.update(routineRuns).set({ status: "ok", summary: "Lembrete enviado" }).where(eq(routineRuns.id, run.id));
+      await db.update(routines).set({ lastRunAt: new Date() }).where(eq(routines.id, routine.id));
+      await finishOnce();
+      return;
+    }
+    if (target.type === "channel" || target.type === "conversation") {
       channelId = target.channelId;
       body = `@${agent.handle} ${routine.prompt}${eventText}`;
     } else {
@@ -521,6 +591,7 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
     // read "Rotina · {name}" instead of the person, who didn't type it.
     const message = await postPersonMessage({ db, pubsub: deps.pubsub }, creator, routine.orgId, channelId, {
       body,
+      threadId: target.type === "conversation" ? target.threadId : undefined,
       meta: {
         routineId: routine.id,
         routineRunId: run.id,
@@ -533,7 +604,7 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
       .where(and(eq(agentRuns.triggerMessageId, message.id), eq(agentRuns.agentId, agent.id)));
     if (!agentRun) return finishRun(db, run.id, "skipped", "O agente não está no canal");
     const delivered =
-      target.type === "channel"
+      target.type === "channel" || target.type === "conversation"
         ? "Resposta no canal"
         : target.type === "artifact"
           ? "Arquivo no Drive"
@@ -543,8 +614,152 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
       .set({ status: "started", agentRunId: agentRun.id, summary: delivered })
       .where(eq(routineRuns.id, run.id));
     await db.update(routines).set({ lastRunAt: new Date() }).where(eq(routines.id, routine.id));
+    await finishOnce();
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
+    await finishOnce().catch(() => {});
     return finishRun(db, run.id, "failed", reason.slice(0, 300));
   }
+}
+
+// ── Reminders from the chat (agents' `schedule_reminder`) ────────────────────
+
+export interface ReminderView {
+  id: string;
+  message: string;
+  at: string | null;
+  timezone: string;
+  description: string;
+  /** The person it reminds (default: whoever asked). */
+  forUserId: string;
+  channelId: string;
+  threadId: string | null;
+  done: boolean;
+}
+
+const reminderView = (r: RoutineRow): ReminderView => {
+  const t = targetOf(r) as Extract<RoutineTarget, { type: "conversation" }>;
+  return {
+    id: r.id,
+    message: r.prompt,
+    at: r.nextRunAt?.toISOString() ?? null,
+    timezone: r.timezone ?? "UTC",
+    description: r.description ?? "",
+    forUserId: t.forUserId ?? r.createdByUserId ?? "",
+    channelId: t.channelId,
+    threadId: t.threadId,
+    done: !r.active,
+  };
+};
+
+/**
+ * A one-off reminder in the conversation it was asked in (a routine with
+ * `trigger: once`, listed in Rotinas, cancellable). The person who asked is
+ * its creator: they must be able to talk to the agent and post there.
+ */
+export async function createReminder(
+  deps: RoutineDeps,
+  requesterId: string,
+  orgId: string,
+  input: {
+    agentId: string;
+    channelId: string;
+    threadId: string | null;
+    at: Date;
+    timezone: string;
+    description: string;
+    message: string;
+    forUserId?: string;
+    /** At the time, ask the agent to do it (a run) instead of only reminding. */
+    askAgent?: boolean;
+  },
+): Promise<ReminderView> {
+  const { db } = deps;
+  await requirePermission(db, requesterId, orgId, "post");
+  const agent = await getAgent(db, orgId, input.agentId);
+  if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
+  if (!canTalkTo(agent, requesterId)) throw new ForbiddenError(await audienceNotice(db, agent));
+  const message = input.message.trim().slice(0, 2000);
+  if (!message) throw new ValidationError("Diga do que lembrar.");
+  if (input.forUserId && input.forUserId !== requesterId) {
+    const [member] = await db
+      .select({ id: channelMembers.id })
+      .from(channelMembers)
+      .where(and(eq(channelMembers.channelId, input.channelId), eq(channelMembers.userId, input.forUserId)));
+    if (!member) throw new ValidationError("Essa pessoa não está nesta conversa.");
+  }
+  const target: RoutineTarget = {
+    type: "conversation",
+    channelId: input.channelId,
+    threadId: input.threadId,
+    reminder: !input.askAgent,
+    forUserId: input.forUserId ?? requesterId,
+  };
+  const [row] = await db
+    .insert(routines)
+    .values({
+      orgId,
+      agentId: agent.id,
+      name: `Lembrete: ${message.split("\n")[0]?.slice(0, 60) ?? ""}`,
+      prompt: message,
+      target: target as unknown as Record<string, unknown>,
+      triggerType: "once",
+      timezone: input.timezone,
+      description: input.description,
+      nextRunAt: input.at,
+      createdByUserId: requesterId,
+    })
+    .returning();
+  if (!row) throw new Error("reminder insert returned nothing");
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: requesterId },
+    action: "routine.created",
+    target: { type: "routine", id: row.id },
+    details: { agentId: agent.id, trigger: "once", via: "agent" },
+  });
+  return reminderView(row);
+}
+
+/** The person's pending reminders (created by them), soonest first. */
+export async function listReminders(db: Database, requesterId: string, orgId: string) {
+  const rows = await db
+    .select()
+    .from(routines)
+    .where(
+      and(
+        eq(routines.orgId, orgId),
+        eq(routines.createdByUserId, requesterId),
+        eq(routines.triggerType, "once"),
+        eq(routines.active, true),
+      ),
+    )
+    .orderBy(routines.nextRunAt)
+    .limit(50);
+  return rows.map(reminderView);
+}
+
+/** Cancels one of the person's own reminders; anyone else's is "not found". */
+export async function cancelReminder(db: Database, requesterId: string, orgId: string, id: string) {
+  const [row] = await db
+    .update(routines)
+    .set({ active: false, nextRunAt: null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(routines.id, id),
+        eq(routines.orgId, orgId),
+        eq(routines.createdByUserId, requesterId),
+        eq(routines.triggerType, "once"),
+        eq(routines.active, true),
+      ),
+    )
+    .returning();
+  if (!row) throw new NotFoundError("Reminder not found");
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: requesterId },
+    action: "routine.cancelled",
+    target: { type: "routine", id },
+  });
+  return reminderView(row);
 }

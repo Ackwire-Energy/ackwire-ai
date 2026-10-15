@@ -30,6 +30,7 @@ import {
   createModelGateway,
   createOrganization,
   createSandboxToolSource,
+  createScheduleToolSource,
   createSkillToolSource,
   createToolGateway,
   type MemberRole,
@@ -78,6 +79,8 @@ export async function setup(
     skillTools?: boolean;
     /** Fake embeddings (hybrid search). Off: full-text only, no embedding usage rows. */
     embeddings?: boolean;
+    /** Add the scheduling tools (schedule_reminder, create_routine…). */
+    scheduleTools?: boolean;
     /** Add the sandbox tools with this (fake) provider. */
     sandbox?: SandboxProvider;
   } = {},
@@ -163,6 +166,7 @@ export async function setup(
     ...(options.calendarTools ? [createCalendarToolSource({ db, pubsub })] : []),
     ...(options.skillTools ? [createSkillToolSource({ db, blobs: artifactDeps.blobs })] : []),
     ...(options.contextTools ? [createContextToolSource(context)] : []),
+    ...(options.scheduleTools ? [createScheduleToolSource({ pubsub, context })] : []),
     ...(sandboxDeps
       ? [createSandboxToolSource({ ...sandboxDeps, artifacts: artifactDeps, skills: { blobs: artifactDeps.blobs } })]
       : []),

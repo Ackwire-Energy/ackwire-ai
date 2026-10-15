@@ -28,6 +28,10 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   },
   "issues:write": { label: "Issues", description: "Criar e atualizar issues." },
   "skills:read": { label: "Usar skills", description: "Carregar as skills ligadas para o agente." },
+  "schedule:write": {
+    label: "Agendar",
+    description: "Criar lembretes e rotinas pelo chat, para quem pediu, no fuso dessa pessoa.",
+  },
   "sandbox:run": {
     label: "Rodar código",
     description:
@@ -39,7 +43,14 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
  * Granted to every new agent: reading context, keeping its own notes, and
  * reading and writing Drive files (low risk). Admins and owners can revoke them.
  */
-export const DEFAULT_AGENT_SCOPES = ["context:read", "memory:write", "drive:read", "drive:write", "skills:read"];
+export const DEFAULT_AGENT_SCOPES = [
+  "context:read",
+  "memory:write",
+  "drive:read",
+  "drive:write",
+  "skills:read",
+  "schedule:write",
+];
 
 export interface ScopeGrant {
   connectionId: string | null;

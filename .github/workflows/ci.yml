@@ -31,13 +31,23 @@ jobs:
         run: |
           set -o pipefail
           bun run typecheck 2>&1 | tee typecheck.log
-      - name: Test
+      # Two processes: the browser-DOM tests (web app, design system) never share one with the
+      # backend tests (PGlite, servers). In one process the first PGlite database after the DOM
+      # files sometimes never came up, and the whole step hung until the timeout.
+      - name: Test (backend)
         if: success() || failure()
-        timeout-minutes: 15
+        timeout-minutes: 10
         shell: bash
         run: |
           set -o pipefail
-          bun test 2>&1 | tee test.log
+          bun test packages/adapters packages/config packages/db packages/engine packages/modules packages/providers apps/server 2>&1 | tee test.log
+      - name: Test (web and design system)
+        if: success() || failure()
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -o pipefail
+          bun test apps/web packages/ui 2>&1 | tee -a test.log
       # GitHub's log storage sometimes loses logs; keep the errors as an artifact and in the summary.
       - name: Keep errors
         if: always()

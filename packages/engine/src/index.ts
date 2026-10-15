@@ -55,6 +55,7 @@ export * from "./runs";
 export * from "./sandbox";
 export * from "./sandbox-tools";
 export * from "./schedule";
+export * from "./schedule-tools";
 export * from "./search";
 export * from "./skill-tools";
 export * from "./skills";

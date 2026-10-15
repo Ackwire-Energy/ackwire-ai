@@ -204,6 +204,13 @@
       "when": 1792063176768,
       "tag": "0028_computer_status",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792070797856,
+      "tag": "0029_schedule_scope",
+      "breakpoints": true
     }
   ]
 }
