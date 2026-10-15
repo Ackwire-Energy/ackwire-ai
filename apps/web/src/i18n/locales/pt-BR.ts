@@ -500,6 +500,13 @@ export const ptBR = {
       "Quem pode aprovar: o responsável pelo agente e os admins da organização. Pedidos expiram em 24 h sem decisão.",
   },
   agent: {
+    editIdentity: "Editar nome e cargo",
+    identityTitle: "Nome e cargo",
+    identityHelp: "É como todo mundo vê o agente. As menções continuam por @{{handle}}.",
+    identitySaved: "Nome e cargo {{of}} {{name}} salvos.",
+    nameLabel: "Nome",
+    roleLabel: "Cargo",
+    roleHelp: "Uma linha, ex.: PM, Dev, Pesquisa.",
     edit: "Editar",
     editSection: "Editar {{section}}",
     chat: "Conversar",

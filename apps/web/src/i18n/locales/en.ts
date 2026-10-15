@@ -496,6 +496,13 @@ export const en: Translations = {
       "Who can approve: the agent's owner and the organization admins. Requests expire after 24 h without a decision.",
   },
   agent: {
+    editIdentity: "Edit name and role",
+    identityTitle: "Name and role",
+    identityHelp: "It's how everyone sees the agent. Mentions keep using @{{handle}}.",
+    identitySaved: "{{name}}'s name and role saved.",
+    nameLabel: "Name",
+    roleLabel: "Role",
+    roleHelp: "One line, e.g. PM, Dev, Research.",
     edit: "Edit",
     editSection: "Edit {{section}}",
     chat: "Chat",

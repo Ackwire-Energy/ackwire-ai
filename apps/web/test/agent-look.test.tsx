@@ -95,3 +95,34 @@ describe("the agent's look", () => {
     expect((within(dialog).getByRole("button", { name: "Salvar" }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
+
+describe("the agent's name and role", () => {
+  const key = async (el: Element, k: string) => {
+    await act(async () => {
+      fireEvent.keyDown(el, { key: k });
+      fireEvent.keyUp(el, { key: k });
+    });
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+  };
+
+  test("Mais ações → Editar nome e cargo: saves both; the @handle stays", async () => {
+    const state = seedState();
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const trigger = screen().getAllByRole("button", { name: "Mais ações" })[0] as HTMLElement;
+    trigger.focus();
+    await key(trigger, "Enter");
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Editar nome e cargo" }));
+    const dialog = screen().getByRole("dialog", { name: "Nome e cargo" });
+    expect(dialog.textContent).toContain("@ada");
+    const name = within(dialog).getByLabelText("Nome") as HTMLInputElement;
+    const role = within(dialog).getByLabelText("Cargo") as HTMLInputElement;
+    await act(async () => fireEvent.change(name, { target: { value: "Ada Lovelace" } }));
+    await act(async () => fireEvent.change(role, { target: { value: "Tech lead" } }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(6);
+    const call = state.calls.find((c) => c.method === "agents.update");
+    expect(call?.args[2]).toEqual({ name: "Ada Lovelace", role: "Tech lead" });
+    expect(state.agents.find((a) => a.id === ADA_ID)?.handle).toBe("ada");
+  });
+});

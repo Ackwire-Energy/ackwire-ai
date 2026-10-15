@@ -113,7 +113,17 @@ function AgentProfile({ agent }: { agent: Agent }) {
     .find((c) => c !== undefined);
   const month = formatMonth(i18n.language, new Date());
   const [dialog, setDialog] = useState<
-    null | "runs" | "budget" | "perms" | "instructions" | "knowledge" | "model" | "owner" | "skills" | "look"
+    | null
+    | "runs"
+    | "budget"
+    | "perms"
+    | "instructions"
+    | "knowledge"
+    | "model"
+    | "owner"
+    | "skills"
+    | "look"
+    | "identity"
   >(null);
   const close = () => setDialog(null);
   const navigate = useNavigate();
@@ -180,6 +190,11 @@ function AgentProfile({ agent }: { agent: Agent }) {
                 }
               >
                 {t("agent.openIn", { channel: home.name })}
+              </MenuItem>
+            )}
+            {editable && (
+              <MenuItem icon="edit" onSelect={() => setDialog("identity")}>
+                {t("agent.editIdentity")}
               </MenuItem>
             )}
             <MenuItem icon="waiting" onSelect={() => setDialog("runs")}>
@@ -336,6 +351,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
         </SummaryRow>
       </div>
 
+      <IdentityDialog open={dialog === "identity"} onClose={close} agent={agent} />
       <InstructionsDialog open={dialog === "instructions"} onClose={close} agent={agent} />
       <KnowledgeDialog open={dialog === "knowledge"} onClose={close} agent={agent} />
       <ModelKeyDialog open={dialog === "model"} onClose={close} agent={agent} />
@@ -398,6 +414,50 @@ function ScopeSummary({ agent }: { agent: Agent }) {
         ? t("agent.permissionsSummary", { ...summary, count: summary.connectors, org: org.name })
         : t("agent.permissionsSummaryBuiltin", { ...summary, org: org.name })}
     </span>
+  );
+}
+
+/** "Nome e cargo": what everyone sees; the @handle stays, so mentions and old messages keep working. */
+function IdentityDialog({ open, onClose, agent }: { open: boolean; onClose: () => void; agent: Agent }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const update = useUpdateAgent(org.id, agent.id);
+  const [name, setName] = useState(agent.name);
+  const [role, setRole] = useState(agent.role ?? "");
+  useEffect(() => {
+    if (!open) return;
+    setName(agent.name);
+    setRole(agent.role ?? "");
+  }, [open, agent.name, agent.role]);
+  const clean = name.trim();
+  return (
+    <EditDialog
+      open={open}
+      onClose={onClose}
+      title={t("agent.identityTitle")}
+      description={t("agent.identityHelp", { handle: agent.handle })}
+      dirty={Boolean(clean) && (clean !== agent.name || role.trim() !== (agent.role ?? ""))}
+      saving={update.isPending}
+      onSave={() =>
+        update.mutate(
+          { name: clean, role: role.trim() },
+          {
+            onSuccess: () => {
+              toast.show(t("agent.identitySaved", agentGrammar(t, clean)));
+              onClose();
+            },
+          },
+        )
+      }
+    >
+      <Field label={t("agent.nameLabel")} id="agent-name">
+        <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} autoFocus />
+      </Field>
+      <Field label={t("agent.roleLabel")} id="agent-role" help={t("agent.roleHelp")}>
+        <Input value={role} maxLength={200} onChange={(e) => setRole(e.target.value)} />
+      </Field>
+    </EditDialog>
   );
 }
 
