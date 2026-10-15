@@ -39,7 +39,9 @@ const Computer = z
     error: z.object({ message: z.string() }).optional().openapi({ description: "With `status: error`." }),
   })
   .openapi("AgentComputer");
-const Accepted = z.object({ status: z.enum(["starting", "running", "stopping", "stopped", "archived", "error", "none"]) }).openapi("ComputerAccepted");
+const Accepted = z
+  .object({ status: z.enum(["starting", "running", "stopping", "stopped", "archived", "error", "none"]) })
+  .openapi("ComputerAccepted");
 const Settings = z
   .object({
     available: z.boolean().openapi({ description: "A sandbox provider is configured on this server." }),

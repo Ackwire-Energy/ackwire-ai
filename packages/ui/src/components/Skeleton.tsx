@@ -60,7 +60,6 @@ export function SkeletonGroup({
 }) {
   const visible = useDelayed(true, delayMs);
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a live status region, not an <output>
     <div
       role="status"
       aria-busy="true"

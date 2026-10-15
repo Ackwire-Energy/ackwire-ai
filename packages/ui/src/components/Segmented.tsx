@@ -66,6 +66,7 @@ export function Segmented<V extends string>({
         />
       )}
       {options.map((o, i) => (
+        // biome-ignore lint/a11y/useSemanticElements: a roving-focus radio group of buttons (arrow keys), styled as a segmented control
         <button
           key={o.value}
           ref={(el) => {
