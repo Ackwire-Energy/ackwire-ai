@@ -524,6 +524,14 @@ p {
   position: relative;
   padding: 8px 24px 20px;
 }
+/* The activity bar floats just above the composer (over the fade): no empty band while nobody works. */
+.channel__composer > .ac-typing {
+  position: absolute;
+  left: 24px;
+  bottom: 100%;
+  margin: 0 0 6px;
+  z-index: var(--z-lifted);
+}
 /* Messages fade out into the page just above the composer (no hard cut, no empty band). */
 .channel__composer::before {
   content: "";
