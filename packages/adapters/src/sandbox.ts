@@ -48,6 +48,8 @@ export interface ExecRequest {
   /** Relative to the workspace (default: the workspace). */
   cwd?: string;
   timeoutSeconds: number;
+  /** Stops the command (killed when the provider can; else we stop waiting): the run was canceled. */
+  signal?: AbortSignal;
 }
 
 export interface ExecResult {
@@ -55,7 +57,22 @@ export interface ExecResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  /** Stopped by `signal`. `killed` false: the provider couldn't kill it, we only stopped waiting. */
+  canceled?: { killed: boolean };
 }
+
+/** Exit code of a canceled command (like Ctrl+C). */
+export const CANCELED_EXIT_CODE = 130;
+
+class ExecCanceledError extends Error {}
+
+export const canceledResult = (stdout: string, stderr: string, killed: boolean): ExecResult => ({
+  exitCode: CANCELED_EXIT_CODE,
+  stdout,
+  stderr,
+  timedOut: false,
+  canceled: { killed },
+});
 
 export interface SandboxFile {
   /** Relative to the workspace. */
@@ -232,15 +249,17 @@ export function createDaytonaSandboxProvider(options: {
   const networks = new Map<string, SandboxInfo["network"]>();
   const auth = { authorization: `Bearer ${options.apiKey}` };
 
-  async function call(url: string, init: RequestInit & { timeoutMs?: number } = {}) {
+  async function call(url: string, init: RequestInit & { timeoutMs?: number; cancel?: AbortSignal } = {}) {
     let res: Response;
     try {
+      const timeout = AbortSignal.timeout(init.timeoutMs ?? 30_000);
       res = await http(url, {
         ...init,
         headers: { ...auth, ...(init.headers as Record<string, string> | undefined) },
-        signal: AbortSignal.timeout(init.timeoutMs ?? 30_000),
+        signal: init.cancel ? AbortSignal.any([timeout, init.cancel]) : timeout,
       });
     } catch (error) {
+      if (init.cancel?.aborted) throw new ExecCanceledError();
       throw new SandboxProviderError(
         `could not reach the computer service: ${maskProvider(error instanceof Error ? error.message : String(error))}`,
       );
@@ -303,13 +322,14 @@ export function createDaytonaSandboxProvider(options: {
   };
 
   /** Runs a shell script as is (base64 through `sh`), in `cwd`. No `envs`, ever. */
-  async function run(id: string, script: string, cwd: string, timeoutSeconds: number) {
+  async function run(id: string, script: string, cwd: string, timeoutSeconds: number, cancel?: AbortSignal) {
     const encoded = Buffer.from(script, "utf8").toString("base64");
     const res = await call(await toolboxUrl(id, "/process/execute"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ command: `sh -c "echo ${encoded} | base64 -d | sh"`, cwd, timeout: timeoutSeconds }),
       timeoutMs: (timeoutSeconds + 30) * 1000,
+      cancel,
     });
     return res;
   }
@@ -350,12 +370,20 @@ export function createDaytonaSandboxProvider(options: {
   async function exec(id: string, request: ExecRequest): Promise<ExecResult> {
     const root = await rootOf(id);
     const marker = `__agentes_${crypto.randomUUID().replace(/-/g, "")}__`;
-    const res = await run(
-      id,
-      splitOutputScript(request.command, marker),
-      request.cwd ? absIn(root, request.cwd) : root,
-      request.timeoutSeconds,
-    );
+    let res: Response;
+    try {
+      res = await run(
+        id,
+        splitOutputScript(request.command, marker),
+        request.cwd ? absIn(root, request.cwd) : root,
+        request.timeoutSeconds,
+        request.signal,
+      );
+    } catch (error) {
+      // A blocking call can't be killed: we stop waiting, the command may still finish on the machine.
+      if (error instanceof ExecCanceledError) return canceledResult("", "", false);
+      throw error;
+    }
     if (res.status === 408) return { exitCode: 124, stdout: "", stderr: "", timedOut: true };
     if (!res.ok) return fail(res, "the command");
     const body = (await res.json()) as { exitCode?: number; result?: string };
@@ -415,6 +443,8 @@ export function createDaytonaSandboxProvider(options: {
       };
       for (;;) {
         await Bun.sleep(streamPollMs);
+        // Canceled: deleting the session (finally) kills the command.
+        if (request.signal?.aborted) return canceledResult(out.stdout, out.stderr, true);
         await pull();
         const res = await call(`${base}/${sessionId}/command/${cmdId}`, { headers: { accept: "application/json" } });
         const cmd = res.ok ? ((await res.json()) as { exitCode?: number | null }) : null;
@@ -566,7 +596,7 @@ function networkBody(mode: NetworkMode, allowDomains: string[]): Record<string, 
 
 /** What the fake saw, for tests. */
 export interface FakeSandboxCall {
-  op: "create" | "exec" | "write" | "read" | "list" | "stop" | "destroy" | "start" | "network";
+  op: "create" | "exec" | "write" | "read" | "list" | "stop" | "destroy" | "start" | "network" | "kill";
   id?: string;
   spec?: SandboxSpec;
   request?: ExecRequest;
@@ -635,6 +665,7 @@ export function createFakeSandboxProvider(
     },
     async execStream(id, request, onOutput) {
       const r = await provider.exec(id, request);
+      if (r.canceled) return r;
       // Like a real stream: the output arrives in pieces.
       for (const stream of ["stdout", "stderr"] as const) {
         const text = r[stream];
@@ -650,7 +681,22 @@ export function createFakeSandboxProvider(
         ? await options.exec(request, b.files)
         : { exitCode: 0, stdout: `ran: ${request.command}`, stderr: "", timedOut: false };
       if ("delayMs" in out) {
-        await Bun.sleep(out.delayMs);
+        // A canceled run kills the command at once (like the session delete on Daytona).
+        const signal = request.signal;
+        const aborted = signal
+          ? new Promise<"canceled">((resolve) => {
+              if (signal.aborted) resolve("canceled");
+              signal.addEventListener("abort", () => resolve("canceled"), { once: true });
+            })
+          : null;
+        const done = await Promise.race([
+          Bun.sleep(out.delayMs).then(() => "done" as const),
+          ...(aborted ? [aborted] : []),
+        ]);
+        if (done === "canceled") {
+          calls.push({ op: "kill", id });
+          return canceledResult("", "", true);
+        }
         return out.result;
       }
       return out;

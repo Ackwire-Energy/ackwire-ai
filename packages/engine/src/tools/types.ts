@@ -13,6 +13,8 @@ export interface ToolContext {
   triggerMessageId: string;
   /** The model's id of this tool call (set by the gateway): live output events refer to it. */
   toolUseId?: string;
+  /** Aborted when a person cancels the run: long tools (running code) stop early. */
+  signal?: AbortSignal;
 }
 
 export interface ToolOutput {

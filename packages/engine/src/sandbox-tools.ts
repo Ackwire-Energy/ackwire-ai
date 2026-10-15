@@ -96,9 +96,11 @@ export function networkSentence(n: Network) {
 
 /** What the model sees from a command: exit code first (it is the line kept in "Ações recentes"). */
 function execOutput(label: string, r: ExecResult, seconds: number, timeout: number, network?: Network): ToolOutput {
-  const head = r.timedOut
-    ? `${label}: timed out after ${timeout} s (stopped)`
-    : `${label}: exit code ${r.exitCode} (${seconds} s)`;
+  const head = r.canceled
+    ? `${label}: canceled by a person after ${seconds} s (${r.canceled.killed ? "stopped" : "no longer waited for; it may still finish"})`
+    : r.timedOut
+      ? `${label}: timed out after ${timeout} s (stopped)`
+      : `${label}: exit code ${r.exitCode} (${seconds} s)`;
   const parts = [head];
   if (r.stdout) parts.push(`stdout:\n${truncateOutput(r.stdout, SANDBOX_LIMITS.stdoutChars)}`);
   if (r.stderr) parts.push(`stderr:\n${truncateOutput(r.stderr, SANDBOX_LIMITS.stderrChars)}`);
@@ -109,7 +111,7 @@ function execOutput(label: string, r: ExecResult, seconds: number, timeout: numb
   return {
     content: parts.join("\n"),
     isError: r.timedOut || r.exitCode !== 0,
-    data: { exitCode: r.exitCode, timedOut: r.timedOut },
+    data: { exitCode: r.exitCode, timedOut: r.timedOut, ...(r.canceled ? { canceled: r.canceled } : {}) },
   };
 }
 
@@ -200,7 +202,9 @@ export function createSandboxToolSource(
    * Runs a command and, when the provider streams, sends what it prints as
    * `agent.tool.output` (every 250 ms at most, ≤ 64 KB per call, secrets masked).
    */
-  const execLive = async (ctx: ToolContext, id: string, request: ExecRequest) => {
+  const execLive = async (ctx: ToolContext, id: string, plain: ExecRequest) => {
+    // Canceling the run stops the command (killed when the provider can).
+    const request: ExecRequest = ctx.signal ? { ...plain, signal: ctx.signal } : plain;
     if (!deps.provider.execStream || !deps.pubsub || !ctx.toolUseId) return deps.provider.exec(id, request);
     // The same thread as the run's other events (DMs and the forum are flat).
     const channel = await getChannelCached(ctx.db, ctx.orgId, ctx.channelId);

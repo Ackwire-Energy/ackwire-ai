@@ -32,6 +32,38 @@ export async function createAgentRuns(
 ): Promise<AgentRun[]> {
   const created: AgentRun[] = [];
   for (const agentId of agentIds) {
+    // One active run per agent and conversation (forum turns are driven separately):
+    // the message goes to it, read at its next step, instead of a second run.
+    if (trigger !== "forum") {
+      const [active] = await tx
+        .select({
+          id: agentRuns.id,
+          pending: agentRuns.pendingMessageIds,
+          triggerMessageId: agentRuns.triggerMessageId,
+        })
+        .from(agentRuns)
+        .where(
+          and(
+            eq(agentRuns.orgId, message.orgId),
+            eq(agentRuns.agentId, agentId),
+            eq(agentRuns.channelId, message.channelId),
+            inArray(agentRuns.status, ["queued", "running", "waiting_approval", "waiting_input"]),
+            sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or exists (
+              select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm'))`,
+          ),
+        )
+        .orderBy(sql`${agentRuns.createdAt} desc`)
+        .limit(1);
+      if (active && active.triggerMessageId !== message.id) {
+        if (!active.pending.includes(message.id)) {
+          await tx
+            .update(agentRuns)
+            .set({ pendingMessageIds: sql`array_append(${agentRuns.pendingMessageIds}, ${message.id}::uuid)` })
+            .where(eq(agentRuns.id, active.id));
+        }
+        continue;
+      }
+    }
     const [run] = await tx
       .insert(agentRuns)
       .values({

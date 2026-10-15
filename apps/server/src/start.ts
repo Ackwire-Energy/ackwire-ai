@@ -16,7 +16,8 @@ import {
 } from "@agenteschat/adapters";
 import { type Config, ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
 import { createDatabase, type Database, ensureMessagePartitions, MigrationMismatchError } from "@agenteschat/db";
-import { createLocalKeyWrapper, enableCaches } from "@agenteschat/engine";
+import { createLocalKeyWrapper, drainLocalRuns, enableCaches } from "@agenteschat/engine";
+
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/providers";
 import { createApp } from "./app";
@@ -26,6 +27,9 @@ import { createLogger } from "./logger";
 import { createRealtime, type SocketData } from "./realtime/ws";
 import { version } from "./version";
 import { startWorkers } from "./workers";
+
+/** On SIGTERM, how long runs in progress get to finish before they are handed to the next instance. */
+const RUN_DRAIN_MS = 20_000;
 
 export interface StartOptions {
   edition: Edition;
@@ -168,8 +172,12 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     if (stopping) return;
     stopping = true;
     log.info("shutting down", { signal });
+    // No new jobs; HTTP stops taking requests (the new deploy serves them).
     workers.stop();
     await server.stop();
+    // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance.
+    const interrupted = await drainLocalRuns(RUN_DRAIN_MS);
+    if (interrupted.length > 0) log.info("runs handed back for the next instance", { runs: interrupted });
     for (const module of modules) await module.onStop?.();
     await adapters.pubsub.close?.();
     await database.close();

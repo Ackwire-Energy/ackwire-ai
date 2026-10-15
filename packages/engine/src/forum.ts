@@ -565,7 +565,7 @@ export async function setForumParticipants(
 
 // ── The worker: turns, rounds, synthesis ─────────────────────────────────────
 
-const FINISHED = new Set(["done", "failed"]);
+const FINISHED = new Set(["done", "failed", "canceled"]);
 
 /**
  * Job `forum.advance`: moves a topic on when nobody is working. Next agent in

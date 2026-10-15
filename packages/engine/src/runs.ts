@@ -7,18 +7,20 @@ export type RunStatus = AgentRun["status"];
 
 /**
  * Allowed transitions of `agent_runs.status` (docs/adr/0008-agent-runs.md):
- * `queued → running → ((waiting_approval | waiting_input) → running)* → done | failed`.
- * `done` and `failed` are terminal. Suspending for an approval is a status
+ * `queued → running → ((waiting_approval | waiting_input) → running)* → done | failed`,
+ * and any non-final state → `canceled` (a person stopped it). The last three are terminal. Suspending for an approval is a status
  * change; resuming is enqueueing a new `agent_run.execute` job.
  */
 export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
-  queued: ["running", "failed"],
-  running: ["waiting_approval", "waiting_input", "done", "failed"],
-  waiting_approval: ["running", "failed"],
+  queued: ["running", "failed", "canceled"],
+  running: ["waiting_approval", "waiting_input", "done", "failed", "canceled"],
+  waiting_approval: ["running", "failed", "canceled"],
   /** Waiting for a person to answer an `ask_user` question (or for it to expire). */
-  waiting_input: ["running", "failed"],
+  waiting_input: ["running", "failed", "canceled"],
   done: [],
   failed: [],
+  /** A person stopped it; whatever it wrote so far is kept. */
+  canceled: [],
 };
 
 export const isTerminal = (status: RunStatus) => RUN_TRANSITIONS[status].length === 0;
@@ -50,7 +52,7 @@ export async function transitionRun(
       status: to,
       updatedAt: now,
       ...(to === "running"
-        ? { startedAt: sql`coalesce(${agentRuns.startedAt}, ${now.toISOString()}::timestamptz)` }
+        ? { startedAt: sql`coalesce(${agentRuns.startedAt}, ${now.toISOString()}::timestamptz)`, heartbeatAt: now }
         : {}),
       ...(isTerminal(to) ? { finishedAt: now } : {}),
       ...patch,

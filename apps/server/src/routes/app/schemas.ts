@@ -113,7 +113,7 @@ const MessageBase = z.object({
       handled: z.array(
         z.object({
           agentId: z.uuid(),
-          status: z.enum(["queued", "running", "waiting_approval", "waiting_input", "done", "failed"]),
+          status: z.enum(["queued", "running", "waiting_approval", "waiting_input", "done", "failed", "canceled"]),
         }),
       ),
     })

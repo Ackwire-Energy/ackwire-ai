@@ -1,4 +1,5 @@
 import {
+  activeRunsIn,
   addChannelMember,
   createChannel,
   joinChannel,
@@ -6,6 +7,7 @@ import {
   listChannels,
   listMessages,
   postPersonMessage,
+  requireChannelAccess,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiError, errorResponse } from "../../http/errors";
@@ -160,6 +162,51 @@ export function chatRoutes(deps: AppDeps) {
       const { orgId, channelId } = c.req.valid("param");
       await addChannelMember(db, c.get("user").id, orgId, channelId, c.req.valid("json"), { pubsub: adapters.pubsub });
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/active-runs",
+      tags,
+      security,
+      summary: "Agent runs still in progress here (call on load and reconnect to drop stale live rows)",
+      request: { params: ChannelParams },
+      responses: {
+        200: json(
+          z.object({
+            runs: z.array(
+              z.object({
+                runId: z.uuid(),
+                agentId: z.uuid(),
+                channelId: z.uuid(),
+                status: z.enum(["queued", "running", "waiting_approval", "waiting_input"]),
+                threadId: z.uuid().nullable(),
+                triggerMessageId: z.uuid(),
+                startedAt: z.string().nullable(),
+                heartbeatAt: z.string().nullable().openapi({ description: "Last sign of life of its worker." }),
+                createdAt: z.string(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      await requireChannelAccess(db, c.get("user").id, orgId, channelId);
+      const runs = await activeRunsIn(db, orgId, channelId);
+      return c.json(
+        {
+          runs: runs.map((r) => ({
+            ...r,
+            status: r.status as "queued" | "running" | "waiting_approval" | "waiting_input",
+          })),
+        },
+        200,
+      );
     },
   );
 

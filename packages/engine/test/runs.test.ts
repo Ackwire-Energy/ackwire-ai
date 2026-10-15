@@ -26,6 +26,10 @@ describe("state machine", () => {
         "running->waiting_input",
         "waiting_input->running",
         "waiting_input->failed",
+        "queued->canceled",
+        "running->canceled",
+        "waiting_approval->canceled",
+        "waiting_input->canceled",
       ].sort(),
     );
   });

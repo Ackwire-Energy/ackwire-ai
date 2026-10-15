@@ -178,7 +178,7 @@ async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
       .reduce((sum, x) => sum + (details.costById.get(x.agentRunId ?? "") ?? 0), 0);
     const running =
       last?.status === "queued" ||
-      (last?.status === "started" && !!agentRun && !["done", "failed"].includes(agentRun.status));
+      (last?.status === "started" && !!agentRun && !["done", "failed", "canceled"].includes(agentRun.status));
     return {
       id: r.id,
       name: r.name,

@@ -69,6 +69,8 @@ export const agentRunStatusEnum = pgEnum("agent_run_status", [
   "waiting_input",
   "done",
   "failed",
+  /** Stopped by a person (`POST …/runs/{id}/cancel`). */
+  "canceled",
 ]);
 export const agentRunTriggerEnum = pgEnum("agent_run_trigger", ["mention", "router", "dm", "forum"]);
 
@@ -99,6 +101,14 @@ export const agentRuns = pgTable(
     transcript: jsonb().$type<Record<string, unknown>>(),
     /** Model calls made so far (capped by AGENT_MAX_TOOL_TURNS). */
     turns: integer().notNull().default(0),
+    /**
+     * People's messages for this run that arrived while it was active (one
+     * active run per agent and conversation): delivered to the model at the
+     * next call ("Nova mensagem de …"), instead of starting a second run.
+     */
+    pendingMessageIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** Bumped by the worker while it executes the run; a stale one means the worker died (recovered on boot). */
+    heartbeatAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),
@@ -266,7 +276,14 @@ export const routingDecisions = pgTable(
   (t) => [unique().on(t.messageId), index().on(t.orgId, t.createdAt)],
 );
 
-export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "refused", "expired"]);
+export const approvalStatusEnum = pgEnum("approval_status", [
+  "pending",
+  "approved",
+  "refused",
+  "expired",
+  /** Its run was canceled. */
+  "canceled",
+]);
 
 /**
  * A sensitive action an agent wants to take (D4, docs/adr/0015). Bound to the
@@ -346,7 +363,13 @@ export const agentScopes = pgTable(
   ],
 );
 
-export const agentQuestionStatusEnum = pgEnum("agent_question_status", ["open", "answered", "expired"]);
+export const agentQuestionStatusEnum = pgEnum("agent_question_status", [
+  "open",
+  "answered",
+  "expired",
+  /** Its run was canceled. */
+  "canceled",
+]);
 
 /**
  * A question an agent asked a person (`ask_user`). The run waits

@@ -28,6 +28,12 @@ export interface FakeReply {
    * usage event (null = the stream died before it).
    */
   failMidStream?: { error?: string; retryable?: boolean; inputTokens: number | null };
+  /**
+   * Waits for this after the first chunk (the test cancels meanwhile). If the
+   * request's signal is aborted then, the stream ends like a real abort:
+   * `request aborted`, with the usage so far.
+   */
+  hold?: Promise<unknown>;
 }
 
 export interface FakeCall {
@@ -57,9 +63,22 @@ export function createFakeProvider(reply?: (request: ModelRequest, call: number)
       const lastMessage = request.messages.at(-1);
       const last = lastMessage ? textOf(lastMessage.content) : "";
       const r = scripted ?? { chunks: ["Echo: ", last.slice(0, 40), "."] };
-      for (const chunk of r.chunks) {
+      let streamed = 0;
+      for (const [i, chunk] of r.chunks.entries()) {
         await Promise.resolve();
+        if (request.signal?.aborted) break;
         onDelta(chunk);
+        streamed += chunk.length;
+        if (i === 0 && r.hold) await r.hold;
+      }
+      if (request.signal?.aborted) {
+        throw new ProviderError("request aborted", false, undefined, {
+          inputTokens: 100,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          outputTokens: null,
+          outputChars: streamed,
+        });
       }
       const text = r.chunks.join("");
       if (r.failMidStream) {

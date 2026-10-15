@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import {
   type ContentBlock,
   type ModelMessage,
@@ -11,17 +11,26 @@ import {
 import { pendingConnectors } from "./access";
 import { getAgentCached } from "./agents";
 import { publishApproval } from "./approvals";
+import {
+  canceledBy,
+  isShutdown,
+  RUN_HEARTBEAT_MS,
+  RunInterruptedError,
+  registerRunAbort,
+  unregisterRunAbort,
+} from "./cancel";
 import { describeCapabilities } from "./capabilities";
 import { buildRunContext, getChannelCached } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
+import { createAgentRuns } from "./dispatch";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { mirrorReplyToIssue } from "./issues";
-import { insertMessage, type Message, messageView } from "./messages";
+import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
 import {
@@ -33,7 +42,7 @@ import {
   questionView,
   syncQuestionMessage,
 } from "./questions";
-import { type AgentRun, addRunStep, type RunStatus, transitionRun } from "./runs";
+import { type AgentRun, addRunStep, isTerminal, type RunStatus, transitionRun } from "./runs";
 import { SANDBOX_SCOPE } from "./sandbox";
 import { enabledSkills } from "./skills";
 import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
@@ -43,7 +52,7 @@ import type { ToolContext } from "./tools/types";
 import { retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentRuns, approvals, agentQuestions } = schema;
+const { agentRuns, approvals, agentQuestions, users } = schema;
 
 export interface RunExecutorDeps {
   db: Database;
@@ -136,9 +145,21 @@ const toolResultFor = (approval: Approval | undefined): { content: string; isErr
  */
 export async function executeRun(deps: RunExecutorDeps, runId: string, options: { finalAttempt: boolean }) {
   const prof = createProfiler();
+  // A person can cancel it: the signal aborts the model stream, tools and running code.
+  const abort = registerRunAbort(runId);
+  // Heartbeat: a run whose worker died (deploy, crash) is found and recovered (`recoverStaleRuns`).
+  const beat = () =>
+    deps.db
+      .update(agentRuns)
+      .set({ heartbeatAt: new Date() })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, "running")))
+      .catch(() => undefined);
+  const heartbeat = setInterval(() => void beat(), RUN_HEARTBEAT_MS);
   try {
-    return await executeRunInner(deps, runId, options, prof);
+    return await executeRunInner(deps, runId, options, prof, abort.signal);
   } finally {
+    clearInterval(heartbeat);
+    unregisterRunAbort(runId, abort);
     if (prof.stages.length > 0) deps.onRunProfile?.({ runId, stages: prof.stages, total: prof.total() });
   }
 }
@@ -148,6 +169,7 @@ async function executeRunInner(
   runId: string,
   options: { finalAttempt: boolean },
   prof: ReturnType<typeof createProfiler>,
+  signal: AbortSignal,
 ) {
   const { db } = deps;
   // Claim first (the common case is a queued run): one statement.
@@ -161,7 +183,7 @@ async function executeRunInner(
     const [loaded] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId));
     if (!loaded) throw new PermanentJobError(`agent run ${runId} not found`);
     run = loaded;
-    if (run.status === "done" || run.status === "failed" || run.status === "queued") return;
+    if (isTerminal(run.status) || run.status === "queued") return;
     if (run.status === "waiting_approval" || run.status === "waiting_input") {
       const [stillPending, stillOpen] = await Promise.all([
         db
@@ -199,7 +221,10 @@ async function executeRunInner(
     runId: run.id,
   });
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
-  const finished = async (status: "done" | "failed" | "waiting_approval" | "waiting_input", error?: string) => {
+  const finished = async (
+    status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
+    error?: string,
+  ) => {
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
     await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, status, ...(error ? { error } : {}) });
     await publishChannelEvent(deps.pubsub, {
@@ -212,7 +237,7 @@ async function executeRunInner(
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
     // A forum turn ended: announce the post and move the topic on (D33).
-    if (channelRow?.kind === "forum" && (status === "done" || status === "failed")) {
+    if (channelRow?.kind === "forum" && (status === "done" || status === "failed" || status === "canceled")) {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
     }
   };
@@ -247,6 +272,7 @@ async function executeRunInner(
     channelId: run.channelId,
     threadRootId: run.threadRootId,
     triggerMessageId: run.triggerMessageId,
+    signal,
   };
   const needsContext = !run.transcript;
   // Independent reads together: the agent (cached), the trigger, and the tools it may use.
@@ -395,277 +421,452 @@ async function executeRunInner(
     await saveTranscript(db, transcript);
   }
 
+  /** Whether a person canceled the run (this process heard it, or the row says so). */
+  /** True when a person canceled; a server shutdown instead hands the run back to the outbox (resumed elsewhere). */
+  const aborted = () => {
+    if (!signal.aborted) return false;
+    if (isShutdown(signal.reason)) throw new RunInterruptedError();
+    return true;
+  };
+  const isCanceled = async () => {
+    if (aborted()) return true;
+    const [row] = await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id));
+    return row?.status === "canceled";
+  };
+  /**
+   * The run was canceled (the row is already `canceled`): post what the agent
+   * wrote so far, nothing lost, with "Interrompido por …", and tell the channel.
+   */
+  const stopCanceled = async (partial: string) => {
+    await deferred;
+    const t = transcript as Transcript;
+    const [row] = await db.select({ error: agentRuns.error }).from(agentRuns).where(eq(agentRuns.id, run.id));
+    const by = canceledBy(row?.error);
+    const [person] = by ? await db.select({ name: users.name }).from(users).where(eq(users.id, by)) : [];
+    const said = [
+      ...t.messages
+        .slice(t.postedUpTo)
+        .filter((m) => m.role === "assistant")
+        .map((m) => textOf(m.content).trim()),
+      partial.trim(),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const note = `_Interrompido${person ? ` por ${person.name}` : ""}._`;
+    const message = await db.transaction(async (tx) => {
+      const m = await postAgentMessage(tx, run, replyThreadId, said ? `${said}\n\n${note}` : note, {
+        ...(takeMemoryUpdates(t) ?? {}),
+        canceled: { byUserId: by },
+      });
+      t.postedUpTo = t.messages.length;
+      t.postedCount++;
+      await addRunStep(tx, run, "error", { reason: "canceled", byUserId: by, messageId: m.id });
+      await tx
+        .update(agentRuns)
+        .set({ replyMessageId: m.id, transcript: t as unknown as Record<string, unknown>, updatedAt: new Date() })
+        .where(eq(agentRuns.id, run.id));
+      return m;
+    });
+    const [view] = await withWikiLinks(db, run.orgId, [messageView(message)]);
+    if (view) await publishMessageCreated(deps.pubsub, view);
+    await publishChannelEvent(deps.pubsub, event("canceled"));
+    await finished("canceled");
+  };
+
+  /** Messages people sent to this conversation while the run was active (one run per agent and conversation). */
+  const takeSteering = async () =>
+    db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ pending: agentRuns.pendingMessageIds })
+        .from(agentRuns)
+        .where(eq(agentRuns.id, run.id))
+        .for("update");
+      const ids = row?.pending ?? [];
+      if (ids.length === 0) return [];
+      await tx.update(agentRuns).set({ pendingMessageIds: [] }).where(eq(agentRuns.id, run.id));
+      return ids;
+    });
+  /** Appends them to the conversation as "Nova mensagem de …" (a step records it), so the model reads them next. */
+  const deliverSteering = async () => {
+    const ids = await takeSteering();
+    if (ids.length === 0) return false;
+    const rows = await db
+      .select({
+        id: schema.messages.id,
+        body: schema.messages.body,
+        name: sql<string | null>`coalesce(${users.name}, ${schema.agents.name})`,
+        createdAt: schema.messages.createdAt,
+      })
+      .from(schema.messages)
+      .leftJoin(users, eq(users.id, schema.messages.authorUserId))
+      .leftJoin(schema.agents, eq(schema.agents.id, schema.messages.authorAgentId))
+      .where(
+        and(eq(schema.messages.orgId, run.orgId), inArray(schema.messages.id, ids), isNull(schema.messages.deletedAt)),
+      );
+    rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    if (rows.length === 0) return false;
+    const text = rows
+      .map((m) => `[Nova mensagem de ${m.name ?? "alguém"}, enquanto você trabalhava]: ${m.body}`)
+      .join("\n\n");
+    const t = transcript as Transcript;
+    const last = t.messages.at(-1);
+    if (last?.role === "user") {
+      const blocks: ContentBlock[] =
+        typeof last.content === "string" ? [{ type: "text", text: last.content }] : last.content;
+      last.content = [...blocks, { type: "text", text }];
+    } else {
+      t.messages.push({ role: "user", content: [{ type: "text", text }] });
+    }
+    await saveTranscript(db, t);
+    later(() => addRunStep(db, run, "context", { steeredMessageIds: rows.map((m) => m.id) }));
+    return true;
+  };
+
   const maxTurns = deps.maxToolTurns ?? 25;
   let firstTurn = true;
-  for (;;) {
-    if (run.turns >= maxTurns) return fail("too_many_tool_calls");
-    const turnTools = firstTurn ? tools : deps.tools ? await deps.tools.list(ctx) : [];
-    firstTurn = false;
-    const specs: ToolSpec[] = turnTools.map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: t.inputSchema,
-    }));
+  try {
+    for (;;) {
+      if (await isCanceled()) return stopCanceled("");
+      await deliverSteering();
+      if (run.turns >= maxTurns) return fail("too_many_tool_calls");
+      const turnTools = firstTurn ? tools : deps.tools ? await deps.tools.list(ctx) : [];
+      firstTurn = false;
+      const specs: ToolSpec[] = turnTools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema,
+      }));
 
-    const turn = run.turns + 1;
-    const deltas = createDeltaPublisher(deps.pubsub, run, replyThreadId, deps.deltaFlushMs ?? 50, transcript.deltaSeq, {
-      turn,
-      event: { type: "agent.typing", ...where },
-      onFirst: () => deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id }),
-    });
-    let result: Awaited<ReturnType<ModelGateway["stream"]>>;
-    try {
-      result = await deps.gateway.stream({
-        orgId: run.orgId,
-        agentId: agent.id,
-        agent,
-        runId: run.id,
-        system: transcript.system,
-        messages: transcript.messages,
-        maxTokens: deps.maxOutputTokens,
-        tools: specs.length > 0 ? specs : undefined,
-        onDelta: deltas.push,
-      });
-    } catch (error) {
+      const turn = run.turns + 1;
+      const deltas = createDeltaPublisher(
+        deps.pubsub,
+        run,
+        replyThreadId,
+        deps.deltaFlushMs ?? 50,
+        transcript.deltaSeq,
+        {
+          turn,
+          event: { type: "agent.typing", ...where },
+          onFirst: () => deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id }),
+        },
+      );
+      let result: Awaited<ReturnType<ModelGateway["stream"]>>;
+      try {
+        result = await deps.gateway.stream({
+          orgId: run.orgId,
+          agentId: agent.id,
+          agent,
+          runId: run.id,
+          system: transcript.system,
+          messages: transcript.messages,
+          maxTokens: deps.maxOutputTokens,
+          tools: specs.length > 0 ? specs : undefined,
+          onDelta: deltas.push,
+          signal,
+        });
+      } catch (error) {
+        await deltas.flush();
+        await deferred;
+        // Canceled mid-stream: the gateway recorded the usage so far; keep the text so far.
+        if (await isCanceled()) return stopCanceled(deltas.text());
+        // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
+        transcript.deltaSeq = deltas.seq();
+        await saveTranscript(db, transcript).catch(() => {});
+        const reason = userFacing(error);
+        if (reason) return fail(reason);
+        if (options.finalAttempt) return fail(`gave_up: ${error instanceof Error ? error.message : String(error)}`);
+        await addRunStep(db, run, "error", { reason: "transient", message: String(error), willRetry: true });
+        throw error;
+      }
       await deltas.flush();
+      prof.mark(`model#${run.turns + 1}`);
       await deferred;
-      // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
       transcript.deltaSeq = deltas.seq();
-      await saveTranscript(db, transcript).catch(() => {});
-      const reason = userFacing(error);
-      if (reason) return fail(reason);
-      if (options.finalAttempt) return fail(`gave_up: ${error instanceof Error ? error.message : String(error)}`);
-      await addRunStep(db, run, "error", { reason: "transient", message: String(error), willRetry: true });
-      throw error;
-    }
-    await deltas.flush();
-    prof.mark(`model#${run.turns + 1}`);
-    await deferred;
-    transcript.deltaSeq = deltas.seq();
-    transcript.messages.push({ role: "assistant", content: result.content });
-    // Text before tool calls is narration of the work: kept on the model call's step, not part of the answer.
-    const turnText = textOf(result.content).trim();
-    const narration = result.stopReason === "tool_use" && turnText ? turnText : "";
-    // Independent writes in parallel (different rows).
-    const [counted] = await Promise.all([
-      db
-        .update(agentRuns)
-        .set({ turns: sql`${agentRuns.turns} + 1` })
-        .where(eq(agentRuns.id, run.id))
-        .returning(),
-      addRunStep(db, run, "model_call", {
-        model: result.model,
-        stopReason: result.stopReason,
-        usageRecordId: result.usageRecordId,
-        costNanoUsd: result.costNanoUsd,
-        ...result.usage,
-        turn,
-        ...(narration ? { narration: narration.slice(0, 4000) } : {}),
-      }),
-    ]);
-    if (counted[0]) run = counted[0];
+      transcript.messages.push({ role: "assistant", content: result.content });
+      // Text before tool calls is narration of the work: kept on the model call's step, not part of the answer.
+      const turnText = textOf(result.content).trim();
+      const narration = result.stopReason === "tool_use" && turnText ? turnText : "";
+      // Independent writes in parallel (different rows).
+      const [counted] = await Promise.all([
+        db
+          .update(agentRuns)
+          .set({ turns: sql`${agentRuns.turns} + 1` })
+          .where(eq(agentRuns.id, run.id))
+          .returning(),
+        addRunStep(db, run, "model_call", {
+          model: result.model,
+          stopReason: result.stopReason,
+          usageRecordId: result.usageRecordId,
+          costNanoUsd: result.costNanoUsd,
+          ...result.usage,
+          turn,
+          ...(narration ? { narration: narration.slice(0, 4000) } : {}),
+        }),
+      ]);
+      if (counted[0]) run = counted[0];
 
-    if (narration) {
-      await publishChannelEvent(deps.pubsub, {
-        type: "agent.narration",
-        ...where,
-        turn,
-        text: narration.slice(0, 4000),
-      });
-    }
-
-    const toolUses = result.content.filter(
-      (b): b is Extract<ContentBlock, { type: "tool_use" }> => b.type === "tool_use",
-    );
-    if (result.stopReason === "tool_use" && toolUses.length > 0 && deps.tools) {
-      const calls: NonNullable<Transcript["pending"]>["calls"] = [];
-      const waiting: Approval[] = [];
-      const asks: { id: string; toolUseId: string; text: string; choices: string[] | null }[] = [];
-      for (const use of toolUses) {
-        const def = turnTools.find((t) => t.name === use.name);
-        const connector = def?.connectorLabel;
-        // A short label for the UI (skill, issue, file); built-in tools only, never connector inputs.
-        const input = use.input as Record<string, unknown> | undefined;
-        const detail =
-          connector || def?.connectionId
-            ? undefined
-            : (toolDetail(use.name, input) ??
-              (await artifactToolDetail(db, run.orgId, run.channelId, use.name, input).catch(() => undefined)));
-        await publishChannelEvent(deps.pubsub, {
-          type: "agent.tool",
-          ...where,
-          tool: use.name,
-          ...(connector ? { connector } : {}),
-          ...(detail ? { detail } : {}),
-          toolUseId: use.id,
-          ...(!(connector || def?.connectionId) && toolCode(use.name, input)
-            ? { code: toolCode(use.name, input) }
-            : {}),
-        });
-        const outcome = await deps.tools
-          .invoke(ctx, { toolUseId: use.id, name: use.name, input: use.input })
-          .finally(() => publishChannelEvent(deps.pubsub, { type: "agent.tool", ...where, tool: null }));
-        const update =
-          outcome.type === "result" ? (outcome.output.data?.memoryUpdate as MemoryUpdate | undefined) : undefined;
-        const data = outcome.type === "result" ? outcome.output.data : undefined;
-        const artifact = data?.artifact as { id: string; version: number } | undefined;
-        if (artifact) transcript.artifacts = [...(transcript.artifacts ?? []), artifact];
-        if (update) {
-          transcript.memoryUpdates = [...(transcript.memoryUpdates ?? []), update];
-          await publishChannelEvent(deps.pubsub, { type: "memory.updated", ...where, update });
-        }
-        if (outcome.type === "approval") {
-          calls.push({ toolUseId: use.id, name: use.name, approvalId: outcome.approval.id });
-          waiting.push(outcome.approval);
-        } else if (outcome.type === "question") {
-          const questionId = Bun.randomUUIDv7();
-          calls.push({ toolUseId: use.id, name: use.name, questionId });
-          asks.push({ id: questionId, toolUseId: use.id, text: outcome.text, choices: outcome.choices });
-        } else {
-          calls.push({
-            toolUseId: use.id,
-            name: use.name,
-            result: { content: outcome.output.content, isError: outcome.output.isError === true },
-          });
-        }
-      }
-      if (waiting.length === 0 && asks.length === 0) {
-        transcript.messages.push({
-          role: "user",
-          content: calls.map((c) => ({
-            type: "tool_result" as const,
-            toolUseId: c.toolUseId,
-            content: c.result?.content ?? "",
-            ...(c.result?.isError ? { isError: true } : {}),
-          })),
-        });
+      // Canceled while the model answered: its tool calls never run.
+      if (aborted()) {
         await saveTranscript(db, transcript);
-        continue;
+        return stopCanceled("");
+      }
+      if (narration) {
+        await publishChannelEvent(deps.pubsub, {
+          type: "agent.narration",
+          ...where,
+          turn,
+          text: narration.slice(0, 4000),
+        });
       }
 
-      // Suspend: post what the agent said so far, one card per approval and each question, then wait.
-      transcript.pending = { calls };
-      const t = transcript;
-      const posted = await db.transaction(async (tx) => {
-        const out: Message[] = [];
-        // Only this turn's text (it introduces the approval or question); earlier narration is in the steps.
-        const said = turnText;
-        if (said) out.push(await postAgentMessage(tx, run, replyThreadId, said, takeMemoryUpdates(t)));
-        t.postedUpTo = t.messages.length;
-        t.postedCount += out.length + waiting.length + asks.length;
-        const cards: Approval[] = [];
-        const questions: AgentQuestionRow[] = [];
-        for (const ask of asks) {
-          const id = ask.id;
-          const [inserted] = await tx
-            .insert(agentQuestions)
-            .values({
-              id,
-              orgId: run.orgId,
-              runId: run.id,
-              agentId: run.agentId,
-              channelId: run.channelId,
-              threadId: replyThreadId,
-              toolUseId: ask.toolUseId,
-              text: ask.text,
-              choices: ask.choices,
-              expiresAt: new Date(Date.now() + QUESTION_TTL_MS),
-            })
-            .onConflictDoNothing()
-            .returning();
-          if (!inserted) continue;
-          const message = await postAgentMessage(tx, run, replyThreadId, ask.text, {
-            questionId: id,
-            question: questionView(inserted),
+      const toolUses = result.content.filter(
+        (b): b is Extract<ContentBlock, { type: "tool_use" }> => b.type === "tool_use",
+      );
+      if (result.stopReason === "tool_use" && toolUses.length > 0 && deps.tools) {
+        const calls: NonNullable<Transcript["pending"]>["calls"] = [];
+        const waiting: Approval[] = [];
+        const asks: { id: string; toolUseId: string; text: string; choices: string[] | null }[] = [];
+        for (const use of toolUses) {
+          // Canceled during a tool: the rest never run.
+          if (signal.aborted) break;
+          const def = turnTools.find((t) => t.name === use.name);
+          const connector = def?.connectorLabel;
+          // A short label for the UI (skill, issue, file); built-in tools only, never connector inputs.
+          const input = use.input as Record<string, unknown> | undefined;
+          const detail =
+            connector || def?.connectionId
+              ? undefined
+              : (toolDetail(use.name, input) ??
+                (await artifactToolDetail(db, run.orgId, run.channelId, use.name, input).catch(() => undefined)));
+          await publishChannelEvent(deps.pubsub, {
+            type: "agent.tool",
+            ...where,
+            tool: use.name,
+            ...(connector ? { connector } : {}),
+            ...(detail ? { detail } : {}),
+            toolUseId: use.id,
+            ...(!(connector || def?.connectionId) && toolCode(use.name, input)
+              ? { code: toolCode(use.name, input) }
+              : {}),
           });
-          out.push(message);
-          const [linked] = await tx
-            .update(agentQuestions)
-            .set({ messageId: message.id })
-            .where(eq(agentQuestions.id, id))
-            .returning();
-          if (linked) {
-            await syncQuestionMessage(tx, linked);
-            message.meta = { ...message.meta, question: questionView(linked) };
-            questions.push(linked);
+          const outcome = await deps.tools
+            .invoke(ctx, { toolUseId: use.id, name: use.name, input: use.input })
+            .finally(() => publishChannelEvent(deps.pubsub, { type: "agent.tool", ...where, tool: null }));
+          const update =
+            outcome.type === "result" ? (outcome.output.data?.memoryUpdate as MemoryUpdate | undefined) : undefined;
+          const data = outcome.type === "result" ? outcome.output.data : undefined;
+          const artifact = data?.artifact as { id: string; version: number } | undefined;
+          if (artifact) transcript.artifacts = [...(transcript.artifacts ?? []), artifact];
+          if (update) {
+            transcript.memoryUpdates = [...(transcript.memoryUpdates ?? []), update];
+            await publishChannelEvent(deps.pubsub, { type: "memory.updated", ...where, update });
+          }
+          if (outcome.type === "approval") {
+            calls.push({ toolUseId: use.id, name: use.name, approvalId: outcome.approval.id });
+            waiting.push(outcome.approval);
+          } else if (outcome.type === "question") {
+            const questionId = Bun.randomUUIDv7();
+            calls.push({ toolUseId: use.id, name: use.name, questionId });
+            asks.push({ id: questionId, toolUseId: use.id, text: outcome.text, choices: outcome.choices });
+          } else {
+            calls.push({
+              toolUseId: use.id,
+              name: use.name,
+              result: { content: outcome.output.content, isError: outcome.output.isError === true },
+            });
           }
         }
-        for (const approval of waiting) {
-          const card = await postAgentMessage(tx, run, replyThreadId, `Pedido de aprovação: ${approval.title}`, {
-            approvalId: approval.id,
+        if (aborted()) {
+          // The calls made are kept for the record; the run ends here.
+          transcript.messages.push({
+            role: "user",
+            content: toolUses.map((use) => {
+              const c = calls.find((x) => x.toolUseId === use.id);
+              return {
+                type: "tool_result" as const,
+                toolUseId: use.id,
+                content: c?.result?.content ?? "Canceled by a person before it ran.",
+                isError: !c?.result || c.result.isError,
+              };
+            }),
           });
-          out.push(card);
-          const [linked] = await tx
-            .update(approvals)
-            .set({ messageId: card.id })
-            .where(eq(approvals.id, approval.id))
-            .returning();
-          if (linked) cards.push(linked);
+          await saveTranscript(db, transcript);
+          return stopCanceled("");
         }
-        await saveTranscript(tx, t);
-        const suspended = await transitionRun(
-          tx,
-          run.id,
-          "running",
-          asks.length > 0 ? "waiting_input" : "waiting_approval",
-        );
-        if (!suspended) throw new PermanentJobError("run changed state while executing");
-        return { messages: out, cards, questions };
+        if (waiting.length === 0 && asks.length === 0) {
+          transcript.messages.push({
+            role: "user",
+            content: calls.map((c) => ({
+              type: "tool_result" as const,
+              toolUseId: c.toolUseId,
+              content: c.result?.content ?? "",
+              ...(c.result?.isError ? { isError: true } : {}),
+            })),
+          });
+          await saveTranscript(db, transcript);
+          continue;
+        }
+
+        // Suspend: post what the agent said so far, one card per approval and each question, then wait.
+        transcript.pending = { calls };
+        const t = transcript;
+        const posted = await db.transaction(async (tx) => {
+          const out: Message[] = [];
+          // Only this turn's text (it introduces the approval or question); earlier narration is in the steps.
+          const said = turnText;
+          if (said) out.push(await postAgentMessage(tx, run, replyThreadId, said, takeMemoryUpdates(t)));
+          t.postedUpTo = t.messages.length;
+          t.postedCount += out.length + waiting.length + asks.length;
+          const cards: Approval[] = [];
+          const questions: AgentQuestionRow[] = [];
+          for (const ask of asks) {
+            const id = ask.id;
+            const [inserted] = await tx
+              .insert(agentQuestions)
+              .values({
+                id,
+                orgId: run.orgId,
+                runId: run.id,
+                agentId: run.agentId,
+                channelId: run.channelId,
+                threadId: replyThreadId,
+                toolUseId: ask.toolUseId,
+                text: ask.text,
+                choices: ask.choices,
+                expiresAt: new Date(Date.now() + QUESTION_TTL_MS),
+              })
+              .onConflictDoNothing()
+              .returning();
+            if (!inserted) continue;
+            const message = await postAgentMessage(tx, run, replyThreadId, ask.text, {
+              questionId: id,
+              question: questionView(inserted),
+            });
+            out.push(message);
+            const [linked] = await tx
+              .update(agentQuestions)
+              .set({ messageId: message.id })
+              .where(eq(agentQuestions.id, id))
+              .returning();
+            if (linked) {
+              await syncQuestionMessage(tx, linked);
+              message.meta = { ...message.meta, question: questionView(linked) };
+              questions.push(linked);
+            }
+          }
+          for (const approval of waiting) {
+            const card = await postAgentMessage(tx, run, replyThreadId, `Pedido de aprovação: ${approval.title}`, {
+              approvalId: approval.id,
+            });
+            out.push(card);
+            const [linked] = await tx
+              .update(approvals)
+              .set({ messageId: card.id })
+              .where(eq(approvals.id, approval.id))
+              .returning();
+            if (linked) cards.push(linked);
+          }
+          await saveTranscript(tx, t);
+          const suspended = await transitionRun(
+            tx,
+            run.id,
+            "running",
+            asks.length > 0 ? "waiting_input" : "waiting_approval",
+          );
+          if (!suspended) throw new PermanentJobError("run changed state while executing");
+          return { messages: out, cards, questions };
+        });
+        prof.mark("persist");
+        for (const m of await withWikiLinks(db, run.orgId, posted.messages.map(messageView)))
+          await publishMessageCreated(deps.pubsub, m);
+        for (const card of posted.cards) await publishApproval(deps, card, "approval.created");
+        for (const q of posted.questions) await publishQuestion(deps.pubsub, q, "question.asked");
+        const waitingFor = asks.length > 0 ? "waiting_input" : "waiting_approval";
+        await publishChannelEvent(deps.pubsub, event(waitingFor));
+        await finished(waitingFor);
+        return;
+      }
+
+      // Final answer.
+      if (result.stopReason === "refusal") return fail("model_refused");
+      const updates = transcript.memoryUpdates ?? [];
+      const saved = (transcript.artifacts ?? []).length > 0 ? "Arquivo salvo." : "";
+      const anythingPosted = transcript.postedCount > 0;
+      // The message is the final answer only: the last model call's text. Without it, a short closing line.
+      const text =
+        turnText ||
+        (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "") ||
+        saved ||
+        closingSummary(transcript, anythingPosted);
+      if (!text && !anythingPosted) return fail("empty_reply");
+      const t = transcript;
+      // Someone wrote while it answered: post this answer, then read the new message(s) and go on.
+      const [still] = await db
+        .select({ pending: agentRuns.pendingMessageIds })
+        .from(agentRuns)
+        .where(eq(agentRuns.id, run.id));
+      if ((still?.pending.length ?? 0) > 0) {
+        const posted = text
+          ? await db.transaction(async (tx) => {
+              const m = await postAgentMessage(tx, run, replyThreadId, text, takeMemoryUpdates(t));
+              t.postedUpTo = t.messages.length;
+              t.postedCount++;
+              await addRunStep(tx, run, "message", { messageId: m.id });
+              await saveTranscript(tx, t);
+              return m;
+            })
+          : null;
+        if (posted) {
+          const [view] = await withWikiLinks(db, run.orgId, [messageView(posted)]);
+          if (view) await publishMessageCreated(deps.pubsub, view);
+        }
+        continue;
+      }
+      const reply = await db.transaction(async (tx) => {
+        const message = text ? await postAgentMessage(tx, run, replyThreadId, text, takeMemoryUpdates(t)) : null;
+        t.postedUpTo = t.messages.length;
+        if (message) t.postedCount++;
+        if (message) {
+          await addRunStep(tx, run, "message", {
+            messageId: message.id,
+            truncated: result.stopReason === "max_tokens",
+          });
+        }
+        // State, reply and transcript in one statement.
+        const done = await transitionRun(tx, run.id, "running", "done", {
+          ...(message ? { replyMessageId: message.id } : {}),
+          error: null,
+          transcript: t as unknown as Record<string, unknown>,
+        });
+        if (!done) throw new PermanentJobError("run changed state while executing");
+        return message;
       });
       prof.mark("persist");
-      for (const m of await withWikiLinks(db, run.orgId, posted.messages.map(messageView)))
-        await publishMessageCreated(deps.pubsub, m);
-      for (const card of posted.cards) await publishApproval(deps, card, "approval.created");
-      for (const q of posted.questions) await publishQuestion(deps.pubsub, q, "question.asked");
-      const waitingFor = asks.length > 0 ? "waiting_input" : "waiting_approval";
-      await publishChannelEvent(deps.pubsub, event(waitingFor));
-      await finished(waitingFor);
+      if (reply) {
+        const [view] = await withWikiLinks(db, run.orgId, [messageView(reply)]);
+        if (view) await publishMessageCreated(deps.pubsub, view);
+      }
+      // Asked to implement an issue: the final reply is also a comment on it.
+      const issueId = trigger?.meta.issueId;
+      if (reply && typeof issueId === "string") {
+        await mirrorReplyToIssue({ db, pubsub: deps.pubsub }, run, issueId, reply.body).catch(() => {});
+      }
+      await publishChannelEvent(deps.pubsub, event("done"));
+      await finished("done");
+      prof.mark("events");
+      // A message that slipped in between the last check and `done` gets its own run (never lost).
+      const orphans = await takeSteering().catch(() => [] as string[]);
+      const lastOrphan = orphans.at(-1);
+      if (lastOrphan && run.trigger !== "forum") {
+        const message = await getMessage(db, run.orgId, lastOrphan);
+        if (message && !message.deletedAt) await createAgentRuns(db, message, [run.agentId], run.trigger);
+      }
       return;
     }
-
-    // Final answer.
-    if (result.stopReason === "refusal") return fail("model_refused");
-    const updates = transcript.memoryUpdates ?? [];
-    const saved = (transcript.artifacts ?? []).length > 0 ? "Arquivo salvo." : "";
-    const anythingPosted = transcript.postedCount > 0;
-    // The message is the final answer only: the last model call's text. Without it, a short closing line.
-    const text =
-      turnText ||
-      (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "") ||
-      saved ||
-      closingSummary(transcript, anythingPosted);
-    if (!text && !anythingPosted) return fail("empty_reply");
-    const t = transcript;
-    const reply = await db.transaction(async (tx) => {
-      const message = text ? await postAgentMessage(tx, run, replyThreadId, text, takeMemoryUpdates(t)) : null;
-      t.postedUpTo = t.messages.length;
-      if (message) t.postedCount++;
-      if (message) {
-        await addRunStep(tx, run, "message", { messageId: message.id, truncated: result.stopReason === "max_tokens" });
-      }
-      // State, reply and transcript in one statement.
-      const done = await transitionRun(tx, run.id, "running", "done", {
-        ...(message ? { replyMessageId: message.id } : {}),
-        error: null,
-        transcript: t as unknown as Record<string, unknown>,
-      });
-      if (!done) throw new PermanentJobError("run changed state while executing");
-      return message;
-    });
-    prof.mark("persist");
-    if (reply) {
-      const [view] = await withWikiLinks(db, run.orgId, [messageView(reply)]);
-      if (view) await publishMessageCreated(deps.pubsub, view);
-    }
-    // Asked to implement an issue: the final reply is also a comment on it.
-    const issueId = trigger?.meta.issueId;
-    if (reply && typeof issueId === "string") {
-      await mirrorReplyToIssue({ db, pubsub: deps.pubsub }, run, issueId, reply.body).catch(() => {});
-    }
-    await publishChannelEvent(deps.pubsub, event("done"));
-    await finished("done");
-    prof.mark("events");
-    return;
+  } catch (error) {
+    // A state change lost to a cancel (the final or suspend transition found `canceled`): end as canceled.
+    if (await isCanceled().catch(() => false)) return stopCanceled("");
+    throw error;
   }
 }
 
@@ -718,6 +919,7 @@ function createDeltaPublisher(
   let started = false;
   const MAX_CHUNK = 2000;
   let buffer = "";
+  let all = "";
   let seq = startSeq;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: Promise<void> = Promise.resolve();
@@ -751,6 +953,7 @@ function createDeltaPublisher(
         if (typing) pending = pending.then(() => publishChannelEvent(pubsub, typing));
       }
       buffer += text;
+      all += text;
       if (flushMs === 0 || buffer.length >= MAX_CHUNK) send();
       else timer ??= setTimeout(send, flushMs);
     },
@@ -759,6 +962,8 @@ function createDeltaPublisher(
       await pending;
     },
     seq: () => seq,
+    /** Everything streamed in this turn (kept when the run is canceled mid-stream). */
+    text: () => all,
   };
 }
 

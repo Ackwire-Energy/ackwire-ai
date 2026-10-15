@@ -111,8 +111,31 @@ export type ChannelEvent =
       threadId: string | null;
       agentId: string;
       runId: string;
-      status: "done" | "failed" | "waiting_approval" | "waiting_input";
+      status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       error?: string;
+    }
+  /**
+   * A person's message went to the agent's task already in progress (one
+   * active run per agent and conversation): it reads it at its next step.
+   * `stop`: the message asked to stop, and the run is being canceled.
+   */
+  | {
+      type: "agent.run.steered";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      messageId: string;
+      stop?: boolean;
+    }
+  /** A person stopped the run (`POST …/runs/{id}/cancel`): drop "pensando…" now; its text so far follows as a message. */
+  | {
+      type: "run.canceled";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      byUserId: string;
     }
   /** A person is typing (client frame `typing`). Clients drop it after `ttlMs`. */
   | { type: "user.typing"; channelId: string; threadId: string | null; userId: string; ttlMs: number }
@@ -133,7 +156,7 @@ export type ChannelEvent =
       messageId: string;
       agentId: string;
       runId: string;
-      status: "done" | "failed" | "waiting_approval" | "waiting_input";
+      status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
     }
   /** An agent changed its memory because a person asked (with an undo). */
   | {

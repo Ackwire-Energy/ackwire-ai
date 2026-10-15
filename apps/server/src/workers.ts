@@ -8,8 +8,10 @@ import {
   expireQuestions,
   fireDueRoutines,
   type JobHandlers,
+  listenForRunCancels,
   processOutbox,
   queueApprovalDigests,
+  recoverStaleRuns,
 } from "@agenteschat/engine";
 import type { Logger } from "./logger";
 
@@ -37,6 +39,8 @@ export const WORKER_INTERVALS_MS = {
   reflections: 10 * 60_000,
   consolidation: 24 * 3600_000,
   routines: 30_000,
+  /** Runs whose worker died (deploy, crash): also once at boot. */
+  recovery: 60_000,
 };
 
 /**
@@ -112,6 +116,11 @@ export function startWorkers(deps: WorkerDeps) {
     if (expired > 0) log.info("agent questions expired", { expired });
   });
 
+  every("recovery", WORKER_INTERVALS_MS.recovery, async () => {
+    const r = await recoverStaleRuns({ db, pubsub: deps.pubsub });
+    if (r.resumed.length + r.failed.length + r.requeued.length > 0) log.info("stale runs recovered", r);
+  });
+
   every("routines", WORKER_INTERVALS_MS.routines, async () => {
     const fired = await fireDueRoutines({ db, pubsub: deps.pubsub });
     if (fired > 0) log.info("routines fired", { fired });
@@ -146,6 +155,8 @@ export function startWorkers(deps: WorkerDeps) {
   }
 
   const offWake = deps.pubsub.subscribe(WAKE_TOPIC, () => void ticks.get("outbox")?.());
+  // A person canceled a run: the instance executing it aborts it.
+  const offCancel = listenForRunCancels(deps.pubsub);
 
   return {
     /** Process the outbox now instead of waiting for the next interval. */
@@ -160,6 +171,7 @@ export function startWorkers(deps: WorkerDeps) {
     stop() {
       stopped = true;
       offWake();
+      offCancel();
       for (const timer of timers) clearInterval(timer);
     },
   };

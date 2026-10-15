@@ -14,6 +14,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { audienceSql, notifyBlocked } from "./audience";
+import { cancelRun } from "./cancel";
 import { requireChannelAccess } from "./channels";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
@@ -26,6 +27,10 @@ const { messages, agents, channelMembers, channels, agentRuns, outbox, agentQues
 export type Message = typeof messages.$inferSelect;
 
 export const MAX_MESSAGE_LENGTH = 40_000;
+
+/** A message that only says stop ("para", "pare", "cancela", "stop"…) cancels the agent's task in progress. */
+export const STOP_WORDS =
+  /^(@[a-z0-9_-]+\s+)?(para|pare|parar|para tudo|pode parar|cancela|cancele|cancelar|interrompe|interrompa|stop|cancel)[\s.!]*$/i;
 
 export interface MessageView {
   id: string;
@@ -78,7 +83,7 @@ export interface Receipts {
   pickedBy: string[];
   handled: {
     agentId: string;
-    status: "queued" | "running" | "waiting_approval" | "waiting_input" | "done" | "failed";
+    status: "queued" | "running" | "waiting_approval" | "waiting_input" | "done" | "failed" | "canceled";
   }[];
 }
 
@@ -170,6 +175,8 @@ interface RawMessage {
   runs: { id: string; agentId: string }[] | string | null;
   /** Agents the sender addressed but can't talk to (D31). */
   blocked?: string[] | string | null;
+  /** Active runs this message was delivered to (no new run). */
+  steered?: { id: string; agentId: string }[] | string | null;
 }
 
 const asDate = (v: Date | string | null) => (v === null ? null : v instanceof Date ? v : new Date(v));
@@ -191,7 +198,13 @@ export async function insertMessageWithRuns(
   tx: Executor,
   input: NewMessage,
   options: { startRuns: boolean },
-): Promise<{ message: Message; runs: { id: string; agentId: string }[]; blocked: string[] }> {
+): Promise<{
+  message: Message;
+  runs: { id: string; agentId: string }[];
+  blocked: string[];
+  /** Runs already active in this conversation that will read the message at their next step. */
+  steered: { id: string; agentId: string }[];
+}> {
   const body = input.body.trim();
   if (body === "") throw new ValidationError("Message is empty");
   if (body.length > MAX_MESSAGE_LENGTH)
@@ -259,11 +272,26 @@ export async function insertMessageWithRuns(
       ), answering as (
         -- Who can talk to the agent (D31): the others get no run, only a notice for the sender.
         select agent_id, trig from addressed where allowed
+      ), active as (
+        -- One active run per agent and conversation: a new message goes to it instead of a second run.
+        select distinct on (r.agent_id) r.id, r.agent_id from ${agentRuns} r
+        where ${person}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
+          and r.agent_id in (select agent_id from answering)
+          and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
+          and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid) or exists (
+            select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm'))
+        order by r.agent_id, r.created_at desc
+      ), steered as (
+        update ${agentRuns} r set pending_message_ids = array_append(r.pending_message_ids, ${id}::uuid),
+          updated_at = now()
+        from active a where r.id = a.id and exists (select 1 from m)
+        returning r.id, r.agent_id
       ), runs as (
         insert into ${agentRuns} (id, org_id, agent_id, channel_id, thread_root_id, trigger_message_id, trigger, hop)
         select gen_random_uuid(), ${input.orgId}::uuid, an.agent_id, ${input.channelId}::uuid,
           coalesce(${threadId}::uuid, ${id}::uuid), ${id}::uuid, an.trig::agent_run_trigger, ${hop} + 1
         from answering an where exists (select 1 from m)
+          and an.agent_id not in (select agent_id from active)
         on conflict do nothing
         returning id, agent_id
       ), jobs as (
@@ -286,6 +314,8 @@ export async function insertMessageWithRuns(
       select m.*,
         coalesce((select json_agg(json_build_object('id', r.id, 'agentId', r.agent_id)) from runs r), '[]'::json) as runs,
         coalesce((select json_agg(ad.agent_id) from addressed ad where not ad.allowed), '[]'::json) as blocked,
+        coalesce((select json_agg(json_build_object('id', s.id, 'agentId', s.agent_id)) from steered s), '[]'::json)
+          as steered,
         (select count(*) from jobs)::int as jobs
       from m`),
   );
@@ -313,7 +343,12 @@ export async function insertMessageWithRuns(
   if (body.includes("[[")) {
     await syncWikiLinks(tx, input.orgId, { type: "message", id: message.id, channelId: input.channelId }, body);
   }
-  return { message, runs: parseJson(row.runs, []), blocked: parseJson(row.blocked ?? null, [] as string[]) };
+  return {
+    message,
+    runs: parseJson(row.runs, []),
+    blocked: parseJson(row.blocked ?? null, [] as string[]),
+    steered: parseJson(row.steered ?? null, [] as { id: string; agentId: string }[]),
+  };
 }
 
 /**
@@ -341,7 +376,7 @@ export async function postPersonMessage(
   if (channel.kind === "forum") throw new ValidationError("Escreva no fórum pela página do tópico.");
   const clientId = input.clientId?.trim().slice(0, 64) || null;
   // One statement: the message, its jobs, and the runs of agents that will surely answer.
-  const { message, runs, blocked } = await insertMessageWithRuns(
+  const { message, runs, blocked, steered } = await insertMessageWithRuns(
     deps.db,
     {
       orgId,
@@ -376,6 +411,27 @@ export async function postPersonMessage(
       threadId: message.threadId,
       messageId: message.id,
     });
+  }
+  if (steered.length > 0) {
+    // Delivered to the agent's task in progress (it reads it at its next step); "para" stops it.
+    const stop = STOP_WORDS.test(message.body.trim());
+    for (const s of steered) {
+      const [active] = await deps.db.select().from(agentRuns).where(eq(agentRuns.id, s.id));
+      const threadId =
+        active && !(channel.kind === "dm" && active.threadRootId === active.triggerMessageId)
+          ? active.threadRootId
+          : null;
+      await publishChannelEvent(deps.pubsub, {
+        type: "agent.run.steered",
+        channelId,
+        threadId,
+        runId: s.id,
+        agentId: s.agentId,
+        messageId: message.id,
+        ...(stop ? { stop: true } : {}),
+      });
+      if (stop) await cancelRun(deps, userId, orgId, s.id).catch(() => undefined);
+    }
   }
   if (runs.length > 0) {
     // DMs are flat: replies to a top-level DM message go in the main timeline.

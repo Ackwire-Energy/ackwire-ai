@@ -3,6 +3,7 @@ import {
   agentView,
   audienceOf,
   availableProviders,
+  cancelRun,
   canTalkTo,
   getOrgSettings,
   getRun,
@@ -615,7 +616,9 @@ export function managementRoutes(deps: AppDeps) {
         params: OrgParams,
         query: z.object({
           agentId: z.uuid().optional(),
-          status: z.enum(["queued", "running", "waiting_approval", "waiting_input", "done", "failed"]).optional(),
+          status: z
+            .enum(["queued", "running", "waiting_approval", "waiting_input", "done", "failed", "canceled"])
+            .optional(),
           before: z.iso.datetime().optional(),
           since: z.iso.datetime().optional(),
           limit: z.coerce.number().int().min(1).max(200).optional(),
@@ -667,6 +670,40 @@ export function managementRoutes(deps: AppDeps) {
       if (!run) return c.json({ error: { code: "not_found", message: "Run not found" } }, 404);
       return c.json(
         { run: toRun(run), steps: steps.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() })) },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/runs/{runId}/cancel",
+      tags: ["Usage"],
+      security,
+      summary:
+        "Stop an agent's run (the person who asked, the agent's owner or an admin). Its text so far is kept; a queued run never starts",
+      request: { params: OrgParams.extend({ runId: z.uuid() }) },
+      responses: {
+        200: json(
+          z.object({
+            id: z.uuid(),
+            status: z.literal("canceled"),
+            previousStatus: z.enum(["queued", "running", "waiting_approval", "waiting_input"]),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, runId } = c.req.valid("param");
+      const result = await cancelRun({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, runId);
+      return c.json(
+        {
+          id: result.id,
+          status: "canceled" as const,
+          previousStatus: result.previousStatus as "queued" | "running" | "waiting_approval" | "waiting_input",
+        },
         200,
       );
     },

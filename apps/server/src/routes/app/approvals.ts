@@ -17,7 +17,7 @@ export const Approval = z
     title: z.string().openapi({ example: "Merge PR #42 into main" }),
     detail: z.string(),
     params: z.record(z.string(), z.unknown()).openapi({ description: "Exactly what will run if approved." }),
-    status: z.enum(["pending", "approved", "refused", "expired"]),
+    status: z.enum(["pending", "approved", "refused", "expired", "canceled"]),
     expiresAt: z.string(),
     createdAt: z.string(),
     decidedByUserId: z.string().nullable(),
