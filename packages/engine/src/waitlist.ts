@@ -1,4 +1,6 @@
-import { type Database, schema } from "@agenteschat/db";
+import { and, type Database, eq, isNull, lt, or, schema, sql } from "@agenteschat/db";
+import { randomToken, sha256 } from "./crypto";
+import { queueEmail } from "./email";
 import { ValidationError } from "./errors";
 
 const { waitlistEntries } = schema;
@@ -6,7 +8,16 @@ const { waitlistEntries } = schema;
 export const WAITLIST_LOCALES = ["pt-BR", "en"] as const;
 export type WaitlistLocale = (typeof WAITLIST_LOCALES)[number];
 
+/** A new confirmation email waits this long after the previous one. */
+export const WAITLIST_RESEND_AFTER_MS = 2 * 60_000;
+/** At most this many confirmation emails per address, ever. */
+export const WAITLIST_MAX_SENDS = 5;
+/** The confirmation link works for this long. */
+export const WAITLIST_LINK_TTL_MS = 48 * 3600_000;
+
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** What `randomToken()` makes: base64url, 32 characters for 24 bytes. */
+export const WAITLIST_TOKEN = /^[A-Za-z0-9_-]{32}$/;
 
 /** Lowercase, trimmed; null when it doesn't look like an email. */
 export function normalizeWaitlistEmail(raw: string): string | null {
@@ -15,23 +26,80 @@ export function normalizeWaitlistEmail(raw: string): string | null {
 }
 
 /**
- * Puts someone on the waiting list. Joining twice keeps the first entry, and
- * the caller answers the same either way, so the list can't be probed.
- * Returns whether a new entry was created.
+ * Puts someone on the waiting list and emails them a confirmation link
+ * (double opt-in). Joining again resends the link, at most once every 2
+ * minutes and 5 times per address; a confirmed address gets nothing. The
+ * caller answers the same either way, so the list can't be probed.
+ * Returns whether a confirmation email was queued.
  */
 export async function joinWaitlist(
   db: Database,
-  input: { email: string; locale?: string; source?: string },
-): Promise<{ created: boolean }> {
+  input: { email: string; locale?: string; source?: string; publicUrl: string },
+  now = new Date(),
+): Promise<{ sent: boolean }> {
   const email = normalizeWaitlistEmail(input.email);
   if (!email) throw new ValidationError("Use an email like name@company.com", "invalid_email");
   const locale: WaitlistLocale = WAITLIST_LOCALES.includes(input.locale as WaitlistLocale)
     ? (input.locale as WaitlistLocale)
     : "pt-BR";
-  const rows = await db
+  await db
     .insert(waitlistEntries)
     .values({ email, locale, source: input.source ?? "landing" })
-    .onConflictDoNothing()
-    .returning({ id: waitlistEntries.id });
-  return { created: rows.length > 0 };
+    .onConflictDoNothing();
+
+  const token = randomToken();
+  return db.transaction(async (tx) => {
+    // One conditional update claims the send, so two requests at once can't both email.
+    const [entry] = await tx
+      .update(waitlistEntries)
+      .set({
+        confirmTokenHash: sha256(token),
+        confirmSentAt: now,
+        confirmSends: sql`${waitlistEntries.confirmSends} + 1`,
+      })
+      .where(
+        and(
+          eq(waitlistEntries.email, email),
+          isNull(waitlistEntries.confirmedAt),
+          lt(waitlistEntries.confirmSends, WAITLIST_MAX_SENDS),
+          or(
+            isNull(waitlistEntries.confirmSentAt),
+            lt(waitlistEntries.confirmSentAt, new Date(now.getTime() - WAITLIST_RESEND_AFTER_MS)),
+          ),
+        ),
+      )
+      .returning({ id: waitlistEntries.id, locale: waitlistEntries.locale, sends: waitlistEntries.confirmSends });
+    if (!entry) return { sent: false };
+    await queueEmail(tx, {
+      orgId: null,
+      key: `waitlist-confirm:${entry.id}:${entry.sends}`,
+      to: [email],
+      template: {
+        kind: "waitlist_confirm",
+        locale: entry.locale === "en" ? "en" : "pt-BR",
+        url: `${input.publicUrl.replace(/\/$/, "")}/?confirm=${token}`,
+      },
+    });
+    return { sent: true };
+  });
+}
+
+/**
+ * Confirms the address behind a link from the confirmation email. Opening
+ * the same link again still answers true; an unknown or expired one, false.
+ */
+export async function confirmWaitlist(db: Database, token: string, now = new Date()): Promise<boolean> {
+  if (!WAITLIST_TOKEN.test(token)) return false;
+  const [entry] = await db
+    .select()
+    .from(waitlistEntries)
+    .where(eq(waitlistEntries.confirmTokenHash, sha256(token)));
+  if (!entry) return false;
+  if (entry.confirmedAt) return true;
+  if (!entry.confirmSentAt || now.getTime() - entry.confirmSentAt.getTime() > WAITLIST_LINK_TTL_MS) return false;
+  await db
+    .update(waitlistEntries)
+    .set({ confirmedAt: now })
+    .where(and(eq(waitlistEntries.id, entry.id), isNull(waitlistEntries.confirmedAt)));
+  return true;
 }

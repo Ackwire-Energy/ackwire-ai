@@ -2430,8 +2430,12 @@ export const ptBR = {
       invalid: "Confira o e-mail. Ele precisa ter o formato nome@empresa.com.",
       rateLimited: "Muitas tentativas seguidas. Espere um minuto e tente de novo.",
       failed: "Não deu para entrar na lista agora. Tente de novo em instantes.",
+      checkTitle: "Confira seu e-mail.",
+      checkText: "Mandamos um link para {{email}}. Abra para confirmar seu lugar na lista.",
       doneTitle: "Você está na lista.",
-      doneText: "Avisamos em {{email}} quando chegar a vez da sua onda.",
+      doneText: "E-mail confirmado. Avisamos quando chegar a vez da sua onda.",
+      expired: "Esse link expirou ou foi trocado por um mais novo. Coloque seu e-mail de novo para receber outro.",
+      confirmFailed: "Não deu para confirmar agora. Abra o link do e-mail de novo em instantes.",
     },
     how: {
       eyebrow: "Como funciona",

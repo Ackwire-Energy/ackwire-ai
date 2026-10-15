@@ -60,7 +60,7 @@ export interface AppOptions {
  * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
  * - `/api/git/*`          git proxy for agents' computers (their own credential, D35)
  * - `/api/machines/*`     connected computers' runner: pair, uploads, install.sh (ADR 0025)
- * - `/api/waitlist`       public: join the waiting list (landing page)
+ * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - everything else       web app (single-page app), when built

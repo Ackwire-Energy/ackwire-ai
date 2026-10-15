@@ -104,6 +104,9 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       join: async (input) => {
         await request<{ ok: true }>("/api/waitlist", { json: input });
       },
+      confirm: async (input) => {
+        await request<{ ok: true }>("/api/waitlist/confirm", { json: input });
+      },
     },
     account: {
       authConfig: () => request<AuthConfig>("/api/app/auth-config"),

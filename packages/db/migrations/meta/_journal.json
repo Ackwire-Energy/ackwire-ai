@@ -281,6 +281,13 @@
       "when": 1792091097719,
       "tag": "0039_connected_computers",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792097620548,
+      "tag": "0040_waitlist_confirmation",
+      "breakpoints": true
     }
   ]
 }

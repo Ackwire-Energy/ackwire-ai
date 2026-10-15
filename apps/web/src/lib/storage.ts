@@ -28,4 +28,6 @@ export const STORAGE_KEYS = {
   lastOrg: "agentes.lastOrg",
   /** The email the visitor put on the landing page's waiting list. */
   waitlist: "agentes.waitlist",
+  /** Set once the visitor opened the link in the confirmation email. */
+  waitlistConfirmed: "agentes.waitlist.confirmed",
 } as const;

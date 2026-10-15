@@ -7,9 +7,9 @@ import { enqueue, PermanentJobError } from "./outbox";
 const { users, organizations, agents, approvals } = schema;
 
 /**
- * Transactional emails (pt-BR), rendered when the `email.send` job runs.
- * Simple, accessible HTML (one column, real text, high contrast, lang=pt-BR)
- * plus a plain-text version.
+ * Transactional emails (pt-BR; the waiting list also in English), rendered
+ * when the `email.send` job runs. Simple, accessible HTML (one column, real
+ * text, high contrast, lang set) plus a plain-text version.
  */
 export type EmailTemplate =
   | { kind: "invitation"; orgName: string; inviterName: string; url: string; role: string }
@@ -19,6 +19,8 @@ export type EmailTemplate =
   /** Someone opened an expired invitation and asked for a new one. `email` is empty for an org link. */
   | { kind: "invite_request"; orgName: string; email: string; url: string }
   | { kind: "verify_email"; url: string }
+  /** Double opt-in for the landing page's waiting list, in the language they joined in. */
+  | { kind: "waitlist_confirm"; locale: "pt-BR" | "en"; url: string }
   | {
       kind: "budget";
       level: "warning" | "exhausted";
@@ -40,9 +42,27 @@ const esc = (s: string) =>
 const usd = (n: number) => `US$ ${n.toFixed(2).replace(".", ",")}`;
 const ROLE: Record<string, string> = { owner: "dono", admin: "admin", member: "membro" };
 
-function layout(title: string, paragraphs: string[], action?: { label: string; url: string }) {
+const LAYOUT = {
+  "pt-BR": {
+    fallback: "Se o botão não funcionar, copie este endereço:",
+    footer: "Você recebeu este e-mail porque usa o agentes.chat.",
+  },
+  en: {
+    fallback: "If the button doesn't work, copy this address:",
+    footer: "You got this email because you use agentes.chat.",
+  },
+};
+
+function layout(
+  title: string,
+  paragraphs: string[],
+  action?: { label: string; url: string },
+  options: { lang?: keyof typeof LAYOUT; footer?: string } = {},
+) {
+  const lang = options.lang ?? "pt-BR";
+  const words = LAYOUT[lang];
   const html = `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(title)}</title></head>
+<html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(title)}</title></head>
 <body style="margin:0;padding:24px;background:#ffffff;color:#111111;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5">
 <main style="max-width:560px;margin:0 auto">
 <p style="font-weight:600;margin:0 0 24px">agentes</p>
@@ -51,10 +71,10 @@ ${paragraphs.map((p) => `<p style="margin:0 0 16px">${p}</p>`).join("\n")}
 ${
   action
     ? `<p style="margin:24px 0"><a href="${esc(action.url)}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px">${esc(action.label)}</a></p>
-<p style="margin:0 0 16px;font-size:14px;color:#444444">Se o botão não funcionar, copie este endereço: <a href="${esc(action.url)}" style="color:#111111">${esc(action.url)}</a></p>`
+<p style="margin:0 0 16px;font-size:14px;color:#444444">${words.fallback} <a href="${esc(action.url)}" style="color:#111111">${esc(action.url)}</a></p>`
     : ""
 }
-<p style="margin:32px 0 0;font-size:13px;color:#555555">Você recebeu este e-mail porque usa o agentes.chat.</p>
+<p style="margin:32px 0 0;font-size:13px;color:#555555">${esc(options.footer ?? words.footer)}</p>
 </main></body></html>`;
   const strip = (p: string) =>
     p
@@ -132,6 +152,39 @@ export function renderEmail(t: EmailTemplate): { subject: string; html: string; 
           url: t.url,
         }),
       };
+    case "waitlist_confirm":
+      return t.locale === "en"
+        ? {
+            subject: "Confirm your spot on the agentes.chat waiting list",
+            ...layout(
+              "Confirm your email",
+              [
+                "You asked to join the agentes.chat waiting list. Confirm that this address is yours and you're in.",
+                "The link works for 48 hours.",
+              ],
+              { label: "Confirm my email", url: t.url },
+              {
+                lang: "en",
+                footer:
+                  "Someone entered this address on agentes.chat. If it wasn't you, ignore this email and nothing happens.",
+              },
+            ),
+          }
+        : {
+            subject: "Confirme seu lugar na lista do agentes.chat",
+            ...layout(
+              "Confirme seu e-mail",
+              [
+                "Você pediu para entrar na lista de espera do agentes.chat. Confirme que este endereço é seu e pronto, você está na lista.",
+                "O link vale por 48 horas.",
+              ],
+              { label: "Confirmar meu e-mail", url: t.url },
+              {
+                footer:
+                  "Alguém colocou este endereço no agentes.chat. Se não foi você, ignore este e-mail e nada acontece.",
+              },
+            ),
+          };
     case "budget": {
       const pct = t.level === "warning" ? "80%" : "100%";
       return {

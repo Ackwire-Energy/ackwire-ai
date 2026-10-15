@@ -6,6 +6,9 @@ import { LandingPage } from "@/pages/landing/LandingPage";
 
 /** Entry point: signed in, the last organization or onboarding; signed out, the landing page. */
 export const Route = createFileRoute("/")({
+  // `?confirm=` comes from the waiting list's confirmation email.
+  validateSearch: (search: Record<string, unknown>): { confirm?: string } =>
+    typeof search.confirm === "string" ? { confirm: search.confirm } : {},
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.ensureQueryData(meQuery(context.api));
     if (!me) return;

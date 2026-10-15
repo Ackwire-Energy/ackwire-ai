@@ -1,4 +1,5 @@
 import { type AgentState, Button, cx, Logo, Segmented, setGaze } from "@agenteschat/ui";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -18,7 +19,7 @@ import { readReducedMotion, useJoy } from "./hooks";
 import { LpIcon } from "./icons";
 import { LiveLedger } from "./LiveLedger";
 import { StoryScroll } from "./StoryScroll";
-import { type JoinResult, Waitlist } from "./Waitlist";
+import { type JoinResult, type LinkProblem, Waitlist } from "./Waitlist";
 import "./landing.css";
 
 const SECTIONS = [
@@ -137,7 +138,38 @@ export function LandingPage() {
 
   // The waiting list (both forms share it).
   const [joined, setJoined] = useState<string | null>(() => storage.get(STORAGE_KEYS.waitlist));
+  const [confirmed, setConfirmed] = useState(() => storage.get(STORAGE_KEYS.waitlistConfirmed) === "1");
+  const [linkProblem, setLinkProblem] = useState<LinkProblem | null>(null);
   const [celebrate, setCelebrate] = useState(0);
+
+  // Opened from the confirmation email (`/?confirm=…`): confirm, then drop the token from the address.
+  const { confirm: confirmToken } = useSearch({ strict: false });
+  const navigate = useNavigate();
+  const confirming = useRef<string | null>(null);
+  const hop = giantJoy.trigger;
+  useEffect(() => {
+    if (!confirmToken || confirming.current === confirmToken) return;
+    confirming.current = confirmToken;
+    void api.waitlist.confirm({ token: confirmToken }).then(
+      () => {
+        storage.set(STORAGE_KEYS.waitlistConfirmed, "1");
+        setConfirmed(true);
+        setLinkProblem(null);
+        hop(2400);
+        setCelebrate((c) => c + 1);
+      },
+      (error) => {
+        const expired = error instanceof ApiError && error.code === "invalid_token";
+        if (expired) {
+          // Back to the form, so they can ask for a new link.
+          storage.remove(STORAGE_KEYS.waitlist);
+          setJoined(null);
+        }
+        setLinkProblem(expired ? "expired" : "confirmFailed");
+      },
+    );
+    void navigate({ to: "/", search: {}, replace: true });
+  }, [api, confirmToken, hop, navigate]);
   const join = async (email: string): Promise<JoinResult> => {
     busy.current = true;
     clearTimeout(typingTimer.current);
@@ -156,6 +188,7 @@ export function LandingPage() {
     busy.current = false;
     storage.set(STORAGE_KEYS.waitlist, email);
     setJoined(email);
+    setLinkProblem(null);
     setGiantState("idle");
     giantJoy.trigger(2400);
     setCelebrate((c) => c + 1);
@@ -219,6 +252,8 @@ export function LandingPage() {
                 ref={heroSlot}
                 variant="hero"
                 joined={joined}
+                confirmed={confirmed}
+                linkProblem={linkProblem}
                 look={doneLook}
                 onJoin={join}
                 onTyping={onTyping}
@@ -240,6 +275,7 @@ export function LandingPage() {
                 ref={finalSlot}
                 variant="final"
                 joined={joined}
+                confirmed={confirmed}
                 look={doneLook}
                 onJoin={join}
                 onTyping={onTyping}

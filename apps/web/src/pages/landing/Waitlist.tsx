@@ -6,12 +6,18 @@ import { useJoy } from "./hooks";
 import { LpAvatar } from "./LpAvatar";
 
 export type JoinResult = "ok" | "invalid" | "rate" | "failed";
+/** What happened to a confirmation link the page was opened with. */
+export type LinkProblem = "expired" | "confirmFailed";
 
 interface WaitlistProps {
   /** The hero form has the privacy note and steers the giant's eyes. */
   variant: "hero" | "final";
   /** The email already on the list (both forms show the done state). */
   joined: string | null;
+  /** The email is confirmed: "you're on the list" instead of "check your email". */
+  confirmed: boolean;
+  /** A confirmation link that didn't work, shown above the hero form. */
+  linkProblem?: LinkProblem | null;
   /** The look of the happy agent in the done state (the giant's). */
   look: AgentAppearance;
   onJoin: (email: string) => Promise<JoinResult>;
@@ -21,7 +27,7 @@ interface WaitlistProps {
 
 /** The only call to action: the waiting list form, or "you're on the list". */
 export const Waitlist = forwardRef<HTMLDivElement, WaitlistProps>(function Waitlist(
-  { variant, joined, look, onJoin, onTyping, onFocusInput },
+  { variant, joined, confirmed, linkProblem, onJoin, onTyping, onFocusInput, look },
   ref,
 ) {
   const { t } = useTranslation();
@@ -49,18 +55,20 @@ export const Waitlist = forwardRef<HTMLDivElement, WaitlistProps>(function Waitl
   };
 
   const message =
-    error === "invalid"
-      ? t("landing.waitlist.invalid")
-      : error === "rate"
-        ? t("landing.waitlist.rateLimited")
-        : error === "failed"
-          ? t("landing.waitlist.failed")
-          : null;
+    !error && variant === "hero" && linkProblem
+      ? t(`landing.waitlist.${linkProblem}`)
+      : error === "invalid"
+        ? t("landing.waitlist.invalid")
+        : error === "rate"
+          ? t("landing.waitlist.rateLimited")
+          : error === "failed"
+            ? t("landing.waitlist.failed")
+            : null;
 
   return (
     <div className={variant === "final" ? "lp-slot" : undefined} ref={ref}>
-      {joined ? (
-        <Done email={joined} look={look} />
+      {joined !== null || confirmed ? (
+        <Done email={joined ?? ""} confirmed={confirmed} look={look} />
       ) : (
         <>
           <form
@@ -112,7 +120,7 @@ export const Waitlist = forwardRef<HTMLDivElement, WaitlistProps>(function Waitl
   );
 });
 
-function Done({ email, look }: { email: string; look: AgentAppearance }) {
+function Done({ email, confirmed, look }: { email: string; confirmed: boolean; look: AgentAppearance }) {
   const { t } = useTranslation();
   const joy = useJoy();
   const { trigger } = joy;
@@ -121,8 +129,8 @@ function Done({ email, look }: { email: string; look: AgentAppearance }) {
     <div className="lp-wl-done" role="status">
       <LpAvatar look={look} className={joy.className} />
       <div>
-        <b>{t("landing.waitlist.doneTitle")}</b>
-        <span>{t("landing.waitlist.doneText", { email })}</span>
+        <b>{t(confirmed ? "landing.waitlist.doneTitle" : "landing.waitlist.checkTitle")}</b>
+        <span>{confirmed ? t("landing.waitlist.doneText") : t("landing.waitlist.checkText", { email })}</span>
       </div>
     </div>
   );

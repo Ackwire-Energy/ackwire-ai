@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
-import { browser, createTestServer, type TestServer } from "./harness";
+import { joinWaitlist, WAITLIST_MAX_SENDS } from "@agenteschat/engine";
+import { browser, createTestServer, ORIGIN, type TestServer } from "./harness";
 
 let t: TestServer;
 beforeEach(async () => {
@@ -9,6 +10,14 @@ beforeEach(async () => {
 afterEach(() => t.close());
 
 const errorCode = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
+
+/** The token in the link of the latest confirmation email sent. */
+function lastToken() {
+  const text = t.email.sent.at(-1)?.text ?? "";
+  const match = text.match(/\/\?confirm=([A-Za-z0-9_-]+)/);
+  if (!match?.[1]) throw new Error(`no confirmation link in: ${text}`);
+  return match[1];
+}
 
 test("joining stores the email once, lowercase, with the language; the answer never tells it was there", async () => {
   const anon = browser(t);
@@ -20,13 +29,85 @@ test("joining stores the email once, lowercase, with the language; the answer ne
   expect(await again.json()).toEqual({ ok: true });
 
   const rows = await t.db.select().from(schema.waitlistEntries);
-  expect(rows.map((r) => [r.email, r.locale, r.source])).toEqual([["ana@acme.com", "en", "landing"]]);
+  expect(rows.map((r) => [r.email, r.locale, r.source, r.confirmedAt])).toEqual([
+    ["ana@acme.com", "en", "landing", null],
+  ]);
 });
 
-test("no locale means pt-BR", async () => {
+test("joining emails a confirmation link (through the outbox, in their language); the link confirms", async () => {
+  const anon = browser(t);
+  await anon("/api/waitlist", { json: { email: "ana@acme.com", locale: "en" } });
+  expect(t.email.sent).toEqual([]); // never inline in the request
+  await t.drain();
+  expect(t.email.sent.map((m) => [m.to, m.subject])).toEqual([
+    [["ana@acme.com"], "Confirm your spot on the agentes.chat waiting list"],
+  ]);
+  expect(t.email.sent[0]?.html).toContain('lang="en"');
+  expect(t.email.sent[0]?.text).toContain(`${ORIGIN}/?confirm=`);
+  const token = lastToken();
+  // Only a hash of the token is stored.
+  const [before] = await t.db.select().from(schema.waitlistEntries);
+  expect(before?.confirmTokenHash).not.toContain(token);
+
+  const res = await anon("/api/waitlist/confirm", { json: { token } });
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ ok: true });
+  const [row] = await t.db.select().from(schema.waitlistEntries);
+  expect(row?.confirmedAt).toBeInstanceOf(Date);
+  // Opening the link again still works; joining again sends nothing.
+  expect((await anon("/api/waitlist/confirm", { json: { token } })).status).toBe(200);
+  await anon("/api/waitlist", { json: { email: "ana@acme.com" } });
+  await t.drain();
+  expect(t.email.sent.length).toBe(1);
+});
+
+test("no locale means pt-BR, and the email is in Portuguese", async () => {
   expect((await browser(t)("/api/waitlist", { json: { email: "bia@acme.com" } })).status).toBe(202);
   const [row] = await t.db.select().from(schema.waitlistEntries);
   expect(row?.locale).toBe("pt-BR");
+  await t.drain();
+  expect(t.email.sent[0]?.subject).toBe("Confirme seu lugar na lista do agentes.chat");
+  expect(t.email.sent[0]?.html).toContain('lang="pt-BR"');
+});
+
+test("an unknown, malformed or expired link is refused with a stable code", async () => {
+  const anon = browser(t);
+  for (const token of ["x".repeat(32), "short", "../../etc"]) {
+    const res = await anon("/api/waitlist/confirm", { json: { token } });
+    expect(res.status).toBe(400);
+    expect(await errorCode(res)).toBe("invalid_token");
+  }
+  const tooLong = await anon("/api/waitlist/confirm", { json: { token: "x".repeat(65) } });
+  expect(await errorCode(tooLong)).toBe("invalid_request");
+
+  await joinWaitlist(t.db, { email: "old@acme.com", publicUrl: ORIGIN }, new Date(Date.now() - 49 * 3600_000));
+  await t.drain();
+  const expired = await anon("/api/waitlist/confirm", { json: { token: lastToken() } });
+  expect(await errorCode(expired)).toBe("invalid_token");
+  const [row] = await t.db.select().from(schema.waitlistEntries);
+  expect(row?.confirmedAt).toBeNull();
+});
+
+test("joining again resends the link at most every 2 minutes and 5 times; only the latest link works", async () => {
+  const at = (minutes: number) => new Date(Date.UTC(2026, 9, 15, 12, minutes));
+  const input = { email: "ana@acme.com", publicUrl: ORIGIN };
+  expect(await joinWaitlist(t.db, input, at(0))).toEqual({ sent: true });
+  await t.drain();
+  const first = lastToken();
+  expect(await joinWaitlist(t.db, input, at(1))).toEqual({ sent: false });
+  expect(await joinWaitlist(t.db, input, at(3))).toEqual({ sent: true });
+  await t.drain();
+  const second = lastToken();
+  expect(second).not.toBe(first);
+  for (let i = 3; i <= WAITLIST_MAX_SENDS; i++) expect((await joinWaitlist(t.db, input, at(i * 3))).sent).toBe(true);
+  expect((await joinWaitlist(t.db, input, at(60))).sent).toBe(false);
+  await t.drain();
+  expect(t.email.sent.length).toBe(WAITLIST_MAX_SENDS);
+  expect(new Set(t.email.sent.map((m) => m.idempotencyKey)).size).toBe(WAITLIST_MAX_SENDS);
+
+  const anon = browser(t);
+  expect(await errorCode(await anon("/api/waitlist/confirm", { json: { token: first } }))).toBe("invalid_token");
+  expect((await anon("/api/waitlist/confirm", { json: { token: lastToken() } })).status).toBe(200);
 });
 
 test("a bad email or body is refused with a stable code", async () => {
@@ -37,18 +118,24 @@ test("a bad email or body is refused with a stable code", async () => {
   const wrongLocale = await anon("/api/waitlist", { json: { email: "a@acme.com", locale: "fr" } });
   expect(wrongLocale.status).toBe(400);
   expect(await errorCode(wrongLocale)).toBe("invalid_request");
+  const tooLong = await anon("/api/waitlist", { json: { email: `${"a".repeat(250)}@acme.com` } });
+  expect(await errorCode(tooLong)).toBe("invalid_request");
   expect(await t.db.select().from(schema.waitlistEntries)).toEqual([]);
+  await t.drain();
+  expect(t.email.sent).toEqual([]);
 });
 
-test("only our own origin can join", async () => {
-  const res = await browser(t)("/api/waitlist", { json: { email: "a@acme.com" }, origin: "https://evil.example" });
-  expect(res.status).toBe(403);
-  expect(await errorCode(res)).toBe("bad_origin");
-  const none = await browser(t)("/api/waitlist", { json: { email: "a@acme.com" }, origin: null });
-  expect(none.status).toBe(403);
+test("only our own origin can join or confirm", async () => {
+  for (const path of ["/api/waitlist", "/api/waitlist/confirm"]) {
+    const json = { email: "a@acme.com", token: "x".repeat(32) };
+    const res = await browser(t)(path, { json, origin: "https://evil.example" });
+    expect(res.status).toBe(403);
+    expect(await errorCode(res)).toBe("bad_origin");
+    expect((await browser(t)(path, { json, origin: null })).status).toBe(403);
+  }
 });
 
-test("too many attempts from one address are throttled", async () => {
+test("too many attempts from one address are throttled, keyed by the address our proxy saw", async () => {
   const anon = browser(t);
   const headers = { "x-forwarded-for": "203.0.113.7" };
   for (let i = 0; i < 10; i++) {
@@ -57,10 +144,26 @@ test("too many attempts from one address are throttled", async () => {
   const limited = await anon("/api/waitlist", { json: { email: "p10@acme.com" }, headers });
   expect(limited.status).toBe(429);
   expect(await errorCode(limited)).toBe("rate_limited");
+  // A made-up address put in front by the client doesn't get around it.
+  const spoofed = await anon("/api/waitlist", {
+    json: { email: "p11@acme.com" },
+    headers: { "x-forwarded-for": "10.9.8.7, 203.0.113.7" },
+  });
+  expect(spoofed.status).toBe(429);
   // Another address is not affected.
   const other = await anon("/api/waitlist", {
     json: { email: "q@acme.com" },
     headers: { "x-forwarded-for": "198.51.100.2" },
   });
   expect(other.status).toBe(202);
+});
+
+test("guessing confirmation links is throttled too", async () => {
+  const anon = browser(t);
+  const headers = { "x-forwarded-for": "203.0.113.9" };
+  for (let i = 0; i < 30; i++) {
+    expect((await anon("/api/waitlist/confirm", { json: { token: "x".repeat(32) }, headers })).status).toBe(400);
+  }
+  const limited = await anon("/api/waitlist/confirm", { json: { token: "x".repeat(32) }, headers });
+  expect(limited.status).toBe(429);
 });

@@ -45,14 +45,15 @@ describe("landing page", () => {
     expect(screen().getAllByRole("button", { name: "Entrar na lista" }).length).toBe(2);
   });
 
-  test("joining the waiting list sends the email and the locale, then shows the done state", async () => {
+  test("joining the waiting list sends the email and the locale, then asks to check the inbox", async () => {
     const { state, api } = signedOut();
     await renderApp("/", { api });
     await joinWith("ana@empresa.com");
     expect(joins(state)).toEqual([{ method: "waitlist.join", args: [{ email: "ana@empresa.com", locale: "pt-BR" }] }]);
-    // Both forms (hero and closing) switch to the done state.
-    expect(screen().getAllByText("Você está na lista.").length).toBe(2);
-    expect(screen().getAllByText(/Avisamos em ana@empresa.com/).length).toBe(2);
+    // Both forms (hero and closing) switch to "check your email" until the link is opened.
+    expect(screen().getAllByText("Confira seu e-mail.").length).toBe(2);
+    expect(screen().getAllByText(/Mandamos um link para ana@empresa.com/).length).toBe(2);
+    expect(screen().queryByText("Você está na lista.")).toBeNull();
     expect(localStorage.getItem("agentes.waitlist")).toBe("ana@empresa.com");
   });
 
@@ -91,12 +92,45 @@ describe("landing page", () => {
     expect(screen().getByRole("alert").textContent).toContain("Não deu para entrar na lista agora.");
   });
 
-  test("someone already on the list sees the done state", async () => {
+  test("someone who joined but didn't confirm yet is still asked to check the inbox", async () => {
     localStorage.setItem("agentes.waitlist", "bia@empresa.com");
     const { api } = signedOut();
     await renderApp("/", { api });
-    expect(screen().getAllByText("Você está na lista.").length).toBe(2);
+    expect(screen().getAllByText("Confira seu e-mail.").length).toBe(2);
     expect(screen().queryByPlaceholderText("voce@empresa.com")).toBeNull();
+  });
+
+  test("someone who confirmed sees the done state", async () => {
+    localStorage.setItem("agentes.waitlist", "bia@empresa.com");
+    localStorage.setItem("agentes.waitlist.confirmed", "1");
+    const { api } = signedOut();
+    await renderApp("/", { api });
+    expect(screen().getAllByText("Você está na lista.").length).toBe(2);
+    expect(screen().getAllByText(/E-mail confirmado/).length).toBe(2);
+  });
+
+  test("opening the confirmation link confirms, shows the done state and drops the token from the address", async () => {
+    const { state, api } = signedOut();
+    const { router } = await renderApp("/?confirm=tok_abc", { api });
+    await settle();
+    expect(state.calls.filter((c) => c.method === "waitlist.confirm")).toEqual([
+      { method: "waitlist.confirm", args: [{ token: "tok_abc" }] },
+    ]);
+    // Works on another device too: no email remembered here.
+    expect(screen().getAllByText("Você está na lista.").length).toBe(2);
+    expect(localStorage.getItem("agentes.waitlist.confirmed")).toBe("1");
+    expect(router.state.location.search).toEqual({});
+  });
+
+  test("an expired confirmation link brings the form back with a way out", async () => {
+    localStorage.setItem("agentes.waitlist", "bia@empresa.com");
+    const { api } = signedOut({ waitlistConfirmError: new ApiError(400, "invalid_token", "Unknown or expired") });
+    await renderApp("/?confirm=tok_old", { api });
+    await settle();
+    expect(screen().getByRole("alert").textContent).toContain("Esse link expirou");
+    expect(screen().getAllByPlaceholderText("voce@empresa.com").length).toBe(2);
+    expect(localStorage.getItem("agentes.waitlist")).toBeNull();
+    expect(localStorage.getItem("agentes.waitlist.confirmed")).toBeNull();
   });
 
   test("in English the page is in English and the join sends locale en", async () => {
@@ -120,7 +154,7 @@ describe("landing page", () => {
     });
     await settle();
     expect(joins(state)).toEqual([{ method: "waitlist.join", args: [{ email: "ana@company.com", locale: "en" }] }]);
-    expect(screen().getAllByText("You're on the list.").length).toBe(2);
+    expect(screen().getAllByText("Check your email.").length).toBe(2);
   });
 
   test("the PT | EN switch in the nav changes the language, and a later join sends locale en", async () => {

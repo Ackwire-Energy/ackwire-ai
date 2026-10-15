@@ -2421,8 +2421,12 @@ export const en: Translations = {
       invalid: "Check the email. It needs to look like name@company.com.",
       rateLimited: "Too many tries in a row. Wait a minute and try again.",
       failed: "We couldn't add you to the list right now. Try again in a moment.",
+      checkTitle: "Check your email.",
+      checkText: "We sent a link to {{email}}. Open it to confirm your spot on the list.",
       doneTitle: "You're on the list.",
-      doneText: "We'll write to {{email}} when it's your wave's turn.",
+      doneText: "Email confirmed. We'll write when it's your wave's turn.",
+      expired: "This link expired or was replaced by a newer one. Enter your email again to get another.",
+      confirmFailed: "We couldn't confirm right now. Open the link in the email again in a moment.",
     },
     how: {
       eyebrow: "How it works",
