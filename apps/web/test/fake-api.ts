@@ -485,6 +485,7 @@ const id = (prefix: string) => `${prefix}-${++n}`;
 
 /** Served by the in-memory fakes in `test/fakes` (same shapes as the server). */
 type FakedParts =
+  | "skills"
   | "access"
   | "invites"
   | "storage"
@@ -531,6 +532,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       get: async (orgId) => ({ id: orgId, name: "Acme", role: "owner", context: "" }),
       update: async (orgId, input) => log("orgs.update", orgId, input),
+      updateMe: async (orgId, input) => {
+        log("orgs.updateMe", orgId, input);
+        const m = state.members.find((x) => x.userId === state.me?.user.id);
+        if (!m) throw new ApiError(404, "not_found", "Member not found");
+        if (input.handle !== undefined) m.handle = input.handle;
+        if (input.timezone !== undefined) m.timezone = input.timezone ?? "America/Sao_Paulo";
+        return { ...m, online: true, lastSeenAt: new Date().toISOString() };
+      },
       members: async () => state.members,
       changeRole: async (orgId, userId, role: Role) => {
         log("orgs.changeRole", orgId, userId, role);

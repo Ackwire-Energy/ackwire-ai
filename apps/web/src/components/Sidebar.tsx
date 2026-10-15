@@ -1,18 +1,28 @@
 import {
+  AffixInput,
+  Alert,
   Avatar,
   Button,
+  Checkbox,
   CountBadge,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Field,
   Icon,
+  Input,
   LogoMark,
   Menu,
   MenuItem,
   MenuRadioGroup,
   MenuSeparator,
 } from "@agenteschat/ui";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
+import { keys } from "@/api/keys";
 import { useChannels, useDms, useOverview } from "@/api/queries";
 import { useAuth } from "@/auth/context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -20,6 +30,8 @@ import { type LocaleCode, locales, setLocale } from "@/i18n";
 import { formatUsd } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { type ThemePreference, useTheme } from "@/lib/theme";
+import { useToast } from "@/lib/toast";
+import type { SettingsSection } from "@/pages/SettingsPage";
 import { useStreams } from "@/realtime/context";
 import { runningAgents } from "@/realtime/streams";
 import { NewChannelDialog } from "./NewChannelDialog";
@@ -46,19 +58,17 @@ export function Sidebar() {
   return (
     <nav className="sidebar" aria-label={t("shell.nav")}>
       <div className="sidebar__org">
-        <LogoMark className="sidebar__org-mark" />
-        <div className="sidebar__org-text">
-          <span className="sidebar__org-name">{org.name}</span>
-          {overview.data && (
-            <span className="sidebar__org-meta">
-              {t("shell.summary", {
-                count: overview.data.people,
-                people: overview.data.people,
-                agents: overview.data.agents,
-              })}
-            </span>
-          )}
-        </div>
+        <WorkspaceMenu
+          summary={
+            overview.data
+              ? t("shell.summary", {
+                  count: overview.data.people,
+                  people: overview.data.people,
+                  agents: overview.data.agents,
+                })
+              : null
+          }
+        />
         <Button asChild variant="ghost" iconOnly style={{ width: 32, height: 32 }}>
           <Link to="/org/$orgId/search" params={{ orgId }} aria-label={t("shell.searchWorkspace")}>
             <Icon name="search" />
@@ -189,7 +199,19 @@ export function Sidebar() {
             </Link>
           </Button>
         )}
-        <AccountMenu spent={spent === null ? null : formatUsd(t, i18n.language, spent)} />
+        <div className="sidebar__me">
+          <AccountMenu spent={spent === null ? null : formatUsd(t, i18n.language, spent)} />
+          <Button asChild variant="ghost" iconOnly style={{ width: 32, height: 32 }}>
+            <Link
+              to="/org/$orgId/settings"
+              params={{ orgId }}
+              aria-label={t("shell.settings")}
+              title={t("shell.settings")}
+            >
+              <Icon name="settings" />
+            </Link>
+          </Button>
+        </div>
       </div>
     </nav>
   );
@@ -213,6 +235,7 @@ function AccountMenu({ spent }: { spent: string | null }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const others = me.organizations.filter((o) => o.id !== org.id);
+  const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
 
   const signOut = async () => {
     await auth.signOut();
@@ -221,62 +244,228 @@ function AccountMenu({ spent }: { spent: string | null }) {
   };
 
   return (
+    <>
+      <Menu
+        side="top"
+        label={t("shell.account")}
+        trigger={
+          <button type="button" className="sidebar__user" aria-label={`${t("shell.account")}: ${me.user.name}`}>
+            <Avatar name={me.user.name} size="sm" imageUrl={me.user.image} />
+            <span className="sidebar__user-name">{me.user.name}</span>
+            {spent && <span className="sidebar__user-spend">{t("shell.spentThisMonth", { amount: spent })}</span>}
+          </button>
+        }
+      >
+        <MenuItem icon="person" onSelect={() => setProfile("handle")}>
+          {t("shell.profile")}
+        </MenuItem>
+        <MenuItem icon="waiting" onSelect={() => setProfile("timezone")}>
+          {t("shell.timezone")}
+        </MenuItem>
+        <MenuSeparator />
+        <MenuRadioGroup
+          label={t("shell.theme")}
+          value={theme.preference}
+          onValueChange={(v) => theme.setPreference(v as ThemePreference)}
+          options={[
+            { value: "system", label: t("shell.themeSystem") },
+            { value: "light", label: t("shell.themeLight") },
+            { value: "dark", label: t("shell.themeDark") },
+          ]}
+        />
+        <MenuSeparator />
+        <MenuRadioGroup
+          label={t("shell.language")}
+          value={i18n.language}
+          onValueChange={(v) => setLocale(v as LocaleCode, i18n)}
+          options={locales.map((l) => ({ value: l.code, label: l.label }))}
+        />
+        <MenuSeparator />
+        {others.map((o) => (
+          <MenuItem
+            key={o.id}
+            icon="channel"
+            onSelect={() => void navigate({ to: "/org/$orgId", params: { orgId: o.id } })}
+          >
+            {o.name}
+          </MenuItem>
+        ))}
+        <MenuItem icon="plus" onSelect={() => void navigate({ to: "/onboarding" })}>
+          {t("shell.newOrg")}
+        </MenuItem>
+        {import.meta.env.DEV && (
+          <MenuItem icon="agent" onSelect={() => void navigate({ to: "/dev/gallery" })}>
+            {t("shell.gallery")}
+          </MenuItem>
+        )}
+        <MenuSeparator />
+        <MenuItem onSelect={() => void signOut()}>{t("auth.signOut")}</MenuItem>
+      </Menu>
+      <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
+    </>
+  );
+}
+
+/**
+ * The workspace header ("Acme · 2 membros · 3 agentes") opens this menu:
+ * settings sections and members, as far as the role allows.
+ */
+function WorkspaceMenu({ summary }: { summary: string | null }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const navigate = useNavigate();
+  const go = (section?: SettingsSection) =>
+    void (section
+      ? navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section } })
+      : navigate({ to: "/org/$orgId/settings", params: { orgId: org.id } }));
+  const admin = can(org.role, "configure");
+  return (
     <Menu
-      side="top"
-      label={t("shell.account")}
+      label={t("shell.workspaceMenu")}
       trigger={
-        <button type="button" className="sidebar__user" aria-label={`${t("shell.account")}: ${me.user.name}`}>
-          <Avatar name={me.user.name} size="sm" imageUrl={me.user.image} />
-          <span className="sidebar__user-name">{me.user.name}</span>
-          {spent && <span className="sidebar__user-spend">{t("shell.spentThisMonth", { amount: spent })}</span>}
+        <button
+          type="button"
+          className="sidebar__org-button"
+          aria-label={t("shell.workspaceMenuOf", { name: org.name })}
+        >
+          <LogoMark className="sidebar__org-mark" />
+          <span className="sidebar__org-text">
+            <span className="sidebar__org-name">{org.name}</span>
+            {summary && <span className="sidebar__org-meta">{summary}</span>}
+          </span>
+          <Icon name="chevronDown" size={16} />
         </button>
       }
     >
-      <MenuRadioGroup
-        label={t("shell.theme")}
-        value={theme.preference}
-        onValueChange={(v) => theme.setPreference(v as ThemePreference)}
-        options={[
-          { value: "system", label: t("shell.themeSystem") },
-          { value: "light", label: t("shell.themeLight") },
-          { value: "dark", label: t("shell.themeDark") },
-        ]}
-      />
-      <MenuSeparator />
-      <MenuRadioGroup
-        label={t("shell.language")}
-        value={i18n.language}
-        onValueChange={(v) => setLocale(v as LocaleCode, i18n)}
-        options={locales.map((l) => ({ value: l.code, label: l.label }))}
-      />
-      <MenuSeparator />
-      {others.map((o) => (
-        <MenuItem
-          key={o.id}
-          icon="channel"
-          onSelect={() => void navigate({ to: "/org/$orgId", params: { orgId: o.id } })}
-        >
-          {o.name}
-        </MenuItem>
-      ))}
-      <MenuItem icon="plus" onSelect={() => void navigate({ to: "/onboarding" })}>
-        {t("shell.newOrg")}
+      <MenuItem icon="settings" onSelect={() => go()}>
+        {t("shell.workspaceSettings")}
       </MenuItem>
-      {can(org.role, "configure") && (
-        <MenuItem
-          icon="settings"
-          onSelect={() => void navigate({ to: "/org/$orgId/settings", params: { orgId: org.id } })}
-        >
-          {t("shell.orgSettings")}
+      <MenuItem icon="link" onSelect={() => go("connectors")}>
+        {t("settings.section.connectors")}
+      </MenuItem>
+      {admin && (
+        <MenuItem icon="document" onSelect={() => go("skills")}>
+          {t("settings.section.skills")}
         </MenuItem>
       )}
-      {import.meta.env.DEV && (
-        <MenuItem icon="agent" onSelect={() => void navigate({ to: "/dev/gallery" })}>
-          {t("shell.gallery")}
+      {admin && (
+        <MenuItem icon="agent" onSelect={() => go("access")}>
+          {t("settings.section.access")}
         </MenuItem>
       )}
       <MenuSeparator />
-      <MenuItem onSelect={() => void signOut()}>{t("auth.signOut")}</MenuItem>
+      <MenuItem icon="members" onSelect={() => go("members")}>
+        {t("shell.members")}
+      </MenuItem>
+      {can(org.role, "manage_members") && (
+        <MenuItem icon="plus" onSelect={() => go("members")}>
+          {t("shell.invite")}
+        </MenuItem>
+      )}
     </Menu>
   );
+}
+
+/** "Perfil" and "Fuso" in the account menu: my handle and time zone in this workspace. */
+function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const dir = useDirectory(org.id);
+  const mine = dir.memberById.get(me.user.id);
+  const [handle, setHandle] = useState("");
+  const [zone, setZone] = useState("");
+  const [useOrgZone, setUseOrgZone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focus) return;
+    setHandle(mine?.handle ?? "");
+    setZone(mine?.timezone ?? "");
+    setUseOrgZone(false);
+    setError(null);
+  }, [focus, mine]);
+  const zoneOk = useOrgZone || isTimeZone(zone.trim());
+  const save = useMutation({
+    mutationFn: () =>
+      api.orgs.updateMe(org.id, {
+        handle: handle.trim() || undefined,
+        timezone: useOrgZone ? null : zone.trim(),
+      }),
+    meta: { silent: true },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.members(org.id) });
+      void qc.invalidateQueries({ queryKey: keys.people(org.id) });
+      toast.show(t("shell.profileSaved"));
+      onClose();
+    },
+    onError: (e) => setError(e.message),
+  });
+  return (
+    <Dialog
+      open={focus !== null}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("shell.profileTitle")}
+      closeLabel={t("common.close")}
+      width={440}
+    >
+      <form
+        style={{ display: "contents" }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (zoneOk) save.mutate();
+        }}
+      >
+        <DialogBody>
+          <Field label={t("shell.handle")} id="me-handle" help={t("shell.handleHelp")}>
+            <AffixInput
+              prefix="@"
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+              autoFocus={focus === "handle"}
+            />
+          </Field>
+          <Field
+            label={t("shell.timezone")}
+            id="me-zone"
+            help={t("shell.timezoneHelp")}
+            error={!zoneOk ? t("shell.timezoneInvalid") : undefined}
+          >
+            <Input
+              value={zone}
+              disabled={useOrgZone}
+              onChange={(e) => setZone(e.target.value)}
+              placeholder="America/Sao_Paulo"
+              autoFocus={focus === "timezone"}
+            />
+          </Field>
+          <span className="row" style={{ gap: 8, alignItems: "center" }}>
+            <Checkbox id="me-zone-org" checked={useOrgZone} onCheckedChange={setUseOrgZone} />
+            <label htmlFor="me-zone-org">{t("shell.useOrgZone")}</label>
+          </span>
+          {error && <Alert>{error}</Alert>}
+        </DialogBody>
+        <DialogFooter>
+          <Button type="button" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button type="submit" variant="primary" disabled={!zoneOk || save.isPending}>
+            {t("common.save")}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Dialog>
+  );
+}
+
+/** An IANA zone the browser knows ("America/Sao_Paulo"). */
+export function isTimeZone(zone: string) {
+  if (!zone) return false;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
 }

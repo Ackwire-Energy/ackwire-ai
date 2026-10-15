@@ -17,7 +17,7 @@ import {
   toInput,
   treeFromAccess,
 } from "@/lib/access";
-import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { fakeAccessTree } from "./fakes/access";
 import { renderApp, screen, settle } from "./render";
 
@@ -58,7 +58,7 @@ describe("access model (same order as the gateway: deny > tool > connector > sco
     const tree = treeFromAccess(access);
     const model = modelFrom(access);
     expect(model.grants.has("connector:conn-gh")).toBe(true);
-    expect(model.grants.has("scope:|drive:write")).toBe(true);
+    expect(model.grants.has("area:drive")).toBe(true);
     expect(model.denies.has("tool:conn-gh|github_merge_pull_request")).toBe(true);
     const back = toInput(model, tree);
     expect(back.connectors).toEqual({ "conn-gh": true });
@@ -66,7 +66,7 @@ describe("access model (same order as the gateway: deny > tool > connector > sco
     expect(back.tools.deny).toEqual([{ connectionId: "conn-gh", name: "github_merge_pull_request" }]);
     // "Perguntar à pessoa" is always on and never sent as a grant.
     const resolved = resolve(tree, model);
-    expect(resolved.find((g) => g.label === "Perguntar à pessoa")?.checked).toBe(true);
+    expect(resolved.find((g) => g.id === "area:chat")?.checked).toBe(true);
     expect(back.scopes.some((s) => s.scope === "")).toBe(false);
   });
 
@@ -82,10 +82,10 @@ describe("access model (same order as the gateway: deny > tool > connector > sco
     model = { ...model, allTools: true };
     model = setDenied(model, "tool:conn-gh|github_merge_pull_request", true);
     const r = resolve(tree, model);
-    expect(r.find((g) => g.id === "scope:|issues:write")?.children[0]?.state).toBe("inherited");
+    expect(r.find((g) => g.id === "area:issues")?.children[0]?.state).toBe("inherited");
     expect(countTools(r)).toEqual({ on: 14, total: 15 });
     // Unchecking an inherited tool is a denial; checking it again lifts it.
-    const issues = tree.find((g) => g.id === "scope:|issues:write");
+    const issues = tree.find((g) => g.id === "area:issues");
     const first = issues?.children[0];
     if (!issues || !first) throw new Error("tree");
     model = toggle(model, first, false, true);
@@ -129,36 +129,77 @@ describe("access model (same order as the gateway: deny > tool > connector > sco
   });
 });
 
-describe("Configurações → Acesso dos agentes", () => {
-  test("agents as columns, groups as rows (expand into tools), click a tool cell to change it", async () => {
-    const state = seedState();
-    await renderApp(`/org/${ORG_ID}/settings`, { api: createFakeApi(state) });
+describe("Configurações → Agentes e acesso", () => {
+  const goAccess = async (state = seedState()) => {
+    await renderApp(`/org/${ORG_ID}/settings/access`, { api: createFakeApi(state) });
     await settle(8);
-    const section = screen().getByRole("region", { name: "Acesso dos agentes" });
-    const headers = within(section)
+    return within(screen().getByRole("region", { name: "Acesso dos agentes" }));
+  };
+
+  test("one row per agent with a summary; Editar opens that agent's permissions", async () => {
+    const section = await goAccess();
+    const rows = Array.from(document.querySelectorAll(".access-agent")).map((r) => r.textContent ?? "");
+    expect(rows[0]).toContain("Ada");
+    expect(rows[0]).toContain("5 de 15 ferramentas · Contexto e memória, Skills");
+    await click(section.getByRole("button", { name: "Editar permissões de Ada" }));
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "Permissões da Ada" })).toBeTruthy();
+  });
+
+  test("matrix dialog: staged changes, one PUT per changed agent on Salvar; Descartar reverts", async () => {
+    const state = seedState();
+    const section = await goAccess(state);
+    await click(section.getByRole("button", { name: "Ver todas as permissões" }));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Todas as permissões" });
+    const headers = within(dialog)
       .getAllByRole("columnheader")
       .map((h) => h.textContent);
     expect(headers).toEqual(["Ferramenta", "Ada", "Atlas"]);
-    expect(section.querySelector("th.access-matrix__sticky")).not.toBeNull();
-    await click(within(section).getByRole("button", { name: "Mostrar ferramentas de GitHub" }));
-    const cell = within(section).getByRole("button", { name: "Ada · Fazer merge: sem acesso" });
-    await click(cell);
+    expect(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Issues · 2" })).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de GitHub · 3" }));
+    await click(within(dialog).getByRole("button", { name: "Ada · Fazer merge: sem acesso" }));
+    await click(within(dialog).getByRole("button", { name: "Atlas · Abrir PR: sem acesso" }));
+    // Nothing saved yet: the footer counts the staged changes.
+    expect(state.calls.some((c) => c.method === "access.set")).toBe(false);
+    expect(dialog.textContent).toContain("2 alterações");
+    expect(within(dialog).getByRole("button", { name: "Ada · Fazer merge: liberada" })).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: "Descartar" }));
+    expect(within(dialog).getByRole("button", { name: "Ada · Fazer merge: sem acesso" })).toBeTruthy();
+    expect(dialog.textContent).not.toContain("alterações");
+    await click(within(dialog).getByRole("button", { name: "Ada · Fazer merge: sem acesso" }));
+    await click(within(dialog).getByRole("button", { name: "Atlas · Abrir PR: sem acesso" }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(6);
-    const put = state.calls.filter((c) => c.method === "access.set").at(-1)?.args;
-    expect(put?.[1]).toBe(ADA_ID);
-    expect((put?.[2] as AccessInput | undefined)?.tools.allow).toEqual([
-      { connectionId: "conn-gh", name: "github_merge_pull_request" },
-    ]);
-    expect(within(section).getByRole("button", { name: "Ada · Fazer merge: liberada" })).toBeTruthy();
-    // Search finds a tool inside a collapsed group.
-    await type(within(section).getByRole("searchbox", { name: "Buscar ferramenta ou grupo" }), "criar issue");
-    expect(within(section).getByText("Criar issue")).toBeTruthy();
+    const puts = state.calls.filter((c) => c.method === "access.set");
+    expect(puts.map((c) => c.args[1]).sort()).toEqual([ADA_ID, ATLAS_ID].sort());
+    expect((puts.find((c) => c.args[1] === ADA_ID)?.args[2] as AccessInput | undefined)?.tools.allow).toContainEqual({
+      connectionId: "conn-gh",
+      name: "github_merge_pull_request",
+    });
   });
 
-  test("members don't see the matrix", async () => {
+  test("inherited cells: a muted check with a tooltip saying where it comes from; closing with changes asks", async () => {
+    const section = await goAccess();
+    await click(section.getByRole("button", { name: "Ver todas as permissões" }));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Todas as permissões" });
+    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Contexto e memória · 3" }));
+    const memoryCell = within(dialog).getByRole("button", { name: "Ada · Lembrar: liberada" });
+    expect(memoryCell.closest("td")?.getAttribute("data-state")).toBe("granted");
+    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Conversa · 1" }));
+    const ask = within(dialog).getByRole("button", { name: "Ada · Perguntar: Liberada por Conversa" });
+    expect(ask.getAttribute("title")).toBe("Liberada por Conversa");
+    expect(ask.closest("td")?.getAttribute("data-state")).toBe("inherited");
+    await click(within(dialog).getByRole("button", { name: "Ada · Ler issues: sem acesso" }));
+    await click(within(dialog).getByRole("button", { name: "Fechar" }));
+    expect(dialog.textContent).toContain("Descartar as alterações?");
+  });
+
+  test("members don't see it", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
-    await renderApp(`/org/${ORG_ID}/settings`, { api: createFakeApi(state) });
+    await renderApp(`/org/${ORG_ID}/settings/access`, { api: createFakeApi(state) });
     await settle(6);
     expect(screen().queryByRole("region", { name: "Acesso dos agentes" })).toBeNull();
   });

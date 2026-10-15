@@ -1,37 +1,49 @@
-import { Card, Icon, type IconName, SearchInput } from "@agenteschat/ui";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useMemo, useState } from "react";
+import {
+  Avatar,
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  DialogFooter,
+  Icon,
+  type IconName,
+  List,
+  SearchInput,
+} from "@agenteschat/ui";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
-import { useAccessMatrix, useCatalog } from "@/api/queries";
-import type { AccessMatrix, AccessState } from "@/api/types";
+import { useAgents } from "@/api/queries";
+import type { AccessState, Agent, AgentAccess } from "@/api/types";
 import { useOrg } from "@/components/org-context";
-import { cycleTool, isOn, modelFrom, toInput, toolLabel, treeFromAccess } from "@/lib/access";
+import { useAreaLabel } from "@/hooks/useAreaLabel";
+import { useDirectory } from "@/hooks/useDirectory";
+import {
+  type AccessModel,
+  type AccessNode,
+  countTools,
+  cycleTool,
+  isOn,
+  modelFrom,
+  type ResolvedNode,
+  resolve,
+  toInput,
+  treeFromAccess,
+} from "@/lib/access";
 import { can } from "@/lib/permissions";
+import { useToast } from "@/lib/toast";
+import { PermissionsDialog } from "@/pages/AgentPage";
 
+/** Inherited is a muted check (with a tooltip saying where it comes from), never a look-alike icon. */
 export const STATE_ICON: Record<AccessState | "partial", IconName> = {
   granted: "check",
-  inherited: "checks",
+  inherited: "check",
   denied: "block",
   off: "dash",
   partial: "dash",
 };
-
-type Tool = AccessMatrix["tools"][number];
-
-/** Rows of the matrix: built-in tools by scope, connector tools by connection. */
-export function matrixGroups(matrix: AccessMatrix, scopeLabel: (scope: string) => string) {
-  const groups = new Map<string, { id: string; label: string; tools: Tool[] }>();
-  for (const tool of matrix.tools) {
-    const id = tool.connectionId === null ? `scope:|${tool.scope}` : `connector:${tool.connectionId}`;
-    const label = tool.connectionId === null ? scopeLabel(tool.scope) : tool.group;
-    const g = groups.get(id) ?? { id, label, tools: [] };
-    g.tools.push(tool);
-    groups.set(id, g);
-  }
-  return [...groups.values()];
-}
 
 /** A group's cell: every tool on, none, or some. */
 export function groupState(states: AccessState[]): AccessState | "partial" {
@@ -41,165 +53,379 @@ export function groupState(states: AccessState[]): AccessState | "partial" {
   return "partial";
 }
 
+/** Tool states by id, for counting staged changes. */
+function statesOf(resolved: ResolvedNode[]) {
+  const out = new Map<string, AccessState>();
+  for (const g of resolved) for (const t of g.children) out.set(t.id, t.state);
+  return out;
+}
+
+/** How many tool cells differ between two models of the same tree. */
+export function changedCells(tree: AccessNode[], a: AccessModel, b: AccessModel) {
+  const x = statesOf(resolve(tree, a));
+  const y = statesOf(resolve(tree, b));
+  let n = 0;
+  for (const [id, s] of x) if (y.get(id) !== s) n++;
+  return n;
+}
+
+/** Every agent's access, read once per agent (the list and the matrix share it). */
+function useAllAccess(agents: Agent[], enabled: boolean) {
+  const api = useApi();
+  const { org } = useOrg();
+  return useQueries({
+    queries: agents.map((a) => ({
+      queryKey: keys.agentAccess(org.id, a.id),
+      queryFn: () => api.access.get(org.id, a.id),
+      enabled,
+      retry: false,
+    })),
+  });
+}
+
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-/** Settings → "Acesso dos agentes" (admins): agents as columns, tool groups as rows (expandable into tools). */
+/**
+ * Settings → "Agentes e acesso" (admins): one row per agent with a short
+ * summary and "Editar" (the agent's "Editar permissões"); "Ver todas as
+ * permissões" opens the matrix in a large dialog.
+ */
 export function AccessMatrixSection() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const admin = can(org.role, "configure");
+  const agents = useAgents(org.id);
+  const list = agents.data ?? [];
+  const access = useAllAccess(list, admin);
+  const areaLabel = useAreaLabel();
+  const [editing, setEditing] = useState<Agent | null>(null);
+  const [matrix, setMatrix] = useState(false);
+  if (!admin) return null;
+  const unavailable = access.some((q) => (q.error as { status?: number } | null)?.status === 404);
+
+  const summary = (a: AccessAgentRow) => {
+    if (!a.access) return null;
+    const tree = treeFromAccess(a.access, areaLabel);
+    const resolved = resolve(tree, modelFrom(a.access));
+    const count = countTools(resolved);
+    const blocked = resolved.flatMap((g) => g.children).filter((x) => x.state === "denied").length;
+    const groups = resolved.filter((g) => g.children.some((x) => isOn(x.state)) && !g.locked).map((g) => g.label);
+    const text = a.access.all
+      ? t("access.summaryAll")
+      : count.on === 0
+        ? t("access.summaryNone")
+        : t("access.summaryCount", {
+            on: count.on,
+            total: count.total,
+            groups: groups.slice(0, 3).join(", "),
+          });
+    return { text, blocked };
+  };
+
+  return (
+    <Card aria-labelledby="sec-access">
+      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
+        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
+          <h2 id="sec-access" className="ac-card__title">
+            {t("access.matrixTitle")}
+          </h2>
+          <span className="small muted">{t("access.listSubtitle")}</span>
+        </div>
+        {!unavailable && list.length > 0 && (
+          <Button variant="primary" size="sm" onClick={() => setMatrix(true)}>
+            {t("access.seeAll")}
+          </Button>
+        )}
+      </div>
+      {unavailable && <p className="small muted">{t("access.unavailable")}</p>}
+      {agents.isSuccess && list.length === 0 && <p className="small muted">{t("access.noAgents")}</p>}
+      {!unavailable && list.length > 0 && (
+        <List aria-label={t("access.matrixTitle")}>
+          {list.map((a, i) => {
+            const s = summary({ agent: a, access: access[i]?.data });
+            return (
+              <div key={a.id} className="ac-list__row access-agent">
+                <Avatar kind="agent" size="sm" name={a.name} initials={dir.agentInitials(a.id)} />
+                <span className="list-col" style={{ flex: "1 1 240px" }}>
+                  <span style={{ fontWeight: 600 }}>
+                    {a.name}
+                    {a.role && <span className="muted"> · {a.role}</span>}
+                  </span>
+                  <span className="small muted">{s?.text ?? t("common.loading")}</span>
+                </span>
+                {s && s.blocked > 0 && <Chip icon="block">{t("access.blockedCount", { count: s.blocked })}</Chip>}
+                <Button size="sm" aria-label={t("access.editAgent", { name: a.name })} onClick={() => setEditing(a)}>
+                  {t("agent.edit")}
+                </Button>
+              </div>
+            );
+          })}
+        </List>
+      )}
+      {editing && <PermissionsDialog open onOpenChange={(o) => !o && setEditing(null)} agent={editing} />}
+      <AccessMatrixDialog
+        open={matrix}
+        onClose={() => setMatrix(false)}
+        agents={list}
+        access={access.map((q) => q.data)}
+      />
+    </Card>
+  );
+}
+
+interface AccessAgentRow {
+  agent: Agent;
+  access: AgentAccess | undefined;
+}
+
+/**
+ * Agents × tools in a large dialog. Clicking a cell cycles (sem acesso →
+ * liberada → bloqueada → sem acesso); nothing saves until "Salvar", which
+ * sends one PUT per changed agent. "Descartar" goes back.
+ */
+export function AccessMatrixDialog({
+  open,
+  onClose,
+  agents,
+  access,
+}: {
+  open: boolean;
+  onClose: () => void;
+  agents: Agent[];
+  access: (AgentAccess | undefined)[];
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
-  const admin = can(org.role, "configure");
-  const matrix = useAccessMatrix(org.id, admin);
-  const catalog = useCatalog();
+  const toast = useToast();
+  const areaLabel = useAreaLabel();
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<Set<string>>(new Set());
-  // A tool cell: read the agent's access, change that tool, save it back.
-  const change = useMutation({
-    mutationFn: async ({ agentId, key }: { agentId: string; key: string }) => {
-      const access = await api.access.get(org.id, agentId);
-      const tree = treeFromAccess(access);
-      return api.access.set(org.id, agentId, toInput(cycleTool(modelFrom(access), tree, key), tree));
-    },
-    onSuccess: (saved, { agentId }) => {
-      qc.setQueryData(keys.agentAccess(org.id, agentId), saved);
-      void qc.invalidateQueries({ queryKey: keys.accessMatrix(org.id) });
-    },
-  });
-  const m = matrix.data;
-  const groups = useMemo(() => {
-    if (!m) return [];
-    const scopes = catalog.data?.builtinScopes ?? [];
-    return matrixGroups(
-      m,
-      (scope) => scopes.find((s) => s.id === scope)?.label ?? (scope === "" ? t("access.askGroup") : scope),
-    );
-  }, [m, catalog.data, t]);
-  if (!admin) return null;
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [staged, setStaged] = useState<Record<string, AccessModel>>({});
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const trees = useMemo(() => access.map((x) => (x ? treeFromAccess(x, areaLabel) : null)), [access, areaLabel]);
+  const base = useMemo(() => access.map((x) => (x ? modelFrom(x) : null)), [access]);
+  useEffect(() => {
+    if (!open) {
+      setStaged({});
+      setConfirm(false);
+      setQuery("");
+    }
+  }, [open]);
+  const modelOf = (i: number) => {
+    const agent = agents[i];
+    return (agent && staged[agent.id]) || base[i] || null;
+  };
+  const changes = agents.reduce((n, a, i) => {
+    const tree = trees[i];
+    const b = base[i];
+    const s = staged[a.id];
+    return tree && b && s ? n + changedCells(tree, b, s) : n;
+  }, 0);
+  const rows = trees.find((x) => x) ?? [];
   const q = fold(query.trim());
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      for (const [i, a] of agents.entries()) {
+        const s = staged[a.id];
+        const tree = trees[i];
+        const b = base[i];
+        if (!s || !tree || !b || changedCells(tree, b, s) === 0) continue;
+        const saved = await api.access.set(org.id, a.id, toInput(s, tree));
+        qc.setQueryData(keys.agentAccess(org.id, a.id), saved);
+      }
+      void qc.invalidateQueries({ queryKey: keys.access(org.id) });
+      toast.show(t("access.matrixSaved", { count: changes }));
+      setStaged({});
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const tryClose = () => (changes > 0 ? setConfirm(true) : onClose());
   const stateLabel = (s: AccessState | "partial") => t(`access.state.${s}`);
+  /** "Liberada por Escrever issues" / "Liberada por Todas as ferramentas". */
+  const inheritedFrom = (model: AccessModel, group: ResolvedNode) =>
+    model.grants.has(group.id) || group.locked || !model.allTools ? group.label : t("access.allTools");
 
   return (
-    <Card aria-labelledby="sec-access">
-      <div className="stack-4" style={{ gap: 2 }}>
-        <h2 id="sec-access" className="ac-card__title">
-          {t("access.matrixTitle")}
-        </h2>
-        <span className="small muted">{t("access.matrixSubtitle")}</span>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => !o && tryClose()}
+      title={t("access.matrixDialog")}
+      closeLabel={t("common.close")}
+      width={1120}
+      className="access-matrix-dialog"
+    >
+      <div className="ac-dialog__tools">
+        <SearchInput
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("access.matrixSearch")}
+          aria-label={t("access.matrixSearch")}
+        />
       </div>
-      {matrix.isError && <p className="small muted">{t("access.unavailable")}</p>}
-      {m && (
-        <>
-          <div className="row" style={{ gap: 12, alignItems: "center" }}>
-            <SearchInput
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("access.matrixSearch")}
-              aria-label={t("access.matrixSearch")}
-            />
-            <span className="access-matrix__legend small muted">
-              {(["granted", "inherited", "denied", "off"] as const).map((s) => (
-                <span key={s} className="actor-label">
-                  <Icon name={STATE_ICON[s]} size={14} />
-                  {stateLabel(s)}
-                </span>
+      <div className="ac-dialog__list">
+        <div className="access-matrix">
+          <table>
+            <colgroup>
+              <col className="access-matrix__first" />
+              {agents.map((a) => (
+                <col key={a.id} />
               ))}
-            </span>
-          </div>
-          <div className="access-matrix">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col" className="access-matrix__sticky">
-                    {t("access.matrixTool")}
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col" className="access-matrix__sticky">
+                  {t("access.matrixTool")}
+                </th>
+                {agents.map((a) => (
+                  <th key={a.id} scope="col">
+                    {a.name}
                   </th>
-                  {m.agents.map((a) => (
-                    <th key={a.id} scope="col">
-                      {a.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {groups.map((g) => {
-                  const groupHit = !q || fold(g.label).includes(q);
-                  const hits = g.tools.filter(
-                    (x) => groupHit || fold(`${x.label || toolLabel(x.name)} ${x.name} ${x.description}`).includes(q),
-                  );
-                  if (!groupHit && hits.length === 0) return null;
-                  const expanded = open.has(g.id) || (q !== "" && !groupHit);
-                  return (
-                    <Fragment key={g.id}>
-                      <tr className="access-matrix__group">
-                        <th scope="row" className="access-matrix__sticky">
-                          <button
-                            type="button"
-                            className="access-matrix__toggle"
-                            aria-expanded={expanded}
-                            aria-label={t(expanded ? "access.collapse" : "access.expand", { name: g.label })}
-                            onClick={() =>
-                              setOpen((s) => {
-                                const next = new Set(s);
-                                if (next.has(g.id)) next.delete(g.id);
-                                else next.add(g.id);
-                                return next;
-                              })
-                            }
-                          >
-                            <Icon name={expanded ? "chevronDown" : "chevronRight"} size={16} />
-                            {g.label}
-                          </button>
-                        </th>
-                        {m.agents.map((a) => {
-                          const state = groupState(g.tools.map((x) => m.cells[a.id]?.[x.key] ?? "off"));
-                          const label = t("access.cell", { agent: a.name, tool: g.label, state: stateLabel(state) });
-                          return (
-                            <td key={a.id} className="access-matrix__cell" data-state={state}>
-                              <span className="access-matrix__btn" role="img" aria-label={label} title={label}>
-                                <Icon name={STATE_ICON[state]} size={16} />
-                              </span>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      {expanded &&
-                        hits.map((x) => (
-                          <tr key={x.key} className="access-matrix__tool">
-                            <th scope="row" className="access-matrix__sticky">
-                              <span className="access-matrix__tool-name">{x.label || toolLabel(x.name)}</span>
-                            </th>
-                            {m.agents.map((a) => {
-                              const state = m.cells[a.id]?.[x.key] ?? "off";
-                              const label = t("access.cell", {
-                                agent: a.name,
-                                tool: x.label || toolLabel(x.name),
-                                state: stateLabel(state),
-                              });
-                              return (
-                                <td key={a.id} className="access-matrix__cell" data-state={state}>
-                                  <button
-                                    type="button"
-                                    className="access-matrix__btn"
-                                    aria-label={label}
-                                    title={label}
-                                    disabled={change.isPending}
-                                    onClick={() => change.mutate({ agentId: a.id, key: x.key })}
-                                  >
-                                    <Icon name={STATE_ICON[state]} size={16} />
-                                  </button>
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((g) => {
+                const groupHit = !q || fold(`${g.label}`).includes(q);
+                const hits = g.children.filter(
+                  (x) =>
+                    groupHit ||
+                    fold(`${x.label} ${x.ref.kind === "tool" ? x.ref.name : ""} ${x.description ?? ""}`).includes(q),
+                );
+                if (!groupHit && hits.length === 0) return null;
+                const isOpen = expanded.has(g.id) || (q !== "" && !groupHit);
+                return (
+                  <Fragment key={g.id}>
+                    <tr className="access-matrix__group">
+                      <th scope="row" className="access-matrix__sticky">
+                        <button
+                          type="button"
+                          className="access-matrix__toggle"
+                          aria-expanded={isOpen}
+                          aria-label={t(isOpen ? "access.collapse" : "access.expand", { name: g.label })}
+                          onClick={() =>
+                            setExpanded((s) => {
+                              const next = new Set(s);
+                              if (next.has(g.id)) next.delete(g.id);
+                              else next.add(g.id);
+                              return next;
+                            })
+                          }
+                        >
+                          <Icon name={isOpen ? "chevronDown" : "chevronRight"} size={16} />
+                          <span>{t("access.groupCount", { name: g.label, count: g.children.length })}</span>
+                          {g.custom && <span className="small muted">{t("access.customNote")}</span>}
+                        </button>
+                      </th>
+                      {agents.map((a, i) => {
+                        const model = modelOf(i);
+                        const tree = trees[i];
+                        const rg = model && tree ? resolve(tree, model).find((x) => x.id === g.id) : undefined;
+                        const state = rg ? groupState(rg.children.map((x) => x.state)) : "off";
+                        const label = t("access.cell", { agent: a.name, tool: g.label, state: stateLabel(state) });
+                        return (
+                          <td key={a.id} className="access-matrix__cell" data-state={state}>
+                            <span className="access-matrix__icon" role="img" aria-label={label} title={label}>
+                              <Icon name={STATE_ICON[state]} size={16} />
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    {isOpen &&
+                      hits.map((x) => (
+                        <tr key={x.id} className="access-matrix__tool">
+                          <th scope="row" className="access-matrix__sticky">
+                            <span className="access-matrix__tool-name">{x.label}</span>
+                          </th>
+                          {agents.map((a, i) => {
+                            const model = modelOf(i);
+                            const tree = trees[i];
+                            const rg = model && tree ? resolve(tree, model).find((y) => y.id === g.id) : undefined;
+                            const cell = rg?.children.find((y) => y.id === x.id);
+                            const state = cell?.state ?? "off";
+                            const changed =
+                              model && tree && base[i] && staged[a.id]
+                                ? statesOf(resolve(tree, base[i] as AccessModel)).get(x.id) !== state
+                                : false;
+                            const why =
+                              state === "inherited" && model && rg
+                                ? t("access.inheritedFrom", { from: inheritedFrom(model, rg) })
+                                : stateLabel(state);
+                            const label = t("access.cell", { agent: a.name, tool: x.label, state: why });
+                            return (
+                              <td
+                                key={a.id}
+                                className="access-matrix__cell"
+                                data-state={state}
+                                data-changed={changed || undefined}
+                              >
+                                <button
+                                  type="button"
+                                  className="access-matrix__btn"
+                                  aria-label={label}
+                                  title={why}
+                                  disabled={!model || !tree || saving}
+                                  onClick={() => {
+                                    if (!model || !tree) return;
+                                    const key = x.id.replace(/^tool:/, "");
+                                    setStaged((st) => ({ ...st, [a.id]: cycleTool(model, tree, key) }));
+                                  }}
+                                >
+                                  <Icon name={STATE_ICON[state]} size={16} />
+                                </button>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {confirm ? (
+        <DialogFooter bar note={t("edit.discardQuestion")}>
+          <Button onClick={() => setConfirm(false)}>{t("edit.keepEditing")}</Button>
+          <Button variant="danger" onClick={onClose}>
+            {t("edit.discard")}
+          </Button>
+        </DialogFooter>
+      ) : (
+        <DialogFooter
+          bar
+          note={
+            <span className="access-matrix__foot">
+              <span className="access-matrix__legend small muted">
+                {(["granted", "inherited", "denied", "off"] as const).map((s) => (
+                  <span key={s} className="actor-label" data-state={s}>
+                    <Icon name={STATE_ICON[s]} size={14} />
+                    {stateLabel(s)}
+                  </span>
+                ))}
+              </span>
+              {changes > 0 && <span className="small">{t("access.changes", { count: changes })}</span>}
+            </span>
+          }
+        >
+          <Button disabled={changes === 0 || saving} onClick={() => setStaged({})}>
+            {t("access.discardChanges")}
+          </Button>
+          <Button variant="primary" disabled={changes === 0 || saving} onClick={() => void save()}>
+            {t("common.save")}
+          </Button>
+        </DialogFooter>
       )}
-    </Card>
+    </Dialog>
   );
 }

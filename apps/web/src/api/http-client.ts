@@ -92,6 +92,7 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       create: (input) =>
         request<{ organization: Organization; generalChannelId: string }>("/api/app/organizations", { json: input }),
       get: (orgId) => request<Organization>(org(orgId)),
+      updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>

@@ -30,6 +30,7 @@ import { Route as OrgOrgIdAgentsNewRouteImport } from './routes/org.$orgId.agent
 import { Route as OrgOrgIdCChannelIdRouteImport } from './routes/org.$orgId.c.$channelId'
 import { Route as OrgOrgIdIssuesIndexRouteImport } from './routes/org.$orgId.issues.index'
 import { Route as OrgOrgIdIssuesNumberRouteImport } from './routes/org.$orgId.issues.$number'
+import { Route as OrgOrgIdSettingsSectionRouteImport } from './routes/org.$orgId.settings_.$section'
 import { Route as OrgOrgIdThreadsThreadIdRouteImport } from './routes/org.$orgId.threads.$threadId'
 import { Route as OrgOrgIdAgentsAgentIdIndexRouteImport } from './routes/org.$orgId.agents.$agentId.index'
 import { Route as OrgOrgIdAgentsAgentIdMemoryRouteImport } from './routes/org.$orgId.agents.$agentId.memory'
@@ -141,6 +142,11 @@ const OrgOrgIdIssuesNumberRoute = OrgOrgIdIssuesNumberRouteImport.update({
   path: '/issues/$number',
   getParentRoute: () => OrgOrgIdRoute,
 } as any)
+const OrgOrgIdSettingsSectionRoute = OrgOrgIdSettingsSectionRouteImport.update({
+  id: '/settings_/$section',
+  path: '/settings/$section',
+  getParentRoute: () => OrgOrgIdRoute,
+} as any)
 const OrgOrgIdThreadsThreadIdRoute = OrgOrgIdThreadsThreadIdRouteImport.update({
   id: '/threads/$threadId',
   path: '/threads/$threadId',
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/org/$orgId/agents/new': typeof OrgOrgIdAgentsNewRoute
   '/org/$orgId/c/$channelId': typeof OrgOrgIdCChannelIdRoute
   '/org/$orgId/issues/$number': typeof OrgOrgIdIssuesNumberRoute
+  '/org/$orgId/settings/$section': typeof OrgOrgIdSettingsSectionRoute
   '/org/$orgId/threads/$threadId': typeof OrgOrgIdThreadsThreadIdRoute
   '/org/$orgId/issues/': typeof OrgOrgIdIssuesIndexRoute
   '/org/$orgId/agents/$agentId/memory': typeof OrgOrgIdAgentsAgentIdMemoryRoute
@@ -217,6 +224,7 @@ export interface FileRoutesByTo {
   '/org/$orgId/agents/new': typeof OrgOrgIdAgentsNewRoute
   '/org/$orgId/c/$channelId': typeof OrgOrgIdCChannelIdRoute
   '/org/$orgId/issues/$number': typeof OrgOrgIdIssuesNumberRoute
+  '/org/$orgId/settings/$section': typeof OrgOrgIdSettingsSectionRoute
   '/org/$orgId/threads/$threadId': typeof OrgOrgIdThreadsThreadIdRoute
   '/org/$orgId/issues': typeof OrgOrgIdIssuesIndexRoute
   '/org/$orgId/agents/$agentId/memory': typeof OrgOrgIdAgentsAgentIdMemoryRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/org/$orgId/agents/new': typeof OrgOrgIdAgentsNewRoute
   '/org/$orgId/c/$channelId': typeof OrgOrgIdCChannelIdRoute
   '/org/$orgId/issues/$number': typeof OrgOrgIdIssuesNumberRoute
+  '/org/$orgId/settings_/$section': typeof OrgOrgIdSettingsSectionRoute
   '/org/$orgId/threads/$threadId': typeof OrgOrgIdThreadsThreadIdRoute
   '/org/$orgId/issues/': typeof OrgOrgIdIssuesIndexRoute
   '/org/$orgId/agents/$agentId/memory': typeof OrgOrgIdAgentsAgentIdMemoryRoute
@@ -276,6 +285,7 @@ export interface FileRouteTypes {
     | '/org/$orgId/agents/new'
     | '/org/$orgId/c/$channelId'
     | '/org/$orgId/issues/$number'
+    | '/org/$orgId/settings/$section'
     | '/org/$orgId/threads/$threadId'
     | '/org/$orgId/issues/'
     | '/org/$orgId/agents/$agentId/memory'
@@ -303,6 +313,7 @@ export interface FileRouteTypes {
     | '/org/$orgId/agents/new'
     | '/org/$orgId/c/$channelId'
     | '/org/$orgId/issues/$number'
+    | '/org/$orgId/settings/$section'
     | '/org/$orgId/threads/$threadId'
     | '/org/$orgId/issues'
     | '/org/$orgId/agents/$agentId/memory'
@@ -331,6 +342,7 @@ export interface FileRouteTypes {
     | '/org/$orgId/agents/new'
     | '/org/$orgId/c/$channelId'
     | '/org/$orgId/issues/$number'
+    | '/org/$orgId/settings_/$section'
     | '/org/$orgId/threads/$threadId'
     | '/org/$orgId/issues/'
     | '/org/$orgId/agents/$agentId/memory'
@@ -498,6 +510,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgOrgIdIssuesNumberRouteImport
       parentRoute: typeof OrgOrgIdRoute
     }
+    '/org/$orgId/settings_/$section': {
+      id: '/org/$orgId/settings_/$section'
+      path: '/settings/$section'
+      fullPath: '/org/$orgId/settings/$section'
+      preLoaderRoute: typeof OrgOrgIdSettingsSectionRouteImport
+      parentRoute: typeof OrgOrgIdRoute
+    }
     '/org/$orgId/threads/$threadId': {
       id: '/org/$orgId/threads/$threadId'
       path: '/threads/$threadId'
@@ -550,6 +569,7 @@ interface OrgOrgIdRouteChildren {
   OrgOrgIdAgentsNewRoute: typeof OrgOrgIdAgentsNewRoute
   OrgOrgIdCChannelIdRoute: typeof OrgOrgIdCChannelIdRoute
   OrgOrgIdIssuesNumberRoute: typeof OrgOrgIdIssuesNumberRoute
+  OrgOrgIdSettingsSectionRoute: typeof OrgOrgIdSettingsSectionRoute
   OrgOrgIdThreadsThreadIdRoute: typeof OrgOrgIdThreadsThreadIdRoute
   OrgOrgIdIssuesIndexRoute: typeof OrgOrgIdIssuesIndexRoute
   OrgOrgIdAgentsAgentIdMemoryRoute: typeof OrgOrgIdAgentsAgentIdMemoryRoute
@@ -572,6 +592,7 @@ const OrgOrgIdRouteChildren: OrgOrgIdRouteChildren = {
   OrgOrgIdAgentsNewRoute: OrgOrgIdAgentsNewRoute,
   OrgOrgIdCChannelIdRoute: OrgOrgIdCChannelIdRoute,
   OrgOrgIdIssuesNumberRoute: OrgOrgIdIssuesNumberRoute,
+  OrgOrgIdSettingsSectionRoute: OrgOrgIdSettingsSectionRoute,
   OrgOrgIdThreadsThreadIdRoute: OrgOrgIdThreadsThreadIdRoute,
   OrgOrgIdIssuesIndexRoute: OrgOrgIdIssuesIndexRoute,
   OrgOrgIdAgentsAgentIdMemoryRoute: OrgOrgIdAgentsAgentIdMemoryRoute,

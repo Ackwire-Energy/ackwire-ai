@@ -59,7 +59,7 @@ describe("classification model", () => {
 describe("Conectar outro servidor MCP", () => {
   test("URL → API key → classify → save; new tools later ask for review", async () => {
     const state = seedState();
-    await renderApp(`/org/${ORG_ID}/settings`, { api: createFakeApi(state) });
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api: createFakeApi(state) });
     await settle(5);
     await click(screen().getByRole("button", { name: "Conectar outro servidor MCP" }));
     const connect = screen().getByRole("dialog", { name: "Conectar outro servidor MCP" });
@@ -133,7 +133,7 @@ describe("Conectar outro servidor MCP", () => {
   });
 
   test("labels can't be empty", async () => {
-    await renderApp(`/org/${ORG_ID}/settings`, { api: createFakeApi(seedState()) });
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api: createFakeApi(seedState()) });
     await settle(5);
     await click(screen().getByRole("button", { name: "Conectar outro servidor MCP" }));
     const connect = screen().getByRole("dialog", { name: "Conectar outro servidor MCP" });
@@ -179,7 +179,7 @@ describe("Conectar outro servidor MCP", () => {
   });
 
   test("Aceitar sugestão is hidden when the backend sends no suggestion", async () => {
-    await renderApp(`/org/${ORG_ID}/settings`, { api: createFakeApi(seedState()) });
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api: createFakeApi(seedState()) });
     await settle(5);
     await click(screen().getByRole("button", { name: "Conectar outro servidor MCP" }));
     const connect = screen().getByRole("dialog", { name: "Conectar outro servidor MCP" });

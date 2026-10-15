@@ -13,7 +13,7 @@ afterEach(() => cleanup());
 
 const go = async (state = seedState()) => {
   const api = createFakeApi(state);
-  const r = await renderApp(`/org/${ORG_ID}/settings`, { api });
+  const r = await renderApp(`/org/${ORG_ID}/settings/storage`, { api });
   await settle(5);
   return { api, r };
 };

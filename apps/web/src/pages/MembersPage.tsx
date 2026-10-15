@@ -35,7 +35,7 @@ export function invitationStatus(
 }
 
 /** telas/Membros.dc.html */
-export function MembersPage() {
+export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const toast = useToast();
@@ -104,9 +104,13 @@ export function MembersPage() {
   const pending = invitations.data ?? [];
 
   return (
-    <div className="page" style={{ gap: 28 }}>
+    <div className={embedded ? "settings__section" : "page"} style={{ gap: 28 }}>
       <header className="page__header">
-        <h1 className="page-title">{t("members.title")}</h1>
+        {embedded ? (
+          <h2 className="page-title">{t("members.title")}</h2>
+        ) : (
+          <h1 className="page-title">{t("members.title")}</h1>
+        )}
         <p className="page-sub">
           {t("members.subtitle", {
             count: people.length,

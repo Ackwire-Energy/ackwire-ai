@@ -85,7 +85,10 @@ export function AccessTree({
           <div className="access-group__head">
             {group.kind === "connector" ? (
               <>
-                <span className="access-group__name">{group.label}</span>
+                <span className="access-group__name">
+                  {group.label}
+                  {group.custom && <span className="small muted"> · {t("access.customNote")}</span>}
+                </span>
                 <span className="access-row__check">
                   <Checkbox
                     id={domId(group.id)}

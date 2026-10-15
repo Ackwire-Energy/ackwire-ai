@@ -26,7 +26,7 @@ const pickTab = async (tab: HTMLElement) => {
   await act(async () => fireEvent.mouseDown(tab));
 };
 const settings = async (state = seedState(), api = createFakeApi(state)) => {
-  await renderApp(`/org/${ORG_ID}/settings`, { api });
+  await renderApp(`/org/${ORG_ID}/settings/skills`, { api });
   await settle(8);
   return { state, api, section: () => screen().getByRole("region", { name: "Skills" }) };
 };
@@ -73,10 +73,13 @@ describe("Configurações → Skills", () => {
     const { state, section } = await settings();
     await click(within(section()).getByRole("button", { name: "Instalar skill" }));
     let dialog = screen().getByRole("dialog", { name: "Instalar skill" });
-    await type(within(dialog).getByLabelText("Link do GitHub"), "nao-e-link");
+    await type(within(dialog).getByRole("textbox", { name: "Link do GitHub" }), "nao-e-link");
     await click(within(dialog).getByRole("button", { name: "Instalar" }));
     expect(dialog.textContent).toContain("Use um link do GitHub");
-    await type(within(dialog).getByLabelText("Link do GitHub"), "https://github.com/acme/skills/tree/main/deploy");
+    await type(
+      within(dialog).getByRole("textbox", { name: "Link do GitHub" }),
+      "https://github.com/acme/skills/tree/main/deploy",
+    );
     await click(within(dialog).getByRole("button", { name: "Instalar" }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "skills.import")?.args[1]).toEqual({

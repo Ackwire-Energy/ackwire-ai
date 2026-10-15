@@ -3,14 +3,14 @@ import type { AccessInput, AccessMatrix, AccessState, AgentAccess, ToolRef } fro
 /**
  * The tool tree the UI edits, built from `GET …/agents/{id}/access` (or, for
  * an agent that doesn't exist yet, from the access matrix). Two levels:
- * groups (a built-in scope, or a connector) and their tools.
+ * groups (a built-in area like "Issues", or a connector) and their tools.
  *
  * Editing model: "all tools" plus explicit grants and denials by node id.
  * A denial wins, then an explicit grant, then inheritance (from "all tools"
  * or a granted group), else off. Same order as the backend's Tool Gateway.
  */
 export interface AccessNode {
-  /** `scope:|{scope}` (built-in), `connector:{connectionId}`, `tool:{connectionId|builtin}|{name}`. */
+  /** `area:{area}` (built-in), `connector:{connectionId}`, `tool:{connectionId|builtin}|{name}`. */
   id: string;
   kind: "group" | "connector" | "tool";
   label: string;
@@ -21,9 +21,11 @@ export interface AccessNode {
   readOnly: boolean;
   /** Always on (the built-in "Perguntar"): not editable. */
   locked: boolean;
-  /** What the backend calls it. */
+  /** A custom MCP server ("servidor MCP" next to its own label). */
+  custom?: boolean;
+  /** What the backend calls it: a built-in area is one or more scopes. */
   ref:
-    | { kind: "scope"; connectionId: null; scope: string }
+    | { kind: "scopes"; connectionId: null; scopes: string[] }
     | { kind: "connector"; connectionId: string }
     | { kind: "tool"; connectionId: string | null; name: string };
   children: AccessNode[];
@@ -43,6 +45,56 @@ export const isOn = (s: AccessState) => s === "granted" || s === "inherited";
 export const toolLabel = (name: string) => name.replace(/[_-]+/g, " ").trim();
 
 const toolId = (connectionId: string | null, name: string) => `tool:${connectionId ?? "builtin"}|${name}`;
+
+/** Built-in scopes grouped by area, with consistent names ("Issues": ler + criar e editar). */
+export type BuiltinArea = "context" | "issues" | "calendar" | "drive" | "skills" | "chat" | "other";
+const AREA_ORDER: BuiltinArea[] = ["context", "issues", "calendar", "drive", "skills", "chat", "other"];
+export function builtinArea(scope: string): BuiltinArea {
+  if (scope === "") return "chat";
+  const prefix = scope.split(":")[0] ?? "";
+  if (prefix === "context" || prefix === "memory") return "context";
+  if (prefix === "issues") return "issues";
+  if (prefix === "calendar") return "calendar";
+  if (prefix === "drive" || prefix === "artifacts") return "drive";
+  if (prefix === "skills") return "skills";
+  return "other";
+}
+/** pt-BR names of the areas (the UI passes translated ones; these are the fallback). */
+export const AREA_LABEL: Record<BuiltinArea, string> = {
+  context: "Contexto e memória",
+  issues: "Issues",
+  calendar: "Agenda",
+  drive: "Drive",
+  skills: "Skills",
+  chat: "Conversa",
+  other: "Outras",
+};
+
+function areaGroups<T extends { scope: string }>(
+  items: T[],
+  label: (area: BuiltinArea) => string,
+): { area: BuiltinArea; node: Omit<AccessNode, "children" | "state">; items: T[] }[] {
+  const by = new Map<BuiltinArea, T[]>();
+  for (const it of items) by.set(builtinArea(it.scope), [...(by.get(builtinArea(it.scope)) ?? []), it]);
+  return AREA_ORDER.filter((a) => by.has(a)).map((area) => {
+    const list = by.get(area) ?? [];
+    const scopes = [...new Set(list.map((x) => x.scope))];
+    return {
+      area,
+      items: list,
+      node: {
+        id: `area:${area}`,
+        kind: "group",
+        label: label(area),
+        description: null,
+        sensitive: false,
+        readOnly: false,
+        locked: scopes.every((x) => x === ""),
+        ref: { kind: "scopes", connectionId: null, scopes: scopes.filter((x) => x !== "") },
+      },
+    };
+  });
+}
 
 function toolNode(
   t: {
@@ -70,19 +122,18 @@ function toolNode(
   };
 }
 
-export function treeFromAccess(access: AgentAccess): AccessNode[] {
-  const builtins: AccessNode[] = access.builtins.map((s) => ({
-    id: `scope:|${s.scope}`,
-    kind: "group",
-    label: s.label,
-    description: null,
-    state: s.state,
-    sensitive: false,
-    readOnly: false,
-    locked: s.scope === "",
-    ref: { kind: "scope", connectionId: null, scope: s.scope },
-    children: s.tools.map((t) => toolNode(t, null)),
-  }));
+export function treeFromAccess(
+  access: AgentAccess,
+  areaLabel: (area: BuiltinArea) => string = (a) => AREA_LABEL[a],
+): AccessNode[] {
+  const builtins: AccessNode[] = areaGroups(access.builtins, areaLabel).map(({ node, items }) => {
+    const states = items.filter((x) => x.scope !== "").map((x) => x.state);
+    return {
+      ...node,
+      state: node.locked ? "inherited" : states.length && states.every((x) => x === "granted") ? "granted" : "off",
+      children: items.flatMap((x) => x.tools.map((t) => toolNode(t, null))),
+    };
+  });
   const connectors: AccessNode[] = access.connectors.map((c) => ({
     id: `connector:${c.connectionId}`,
     kind: "connector",
@@ -92,45 +143,56 @@ export function treeFromAccess(access: AgentAccess): AccessNode[] {
     sensitive: false,
     readOnly: false,
     locked: false,
+    custom: c.custom,
     ref: { kind: "connector", connectionId: c.connectionId },
-    children: c.scopes.flatMap((s) => s.tools.map((t) => toolNode(t, s.label))),
+    children: c.scopes.flatMap((x) => x.tools.map((t) => toolNode(t, x.label))),
   }));
   return [...builtins, ...connectors];
 }
 
 /**
  * For "Criar agente" (no agent yet): the tree from the matrix tools. Built-in
- * tools are grouped by scope, labelled with `scopeLabel`; connectors by connection.
+ * tools are grouped by area; connectors by connection.
  */
-export function treeFromMatrix(matrix: AccessMatrix, scopeLabel: (scope: string) => string): AccessNode[] {
-  const groups = new Map<string, AccessNode>();
+export function treeFromMatrix(
+  matrix: AccessMatrix,
+  areaLabel: (area: BuiltinArea) => string = (a) => AREA_LABEL[a],
+): AccessNode[] {
+  const builtin = matrix.tools.filter((t) => t.connectionId === null);
+  const groups: AccessNode[] = areaGroups(builtin, areaLabel).map(({ node, items }) => ({
+    ...node,
+    state: node.locked ? "inherited" : "off",
+    children: items.map((t) => toolNode(t, null)),
+  }));
+  const connectors = new Map<string, AccessNode>();
   for (const t of matrix.tools) {
-    const builtin = t.connectionId === null;
-    const id = builtin ? `scope:|${t.scope}` : `connector:${t.connectionId}`;
-    let g = groups.get(id);
+    if (t.connectionId === null) continue;
+    let g = connectors.get(t.connectionId);
     if (!g) {
       g = {
-        id,
-        kind: builtin ? "group" : "connector",
-        label: builtin ? scopeLabel(t.scope) : t.group,
+        id: `connector:${t.connectionId}`,
+        kind: "connector",
+        label: t.group,
         description: null,
-        state: builtin && t.scope === "" ? "inherited" : "off",
+        state: "off",
         sensitive: false,
         readOnly: false,
-        locked: builtin && t.scope === "",
-        ref: builtin
-          ? { kind: "scope", connectionId: null, scope: t.scope }
-          : { kind: "connector", connectionId: t.connectionId as string },
+        locked: false,
+        ref: { kind: "connector", connectionId: t.connectionId },
         children: [],
       };
-      groups.set(id, g);
+      connectors.set(t.connectionId, g);
     }
-    g.children.push(toolNode(t, builtin ? null : scopeLabel(t.scope)));
+    g.children.push(toolNode(t, null));
   }
-  return [...groups.values()];
+  return [...groups, ...connectors.values()];
 }
 
-/** Explicit grants and denials as the server reports them. A connector scope granted becomes its tools. */
+/**
+ * Explicit grants and denials as the server reports them. An area counts as
+ * granted when all its scopes are; a scope granted on its own (or a connector
+ * scope) becomes grants of its tools.
+ */
 export function modelFrom(access: AgentAccess): AccessModel {
   const grants = new Set<string>();
   const denies = new Set<string>();
@@ -140,15 +202,20 @@ export function modelFrom(access: AgentAccess): AccessModel {
       if (t.state === "denied") denies.add(toolId(t.connectionId, t.name));
     }
   };
-  for (const s of access.builtins) {
-    if (s.state === "granted" && s.scope !== "") grants.add(`scope:|${s.scope}`);
-    tools(s.tools);
+  for (const { area, items } of areaGroups(access.builtins, (a) => a)) {
+    const scoped = items.filter((x) => x.scope !== "");
+    const all = scoped.length > 0 && scoped.every((x) => x.state === "granted");
+    if (all) grants.add(`area:${area}`);
+    for (const x of items) {
+      if (!all && x.state === "granted") for (const t of x.tools) grants.add(toolId(t.connectionId, t.name));
+      tools(x.tools);
+    }
   }
   for (const c of access.connectors) {
     if (c.state === "granted") grants.add(`connector:${c.connectionId}`);
-    for (const s of c.scopes) {
-      if (s.state === "granted") for (const t of s.tools) grants.add(toolId(t.connectionId, t.name));
-      tools(s.tools);
+    for (const x of c.scopes) {
+      if (x.state === "granted") for (const t of x.tools) grants.add(toolId(t.connectionId, t.name));
+      tools(x.tools);
     }
   }
   return { allTools: access.all, grants, denies };
@@ -161,8 +228,8 @@ export function toInput(model: AccessModel, tree: AccessNode[]): AccessInput {
   const deny = new Map<string, ToolRef>();
   for (const g of tree) {
     if (g.ref.kind === "connector") input.connectors[g.ref.connectionId] = model.grants.has(g.id);
-    if (g.ref.kind === "scope" && !g.locked && model.grants.has(g.id)) {
-      input.scopes.push({ connectionId: null, scope: g.ref.scope });
+    if (g.ref.kind === "scopes" && !g.locked && model.grants.has(g.id)) {
+      for (const scope of g.ref.scopes) input.scopes.push({ connectionId: null, scope });
     }
     const groupDenied = model.denies.has(g.id);
     for (const t of g.children) {

@@ -8,11 +8,14 @@ import {
   DialogFooter,
   DialogSearchList,
   Field,
+  Icon,
+  type IconName,
   Input,
   List,
   Select,
   Textarea,
 } from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -32,7 +35,7 @@ import {
   useUpdateSettings,
   useUsageReport,
 } from "@/api/queries";
-import type { Connection, ConnectorDef, Credential, CustomServer } from "@/api/types";
+import type { Connection, ConnectorDef, Credential, CustomServer, Role } from "@/api/types";
 import { AccessMatrixSection } from "@/components/AccessMatrix";
 import { ConnectCustomDialog, CustomServerRow, GrantAgentsDialog, ReviewToolsDialog } from "@/components/CustomMcp";
 import { useOrg } from "@/components/org-context";
@@ -45,6 +48,7 @@ import { can } from "@/lib/permissions";
 import { isProviderId, keyLooksValid, PROVIDERS, type ProviderId, providerLabel } from "@/lib/providers";
 import { connectorDescription } from "@/lib/scopes";
 import { useToast } from "@/lib/toast";
+import { MembersPage } from "./MembersPage";
 
 const isHttps = (v: string) => /^https:\/\/[^\s/]+/.test(v.trim());
 
@@ -54,12 +58,47 @@ export function searchCatalog(list: ConnectorDef[], query: string) {
   return q ? list.filter((d) => `${d.label} ${d.id} ${d.description}`.toLowerCase().includes(q)) : list;
 }
 
-/** Organization settings: context, connectors (two-layer, D7), provider keys and usage. */
-export function SettingsPage({ connected, review }: { connected?: string; review?: boolean }) {
+export type SettingsSection = "general" | "members" | "access" | "connectors" | "skills" | "keys" | "storage" | "usage";
+
+/** The settings sub-nav, in order, with who can open each. */
+export const SETTINGS_SECTIONS: { id: SettingsSection; icon: IconName; allowed: (role: Role) => boolean }[] = [
+  { id: "general", icon: "settings", allowed: () => true },
+  { id: "members", icon: "members", allowed: () => true },
+  { id: "access", icon: "agent", allowed: (r) => can(r, "configure") },
+  { id: "connectors", icon: "link", allowed: () => true },
+  { id: "skills", icon: "document", allowed: (r) => can(r, "configure") },
+  { id: "keys", icon: "approve", allowed: (r) => can(r, "manage_credentials") },
+  { id: "storage", icon: "drive", allowed: (r) => can(r, "configure") },
+  { id: "usage", icon: "waiting", allowed: (r) => can(r, "view_usage") },
+];
+
+export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
+
+/** `?connected=github` (back from OAuth) and `?review=1` (a custom MCP server to classify). */
+export const settingsSearch = (search: Record<string, unknown>): { connected?: string; review?: string } => ({
+  connected: typeof search.connected === "string" ? search.connected : undefined,
+  review: search.review === undefined ? undefined : String(search.review),
+});
+
+/**
+ * Settings: a left sub-nav and one section per URL (`/settings/connectors`, …).
+ * Members only see what they can open.
+ */
+export function SettingsPage({
+  section = "general",
+  connected,
+  review,
+}: {
+  section?: SettingsSection;
+  connected?: string;
+  review?: boolean;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const catalog = useCatalog();
+  const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org.role));
+  const current = visible.some((s) => s.id === section) ? section : "general";
 
   // Back from the OAuth provider: `?connected=github`.
   useEffect(() => {
@@ -71,18 +110,48 @@ export function SettingsPage({ connected, review }: { connected?: string; review
   }, [connected, catalog.data, review, toast, t]);
 
   return (
-    <div className="page page--wide">
-      <header className="page__header">
-        <h1 className="page-title">{t("settings.title")}</h1>
-      </header>
-      {!can(org.role, "configure") && <p className="page__note">{t("settings.readOnly")}</p>}
-      <OrgSection />
-      <ConnectorsSection review={review} />
-      <AccessMatrixSection />
-      <SkillsSection />
-      <KeysSection />
-      <StorageSection />
-      <UsageSection />
+    <div className="settings">
+      <nav className="settings__nav" aria-label={t("settings.nav")}>
+        <h1 className="settings__title">{t("settings.title")}</h1>
+        <ul>
+          {visible.map((s) => (
+            <li key={s.id}>
+              <Link
+                to="/org/$orgId/settings/$section"
+                params={{ orgId: org.id, section: s.id }}
+                className="settings__link"
+                aria-current={s.id === current ? "page" : undefined}
+              >
+                <Icon name={s.icon} />
+                {t(`settings.section.${s.id}`)}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div className="settings__body">
+        {current !== "members" && (
+          <header className="page__header">
+            <h2 className="page-title">{t(`settings.section.${current}`)}</h2>
+            <p className="muted" style={{ margin: 0 }}>
+              {t(`settings.sectionText.${current}`)}
+            </p>
+          </header>
+        )}
+        {current === "general" && (
+          <>
+            {!can(org.role, "configure") && <p className="page__note">{t("settings.readOnly")}</p>}
+            <OrgSection />
+          </>
+        )}
+        {current === "members" && <MembersPage embedded />}
+        {current === "access" && <AccessMatrixSection />}
+        {current === "connectors" && <ConnectorsSection review={review} />}
+        {current === "skills" && <SkillsSection />}
+        {current === "keys" && <KeysSection />}
+        {current === "storage" && <StorageSection />}
+        {current === "usage" && <UsageSection />}
+      </div>
     </div>
   );
 }
@@ -434,7 +503,7 @@ function ConnectDialog({ def, onClose }: { def: ConnectorDef | null; onClose: ()
                 disabled={oauth.isPending || (def.needsServerUrl && !isHttps(serverUrl))}
                 onClick={() =>
                   oauth.mutate(
-                    { connector: def.id, returnTo: `/org/${org.id}/settings`, serverUrl: server },
+                    { connector: def.id, returnTo: `/org/${org.id}/settings/connectors`, serverUrl: server },
                     { onSuccess: (url) => navigateAway(url) },
                   )
                 }

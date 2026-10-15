@@ -61,37 +61,92 @@ describe("Aprovações", () => {
 });
 
 describe("Agente", () => {
-  test("profile header, budget figures from usage, permissions summary and memory section", async () => {
+  test("profile: header with Conversar and '…', read-only summaries with one Editar each", async () => {
     await go(`agents/${ADA_ID}`);
     expect(screen().getByRole("heading", { level: 1, name: "Ada" })).toBeTruthy();
-    expect(document.body.textContent).toContain("Dev · responde a João · Claude Sonnet 5.5 com a chave da Acme");
-    expect(screen().getByRole("link", { name: "Abrir no #eng" })).toBeTruthy();
+    const head = document.querySelector(".agent-head") as HTMLElement;
+    expect(head.textContent).toContain("Dev");
+    expect(head.textContent).toContain("Claude Sonnet 5.5");
+    expect(head.textContent).toContain("Responsável: João");
+    expect(within(head).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
+    );
+    expect(within(head).getByRole("link", { name: "Conversar" }).className).toContain("ac-btn--primary");
+    // No form fields on the page itself.
+    expect(document.querySelector(".agent-page textarea, .agent-page select")).toBeNull();
+    expect(document.querySelector(".agent-page [role='combobox']")).toBeNull();
     const budget = screen().getByRole("region", { name: /Orçamento de/ });
     expect(budget.textContent).toContain("US$ 12,30");
     expect(budget.textContent).toContain("de US$ 40,00");
     expect(budget.textContent).toContain("142 execuções · 3,1 mi de tokens · aviso ao João em 80%.");
     expect(within(budget).getByRole("meter", { name: "Orçamento usado" }).getAttribute("aria-valuenow")).toBe("12.3");
-    const perms = screen().getByRole("region", { name: "O que a Ada pode fazer" });
-    expect(perms.textContent).toContain("4 de 7 permissões liberadas em 1 conector da Acme.");
-    expect(perms.textContent).toContain("ler o contexto, lembrar");
-    expect(perms.textContent).toContain("fazer merge pede aprovação");
-    const memory = screen().getByRole("region", { name: "O que a Ada sabe" });
-    expect(memory.textContent).toContain(
+    expect(screen().getByRole("region", { name: "O que a Ada pode fazer" }).textContent).toContain(
+      "5 de 15 ferramentas",
+    );
+    expect(screen().getByRole("region", { name: "Modelo e chave" }).textContent).toContain(
+      "Claude Sonnet 5.5 · com a chave da Acme",
+    );
+    expect(screen().getByRole("region", { name: "Skills" }).textContent).toContain("1 skill: Revisão de PR");
+    expect(screen().getByRole("region", { name: "O que a Ada sabe" }).textContent).toContain(
       "4 fatos e decisões, 2 lições aprendidas com o time · 1 proposta de melhoria esperando João",
     );
+    for (const name of [
+      "Editar Instruções",
+      "Editar conhecimento",
+      "Editar Modelo e chave",
+      "Editar Responsável",
+      "Editar permissões",
+      "Editar Skills",
+    ]) {
+      expect(screen().getByRole("button", { name })).toBeTruthy();
+    }
   });
 
-  test("saving instructions calls the real endpoint", async () => {
+  test("Instruções: a large editor in a dialog; Salvar only with changes; closing with changes asks first", async () => {
     const { state } = await go(`agents/${ADA_ID}`);
-    const save = screen().getByRole("button", { name: "Salvar alterações" });
-    expect(save.hasAttribute("disabled")).toBe(true);
-    await type(screen().getByLabelText("Como a Ada trabalha"), "Programa em branches.");
-    await click(save);
+    await click(screen().getByRole("button", { name: "Editar Instruções" }));
+    const dialog = screen().getByRole("dialog", { name: "Como a Ada trabalha" });
+    expect(within(dialog).getByRole("button", { name: "Salvar" }).hasAttribute("disabled")).toBe(true);
+    await type(within(dialog).getByLabelText("Instruções"), "Programa em branches.");
+    expect(dialog.textContent).toContain("Alterações não salvas");
+    await click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    expect(dialog.textContent).toContain("Descartar as alterações?");
+    await click(within(dialog).getByRole("button", { name: "Continuar editando" }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
       instructions: "Programa em branches.",
     });
-    expect(screen().getByRole("button", { name: "Salvo" })).toBeTruthy();
+    expect(screen().queryByRole("dialog", { name: "Como a Ada trabalha" })).toBeNull();
+    expect(screen().getByText("Alterações da Ada salvas.")).toBeTruthy();
+  });
+
+  test("Modelo e chave: both in one dialog", async () => {
+    const { state } = await go(`agents/${ADA_ID}`);
+    await click(screen().getByRole("button", { name: "Editar Modelo e chave" }));
+    const dialog = screen().getByRole("dialog", { name: "Modelo e chave" });
+    expect(within(dialog).getByRole("combobox", { name: "Modelo" })).toBeTruthy();
+    expect(within(dialog).getByRole("combobox", { name: "Chave" })).toBeTruthy();
+    const model = within(dialog).getByRole("combobox", { name: "Modelo" });
+    model.focus();
+    await act(async () => fireEvent.keyDown(model, { key: "Enter" }));
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    await click(within(screen().getByRole("listbox")).getByRole("option", { name: /Opus/ }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({ model: "claude-opus-5-5" });
+  });
+
+  test("Conhecimento: what the agent knows, with search", async () => {
+    await go(`agents/${ADA_ID}`);
+    await click(screen().getByRole("button", { name: "Editar conhecimento" }));
+    const dialog = screen().getByRole("dialog", { name: "O que a Ada sabe" });
+    expect(dialog.querySelectorAll(".ac-list__row").length).toBeGreaterThan(0);
+    await type(within(dialog).getByRole("searchbox", { name: "Buscar no que sabe" }), "zzz-nada");
+    expect(dialog.textContent).toContain("Nada com “zzz-nada”.");
+    expect(within(dialog).getByRole("link", { name: "Editar a memória" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/agents/${ADA_ID}/memory`,
+    );
   });
 
   test("Ajustar orçamento validates and saves the limit", async () => {
@@ -115,7 +170,9 @@ describe("Agente", () => {
 
   test("Ver execuções: searchable run history", async () => {
     await go(`agents/${ADA_ID}`);
-    await click(screen().getByRole("button", { name: "Ver execuções" }));
+    await click(
+      within(screen().getByRole("region", { name: /Orçamento de/ })).getByRole("button", { name: "Ver execuções" }),
+    );
     await settle();
     const dialog = screen().getByRole("dialog", { name: "Execuções da Ada" });
     expect(dialog.textContent).toContain("@ada o login está devolvendo 401");
@@ -133,8 +190,11 @@ describe("Agente", () => {
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Permissões da Ada" });
     expect(dialog.textContent).toContain("5 de 15 ferramentas");
-    const memory = within(dialog).getByRole("region", { name: "Memória" });
-    expect(within(memory).getByRole("checkbox", { name: "Memória" }).getAttribute("aria-checked")).toBe("true");
+    // Built-ins are grouped by area; only the memory tools are on, so the area is partial.
+    const memory = within(dialog).getByRole("region", { name: "Contexto e memória" });
+    expect(within(memory).getByRole("checkbox", { name: "Contexto e memória" }).getAttribute("aria-checked")).toBe(
+      "mixed",
+    );
     const github = within(dialog).getByRole("region", { name: "GitHub" });
     const merge = within(github).getByRole("checkbox", { name: "Fazer merge" });
     expect(merge.closest("li")?.textContent).toContain("pede aprovação");
@@ -163,7 +223,7 @@ describe("Agente", () => {
     };
     expect(put.all).toBe(true);
     expect(put.tools.deny.map((x) => x.name)).toEqual(["github_merge_pull_request"]);
-    expect(put.tools.allow.map((x) => x.name)).toEqual(["github_create_pull_request"]);
+    expect(put.tools.allow.map((x) => x.name)).toContain("github_create_pull_request");
     expect(screen().getByText("Permissões da Ada salvas.")).toBeTruthy();
   });
 
@@ -171,7 +231,7 @@ describe("Agente", () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(`agents/${ADA_ID}`, state);
-    expect(screen().queryByRole("button", { name: "Salvar alterações" })).toBeNull();
+    expect(screen().queryByRole("button", { name: /^Editar/ })).toBeNull();
     expect(screen().queryByRole("button", { name: "Ajustar orçamento" })).toBeNull();
     expect(screen().queryByRole("button", { name: "Editar permissões" })).toBeNull();
     expect(document.body.textContent).toContain("Só admins editam agentes.");

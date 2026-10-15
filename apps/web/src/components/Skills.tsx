@@ -8,7 +8,6 @@ import {
   DialogBody,
   DialogFooter,
   DialogSearchList,
-  EmptyState,
   Field,
   Icon,
   type IconName,
@@ -25,6 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAgentSkills, useSkill, useSkillAction, useSkills, useSkillUsage } from "@/api/queries";
 import type { Skill, SkillDetail, SkillFile } from "@/api/types";
+import { EditDialog } from "@/components/EditDialog";
 import { useOrg } from "@/components/org-context";
 import { joinNames, relativeTime } from "@/lib/format";
 import { Markdown } from "@/lib/markdown";
@@ -544,93 +544,57 @@ export function SkillPicker({
   );
 }
 
-/** Agent profile → Skills: what is enabled, and "Gerenciar skills". */
-export function AgentSkillsSection({
+/** Agent profile → Skills → "Gerenciar skills": our checkboxes over the library, saved explicitly. */
+export function ManageSkillsDialog({
   agentId,
   agentName,
-  editable,
+  open,
+  onClose,
 }: {
   agentId: string;
   agentName: string;
-  editable: boolean;
+  open: boolean;
+  onClose: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const skills = useAgentSkills(org.id, agentId);
   const action = useSkillAction(org.id);
-  const [managing, setManaging] = useState(false);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  if (skills.isError) return null;
   const list = skills.data ?? [];
-  const on = list.filter((s) => s.enabled);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [initial, setInitial] = useState("");
+  useEffect(() => {
+    if (!open || !skills.data) return;
+    const on = skills.data.filter((s) => s.enabled).map((s) => s.id);
+    setPicked(new Set(on));
+    setInitial([...on].sort().join(","));
+  }, [open, skills.data]);
+  const dirty = [...picked].sort().join(",") !== initial;
   return (
-    <Card aria-labelledby="sec-agent-skills">
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
-          <h2 id="sec-agent-skills" className="ac-card__title">
-            {t("skills.agentTitle")}
-          </h2>
-          <span className="small muted">{t("skills.agentSubtitle", { name: agentName })}</span>
-        </div>
-        {editable && list.length > 0 && (
-          <Button
-            size="sm"
-            onClick={() => {
-              setPicked(new Set(on.map((s) => s.id)));
-              setManaging(true);
-            }}
-          >
-            {t("skills.manage")}
-          </Button>
-        )}
-      </div>
-      {skills.isSuccess && on.length === 0 && (
-        <EmptyState icon="document">{t("skills.agentEmpty", { name: agentName })}</EmptyState>
+    <EditDialog
+      open={open}
+      onClose={onClose}
+      title={t("skills.manageTitle", { name: agentName })}
+      dirty={dirty}
+      saving={action.isPending}
+      onSave={() =>
+        action.mutate(
+          { type: "assign", agentId, skills: list.map((s) => ({ skillId: s.id, enabled: picked.has(s.id) })) },
+          {
+            onSuccess: () => {
+              toast.show(t("skills.assigned", { name: agentName }));
+              onClose();
+            },
+          },
+        )
+      }
+    >
+      {list.length === 0 ? (
+        <p className="small muted">{t("skills.empty")}</p>
+      ) : (
+        <SkillPicker skills={list} selected={picked} onChange={setPicked} />
       )}
-      {on.length > 0 && (
-        <List aria-label={t("skills.agentTitle")}>
-          {on.map((s) => (
-            <div key={s.id} className="ac-list__row">
-              <span className="list-col">
-                <span style={{ fontWeight: 600 }}>{s.name}</span>
-                <span className="small muted">{s.description}</span>
-              </span>
-              <SourceChip skill={s} />
-            </div>
-          ))}
-        </List>
-      )}
-      <Dialog
-        open={managing}
-        onOpenChange={setManaging}
-        title={t("skills.manageTitle", { name: agentName })}
-        closeLabel={t("common.close")}
-      >
-        <DialogBody>
-          <SkillPicker skills={list} selected={picked} onChange={setPicked} />
-        </DialogBody>
-        <DialogFooter>
-          <Button onClick={() => setManaging(false)}>{t("common.cancel")}</Button>
-          <Button
-            variant="primary"
-            disabled={action.isPending}
-            onClick={() =>
-              action.mutate(
-                { type: "assign", agentId, skills: list.map((s) => ({ skillId: s.id, enabled: picked.has(s.id) })) },
-                {
-                  onSuccess: () => {
-                    toast.show(t("skills.assigned", { name: agentName }));
-                    setManaging(false);
-                  },
-                },
-              )
-            }
-          >
-            {t("skills.save")}
-          </Button>
-        </DialogFooter>
-      </Dialog>
-    </Card>
+    </EditDialog>
   );
 }

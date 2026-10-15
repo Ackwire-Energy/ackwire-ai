@@ -101,6 +101,12 @@ export const extraIcons = {
   arrowUp: [["path", { d: "M10 15V5M5.5 9.5 10 5l4.5 4.5" }]],
   /** Calendario.dc.html: next week. */
   chevronRight: [["path", { d: "m8 5 5 5-5 5" }]],
+  /** "…" menu (more actions). */
+  more: [
+    ["circle", { cx: "5", cy: "10", r: "1.1" }],
+    ["circle", { cx: "10", cy: "10", r: "1.1" }],
+    ["circle", { cx: "15", cy: "10", r: "1.1" }],
+  ],
   /** Access matrix: off (not granted). */
   dash: [["path", { d: "M6 10h8" }]],
   /** "Bloquear" (deny a tool). */

@@ -35,7 +35,7 @@ describe("Configurações da organização", () => {
   });
 
   test("connected connectors are listed; disconnect asks first", async () => {
-    const { state } = await go();
+    const { state } = await go(seedState(), "settings/connectors");
     const section = screen().getByRole("region", { name: "Conectores" });
     expect(section.textContent).toContain("GitHub");
     expect(section.textContent).toContain("Conectado como acme · por OAuth");
@@ -49,7 +49,7 @@ describe("Configurações da organização", () => {
   });
 
   test("add a connector from the searchable catalog with an API key", async () => {
-    const { state } = await go();
+    const { state } = await go(seedState(), "settings/connectors");
     await click(screen().getByRole("button", { name: "Adicionar conector" }));
     const add = screen().getByRole("dialog", { name: "Adicionar conector" });
     expect(add.textContent).toContain("Repositórios, PRs, issues e Actions.");
@@ -76,7 +76,7 @@ describe("Configurações da organização", () => {
     const left: string[] = [];
     setNavigateAway((url) => left.push(url));
     const state = seedState({ connections: [] });
-    await go(state);
+    await go(state, "settings/connectors");
     await click(screen().getByRole("button", { name: "Adicionar conector" }));
     const add = screen().getByRole("dialog", { name: "Adicionar conector" });
     await type(within(add).getByRole("searchbox", { name: "Buscar conector" }), "github");
@@ -87,13 +87,13 @@ describe("Configurações da organização", () => {
     expect(state.calls.find((c) => c.method === "connectors.startOAuth")?.args).toEqual([
       ORG_ID,
       "github",
-      { returnTo: `/org/${ORG_ID}/settings`, serverUrl: undefined },
+      { returnTo: `/org/${ORG_ID}/settings/connectors`, serverUrl: undefined },
     ]);
     expect(left[0]).toStartWith("https://github.com/login/oauth/authorize");
   });
 
   test("a connector without a default server asks for an https address", async () => {
-    await go(seedState({ connections: [] }));
+    await go(seedState({ connections: [] }), "settings/connectors");
     await click(screen().getByRole("button", { name: "Adicionar conector" }));
     const add = screen().getByRole("dialog", { name: "Adicionar conector" });
     await type(within(add).getByRole("searchbox", { name: "Buscar conector" }), "drive");
@@ -106,7 +106,7 @@ describe("Configurações da organização", () => {
   });
 
   test("provider keys: default marked; rotate keeps the key; the default can't be deleted; usage by kind", async () => {
-    const { state } = await go();
+    const { state, router } = await go(seedState(), "settings/keys");
     const keys = () => screen().getByRole("region", { name: "Chaves de provedor" });
     expect(keys().textContent).toContain("Anthropic da Acme");
     expect(keys().textContent).toContain("Anthropic · Termina em 7f2a");
@@ -157,6 +157,10 @@ describe("Configurações da organização", () => {
     );
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.removeCredential")?.args).toEqual([ORG_ID, "cred-1", true]);
+    await act(() =>
+      router.navigate({ to: "/org/$orgId/settings/$section", params: { orgId: ORG_ID, section: "usage" } }),
+    );
+    await settle(4);
     const usage = screen().getByRole("region", { name: "Uso deste mês" });
     expect(usage.textContent).toContain("Agentes154 chamadasUS$ 15,40");
     expect(usage.textContent).toContain("Roteador80 chamadasUS$ 0,50");
@@ -169,7 +173,19 @@ describe("Configurações da organização", () => {
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(state);
     expect(document.body.textContent).toContain("Só admins mudam as configurações.");
+    // The sub-nav only lists what a member can open.
+    const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
+    expect(
+      within(nav)
+        .getAllByRole("link")
+        .map((l) => l.textContent),
+    ).toEqual(["Geral", "Membros e convites", "Conectores"]);
+    cleanup();
+    await go(state, "settings/connectors");
     expect(screen().queryByRole("button", { name: "Adicionar conector" })).toBeNull();
+    cleanup();
+    // A section they can't open falls back to Geral.
+    await go(state, "settings/keys");
     expect(screen().queryByRole("region", { name: "Chaves de provedor" })).toBeNull();
     expect(screen().queryByRole("region", { name: "Uso deste mês" })).toBeNull();
   });

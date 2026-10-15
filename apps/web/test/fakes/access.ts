@@ -28,29 +28,29 @@ const BUILTINS: { scope: string; label: string; tools: FakeTool[] }[] = [
   {
     scope: "context:read",
     label: "Busca",
-    tools: [tool("search_workspace", "Buscar no workspace", "Mensagens e issues.", true)],
+    tools: [tool("search_workspace", "Ler o contexto", "Mensagens e issues.", true)],
   },
   {
     scope: "drive:write",
     label: "Drive",
     tools: [
-      tool("drive_create_document", "Criar arquivo", "Relatórios e tabelas."),
-      tool("drive_read_file", "Ler arquivo", "Abre documentos.", true),
+      tool("drive_create_document", "Escrever arquivos", "Relatórios e tabelas."),
+      tool("drive_read_file", "Ler arquivos", "Abre documentos.", true),
     ],
   },
   {
     scope: "issues:write",
     label: "Issues",
     tools: [
-      tool("issues_create", "Criar issue", "Abre uma issue."),
-      tool("issues_list", "Ver issues", "Lista issues.", true),
+      tool("issues_create", "Criar e editar issues", "Abre uma issue."),
+      tool("issues_list", "Ler issues", "Lista issues.", true),
     ],
   },
   {
     scope: "calendar:write",
     label: "Calendário",
     tools: [
-      tool("calendar_propose_event", "Propor horário", "Uma pessoa confirma."),
+      tool("calendar_propose_event", "Propor eventos", "Uma pessoa confirma."),
       tool("calendar_list_events", "Ver agenda", "Eventos do workspace.", true),
     ],
   },

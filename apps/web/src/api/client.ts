@@ -90,6 +90,8 @@ export interface ApiClient {
     }): Promise<{ organization: Organization; generalChannelId: string }>;
     get(orgId: string): Promise<Organization>;
     update(orgId: string, input: { name?: string; context?: string }): Promise<void>;
+    /** My handle and time zone in this organization (`timezone: null` = the organization's). */
+    updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
     members(orgId: string): Promise<Member[]>;
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
     removeMember(orgId: string, userId: string): Promise<void>;

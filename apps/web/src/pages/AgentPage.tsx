@@ -2,28 +2,30 @@ import {
   AttentionNote,
   Avatar,
   Button,
-  Card,
   Checkbox,
+  Chip,
   Dialog,
   DialogBody,
   DialogFooter,
   DialogSearchList,
   EmptyState,
   Field,
-  Icon,
   Input,
+  Menu,
+  MenuItem,
   Meter,
   Select,
   Textarea,
 } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { useEffect, useMemo, useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   useAgentAccess,
   useAgentDetail,
   useAgentScopes,
+  useAgentSkills,
   useChannels,
   useCredentials,
   useMemory,
@@ -38,12 +40,14 @@ import {
 } from "@/api/queries";
 import type { Agent, AgentAccess } from "@/api/types";
 import { AccessTree } from "@/components/AccessTree";
+import { EditDialog } from "@/components/EditDialog";
 import { useOrg } from "@/components/org-context";
-import { AgentSkillsSection } from "@/components/Skills";
+import { ManageSkillsDialog } from "@/components/Skills";
+import { useAreaLabel } from "@/hooks/useAreaLabel";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useScopeGroups } from "@/hooks/useScopeGroups";
-import { type AccessModel, modelFrom, toInput, treeFromAccess } from "@/lib/access";
-import { formatInt, formatMonth, formatTokensShort, formatUsd, whenAt } from "@/lib/format";
+import { type AccessModel, countTools, modelFrom, resolve, toInput, treeFromAccess } from "@/lib/access";
+import { formatInt, formatMonth, formatTokensShort, formatUsd, joinNames, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
 import { scopeSummary, searchGroups, toggleGrant } from "@/lib/scopes";
@@ -81,7 +85,11 @@ function AgentProfile({ agent }: { agent: Agent }) {
   const models = useModels();
   const detail = useAgentDetail(org.id, agent.id);
   const channels = useChannels(org.id);
-  const update = useUpdateAgent(org.id, agent.id);
+  const settings = useSettings(org.id);
+  const access = useAgentAccess(org.id, agent.id);
+  const skills = useAgentSkills(org.id, agent.id);
+  const memory = useMemory(org.id, agent.id);
+  const proposals = useProposals(org.id);
   const editable = can(org.role, "manage_agents");
   const g = agentGrammar(t, agent.name);
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
@@ -91,80 +99,177 @@ function AgentProfile({ agent }: { agent: Agent }) {
     .map((ac) => channels.data?.find((c) => c.id === ac.id && c.isMember))
     .find((c) => c !== undefined);
   const month = formatMonth(i18n.language, new Date());
-
-  const [instructions, setInstructions] = useState(agent.instructions);
-  const [saved, setSaved] = useState(false);
-  const [dialog, setDialog] = useState<null | "runs" | "budget" | "perms">(null);
-  useEffect(() => setInstructions(agent.instructions), [agent.instructions]);
+  const [dialog, setDialog] = useState<
+    null | "runs" | "budget" | "perms" | "instructions" | "knowledge" | "model" | "owner" | "skills"
+  >(null);
+  const close = () => setDialog(null);
+  const navigate = useNavigate();
 
   const spent = detail.data?.spentThisMonthUsd ?? 0;
   const tokens = detail.data?.tokensThisMonth ?? 0;
   const runs = detail.data?.runsThisMonth ?? 0;
-  const key = agent.hasCredential ? t("agent.withOrgKey", { org: org.name }) : t("agent.withPlatformKey");
+  const credentialId = detail.data?.credentialId ?? null;
+  const keyLabel =
+    credentialId && credentialId !== settings.data?.defaultCredentialId
+      ? t("agent.ownKey")
+      : agent.hasCredential
+        ? t("agent.withOrgKey", { org: org.name })
+        : t("agent.withPlatformKey");
+  const tools = access.data ? countTools(resolve(treeFromAccess(access.data), modelFrom(access.data))) : null;
+  const enabledSkills = (skills.data ?? []).filter((x) => x.enabled);
+  const active = (memory.data ?? []).filter((m) => !m.archived);
+  const facts = active.filter((m) => m.kind === "fact" || m.kind === "decision").length;
+  const lessons = active.filter((m) => m.kind === "lesson" || m.kind === "preference").length;
+  const pending = (proposals.data ?? []).filter((p) => p.agentId === agent.id && p.status === "pending");
+  const who = pending[0] ? (pending[0].decider.type === "user" ? pending[0].decider.name : t("roles.adminLower")) : "";
+  const edit = (section: string, open: typeof dialog) =>
+    editable ? (
+      <Button size="sm" aria-label={t("agent.editSection", { section })} onClick={() => setDialog(open)}>
+        {t("agent.edit")}
+      </Button>
+    ) : null;
 
   return (
-    <div className="page page--wide">
-      <header className="page__header page__header--row">
+    <div className="page page--mid agent-page">
+      <header className="agent-head">
         <Avatar kind="agent" size="lg" name={agent.name} initials={dir.agentInitials(agent.id)} />
-        <div className="page__header-text">
+        <div className="agent-head__text">
           <h1 className="page-title">{agent.name}</h1>
-          <span className="muted">
-            {owner ? (
-              <Trans
-                i18nKey="agent.subtitle"
-                values={{ role: agent.role || `@${agent.handle}`, owner: owner.name, model: modelLabel, key }}
-                components={{ b: <b style={{ color: "var(--ink)" }} /> }}
-              />
-            ) : (
-              t("agent.subtitleNoOwner", { role: agent.role || `@${agent.handle}`, model: modelLabel, key })
-            )}
+          <span className="agent-head__meta">
+            {agent.role && <span>{agent.role}</span>}
+            <Chip icon="agent">{modelLabel}</Chip>
+            <span className="muted">{owner ? t("agent.ownerLine", { name: owner.name }) : t("agent.noOwnerLine")}</span>
           </span>
         </div>
-        <div className="row">
-          {home && (
-            <Button asChild>
-              <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: home.id }}>
+        <div className="row agent-head__actions">
+          <Button asChild variant="primary">
+            <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
+              {t("agent.chat")}
+            </Link>
+          </Button>
+          <Menu
+            align="end"
+            label={t("agent.moreActions")}
+            trigger={<Button variant="ghost" iconOnly icon="more" aria-label={t("agent.moreActions")} />}
+          >
+            {home && (
+              <MenuItem
+                icon="channel"
+                onSelect={() =>
+                  void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: home.id } })
+                }
+              >
                 {t("agent.openIn", { channel: home.name })}
-              </Link>
-            </Button>
-          )}
-          {editable && (
-            <Button
-              variant="primary"
-              disabled={update.isPending || instructions === agent.instructions}
-              onClick={() => update.mutate({ instructions }, { onSuccess: () => setSaved(true) })}
+              </MenuItem>
+            )}
+            <MenuItem icon="waiting" onSelect={() => setDialog("runs")}>
+              {t("agent.viewRuns")}
+            </MenuItem>
+            <MenuItem
+              icon="info"
+              onSelect={() =>
+                void navigate({
+                  to: "/org/$orgId/agents/$agentId/memory",
+                  params: { orgId: org.id, agentId: agent.id },
+                })
+              }
             >
-              {saved && instructions === agent.instructions ? t("agent.saved") : t("agent.saveChanges")}
-            </Button>
-          )}
+              {t("agent.viewMemory")}
+            </MenuItem>
+          </Menu>
         </div>
       </header>
       {!editable && <p className="page__note">{t("agent.readOnly", g)}</p>}
 
-      <div className="cards-2">
-        <Card aria-labelledby="sec-instr">
-          <h2 id="sec-instr" className="ac-card__title">
-            {t("agent.instructions")}
-          </h2>
-          <Field label={t("agent.howWorks", g)} id="instr" help={t("agent.instructionsHelp", { org: org.name })}>
-            <Textarea
-              rows={6}
-              value={instructions}
-              readOnly={!editable}
-              onChange={(e) => {
-                setInstructions(e.target.value);
-                setSaved(false);
-              }}
-            />
-          </Field>
-          <OwnerField agent={agent} editable={editable} />
-          <ModelAndKeyFields agent={agent} editable={editable} />
-        </Card>
+      <div className="summary-list">
+        <SummaryRow
+          id="sec-instr"
+          title={t("agent.howWorks", g)}
+          action={edit(t("agent.instructions"), "instructions")}
+        >
+          {agent.instructions.trim() ? (
+            <p className="summary-row__preview">{agent.instructions}</p>
+          ) : (
+            <p className="muted">{t("agent.noInstructions", g)}</p>
+          )}
+          <span className="small muted">{t("agent.instructionsHelp", { org: org.name })}</span>
+        </SummaryRow>
 
-        <Card aria-labelledby="sec-budget">
-          <h2 id="sec-budget" className="ac-card__title">
-            {t("agent.budgetTitle", { month })}
-          </h2>
+        <SummaryRow id="sec-mem" title={t("agent.memoryTitle", g)} action={edit(t("agent.knowledge"), "knowledge")}>
+          <span>
+            {t("agent.memorySummary", {
+              facts: t("agent.memoryFacts", { count: facts }),
+              lessons: t("agent.memoryLessons", { count: lessons }),
+            })}
+            {pending.length > 0 && t("agent.memoryProposals", { count: pending.length, who })}
+          </span>
+        </SummaryRow>
+
+        <SummaryRow id="sec-model" title={t("agent.modelAndKey")} action={edit(t("agent.modelAndKey"), "model")}>
+          <span>
+            {modelLabel} · {keyLabel}
+          </span>
+        </SummaryRow>
+
+        <SummaryRow id="sec-owner" title={t("newAgent.owner")} action={edit(t("newAgent.owner"), "owner")}>
+          <span>{owner ? owner.name : t("newAgent.noOwnerOption")}</span>
+          <span className="small muted">{owner ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
+        </SummaryRow>
+
+        <SummaryRow
+          id="sec-perm"
+          title={t("agent.permissionsTitle", g)}
+          action={
+            editable ? (
+              <Button size="sm" aria-label={t("agent.editPermissions")} onClick={() => setDialog("perms")}>
+                {t("agent.edit")}
+              </Button>
+            ) : null
+          }
+        >
+          {tools ? (
+            <span>
+              {access.data?.all
+                ? t("agent.toolsAll", { on: tools.on, total: tools.total })
+                : t("agent.toolsCount", { on: tools.on, total: tools.total })}
+            </span>
+          ) : (
+            <ScopeSummary agent={agent} />
+          )}
+        </SummaryRow>
+
+        <SummaryRow id="sec-skills" title={t("skills.agentTitle")} action={edit(t("skills.agentTitle"), "skills")}>
+          {skills.isError ? (
+            <span className="muted">{t("skills.unavailable")}</span>
+          ) : enabledSkills.length > 0 ? (
+            <span>
+              {t("agent.skillsCount", { count: enabledSkills.length })}:{" "}
+              {joinNames(
+                enabledSkills.map((x) => x.name),
+                t("newAgent.and"),
+              )}
+            </span>
+          ) : (
+            <span className="muted">{t("skills.agentEmpty", { name: agent.name })}</span>
+          )}
+        </SummaryRow>
+
+        <SummaryRow
+          id="sec-budget"
+          title={t("agent.budgetTitle", { month })}
+          action={
+            <div className="row" style={{ gap: 4 }}>
+              <Button size="sm" variant="ghost" onClick={() => setDialog("runs")}>
+                {t("agent.viewRuns")}
+              </Button>
+              {editable && (
+                <Button size="sm" onClick={() => setDialog("budget")}>
+                  {t("agent.adjustBudget")}
+                </Button>
+              )}
+            </div>
+          }
+        >
           {detail.isError ? (
             <span className="small muted">{t("agent.usageHidden")}</span>
           ) : (
@@ -194,23 +299,14 @@ function AgentProfile({ agent }: { agent: Agent }) {
               </span>
             </>
           )}
-          <div className="row">
-            <Button size="sm" onClick={() => setDialog("runs")}>
-              {t("agent.viewRuns")}
-            </Button>
-            {editable && (
-              <Button size="sm" onClick={() => setDialog("budget")}>
-                {t("agent.adjustBudget")}
-              </Button>
-            )}
-          </div>
-        </Card>
+        </SummaryRow>
       </div>
 
-      <PermissionsSection agent={agent} editable={editable} onEdit={() => setDialog("perms")} />
-      <AgentSkillsSection agentId={agent.id} agentName={agent.name} editable={editable} />
-      <MemorySection agent={agent} />
-
+      <InstructionsDialog open={dialog === "instructions"} onClose={close} agent={agent} />
+      <KnowledgeDialog open={dialog === "knowledge"} onClose={close} agent={agent} />
+      <ModelKeyDialog open={dialog === "model"} onClose={close} agent={agent} />
+      <OwnerDialog open={dialog === "owner"} onClose={close} agent={agent} />
+      <ManageSkillsDialog agentId={agent.id} agentName={agent.name} open={dialog === "skills"} onClose={close} />
       <RunsDialog
         open={dialog === "runs"}
         onOpenChange={(o) => setDialog(o ? "runs" : null)}
@@ -228,51 +324,132 @@ function AgentProfile({ agent }: { agent: Agent }) {
   );
 }
 
-/** Built-in scopes + the scopes of the organization's connections. */
-/** "Responsável" on the profile: a member or "Sem responsável" (admins then get alerts and approve). */
-function OwnerField({ agent, editable }: { agent: Agent; editable: boolean }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
-  const update = useUpdateAgent(org.id, agent.id);
-  const value = agent.ownerUserId ?? NO_OWNER;
-  const options = [
-    ...dir.members.map((m) => ({ value: m.userId, label: m.name, description: t(`roles.${m.role}`) })),
-    { value: NO_OWNER, label: t("newAgent.noOwnerOption") },
-  ];
+/** A section of the profile: title, a read-only summary, and one action. */
+function SummaryRow({
+  id,
+  title,
+  action,
+  children,
+}: {
+  id: string;
+  title: string;
+  action: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <Field
-      label={t("newAgent.owner")}
-      id={`owner-${agent.id}`}
-      help={value === NO_OWNER ? t("newAgent.noOwnerHelp") : t("newAgent.ownerHelp")}
-    >
-      <Select
-        value={value}
-        onValueChange={(v) => update.mutate({ ownerUserId: v === NO_OWNER ? null : v })}
-        options={options}
-        disabled={!editable || update.isPending}
-      />
-    </Field>
+    <section aria-labelledby={id} className="summary-row">
+      <div className="summary-row__text">
+        <h2 id={id} className="summary-row__title">
+          {title}
+        </h2>
+        <div className="summary-row__body">{children}</div>
+      </div>
+      {action && <div className="summary-row__action">{action}</div>}
+    </section>
   );
 }
 
-/** Model (grouped by provider; no key = disabled) and key (workspace default or another stored key). */
-function ModelAndKeyFields({ agent, editable }: { agent: Agent; editable: boolean }) {
+/** Before the access API: what is granted per scope group. */
+function ScopeSummary({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const groups = useScopeGroups(org.id);
+  const grants = useAgentScopes(org.id, agent.id);
+  const summary = groups && grants.data ? scopeSummary(groups, grants.data, t("agent.noPermission")) : null;
+  if (!summary) return null;
+  return (
+    <span>
+      {summary.connectors > 0
+        ? t("agent.permissionsSummary", { ...summary, count: summary.connectors, org: org.name })
+        : t("agent.permissionsSummaryBuiltin", { ...summary, org: org.name })}
+    </span>
+  );
+}
+
+function InstructionsDialog({ open, onClose, agent }: { open: boolean; onClose: () => void; agent: Agent }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const update = useUpdateAgent(org.id, agent.id);
+  const g = agentGrammar(t, agent.name);
+  const [text, setText] = useState(agent.instructions);
+  useEffect(() => {
+    if (open) setText(agent.instructions);
+  }, [open, agent.instructions]);
+  return (
+    <EditDialog
+      open={open}
+      onClose={onClose}
+      title={t("agent.howWorks", g)}
+      description={t("agent.instructionsHelp", { org: org.name })}
+      dirty={text !== agent.instructions}
+      saving={update.isPending}
+      width={760}
+      onSave={() =>
+        update.mutate(
+          { instructions: text },
+          {
+            onSuccess: () => {
+              toast.show(t("agent.savedToast", g));
+              onClose();
+            },
+          },
+        )
+      }
+    >
+      <Field label={t("agent.instructions")} id="instr">
+        <Textarea rows={16} value={text} onChange={(e) => setText(e.target.value)} />
+      </Field>
+    </EditDialog>
+  );
+}
+
+function ModelKeyDialog({ open, onClose, agent }: { open: boolean; onClose: () => void; agent: Agent }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const toast = useToast();
   const update = useUpdateAgent(org.id, agent.id);
   const detail = useAgentDetail(org.id, agent.id);
   const models = useModels();
   const credentials = useCredentials(org.id, can(org.role, "manage_credentials"));
   const settings = useSettings(org.id);
   const platform = usePlatformKey(org.id);
-  const credentialId = detail.data?.credentialId ?? null;
+  const g = agentGrammar(t, agent.name);
+  const savedKey = (() => {
+    const id = detail.data?.credentialId ?? null;
+    return id && id !== settings.data?.defaultCredentialId ? id : DEFAULT_KEY;
+  })();
+  const [model, setModel] = useState(agent.model);
+  const [key, setKey] = useState(savedKey);
+  useEffect(() => {
+    if (!open) return;
+    setModel(agent.model);
+    setKey(savedKey);
+  }, [open, agent.model, savedKey]);
+  const dirty = model !== agent.model || key !== savedKey;
   return (
-    <div className="grid-fields">
+    <EditDialog
+      open={open}
+      onClose={onClose}
+      title={t("agent.modelAndKey")}
+      dirty={dirty}
+      saving={update.isPending}
+      onSave={() => {
+        const patch: { model?: string; credentialId?: string | null } = {};
+        if (model !== agent.model) patch.model = model;
+        if (key !== savedKey) patch.credentialId = key === DEFAULT_KEY ? null : key;
+        update.mutate(patch, {
+          onSuccess: () => {
+            toast.show(t("agent.savedToast", g));
+            onClose();
+          },
+        });
+      }}
+    >
       <Field label={t("newAgent.model")} id={`model-${agent.id}`}>
         <Select
-          value={agent.model}
-          onValueChange={(model) => update.mutate({ model })}
+          value={model}
+          onValueChange={setModel}
           options={modelOptions(
             t,
             i18n.language,
@@ -280,120 +457,119 @@ function ModelAndKeyFields({ agent, editable }: { agent: Agent; editable: boolea
             credentials.data ?? [],
             platform.data ?? false,
           )}
-          disabled={!editable || update.isPending}
         />
       </Field>
       <Field label={t("newAgent.key")} id={`key-${agent.id}`}>
         <Select
-          value={credentialId && credentialId !== settings.data?.defaultCredentialId ? credentialId : DEFAULT_KEY}
-          onValueChange={(v) => update.mutate({ credentialId: v === DEFAULT_KEY ? null : v })}
+          value={key}
+          onValueChange={setKey}
           options={keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null)}
-          disabled={!editable || update.isPending}
         />
       </Field>
-    </div>
+    </EditDialog>
   );
 }
 
-function PermissionsSection({ agent, editable, onEdit }: { agent: Agent; editable: boolean; onEdit: () => void }) {
+/** "Responsável": a member or "Sem responsável" (admins then get alerts and approve). */
+function OwnerDialog({ open, onClose, agent }: { open: boolean; onClose: () => void; agent: Agent }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const groups = useScopeGroups(org.id);
-  const grants = useAgentScopes(org.id, agent.id);
+  const toast = useToast();
+  const dir = useDirectory(org.id);
+  const update = useUpdateAgent(org.id, agent.id);
   const g = agentGrammar(t, agent.name);
-  const summary = groups && grants.data ? scopeSummary(groups, grants.data, t("agent.noPermission")) : null;
+  const saved = agent.ownerUserId ?? NO_OWNER;
+  const [value, setValue] = useState(saved);
+  useEffect(() => {
+    if (open) setValue(saved);
+  }, [open, saved]);
+  const options = [
+    ...dir.members.map((m) => ({ value: m.userId, label: m.name, description: t(`roles.${m.role}`) })),
+    { value: NO_OWNER, label: t("newAgent.noOwnerOption") },
+  ];
   return (
-    <Card aria-labelledby="sec-perm">
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
-          <h2 id="sec-perm" className="ac-card__title">
-            {t("agent.permissionsTitle", g)}
-          </h2>
-          {summary && (
-            <span className="small muted">
-              {summary.connectors > 0
-                ? t("agent.permissionsSummary", { ...summary, count: summary.connectors, org: org.name })
-                : t("agent.permissionsSummaryBuiltin", { ...summary, org: org.name })}
-            </span>
-          )}
-        </div>
-        <div className="row">
-          {can(org.role, "manage_agents") && summary?.connectors === 0 && (
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/org/$orgId/settings" params={{ orgId: org.id }}>
-                {t("agent.connectHint")}
-              </Link>
-            </Button>
-          )}
-          {editable && summary && (
-            <Button size="sm" onClick={onEdit}>
-              {t("agent.editPermissions")}
-            </Button>
-          )}
-        </div>
-      </div>
-      {summary && (
-        <div>
-          {summary.rows.map((r) => (
-            <div key={r.id} className="connector-row">
-              <span className="connector-row__name">{r.name}</span>
-              <span className="connector-row__granted">{r.granted}</span>
-              {r.gated.length > 0 && (
-                <AttentionNote>{t("agent.asksApproval", { scopes: r.gated.join(", ") })}</AttentionNote>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
+    <EditDialog
+      open={open}
+      onClose={onClose}
+      title={t("newAgent.owner")}
+      dirty={value !== saved}
+      saving={update.isPending}
+      width={480}
+      onSave={() =>
+        update.mutate(
+          { ownerUserId: value === NO_OWNER ? null : value },
+          {
+            onSuccess: () => {
+              toast.show(t("agent.savedToast", g));
+              onClose();
+            },
+          },
+        )
+      }
+    >
+      <Field
+        label={t("newAgent.owner")}
+        id={`owner-${agent.id}`}
+        help={value === NO_OWNER ? t("newAgent.noOwnerHelp") : t("newAgent.ownerHelp")}
+      >
+        <Select value={value} onValueChange={setValue} options={options} />
+      </Field>
+    </EditDialog>
   );
 }
 
-function MemorySection({ agent }: { agent: Agent }) {
+/** "Conhecimento": what the agent knows, with search; editing happens on the memory page. */
+function KnowledgeDialog({ open, onClose, agent }: { open: boolean; onClose: () => void; agent: Agent }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const memory = useMemory(org.id, agent.id);
   const proposals = useProposals(org.id);
   const g = agentGrammar(t, agent.name);
-  const active = (memory.data ?? []).filter((m) => !m.archived);
-  const facts = active.filter((m) => m.kind === "fact" || m.kind === "decision").length;
-  const lessons = active.filter((m) => m.kind === "lesson" || m.kind === "preference").length;
+  const [q, setQ] = useState("");
+  const items = (memory.data ?? []).filter((m) => !m.archived);
+  const shown = q.trim() ? items.filter((m) => m.text.toLowerCase().includes(q.trim().toLowerCase())) : items;
   const pending = (proposals.data ?? []).filter((p) => p.agentId === agent.id && p.status === "pending");
-  const who = pending[0] ? (pending[0].decider.type === "user" ? pending[0].decider.name : t("roles.adminLower")) : "";
   return (
-    <Card
-      aria-labelledby="sec-mem"
-      className="row"
-      style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center" }}
+    <Dialog
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("agent.memoryTitle", g)}
+      closeLabel={t("common.close")}
     >
-      <div className="stack-4" style={{ flex: "1 1 320px", gap: 2 }}>
-        <h2 id="sec-mem" className="ac-card__title">
-          {t("agent.memoryTitle", g)}
-        </h2>
-        <span className="small muted">
-          {t("agent.memorySummary", {
-            facts: t("agent.memoryFacts", { count: facts }),
-            lessons: t("agent.memoryLessons", { count: lessons }),
-          })}
-          {pending.length > 0 && t("agent.memoryProposals", { count: pending.length, who })}
-        </span>
-      </div>
-      <div className="row">
-        <Button asChild size="sm">
-          <Link to="/org/$orgId/agents/$agentId/memory" params={{ orgId: org.id, agentId: agent.id }}>
-            {t("agent.viewMemory")}
-          </Link>
-        </Button>
+      <DialogSearchList
+        query={q}
+        onQueryChange={setQ}
+        searchLabel={t("agent.knowledgeSearch")}
+        searchPlaceholder={t("agent.knowledgeSearch")}
+        isEmpty={shown.length === 0}
+        emptyText={items.length === 0 ? t("agent.knowledgeEmpty", g) : t("agent.knowledgeNoResults", { q })}
+      >
+        {shown.map((m) => (
+          <div key={m.id} className="ac-list__row">
+            <span className="list-col">
+              <span>{m.text}</span>
+              <span className="small muted">
+                {t(`memory.kinds.${m.kind}`)} · {m.source}
+              </span>
+            </span>
+          </div>
+        ))}
+      </DialogSearchList>
+      <DialogFooter bar>
         {pending.length > 0 && (
-          <Button asChild size="sm">
+          <Button asChild>
             <Link to="/org/$orgId/proposals" params={{ orgId: org.id }} search={{ agent: agent.id }}>
-              <Icon name="waiting" size={16} style={{ color: "var(--attention)" }} />
               {t("agent.viewProposal", { count: pending.length })}
             </Link>
           </Button>
         )}
-      </div>
-    </Card>
+        <Button asChild variant="primary">
+          <Link to="/org/$orgId/agents/$agentId/memory" params={{ orgId: org.id, agentId: agent.id }}>
+            {t("agent.editMemory")}
+          </Link>
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }
 
@@ -533,7 +709,7 @@ function BudgetDialog({
  * "Editar permissões": the tool tree (`…/agents/{id}/access`). Until the
  * backend has it (404), the older per-scope list.
  */
-function PermissionsDialog({
+export function PermissionsDialog({
   open,
   onOpenChange,
   agent,
@@ -567,7 +743,8 @@ function AccessDialog({
   const save = useSetAgentAccess(org.id);
   const g = agentGrammar(t, agent.name);
   const [model, setModel] = useState<AccessModel | null>(null);
-  const tree = useMemo(() => (access ? treeFromAccess(access) : null), [access]);
+  const areaLabel = useAreaLabel();
+  const tree = useMemo(() => (access ? treeFromAccess(access, areaLabel) : null), [access, areaLabel]);
   // Start from the server's state each time the dialog opens.
   useEffect(() => {
     if (open && access) setModel(modelFrom(access));

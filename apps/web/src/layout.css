@@ -1871,32 +1871,46 @@ p {
   text-decoration: line-through;
 }
 
-/* Settings → Acesso dos agentes */
+/* Settings → Agentes e acesso: the matrix dialog (neutral surfaces, works in light and dark) */
+.access-matrix-dialog {
+  --ac-dialog-width: 1120px;
+}
 .access-matrix {
   overflow: auto;
-  max-height: 70vh;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
 }
 .access-matrix table {
+  width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 14px;
 }
+.access-matrix__first {
+  width: 280px;
+}
 .access-matrix th,
 .access-matrix td {
-  padding: 6px 10px;
+  height: 40px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--line);
   text-align: center;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: var(--surface-raised);
+  color: var(--ink);
 }
 .access-matrix thead th {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
   font-weight: 600;
-  background: var(--surface-sunken);
+  font-size: 13px;
+  color: var(--ink-muted);
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--line-strong);
 }
 /* First column stays while scrolling sideways. */
 .access-matrix .access-matrix__sticky {
@@ -1904,11 +1918,14 @@ p {
   left: 0;
   z-index: var(--z-sticky);
   text-align: left;
-  min-width: 220px;
   border-right: 1px solid var(--line);
 }
 .access-matrix thead .access-matrix__sticky {
   z-index: calc(var(--z-sticky) + 1);
+}
+.access-matrix__group th,
+.access-matrix__group td {
+  background: var(--surface-sunken);
 }
 .access-matrix__group th {
   font-weight: 600;
@@ -1918,7 +1935,8 @@ p {
   font-weight: 400;
 }
 .access-matrix__toggle,
-.access-matrix__btn {
+.access-matrix__btn,
+.access-matrix__icon {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1928,6 +1946,9 @@ p {
   background: none;
   font: inherit;
   color: inherit;
+}
+.access-matrix__toggle,
+.access-matrix__btn {
   cursor: pointer;
 }
 .access-matrix__btn:hover,
@@ -1939,14 +1960,32 @@ p {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Inherited: the same check, muted. Off: muted dash. */
 .access-matrix__cell[data-state="inherited"] .ac-icon,
-.access-matrix__cell[data-state="off"] .ac-icon {
+.access-matrix__cell[data-state="off"] .ac-icon,
+.access-matrix__cell[data-state="partial"] .ac-icon,
+.access-matrix__legend [data-state="inherited"] .ac-icon,
+.access-matrix__legend [data-state="off"] .ac-icon {
   color: var(--ink-muted);
+  opacity: 0.6;
+}
+/* A staged change waits for "Salvar". */
+.access-matrix__cell[data-changed] .access-matrix__btn {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+.access-matrix__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
 }
 .access-matrix__legend {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 12px;
+}
+.access-agent .ac-chip {
+  margin-left: 0;
 }
 
 /* Custom MCP: pending review call to action and the suggestion bar */
@@ -2063,4 +2102,197 @@ p {
 .skill-picker {
   max-height: 280px;
   overflow-y: auto;
+}
+
+/* Workspace header as a menu button; the account row stays at the bottom with the settings gear. */
+.sidebar__org-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sidebar__org-button:hover {
+  background: var(--surface-raised);
+}
+.sidebar__org-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.sidebar__org-button > .ac-icon {
+  color: var(--ink-muted);
+  flex: none;
+}
+.sidebar__foot {
+  position: sticky;
+  bottom: 0;
+  padding-top: var(--space-2);
+  background: var(--surface-sunken);
+}
+.sidebar__me {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sidebar__me > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Settings: left sub-nav + one section */
+.settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  align-items: flex-start;
+}
+.settings__nav {
+  flex: 0 0 220px;
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings__title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 700;
+}
+.settings__nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 14px;
+}
+.settings__link:hover {
+  background: var(--surface-raised);
+}
+.settings__link[aria-current="page"] {
+  background: var(--surface-raised);
+  font-weight: 600;
+}
+.settings__link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.settings__body {
+  flex: 1 1 560px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.settings__section {
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 760px) {
+  .settings__nav {
+    position: static;
+    flex: 1 1 100%;
+  }
+  .settings__nav ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+/* Agent profile: header, then calm summary rows with one action each (editing in dialogs). */
+.agent-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+.agent-head__text {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.agent-head__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.agent-head__meta .ac-chip {
+  margin-left: 0;
+}
+.summary-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+.summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 24px;
+  padding: 16px 20px;
+}
+.summary-row + .summary-row {
+  border-top: 1px solid var(--line);
+}
+.summary-row__text {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.summary-row__title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 650;
+}
+.summary-row__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 20px;
+}
+/* First lines of the instructions; the full text lives in the dialog. */
+.summary-row__preview {
+  margin: 0;
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.summary-row__action {
+  flex: none;
 }

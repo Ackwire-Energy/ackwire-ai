@@ -18,7 +18,6 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import {
   useAccessMatrix,
-  useCatalog,
   useChannels,
   useConnections,
   useCreateAgent,
@@ -34,6 +33,7 @@ import type { Agent, Credential, Model } from "@/api/types";
 import { AccessTree } from "@/components/AccessTree";
 import { useOrg } from "@/components/org-context";
 import { SkillPicker } from "@/components/Skills";
+import { useAreaLabel } from "@/hooks/useAreaLabel";
 import { type AccessModel, type Preset, presetModel, toInput, treeFromMatrix } from "@/lib/access";
 import { joinNames } from "@/lib/format";
 import { can } from "@/lib/permissions";
@@ -144,15 +144,11 @@ export function NewAgentPage() {
   const [on, setOn] = useState<Record<string, boolean>>({});
   // "Ferramentas": a preset, then the same tree as "Editar permissões" (only when the backend has it).
   const accessMatrix = useAccessMatrix(org.id, can(org.role, "configure"));
-  const catalog = useCatalog();
-  const toolTree = useMemo(() => {
-    if (!accessMatrix.data) return null;
-    const scopes = catalog.data?.builtinScopes ?? [];
-    return treeFromMatrix(
-      accessMatrix.data,
-      (scope) => scopes.find((x) => x.id === scope)?.label ?? (scope === "" ? t("access.askGroup") : scope),
-    );
-  }, [accessMatrix.data, catalog.data, t]);
+  const areaLabel = useAreaLabel();
+  const toolTree = useMemo(
+    () => (accessMatrix.data ? treeFromMatrix(accessMatrix.data, areaLabel) : null),
+    [accessMatrix.data, areaLabel],
+  );
   const [preset, setPreset] = useState<Preset>("standard");
   // "Skills" (optional): only when the library exists and has something.
   const library = useSkills(org.id);

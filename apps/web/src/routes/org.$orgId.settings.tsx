@@ -1,22 +1,26 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Main } from "@/components/Main";
-import { SettingsPage } from "@/pages/SettingsPage";
+import { SettingsPage, settingsSearch } from "@/pages/SettingsPage";
 
 /**
- * Organization settings: context, connectors, provider keys, usage. The OAuth
- * callback returns here (`?connected=github`; a custom MCP server also brings
- * `?review=1` so its classification opens right away).
+ * Settings → Geral. Older OAuth returns (`/settings?connected=…`, `?review=1`)
+ * land on Conectores, where they are handled.
  */
 export const Route = createFileRoute("/org/$orgId/settings")({
-  validateSearch: (search: Record<string, unknown>): { connected?: string; review?: string } => ({
-    connected: typeof search.connected === "string" ? search.connected : undefined,
-    review: search.review === undefined ? undefined : String(search.review),
-  }),
+  validateSearch: settingsSearch,
+  beforeLoad: ({ params, search }) => {
+    if (search.connected !== undefined || search.review !== undefined) {
+      throw redirect({
+        to: "/org/$orgId/settings/$section",
+        params: { orgId: params.orgId, section: "connectors" },
+        search,
+      });
+    }
+  },
   component: function Settings() {
-    const { connected, review } = Route.useSearch();
     return (
       <Main>
-        <SettingsPage connected={connected} review={review !== undefined} />
+        <SettingsPage section="general" />
       </Main>
     );
   },

@@ -181,13 +181,16 @@ describe("agent owner is optional", () => {
     expect(state.calls.find((c) => c.method === "agents.create")?.args[1]).toMatchObject({ ownerUserId: null });
   });
 
-  test("profile: the owner select updates the agent; the header says 'sem responsável'", async () => {
+  test("profile: Responsável is edited in a dialog; the header says 'Sem responsável'", async () => {
     const state = seedState();
     const { state: s } = await go(`agents/${ADA_ID}`, state);
-    await pick(screen().getByRole("combobox", { name: "Responsável" }), /Sem responsável/);
+    await click(screen().getByRole("button", { name: "Editar Responsável" }));
+    const dialog = screen().getByRole("dialog", { name: "Responsável" });
+    await pick(within(dialog).getByRole("combobox", { name: "Responsável" }), /Sem responsável/);
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(4);
     expect(s.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({ ownerUserId: null });
-    expect(document.body.textContent).toContain("Dev · sem responsável · Claude Sonnet 5.5");
+    expect(document.querySelector(".agent-head")?.textContent).toContain("Sem responsável");
   });
 });
 
