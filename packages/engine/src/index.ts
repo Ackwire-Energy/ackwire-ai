@@ -79,6 +79,7 @@ export * from "./tools/scopes";
 export * from "./tools/types";
 export * from "./ttf";
 export * from "./usage";
+export * from "./waitlist";
 export * from "./webhooks";
 export * from "./wiki";
 export * from "./wiki-links";

@@ -9,5 +9,6 @@ export * from "./sandbox";
 export * from "./skills";
 export * from "./storage";
 export * from "./tenancy";
+export * from "./waitlist";
 export * from "./wiki";
 export * from "./work";

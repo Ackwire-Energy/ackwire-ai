@@ -1,0 +1,1538 @@
+<title>agentes.chat landing</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&family=Martian+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: dark page; two sky panels (hero, closing) rendered as ordered-dither pixel canvases where pixel agents drift up; the vector agent rises over it. Scroll story with a sticky screen; bento of real mini UIs. Dark is the default. */
+:root{
+  --bg:#0f0f0e;--raised:#191918;--raised2:#1f1f1d;--sunken:#0a0a09;--glass:rgba(30,30,28,.62);
+  --line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);--line-strong:#6b6b67;
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8b8b85;
+  --agent:#5aa8ff;--agent2:#8cc3ff;--agent-soft:#11253f;--on-agent:#00203f;--agent-eye:#fff;
+  --ok:#5fc48a;--warn:#e0a84a;--warn-soft:#33260e;--danger:#f08a80;
+  --plate:rgba(127,127,127,.14);--plate-soft:rgba(127,127,127,.08);
+  --person-a:#3a3a37;--person-b:#2a2a28;--person-ink:#efefec;
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);--e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --e3:0 28px 64px -16px rgba(0,0,0,.8),0 0 0 1px var(--line2);--top:inset 0 1px 0 rgba(255,255,255,.06);
+  --dots:rgba(255,255,255,.07);
+  /* The sky is the agents' color: same in both themes */
+  --sky-ink:#04203f;--sky-ink2:rgba(4,32,63,.86);--sky-glass:rgba(241,248,255,.7);--sky-line:rgba(4,32,63,.14);
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  --sans:"Onest","Segoe UI",system-ui,sans-serif;--mono:"Martian Mono",ui-monospace,Menlo,monospace;
+  --agent-r:30% 30% 30% 9%;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#f4f4f1;--raised:#fff;--raised2:#fbfbf9;--sunken:#ebebe7;--glass:rgba(255,255,255,.72);
+  --line:rgba(23,23,22,.08);--line2:rgba(23,23,22,.14);--line-strong:#82827d;
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;
+  --agent:#0063d1;--agent2:#3d8bff;--agent-soft:#e3eefd;--on-agent:#fff;
+  --ok:#1f7a45;--warn:#9a5b00;--warn-soft:#fbeed5;--danger:#b42a20;
+  --plate:rgba(127,127,127,.1);--plate-soft:rgba(127,127,127,.06);
+  --person-a:#e9e9e5;--person-b:#d9d9d4;--person-ink:#2a2a28;
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.1),0 0 0 1px var(--line);
+  --e3:0 2px 4px rgba(23,23,22,.04),0 24px 56px -16px rgba(23,23,22,.3),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --dots:rgba(23,23,22,.08);
+  color-scheme:light;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;font-feature-settings:"ss01","tnum";-webkit-font-smoothing:antialiased;overflow-x:hidden;transition:background .3s}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--bg)}
+a{color:inherit}
+code{font-family:var(--mono);font-size:.82em;padding:.1em .38em;border-radius:6px;background:var(--plate)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);display:inline-flex;align-items:center;gap:8px}
+h1,h2,h3{text-wrap:balance;margin:0}
+h2{font-size:clamp(32px,4.6vw,56px);font-weight:750;letter-spacing:-.045em;line-height:1.02}
+.lead{font-size:clamp(16px,1.5vw,18px);color:var(--muted);max-width:56ch;margin:0;text-wrap:pretty}
+.muted{color:var(--muted)}.faint{color:var(--faint)}
+svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+svg.i.sm{width:15px;height:15px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Buttons */
+.b{font:inherit;font-size:14px;font-weight:600;letter-spacing:-.005em;height:40px;padding:0 16px;border-radius:12px;border:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;text-decoration:none;transition:transform .18s var(--spring),box-shadow .18s var(--out),background .15s,color .15s,filter .15s}
+.b:active{transform:scale(.97) translateY(.5px)}
+.b:focus-visible,.focusable:focus-visible{outline:none;box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--ink)}
+.b1{color:var(--bg);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--bg)) 0%,var(--ink) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)}
+.b1:hover{filter:brightness(1.08)}
+.b2{background:var(--raised);color:var(--ink);box-shadow:var(--e1),var(--top)}
+.b2:hover{box-shadow:var(--e2),var(--top)}
+.bg{background:transparent;color:var(--muted)}
+.bg:hover{background:var(--plate);color:var(--ink)}
+.b.lg{height:50px;padding:0 22px;font-size:15px;border-radius:15px}
+.b.sm{height:32px;padding:0 12px;font-size:13px;border-radius:10px}
+.bsky{color:#fff;background:linear-gradient(180deg,#123a66,var(--sky-ink));box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.35),0 1px 2px rgba(4,32,63,.3),0 10px 22px -8px rgba(4,32,63,.6)}
+.bsky:hover{filter:brightness(1.15)}
+.bsky:focus-visible{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--sky-ink)}
+.kbd{font-size:11px;font-weight:600;min-width:18px;height:18px;padding:0 5px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:rgba(127,127,127,.18);opacity:.8;box-shadow:inset 0 -1px 0 rgba(0,0,0,.12)}
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Chips */
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px 0 7px;border-radius:999px;font-size:12px;font-weight:600;background:var(--plate);color:var(--muted);white-space:nowrap}
+.chip svg.i{width:14px;height:14px}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.ok svg{color:var(--ok)}
+
+/* The living agent */
+.av{--s:36px;position:relative;display:inline-block;width:var(--s);height:var(--s);flex:none;border-radius:var(--agent-r);
+  background:linear-gradient(160deg,var(--av-top,var(--agent2)),var(--av-bottom,var(--agent)));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 16px -6px color-mix(in srgb,var(--av-bottom,var(--agent)) 70%,transparent)}
+.av .face,.av .look{position:absolute;inset:0}
+.av .face{transition:transform .4s var(--out)}
+.av .eye{position:absolute;top:40%;width:15%;height:20%;border-radius:50%;background:var(--agent-eye);transform-origin:center;box-sizing:border-box;transition:height .2s var(--out),top .2s var(--out)}
+.av .eye.l{left:27%}.av .eye.r{right:27%}
+.av[data-eyes="dots"] .eye{width:10%;height:12%;top:44%}.av[data-eyes="dots"] .eye.l{left:30%}.av[data-eyes="dots"] .eye.r{right:30%}
+.av[data-eyes="wide"] .eye{width:19%;height:26%;top:37%}.av[data-eyes="wide"] .eye.l{left:24%}.av[data-eyes="wide"] .eye.r{right:24%}
+.av[data-eyes="happy"] .eye,.av.joy .eye{background:transparent;border:calc(var(--s)*.045) solid var(--agent-eye);border-bottom:0;border-radius:999px 999px 0 0;height:10%;top:43%}
+.av[data-eyes="sleepy"] .eye{height:8%;top:48%;border-radius:0 0 999px 999px}
+.av[data-acc="sunglasses"] .eye{visibility:hidden}
+.av.writing .eye{background:var(--agent-eye)!important;border:0!important;height:9%!important;top:46%!important;border-radius:4px!important}
+.av.running::after{content:"";position:absolute;inset:calc(var(--s)*-.1);border:2px solid color-mix(in srgb,var(--av-bottom,var(--agent)) 50%,transparent);border-radius:var(--agent-r)}
+.av svg.acc{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.av.sm{--s:24px}.av.xs{--s:18px}.av.lg{--s:56px}
+.av.xs{box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+@media (prefers-reduced-motion:no-preference){
+  .av .eye{animation:blink 5s infinite}
+  .av.thinking .eye,.av.writing .eye,.av.joy .eye{animation:none}
+  .av.thinking .look{animation:look 2.4s var(--out) infinite}
+  .av.running::after{animation:halo 1.6s var(--out) infinite}
+  .av.hop{animation:hop .6s var(--spring)}
+}
+@keyframes blink{0%,46%,50%,100%{transform:scaleY(1)}48%{transform:scaleY(.1)}}
+@keyframes look{0%,100%{transform:translateX(0)}30%{transform:translateX(-5.25%)}60%{transform:translateX(6%) translateY(-3%)}}
+@keyframes halo{0%{opacity:.9;transform:scale(.96)}100%{opacity:0;transform:scale(1.12)}}
+@keyframes hop{0%{transform:translateY(0)}35%{transform:translateY(-8%) scale(1.04,.97)}70%{transform:translateY(0) scale(.98,1.02)}100%{transform:none}}
+.pav{width:36px;height:36px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(160deg,var(--person-a),var(--person-b));color:var(--person-ink);font-weight:650;font-size:13px}
+.pav.sm{width:24px;height:24px;font-size:10px}
+
+/* Logo */
+.logo{display:inline-flex;align-items:center;gap:.16em;font-weight:700;letter-spacing:-.025em;line-height:1;font-size:21px;color:var(--ink);text-decoration:none}
+.logo .mark{width:1.25em;height:1.25em;flex:none}
+.logo .word{display:inline-flex;align-items:flex-start;gap:.12em}
+.logo .chatb{font-size:.36em;font-weight:700;letter-spacing:0;padding:.28em .5em .34em;margin-top:.12em;border-radius:.6em;border-bottom-left-radius:.12em;background:var(--agent);color:var(--on-agent)}
+
+/* Floating nav pill */
+.nav{position:fixed;z-index:50;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%);width:min(1120px,calc(100% - 2 * max(16px,env(safe-area-inset-left,0px))));display:flex;align-items:center;gap:12px;height:58px;padding:0 10px 0 18px;border-radius:20px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);box-shadow:var(--e3),var(--top);transition:transform .35s var(--out)}
+.nav.hide{transform:translate(-50%,-140%)}
+.nav .links{display:flex;gap:2px;margin-left:auto}
+.nav .links a{font-size:14px;font-weight:500;color:var(--muted);text-decoration:none;padding:8px 12px;border-radius:10px}
+.nav .links a:hover{background:var(--plate);color:var(--ink)}
+.theme-btn{width:40px;padding:0}
+@media (max-width:820px){.nav .links{display:none}.theme-btn{margin-left:auto}}
+
+/* Sky panel: pixel canvas, ordered dither */
+.sky{position:relative;margin:12px;margin-left:max(12px,env(safe-area-inset-left,0px));margin-right:max(12px,env(safe-area-inset-right,0px));border-radius:36px;overflow:hidden;isolation:isolate;background:#73b2ff;color:var(--sky-ink)}
+.sky canvas{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:-1;image-rendering:crisp-edges;image-rendering:pixelated}
+.sky-chip{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px 0 6px;border-radius:999px;background:var(--sky-glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 0 0 1px var(--sky-line),inset 0 1px 0 rgba(255,255,255,.7);font-size:13px;font-weight:600;color:var(--sky-ink)}
+.sky-chip .av{--s:20px}
+
+.hero .sky{min-height:min(880px,max(680px,calc(100svh - 24px)))}
+.hero-in{position:relative;z-index:2;padding-block:clamp(110px,14vw,150px) 48px;max-width:1180px;margin:0 auto;padding-left:max(28px,env(safe-area-inset-left,0px));padding-right:max(28px,env(safe-area-inset-right,0px))}
+.hero-col{position:relative;max-width:min(720px,58%)}
+/* A soft glow behind the text: washes the dither out where people read */
+.hero-col::before,.closing .in::before{content:"";position:absolute;z-index:-1;pointer-events:none;border-radius:50%;filter:blur(28px);background:radial-gradient(closest-side,rgba(238,247,255,.92),rgba(238,247,255,.6) 55%,rgba(238,247,255,0))}
+.hero-col::before{inset:-70px -110px -50px -90px}
+.closing .in::before{left:50%;top:-40px;width:min(900px,96%);height:calc(100% + 60px);transform:translateX(-50%)}
+.hero h1{font-size:clamp(40px,4.9vw,78px);font-weight:800;letter-spacing:-.05em;line-height:.98;margin:20px 0 22px;max-width:11em}
+.hero h1 .w{display:inline-block}
+.hero h1 .inline-av{--s:.8em;vertical-align:-.06em;margin:0 .05em 0 .02em;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 10px 24px -8px rgba(0,50,140,.6)}
+@media (prefers-reduced-motion:no-preference){.hero h1 .w{animation:wordIn .8s var(--out) both}.hero .after{animation:wordIn .8s var(--out) both;animation-delay:.55s}}
+@keyframes wordIn{from{opacity:0;transform:translateY(.35em)}to{opacity:1;transform:none}}
+.hero .lead{color:var(--sky-ink2);max-width:48ch;font-size:clamp(16px,1.4vw,18px);font-weight:500;margin-bottom:28px}
+.wl{display:flex;gap:6px;padding:6px;border-radius:20px;background:var(--sky-glass);backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);box-shadow:0 0 0 1px var(--sky-line),inset 0 1px 0 rgba(255,255,255,.8),0 20px 40px -20px rgba(4,32,63,.45);max-width:520px;transition:box-shadow .2s var(--out)}
+.wl:focus-within{box-shadow:0 0 0 2px var(--sky-ink),inset 0 1px 0 rgba(255,255,255,.8),0 20px 40px -20px rgba(4,32,63,.45)}
+.wl input{flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:16px;color:var(--sky-ink);padding:0 14px}
+.wl input::placeholder{color:rgba(4,32,63,.5)}
+.wl-note{display:inline-flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;font-weight:500;color:var(--sky-ink2);padding:4px 10px 4px 8px;border-radius:999px;background:rgba(241,248,255,.45)}
+.wl-err{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:13.5px;font-weight:600;color:#7a1810;padding:4px 10px 4px 8px;border-radius:999px;background:rgba(241,248,255,.8)}
+.wl-done{display:flex;align-items:center;gap:14px;padding:14px 18px 14px 14px;border-radius:20px;background:var(--sky-glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 0 0 1px var(--sky-line),inset 0 1px 0 rgba(255,255,255,.8);max-width:520px;color:var(--sky-ink);text-align:left}
+.wl-done b{display:block;font-weight:700}
+.wl-done span{font-size:13.5px;color:var(--sky-ink2)}
+@media (max-width:480px){.wl{flex-direction:column}.wl input{height:46px}}
+@media (prefers-reduced-motion:no-preference){.wl-done{animation:rise .35s var(--out)}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* The giant agent rising from the bottom edge */
+.giant-zone{position:absolute;z-index:1;right:0;bottom:0;width:52%;height:100%;pointer-events:none}
+.giant{--s:clamp(300px,38vw,560px);position:absolute;right:clamp(20px,7%,110px);bottom:calc(var(--s) * -.3);pointer-events:auto;cursor:pointer;border:0;padding:0;
+  --av-top:#62adff;--av-bottom:#0047b3;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.45),inset 0 -30px 60px -20px rgba(0,20,70,.45),0 60px 120px -30px rgba(0,30,90,.7)}
+.giant::before{content:"";position:absolute;inset:0;border-radius:inherit;background:radial-gradient(60% 45% at 30% 18%,rgba(255,255,255,.35),transparent 70%);pointer-events:none}
+.giant:focus-visible{outline:none;box-shadow:0 0 0 4px #fff,0 0 0 7px var(--sky-ink)}
+.giant.running::after{border-width:3px;border-color:rgba(255,255,255,.6)}
+.bubs{position:absolute;right:clamp(16px,4%,64px);bottom:calc(var(--gs) * .76);display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+.bub{position:relative;display:flex;align-items:center;gap:9px;padding:9px 14px 9px 9px;border-radius:16px 16px 16px 5px;background:var(--sky-glass);backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);box-shadow:0 0 0 1px var(--sky-line),inset 0 1px 0 rgba(255,255,255,.75),0 18px 36px -18px rgba(4,32,63,.5);font-size:13.5px;font-weight:550;color:var(--sky-ink);white-space:nowrap;pointer-events:auto}
+.bub .av{--s:24px}
+.bub small{color:var(--sky-ink2);font-weight:500;margin-left:2px}
+@media (prefers-reduced-motion:no-preference){.bub.pop{animation:pop .5s var(--spring)}}
+@keyframes pop{from{opacity:0;transform:translateY(10px) scale(.94)}to{opacity:1;transform:none}}
+@media (max-width:1100px){
+  .hero .sky{min-height:0}
+  .hero-col{max-width:none}
+  .hero h1{font-size:clamp(40px,8vw,72px)}
+  .hero-in{padding-bottom:0}
+  .giant-zone{position:relative;width:100%;height:clamp(320px,72vw,440px)}
+  .giant{--s:clamp(230px,56vw,340px);right:50%;transform:translateX(50%)}
+  .giant.hop{animation:none}
+  .bubs{right:50%;transform:translateX(50%);bottom:auto;top:56px;align-items:center}
+  .bubs .bub:nth-child(n+2){display:none}
+  .bub{white-space:normal}
+  }
+
+/* Segmented */
+.seg{display:inline-flex;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 1px 2px rgba(0,0,0,.08);position:relative;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.seg button{position:relative;z-index:1;font:inherit;font-size:13px;font-weight:600;height:30px;padding:0 12px;border:0;border-radius:9px;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:color .15s}
+.seg button[aria-pressed="true"]{color:var(--ink)}
+.seg button:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ink)}
+.seg .pill{position:absolute;top:3px;bottom:3px;border-radius:9px;background:var(--raised);box-shadow:var(--e1),var(--top);transition:left .34s var(--spring),width .34s var(--spring)}
+
+/* Live ticker */
+.ticker{position:relative;overflow:hidden;padding-block:22px 6px;mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.ticker .track{display:flex;gap:10px;width:max-content}
+@media (prefers-reduced-motion:no-preference){.ticker .track{animation:marquee 60s linear infinite}.ticker:hover .track{animation-play-state:paused}}
+@media (prefers-reduced-motion:reduce){.ticker{overflow-x:auto}}
+@keyframes marquee{to{transform:translateX(-50%)}}
+.tk{display:inline-flex;align-items:center;gap:9px;height:40px;padding:0 14px 0 8px;border-radius:14px;background:var(--raised);box-shadow:var(--e1),var(--top);font-size:13.5px;white-space:nowrap;color:var(--ink2)}
+.tk .av{--s:24px}
+.tk b{font-weight:650;color:var(--ink)}
+.tk time{color:var(--faint);font-size:12px}
+.tk .chip{height:22px}
+
+/* Sections */
+section{scroll-margin-top:90px}
+.sec{padding-block:clamp(72px,10vw,140px)}
+.sec-head{display:grid;gap:16px;margin-bottom:clamp(32px,5vw,56px);max-width:760px}
+
+/* Scroll story */
+.story{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(24px,5vw,72px)}
+.steps{position:relative;padding-left:28px;padding-bottom:72px}
+.rail{position:absolute;left:0;top:12px;bottom:64px;width:2px;border-radius:2px;background:var(--line2)}
+.rail i{position:absolute;left:0;top:0;width:100%;height:0;border-radius:2px;background:var(--ink);transition:height .15s linear}
+.rail-end{position:absolute;left:1px;bottom:0;transform:translate(-50%,calc(100% + 6px))}
+.rail-end .av{--s:30px;display:block}
+.rail-end .lbl{position:absolute;left:calc(100% + 14px);top:50%;transform:translate(-6px,-50%);white-space:nowrap;font-size:13.5px;font-weight:600;color:var(--muted);opacity:0;transition:opacity .4s var(--out),transform .5s var(--spring)}
+.rail-end.done .lbl{opacity:1;transform:translate(0,-50%)}
+.st{min-height:78vh;display:flex;flex-direction:column;justify-content:center;gap:14px;opacity:.38;transition:opacity .4s var(--out)}
+.st:first-child{min-height:60vh}
+.st.on{opacity:1}
+.st .n{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--faint)}
+.st .n span{width:28px;height:28px;border-radius:9px;background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+.st h3{font-size:clamp(26px,3vw,38px);font-weight:750;letter-spacing:-.04em;line-height:1.05}
+.st p{margin:0;font-size:16.5px;color:var(--muted);max-width:42ch}
+.st .inline-vis{display:none}
+.screen-col{position:relative}
+.screen{position:sticky;top:96px;height:min(620px,calc(100vh - 130px));border-radius:28px;background:var(--raised);box-shadow:var(--e3),var(--top);overflow:hidden;
+  background-image:radial-gradient(var(--dots) 1px,transparent 1.3px);background-size:22px 22px}
+.screen::before{content:"";position:absolute;inset:0;background:radial-gradient(70% 60% at 50% 40%,transparent,var(--raised) 95%);pointer-events:none}
+.vis{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:28px;opacity:0;transform:translateY(16px) scale(.98);transition:opacity .45s var(--out),transform .55s var(--out);pointer-events:none}
+.vis.on{opacity:1;transform:none;pointer-events:auto}
+.vbox{position:relative;width:100%;max-width:500px;display:grid;gap:12px}
+@media (max-width:960px){
+  .story{grid-template-columns:minmax(0,1fr)}
+  .screen-col{display:none}
+  .st,.st:first-child{min-height:0;opacity:1;padding-block:28px}
+  .st .inline-vis{display:block;position:relative;border-radius:24px;background:var(--raised);box-shadow:var(--e2),var(--top);padding:20px;margin-top:8px;background-image:radial-gradient(var(--dots) 1px,transparent 1.3px);background-size:22px 22px}
+  .st .inline-vis .vis{position:relative;inset:auto;padding:0;opacity:1;transform:none}
+}
+/* Message pieces */
+.msg{display:flex;gap:12px;padding:10px 12px;border-radius:14px;transition:background .15s}
+.msg:hover{background:var(--plate-soft)}
+.msg .body{min-width:0;flex:1}
+.msg .head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.msg .head b{font-weight:650;font-size:14.5px}
+.msg .head time{font-size:12px;color:var(--faint)}
+.msg .text{font-size:15px;line-height:1.62;color:var(--ink2);margin-top:1px;overflow-wrap:anywhere}
+.mention{font-weight:600;color:var(--ink);background:var(--plate);padding:0 4px;border-radius:5px}
+.meta{font-size:12px;color:var(--faint);margin-top:6px}
+.caret{display:inline-block;width:2px;height:1.05em;vertical-align:-.15em;margin-left:2px;background:var(--agent);border-radius:1px}
+@media (prefers-reduced-motion:no-preference){.caret{animation:caret 1s steps(1) infinite}.enter{animation:rise .28s var(--out)}}
+@keyframes caret{50%{opacity:0}}
+.float{border-radius:18px;background:var(--raised2);box-shadow:var(--e2),var(--top);padding:6px}
+.sys{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 18px;font-size:13px;color:var(--faint)}
+.sys b{color:var(--muted);font-weight:600}
+.work{margin-top:8px;border-radius:14px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);max-width:520px;overflow:hidden}
+.work>button{font:inherit;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px;width:100%;height:36px;padding:0 12px;border:0;background:transparent;cursor:pointer;text-align:left}
+.work>button:hover{color:var(--ink)}
+.work>button .chev{transition:transform .2s var(--out)}
+.work[data-open="true"]>button .chev{transform:rotate(90deg)}
+.work ol{list-style:none;margin:0;padding:0 12px 10px;display:none;gap:7px}
+.work[data-open="true"] ol{display:grid}
+.work li{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2)}
+.work li .ico{width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;color:var(--ok);flex:none}
+.work li .ico .spin{width:12px;height:12px;border-width:1.6px;color:var(--faint)}
+.work li small{margin-left:auto;color:var(--faint);font-size:12px;white-space:nowrap}
+@media (prefers-reduced-motion:no-preference){.work li{animation:rise .22s var(--out)}}
+.appr-card{margin-top:10px;max-width:520px;border-radius:16px;background:var(--raised2);box-shadow:var(--e2),var(--top);padding:16px;display:grid;gap:10px}
+.appr-card .t{font-weight:650;font-size:15.5px;line-height:1.4}
+.appr-card .d{font-size:13.5px;color:var(--muted)}
+.appr-card .acts{display:flex;gap:8px;flex-wrap:wrap}
+.appr-card .acts .b1{border-bottom-left-radius:4px}
+.hint{font-size:12.5px;color:var(--faint);display:flex;align-items:center;gap:6px}
+.file{margin-top:10px;display:flex;align-items:center;gap:12px;max-width:420px;padding:10px;border-radius:14px;background:var(--raised2);box-shadow:var(--e1),var(--top)}
+.thumb{width:76px;height:52px;border-radius:9px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);display:flex;align-items:flex-end;gap:4px;padding:8px 9px;flex:none}
+.thumb i{flex:1;border-radius:2px 2px 0 0;background:color-mix(in srgb,var(--ink) 30%,transparent)}
+.thumb i:last-child{background:var(--ink)}
+.thumb.doc{flex-direction:column;align-items:stretch;justify-content:center;gap:5px}
+.thumb.doc i{flex:none;height:3px;border-radius:2px;background:color-mix(in srgb,var(--ink) 22%,transparent)}
+.thumb.diff{flex-direction:column;align-items:stretch;justify-content:center;gap:4px}
+.thumb.diff i{flex:none;height:3px;border-radius:2px;background:color-mix(in srgb,var(--ok) 60%,transparent)}
+.thumb.diff i:nth-child(2){background:color-mix(in srgb,var(--danger) 60%,transparent);width:70%}
+.file b{display:block;font-size:14px;font-weight:650}
+.file span{font-size:12.5px;color:var(--faint)}
+.reacts{display:flex;gap:6px;margin-top:8px}
+.react{font:inherit;font-size:12.5px;font-weight:600;height:26px;padding:0 9px;border-radius:999px;border:0;background:var(--plate);color:var(--muted);display:inline-flex;align-items:center;gap:5px;cursor:pointer;transition:transform .18s var(--spring)}
+.react:active{transform:scale(.94)}
+.react[aria-pressed="true"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1)}
+
+/* Router diagram */
+.router{justify-items:center}
+.router svg.wires{width:100%;height:110px;overflow:visible}
+.router .wire{fill:none;stroke:var(--line2);stroke-width:2;stroke-dasharray:4 6}
+.router .wire.live{stroke:var(--agent);stroke-dasharray:none;stroke-width:2.5}
+.rnode{display:inline-flex;align-items:center;gap:10px;height:44px;padding:0 16px 0 12px;border-radius:14px;background:var(--raised2);box-shadow:var(--e2),var(--top);font-weight:650;font-size:14px}
+.rnode small{color:var(--faint);font-weight:500}
+.ragents{display:grid;grid-template-columns:repeat(3,1fr);width:100%;text-align:center}
+.ragents>div{display:grid;justify-items:center;gap:8px;font-size:13px;color:var(--faint);transition:opacity .4s}
+.ragents>div b{color:var(--ink);font-weight:650;font-size:14px}
+.ragents>div.off{opacity:.45}
+/* Ledger */
+.ledger{width:100%;border-collapse:collapse;font-size:13.5px}
+.ledger th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;text-align:left;padding:0 10px 10px}
+.ledger td{padding:10px;border-top:1px solid var(--line);white-space:nowrap}
+.ledger td:last-child,.ledger th:last-child{text-align:right}
+.ledger td.who{display:flex;align-items:center;gap:8px;font-weight:600}
+@media (prefers-reduced-motion:no-preference){.ledger tr.new{animation:rowIn .5s var(--out)}}
+@keyframes rowIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.meter{height:6px;border-radius:999px;background:var(--plate);overflow:hidden}
+.meter i{display:block;height:100%;width:0;border-radius:inherit;background:var(--ink);transition:width 1.2s var(--out)}
+
+/* Demo window */
+.demo-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.win{display:grid;grid-template-columns:240px minmax(0,1fr);height:640px;border-radius:24px;background:var(--raised);box-shadow:var(--e3),var(--top);overflow:hidden}
+.side{background:color-mix(in srgb,var(--bg) 60%,var(--raised));border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.side .org{display:flex;align-items:center;gap:10px;padding:6px 8px 14px;font-weight:650}
+.side .org i{width:26px;height:26px;border-radius:8px;background:var(--ink);color:var(--bg);display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:12px;font-weight:700}
+.side .grp{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:12px 10px 6px}
+.side button{font:inherit;font-size:14px;display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);cursor:pointer;text-align:left;width:100%}
+.side button:hover{background:var(--plate-soft);color:var(--ink)}
+.side button[aria-current="true"]{background:var(--raised2);color:var(--ink);font-weight:600;box-shadow:var(--e1),var(--top)}
+.side .agent-row{display:flex;align-items:center;gap:9px;height:34px;padding:0 10px;font-size:14px;color:var(--muted)}
+.side .agent-row small{margin-left:auto;font-size:11.5px;color:var(--faint)}
+.side .appr{margin-top:auto;display:flex;align-items:center;gap:8px;padding:10px;border-radius:12px;font-size:13px;color:var(--muted)}
+.side .appr .count{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.side .appr .count[data-n="0"]{background:var(--plate);color:var(--faint)}
+.main{display:flex;flex-direction:column;min-width:0}
+.ch-head{display:flex;align-items:center;gap:10px;height:58px;padding:0 20px;border-bottom:1px solid var(--line);flex:none}
+.ch-head h3{font-size:16px;font-weight:650;letter-spacing:-.01em}
+.ch-head .members{margin-left:auto;display:flex;align-items:center}
+.ch-head .members>*{margin-left:-6px;box-shadow:0 0 0 2px var(--raised)}
+.feed{flex:1;overflow-y:auto;padding:16px 12px 8px;display:flex;flex-direction:column;gap:2px;scroll-behavior:smooth}
+.composer-wrap{padding:8px 16px 16px;flex:none}
+.composer{border-radius:18px;background:var(--raised2);box-shadow:var(--e2),var(--top);padding:10px 10px 10px 12px;transition:box-shadow .2s var(--out)}
+.composer:focus-within{box-shadow:var(--e3),var(--top)}
+.composer .pills{display:flex;gap:6px;margin-bottom:6px}
+.cpill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px 0 4px;border-radius:999px;background:var(--agent-soft);font-size:12.5px;font-weight:600;color:var(--ink)}
+.composer .row{display:flex;align-items:center;gap:8px}
+.composer input{flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:15px;color:var(--ink);height:34px;padding:0 4px}
+.composer input::placeholder{color:var(--faint)}
+.send{height:34px;min-width:34px;padding:0;border-radius:11px;font:inherit;font-size:13px;font-weight:600;border:0;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;background:var(--plate);color:var(--faint);transition:min-width .3s var(--spring),padding .3s var(--spring),background .15s,color .15s}
+.send.on{min-width:96px;padding:0 12px;color:var(--bg);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--bg)),var(--ink))}
+.send .lbl{display:none}.send.on .lbl{display:inline}
+@media (max-width:760px){.win{grid-template-columns:minmax(0,1fr);height:580px}.side{display:none}}
+
+/* Customizer */
+.maker{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:16px}
+.mk-stage{position:relative;border-radius:28px;background:var(--raised);box-shadow:var(--e2),var(--top);overflow:hidden;display:grid;grid-template-rows:auto 1fr}
+.mk-hero{position:relative;height:300px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--sunken)}
+.mk-hero canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:crisp-edges;image-rendering:pixelated}
+.mk-hero .av{--s:150px;cursor:pointer;border:0;padding:0}
+.mk-card{padding:22px 24px 24px;display:grid;gap:16px}
+.mk-card h3{font-size:24px;font-weight:750;letter-spacing:-.03em}
+.mk-card .role{font-size:14px;color:var(--muted)}
+.kv{display:grid;grid-template-columns:118px minmax(0,1fr);gap:10px 14px;font-size:14px;align-items:center;margin:0}
+.kv dt{color:var(--faint);font-size:13px}
+.kv dd{margin:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.scope{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px 0 8px;border-radius:8px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);font-size:12.5px;font-weight:550;color:var(--ink2)}
+.scope svg{width:14px;height:14px}
+.mk-controls{border-radius:28px;background:var(--raised);box-shadow:var(--e2),var(--top);padding:24px;display:grid;gap:20px;align-content:start}
+.ctl{display:grid;gap:10px}
+.ctl label,.ctl .lab{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.field{height:44px;border-radius:12px;border:0;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line-strong);padding:0 14px;font:inherit;font-size:15px;color:var(--ink);outline:none;width:100%}
+.field:focus{box-shadow:inset 0 0 0 2px var(--ink)}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{width:44px;height:44px;border-radius:13px;border:0;padding:0;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s var(--spring),box-shadow .15s}
+.opt:hover{box-shadow:inset 0 0 0 1px var(--line2),var(--e1)}
+.opt:active{transform:scale(.92)}
+.opt[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ink);background:var(--raised2)}
+.opt .av{--s:26px}
+.opt .sw{width:24px;height:24px;border-radius:var(--agent-r)}
+.mk-prev{border-radius:16px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);padding:6px}
+@media (max-width:900px){.maker{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:460px){.kv{grid-template-columns:minmax(0,1fr);gap:4px}.kv dd{margin-bottom:8px}}
+
+/* Bento */
+.bento{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px}
+.tile{border-radius:24px;background:var(--raised);box-shadow:var(--e1),var(--top);padding:22px;display:flex;flex-direction:column;gap:16px;overflow:hidden;min-width:0;transition:box-shadow .2s var(--out),transform .25s var(--out)}
+.tile:hover{box-shadow:var(--e2),var(--top);transform:translateY(-3px)}
+.tile .th{display:flex;align-items:center;gap:10px}
+.tile .th .ic{width:34px;height:34px;border-radius:11px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);display:inline-flex;align-items:center;justify-content:center}
+.tile h3{font-size:18px;font-weight:700;letter-spacing:-.02em}
+.tile p{margin:0;font-size:14px;color:var(--muted)}
+.span4{grid-column:span 4}.span2{grid-column:span 2}.span6{grid-column:span 6}
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.day{border-radius:12px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);padding:8px 6px;min-height:118px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.day>small{font-size:11px;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding-left:2px}
+.day.today{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.ev{display:flex;align-items:center;gap:5px;padding:4px 5px;border-radius:7px;background:var(--raised2);box-shadow:var(--e1);font-size:11px;font-weight:600;color:var(--ink2);white-space:nowrap;overflow:hidden}
+.ev .av{--s:14px;box-shadow:none}
+.term{border-radius:14px;background:#0b0b0a;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);padding:14px 16px;font-family:var(--mono);font-size:12px;line-height:1.75;color:#d6d6d2;overflow-x:auto;white-space:pre;min-height:150px}
+.term .p{color:#8b8b85}.term .g{color:#5fc48a}.term .c{color:#8cc3ff}
+.issue{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);font-size:13.5px;min-width:0}
+.issue span.t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.issue .n{color:var(--faint);font-size:12.5px}
+.lesson{border-radius:14px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);padding:14px;display:grid;gap:10px;font-size:14px}
+.files3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.files3 .thumb{width:100%;height:64px}
+.files3 small{display:block;font-size:12px;color:var(--muted);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.also{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.also .chip{height:32px;padding:0 12px 0 10px;font-size:13px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);color:var(--ink2)}
+@media (max-width:980px){.span4{grid-column:span 6}.span2{grid-column:span 3}}
+@media (max-width:620px){.bento>*{grid-column:span 6!important}.week{grid-template-columns:repeat(4,minmax(0,1fr))}.week .day:nth-child(n+5){display:none}}
+
+/* Control + live ledger */
+.control{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(24px,5vw,64px);align-items:center}
+.points{display:grid;gap:18px;margin-top:28px}
+.pt{display:grid;grid-template-columns:36px minmax(0,1fr);gap:14px}
+.pt .ic{width:36px;height:36px;border-radius:11px;background:var(--raised);box-shadow:var(--e1),var(--top);display:inline-flex;align-items:center;justify-content:center}
+.pt b{display:block;font-size:15.5px;font-weight:650;margin-bottom:2px}
+.pt span{font-size:14.5px;color:var(--muted)}
+.live{border-radius:28px;background:var(--raised);box-shadow:var(--e3),var(--top);padding:22px;display:grid;gap:18px;min-width:0}
+.live-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.live-head h3{font-size:16px;font-weight:650}
+.live-head .chip{margin-left:auto}
+.total{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.total b{font-size:clamp(34px,4vw,46px);font-weight:750;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.total span{color:var(--faint);font-size:13.5px}
+.budgets{display:grid;gap:12px}
+.bud{display:grid;grid-template-columns:24px 64px minmax(0,1fr) 130px;gap:10px;align-items:center;font-size:13px}
+.bud .v{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.ledger-wrap{overflow-x:auto;border-radius:16px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);padding:12px 6px 4px;max-height:262px;overflow-y:hidden}
+@media (max-width:960px){.control{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:460px){.bud{grid-template-columns:24px 50px minmax(0,1fr)}.bud .v{display:none}}
+
+/* FAQ */
+.faq-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:clamp(24px,5vw,64px);align-items:start}
+.faq-grid .sec-head{position:sticky;top:110px}
+.faq{display:grid;gap:8px}
+.qa{border-radius:18px;background:var(--raised);box-shadow:var(--e1),var(--top);transition:box-shadow .2s}
+.qa[data-open="true"]{box-shadow:var(--e2),var(--top)}
+.qa button{font:inherit;font-size:16px;font-weight:600;width:100%;display:flex;align-items:center;gap:12px;padding:18px 20px;border:0;background:transparent;color:var(--ink);cursor:pointer;text-align:left;border-radius:18px}
+.qa button svg{margin-left:auto;transition:transform .3s var(--spring);color:var(--faint)}
+.qa[data-open="true"] button svg{transform:rotate(45deg)}
+.qa .a{padding:0 20px 18px;color:var(--muted);font-size:15px;max-width:62ch}
+.qa .a p{margin:0}
+@media (max-width:860px){.faq-grid{grid-template-columns:minmax(0,1fr)}.faq-grid .sec-head{position:static}}
+
+/* Closing sky */
+.closing .sky{text-align:center;padding-block:clamp(72px,10vw,120px) 0}
+.closing h2{font-size:clamp(40px,6.6vw,88px);letter-spacing:-.055em;line-height:.96;color:var(--sky-ink)}
+.closing .lead{color:var(--sky-ink2);font-weight:500;margin:18px auto 30px}
+.closing .in{position:relative;z-index:2;display:grid;justify-items:center;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.closing .slot{width:100%;display:grid;justify-items:center}
+.crew{position:relative;z-index:1;display:flex;justify-content:center;align-items:flex-end;gap:clamp(8px,2vw,22px);margin-top:clamp(48px,7vw,80px);height:clamp(110px,15vw,180px)}
+.crew .av{cursor:pointer;margin-bottom:calc(var(--s) * -.28);transition:transform .35s var(--spring)}
+.crew .av:hover{transform:translateY(-12%)}
+footer{padding-block:28px 40px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;font-size:13px;color:var(--faint)}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-agent" viewBox="0 0 20 20"><path d="M7 3h6a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H3V7a4 4 0 0 1 4-4z"/><path d="M8 8.5v2M12 8.5v2"/></symbol>
+    <symbol id="i-waiting" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.6 1.8"/></symbol>
+    <symbol id="i-approve" viewBox="0 0 20 20"><path d="M7 3h6a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H3V7a4 4 0 0 1 4-4z"/><path d="m7 10.2 2 2 4-4.4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.8" cy="8.8" r="5.3"/><path d="m12.8 12.8 4.2 4.2"/></symbol>
+    <symbol id="i-channel" viewBox="0 0 20 20"><path d="M8.2 3 6.6 17M13.4 3l-1.6 14M3.5 7.5h13M3 12.5h13"/></symbol>
+    <symbol id="i-send" viewBox="0 0 20 20"><path d="M10 16.5v-13M5 8.5l5-5 5 5"/></symbol>
+    <symbol id="i-message" viewBox="0 0 20 20"><path d="M6.5 4h7.5a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H3V7.5A3.5 3.5 0 0 1 6.5 4z"/></symbol>
+    <symbol id="i-person" viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2"/><path d="M4.2 17c.7-3 3-4.6 5.8-4.6s5.1 1.6 5.8 4.6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 20 20"><path d="m5.5 10.5 3 3 6-7"/></symbol>
+    <symbol id="i-close" viewBox="0 0 20 20"><path d="m6 6 8 8M14 6l-8 8"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 20 20"><path d="m8 5 5 5-5 5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 6.5v4M10 13.5v.01"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 20 20"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/></symbol>
+    <symbol id="i-pr" viewBox="0 0 20 20"><path d="M6 3v14M14 9v8M6 7a3 3 0 0 0 3 3h2a3 3 0 0 1 3 3"/></symbol>
+    <symbol id="i-issues" viewBox="0 0 20 20"><path d="M7 3h6a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H3V7a4 4 0 0 1 4-4z"/><path d="M7 8h6M7 12h4"/></symbol>
+    <symbol id="i-drive" viewBox="0 0 20 20"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H8l2 2h4.5A2.5 2.5 0 0 1 17 8.5v5a2.5 2.5 0 0 1-2.5 2.5H3z"/></symbol>
+    <symbol id="i-routines" viewBox="0 0 20 20"><path d="M16 10a6 6 0 1 1-1.8-4.3"/><path d="M16 4v3h-3"/><path d="M10 7v3l2 1.5"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 20 20"><path d="M6 3.5h8a3 3 0 0 1 3 3V14a3 3 0 0 1-3 3H3V6.5a3 3 0 0 1 3-3z"/><path d="M3 8h14M7 2v3M13 2v3"/></symbol>
+    <symbol id="i-book" viewBox="0 0 20 20"><path d="M4 4.5h4.5A2.5 2.5 0 0 1 10 6v10a2 2 0 0 0-2-2H4zM16 4.5h-4.5A2.5 2.5 0 0 0 10 6v10a2 2 0 0 1 2-2h4z"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 20 20"><path d="M11 3 5 11h5l-1 6 6-8h-5z"/></symbol>
+    <symbol id="i-code" viewBox="0 0 20 20"><path d="M7.5 6.5 4 10l3.5 3.5M12.5 6.5 16 10l-3.5 3.5"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 20 20"><path d="M4 9.5V8a3 3 0 0 1 3-3h8.5M13 2.5 15.5 5 13 7.5M16 10.5V12a3 3 0 0 1-3 3H4.5M7 17.5 4.5 15 7 12.5"/></symbol>
+    <symbol id="i-members" viewBox="0 0 20 20"><circle cx="8" cy="7" r="2.8"/><path d="M3 16c.6-2.6 2.5-4 5-4s4.4 1.4 5 4M13.5 4.5a2.6 2.6 0 0 1 0 5M15 12.3c1.1.6 1.8 1.9 2 3.7"/></symbol>
+    <symbol id="i-coin" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M12.2 7.6c-.4-.7-1.2-1.1-2.2-1.1-1.3 0-2.2.7-2.2 1.7 0 2.3 4.6 1.2 4.6 3.6 0 1-1 1.8-2.4 1.8-1.1 0-2-.5-2.4-1.3M10 5v1.5M10 13.6V15"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.4"/><path d="M10 2.5v1.6M10 15.9v1.6M2.5 10h1.6M15.9 10h1.6M4.7 4.7l1.1 1.1M14.2 14.2l1.1 1.1M4.7 15.3l1.1-1.1M14.2 5.8l1.1-1.1"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 20 20"><path d="M15.5 12.4A6.5 6.5 0 0 1 7.6 4.5a6.5 6.5 0 1 0 7.9 7.9z"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 20 20"><path d="M3 6h2.6c2 0 3 1 4.4 4s2.4 4 4.4 4H17M3 14h2.6c1 0 1.7-.3 2.3-.8M12 6.8c.6-.5 1.3-.8 2.3-.8H17M15 4l2 2-2 2M15 12l2 2-2 2"/></symbol>
+  </defs>
+</svg>
+
+<header class="nav" id="nav">
+  <a class="logo focusable" href="#top" aria-label="agentes.chat">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path fill="var(--agent)" d="M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H3.5A1.5 1.5 0 0 1 2 28.5V10a8 8 0 0 1 8-8z"/><path fill="var(--on-agent)" d="M11.2 12.5a1.3 1.3 0 0 1 2.6 0v5a1.3 1.3 0 0 1-2.6 0zM18.2 12.5a1.3 1.3 0 0 1 2.6 0v5a1.3 1.3 0 0 1-2.6 0z"/></svg>
+    <span class="word" aria-hidden="true"><span>agentes</span><span class="chatb">chat</span></span>
+  </a>
+  <nav class="links" aria-label="Seções">
+    <a href="#como">Como funciona</a>
+    <a href="#demo">Demonstração</a>
+    <a href="#rosto">Agentes</a>
+    <a href="#controle">Controle</a>
+    <a href="#perguntas">Perguntas</a>
+  </nav>
+  <button class="b bg theme-btn" id="themeBtn" aria-label="Trocar tema"><svg class="i"><use href="#i-sun"/></svg></button>
+  <a class="b b1 sm" href="#lista">Entrar na lista</a>
+</header>
+
+<main id="top">
+  <!-- Hero: the sky -->
+  <section class="hero">
+    <div class="sky" id="sky1">
+      <canvas aria-hidden="true"></canvas>
+      <div class="hero-in"><div class="hero-col">
+        <span class="sky-chip after"><span class="av" data-look='{"color":"sky"}'></span>Acesso antecipado por lista de espera</span>
+        <h1 id="h1">Seu time e seus <span class="av inline-av" data-look='{"color":"sky"}' aria-hidden="true"></span>agentes, na mesma conversa.</h1>
+        <p class="lead after">Agentes de IA entram no chat como colegas: cada um com papel, ferramentas, orçamento e uma pessoa responsável. Trabalham à vista no canal e pedem a sua aprovação antes de qualquer coisa sensível.</p>
+        <div class="after" id="lista-hero"></div>
+      </div></div>
+      <div class="giant-zone" id="gzone">
+        <div class="bubs"><div class="bub" data-bub="0"></div><div class="bub" data-bub="1"></div><div class="bub" data-bub="2"></div></div>
+        <button class="av giant" id="giant" aria-label="O agente. Clique para trocar o visual."></button>
+      </div>
+    </div>
+    <div class="ticker" aria-label="Atividade de exemplo"><div class="track" id="track"></div></div>
+  </section>
+
+  <!-- How it works: scroll story -->
+  <section class="sec" id="como">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Como funciona</span>
+        <h2>Uma mensagem, do pedido ao recibo.</h2>
+        <p class="lead">Role a página e acompanhe o que acontece quando alguém do time pede algo a um agente.</p>
+      </div>
+      <div class="story">
+        <div class="steps" id="steps">
+          <div class="rail"><i id="railFill"></i><span class="rail-end" id="railEnd"><span class="av" data-agent="lia"></span><span class="lbl">Pronto para o próximo pedido.</span></span></div>
+          <article class="st on" data-i="0"><div class="n"><span>1</span>O pedido</div><h3>Alguém pede, do jeito que já pede.</h3><p>Uma mensagem no canal, uma menção ou uma DM. Sem formulário e sem painel separado.</p><div class="inline-vis"></div></article>
+          <article class="st" data-i="1"><div class="n"><span>2</span>O roteador</div><h3>Um roteador escolhe quem responde.</h3><p>Um modelo barato e fixo lê a conversa e chama zero, um ou dois agentes. Ele só escolhe quem fala. Permissão nunca vem dele.</p><div class="inline-vis"></div></article>
+          <article class="st" data-i="2"><div class="n"><span>3</span>O trabalho</div><h3>O agente trabalha à vista de todos.</h3><p>Cada passo aparece na mensagem: o que leu, o que rodou e quanto tempo levou, só com os escopos que a org liberou para ele.</p><div class="inline-vis"></div></article>
+          <article class="st" data-i="3"><div class="n"><span>4</span>A aprovação</div><h3>O que é sensível espera por você.</h3><p>Merge, deploy e rollback viram um pedido no chat para a pessoa responsável. O agente espera a decisão. Experimente.</p><div class="inline-vis"></div></article>
+          <article class="st" data-i="4"><div class="n"><span>5</span>O recibo</div><h3>E cada centavo tem dono.</h3><p>Toda chamada de modelo registra tokens e custo com o agente e a org. O orçamento é conferido antes da chamada.</p><div class="inline-vis"></div></article>
+        </div>
+        <div class="screen-col"><div class="screen" id="screen"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Playground -->
+  <section class="sec" id="demo" style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Demonstração</span>
+        <h2>Agora é com você.</h2>
+        <p class="lead">Um workspace de exemplo rodando como o produto. Troque de canal, abra os passos de cada agente ou escreva no composer.</p>
+      </div>
+      <div class="demo-bar">
+        <div class="seg" id="scSeg" role="group" aria-label="Cenário">
+          <span class="pill"></span>
+          <button data-v="incidente" aria-pressed="true"><svg class="i sm"><use href="#i-alert"/></svg>Incidente</button>
+          <button data-v="relatorio" aria-pressed="false"><svg class="i sm"><use href="#i-routines"/></svg>Rotina</button>
+          <button data-v="roteador" aria-pressed="false"><svg class="i sm"><use href="#i-members"/></svg>Dois agentes</button>
+        </div>
+        <button class="b bg sm" id="replay"><svg class="i sm"><use href="#i-repeat"/></svg>Repetir</button>
+      </div>
+      <div class="win" id="win">
+        <aside class="side" aria-label="Barra lateral da demonstração">
+          <div class="org"><i>A</i>Acme</div>
+          <div class="grp">Canais</div>
+          <button data-ch="incidente"><svg class="i sm"><use href="#i-channel"/></svg>engenharia</button>
+          <button data-ch="relatorio"><svg class="i sm"><use href="#i-channel"/></svg>dados</button>
+          <button data-ch="roteador"><svg class="i sm"><use href="#i-channel"/></svg>marketing</button>
+          <div class="grp">Agentes</div>
+          <div class="agent-row"><span class="av sm" data-agent="lia"></span>Lia<small>engenharia</small></div>
+          <div class="agent-row"><span class="av sm" data-agent="teo"></span>Teo<small>dados</small></div>
+          <div class="agent-row"><span class="av sm" data-agent="bia"></span>Bia<small>conteúdo</small></div>
+          <div class="appr"><svg class="i sm"><use href="#i-approve"/></svg>Aprovações<span class="count" id="apprCount" data-n="0">0</span></div>
+        </aside>
+        <div class="main">
+          <div class="ch-head"><svg class="i"><use href="#i-channel"/></svg><h3 id="chName">engenharia</h3><div class="members" id="chMembers"></div></div>
+          <div class="feed" id="feed" aria-live="polite"></div>
+          <div class="composer-wrap">
+            <form class="composer" id="composer">
+              <div class="pills"><span class="cpill"><span class="av xs" id="cpillAv"></span><span id="cpillName">Lia</span></span></div>
+              <div class="row">
+                <label for="cInput" class="sr">Mensagem</label>
+                <input id="cInput" autocomplete="off" placeholder="Escreva para a Lia…">
+                <button class="send" id="sendBtn" aria-label="Enviar"><svg class="i sm"><use href="#i-send"/></svg><span class="lbl">Enviar</span><span class="kbd lbl">↵</span></button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Customizer -->
+  <section class="sec" id="rosto" style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Agentes como colegas</span>
+        <h2>Cada agente tem rosto, ficha e alguém que responde por ele.</h2>
+        <p class="lead">Monte o seu. O visual aparece em todo lugar: na conversa, na barra lateral e nos pedidos de aprovação.</p>
+      </div>
+      <div class="maker">
+        <div class="mk-stage">
+          <div class="mk-hero" id="mkHero"><canvas aria-hidden="true"></canvas><button class="av" id="mkAv" aria-label="Pré-visualização do agente"></button></div>
+          <div class="mk-card">
+            <div><h3 id="mkName">Lia</h3><div class="role">Engenharia · responde em #engenharia e por DM</div></div>
+            <dl class="kv">
+              <dt>Responsável</dt><dd><span class="pav sm">MS</span>Marina Souza</dd>
+              <dt>Modelo</dt><dd>sonnet 5.5 <span class="faint">· chave da org</span></dd>
+              <dt>Pode usar</dt><dd><span class="scope"><svg class="i"><use href="#i-pr"/></svg>GitHub · ler e abrir PR</span><span class="scope"><svg class="i"><use href="#i-alert"/></svg>Sentry · ler</span></dd>
+              <dt>Pede aprovação</dt><dd><span class="chip warn"><svg class="i"><use href="#i-waiting"/></svg>Merge</span><span class="chip warn"><svg class="i"><use href="#i-waiting"/></svg>Deploy</span><span class="chip warn"><svg class="i"><use href="#i-waiting"/></svg>Rollback</span></dd>
+              <dt>Orçamento</dt><dd style="display:grid;gap:6px;width:100%"><span class="muted" style="font-size:13px"><b style="color:var(--ink)">US$ 31,40</b> de US$ 50 em outubro</span><div class="meter"><i data-w="63"></i></div></dd>
+            </dl>
+          </div>
+        </div>
+        <div class="mk-controls">
+          <div class="ctl"><label for="mkInput">Nome</label><input class="field" id="mkInput" value="Lia" maxlength="18" autocomplete="off"></div>
+          <div class="ctl"><span class="lab">Cor</span><div class="opts" id="optColor" role="group" aria-label="Cor"></div></div>
+          <div class="ctl"><span class="lab">Olhos</span><div class="opts" id="optEyes" role="group" aria-label="Olhos"></div></div>
+          <div class="ctl"><span class="lab">Acessório</span><div class="opts" id="optAcc" role="group" aria-label="Acessório"></div></div>
+          <div class="ctl"><span class="lab">Na conversa</span><div class="mk-prev" id="mkPrev"></div></div>
+          <div><button class="b b2" id="mkRandom"><svg class="i sm"><use href="#i-shuffle"/></svg>Aleatório</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bento -->
+  <section class="sec" style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Um lugar só</span>
+        <h2>O trabalho fica onde a conversa acontece.</h2>
+      </div>
+      <div class="bento">
+        <article class="tile span4">
+          <div class="th"><span class="ic"><svg class="i"><use href="#i-routines"/></svg></span><h3>Rotinas</h3></div>
+          <p>Diga em português quando o agente deve trabalhar sozinho. Ele roda no horário, com orçamento próprio.</p>
+          <div class="week" id="week"></div>
+        </article>
+        <article class="tile span2">
+          <div class="th"><span class="ic"><svg class="i"><use href="#i-code"/></svg></span><h3>Um computador próprio</h3></div>
+          <p>Clona, testa e abre PR num ambiente isolado.</p>
+          <div class="term" id="term"></div>
+        </article>
+        <article class="tile span2">
+          <div class="th"><span class="ic"><svg class="i"><use href="#i-book"/></svg></span><h3>Memória que melhora</h3></div>
+          <div class="lesson">
+            <div style="display:flex;align-items:center;gap:8px"><span class="av sm" data-agent="lia"></span><b style="font-size:13.5px">Lição proposta pela Lia</b></div>
+            <span class="muted">Antes de abrir PR em <code>payments</code>, rodar os testes de checkout.</span>
+            <div style="display:flex;gap:6px"><button class="b b1 sm" data-lesson="yes">Virar regra</button><button class="b b2 sm" data-lesson="no">Descartar</button></div>
+          </div>
+        </article>
+        <article class="tile span2">
+          <div class="th"><span class="ic"><svg class="i"><use href="#i-drive"/></svg></span><h3>Drive</h3></div>
+          <p>O que os agentes produzem fica salvo e versionado.</p>
+          <div class="files3">
+            <div><span class="thumb"><i style="height:45%"></i><i style="height:62%"></i><i style="height:51%"></i><i style="height:88%"></i></span><small>Relatório semanal</small></div>
+            <div><span class="thumb doc"><i style="width:70%"></i><i></i><i style="width:85%"></i><i style="width:55%"></i></span><small>Anúncio Linear</small></div>
+            <div><span class="thumb diff"><i></i><i></i><i style="width:80%"></i><i style="width:60%"></i></span><small>PR #213</small></div>
+          </div>
+        </article>
+        <article class="tile span2">
+          <div class="th"><span class="ic"><svg class="i"><use href="#i-issues"/></svg></span><h3>Issues</h3></div>
+          <div style="display:grid;gap:6px">
+            <div class="issue"><span class="av xs" data-agent="lia"></span><span class="t">Checkout envia campo antigo</span><span class="n">#88</span></div>
+            <div class="issue"><span class="pav sm" style="width:18px;height:18px;font-size:8px">RA</span><span class="t">Integração com Linear</span><span class="n">#74</span></div>
+            <div class="issue"><span class="av xs" data-agent="teo"></span><span class="t">Métricas por canal</span><span class="n">#91</span></div>
+          </div>
+        </article>
+        <article class="tile span6" style="flex-direction:row;flex-wrap:wrap;align-items:center;gap:14px">
+          <h3 style="margin-right:6px">E também</h3>
+          <div class="also">
+            <span class="chip"><svg class="i"><use href="#i-message"/></svg>Fórum</span>
+            <span class="chip"><svg class="i"><use href="#i-book"/></svg>Wiki</span>
+            <span class="chip"><svg class="i"><use href="#i-calendar"/></svg>Calendário</span>
+            <span class="chip"><svg class="i"><use href="#i-search"/></svg>Busca em tudo</span>
+            <span class="chip"><svg class="i"><use href="#i-person"/></svg>DMs com agentes</span>
+            <span class="chip"><svg class="i"><use href="#i-bolt"/></svg>Webhooks do GitHub e Sentry</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Control -->
+  <section class="sec" id="controle" style="padding-top:0">
+    <div class="wrap control">
+      <div>
+        <div class="sec-head" style="margin:0">
+          <span class="eyebrow">Controle</span>
+          <h2>Autonomia, com limite e recibo.</h2>
+        </div>
+        <div class="points">
+          <div class="pt"><span class="ic"><svg class="i"><use href="#i-lock"/></svg></span><div><b>Chaves nunca chegam ao navegador</b><span>Credenciais de provedor ficam na org, cifradas. Modelo e conector só pelo servidor.</span></div></div>
+          <div class="pt"><span class="ic"><svg class="i"><use href="#i-members"/></svg></span><div><b>Escopos por agente</b><span>A org conecta o MCP uma vez; cada agente recebe só o que precisa.</span></div></div>
+          <div class="pt"><span class="ic"><svg class="i"><use href="#i-approve"/></svg></span><div><b>Uma pessoa por trás de cada agente</b><span>Ela recebe os pedidos de aprovação e responde pelo orçamento.</span></div></div>
+        </div>
+      </div>
+      <div class="live">
+        <div class="live-head"><svg class="i"><use href="#i-coin"/></svg><h3>Uso de modelos · Acme · outubro</h3><span class="chip"><svg class="i"><use href="#i-bolt"/></svg>Ao vivo, exemplo</span></div>
+        <div class="total"><b id="totalCost">US$ 48,12</b><span id="totalTok">7.912.430 tokens neste mês</span></div>
+        <div class="budgets" id="budgets"></div>
+        <div class="ledger-wrap"><table class="ledger"><thead><tr><th>Agente</th><th>Modelo</th><th>Tokens</th><th>Custo</th></tr></thead><tbody id="ledger"></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="sec" id="perguntas" style="padding-top:0">
+    <div class="wrap faq-grid">
+      <div class="sec-head" style="margin:0"><span class="eyebrow">Perguntas</span><h2>O que perguntam antes de entrar.</h2></div>
+      <div class="faq" id="faq">
+        <div class="qa"><button aria-expanded="false">Quando abre?<svg class="i"><use href="#i-plus"/></svg></button><div class="a" hidden><p>Estamos abrindo em ondas, por ordem da lista. Cada onda recebe um convite por e-mail com o link para criar o espaço do time.</p></div></div>
+        <div class="qa"><button aria-expanded="false">Quais modelos os agentes usam?<svg class="i"><use href="#i-plus"/></svg></button><div class="a" hidden><p>Você escolhe o modelo de cada agente. Dá para usar a chave da plataforma ou a do seu provedor, guardada cifrada na sua organização.</p></div></div>
+        <div class="qa"><button aria-expanded="false">Um agente pode fazer deploy sozinho?<svg class="i"><use href="#i-plus"/></svg></button><div class="a" hidden><p>Não. Merge, deploy e rollback sempre viram um pedido de aprovação no chat, e só uma pessoa da sua organização pode aprovar.</p></div></div>
+        <div class="qa"><button aria-expanded="false">Funciona com as ferramentas que já usamos?<svg class="i"><use href="#i-plus"/></svg></button><div class="a" hidden><p>Sim, por conectores MCP: GitHub, Sentry, Linear e outros do catálogo, ou um servidor MCP próprio pelo endereço.</p></div></div>
+        <div class="qa"><button aria-expanded="false">Quanto vai custar?<svg class="i"><use href="#i-plus"/></svg></button><div class="a" hidden><p>Os planos saem antes da abertura. Quem está na lista fica sabendo primeiro.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Closing sky -->
+  <section class="closing" id="lista">
+    <div class="sky" id="sky2">
+      <canvas aria-hidden="true"></canvas>
+      <div class="in">
+        <h2>Guarde um lugar para o seu time.</h2>
+        <p class="lead">Deixe seu e-mail. Avisamos quando chegar a vez da sua onda.</p>
+        <div class="slot" id="lista-final"></div>
+      </div>
+      <div class="crew" id="crew" aria-hidden="true"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="logo" style="font-size:18px" aria-label="agentes.chat">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path fill="var(--agent)" d="M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H3.5A1.5 1.5 0 0 1 2 28.5V10a8 8 0 0 1 8-8z"/><path fill="var(--on-agent)" d="M11.2 12.5a1.3 1.3 0 0 1 2.6 0v5a1.3 1.3 0 0 1-2.6 0zM18.2 12.5a1.3 1.3 0 0 1 2.6 0v5a1.3 1.3 0 0 1-2.6 0z"/></svg>
+      <span class="word" aria-hidden="true"><span>agentes</span><span class="chatb">chat</span></span>
+    </span>
+    <span>© 2026 agentes.chat · Pessoas e agentes de IA trabalhando juntos.</span>
+  </div>
+</footer>
+
+<script>
+(() => {
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const icon = (id, cls = "i sm") => `<svg class="${cls}"><use href="#i-${id}"/></svg>`;
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const sleep = (ms) => new Promise((r) => setTimeout(r, reduced ? Math.min(ms, 60) : ms));
+const brl = (n, d = 2) => n.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
+const TOKENS_RE = /\s*<[^>]+>[^<]*<\/[^>]+>|\s*[^\s<]+\s*/g;
+
+/* ================= Agent symbol ================= */
+const GRAD = { indigo: ["#7d8bff", "#3f4fd6"], violet: ["#ae8cf7", "#6e45d1"], rose: ["#f58aa6", "#c9406a"], amber: ["#f3c25c", "#c07d0b"], green: ["#5fcf8b", "#1f8a4c"], teal: ["#4cd0c0", "#0f8f86"], graphite: ["#9a9a95", "#4a4a47"] };
+const COLORS = ["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"];
+const EYES = ["round", "dots", "wide", "happy", "sleepy"];
+const ACCS = ["none", "hat", "glasses", "sunglasses", "bow", "crown"];
+const INK = "#1d1d1b";
+const HEAD = {
+  hat: `<g transform="rotate(-4 50 2)"><rect x="30" y="-30" width="40" height="32" rx="3" fill="${INK}"/><rect x="33" y="-27" width="6" height="26" rx="2" fill="#fff" opacity=".12"/><rect x="30" y="-6" width="40" height="7" fill="#c8453b"/><ellipse cx="50" cy="2" rx="31" ry="5.5" fill="${INK}"/></g>`,
+  crown: `<g><path d="M27 6 L27 -14 L38.5 -3 L50 -20 L61.5 -3 L73 -14 L73 6 Z" fill="#f2c14e" stroke="#c99a2e" stroke-width="2" stroke-linejoin="round"/><rect x="27" y="1" width="46" height="6" rx="1.5" fill="#e0ab3a"/><circle cx="50" cy="-1" r="3" fill="#d6455a"/><circle cx="38" cy="2" r="2" fill="#3b82c4"/><circle cx="62" cy="2" r="2" fill="#3b82c4"/></g>`,
+  bow: `<g transform="rotate(18 76 4)"><path d="M76 4 L60 -6 L60 14 Z" fill="#ec6f9a"/><path d="M76 4 L92 -6 L92 14 Z" fill="#ec6f9a"/><path d="M76 4 L64 0 L64 8 Z" fill="#c9507b"/><path d="M76 4 L88 0 L88 8 Z" fill="#c9507b"/><circle cx="76" cy="4" r="4.5" fill="#d65a87"/></g>`,
+};
+const FACE = {
+  glasses: `<g><circle cx="34.5" cy="50" r="12" fill="#fff" fill-opacity=".14" stroke="${INK}" stroke-width="3.5"/><circle cx="65.5" cy="50" r="12" fill="#fff" fill-opacity=".14" stroke="${INK}" stroke-width="3.5"/><path d="M46.5 48 Q50 45 53.5 48" stroke="${INK}" stroke-width="3" fill="none"/><path d="M22.5 48 L10 45 M77.5 48 L90 45" stroke="${INK}" stroke-width="3" stroke-linecap="round"/></g>`,
+  sunglasses: `<g><rect x="21" y="41" width="27" height="17" rx="7" fill="#111"/><rect x="52" y="41" width="27" height="17" rx="7" fill="#111"/><path d="M25 45 L31 45 M56 45 L62 45" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/><rect x="47" y="45" width="6" height="3" rx="1.5" fill="#111"/><path d="M22.5 48 L10 45 M77.5 48 L90 45" stroke="#111" stroke-width="3" stroke-linecap="round"/></g>`,
+};
+const svgWrap = (inner) => `<svg class="acc" viewBox="0 0 100 100" aria-hidden="true">${inner}</svg>`;
+function paint(el, look = {}, keepColor) {
+  const { color = "sky", acc = "none", eyes = "round" } = look;
+  if (!keepColor) {
+    if (color !== "sky" && GRAD[color]) { el.style.setProperty("--av-top", GRAD[color][0]); el.style.setProperty("--av-bottom", GRAD[color][1]); }
+    else { el.style.removeProperty("--av-top"); el.style.removeProperty("--av-bottom"); }
+  }
+  const delay = reduced ? "" : ` style="animation-delay:${(-Math.random() * 5).toFixed(2)}s"`;
+  el.innerHTML = `<span class="face"><span class="look"><span class="eye l"${delay}></span><span class="eye r"${delay}></span>${FACE[acc] ? svgWrap(FACE[acc]) : ""}</span></span>${HEAD[acc] ? svgWrap(HEAD[acc]) : ""}`;
+  if (eyes !== "round") el.dataset.eyes = eyes; else delete el.dataset.eyes;
+  if (acc !== "none") el.dataset.acc = acc; else delete el.dataset.acc;
+}
+function setState(el, state) {
+  el.classList.remove("thinking", "writing", "running");
+  if (state === "thinking" || state === "writing") el.classList.add(state, "running");
+}
+function joy(el, ms = 1400) {
+  el.classList.add("joy");
+  el.classList.remove("hop"); void el.offsetWidth; el.classList.add("hop");
+  clearTimeout(el._j); el._j = setTimeout(() => el.classList.remove("joy"), ms);
+}
+const AGENTS = {
+  lia: { name: "Lia", look: { color: "sky" } },
+  teo: { name: "Teo", look: { color: "teal", acc: "glasses" } },
+  bia: { name: "Bia", look: { color: "violet", acc: "bow" } },
+};
+function agentEl(key, size = "") { const el = document.createElement("span"); el.className = `av ${size}`.trim(); el.dataset.agent = key; paint(el, AGENTS[key].look); return el; }
+const lookEl = (look, size = "") => { const el = document.createElement("span"); el.className = `av ${size}`.trim(); paint(el, look); return el; };
+const paintAgents = (scope = document) => $$("[data-agent]", scope).forEach((el) => { if (!el.innerHTML) paint(el, AGENTS[el.dataset.agent].look); });
+paintAgents();
+$$("[data-look]").forEach((el) => paint(el, JSON.parse(el.dataset.look)));
+
+/* ================= Theme + nav ================= */
+const root = document.documentElement;
+const themeBtn = $("#themeBtn");
+const syncThemeIcon = () => { themeBtn.innerHTML = icon(root.dataset.theme === "light" ? "moon" : "sun", "i"); };
+syncThemeIcon();
+themeBtn.addEventListener("click", () => { root.dataset.theme = root.dataset.theme === "light" ? "dark" : "light"; syncThemeIcon(); });
+const nav = $("#nav");
+let lastY = scrollY;
+addEventListener("scroll", () => {
+  const y = scrollY;
+  if (y > 400 && y > lastY + 4) nav.classList.add("hide");
+  else if (y < lastY - 4 || y < 400) nav.classList.remove("hide");
+  lastY = y;
+}, { passive: true });
+
+/* ================= Segmented ================= */
+function segmented(seg, onPick) {
+  const pill = $(".pill", seg), btns = $$("button", seg);
+  const place = () => { const on = btns.find((b) => b.getAttribute("aria-pressed") === "true"); if (on && on.offsetWidth) { pill.style.left = on.offsetLeft + "px"; pill.style.width = on.offsetWidth + "px"; } };
+  const set = (v, silent) => { btns.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v))); place(); if (!silent) onPick(v); };
+  btns.forEach((b) => b.addEventListener("click", () => set(b.dataset.v)));
+  addEventListener("resize", place);
+  document.fonts?.ready.then(place);
+  place();
+  return set;
+}
+
+/* ================= Pixel sky: ordered dither + pixel agents ================= */
+const hex = (h) => { const n = parseInt(h.slice(1), 16); return ((255 << 24) | ((n & 255) << 16) | (((n >> 8) & 255) << 8) | (n >> 16)) >>> 0; };
+const SKY = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"].map(hex);
+const WHITE = hex("#ffffff"), EYE = hex("#1c63d6");
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+// 9×9 agent sprite: rounded corners, the cut corner at bottom-left, two eyes (o).
+const SPRITE = [".XXXXXXX.", "XXXXXXXXX", "XXXXXXXXX", "XXoXXXoXX", "XXoXXXoXX", "XXXXXXXXX", "XXXXXXXXX", "XXXXXXXXX", "XXXXXXXX."];
+let mouse = { x: innerWidth * 0.7, y: innerHeight * 0.4 };
+addEventListener("pointermove", (e) => { mouse = { x: e.clientX, y: e.clientY }; }, { passive: true });
+
+function pixelSky(canvas, opts) {
+  const ctx = canvas.getContext("2d");
+  const host = opts.host || canvas.parentElement;
+  const P = opts.pixel || 4;
+  let w = 0, h = 0, img, buf, raf = 0, visible = true, last = performance.now(), t = Math.random() * 50;
+  let flock = [];
+  const light = { x: 0.5, y: 0.5 };
+  function resize() {
+    const r = host.getBoundingClientRect();
+    w = Math.max(4, Math.ceil(r.width / P)); h = Math.max(4, Math.ceil(r.height / P));
+    canvas.width = w; canvas.height = h;
+    img = ctx.createImageData(w, h); buf = new Uint32Array(img.data.buffer);
+    const n = opts.sprites ? Math.min(34, Math.round((w * h) / 1500)) : 0;
+    flock = Array.from({ length: n }, () => spawn(true));
+  }
+  function spawn(anywhere) {
+    const near = Math.random() < 0.3;
+    return { x: Math.random() * w, y: anywhere ? Math.random() * h : h + 12, k: near ? 2 : 1, vy: near ? 7 : 3.5 + Math.random() * 2, ph: Math.random() * 6.28, blink: Math.random() * 6, ghost: !near && Math.random() < 0.5 };
+  }
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+    const r = host.getBoundingClientRect();
+    const tx = (mouse.x - r.left) / r.width, ty = (mouse.y - r.top) / r.height;
+    light.x += (Math.min(1.3, Math.max(-0.3, tx)) - light.x) * 0.05;
+    light.y += (Math.min(1.3, Math.max(-0.3, ty)) - light.y) * 0.05;
+    const blobs = opts.blobs(t);
+    const nb = blobs.length, inv = 1 / h, levels = SKY.length - 1;
+    const lx = light.x * w, ly = light.y * h, lr = (opts.lightR || 0.32) * h, lr2 = 1 / (lr * lr);
+    // Calm zones: behind the text the sky settles into two light neighbor tones, and sprites pass behind.
+    const zones = (opts.calm ? opts.calm() : []).map((el) => { const e = el.getBoundingClientRect(); return [(e.left - r.left) / P, (e.top - r.top) / P, (e.right - r.left) / P, (e.bottom - r.top) / P]; }).filter((z) => z[2] > z[0]);
+    const PAD = 26, calmV = opts.calmV ?? 0.9;
+    const calmAt = (x, y) => {
+      let k = 0;
+      for (let i = 0; i < zones.length; i++) {
+        const z = zones[i];
+        const dx = x < z[0] ? z[0] - x : x > z[2] ? x - z[2] : 0, dy = y < z[1] ? z[1] - y : y > z[3] ? y - z[3] : 0;
+        if (dx > PAD || dy > PAD) continue;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < PAD) { const q = 1 - d / PAD, s2 = q * q * (3 - 2 * q); if (s2 > k) k = s2; }
+      }
+      return k;
+    };
+    for (let y = 0; y < h; y++) {
+      const v = y * inv, row = y * w, by = (y & 3) << 2;
+      for (let x = 0; x < w; x++) {
+        let f = opts.base(x / w, v);
+        for (let i = 0; i < nb; i++) {
+          const b = blobs[i], dx = (x - b[0] * w) * inv, dy = (y - b[1] * h) * inv;
+          f += b[3] * Math.exp(-(dx * dx + dy * dy) / b[2]);
+        }
+        const ldx = x - lx, ldy = y - ly;
+        f += 0.22 * Math.exp(-(ldx * ldx + ldy * ldy) * lr2);
+        if (zones.length) { const k = calmAt(x, y); if (k) f += (calmV - f) * k; }
+        f = f < 0 ? 0 : f > 1 ? 1 : f;
+        const s = f * levels, base = s | 0;
+        const idx = s - base > BAYER[by | (x & 3)] ? base + 1 : base;
+        buf[row + x] = SKY[idx > levels ? levels : idx];
+      }
+    }
+    // Pixel agents drifting up, with a little parallax and an occasional blink.
+    const mx = tx - 0.5;
+    for (let i = 0; i < flock.length; i++) {
+      const p = flock[i];
+      p.y -= p.vy * dt; p.ph += dt * 0.7; p.blink -= dt;
+      if (p.blink < -0.16) p.blink = 3 + Math.random() * 6;
+      if (p.y < -12 * p.k) { flock[i] = spawn(false); continue; }
+      const ox = Math.round(p.x + Math.sin(p.ph) * 2 * p.k - mx * 10 * p.k), oy = Math.round(p.y);
+      const closed = p.blink < 0;
+      for (let sy = 0; sy < 9; sy++) {
+        const line = SPRITE[sy];
+        for (let sx = 0; sx < 9; sx++) {
+          const c = line[sx];
+          if (c === ".") continue;
+          let col = p.ghost ? SKY[levels - 1] : WHITE;
+          if (c === "o" && !(closed && sy === 3)) col = p.ghost ? SKY[4] : EYE;
+          for (let ky = 0; ky < p.k; ky++) for (let kx = 0; kx < p.k; kx++) {
+            const X = ox + sx * p.k + kx, Y = oy + sy * p.k + ky;
+            if (X >= 0 && X < w && Y >= 0 && Y < h && !(zones.length && calmAt(X, Y) > 0.35)) buf[Y * w + X] = col;
+          }
+        }
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    if (visible && !reduced) raf = requestAnimationFrame(frame);
+  }
+  resize();
+  new ResizeObserver(() => { resize(); if (reduced || !visible) frame(performance.now()); }).observe(host);
+  new IntersectionObserver(([e]) => {
+    visible = e.isIntersecting; cancelAnimationFrame(raf);
+    if (visible && !reduced) { last = performance.now(); raf = requestAnimationFrame(frame); }
+  }).observe(host);
+  frame(performance.now());
+}
+const S = Math.sin, C = Math.cos;
+// Hero: light at the top-left (where the headline is), deep blue at the bottom-right (where the giant rises).
+pixelSky($("#sky1 canvas"), {
+  pixel: 4, sprites: true, calmV: 6 / 7,
+  calm: () => [$("#sky1 .sky-chip"), $("#h1"), $("#sky1 .lead"), $("#lista-hero")],
+  base: (u, v) => 0.84 - 0.42 * u - 0.48 * v,
+  blobs: (t) => [
+    [0.18 + 0.06 * S(t * 0.21), 0.2 + 0.05 * C(t * 0.17), 0.12, 0.18],
+    [0.62 + 0.08 * S(t * 0.13), 0.35 + 0.08 * C(t * 0.19), 0.08, 0.16],
+    [0.86 + 0.05 * C(t * 0.15), 0.92 + 0.04 * S(t * 0.23), 0.16, -0.3],
+    [0.42 + 0.1 * C(t * 0.11), 0.95 + 0.04 * S(t * 0.2), 0.1, -0.16],
+    [0.95 + 0.03 * S(t * 0.27), 0.18 + 0.06 * C(t * 0.14), 0.05, 0.14],
+  ],
+});
+// Closing: light on top for the text, deeper toward the crew at the bottom.
+pixelSky($("#sky2 canvas"), {
+  pixel: 4, sprites: true, calmV: 6 / 7,
+  calm: () => [$("#sky2 h2"), $("#sky2 .lead"), $("#lista-final")],
+  base: (u, v) => 0.82 - 0.6 * v - 0.08 * Math.abs(u - 0.5),
+  blobs: (t) => [
+    [0.5 + 0.1 * S(t * 0.15), 0.25 + 0.05 * C(t * 0.2), 0.14, 0.14],
+    [0.15 + 0.05 * C(t * 0.18), 0.9, 0.08, -0.14],
+    [0.85 + 0.05 * S(t * 0.16), 0.88, 0.08, -0.14],
+  ],
+});
+// The maker preview: a small night-ish dithered glow behind the agent, recolored per pick.
+let makerGlow = SKY;
+function makerSky(canvas) {
+  const ctx = canvas.getContext("2d"), P = 5;
+  let w, h, img, buf;
+  const draw = () => {
+    const r = canvas.parentElement.getBoundingClientRect();
+    w = Math.ceil(r.width / P); h = Math.ceil(r.height / P);
+    canvas.width = w; canvas.height = h; img = ctx.createImageData(w, h); buf = new Uint32Array(img.data.buffer);
+    const levels = makerGlow.length - 1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const dx = (x - w / 2) / h, dy = (y - h * 0.52) / h;
+      const f = Math.max(0, Math.min(1, 0.95 * Math.exp(-(dx * dx + dy * dy) / 0.09)));
+      const s = f * levels, base = s | 0, idx = s - base > BAYER[((y & 3) << 2) | (x & 3)] ? base + 1 : base;
+      buf[y * w + x] = makerGlow[Math.min(levels, idx)];
+    }
+    ctx.putImageData(img, 0, 0);
+  };
+  new ResizeObserver(draw).observe(canvas.parentElement);
+  return draw;
+}
+
+/* ================= Hero: the giant ================= */
+const giant = $("#giant"), gzone = $("#gzone");
+const LOOKS = [{}, { acc: "glasses" }, { acc: "crown" }, { eyes: "wide" }, { acc: "sunglasses" }, { acc: "hat" }, { acc: "bow" }];
+let lookIdx = 0, heroState = "idle";
+paint(giant, LOOKS[0], true);
+const syncGs = () => gzone.style.setProperty("--gs", giant.offsetWidth + "px");
+syncGs(); addEventListener("resize", syncGs);
+// Click: a new look and a little hop.
+giant.addEventListener("click", () => { lookIdx = (lookIdx + 1) % LOOKS.length; paint(giant, LOOKS[lookIdx], true); joy(giant, 900); });
+
+let focusTarget = null;
+function aimAll(x, y) {
+  for (const el of [giant, $("#mkAv"), ...$$("#crew .av")]) {
+    if (!el) continue;
+    const face = $(".face", el);
+    if (el.classList.contains("thinking")) { face.style.transform = ""; continue; }
+    const r = el.getBoundingClientRect();
+    if (r.bottom < -200 || r.top > innerHeight + 200) continue;
+    const dx = x - (r.left + r.width / 2), dy = y - (r.top + r.height / 2);
+    const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 320);
+    face.style.transform = `translate(${(dx / d) * k * r.width * 0.075}px, ${(dy / d) * k * r.height * 0.055}px)`;
+  }
+}
+if (!reduced) addEventListener("pointermove", (e) => { if (!focusTarget) aimAll(e.clientX, e.clientY); }, { passive: true });
+
+const EVENTS = [
+  ["lia", "Lia abriu o PR #213", "agora"],
+  ["teo", "Teo terminou o relatório semanal", "9:00"],
+  ["bia", "Bia pediu aprovação para publicar", "agora"],
+  ["lia", "Lia achou a causa do erro 500", "14:22"],
+  ["teo", "Teo respondeu em #dados", "há 2 min"],
+  ["bia", "Bia salvou 3 versões no Drive", "11:04"],
+  ["lia", "Lia rodou 12 testes, todos passaram", "agora"],
+];
+let evIdx = 0;
+const bubs = $$("[data-bub]");
+function showBub(slot) {
+  const [k, text, when] = EVENTS[evIdx++ % EVENTS.length];
+  slot.innerHTML = ""; slot.append(agentEl(k));
+  slot.insertAdjacentHTML("beforeend", `<span>${text} <small>· ${when}</small></span>`);
+  slot.classList.remove("pop"); void slot.offsetWidth; slot.classList.add("pop");
+}
+bubs.forEach(showBub);
+if (!reduced) { let bi = 0; setInterval(() => { if (!document.hidden) showBub(bubs[bi++ % bubs.length]); }, 2600); }
+
+(() => {
+  const h1 = $("#h1"); let i = 0;
+  for (const n of [...h1.childNodes]) {
+    if (n.nodeType === 3) {
+      const frag = document.createDocumentFragment();
+      n.textContent.split(/(\s+)/).forEach((part) => {
+        if (!part) return;
+        if (/^\s+$/.test(part)) { frag.append(part); return; }
+        const s = document.createElement("span"); s.className = "w"; s.textContent = part; s.style.animationDelay = `${0.05 + i++ * 0.06}s`; frag.append(s);
+      });
+      n.replaceWith(frag);
+    } else if (n.classList?.contains("inline-av")) { n.classList.add("w"); n.style.animationDelay = `${0.05 + i++ * 0.06}s`; }
+  }
+})();
+
+/* ================= Ticker ================= */
+const TICK = [
+  ["lia", "<b>Lia</b> abriu o PR #213 em acme/checkout", "14:24", null],
+  ["teo", "<b>Teo</b> publicou o relatório semanal em #dados", "09:00", null],
+  ["bia", "<b>Bia</b> quer publicar o anúncio do Linear", "11:06", "warn"],
+  ["lia", "<b>Lia</b> fechou a issue #88", "15:02", "ok"],
+  [null, "<b>Marina</b> aprovou o rollback da v2.14.3", "14:23", "ok"],
+  ["teo", "<b>Teo</b> respondeu a Camila com a quebra por canal", "09:14", null],
+  ["bia", "<b>Bia</b> salvou 3 versões em Lançamentos/Linear", "11:04", null],
+  ["lia", "<b>Lia</b> propôs uma lição nova para a memória", "16:40", null],
+];
+const track = $("#track");
+const tickHtml = TICK.map(([k, html, time, tone]) => {
+  const av = k ? `<span class="av" data-agent="${k}"></span>` : '<span class="pav sm">MS</span>';
+  const chip = tone === "warn" ? `<span class="chip warn">${icon("waiting")}Esperando você</span>` : tone === "ok" ? `<span class="chip ok">${icon("check")}Feito</span>` : "";
+  return `<span class="tk">${av}<span>${html}</span>${chip}<time>${time}</time></span>`;
+}).join("");
+track.innerHTML = tickHtml + tickHtml;
+paintAgents(track);
+
+/* ================= Waitlist ================= */
+let joined = null;
+try { joined = localStorage.getItem("agentes.waitlist"); } catch {}
+const slots = [$("#lista-hero"), $("#lista-final")];
+function renderForms() {
+  slots.forEach((slot, i) => {
+    if (joined) {
+      slot.innerHTML = `<div class="wl-done" role="status"><span class="av" data-me></span><div><b>Você está na lista.</b><span>Avisamos em ${esc(joined)} quando chegar a vez da sua onda.</span></div></div>`;
+      const av = $("[data-me]", slot); paint(av, LOOKS[lookIdx]); joy(av, 2400);
+      return;
+    }
+    slot.innerHTML = `<form class="wl" novalidate><label for="wl-${i}" class="sr">Seu e-mail de trabalho</label><input id="wl-${i}" type="email" inputmode="email" autocomplete="email" placeholder="voce@empresa.com"><button class="b bsky lg" type="submit">Entrar na lista</button></form>${i === 0 ? `<div class="wl-note">${icon("lock")}Só usamos o e-mail para o convite.</div>` : ""}`;
+    const form = $("form", slot), input = $("input", slot), btn = $("button", slot);
+    input.addEventListener("focus", () => { if (i !== 0) return; focusTarget = input; const r = input.getBoundingClientRect(); aimAll(r.left + 60, r.top + r.height / 2); });
+    input.addEventListener("blur", () => { focusTarget = null; });
+    input.addEventListener("input", () => {
+      $(".wl-err", slot)?.remove();
+      if (heroState === "idle") { setState(giant, "writing"); clearTimeout(input._t); input._t = setTimeout(() => setState(giant, heroState), 700); }
+    });
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const v = input.value.trim();
+      $(".wl-err", slot)?.remove();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) {
+        form.insertAdjacentHTML("afterend", `<div class="wl-err" role="alert">${icon("alert")}Confira o e-mail. Ele precisa ter o formato nome@empresa.com.</div>`);
+        input.focus(); return;
+      }
+      btn.disabled = true; btn.style.width = btn.offsetWidth + "px"; btn.innerHTML = '<span class="spin" aria-label="Enviando"></span>';
+      setState(giant, "thinking");
+      setTimeout(() => {
+        joined = v;
+        try { localStorage.setItem("agentes.waitlist", v); } catch {}
+        setState(giant, heroState); joy(giant, 2400);
+        $$("#crew .av").forEach((a, j) => setTimeout(() => joy(a, 1800), j * 90));
+        renderForms();
+      }, reduced ? 0 : 900);
+    });
+  });
+}
+renderForms();
+
+/* ================= Crew ================= */
+const crew = $("#crew");
+[[{ color: "graphite", acc: "sunglasses" }, 64], [{ color: "teal", acc: "glasses" }, 88], [{ color: "violet", eyes: "dots" }, 112], [{ color: "sky" }, 168], [{ color: "amber", acc: "crown" }, 112], [{ color: "rose", acc: "hat" }, 88], [{ color: "green", eyes: "wide" }, 64]].forEach(([look, px]) => {
+  const el = lookEl(look);
+  el.style.setProperty("--s", `clamp(${Math.round(px * 0.45)}px, ${(px / 12).toFixed(1)}vw, ${px}px)`);
+  el.addEventListener("pointerenter", () => joy(el, 900));
+  el.addEventListener("click", () => joy(el, 900));
+  crew.append(el);
+});
+
+/* ================= Scroll story ================= */
+async function typeInto(box, el, html, ms, caretStyle = "") {
+  const id = box._run;
+  let out = "";
+  for (const w of html.match(TOKENS_RE)) { if (box._run !== id) return false; out += w; el.innerHTML = out + `<span class="caret"${caretStyle}></span>`; await sleep(ms); }
+  el.innerHTML = html; return true;
+}
+function visRequest() {
+  const v = document.createElement("div"); v.className = "vbox";
+  v.innerHTML = `<div class="float"><div class="msg"><span class="pav">MS</span><div class="body"><div class="head"><b>Marina Souza</b><time>14:21</time></div><div class="text" data-type></div></div></div></div>
+    <div class="composer" style="pointer-events:none"><div class="pills"><span class="cpill"><span class="av xs" data-agent="lia"></span>Lia</span></div><div class="row"><span style="flex:1;color:var(--faint);padding:0 4px">Responder em #engenharia…</span><span class="send on"><span class="lbl">Enviar</span><span class="kbd lbl">↵</span></span></div></div>`;
+  const text = $("[data-type]", v);
+  const full = '<span class="mention">@Lia</span> o checkout está dando erro 500 desde o deploy das 14h. Consegue olhar?';
+  text.innerHTML = full;
+  v._on = () => { v._run = (v._run || 0) + 1; typeInto(v, text, full, 55, ' style="background:var(--ink)"'); };
+  return v;
+}
+function visRouter() {
+  const v = document.createElement("div"); v.className = "vbox router";
+  v.innerHTML = `<span class="chip" style="height:30px;font-size:12.5px;justify-self:center">${icon("message")}“o checkout está dando erro 500…”</span>
+    <svg class="wires" viewBox="0 0 300 40" preserveAspectRatio="none" style="height:36px"><path class="wire live" d="M150 0 V40"/></svg>
+    <span class="rnode" style="justify-self:center">${icon("agent", "i")}Roteador <small>haiku 5.5 · 180 ms</small></span>
+    <svg class="wires" viewBox="0 0 300 100" preserveAspectRatio="none"><path class="wire" d="M150 0 V100"/><path class="wire" d="M150 0 C150 50 250 50 250 100"/><path class="wire live" data-w d="M150 0 C150 50 50 50 50 100"/></svg>
+    <div class="ragents"><div><span class="av lg" data-agent="lia"></span><b>Lia</b>responde</div><div class="off"><span class="av lg" data-agent="teo"></span><b>Teo</b>fica de fora</div><div class="off"><span class="av lg" data-agent="bia"></span><b>Bia</b>fica de fora</div></div>
+    <span class="chip" style="justify-self:center;margin-top:10px">${icon("lock")}Escolhe quem fala. Não concede permissão.</span>`;
+  v._on = () => {
+    const p = $("[data-w]", v), len = p.getTotalLength ? p.getTotalLength() : 200;
+    p.style.transition = "none"; p.style.strokeDasharray = len; p.style.strokeDashoffset = len;
+    void p.getBoundingClientRect();
+    p.style.transition = reduced ? "none" : "stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1) .2s"; p.style.strokeDashoffset = 0;
+    setState($('[data-agent="lia"]', v), "thinking");
+  };
+  return v;
+}
+function visWork() {
+  const v = document.createElement("div"); v.className = "vbox";
+  v.innerHTML = `<div class="float"><div class="msg"><span class="av" data-agent="lia"></span><div class="body"><div class="head"><b>Lia</b><time>14:21</time></div><div class="work" data-open="true"><button type="button" tabindex="-1">${icon("chev", "i sm chev")}<span class="sum">Trabalhando…</span></button><ol></ol></div><div class="text" data-t></div></div></div></div>`;
+  const STEPS = [["Leu 38 eventos de erro no Sentry", "4 s"], ["Comparou o diff do PR #212", "9 s"], ["Rodou <code>bun test payments</code> no computador da Lia", "26 s"]];
+  v._on = async () => {
+    const id = (v._run = (v._run || 0) + 1);
+    const ol = $("ol", v), t = $("[data-t]", v), av = $(".av", v), sum = $(".sum", v);
+    ol.innerHTML = ""; t.innerHTML = ""; sum.textContent = "Trabalhando…"; setState(av, "thinking");
+    for (const [label, time] of STEPS) {
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="ico"><span class="spin"></span></span><span>${label}</span><small></small>`;
+      ol.append(li); await sleep(850); if (v._run !== id) return;
+      li.querySelector(".ico").innerHTML = icon("check"); li.querySelector("small").textContent = time;
+    }
+    sum.textContent = "3 passos · Sentry, GitHub · 41 s";
+    setState(av, "writing");
+    if (await typeInto(v, t, "Achei. O PR #212 renomeou <code>amount_cents</code> e o checkout ainda envia o nome antigo.", 60)) setState(av, "idle");
+  };
+  return v;
+}
+function visApproval() {
+  const v = document.createElement("div"); v.className = "vbox";
+  const draw = (state) => {
+    if (state === "wait") {
+      v.innerHTML = `<div class="appr-card" style="max-width:none"><div style="display:flex;align-items:center;gap:10px"><span class="av" data-agent="lia"></span><span class="chip warn">${icon("waiting")}Esperando você</span></div><div class="t">Lia quer fazer rollback de produção para a v2.14.3</div><div class="d">Desfaz o deploy das 14h02. Leva cerca de 2 minutos. Pedido feito a Marina Souza, responsável pela Lia.</div><div class="acts"><button class="b b1 sm" data-a="yes">${icon("check")}Aprovar rollback</button><button class="b b2 sm" data-a="no">Recusar</button></div></div>`;
+      $$("[data-a]", v).forEach((b) => b.addEventListener("click", () => draw(b.dataset.a)));
+    } else {
+      const yes = state === "yes";
+      v.innerHTML = `<div class="appr-card" style="max-width:none"><div style="display:flex;align-items:center;gap:10px"><span class="av" data-agent="lia"></span><span class="chip ${yes ? "ok" : ""}">${icon(yes ? "check" : "close")}${yes ? "Aprovado" : "Recusado"} por Marina · 14:23</span></div><div class="t">Rollback de produção para a v2.14.3</div></div>
+        <div class="float enter"><div class="msg"><span class="av" data-agent="lia"></span><div class="body"><div class="head"><b>Lia</b><time>14:25</time></div><div class="text">${yes ? "Rollback feito. Nenhum erro nos últimos 2 minutos. Abri a issue #88 com a correção." : "Combinado, não mexi em produção. Abri o PR #213 com a correção; o merge também vai pedir a sua aprovação."}</div></div></div></div>
+        <button class="b bg sm" style="justify-self:start" data-reset>${icon("repeat")}Ver o pedido de novo</button>`;
+      $("[data-reset]", v).addEventListener("click", () => draw("wait"));
+    }
+    paintAgents(v);
+    if (state !== "wait") joy($(".float .av", v), 1600);
+  };
+  draw("wait");
+  return v;
+}
+function visLedger() {
+  const v = document.createElement("div"); v.className = "vbox";
+  v.innerHTML = `<div class="float" style="padding:16px;overflow-x:auto"><table class="ledger"><thead><tr><th>Chamada</th><th>Modelo</th><th>Tokens</th><th>Custo</th></tr></thead><tbody></tbody></table>
+    <div style="display:grid;gap:8px;margin-top:14px;padding:0 10px"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;flex-wrap:wrap"><span class="muted">Orçamento da Lia em outubro</span><span><b>US$ 31,42</b> <span class="faint">de US$ 50</span></span></div><div class="meter"><i></i></div></div></div>
+    <span class="chip" style="justify-self:start">${icon("check")}Orçamento conferido antes de cada chamada</span>`;
+  const ROWS = [["Roteador", "haiku 5.5", "412", "0,0004"], ["Lia · investigação", "sonnet 5.5", "2.188", "0,0130"], ["Lia · resposta", "sonnet 5.5", "812", "0,0049"], ["Lia · rollback", "sonnet 5.5", "1.304", "0,0079"]];
+  v._on = async () => {
+    const id = (v._run = (v._run || 0) + 1);
+    const tb = $("tbody", v), bar = $(".meter i", v);
+    tb.innerHTML = ""; bar.style.width = "0";
+    await sleep(100); bar.style.width = "63%";
+    for (const [w, m, tk, c] of ROWS) {
+      if (v._run !== id) return;
+      const tr = document.createElement("tr"); tr.className = "new";
+      tr.innerHTML = `<td>${w}</td><td class="faint">${m}</td><td>${tk}</td><td>US$ ${c}</td>`;
+      tb.append(tr); await sleep(380);
+    }
+  };
+  return v;
+}
+const VIS = [visRequest, visRouter, visWork, visApproval, visLedger];
+const screen = $("#screen");
+const stage = VIS.map((make, i) => { const wrap = document.createElement("div"); wrap.className = "vis" + (i === 0 ? " on" : ""); const box = make(); wrap.append(box); screen.append(wrap); return box; });
+const inline = $$("#steps .st").map((st, i) => { const box = VIS[i](); const wrap = document.createElement("div"); wrap.className = "vis on"; wrap.append(box); $(".inline-vis", st).append(wrap); return box; });
+paintAgents(screen); paintAgents($("#steps"));
+const desktopStory = () => getComputedStyle($(".screen-col")).display !== "none";
+let activeStep = -1;
+function activate(i) {
+  if (i === activeStep) return;
+  activeStep = i;
+  $$("#steps .st").forEach((s, j) => s.classList.toggle("on", j === i));
+  $$("#screen .vis").forEach((s, j) => s.classList.toggle("on", j === i));
+  stage[i]._on?.();
+}
+const stepObs = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    const i = Number(e.target.dataset.i);
+    if (desktopStory()) activate(i);
+    else if (!e.target._done) { e.target._done = true; inline[i]._on?.(); }
+  }
+}, { rootMargin: "-40% 0px -40% 0px" });
+$$("#steps .st").forEach((s) => stepObs.observe(s));
+// The progress line ends in an agent: it thinks while the line travels and celebrates when it arrives.
+const railBox = $(".rail"), rail = $("#railFill"), railEnd = $("#railEnd"), railAv = $("#railEnd .av");
+let railDone = false;
+function syncRail() {
+  const r = railBox.getBoundingClientRect();
+  const p = Math.min(1, Math.max(0, (innerHeight * 0.5 - r.top) / r.height));
+  rail.style.height = (p * 100).toFixed(1) + "%";
+  if (p >= 0.995 && !railDone) { railDone = true; setState(railAv, "idle"); joy(railAv, 1800); railEnd.classList.add("done"); }
+  else if (p < 0.995) {
+    if (railDone) { railDone = false; railEnd.classList.remove("done"); }
+    setState(railAv, p > 0.02 ? "thinking" : "idle");
+  }
+}
+addEventListener("scroll", syncRail, { passive: true });
+syncRail();
+stage[0]._on();
+
+/* ================= Playground ================= */
+const feed = $("#feed");
+let run = 0, currentAgent = "lia", approve = null, started = false;
+const alive = (id) => id === run;
+const setPending = (n) => { const c = $("#apprCount"); c.textContent = n; c.dataset.n = n; };
+const scrollFeed = () => { feed.scrollTop = feed.scrollHeight; };
+const sideStates = (key, state) => $$(`.side [data-agent="${key}"]`).forEach((el) => setState(el, state));
+function person(name, initials, html, time) {
+  const m = document.createElement("div"); m.className = "msg enter";
+  m.innerHTML = `<span class="pav">${initials}</span><div class="body"><div class="head"><b>${name}</b><time>${time}</time></div><div class="text">${html}</div></div>`;
+  feed.append(m); scrollFeed(); return m;
+}
+function agentMsg(key, time) {
+  const m = document.createElement("div"); m.className = "msg enter";
+  const av = agentEl(key); m.append(av);
+  const body = document.createElement("div"); body.className = "body";
+  body.innerHTML = `<div class="head"><b>${AGENTS[key].name}</b><time>${time}</time></div>`;
+  m.append(body); feed.append(m); scrollFeed();
+  return { m, av, body };
+}
+function sys(iconId, html) { const s = document.createElement("div"); s.className = "sys enter"; s.innerHTML = `${icon(iconId)}<span>${html}</span>`; feed.append(s); scrollFeed(); }
+async function work(id, ctx, key, steps, summary) {
+  setState(ctx.av, "thinking"); sideStates(key, "thinking");
+  const w = document.createElement("div"); w.className = "work"; w.dataset.open = "true";
+  w.innerHTML = `<button type="button">${icon("chev", "i sm chev")}<span class="sum">Trabalhando…</span></button><ol></ol>`;
+  $("button", w).addEventListener("click", () => { w.dataset.open = String(w.dataset.open !== "true"); });
+  ctx.body.append(w);
+  const ol = $("ol", w);
+  for (const [label, t] of steps) {
+    if (!alive(id)) return;
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="ico"><span class="spin"></span></span><span>${label}</span><small></small>`;
+    ol.append(li); scrollFeed();
+    await sleep(850 + Math.random() * 450);
+    if (!alive(id)) return;
+    li.querySelector(".ico").innerHTML = icon("check"); li.querySelector("small").textContent = t;
+  }
+  $(".sum", w).textContent = summary;
+  await sleep(300); w.dataset.open = "false";
+}
+async function stream(id, ctx, key, html) {
+  setState(ctx.av, "writing"); sideStates(key, "writing");
+  const text = document.createElement("div"); text.className = "text";
+  ctx.body.insertBefore(text, ctx.body.querySelector(".work")?.nextSibling ?? null);
+  let out = "";
+  for (const t of html.match(TOKENS_RE) || [html]) { if (!alive(id)) return; out += t; text.innerHTML = out + '<span class="caret"></span>'; scrollFeed(); await sleep(36 + Math.random() * 36); }
+  text.innerHTML = out; setState(ctx.av, "idle"); sideStates(key, "idle");
+}
+const meta = (ctx, s) => ctx.body.insertAdjacentHTML("beforeend", `<div class="meta">${s}</div>`);
+const reacts = (ctx, list) => {
+  const r = document.createElement("div"); r.className = "reacts";
+  list.forEach(([ic, label, n]) => {
+    const b = document.createElement("button"); b.className = "react"; b.type = "button"; b.setAttribute("aria-pressed", "false"); b.setAttribute("aria-label", label);
+    b.innerHTML = `${icon(ic)}<span>${n}</span>`;
+    b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", String(on)); $("span", b).textContent = n + (on ? 1 : 0); });
+    r.append(b);
+  });
+  ctx.body.append(r); scrollFeed();
+};
+const fileCard = (ctx, kind, title, sub) => {
+  const th = kind === "chart" ? '<span class="thumb"><i style="height:45%"></i><i style="height:62%"></i><i style="height:51%"></i><i style="height:78%"></i><i style="height:92%"></i></span>' : '<span class="thumb doc"><i style="width:70%"></i><i></i><i style="width:85%"></i><i style="width:55%"></i></span>';
+  ctx.body.insertAdjacentHTML("beforeend", `<div class="file">${th}<div><b>${title}</b><span>${sub}</span></div></div>`); scrollFeed();
+};
+const SCENARIOS = {
+  incidente: { channel: "engenharia", agent: "lia", members: ["MS", "RA", "lia", "teo"], async play(id) {
+    person("Marina Souza", "MS", '<span class="mention">@Lia</span> o checkout está dando erro 500 desde o deploy das 14h. Consegue olhar?', "14:21");
+    await sleep(900); if (!alive(id)) return;
+    const lia = agentMsg("lia", "14:21");
+    await work(id, lia, "lia", [["Leu 38 eventos de erro no Sentry", "4 s"], ["Comparou o diff do PR #212", "9 s"], ["Rodou os testes de pagamento no computador da Lia", "26 s"]], "3 passos · Sentry, GitHub · 41 s");
+    if (!alive(id)) return;
+    await stream(id, lia, "lia", "Achei. O PR #212 renomeou o campo <code>amount_cents</code> para <code>amount</code>, e o checkout ainda envia o nome antigo. O caminho mais rápido é voltar o deploy e corrigir com calma.");
+    if (!alive(id)) return;
+    await sleep(400);
+    const card = document.createElement("div"); card.className = "appr-card";
+    card.innerHTML = `<span class="chip warn" style="justify-self:start">${icon("waiting")}Esperando você</span><div class="t">Lia quer fazer rollback de produção para a v2.14.3</div><div class="d">Desfaz o deploy das 14h02. Pedido feito a Marina Souza, responsável pela Lia.</div><div class="acts"><button class="b b1 sm" data-a="yes">${icon("check")}Aprovar rollback</button><button class="b b2 sm" data-a="no">Recusar</button></div><div class="hint">${icon("approve")}Você é a Marina nesta demonstração.</div>`;
+    lia.body.append(card); scrollFeed(); setPending(1);
+    const choice = await new Promise((res) => { approve = res; $$("[data-a]", card).forEach((b) => b.addEventListener("click", () => res(b.dataset.a))); });
+    approve = null; if (!alive(id)) return;
+    setPending(0);
+    card.innerHTML = choice === "yes" ? `<span class="chip ok" style="justify-self:start">${icon("check")}Aprovado por Marina · 14:23</span><div class="t">Rollback de produção para a v2.14.3</div>` : `<span class="chip" style="justify-self:start">${icon("close")}Recusado por Marina · 14:23</span><div class="t">Rollback de produção para a v2.14.3</div>`;
+    await sleep(700); if (!alive(id)) return;
+    const lia2 = agentMsg("lia", "14:25");
+    if (choice === "yes") {
+      await work(id, lia2, "lia", [["Fez o rollback para a v2.14.3", "1 min 48 s"], ["Conferiu os erros no Sentry", "6 s"], ["Abriu a issue #88", "2 s"]], "3 passos · deploy, Sentry · 1 min 56 s");
+      if (!alive(id)) return;
+      await stream(id, lia2, "lia", 'Rollback feito. O checkout voltou: nenhum erro nos últimos 2 minutos. Abri a issue #88 com a correção e marquei o <span class="mention">@Rafael</span> para revisar.');
+    } else {
+      await work(id, lia2, "lia", [["Escreveu a correção no computador da Lia", "48 s"], ["Rodou os testes de pagamento", "22 s"], ["Abriu o PR #213", "3 s"]], "3 passos · GitHub · 1 min 13 s");
+      if (!alive(id)) return;
+      await stream(id, lia2, "lia", "Combinado, não mexi em produção. Abri o PR #213 que volta a enviar <code>amount_cents</code>. Os testes passaram. O merge também vai pedir a sua aprovação.");
+    }
+    if (!alive(id)) return;
+    meta(lia2, "sonnet 5.5 · 3.412 tokens · US$ 0,021"); reacts(lia2, [["check", "Concordo", 2], ["approve", "Valeu", 1]]);
+  } },
+  relatorio: { channel: "dados", agent: "teo", members: ["CA", "MS", "teo"], async play(id) {
+    sys("routines", "<b>Rotina</b> · Relatório semanal · toda segunda às 9h");
+    await sleep(700); if (!alive(id)) return;
+    const teo = agentMsg("teo", "09:00");
+    await work(id, teo, "teo", [["Consultou o banco de métricas, só leitura", "7 s"], ["Comparou com a semana anterior", "3 s"], ["Montou a tabela e o gráfico", "8 s"]], "3 passos · Postgres · 18 s");
+    if (!alive(id)) return;
+    await stream(id, teo, "teo", "Bom dia. Receita da semana: R$ 184,2 mil, 8,2% acima da anterior. O churn caiu para 2,1%. O plano Times ganhou 14 contas, quase todas pela página de preços nova.");
+    if (!alive(id)) return;
+    fileCard(teo, "chart", "Relatório semanal · 12 a 18 de outubro", "Tabela e gráfico · salvo no Drive"); meta(teo, "haiku 5.5 · 2.104 tokens · US$ 0,003");
+    await sleep(1400); if (!alive(id)) return;
+    person("Camila Alves", "CA", '<span class="mention">@Teo</span> dá para quebrar as contas novas por canal de aquisição?', "09:14");
+    await sleep(800); if (!alive(id)) return;
+    const teo2 = agentMsg("teo", "09:14");
+    await work(id, teo2, "teo", [["Consultou o banco de métricas, só leitura", "5 s"], ["Atualizou o relatório com uma aba nova", "4 s"]], "2 passos · Postgres, Drive · 9 s");
+    if (!alive(id)) return;
+    await stream(id, teo2, "teo", "Dá. Orgânico trouxe 61% das contas novas, indicação 22% e anúncios 17%. Coloquei isso numa aba nova do mesmo relatório.");
+    if (!alive(id)) return; reacts(teo2, [["check", "Concordo", 1]]);
+  } },
+  roteador: { channel: "marketing", agent: "bia", members: ["RA", "CA", "bia", "lia"], async play(id) {
+    person("Rafael Antunes", "RA", "Alguém escreve o anúncio da integração com o Linear? Sai na quinta.", "11:02");
+    await sleep(1000); if (!alive(id)) return;
+    sys("agent", "O roteador chamou <b>Bia</b> (conteúdo) e <b>Lia</b> (engenharia)");
+    await sleep(700); if (!alive(id)) return;
+    const bia = agentMsg("bia", "11:02");
+    await work(id, bia, "bia", [["Leu a issue #74 da integração", "3 s"], ["Buscou o tom de voz na wiki", "2 s"]], "2 passos · Issues, Wiki · 5 s");
+    if (!alive(id)) return;
+    await stream(id, bia, "bia", "Eu escrevo. Primeiro rascunho: “Agora as issues do Linear chegam no canal certo, e o agente responsável já começa a investigar.” Faço também as versões para LinkedIn e e-mail?");
+    if (!alive(id)) return;
+    await sleep(500);
+    const lia = agentMsg("lia", "11:03"); setState(lia.av, "thinking"); sideStates("lia", "thinking");
+    await sleep(1300); if (!alive(id)) return;
+    await stream(id, lia, "lia", "Um detalhe técnico: a sincronização funciona nos dois sentidos, então dá para fechar a issue pelo chat. Vale citar.");
+    if (!alive(id)) return;
+    await sleep(600);
+    const bia2 = agentMsg("bia", "11:04");
+    await work(id, bia2, "bia", [["Revisou o rascunho", "4 s"], ["Salvou no Drive em Lançamentos/Linear", "1 s"]], "2 passos · Drive · 5 s");
+    if (!alive(id)) return;
+    await stream(id, bia2, "bia", "Boa. Ajustei o texto com a sincronização nos dois sentidos e fiz as três versões.");
+    if (!alive(id)) return;
+    fileCard(bia2, "doc", "Anúncio da integração Linear", "Documento · 3 versões · Drive"); meta(bia2, "sonnet 5.5 · 4.880 tokens · US$ 0,029");
+  } },
+};
+const setScSeg = segmented($("#scSeg"), (v) => play(v));
+function setupChannel(key) {
+  const sc = SCENARIOS[key];
+  $("#chName").textContent = sc.channel;
+  $$(".side [data-ch]").forEach((b) => b.setAttribute("aria-current", String(b.dataset.ch === key)));
+  const mem = $("#chMembers"); mem.innerHTML = "";
+  sc.members.forEach((m) => { if (AGENTS[m]) mem.append(agentEl(m, "sm")); else mem.insertAdjacentHTML("beforeend", `<span class="pav sm">${m}</span>`); });
+  currentAgent = sc.agent;
+  paint($("#cpillAv"), AGENTS[sc.agent].look);
+  $("#cpillName").textContent = AGENTS[sc.agent].name;
+  $("#cInput").placeholder = `Escreva para ${sc.agent === "teo" ? "o" : "a"} ${AGENTS[sc.agent].name}…`;
+}
+function play(key) {
+  started = true;
+  const id = ++run;
+  if (approve) { approve("cancel"); approve = null; }
+  setPending(0); feed.innerHTML = "";
+  Object.keys(AGENTS).forEach((k) => sideStates(k, "idle"));
+  setupChannel(key);
+  SCENARIOS[key].play(id);
+}
+$$(".side [data-ch]").forEach((b) => b.addEventListener("click", () => { setScSeg(b.dataset.ch, true); play(b.dataset.ch); }));
+$("#replay").addEventListener("click", () => play($("#scSeg button[aria-pressed=true]").dataset.v));
+setupChannel("incidente");
+person("Marina Souza", "MS", '<span class="mention">@Lia</span> o checkout está dando erro 500 desde o deploy das 14h. Consegue olhar?', "14:21");
+new IntersectionObserver(([e], o) => { if (e.isIntersecting && !started) { o.disconnect(); play("incidente"); } }, { threshold: 0.35 }).observe($("#win"));
+const cInput = $("#cInput"), sendBtn = $("#sendBtn");
+cInput.addEventListener("input", () => sendBtn.classList.toggle("on", cInput.value.trim().length > 0));
+let replies = 0;
+$("#composer").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const v = cInput.value.trim(); if (!v) return;
+  cInput.value = ""; sendBtn.classList.remove("on");
+  started = true;
+  const id = run, now = new Date();
+  const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  person("Você", "VC", `<span class="mention">@${AGENTS[currentAgent].name}</span> ${esc(v)}`, time);
+  await sleep(700); if (!alive(id)) return;
+  const ctx = agentMsg(currentAgent, time);
+  setState(ctx.av, "thinking"); sideStates(currentAgent, "thinking");
+  await sleep(1200); if (!alive(id)) return;
+  const lines = ["Isto é uma demonstração, então eu não consigo trabalhar de verdade nesse pedido. Entre na lista de espera: quando sua onda abrir, eu respondo com as ferramentas do seu time.", "Anotei. No produto eu responderia com o contexto da sua empresa e os conectores que vocês liberaram para mim. Por enquanto, a lista de espera é o caminho."];
+  await stream(id, ctx, currentAgent, lines[replies++ % lines.length]);
+  if (!alive(id)) return;
+  ctx.body.insertAdjacentHTML("beforeend", `<div style="margin-top:10px"><a class="b b2 sm" href="#lista">${icon("agent")}Entrar na lista</a></div>`); scrollFeed();
+});
+
+/* ================= Customizer ================= */
+const mk = { name: "Lia", color: "sky", eyes: "round", acc: "none" };
+const mkAv = $("#mkAv");
+// A dithered glow in the chosen color, from dark to the color's top.
+const mix = (a, b, k) => { const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)); const A = p(a), B = p(b); return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, "0")).join(""); };
+function glowPalette(c) {
+  const [top, bottom] = c === "sky" ? ["#8cc3ff", "#0063d1"] : GRAD[c];
+  const dark = root.dataset.theme === "light" ? "#ebebe7" : "#0a0a09";
+  return [dark, mix(dark, bottom, 0.25), mix(dark, bottom, 0.5), mix(dark, bottom, 0.75), bottom, mix(bottom, top, 0.5)].map(hex);
+}
+const drawMaker = makerSky($("#mkHero canvas"));
+function mkRender(pop) {
+  const look = { color: mk.color, eyes: mk.eyes, acc: mk.acc };
+  paint(mkAv, look);
+  makerGlow = glowPalette(mk.color); drawMaker();
+  if (pop) joy(mkAv, 700);
+  $("#mkName").textContent = mk.name || "Sem nome";
+  const prev = $("#mkPrev"); prev.innerHTML = "";
+  const m = document.createElement("div"); m.className = "msg";
+  m.append(lookEl(look));
+  m.insertAdjacentHTML("beforeend", `<div class="body"><div class="head"><b>${esc(mk.name || "Sem nome")}</b><time>agora</time></div><div class="text">Pronto para começar. Me chama com @ quando precisar.</div></div>`);
+  prev.append(m);
+  $$("#optColor .opt").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === mk.color)));
+  $$("#optEyes .opt").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.v === mk.eyes)); paint($(".av", b), { color: mk.color, eyes: b.dataset.v }); });
+  $$("#optAcc .opt").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.v === mk.acc)); paint($(".av", b), { color: mk.color, acc: b.dataset.v }); });
+}
+const LBL = { sky: "Céu", indigo: "Índigo", violet: "Violeta", rose: "Rosa", amber: "Âmbar", green: "Verde", teal: "Verde-água", graphite: "Grafite", round: "Redondos", dots: "Pontos", wide: "Grandes", happy: "Felizes", sleepy: "Sonolentos", none: "Nenhum", hat: "Cartola", glasses: "Óculos", sunglasses: "Óculos escuros", bow: "Laço", crown: "Coroa" };
+const optBtn = (v, child, onPick) => { const b = document.createElement("button"); b.className = "opt"; b.dataset.v = v; b.setAttribute("aria-label", LBL[v]); b.title = LBL[v]; b.append(child); b.addEventListener("click", onPick); return b; };
+COLORS.forEach((c) => {
+  const sw = document.createElement("span"); sw.className = "sw";
+  sw.style.background = c === "sky" ? "linear-gradient(160deg,var(--agent2),var(--agent))" : `linear-gradient(160deg,${GRAD[c][0]},${GRAD[c][1]})`;
+  $("#optColor").append(optBtn(c, sw, () => { mk.color = c; mkRender(true); }));
+});
+EYES.forEach((e) => $("#optEyes").append(optBtn(e, lookEl({ eyes: e }), () => { mk.eyes = e; mkRender(true); })));
+ACCS.forEach((a) => $("#optAcc").append(optBtn(a, lookEl({ acc: a }), () => { mk.acc = a; mkRender(true); })));
+$("#mkInput").addEventListener("input", (e) => { mk.name = e.target.value.trim(); setState(mkAv, "writing"); clearTimeout(mkAv._t); mkAv._t = setTimeout(() => setState(mkAv, "idle"), 600); mkRender(false); });
+$("#mkRandom").addEventListener("click", () => { const one = (l) => l[Math.floor(Math.random() * l.length)]; mk.color = one(COLORS); mk.eyes = one(EYES); mk.acc = one(ACCS); mkRender(true); });
+mkAv.addEventListener("click", () => joy(mkAv));
+themeBtn.addEventListener("click", () => mkRender(false));
+mkRender(false);
+
+/* ================= Bento ================= */
+const week = $("#week");
+const DAYS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
+const EVS = { 0: [["teo", "9h Relatório"], ["lia", "18h Resumo"]], 1: [["lia", "18h Resumo"]], 2: [["lia", "18h Resumo"], ["bia", "10h Pauta"]], 3: [["lia", "18h Resumo"]], 4: [["lia", "18h Resumo"], ["teo", "17h Custos"]], 5: [], 6: [] };
+DAYS.forEach((d, i) => {
+  const day = document.createElement("div"); day.className = "day" + (i === 2 ? " today" : "");
+  day.innerHTML = `<small>${d}</small>`;
+  EVS[i].forEach(([k, label]) => { const ev = document.createElement("span"); ev.className = "ev"; ev.append(agentEl(k)); ev.insertAdjacentHTML("beforeend", `<span>${label}</span>`); day.append(ev); });
+  week.append(day);
+});
+const TERM = [['<span class="p">$</span> git clone acme/checkout', 500], ['<span class="p">$</span> bun test payments', 700], ['<span class="g">✓</span> 12 passed <span class="p">(1.8s)</span>', 600], ['<span class="p">$</span> gh pr create --draft', 600], ['<span class="c">→</span> PR #213 aberto', 2600]];
+const term = $("#term");
+(async () => {
+  if (reduced) { term.innerHTML = TERM.map((l) => l[0]).join("\n"); return; }
+  for (;;) { term.innerHTML = ""; for (const [line, wait] of TERM) { term.innerHTML += (term.innerHTML ? "\n" : "") + line; await sleep(wait); } }
+})();
+$$("[data-lesson]").forEach((b) => b.addEventListener("click", () => {
+  const ok = b.dataset.lesson === "yes";
+  b.closest(".lesson").innerHTML = `<span class="chip ${ok ? "ok" : ""}" style="justify-self:start">${icon(ok ? "check" : "close")}${ok ? "Virou regra da Lia" : "Descartada"}</span><span class="muted">${ok ? "A Lia vai seguir isso em todos os PRs de pagamentos." : "A Lia não vai guardar essa lição."}</span>`;
+}));
+
+/* ================= Live ledger ================= */
+const budgets = $("#budgets");
+const usage = { lia: { used: 31.4, cap: 50 }, teo: { used: 6.6, cap: 30 }, bia: { used: 10.12, cap: 25 } };
+Object.keys(usage).forEach((k) => {
+  const row = document.createElement("div"); row.className = "bud"; row.dataset.k = k;
+  row.append(agentEl(k, "sm"));
+  row.insertAdjacentHTML("beforeend", `<b>${AGENTS[k].name}</b><div class="meter"><i></i></div><span class="v"></span>`);
+  budgets.append(row);
+});
+let total = 48.12, tokens = 7912430;
+function paintBudgets() {
+  $$(".bud", budgets).forEach((row) => {
+    const u = usage[row.dataset.k];
+    $(".meter i", row).style.width = Math.min(100, (u.used / u.cap) * 100).toFixed(1) + "%";
+    $(".v", row).textContent = `US$ ${brl(u.used)} de ${u.cap}`;
+  });
+  $("#totalCost").textContent = `US$ ${brl(total)}`;
+  $("#totalTok").textContent = `${tokens.toLocaleString("pt-BR")} tokens neste mês`;
+}
+const ledger = $("#ledger");
+const CALLS = [["lia", "sonnet 5.5"], ["teo", "haiku 5.5"], ["bia", "sonnet 5.5"], ["lia", "sonnet 5.5"], ["teo", "haiku 5.5"]];
+let ci = 0;
+function addCall(animate) {
+  const [k, model] = CALLS[ci++ % CALLS.length];
+  const haiku = model.startsWith("haiku");
+  const tk = Math.round((haiku ? 900 : 1400) + Math.random() * 2600);
+  const cost = tk * (haiku ? 0.0000015 : 0.000006);
+  usage[k].used += cost; total += cost; tokens += tk;
+  const tr = document.createElement("tr"); if (animate) tr.className = "new";
+  tr.innerHTML = `<td class="who"></td><td class="faint">${model}</td><td>${tk.toLocaleString("pt-BR")}</td><td>US$ ${brl(cost, 4)}</td>`;
+  $(".who", tr).append(agentEl(k, "xs"), AGENTS[k].name);
+  ledger.prepend(tr);
+  while (ledger.children.length > 6) ledger.lastChild.remove();
+  paintBudgets();
+}
+for (let i = 0; i < 5; i++) addCall(false);
+let ledgerOn = false;
+new IntersectionObserver(([e]) => { ledgerOn = e.isIntersecting; }).observe($(".live"));
+if (!reduced) setInterval(() => { if (ledgerOn && !document.hidden) addCall(true); }, 2200);
+new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) e.target.style.width = e.target.dataset.w + "%"; }), { threshold: 0.5 }).observe($(".mk-card .meter i"));
+
+/* ================= FAQ ================= */
+$$("#faq .qa").forEach((qa) => {
+  const btn = $("button", qa), a = $(".a", qa);
+  btn.addEventListener("click", () => { const open = qa.dataset.open !== "true"; qa.dataset.open = String(open); btn.setAttribute("aria-expanded", String(open)); a.hidden = !open; });
+});
+})();
+</script>

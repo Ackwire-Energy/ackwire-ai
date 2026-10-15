@@ -26,4 +26,6 @@ export const storage = {
 export const STORAGE_KEYS = {
   theme: "agentes.theme",
   lastOrg: "agentes.lastOrg",
+  /** The email the visitor put on the landing page's waiting list. */
+  waitlist: "agentes.waitlist",
 } as const;
