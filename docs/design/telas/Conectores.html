@@ -62,6 +62,9 @@ button{font:inherit;color:inherit}
 svg.i{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .logo{width:36px;height:36px;border-radius:11px 11px 11px 4px;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none;background:var(--sunken);color:var(--ink2);box-shadow:inset 0 0 0 1px var(--line)}
 .logo.lg{width:44px;height:44px;font-size:17px;border-radius:13px 13px 13px 5px}
+/* Brand icon (Simple Icons, CC0) drawn as a mask in the brand color; near-black or too-light brands take the ink. */
+.logo .ic{width:58%;height:58%;background:var(--c,var(--ink));-webkit-mask:var(--src) center/contain no-repeat;mask:var(--src) center/contain no-repeat}
+.logo.has-ic{background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2)}
 
 /* Catalog */
 .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
@@ -232,6 +235,14 @@ const CATALOG = [
 ];
 const CATS = ["Todos", "Desenvolvimento", "Produto", "Docs", "Pagamentos", "Suporte", "Marketing", "Automação"];
 const byId = Object.fromEntries(CATALOG.map((c) => [c.id, c]));
+/* Brand icons (apps/web/public/connectors, from Simple Icons 16.32.0, CC0) and their brand color.
+   No color = the ink (brands that are near-black or too light to read on the tile). Canva isn't in Simple Icons. */
+const ICONS = {
+  github: { file: "github" }, linear: { file: "linear", hex: "#5E6AD2" }, sentry: { file: "sentry" }, notion: { file: "notion" },
+  drive: { file: "googledrive", hex: "#4285F4" }, atlassian: { file: "atlassian", hex: "#0052CC" }, asana: { file: "asana", hex: "#F06A6A" },
+  stripe: { file: "stripe", hex: "#635BFF" }, supabase: { file: "supabase", hex: "#3FCF8E" }, cloudflare: { file: "cloudflare", hex: "#F38020" },
+  intercom: { file: "intercom" }, zapier: { file: "zapier", hex: "#FF4F00" }, webflow: { file: "webflow", hex: "#146EF5" },
+};
 
 /* State: connected services and each agent's level per connector. */
 const state = {
@@ -252,7 +263,12 @@ const lock = '<svg class="i" viewBox="0 0 24 24"><rect x="5" y="11" width="14" h
 const check = '<svg class="i" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
 const $ = (s) => document.querySelector(s);
 const initials = (n) => n.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-const logo = (c, lg) => `<span class="logo${lg ? " lg" : ""}" aria-hidden="true">${initials(c.name)}</span>`;
+const logo = (c, lg) => {
+  const ic = ICONS[c.id];
+  if (!ic) return `<span class="logo${lg ? " lg" : ""}" aria-hidden="true">${initials(c.name)}</span>`;
+  const style = `--src:url(../../../apps/web/public/connectors/${ic.file}.svg)${ic.hex ? `;--c:${ic.hex}` : ""}`;
+  return `<span class="logo has-ic${lg ? " lg" : ""}" aria-hidden="true"><span class="ic" style="${style}"></span></span>`;
+};
 
 /* Agents drawn by the engine, alive. */
 const live = [];
