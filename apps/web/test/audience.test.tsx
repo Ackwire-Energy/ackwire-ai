@@ -41,7 +41,7 @@ describe("Quem pode falar com a Ada", () => {
     await click(within(dialog).getAllByLabelText(/Só algumas pessoas/)[0] as HTMLElement);
     // The owner (João) always can; he isn't in the list.
     expect(dialog.textContent).toContain("João sempre pode, como responsável.");
-    await click(within(dialog).getByLabelText(/Walter/));
+    await click(within(dialog).getAllByLabelText(/Walter/)[0] as HTMLElement);
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({

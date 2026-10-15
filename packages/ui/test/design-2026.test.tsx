@@ -38,10 +38,15 @@ describe("buttons and kbd", () => {
     expect(container.querySelector("kbd.ac-kbd")?.textContent).toBe("esc");
   });
 
-  test("disabled stays disabled; focus-visible gets the ring class hook", () => {
-    render(<Button disabled>Salvar</Button>);
-    const b = body().getByRole("button", { name: "Salvar" });
-    expect(b.hasAttribute("disabled")).toBe(true);
+  test("disabled stays disabled; an enabled button takes focus (the ring is CSS :focus-visible)", () => {
+    render(
+      <>
+        <Button disabled>Salvar</Button>
+        <Button>Cancelar</Button>
+      </>,
+    );
+    expect(body().getByRole("button", { name: "Salvar" }).hasAttribute("disabled")).toBe(true);
+    const b = body().getByRole("button", { name: "Cancelar" });
     b.focus();
     expect(document.activeElement).toBe(b);
   });

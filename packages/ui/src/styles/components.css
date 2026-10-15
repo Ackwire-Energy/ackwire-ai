@@ -2557,7 +2557,7 @@ a.ac-list__row:focus-visible {
 }
 .ac-seg__item {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   font: inherit;
   font-size: 13px;
   font-weight: 600;

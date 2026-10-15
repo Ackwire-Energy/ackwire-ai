@@ -4,6 +4,7 @@
  * tooltips) sit above dialogs and sheets so they open inside them.
  */
 :root {
+  --z-raised: 1;
   --z-sticky: 1;
   --z-scrim: 40;
   --z-dialog: 41;
