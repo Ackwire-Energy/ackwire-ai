@@ -17,6 +17,15 @@ const Target = z.union([
   z.object({ type: z.literal("channel"), channelId: z.uuid() }),
   z.object({ type: z.literal("dm") }),
   z.object({ type: z.literal("artifact") }),
+  z
+    .object({
+      type: z.literal("forum"),
+      agentIds: z.array(z.uuid()).min(1).max(8),
+      rounds: z.number().int().min(1).max(10).optional(),
+    })
+    .openapi({
+      description: "Opens a forum topic each time: the prompt is its goal; the routine's agent writes the synthesis.",
+    }),
 ]);
 /** What routines show: also `conversation` (a thread or DM, from an agent's `schedule_reminder` or `create_routine`). */
 const TargetView = z.union([
@@ -77,7 +86,12 @@ export function routineRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
-  const routines: RoutineDeps = { db, pubsub: adapters.pubsub, context: deps.extras?.context };
+  const routines: RoutineDeps = {
+    db,
+    pubsub: adapters.pubsub,
+    context: deps.extras?.context,
+    artifacts: deps.extras?.artifacts,
+  };
 
   app.openapi(
     createRoute({

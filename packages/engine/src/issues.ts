@@ -8,6 +8,7 @@ import { getMessage, postPersonMessage } from "./messages";
 import { can, getMembership } from "./organizations";
 import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
+import { syncWikiLinks } from "./wiki-links";
 
 const { issues, issueActivity, issueCounters, channels, channelMembers, artifacts } = schema;
 
@@ -270,6 +271,9 @@ export async function createIssue(
     if (!issue) throw new Error("issue insert returned nothing");
     await addActivity(tx, issue, { kind: "event", author, text: "criou a issue", event: "created" });
     await enqueueIndex(tx, { orgId, kind: "issue", sourceId: issue.id });
+    if (issue.description.includes("[[")) {
+      await syncWikiLinks(tx, orgId, { type: "issue", id: issue.id, channelId: issue.channelId }, issue.description);
+    }
     return issue;
   });
   const view = await one(db, row);
@@ -406,6 +410,9 @@ export async function updateIssue(
     if (!updated) throw new NotFoundError("Issue not found");
     for (const e of events) await addActivity(tx, updated, { kind: "event", author, ...e });
     await enqueueIndex(tx, { orgId, kind: "issue", sourceId: updated.id });
+    if (set.description !== undefined && (set.description.includes("[[") || current.description.includes("[["))) {
+      await syncWikiLinks(tx, orgId, { type: "issue", id: updated.id, channelId: updated.channelId }, set.description);
+    }
     return updated;
   });
   const view = await one(db, row);

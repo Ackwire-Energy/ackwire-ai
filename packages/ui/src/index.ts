@@ -6,6 +6,19 @@
  * translates them with `t()`.
  */
 
+export {
+  AGENT_ACCESSORIES,
+  AGENT_COLORS,
+  AGENT_EYES,
+  type AgentAccessory,
+  AgentAccessoryLayer,
+  type AgentAppearance,
+  type AgentColor,
+  type AgentEyes,
+  appearanceStyle,
+  normalizeAppearance,
+  randomAppearance,
+} from "./components/AgentLook";
 export { ApprovalCard, type ApprovalCardProps, type ApprovalStatus } from "./components/ApprovalCard";
 export {
   type AgentState,
@@ -34,6 +47,7 @@ export {
   type ComposerMentions,
   type ComposerProps,
   type ComposerSuggestion,
+  linkQuery,
   mentionQuery,
 } from "./components/Composer";
 export { DatePicker, type DatePickerProps, monthGrid, parseYmd, ymd } from "./components/DatePicker";

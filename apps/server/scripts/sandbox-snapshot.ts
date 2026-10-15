@@ -5,7 +5,7 @@
  *
  * Builds infra/sandbox/Dockerfile on Daytona (POST /snapshots with the
  * Dockerfile content), waits until it is active, starts one sandbox from it
- * (no network) and runs `node -v`, `npm -v`, `pnpm -v` and
+ * (no network) and runs `node -v`, `npm -v`, `pnpm -v`, `yarn -v` and
  * `python3 -c "import pandas, matplotlib"`, then deletes that sandbox. Set
  * SANDBOX_SNAPSHOT to the name afterwards. Never part of `bun test`.
  */
@@ -19,7 +19,9 @@ if (!key) {
   console.error("Set DAYTONA_API_KEY in .env");
   process.exit(1);
 }
-const name = process.argv[2] ?? config.SANDBOX_SNAPSHOT ?? "agentes-computer-v1";
+// The current image version; bump it whenever infra/sandbox/Dockerfile changes
+// (a snapshot is immutable), then point SANDBOX_SNAPSHOT at the new name.
+const name = process.argv[2] ?? "agentes-computer-v2";
 const api = config.DAYTONA_API_URL.replace(/\/$/, "");
 const headers = { authorization: `Bearer ${key}`, "content-type": "application/json" };
 const dockerfile = await Bun.file(resolve(import.meta.dir, "../../../infra/sandbox/Dockerfile")).text();
@@ -82,7 +84,10 @@ try {
   for (const command of [
     "node -v",
     "npm -v",
+    // With the network blocked, these prove nothing is downloaded on first use.
     "pnpm -v",
+    "command -v pnpm",
+    "yarn -v",
     "python3 -c \"import pandas, matplotlib; print('ok')\"",
     "pwd",
     "whoami",

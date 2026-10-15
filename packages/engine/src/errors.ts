@@ -14,7 +14,11 @@ export class NotFoundError extends Error {
 }
 
 export class ConflictError extends Error {
-  constructor(message: string) {
+  /** The API error code (`conflict`, `version_conflict`, `slug_taken`…). */
+  constructor(
+    message: string,
+    readonly code: string = "conflict",
+  ) {
     super(message);
     this.name = "ConflictError";
   }

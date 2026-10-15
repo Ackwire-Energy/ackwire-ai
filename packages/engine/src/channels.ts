@@ -103,7 +103,8 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
   if (!row) throw new ForbiddenError("You are not a member of this organization");
   const channel = row.channel;
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
-  if (!row.memberId) throw new ForbiddenError("Join this channel first");
+  // Forum topics are readable by the whole organization (D33); writing goes through the forum.
+  if (!row.memberId && channel.kind !== "forum") throw new ForbiddenError("Join this channel first");
   const membership: Membership = { orgId, orgName: row.orgName, role: row.role };
   return { channel, membership };
 }

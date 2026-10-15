@@ -1,5 +1,6 @@
 import {
   acceptInvitation,
+  avatarFile,
   changeMemberRole,
   countUsers,
   createInvitation,
@@ -11,15 +12,17 @@ import {
   listMemberships,
   previewInvitation,
   queueInvitationEmail,
+  removeAvatar,
   removeMember,
   requirePermission,
   revokeInvitation,
+  setAvatar,
   updateOrganization,
   updateOrgSettings,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { authUiConfig } from "../../auth";
-import { apiError } from "../../http/errors";
+import { apiError, errorResponse } from "../../http/errors";
 import {
   type AppDeps,
   body,
@@ -43,7 +46,7 @@ export function accountRoutes(deps: AppDeps) {
   const { db, config } = deps;
   const app = createAppRouter(deps);
   const session = requireSession(deps.auth);
-  for (const path of ["/me", "/organizations", "/organizations/*", "/invitations/:token/accept"])
+  for (const path of ["/me", "/avatars/*", "/organizations", "/organizations/*", "/invitations/:token/accept"])
     app.use(path, session);
 
   // ── Public ────────────────────────────────────────────────────────────────
@@ -129,6 +132,78 @@ export function accountRoutes(deps: AppDeps) {
       );
     },
   );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/avatar",
+      tags,
+      security,
+      summary: "Set your photo (JPEG, PNG or WebP up to 2 MB; metadata is removed). It is yours in every organization.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            imageBase64: z
+              .string()
+              .min(1)
+              .max(3_000_000)
+              .openapi({ description: "The image bytes in base64 (a data: URL prefix is accepted)." }),
+            contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+          }),
+        ),
+      },
+      responses: {
+        200: json(z.object({ avatarUrl: z.string() })),
+        429: errorResponse("Too many photo changes"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      await requirePermission(db, user.id, c.req.valid("param").orgId, "read");
+      const limit = await deps.adapters.rateLimiter.consume(`avatar:${user.id}`, { limit: 10, windowMs: 3600_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many photo changes; try again later");
+      return c.json(await setAvatar({ db, blobs: deps.adapters.platformBlobs }, user.id, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/me/avatar",
+      tags,
+      security,
+      summary: "Remove your photo (back to initials)",
+      request: { params: OrgParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      await requirePermission(db, c.get("user").id, c.req.valid("param").orgId, "read");
+      await removeAvatar({ db, blobs: deps.adapters.platformBlobs }, c.get("user").id);
+      return c.body(null, 204);
+    },
+  );
+
+  // A person's photo, for people who share an organization with them. The file
+  // name is a content hash, so a new photo gets a new URL and the old one can be cached.
+  app.get("/avatars/:userId/:file", async (c) => {
+    const file = await avatarFile(
+      { db, blobs: deps.adapters.platformBlobs },
+      c.get("user").id,
+      c.req.param("userId"),
+      c.req.param("file"),
+    );
+    return new Response(file.body, {
+      status: 200,
+      headers: {
+        "content-type": file.contentType,
+        "x-content-type-options": "nosniff",
+        "content-security-policy": "sandbox",
+        "cache-control": "private, max-age=31536000, immutable",
+      },
+    });
+  });
 
   app.openapi(
     createRoute({

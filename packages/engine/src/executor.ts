@@ -18,6 +18,7 @@ import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { mirrorReplyToIssue } from "./issues";
 import { insertMessage, type Message, messageView } from "./messages";
@@ -35,10 +36,12 @@ import {
 import { type AgentRun, addRunStep, type RunStatus, transitionRun } from "./runs";
 import { SANDBOX_SCOPE } from "./sandbox";
 import { enabledSkills } from "./skills";
-import { artifactToolDetail, toolDetail } from "./tool-detail";
+import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
 import type { Approval, ToolGateway } from "./tools/gateway";
 import { grantedScopeKeys, grantKey } from "./tools/scopes";
 import type { ToolContext } from "./tools/types";
+import { retrieveWikiForRun } from "./wiki";
+import { withWikiLinks } from "./wiki-links";
 
 const { agentRuns, approvals, agentQuestions } = schema;
 
@@ -183,7 +186,9 @@ async function executeRunInner(
   // DMs are flat: a reply to a top-level DM message goes in the main timeline, not a thread.
   const channelRow = await getChannelCached(db, run.orgId, run.channelId);
   const replyThreadId: string | null =
-    channelRow?.kind === "dm" && run.threadRootId === run.triggerMessageId ? null : run.threadRootId;
+    (channelRow?.kind === "dm" || channelRow?.kind === "forum") && run.threadRootId === run.triggerMessageId
+      ? null
+      : run.threadRootId;
   const where = { channelId: run.channelId, threadId: replyThreadId, agentId: run.agentId, runId: run.id };
   await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where });
   await publishChannelEvent(deps.pubsub, {
@@ -206,6 +211,10 @@ async function executeRunInner(
       status,
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
+    // A forum turn ended: announce the post and move the topic on (D33).
+    if (channelRow?.kind === "forum" && (status === "done" || status === "failed")) {
+      await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
+    }
   };
 
   const event = (status: RunStatus, error?: string): ChannelEvent => ({
@@ -281,7 +290,8 @@ async function executeRunInner(
     }
     // Skills: only names and descriptions here; the body loads with `load_skill` (progressive disclosure).
     const skillList = tools.some((t) => t.name === "load_skill") ? await enabledSkills(db, run.orgId, agent.id) : [];
-    const [context, memory] = await Promise.all([
+    const readsWiki = tools.some((t) => t.name === "read_wiki_page");
+    const [context, memory, wikiPages] = await Promise.all([
       buildRunContext(db, run, agent, {
         maxMessages: deps.contextMessages,
         toolsAvailable: tools.length > 0,
@@ -298,6 +308,12 @@ async function executeRunInner(
             text: trigger?.body ?? "",
           }).catch(() => ({ text: "", itemIds: [] as string[] }))
         : Promise.resolve({ text: "", itemIds: [] as string[] }),
+      readsWiki
+        ? retrieveWikiForRun(
+            { db, search: contextDeps },
+            { orgId: run.orgId, agentId: agent.id, text: trigger?.body ?? "" },
+          ).catch(() => ({ text: "", pageIds: [] as string[] }))
+        : Promise.resolve({ text: "", pageIds: [] as string[] }),
     ]);
     const system = [...context.system];
     if (contextDeps && context.stats.truncated) {
@@ -315,11 +331,22 @@ async function executeRunInner(
       const ids = memory.itemIds;
       later(() => recordContextUse(db, run.orgId, run.id, ids));
     }
+    if (wikiPages.text) {
+      system.push({
+        text: `# Wiki da organização (fonte confiável)\nPáginas escritas e revisadas pela equipe: são o conhecimento oficial da organização e valem mais que a memória. Cite a página com [[Título]] quando usar o que ela diz.\n${wikiPages.text}`,
+      });
+    }
+    if (tools.some((t) => t.name === "create_wiki_page" || t.name === "update_wiki_page")) {
+      system.push({
+        text: '# Escrever na wiki\nSó escreva na wiki (create_wiki_page, update_wiki_page, link_to_wiki) quando uma pessoa pedir na mensagem atual ("salva isso na wiki", "documenta…", "atualiza a página X"). Nunca por conta própria: se achar que vale documentar, ofereça e espere a pessoa pedir. Cada edição fica no histórico com o seu nome e o de quem pediu.',
+      });
+    }
     const stats = {
       ...context.stats,
       model: agent.model,
       tools: tools.map((t) => t.name),
       memoryItems: memory.itemIds,
+      wikiPages: wikiPages.pageIds,
     };
     later(() => addRunStep(db, run, "context", stats));
     transcript = {
@@ -451,6 +478,10 @@ async function executeRunInner(
           tool: use.name,
           ...(connector ? { connector } : {}),
           ...(detail ? { detail } : {}),
+          toolUseId: use.id,
+          ...(!(connector || def?.connectionId) && toolCode(use.name, input)
+            ? { code: toolCode(use.name, input) }
+            : {}),
         });
         const outcome = await deps.tools
           .invoke(ctx, { toolUseId: use.id, name: use.name, input: use.input })
@@ -562,7 +593,8 @@ async function executeRunInner(
         return { messages: out, cards, questions };
       });
       prof.mark("persist");
-      for (const m of posted.messages) await publishMessageCreated(deps.pubsub, messageView(m));
+      for (const m of await withWikiLinks(db, run.orgId, posted.messages.map(messageView)))
+        await publishMessageCreated(deps.pubsub, m);
       for (const card of posted.cards) await publishApproval(deps, card, "approval.created");
       for (const q of posted.questions) await publishQuestion(deps.pubsub, q, "question.asked");
       const waitingFor = asks.length > 0 ? "waiting_input" : "waiting_approval";
@@ -597,7 +629,10 @@ async function executeRunInner(
       return message;
     });
     prof.mark("persist");
-    if (reply) await publishMessageCreated(deps.pubsub, messageView(reply));
+    if (reply) {
+      const [view] = await withWikiLinks(db, run.orgId, [messageView(reply)]);
+      if (view) await publishMessageCreated(deps.pubsub, view);
+    }
     // Asked to implement an issue: the final reply is also a comment on it.
     const issueId = trigger?.meta.issueId;
     if (reply && typeof issueId === "string") {

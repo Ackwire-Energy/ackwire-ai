@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gte, inArray, isNotNull, lte, rowsOf, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
+import type { ArtifactDeps } from "./artifacts";
 import { audienceNotice, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
 import { type ContextDeps, resolveSummaryModel } from "./context/summaries";
@@ -8,6 +9,7 @@ import { nextCronTime } from "./cron";
 import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishUserEvent } from "./events";
+import { createForumTopic } from "./forum";
 import { getOrgSettings } from "./management";
 import { insertMessageWithRuns, messageView, postPersonMessage } from "./messages";
 import { can, requirePermission } from "./organizations";
@@ -26,7 +28,9 @@ export type RoutineTarget =
    * `reminder`: at the time the agent just posts "Lembrete: …" mentioning
    * `forUserId` (no run); otherwise the agent is asked, as in any routine.
    */
-  | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string };
+  | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string }
+  /** Opens a forum topic each time (D33): the prompt is its goal, these agents discuss it. */
+  | { type: "forum"; agentIds: string[]; rounds?: number };
 export const ROUTINE_EVENTS = [
   "sentry.issue_created",
   "github.pr_opened",
@@ -76,6 +80,8 @@ export interface RoutineInput {
 export interface RoutineDeps {
   db: Database;
   pubsub: PubSub;
+  /** Forum routines save their synthesis in the Drive. */
+  artifacts?: ArtifactDeps;
   /** For the model fallback of schedule parsing (`kind=summary`). */
   context?: ContextDeps;
 }
@@ -256,6 +262,12 @@ async function requireRoutineManager(db: Database, actorId: string, orgId: strin
 }
 
 async function checkTarget(db: Database, orgId: string, agentId: string, target: RoutineTarget) {
+  if (target.type === "forum") {
+    if (target.agentIds.length === 0 || target.agentIds.length > 8) {
+      throw new ValidationError("Escolha de 1 a 8 agentes para o fórum.");
+    }
+    return;
+  }
   if (target.type !== "channel" && target.type !== "conversation") return;
   const [row] = await db
     .select({ id: channelMembers.id })
@@ -536,6 +548,33 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
     }
   };
   try {
+    if (target.type === "forum") {
+      // A topic on a schedule ("toda sexta, retrospectiva"), opened for the routine's creator.
+      const when = new Intl.DateTimeFormat("pt-BR", {
+        timeZone: routine.timezone ?? "UTC",
+        day: "2-digit",
+        month: "2-digit",
+      }).format(new Date());
+      const topic = await createForumTopic(
+        { db, pubsub: deps.pubsub, artifacts: deps.artifacts },
+        { type: "person", userId: creator },
+        routine.orgId,
+        {
+          title: `${routine.name} — ${when}`,
+          goal: routine.prompt,
+          agentIds: [...new Set([agent.id, ...target.agentIds])],
+          rounds: target.rounds,
+          ownerAgentId: agent.id,
+        },
+      );
+      await db
+        .update(routineRuns)
+        .set({ status: "ok", summary: `Fórum aberto: ${topic.title}` })
+        .where(eq(routineRuns.id, run.id));
+      await db.update(routines).set({ lastRunAt: new Date() }).where(eq(routines.id, routine.id));
+      await finishOnce();
+      return;
+    }
     if (target.type === "conversation" && target.reminder) {
       // A plain reminder: the agent's own message, mentioning the person; no run.
       const who = target.forUserId ?? creator;

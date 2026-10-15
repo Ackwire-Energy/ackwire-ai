@@ -208,6 +208,8 @@ export async function listMembers(db: Database, orgId: string) {
   }
   return rows.map(({ ownTimezone, orgTimezone, handle, ...r }) => ({
     ...r,
+    /** The photo uploaded here (`PUT …/me/avatar`); `image` may also be a sign-in provider's. */
+    avatarUrl: r.image?.startsWith("/api/app/avatars/") ? r.image : null,
     handle: handle ?? "",
     timezone: ownTimezone ?? orgTimezone ?? "UTC",
   }));

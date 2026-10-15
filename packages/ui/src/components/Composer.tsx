@@ -75,10 +75,22 @@ export interface ComposerProps {
   mentions?: ComposerMentions;
   /** "/" at the start of the box opens these commands (same combobox). */
   commands?: ComposerCommands;
+  /** `[[` autocompletes (e.g. wiki pages): `insert` is the title put inside `[[…]]`. */
+  links?: ComposerMentions;
   /** Context pills under the text (the target agent, the active skill). */
   pills?: ReactNode;
   /** Shown in the send button once there is text ("Enviar"); the key hint follows. */
   sendText?: string;
+}
+
+/** "[[que" right before the caret (no "]]" or line break yet). */
+export function linkQuery(text: string, caret: number): { start: number; query: string } | null {
+  const before = text.slice(0, caret);
+  const at = before.lastIndexOf("[[");
+  if (at < 0) return null;
+  const query = before.slice(at + 2);
+  if (/[\]\n[]/.test(query) || query.length > 80) return null;
+  return { start: at, query };
 }
 
 /** "@que" right before the caret (start of text or after a space or bracket). */
@@ -105,6 +117,7 @@ export function Composer({
   textareaRef,
   mentions,
   commands,
+  links,
   pills,
   sendText,
 }: ComposerProps) {
@@ -114,6 +127,8 @@ export function Composer({
   useImperativeHandle(textareaRef, () => ref.current as HTMLTextAreaElement, []);
   // The "@…" being typed, and the one the person closed with Esc.
   const [token, setToken] = useState<{ start: number; query: string } | null>(null);
+  // `[[que` being typed (wiki links).
+  const [linkToken, setLinkToken] = useState<{ start: number; query: string } | null>(null);
   const [dismissed, setDismissed] = useState<number | null>(null);
   const [active, setActive] = useState(0);
   const caretAfter = useRef<number | null>(null);
@@ -146,12 +161,21 @@ export function Composer({
           })) ?? [])
       : [];
   const mentionItems = mentions && token && token.start !== dismissed ? mentions.search(token.query) : [];
-  const items = slashItems.length > 0 ? slashItems : mentionItems;
+  const linkItems = links && linkToken && linkToken.start !== dismissed ? links.search(linkToken.query) : [];
+  const items = slashItems.length > 0 ? slashItems : linkItems.length > 0 ? linkItems : mentionItems;
   const isSlash = slashItems.length > 0;
+  const isLink = !isSlash && linkItems.length > 0;
   const open = items.length > 0;
   const current = Math.min(active, Math.max(0, items.length - 1));
 
   const track = (text: string, caret: number) => {
+    if (links) {
+      const nextLink = linkQuery(text, caret);
+      if (nextLink?.start !== linkToken?.start || nextLink?.query !== linkToken?.query) {
+        setLinkToken(nextLink);
+        setActive(0);
+      }
+    }
     if (!mentions) return;
     const next = mentionQuery(text, caret);
     if (next?.start !== token?.start || next?.query !== token?.query) {
@@ -167,6 +191,16 @@ export function Composer({
       caretAfter.current = item.insert.length;
       onChange(item.insert);
       command?.onPick?.();
+      return;
+    }
+    if (isLink && linkToken) {
+      const end = linkToken.start + 2 + linkToken.query.length;
+      const inserted = `[[${item.insert}]] `;
+      const next = value.slice(0, linkToken.start) + inserted + value.slice(end).replace(/^\]\]\s?/, "");
+      caretAfter.current = linkToken.start + inserted.length;
+      setLinkToken(null);
+      onChange(next);
+      links?.onPick?.(item);
       return;
     }
     if (!token) return;
@@ -197,7 +231,7 @@ export function Composer({
       }
       const item = items[current];
       // Already typed in full ("oi @ada" + Enter): Enter sends; Tab still completes.
-      const typedInFull = item && token && item.insert.toLowerCase() === token.query.toLowerCase();
+      const typedInFull = !isLink && item && token && item.insert.toLowerCase() === token.query.toLowerCase();
       if (e.key === "Tab" || (e.key === "Enter" && !typedInFull)) {
         e.preventDefault();
         if (item) pick(item);
@@ -206,7 +240,7 @@ export function Composer({
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        setDismissed(isSlash ? -1 : (token?.start ?? null));
+        setDismissed(isSlash ? -1 : isLink ? (linkToken?.start ?? null) : (token?.start ?? null));
         return;
       }
     }
@@ -233,7 +267,7 @@ export function Composer({
       }}
       onSelect={(e) => track(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
       onKeyDown={onKeyDown}
-      {...(mentions || commands
+      {...(mentions || commands || links
         ? {
             role: "combobox",
             "aria-autocomplete": "list" as const,
@@ -290,7 +324,7 @@ export function Composer({
           </div>
         </div>
       </RPopover.Anchor>
-      {(mentions || commands) && (
+      {(mentions || commands || links) && (
         <RPopover.Portal>
           <RPopover.Content
             className={cx("ac-menu ac-suggest", isSlash && "ac-suggest--commands")}
@@ -307,7 +341,9 @@ export function Composer({
             <div
               role="listbox"
               id={listId}
-              aria-label={isSlash ? (commands?.listLabel ?? "") : (mentions?.listLabel ?? "")}
+              aria-label={
+                isSlash ? (commands?.listLabel ?? "") : isLink ? (links?.listLabel ?? "") : (mentions?.listLabel ?? "")
+              }
             >
               {items.map((item, i) => {
                 const heading = item.group && item.group !== items[i - 1]?.group;

@@ -3015,6 +3015,7 @@ a.ac-list__row:focus-visible {
 }
 .ac-work__step {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding: 7px 14px 7px 16px;
@@ -3332,4 +3333,78 @@ a.ac-list__row:focus-visible {
 .ac-tick--pending {
   background: var(--sunken);
   color: var(--muted);
+}
+.ac-work__detail {
+  flex: 1 0 100%;
+  padding: 6px 0 4px 28px;
+  min-width: 0;
+}
+
+/* Agent look (customizer): color, eyes and accessories, at every size, still alive. */
+.ac-avatar--agent[style*="--av-top"] {
+  background: linear-gradient(160deg, var(--av-top), var(--av-bottom));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 6px 16px -6px color-mix(in srgb, var(--av-bottom) 70%, transparent);
+}
+.ac-avatar--agent[style*="--av-top"].ac-avatar--running::after {
+  border-color: color-mix(in srgb, var(--av-bottom) 45%, transparent);
+}
+.ac-avatar--xl {
+  width: 112px;
+  height: 112px;
+  font-size: 36px;
+}
+.ac-avatar__accessory {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+/* Eyes */
+.ac-avatar[data-eyes="dots"] .ac-avatar__eye {
+  width: 10%;
+  height: 12%;
+  top: 44%;
+}
+.ac-avatar[data-eyes="dots"] .ac-avatar__eye--l {
+  left: 30%;
+}
+.ac-avatar[data-eyes="dots"] .ac-avatar__eye--r {
+  right: 30%;
+}
+.ac-avatar[data-eyes="wide"] .ac-avatar__eye {
+  width: 19%;
+  height: 26%;
+  top: 37%;
+}
+.ac-avatar[data-eyes="wide"] .ac-avatar__eye--l {
+  left: 24%;
+}
+.ac-avatar[data-eyes="wide"] .ac-avatar__eye--r {
+  right: 24%;
+}
+.ac-avatar[data-eyes="happy"] .ac-avatar__eye {
+  background: transparent;
+  border: 0.14em solid var(--agent-eye);
+  border-bottom: 0;
+  border-radius: 999px 999px 0 0;
+  height: 9%;
+  top: 44%;
+  box-sizing: border-box;
+}
+.ac-avatar[data-eyes="sleepy"] .ac-avatar__eye {
+  height: 8%;
+  top: 48%;
+  border-radius: 0 0 999px 999px;
+}
+/* Writing always shows dash eyes, whatever the style. */
+.ac-avatar--writing[data-eyes] .ac-avatar__eye {
+  background: var(--agent-eye);
+  border: 0;
+  height: 9%;
+  top: 46%;
+  border-radius: 4px;
 }

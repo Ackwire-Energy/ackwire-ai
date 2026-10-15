@@ -12,6 +12,7 @@ export const Member = z
     name: z.string(),
     email: z.string(),
     image: z.string().nullable(),
+    avatarUrl: z.string().nullable().openapi({ description: "The photo uploaded here; wins over `image`." }),
     role: Role,
     joinedAt: z.string(),
     handle: z.string(),
@@ -48,6 +49,14 @@ export const AgentAudience = z
   .object({ mode: z.enum(["everyone", "people", "owner"]), userIds: z.array(z.string()).max(500) })
   .openapi("AgentAudience");
 
+export const AgentAppearance = z
+  .object({
+    color: z.enum(["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"]),
+    eyes: z.enum(["round", "dots", "wide", "happy", "sleepy"]),
+    accessory: z.enum(["none", "hat", "cap", "glasses", "sunglasses", "headphones", "bow", "crown"]),
+  })
+  .openapi("AgentAppearance");
+
 export const Agent = z
   .object({
     id: z.uuid(),
@@ -63,6 +72,7 @@ export const Agent = z
     audience: AgentAudience,
     audienceMode: z.enum(["everyone", "people", "owner"]),
     canTalk: z.boolean().openapi({ description: "Whether the current person can talk to it (mentions, DMs)." }),
+    appearance: AgentAppearance.nullable().openapi({ description: "Its look; null = the default." }),
   })
   .openapi("Agent");
 

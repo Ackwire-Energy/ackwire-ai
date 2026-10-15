@@ -524,6 +524,32 @@ async function computerView(
   return { ...base, diskUsedGib: Math.round((diskMib / 1024) * 100) / 100, status };
 }
 
+/** The agent's own computer, for its tools (no person's permission: it's the agent asking about itself). */
+export async function ownComputerStatus(deps: Pick<SandboxDeps, "db" | "provider">, orgId: string, agentId: string) {
+  return computerView(deps, orgId, agentId, await liveComputer(deps.db, orgId, agentId));
+}
+
+/** The agent turns its own computer off (`computer_stop`); files stay. */
+export async function stopOwnComputer(
+  deps: Pick<SandboxDeps, "db" | "provider"> & { pubsub?: PubSub },
+  orgId: string,
+  agentId: string,
+) {
+  const row = await liveComputer(deps.db, orgId, agentId);
+  if (!row?.providerId) return ownComputerStatus(deps, orgId, agentId);
+  await deps.provider.stop(row.providerId);
+  await deps.db.update(sandboxes).set({ status: "stopped", updatedAt: new Date() }).where(eq(sandboxes.id, row.id));
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "agent", id: agentId },
+    action: "sandbox.stopped",
+    target: { type: "sandbox", id: row.id },
+    details: { agentId, via: "tool" },
+  });
+  await publishComputerEvent(deps.pubsub, orgId, { agentId, status: "stopped" });
+  return ownComputerStatus(deps, orgId, agentId);
+}
+
 export async function getAgentComputer(
   deps: Pick<SandboxDeps, "db" | "provider">,
   actorId: string,

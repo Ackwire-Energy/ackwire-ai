@@ -79,6 +79,8 @@ export const agents = pgTable(
      */
     audienceMode: text().$type<"everyone" | "people" | "owner">().notNull().default("everyone"),
     audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
+    /** Its look in the app (color, eyes, accessory from a fixed allow-list). Null = the default look. */
+    appearance: jsonb().$type<{ color: string; eyes: string; accessory: string }>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),

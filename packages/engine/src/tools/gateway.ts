@@ -155,7 +155,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         await addRunStep(ctx.db, step, "approval", { approvalId: row.id, toolUseId: call.toolUseId, title: row.title });
         return { type: "approval", approval: row };
       }
-      const output = await run(tool, call.input, ctx);
+      const output = await run(tool, call.input, { ...ctx, toolUseId: call.toolUseId });
       if (builtIn && output.waitForAnswer?.text) {
         return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices };
       }
@@ -193,7 +193,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           .where(sql`${approvals.id} = ${approval.id} and ${approvals.executedAt} is null`)
           .returning({ id: approvals.id });
         if (claimed.length === 0) return { content: "Already executed", isError: false };
-        output = await run(tool, approval.params, ctx);
+        output = await run(tool, approval.params, { ...ctx, toolUseId: approval.toolUseId });
       }
       await ctx.db
         .update(approvals)

@@ -240,6 +240,90 @@ describe("limits and cost", () => {
   });
 });
 
+describe("what the agent is running", () => {
+  test("the activity shows the code (secrets masked); output streams live, capped; the step keeps it", async () => {
+    const provider = sandboxSetup(() => ({
+      exitCode: 0,
+      stdout: `${"x".repeat(100_000)}token sk-ant-abcdefghijklmnop`,
+      stderr: "warn",
+      timedOut: false,
+    }));
+    f = await setup({
+      sandbox: provider,
+      reply: (req) => {
+        const last = JSON.stringify(req.messages.at(-1)?.content);
+        if (last.includes("tool_result")) return { chunks: ["Rodei."] };
+        return {
+          chunks: [],
+          toolUses: [
+            {
+              name: "run_code",
+              input: { language: "python", code: 'key = "sk-ant-abcdefghijklmnop"\nprint(1)' },
+            },
+          ],
+        };
+      },
+    });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    const events = f.listen(f.general.id);
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev roda isso",
+    });
+    await drainOutbox(f.db, f.handlers);
+    await Bun.sleep(5);
+    const start = events.find((e) => e.type === "agent.tool" && (e as { tool?: string }).tool === "run_code") as
+      | { toolUseId?: string; code?: { language: string; source: string } }
+      | undefined;
+    expect(start?.code?.language).toBe("python");
+    expect(start?.code?.source).toContain("print(1)");
+    expect(start?.code?.source).not.toContain("sk-ant-abcdefghijklmnop");
+    const out = events.filter((e) => e.type === "agent.tool.output") as unknown as {
+      stream: string;
+      text: string;
+      toolUseId?: string;
+      threadId: string | null;
+    }[];
+    expect(out.length).toBeGreaterThan(0);
+    expect(out.every((o) => o.toolUseId === start?.toolUseId && o.threadId !== null)).toBe(true);
+    const streamed = out.map((o) => o.text).join("");
+    expect(streamed.length).toBeLessThan(66 * 1024);
+    expect(streamed).toContain("mais saída");
+    expect(out.some((o) => o.stream === "stderr" && o.text.includes("warn"))).toBe(true);
+    // After the fact: the call (with the code) and the result (exit code, output) are in the run's steps.
+    const steps = await f.db.select().from(schema.agentRunSteps);
+    const callStep = steps.find((s) => s.kind === "tool_call")?.data as { input?: { code?: string } };
+    expect(callStep?.input?.code).toContain("print(1)");
+    const result = steps.find((s) => s.kind === "tool_result")?.data as {
+      content: string;
+      data?: { exitCode?: number };
+    };
+    expect(result.content).toStartWith("run_code python: exit code 0");
+    expect(result.data?.exitCode).toBe(0);
+  });
+});
+
+describe("turning the computer on and off from the chat", () => {
+  test("computer_status, computer_start (creates it), computer_stop (files kept), audited as the agent", async () => {
+    const provider = sandboxSetup();
+    f = await setup({ sandbox: provider, reply: () => ({ chunks: ["ok"] }) });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    const ctx = await runCtx();
+    expect((await call(ctx, "computer_status", {})).content).toStartWith("Status: none");
+    const on = await call(ctx, "computer_start", {});
+    expect(on.isError).toBeFalsy();
+    expect(on.content).toStartWith("Your computer is running.");
+    expect(provider.calls.filter((c) => c.op === "create")).toHaveLength(1);
+    await call(ctx, "write_file", { path: "a.txt", content: "a" });
+    const off = await call(ctx, "computer_stop", {});
+    expect(off.content).toBe("Your computer is stopped; files kept.");
+    const [row] = await f.db.select().from(schema.sandboxes);
+    expect(row?.status).toBe("stopped");
+    const audit = (await f.db.select().from(schema.auditLog)).find((a) => a.action === "sandbox.stopped");
+    expect(audit).toMatchObject({ actorType: "agent", actorId: f.agent.id });
+    expect((await call(ctx, "read_file", { path: "a.txt" })).content).toContain("a"); // starts again, same files
+  });
+});
+
 describe("network mode", () => {
   test("open internet: new computers get it; running ones switch in place; stopped ones on next start", async () => {
     const provider = sandboxSetup();

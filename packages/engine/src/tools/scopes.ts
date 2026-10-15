@@ -28,6 +28,15 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   },
   "issues:write": { label: "Issues", description: "Criar e atualizar issues." },
   "skills:read": { label: "Usar skills", description: "Carregar as skills ligadas para o agente." },
+  "wiki:read": { label: "Ler a wiki", description: "Buscar e ler as páginas da wiki da organização." },
+  "wiki:write": {
+    label: "Escrever na wiki",
+    description: "Criar e editar páginas da wiki, só quando uma pessoa pede.",
+  },
+  "forum:write": {
+    label: "Fórum",
+    description: "Abrir tópicos no fórum, ler e postar fora da própria vez.",
+  },
   "schedule:write": {
     label: "Agendar",
     description: "Criar lembretes e rotinas pelo chat, para quem pediu, no fuso dessa pessoa.",
@@ -50,6 +59,9 @@ export const DEFAULT_AGENT_SCOPES = [
   "drive:write",
   "skills:read",
   "schedule:write",
+  "forum:write",
+  "wiki:read",
+  "wiki:write",
 ];
 
 export interface ScopeGrant {
@@ -107,7 +119,7 @@ export function toolAccess(
 
 /** `drive:read` → `drive:write` for built-in scopes that have both; otherwise null. */
 export function impliedByWrite(scope: string) {
-  const m = /^(drive|issues|calendar):read$/.exec(scope);
+  const m = /^(drive|issues|calendar|wiki):read$/.exec(scope);
   return m ? `${m[1]}:write` : null;
 }
 

@@ -24,6 +24,7 @@ import {
   createCalendarToolSource,
   createContextToolSource,
   createCredential,
+  createForumToolSource,
   createIssueToolSource,
   createJobHandlers,
   createLocalKeyWrapper,
@@ -33,6 +34,7 @@ import {
   createScheduleToolSource,
   createSkillToolSource,
   createToolGateway,
+  createWikiToolSource,
   type MemberRole,
   type SandboxDeps,
   type StorageDeps,
@@ -79,8 +81,12 @@ export async function setup(
     skillTools?: boolean;
     /** Fake embeddings (hybrid search). Off: full-text only, no embedding usage rows. */
     embeddings?: boolean;
+    /** Add the forum tools (open_forum_topic, post_in_forum, read_forum_topic). */
+    forumTools?: boolean;
     /** Add the scheduling tools (schedule_reminder, create_routine…). */
     scheduleTools?: boolean;
+    /** Add the wiki tools (search_wiki, read_wiki_page, create_wiki_page…). */
+    wikiTools?: boolean;
     /** Add the sandbox tools with this (fake) provider. */
     sandbox?: SandboxProvider;
   } = {},
@@ -167,8 +173,17 @@ export async function setup(
     ...(options.skillTools ? [createSkillToolSource({ db, blobs: artifactDeps.blobs })] : []),
     ...(options.contextTools ? [createContextToolSource(context)] : []),
     ...(options.scheduleTools ? [createScheduleToolSource({ pubsub, context })] : []),
+    ...(options.forumTools ? [createForumToolSource({ pubsub, artifacts: artifactDeps })] : []),
+    ...(options.wikiTools ? [createWikiToolSource({ pubsub, search: context, artifacts: artifactDeps })] : []),
     ...(sandboxDeps
-      ? [createSandboxToolSource({ ...sandboxDeps, artifacts: artifactDeps, skills: { blobs: artifactDeps.blobs } })]
+      ? [
+          createSandboxToolSource({
+            ...sandboxDeps,
+            artifacts: artifactDeps,
+            skills: { blobs: artifactDeps.blobs },
+            pubsub,
+          }),
+        ]
       : []),
     ...(options.toolSources ?? []),
   ];
@@ -185,6 +200,7 @@ export async function setup(
     context,
     search,
     storage,
+    artifacts: artifactDeps,
     sandbox: sandboxDeps,
   };
   const handlers = createJobHandlers(jobDeps);

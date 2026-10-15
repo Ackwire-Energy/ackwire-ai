@@ -42,7 +42,7 @@ const KINDS = [
   "note",
   "lesson",
 ] as const;
-const SEARCH_KINDS = ["message", "context_item", "issue", "forum_topic", "forum_reply", "file"] as const;
+const SEARCH_KINDS = ["message", "context_item", "issue", "forum_topic", "forum_reply", "file", "wiki"] as const;
 
 const Item = z
   .object({

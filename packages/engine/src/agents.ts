@@ -1,5 +1,6 @@
 import { and, asc, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
+import type { AgentAppearance } from "./appearance";
 import { caches } from "./cache";
 import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { getMembership, requirePermission } from "./organizations";
@@ -163,6 +164,8 @@ export const agentView = (a: Agent) => ({
   ownerUserId: a.ownerUserId,
   hasCredential: a.credentialId !== null,
   monthlyBudgetNanoUsd: a.monthlyBudgetNanoUsd,
+  /** Its look (color, eyes, accessory); null = the default. */
+  appearance: (a.appearance ?? null) as AgentAppearance | null,
   createdAt: a.createdAt,
 });
 

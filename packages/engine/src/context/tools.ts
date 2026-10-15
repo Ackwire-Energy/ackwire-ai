@@ -43,7 +43,10 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           query: { type: "string", minLength: 1, maxLength: 500 },
           kinds: {
             type: "array",
-            items: { type: "string", enum: ["message", "context_item", "issue", "forum_topic", "forum_reply", "file"] },
+            items: {
+              type: "string",
+              enum: ["message", "context_item", "issue", "forum_topic", "forum_reply", "file", "wiki"],
+            },
           },
           limit: { type: "integer", minimum: 1, maximum: 20 },
         },

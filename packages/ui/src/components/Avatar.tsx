@@ -1,5 +1,6 @@
 import type { HTMLAttributes } from "react";
 import { cx } from "../cx";
+import { AgentAccessoryLayer, type AgentAppearance, appearanceStyle } from "./AgentLook";
 
 export type AvatarKind = "person" | "agent";
 
@@ -14,13 +15,15 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   /** Display name; initials are derived from it unless `initials` is given. */
   name: string;
   initials?: string;
-  /** 18 (receipts), 24, 36 (default) or 56px. */
-  size?: "xs" | "sm" | "md" | "lg";
+  /** 18 (receipts), 24, 36 (default), 56 or 112px (the customizer preview). */
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   imageUrl?: string | null;
   /** Agent is executing: the halo (same as `state="thinking"` unless `state` says otherwise). */
   running?: boolean;
   /** The living agent symbol's state (agents only). */
   state?: AgentState;
+  /** The agent's look: color, eyes and an accessory (agents only). */
+  appearance?: AgentAppearance;
   /** Online (person) / available (agent) dot. */
   presence?: boolean;
   /** Set when no visible name is next to the avatar: exposes `name` to screen readers. */
@@ -48,9 +51,11 @@ export function Avatar({
   imageUrl,
   running,
   state,
+  appearance,
   presence,
   labelled,
   className,
+  style,
   ...rest
 }: AvatarProps) {
   const a11y = labelled ? ({ role: "img", "aria-label": name } as const) : ({ "aria-hidden": true } as const);
@@ -69,12 +74,15 @@ export function Avatar({
       {...a11y}
       data-kind={kind}
       data-state={agent ? mood : undefined}
+      data-eyes={agent && appearance?.eyes && appearance.eyes !== "round" ? appearance.eyes : undefined}
+      style={agent ? { ...appearanceStyle(appearance), ...style } : style}
       {...rest}
     >
       {agent ? (
         <>
           <span className="ac-avatar__eye ac-avatar__eye--l" />
           <span className="ac-avatar__eye ac-avatar__eye--r" />
+          <AgentAccessoryLayer accessory={appearance?.accessory} />
         </>
       ) : imageUrl ? (
         <img src={imageUrl} alt="" />

@@ -19,6 +19,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
+import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 
 const { messages, agents, channelMembers, channels, agentRuns, outbox, agentQuestions } = schema;
 
@@ -308,6 +309,10 @@ export async function insertMessageWithRuns(
     editedAt: asDate(row.edited_at),
     deletedAt: asDate(row.deleted_at),
   };
+  // `[[…]]` links become backlinks of the pages they name (D34).
+  if (body.includes("[[")) {
+    await syncWikiLinks(tx, input.orgId, { type: "message", id: message.id, channelId: input.channelId }, body);
+  }
   return { message, runs: parseJson(row.runs, []), blocked: parseJson(row.blocked ?? null, [] as string[]) };
 }
 
@@ -332,6 +337,8 @@ export async function postPersonMessage(
   // One access check (membership + channel) instead of two round trips.
   const { channel, membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
   if (!can(membership.role, "post")) throw new ForbiddenError();
+  // A forum topic is written through the forum (its turns), never as a plain chat (D33).
+  if (channel.kind === "forum") throw new ValidationError("Escreva no fórum pela página do tópico.");
   const clientId = input.clientId?.trim().slice(0, 64) || null;
   // One statement: the message, its jobs, and the runs of agents that will surely answer.
   const { message, runs, blocked } = await insertMessageWithRuns(
@@ -346,7 +353,7 @@ export async function postPersonMessage(
     },
     { startRuns: true },
   );
-  const view = messageView(message);
+  const [view] = (await withWikiLinks(deps.db, orgId, [messageView(message)])) as [MessageView];
   // Right after the commit, before any routing: the sender's optimistic copy reconciles by `clientId`.
   await publishMessageCreated(deps.pubsub, view);
   // People mentioned by handle hear about it on their own topic (notifications).
@@ -516,7 +523,7 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
     ),
     usageFor(db, orgId, list),
   ]);
-  return list.map((m) => {
+  const views = list.map((m) => {
     const runUsage = m.agentRunId ? usage.get(m.agentRunId) : undefined;
     return {
       ...messageView(m),
@@ -524,4 +531,5 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
       ...(runUsage ? { usage: runUsage } : {}),
     };
   });
+  return withWikiLinks(db, orgId, views);
 }

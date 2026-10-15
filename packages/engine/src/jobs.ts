@@ -1,5 +1,7 @@
 import type { EmailSender, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
 import { and, count, eq, inArray, queryTrace, schema } from "@agenteschat/db";
+import type { ArtifactDeps } from "./artifacts";
+import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
@@ -7,6 +9,7 @@ import { dispatchDm, dispatchMentions, mentionIntent } from "./dispatch";
 import { sendQueuedEmail } from "./email";
 import { publishChannelEvent } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
+import { advanceForumTopic } from "./forum";
 import { getMessage } from "./messages";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import {
@@ -48,6 +51,8 @@ export interface JobDeps extends RunExecutorDeps {
   email?: EmailSender;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
+  /** Drive (job `forum.advance` saves the forum synthesis). */
+  artifacts?: ArtifactDeps;
   /** Agents' computers (jobs `sandbox.start`, `sandbox.stop`). */
   sandbox?: SandboxDeps | null;
   router?: {
@@ -237,6 +242,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           });
         }
       };
+      const where = await getChannelCached(deps.db, message.orgId, message.channelId);
+      // The forum moves by its own turns (D33): no mentions, router or DMs there.
+      if (where?.kind === "forum") return;
       if (message.authorType !== "person") {
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
@@ -257,10 +265,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       }
       // An answer to an agent's question resumes that run; nobody else is routed.
       if (typeof message.meta.answersQuestionId === "string") return;
-      const [channel] = await deps.db
-        .select({ kind: schema.channels.kind })
-        .from(schema.channels)
-        .where(eq(schema.channels.id, message.channelId));
+      const channel = where;
       if (channel?.kind === "dm") {
         await dispatchDm(deps.db, message, { maxHops: deps.maxHops }); // idempotent safety net
         return;
@@ -298,8 +303,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     "routine.run": async (job) => {
       await executeRoutineRun(
-        { db: deps.db, pubsub: deps.pubsub, context: deps.context },
+        { db: deps.db, pubsub: deps.pubsub, context: deps.context, artifacts: deps.artifacts },
         String(job.payload.routineRunId),
+      );
+    },
+    "forum.advance": async (job) => {
+      await advanceForumTopic(
+        { db: deps.db, pubsub: deps.pubsub, artifacts: deps.artifacts },
+        String(job.payload.topicId),
       );
     },
     "sandbox.start": async (job) => {

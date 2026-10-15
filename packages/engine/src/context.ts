@@ -162,7 +162,7 @@ export async function buildRunContext(
         join agents a on a.id = r.agent_id
         join channels c on c.id = r.channel_id
         where r.org_id = ${run.orgId}::uuid and r.channel_id = ${run.channelId}::uuid
-          ${channel.kind === "dm" ? sql`` : sql`and r.thread_root_id = ${run.threadRootId}::uuid`}
+          ${channel.kind !== "channel" ? sql`` : sql`and r.thread_root_id = ${run.threadRootId}::uuid`}
           and r.id <> ${run.id}::uuid and s.kind = 'tool_result'
         order by s.created_at desc limit 12)
       union all
@@ -180,7 +180,7 @@ export async function buildRunContext(
           )})
           and coalesce((s.data->>'isError')::boolean, false) = false
           and not (r.channel_id = ${run.channelId}::uuid
-            ${channel.kind === "dm" ? sql`` : sql`and r.thread_root_id = ${run.threadRootId}::uuid`})
+            ${channel.kind !== "channel" ? sql`` : sql`and r.thread_root_id = ${run.threadRootId}::uuid`})
           and exists (select 1 from channel_members m
             where m.channel_id = r.channel_id and m.user_id = ${requester ?? ""})
         order by s.created_at desc limit 10)`),
@@ -309,13 +309,15 @@ export async function buildRunContext(
       : []),
     {
       text:
-        channel.kind === "dm"
-          ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
-          : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying in a thread. Members: ${memberList}.${
-              otherAgents
-                ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or suggest asking it (e.g. "pergunte a @${others[0]?.agentHandle}").`
-                : ""
-            }`,
+        channel.kind === "forum"
+          ? `# Where you are\nThe forum topic "${channel.topic}": an asynchronous discussion in rounds among ${memberList}. You speak once per round, when it's your turn (the latest "[Fórum]" message says the round and the goal). Bring your own view and data from your tools; agree or disagree with reasons, and address the others with @ (they answer in their turn; mentions start nobody). Don't repeat what was already said; if you have nothing new, say so in one line. Write your post as the reply text.`
+          : channel.kind === "dm"
+            ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
+            : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying in a thread. Members: ${memberList}.${
+                otherAgents
+                  ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or suggest asking it (e.g. "pergunte a @${others[0]?.agentHandle}").`
+                  : ""
+              }`,
     },
   ];
   const systemChars = system.reduce((n, b) => n + b.text.length, 0);
@@ -388,7 +390,12 @@ export function toTurns(
     const routine = m.meta?.routine as { name?: unknown } | undefined;
     const who = (authorId && names.get(authorId)) || "unknown";
     // A routine's message: posted for its creator on a schedule, not typed by them.
-    const label = routine && typeof routine.name === "string" ? `Rotina "${routine.name}", criada por ${who}` : who;
+    const forum = m.meta?.forum as { kickoff?: boolean } | undefined;
+    const label = forum?.kickoff
+      ? "Fórum"
+      : routine && typeof routine.name === "string"
+        ? `Rotina "${routine.name}", criada por ${who}`
+        : who;
     const text = own ? m.body : `[${label}]: ${m.body}`;
     const last = turns.at(-1);
     if (last && last.role === role) last.parts.push({ id: m.id, text });

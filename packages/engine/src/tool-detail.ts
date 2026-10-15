@@ -73,3 +73,25 @@ export async function artifactToolDetail(
     .where(and(eq(schema.artifacts.id, id), eq(schema.artifacts.orgId, orgId), isNull(schema.artifacts.deletedAt)));
   return a && a.channelId === channelId ? short(a.title) : undefined;
 }
+
+/** Things that look like credentials, masked in previews and live output (agents should never have any). */
+const SECRET =
+  /\b(sk-[A-Za-z0-9_-]{12,}|sk-ant-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[abprs]-[A-Za-z0-9-]{10,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{8,})/g;
+
+export const maskSecrets = (text: string) => text.replace(SECRET, "••••");
+
+export const PREVIEW_CODE_CHARS = 4096;
+
+/** `run_code`'s code for the activity bar (≤ 4 KB, secrets masked). File tools show their path in `detail`. */
+export function toolCode(
+  name: string,
+  input: Record<string, unknown> | undefined,
+): { language: string; source: string } | undefined {
+  if (name !== "run_code") return undefined;
+  const i = input ?? {};
+  const code = maskSecrets(typeof i.code === "string" ? i.code : "");
+  return {
+    language: typeof i.language === "string" ? i.language : "",
+    source: code.length > PREVIEW_CODE_CHARS ? `${code.slice(0, PREVIEW_CODE_CHARS)}\n…` : code,
+  };
+}

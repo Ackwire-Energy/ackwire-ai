@@ -37,6 +37,9 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
   "calendar:write": ["propose_event"],
   "skills:read": ["load_skill", "read_skill_file"],
   "schedule:write": ["schedule_reminder", "create_routine", "list_reminders", "cancel_reminder"],
+  "forum:write": ["open_forum_topic", "post_in_forum", "read_forum_topic"],
+  "wiki:read": ["search_wiki", "read_wiki_page"],
+  "wiki:write": ["create_wiki_page", "update_wiki_page", "link_to_wiki"],
   "sandbox:run": [
     "run_code",
     "write_file",
@@ -45,6 +48,9 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "export_file",
     "import_file",
     "run_skill_script",
+    "computer_start",
+    "computer_stop",
+    "computer_status",
   ],
 };
 
@@ -108,6 +114,17 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   create_routine: { label: "Criar rotina", description: "Cria uma rotina recorrente nesta conversa." },
   list_reminders: { label: "Ver lembretes", description: "Lista os lembretes pendentes de quem pediu." },
   cancel_reminder: { label: "Cancelar lembrete", description: "Cancela um lembrete de quem pediu." },
+  open_forum_topic: { label: "Abrir tópico no fórum", description: "Leva um assunto para discussão entre agentes." },
+  post_in_forum: { label: "Postar no fórum", description: "Posta num tópico fora da própria vez." },
+  read_forum_topic: { label: "Ler tópico do fórum", description: "Lê o objetivo e as respostas de um tópico." },
+  search_wiki: { label: "Buscar na wiki", description: "Procura páginas da wiki da organização." },
+  read_wiki_page: { label: "Ler página da wiki", description: "Lê uma página da wiki inteira." },
+  create_wiki_page: { label: "Criar página na wiki", description: "Cria uma página quando alguém pede." },
+  update_wiki_page: {
+    label: "Editar página da wiki",
+    description: "Acrescenta ou reescreve um trecho quando alguém pede.",
+  },
+  link_to_wiki: { label: "Ligar páginas da wiki", description: "Liga uma página a outras quando alguém pede." },
   run_code: { label: "Rodar código", description: "Roda Python, Node ou bash no ambiente isolado da conversa." },
   write_file: { label: "Escrever no ambiente", description: "Grava um arquivo no ambiente de código." },
   read_file: { label: "Ler do ambiente", description: "Lê um arquivo do ambiente de código." },
@@ -115,6 +132,9 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   export_file: { label: "Salvar no Drive", description: "Leva um arquivo do ambiente para o Drive." },
   import_file: { label: "Trazer do Drive", description: "Copia um arquivo do Drive para o ambiente." },
   run_skill_script: { label: "Rodar script de skill", description: "Roda um script de uma skill no ambiente." },
+  computer_start: { label: "Ligar o computador", description: "Liga o computador do agente (cria na primeira vez)." },
+  computer_stop: { label: "Desligar o computador", description: "Desliga o computador; os arquivos ficam." },
+  computer_status: { label: "Ver o computador", description: "Diz se está ligado, o disco usado e o custo do mês." },
 };
 
 const humanize = (name: string) => {

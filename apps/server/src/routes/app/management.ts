@@ -25,7 +25,7 @@ import {
 import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
-import { AgentAudience, Credential, Role } from "./schemas";
+import { AgentAppearance, AgentAudience, Credential, Role } from "./schemas";
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
@@ -56,6 +56,7 @@ const Person = z
     name: z.string(),
     email: z.string(),
     image: z.string().nullable(),
+    avatarUrl: z.string().nullable().openapi({ description: "The photo uploaded here; wins over `image`." }),
     role: Role,
     joinedAt: z.string(),
     lastSeenAt: z.string().nullable(),
@@ -101,6 +102,7 @@ const AgentDetail = z
     audience: AgentAudience,
     audienceMode: z.enum(["everyone", "people", "owner"]),
     canTalk: z.boolean(),
+    appearance: AgentAppearance.nullable(),
   })
   .openapi("AgentDetail");
 
@@ -551,6 +553,7 @@ export function managementRoutes(deps: AppDeps) {
           audience: audienceOf(d.agent),
           audienceMode: d.agent.audienceMode,
           canTalk: canTalkTo(d.agent, c.get("user").id),
+          appearance: v.appearance,
           channels: d.channels,
           createdAt: v.createdAt.toISOString(),
         },

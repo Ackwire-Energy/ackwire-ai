@@ -182,14 +182,29 @@ export function sandboxRoutes(deps: AppDeps) {
           }),
         ),
       },
-      responses: { 200: json(Settings), ...errors },
+      responses: {
+        200: json(
+          Settings.extend({
+            networkApply: z.enum(["live", "next_start"]).openapi({
+              description:
+                "`live`: every computer has the new network now; `next_start`: some get it when they next start.",
+            }),
+          }),
+        ),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
       await updateSandboxSettings(db, c.get("user").id, orgId, c.req.valid("json"));
       // Running computers get the new network now; stopped ones when they next start.
-      if (deps.extras?.sandbox) await applyOrgNetwork(deps.extras.sandbox, orgId).catch(() => undefined);
-      return c.json(await settingsView(orgId), 200);
+      const applied = deps.extras?.sandbox
+        ? await applyOrgNetwork(deps.extras.sandbox, orgId).catch(() => ({ applied: 0, later: 1 }))
+        : { applied: 0, later: 0 };
+      return c.json(
+        { ...(await settingsView(orgId)), networkApply: applied.later > 0 ? "next_start" : "live" } as const,
+        200,
+      );
     },
   );
 

@@ -10,6 +10,7 @@ import {
   createCalendarToolSource,
   createConnectorToolSource,
   createContextToolSource,
+  createForumToolSource,
   createIssueToolSource,
   createJobHandlers,
   createModelGateway,
@@ -17,6 +18,7 @@ import {
   createScheduleToolSource,
   createSkillToolSource,
   createToolGateway,
+  createWikiToolSource,
   type McpConnect,
   notifyOwnerOnBudget,
   queueBudgetEmail,
@@ -128,9 +130,20 @@ export function buildEngine(o: EngineOptions) {
       createSkillToolSource({ db, blobs: artifacts.blobs }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),
       createScheduleToolSource({ pubsub: adapters.pubsub, context }),
+      createForumToolSource({ pubsub: adapters.pubsub, artifacts }),
+      createWikiToolSource({ pubsub: adapters.pubsub, search: context, artifacts }),
       createContextToolSource(context),
       createConnectorToolSource(connectorDeps),
-      ...(sandbox ? [createSandboxToolSource({ ...sandbox, artifacts, skills: { blobs: artifacts.blobs } })] : []),
+      ...(sandbox
+        ? [
+            createSandboxToolSource({
+              ...sandbox,
+              artifacts,
+              skills: { blobs: artifacts.blobs },
+              pubsub: adapters.pubsub,
+            }),
+          ]
+        : []),
       ...(o.toolSources ?? []),
     ],
   });
@@ -143,6 +156,7 @@ export function buildEngine(o: EngineOptions) {
     search: adapters.search,
     email: adapters.email,
     storage,
+    artifacts,
     sandbox,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,

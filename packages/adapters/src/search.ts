@@ -1,6 +1,6 @@
 import { and, type Database, desc, eq, inArray, rowsOf, schema, sql } from "@agenteschat/db";
 
-export type SearchKind = "message" | "context_item" | "issue" | "forum_topic" | "forum_reply" | "file";
+export type SearchKind = "message" | "context_item" | "issue" | "forum_topic" | "forum_reply" | "file" | "wiki";
 
 export interface SearchDocument {
   orgId: string;

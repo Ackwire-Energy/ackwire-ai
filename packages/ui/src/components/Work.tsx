@@ -10,6 +10,8 @@ export interface WorkStep {
   failed?: boolean;
   /** Still loading: a spinner instead of the check. */
   pending?: boolean;
+  /** Shown under the step (e.g. the code it ran and its output). */
+  detail?: ReactNode;
 }
 
 /**
@@ -72,6 +74,7 @@ export function WorkSummary({
               </span>
               <span>{s.label}</span>
               {s.time && <span className="ac-work__time">{s.time}</span>}
+              {s.detail && <div className="ac-work__detail">{s.detail}</div>}
             </li>
           ))}
         </ol>

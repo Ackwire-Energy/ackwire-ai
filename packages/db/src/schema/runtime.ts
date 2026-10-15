@@ -70,7 +70,7 @@ export const agentRunStatusEnum = pgEnum("agent_run_status", [
   "done",
   "failed",
 ]);
-export const agentRunTriggerEnum = pgEnum("agent_run_trigger", ["mention", "router", "dm"]);
+export const agentRunTriggerEnum = pgEnum("agent_run_trigger", ["mention", "router", "dm", "forum"]);
 
 export const agentRuns = pgTable(
   "agent_runs",

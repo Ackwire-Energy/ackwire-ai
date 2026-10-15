@@ -11,6 +11,8 @@ export interface ToolContext {
   channelId: string;
   threadRootId: string;
   triggerMessageId: string;
+  /** The model's id of this tool call (set by the gateway): live output events refer to it. */
+  toolUseId?: string;
 }
 
 export interface ToolOutput {

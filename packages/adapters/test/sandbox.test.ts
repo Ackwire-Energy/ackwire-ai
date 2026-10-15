@@ -192,6 +192,47 @@ describe("Daytona sandbox provider (REST)", () => {
   });
 });
 
+describe("live output", () => {
+  test("a session runs the command in the background; new stdout and stderr arrive while it runs", async () => {
+    const d = fakeDaytona();
+    let polls = 0;
+    const calls: string[] = [];
+    const fetch = async (url: string, init: RequestInit = {}) => {
+      const u = new URL(url);
+      if (u.pathname.startsWith("/toolbox/sb1/process/session")) {
+        calls.push(`${init.method ?? "GET"} ${u.pathname}`);
+        if (init.method === "POST" && u.pathname.endsWith("/exec")) return Response.json({ cmdId: "c1" });
+        if (init.method === "POST" || init.method === "DELETE") return Response.json({});
+        if (u.pathname.endsWith("/logs")) {
+          polls++;
+          const stdout = ["one\n", "one\ntwo /home/daytona/workspace/x\n", "one\ntwo /home/daytona/workspace/x\n"][
+            Math.min(polls - 1, 2)
+          ];
+          return Response.json({ stdout, stderr: polls > 1 ? "warn\n" : "" });
+        }
+        return Response.json(polls >= 3 ? { id: "c1", command: "x", exitCode: 0 } : { id: "c1", command: "x" });
+      }
+      return d.fetch(url, init);
+    };
+    const p = createDaytonaSandboxProvider({ apiKey: "k", fetch, pollMs: 0 });
+    await p.create(spec);
+    const chunks: [string, string][] = [];
+    const r = await (p.execStream as NonNullable<typeof p.execStream>)(
+      "sb1",
+      { command: "python3 run.py", timeoutSeconds: 30 },
+      (stream, chunk) => chunks.push([stream, chunk]),
+    );
+    expect(chunks).toEqual([
+      ["stdout", "one\n"],
+      ["stdout", "two /workspace/x\n"],
+      ["stderr", "warn\n"],
+    ]);
+    expect(r).toEqual({ exitCode: 0, stdout: "one\ntwo /workspace/x\n", stderr: "warn\n", timedOut: false });
+    expect(calls[0]).toBe("POST /toolbox/sb1/process/session");
+    expect(calls.at(-1)).toMatch(/^DELETE \/toolbox\/sb1\/process\/session\/agentes-/);
+  });
+});
+
 describe("network modes", () => {
   test("open: created with no network fields; switched in place, without a restart", async () => {
     const d = fakeDaytona();

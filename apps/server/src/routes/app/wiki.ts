@@ -1,0 +1,533 @@
+import {
+  appendSourceToWiki,
+  createPageFromSource,
+  createWikiPage,
+  deleteWikiPage,
+  diffWikiVersions,
+  getWikiPage,
+  getWikiVersion,
+  listWikiPages,
+  listWikiVersions,
+  moveWikiPage,
+  parseWikiLinks,
+  renameWikiPage,
+  requirePermission,
+  resolveWikiTargets,
+  restoreWikiPage,
+  setWikiPageLock,
+  suggestWikiPages,
+  updateWikiPage,
+  type WikiActor,
+  type WikiDeps,
+  wikiGraph,
+  wikiTree,
+} from "@agenteschat/engine";
+import { createRoute, z } from "@hono/zod-openapi";
+import { errorResponse } from "../../http/errors";
+import {
+  type AppDeps,
+  body,
+  createAppRouter,
+  errors,
+  json,
+  noContent,
+  OrgParams,
+  requireSession,
+  security,
+} from "./context";
+
+const tags = ["Wiki"];
+const Author = z
+  .object({
+    type: z.enum(["person", "agent"]),
+    id: z.string(),
+    onBehalfOf: z.string().nullable().openapi({ description: "Agents: the person who asked for the edit." }),
+  })
+  .openapi("WikiAuthor");
+const Summary = z
+  .object({
+    id: z.uuid(),
+    slug: z.string().openapi({ description: '"guia-de-deploy": unique in the org, no folder; changes on rename.' }),
+    title: z.string(),
+    folder: z.string().openapi({ description: '"Processos/Vendas" ("" = the root).' }),
+    tags: z.array(z.string()),
+    version: z.number(),
+    locked: z.boolean().openapi({ description: "Only admins edit it." }),
+    updatedAt: z.string(),
+    updatedBy: Author,
+  })
+  .openapi("WikiPageSummary");
+const Backlink = z
+  .union([
+    z.object({ kind: z.literal("page"), slug: z.string(), title: z.string() }),
+    z.object({
+      kind: z.literal("message"),
+      channelId: z.uuid(),
+      messageId: z.uuid(),
+      channelName: z.string(),
+      excerpt: z.string(),
+      at: z.string(),
+    }),
+    z.object({ kind: z.literal("forum"), topicId: z.uuid(), title: z.string() }),
+    z.object({ kind: z.literal("issue"), number: z.number(), title: z.string() }),
+  ])
+  .openapi("WikiBacklink");
+const Page = Summary.extend({
+  body: z.string(),
+  createdAt: z.string(),
+  createdBy: Author,
+  authors: z.array(Author).openapi({ description: "Everyone who wrote it, most recent first." }),
+  backlinks: z.array(Backlink),
+  links: z.array(z.object({ target: z.string(), slug: z.string(), title: z.string().nullable(), exists: z.boolean() })),
+  source: z.object({ type: z.string(), id: z.string(), channelId: z.string().optional() }).nullable(),
+  deletedAt: z.string().nullable(),
+}).openapi("WikiPage");
+const Version = z
+  .object({ version: z.number(), at: z.string(), author: Author, note: z.string().nullable(), title: z.string() })
+  .openapi("WikiVersion");
+const Source = z
+  .union([
+    z.object({ kind: z.literal("message"), channelId: z.uuid(), messageId: z.uuid() }),
+    z.object({ kind: z.literal("forum"), topicId: z.uuid() }),
+  ])
+  .openapi("WikiSource");
+const Title = z.string().trim().min(1).max(200);
+const Folder = z.string().max(200);
+const Tags = z.array(z.string().max(40)).max(20);
+const PageParams = OrgParams.extend({ slug: z.string().min(1).max(200) });
+const conflict = errorResponse("`version_conflict`: someone saved first; `slug_taken`: the name is in use");
+
+/**
+ * The org wiki (D34): pages every member reads and edits (admins can lock
+ * one), linked with `[[Título]]`, with history, backlinks and a graph.
+ * `{slug}` also accepts the page id.
+ */
+export function wikiRoutes(deps: AppDeps) {
+  const { db, adapters } = deps;
+  const app = createAppRouter(deps);
+  app.use("/organizations/*", requireSession(deps.auth));
+  const wiki = (): WikiDeps => ({
+    db,
+    pubsub: adapters.pubsub,
+    search: { db, search: adapters.search, gateway: { embed: deps.extras?.embed ?? (async () => null) } },
+    artifacts: deps.extras?.artifacts,
+  });
+  const person = (userId: string): WikiActor => ({ type: "person", userId });
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/wiki/pages",
+      tags,
+      security,
+      summary: "Pages without bodies (all, or by folder, tag or title words), most recent first",
+      request: {
+        params: OrgParams,
+        query: z.object({
+          folder: z.string().max(200).optional(),
+          tag: z.string().max(40).optional(),
+          q: z.string().max(200).optional(),
+          deleted: z.stringbool().optional().openapi({ description: "The trash (deleted pages, to restore)." }),
+        }),
+      },
+      responses: { 200: json(z.object({ pages: z.array(Summary) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ pages: await listWikiPages(db, person(c.get("user").id), orgId, c.req.valid("query")) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/wiki/tree",
+      tags,
+      security,
+      summary: "Folders and tags with counts, all pages and the latest ones (the sidebar)",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            pages: z.array(Summary),
+            folders: z.array(z.object({ path: z.string(), count: z.number() })),
+            tags: z.array(z.object({ tag: z.string(), count: z.number() })),
+            recent: z.array(Summary),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => c.json(await wikiTree(db, person(c.get("user").id), c.req.valid("param").orgId), 200),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/wiki/search",
+      tags,
+      security,
+      summary: "Title search for the `[[` autocomplete (titles starting with the text first)",
+      request: { params: OrgParams, query: z.object({ q: z.string().max(200).default("") }) },
+      responses: { 200: json(z.object({ pages: z.array(Summary) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const pages = await suggestWikiPages(db, person(c.get("user").id), orgId, c.req.valid("query").q);
+      return c.json({ pages }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/resolve",
+      tags,
+      security,
+      summary: "Resolve `[[…]]` links (or a text containing them): for issues and documents",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            targets: z.array(z.string().max(300)).max(200).optional(),
+            text: z.string().max(200_000).optional(),
+          }),
+        ),
+      },
+      responses: {
+        200: json(
+          z.object({
+            links: z.array(
+              z.object({
+                target: z.string(),
+                label: z.string(),
+                section: z.string().nullable(),
+                slug: z.string(),
+                title: z.string().nullable(),
+                exists: z.boolean(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      await requirePermission(db, c.get("user").id, orgId, "read");
+      const input = c.req.valid("json");
+      const text = [input.text ?? "", ...(input.targets ?? []).map((t) => `[[${t.replace(/[[\]]/g, "")}]]`)].join("\n");
+      return c.json({ links: await resolveWikiTargets(db, orgId, parseWikiLinks(text)) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/wiki/graph",
+      tags,
+      security,
+      summary: "Pages and the links between them (`unresolved`: links to pages not written yet)",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            nodes: z.array(
+              z.object({
+                id: z.uuid(),
+                slug: z.string(),
+                title: z.string(),
+                folder: z.string(),
+                tags: z.array(z.string()),
+                agentId: z.uuid().nullable(),
+              }),
+            ),
+            edges: z.array(z.object({ from: z.string(), to: z.string() })),
+            unresolved: z.array(z.object({ from: z.string(), toSlug: z.string() })),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => c.json(await wikiGraph(db, person(c.get("user").id), c.req.valid("param").orgId), 200),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/pages",
+      tags,
+      security,
+      summary: "Create a page (the slug comes from the title)",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            title: Title,
+            body: z.string().max(200_000).default(""),
+            folder: Folder.optional(),
+            tags: Tags.optional(),
+            note: z.string().max(300).optional(),
+          }),
+        ),
+      },
+      responses: { 201: json(Page, "Created"), ...errors, 409: conflict },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await createWikiPage(wiki(), person(c.get("user").id), orgId, c.req.valid("json")), 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/save",
+      tags,
+      security,
+      summary: '"Salvar na wiki" on a new page: a message or a forum synthesis, with a link back to it',
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({ source: Source, title: Title.optional(), folder: Folder.optional(), tags: Tags.optional() }),
+        ),
+      },
+      responses: { 201: json(Page, "Created"), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await createPageFromSource(wiki(), c.get("user").id, orgId, c.req.valid("json")), 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/wiki/pages/{slug}",
+      tags,
+      security,
+      summary: "A page with its backlinks (an old slug still finds it)",
+      request: { params: PageParams },
+      responses: { 200: json(Page), ...errors },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      return c.json(await getWikiPage(db, person(c.get("user").id), orgId, slug), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/wiki/pages/{slug}",
+      tags,
+      security,
+      summary: "Save an edit (409 `version_conflict` if someone saved after `baseVersion`)",
+      request: {
+        params: PageParams,
+        body: body(
+          z.object({
+            body: z.string().max(200_000),
+            baseVersion: z.number().int().min(1),
+            title: Title.optional(),
+            folder: Folder.optional(),
+            tags: Tags.optional(),
+            note: z.string().max(300).optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(Page), ...errors, 409: conflict },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      return c.json(await updateWikiPage(wiki(), person(c.get("user").id), orgId, slug, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/pages/{slug}/append",
+      tags,
+      security,
+      summary: '"Salvar na wiki" on an existing page: appends the message or synthesis, with where it came from',
+      request: {
+        params: PageParams,
+        body: body(
+          z.object({
+            text: z.string().max(200_000).optional().openapi({ description: "Your own text instead of the source's." }),
+            source: Source,
+            section: z.string().max(200).optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(Page), ...errors },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      return c.json(await appendSourceToWiki(wiki(), c.get("user").id, orgId, slug, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/pages/{slug}/rename",
+      tags,
+      security,
+      summary: "New title and slug; links in other pages follow, old links keep working",
+      request: { params: PageParams, body: body(z.object({ title: Title })) },
+      responses: { 200: json(Page), ...errors, 409: conflict },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      return c.json(await renameWikiPage(wiki(), person(c.get("user").id), orgId, slug, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/pages/{slug}/move",
+      tags,
+      security,
+      summary: 'Move to another folder ("" = the root)',
+      request: { params: PageParams, body: body(z.object({ folder: Folder })) },
+      responses: { 200: json(Page), ...errors },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      return c.json(await moveWikiPage(wiki(), person(c.get("user").id), orgId, slug, c.req.valid("json").folder), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/pages/{slug}/lock",
+      tags,
+      security,
+      summary: "Lock (only admins edit) or unlock a page; admins only",
+      request: { params: PageParams, body: body(z.object({ locked: z.boolean() })) },
+      responses: { 200: json(Page), ...errors },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      return c.json(await setWikiPageLock(wiki(), c.get("user").id, orgId, slug, c.req.valid("json").locked), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/wiki/pages/{slug}",
+      tags,
+      security,
+      summary: "Move a page to the trash (restore brings it back)",
+      request: { params: PageParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      await deleteWikiPage(wiki(), person(c.get("user").id), orgId, slug);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/pages/{slug}/restore",
+      tags,
+      security,
+      summary: "Bring a deleted page back (by id, or the latest deleted page with that slug)",
+      request: { params: PageParams },
+      responses: { 200: json(Page), ...errors, 409: conflict },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      return c.json(await restoreWikiPage(wiki(), person(c.get("user").id), orgId, slug), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/wiki/pages/{slug}/history",
+      tags,
+      security,
+      summary: "Every version, newest first, with author (and for whom, for agents) and note",
+      request: { params: PageParams },
+      responses: { 200: json(z.object({ versions: z.array(Version) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      return c.json({ versions: await listWikiVersions(db, person(c.get("user").id), orgId, slug) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/wiki/pages/{slug}/versions/{version}",
+      tags,
+      security,
+      summary: "One version's content",
+      request: { params: PageParams.extend({ version: z.coerce.number().int().min(1) }) },
+      responses: {
+        200: json(
+          z.object({
+            version: z.number(),
+            title: z.string(),
+            body: z.string(),
+            folder: z.string(),
+            tags: z.array(z.string()),
+            at: z.string(),
+            author: Author,
+            note: z.string().nullable(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, slug, version } = c.req.valid("param");
+      return c.json(await getWikiVersion(db, person(c.get("user").id), orgId, slug, version), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/wiki/pages/{slug}/diff",
+      tags,
+      security,
+      summary: "What changed between two versions (lines and a unified patch)",
+      request: {
+        params: PageParams,
+        query: z.object({ from: z.coerce.number().int().min(1), to: z.coerce.number().int().min(1) }),
+      },
+      responses: {
+        200: json(
+          z.object({
+            from: z.number(),
+            to: z.number(),
+            titleChanged: z.object({ from: z.string(), to: z.string() }).nullable(),
+            added: z.number(),
+            removed: z.number(),
+            lines: z.array(z.object({ type: z.enum(["same", "add", "del"]), text: z.string() })),
+            patch: z.string(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      const { from, to } = c.req.valid("query");
+      return c.json(await diffWikiVersions(db, person(c.get("user").id), orgId, slug, from, to), 200);
+    },
+  );
+
+  return app;
+}

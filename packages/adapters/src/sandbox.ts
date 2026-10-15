@@ -74,6 +74,15 @@ export interface SandboxProvider {
   ensureStarted(id: string): Promise<SandboxInfo>;
   /** Runs a shell command in the workspace. No environment variables are passed. */
   exec(id: string, request: ExecRequest): Promise<ExecResult>;
+  /**
+   * The same, telling `onOutput` what it prints while it runs (new text only,
+   * stdout and stderr apart). Providers without streaming report it all at the end.
+   */
+  execStream?(
+    id: string,
+    request: ExecRequest,
+    onOutput: (stream: "stdout" | "stderr", chunk: string) => void,
+  ): Promise<ExecResult>;
   /** Paths are relative to the workspace; parents are created. */
   writeFile(id: string, path: string, data: Uint8Array): Promise<void>;
   /** Null when the file doesn't exist. */
@@ -217,6 +226,7 @@ export function createDaytonaSandboxProvider(options: {
   // provider's default image it may have to live in the user's home (no root to create it).
   const roots = new Map<string, string>();
   const pollMs = options.pollMs ?? 1000;
+  const streamPollMs = options.pollMs ?? 500;
   const readyTimeoutMs = options.readyTimeoutMs ?? 90_000;
   const toolbox = new Map<string, string>();
   const networks = new Map<string, SandboxInfo["network"]>();
@@ -354,8 +364,74 @@ export function createDaytonaSandboxProvider(options: {
     return { exitCode, stdout: mask(stdout, root), stderr: mask(stderr, root), timedOut: exitCode === 124 };
   }
 
+  /**
+   * A command in its own shell session, run in the background: we poll its
+   * logs (stdout and stderr apart) and pass on what's new, until it ends or
+   * the timeout passes. Falls back to the blocking `exec` when sessions fail.
+   */
+  async function execStream(
+    id: string,
+    request: ExecRequest,
+    onOutput: (stream: "stdout" | "stderr", chunk: string) => void,
+  ): Promise<ExecResult> {
+    const root = await rootOf(id);
+    const sessionId = `agentes-${crypto.randomUUID()}`;
+    const base = await toolboxUrl(id, "/process/session");
+    const json = { "content-type": "application/json", accept: "application/json" };
+    const created = await call(base, { method: "POST", headers: json, body: JSON.stringify({ sessionId }) });
+    if (!created.ok) return exec(id, request);
+    try {
+      const cwd = request.cwd ? absIn(root, request.cwd) : root;
+      const started = await call(`${base}/${sessionId}/exec`, {
+        method: "POST",
+        headers: json,
+        body: JSON.stringify({ command: `cd ${shellQuote(cwd)} && ${request.command}`, runAsync: true }),
+      });
+      if (!started.ok) return exec(id, request);
+      const { cmdId } = (await started.json()) as { cmdId?: string };
+      if (!cmdId) return exec(id, request);
+      const sent = { stdout: 0, stderr: 0 };
+      let out = { stdout: "", stderr: "" };
+      const deadline = Date.now() + (request.timeoutSeconds + 5) * 1000;
+      const pull = async () => {
+        const res = await call(`${base}/${sessionId}/command/${cmdId}/logs`, {
+          headers: { accept: "application/json" },
+        });
+        if (!res.ok) return;
+        const text = await res.text();
+        let logs: { stdout?: string; stderr?: string };
+        try {
+          logs = JSON.parse(text) as { stdout?: string; stderr?: string };
+        } catch {
+          logs = { stdout: text };
+        }
+        out = { stdout: mask(logs.stdout ?? "", root), stderr: mask(logs.stderr ?? "", root) };
+        for (const stream of ["stdout", "stderr"] as const) {
+          if (out[stream].length > sent[stream]) {
+            onOutput(stream, out[stream].slice(sent[stream]));
+            sent[stream] = out[stream].length;
+          }
+        }
+      };
+      for (;;) {
+        await Bun.sleep(streamPollMs);
+        await pull();
+        const res = await call(`${base}/${sessionId}/command/${cmdId}`, { headers: { accept: "application/json" } });
+        const cmd = res.ok ? ((await res.json()) as { exitCode?: number | null }) : null;
+        if (cmd && typeof cmd.exitCode === "number") {
+          await pull();
+          return { exitCode: cmd.exitCode, stdout: out.stdout, stderr: out.stderr, timedOut: cmd.exitCode === 124 };
+        }
+        if (Date.now() > deadline) return { ...out, exitCode: 124, timedOut: true };
+      }
+    } finally {
+      await call(`${base}/${sessionId}`, { method: "DELETE" }).catch(() => undefined);
+    }
+  }
+
   return {
     id: "daytona",
+    execStream,
     async create(spec) {
       const base = {
         labels: spec.labels,
@@ -556,6 +632,15 @@ export function createFakeSandboxProvider(
         b.state = "started";
       }
       return view(id);
+    },
+    async execStream(id, request, onOutput) {
+      const r = await provider.exec(id, request);
+      // Like a real stream: the output arrives in pieces.
+      for (const stream of ["stdout", "stderr"] as const) {
+        const text = r[stream];
+        for (let i = 0; i < text.length; i += 1000) onOutput(stream, text.slice(i, i + 1000));
+      }
+      return r;
     },
     async exec(id, request) {
       const b = box(id);

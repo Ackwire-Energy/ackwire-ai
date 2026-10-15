@@ -227,7 +227,7 @@ async function personCanRead(db: Database, userId: string, orgId: string, a: Pic
     .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId)))
     .where(and(eq(channels.id, a.channelId), eq(channels.orgId, orgId)));
   if (!row) return false;
-  return row.memberId !== null || (row.visibility === "public" && row.kind === "channel");
+  return row.memberId !== null || (row.visibility === "public" && (row.kind === "channel" || row.kind === "forum"));
 }
 
 async function canRead(db: Database, actor: ArtifactActor, orgId: string, a: Pick<ArtifactRow, "channelId">) {
@@ -519,7 +519,7 @@ export async function listArtifacts(
     }
   } else {
     const member = and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, actor.userId));
-    const open = and(eq(channels.visibility, "public"), eq(channels.kind, "channel"));
+    const open = and(eq(channels.visibility, "public"), inArray(channels.kind, ["channel", "forum"]));
     const rows = await db
       .select({ id: channels.id })
       .from(channels)

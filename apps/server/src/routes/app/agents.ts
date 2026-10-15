@@ -12,6 +12,7 @@ import {
   listCredentials,
   NotFoundError,
   revokeCredential,
+  setAgentAppearance,
   setAgentAudience,
   updateAgent,
   usageSummary,
@@ -30,7 +31,7 @@ import {
   requireSession,
   security,
 } from "./context";
-import { Agent, AgentAudience, Credential, Model, Usage } from "./schemas";
+import { Agent, AgentAppearance, AgentAudience, Credential, Model, Usage } from "./schemas";
 
 const tags = ["Agents"];
 
@@ -66,6 +67,9 @@ const AgentFields = z.object({
     .openapi({ description: "Spend cap per calendar month (UTC). Null = no cap." }),
   audience: AgentAudience.optional().openapi({
     description: "Who can talk to it. The agent's owner or admins can change it.",
+  }),
+  appearance: AgentAppearance.nullable().optional().openapi({
+    description: "Its look (fixed allow-list). The agent's owner or admins can change it; null = the default.",
   }),
 });
 
@@ -223,7 +227,7 @@ export function agentRoutes(deps: AppDeps) {
       responses: { 201: json(Agent, "Created"), ...errors },
     }),
     async (c) => {
-      const { monthlyBudgetUsd, audience, ...input } = c.req.valid("json");
+      const { monthlyBudgetUsd, audience, appearance, ...input } = c.req.valid("json");
       const orgId = c.req.valid("param").orgId;
       let agent = await createAgent(
         db,
@@ -233,6 +237,7 @@ export function agentRoutes(deps: AppDeps) {
         { model: config.AGENT_DEFAULT_MODEL },
       );
       if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
+      if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
       return c.json(toAgent(agent, c.get("user").id), 201);
     },
   );
@@ -250,14 +255,18 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const { monthlyBudgetUsd, audience, ...input } = c.req.valid("json");
+      const { monthlyBudgetUsd, audience, appearance, ...input } = c.req.valid("json");
       const actor = c.get("user").id;
-      // The audience alone can be changed by the agent's owner too; everything else needs an admin.
-      const other = !audience || Object.values(input).some((v) => v !== undefined) || monthlyBudgetUsd !== undefined;
+      // The audience and the look can be changed by the agent's owner too; everything else needs an admin.
+      const other =
+        (!audience && appearance === undefined) ||
+        Object.values(input).some((v) => v !== undefined) ||
+        monthlyBudgetUsd !== undefined;
       let agent = other
         ? await updateAgent(db, actor, orgId, agentId, { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) })
         : null;
       if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience);
+      if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);
       if (!agent) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");

@@ -16,6 +16,7 @@ import { connectorRoutes } from "./routes/app/connectors";
 import { customConnectorRoutes } from "./routes/app/connectors-custom";
 import type { AppDeps } from "./routes/app/context";
 import { dmRoutes } from "./routes/app/dms";
+import { forumRoutes } from "./routes/app/forum";
 import { inviteRoutes } from "./routes/app/invites";
 import { issueRoutes } from "./routes/app/issues";
 import { knowledgeRoutes } from "./routes/app/knowledge";
@@ -26,6 +27,7 @@ import { routineRoutes } from "./routes/app/routines";
 import { sandboxRoutes } from "./routes/app/sandboxes";
 import { skillRoutes } from "./routes/app/skills";
 import { storageRoutes } from "./routes/app/storage";
+import { wikiRoutes } from "./routes/app/wiki";
 import { registerHealth } from "./routes/health";
 import { registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
 
@@ -95,6 +97,8 @@ export function createApp(options: AppOptions) {
     api.route("/app", storageRoutes(deps));
     api.route("/app", artifactRoutes(deps));
     api.route("/app", issueRoutes(deps));
+    api.route("/app", forumRoutes(deps));
+    api.route("/app", wikiRoutes(deps));
     api.route("/app", routineRoutes(deps));
     api.route("/app", calendarRoutes(deps));
     api.route("/app", skillRoutes(deps));

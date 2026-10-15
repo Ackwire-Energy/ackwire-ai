@@ -68,6 +68,21 @@ export type ChannelEvent =
       connector?: string;
       /** A short label (≤ 80 chars): the skill, the issue (#131 or title) or the Drive file. Built-in tools only. */
       detail?: string;
+      /** The model's id of this call (live output refers to it). */
+      toolUseId?: string;
+      /** `run_code`: the code being run (≤ 4 KB, secrets masked). */
+      code?: { language: string; source: string };
+    }
+  /** What a computer command prints while it runs (throttled, ≤ 64 KB per call). */
+  | {
+      type: "agent.tool.output";
+      channelId: string;
+      threadId: string | null;
+      runId: string;
+      agentId: string;
+      toolUseId?: string;
+      stream: "stdout" | "stderr";
+      text: string;
     }
   /** The agent's first words arrived (switch "thinking" to "typing"). */
   | { type: "agent.typing"; channelId: string; threadId: string | null; agentId: string; runId: string }

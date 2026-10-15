@@ -20,7 +20,7 @@ import { organizations } from "./tenancy";
 
 export const channelVisibilityEnum = pgEnum("channel_visibility", ["public", "private"]);
 /** `channel`: a named channel. `dm`: a direct conversation (person↔person or person↔agent), participants only. */
-export const channelKindEnum = pgEnum("channel_kind", ["channel", "dm"]);
+export const channelKindEnum = pgEnum("channel_kind", ["channel", "dm", "forum"]);
 
 /** A conversation space. `public`: any member of the organization may join; `private`: invite only. */
 export const channels = pgTable(

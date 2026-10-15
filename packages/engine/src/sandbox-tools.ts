@@ -1,4 +1,4 @@
-import { type ExecResult, type NetworkMode, workspacePath } from "@agenteschat/adapters";
+import { type ExecRequest, type ExecResult, type NetworkMode, type PubSub, workspacePath } from "@agenteschat/adapters";
 import {
   type ArtifactActor,
   type ArtifactDeps,
@@ -8,19 +8,28 @@ import {
   tableToCsv,
   updateArtifact,
 } from "./artifacts";
+import { getChannelCached } from "./context";
+import { publishChannelEvent } from "./events";
 import {
   getSandboxSettings,
+  ownComputerStatus,
   SANDBOX_LIMITS,
   SANDBOX_SCOPE,
   type SandboxDeps,
+  stopOwnComputer,
   truncateOutput,
   withSandbox,
 } from "./sandbox";
 import { agentSkillByName, type SkillDeps, skillFolderFiles } from "./skills";
+import { maskSecrets } from "./tool-detail";
 import { grantedScopeKeys, grantKey, toolAllowScope } from "./tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+/** Live output of one call: at most this much, at most this often. */
+export const LIVE_OUTPUT_CHARS = 64 * 1024;
+const LIVE_OUTPUT_EVERY_MS = 250;
 const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
@@ -69,10 +78,19 @@ export const OPEN_NETWORK_NOTE =
 
 type Network = { mode: NetworkMode; domains: string[] };
 
+const networkOf = (mode: string | undefined): Network => ({
+  mode: mode === "open" || mode === "allowlist" ? mode : "blocked",
+  domains: [],
+});
+
 /** One sentence the agent reads about its internet, from the org's setting. */
 export function networkSentence(n: Network) {
   if (n.mode === "open") return "This computer has open internet access (no secrets inside).";
-  if (n.mode === "allowlist") return `Internet only for these domains: ${n.domains.slice(0, 20).join(", ")}.`;
+  if (n.mode === "allowlist") {
+    return n.domains.length > 0
+      ? `Internet only for these domains: ${n.domains.slice(0, 20).join(", ")}.`
+      : "Internet only for the domains the organization allowed.";
+  }
   return "No internet access (the organization can allow domains or open it in Configurações → Sandbox).";
 }
 
@@ -176,8 +194,56 @@ const slug = (s: string) =>
  * Without a provider the source offers nothing.
  */
 export function createSandboxToolSource(
-  deps: SandboxDeps & { artifacts: ArtifactDeps; skills: Pick<SkillDeps, "blobs"> },
+  deps: SandboxDeps & { artifacts: ArtifactDeps; skills: Pick<SkillDeps, "blobs">; pubsub?: PubSub },
 ): ToolSource {
+  /**
+   * Runs a command and, when the provider streams, sends what it prints as
+   * `agent.tool.output` (every 250 ms at most, ≤ 64 KB per call, secrets masked).
+   */
+  const execLive = async (ctx: ToolContext, id: string, request: ExecRequest) => {
+    if (!deps.provider.execStream || !deps.pubsub || !ctx.toolUseId) return deps.provider.exec(id, request);
+    // The same thread as the run's other events (DMs and the forum are flat).
+    const channel = await getChannelCached(ctx.db, ctx.orgId, ctx.channelId);
+    const flat = (channel?.kind === "dm" || channel?.kind === "forum") && ctx.threadRootId === ctx.triggerMessageId;
+    const threadId = flat ? null : ctx.threadRootId;
+    const pending = { stdout: "", stderr: "" };
+    let sent = 0;
+    let capped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const publish = async () => {
+      timer = null;
+      // stderr first: short, and it's where errors are.
+      for (const stream of ["stderr", "stdout"] as const) {
+        let chunk = pending[stream];
+        pending[stream] = "";
+        if (!chunk || capped) continue;
+        if (sent + chunk.length > LIVE_OUTPUT_CHARS) {
+          chunk = `${chunk.slice(0, Math.max(0, LIVE_OUTPUT_CHARS - sent))}\n[… mais saída: veja o resultado no fim …]`;
+          capped = true;
+        }
+        sent += chunk.length;
+        await publishChannelEvent(deps.pubsub, {
+          type: "agent.tool.output",
+          channelId: ctx.channelId,
+          threadId,
+          runId: ctx.runId,
+          agentId: ctx.agentId,
+          toolUseId: ctx.toolUseId,
+          stream,
+          text: maskSecrets(chunk),
+        });
+      }
+    };
+    try {
+      return await deps.provider.execStream(id, request, (stream, chunk) => {
+        pending[stream] += chunk;
+        timer ??= setTimeout(() => void publish(), LIVE_OUTPUT_EVERY_MS);
+      });
+    } finally {
+      if (timer) clearTimeout(timer);
+      await publish();
+    }
+  };
   // A recreated computer is told to the agent with the result of the call that found out.
   const notices = new WeakMap<ToolContext, string>();
   const run = <T>(ctx: ToolContext, seconds: number, fn: (id: string) => Promise<T>) =>
@@ -226,12 +292,62 @@ export function createSandboxToolSource(
           const started = Date.now();
           const result = await run(ctx, timeout + 15, async (id) => {
             await deps.provider.writeFile(id, file, new TextEncoder().encode(str(input.code)));
-            return deps.provider.exec(id, {
+            return execLive(ctx, id, {
               command: `timeout -k 5 ${timeout} ${runner.bin} ${quote(file)}`,
               timeoutSeconds: timeout + 10,
             });
           });
           return execOutput(`run_code ${lang}`, result, Math.round((Date.now() - started) / 1000), timeout, network);
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: "computer_start",
+      description:
+        "Turn your computer on now (it is created the first time). Usually not needed: it starts by itself when you run code. No approval needed.",
+      scope: SANDBOX_SCOPE,
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      async execute(_input, ctx) {
+        try {
+          await run(ctx, 30, async () => undefined);
+          const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
+          return {
+            content: `Your computer is ${s.status}. ${networkSentence(networkOf(s.network))}`,
+            data: { computer: s },
+          };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: "computer_stop",
+      description: "Turn your computer off now (files stay; it starts again when you need it).",
+      scope: SANDBOX_SCOPE,
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      async execute(_input, ctx) {
+        try {
+          const s = await stopOwnComputer(deps, ctx.orgId, ctx.agentId);
+          return { content: `Your computer is ${s.status}; files kept.`, data: { computer: s } };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: "computer_status",
+      description: "Is your computer on? Disk used, this month's cost, and its internet access.",
+      scope: SANDBOX_SCOPE,
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      async execute(_input, ctx) {
+        try {
+          const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
+          return {
+            content: `Status: ${s.status}; disk used: ${s.diskUsedGib} GB; cost this month: US$ ${s.costMonthUsd.toFixed(2)}; network: ${s.network ?? "none yet"}.`,
+            data: { computer: s },
+          };
         } catch (error) {
           return failed(error);
         }
@@ -418,7 +534,7 @@ export function createSandboxToolSource(
           const started = Date.now();
           const result = await run(ctx, timeout + 30, async (id) => {
             for (const f of files) await deps.provider.writeFile(id, `${base}/${f.path}`, f.data);
-            return deps.provider.exec(id, {
+            return execLive(ctx, id, {
               command: `timeout -k 5 ${timeout} ${bin} ${quote(`${base}/${target.path}`)}${args ? ` ${args}` : ""}`,
               timeoutSeconds: timeout + 10,
             });
@@ -439,9 +555,18 @@ export function createSandboxToolSource(
       const keys = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
       const granted =
         keys.has(grantKey(null, SANDBOX_SCOPE)) ||
-        ["run_code", "run_skill_script", "write_file", "read_file", "list_files", "export_file", "import_file"].some(
-          (n) => keys.has(grantKey(null, toolAllowScope(n))),
-        );
+        [
+          "run_code",
+          "run_skill_script",
+          "write_file",
+          "read_file",
+          "list_files",
+          "export_file",
+          "import_file",
+          "computer_start",
+          "computer_stop",
+          "computer_status",
+        ].some((n) => keys.has(grantKey(null, toolAllowScope(n))));
       if (!granted) return withNotices(build(false, 60));
       const settings = await getSandboxSettings(ctx.db, ctx.orgId);
       if (!settings.enabled) return [];

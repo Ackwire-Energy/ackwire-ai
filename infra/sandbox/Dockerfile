@@ -19,7 +19,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && fc-cache -f
 
-# Node LTS 22.x with npm and corepack (pnpm, yarn).
+# Node LTS 22.x with npm and corepack (yarn); pnpm is installed for real below.
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
@@ -41,10 +41,16 @@ USER agente
 ENV HOME=/home/agente \
     NPM_CONFIG_PREFIX=/home/agente/.npm-global \
     COREPACK_HOME=/home/agente/.cache/corepack \
+    COREPACK_DEFAULT_TO_LATEST=0 \
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     PATH=/home/agente/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
+# pnpm as a real global install (ahead of the corepack shim on PATH), so it
+# works with the network blocked; yarn is prepared in corepack's cache. Both
+# run once here so nothing is downloaded on first use.
 RUN mkdir -p /home/agente/.npm-global /home/agente/.cache/corepack \
- && corepack prepare pnpm@latest --activate \
- && corepack prepare yarn@stable --activate
+ && npm install -g pnpm@10 \
+ && corepack prepare yarn@stable --activate \
+ && cd /tmp && pnpm -v && yarn -v && command -v pnpm
 WORKDIR /workspace
 
 CMD ["sleep", "infinity"]

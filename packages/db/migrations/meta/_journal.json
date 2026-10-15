@@ -218,6 +218,27 @@
       "when": 1792073330776,
       "tag": "0030_sandbox_network",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792073721317,
+      "tag": "0031_forum",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792074424774,
+      "tag": "0032_agent_appearance",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792075027994,
+      "tag": "0033_wiki",
+      "breakpoints": true
     }
   ]
 }

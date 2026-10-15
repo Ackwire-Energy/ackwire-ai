@@ -47,7 +47,7 @@ export function validationHook<E extends Env>(): Hook<unknown, E, string, unknow
 export function domainErrorResponse(error: unknown, c: Context) {
   if (error instanceof ForbiddenError) return apiError(c, 403, "forbidden", error.message);
   if (error instanceof NotFoundError) return apiError(c, 404, "not_found", error.message);
-  if (error instanceof ConflictError) return apiError(c, 409, "conflict", error.message);
+  if (error instanceof ConflictError) return apiError(c, 409, error.code, error.message);
   if (error instanceof ValidationError) return apiError(c, 400, "invalid_request", error.message);
   if (error instanceof BudgetExceededError) return apiError(c, 402, "budget_exceeded", error.message);
   if (error instanceof MissingCredentialError) return apiError(c, 400, "missing_credential", error.message);
