@@ -3,7 +3,8 @@ FROM oven/bun:1.3.1
 WORKDIR /app
 COPY . .
 RUN bun install --frozen-lockfile \
- && bun run --filter '@agenteschat/web' build
+ && bun run --filter '@agenteschat/web' build \
+ && bun build apps/server/runner/main.ts --target=node --banner '#!/usr/bin/env node' --outfile apps/web/dist/runner/agentes-runner.mjs
 ENV NODE_ENV=production \
     WEB_DIR=/app/apps/web/dist \
     PORT=3000
