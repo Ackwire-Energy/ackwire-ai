@@ -20,6 +20,7 @@ import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useModels } from "@/api/queries";
 import type { Role } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { CenteredLayout } from "@/components/AuthLayout";
 import { keyLooksValid, PROVIDERS, type ProviderId, providerLabel, suggestModel } from "@/lib/providers";
 import { handleFrom, isEmail, slugify } from "@/lib/text";
@@ -262,7 +263,7 @@ export function OnboardingPage() {
                 const info = presetInfo(p);
                 return (
                   <OptionCard key={p} pressed={preset === p} onClick={() => setPreset(p)}>
-                    <Avatar kind="agent" name={info.name} initials={p === "atlas" ? "At" : undefined} />
+                    <AgentAvatar name={info.name} initials={p === "atlas" ? "At" : undefined} />
                     <span className="ac-option__text">
                       <span className="ac-option__title">
                         {info.name} · {info.role}

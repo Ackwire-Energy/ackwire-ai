@@ -1,9 +1,10 @@
-import { ApprovalCard, Avatar, Button } from "@agenteschat/ui";
+import { ApprovalCard, Button } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import { useDecideApproval } from "@/api/queries";
 import type { Agent, Approval, Channel, Member } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { relativeTime, timeLeft, whenAt } from "@/lib/format";
 import { useOrg } from "./org-context";
 
@@ -145,7 +146,13 @@ export function ApprovalListItem({
       wide
       aria-label={approval.title}
       status={pending ? "waiting" : approval.status === "approved" ? "approved" : "refused"}
-      avatar={<Avatar kind="agent" size="sm" name={name} initials={initials} />}
+      avatar={
+        agent ? (
+          <AgentAvatar agentId={agent.id} size="sm" name={name} />
+        ) : (
+          <AgentAvatar size="sm" name={name} initials={initials} />
+        )
+      }
       who={
         channel ? (
           <Trans

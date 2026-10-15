@@ -7,7 +7,6 @@ import {
   type AgentColor,
   type AgentEyes,
   type AgentState,
-  Avatar,
   Button,
   normalizeAppearance,
   randomAppearance,
@@ -17,6 +16,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUpdateAgent } from "@/api/queries";
 import type { Agent } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { EditDialog } from "@/components/EditDialog";
 import { useOrg } from "@/components/org-context";
 import { agentGrammar } from "@/lib/grammar";
@@ -61,7 +61,7 @@ function Choices<V extends string>({
             className="look-choice"
             onClick={() => onChange(v)}
           >
-            <Avatar kind="agent" size="md" name={name(v)} appearance={render(v)} />
+            <AgentAvatar size="md" name={name(v)} appearance={render(v)} />
           </button>
         ))}
       </div>
@@ -112,7 +112,7 @@ export function AgentCustomizer({ agent, open, onClose }: { agent: Agent; open: 
       }
     >
       <div className="look-stage">
-        <Avatar kind="agent" size="xl" name={agent.name} state={preview} appearance={look} labelled />
+        <AgentAvatar size="xl" name={agent.name} state={preview} appearance={look} labelled />
         <Segmented
           size="sm"
           label={t("look.previewState")}

@@ -11,6 +11,7 @@ import type {
   AgentQuestion,
   AgentSkill,
   AgentUsage,
+  ApiRule,
   Approval,
   Artifact,
   ArtifactContent,
@@ -21,6 +22,7 @@ import type {
   BatchInviteResult,
   CalendarEvent,
   CalendarEventInput,
+  CalendarEventPatch,
   CalendarRange,
   Channel,
   ChannelMember,
@@ -60,7 +62,9 @@ import type {
   RosterMember,
   Routine,
   RoutineInput,
+  RoutinePatch,
   RoutineRun,
+  RuleInfo,
   Run,
   RunStep,
   S3Input,
@@ -70,6 +74,7 @@ import type {
   ScopeGrant,
   SearchHit,
   SearchKind,
+  SeriesScope,
   Skill,
   SkillDetail,
   SkillInput,
@@ -340,6 +345,15 @@ export interface ApiClient {
     setActive(orgId: string, id: string, active: boolean): Promise<Routine>;
     runNow(orgId: string, id: string): Promise<Routine>;
     runs(orgId: string, id: string): Promise<RoutineRun[]>;
+    /** A phrase → rule, its description, cron and next 5 runs. */
+    parseRule(orgId: string, phrase: string, timezone?: string): Promise<RuleInfo>;
+    /** A rule → its description, cron and next 5 runs (the picker's sentence). */
+    describeRule(orgId: string, rule: ApiRule): Promise<RuleInfo>;
+    /** Only the changed fields; the answer has the new `nextRunAt`. */
+    update(orgId: string, id: string, patch: RoutinePatch): Promise<Routine>;
+    /** Soft delete: it stops running and leaves the list. */
+    remove(orgId: string, id: string): Promise<void>;
+    duplicate(orgId: string, id: string): Promise<Routine>;
   };
   /** The org wiki: pages in folders, `[[links]]`, backlinks, history and the graph. */
   wiki: {
@@ -386,6 +400,14 @@ export interface ApiClient {
     /** Confirms an agent's proposal: creates the event and invites the people. */
     confirmProposal(orgId: string, id: string): Promise<CalendarEvent>;
     dismissProposal(orgId: string, id: string): Promise<void>;
+    /** A recurring event: `scope` and the occurrence's original start say which occurrences change. */
+    update(
+      orgId: string,
+      id: string,
+      patch: CalendarEventPatch,
+      series?: { scope: SeriesScope; occurrenceStart: string },
+    ): Promise<CalendarEvent>;
+    remove(orgId: string, id: string, series?: { scope: SeriesScope; occurrenceStart: string }): Promise<void>;
   };
   artifacts: {
     /** Everything the viewer can see, newest update first. */

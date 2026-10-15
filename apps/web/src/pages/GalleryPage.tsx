@@ -35,6 +35,7 @@ import {
 } from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { useTheme } from "@/lib/theme";
 
 /*
@@ -161,14 +162,14 @@ export function GalleryPage() {
         <div className="row">
           <Avatar name="Marina" />
           <Avatar name="João" presence />
-          <Avatar kind="agent" name="Ada" />
-          <Avatar kind="agent" name="Atlas" initials="At" running />
-          <Avatar kind="agent" name="Lia" size="lg" />
-          <Avatar kind="agent" name="Theo" size="sm" />
+          <AgentAvatar name="Ada" />
+          <AgentAvatar name="Atlas" initials="At" running />
+          <AgentAvatar name="Lia" size="lg" />
+          <AgentAvatar name="Theo" size="sm" />
           <AvatarStack>
             <Avatar size="sm" name="W" />
             <Avatar size="sm" name="J" />
-            <Avatar size="sm" kind="agent" name="A" />
+            <AgentAvatar size="sm" name="A" />
           </AvatarStack>
           <Chip icon="waiting" tone="waiting">
             Aguardando você
@@ -189,7 +190,7 @@ export function GalleryPage() {
             </MessageText>
           </Message>
           <Message
-            avatar={<Avatar kind="agent" name="Ada" />}
+            avatar={<AgentAvatar name="Ada" />}
             author="Ada"
             time="10:43"
             meta="sonnet 5.5 · 1.240 tokens · US$ 0,004"
@@ -200,7 +201,7 @@ export function GalleryPage() {
             </MessageText>
           </Message>
           <Message
-            avatar={<Avatar kind="agent" name="Atlas" initials="At" running />}
+            avatar={<AgentAvatar name="Atlas" initials="At" running />}
             author="Atlas"
             time="agora"
             meta="escrevendo…"

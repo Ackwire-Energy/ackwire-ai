@@ -60,6 +60,14 @@ export { Mention } from "./components/Mention";
 export { Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "./components/Menu";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
 export { Popover } from "./components/Popover";
+export {
+  modeOf,
+  monthlyKindOf,
+  type RecurrenceLabels,
+  type RecurrenceMode,
+  RecurrencePicker,
+  type RecurrencePickerProps,
+} from "./components/RecurrencePicker";
 export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";
 export { Select, type SelectOption, type SelectProps } from "./components/Select";
 export { Sheet, type SheetProps } from "./components/Sheet";
@@ -90,7 +98,35 @@ export {
 } from "./components/Surfaces";
 export { type TabItem, TabPanel, Tabs } from "./components/Tabs";
 export { normalizeTime, TimeSelect, type TimeSelectProps, timeOptions } from "./components/TimeSelect";
+export { TimezoneSelect, type TimezoneSelectLabels, type TimezoneSelectProps } from "./components/TimezoneSelect";
 export { Token, TokenList } from "./components/Token";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { cx } from "./cx";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
+export {
+  BUSINESS_DAYS,
+  nextOccurrences,
+  type RecurrenceFreq,
+  type RecurrenceRule,
+  ruleFor,
+  WEEKDAYS,
+  type Weekday,
+  weekdayOf,
+  weekdayOfYmd,
+  weekdayPosition,
+  zonedInstant,
+} from "./recurrence";
+export {
+  allZones,
+  cityOf,
+  FALLBACK_ZONES,
+  filterZones,
+  offsetLabel,
+  offsetMinutes,
+  parseOffsetQuery,
+  regionOf,
+  type ZoneOption,
+  type ZoneRegion,
+  zoneOption,
+  zoneOptions,
+} from "./timezones";

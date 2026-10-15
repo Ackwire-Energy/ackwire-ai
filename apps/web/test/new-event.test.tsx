@@ -154,7 +154,7 @@ describe("Calendário > Novo evento", () => {
     "week navigation and Novo evento",
     async () => {
       await go("calendar");
-      const label = () => document.querySelector(".calendar-page__range")?.textContent;
+      const label = () => document.querySelector(".cal-page__range")?.textContent;
       const now = label();
       await click(screen().getByRole("button", { name: "Próxima semana" }));
       await settle(4);
@@ -176,14 +176,14 @@ describe("Calendário > Novo evento", () => {
       expect(dialog.querySelector('input[type="time"], input[type="date"], select')).toBeNull();
       await setTime("Fim", "9");
       expect((within(dialog).getByRole("combobox", { name: "Fim" }) as HTMLInputElement).value).toBe("09:00");
-      expect(dialog.textContent).toContain("Use hh:mm, com o fim depois do início.");
+      expect(dialog.textContent).toContain("O fim precisa ser depois do início.");
       expect(within(dialog).getByRole("button", { name: "Criar evento" }).hasAttribute("disabled")).toBe(true);
       await setTime("Início", "1400");
       await setTime("Fim", "15h");
       // Our date picker: a month grid in a popover.
       const tuesday = new Date(mondayOf(new Date()).getTime() + 86_400_000 + 3_600_000);
       const dayName = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(tuesday);
-      await click(within(dialog).getByRole("button", { name: "Dia" }));
+      await click(within(dialog).getByRole("button", { name: "Data de início" }));
       const picker = screen().getByRole("dialog", { name: "Escolher data" });
       await click(within(picker).getByRole("button", { name: dayName }));
       await settle(2);
@@ -196,6 +196,75 @@ describe("Calendário > Novo evento", () => {
       const col = document.querySelector(`[data-day="${toYmd(tuesday)}"]`) as HTMLElement;
       expect(within(col).getByRole("button", { name: "Planejamento da sprint, 14:00–15:00" })).toBeTruthy();
       // A hang (focus or render loop) fails fast instead of taking the run down.
+    },
+    20_000,
+  );
+});
+
+describe("RecurrencePicker (interaction)", () => {
+  test.skipIf(!process.env.RUN_NEW_EVENT)(
+    "tabs, weekday chips and the end: the rule and the sentence follow",
+    async () => {
+      const { RecurrencePicker } = await import("@agenteschat/ui");
+      const { createI18n } = await import("@/i18n");
+      const { recurrenceLabels, ruleSentence } = await import("@/lib/recurrence");
+      const i18n = createI18n("pt-BR");
+      const t = i18n.t.bind(i18n) as unknown as Parameters<typeof ruleSentence>[0];
+      type Rule = Parameters<typeof ruleSentence>[2];
+      function Harness() {
+        const [rule, setRule] = useState<Rule>({
+          freq: "weekly",
+          interval: 1,
+          byWeekday: ["MO"],
+          times: ["09:00"],
+          timezone: "America/Sao_Paulo",
+          start: "2026-10-12",
+        });
+        return (
+          <>
+            <RecurrencePicker
+              value={rule}
+              onChange={setRule}
+              labels={recurrenceLabels(t, "pt-BR", rule)}
+              locale="pt-BR"
+              summary={ruleSentence(t, "pt-BR", rule, new Date(2026, 9, 15))}
+            />
+            <output>{JSON.stringify(rule)}</output>
+          </>
+        );
+      }
+      render(<Harness />);
+      const out = () => JSON.parse(document.querySelector("output")?.textContent ?? "{}");
+      await click(body().getByRole("button", { name: "quarta-feira" }));
+      expect(out().byWeekday).toEqual(["MO", "WE"]);
+      await type(body().getByLabelText("Intervalo"), "2");
+      expect(document.querySelector(".ac-recur__summary")?.textContent).toBe(
+        "A cada 2 semanas, seg e qua, às 09:00 (horário de Brasília)",
+      );
+      await click(body().getByRole("radio", { name: "Diária" }));
+      expect(out().freq).toBe("daily");
+      await click(body().getByRole("radio", { name: "Só dias úteis" }));
+      expect(out().byWeekday).toEqual(["MO", "TU", "WE", "TH", "FR"]);
+      await click(body().getByRole("radio", { name: "Após" }));
+      expect(out().count).toBe(10);
+    },
+    10_000,
+  );
+});
+
+describe("Calendário > arrastar para criar", () => {
+  test.skipIf(!process.env.RUN_NEW_EVENT)(
+    "a drag on an empty column opens Novo evento with that slot",
+    async () => {
+      await go("calendar");
+      const col = document.querySelector(`[data-day="${toYmd(new Date())}"]`) as HTMLElement;
+      await act(async () => fireEvent.pointerDown(col, { clientX: 5, clientY: 14 * 44, button: 0 }));
+      await act(async () => fireEvent.pointerMove(window, { clientX: 5, clientY: 15 * 44 }));
+      await act(async () => fireEvent.pointerUp(window, { clientX: 5, clientY: 15 * 44 }));
+      await settle(3);
+      const dialog = screen().getByRole("dialog", { name: "Novo evento" });
+      expect((within(dialog).getByRole("combobox", { name: "Início" }) as HTMLInputElement).value).toBe("14:00");
+      expect((within(dialog).getByRole("combobox", { name: "Fim" }) as HTMLInputElement).value).toBe("15:00");
     },
     20_000,
   );

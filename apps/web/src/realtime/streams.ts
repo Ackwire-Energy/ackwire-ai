@@ -141,6 +141,8 @@ export type LiveWork =
       code: LiveCode | null;
       output: LiveOutput[];
       running: boolean;
+      /** When the call started (the stop confirmation says "rodando código há 2 min"). */
+      since?: number;
     };
 
 /** The narration lines of a run (what it said between tool calls). */
@@ -370,6 +372,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
           ...work.map((w) => (w.kind === "call" && w.running ? { ...w, running: false } : w)),
           {
             kind: "call" as const,
+            since: Date.now(),
             id: event.toolUseId ?? `call-${work.length}`,
             tool: event.tool ?? "",
             connector: event.connector ?? null,

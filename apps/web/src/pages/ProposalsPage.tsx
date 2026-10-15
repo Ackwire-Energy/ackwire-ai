@@ -1,10 +1,11 @@
-import { Alert, Avatar, Button, Card, Chip, Diff, diffLines, EmptyState, Field, Icon, Textarea } from "@agenteschat/ui";
+import { Alert, Button, Card, Chip, Diff, diffLines, EmptyState, Field, Icon, Textarea } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { ApiError } from "@/api/http";
 import { useDecideProposal, useProposals } from "@/api/queries";
 import type { Proposal } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { relativeTime, whenAt } from "@/lib/format";
@@ -109,7 +110,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                 onClick={() => setSelected(p.id)}
               >
                 <span className="row">
-                  <Avatar kind="agent" size="sm" name={agentName(p.agentId)} initials={dir.agentInitials(p.agentId)} />
+                  <AgentAvatar agentId={p.agentId} size="sm" name={agentName(p.agentId)} />
                   <span style={{ fontWeight: 600 }}>{agentName(p.agentId)}</span>
                   <span className="small muted" style={{ marginLeft: "auto", fontSize: 12 }}>
                     {relativeTime(t, i18n.language, p.createdAt)}
@@ -125,12 +126,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
 
           <Card as="article" className="proposals__detail" aria-labelledby="prop-title">
             <div className="row">
-              <Avatar
-                kind="agent"
-                size="sm"
-                name={agentName(current.agentId)}
-                initials={dir.agentInitials(current.agentId)}
-              />
+              <AgentAvatar agentId={current.agentId} size="sm" name={agentName(current.agentId)} />
               <span className="small muted">
                 <Trans
                   i18nKey="proposals.proposes"

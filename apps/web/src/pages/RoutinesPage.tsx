@@ -7,24 +7,58 @@ import {
   DialogFooter,
   EmptyState,
   Field,
+  Icon,
   Input,
   List,
+  Menu,
+  MenuItem,
   RadioCard,
   RadioGroup,
+  RecurrencePicker,
+  type RecurrenceRule,
   Segmented,
   Select,
   Textarea,
+  zonedInstant,
 } from "@agenteschat/ui";
+import type { TFunction } from "i18next";
 import { useDeferredValue, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useChannels, useDms, useRoutineAction, useRoutineRuns, useRoutines, useScheduleParse } from "@/api/queries";
-import type { Routine, RoutineEvent, RoutineTarget, RoutineTargetInput } from "@/api/types";
+import {
+  useChannels,
+  useDms,
+  useRoutineAction,
+  useRoutineRuns,
+  useRoutines,
+  useRuleDescribe,
+  useRuleParse,
+} from "@/api/queries";
+import type {
+  Routine,
+  RoutineEvent,
+  RoutineInput,
+  RoutinePatch,
+  RoutineRun,
+  RoutineTarget,
+  RoutineTargetInput,
+} from "@/api/types";
 import { useActors } from "@/components/actors";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { formatUsd, whenAt } from "@/lib/format";
+import { ZoneSelect } from "@/components/ZoneSelect";
+import { formatUsd, toYmd, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
-import { COMMON_TIMEZONES, onceParts, timezoneLabel } from "@/lib/routines";
+import {
+  defaultRule,
+  fromApiRule,
+  phraseToRule,
+  recurrenceLabels,
+  ruleSentence,
+  ruleToPhrase,
+  toApiRule,
+  upcomingLabels,
+} from "@/lib/recurrence";
+import { browserTimezone, onceParts, timezoneLabel, timezoneName } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
 
 export const ROUTINE_EVENTS: RoutineEvent[] = [
@@ -79,6 +113,7 @@ export function RoutinesPage() {
   const { org } = useOrg();
   const routines = useRoutines(org.id);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Routine | null>(null);
   const [runsFor, setRunsFor] = useState<Routine | null>(null);
   const [showDone, setShowDone] = useState(false);
   const list = routines.data ?? [];
@@ -107,7 +142,7 @@ export function RoutinesPage() {
       {routines.isSuccess && list.length === 0 && <EmptyState icon="routines">{t("routines.empty")}</EmptyState>}
       <div className="stack-4" style={{ gap: 12 }}>
         {current.map((r) => (
-          <RoutineCard key={r.id} routine={r} onRuns={() => setRunsFor(r)} />
+          <RoutineCard key={r.id} routine={r} onRuns={() => setRunsFor(r)} onEdit={() => setEditing(r)} />
         ))}
       </div>
       {done.length > 0 && (
@@ -124,29 +159,37 @@ export function RoutinesPage() {
           {showDone && (
             <div id="routines-done-list" className="stack-4" style={{ gap: 12 }}>
               {done.map((r) => (
-                <RoutineCard key={r.id} routine={r} onRuns={() => setRunsFor(r)} />
+                <RoutineCard key={r.id} routine={r} onRuns={() => setRunsFor(r)} onEdit={() => setEditing(r)} />
               ))}
             </div>
           )}
         </section>
       )}
-      <NewRoutineDialog open={creating} onClose={() => setCreating(false)} />
+      <RoutineDialog open={creating} onClose={() => setCreating(false)} />
+      <RoutineDialog
+        key={editing?.id ?? "none"}
+        open={Boolean(editing)}
+        routine={editing ?? undefined}
+        onClose={() => setEditing(null)}
+      />
       <RunsDialog routine={runsFor} onClose={() => setRunsFor(null)} />
     </div>
   );
 }
 
-function RoutineCard({ routine: r, onRuns }: { routine: Routine; onRuns: () => void }) {
+function RoutineCard({ routine: r, onRuns, onEdit }: { routine: Routine; onRuns: () => void; onEdit: () => void }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
+  const toast = useToast();
   const action = useRoutineAction(org.id);
+  const [deleting, setDeleting] = useState(false);
   const target = useTargetLabel();
   const agent = { type: "agent" as const, id: r.agentId };
   // The zone always shows, so a routine read in UTC by mistake is easy to spot.
   const when =
     r.trigger.type === "schedule"
-      ? `${r.trigger.description} (${timezoneLabel(r.trigger.timezone || "UTC")})`
+      ? `${r.trigger.description} (${timezoneLabel(r.trigger.timezone || "UTC", undefined, i18n.language)})`
       : r.trigger.type === "once"
         ? t("routines.once", onceParts(i18n.language, r.trigger.at, r.trigger.timezone || "UTC"))
         : t(`routines.event.${r.trigger.event}`);
@@ -219,7 +262,81 @@ function RoutineCard({ routine: r, onRuns }: { routine: Routine; onRuns: () => v
         <Button size="sm" variant="ghost" onClick={onRuns}>
           {t("routines.runs")}
         </Button>
+        <Button
+          size="sm"
+          variant="primary"
+          icon="edit"
+          onClick={onEdit}
+          aria-label={t("routines.editName", { name: r.name })}
+        >
+          {t("routines.edit")}
+        </Button>
+        <Menu
+          align="end"
+          label={t("routines.more", { name: r.name })}
+          trigger={
+            <Button variant="ghost" size="sm" iconOnly icon="more" aria-label={t("routines.more", { name: r.name })} />
+          }
+        >
+          <MenuItem
+            icon="copy"
+            onSelect={() =>
+              action.mutate(
+                { type: "duplicate", id: r.id },
+                {
+                  onSuccess: (copy) =>
+                    toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
+                },
+              )
+            }
+          >
+            {t("routines.duplicate")}
+          </MenuItem>
+          {r.webhookUrl && (
+            <MenuItem
+              icon="link"
+              onSelect={async () => {
+                await navigator.clipboard?.writeText(r.webhookUrl ?? "");
+                toast.show(t("routines.webhookCopied"));
+              }}
+            >
+              {t("routines.copyWebhook")}
+            </MenuItem>
+          )}
+          <MenuItem icon="trash" onSelect={() => setDeleting(true)}>
+            {t("routines.delete")}
+          </MenuItem>
+        </Menu>
       </div>
+      <Dialog
+        open={deleting}
+        onOpenChange={(o) => !o && setDeleting(false)}
+        title={t("routines.deleteTitle", { name: r.name })}
+        description={t("routines.deleteBody")}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogFooter>
+          <Button onClick={() => setDeleting(false)}>{t("common.cancel")}</Button>
+          <Button
+            variant="danger"
+            loading={action.isPending && action.variables?.type === "delete"}
+            onClick={() =>
+              action.mutate(
+                { type: "delete", id: r.id },
+                {
+                  onSuccess: () => {
+                    setDeleting(false);
+                    toast.show(t("routines.deleted"));
+                  },
+                },
+              )
+            }
+          >
+            {t("routines.deleteConfirm")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </article>
   );
 }
@@ -244,7 +361,7 @@ function RunsDialog({ routine, onClose }: { routine: Routine | null; onClose: ()
               <span className="small muted tabular" style={{ flex: "0 0 96px" }}>
                 {whenAt(t, i18n.language, x.at)}
               </span>
-              <span style={{ flex: 1 }}>{x.summary}</span>
+              <span style={{ flex: 1 }}>{runSummary(t, x)}</span>
               <Chip icon={x.status === "ok" ? "check" : "alert"}>{t(`routines.runStatus.${x.status}`)}</Chip>
               <span className="small muted tabular">{formatUsd(t, i18n.language, x.costUsd)}</span>
             </div>
@@ -261,29 +378,98 @@ function RunsDialog({ routine, onClose }: { routine: Routine | null; onClose: ()
 const TARGET_DM = "dm";
 const TARGET_ARTIFACT = "artifact";
 const TARGET_FORUM = "forum";
+/** Editing a routine made in the chat (a thread or DM): keep where it delivers. */
+const TARGET_KEEP = "keep";
 const FORUM_ROUNDS = ["1", "2", "3", "5"] as const;
 
-function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
+/** Where a routine delivers, as the form's select value. */
+function targetChoice(target: RoutineTarget | undefined): string {
+  if (!target) return "";
+  if (target.type === "channel") return target.channelId;
+  if (target.type === "dm") return TARGET_DM;
+  if (target.type === "artifact") return TARGET_ARTIFACT;
+  if (target.type === "forum") return TARGET_FORUM;
+  return TARGET_KEEP;
+}
+
+/** The phrase the routine was set with ("toda segunda às 9h"; made with the picker: its rule's phrase). */
+function phraseOf(r: Routine | undefined): string {
+  if (!r) return "toda segunda às 9h";
+  if (r.trigger.type === "schedule") {
+    if (r.trigger.phrase) return r.trigger.phrase;
+    if (r.trigger.rule) return ruleToPhrase(fromApiRule(r.trigger.rule, toYmd(new Date())));
+    return r.trigger.description;
+  }
+  return r.trigger.type === "once" ? r.trigger.description : "toda segunda às 9h";
+}
+
+/** The rule a routine runs on, in `zone` (a phrase-only routine: its phrase read as a rule). */
+function ruleOf(r: Routine | undefined, zone: string): RecurrenceRule {
+  const base = defaultRule(zone);
+  if (r?.trigger.type === "once") return onceRule(r.trigger.at, zone);
+  if (r?.trigger.type === "schedule" && r.trigger.rule)
+    return { ...fromApiRule(r.trigger.rule, base.start), timezone: zone };
+  return phraseToRule(phraseOf(r), base) ?? base;
+}
+const zoneOf = (r: Routine | undefined) => (r && r.trigger.type !== "event" ? r.trigger.timezone || "UTC" : "");
+const isUtc = (z: string) => z === "UTC" || z === "Etc/UTC";
+
+/**
+ * "Nova rotina" and "Editar" (the same form). Editing starts from the routine
+ * and saves only what changed; a routine still read in UTC (made before time
+ * zones) starts in my zone, with a hint to keep UTC instead.
+ */
+function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () => void; routine?: Routine }) {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
   const toast = useToast();
   const actors = useActors();
   const channels = useChannels(org.id);
+  const targetLabel = useTargetLabel();
   const action = useRoutineAction(org.id);
   const agents = actors.dir.agents;
-  const [agentId, setAgentId] = useState("");
-  const [target, setTarget] = useState("");
+  const editing = Boolean(routine);
+  const initialForum = routine?.target.type === "forum" ? routine.target : null;
+  const myZone = actors.dir.memberById.get(me.user.id)?.timezone || browserTimezone() || "America/Sao_Paulo";
+  const savedZone = zoneOf(routine);
+  const wasUtc = editing && routine?.trigger.type !== "event" && isUtc(savedZone);
+  const [agentId, setAgentId] = useState(routine?.agentId ?? "");
+  const [target, setTarget] = useState(targetChoice(routine?.target));
   // "Um tópico no fórum": which agents discuss, and how many rounds.
-  const [forumAgents, setForumAgents] = useState<string[]>([]);
-  const [forumRounds, setForumRounds] = useState<(typeof FORUM_ROUNDS)[number]>("3");
-  const [prompt, setPrompt] = useState("");
-  const [name, setName] = useState("");
-  const [kind, setKind] = useState<"schedule" | "event">("schedule");
-  const [phrase, setPhrase] = useState("toda segunda às 9h");
-  const [event, setEvent] = useState<RoutineEvent>("sentry.issue_created");
+  const [forumAgents, setForumAgents] = useState<string[]>(initialForum?.agentIds ?? []);
+  const [forumRounds, setForumRounds] = useState<(typeof FORUM_ROUNDS)[number]>(
+    (FORUM_ROUNDS as readonly string[]).includes(String(initialForum?.rounds))
+      ? (String(initialForum?.rounds) as (typeof FORUM_ROUNDS)[number])
+      : "3",
+  );
+  const [prompt, setPrompt] = useState(routine?.prompt ?? "");
+  const [name, setName] = useState(routine?.name ?? "");
+  const [kind, setKind] = useState<"schedule" | "event">(routine?.trigger.type === "event" ? "event" : "schedule");
+  // The phrase field speaks Portuguese (the parser's language); in another UI language it starts empty.
+  const phraseLang = i18n.language.startsWith("pt");
+  const [phrase, setPhrase] = useState(routine || phraseLang ? phraseOf(routine) : "");
+  const [event, setEvent] = useState<RoutineEvent>(
+    routine?.trigger.type === "event" ? routine.trigger.event : "sentry.issue_created",
+  );
+  const [budget, setBudget] = useState(routine?.budgetUsd ? String(routine.budgetUsd) : "");
   const [touched, setTouched] = useState(false);
-  /** Empty = let the server read it in the person's own zone; set once they pick one. */
-  const [zone, setZone] = useState("");
+  // One source of truth for "when": the rule (the picker), with the phrase kept in step.
+  const [rule, setRule] = useState<RecurrenceRule>(() => ruleOf(routine, wasUtc ? myZone : savedZone || myZone));
+  // What the routine had, to tell whether "when" changed.
+  const [savedRule] = useState(() => JSON.stringify(toApiRule(ruleOf(routine, savedZone || myZone))));
+  const zone = rule.timezone;
+  const setZone = (z: string) => setRule((r) => ({ ...r, timezone: z }));
+  // The phrase was typed (its parse fills the picker) or follows the picker.
+  const [phraseTyped, setPhraseTyped] = useState(false);
+  const pickRule = (next: RecurrenceRule) => {
+    setRule(next);
+    setPhrase(phraseLang ? ruleToPhrase(next) : "");
+    setPhraseTyped(false);
+  };
+  const typePhrase = (text: string) => {
+    setPhrase(text);
+    setPhraseTyped(true);
+  };
   useEffect(() => {
     if (!agentId && agents[0]) setAgentId(agents[0].id);
   }, [agentId, agents]);
@@ -291,13 +477,27 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
     if (!target && channels.data?.[0]) setTarget(channels.data[0].id);
   }, [target, channels.data]);
   const typed = useDeferredValue(phrase.trim());
-  const parsed = useScheduleParse(org.id, typed, open && kind === "schedule" && typed.length > 0, zone || undefined);
-  const shownZone = zone || (parsed.data?.ok ? parsed.data.timezone : "");
-  const zoneOptions = [...new Set([...(shownZone ? [shownZone] : []), ...COMMON_TIMEZONES])].map((z) => ({
-    value: z,
-    label: timezoneLabel(z),
-  }));
-  const scheduleOk = kind === "event" || (typed.length > 0 && parsed.data?.ok === true);
+  const once = rule.freq === "once";
+  const parsed = useRuleParse(org.id, typed, open && kind === "schedule" && phraseTyped && typed.length > 0, zone);
+  // A phrase the server understood fills the picker (one source of truth: the rule).
+  const parsedRule = parsed.data?.ok ? parsed.data.rule : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: apply each new parse once
+  useEffect(() => {
+    if (parsedRule && phraseTyped) setRule((r) => ({ ...fromApiRule(parsedRule, r.start), timezone: r.timezone }));
+  }, [parsedRule]);
+  const apiRule = kind === "schedule" && !once ? toApiRule(rule) : null;
+  const described = useRuleDescribe(org.id, open ? apiRule : null);
+  const info = described.data?.ok ? described.data : null;
+  // The picker opens on demand ("Ajustar dias e horários"); the sentence and next runs always show.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const upcoming = info?.nextRuns.length
+    ? info.nextRuns.slice(0, 3).map((iso) => runLabel(i18n.language, iso, rule.timezone))
+    : upcomingLabels(i18n.language, rule);
+  const phraseFailed = phraseTyped && typed.length > 0 && parsed.data?.ok === false;
+  const shownZone = zone;
+  const scheduleOk = kind === "event" || once || !phraseFailed;
+  const budgetValue = budget.trim() ? Number(budget.replace(",", ".")) : null;
+  const budgetOk = budgetValue === null || (Number.isFinite(budgetValue) && budgetValue > 0);
   const targetValue = (): RoutineTargetInput =>
     target === TARGET_FORUM
       ? { type: "forum", agentIds: forumAgents.length > 0 ? forumAgents : [agentId], rounds: Number(forumRounds) }
@@ -306,21 +506,102 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
         : target === TARGET_ARTIFACT
           ? { type: "artifact" }
           : { type: "channel", channelId: target };
+  const trigger = (): RoutineInput["trigger"] =>
+    kind === "event"
+      ? { type: "event", event }
+      : once
+        ? {
+            type: "once",
+            at: zonedInstant(rule.start, rule.times[0] ?? "09:00", rule.timezone).toISOString(),
+            timezone: rule.timezone,
+          }
+        : { type: "schedule", rule: toApiRule(rule) };
+  /** What changed against the routine (`PATCH` sends only this). */
+  const changes = (r: Routine): RoutinePatch => {
+    const patch: RoutinePatch = {};
+    if (name.trim() && name.trim() !== r.name) patch.name = name.trim();
+    if (prompt.trim() !== r.prompt) patch.prompt = prompt.trim();
+    if (agentId !== r.agentId) patch.agentId = agentId;
+    const forumChanged =
+      target === TARGET_FORUM &&
+      r.target.type === "forum" &&
+      (JSON.stringify([...(forumAgents.length > 0 ? forumAgents : [agentId])].sort()) !==
+        JSON.stringify([...r.target.agentIds].sort()) ||
+        Number(forumRounds) !== (r.target.rounds ?? 3));
+    if (target !== TARGET_KEEP && (target !== targetChoice(r.target) || forumChanged)) patch.target = targetValue();
+    const triggerChanged =
+      kind === "event"
+        ? r.trigger.type !== "event" || r.trigger.event !== event
+        : once
+          ? r.trigger.type !== "once" ||
+            JSON.stringify(trigger()) !== JSON.stringify({ type: "once", at: r.trigger.at, timezone: savedZone })
+          : r.trigger.type !== "schedule" || JSON.stringify(toApiRule(rule)) !== savedRule;
+    if (triggerChanged) patch.trigger = trigger();
+    if (budgetValue !== (r.budgetUsd ?? null)) patch.budgetUsd = budgetValue;
+    return patch;
+  };
   const help = () => {
-    if (!typed) return t("routines.form.frequencyPlaceholder");
-    if (!parsed.data) return "";
-    return parsed.data.ok
-      ? t("routines.form.parsed", {
-          description: parsed.data.description,
-          timezone: timezoneLabel(parsed.data.timezone),
-        })
-      : parsed.data.error;
+    if (phraseFailed && parsed.data && !parsed.data.ok) return parsed.data.error;
+    if (!info) return "";
+    return t("routines.form.parsed", {
+      description: info.description,
+      timezone: timezoneLabel(rule.timezone, undefined, i18n.language),
+    });
+  };
+  const submit = () => {
+    setTouched(true);
+    if (!prompt.trim() || !agentId || !scheduleOk || !budgetOk) return;
+    if (routine) {
+      const patch = changes(routine);
+      if (Object.keys(patch).length === 0) {
+        onClose();
+        return;
+      }
+      action.mutate(
+        { type: "update", id: routine.id, patch },
+        {
+          onSuccess: (saved) => {
+            const next = (saved as Routine | undefined)?.nextRunAt;
+            toast.show(
+              next
+                ? t("routines.form.saved", { next: t("routines.next", { when: nextLabel(i18n.language, next) }) })
+                : t("routines.form.savedNoNext"),
+            );
+            onClose();
+          },
+        },
+      );
+      return;
+    }
+    action.mutate(
+      {
+        type: "create",
+        input: {
+          name: name.trim() || undefined,
+          agentId,
+          prompt: prompt.trim(),
+          target: targetValue(),
+          trigger: trigger(),
+          ...(budgetValue !== null ? { budgetUsd: budgetValue } : {}),
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.show(t("routines.form.created"));
+          setPrompt("");
+          setName("");
+          setBudget("");
+          setTouched(false);
+          onClose();
+        },
+      },
+    );
   };
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      title={t("routines.new")}
+      title={editing ? t("routines.editTitle") : t("routines.new")}
       closeLabel={t("common.close")}
       width={560}
     >
@@ -328,29 +609,7 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
         style={{ display: "contents" }}
         onSubmit={(e) => {
           e.preventDefault();
-          setTouched(true);
-          if (!prompt.trim() || !agentId || !scheduleOk) return;
-          action.mutate(
-            {
-              type: "create",
-              input: {
-                name: name.trim() || undefined,
-                agentId,
-                prompt: prompt.trim(),
-                target: targetValue(),
-                trigger: kind === "schedule" ? scheduleTrigger(phrase.trim(), shownZone) : { type: "event", event },
-              },
-            },
-            {
-              onSuccess: () => {
-                toast.show(t("routines.form.created"));
-                setPrompt("");
-                setName("");
-                setTouched(false);
-                onClose();
-              },
-            },
-          );
+          submit();
         }}
       >
         <DialogBody>
@@ -368,6 +627,9 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
                 value={target || undefined}
                 onValueChange={setTarget}
                 options={[
+                  ...(routine && target === TARGET_KEEP
+                    ? [{ value: TARGET_KEEP, label: targetLabel(routine.target) }]
+                    : []),
                   ...(channels.data ?? []).map((c) => ({ value: c.id, label: `#${c.name}` })),
                   { value: TARGET_DM, label: t("routines.target.dm") },
                   { value: TARGET_ARTIFACT, label: t("routines.target.artifact") },
@@ -421,7 +683,7 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
               placeholder={t("routines.form.whatPlaceholder")}
             />
           </Field>
-          <Field label={t("routines.form.name")} id="nr-name">
+          <Field label={editing ? t("routines.form.title") : t("routines.form.name")} id="nr-name">
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
           <RadioGroup
@@ -433,25 +695,66 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
             <RadioCard value="schedule" id="nr-k-time" checked={kind === "schedule"} title={t("routines.form.time")} />
             <RadioCard value="event" id="nr-k-event" checked={kind === "event"} title={t("routines.form.onEvent")} />
           </RadioGroup>
-          {kind === "schedule" ? (
+          {kind === "schedule" && (
+            <div className="routine-when">
+              <div className="routine-when__head">
+                <span className="routine-when__sentence" aria-live="polite">
+                  {ruleSentence(t, i18n.language, rule)}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  icon="repeat"
+                  aria-expanded={pickerOpen}
+                  onClick={() => setPickerOpen((o) => !o)}
+                >
+                  {t("routines.form.adjust")}
+                </Button>
+              </div>
+              {!pickerOpen && upcoming.length > 0 && (
+                <span className="small muted">{t("routines.form.nextRuns", { list: upcoming.join(" · ") })}</span>
+              )}
+              {pickerOpen && (
+                <RecurrencePicker
+                  value={rule}
+                  onChange={pickRule}
+                  labels={recurrenceLabels(t, i18n.language, rule)}
+                  locale={i18n.language}
+                  upcoming={upcoming}
+                  hideTimezone
+                />
+              )}
+            </div>
+          )}
+          {kind === "schedule" && (
+            <Field label={t("routines.form.timezone")} id="nr-zone">
+              <ZoneSelect value={zone} onChange={setZone} />
+            </Field>
+          )}
+          {kind === "schedule" && !once ? (
             <Field
               label={t("routines.form.frequency")}
               id="nr-when"
-              help={parsed.data?.ok === false && typed ? undefined : help()}
-              error={parsed.data?.ok === false && typed ? help() : undefined}
+              help={phraseFailed ? undefined : help()}
+              error={phraseFailed ? help() : undefined}
             >
               <Input
                 value={phrase}
-                onChange={(e) => setPhrase(e.target.value)}
-                placeholder={t("routines.form.frequencyPlaceholder")}
+                onChange={(e) => typePhrase(e.target.value)}
+                placeholder={t("recurrence.phrasePlaceholder")}
               />
             </Field>
           ) : null}
-          {kind === "schedule" && shownZone ? (
-            <Field label={t("routines.form.timezone")} id="nr-zone">
-              <Select value={shownZone} onValueChange={setZone} options={zoneOptions} />
-            </Field>
-          ) : null}
+          {kind === "schedule" && wasUtc && !isUtc(shownZone) && (
+            <p className="routine-utc-hint small">
+              <Icon name="waiting" size={14} />
+              <span>{t("routines.form.utcHint", { zone: timezoneName(shownZone, i18n.language) })}</span>
+              <button type="button" className="ac-link" onClick={() => setZone("UTC")}>
+                {t("routines.form.keepUtc")}
+              </button>
+            </p>
+          )}
           {kind === "schedule" ? null : (
             <Field
               label={t("routines.form.event")}
@@ -465,13 +768,21 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
               />
             </Field>
           )}
+          <Field
+            label={t("routines.form.budget")}
+            id="nr-budget"
+            help={budgetOk ? t("routines.form.budgetHelp") : undefined}
+            error={budgetOk ? undefined : t("routines.form.budgetInvalid")}
+          >
+            <Input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="5" />
+          </Field>
         </DialogBody>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("routines.form.cancel")}
           </Button>
-          <Button type="submit" variant="primary" disabled={action.isPending || !agentId || !scheduleOk}>
-            {t("routines.form.create")}
+          <Button type="submit" variant="primary" disabled={action.isPending || !agentId || !scheduleOk || !budgetOk}>
+            {editing ? t("routines.form.save") : t("routines.form.create")}
           </Button>
         </DialogFooter>
       </form>
@@ -479,8 +790,46 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
-/** The schedule trigger with the zone the person saw in the preview (the server reads the phrase in it). */
-function scheduleTrigger(phrase: string, timezone: string) {
-  const trigger = { type: "schedule" as const, phrase, ...(timezone ? { timezone } : {}) };
-  return trigger as { type: "schedule"; phrase: string };
+/** A one-off routine's moment as a rule ("Uma vez", that day and time in its zone). */
+function onceRule(at: string, timezone: string): RecurrenceRule {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(at));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  return {
+    freq: "once",
+    interval: 1,
+    times: [`${get("hour")}:${get("minute")}`],
+    timezone,
+    start: `${get("year")}-${get("month")}-${get("day")}`,
+  };
+}
+
+/** A next run ("seg, 20 out · 09:00") in the rule's zone. */
+function runLabel(locale: string, iso: string, timeZone: string) {
+  const d = new Date(iso);
+  const date = new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone })
+    .format(d)
+    .replace(/\./g, "")
+    .replace(/ de /g, " ");
+  const time = new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone,
+  }).format(d);
+  return `${date} · ${time}`;
+}
+
+/** A run's summary in the UI language (from its code), else the server's words. */
+function runSummary(t: TFunction, run: RoutineRun) {
+  if (!run.summaryCode) return run.summary;
+  const key = `routines.summary.${run.summaryCode.replace(/^routine_run\./, "")}`;
+  const tt = t as unknown as (k: string, o: Record<string, unknown>) => string;
+  return tt(key, { ...(run.summaryParams ?? {}), defaultValue: run.summary });
 }

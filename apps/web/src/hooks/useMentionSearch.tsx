@@ -2,6 +2,7 @@ import { Avatar, type ComposerSuggestion } from "@agenteschat/ui";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChannelMember } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { canTalk } from "@/lib/audience";
 import { useDirectory } from "./useDirectory";
@@ -37,7 +38,7 @@ export function useMentionSearch(members?: ChannelMember[]) {
             description: [`@${a.handle}`, a.role ? t("issues.agentRole", { role: a.role }) : null]
               .filter(Boolean)
               .join(" · "),
-            leading: <Avatar kind="agent" size="xs" name={a.name} initials={dir.agentInitials(a.id)} />,
+            leading: <AgentAvatar agentId={a.id} size="xs" name={a.name} />,
             note: here ? undefined : t("mentions.notInChannel"),
             inChannel: here,
             rank: fold(a.name).startsWith(q) || fold(a.handle).startsWith(q) ? 0 : 1,

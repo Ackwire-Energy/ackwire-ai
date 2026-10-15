@@ -1,8 +1,6 @@
 import {
   Avatar,
-  AvatarStack,
   Button,
-  Checkbox,
   Composer,
   type ComposerCommand,
   DayDivider,
@@ -20,6 +18,7 @@ import {
   SkeletonGroup,
   SkeletonMessage,
   Spinner,
+  Switch,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -56,9 +55,10 @@ import type {
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
 import { buildTimeline, mergeTimeline, threadRootsToLoad } from "@/chat/timeline";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
+import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard } from "@/components/ChatCards";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { ForumMessageCard, forumTopicOfMessage } from "@/components/Forum";
@@ -71,7 +71,7 @@ import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
-import { isStoppable, StopButton, useStopRun } from "@/components/StopRun";
+import { askToStop, isStoppable, StopButton, useStopRun } from "@/components/StopRun";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
@@ -83,7 +83,6 @@ import { entersWithMotion, greetingSuggestions, messageUsage, nearBottom, usageL
 import { clearDraft, peekDraft } from "@/lib/drafts";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
-import { lookOf } from "@/lib/look";
 import { reportPainted } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { isReminderMessage, routineOfMessage } from "@/lib/routines";
@@ -225,7 +224,8 @@ function ChannelView({
   // ⌘K "Pedir a um agente" leaves the text for this DM's composer.
   const draftKey = chrome?.dmAgentId ? `agent:${chrome.dmAgentId}` : null;
   const [draft, setDraft] = useState(() => (draftKey ? (peekDraft(draftKey) ?? "") : ""));
-  // Esc (composer empty, nothing open): stops the most recent run here that I may stop.
+  // Esc (composer empty, nothing open): asks to stop the most recent run here that I may stop
+  // (the confirmation; Esc twice within 1.5 s stops directly).
   const { canStop: mayStop, stop: stopRun } = useStopRun();
   const draftRef = useRef("");
   useEffect(() => {
@@ -237,7 +237,7 @@ function ChannelView({
         .at(-1);
       if (!target) return;
       e.preventDefault();
-      stopRun(target);
+      askToStop(target.runId, isWriting(target) ? "row" : "bar", true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -630,7 +630,6 @@ function ChannelView({
   ]
     .filter(Boolean)
     .join(" · ");
-  const stack = [...channelPeople.slice(0, 2), ...channelAgents.slice(0, 2)];
 
   return (
     <ChannelActionsContext.Provider value={actions}>
@@ -641,23 +640,12 @@ function ChannelView({
               <h1 className="channel__title"># {channel.name}</h1>
               {subtitle && <span className="channel__topic">{subtitle}</span>}
             </div>
-            {stack.length > 0 && (
-              <AvatarStack
-                role="img"
-                aria-label={t("channel.members", {
-                  names: [...channelPeople, ...channelAgents].map((m) => m.name).join(", "),
-                })}
-              >
-                {stack.map((m) =>
-                  // People have `userId`; agents don't (both have `handle` now).
-                  "userId" in m ? (
-                    <Avatar key={m.userId} size="sm" name={m.name} imageUrl={m.image} />
-                  ) : (
-                    <Avatar key={m.id} kind="agent" size="sm" name={m.name} appearance={lookOf(m)} />
-                  ),
-                )}
-              </AvatarStack>
-            )}
+            <ChannelMembersStack
+              channelId={channel.id}
+              people={channelPeople}
+              agents={channelAgents}
+              onDetails={() => setDetailsOpen(true)}
+            />
             <Button size="sm" onClick={() => setDetailsOpen(true)}>
               {t("channel.details")}
             </Button>
@@ -830,7 +818,7 @@ function ChannelView({
                     {mayStop(workingRun) && (
                       <>
                         {" · "}
-                        <StopButton run={workingRun} onStop={stopRun} />
+                        <StopButton run={workingRun} onStop={stopRun} place="composer" />
                       </>
                     )}
                   </span>
@@ -994,7 +982,7 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
             key={c.key}
             agent
             stacked
-            avatar={<Avatar kind="agent" name={name} appearance={lookOf(dir.agentById.get(c.agentId))} />}
+            avatar={<AgentAvatar agentId={c.agentId} name={name} state="idle" />}
             author={name}
             time={t("common.now")}
           >
@@ -1062,7 +1050,7 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
       agent
       grouped={grouped}
       streaming={!failed && !waiting && !canceled}
-      avatar={<Avatar kind="agent" name={name} state={agentStateOfRun(run)} appearance={lookOf(agent)} />}
+      avatar={<AgentAvatar agentId={run.agentId} name={name} state={agentStateOfRun(run)} />}
       author={
         failed || canceled ? (
           name
@@ -1139,7 +1127,7 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
                     {capitalize(activityVerb(t, doing))}…
                   </p>
                 )}
-              {isStoppable(run) && canStop(run) && <StopButton run={run} onStop={stop} />}
+              {isStoppable(run) && canStop(run) && <StopButton run={run} onStop={stop} place="row" />}
             </div>
           )}
         </>
@@ -1274,14 +1262,7 @@ function ActivityBar({ channelId }: { channelId: string }) {
             <span className="ac-typing__avatars" aria-hidden="true">
               {entries.map((e) =>
                 e.type === "agent" ? (
-                  <Avatar
-                    key={`a:${e.id}`}
-                    kind="agent"
-                    size="xs"
-                    name={e.name}
-                    state="thinking"
-                    appearance={lookOf(dir.agentById.get(e.id))}
-                  />
+                  <AgentAvatar key={`a:${e.id}`} agentId={e.id} size="xs" name={e.name} state="thinking" />
                 ) : (
                   <Avatar key={`p:${e.id}`} size="xs" name={e.name} imageUrl={dir.memberById.get(e.id)?.image} />
                 ),
@@ -1296,8 +1277,9 @@ function ActivityBar({ channelId }: { channelId: string }) {
               <span />
               <span />
             </span>
+            {barStoppable.length > 0 && <span className="ac-typing__sep" aria-hidden="true" />}
             {barStoppable.map((r) => (
-              <StopButton key={r.runId} run={r} onStop={stop} />
+              <StopButton key={r.runId} run={r} onStop={stop} place="bar" />
             ))}
           </>
         )}
@@ -1334,7 +1316,17 @@ const TimelineMessage = memo(function TimelineMessage({
   // `agent.run.steered`: this message went into a running task.
   const steeredAgent = useLive((s) => s.steered[m.id]);
   // A stopped run's message (`meta.canceled`): the text so far, and "Interrompido por Walter" as a note.
-  const { body, note: canceledNote } = useMemo(() => splitCanceled(m.body, m.meta), [m.body, m.meta]);
+  const stopped = useMemo(() => splitCanceled(m.body, m.meta), [m.body, m.meta]);
+  const body = stopped.body;
+  const stopper = stopped.byUserId ? dir.memberById.get(stopped.byUserId)?.name : undefined;
+  const canceledNote = !stopped.canceled
+    ? null
+    : stopper
+      ? t("run.canceledBy", { name: stopper })
+      : stopped.byUserId || !stopped.note
+        ? t("run.canceled")
+        : // Older messages without a person in the meta: the server's line.
+          stopped.note;
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Lembrete".
   const reminder = isReminderMessage(m.meta);
@@ -1396,16 +1388,17 @@ const TimelineMessage = memo(function TimelineMessage({
           </span>
         ) : m.author.id ? (
           <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
-            <Avatar
-              kind={m.author.type}
-              appearance={lookOf(agent)}
-              name={name}
-              imageUrl={person?.image}
-              initials={agent ? dir.agentInitials(agent.id) : undefined}
-            />
+            {agent ? (
+              // A saved message: the agent at rest (its live state shows on the live row).
+              <AgentAvatar agentId={agent.id} name={name} state="idle" />
+            ) : (
+              <Avatar kind="person" name={name} imageUrl={person?.image} />
+            )}
           </ProfileTrigger>
+        ) : m.author.type === "agent" ? (
+          <AgentAvatar name={name} />
         ) : (
-          <Avatar kind={m.author.type} name={name} imageUrl={person?.image} />
+          <Avatar kind="person" name={name} imageUrl={person?.image} />
         )
       }
       author={
@@ -1640,14 +1633,14 @@ function ChannelDetails({
         >
           {rows.map((r) => (
             <div key={r.key} className="member-row">
-              <Avatar kind={r.kind} size="sm" name={r.name} imageUrl={r.image} initials={r.initials} />
+              <ActorAvatar actor={{ type: r.kind, id: r.id }} size="sm" name={r.name} />
               <span className="list-col">
                 <span style={{ fontWeight: 600 }}>{r.name}</span>
                 <span className="small muted">{r.sub}</span>
               </span>
               {r.kind === "agent" && (
-                <label htmlFor={`auto-${r.id}`} className="row small" style={{ gap: 6 }}>
-                  <Checkbox
+                <label htmlFor={`auto-${r.id}`} className="member-row__switch small">
+                  <Switch
                     id={`auto-${r.id}`}
                     aria-label={t("channelMembers.autoReplyFor", { name: r.name })}
                     checked={Boolean(r.autoReply)}

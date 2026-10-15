@@ -8,10 +8,12 @@ import type {
   AccessInput,
   AgentComputer,
   AgentInput,
+  ApiRule,
   Approval,
   ArtifactContent,
   ArtifactFilters,
   CalendarEventInput,
+  CalendarEventPatch,
   ForumParticipantsInput,
   ForumSuggestedIssue,
   ForumTopicDetail,
@@ -22,10 +24,12 @@ import type {
   OrgSettings,
   Role,
   RoutineInput,
+  RoutinePatch,
   S3Input,
   SandboxSettingsInput,
   ScopeGrant,
   SearchKind,
+  SeriesScope,
   SkillInput,
   SkillPatch,
   ToolAccess,
@@ -871,6 +875,30 @@ export const useScheduleParse = (orgId: string, phrase: string, enabled: boolean
   });
 };
 
+/** `POST …/routines/parse-rule`: a phrase → rule (fills the picker). */
+export const useRuleParse = (orgId: string, phrase: string, enabled: boolean, timezone?: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["org", orgId, "routines", "parse-rule", phrase, timezone ?? ""] as const,
+    queryFn: () => api.routines.parseRule(orgId, phrase, timezone),
+    enabled,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+};
+
+/** `POST …/routines/describe-rule`: the picker's sentence and next runs. */
+export const useRuleDescribe = (orgId: string, rule: ApiRule | null) => {
+  const api = useApi();
+  const key = rule ? JSON.stringify(rule) : "";
+  return useQuery({
+    queryKey: ["org", orgId, "routines", "describe-rule", key] as const,
+    queryFn: () => api.routines.describeRule(orgId, rule as ApiRule),
+    enabled: Boolean(rule),
+    placeholderData: (prev) => prev,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+};
+
 export function useRoutineAction(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -879,9 +907,15 @@ export function useRoutineAction(orgId: string) {
       action:
         | { type: "create"; input: RoutineInput }
         | { type: "active"; id: string; active: boolean }
-        | { type: "run"; id: string },
+        | { type: "run"; id: string }
+        | { type: "update"; id: string; patch: RoutinePatch }
+        | { type: "delete"; id: string }
+        | { type: "duplicate"; id: string },
     ): Promise<unknown> => {
       if (action.type === "create") return api.routines.create(orgId, action.input);
+      if (action.type === "update") return api.routines.update(orgId, action.id, action.patch);
+      if (action.type === "delete") return api.routines.remove(orgId, action.id);
+      if (action.type === "duplicate") return api.routines.duplicate(orgId, action.id);
       if (action.type === "active") return api.routines.setActive(orgId, action.id, action.active);
       return api.routines.runNow(orgId, action.id);
     },
@@ -908,9 +942,20 @@ export function useCalendarAction(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (
-      action: { type: "create"; input: CalendarEventInput } | { type: "confirm" | "dismiss"; id: string },
+      action:
+        | { type: "create"; input: CalendarEventInput }
+        | { type: "confirm" | "dismiss"; id: string }
+        | {
+            type: "update";
+            id: string;
+            patch: CalendarEventPatch;
+            series?: { scope: SeriesScope; occurrenceStart: string };
+          }
+        | { type: "remove"; id: string; series?: { scope: SeriesScope; occurrenceStart: string } },
     ): Promise<unknown> => {
       if (action.type === "create") return api.calendar.create(orgId, action.input);
+      if (action.type === "update") return api.calendar.update(orgId, action.id, action.patch, action.series);
+      if (action.type === "remove") return api.calendar.remove(orgId, action.id, action.series);
       if (action.type === "confirm") return api.calendar.confirmProposal(orgId, action.id);
       return api.calendar.dismissProposal(orgId, action.id);
     },

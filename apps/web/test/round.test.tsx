@@ -116,8 +116,8 @@ describe("Detalhes do canal: membros", () => {
     state.channelMembers[GENERAL_ID]?.push({ type: "agent", id: ATLAS_ID });
     await go(`c/${ENG_ID}`, state);
     let dialog = await openDetails();
-    expect(within(dialog).getByRole("checkbox", { name: "Ada responde sem menção" })).toBeTruthy();
-    const atlasAuto = within(dialog).getByRole("checkbox", { name: "Atlas responde sem menção" });
+    expect(within(dialog).getByRole("switch", { name: "Ada responde sem menção" })).toBeTruthy();
+    const atlasAuto = within(dialog).getByRole("switch", { name: "Atlas responde sem menção" });
     expect(atlasAuto.getAttribute("aria-checked")).toBe("true");
     await click(atlasAuto);
     await settle(4);
@@ -161,9 +161,7 @@ describe("Detalhes do canal: membros", () => {
     const dialog = await openDetails();
     expect(within(dialog).queryByRole("button", { name: "Adicionar" })).toBeNull();
     expect(within(dialog).queryByRole("button", { name: /Remover/ })).toBeNull();
-    expect(within(dialog).getByRole("checkbox", { name: "Ada responde sem menção" }).hasAttribute("disabled")).toBe(
-      true,
-    );
+    expect(within(dialog).getByRole("switch", { name: "Ada responde sem menção" }).hasAttribute("disabled")).toBe(true);
     expect(dialog.textContent).toContain("Só quem criou o canal e os admins mudam os membros.");
   });
 });

@@ -1,6 +1,7 @@
-import { Avatar, Icon, type IconName, Popover } from "@agenteschat/ui";
+import { Icon, type IconName, Popover } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import type { Message } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
 import { joinNames } from "@/lib/format";
 import { useLive } from "@/realtime/context";
@@ -61,7 +62,7 @@ export function MessageReceipts({ message }: { message: Message }) {
         <div className="ac-popover__title">{t("receipts.popoverTitle")}</div>
         {view.seen.map((id) => (
           <div key={id} className="ac-popover__row">
-            <Avatar kind="agent" size="xs" name={name(id)} initials={dir.agentInitials(id)} />
+            <AgentAvatar agentId={id} size="xs" name={name(id)} />
             <span>{name(id)}</span>
             <span className="ac-popover__row-status">{t(`receipts.status.${phases.get(id) ?? "seen"}`)}</span>
           </div>

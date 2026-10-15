@@ -13,14 +13,29 @@ export const DEFAULT_LOCALE: LocaleCode = "pt-BR";
 
 const STORAGE_KEY = "agentes.locale";
 
-export function savedLocale(): LocaleCode {
+/** The browser's language mapped to ours ("pt-PT" → pt-BR, "en-GB" → en), else null. */
+export function browserLocale(languages: readonly string[] = browserLanguages()): LocaleCode | null {
+  for (const l of languages) {
+    const tag = l.toLowerCase();
+    if (tag.startsWith("pt")) return "pt-BR";
+    if (tag.startsWith("en")) return "en";
+  }
+  return null;
+}
+function browserLanguages(): readonly string[] {
+  if (typeof navigator === "undefined") return [];
+  return navigator.languages?.length ? navigator.languages : navigator.language ? [navigator.language] : [];
+}
+
+/** The saved choice; for someone new, the browser's language; else pt-BR. */
+export function savedLocale(languages?: readonly string[]): LocaleCode {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && locales.some((l) => l.code === saved)) return saved as LocaleCode;
   } catch {
-    // Storage unavailable (private mode): use the default.
+    // Storage unavailable (private mode): fall through.
   }
-  return DEFAULT_LOCALE;
+  return browserLocale(languages) ?? DEFAULT_LOCALE;
 }
 
 export function setLocale(code: LocaleCode, instance: I18n = i18n) {

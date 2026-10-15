@@ -10,7 +10,6 @@ import {
   DialogFooter,
   Field,
   Icon,
-  Input,
   Kbd,
   LogoMark,
   Menu,
@@ -29,12 +28,14 @@ import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useChannels, useDms, useOverview, usePrefetchMessages } from "@/api/queries";
 import { useAuth } from "@/auth/context";
+import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type LocaleCode, locales, setLocale } from "@/i18n";
 import { audienceChip } from "@/lib/audience";
 import { formatUsd } from "@/lib/format";
 import { markOpen } from "@/lib/perf";
 import { can } from "@/lib/permissions";
+import { browserTimezone } from "@/lib/routines";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/SettingsPage";
@@ -157,7 +158,7 @@ export function Sidebar() {
         </Button>
       </div>
 
-      <button type="button" className="sidebar__jump" onClick={openPalette}>
+      <button type="button" className="sidebar__jump" onClick={openPalette} title={t("palette.jump")}>
         <Icon name="search" />
         <span className="sidebar__item-label">{t("palette.jump")}</span>
         <Kbd>{modKey()}</Kbd>
@@ -165,38 +166,38 @@ export function Sidebar() {
       </button>
 
       <div className="sidebar__group">
-        <Link to="/org/$orgId/approvals" params={{ orgId }} className="sidebar__item">
+        <Link to="/org/$orgId/approvals" params={{ orgId }} className="sidebar__item" title={t("shell.approvals")}>
           <Icon name="waiting" />
           <span className="sidebar__item-label">{t("shell.approvals")}</span>
           {pending > 0 && (
             <CountBadge aria-label={t("shell.pendingApprovals", { count: pending })}>{pending}</CountBadge>
           )}
         </Link>
-        <Link to="/org/$orgId/issues" params={{ orgId }} className="sidebar__item">
+        <Link to="/org/$orgId/issues" params={{ orgId }} className="sidebar__item" title={t("shell.issues")}>
           <Icon name="issues" />
           <span className="sidebar__item-label">{t("shell.issues")}</span>
         </Link>
-        <Link to="/org/$orgId/routines" params={{ orgId }} className="sidebar__item">
+        <Link to="/org/$orgId/routines" params={{ orgId }} className="sidebar__item" title={t("shell.routines")}>
           <Icon name="routines" />
           <span className="sidebar__item-label">{t("shell.routines")}</span>
         </Link>
-        <Link to="/org/$orgId/calendar" params={{ orgId }} className="sidebar__item">
+        <Link to="/org/$orgId/calendar" params={{ orgId }} className="sidebar__item" title={t("shell.calendar")}>
           <Icon name="calendar" />
           <span className="sidebar__item-label">{t("shell.calendar")}</span>
         </Link>
-        <Link to="/org/$orgId/forum" params={{ orgId }} className="sidebar__item">
+        <Link to="/org/$orgId/forum" params={{ orgId }} className="sidebar__item" title={t("shell.forum")}>
           <Icon name="message" />
           <span className="sidebar__item-label">{t("shell.forum")}</span>
         </Link>
-        <Link to="/org/$orgId/wiki" params={{ orgId }} className="sidebar__item">
+        <Link to="/org/$orgId/wiki" params={{ orgId }} className="sidebar__item" title={t("shell.wiki")}>
           <Icon name="book" />
           <span className="sidebar__item-label">{t("shell.wiki")}</span>
         </Link>
-        <Link to="/org/$orgId/drive" params={{ orgId }} className="sidebar__item">
+        <Link to="/org/$orgId/drive" params={{ orgId }} className="sidebar__item" title={t("shell.drive")}>
           <Icon name="drive" />
           <span className="sidebar__item-label">{t("shell.drive")}</span>
         </Link>
-        <Link to="/org/$orgId/members" params={{ orgId }} className="sidebar__item">
+        <Link to="/org/$orgId/members" params={{ orgId }} className="sidebar__item" title={t("shell.members")}>
           <Icon name="members" />
           <span className="sidebar__item-label">{t("shell.members")}</span>
         </Link>
@@ -223,6 +224,7 @@ export function Sidebar() {
               to="/org/$orgId/c/$channelId"
               params={{ orgId, channelId: c.id }}
               className="sidebar__item"
+              title={`#${c.name}`}
               onMouseEnter={() => prefetch(c.id)}
               onFocus={() => prefetch(c.id)}
               onClick={() => markOpen(c.id)}
@@ -248,6 +250,7 @@ export function Sidebar() {
               to="/org/$orgId/dm/agent/$agentId"
               params={{ orgId, agentId: a.id }}
               className="sidebar__item"
+              title={a.role ? `${a.name} · ${a.role}` : a.name}
               onMouseEnter={() => prefetchDm(a.id)}
               onFocus={() => prefetchDm(a.id)}
               onClick={() => markOpen(dmWith.get(a.id) ?? a.id)}
@@ -280,6 +283,7 @@ export function Sidebar() {
                 to="/org/$orgId/dm/person/$userId"
                 params={{ orgId, userId: m.userId }}
                 className="sidebar__item"
+                title={m.name}
                 data-unread={unread > 0}
                 onMouseEnter={() => prefetchDm(m.userId)}
                 onFocus={() => prefetchDm(m.userId)}
@@ -298,10 +302,10 @@ export function Sidebar() {
 
       <div className="sidebar__foot">
         {can(org.role, "manage_agents") && (
-          <Button asChild block className="ac-btn--cut">
-            <Link to="/org/$orgId/agents/new" params={{ orgId }}>
+          <Button asChild block className="ac-btn--cut sidebar__create">
+            <Link to="/org/$orgId/agents/new" params={{ orgId }} title={t("shell.createAgent")}>
               <Icon name="plus" />
-              {t("shell.createAgent")}
+              <span className="sidebar__item-label">{t("shell.createAgent")}</span>
             </Link>
           </Button>
         )}
@@ -356,7 +360,12 @@ function AccountMenu({ spent }: { spent: string | null }) {
         side="top"
         label={t("shell.account")}
         trigger={
-          <button type="button" className="sidebar__user" aria-label={`${t("shell.account")}: ${me.user.name}`}>
+          <button
+            type="button"
+            className="sidebar__user"
+            aria-label={`${t("shell.account")}: ${me.user.name}`}
+            title={me.user.name}
+          >
             <Avatar name={me.user.name} size="sm" imageUrl={dir.memberById.get(me.user.id)?.image ?? me.user.image} />
             <span className="sidebar__user-name">{me.user.name}</span>
             {spent && <span className="sidebar__user-spend">{t("shell.spentThisMonth", { amount: spent })}</span>}
@@ -382,7 +391,9 @@ function AccountMenu({ spent }: { spent: string | null }) {
         />
         <MenuSeparator />
         <MenuRadioGroup
-          label={t("shell.language")}
+          label={t("shell.languageCurrent", {
+            name: locales.find((l) => l.code === i18n.language)?.label ?? i18n.language,
+          })}
           value={i18n.language}
           onValueChange={(v) => setLocale(v as LocaleCode, i18n)}
           options={locales.map((l) => ({ value: l.code, label: l.label }))}
@@ -490,7 +501,7 @@ function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null
   useEffect(() => {
     if (!focus) return;
     setHandle(mine?.handle ?? "");
-    setZone(mine?.timezone ?? "");
+    setZone(mine?.timezone || browserTimezone() || "UTC");
     setUseOrgZone(false);
     setError(null);
   }, [focus, mine]);
@@ -550,13 +561,7 @@ function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null
             help={t("shell.timezoneHelp")}
             error={!zoneOk ? t("shell.timezoneInvalid") : undefined}
           >
-            <Input
-              value={zone}
-              disabled={useOrgZone}
-              onChange={(e) => setZone(e.target.value)}
-              placeholder="America/Sao_Paulo"
-              autoFocus={focus === "timezone"}
-            />
+            <ZoneSelect value={zone || "UTC"} disabled={useOrgZone} onChange={setZone} />
           </Field>
           <span className="row" style={{ gap: 8, alignItems: "center" }}>
             <Checkbox id="me-zone-org" checked={useOrgZone} onCheckedChange={setUseOrgZone} />

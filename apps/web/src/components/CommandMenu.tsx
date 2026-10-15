@@ -3,11 +3,11 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useChannels, useForumTopics, useWikiTree } from "@/api/queries";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { canTalk } from "@/lib/audience";
 import { setDraftFor } from "@/lib/drafts";
-import { lookOf } from "@/lib/look";
 import { SETTINGS_SECTIONS } from "@/pages/SettingsPage";
 
 /** ⌘K / Ctrl+K anywhere in the workspace (also when typing): opens the palette. */
@@ -69,7 +69,7 @@ export function CommandMenu() {
         label: a.name,
         sub: a.role ? t("palette.agentRole", { role: a.role }) : t("palette.agent"),
         keywords: a.handle,
-        mark: <Avatar kind="agent" size="xs" name={a.name} appearance={lookOf(a)} />,
+        mark: <AgentAvatar agentId={a.id} size="xs" name={a.name} />,
         onSelect: () => void navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId, agentId: a.id } }),
       });
     }
@@ -132,7 +132,7 @@ export function CommandMenu() {
       group: goTo,
       label: t("palette.wikiNew"),
       sub: t("shell.wiki"),
-      keywords: "wiki nova página criar",
+      keywords: t("palette.newWikiKeywords"),
       mark: <Icon name="plus" size={16} />,
       onSelect: () => void navigate({ to: "/org/$orgId/wiki", params: { orgId }, search: { new: "" } }),
     });
@@ -167,7 +167,7 @@ export function CommandMenu() {
           group: t("palette.ask"),
           label: t("palette.askLabel", { name: a.name, text: body || text }),
           sub: t("palette.newConversation"),
-          mark: <Avatar kind="agent" size="xs" name={a.name} appearance={lookOf(a)} />,
+          mark: <AgentAvatar agentId={a.id} size="xs" name={a.name} />,
           onSelect: () => {
             setDraftFor(`agent:${a.id}`, body || text);
             void navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: org.id, agentId: a.id } });

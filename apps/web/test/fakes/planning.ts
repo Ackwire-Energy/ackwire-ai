@@ -10,17 +10,21 @@
  *   `POST …/calendar/events`, `POST …/calendar/proposals/{id}/confirm|dismiss`.
  * Nothing runs: "Rodar agora" and "Pedir à Ada" only change local state. Seeded in development only.
  */
+import { nextOccurrences } from "@agenteschat/ui";
 import type { ApiClient } from "@/api/client";
 import type {
   Actor,
+  ApiRule,
   CalendarEvent,
   CalendarProposal,
   Issue,
   IssueActivity,
   Routine,
   RoutineRun,
+  RuleInfo,
   ScheduleParse,
 } from "@/api/types";
+import { defaultRule, fromApiRule, phraseToRule, ruleToPhrase, toApiRule } from "@/lib/recurrence";
 import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg } from "./context";
 
 const DAYS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
@@ -101,7 +105,10 @@ interface Store {
   proposals: CalendarProposal[];
 }
 
-export function createMockPlanning(ctx: MockContext): Pick<ApiClient, "issues" | "routines" | "calendar"> {
+export function createMockPlanning(
+  ctx: MockContext,
+  record: (method: string, ...args: unknown[]) => void = () => {},
+): Pick<ApiClient, "issues" | "routines" | "calendar"> {
   const me = async (): Promise<Actor> => ({ type: "person", id: (await ctx.lookup.me())?.user.id ?? "me" });
   const store = perOrg<Store>(async (orgId) => {
     const s: Store = { issues: [], activity: new Map(), routines: [], runs: new Map(), events: [], proposals: [] };
@@ -426,21 +433,27 @@ export function createMockPlanning(ctx: MockContext): Pick<ApiClient, "issues" |
     },
     routines: {
       list: async (orgId) => clone((await store(orgId)).routines),
-      parseSchedule: async (_orgId, phrase) => parseSchedulePhrase(phrase),
+      parseSchedule: async (_orgId, phrase, timezone) => parseSchedulePhrase(phrase, timezone),
+      parseRule: async (_orgId, phrase, timezone = "America/Sao_Paulo") => {
+        const today = ctx.now();
+        const base = defaultRule(timezone, today);
+        const rule = phraseToRule(phrase, base);
+        if (!rule) return { ok: false, error: "Não entendi. Tente “toda segunda às 9h” ou “dias úteis às 18h”." };
+        return ruleInfo(toApiRule(rule), today);
+      },
+      describeRule: async (_orgId, rule) => ruleInfo(rule, ctx.now()),
       create: async (orgId, input) => {
         const s = await store(orgId);
         let trigger: Routine["trigger"];
-        if (input.trigger.type === "schedule") {
-          const p = parseSchedulePhrase(input.trigger.phrase);
-          if (!p.ok) throw new Error(p.error);
+        if (input.trigger.type === "schedule") trigger = scheduleOf(input.trigger);
+        else if (input.trigger.type === "once")
           trigger = {
-            type: "schedule",
-            phrase: input.trigger.phrase,
-            cron: p.cron,
-            timezone: p.timezone,
-            description: p.description,
+            type: "once",
+            at: input.trigger.at,
+            timezone: input.trigger.timezone ?? "America/Sao_Paulo",
+            description: input.trigger.at,
           };
-        } else trigger = input.trigger;
+        else trigger = input.trigger;
         const agents = await ctx.lookup.agents(orgId);
         const r: Routine = {
           id: mockId("rt"),
@@ -454,10 +467,58 @@ export function createMockPlanning(ctx: MockContext): Pick<ApiClient, "issues" |
           running: false,
           lastRun: null,
           monthCostUsd: 0,
+          budgetUsd: input.budgetUsd ?? null,
           createdAt: ctx.now().toISOString(),
         };
         s.routines.push(r);
         return clone(r);
+      },
+      update: async (orgId, id, patch) => {
+        record("routines.update", id, patch);
+        const r = await findRoutine(orgId, id);
+        if (patch.name !== undefined) r.name = patch.name;
+        if (patch.prompt !== undefined) r.prompt = patch.prompt;
+        if (patch.agentId !== undefined) r.agentId = patch.agentId;
+        if (patch.target !== undefined) r.target = patch.target;
+        if (patch.budgetUsd !== undefined) r.budgetUsd = patch.budgetUsd;
+        if (patch.active !== undefined) r.active = patch.active;
+        if (patch.trigger?.type === "schedule") r.trigger = scheduleOf(patch.trigger);
+        else if (patch.trigger?.type === "once")
+          r.trigger = {
+            type: "once",
+            at: patch.trigger.at,
+            timezone: patch.trigger.timezone ?? "America/Sao_Paulo",
+            description: r.trigger.type === "once" ? r.trigger.description : patch.trigger.at,
+          };
+        else if (patch.trigger) r.trigger = patch.trigger;
+        r.nextRunAt =
+          r.active && r.trigger.type === "schedule"
+            ? (nextCronRun(r.trigger.cron, ctx.now())?.toISOString() ?? null)
+            : null;
+        return clone(r);
+      },
+      remove: async (orgId, id) => {
+        record("routines.remove", id);
+        await findRoutine(orgId, id);
+        const s = await store(orgId);
+        s.routines = s.routines.filter((x) => x.id !== id);
+      },
+      duplicate: async (orgId, id) => {
+        record("routines.duplicate", id);
+        const r = await findRoutine(orgId, id);
+        const copy: Routine = {
+          ...clone(r),
+          id: mockId("rt"),
+          name: `${r.name} (cópia)`,
+          active: false,
+          nextRunAt: null,
+          running: false,
+          lastRun: null,
+          monthCostUsd: 0,
+          createdAt: ctx.now().toISOString(),
+        };
+        (await store(orgId)).routines.push(copy);
+        return clone(copy);
       },
       setActive: async (orgId, id, active) => {
         const r = await findRoutine(orgId, id);
@@ -501,7 +562,7 @@ export function createMockPlanning(ctx: MockContext): Pick<ApiClient, "issues" |
         }
         const day = (d: string) => new Date(`${d}T12:00:00`);
         return clone({
-          events: s.events.filter((e) => inRange(e.start)),
+          events: expandEvents(s.events, a, b),
           routines,
           deadlines: s.issues
             .filter(
@@ -533,7 +594,11 @@ export function createMockPlanning(ctx: MockContext): Pick<ApiClient, "issues" |
           channelId: input.channelId ?? null,
           issueId: input.issueId ?? null,
           createdBy: await me(),
+          rule: input.rule ?? null,
+          location: input.location ?? null,
+          exdates: [],
         };
+        record("calendar.create", input);
         (await store(orgId)).events.push(e);
         return clone(e);
       },
@@ -564,6 +629,146 @@ export function createMockPlanning(ctx: MockContext): Pick<ApiClient, "issues" |
         const s = await store(orgId);
         s.proposals = s.proposals.filter((x) => x.id !== id);
       },
+      update: async (orgId, id, patch, series) => {
+        record("calendar.update", id, patch, series);
+        const s = await store(orgId);
+        const master = s.events.find((e) => e.id === id);
+        if (!master) throw new MockNotFoundError("Evento não encontrado.");
+        if (!series || series.scope === "all" || !master.rule || master.rule.freq === "once") {
+          // A whole series moves by how much this occurrence moved.
+          if (series && patch.start && master.rule && master.rule.freq !== "once") {
+            const delta = new Date(patch.start).getTime() - new Date(series.occurrenceStart).getTime();
+            const dur = patch.end
+              ? new Date(patch.end).getTime() - new Date(patch.start).getTime()
+              : new Date(master.end).getTime() - new Date(master.start).getTime();
+            const start = new Date(new Date(master.start).getTime() + delta);
+            Object.assign(master, {
+              ...patch,
+              start: start.toISOString(),
+              end: new Date(start.getTime() + dur).toISOString(),
+            });
+            master.rule = { ...master.rule, start: localYmd(start), times: [localHm(start)] };
+          } else Object.assign(master, patch);
+          return clone(master);
+        }
+        const occurrence = new Date(series.occurrenceStart);
+        if (series.scope === "this") {
+          master.exdates = [...(master.exdates ?? []), localYmd(occurrence)];
+          const dur = new Date(master.end).getTime() - new Date(master.start).getTime();
+          const override: CalendarEvent = {
+            ...clone(master),
+            start: occurrence.toISOString(),
+            end: new Date(occurrence.getTime() + dur).toISOString(),
+            ...patch,
+            id: mockId("ev"),
+            rule: null,
+            exdates: [],
+            seriesId: master.id,
+            occurrenceStart: series.occurrenceStart,
+          };
+          s.events.push(override);
+          return clone(override);
+        }
+        // "Este e os próximos": the series ends the day before; a new one starts here.
+        const until = localYmd(new Date(occurrence.getTime() - 86_400_000));
+        const rule = master.rule;
+        master.rule = { ...rule, until };
+        const start = new Date(patch.start ?? series.occurrenceStart);
+        const dur = new Date(patch.end ?? master.end).getTime() - new Date(patch.start ?? master.start).getTime();
+        const next: CalendarEvent = {
+          ...clone(master),
+          ...patch,
+          id: mockId("ev"),
+          start: start.toISOString(),
+          end: new Date(start.getTime() + dur).toISOString(),
+          rule: { ...(patch.rule ?? rule), start: localYmd(start), times: [localHm(start)], until: rule.until ?? null },
+          exdates: [],
+        };
+        s.events.push(next);
+        return clone(next);
+      },
+      remove: async (orgId, id, series) => {
+        record("calendar.remove", id, series);
+        const s = await store(orgId);
+        const master = s.events.find((e) => e.id === id);
+        if (!master) throw new MockNotFoundError("Evento não encontrado.");
+        if (!series || series.scope === "all" || !master.rule) {
+          s.events = s.events.filter((e) => e.id !== id && e.seriesId !== id);
+          return;
+        }
+        const day = localYmd(new Date(series.occurrenceStart));
+        if (series.scope === "this") master.exdates = [...(master.exdates ?? []), day];
+        else
+          master.rule = {
+            ...master.rule,
+            until: localYmd(new Date(new Date(series.occurrenceStart).getTime() - 86_400_000)),
+          };
+      },
     },
   };
+}
+
+/** A schedule trigger from a phrase or a rule (the rule's phrase gives the mock its cron and description). */
+function scheduleOf(
+  input: { type: "schedule"; phrase: string; timezone?: string } | { type: "schedule"; rule: ApiRule },
+): Routine["trigger"] {
+  if ("rule" in input) {
+    const rule = fromApiRule(input.rule, localYmd(new Date()));
+    const p = parseSchedulePhrase(ruleToPhrase(rule), rule.timezone);
+    return {
+      type: "schedule",
+      phrase: null,
+      rule: input.rule,
+      cron: p.ok ? p.cron : "0 9 * * *",
+      timezone: rule.timezone,
+      description: p.ok ? p.description : ruleToPhrase(rule),
+    };
+  }
+  const p = parseSchedulePhrase(input.phrase, input.timezone);
+  if (!p.ok) throw new Error(p.error);
+  return { type: "schedule", phrase: input.phrase, cron: p.cron, timezone: p.timezone, description: p.description };
+}
+
+/** The mock's `parse-rule` / `describe-rule` answer. */
+function ruleInfo(api: ApiRule, now: Date): RuleInfo {
+  const rule = fromApiRule(api, localYmd(now));
+  const phrase = ruleToPhrase(rule);
+  const p = parseSchedulePhrase(phrase, rule.timezone);
+  return {
+    ok: true,
+    rule: api,
+    description: p.ok ? p.description : phrase,
+    cron: p.ok ? p.cron : "",
+    nextRuns: nextOccurrences(rule, now, 5).map((d) => d.toISOString()),
+  };
+}
+
+const localYmd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const localHm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+/** Events in [a, b): single ones that overlap it, and each occurrence of the recurring ones. */
+function expandEvents(events: CalendarEvent[], a: Date, b: Date): CalendarEvent[] {
+  const out: CalendarEvent[] = [];
+  for (const e of events) {
+    const start = new Date(e.start);
+    const end = new Date(e.end);
+    if (!e.rule || e.rule.freq === "once") {
+      if (start < b && end > a) out.push(e);
+      continue;
+    }
+    const dur = end.getTime() - start.getTime();
+    const skip = new Set(e.exdates ?? []);
+    for (const at of nextOccurrences(fromApiRule(e.rule, localYmd(start)), new Date(a.getTime() - dur), 400)) {
+      if (at >= b) break;
+      if (skip.has(localYmd(at))) continue;
+      out.push({
+        ...e,
+        start: at.toISOString(),
+        end: new Date(at.getTime() + dur).toISOString(),
+        seriesId: e.id,
+        occurrenceStart: at.toISOString(),
+      });
+    }
+  }
+  return out;
 }

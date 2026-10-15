@@ -50,6 +50,7 @@ import type {
   RosterMember,
   Routine,
   RoutineRun,
+  RuleInfo,
   Run,
   RunStep,
   SandboxSettings,
@@ -377,6 +378,13 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         request<Routine>(`${org(orgId)}/routines/${enc(id)}`, { method: "PATCH", json: { active } }),
       runNow: (orgId, id) => request<Routine>(`${org(orgId)}/routines/${enc(id)}/run`, { json: {} }),
       runs: async (orgId, id) => (await request<{ runs: RoutineRun[] }>(`${org(orgId)}/routines/${enc(id)}/runs`)).runs,
+      parseRule: (orgId, phrase, timezone) =>
+        request<RuleInfo>(`${org(orgId)}/routines/parse-rule`, { json: { phrase, ...(timezone ? { timezone } : {}) } }),
+      describeRule: (orgId, rule) => request<RuleInfo>(`${org(orgId)}/routines/describe-rule`, { json: { rule } }),
+      update: (orgId, id, patch) =>
+        request<Routine>(`${org(orgId)}/routines/${enc(id)}`, { method: "PATCH", json: patch }),
+      remove: (orgId, id) => request<void>(`${org(orgId)}/routines/${enc(id)}`, { method: "DELETE" }),
+      duplicate: (orgId, id) => request<Routine>(`${org(orgId)}/routines/${enc(id)}/duplicate`, { json: {} }),
     },
     wiki: {
       tree: async (orgId) => (await request<{ pages: WikiPageSummary[] }>(`${org(orgId)}/wiki/pages`)).pages,
@@ -421,6 +429,16 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         request<CalendarEvent>(`${org(orgId)}/calendar/proposals/${enc(id)}/confirm`, { json: {} }),
       dismissProposal: (orgId, id) =>
         request<void>(`${org(orgId)}/calendar/proposals/${enc(id)}/dismiss`, { json: {} }),
+      update: (orgId, id, patch, series) =>
+        request<CalendarEvent>(`${org(orgId)}/calendar/events/${enc(id)}`, {
+          method: "PATCH",
+          json: { ...patch, ...(series ?? {}) },
+        }),
+      remove: (orgId, id, series) =>
+        request<void>(`${org(orgId)}/calendar/events/${enc(id)}`, {
+          method: "DELETE",
+          ...(series ? { query: series } : {}),
+        }),
     },
     customConnectors: {
       list: async (orgId) => (await request<{ servers: CustomServer[] }>(`${org(orgId)}/connectors/custom`)).servers,

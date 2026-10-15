@@ -1,8 +1,9 @@
-import { Avatar, Button, EmptyState, Icon, SearchInput, Select, type SelectOption } from "@agenteschat/ui";
+import { Button, EmptyState, Icon, SearchInput, Select, type SelectOption } from "@agenteschat/ui";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useArtifacts, useChannels } from "@/api/queries";
 import type { ArtifactFilters, ArtifactKind } from "@/api/types";
+import { ActorAvatar } from "@/components/AgentAvatar";
 import { useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -143,13 +144,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
                   <td>{t(`artifacts.kind.${a.kind}`)}</td>
                   <td>
                     <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
-                      <Avatar
-                        size="xs"
-                        kind={a.createdBy.type}
-                        name={authorName(a.createdBy)}
-                        initials={a.createdBy.type === "agent" ? dir.agentInitials(a.createdBy.id) : undefined}
-                        imageUrl={a.createdBy.type === "person" ? dir.memberById.get(a.createdBy.id)?.image : undefined}
-                      />
+                      <ActorAvatar size="xs" actor={a.createdBy} name={authorName(a.createdBy)} />
                       {authorName(a.createdBy)}
                     </span>
                   </td>

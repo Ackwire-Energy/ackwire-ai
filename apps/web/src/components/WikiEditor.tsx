@@ -118,7 +118,7 @@ export function WikiEditor({
     },
     code: () => {
       const s = sel();
-      apply(wrapSelection(value, s.start, s.end, "`", "`", "código"));
+      apply(wrapSelection(value, s.start, s.end, "`", "`", t("wiki.editor.codeSample")));
     },
   };
 

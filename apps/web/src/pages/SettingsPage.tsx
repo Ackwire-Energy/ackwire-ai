@@ -42,6 +42,7 @@ import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
+import { ZoneSelect } from "@/components/ZoneSelect";
 import { toolsToReview } from "@/lib/custom-tools";
 import { formatShortDate, formatUsd, relativeTime } from "@/lib/format";
 import { navigateAway } from "@/lib/navigate";
@@ -205,7 +206,7 @@ function OrgSection() {
             <Input value={name} onChange={(e) => setName(e.target.value)} readOnly={!editable} />
           </Field>
           <Field label={t("settings.timezone")} id="set-tz" help={t("settings.timezoneHelp")}>
-            <Input value={timezone} onChange={(e) => setTimezone(e.target.value)} readOnly={!editable} />
+            <ZoneSelect value={timezone || "UTC"} onChange={setTimezone} disabled={!editable} />
           </Field>
         </div>
         <Field label={t("settings.context")} id="set-ctx" help={t("settings.contextHelp")}>

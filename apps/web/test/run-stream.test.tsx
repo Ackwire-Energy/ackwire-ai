@@ -135,6 +135,11 @@ describe("live row and Parar", () => {
     const row = document.querySelector(".ac-msg--streaming") as HTMLElement;
     await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Parar" })));
     await settle(2);
+    // Nothing stops before the confirmation.
+    expect(state.calls.some((c) => c.method === "agents.cancelRun")).toBe(false);
+    const confirm = screen().getByRole("dialog", { name: "Parar a tarefa da Ada?" });
+    await act(async () => fireEvent.click(within(confirm).getByRole("button", { name: "Parar" })));
+    await settle(2);
     expect(state.calls.find((c) => c.method === "agents.cancelRun")?.args).toEqual([ORG_ID, "r-live"]);
     expect(within(row).getByRole("button", { name: "Parando…" }).hasAttribute("disabled")).toBe(true);
     await ev({ type: "run.canceled", ...ids, byUserId: "u-walter" });
@@ -146,10 +151,14 @@ describe("live row and Parar", () => {
     expect(stopped.querySelector('.ac-avatar[data-state="idle"]')).not.toBeNull();
   });
 
-  test("Esc with an empty composer stops the latest run I may stop", async () => {
+  test("Esc with an empty composer asks to stop the latest run I may stop; Esc again right away stops it", async () => {
     const { state, ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await settle(2);
+    await act(async () => fireEvent.keyDown(window, { key: "Escape" }));
+    await settle(2);
+    expect(screen().getByRole("dialog", { name: "Parar a tarefa da Ada?" })).toBeTruthy();
+    expect(state.calls.some((c) => c.method === "agents.cancelRun")).toBe(false);
     await act(async () => fireEvent.keyDown(window, { key: "Escape" }));
     await settle(2);
     expect(state.calls.find((c) => c.method === "agents.cancelRun")?.args).toEqual([ORG_ID, "r-live"]);

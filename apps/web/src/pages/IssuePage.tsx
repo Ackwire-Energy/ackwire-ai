@@ -1,9 +1,10 @@
-import { Alert, Avatar, Button, Checkbox, Composer, Field, Icon, Message, MessageText, Select } from "@agenteschat/ui";
+import { Alert, Button, Checkbox, Composer, Field, Icon, Message, MessageText, Select } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useChannels, useIssue, useIssueAction, useIssueActivity } from "@/api/queries";
 import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "@/api/types";
+import { ActorAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { useArtifactViewer } from "@/components/artifacts/ArtifactViewer";
 import { useOrg } from "@/components/org-context";
@@ -188,14 +189,7 @@ function Activity({ issue }: { issue: Issue }) {
           <Message
             key={a.id}
             agent={a.author.type === "agent"}
-            avatar={
-              <Avatar
-                kind={a.author.type}
-                name={actors.name(a.author)}
-                initials={a.author.type === "agent" ? actors.dir.agentInitials(a.author.id) : undefined}
-                imageUrl={a.author.type === "person" ? actors.dir.memberById.get(a.author.id)?.image : undefined}
-              />
-            }
+            avatar={<ActorAvatar actor={a.author} name={actors.name(a.author)} />}
             author={actors.name(a.author)}
             time={<time dateTime={a.createdAt}>{whenAt(t, i18n.language, a.createdAt)}</time>}
           >

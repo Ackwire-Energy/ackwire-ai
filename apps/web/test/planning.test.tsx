@@ -203,7 +203,9 @@ describe("Rotinas", () => {
     await settle(4);
     expect(dialog.textContent).toContain("Toda segunda-feira, às 09:00 · horário de Brasília (UTC−3)");
     // The zone has its own select, so the person can change it.
-    expect(within(dialog).getByRole("combobox", { name: "Fuso horário" }).textContent).toContain("horário de Brasília");
+    expect(within(dialog).getByRole("combobox", { name: "Fuso horário" }).textContent).toContain(
+      "Horário de Brasília · UTC−3",
+    );
     await type(within(dialog).getByLabelText("Frequência"), "quando der");
     await settle(4);
     expect(dialog.textContent).toContain("Não entendi.");
@@ -241,41 +243,58 @@ describe("Rotinas", () => {
 });
 
 describe("Calendário", () => {
-  test("week with events, routine runs and issue due dates; layers hide them", async () => {
+  const openPanel = async () => {
+    const show = screen().queryByRole("button", { name: "Mostrar painel" });
+    if (show) await click(show);
+  };
+  test("week of 7 days with events, routine runs and issue due dates; filter chips hide them", async () => {
     const api = createFakeApi(seedState());
     const monday = mondayOf(new Date());
     await api.issues.create(ORG_ID, { title: "Fechar a release", dueDate: toYmd(monday) });
     await go("calendar", api);
     expect(screen().getByRole("heading", { level: 1, name: "Calendário" })).toBeTruthy();
+    expect(document.querySelectorAll(".cal-week__col")).toHaveLength(7);
     expect(screen().getByRole("button", { name: "Daily de produto, 10:00–11:00" })).toBeTruthy();
     expect(screen().getByRole("button", { name: "Resumo da semana, 09:00–09:30" })).toBeTruthy();
     expect(screen().getAllByRole("button", { name: /^Erros do Sentry do dia, 18:00/ })).toHaveLength(5);
-    expect(screen().getByText("#133 Fechar a release")).toBeTruthy();
+    expect(screen().getByRole("button", { name: "#133 Fechar a release, dia todo" })).toBeTruthy();
+    // Routines are recurring and muted.
+    const routine = screen().getByRole("button", { name: "Resumo da semana, 09:00–09:30" });
+    expect(routine.getAttribute("data-source")).toBe("routine");
+    expect(routine.querySelector(".cal-chip__repeat")).not.toBeNull();
 
-    await click(screen().getByLabelText("Rotinas"));
+    await openPanel();
+    const filters = screen().getByRole("group", { name: "Filtros" });
+    await click(within(filters).getByRole("button", { name: /^Rotinas/ }));
     expect(screen().queryByRole("button", { name: /^Resumo da semana/ })).toBeNull();
-    await click(screen().getByLabelText("Prazos de issues"));
-    expect(screen().queryByText("#133 Fechar a release")).toBeNull();
+    await click(within(filters).getByRole("button", { name: /^Prazos de issues/ }));
+    expect(screen().queryByRole("button", { name: /Fechar a release/ })).toBeNull();
     expect(screen().getByRole("button", { name: "Daily de produto, 10:00–11:00" })).toBeTruthy();
+    // "Dias úteis": Monday to Friday only.
+    await click(screen().getByRole("button", { name: "Dias úteis" }));
+    expect(document.querySelectorAll(".cal-week__col")).toHaveLength(5);
   });
 
-  test("selecting shows details; an agent's proposal is confirmed by a person", async () => {
+  test("an event opens its details in a popover; an agent's proposal is confirmed by a person", async () => {
     await go("calendar");
-    const aside = () => screen().getByRole("complementary", { name: "Detalhes" });
-    expect(aside().textContent).toContain("Agentes só propõem horários.");
     await click(screen().getByRole("button", { name: "Daily de produto, 10:00–11:00" }));
-    const sel = within(aside()).getByRole("region", { name: "Daily de produto" });
-    expect(sel.textContent).toContain("Evento");
-    expect(sel.textContent).toContain("Walter");
-    const proposal = within(aside()).getByRole("group", { name: "Proposta de evento" });
-    expect(proposal.textContent).toContain("propõe um horário");
+    await settle(2);
+    const details = screen().getByRole("region", { name: "Daily de produto" });
+    expect(details.textContent).toContain("Evento");
+    expect(details.textContent).toContain("Walter");
+    expect(within(details).getByRole("button", { name: "Editar" })).toBeTruthy();
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await settle(2);
+    await openPanel();
+    const side = screen().getByRole("complementary", { name: "Painel do calendário" });
+    expect(side.textContent).toContain("Agentes só propõem horários.");
+    const proposal = within(side).getByRole("group", { name: "Proposta de evento" });
     expect(proposal.textContent).toContain("Revisão do roadmap");
     expect(proposal.textContent).toContain("livre para todos");
     await click(within(proposal).getByRole("button", { name: "Confirmar e convidar" }));
     await settle(5);
     expect(screen().getByText("Evento criado e convites enviados.")).toBeTruthy();
     expect(screen().getByRole("button", { name: "Revisão do roadmap, 15:00–15:45" })).toBeTruthy();
-    expect(within(aside()).queryByRole("group", { name: "Proposta de evento" })).toBeNull();
   });
 });
 

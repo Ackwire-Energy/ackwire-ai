@@ -109,12 +109,11 @@ describe("work summary and stopped messages", () => {
     expect(w.steps).toHaveLength(1);
   });
 
-  test("splitCanceled keeps the text and turns the last line into a note", () => {
-    expect(splitCanceled("Comecei a análise.\n\n_Interrompido por Walter._", { canceled: true })).toEqual({
-      body: "Comecei a análise.",
-      note: "Interrompido por Walter",
-    });
-    expect(splitCanceled("_ênfase_", {})).toEqual({ body: "_ênfase_", note: null });
+  test("splitCanceled keeps the text and takes out the server's last line; the person comes from the meta", () => {
+    expect(
+      splitCanceled("Comecei a análise.\n\n_Interrompido por Walter._", { canceled: { byUserId: "u-walter" } }),
+    ).toEqual({ body: "Comecei a análise.", canceled: true, byUserId: "u-walter", note: "Interrompido por Walter" });
+    expect(splitCanceled("_ênfase_", {})).toEqual({ body: "_ênfase_", canceled: false, byUserId: null, note: null });
   });
 });
 
@@ -129,7 +128,7 @@ describe("in the channel", () => {
       body: "Comecei a revisar o PR.\n\n_Interrompido por Walter._",
       mentionedAgentIds: [],
       agentRunId: "r-stopped",
-      meta: { canceled: true },
+      meta: { canceled: { byUserId: "u-walter" } },
       createdAt: new Date().toISOString(),
     } as Message);
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
@@ -157,6 +156,9 @@ describe("in the channel", () => {
     await settle(2);
     const row = document.querySelector('[data-run-id="run-1"]') as HTMLElement;
     await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Parar" })));
+    await settle(2);
+    const confirm = screen().getByRole("dialog", { name: "Parar a tarefa da Ada?" });
+    await act(async () => fireEvent.click(within(confirm).getByRole("button", { name: "Parar" })));
     await settle(4);
     expect(state.calls.some((c) => c.method === "agents.cancelRun")).toBe(true);
     expect(document.querySelector('[data-run-id="run-1"]')).toBeNull();

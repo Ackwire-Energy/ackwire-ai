@@ -864,8 +864,39 @@ export type IssuePatch = Partial<
 
 export type RoutineEvent = "sentry.issue_created" | "github.pr_opened" | "issue.created" | "deploy.succeeded";
 
+/**
+ * The rule as the API sends it: monthly/yearly positions are in `byWeekday`
+ * ("2TU", "-1FR"); yearly may carry `byMonth`; `"once"` means no repeat.
+ */
+export interface ApiRule {
+  freq: "once" | "hourly" | "daily" | "weekly" | "monthly" | "yearly";
+  interval?: number;
+  byWeekday?: string[];
+  byMonthDay?: number[];
+  byMonth?: number[];
+  bySetPos?: number | null;
+  times?: string[];
+  timezone: string;
+  start?: string | null;
+  until?: string | null;
+  count?: number | null;
+}
+
+/** `POST …/routines/parse-rule` and `…/describe-rule`. */
+export type RuleInfo =
+  | { ok: true; rule: ApiRule; description: string; cron: string; nextRuns: string[] }
+  | { ok: false; error: string };
+
 export type RoutineTrigger =
-  | { type: "schedule"; phrase: string; cron: string; timezone: string; description: string }
+  | {
+      type: "schedule";
+      /** Set when it was written as a phrase; routines made with the picker have only `rule`. */
+      phrase?: string | null;
+      rule?: ApiRule | null;
+      cron: string;
+      timezone: string;
+      description: string;
+    }
   | { type: "event"; event: RoutineEvent }
   /** A one-off (reminders, "amanhã às 9h"): fires once at `at`, then the routine is inactive. */
   | { type: "once"; at: string; timezone: string; description: string };
@@ -899,6 +930,10 @@ export interface Routine {
   running: boolean;
   lastRun: RoutineRun | null;
   monthCostUsd: number;
+  /** Monthly cap for this routine (US$); null/absent = only the agent's own budget. */
+  budgetUsd?: number | null;
+  /** Event routines that can be triggered by a webhook: the URL to call. */
+  webhookUrl?: string | null;
   createdAt: string;
 }
 
@@ -906,8 +941,11 @@ export interface RoutineRun {
   id: string;
   at: string;
   status: "ok" | "failed" | "skipped";
-  /** "Resumo postado no #geral", "Orçamento do mês esgotado". */
+  /** "Resumo postado no #geral", "Orçamento do mês esgotado" (the server's pt-BR words). */
   summary: string;
+  /** The same as a code ("routine_run.paused") and its values: shown in the UI language. */
+  summaryCode?: string | null;
+  summaryParams?: Record<string, string>;
   costUsd: number;
 }
 
@@ -916,8 +954,16 @@ export interface RoutineInput {
   agentId: string;
   prompt: string;
   target: RoutineTargetInput;
-  trigger: { type: "schedule"; phrase: string } | { type: "event"; event: RoutineEvent };
+  trigger:
+    | { type: "schedule"; phrase: string; timezone?: string }
+    | { type: "schedule"; rule: ApiRule }
+    | { type: "event"; event: RoutineEvent }
+    | { type: "once"; at: string; timezone?: string };
+  budgetUsd?: number | null;
 }
+
+/** `PATCH …/routines/{id}`: only what changed. */
+export type RoutinePatch = Partial<Omit<RoutineInput, "name">> & { name?: string; active?: boolean };
 
 /** Natural language → cron, in the workspace time zone (the backend decides). */
 export type ScheduleParse =
@@ -941,7 +987,38 @@ export interface CalendarEvent {
   channelId: string | null;
   issueId: string | null;
   createdBy: Actor;
+  /** Structured recurrence (`freq` once = a single event); day and time come from the event. */
+  rule?: ApiRule | null;
+  location?: string | null;
+  /** All-day events: `YYYY-MM-DD`, the end inclusive. */
+  startDate?: string | null;
+  endDate?: string | null;
+  /** An occurrence of a series: the series' id and this occurrence's original start. */
+  seriesId?: string | null;
+  occurrenceStart?: string | null;
+  /** Days left out of the series (`YYYY-MM-DD`). */
+  exdates?: string[];
 }
+
+/** Which occurrences an edit of a recurring event changes. */
+export type SeriesScope = "this" | "following" | "all";
+
+export type CalendarEventPatch = Partial<
+  Pick<
+    CalendarEventInput,
+    | "title"
+    | "description"
+    | "start"
+    | "end"
+    | "allDay"
+    | "startDate"
+    | "endDate"
+    | "timezone"
+    | "participants"
+    | "rule"
+    | "location"
+  >
+>;
 
 /** An agent's suggested slot; a person confirms before anyone is invited. */
 export interface CalendarProposal {
@@ -977,6 +1054,11 @@ export interface CalendarEventInput {
   participants: Actor[];
   channelId?: string | null;
   issueId?: string | null;
+  rule?: ApiRule | null;
+  location?: string | null;
+  /** All-day: `YYYY-MM-DD`, the end inclusive. */
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 // ── Agent access (apps/server/src/routes/app/access.ts) ──────────────────────

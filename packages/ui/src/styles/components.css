@@ -3429,3 +3429,191 @@ a.ac-list__row:focus-visible {
   top: 46%;
   border-radius: 4px;
 }
+
+/* Recurrence picker: the sentence, the frequency tabs, then days, times, period and zone */
+.ac-recur {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+}
+.ac-recur__summary {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ac-recur__modes {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.ac-recur__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.ac-recur__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ac-recur__every,
+.ac-recur__inline {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.ac-recur__n.ac-input,
+.ac-recur__n {
+  width: 56px;
+  text-align: center;
+}
+.ac-recur__days {
+  display: inline-flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ac-recur__day {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--sunken);
+  color: var(--ink2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.15s var(--out),
+    box-shadow 0.15s var(--out);
+}
+.ac-recur__day:hover {
+  background: var(--plate);
+}
+.ac-recur__day[aria-pressed="true"] {
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow:
+    var(--e1),
+    0 0 0 1.5px var(--ink);
+}
+.ac-recur__day:focus-visible {
+  outline: none;
+  box-shadow: var(--field-ring);
+}
+.ac-recur__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ac-recur__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ac-recur__times {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ac-recur__time {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.ac-recur__time .ac-input {
+  width: 92px;
+}
+.ac-recur__note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.ac-recur__upcoming ol {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-recur__day {
+    transition: none;
+  }
+}
+
+/* Time zone selector: a search over every zone, suggestions first, offsets live */
+.ac-tz__offset {
+  color: var(--muted);
+}
+.ac-tz__menu.ac-menu {
+  width: min(380px, 92vw);
+  padding: 6px;
+}
+.ac-tz__search.ac-input {
+  width: 100%;
+  margin-bottom: 6px;
+}
+.ac-tz__list {
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ac-tz__option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "name off"
+    "id off";
+  align-items: center;
+  column-gap: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-item);
+  cursor: pointer;
+}
+.ac-tz__option[data-active] {
+  background: var(--plate);
+}
+.ac-tz__option[aria-selected="true"] .ac-tz__name {
+  font-weight: 700;
+}
+.ac-tz__name {
+  grid-area: name;
+  font-size: 13.5px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-tz__id {
+  grid-area: id;
+  font-size: 11.5px;
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-tz__off {
+  grid-area: off;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ac-tz__empty {
+  margin: 8px 10px;
+  font-size: 13px;
+  color: var(--muted);
+}

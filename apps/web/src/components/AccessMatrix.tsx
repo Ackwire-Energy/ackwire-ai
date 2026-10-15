@@ -1,15 +1,4 @@
-import {
-  Avatar,
-  Button,
-  Card,
-  Chip,
-  Dialog,
-  DialogFooter,
-  Icon,
-  type IconName,
-  List,
-  SearchInput,
-} from "@agenteschat/ui";
+import { Button, Card, Chip, Dialog, DialogFooter, Icon, type IconName, List, SearchInput } from "@agenteschat/ui";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,10 +6,10 @@ import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useAgents } from "@/api/queries";
 import type { AccessState, Agent, AgentAccess } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useAreaLabel } from "@/hooks/useAreaLabel";
-import { useDirectory } from "@/hooks/useDirectory";
 import {
   type AccessModel,
   type AccessNode,
@@ -94,7 +83,6 @@ const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,
 export function AccessMatrixSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const dir = useDirectory(org.id);
   const admin = can(org.role, "configure");
   const agents = useAgents(org.id);
   const list = agents.data ?? [];
@@ -150,7 +138,7 @@ export function AccessMatrixSection() {
             const s = summary({ agent: a, access: access[i]?.data });
             return (
               <div key={a.id} className="ac-list__row access-agent">
-                <Avatar kind="agent" size="sm" name={a.name} initials={dir.agentInitials(a.id)} />
+                <AgentAvatar agentId={a.id} size="sm" name={a.name} />
                 <span className="list-col" style={{ flex: "1 1 240px" }}>
                   <span style={{ fontWeight: 600 }}>
                     {a.name}

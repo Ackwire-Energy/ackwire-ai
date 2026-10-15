@@ -30,6 +30,36 @@ export const COMMON_TIMEZONES = [
   "UTC",
 ];
 
+/** English names (the Portuguese ones below are the default). */
+const NAMES_EN: Record<string, string> = {
+  "America/Sao_Paulo": "Brasília time",
+  "America/Manaus": "Amazonas time",
+  "America/Fortaleza": "Fortaleza time",
+  "America/Recife": "Recife time",
+  "America/Belem": "Belém time",
+  "America/Cuiaba": "Cuiabá time",
+  "America/Rio_Branco": "Acre time",
+  "America/Noronha": "Fernando de Noronha time",
+  "America/New_York": "New York (US Eastern)",
+  "America/Chicago": "Chicago (US Central)",
+  "America/Denver": "Denver (US Mountain)",
+  "America/Los_Angeles": "Los Angeles (US Pacific)",
+  "America/Mexico_City": "Mexico City",
+  "America/Montevideo": "Montevideo",
+  "America/Asuncion": "Asunción",
+  "Europe/Lisbon": "Lisbon",
+  "Europe/London": "London",
+  "Europe/Madrid": "Madrid",
+  "Europe/Berlin": "Berlin",
+  "Europe/Rome": "Rome",
+  "Europe/Amsterdam": "Amsterdam",
+  "Atlantic/Azores": "Azores",
+  "Asia/Kolkata": "India",
+  "Asia/Shanghai": "Shanghai (China)",
+  "Asia/Tokyo": "Tokyo",
+};
+const namesFor = (locale?: string) => (locale && !locale.startsWith("pt") ? NAMES_EN : NAMES);
+
 const NAMES: Record<string, string> = {
   "America/Sao_Paulo": "horário de Brasília",
   "America/Manaus": "horário do Amazonas",
@@ -39,12 +69,35 @@ const NAMES: Record<string, string> = {
   "America/Cuiaba": "horário de Cuiabá",
   "America/Rio_Branco": "horário do Acre",
   "America/Noronha": "horário de Fernando de Noronha",
-  "America/New_York": "Nova York",
-  "America/Chicago": "Chicago",
-  "America/Los_Angeles": "Los Angeles",
+  "America/New_York": "Nova York (Leste dos EUA)",
+  "America/Chicago": "Chicago (Centro dos EUA)",
+  "America/Denver": "Denver (Montanhas dos EUA)",
+  "America/Los_Angeles": "Los Angeles (Pacífico dos EUA)",
+  "America/Toronto": "Toronto",
+  "America/Mexico_City": "Cidade do México",
+  "America/Argentina/Buenos_Aires": "Buenos Aires",
+  "America/Santiago": "Santiago",
+  "America/Bogota": "Bogotá",
+  "America/Lima": "Lima",
+  "America/Montevideo": "Montevidéu",
+  "America/Asuncion": "Assunção",
   "Europe/Lisbon": "Lisboa",
   "Europe/London": "Londres",
   "Europe/Madrid": "Madri",
+  "Europe/Paris": "Paris",
+  "Europe/Berlin": "Berlim",
+  "Europe/Rome": "Roma",
+  "Europe/Amsterdam": "Amsterdã",
+  "Atlantic/Azores": "Açores",
+  "Africa/Luanda": "Luanda",
+  "Africa/Maputo": "Maputo",
+  "Asia/Dubai": "Dubai",
+  "Asia/Kolkata": "Índia",
+  "Asia/Singapore": "Singapura",
+  "Asia/Shanghai": "Xangai (China)",
+  "Asia/Tokyo": "Tóquio",
+  "Australia/Sydney": "Sydney",
+  "Pacific/Auckland": "Auckland",
 };
 
 /** "UTC−3", "UTC+5:30", "UTC" for a zone at `at`. */
@@ -63,9 +116,10 @@ export function utcOffset(timeZone: string, at = new Date()): string {
 }
 
 /** "horário de Brasília (UTC−3)"; "UTC"; unknown zones by their IANA name with the offset. */
-export function timezoneLabel(timeZone: string, at = new Date()): string {
+export function timezoneLabel(timeZone: string, at = new Date(), locale?: string): string {
   if (timeZone === "UTC" || timeZone === "Etc/UTC") return "UTC";
-  return `${NAMES[timeZone] ?? timeZone} (${utcOffset(timeZone, at)})`;
+  const names = namesFor(locale);
+  return `${names[timeZone] ?? NAMES[timeZone] ?? timeZone} (${utcOffset(timeZone, at)})`;
 }
 
 /** The browser's zone, if it has one. */
@@ -78,8 +132,8 @@ export function browserTimezone(): string | null {
 }
 
 /** "horário de Brasília" (the zone's name, without the offset). */
-export const timezoneName = (timeZone: string) =>
-  timeZone === "UTC" || timeZone === "Etc/UTC" ? "UTC" : (NAMES[timeZone] ?? timeZone);
+export const timezoneName = (timeZone: string, locale?: string) =>
+  timeZone === "UTC" || timeZone === "Etc/UTC" ? "UTC" : (namesFor(locale)[timeZone] ?? NAMES[timeZone] ?? timeZone);
 
 /** A one-off's moment in its own zone: { weekday: "qui", date: "16/10", time: "09:00", zone: "horário de Brasília" }. */
 export function onceParts(locale: string, at: string, timeZone: string) {
@@ -105,10 +159,25 @@ export function onceParts(locale: string, at: string, timeZone: string) {
     }).formatToParts(new Date(at));
   }
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  // Day/month order and 12h/24h follow the locale.
+  const fmt = (opts: Intl.DateTimeFormatOptions) => {
+    try {
+      return new Intl.DateTimeFormat(locale, { ...opts, timeZone }).format(new Date(at));
+    } catch {
+      return new Intl.DateTimeFormat(locale, opts).format(new Date(at));
+    }
+  };
   return {
     weekday: get("weekday").replace(/\.$/, ""),
-    date: `${get("day")}/${get("month")}`,
-    time: `${get("hour")}:${get("minute")}`,
-    zone: timezoneName(timeZone),
+    date: fmt({ day: "2-digit", month: "2-digit" }),
+    time: fmt({ hour: "2-digit", minute: "2-digit" }),
+    zone: timezoneName(timeZone, locale),
   };
+}
+
+/** The selector's name for a zone: "Horário de Brasília", "Nova York (Leste dos EUA)", "UTC". */
+export function zoneDisplayName(timeZone: string, locale?: string): string | undefined {
+  if (timeZone === "UTC" || timeZone === "Etc/UTC") return "UTC";
+  const name = namesFor(locale)[timeZone] ?? NAMES[timeZone];
+  return name ? name.charAt(0).toLocaleUpperCase() + name.slice(1) : undefined;
 }

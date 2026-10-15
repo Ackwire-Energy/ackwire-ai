@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Button,
   Card,
   Checkbox,
@@ -23,9 +22,9 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAgents, useComputer, useComputerAction, useSandboxSettings, useSaveSandboxSettings } from "@/api/queries";
 import type { Agent, AgentComputer, SandboxNetwork, SandboxSettings } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { LoadingCards, LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { useDirectory } from "@/hooks/useDirectory";
 import {
   busyDisplay,
   busyView,
@@ -323,13 +322,11 @@ export function AgentComputerRow({ agent, editable }: { agent: Agent; editable: 
 
 function ComputerListRow({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
   const life = useComputerLifecycle(agent);
   const { pc } = life;
   return (
     <div className="ac-list__row computer-row">
-      <Avatar kind="agent" size="sm" name={agent.name} initials={dir.agentInitials(agent.id)} />
+      <AgentAvatar agentId={agent.id} size="sm" name={agent.name} />
       <span className="list-col" style={{ flex: "1 1 220px" }}>
         <span style={{ fontWeight: 600 }}>{agent.name}</span>
         {pc.isLoading && <LoadingLine width={200} />}
@@ -508,7 +505,7 @@ export function SandboxSection() {
                 >
                   <Input
                     value={domain}
-                    placeholder="api.exemplo.com ou *.exemplo.com"
+                    placeholder={t("sandbox.domainPlaceholder")}
                     onChange={(e) => {
                       setDomain(e.target.value);
                       setDomainError(null);

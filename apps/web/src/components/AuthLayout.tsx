@@ -1,6 +1,7 @@
 import { Avatar, Logo, Mention, Message, MessageText } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { AgentAvatar } from "@/components/AgentAvatar";
 
 /** Split screen of telas/Entrar and Cadastro: illustration aside, form on the right. */
 export function AuthLayout({ aside, children }: { aside: "demo" | "steps"; children: ReactNode }) {
@@ -24,7 +25,7 @@ function DemoChat() {
           <Mention>@Lia</Mention> {t("auth.demoAsk")}
         </MessageText>
       </Message>
-      <Message avatar={<Avatar kind="agent" name="Lia" />} author="Lia" time="09:13" agent>
+      <Message avatar={<AgentAvatar name="Lia" />} author="Lia" time="09:13" agent>
         <MessageText>{t("auth.demoReply")}</MessageText>
       </Message>
       <p className="auth__tagline">{t("auth.tagline")}</p>

@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Button,
   Card,
   CheckboxPill,
@@ -32,6 +31,7 @@ import {
 import type { Agent, AgentAudience, Credential, Model } from "@/api/types";
 import { AccessTree } from "@/components/AccessTree";
 import { AudienceChoice, audienceValid } from "@/components/AgentAudience";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { SkillPicker } from "@/components/Skills";
 import { useAreaLabel } from "@/hooks/useAreaLabel";
@@ -269,7 +269,7 @@ export function NewAgentPage() {
     return (
       <div className="page page--narrow">
         <Card padded as="div" style={{ alignItems: "flex-start", gap: 16 }}>
-          <Avatar kind="agent" size="lg" name={created.agent.name} running />
+          <AgentAvatar agent={created.agent} size="lg" name={created.agent.name} running />
           <h1 className="page-title">{t("newAgent.createdTitle", { name: created.agent.name })}</h1>
           <p className="page-sub" style={{ maxWidth: "60ch" }}>
             {created.channels.length > 0
@@ -349,7 +349,7 @@ export function NewAgentPage() {
           {t("newAgent.who")}
         </h2>
         <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-          <Avatar kind="agent" size="lg" name={displayName} />
+          <AgentAvatar size="lg" name={displayName} />
           <div className="grid-fields" style={{ flex: 1 }}>
             <Field label={t("newAgent.name")} id="ag-name" help={t("newAgent.nameHelp", { handle })}>
               <Input

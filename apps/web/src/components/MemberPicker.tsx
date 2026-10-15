@@ -1,6 +1,7 @@
-import { Avatar, Checkbox, SearchInput, Token, TokenList } from "@agenteschat/ui";
+import { Checkbox, SearchInput, Token, TokenList } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ActorAvatar } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useOrg } from "./org-context";
 
@@ -50,8 +51,6 @@ export function MemberPickerRows({
   selected: Set<PickKey>;
   onToggle: (key: PickKey, on: boolean) => void;
 }) {
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
   const { t } = useTranslation();
   return (
     <>
@@ -60,12 +59,7 @@ export function MemberPickerRows({
         return (
           <label key={r.key} htmlFor={id} className="scope-row">
             <Checkbox id={id} checked={selected.has(r.key)} onCheckedChange={(on) => onToggle(r.key, on)} />
-            <Avatar
-              kind={r.kind}
-              size="sm"
-              name={r.name}
-              initials={r.kind === "agent" ? dir.agentInitials(r.id) : undefined}
-            />
+            <ActorAvatar actor={{ type: r.kind, id: r.id }} size="sm" name={r.name} />
             <span className="scope-row__text">
               <span>{r.name}</span>
               <span className="small muted">
@@ -104,8 +98,6 @@ export function PeoplePicker({
   onChange: (next: Set<PickKey>) => void;
 }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
   const [query, setQuery] = useState("");
   const rows = useMemberRows(query);
   const all = useMemberRows("");
@@ -125,14 +117,7 @@ export function PeoplePicker({
           {picked.map((r) => (
             <li key={r.key}>
               <Token
-                leading={
-                  <Avatar
-                    kind={r.kind}
-                    size="xs"
-                    name={r.name}
-                    initials={r.kind === "agent" ? dir.agentInitials(r.id) : undefined}
-                  />
-                }
+                leading={<ActorAvatar actor={{ type: r.kind, id: r.id }} size="xs" name={r.name} />}
                 removeLabel={t("common.removeName", { name: r.name })}
                 onRemove={() => toggle(r.key, false)}
               >

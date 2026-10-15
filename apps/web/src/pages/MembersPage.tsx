@@ -12,6 +12,7 @@ import {
   useUsage,
 } from "@/api/queries";
 import type { InvitationWithStatus, Role } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -269,7 +270,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                 params={{ orgId: org.id, agentId: a.id }}
                 className="ac-list__row"
               >
-                <Avatar kind="agent" size="sm" name={a.name} initials={dir.agentInitials(a.id)} />
+                <AgentAvatar agentId={a.id} size="sm" name={a.name} />
                 <span className="list-col">
                   <span style={{ fontWeight: 600 }}>
                     {a.name}

@@ -1,6 +1,7 @@
-import { Avatar, type SelectOption } from "@agenteschat/ui";
+import type { SelectOption } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import type { Actor } from "@/api/types";
+import { ActorAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
@@ -26,15 +27,7 @@ export function useActors() {
       description: a.role ? t("issues.agentRole", { role: a.role }) : undefined,
     })),
   ];
-  const avatar = (a: Actor, size: "xs" | "sm" = "xs") => (
-    <Avatar
-      size={size}
-      kind={a.type}
-      name={name(a)}
-      initials={a.type === "agent" ? dir.agentInitials(a.id) : undefined}
-      imageUrl={a.type === "person" ? dir.memberById.get(a.id)?.image : undefined}
-    />
-  );
+  const avatar = (a: Actor, size: "xs" | "sm" = "xs") => <ActorAvatar size={size} actor={a} name={name(a)} />;
   return { dir, name, options, avatar, meId: me.user.id };
 }
 

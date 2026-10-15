@@ -233,7 +233,7 @@ function TopicView({ topic }: { topic: ForumTopicDetail }) {
               {t(a.state === "writing" ? "forum.writing" : "forum.thinking", { name: a.name })}
               {(() => {
                 const run = liveRuns.find((r) => r.agentId === a.id && isStoppable(r));
-                return run && canStop(run) ? <StopButton run={run} onStop={stop} /> : null;
+                return run && canStop(run) ? <StopButton run={run} onStop={stop} place="forum" /> : null;
               })()}
             </span>
           ))}

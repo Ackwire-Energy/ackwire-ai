@@ -143,4 +143,30 @@ export const extraIcons = {
     ["rect", { x: "4.5", y: "9", width: "11", height: "8", rx: "2" }],
     ["path", { d: "M7 9V6.5a3 3 0 0 1 6 0V9" }],
   ],
+  /** "Duplicar", "Copiar". */
+  copy: [
+    ["rect", { x: "7", y: "7", width: "9.5", height: "9.5", rx: "2" }],
+    ["path", { d: "M13 7V5.5a2 2 0 0 0-2-2H5.5a2 2 0 0 0-2 2V11a2 2 0 0 0 2 2H7" }],
+  ],
+  /** "Apagar". */
+  trash: [
+    [
+      "path",
+      { d: "M4 6h12M8 6V4.5h4V6M5.5 6l.8 9.5a1.5 1.5 0 0 0 1.5 1.5h4.4a1.5 1.5 0 0 0 1.5-1.5L14.5 6M8.5 9v5M11.5 9v5" },
+    ],
+  ],
+  /** A recurring event or routine. */
+  repeat: [
+    [
+      "path",
+      { d: "M4 9.5V8a3 3 0 0 1 3-3h8.5M13 2.5 15.5 5 13 7.5M16 10.5V12a3 3 0 0 1-3 3H4.5M7 17.5 4.5 15 7 12.5" },
+    ],
+  ],
+  /** "Filtros". */
+  filter: [["path", { d: "M3.5 5h13M6 10h8M8.5 15h3" }]],
+  /** Side panel toggle. */
+  sidebar: [
+    ["rect", { x: "3", y: "4", width: "14", height: "12", rx: "2.5" }],
+    ["path", { d: "M12.5 4v12" }],
+  ],
 } satisfies Record<string, IconShape[]>;

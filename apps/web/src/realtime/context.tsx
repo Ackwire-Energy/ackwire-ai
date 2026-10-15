@@ -315,6 +315,10 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
       }
       if (isAgentUnavailable(event)) streams.unavailable(event);
+      // Someone changed the calendar: the open ranges refetch.
+      if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {
+        void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
+      }
       // The forum (org broadcasts): the list and the open topic refresh.
       if ((event.type === "forum.topic.updated" || event.type === "forum.post.created") && "topicId" in event) {
         const topicId = String(event.topicId);
@@ -414,6 +418,12 @@ export async function reconcileChannelRuns(
   return dropped;
 }
 
+let quiet: StreamsStore | null = null;
+const quietStore = () => {
+  quiet ??= createStreamsStore();
+  return quiet;
+};
+
 /** Subscribes to a channel while mounted: live runs + message cache updates. */
 export function useChannelRealtime(orgId: string, channelId: string, enabled: boolean) {
   const { connection, streams } = useRealtime();
@@ -459,7 +469,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
  * the whole timeline.
  */
 export function useLive<T>(select: (state: LiveState) => T, isEqual: (a: T, b: T) => boolean = Object.is): T {
-  const { streams: store } = useRealtime();
+  // Outside the org shell (a lone component in a test, the gallery): a quiet, empty store.
+  const store = useContext(RealtimeContext)?.streams ?? quietStore();
   const selectRef = useRef(select);
   selectRef.current = select;
   const [value, setValue] = useState(() => select(store.get()));

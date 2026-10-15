@@ -145,12 +145,28 @@ export function stepLabel(t: TFunction, s: WorkItem) {
 }
 
 /**
- * A message of a stopped run (`meta.canceled`) ends with "_Interrompido por
- * Walter._": that line becomes a muted note under the text, not part of it.
+ * A message of a stopped run (`meta.canceled`, `true` or `{ byUserId }`) ends
+ * with the server's "_Interrompido por Walter._": that line leaves the text,
+ * and the note is written on the client, in the UI language, from the meta.
+ * `note` is the server's line (only a fallback when the meta has no person).
  */
 export function splitCanceled(body: string, meta: Record<string, unknown> | undefined) {
-  if (!meta?.canceled) return { body, note: null };
+  const canceled = meta?.canceled;
+  if (!canceled) return { body, canceled: false, byUserId: null as string | null, note: null as string | null };
+  const byUserId =
+    typeof canceled === "object" && canceled && typeof (canceled as { byUserId?: unknown }).byUserId === "string"
+      ? ((canceled as { byUserId: string }).byUserId as string)
+      : null;
+  // The server also sends what the agent wrote, without the note.
+  const said = typeof canceled === "object" && canceled ? (canceled as { text?: unknown }).text : undefined;
   const match = /\n*\s*_([^_\n]+)_\s*$/.exec(body);
-  if (!match) return { body, note: null };
-  return { body: body.slice(0, match.index).trimEnd(), note: (match[1] ?? "").trim().replace(/\.$/, "") };
+  if (typeof said === "string")
+    return { body: said, canceled: true, byUserId, note: match?.[1]?.trim().replace(/\.$/, "") ?? null };
+  if (!match) return { body, canceled: true, byUserId, note: null };
+  return {
+    body: body.slice(0, match.index).trimEnd(),
+    canceled: true,
+    byUserId,
+    note: (match[1] ?? "").trim().replace(/\.$/, ""),
+  };
 }

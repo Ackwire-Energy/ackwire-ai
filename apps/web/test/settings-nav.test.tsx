@@ -107,9 +107,16 @@ describe("finding the settings", () => {
     await settle(2);
     const dialog = screen().getByRole("dialog", { name: "Seu perfil neste workspace" });
     await type(within(dialog).getByLabelText("Seu @"), "walt");
-    await type(within(dialog).getByLabelText("Fuso horário"), "Lua/Base");
-    expect(dialog.textContent).toContain("Use um fuso como America/Sao_Paulo.");
-    await type(within(dialog).getByLabelText("Fuso horário"), "Europe/Lisbon");
+    // Our zone selector: search by city, Enter picks.
+    const zoneBox = within(dialog).getByRole("combobox", { name: "Fuso horário" });
+    expect(zoneBox.textContent).toContain("UTC");
+    await click(zoneBox);
+    await settle(2);
+    const search = screen().getByRole("combobox", { name: "Buscar fuso" });
+    await type(search, "lisboa");
+    await act(async () => fireEvent.keyDown(search, { key: "Enter" }));
+    await settle(2);
+    expect(within(dialog).getByRole("combobox", { name: "Fuso horário" }).textContent).toContain("Lisboa");
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "orgs.updateMe")?.args).toEqual([

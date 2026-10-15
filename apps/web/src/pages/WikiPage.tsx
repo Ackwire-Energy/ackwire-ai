@@ -15,6 +15,7 @@ import {
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -34,20 +35,25 @@ import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import { leafTitle, outlineOf, type WikiFolder, wikiSlug, wikiTree } from "@/lib/wiki";
 
-/** The suggested start: Visão geral, Processos, Glossário. */
-export const STARTER_PAGES = [
-  {
-    title: "Visão geral",
-    folder: "",
-    body: "# Visão geral\n\nO que a organização faz, quem é quem e por onde começar.\n\n- [[Como trabalhamos]]\n- [[Glossário]]\n",
-  },
-  {
-    title: "Como trabalhamos",
-    folder: "Processos",
-    body: "# Como trabalhamos\n\nRituais, ferramentas e combinados.\n",
-  },
-  { title: "Glossário", folder: "", body: "# Glossário\n\n**Termo**: o que significa aqui.\n" },
-];
+/** The suggested start (Visão geral, Processos/Como trabalhamos, Glossário), in the UI language. */
+export function starterPages(t: TFunction) {
+  const overview = t("wiki.starterPages.overview");
+  const how = t("wiki.starterPages.howWeWork");
+  const glossary = t("wiki.starterPages.glossary");
+  return [
+    {
+      title: overview,
+      folder: "",
+      body: `# ${overview}\n\n${t("wiki.starterPages.overviewBody")}\n\n- [[${how}]]\n- [[${glossary}]]\n`,
+    },
+    {
+      title: how,
+      folder: t("wiki.starterPages.processes"),
+      body: `# ${how}\n\n${t("wiki.starterPages.howWeWorkBody")}\n`,
+    },
+    { title: glossary, folder: "", body: `# ${glossary}\n\n${t("wiki.starterPages.glossaryBody")}\n` },
+  ];
+}
 
 type Center = "page" | "graph";
 
@@ -245,14 +251,14 @@ function WikiEmpty({ onCreate }: { onCreate: () => void }) {
                 setBusy(true);
                 try {
                   // Straight to the API: the empty state goes away as soon as the first page exists.
-                  for (const p of STARTER_PAGES) {
+                  for (const p of starterPages(t)) {
                     await api.wiki.create(org.id, { title: p.title, folder: p.folder, body: p.body });
                   }
                   void qc.invalidateQueries({ queryKey: keys.wiki(org.id) });
                   toast.show(t("wiki.starterCreated"));
                   void navigate({
                     to: "/org/$orgId/wiki/$slug",
-                    params: { orgId: org.id, slug: wikiSlug("Visão geral") },
+                    params: { orgId: org.id, slug: wikiSlug(t("wiki.starterPages.overview")) },
                   });
                 } finally {
                   setBusy(false);
@@ -267,7 +273,7 @@ function WikiEmpty({ onCreate }: { onCreate: () => void }) {
         {t("wiki.emptyText")}
       </EmptyState>
       <ul className="wiki-starter" aria-label={t("wiki.starter")}>
-        {STARTER_PAGES.map((p) => (
+        {starterPages(t).map((p) => (
           <li key={p.title}>
             <Icon name="document" size={14} />
             {p.folder ? `${p.folder} / ${p.title}` : p.title}
@@ -747,7 +753,11 @@ function NewPageDialog({
             <Input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
           </Field>
           <Field label={t("wiki.form.folder")} id="wiki-new-folder" help={t("wiki.form.folderHelp")}>
-            <Input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="Processos" />
+            <Input
+              value={folder}
+              onChange={(e) => setFolder(e.target.value)}
+              placeholder={t("wiki.form.folderPlaceholder")}
+            />
           </Field>
           {folders.length > 0 && (
             <div className="wiki-tags">
