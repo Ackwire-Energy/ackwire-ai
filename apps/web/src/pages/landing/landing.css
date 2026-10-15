@@ -692,18 +692,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -30px 60px -20px rgba(0, 20, 70, 0.45),
-    0 60px 120px -30px rgba(0, 30, 90, 0.7);
-}
-.lp .lp-giant .lp-giant__av::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(60% 45% at 30% 18%, rgba(255, 255, 255, 0.35), transparent 70%);
-  pointer-events: none;
+  /* Flat dither like every agent: no gloss, only the shadow on the sky. */
+  box-shadow: 0 60px 120px -30px rgba(0, 30, 90, 0.7);
 }
 .lp .lp-giant .lp-giant__av.ac-avatar--running::after {
   border-width: 3px;

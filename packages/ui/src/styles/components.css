@@ -813,8 +813,14 @@ textarea.ac-input {
   color: var(--ink-muted);
   font-weight: 600;
 }
+.ac-logo__dither {
+  image-rendering: pixelated;
+}
 .ac-logo--mono .ac-logo__body {
   fill: currentColor;
+}
+.ac-logo--mono .ac-logo__dither {
+  display: none;
 }
 .ac-logo--mono .ac-logo__eyes {
   fill: var(--surface);
@@ -2868,19 +2874,21 @@ a.ac-list__row:focus-visible {
 }
 /* Agents: the living symbol */
 .ac-avatar--agent {
+  /* The body is the sky's dither in the agent's color (set by Avatar); the gradient shows until it paints. */
   background: linear-gradient(160deg, var(--agent2), var(--agent));
+  background-image: var(--av-dither, linear-gradient(160deg, var(--agent2), var(--agent)));
+  background-size: 100% 100%;
+  image-rendering: pixelated;
   color: var(--on-agent);
   border-radius: var(--radius-agent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 6px 16px -6px color-mix(in srgb, var(--agent) 70%, transparent);
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--agent) 70%, transparent);
 }
 .ac-avatar--sm.ac-avatar--agent,
 .ac-avatar--xs.ac-avatar--agent {
   border-radius: var(--radius-agent);
 }
 .ac-avatar--xs.ac-avatar--agent {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: none;
 }
 .ac-avatar__eye {
   position: absolute;
@@ -3378,9 +3386,9 @@ a.ac-list__row:focus-visible {
 /* Agent look (customizer): color, eyes and accessories, at every size, still alive. */
 .ac-avatar--agent[style*="--av-top"] {
   background: linear-gradient(160deg, var(--av-top), var(--av-bottom));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 6px 16px -6px color-mix(in srgb, var(--av-bottom) 70%, transparent);
+  background-image: var(--av-dither, linear-gradient(160deg, var(--av-top), var(--av-bottom)));
+  background-size: 100% 100%;
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--av-bottom) 70%, transparent);
 }
 .ac-avatar--agent[style*="--av-top"].ac-avatar--running::after {
   border-color: color-mix(in srgb, var(--av-bottom) 45%, transparent);

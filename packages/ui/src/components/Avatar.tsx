@@ -1,5 +1,6 @@
-import type { HTMLAttributes } from "react";
+import type { CSSProperties, HTMLAttributes } from "react";
 import { cx } from "../cx";
+import { ditherCells, ditherUrl } from "../sky/dither";
 import { AgentAccessoryLayer, type AgentAppearance, appearanceStyle } from "./AgentLook";
 
 export type AvatarKind = "person" | "agent";
@@ -32,6 +33,11 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
 
 /** Rendered size of each avatar size (accessories simplify when small). */
 const SIZE_PX: Record<NonNullable<AvatarProps["size"]>, number> = { xs: 18, sm: 24, md: 36, lg: 56, xl: 112 };
+
+/** The body's dithered texture in the agent's color, with a grid that fits the size. */
+function ditherStyle(a: AgentAppearance | undefined, px: number): CSSProperties {
+  return { "--av-dither": `url("${ditherUrl(a?.color ?? "sky", ditherCells(px))}")` } as CSSProperties;
+}
 
 /** 1–2 letters: "Ada" → "A", "Atlas" → "At" when asked; "Marina Souza" → "MS". */
 export function initialsOf(name: string): string {
@@ -81,7 +87,7 @@ export function Avatar({
         agent && appearance?.accessory && appearance.accessory !== "none" ? appearance.accessory : undefined
       }
       data-eyes={agent && appearance?.eyes && appearance.eyes !== "round" ? appearance.eyes : undefined}
-      style={agent ? { ...appearanceStyle(appearance), ...style } : style}
+      style={agent ? { ...appearanceStyle(appearance), ...ditherStyle(appearance, SIZE_PX[size]), ...style } : style}
       {...rest}
     >
       {agent ? (

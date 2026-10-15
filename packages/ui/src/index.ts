@@ -126,6 +126,7 @@ export {
   zonedInstant,
 } from "./recurrence";
 export { pixelBurst } from "./sky/burst";
+export { ditherCells, ditherSvg, ditherTones, ditherUrl } from "./sky/dither";
 export {
   drawSprite,
   prefersReducedMotion,

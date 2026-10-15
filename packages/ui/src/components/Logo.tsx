@@ -1,8 +1,15 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, useId } from "react";
 import { cx } from "../cx";
+import { ditherUrl } from "../sky/dither";
 
-/** The agent mark: `agent` square with the cut corner and two `on-agent` eyes. */
+const BODY = "M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H3.5A1.5 1.5 0 0 1 2 28.5V10a8 8 0 0 1 8-8z";
+
+/**
+ * The agent mark: the square with the cut corner in the sky's dither (solid
+ * `agent` under it, and alone in the mono logo) and two `on-agent` eyes.
+ */
 export function LogoMark({ size, className, label }: { size?: number; className?: string; label?: string }) {
+  const clip = `ac-logo-${useId().replace(/[^\w-]/g, "")}`;
   return (
     <svg
       viewBox="0 0 32 32"
@@ -12,9 +19,21 @@ export function LogoMark({ size, className, label }: { size?: number; className?
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <path
-        className="ac-logo__body"
-        d="M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H3.5A1.5 1.5 0 0 1 2 28.5V10a8 8 0 0 1 8-8z"
+      <defs>
+        <clipPath id={clip}>
+          <path d={BODY} />
+        </clipPath>
+      </defs>
+      <path className="ac-logo__body" d={BODY} />
+      <image
+        className="ac-logo__dither"
+        href={ditherUrl("sky", 12)}
+        x="2"
+        y="2"
+        width="28"
+        height="28"
+        preserveAspectRatio="none"
+        clipPath={`url(#${clip})`}
       />
       <path
         className="ac-logo__eyes"
