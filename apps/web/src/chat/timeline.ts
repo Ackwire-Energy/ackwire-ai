@@ -38,7 +38,24 @@ export type TimelineItem =
   | { kind: "approval"; key: string; approval: Approval }
   | { kind: "run"; key: string; run: LiveRun };
 
-const GROUP_WINDOW_MS = 5 * 60_000;
+export const GROUP_WINDOW_MS = 5 * 60_000;
+
+/**
+ * A row's React key. An optimistic message keeps its key when the server
+ * copy (same `clientId`, new id) replaces it: no remount, no flash.
+ */
+export const messageKey = (m: Pick<Message, "id" | "clientId">) => (m.clientId ? `c:${m.clientId}` : m.id);
+
+/** Same author (person or agent) writing again within 5 minutes: the row collapses under the previous one. */
+export function groupsWith(
+  prev: { author: Message["author"]; createdAt: string } | null | undefined,
+  author: Message["author"],
+  createdAt: string,
+) {
+  if (!prev) return false;
+  const gap = new Date(createdAt).getTime() - new Date(prev.createdAt).getTime();
+  return prev.author.type === author.type && prev.author.id === author.id && gap < GROUP_WINDOW_MS;
+}
 const dayKey = (iso: string) => {
   const d = new Date(iso);
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -55,7 +72,7 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
     ...messages.map((m) => ({
       at: m.createdAt,
       id: m.id,
-      item: { kind: "message" as const, key: m.id, message: m, grouped: false },
+      item: { kind: "message" as const, key: messageKey(m), message: m, grouped: false },
     })),
     ...approvals.map((a) => ({
       at: a.createdAt,
@@ -76,12 +93,7 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
     }
     if (entry.item.kind === "message") {
       const m = entry.item.message;
-      const grouped =
-        prev !== null &&
-        prev.author.type === m.author.type &&
-        prev.author.id === m.author.id &&
-        new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() < GROUP_WINDOW_MS;
-      out.push({ ...entry.item, grouped });
+      out.push({ ...entry.item, grouped: groupsWith(prev, m.author, m.createdAt) });
       prev = m;
     } else {
       out.push(entry.item);

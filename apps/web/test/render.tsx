@@ -1,3 +1,4 @@
+import { domWindow } from "@agenteschat/ui/testing/dom";
 import {
   createMemoryHistory,
   createRootRouteWithContext,
@@ -21,6 +22,10 @@ import { RealtimeProvider } from "@/realtime/context";
 import { routeTree } from "@/routeTree.gen";
 import { createFakeAuth } from "./fake-auth";
 import { fakeSockets } from "./fake-socket";
+
+// Screen tests check end states: with reduced motion, streamed text shows whole at once and scrolls
+// jump instead of gliding. The reveal pace itself is unit-tested in `chat-motion.test.ts`.
+domWindow().happyDOM.settings.device.prefersReducedMotion = "reduce";
 
 export function makeServices(
   api: ApiClient,

@@ -521,6 +521,17 @@ p {
 .channel__empty {
   margin: auto 16px;
 }
+/* First-message suggestions in an empty conversation: neutral buttons that wrap */
+.channel__suggestions {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
 .member-row {
   display: flex;
   align-items: center;
@@ -1792,4 +1803,148 @@ p {
 }
 .mention-offer > .small:first-child {
   flex: 1 1 220px;
+}
+
+/* Agent access: tool tree ("Editar permissões", "Criar agente → Ferramentas") */
+.access-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.access-tree__all {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+.access-group {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.access-group__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+.access-group__name {
+  font-weight: 600;
+}
+.access-group__tools {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.access-row,
+.access-row__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.access-row {
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+}
+.access-row__text {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.access-row .ac-chip {
+  margin-left: 0;
+}
+/* Inherited from "all tools" or the group: checked and muted. */
+.access-row[data-inherited] .ac-check {
+  opacity: 0.55;
+}
+.access-row[data-state="denied"] .access-row__text label {
+  color: var(--ink-muted);
+  text-decoration: line-through;
+}
+
+/* Settings → Acesso dos agentes */
+.access-matrix {
+  overflow: auto;
+  max-height: 70vh;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.access-matrix table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+.access-matrix th,
+.access-matrix td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+  white-space: nowrap;
+  background: var(--surface-raised);
+}
+.access-matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  font-weight: 600;
+  background: var(--surface-sunken);
+}
+/* First column stays while scrolling sideways. */
+.access-matrix__sticky {
+  position: sticky;
+  left: 0;
+  z-index: var(--z-sticky);
+  text-align: left !important;
+  min-width: 220px;
+  border-right: 1px solid var(--line);
+}
+.access-matrix thead .access-matrix__sticky {
+  z-index: calc(var(--z-sticky) + 1);
+}
+.access-matrix__group th {
+  font-weight: 600;
+}
+.access-matrix__tool-name {
+  padding-left: 22px;
+  font-weight: 400;
+}
+.access-matrix__toggle,
+.access-matrix__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.access-matrix__btn:hover,
+.access-matrix__toggle:hover {
+  background: var(--surface-sunken);
+}
+.access-matrix__btn:focus-visible,
+.access-matrix__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.access-matrix__cell[data-state="inherited"] .ac-icon,
+.access-matrix__cell[data-state="off"] .ac-icon {
+  color: var(--ink-muted);
+}
+.access-matrix__legend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }

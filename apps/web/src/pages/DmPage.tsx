@@ -8,6 +8,7 @@ import { useModels } from "@/api/queries";
 import type { DmTarget } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { greetingSuggestions } from "@/lib/chat";
 import { agentGrammar } from "@/lib/grammar";
 import { ChannelPage } from "./ChannelPage";
 
@@ -96,6 +97,8 @@ export function DmPage({ target }: { target: DmTarget }) {
         composerTarget: name,
         dmAgentId: agent?.id,
         emptyText: agent ? t("dm.emptyAgent", agentGrammar(t, agent.name)) : t("dm.emptyPerson", { name }),
+        emptyTitle: agent ? t("chat.sayHiAgent", agentGrammar(t, agent.name)) : t("chat.sayHiPerson", { name }),
+        suggestions: agent ? greetingSuggestions(t, agent.role) : [],
       }}
     />
   );

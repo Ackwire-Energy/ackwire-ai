@@ -47,13 +47,25 @@ const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
 export const daysBetween = (iso: string, now: Date) =>
   Math.round((startOfDay(now) - startOfDay(new Date(iso))) / 86_400_000);
 
-/** Day divider label: "Hoje", "Ontem", "12 out". */
+const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+
+/** "Segunda-feira" */
+export const formatWeekday = (locale: string, iso: string) =>
+  capitalize(new Intl.DateTimeFormat(locale, { weekday: "long" }).format(new Date(iso)));
+
+/** Day divider label: "Hoje", "Ontem", a weekday within the week ("Segunda-feira"), "12 out", "12 out 2025". */
 export function dayLabel(t: TFunction, locale: string, iso: string, now = new Date()) {
   const days = daysBetween(iso, now);
   if (days === 0) return t("common.today");
   if (days === 1) return t("common.yesterday");
-  return formatShortDate(locale, iso);
+  if (days > 1 && days < 7) return formatWeekday(locale, iso);
+  const year = new Date(iso).getFullYear();
+  return year === now.getFullYear() ? formatShortDate(locale, iso) : `${formatShortDate(locale, iso)} ${year}`;
 }
+
+/** "terça-feira, 14 de outubro de 2026 às 21:10" (tooltip on a message's time). */
+export const formatFullDate = (locale: string, iso: string) =>
+  new Intl.DateTimeFormat(locale, { dateStyle: "full", timeStyle: "short" }).format(new Date(iso));
 
 /** "agora", "há 2 min", "há 3 h", "ontem", "12 out". */
 export function relativeTime(t: TFunction, locale: string, iso: string, now = new Date()) {

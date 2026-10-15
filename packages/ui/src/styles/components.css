@@ -430,6 +430,85 @@ textarea.ac-input {
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
+/* Details behind the time (date, model, tokens, cost): a tooltip on hover or focus, never in the header */
+.ac-msg__time--details,
+.ac-msg__gutter-time {
+  position: relative;
+}
+.ac-msg__time--details {
+  cursor: default;
+  border-radius: var(--radius-cut);
+}
+.ac-msg__time--details:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-msg__tip {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  z-index: var(--z-sticky);
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-raised);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--overlay);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.ac-msg__time--details:hover .ac-msg__tip,
+.ac-msg__time--details:focus-visible .ac-msg__tip,
+.ac-msg__gutter-time:hover .ac-msg__tip {
+  visibility: visible;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-msg__tip {
+    transform: translateY(2px);
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease,
+      visibility 0s linear 120ms;
+  }
+  .ac-msg__time--details:hover .ac-msg__tip,
+  .ac-msg__time--details:focus-visible .ac-msg__tip,
+  .ac-msg__gutter-time:hover .ac-msg__tip {
+    transform: none;
+    transition-delay: 250ms, 250ms, 0s;
+  }
+}
+/* A person-facing state on the header line ("enviando…"): icon + word, muted */
+.ac-msg__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+/* New rows slide in a little (opacity/transform only) */
+@media (prefers-reduced-motion: no-preference) {
+  .ac-msg--enter {
+    animation: ac-msg-enter 180ms ease-out both;
+  }
+}
+@keyframes ac-msg-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 .ac-msg__text {
   margin: 2px 0 0;
   overflow-wrap: anywhere;
@@ -929,7 +1008,12 @@ textarea.ac-input {
   border-radius: 999px;
   background: var(--on-action);
 }
+.ac-check[data-state="indeterminate"] .ac-check__mark {
+  height: 2px;
+  clip-path: none;
+}
 .ac-check[data-state="checked"],
+.ac-check[data-state="indeterminate"],
 .ac-radio[data-state="checked"] {
   background: var(--action);
   border-color: var(--action);
@@ -1680,6 +1764,27 @@ a.ac-list__row:focus-visible {
     animation-delay: 0.3s;
   }
 }
+/* The bar's words fade in when someone starts (or changes what they're doing) */
+@media (prefers-reduced-motion: no-preference) {
+  .ac-typing__text {
+    animation: ac-fade-in 160ms ease-out both;
+  }
+}
+@keyframes ac-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* Under a reply being written: what the agent is doing now ("consultando o GitHub…") */
+.ac-msg__activity {
+  margin: var(--space-1) 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
 @keyframes ac-typing-dot {
   0%,
   60%,
@@ -1902,4 +2007,44 @@ a.ac-list__row:focus-visible {
   padding-left: var(--space-2);
   font-size: 12px;
   color: var(--ink-muted);
+}
+
+/* Switch (on/off): ink when on, never a status color */
+.ac-switch {
+  all: unset;
+  flex: none;
+  box-sizing: border-box;
+  width: 36px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--line-strong);
+  position: relative;
+  cursor: pointer;
+}
+.ac-switch[data-state="checked"] {
+  background: var(--action);
+}
+.ac-switch:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.ac-switch[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ac-switch__thumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 2px;
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  transition: transform 120ms ease;
+}
+.ac-switch[data-state="checked"] .ac-switch__thumb {
+  transform: translateX(16px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-switch__thumb {
+    transition: none;
+  }
 }

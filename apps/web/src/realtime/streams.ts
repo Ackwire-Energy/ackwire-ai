@@ -25,6 +25,25 @@ export interface LiveRun {
   error?: string;
   /** Added by the client on send; no server event yet. */
   provisional?: boolean;
+  /** The tool it is calling right now ("github_list_prs"), from `agent.tool`. */
+  tool?: string | null;
+  /** The app of that tool, when the event names it ("GitHub"). */
+  connector?: string | null;
+}
+
+/**
+ * "Theo está consultando o GitHub…": the tool an agent is calling. Not sent
+ * by the backend yet (packages/engine/src/events.ts has no tool event); the
+ * client handles it as soon as it exists. `tool: null` = the call ended.
+ */
+export interface AgentToolEvent {
+  type: "agent.tool";
+  channelId: string;
+  threadId: string;
+  runId: string;
+  agentId: string;
+  tool: string | null;
+  connector?: string | null;
 }
 
 export interface StreamsState {
@@ -89,8 +108,14 @@ function reopen(state: StreamsState, runId: string): StreamsState {
   return { ...state, finished };
 }
 
-export function applyChannelEvent(state: StreamsState, event: ChannelEvent): StreamsState {
+export function applyChannelEvent(state: StreamsState, event: ChannelEvent | AgentToolEvent): StreamsState {
   switch (event.type) {
+    case "agent.tool": {
+      if (state.finished[event.runId]) return state;
+      const current = state.runs[event.runId];
+      const status: LiveStatus = current?.text ? current.status : "thinking";
+      return upsert(state, event, { status, tool: event.tool, connector: event.connector ?? null });
+    }
     case "message.created": {
       const m = event.message;
       if (!m?.agentRunId) return state;

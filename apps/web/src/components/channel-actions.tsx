@@ -10,6 +10,8 @@ export interface ChannelActions {
   resend: (body: string) => void;
   /** "Responder" on an agent's question: type the answer in the composer. */
   focusComposer: () => void;
+  /** A streaming reply grew: stay at the bottom if the person is there. */
+  followBottom?: () => void;
   channelAgents: Agent[];
 }
 export const ChannelActionsContext = createContext<ChannelActions | null>(null);

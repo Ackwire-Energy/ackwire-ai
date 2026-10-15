@@ -220,6 +220,32 @@ describe("Message", () => {
     expect(second?.querySelector(".ac-visually-hidden")?.textContent).toContain("Atlas");
   });
 
+  test("machine details live in a tooltip on the time; person-facing states show with an icon", () => {
+    const { container } = render(
+      <Message
+        author="Ada"
+        time="21:10"
+        meta="sonnet 5.5 · 1.240 tokens · US$ 0,004"
+        status={{ icon: "waiting", label: "enviando…" }}
+        entering
+        agent
+      >
+        <MessageText>Achei a causa.</MessageText>
+      </Message>,
+    );
+    const article = container.querySelector("article");
+    expect(article?.className).toContain("ac-msg--enter");
+    const time = article?.querySelector(".ac-msg__time--details") as HTMLElement;
+    expect(time.tabIndex).toBe(0);
+    const tip = within(container).getByRole("tooltip");
+    expect(time.getAttribute("aria-describedby")).toBe(tip.id);
+    expect(time.contains(tip)).toBe(true);
+    expect(tip.textContent).toBe("sonnet 5.5 · 1.240 tokens · US$ 0,004");
+    const status = article?.querySelector(".ac-msg__status");
+    expect(status?.textContent).toBe("enviando…");
+    expect(status?.querySelector("svg")).not.toBeNull();
+  });
+
   test("first and grouped messages share one text edge: a fixed avatar column or an equal gutter", async () => {
     const { container } = render(
       <>

@@ -1,9 +1,10 @@
-import { Checkbox as RCheckbox, RadioGroup as RRadioGroup } from "radix-ui";
+import { Checkbox as RCheckbox, RadioGroup as RRadioGroup, Switch as RSwitch } from "radix-ui";
 import type { ReactNode } from "react";
 import { cx } from "../cx";
 
 export interface CheckboxProps {
-  checked: boolean;
+  /** `"indeterminate"`: some children checked (tri-state groups). Toggling it checks it. */
+  checked: boolean | "indeterminate";
   onCheckedChange?: (checked: boolean) => void;
   id?: string;
   disabled?: boolean;
@@ -12,7 +13,10 @@ export interface CheckboxProps {
   className?: string;
 }
 
-/** Our checkbox (Radix Checkbox: a `role="checkbox"` button, Space toggles). Pair it with a `<label htmlFor>`. */
+/**
+ * Our checkbox (Radix Checkbox: a `role="checkbox"` button, Space toggles;
+ * `aria-checked="mixed"` when indeterminate). Pair it with a `<label htmlFor>`.
+ */
 export function Checkbox({ checked, onCheckedChange, className, ...rest }: CheckboxProps) {
   return (
     <RCheckbox.Root
@@ -117,5 +121,36 @@ export function RadioCard({
       </span>
       {aside && <span className="ac-option__aside">{aside}</span>}
     </label>
+  );
+}
+
+/** Our on/off switch (Radix Switch: `role="switch"`, Space toggles). Pair it with a `<label htmlFor>`. */
+export function Switch({
+  checked,
+  onCheckedChange,
+  id,
+  disabled,
+  className,
+  ...rest
+}: {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  id?: string;
+  disabled?: boolean;
+  className?: string;
+  "aria-label"?: string;
+  "aria-describedby"?: string;
+}) {
+  return (
+    <RSwitch.Root
+      className={cx("ac-switch", className)}
+      checked={checked}
+      onCheckedChange={onCheckedChange}
+      id={id}
+      disabled={disabled}
+      {...rest}
+    >
+      <RSwitch.Thumb className="ac-switch__thumb" />
+    </RSwitch.Root>
   );
 }

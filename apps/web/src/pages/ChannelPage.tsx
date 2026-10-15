@@ -32,6 +32,7 @@ import {
   useChannels,
   useJoinChannel,
   useMessages,
+  useModels,
   usePostMessage,
   useRoster,
   useThreads,
@@ -48,7 +49,7 @@ import type {
 } from "@/api/types";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
-import { buildTimeline, mergeTimeline, threadRootsToLoad } from "@/chat/timeline";
+import { buildTimeline, groupsWith, mergeTimeline, threadRootsToLoad } from "@/chat/timeline";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { InlineProposal, MemoryChangeCard, QuestionCard } from "@/components/ChatCards";
@@ -60,8 +61,11 @@ import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
+import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
+import { activityText, activityVerb, barEntries, isWriting, toolActivity } from "@/lib/activity";
 import { artifactRefs } from "@/lib/artifacts";
-import { dayLabel, formatTime, joinNames } from "@/lib/format";
+import { entersWithMotion, greetingSuggestions, messageUsage, nearBottom, usageLine } from "@/lib/chat";
+import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
 import {
@@ -84,6 +88,10 @@ export interface ChannelChrome {
   composerTarget?: string;
   /** A DM with this agent: it answers every message (optimistic "pensando…" is allowed). */
   dmAgentId?: string;
+  /** Empty conversation: "Diga oi para o Theo". */
+  emptyTitle?: string;
+  /** Empty conversation: first messages to pick (they go to the composer). */
+  suggestions?: string[];
 }
 
 const sameRuns = (a: LiveRun[], b: LiveRun[]) => a.length === b.length && a.every((r, i) => r === b[i]);
@@ -208,27 +216,54 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
   // bottom; if they scrolled up, offer "Novas mensagens" instead of jumping.
   const scroller = useRef<HTMLElement>(null);
   const stick = useRef(true);
+  // A smooth scroll in progress: its intermediate positions don't mean "the person scrolled up".
+  const autoScrollUntil = useRef(0);
+  const reducedMotion = usePrefersReducedMotion();
   const [unseen, setUnseen] = useState(false);
   const runCount = useStreams((s) => runsInChannel(s, channel.id).length);
   const streamSize = useStreams((s) => runsInChannel(s, channel.id).reduce((n, r) => n + r.text.length, 0));
   const lastKey = timeline.at(-1)?.key;
-  const toBottom = () => {
+  const previousLastKey = useRef(lastKey);
+  const openedAt = useRef(Date.now());
+  const toBottom = (smooth = false) => {
     const el = scroller.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) {
+      if (smooth && !reducedMotion && typeof el.scrollTo === "function") {
+        autoScrollUntil.current = Date.now() + 600;
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      } else el.scrollTop = el.scrollHeight;
+    }
     stick.current = true;
     setUnseen(false);
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll whenever rows or streaming text grow
   useLayoutEffect(() => {
-    if (stick.current) toBottom();
-    else setUnseen(true);
+    // A new row glides down; streaming text follows instantly (no fighting smooth scrolls each frame).
+    // Not while the channel is still loading (first page, thread replies): that lands at once.
+    const newRow = previousLastKey.current !== lastKey;
+    const settled = previousLastKey.current !== undefined && Date.now() - openedAt.current > 1500;
+    previousLastKey.current = lastKey;
+    if (stick.current) toBottom(newRow && settled);
+    else if (newRow || runCount > 0) setUnseen(true);
   }, [lastKey, runCount, streamSize]);
 
   const onSend = (text: string) => {
-    toBottom();
+    toBottom(true);
     setDraft("");
     send(text);
   };
+  const lastMessage = useMemo(() => {
+    for (let i = timeline.length - 1; i >= 0; i--) {
+      const item = timeline[i];
+      if (item?.kind === "message") return item.message;
+    }
+    return null;
+  }, [timeline]);
+  const emptySuggestions = useMemo(() => {
+    if (chrome?.suggestions) return chrome.suggestions;
+    const first = channelAgents[0];
+    return first ? greetingSuggestions(t, first.role).map((s) => `@${first.handle} ${s}`) : [];
+  }, [chrome?.suggestions, channelAgents, t]);
 
   const actions: ChannelActions = {
     insertMention: (handle) => {
@@ -241,6 +276,10 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
     },
     resend: (body) => send(body),
     focusComposer: () => composer.current?.focus(),
+    followBottom: () => {
+      const el = scroller.current;
+      if (el && stick.current && Date.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
+    },
     channelAgents,
   };
 
@@ -312,9 +351,10 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
               aria-live="polite"
               aria-relevant="additions"
               onScroll={(e) => {
-                const el = e.currentTarget;
-                stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-                if (stick.current) setUnseen(false);
+                const near = nearBottom(e.currentTarget);
+                if (!near && Date.now() < autoScrollUntil.current) return;
+                stick.current = near;
+                if (near) setUnseen(false);
               }}
             >
               {/* Pushes short channels down, next to the composer. */}
@@ -326,16 +366,40 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
               )}
               {messages.isSuccess && timeline.length === 0 && streamSize === 0 && (
                 <div className="channel__empty">
-                  <EmptyState icon="message">{chrome?.emptyText ?? t("channel.empty")}</EmptyState>
+                  <EmptyState
+                    icon="message"
+                    title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
+                    actions={
+                      emptySuggestions.length > 0 ? (
+                        <fieldset className="channel__suggestions">
+                          <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
+                          {emptySuggestions.map((s) => (
+                            <Button
+                              key={s}
+                              size="sm"
+                              onClick={() => {
+                                setDraft(s);
+                                composer.current?.focus();
+                              }}
+                            >
+                              {s}
+                            </Button>
+                          ))}
+                        </fieldset>
+                      ) : undefined
+                    }
+                  >
+                    {chrome?.emptyText ?? t("channel.empty")}
+                  </EmptyState>
                 </div>
               )}
-              <Timeline items={timeline} />
+              <Timeline items={timeline} ready={messages.isSuccess} />
               <LiveMemoryCards channelId={channel.id} />
-              <LiveRuns channelId={channel.id} />
+              <LiveRuns channelId={channel.id} last={lastMessage} />
             </section>
             {unseen && (
               <div className="channel__pill">
-                <Button size="sm" className="ac-new-messages" onClick={toBottom}>
+                <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
                   {t("channel.newMessages")}
                   <Icon name="chevronDown" size={16} />
                 </Button>
@@ -390,15 +454,38 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
 }
 
 /** Persisted rows. Memoized: streaming deltas don't re-render it. */
-const Timeline = memo(function Timeline({ items }: { items: ReturnType<typeof buildTimeline> }) {
+const Timeline = memo(function Timeline({
+  items,
+  ready,
+}: {
+  items: ReturnType<typeof buildTimeline>;
+  /** The first page loaded: rows from then on slide in. */
+  ready: boolean;
+}) {
   const { t, i18n } = useTranslation();
+  const models = useModels();
+  const modelLabels = useMemo(
+    () => new Map((models.data?.models ?? []).map((m) => [m.id, m.label] as const)),
+    [models.data],
+  );
+  const [mountedAt] = useState(() => Date.now());
+  // Keys of the first load (idempotent, so a double render in StrictMode agrees).
+  const initialKeys = useRef<Set<string> | null>(null);
+  if (ready && initialKeys.current === null) initialKeys.current = new Set(items.map((i) => i.key));
+  const initial = initialKeys.current;
   return (
     <>
       {items.map((item) =>
         item.kind === "day" ? (
           <DayDivider key={item.key}>{dayLabel(t, i18n.language, item.iso)}</DayDivider>
         ) : item.kind === "message" ? (
-          <TimelineMessage key={item.key} message={item.message} grouped={item.grouped} />
+          <TimelineMessage
+            key={item.key}
+            message={item.message}
+            grouped={item.grouped}
+            entering={initial !== null && entersWithMotion(item.key, item.message.createdAt, initial, mountedAt)}
+            modelLabels={modelLabels}
+          />
         ) : null,
       )}
     </>
@@ -432,39 +519,61 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
   );
 }
 
-/** Replies being written: they appear at the end of the timeline once the first words arrive. */
-const writing = (r: LiveRun) => r.status === "failed" || r.text.length > 0;
-function LiveRuns({ channelId }: { channelId: string }) {
-  const runs = useStreams((s) => runsInChannel(s, channelId).filter(writing), sameRuns);
+/**
+ * Replies being written: they appear at the end of the timeline once the
+ * first words arrive. A reply right after the same agent's message (within
+ * 5 minutes) is grouped already, so the final message takes its place
+ * without the header popping in.
+ */
+function LiveRuns({ channelId, last }: { channelId: string; last: MessageType | null }) {
+  const runs = useStreams((s) => runsInChannel(s, channelId).filter(isWriting), sameRuns);
+  const memoryCards = useLive((s) => s.memory[channelId]?.length ?? 0);
+  const [now] = useState(() => new Date().toISOString());
   return (
     <>
-      {runs.map((run) => (
-        <LiveRunRow key={run.runId} run={run} />
-      ))}
+      {runs.map((run, i) => {
+        const prev = i === 0 ? (memoryCards > 0 ? null : last) : { author: agentAuthor(runs[i - 1]), createdAt: now };
+        const grouped = run.status !== "failed" && groupsWith(prev, agentAuthor(run), new Date().toISOString());
+        return <LiveRunRow key={run.runId} run={run} grouped={grouped} />;
+      })}
     </>
   );
 }
 
-const LiveRunRow = memo(function LiveRunRow({ run }: { run: LiveRun }) {
-  const { t } = useTranslation();
+const agentAuthor = (r: LiveRun | undefined) => ({ type: "agent" as const, id: r?.agentId ?? null });
+
+const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+
+const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; grouped: boolean }) {
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const dismissRun = useDismissRun();
+  const actions = useChannelActions();
   const agent = dir.agentById.get(run.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const failed = run.status === "failed";
+  const waiting = run.status === "waiting_approval";
+  // Same clock face as the final message ("21:10"), from when the first words showed.
+  const [startedAt] = useState(() => new Date().toISOString());
+  const text = useRevealedText(run.text);
+  const followBottom = actions?.followBottom;
+  useLayoutEffect(() => {
+    if (text) followBottom?.();
+  }, [text, followBottom]);
+  const doing = run.tool ? toolActivity(run.tool, run.connector) : null;
   return (
     <Message
       agent
-      streaming={!failed}
+      grouped={grouped}
+      streaming={!failed && !waiting}
       avatar={<Avatar kind="agent" name={name} initials={dir.agentInitials(run.agentId)} running={!failed} />}
       author={name}
-      time={t("common.now")}
-      meta={
-        failed ? undefined : run.status === "waiting_approval" ? t("channel.waitingApproval") : t("channel.writing")
-      }
+      time={<time dateTime={startedAt}>{formatTime(i18n.language, startedAt)}</time>}
+      status={waiting ? { icon: "waiting", label: t("channel.waitingApproval") } : undefined}
       data-live={run.status}
     >
+      {!failed && !waiting && <span className="ac-visually-hidden">{t("channel.writing")}</span>}
       {failed ? (
         <p className="ac-msg__error" role="alert">
           <Icon name="alert" size={18} />
@@ -483,30 +592,26 @@ const LiveRunRow = memo(function LiveRunRow({ run }: { run: LiveRun }) {
           />
         </p>
       ) : (
-        <MessageText>
-          <MessageBody body={run.text} resolveMention={dir.mentionName} />
-        </MessageText>
+        <>
+          <MessageText>
+            <MessageBody body={text} resolveMention={dir.mentionName} />
+          </MessageText>
+          {doing && doing.kind !== "thinking" && (
+            <p className="ac-msg__activity" aria-live="polite">
+              {capitalize(activityVerb(t, doing))}…
+            </p>
+          )}
+        </>
       )}
     </Message>
   );
 });
 
-/** Who is about to write: agents thinking (no words yet) and people typing. */
-export function activityNames(
-  runs: LiveRun[],
-  typingUserIds: string[],
-  agentName: (id: string) => string,
-  personName: (id: string) => string | undefined,
-) {
-  const agents = [...new Set(runs.filter((r) => !writing(r) && r.status !== "waiting_approval").map((r) => r.agentId))];
-  const people = typingUserIds.filter((id) => personName(id));
-  return { agents, people, names: [...agents.map(agentName), ...people.map((id) => personName(id) ?? "")] };
-}
-
 /**
- * The typing bar right above the composer: small avatars + "Theo está
- * digitando…" + three dots (still with reduced motion). Agents leave it when
- * their first words arrive in the timeline.
+ * The typing bar right above the composer: small avatars + what each one is
+ * doing ("Theo está consultando o GitHub · Marina está digitando…") + three
+ * dots (still with reduced motion). Agents leave it when their first words
+ * arrive in the timeline.
  */
 function ActivityBar({ channelId }: { channelId: string }) {
   const { t } = useTranslation();
@@ -521,33 +626,30 @@ function ActivityBar({ channelId }: { channelId: string }) {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [typing]);
-  const { agents, people, names } = activityNames(
+  const entries = barEntries(
     runs,
     ids,
     (id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent"),
     (id) => dir.memberById.get(id)?.name,
   );
-  const active = names.length > 0;
+  const text = activityText(t, entries);
+  const active = entries.length > 0;
   return (
     <div className="ac-typing" aria-live="polite" data-active={active}>
       {active && (
         <>
           <span className="ac-typing__avatars" aria-hidden="true">
-            {agents.map((id) => (
-              <Avatar
-                key={id}
-                kind="agent"
-                size="xs"
-                name={dir.agentById.get(id)?.name ?? ""}
-                initials={dir.agentInitials(id)}
-              />
-            ))}
-            {people.map((id) => (
-              <Avatar key={id} size="xs" name={dir.memberById.get(id)?.name ?? ""} />
-            ))}
+            {entries.map((e) =>
+              e.type === "agent" ? (
+                <Avatar key={`a:${e.id}`} kind="agent" size="xs" name={e.name} initials={dir.agentInitials(e.id)} />
+              ) : (
+                <Avatar key={`p:${e.id}`} size="xs" name={e.name} imageUrl={dir.memberById.get(e.id)?.image} />
+              ),
+            )}
           </span>
-          <span className="ac-typing__text">
-            {t("channel.typing", { count: names.length, names: joinNames(names, t("newAgent.and")) })}
+          {/* Keyed by the words: a new activity fades in. */}
+          <span key={text} className="ac-typing__text">
+            {text}
           </span>
           <span className="ac-typing__dots" aria-hidden="true">
             <span />
@@ -564,12 +666,18 @@ function ActivityBar({ channelId }: { channelId: string }) {
 const TimelineMessage = memo(function TimelineMessage({
   message: m,
   grouped,
+  entering,
+  modelLabels,
 }: {
   message: MessageType;
   grouped: boolean;
+  entering: boolean;
+  modelLabels: Map<string, string>;
 }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
+  // The streamed row it replaces was already on screen: take its place without sliding in again.
+  const replacesLive = useStreams((s) => Boolean(m.agentRunId && s.finished[m.agentRunId]));
   const dir = useDirectory(org.id);
   const actions = useChannelActions();
   const [active, setActive] = useState(false);
@@ -603,10 +711,20 @@ const TimelineMessage = memo(function TimelineMessage({
   const artifacts = m.author.type === "agent" ? artifactRefs(meta) : [];
   const card = approvalId || proposalId || memoryUpdates.length > 0 || question;
   const feedback = m.author.type === "agent" && !card && !m.local;
+  // People see name, time and text; the date, model, tokens and cost wait behind the time.
+  const usage = m.author.type === "agent" ? messageUsage(m) : null;
+  const showCost = can(org.role, "view_usage") || (agent?.ownerUserId != null && agent.ownerUserId === me.user.id);
+  const details = [
+    formatFullDate(i18n.language, m.createdAt),
+    usage ? usageLine(t, i18n.language, usage, { modelLabel: modelLabels.get(usage.model), showCost }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <Message
       agent={m.author.type === "agent"}
       grouped={grouped}
+      entering={entering && !replacesLive}
       className={m.local ? `ac-msg--local ac-msg--${m.local}` : undefined}
       onMouseEnter={feedback ? () => setActive(true) : undefined}
       onFocus={feedback ? () => setActive(true) : undefined}
@@ -638,7 +756,8 @@ const TimelineMessage = memo(function TimelineMessage({
         )
       }
       time={<time dateTime={m.createdAt}>{formatTime(i18n.language, m.createdAt)}</time>}
-      meta={m.local === "pending" ? t("channel.sending") : undefined}
+      meta={m.local ? undefined : details}
+      status={m.local === "pending" ? { icon: "waiting", label: t("channel.sending") } : undefined}
       aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} /> : undefined}
       stacked={Boolean(card)}
     >

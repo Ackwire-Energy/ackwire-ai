@@ -9,7 +9,15 @@
 export { ApprovalCard, type ApprovalCardProps, type ApprovalStatus } from "./components/ApprovalCard";
 export { Avatar, type AvatarKind, type AvatarProps, AvatarStack, initialsOf } from "./components/Avatar";
 export { Button, type ButtonProps, type ButtonVariant } from "./components/Button";
-export { Checkbox, CheckboxPill, type CheckboxProps, Radio, RadioCard, RadioGroup } from "./components/Checkbox";
+export {
+  Checkbox,
+  CheckboxPill,
+  type CheckboxProps,
+  Radio,
+  RadioCard,
+  RadioGroup,
+  Switch,
+} from "./components/Checkbox";
 export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge } from "./components/Chip";
 export {
   Composer,
