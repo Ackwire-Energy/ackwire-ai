@@ -1319,6 +1319,16 @@ const TimelineMessage = memo(function TimelineMessage({
   const name = dir.authorName(m.author);
   // Posted by a routine on its creator's behalf: shown as the routine, never as if the person typed it.
   const routine = routineOfMessage(m.meta);
+  // Its text is the instructions it gives the agent: one line ("Chamou @Theo"), the instructions on demand.
+  const [routineOpen, setRoutineOpen] = useState(false);
+  const routineAgents = useMemo(() => {
+    if (!routine) return [];
+    const handles = new Set([...m.body.matchAll(/@([\w.-]+)/g)].map((x) => (x[1] ?? "").toLowerCase()));
+    return [...handles].flatMap((h) => {
+      const a = dir.agentByHandle.get(h);
+      return a ? [a] : [];
+    });
+  }, [routine, m.body, dir.agentByHandle]);
   const wikiLink = useWikiLinkRenderer();
   // `agent.run.steered`: this message went into a running task.
   const steeredAgent = useLive((s) => s.steered[m.id]);
@@ -1440,7 +1450,25 @@ const TimelineMessage = memo(function TimelineMessage({
       aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} /> : undefined}
       stacked={Boolean(card)}
     >
-      {(body.trim() || (!card && !canceledNote)) && (
+      {routine && (
+        <p className="msg-routine small">
+          <span className="muted">
+            {routineAgents.length
+              ? t("channel.routineCalled", { names: routineAgents.map((a) => `@${a.name}`).join(", ") })
+              : t("channel.routineRan")}
+          </span>
+          <button
+            type="button"
+            className="ac-link"
+            aria-expanded={routineOpen}
+            onClick={() => setRoutineOpen((o) => !o)}
+            style={inlineButton}
+          >
+            {routineOpen ? t("channel.routineHide") : t("channel.routineShow")}
+          </button>
+        </p>
+      )}
+      {(!routine || routineOpen) && (body.trim() || (!card && !canceledNote)) && (
         <MessageText>
           <MessageBody body={body} resolveMention={dir.mentionName} renderMention={renderMention} wikiLink={wikiLink} />
         </MessageText>

@@ -2716,6 +2716,14 @@ p {
   align-self: stretch;
 }
 /* "Lembrete" next to the agent's name on a reminder message. */
+/* A routine's message: one line saying whom it called; its instructions open on demand. */
+.msg-routine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0 0;
+}
 .msg-reminder {
   display: inline-flex;
   align-items: center;

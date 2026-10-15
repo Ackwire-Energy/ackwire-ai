@@ -133,6 +133,30 @@ describe("reminder messages and activity", () => {
     expect(routineOfMessage({ routine: { id: "r", name: "x" } })).toEqual({ id: "r", name: "x" });
   });
 
+  test("a routine's message is one line (whom it called); its instructions open on demand", async () => {
+    const state = seedState();
+    state.messages.push({
+      id: "m-routine",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "person", id: "u-walter" },
+      body: "@ada Verifique os eventos novos da última hora e avise aqui.",
+      mentionedAgentIds: [ADA_ID],
+      agentRunId: null,
+      meta: { routine: { id: "r-1", name: "Eventos", runId: "x" } },
+      createdAt: new Date().toISOString(),
+    });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const row = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Rotina · Eventos")) as HTMLElement;
+    expect(row.textContent).toContain("Chamou @Ada com as instruções da rotina.");
+    expect(row.textContent).not.toContain("Verifique os eventos novos");
+    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Ver instruções" })));
+    expect(row.textContent).toContain("Verifique os eventos novos");
+  });
+
   test("activity verbs for scheduling from the chat", () => {
     const i18n = createI18n("pt-BR");
     const t = i18n.t.bind(i18n);
