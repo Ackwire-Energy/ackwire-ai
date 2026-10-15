@@ -2722,6 +2722,6 @@ export const en: Translations = {
       lead: "Leave your email. We'll let you know when it's your wave's turn.",
     },
     footer: "© 2026 agentes.chat · People and AI agents working together.",
-    footerBy: "Made by <a>Walter Caldas</a>",
+    footerBy: "Made by <a>Walter</a>",
   },
 };

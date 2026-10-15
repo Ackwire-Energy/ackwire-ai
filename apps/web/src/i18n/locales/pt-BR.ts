@@ -2732,7 +2732,7 @@ export const ptBR = {
       lead: "Deixe seu e-mail. Avisamos quando chegar a vez da sua onda.",
     },
     footer: "© 2026 agentes.chat · Pessoas e agentes de IA trabalhando juntos.",
-    footerBy: "Feito por <a>Walter Caldas</a>",
+    footerBy: "Feito por <a>Walter</a>",
   },
 };
 
