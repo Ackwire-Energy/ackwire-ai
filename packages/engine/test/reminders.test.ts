@@ -136,7 +136,7 @@ describe("reminders from the chat", () => {
             {
               name: "create_routine",
               input: {
-                schedule: "toda hora",
+                schedule: "toda segunda às 10h",
                 prompt: "Veja os reviews  da última hora e avise aqui.",
                 title: "Reviews",
               },
