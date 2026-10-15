@@ -67,9 +67,16 @@ export function LandingPage() {
     const before = { bg: html.style.backgroundColor, scheme: html.style.colorScheme };
     html.style.backgroundColor = bg;
     html.style.colorScheme = theme;
+    // The phone's status bar too (theme-color), back to the app's colors on the way out.
+    const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')];
+    const colors = metas.map((m) => m.content);
+    for (const m of metas) if (bg) m.content = bg;
     return () => {
       html.style.backgroundColor = before.bg;
       html.style.colorScheme = before.scheme;
+      metas.forEach((m, i) => {
+        m.content = colors[i] ?? m.content;
+      });
     };
   }, [theme]);
   useEffect(() => {

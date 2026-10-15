@@ -334,10 +334,33 @@
     margin-left: auto;
   }
 }
-@media (max-width: 380px) {
+/* Phones: the bar fits the screen. Narrower first drops ".chat", then the theme button (the page stays dark), then the word. */
+@media (max-width: 560px) {
   .lp .lp-nav {
     gap: 8px;
-    padding-left: 14px;
+    height: 54px;
+    padding: 0 8px 0 12px;
+    border-radius: 18px;
+  }
+  .lp .lp-logo .ac-logo__chat {
+    display: none;
+  }
+  .lp .lp-lang .ac-seg__item {
+    padding: 0 8px;
+  }
+  .lp .lp-nav > .ac-btn--primary {
+    flex: none;
+    padding: 0 12px;
+  }
+}
+@media (max-width: 480px) {
+  .lp .lp-theme-btn {
+    display: none;
+  }
+}
+@media (max-width: 400px) {
+  .lp .lp-logo .ac-logo__word {
+    display: none;
   }
 }
 
