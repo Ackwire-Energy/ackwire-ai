@@ -198,7 +198,12 @@ export interface ActiveRun {
   channelId: string;
   threadId: string;
   status: RunStatus;
+  /** The message that started it (the live row goes right after it). */
+  triggerMessageId?: string | null;
   startedAt?: string | null;
+  /** Last sign of life from the worker. */
+  heartbeatAt?: string | null;
+  createdAt?: string;
 }
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
@@ -213,6 +218,8 @@ export type ChannelEvent =
       agentId: string;
       seq: number;
       text: string;
+      /** Which model call of the run this text belongs to (narration is keyed by it). */
+      turn?: number;
     }
   | {
       type: "agent.run";
@@ -222,6 +229,9 @@ export type ChannelEvent =
       agentId: string;
       status: RunStatus;
       error?: string;
+      /** The message that started the run (anchors its live row). */
+      triggerMessageId?: string | null;
+      startedAt?: string | null;
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
   // ── Chat latency batch (packages/engine/src/events.ts) ──────────────────────

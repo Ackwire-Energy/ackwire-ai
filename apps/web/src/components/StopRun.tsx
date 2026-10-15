@@ -2,6 +2,7 @@ import { Button } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
 import type { Message } from "@/api/types";
 import { useOrg } from "@/components/org-context";
@@ -27,11 +28,20 @@ export function useStopRun() {
   const stop = useMutation({
     mutationFn: (runId: string) => api.agents.cancelRun(org.id, runId),
     onMutate: (runId) => live.stopping(runId, me.user.id),
-    onError: (_e, runId) => live.unstopping(runId),
+    onError: (err, runId) => {
+      // 409 `run_finished`: it ended on its own meanwhile; its message is on the way (or already here).
+      if (err instanceof ApiError && err.status === 409) {
+        const r = live.get().streams.runs[runId];
+        live.dismiss(runId);
+        if (r) void qc.invalidateQueries({ queryKey: keys.messages(org.id, r.channelId) });
+        return;
+      }
+      live.unstopping(runId);
+    },
   });
   const startedByMe = (r: LiveRun) => {
     const list = qc.getQueryData<Message[]>(keys.messages(org.id, r.channelId)) ?? [];
-    const root = list.find((m) => m.id === r.threadId);
+    const root = list.find((m) => m.id === (r.triggerMessageId ?? r.threadId));
     return root?.author.type === "person" && root.author.id === me.user.id;
   };
   const canStop = (r: LiveRun) =>

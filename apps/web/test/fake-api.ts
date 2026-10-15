@@ -832,6 +832,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       runs: async (_orgId, filter = {}) => state.runs.filter((r) => !filter.agentId || r.agentId === filter.agentId),
       cancelRun: async (orgId, runId) => {
         log("agents.cancelRun", orgId, runId);
+        if (state.runs.some((r) => r.id === runId && r.status !== "running" && r.status !== "queued"))
+          throw new ApiError(409, "run_finished", "Run already finished");
       },
       activeRuns: async (_orgId, channelId) => {
         log("agents.activeRuns", channelId);

@@ -12,6 +12,8 @@ export interface WorkStep {
   pending?: boolean;
   /** Shown under the step (e.g. the code it ran and its output). */
   detail?: ReactNode;
+  /** What the agent said between steps (narration): muted text, no check. */
+  note?: boolean;
 }
 
 /**
@@ -55,23 +57,27 @@ export function WorkSummary({
       {open && (
         <ol className="ac-work__steps" id={id}>
           {steps.map((s) => (
-            <li key={s.key} className="ac-work__step">
-              <span
-                className={cx("ac-tick", s.failed && "ac-tick--failed", s.pending && "ac-tick--pending")}
-                aria-hidden="true"
-              >
-                {s.pending ? (
-                  <Spinner size={10} />
-                ) : s.failed ? (
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                    <path d="M6 3v3.5M6 8.6v.1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                ) : (
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                    <path d="m2.5 6.2 2.3 2.3 4.7-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-                  </svg>
-                )}
-              </span>
+            <li key={s.key} className={cx("ac-work__step", s.note && "ac-work__step--note")}>
+              {s.note ? (
+                <span className="ac-work__gap" aria-hidden="true" />
+              ) : (
+                <span
+                  className={cx("ac-tick", s.failed && "ac-tick--failed", s.pending && "ac-tick--pending")}
+                  aria-hidden="true"
+                >
+                  {s.pending ? (
+                    <Spinner size={10} />
+                  ) : s.failed ? (
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                      <path d="M6 3v3.5M6 8.6v.1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  ) : (
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                      <path d="m2.5 6.2 2.3 2.3 4.7-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                    </svg>
+                  )}
+                </span>
+              )}
               <span>{s.label}</span>
               {s.time && <span className="ac-work__time">{s.time}</span>}
               {s.detail && <div className="ac-work__detail">{s.detail}</div>}

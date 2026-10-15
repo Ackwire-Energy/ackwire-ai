@@ -88,6 +88,7 @@ import { reportPainted } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { isReminderMessage, routineOfMessage } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
+import { splitCanceled } from "@/lib/work";
 import {
   reconcileChannelRuns,
   useChannelRealtime,
@@ -587,7 +588,7 @@ function ChannelView({
   const liveKey = useStreams((s) =>
     runsInChannel(s, channel.id)
       .filter(isWriting)
-      .map((r) => JSON.stringify([r.runId, r.startedAt ?? 0, r.threadId]))
+      .map((r) => JSON.stringify([r.runId, r.startedAt ?? 0, r.threadId, r.triggerMessageId ?? null]))
       .join("\n"),
   );
   const { anchors, unanchored } = useMemo(() => liveAnchors(liveKey, timeline), [liveKey, timeline]);
@@ -910,14 +911,23 @@ const Timeline = memo(function Timeline({
 
 const CLOCK_SLACK_MS = 3000;
 
-/** Where each live run goes: after the message that started it (else at the end). */
+/**
+ * Where each live run goes: after the message that started it (`triggerMessageId`;
+ * without it, the last message of its conversation sent before it started), else at the end.
+ */
 
 export function liveAnchors(liveKey: string, items: ReturnType<typeof buildTimeline>) {
   const anchors = new Map<string, string[]>();
   const unanchored: string[] = [];
   if (!liveKey) return { anchors, unanchored };
   for (const line of liveKey.split("\n")) {
-    const [runId, started, threadId] = JSON.parse(line) as [string, number, string];
+    const [runId, started, threadId, trigger] = JSON.parse(line) as [string, number, string, string | null];
+    // The server says which message started it: right after that one.
+    const exact = trigger ? items.find((i) => i.kind === "message" && i.message.id === trigger) : undefined;
+    if (exact) {
+      anchors.set(exact.key, [...(anchors.get(exact.key) ?? []), runId]);
+      continue;
+    }
     // Anchor: the last message of its conversation sent before the run started (a little slack
     // for clock skew); messages that came later stay below the row.
     const startedAt = Number(started) || Number.POSITIVE_INFINITY;
@@ -1323,6 +1333,8 @@ const TimelineMessage = memo(function TimelineMessage({
   const wikiLink = useWikiLinkRenderer();
   // `agent.run.steered`: this message went into a running task.
   const steeredAgent = useLive((s) => s.steered[m.id]);
+  // A stopped run's message (`meta.canceled`): the text so far, and "Interrompido por Walter" as a note.
+  const { body, note: canceledNote } = useMemo(() => splitCanceled(m.body, m.meta), [m.body, m.meta]);
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Lembrete".
   const reminder = isReminderMessage(m.meta);
@@ -1428,16 +1440,12 @@ const TimelineMessage = memo(function TimelineMessage({
       aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} /> : undefined}
       stacked={Boolean(card)}
     >
-      {(m.body.trim() || !card) && (
+      {(body.trim() || (!card && !canceledNote)) && (
         <MessageText>
-          <MessageBody
-            body={m.body}
-            resolveMention={dir.mentionName}
-            renderMention={renderMention}
-            wikiLink={wikiLink}
-          />
+          <MessageBody body={body} resolveMention={dir.mentionName} renderMention={renderMention} wikiLink={wikiLink} />
         </MessageText>
       )}
+      {canceledNote && <p className="ac-msg__activity run-canceled">{canceledNote}</p>}
       {m.local === "failed" && (
         <p className="ac-msg__error" role="alert">
           <Icon name="alert" size={18} />

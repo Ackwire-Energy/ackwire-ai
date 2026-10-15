@@ -18,8 +18,19 @@ export interface WorkItem {
   output?: LiveOutput[];
 }
 
+/** What the agent said before a model call's tools (`model_call` step: `narration`, `turn`). */
+export interface WorkNarration {
+  key: string;
+  turn: number;
+  text: string;
+  /** How many tool calls came before it (where it goes among the steps). */
+  at: number;
+}
+
 export interface Work {
   steps: WorkItem[];
+  /** The narration between tool calls, in order. */
+  narration: WorkNarration[];
   /** Apps it used ("himetrica", "Drive"), in order of first use. */
   connectors: string[];
   durationMs: number | null;
@@ -53,8 +64,20 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
     if (s.kind === "tool_result" && typeof id === "string") results.set(id, s);
   }
   const items: WorkItem[] = [];
+  const narration: WorkNarration[] = [];
   const connectors: string[] = [];
   for (const s of steps) {
+    if (s.kind === "model_call") {
+      const text = typeof s.data.narration === "string" ? s.data.narration.trim() : "";
+      if (text)
+        narration.push({
+          key: `say-${s.seq}`,
+          turn: typeof s.data.turn === "number" ? s.data.turn : narration.length,
+          text,
+          at: items.length,
+        });
+      continue;
+    }
     if (s.kind !== "tool_call") continue;
     const name = typeof s.data.name === "string" ? s.data.name : "";
     const id = typeof s.data.toolUseId === "string" ? s.data.toolUseId : `${s.seq}`;
@@ -98,7 +121,7 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       : first && last
         ? Math.max(0, time(last.createdAt) - time(first.createdAt))
         : null;
-  return { steps: items, connectors, durationMs };
+  return { steps: items, narration, connectors, durationMs };
 }
 
 /** "12 s", "3 min". */
@@ -119,4 +142,15 @@ export function workHeader(t: TFunction, w: { steps: number; connectors: string[
 /** "Consultou o himetrica", "Criou uma issue", "Usou github list prs". */
 export function stepLabel(t: TFunction, s: WorkItem) {
   return t(`chat.work.step.${s.kind}`, { app: s.app ?? "", tool: toolLabel(s.tool) });
+}
+
+/**
+ * A message of a stopped run (`meta.canceled`) ends with "_Interrompido por
+ * Walter._": that line becomes a muted note under the text, not part of it.
+ */
+export function splitCanceled(body: string, meta: Record<string, unknown> | undefined) {
+  if (!meta?.canceled) return { body, note: null };
+  const match = /\n*\s*_([^_\n]+)_\s*$/.exec(body);
+  if (!match) return { body, note: null };
+  return { body: body.slice(0, match.index).trimEnd(), note: (match[1] ?? "").trim().replace(/\.$/, "") };
 }

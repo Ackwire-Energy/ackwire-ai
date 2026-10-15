@@ -3022,6 +3022,13 @@ a.ac-list__row:focus-visible {
   font-size: 13px;
   color: var(--ink2);
 }
+.ac-work__step--note {
+  color: var(--muted);
+}
+.ac-work__gap {
+  width: 18px;
+  flex: none;
+}
 .ac-work__time {
   margin-left: auto;
   font-size: 12px;

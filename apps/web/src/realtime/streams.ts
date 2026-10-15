@@ -19,6 +19,19 @@ export interface RunSteeredEvent {
   channelId: string;
   runId: string;
   messageId: string;
+  /** The new message asked it to stop: the run is wrapping up. */
+  stop?: boolean;
+}
+
+/** `agent.narration`: the text of model call `turn` was narration (said before tool calls), not the answer. */
+export interface AgentNarrationEvent {
+  type: "agent.narration";
+  channelId: string;
+  threadId: string;
+  runId: string;
+  agentId: string;
+  turn: number;
+  text: string;
 }
 
 /** `run.canceled` (expected from the backend with `POST …/runs/{id}/cancel`). */
@@ -76,6 +89,10 @@ export interface LiveRun {
   since?: number;
   /** When this client first saw the run (places the live row by time in the timeline). */
   startedAt?: number;
+  /** The message that started it (its live row goes right after it). */
+  triggerMessageId?: string | null;
+  /** The model call the streaming text belongs to (`agent.delta.turn`). */
+  turn?: number;
   /** Last event seen for this run (a run silent for minutes may be orphaned on the server). */
   lastEventAt?: number;
   runId: string;
@@ -112,7 +129,7 @@ export interface LiveRun {
 }
 
 export type LiveWork =
-  | { kind: "say"; text: string }
+  | { kind: "say"; text: string; turn?: number }
   /** A new message reached the running task ("Nova mensagem de Walter"). */
   | { kind: "steer"; messageId: string }
   | {
@@ -258,6 +275,8 @@ function upsert(
     // No delta yet: the backend's first delta is seq 0, so "seen" starts below it.
     lastSeq: -1,
     startedAt: provisional?.startedAt ?? Date.now(),
+    // A "pensando…" row hangs off the message I sent: that message started the run.
+    ...(provisional ? { triggerMessageId: provisional.threadId } : {}),
     ...current,
     ...patch,
   };
@@ -271,7 +290,22 @@ function reopen(state: StreamsState, runId: string): StreamsState {
   return { ...state, finished };
 }
 
-type StreamEvent = ChannelEvent | AgentToolEvent | AgentToolOutputEvent | RunCanceledEvent | RunSteeredEvent;
+type StreamEvent =
+  | ChannelEvent
+  | AgentToolEvent
+  | AgentToolOutputEvent
+  | RunCanceledEvent
+  | RunSteeredEvent
+  | AgentNarrationEvent;
+
+/** Adds what the agent said (or replaces the line of the same turn: `agent.narration` is the final word). */
+function say(work: LiveWork[], text: string, turn: number | undefined): LiveWork[] {
+  if (turn !== undefined) {
+    const at = work.findIndex((w) => w.kind === "say" && w.turn === turn);
+    if (at >= 0) return work.map((w, i) => (i === at ? { kind: "say" as const, text, turn } : w));
+  }
+  return [...work, { kind: "say" as const, text, ...(turn !== undefined ? { turn } : {}) }];
+}
 
 export function applyChannelEvent(state: StreamsState, event: StreamEvent, now = Date.now()): StreamsState {
   const next = applyEvent(state, event);
@@ -290,17 +324,33 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       // Text so far is narration: the answer continues after the new message.
       const said = r.text.trim();
       const work: LiveWork[] = [
-        ...(r.work ?? []),
-        ...(said ? [{ kind: "say" as const, text: said }] : []),
+        ...(said ? say(r.work ?? [], said, r.turn) : (r.work ?? [])),
         { kind: "steer", messageId: event.messageId },
       ];
       return {
         ...state,
         runs: {
           ...state.runs,
-          [event.runId]: { ...r, work, ...(said ? { text: "", status: "thinking" as const } : {}) },
+          [event.runId]: {
+            ...r,
+            work,
+            ...(said ? { text: "", status: "thinking" as const } : {}),
+            ...(event.stop ? { stopping: true } : {}),
+          },
         },
       };
+    }
+    case "agent.narration": {
+      if (state.finished[event.runId]) return state;
+      const r = state.runs[event.runId];
+      const text = event.text.trim();
+      if (!text) return state;
+      // The streaming text is this turn's: it moves to the narration.
+      const current = r && r.turn === event.turn;
+      return upsert(state, event, {
+        work: say(r?.work ?? [], text, event.turn),
+        ...(current ? { text: "", status: "thinking" as const } : {}),
+      });
     }
     case "run.canceled":
       return cancel(state, event.runId, event.byUserId);
@@ -313,7 +363,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const said = newCall ? (current?.text ?? "").trim() : "";
       const status: LiveStatus = said ? "thinking" : current?.text ? current.status : "thinking";
       let work = current?.work ?? [];
-      if (said) work = [...work, { kind: "say" as const, text: said }];
+      if (said) work = say(work, said, current?.turn);
       if (newCall) {
         // A new call means the previous ones ended.
         work = [
@@ -402,7 +452,12 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const current = s.runs[event.runId];
       const status: LiveStatus =
         (event.status === "running" || event.status === "queued") && !current?.text ? "thinking" : event.status;
-      return upsert(s, event, { status, error: event.error });
+      return upsert(s, event, {
+        status,
+        error: event.error,
+        ...(event.triggerMessageId ? { triggerMessageId: event.triggerMessageId } : {}),
+        ...(event.startedAt ? { startedAt: Date.parse(event.startedAt) } : {}),
+      });
     }
     case "agent.thinking": {
       // Announced at post time, before the run exists.
@@ -441,7 +496,23 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       if (state.finished[event.runId]) return state;
       const current = state.runs[event.runId];
       if (current && event.seq <= current.lastSeq) return state;
-      return upsert(state, event, { status: "running", text: (current?.text ?? "") + event.text, lastSeq: event.seq });
+      // A new model call: what the previous one wrote (and no tool call moved) was narration.
+      const prev = current?.text.trim() ?? "";
+      if (current && event.turn !== undefined && current.turn !== undefined && event.turn > current.turn && prev) {
+        return upsert(state, event, {
+          status: "running",
+          work: say(current.work ?? [], prev, current.turn),
+          text: event.text,
+          lastSeq: event.seq,
+          turn: event.turn,
+        });
+      }
+      return upsert(state, event, {
+        status: "running",
+        text: (current?.text ?? "") + event.text,
+        lastSeq: event.seq,
+        ...(event.turn !== undefined ? { turn: event.turn } : {}),
+      });
     }
     default:
       return state;
@@ -493,11 +564,35 @@ export function reconcileRuns(
     s = finish(s, r.runId);
   }
   for (const a of active) {
-    if (!known.has(a.runId) || a.channelId !== channelId || s.runs[a.runId] || s.finished[a.runId]) continue;
+    if (!known.has(a.runId) || a.channelId !== channelId || s.finished[a.runId]) continue;
+    const startedAt = a.startedAt ? Date.parse(a.startedAt) : undefined;
+    const heartbeat = a.heartbeatAt ? Date.parse(a.heartbeatAt) : undefined;
+    const r = s.runs[a.runId];
+    if (r) {
+      // What the server knows better: where it started, and that it's alive.
+      const lastEventAt = Math.max(r.lastEventAt ?? 0, heartbeat ?? 0) || r.lastEventAt;
+      s = {
+        ...s,
+        runs: {
+          ...s.runs,
+          [a.runId]: {
+            ...r,
+            ...(a.triggerMessageId ? { triggerMessageId: a.triggerMessageId } : {}),
+            ...(startedAt ? { startedAt } : {}),
+            ...(lastEventAt ? { lastEventAt } : {}),
+          },
+        },
+      };
+      continue;
+    }
     // Waiting for an approval: the card shows it, not a live row.
     if (a.status === "waiting_approval") continue;
-    const startedAt = a.startedAt ? Date.parse(a.startedAt) : now;
-    s = upsert(s, a, { status: "thinking", startedAt, lastEventAt: now });
+    s = upsert(s, a, {
+      status: "thinking",
+      startedAt: startedAt ?? now,
+      lastEventAt: now,
+      ...(a.triggerMessageId ? { triggerMessageId: a.triggerMessageId } : {}),
+    });
   }
   return s;
 }

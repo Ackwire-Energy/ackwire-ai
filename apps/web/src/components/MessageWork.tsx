@@ -51,13 +51,17 @@ export function MessageWork({
         : []
       : work.steps.length === 0
         ? [{ key: "none", label: t("chat.work.none") }]
-        : work.steps.map((s) => ({
-            key: s.key,
-            label: stepLabel(t, s),
-            time: s.ms !== null ? formatDuration(t, s.ms) : undefined,
-            failed: s.failed,
-            // The code it ran, and its output, after the fact.
-            detail: s.code ? <CodePanel code={s.code} output={s.output ?? []} /> : undefined,
-          }));
+        : work.steps.flatMap((s, i) => [
+            // What it said before this call ("Go não está instalado; vou tentar com gcc.").
+            ...work.narration.filter((n) => n.at === i).map((n) => ({ key: n.key, label: n.text, note: true })),
+            {
+              key: s.key,
+              label: stepLabel(t, s),
+              time: s.ms !== null ? formatDuration(t, s.ms) : undefined,
+              failed: s.failed,
+              // The code it ran, and its output, after the fact.
+              detail: s.code ? <CodePanel code={s.code} output={s.output ?? []} /> : undefined,
+            },
+          ]);
   return <WorkSummary summary={summary} steps={steps} onToggle={setOpen} />;
 }

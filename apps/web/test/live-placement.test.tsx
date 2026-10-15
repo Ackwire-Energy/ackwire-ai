@@ -34,7 +34,8 @@ const msg = (id: string, threadId: string | null, at: number): TimelineItem => (
     createdAt: new Date(at).toISOString(),
   } as Message,
 });
-const key = (runId: string, startedAt: number, threadId: string) => JSON.stringify([runId, startedAt, threadId]);
+const key = (runId: string, startedAt: number, threadId: string, trigger: string | null = null) =>
+  JSON.stringify([runId, startedAt, threadId, trigger]);
 
 describe("where a live run goes", () => {
   const items = [msg("a", null, 1_000), msg("b", "a", 60_000), msg("other", null, 120_000), msg("c", "a", 180_000)];
@@ -43,6 +44,11 @@ describe("where a live run goes", () => {
     const { anchors, unanchored } = liveAnchors(key("r1", 100_000, "a"), items);
     expect([...anchors.entries()]).toEqual([["b", ["r1"]]]);
     expect(unanchored).toEqual([]);
+  });
+
+  test("the server's triggerMessageId wins over the time guess", () => {
+    const { anchors } = liveAnchors(key("r1", 500_000, "a", "b"), items);
+    expect([...anchors.entries()]).toEqual([["b", ["r1"]]]);
   });
 
   test("ids with colons, several runs, unknown conversation at the end", () => {
