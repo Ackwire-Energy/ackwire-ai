@@ -99,7 +99,11 @@ test("joining again resends the link at most every 2 minutes and 5 times; only t
   await t.drain();
   const second = lastToken();
   expect(second).not.toBe(first);
-  for (let i = 3; i <= WAITLIST_MAX_SENDS; i++) expect((await joinWaitlist(t.db, input, at(i * 3))).sent).toBe(true);
+  // Drain after each send: the outbox doesn't promise order, and the test reads the latest link.
+  for (let i = 3; i <= WAITLIST_MAX_SENDS; i++) {
+    expect((await joinWaitlist(t.db, input, at(i * 3))).sent).toBe(true);
+    await t.drain();
+  }
   expect((await joinWaitlist(t.db, input, at(60))).sent).toBe(false);
   await t.drain();
   expect(t.email.sent.length).toBe(WAITLIST_MAX_SENDS);
