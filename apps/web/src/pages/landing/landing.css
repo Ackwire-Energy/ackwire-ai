@@ -2267,6 +2267,16 @@
 .lp .lp-footer {
   padding-block: 28px 40px;
 }
+.lp .lp-footer__by a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--line2, currentColor);
+  text-underline-offset: 3px;
+}
+.lp .lp-footer__by a:hover {
+  text-decoration-color: currentColor;
+}
 .lp .lp-footer .lp-wrap {
   display: flex;
   flex-wrap: wrap;

@@ -1,7 +1,7 @@
 import { type AgentState, Button, cx, Logo, Segmented, setGaze } from "@agenteschat/ui";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ApiError } from "@/api/http";
 import { type LocaleCode, setLocale } from "@/i18n";
@@ -301,6 +301,12 @@ export function LandingPage() {
           <div className="lp-wrap">
             <Logo variant="expanded" size={18} />
             <span>{t("landing.footer")}</span>
+            <span className="lp-footer__by">
+              <Trans
+                i18nKey="landing.footerBy"
+                components={{ a: <a href="https://wescld.com" target="_blank" rel="noopener" /> }}
+              />
+            </span>
           </div>
         </footer>
       </div>
