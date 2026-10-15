@@ -1899,11 +1899,11 @@ p {
   background: var(--surface-sunken);
 }
 /* First column stays while scrolling sideways. */
-.access-matrix__sticky {
+.access-matrix .access-matrix__sticky {
   position: sticky;
   left: 0;
   z-index: var(--z-sticky);
-  text-align: left !important;
+  text-align: left;
   min-width: 220px;
   border-right: 1px solid var(--line);
 }

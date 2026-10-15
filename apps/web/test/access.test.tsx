@@ -146,7 +146,7 @@ describe("Configurações → Acesso dos agentes", () => {
     await settle(6);
     const put = state.calls.filter((c) => c.method === "access.set").at(-1)?.args;
     expect(put?.[1]).toBe(ADA_ID);
-    expect((put?.[2] as AccessInput).tools.allow).toEqual([
+    expect((put?.[2] as AccessInput | undefined)?.tools.allow).toEqual([
       { connectionId: "conn-gh", name: "github_merge_pull_request" },
     ]);
     expect(within(section).getByRole("button", { name: "Ada · github merge pull request: liberada" })).toBeTruthy();
