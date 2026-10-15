@@ -24,10 +24,14 @@ export interface ConnectorTool {
   onSuccess?: { kind: OutcomeKind; subject: string };
 }
 
+/** Catalog groups (the app translates them): Desenvolvimento, Produto, Docs, Pagamentos, Suporte, Marketing, Automação. */
+export type ConnectorCategory = "dev" | "product" | "docs" | "payments" | "support" | "marketing" | "automation";
+
 export interface ConnectorDefinition {
   id: string;
   label: string;
   description: string;
+  category: ConnectorCategory;
   /** Default MCP endpoint (streamable HTTP). Null = the org must give one. */
   serverUrl: string | null;
   auth: ("oauth" | "api_key")[];
@@ -41,6 +45,7 @@ const s = (label: string, description: string): ConnectorScope => ({ label, desc
 export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
   github: {
     id: "github",
+    category: "dev",
     label: "GitHub",
     description: "Repositórios, pull requests, issues e Actions.",
     serverUrl: "https://api.githubcopilot.com/mcp/",
@@ -107,6 +112,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
   },
   sentry: {
     id: "sentry",
+    category: "dev",
     label: "Sentry",
     description: "Erros, issues e eventos.",
     serverUrl: "https://mcp.sentry.dev/mcp",
@@ -131,6 +137,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
   },
   linear: {
     id: "linear",
+    category: "product",
     label: "Linear",
     description: "Issues, projetos e comentários.",
     serverUrl: "https://mcp.linear.app/mcp",
@@ -156,6 +163,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
   },
   drive: {
     id: "drive",
+    category: "docs",
     label: "Google Drive",
     description: "Buscar, ler e escrever documentos (qualquer servidor MCP do tipo Drive).",
     serverUrl: null,

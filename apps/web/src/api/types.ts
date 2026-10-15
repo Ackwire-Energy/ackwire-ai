@@ -334,32 +334,33 @@ export interface ScopeInfo {
   sensitive: boolean;
 }
 
-/** Catalog groups: Desenvolvimento, Produto, Docs, Pagamentos, Marketing, Suporte. */
-export type ConnectorCategory = "dev" | "product" | "docs" | "payments" | "marketing" | "support";
+/** Catalog groups: Desenvolvimento, Produto, Docs, Pagamentos, Suporte, Marketing, Automação. */
+export type ConnectorCategory = "dev" | "product" | "docs" | "payments" | "support" | "marketing" | "automation";
 
-/** A connector agentes.chat knows (catalog). */
+/** A connector agentes.chat knows (`GET /connectors/catalog`: ours and the one-click MCP servers, one per service). */
 export interface ConnectorDef {
-  /** Expected from the backend's catalog: the group it shows under. */
-  category?: ConnectorCategory;
-  /**
-   * `remote_mcp`: the vendor's official remote MCP server (one click, then the
-   * same review as a custom server); `oauth_app`: our OAuth app (GitHub);
-   * absent: the classic catalog connector.
-   */
-  kind?: "remote_mcp" | "oauth_app";
-  /** The remote MCP endpoint (`remote_mcp`). */
-  serverUrl?: string | null;
-  /** Configured on this server; `false` shows "Em breve". */
-  available?: boolean;
-  /** An official asset URL from the catalog (else a monogram). */
-  iconUrl?: string | null;
   id: string;
   label: string;
   description: string;
+  /**
+   * `catalog`: our connector with its own scopes (GitHub, Drive…);
+   * `remote_mcp`: the vendor's official MCP server (one click, then the same
+   * tools review as a custom server).
+   */
+  kind: "catalog" | "remote_mcp";
+  category: ConnectorCategory;
   auth: ("oauth" | "api_key")[];
-  /** The server has an OAuth app for it (else: API key only). */
+  /** Signs in with OAuth here: our OAuth app, or the vendor's MCP OAuth. */
   oauthConfigured: boolean;
+  /** Can be connected on this server; `false` shows "Em breve". */
+  available: boolean;
   needsServerUrl: boolean;
+  /** The MCP endpoint (`remote_mcp`). */
+  serverUrl: string | null;
+  /** Brand icon served by this app (`/connectors/github.svg`); null = a monogram. */
+  iconUrl: string | null;
+  /** Tint of the icon; null = the ink. */
+  brandColor: string | null;
   scopes: ScopeInfo[];
   tools: { name: string; scope: string; sensitive: boolean }[];
 }
@@ -586,6 +587,8 @@ export interface BudgetEvent {
 
 /** How a tool of a custom server may be used. `null` = not classified yet (hidden from agents). */
 export type ToolAccess = "read" | "write" | "approval";
+/** An admin's decision on a tool: how it may be used, or `off` (never offered, not asked again). */
+export type ToolDecision = ToolAccess | "off";
 
 export interface CustomTool {
   name: string;
@@ -595,7 +598,7 @@ export interface CustomTool {
   readOnlyHint: boolean | null;
   /** Our suggestion until an admin decides (read-only → read, destructive/write-like → approval, else write). */
   suggestedAccess?: ToolAccess | null;
-  access: ToolAccess | null;
+  access: ToolDecision | null;
   /** Shown to people (approval cards, permissions), in pt-BR. */
   label: string;
   firstSeenAt: string;

@@ -85,7 +85,7 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
-  ToolAccess,
+  ToolDecision,
   TrashedArtifact,
   UsageReport,
   WikiGraph,
@@ -328,7 +328,7 @@ export interface ApiClient {
     saveTools(
       orgId: string,
       serverId: string,
-      input: { label: string; tools: { name: string; access: ToolAccess; label: string }[] },
+      input: { label: string; tools: { name: string; access: ToolDecision; label: string }[] },
     ): Promise<CustomServer>;
     disconnect(orgId: string, serverId: string): Promise<void>;
   };

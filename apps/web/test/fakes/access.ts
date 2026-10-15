@@ -5,7 +5,15 @@
  * - `GET …/access-matrix`
  */
 import type { ApiClient } from "@/api/client";
-import type { AccessInput, AccessMatrix, AccessScope, AccessState, AgentAccess, Connection } from "@/api/types";
+import type {
+  AccessInput,
+  AccessMatrix,
+  AccessScope,
+  AccessState,
+  AgentAccess,
+  Connection,
+  CustomServer,
+} from "@/api/types";
 import type { MockContext } from "./context";
 
 type FakeTool = { name: string; label: string; description: string; sensitive: boolean; readOnly: boolean };
@@ -96,7 +104,24 @@ const empty = (): AccessInput => ({
   tools: { allow: [], deny: [] },
 });
 
-export function fakeAccessTree(input: AccessInput, connections: Connection[]): AgentAccess {
+/** A custom server's classified tools in two scopes, like the backend (`custom:{id}:read` / `:write`). */
+function customScopes(s: CustomServer): { scope: string; label: string; tools: FakeTool[] }[] {
+  const exposed = s.reviewedAt ? s.tools.filter((t) => t.access !== null && t.access !== "off") : [];
+  const of = (read: boolean) =>
+    exposed
+      .filter((t) => (t.access === "read") === read)
+      .map((t) => tool(t.name, t.label || t.name, t.description, t.access === "read", t.access === "approval"));
+  return [
+    { scope: `custom:${s.id}:read`, label: "Leitura", tools: of(true) },
+    { scope: `custom:${s.id}:write`, label: "Escrita", tools: of(false) },
+  ].filter((x) => x.tools.length > 0);
+}
+
+export function fakeAccessTree(
+  input: AccessInput,
+  connections: Connection[],
+  servers: CustomServer[] = [],
+): AgentAccess {
   const allowed = (c: string | null, name: string) =>
     input.tools.allow.some((t) => t.connectionId === c && t.name === name);
   const denied = (c: string | null, name: string) =>
@@ -122,26 +147,35 @@ export function fakeAccessTree(input: AccessInput, connections: Connection[]): A
       state: toolState(null, t.name, b.scope),
     })),
   }));
-  const connectors = connections
-    .filter((c) => !c.revokedAt && c.connector === "github")
-    .map((c) => ({
-      connectionId: c.id,
-      connector: c.connector,
-      label: "GitHub",
-      custom: false,
-      state: (input.connectors[c.id] ? "granted" : input.all ? "inherited" : "off") as AccessState,
-      scopes: GITHUB.map((s) => ({
+  const connectors = [
+    ...connections
+      .filter((c) => !c.revokedAt && c.connector === "github")
+      .map((c) => ({ id: c.id, connector: c.connector, label: "GitHub", custom: false, scopes: GITHUB })),
+    ...servers.map((s) => ({
+      id: s.id,
+      connector: `custom:${s.id}`,
+      label: s.label,
+      custom: true,
+      scopes: customScopes(s),
+    })),
+  ].map((c) => ({
+    connectionId: c.id,
+    connector: c.connector,
+    label: c.label,
+    custom: c.custom,
+    state: (input.connectors[c.id] ? "granted" : input.all ? "inherited" : "off") as AccessState,
+    scopes: c.scopes.map((s) => ({
+      scope: s.scope,
+      label: s.label,
+      state: scopeState(c.id, s.scope),
+      tools: s.tools.map((t) => ({
+        ...t,
+        connectionId: c.id,
         scope: s.scope,
-        label: s.label,
-        state: scopeState(c.id, s.scope),
-        tools: s.tools.map((t) => ({
-          ...t,
-          connectionId: c.id,
-          scope: s.scope,
-          state: toolState(c.id, t.name, s.scope),
-        })),
+        state: toolState(c.id, t.name, s.scope),
       })),
-    }));
+    })),
+  }));
   return { all: input.all, builtins, connectors };
 }
 
@@ -149,21 +183,24 @@ export function createFakeAccess(
   ctx: MockContext,
   connections: (orgId: string) => Promise<Connection[]>,
   log: (method: string, ...args: unknown[]) => void,
+  /** Custom MCP servers (their classified tools join the tree). */
+  servers: (orgId: string) => Promise<CustomServer[]> = async () => [],
 ): ApiClient["access"] {
   const inputs = new Map<string, AccessInput>();
   const of = (agentId: string) => inputs.get(agentId) ?? empty();
+  const tree = async (orgId: string, input: AccessInput) =>
+    fakeAccessTree(input, await connections(orgId), await servers(orgId));
   return {
-    get: async (orgId, agentId) => fakeAccessTree(of(agentId), await connections(orgId)),
+    get: async (orgId, agentId) => tree(orgId, of(agentId)),
     set: async (orgId, agentId, input) => {
       log("access.set", orgId, agentId, input);
       inputs.set(agentId, structuredClone(input));
-      return fakeAccessTree(input, await connections(orgId));
+      return tree(orgId, input);
     },
     matrix: async (orgId) => {
-      const conns = await connections(orgId);
       const agents = await ctx.lookup.agents(orgId);
       const tools: (AccessMatrix["tools"][number] & { state: AccessState })[] = [];
-      const sample = fakeAccessTree(empty(), conns);
+      const sample = await tree(orgId, empty());
       for (const s of sample.builtins) {
         for (const t of s.tools) tools.push({ ...t, group: "agentes", key: `builtin|${t.name}` });
       }
@@ -174,10 +211,10 @@ export function createFakeAccess(
       }
       const cells: AccessMatrix["cells"] = {};
       for (const a of agents) {
-        const tree = fakeAccessTree(of(a.id), conns);
+        const agentTree = await tree(orgId, of(a.id));
         const row: Record<string, AccessState> = {};
-        for (const s of tree.builtins) for (const t of s.tools) row[`builtin|${t.name}`] = t.state;
-        for (const c of tree.connectors) {
+        for (const s of agentTree.builtins) for (const t of s.tools) row[`builtin|${t.name}`] = t.state;
+        for (const c of agentTree.connectors) {
           for (const s of c.scopes) for (const t of s.tools) row[`${c.connectionId}|${t.name}`] = t.state;
         }
         cells[a.id] = row;

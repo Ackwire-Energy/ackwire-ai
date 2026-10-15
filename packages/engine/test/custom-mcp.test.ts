@@ -5,6 +5,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
+  acceptCustomSuggestion,
   type CustomDeps,
   completeOAuth,
   connectCustomServer,
@@ -250,6 +251,17 @@ describe("custom MCP servers", () => {
     mcp.state.extra = true;
     const refreshed = await refreshCustomServer(deps, f.owner.id, f.org.id, server.id);
     expect(refreshed.tools.find((t) => t.name === "reopen_ticket")?.access).toBeNull();
+
+    // Turned off: never offered, not waiting for review, and the suggestion doesn't turn it back on.
+    const off = await saveCustomTools(deps, f.owner.id, f.org.id, server.id, {
+      label: "Suporte",
+      tools: [{ name: "close_ticket", access: "off", label: "Fechar chamado" }],
+    });
+    expect(off.tools.find((t) => t.name === "close_ticket")?.access).toBe("off");
+    expect((await source.tools(ctx)).map((t) => t.name)).toEqual(["suporte_list_tickets"]);
+    const accepted = await acceptCustomSuggestion(deps, f.owner.id, f.org.id, server.id);
+    expect(accepted.server.tools.find((t) => t.name === "close_ticket")?.access).toBe("off");
+    expect(accepted.server.tools.find((t) => t.name === "reopen_ticket")?.access).not.toBeNull();
   });
 
   test("MCP-native OAuth: discovery, dynamic registration, PKCE S256 + resource, token refresh", async () => {

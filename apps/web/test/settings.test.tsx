@@ -4,7 +4,6 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { setNavigateAway } from "@/lib/navigate";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -38,27 +37,31 @@ describe("Configurações da organização", () => {
     const { state } = await go(seedState(), "settings/connectors");
     const section = screen().getByRole("region", { name: "Conectores" });
     expect(section.textContent).toContain("GitHub");
-    expect(section.textContent).toContain("Conectado como acme · por OAuth");
-    await click(within(section).getByRole("button", { name: "Desconectar" }));
-    const dialog = screen().getByRole("dialog", { name: "Desconectar GitHub" });
-    expect(dialog.textContent).toContain("Os agentes perdem as permissões do GitHub na hora.");
+    expect(section.textContent).toContain("Ativo");
+    expect(section.textContent).toContain("Conectado como acme");
+    expect(section.textContent).toContain("3 ferramentas");
+    expect(section.textContent).toContain("Nenhum agente ainda");
+    await click(within(section).getByRole("button", { name: "Desconectar GitHub" }));
+    const dialog = screen().getByRole("dialog", { name: "Desconectar GitHub?" });
+    expect(dialog.textContent).toContain("Nenhum agente usa agora.");
     await click(within(dialog).getByRole("button", { name: "Desconectar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "connectors.disconnect")?.args).toEqual([ORG_ID, "conn-gh"]);
     expect(screen().getByRole("region", { name: "Conectores" }).textContent).toContain("Nenhum conector ainda.");
   });
 
-  test("add a connector from the searchable catalog with an API key", async () => {
+  test("add a connector from the searchable catalog with an API key, then review what it does", async () => {
     const { state } = await go(seedState(), "settings/connectors");
     await click(screen().getByRole("button", { name: "Adicionar conector" }));
     const add = screen().getByRole("dialog", { name: "Adicionar conector" });
-    expect(add.textContent).toContain("Repositórios, PRs, issues e Actions.");
+    expect(add.textContent).toContain("Código, PRs, issues e Actions.");
     await type(within(add).getByRole("searchbox", { name: "Buscar conector" }), "sentry");
-    expect(within(add).getAllByRole("listitem")).toHaveLength(1);
+    // Sentry, and the card for any other MCP server.
+    expect(within(add).getAllByRole("listitem")).toHaveLength(2);
     await click(within(add).getByRole("button", { name: "Conectar Sentry" }));
     const connect = screen().getByRole("dialog", { name: "Conectar Sentry" });
     // Sentry has no OAuth app on this server: API key only.
-    expect(within(connect).queryByRole("button", { name: "Conectar com Sentry" })).toBeNull();
+    expect(within(connect).queryByRole("button", { name: "Continuar no Sentry" })).toBeNull();
     await click(within(connect).getByRole("button", { name: "Conectar com a chave" }));
     expect(connect.textContent).toContain("Cole a chave de API (pelo menos 8 caracteres).");
     await type(within(connect).getByLabelText("Chave de API"), "sntrys_abcdef123");
@@ -69,27 +72,11 @@ describe("Configurações da organização", () => {
       apiKey: "[redacted]",
       serverUrl: undefined,
     });
+    const tools = screen().getByRole("dialog", { name: "O que Sentry faz" });
+    expect(within(tools).getByRole("region", { name: "Lê" }).textContent).toContain("search_issues");
+    await click(within(tools).getByRole("button", { name: "Cancelar" }));
+    await settle(2);
     expect(screen().getByRole("region", { name: "Conectores" }).textContent).toContain("Sentry");
-  });
-
-  test("OAuth: starts on the server and leaves for the provider, coming back to settings", async () => {
-    const left: string[] = [];
-    setNavigateAway((url) => left.push(url));
-    const state = seedState({ connections: [] });
-    await go(state, "settings/connectors");
-    await click(screen().getByRole("button", { name: "Adicionar conector" }));
-    const add = screen().getByRole("dialog", { name: "Adicionar conector" });
-    await type(within(add).getByRole("searchbox", { name: "Buscar conector" }), "github");
-    await click(within(add).getByRole("button", { name: "Conectar GitHub" }));
-    const connect = screen().getByRole("dialog", { name: "Conectar GitHub" });
-    await click(within(connect).getByRole("button", { name: "Conectar com GitHub" }));
-    await settle(4);
-    expect(state.calls.find((c) => c.method === "connectors.startOAuth")?.args).toEqual([
-      ORG_ID,
-      "github",
-      { returnTo: `/org/${ORG_ID}/settings/connectors`, serverUrl: undefined },
-    ]);
-    expect(left[0]).toStartWith("https://github.com/login/oauth/authorize");
   });
 
   test("a connector without a default server asks for an https address", async () => {

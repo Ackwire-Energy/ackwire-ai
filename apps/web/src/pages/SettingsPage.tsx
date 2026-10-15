@@ -14,30 +14,22 @@ import {
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   useAddCredential,
-  useCatalog,
-  useConnections,
-  useConnectWithKey,
   useCredentials,
-  useCustomServerAction,
-  useCustomServers,
-  useDisconnect,
   usePlatformKey,
   useRemoveCredential,
   useRotateCredential,
   useSettings,
-  useStartOAuth,
   useUpdateSettings,
   useUsageReport,
 } from "@/api/queries";
-import type { Connection, ConnectorDef, Credential, CustomServer, Role } from "@/api/types";
+import type { Credential, Role } from "@/api/types";
 import { AccessMatrixSection } from "@/components/AccessMatrix";
 import { SandboxSection } from "@/components/AgentComputer";
-import { ConnectorCatalogDialog } from "@/components/ConnectorCatalog";
-import { ConnectCustomDialog, CustomServerRow, GrantAgentsDialog, ReviewToolsDialog } from "@/components/CustomMcp";
+import { ConnectorsSection } from "@/components/Connectors";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { MachinesSection } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
@@ -45,19 +37,11 @@ import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
-import { toolsToReview } from "@/lib/custom-tools";
 import { formatShortDate, formatUsd, relativeTime } from "@/lib/format";
-import { navigateAway } from "@/lib/navigate";
 import { can } from "@/lib/permissions";
 import { isProviderId, keyLooksValid, PROVIDERS, type ProviderId, providerLabel } from "@/lib/providers";
-import { connectorDescription } from "@/lib/scopes";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
-
-const isHttps = (v: string) => /^https:\/\/[^\s/]+/.test(v.trim());
-/** Same MCP address, ignoring a trailing slash and case. */
-const sameServer = (a: string | null | undefined, b: string | null | undefined) =>
-  Boolean(a && b) && (a ?? "").replace(/\/+$/, "").toLowerCase() === (b ?? "").replace(/\/+$/, "").toLowerCase();
 
 export type SettingsSection =
   | "general"
@@ -109,19 +93,8 @@ export function SettingsPage({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const toast = useToast();
-  const catalog = useCatalog();
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org.role));
   const current = visible.some((s) => s.id === section) ? section : "general";
-
-  // Back from the OAuth provider: `?connected=github`.
-  useEffect(() => {
-    // A custom MCP server opens its classification instead (`?review=1`).
-    if (!connected || !catalog.data || review) return;
-    const name = catalog.data.connectors.find((d) => d.id === connected)?.label ?? connected;
-    toast.show(t("connectors.connectedToast", { name }));
-    window.history.replaceState(null, "", window.location.pathname);
-  }, [connected, catalog.data, review, toast, t]);
 
   return (
     <div className="settings">
@@ -160,7 +133,7 @@ export function SettingsPage({
         )}
         {current === "members" && <MembersPage embedded />}
         {current === "access" && <AccessMatrixSection />}
-        {current === "connectors" && <ConnectorsSection review={review} />}
+        {current === "connectors" && <ConnectorsSection connected={connected} review={review} />}
         {current === "skills" && <SkillsSection />}
         {current === "keys" && <KeysSection />}
         {current === "storage" && <StorageSection />}
@@ -246,327 +219,6 @@ function OrgSection() {
       </form>
       <OrgLogoDialog open={logo} onClose={() => setLogo(false)} />
     </Card>
-  );
-}
-
-function ConnectorsSection({ review }: { review?: boolean }) {
-  const { t, i18n } = useTranslation();
-  const { org } = useOrg();
-  const catalog = useCatalog();
-  const connections = useConnections(org.id);
-  const disconnect = useDisconnect(org.id);
-  const toast = useToast();
-  const admin = can(org.role, "configure");
-  const [adding, setAdding] = useState(false);
-  const [connecting, setConnecting] = useState<ConnectorDef | null>(null);
-  const [removing, setRemoving] = useState<{ connection: Connection; def: ConnectorDef } | null>(null);
-  const customServers = useCustomServers(org.id);
-  const customActions = useCustomServerAction(org.id);
-  const custom = customServers.data ?? [];
-  const [addingCustom, setAddingCustom] = useState(false);
-  const [customInitial, setCustomInitial] = useState<{ url: string; label: string; needsKey: boolean } | null>(null);
-  const [remotePending, setRemotePending] = useState<string | null>(null);
-  const [reviewing, setReviewing] = useState<CustomServer | null>(null);
-  const [granting, setGranting] = useState<CustomServer | null>(null);
-  // Back from a custom server's OAuth: open the classification of the newest pending one.
-  const reviewHandled = useRef(false);
-  useEffect(() => {
-    if (!review || reviewHandled.current || !customServers.data) return;
-    reviewHandled.current = true;
-    const pending = [...customServers.data]
-      .filter((s) => !s.reviewedAt || toolsToReview(s) > 0)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-    if (pending) setReviewing(pending);
-    window.history.replaceState(null, "", window.location.pathname);
-  }, [review, customServers.data]);
-  const active = (connections.data ?? []).filter((c) => !c.revokedAt);
-  const defOf = (c: Connection) => catalog.data?.connectors.find((d) => d.id === c.connector);
-
-  return (
-    <Card aria-labelledby="sec-conn">
-      <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-        <div className="stack-4" style={{ flex: "1 1 280px", gap: 2 }}>
-          <h2 id="sec-conn" className="ac-card__title">
-            {t("connectors.title")}
-          </h2>
-          <span className="small muted">{t("connectors.subtitle", { org: org.name })}</span>
-        </div>
-        {admin && (
-          <div className="row">
-            <Button
-              size="sm"
-              onClick={() => {
-                setCustomInitial(null);
-                setAddingCustom(true);
-              }}
-            >
-              {t("customMcp.connectOther")}
-            </Button>
-            <Button size="sm" icon="plus" onClick={() => setAdding(true)}>
-              {t("connectors.add")}
-            </Button>
-          </div>
-        )}
-      </div>
-      {connections.isLoading && <LoadingList count={2} avatar={false} trailing />}
-      {connections.isSuccess && active.length === 0 && custom.length === 0 && (
-        <p className="small muted">{t("connectors.none")}</p>
-      )}
-      {custom.length > 0 && (
-        <List aria-label={t("customMcp.custom")}>
-          {custom.map((server) => (
-            <CustomServerRow
-              key={server.id}
-              server={server}
-              admin={admin}
-              onReview={() => setReviewing(server)}
-              onDisconnect={() => customActions.disconnect.mutate(server.id)}
-            />
-          ))}
-        </List>
-      )}
-      {active.length > 0 && (
-        <List>
-          {active.map((c) => {
-            const def = defOf(c);
-            return (
-              <div key={c.id} className="ac-list__row">
-                <span className="list-col">
-                  <span style={{ fontWeight: 600 }}>{def?.label ?? c.label}</span>
-                  <span className="small muted">
-                    {c.accountLabel
-                      ? t("connectors.connectedAs", { account: c.accountLabel })
-                      : t("connectors.connectedAt", { when: formatShortDate(i18n.language, c.createdAt) })}{" "}
-                    · {c.authType === "oauth" ? t("connectors.viaOAuth") : t("connectors.viaKey")}
-                  </span>
-                </span>
-                <Chip icon="check" tone="done">
-                  {t("connectors.connected")}
-                </Chip>
-                {admin && def && (
-                  <div className="row" style={{ gap: 4 }}>
-                    <Button variant="ghost" size="sm" onClick={() => setConnecting(def)}>
-                      {t("connectors.reconnect")}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ac-btn--danger"
-                      onClick={() => setRemoving({ connection: c, def })}
-                    >
-                      {t("connectors.disconnect")}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </List>
-      )}
-
-      <ConnectCustomDialog
-        open={addingCustom}
-        initial={customInitial}
-        onOpenChange={setAddingCustom}
-        onConnected={(server) => {
-          setAddingCustom(false);
-          setReviewing(server);
-        }}
-      />
-      <ReviewToolsDialog
-        server={reviewing}
-        onClose={() => setReviewing(null)}
-        onSaved={(saved) => {
-          setReviewing(null);
-          setGranting(saved);
-        }}
-      />
-      <GrantAgentsDialog server={granting} onClose={() => setGranting(null)} />
-      <ConnectorCatalogDialog
-        open={adding}
-        onOpenChange={setAdding}
-        connectors={catalog.data?.connectors ?? []}
-        connected={
-          new Set([
-            ...active.map((c) => c.connector),
-            // An official remote MCP server is connected as a custom server with its address.
-            ...(catalog.data?.connectors ?? [])
-              .filter((d) => d.kind === "remote_mcp" && custom.some((x) => sameServer(x.serverUrl, d.serverUrl)))
-              .map((d) => d.id),
-          ])
-        }
-        pendingId={remotePending}
-        loading={catalog.isLoading}
-        onPick={(def) => {
-          if (def.kind !== "remote_mcp" || !def.serverUrl) {
-            setAdding(false);
-            setConnecting(def);
-            return;
-          }
-          // One click: the server tries OAuth; a key if it must; then the same review as a custom server.
-          const serverUrl = def.serverUrl;
-          setRemotePending(def.id);
-          customActions.connect.mutate(
-            { serverUrl, label: def.label, returnTo: `/org/${org.id}/settings?review=1` },
-            {
-              onSettled: () => setRemotePending(null),
-              onSuccess: (result) => {
-                if (result.status === "oauth") navigateAway(result.authorizeUrl);
-                else if (result.status === "needs_key") {
-                  setAdding(false);
-                  setCustomInitial({ url: serverUrl, label: def.label, needsKey: true });
-                  setAddingCustom(true);
-                } else {
-                  setAdding(false);
-                  setReviewing(result.server);
-                }
-              },
-            },
-          );
-        }}
-        onOther={() => {
-          setAdding(false);
-          setCustomInitial(null);
-          setAddingCustom(true);
-        }}
-      />
-      <ConnectDialog def={connecting} onClose={() => setConnecting(null)} />
-      <Dialog
-        open={removing !== null}
-        onOpenChange={(o) => !o && setRemoving(null)}
-        title={t("connectors.disconnectTitle", { name: removing?.def.label ?? "" })}
-        description={t("connectors.disconnectText", { name: removing?.def.label ?? "" })}
-        closeLabel={t("common.close")}
-        width={440}
-      >
-        <DialogFooter>
-          <Button onClick={() => setRemoving(null)}>{t("common.cancel")}</Button>
-          <Button
-            variant="danger"
-            disabled={disconnect.isPending}
-            loading={disconnect.isPending}
-            onClick={() => {
-              if (!removing) return;
-              disconnect.mutate(removing.connection.id, {
-                onSuccess: () => {
-                  toast.show(t("connectors.disconnected", { name: removing.def.label }));
-                  setRemoving(null);
-                },
-              });
-            }}
-          >
-            {t("connectors.disconnect")}
-          </Button>
-        </DialogFooter>
-      </Dialog>
-    </Card>
-  );
-}
-
-/** Connect (or replace the key of) one connector: OAuth when the server has an app, else an API key. */
-function ConnectDialog({ def, onClose }: { def: ConnectorDef | null; onClose: () => void }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const toast = useToast();
-  const withKey = useConnectWithKey(org.id);
-  const oauth = useStartOAuth(org.id);
-  const [apiKey, setApiKey] = useState("");
-  const [serverUrl, setServerUrl] = useState("");
-  const [touched, setTouched] = useState(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the form for each connector
-  useEffect(() => {
-    setApiKey("");
-    setServerUrl("");
-    setTouched(false);
-  }, [def]);
-  if (!def) return null;
-  const canOAuth = def.auth.includes("oauth") && def.oauthConfigured;
-  const canKey = def.auth.includes("api_key");
-  const keyError = touched && apiKey.trim().length < 8 ? t("connectors.apiKeyInvalid") : undefined;
-  const urlError = touched && def.needsServerUrl && !isHttps(serverUrl) ? t("connectors.serverUrlInvalid") : undefined;
-  const server = def.needsServerUrl ? serverUrl.trim() : undefined;
-
-  return (
-    <Dialog
-      open
-      onOpenChange={(o) => !o && onClose()}
-      title={t("connectors.connectTitle", { name: def.label })}
-      description={connectorDescription(t, def)}
-      closeLabel={t("common.close")}
-      width={480}
-    >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setTouched(true);
-          if (apiKey.trim().length < 8 || (def.needsServerUrl && !isHttps(serverUrl))) return;
-          withKey.mutate(
-            { connector: def.id, apiKey: apiKey.trim(), serverUrl: server },
-            {
-              onSuccess: () => {
-                toast.show(t("connectors.connectedToast", { name: def.label }));
-                onClose();
-              },
-            },
-          );
-        }}
-      >
-        <DialogBody>
-          {def.needsServerUrl && (
-            <Field
-              label={t("connectors.serverUrl")}
-              id="conn-url"
-              help={t("connectors.serverUrlHelp", { org: org.name })}
-              error={urlError}
-            >
-              <Input
-                value={serverUrl}
-                onChange={(e) => setServerUrl(e.target.value)}
-                placeholder="https://"
-                inputMode="url"
-              />
-            </Field>
-          )}
-          {canOAuth && (
-            <>
-              <Button
-                variant="primary"
-                block
-                disabled={oauth.isPending || (def.needsServerUrl && !isHttps(serverUrl))}
-                onClick={() =>
-                  oauth.mutate(
-                    { connector: def.id, returnTo: `/org/${org.id}/settings/connectors`, serverUrl: server },
-                    { onSuccess: (url) => navigateAway(url) },
-                  )
-                }
-              >
-                {t("connectors.connectOAuth", { name: def.label })}
-              </Button>
-              <span className="small muted">{t("connectors.oauthHelp", { name: def.label })}</span>
-              {canKey && <div className="auth__or">{t("connectors.orKey")}</div>}
-            </>
-          )}
-          {canKey && (
-            <Field label={t("connectors.apiKey")} id="conn-key" help={t("connectors.apiKeyHelp")} error={keyError}>
-              <Input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
-            </Field>
-          )}
-        </DialogBody>
-        <DialogFooter>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          {canKey && (
-            <Button
-              type="submit"
-              variant={canOAuth ? "default" : "primary"}
-              disabled={withKey.isPending}
-              loading={withKey.isPending}
-            >
-              {t("connectors.saveKey")}
-            </Button>
-          )}
-        </DialogFooter>
-      </form>
-    </Dialog>
   );
 }
 

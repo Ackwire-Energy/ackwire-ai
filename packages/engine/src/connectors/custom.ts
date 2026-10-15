@@ -22,6 +22,9 @@ export const CUSTOM_PREFIX = "custom:";
 export const isCustom = (c: Pick<ConnectorConnection, "connector">) => c.connector.startsWith(CUSTOM_PREFIX);
 export type ToolAccess = "read" | "write" | "approval";
 const ACCESS: readonly ToolAccess[] = ["read", "write", "approval"];
+/** An admin's decision on a tool: how it may be used, or `off` (never offered to agents, not asked again). */
+export type ToolDecision = ToolAccess | "off";
+const DECISIONS: readonly ToolDecision[] = [...ACCESS, "off"];
 
 /** The scope a classified tool needs: reading, or writing (also for tools that always ask approval). */
 export const customScope = (connectionId: string, access: ToolAccess) =>
@@ -46,7 +49,8 @@ export interface CustomToolView {
   readOnlyHint: boolean | null;
   /** Our suggestion until an admin decides (`accept-suggestion` applies it). */
   suggestedAccess: ToolAccess | null;
-  access: ToolAccess | null;
+  /** Null = not decided yet (hidden from agents, waits for review). */
+  access: ToolDecision | null;
   label: string;
   firstSeenAt: string;
 }
@@ -102,7 +106,7 @@ function view(c: ConnectorConnection, tools: (typeof customTools.$inferSelect)[]
         description: t.description,
         readOnlyHint: t.readOnlyHint,
         suggestedAccess: ACCESS.includes(t.suggestedAccess as ToolAccess) ? (t.suggestedAccess as ToolAccess) : null,
-        access: ACCESS.includes(t.access as ToolAccess) ? (t.access as ToolAccess) : null,
+        access: DECISIONS.includes(t.access as ToolDecision) ? (t.access as ToolDecision) : null,
         label: t.label,
         firstSeenAt: t.firstSeenAt.toISOString(),
       })),
@@ -370,20 +374,21 @@ export async function refreshCustomServer(deps: CustomDeps, actorId: string, org
 
 /**
  * Saves the label and each tool's classification (admins). Only classified
- * tools are offered to agents; `approval` tools always ask a person.
+ * tools are offered to agents; `approval` tools always ask a person; `off`
+ * tools are never offered and don't wait for review.
  */
 export async function saveCustomTools(
   deps: CustomDeps,
   actorId: string,
   orgId: string,
   id: string,
-  input: { label: string; tools: { name: string; access: ToolAccess; label: string }[] },
+  input: { label: string; tools: { name: string; access: ToolDecision; label: string }[] },
 ) {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const c = await loadCustom(deps.db, orgId, id);
   const known = new Map((await toolRows(deps.db, [c.id])).map((t) => [t.name, t]));
   for (const t of input.tools) {
-    if (!ACCESS.includes(t.access)) throw new ValidationError(`Invalid access for ${t.name}`);
+    if (!DECISIONS.includes(t.access)) throw new ValidationError(`Invalid access for ${t.name}`);
     if (!known.has(t.name)) throw new ValidationError(`Unknown tool ${t.name}`);
   }
   const now = new Date();
@@ -430,11 +435,11 @@ export async function acceptCustomSuggestion(deps: CustomDeps, actorId: string, 
   const rows = await toolRows(deps.db, [c.id]);
   const tools = rows.map((t) => ({
     name: t.name,
-    access: (ACCESS.includes(t.access as ToolAccess)
+    access: (DECISIONS.includes(t.access as ToolDecision)
       ? t.access
       : ACCESS.includes(t.suggestedAccess as ToolAccess)
         ? t.suggestedAccess
-        : suggestAccess(t)) as ToolAccess,
+        : suggestAccess(t)) as ToolDecision,
     label: t.label,
   }));
   const server = await saveCustomTools(deps, actorId, orgId, id, { label: c.label, tools });

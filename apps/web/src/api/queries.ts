@@ -34,7 +34,7 @@ import type {
   SeriesScope,
   SkillInput,
   SkillPatch,
-  ToolAccess,
+  ToolDecision,
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
@@ -653,7 +653,7 @@ export function useCustomServerAction(orgId: string) {
       }: {
         id: string;
         label: string;
-        tools: { name: string; access: ToolAccess; label: string }[];
+        tools: { name: string; access: ToolDecision; label: string }[];
       }) => api.customConnectors.saveTools(orgId, id, input),
       onSuccess: done,
     }),

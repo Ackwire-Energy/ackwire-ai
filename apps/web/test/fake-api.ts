@@ -9,6 +9,7 @@ import type {
   ChannelMember,
   Connection,
   ConnectorCatalog,
+  ConnectorDef,
   Credential,
   InvitationWithStatus,
   Me,
@@ -434,17 +435,45 @@ function run(id: string, agentId: string, what: string, tokens: number, costUsd:
 }
 
 /** The shape of `GET /api/app/connectors/catalog` (subset of the real catalog). */
+const remote = (
+  id: string,
+  label: string,
+  category: ConnectorDef["category"],
+  description: string,
+  serverUrl: string,
+  brandColor: string | null,
+  icon = true,
+): ConnectorDef => ({
+  id,
+  label,
+  category,
+  kind: "remote_mcp",
+  description,
+  auth: ["oauth"],
+  oauthConfigured: true,
+  available: true,
+  needsServerUrl: false,
+  serverUrl,
+  iconUrl: icon ? `/connectors/${id}.svg` : null,
+  brandColor,
+  scopes: [],
+  tools: [],
+});
 export const CATALOG: ConnectorCatalog = {
   connectors: [
     {
       id: "github",
       label: "GitHub",
       category: "dev",
-      kind: "oauth_app",
+      kind: "catalog",
       description: "Repositories, pull requests, issues and Actions.",
       auth: ["oauth", "api_key"],
       oauthConfigured: true,
+      available: true,
       needsServerUrl: false,
+      serverUrl: "https://api.githubcopilot.com/mcp/",
+      iconUrl: "/connectors/github.svg",
+      brandColor: null,
       scopes: [
         {
           id: "github:repo.read",
@@ -461,73 +490,57 @@ export const CATALOG: ConnectorCatalog = {
         { id: "github:pr.write", label: "Open pull requests", description: "Open pull requests.", sensitive: false },
         { id: "github:pr.merge", label: "Merge pull requests", description: "Merge a pull request.", sensitive: true },
       ],
-      tools: [{ name: "merge_pull_request", scope: "github:pr.merge", sensitive: true }],
+      tools: [
+        { name: "get_file_contents", scope: "github:repo.read", sensitive: false },
+        { name: "create_pull_request", scope: "github:pr.write", sensitive: false },
+        { name: "merge_pull_request", scope: "github:pr.merge", sensitive: true },
+      ],
     },
     {
       id: "sentry",
       label: "Sentry",
       category: "dev",
+      kind: "catalog",
       description: "Errors, issues and events.",
       auth: ["oauth", "api_key"],
       oauthConfigured: false,
+      available: true,
       needsServerUrl: false,
+      serverUrl: "https://mcp.sentry.dev/mcp",
+      iconUrl: "/connectors/sentry.svg",
+      brandColor: null,
       scopes: [{ id: "sentry:issues.read", label: "Read errors", description: "Search issues.", sensitive: false }],
-      tools: [],
+      tools: [{ name: "search_issues", scope: "sentry:issues.read", sensitive: false }],
     },
     {
       id: "drive",
       label: "Google Drive",
       category: "docs",
+      kind: "catalog",
       description: "Search, read and write documents (any Drive-like MCP server).",
       auth: ["oauth", "api_key"],
       oauthConfigured: false,
+      available: true,
       needsServerUrl: true,
+      serverUrl: null,
+      iconUrl: "/connectors/googledrive.svg",
+      brandColor: "#4285F4",
       scopes: [
         { id: "drive:files.read", label: "Read documents", description: "Search and read files.", sensitive: false },
       ],
       tools: [],
     },
     // Official remote MCP servers: one click, then the same review as a custom server.
+    remote("linear", "Linear", "product", "Issues, projetos e ciclos.", "https://mcp.linear.app/mcp", "#5E6AD2"),
+    remote("notion", "Notion", "docs", "Páginas e bancos de dados.", "https://mcp.notion.com/mcp", null),
+    remote("stripe", "Stripe", "payments", "Clientes e cobranças.", "https://mcp.stripe.com", "#635BFF"),
+    remote("zapier", "Zapier", "automation", "Ações do Zapier.", "https://oauth.zapier.example/mcp", "#FF4F00"),
+    remote("canva", "Canva", "marketing", "Designs e modelos.", "https://mcp.canva.com/mcp", null, false),
     {
-      id: "linear",
-      label: "Linear",
-      category: "product",
-      kind: "remote_mcp",
-      serverUrl: "https://mcp.linear.app/mcp",
-      available: true,
-      description: "Issues, projetos e ciclos.",
-      auth: ["oauth"],
-      oauthConfigured: true,
-      needsServerUrl: false,
-      scopes: [],
-      tools: [],
-    },
-    {
-      id: "notion",
-      label: "Notion",
-      category: "docs",
-      kind: "remote_mcp",
-      serverUrl: "https://mcp.notion.com/mcp",
-      available: true,
-      description: "Páginas e bancos de dados.",
-      auth: ["oauth"],
-      oauthConfigured: true,
-      needsServerUrl: false,
-      scopes: [],
-      tools: [],
-    },
-    {
-      id: "slack",
-      label: "Slack",
-      category: "support",
-      kind: "oauth_app",
+      ...remote("slack", "Slack", "support", "Canais e mensagens.", "https://mcp.slack.example/mcp", null, false),
+      kind: "catalog",
       available: false,
-      description: "Canais e mensagens.",
-      auth: ["oauth"],
       oauthConfigured: false,
-      needsServerUrl: false,
-      scopes: [],
-      tools: [],
     },
   ],
   builtinScopes: [
@@ -1248,6 +1261,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     },
   };
   const machines = createFakeMachines(ctx, (method, ...args) => state.calls.push({ method, args }));
+  const customConnectors = createMockCustomConnectors(ctx, (method, ...args) => state.calls.push({ method, args }));
   const client: ApiClient = {
     ...http,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
@@ -1259,6 +1273,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       ctx,
       (orgId) => http.connectors.list(orgId),
       (method, ...args) => state.calls.push({ method, args }),
+      (orgId) => customConnectors.list(orgId),
     ),
     invites: {
       createLink: async (orgId) => {
@@ -1275,7 +1290,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     storage: createMockStorage(),
     artifacts: createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args })),
     ...createMockPlanning(ctx, (method, ...args) => state.calls.push({ method, args })),
-    customConnectors: createMockCustomConnectors(ctx),
+    customConnectors,
   };
   fakeMachinesOf.set(client, machines);
   return client;

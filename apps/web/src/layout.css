@@ -741,29 +741,6 @@ p {
   border-radius: var(--radius-md);
 }
 
-/* Custom MCP tool classification (same row pattern as the permissions dialog) */
-.tool-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
-}
-.tool-row__head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.tool-row__name {
-  font-size: 13px;
-}
-.tool-row__controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
-  gap: var(--space-2);
-  margin-top: var(--space-1);
-}
-
 /* "Marina está digitando…" above the composer (keeps its height so the box doesn't jump) */
 .channel__typing {
   margin: 0 4px 4px;
@@ -1932,22 +1909,6 @@ p {
   margin-left: 0;
 }
 
-/* Custom MCP: pending review call to action and the suggestion bar */
-.mcp-cta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  flex: 1 1 100%;
-}
-.mcp-cta > .small {
-  flex: 1 1 220px;
-}
-.mcp-suggest {
-  align-items: center;
-  padding-top: 4px;
-}
-
 /* Skills: library rows, detail sheet, file viewer, picker */
 .skill-row__name {
   padding: 0;
@@ -2318,37 +2279,75 @@ p {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+.catalog__list {
+  padding-bottom: 20px;
+}
 .catalog-grid {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 2px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
   gap: 10px;
 }
-.catalog-card {
-  display: grid;
-  grid-template-columns: 36px 1fr;
-  grid-template-rows: auto auto;
-  gap: 10px 12px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-raised);
+.catalog-grid > li {
+  display: flex;
+  min-width: 0;
 }
-.catalog-card[data-disabled] .catalog-card__text {
+.catalog-grid__empty {
+  grid-column: 1 / -1;
+}
+.catalog-card {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  box-shadow: var(--e1);
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--spring),
+    box-shadow 0.2s;
+}
+.catalog-card:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--e2);
+}
+.catalog-card:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.catalog-card:disabled {
+  cursor: default;
+}
+.catalog-card:disabled .catalog-card__text {
   opacity: 0.7;
+}
+.catalog-card--other {
+  background: transparent;
+  box-shadow: none;
+  border: 1.5px dashed var(--line2);
 }
 .catalog-card__text {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
 }
 .catalog-card__head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
   min-width: 0;
 }
 .catalog-card__name {
@@ -2357,48 +2356,248 @@ p {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.catalog-card__badge {
-  flex: none;
-  font-size: 11px;
-  line-height: 16px;
-  padding: 0 6px;
-  border-radius: 4px;
-  border: 1px solid var(--line);
-  color: var(--ink-muted);
-}
 .catalog-card__desc {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.catalog-card__action {
-  grid-column: 2;
+.catalog-card__meta {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
 }
+
+/* A connector's brand icon (Simple Icons, CC0) as a mask in its color, or a monogram. */
 .connector-icon {
+  flex: none;
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  object-fit: contain;
-}
-.connector-icon--mono {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--ink);
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-md);
   font-weight: 650;
   font-size: 14px;
 }
-.catalog__other {
+.connector-icon--lg {
+  width: 44px;
+  height: 44px;
+  font-size: 16px;
+}
+.connector-icon--mono {
+  background: var(--sunken);
+  color: var(--ink2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.connector-icon--brand {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+.connector-icon__mark {
+  width: 58%;
+  height: 58%;
+  background: var(--connector-color, var(--ink));
+  -webkit-mask: var(--connector-icon) center / contain no-repeat;
+  mask: var(--connector-icon) center / contain no-repeat;
+}
+
+/* Settings → Conectores: one row per connected service. */
+.connected-row {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+.connected-row__text {
+  flex: 1 1 220px;
+}
+.connected-row__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.connected-row__who {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+}
+.connected-row__actions {
+  display: flex;
   flex-wrap: wrap;
-  padding: 12px 20px 20px;
+  gap: 6px;
+}
+
+/* The connect flow: one dialog, three steps (conectar → o que faz → quem usa). */
+.cflow__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.cflow__steps {
+  display: flex;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0 20px 12px;
+}
+.cflow__steps li {
+  flex: 1;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--sunken);
+}
+.cflow__steps li[data-on] {
+  background: var(--ink);
+}
+.cflow__body {
+  gap: 12px;
+  padding-bottom: 16px;
+}
+/* Everything stays inside the dialog, down to phone width. */
+.cflow__body > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.cflow__text {
+  margin: 0;
+}
+.cflow__oauth {
+  height: auto;
+  min-height: 44px;
+  white-space: normal;
+  text-align: center;
+}
+.cflow__more summary {
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: 13px;
+  width: fit-content;
+  border-radius: var(--radius-sm);
+}
+.cflow__more summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.cflow__key {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.cflow__lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+.cflow__lead > .cflow__text {
+  flex: 1 1 260px;
+}
+.cflow-group__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.cflow-group__count {
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+.cflow-tools {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cflow-tool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--sunken);
+}
+.cflow-tool[data-off] .cflow-tool__text {
+  opacity: 0.5;
+}
+.cflow-tool__text {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cflow-tool__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.cflow-tool__code {
+  font-size: 11.5px;
+  color: var(--faint);
+  overflow-wrap: anywhere;
+}
+.cflow-tool__desc {
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cflow__all {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.cflow-agents {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cflow-agent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+.cflow-agent__name {
+  flex: 1 1 140px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+}
+.cflow__asks {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.cflow__asks .ac-icon {
+  flex: none;
+  width: 15px;
+  height: 15px;
 }
 
 /* Loading placeholders that keep the page layout. */

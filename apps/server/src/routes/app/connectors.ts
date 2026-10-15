@@ -2,12 +2,12 @@ import { connectorOAuthApps } from "@agenteschat/config";
 import {
   acceptCustomSuggestion,
   BUILTIN_SCOPES,
-  CONNECTOR_CATALOG,
   type ConnectorDeps,
   completeOAuth,
   connectionView,
   connectOverHttp,
   connectorGrantValidator,
+  connectorListing,
   createApiKeyConnection,
   getAgent,
   isCustom,
@@ -58,9 +58,20 @@ const CatalogEntry = z
     id: z.string(),
     label: z.string(),
     description: z.string(),
+    kind: z.enum(["catalog", "remote_mcp"]).openapi({
+      description:
+        "`catalog`: our connector with its own scopes; `remote_mcp`: a vendor's official MCP server (one click).",
+    }),
+    category: z.enum(["dev", "product", "docs", "payments", "support", "marketing", "automation"]),
     auth: z.array(z.enum(["oauth", "api_key"])),
-    oauthConfigured: z.boolean().openapi({ description: "This server has an OAuth app for it (else: API key only)." }),
+    oauthConfigured: z
+      .boolean()
+      .openapi({ description: "Signs in with OAuth here: our OAuth app, or the vendor's MCP OAuth." }),
+    available: z.boolean().openapi({ description: "Can be connected on this server." }),
     needsServerUrl: z.boolean(),
+    serverUrl: z.string().nullable().openapi({ description: "The MCP endpoint (`remote_mcp`)." }),
+    iconUrl: z.string().nullable().openapi({ description: "Brand icon served by the web app; null = a monogram." }),
+    brandColor: z.string().nullable().openapi({ description: "Tint of the icon; null = the ink." }),
     scopes: z.array(ScopeInfo),
     tools: z.array(z.object({ name: z.string(), scope: z.string(), sensitive: z.boolean() })),
   })
@@ -93,7 +104,8 @@ export function connectorRoutes(deps: AppDeps) {
       path: "/connectors/catalog",
       tags,
       security,
-      summary: "Connectors agentes.chat knows, their scopes and tools; plus built-in scopes",
+      summary:
+        "Connectors agentes.chat knows (ours and one-click MCP servers), their scopes and tools; plus built-in scopes",
       responses: {
         200: json(z.object({ connectors: z.array(CatalogEntry), builtinScopes: z.array(ScopeInfo) })),
         401: errors[401],
@@ -102,28 +114,7 @@ export function connectorRoutes(deps: AppDeps) {
     (c) =>
       c.json(
         {
-          connectors: Object.values(CONNECTOR_CATALOG).map((d) => {
-            const sensitiveScopes = new Set(Object.values(d.tools).flatMap((t) => (t.sensitive ? [t.scope] : [])));
-            return {
-              id: d.id,
-              label: d.label,
-              description: d.description,
-              auth: d.auth,
-              oauthConfigured: Boolean(d.oauth && oauthApps[d.id]),
-              needsServerUrl: d.serverUrl === null,
-              scopes: Object.entries(d.scopes).map(([id, s]) => ({
-                id: `${d.id}:${id}`,
-                label: s.label,
-                description: s.description,
-                sensitive: sensitiveScopes.has(id),
-              })),
-              tools: Object.entries(d.tools).map(([name, t]) => ({
-                name,
-                scope: `${d.id}:${t.scope}`,
-                sensitive: t.sensitive === true,
-              })),
-            };
-          }),
+          connectors: connectorListing(oauthApps),
           builtinScopes: Object.entries(BUILTIN_SCOPES).map(([id, s]) => ({
             id,
             label: s.label,

@@ -16,6 +16,7 @@ export * from "./channels";
 export * from "./connectors/catalog";
 export * from "./connectors/connections";
 export * from "./connectors/custom";
+export * from "./connectors/listing";
 export * from "./connectors/mcp";
 export * from "./connectors/oauth-mcp";
 export * from "./connectors/presets";

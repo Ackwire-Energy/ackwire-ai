@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -32,7 +33,8 @@ test("connectors API: catalog, API-key connection (masked), agent scopes, OAuth 
   const github = catalog.connectors.find((c) => c.id === "github");
   expect(github?.oauthConfigured).toBe(true);
   expect(github?.scopes.find((s) => s.id === "github:pr.merge")?.sensitive).toBe(true);
-  expect(catalog.connectors.find((c) => c.id === "linear")?.oauthConfigured).toBe(false);
+  // No Linear OAuth app here: Linear is the one-click MCP server.
+  expect(catalog.connectors.find((c) => c.id === "linear")).toMatchObject({ kind: "remote_mcp" });
   expect(catalog.builtinScopes.map((s) => s.id)).toContain("context:read");
 
   const created = await owner(`/api/app/organizations/${orgId}/connectors`, {
@@ -81,4 +83,59 @@ test("connectors API: catalog, API-key connection (masked), agent scopes, OAuth 
   // Replaying the callback fails and says so in the redirect.
   const replay = await owner(`/api/app/connectors/oauth/callback?state=${url.searchParams.get("state")}&code=abc`);
   expect(replay.headers.get("location")).toContain("connector_error=");
+});
+
+type Listed = {
+  id: string;
+  kind: string;
+  category: string;
+  serverUrl: string | null;
+  available: boolean;
+  iconUrl: string | null;
+  brandColor: string | null;
+};
+
+test("catalog: one list of our connectors and the one-click MCP servers, one entry per service, brand icons", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { connectors } = (await (await owner("/api/app/connectors/catalog")).json()) as { connectors: Listed[] };
+  const ids = connectors.map((c) => c.id);
+  expect(new Set(ids).size).toBe(ids.length);
+  const byId = (id: string) => connectors.find((c) => c.id === id);
+  expect(byId("notion")).toMatchObject({
+    kind: "remote_mcp",
+    category: "docs",
+    serverUrl: "https://mcp.notion.com/mcp",
+    available: true,
+    iconUrl: "/connectors/notion.svg",
+    brandColor: null,
+  });
+  expect(byId("zapier")).toMatchObject({ category: "automation", brandColor: "#FF4F00" });
+  expect(byId("stripe")?.category).toBe("payments");
+  // Linear and Sentry are in both lists: without an OAuth app here, the one-click server wins.
+  expect(byId("linear")).toMatchObject({ kind: "remote_mcp", serverUrl: "https://mcp.linear.app/mcp" });
+  expect(byId("sentry")?.kind).toBe("remote_mcp");
+  // Ours: GitHub (API key at least) and Drive (asks for the server address).
+  expect(byId("github")).toMatchObject({ kind: "catalog", category: "dev", available: true });
+  expect(byId("drive")).toMatchObject({ kind: "catalog", iconUrl: "/connectors/googledrive.svg" });
+  // No icon in Simple Icons: a monogram.
+  expect(byId("canva")?.iconUrl).toBeNull();
+  // Every icon the catalog names exists in the web app.
+  const publicDir = new URL("../../web/public", import.meta.url).pathname;
+  for (const c of connectors) {
+    if (c.iconUrl) expect(existsSync(`${publicDir}${c.iconUrl}`)).toBe(true);
+  }
+});
+
+test("catalog: with its OAuth app configured, our Linear connector replaces the one-click server", async () => {
+  t = await createTestServer({
+    env: { CONNECTOR_LINEAR_CLIENT_ID: "lin-id", CONNECTOR_LINEAR_CLIENT_SECRET: "lin-secret" },
+  });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { connectors } = (await (await owner("/api/app/connectors/catalog")).json()) as { connectors: Listed[] };
+  const linear = connectors.filter((c) => c.id === "linear");
+  expect(linear).toHaveLength(1);
+  expect(linear[0]).toMatchObject({ kind: "catalog", category: "product", iconUrl: "/connectors/linear.svg" });
 });

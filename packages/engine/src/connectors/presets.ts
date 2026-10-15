@@ -1,3 +1,4 @@
+import type { ConnectorCategory } from "./catalog";
 import { canonicalResource } from "./oauth-mcp";
 
 /**
@@ -17,6 +18,7 @@ export interface McpPreset {
   id: string;
   label: string;
   description: string;
+  category: ConnectorCategory;
   /** Icon name in the app's icon set (falls back to a generic plug). */
   icon: string;
   serverUrl: string;
@@ -25,6 +27,7 @@ export interface McpPreset {
 export const MCP_PRESETS: readonly McpPreset[] = [
   {
     id: "linear",
+    category: "product",
     label: "Linear",
     description: "Issues, projetos e ciclos do Linear.",
     icon: "linear",
@@ -32,6 +35,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "sentry",
+    category: "dev",
     label: "Sentry",
     description: "Erros, issues e releases do Sentry.",
     icon: "sentry",
@@ -39,6 +43,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "notion",
+    category: "docs",
     label: "Notion",
     description: "Páginas e bases de dados do Notion.",
     icon: "notion",
@@ -46,6 +51,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "atlassian",
+    category: "product",
     label: "Atlassian (Jira e Confluence)",
     description: "Issues do Jira e páginas do Confluence.",
     icon: "atlassian",
@@ -53,6 +59,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "asana",
+    category: "product",
     label: "Asana",
     description: "Tarefas, projetos e times do Asana.",
     icon: "asana",
@@ -60,6 +67,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "stripe",
+    category: "payments",
     label: "Stripe",
     description: "Clientes, pagamentos, assinaturas e faturas do Stripe.",
     icon: "stripe",
@@ -67,6 +75,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "cloudflare-bindings",
+    category: "dev",
     label: "Cloudflare (Workers)",
     description: "Workers, KV, R2 e D1 da conta Cloudflare.",
     icon: "cloudflare",
@@ -74,6 +83,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "cloudflare-observability",
+    category: "dev",
     label: "Cloudflare (logs)",
     description: "Logs e métricas dos Workers.",
     icon: "cloudflare",
@@ -81,6 +91,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "supabase",
+    category: "dev",
     label: "Supabase",
     description: "Projetos, banco de dados e funções do Supabase.",
     icon: "supabase",
@@ -88,6 +99,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "intercom",
+    category: "support",
     label: "Intercom",
     description: "Conversas e contatos do Intercom (contas nos EUA).",
     icon: "intercom",
@@ -95,6 +107,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "paypal",
+    category: "payments",
     label: "PayPal",
     description: "Pedidos, faturas e transações do PayPal.",
     icon: "paypal",
@@ -102,6 +115,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "square",
+    category: "payments",
     label: "Square",
     description: "Pagamentos, pedidos e catálogo do Square.",
     icon: "square",
@@ -109,6 +123,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "webflow",
+    category: "marketing",
     label: "Webflow",
     description: "Sites, páginas e CMS do Webflow.",
     icon: "webflow",
@@ -116,6 +131,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "zapier",
+    category: "automation",
     label: "Zapier",
     description: "As ações que você liberou no Zapier MCP.",
     icon: "zapier",
@@ -123,6 +139,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   },
   {
     id: "canva",
+    category: "marketing",
     label: "Canva",
     description: "Designs e modelos do Canva.",
     icon: "canva",

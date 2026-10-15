@@ -1,11 +1,12 @@
 /**
- * Test fake — custom MCP servers ("Conectar outro servidor MCP").
+ * Test fake — custom MCP servers ("Outro servidor MCP" in "Adicionar conector").
  * Mirrors these endpoints:
  * - GET    /api/app/organizations/{orgId}/connectors/custom
  * - POST   /api/app/organizations/{orgId}/connectors/custom { serverUrl, apiKey?, label?, returnTo }
  *          → { status: "connected", server } | { status: "oauth", authorizeUrl } | { status: "needs_key" }
  * - POST   /api/app/organizations/{orgId}/connectors/custom/{id}/refresh (re-list tools)
  * - PUT    /api/app/organizations/{orgId}/connectors/custom/{id}/tools { label, tools: [{ name, access, label }] }
+ *          (`access`: read | write | approval | off)
  * - DELETE /api/app/organizations/{orgId}/connectors/custom/{id}
  * The mock never talks to the URL: it pretends the server offers a ticket
  * tool set, needs an API key unless the URL contains "oauth", and gains one
@@ -33,7 +34,10 @@ const tool = ([name, description, readOnly]: [string, string, boolean | null], n
   firstSeenAt: now.toISOString(),
 });
 
-export function createMockCustomConnectors(ctx: MockContext): ApiClient["customConnectors"] {
+export function createMockCustomConnectors(
+  ctx: MockContext,
+  log: (method: string, ...args: unknown[]) => void = () => {},
+): ApiClient["customConnectors"] {
   const byOrg = new Map<string, CustomServer[]>();
   const refreshed = new Set<string>();
   const list = (orgId: string) => {
@@ -52,6 +56,7 @@ export function createMockCustomConnectors(ctx: MockContext): ApiClient["customC
   return {
     list: async (orgId) => clone(list(orgId)),
     connect: async (orgId, input) => {
+      log("customConnectors.connect", orgId, { ...input, apiKey: input.apiKey ? "[redacted]" : undefined });
       const oauth = input.serverUrl.includes("oauth");
       if (!oauth && !input.apiKey) return { status: "needs_key" };
       const now = ctx.now();
@@ -69,6 +74,7 @@ export function createMockCustomConnectors(ctx: MockContext): ApiClient["customC
       return { status: "connected", server: clone(server) };
     },
     refresh: async (orgId, id) => {
+      log("customConnectors.refresh", orgId, id);
       const s = find(orgId, id);
       if (!refreshed.has(id)) {
         refreshed.add(id);
@@ -77,6 +83,7 @@ export function createMockCustomConnectors(ctx: MockContext): ApiClient["customC
       return clone(s);
     },
     saveTools: async (orgId, id, input) => {
+      log("customConnectors.saveTools", orgId, id, structuredClone(input));
       const s = find(orgId, id);
       s.label = input.label;
       for (const t of input.tools) {
@@ -90,6 +97,7 @@ export function createMockCustomConnectors(ctx: MockContext): ApiClient["customC
       return clone(s);
     },
     disconnect: async (orgId, id) => {
+      log("customConnectors.disconnect", orgId, id);
       byOrg.set(
         orgId,
         list(orgId).filter((x) => x.id !== id),

@@ -28,6 +28,8 @@ import {
 
 const tags = ["Connectors"];
 const Access = z.enum(["read", "write", "approval"]);
+/** An admin's decision: how the tool may be used, or `off` (never offered, not asked again). */
+const Decision = z.enum(["read", "write", "approval", "off"]);
 
 const CustomServer = z
   .object({
@@ -41,7 +43,7 @@ const CustomServer = z
         description: z.string(),
         readOnlyHint: z.boolean().nullable(),
         suggestedAccess: Access.nullable().openapi({ description: "Our suggestion until an admin decides." }),
-        access: Access.nullable().openapi({ description: "Null = not classified yet: hidden from agents." }),
+        access: Decision.nullable().openapi({ description: "Null = not classified yet: hidden from agents." }),
         label: z.string(),
         firstSeenAt: z.string(),
       }),
@@ -210,7 +212,7 @@ export function customConnectorRoutes(deps: AppDeps) {
         body: body(
           z.object({
             label: z.string().max(80),
-            tools: z.array(z.object({ name: z.string(), access: Access, label: z.string().max(120) })).max(500),
+            tools: z.array(z.object({ name: z.string(), access: Decision, label: z.string().max(120) })).max(500),
           }),
         ),
       },
