@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   createDaytonaSandboxProvider,
   createFakeSandboxProvider,
+  maskProvider,
   parseSplitOutput,
   SandboxGoneError,
   splitOutputScript,
@@ -82,8 +83,8 @@ function fakeDaytona(options: { refuseNetworkPolicy?: boolean; execResult?: (scr
     }
     if (u.host === "proxy.app.daytona.io" && u.pathname === "/toolbox/sb1/files") {
       return Response.json([
-        { name: "a.py", path: "/home/daytona/workspace/a.py", isDir: false, size: 3 },
-        { name: "out", path: "/home/daytona/workspace/out", isDir: true, size: 0 },
+        { name: "a.py", path: "/workspace/a.py", isDir: false, size: 3 },
+        { name: "out", path: "/workspace/out", isDir: true, size: 0 },
       ]);
     }
     return new Response("unexpected", { status: 500 });
@@ -154,7 +155,7 @@ describe("Daytona sandbox provider (REST)", () => {
     expect(r).toEqual({ exitCode: 2, stdout: "ok out", stderr: "boom err", timedOut: false });
     expect(seen).toContain("python3 a.py");
     const exec = d.calls.filter((c) => c.url.endsWith("/process/execute")).at(-1);
-    expect(exec?.body).toMatchObject({ cwd: "/home/daytona/workspace", timeout: 30 });
+    expect(exec?.body).toMatchObject({ cwd: "/workspace", timeout: 30 });
     expect(exec?.body).not.toHaveProperty("envs");
   });
 
@@ -164,7 +165,7 @@ describe("Daytona sandbox provider (REST)", () => {
     await p.create(spec);
     await p.writeFile("sb1", "/workspace/out/r.md", new TextEncoder().encode("# r"));
     const up = d.calls.filter((c) => c.url.includes("/files/upload-v2")).at(-1);
-    expect(new URL(up?.url ?? "").searchParams.get("path")).toBe("/home/daytona/workspace/out/r.md");
+    expect(new URL(up?.url ?? "").searchParams.get("path")).toBe("/workspace/out/r.md");
     expect(new TextDecoder().decode((await p.readFile("sb1", "x.txt")) ?? new Uint8Array())).toBe("conteúdo");
     expect(await p.readFile("sb1", "missing.txt")).toBeNull();
     expect(await p.listFiles("sb1", "")).toEqual([
@@ -185,6 +186,57 @@ describe("Daytona sandbox provider (REST)", () => {
     await p.destroy("sb1");
     expect(await p.get("sb1")).toBeNull();
     await expect(p.ensureStarted("sb1")).rejects.toBeInstanceOf(SandboxGoneError);
+  });
+});
+
+describe("no provider name or home in what agents see", () => {
+  test("our snapshot by name, as user agente; the default image gets /workspace made on first start", async () => {
+    const scripts: string[] = [];
+    const d = fakeDaytona({
+      execResult: (script) => {
+        scripts.push(script);
+        return { exitCode: 0, result: "" };
+      },
+    });
+    const p = createDaytonaSandboxProvider({ apiKey: "k", fetch: d.fetch, pollMs: 0, snapshot: "agentes-computer-v1" });
+    await p.create(spec);
+    expect(d.calls[0]?.body).toMatchObject({ snapshot: "agentes-computer-v1", user: "agente" });
+    expect(scripts).toEqual([]);
+
+    const plain = fakeDaytona({
+      execResult: (script) => {
+        scripts.push(script);
+        return { exitCode: 0, result: "" };
+      },
+    });
+    const q = createDaytonaSandboxProvider({ apiKey: "k", fetch: plain.fetch, pollMs: 0 });
+    await q.create(spec);
+    expect(plain.calls[0]?.body).not.toHaveProperty("snapshot");
+    expect(scripts.some((x) => x.includes("mkdir -p /workspace"))).toBe(true);
+  });
+
+  test("output and errors are masked", async () => {
+    expect(maskProvider("cd /home/daytona/workspace/out && ls /home/daytona/.cache (Daytona)")).toBe(
+      "cd /workspace/out && ls ~/.cache (computador)",
+    );
+    const d = fakeDaytona({
+      execResult: (script) => {
+        const marker = /printf '\\n%s\\n' '([^']+)'/.exec(script)?.[1] ?? "";
+        return { exitCode: 1, result: `/home/daytona/workspace/a.py\n${marker}\nTraceback in /home/daytona/x` };
+      },
+    });
+    const p = createDaytonaSandboxProvider({ apiKey: "k", fetch: d.fetch, pollMs: 0 });
+    await p.create(spec);
+    const r = await p.exec("sb1", { command: "python3 a.py", timeoutSeconds: 5 });
+    expect(r.stdout).toBe("/workspace/a.py");
+    expect(r.stderr).toBe("Traceback in ~/x");
+    const refusing = createDaytonaSandboxProvider({
+      apiKey: "k",
+      pollMs: 0,
+      fetch: async () => new Response("Daytona quota exceeded", { status: 429 }),
+    });
+    const error = await refusing.create(spec).catch((e: Error) => e);
+    expect(String(error)).not.toMatch(/daytona/i);
   });
 });
 

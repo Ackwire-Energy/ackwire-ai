@@ -141,6 +141,7 @@ export function buildEngine(o: EngineOptions) {
     search: adapters.search,
     email: adapters.email,
     storage,
+    sandbox,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,

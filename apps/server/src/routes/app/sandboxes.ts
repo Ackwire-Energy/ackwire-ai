@@ -25,7 +25,9 @@ import {
 const tags = ["Agent computer"];
 const Computer = z
   .object({
-    status: z.enum(["running", "stopped", "archived", "none"]).openapi({ description: "`none`: never created yet." }),
+    status: z
+      .enum(["starting", "running", "stopping", "stopped", "archived", "error", "none"])
+      .openapi({ description: "`none`: never created yet. Changes also come as `agent.computer` events." }),
     diskUsedGib: z.number().openapi({ description: "Size of the workspace, last measured while it ran." }),
     costMonthUsd: z.number(),
     createdAt: z.string().nullable(),
@@ -34,8 +36,10 @@ const Computer = z
       .enum(["blocked", "allowlist", "provider-default"])
       .optional()
       .openapi({ description: "`provider-default`: the provider's plan can't apply our domain list." }),
+    error: z.object({ message: z.string() }).optional().openapi({ description: "With `status: error`." }),
   })
   .openapi("AgentComputer");
+const Accepted = z.object({ status: z.enum(["starting", "running", "stopping"]) }).openapi("ComputerAccepted");
 const Settings = z
   .object({
     available: z.boolean().openapi({ description: "A sandbox provider is configured on this server." }),
@@ -89,13 +93,14 @@ export function sandboxRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/agents/{agentId}/computer/start",
       tags,
       security,
-      summary: "Turn it on (creates it the first time)",
+      summary: "Turn it on (creates it the first time); returns at once, progress as `agent.computer` events",
       request: { params: AgentParams },
-      responses: { 200: json(Computer), ...errors },
+      responses: { 202: json(Accepted, "Accepted: the work goes on in the background"), ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      return c.json(await startAgentComputer(sandbox(), c.get("user").id, orgId, agentId), 200);
+      const deps2 = { ...sandbox(), pubsub: deps.adapters.pubsub };
+      return c.json(await startAgentComputer(deps2, c.get("user").id, orgId, agentId), 202);
     },
   );
 
@@ -105,13 +110,14 @@ export function sandboxRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/agents/{agentId}/computer/stop",
       tags,
       security,
-      summary: "Turn it off now (files kept)",
+      summary: "Turn it off (files kept); returns at once",
       request: { params: AgentParams },
-      responses: { 200: json(Computer), ...errors },
+      responses: { 202: json(Accepted, "Accepted: the work goes on in the background"), ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      return c.json(await stopAgentComputer(sandbox(), c.get("user").id, orgId, agentId), 200);
+      const deps2 = { ...sandbox(), pubsub: deps.adapters.pubsub };
+      return c.json(await stopAgentComputer(deps2, c.get("user").id, orgId, agentId), 202);
     },
   );
 
@@ -127,7 +133,7 @@ export function sandboxRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      await deleteAgentComputer(sandbox(), c.get("user").id, orgId, agentId);
+      await deleteAgentComputer({ ...sandbox(), pubsub: deps.adapters.pubsub }, c.get("user").id, orgId, agentId);
       return c.body(null, 204);
     },
   );

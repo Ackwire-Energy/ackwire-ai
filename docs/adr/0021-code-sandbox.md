@@ -25,6 +25,15 @@ We call the REST API directly instead of the official `@daytonaio/sdk`. Adding t
 
 **API.** `GET …/agents/{id}/computer` returns `{ status, diskUsedGib, costMonthUsd, createdAt, lastUsedAt, network }`, where `status` is `running`, `stopped`, `archived` or `none`. The disk size is measured with `du` while the computer runs and kept for when it is stopped. `POST …/computer/start|stop` and `DELETE …/computer` complete the set. The agent's owner and admins can use all of it; everything is audited.
 
+**Image.** `infra/sandbox/Dockerfile` defines the computer: a non-root user `agente` with `WORKDIR /workspace` owned by it, Python 3.12 with pandas, numpy, matplotlib, openpyxl, python-docx and reportlab, Node 22 LTS with npm and corepack (so pnpm and yarn work, and global npm installs go to the user's home, no root needed), git, curl, and the DejaVu and Noto fonts.
+- `apps/server/scripts/sandbox-snapshot.ts [name]` registers it as a Daytona snapshot (`POST /snapshots` with the Dockerfile content) and waits until it is active.
+- The script then checks one sandbox made from it (`node -v`, `npm -v`, `pnpm -v`, `python3 -c "import pandas, matplotlib"`) and deletes that sandbox.
+- `SANDBOX_SNAPSHOT` names the snapshot sandboxes are created from, as user `agente`. Without it, the provider's default image is used, and the adapter creates `/workspace` on first start.
+
+**What agents and people see.** The workspace is always `/workspace`, and tools show paths relative to it. The adapter masks the provider in everything it returns: its home paths become `/workspace` or `~`, and its name becomes "computador". That covers command output, provider errors and the error reasons of a computer that failed.
+
+**Start and stop don't block.** `POST …/computer/start` and `POST …/computer/stop` mark the computer `starting` or `stopping`, queue an outbox job (`sandbox.start`, `sandbox.stop`) and return `202`. On a first start, a placeholder row (no provider id) holds `starting` until the job fills it in. Each change is broadcast to the organization as `agent.computer { agentId, status, step?: creating|preparing|ready, error? }`; every member can see its agents. A failure leaves `status: error` with the masked reason in `last_error` (migration 0028).
+
 **Tools.** The `sandbox:run` scope covers `run_code`, `write_file`, `read_file`, `list_files`, `export_file`, `import_file` and `run_skill_script`. It is not in the default scopes, and the `*` ("all tools") grant does not cover it (`NOT_IN_ALL` in `tools/scopes.ts`).
 - An organization can make `run_code` and `run_skill_script` sensitive, so every call waits for an approval.
 - `export_file` maps `.md`/`.txt`, `.csv`, `.html` and `.mmd` to Drive kinds, as a new file or a new version.

@@ -93,6 +93,20 @@ export class SandboxProviderError extends Error {
   }
 }
 
+/** Where agents' files live inside every computer. */
+export const WORKSPACE = "/workspace";
+
+/**
+ * Hides the provider from what agents and people read: its home paths become
+ * `/workspace` or `~`, and its name becomes "computador".
+ */
+export function maskProvider(text: string) {
+  return text
+    .replace(/\/home\/daytona\/workspace/g, WORKSPACE)
+    .replace(/\/home\/daytona/g, "~")
+    .replace(/daytona/gi, "computador");
+}
+
 /** A workspace-relative path, cleaned: no `..`, no absolute paths outside it. */
 export function workspacePath(path: string) {
   const trimmed = path
@@ -165,8 +179,11 @@ export function createDaytonaSandboxProvider(options: {
   apiKey: string;
   apiUrl?: string;
   target?: string;
-  /** Where the workspace lives inside the sandbox (the default user's home). */
-  workspaceDir?: string;
+  /**
+   * Our snapshot (infra/sandbox/Dockerfile: user `agente`, `/workspace`).
+   * Unset: the provider's default image, where `/workspace` is created on first start.
+   */
+  snapshot?: string;
   fetch?: (url: string, init?: RequestInit) => Promise<Response>;
   /** Tests: no waiting between polls. */
   pollMs?: number;
@@ -174,7 +191,8 @@ export function createDaytonaSandboxProvider(options: {
 }): SandboxProvider {
   const http = options.fetch ?? ((url: string, init?: RequestInit) => fetch(url, init));
   const api = (options.apiUrl ?? "https://app.daytona.io/api").replace(/\/$/, "");
-  const root = (options.workspaceDir ?? "/home/daytona/workspace").replace(/\/$/, "");
+  // Always `/workspace`: agents and people never see the provider's home directory.
+  const root = WORKSPACE;
   const pollMs = options.pollMs ?? 1000;
   const readyTimeoutMs = options.readyTimeoutMs ?? 90_000;
   const toolbox = new Map<string, string>();
@@ -190,7 +208,9 @@ export function createDaytonaSandboxProvider(options: {
         signal: AbortSignal.timeout(init.timeoutMs ?? 30_000),
       });
     } catch (error) {
-      throw new SandboxProviderError(`could not reach Daytona: ${error instanceof Error ? error.message : error}`);
+      throw new SandboxProviderError(
+        `could not reach the computer service: ${maskProvider(error instanceof Error ? error.message : String(error))}`,
+      );
     }
     return res;
   }
@@ -198,7 +218,10 @@ export function createDaytonaSandboxProvider(options: {
   async function fail(res: Response, what: string): Promise<never> {
     const text = (await res.text().catch(() => "")).slice(0, 300);
     if (res.status === 404) throw new SandboxGoneError(`${what}: not found`);
-    throw new SandboxProviderError(`Daytona refused ${what} (${res.status}): ${text}`, res.status);
+    throw new SandboxProviderError(
+      `the computer service refused ${what} (${res.status}): ${maskProvider(text)}`,
+      res.status,
+    );
   }
 
   const info = (s: DaytonaSandbox): SandboxInfo => {
@@ -226,7 +249,9 @@ export function createDaytonaSandboxProvider(options: {
       const s = info(raw);
       if (s.state === "started") return s;
       if (s.state === "error" || s.state === "destroyed") {
-        throw new SandboxGoneError(`the sandbox is ${raw.state}${raw.errorReason ? `: ${raw.errorReason}` : ""}`);
+        throw new SandboxGoneError(
+          `the computer is ${raw.state}${raw.errorReason ? `: ${maskProvider(raw.errorReason)}` : ""}`,
+        );
       }
       if (Date.now() > deadline) throw new SandboxProviderError("the sandbox took too long to start");
       await Bun.sleep(pollMs);
@@ -269,7 +294,7 @@ export function createDaytonaSandboxProvider(options: {
     const body = (await res.json()) as { exitCode?: number; result?: string };
     const { stdout, stderr } = parseSplitOutput(body.result ?? "", marker);
     const exitCode = body.exitCode ?? 0;
-    return { exitCode, stdout, stderr, timedOut: exitCode === 124 };
+    return { exitCode, stdout: maskProvider(stdout), stderr: maskProvider(stderr), timedOut: exitCode === 124 };
   }
 
   return {
@@ -284,6 +309,7 @@ export function createDaytonaSandboxProvider(options: {
         // Negative = never deleted on its own: the agent's files stay until a person deletes the computer.
         autoDeleteInterval: -1,
         ...(options.target ? { target: options.target } : {}),
+        ...(options.snapshot ? { snapshot: options.snapshot, user: "agente" } : {}),
       };
       const network =
         spec.allowDomains.length > 0
@@ -310,7 +336,13 @@ export function createDaytonaSandboxProvider(options: {
       networks.set(created.id, mode);
       info(created);
       const ready = await waitStarted(created.id);
-      await exec(created.id, { command: `mkdir -p ${shellQuote(root)}`, timeoutSeconds: 15 }).catch(() => undefined);
+      if (!options.snapshot) {
+        // The default image has no /workspace: make it, owned by the sandbox user.
+        await exec(created.id, {
+          command: `mkdir -p ${root} 2>/dev/null || sudo mkdir -p ${root}; sudo chown "$(id -u):$(id -g)" ${root} 2>/dev/null || true`,
+          timeoutSeconds: 15,
+        }).catch(() => undefined);
+      }
       return ready;
     },
     async get(id) {

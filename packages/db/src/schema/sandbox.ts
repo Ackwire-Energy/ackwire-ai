@@ -38,13 +38,15 @@ export const sandboxes = pgTable(
     key: text().notNull(),
     provider: text().notNull(),
     providerId: text().notNull(),
-    /** `running`, `stopped`, `archived`, `deleted` or `error` (last seen). */
+    /** `starting`, `running`, `stopping`, `stopped`, `archived`, `error` or `deleted` (last seen). */
     status: text().notNull(),
     /** `blocked`, `allowlist` or `provider-default`. */
     network: text().notNull().default("blocked"),
     cpu: integer().notNull(),
     memoryGib: integer().notNull(),
     diskGib: integer().notNull(),
+    /** Why the last start or stop failed (shown with `status = 'error'`). */
+    lastError: text(),
     /** Last measured size of the workspace, in MiB. */
     diskUsedMib: integer().notNull().default(0),
     billedSeconds: integer().notNull().default(0),

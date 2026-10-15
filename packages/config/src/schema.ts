@@ -370,6 +370,13 @@ export const envVars = {
     description: "Daytona region for new sandboxes (e.g. `us` or `eu`). Default: the Daytona organization's default.",
     section: "Sandbox",
   },
+  SANDBOX_SNAPSHOT: {
+    schema: z.string().optional(),
+    description:
+      "Name of our computer snapshot in Daytona (built from infra/sandbox/Dockerfile by `bun apps/server/scripts/sandbox-snapshot.ts`). Unset: the provider's default image, with /workspace created on first start.",
+    section: "Sandbox",
+    example: "agentes-computer-v1",
+  },
   SANDBOX_AUTO_STOP_MINUTES: {
     schema: z.coerce.number().int().min(1).max(120).default(10),
     description: "An agent's computer stops after this many idle minutes (its next use starts it again, files kept).",

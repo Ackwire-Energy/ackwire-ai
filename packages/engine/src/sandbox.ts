@@ -1,10 +1,19 @@
-import { SandboxGoneError, type SandboxInfo, type SandboxProvider, type SandboxResources } from "@agenteschat/adapters";
+import {
+  maskProvider,
+  type PubSub,
+  SandboxGoneError,
+  type SandboxInfo,
+  type SandboxProvider,
+  type SandboxResources,
+} from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema, sql } from "@agenteschat/db";
 import { getAgent, getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { BudgetExceededError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { publishOrgEvent } from "./events";
 import { agentBudgetState } from "./gateway";
 import { can, requirePermission } from "./organizations";
+import { enqueue } from "./outbox";
 import type { ToolContext } from "./tools/types";
 import { monthStartUtc } from "./usage";
 
@@ -167,12 +176,16 @@ async function acquire(
   agentId: string,
   settings: SandboxSettings,
   actor: { type: "agent" | "person"; id: string },
+  onStep?: (step: "creating" | "preparing") => void | Promise<void>,
 ): Promise<{ row: SandboxRow; info: SandboxInfo; previous: Previous }> {
   const { db, provider } = deps;
   const key = computerKey(agentId);
   const live = await liveComputer(db, orgId, agentId);
   let lost = false;
-  if (live) {
+  // A row without a provider id is a computer being created (`POST …/computer/start`): fill it in.
+  const placeholder = live && !live.providerId ? live : null;
+  if (live && !placeholder) {
+    await onStep?.("preparing");
     try {
       const before = await provider.get(live.providerId);
       const wasRunning = before?.state === "started";
@@ -190,6 +203,7 @@ async function acquire(
         .where(eq(sandboxes.id, live.id));
     }
   }
+  await onStep?.("creating");
   const info = await provider.create({
     key: `${orgId}:${key}`,
     labels: { "agentes.org": orgId, "agentes.agent": agentId },
@@ -197,22 +211,27 @@ async function acquire(
     autoStopMinutes: deps.autoStopMinutes,
     autoArchiveMinutes: deps.archiveAfterDays * 24 * 60,
   });
-  const [row] = await db
-    .insert(sandboxes)
-    .values({
-      orgId,
-      agentId,
-      key,
-      provider: provider.id,
-      providerId: info.id,
-      status: "running",
-      network: info.network,
-      cpu: Math.round(info.resources.cpu),
-      memoryGib: Math.round(info.resources.memoryGiB),
-      diskGib: Math.round(info.resources.diskGiB),
-    })
-    .onConflictDoNothing()
-    .returning();
+  const machine = {
+    provider: provider.id,
+    providerId: info.id,
+    status: "running",
+    lastError: null,
+    network: info.network,
+    cpu: Math.round(info.resources.cpu),
+    memoryGib: Math.round(info.resources.memoryGiB),
+    diskGib: Math.round(info.resources.diskGiB),
+  };
+  const [row] = placeholder
+    ? await db
+        .update(sandboxes)
+        .set({ ...machine, updatedAt: new Date() })
+        .where(eq(sandboxes.id, placeholder.id))
+        .returning()
+    : await db
+        .insert(sandboxes)
+        .values({ orgId, agentId, key, ...machine })
+        .onConflictDoNothing()
+        .returning();
   if (!row) {
     // Another run of this agent created it at the same time: use that one.
     await provider.destroy(info.id).catch(() => undefined);
@@ -324,14 +343,17 @@ export async function withSandbox<T>(
   }
 }
 
+export type ComputerStatus = "starting" | "running" | "stopping" | "stopped" | "archived" | "error" | "none";
+
 /** `GET …/agents/{id}/computer`, exactly what the app shows. */
 export interface AgentComputerView {
-  status: "running" | "stopped" | "archived" | "none";
+  status: ComputerStatus;
   diskUsedGib: number;
   costMonthUsd: number;
   createdAt: string | null;
   lastUsedAt: string | null;
   network?: "blocked" | "allowlist" | "provider-default";
+  error?: { message: string };
 }
 
 /** The agent's owner or an admin (`manage_agents`). */
@@ -344,13 +366,36 @@ async function requireComputerManager(db: Database, actorId: string, orgId: stri
   }
 }
 
-const STATUS: Record<string, AgentComputerView["status"]> = {
+const STATUS: Record<string, ComputerStatus> = {
   started: "running",
-  creating: "running",
-  starting: "running",
+  creating: "starting",
+  starting: "starting",
   stopped: "stopped",
   archived: "archived",
+  error: "error",
 };
+
+/**
+ * `agent.computer { agentId, status, step?, error? }` to the organization
+ * (every member can see its agents), on each change.
+ */
+export async function publishComputerEvent(
+  pubsub: PubSub | undefined,
+  orgId: string,
+  event: { agentId: string; status: ComputerStatus; step?: "creating" | "preparing" | "ready"; error?: string },
+) {
+  await publishOrgEvent(pubsub, {
+    type: "org.broadcast",
+    orgId,
+    event: {
+      type: "agent.computer",
+      agentId: event.agentId,
+      status: event.status,
+      ...(event.step ? { step: event.step } : {}),
+      ...(event.error ? { error: { message: event.error } } : {}),
+    },
+  });
+}
 
 async function computerView(
   deps: Pick<SandboxDeps, "db" | "provider">,
@@ -371,8 +416,20 @@ async function computerView(
     );
   const costMonthUsd = Number(spent?.total ?? 0) / 1e9;
   if (!row) return { status: "none", diskUsedGib: 0, costMonthUsd, createdAt: null, lastUsedAt: null };
+  const base = {
+    diskUsedGib: Math.round((row.diskUsedMib / 1024) * 100) / 100,
+    costMonthUsd,
+    createdAt: row.createdAt.toISOString(),
+    lastUsedAt: row.lastUsedAt.toISOString(),
+    network: row.network as AgentComputerView["network"],
+  };
+  // Work in progress (a job is on it) or a failed start: answer from the row, no provider call.
+  if (row.status === "starting" || row.status === "stopping" || row.status === "error" || !row.providerId) {
+    const status = (row.providerId ? row.status : row.status === "error" ? "error" : "starting") as ComputerStatus;
+    return { ...base, status, ...(row.lastError ? { error: { message: row.lastError } } : {}) };
+  }
   const info = await deps.provider.get(row.providerId).catch(() => null);
-  const status = info ? (STATUS[info.state] ?? "stopped") : "none";
+  const status: ComputerStatus = info ? (STATUS[info.state] ?? "stopped") : "none";
   let diskMib = row.diskUsedMib;
   if (info?.state === "started") {
     // Measured while it runs (cheap), kept for when it's stopped.
@@ -388,14 +445,7 @@ async function computerView(
   if (status !== row.status && status !== "none") {
     await deps.db.update(sandboxes).set({ status, updatedAt: new Date() }).where(eq(sandboxes.id, row.id));
   }
-  return {
-    status,
-    diskUsedGib: Math.round((diskMib / 1024) * 100) / 100,
-    costMonthUsd,
-    createdAt: row.createdAt.toISOString(),
-    lastUsedAt: row.lastUsedAt.toISOString(),
-    network: row.network as AgentComputerView["network"],
-  };
+  return { ...base, diskUsedGib: Math.round((diskMib / 1024) * 100) / 100, status };
 }
 
 export async function getAgentComputer(
@@ -408,47 +458,151 @@ export async function getAgentComputer(
   return computerView(deps, orgId, agentId, await liveComputer(deps.db, orgId, agentId));
 }
 
-/** Turns the computer on (creating it if the agent never had one). */
-export async function startAgentComputer(deps: SandboxDeps, actorId: string, orgId: string, agentId: string) {
-  await requireComputerManager(deps.db, actorId, orgId, agentId);
-  const settings = await getSandboxSettings(deps.db, orgId);
-  if (!settings.enabled) throw new ValidationError("The agents' computers are turned off for this organization.");
-  const { row } = await acquire(deps, orgId, agentId, settings, { type: "person", id: actorId });
-  await recordAudit(deps.db, {
-    orgId,
-    actor: { type: "person", id: actorId },
-    action: "sandbox.started",
-    target: { type: "sandbox", id: row.id },
-    details: { agentId },
-  });
-  return computerView(deps, orgId, agentId, await liveComputer(deps.db, orgId, agentId));
-}
-
-/** Stops it now; files stay, and the next use starts it again. */
-export async function stopAgentComputer(
-  deps: Pick<SandboxDeps, "db" | "provider">,
+/**
+ * Turns the computer on (creating it the first time) without waiting: marks
+ * it `starting`, queues `sandbox.start` and returns. Progress comes as
+ * `agent.computer` events.
+ */
+export async function startAgentComputer(
+  deps: Pick<SandboxDeps, "db"> & { pubsub?: PubSub },
   actorId: string,
   orgId: string,
   agentId: string,
+): Promise<{ status: ComputerStatus }> {
+  await requireComputerManager(deps.db, actorId, orgId, agentId);
+  const settings = await getSandboxSettings(deps.db, orgId);
+  if (!settings.enabled) throw new ValidationError("The agents' computers are turned off for this organization.");
+  const live = await liveComputer(deps.db, orgId, agentId);
+  if (live?.status === "running") return { status: "running" };
+  if (live?.status === "starting") return { status: "starting" };
+  await deps.db.transaction(async (tx) => {
+    if (live) {
+      await tx
+        .update(sandboxes)
+        .set({ status: "starting", lastError: null, updatedAt: new Date() })
+        .where(eq(sandboxes.id, live.id));
+    } else {
+      await tx
+        .insert(sandboxes)
+        .values({
+          orgId,
+          agentId,
+          key: computerKey(agentId),
+          provider: "",
+          providerId: "",
+          status: "starting",
+          cpu: 0,
+          memoryGib: 0,
+          diskGib: 0,
+        })
+        .onConflictDoNothing();
+    }
+    await enqueue(tx, {
+      orgId,
+      kind: "sandbox.start",
+      payload: { agentId, actorId },
+      dedupeKey: `sandbox.start:${agentId}:${Date.now()}`,
+      maxAttempts: 1,
+    });
+  });
+  await publishComputerEvent(deps.pubsub, orgId, {
+    agentId,
+    status: "starting",
+    step: live ? "preparing" : "creating",
+  });
+  return { status: "starting" };
+}
+
+/** Job `sandbox.start`: the provider work behind `startAgentComputer`. Failures land on the row as `error`. */
+export async function runComputerStart(
+  deps: SandboxDeps & { pubsub?: PubSub },
+  orgId: string,
+  agentId: string,
+  actorId: string,
 ) {
+  const settings = await getSandboxSettings(deps.db, orgId);
+  try {
+    const { row } = await acquire(deps, orgId, agentId, settings, { type: "person", id: actorId }, (step) =>
+      publishComputerEvent(deps.pubsub, orgId, { agentId, status: "starting", step }),
+    );
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "sandbox.started",
+      target: { type: "sandbox", id: row.id },
+      details: { agentId },
+    });
+    await publishComputerEvent(deps.pubsub, orgId, { agentId, status: "running", step: "ready" });
+  } catch (error) {
+    const message = maskProvider(error instanceof Error ? error.message : String(error)).slice(0, 500);
+    const live = await liveComputer(deps.db, orgId, agentId);
+    if (live) {
+      await deps.db
+        .update(sandboxes)
+        .set({ status: "error", lastError: message, updatedAt: new Date() })
+        .where(eq(sandboxes.id, live.id));
+    }
+    await publishComputerEvent(deps.pubsub, orgId, { agentId, status: "error", error: message });
+  }
+}
+
+/** Stops it without waiting (`stopping`, job `sandbox.stop`); files stay, and the next use starts it again. */
+export async function stopAgentComputer(
+  deps: Pick<SandboxDeps, "db"> & { pubsub?: PubSub },
+  actorId: string,
+  orgId: string,
+  agentId: string,
+): Promise<{ status: ComputerStatus }> {
   await requireComputerManager(deps.db, actorId, orgId, agentId);
   const row = await liveComputer(deps.db, orgId, agentId);
-  if (!row) throw new NotFoundError("This agent has no computer yet");
-  await deps.provider.stop(row.providerId);
-  await deps.db.update(sandboxes).set({ status: "stopped", updatedAt: new Date() }).where(eq(sandboxes.id, row.id));
-  await recordAudit(deps.db, {
-    orgId,
-    actor: { type: "person", id: actorId },
-    action: "sandbox.stopped",
-    target: { type: "sandbox", id: row.id },
-    details: { agentId },
+  if (!row?.providerId) throw new NotFoundError("This agent has no computer yet");
+  await deps.db.transaction(async (tx) => {
+    await tx.update(sandboxes).set({ status: "stopping", updatedAt: new Date() }).where(eq(sandboxes.id, row.id));
+    await enqueue(tx, {
+      orgId,
+      kind: "sandbox.stop",
+      payload: { agentId, actorId },
+      dedupeKey: `sandbox.stop:${agentId}:${Date.now()}`,
+      maxAttempts: 1,
+    });
   });
-  return computerView(deps, orgId, agentId, await liveComputer(deps.db, orgId, agentId));
+  await publishComputerEvent(deps.pubsub, orgId, { agentId, status: "stopping" });
+  return { status: "stopping" };
+}
+
+/** Job `sandbox.stop`. */
+export async function runComputerStop(
+  deps: Pick<SandboxDeps, "db" | "provider"> & { pubsub?: PubSub },
+  orgId: string,
+  agentId: string,
+  actorId: string,
+) {
+  const row = await liveComputer(deps.db, orgId, agentId);
+  if (!row?.providerId) return;
+  try {
+    await deps.provider.stop(row.providerId);
+    await deps.db.update(sandboxes).set({ status: "stopped", updatedAt: new Date() }).where(eq(sandboxes.id, row.id));
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "sandbox.stopped",
+      target: { type: "sandbox", id: row.id },
+      details: { agentId },
+    });
+    await publishComputerEvent(deps.pubsub, orgId, { agentId, status: "stopped" });
+  } catch (error) {
+    const message = maskProvider(error instanceof Error ? error.message : String(error)).slice(0, 500);
+    await deps.db
+      .update(sandboxes)
+      .set({ status: "error", lastError: message, updatedAt: new Date() })
+      .where(eq(sandboxes.id, row.id));
+    await publishComputerEvent(deps.pubsub, orgId, { agentId, status: "error", error: message });
+  }
 }
 
 /** Deletes the computer and every file on it. */
 export async function deleteAgentComputer(
-  deps: Pick<SandboxDeps, "db" | "provider">,
+  deps: Pick<SandboxDeps, "db" | "provider"> & { pubsub?: PubSub },
   actorId: string,
   orgId: string,
   agentId: string,
@@ -456,7 +610,7 @@ export async function deleteAgentComputer(
   await requireComputerManager(deps.db, actorId, orgId, agentId);
   const row = await liveComputer(deps.db, orgId, agentId);
   if (!row) throw new NotFoundError("This agent has no computer");
-  await deps.provider.destroy(row.providerId);
+  if (row.providerId) await deps.provider.destroy(row.providerId);
   await deps.db
     .update(sandboxes)
     .set({ status: "deleted", deletedAt: new Date(), updatedAt: new Date() })
@@ -468,6 +622,7 @@ export async function deleteAgentComputer(
     target: { type: "sandbox", id: row.id },
     details: { agentId },
   });
+  await publishComputerEvent(deps.pubsub, orgId, { agentId, status: "none" });
 }
 
 /** Keeps the start and end of long output, cutting the middle. */

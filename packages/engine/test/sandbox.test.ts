@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createFakeSandboxProvider, type ExecRequest, type FakeSandboxProvider } from "@agenteschat/adapters";
+import { createFakeSandboxProvider, type ExecRequest, type FakeSandboxProvider, orgTopic } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
@@ -296,7 +296,11 @@ describe("the agent's computer API", () => {
         : { exitCode: 0, stdout: "", stderr: "", timedOut: false },
     );
     f = await setup({ sandbox: provider, reply: () => ({ chunks: ["ok"] }) });
-    const deps = f.sandboxDeps as NonNullable<typeof f.sandboxDeps>;
+    const deps = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const events: { type?: string; event?: Record<string, unknown> }[] = [];
+    f.pubsub.subscribe(orgTopic(f.org.id), (e) => events.push(e as (typeof events)[number]));
+    const computerEvents = () =>
+      events.filter((e) => e.event?.type === "agent.computer").map((e) => [e.event?.status, e.event?.step]);
     expect(await getAgentComputer(deps, f.owner.id, f.org.id, f.agent.id)).toEqual({
       status: "none",
       diskUsedGib: 0,
@@ -304,11 +308,34 @@ describe("the agent's computer API", () => {
       createdAt: null,
       lastUsedAt: null,
     });
-    const started = await startAgentComputer(deps, f.owner.id, f.org.id, f.agent.id);
-    expect(started).toMatchObject({ status: "running", diskUsedGib: 0.5, network: "blocked" });
-    expect((await stopAgentComputer(deps, f.owner.id, f.org.id, f.agent.id)).status).toBe("stopped");
-    expect((await startAgentComputer(deps, f.owner.id, f.org.id, f.agent.id)).status).toBe("running");
+    // Start returns at once; the job does the provider work and reports each step.
+    expect(await startAgentComputer(deps, f.owner.id, f.org.id, f.agent.id)).toEqual({ status: "starting" });
+    expect(provider.calls).toEqual([]);
+    expect((await getAgentComputer(deps, f.owner.id, f.org.id, f.agent.id)).status).toBe("starting");
+    await drainOutbox(f.db, f.handlers);
+    expect(await getAgentComputer(deps, f.owner.id, f.org.id, f.agent.id)).toMatchObject({
+      status: "running",
+      diskUsedGib: 0.5,
+      network: "blocked",
+    });
+    expect(await stopAgentComputer(deps, f.owner.id, f.org.id, f.agent.id)).toEqual({ status: "stopping" });
+    await drainOutbox(f.db, f.handlers);
+    expect((await getAgentComputer(deps, f.owner.id, f.org.id, f.agent.id)).status).toBe("stopped");
+    await startAgentComputer(deps, f.owner.id, f.org.id, f.agent.id);
+    await drainOutbox(f.db, f.handlers);
+    expect((await getAgentComputer(deps, f.owner.id, f.org.id, f.agent.id)).status).toBe("running");
     expect(provider.calls.filter((c) => c.op === "create")).toHaveLength(1);
+    await Bun.sleep(5);
+    expect(computerEvents()).toEqual([
+      ["starting", "creating"],
+      ["starting", "creating"],
+      ["running", "ready"],
+      ["stopping", undefined],
+      ["stopped", undefined],
+      ["starting", "preparing"],
+      ["starting", "preparing"],
+      ["running", "ready"],
+    ]);
 
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     await expect(getAgentComputer(deps, bia.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
@@ -321,6 +348,20 @@ describe("the agent's computer API", () => {
     expect(provider.calls.some((c) => c.op === "destroy")).toBe(true);
     const actions = (await f.db.select().from(schema.auditLog)).map((x) => x.action);
     expect(actions).toEqual(expect.arrayContaining(["sandbox.created", "sandbox.stopped", "sandbox.deleted"]));
+  });
+
+  test("a start that fails ends as error with the reason, never naming the provider", async () => {
+    const provider = sandboxSetup();
+    provider.create = async () => {
+      throw new Error("Daytona quota exceeded in /home/daytona");
+    };
+    f = await setup({ sandbox: provider, reply: () => ({ chunks: ["ok"] }) });
+    const deps = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    await startAgentComputer(deps, f.owner.id, f.org.id, f.agent.id);
+    await drainOutbox(f.db, f.handlers);
+    const view = await getAgentComputer(deps, f.owner.id, f.org.id, f.agent.id);
+    expect(view.status).toBe("error");
+    expect(view.error?.message).toBe("computador quota exceeded in ~");
   });
 
   test("granted but no provider on the server: the prompt says the sandbox is off", async () => {

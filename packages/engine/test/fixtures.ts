@@ -181,6 +181,7 @@ export async function setup(
     context,
     search,
     storage,
+    sandbox: sandboxDeps,
   };
   const handlers = createJobHandlers(jobDeps);
 

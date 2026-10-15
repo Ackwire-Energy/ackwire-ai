@@ -35,11 +35,20 @@ test("computer API: settings, the agent's computer, and the access tree shows 'R
   // The agent's computer: none yet, then on, off, deleted.
   expect(await (await api(`/agents/${agentId}/computer`)).json()).toMatchObject({ status: "none", diskUsedGib: 0 });
   const on = await api(`/agents/${agentId}/computer/start`, { json: {} });
+  expect(on.status).toBe(202);
+  expect(await on.json()).toEqual({ status: "starting" });
+  await t.drain();
   // The org allowlist was set above, so the computer is created with it.
-  expect(await on.json()).toMatchObject({ status: "running", network: "allowlist", costMonthUsd: 0 });
-  expect(await (await api(`/agents/${agentId}/computer/stop`, { json: {} })).json()).toMatchObject({
-    status: "stopped",
+  expect(await (await api(`/agents/${agentId}/computer`)).json()).toMatchObject({
+    status: "running",
+    network: "allowlist",
+    costMonthUsd: 0,
   });
+  const off = await api(`/agents/${agentId}/computer/stop`, { json: {} });
+  expect(off.status).toBe(202);
+  expect(await off.json()).toEqual({ status: "stopping" });
+  await t.drain();
+  expect(await (await api(`/agents/${agentId}/computer`)).json()).toMatchObject({ status: "stopped" });
   expect((await api(`/agents/${agentId}/computer`, { method: "DELETE" })).status).toBe(204);
   expect((await api(`/agents/${agentId}/computer/stop`, { json: {} })).status).toBe(404);
 

@@ -190,6 +190,7 @@ try {
       apiKey: config.DAYTONA_API_KEY,
       apiUrl: config.DAYTONA_API_URL,
       target: config.DAYTONA_TARGET,
+      snapshot: config.SANDBOX_SNAPSHOT,
     });
     const box = await sandbox.create({
       key: `smoke:${userId}`,

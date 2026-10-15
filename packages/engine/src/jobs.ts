@@ -19,6 +19,7 @@ import {
 import { createJevMentionClassifier, createJevRouterStrategy, jevCostNanoUsd, withFallback } from "./router-jev";
 import { executeRoutineRun } from "./routines";
 import type { AgentRun } from "./runs";
+import { runComputerStart, runComputerStop, type SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { runMigration, type StorageDeps } from "./storage";
 
@@ -47,6 +48,8 @@ export interface JobDeps extends RunExecutorDeps {
   email?: EmailSender;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
+  /** Agents' computers (jobs `sandbox.start`, `sandbox.stop`). */
+  sandbox?: SandboxDeps | null;
   router?: {
     /** Off = only @mentions start runs. */
     enabled: boolean;
@@ -297,6 +300,24 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       await executeRoutineRun(
         { db: deps.db, pubsub: deps.pubsub, context: deps.context },
         String(job.payload.routineRunId),
+      );
+    },
+    "sandbox.start": async (job) => {
+      if (!deps.sandbox) throw new PermanentJobError("no computer provider configured");
+      await runComputerStart(
+        { ...deps.sandbox, pubsub: deps.pubsub },
+        orgOf(job),
+        String(job.payload.agentId),
+        String(job.payload.actorId),
+      );
+    },
+    "sandbox.stop": async (job) => {
+      if (!deps.sandbox) throw new PermanentJobError("no computer provider configured");
+      await runComputerStop(
+        { ...deps.sandbox, pubsub: deps.pubsub },
+        orgOf(job),
+        String(job.payload.agentId),
+        String(job.payload.actorId),
       );
     },
     "storage.migrate": async (job) => {
