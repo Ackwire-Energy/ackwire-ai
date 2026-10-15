@@ -41,9 +41,9 @@ describe("Configurações → Skills", () => {
     expect(review.textContent).toContain("GitHub");
     expect(review.textContent).toContain("v3");
     expect(review.textContent).toContain("1 agente usa");
-    expect((rows[1]?.closest(".skill-row") as HTMLElement).textContent).toContain("Criada aqui");
-    expect((rows[1]?.closest(".skill-row") as HTMLElement).textContent).toContain("Em agentes novos");
-    expect((rows[2]?.closest(".skill-row") as HTMLElement).textContent).toContain("Enviada");
+    expect((rows[1]?.closest(".skill-row") as HTMLElement | null)?.textContent).toContain("Criada aqui");
+    expect((rows[1]?.closest(".skill-row") as HTMLElement | null)?.textContent).toContain("Em agentes novos");
+    expect((rows[2]?.closest(".skill-row") as HTMLElement | null)?.textContent).toContain("Enviada");
   });
 
   test("detail: rendered body, files (scripts need a sandbox), remove names the agents", async () => {
