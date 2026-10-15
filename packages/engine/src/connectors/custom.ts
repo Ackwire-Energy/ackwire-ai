@@ -15,6 +15,7 @@ import {
 } from "./connections";
 import type { McpConnect, McpTool } from "./mcp";
 import { authServerMetadata, ensureOAuthClient, type McpOAuthDeps, probeMcpServer } from "./oauth-mcp";
+import { presetForServer } from "./presets";
 
 const { connectorConnections, customTools, oauthStates, agentScopes, agents } = schema;
 
@@ -213,6 +214,9 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
   }
   const existing = await deps.db.select().from(customTools).where(eq(customTools.connectionId, c.id));
   const byName = new Map(existing.map((t) => [t.name, t]));
+  // A read-only server (Supabase with `read_only=true`) enforces it itself: every tool only reads.
+  const readOnly = presetForServer(c.serverUrl)?.readOnly === true;
+  const suggest = (tool: McpTool) => (readOnly ? ("read" as const) : suggestAccess(tool));
   const seen = new Set<string>();
   for (const tool of listed) {
     seen.add(tool.name);
@@ -225,7 +229,7 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
           description,
           readOnlyHint: tool.readOnlyHint ?? null,
           destructiveHint: tool.destructiveHint ?? null,
-          suggestedAccess: suggestAccess(tool),
+          suggestedAccess: suggest(tool),
           removedAt: null,
         })
         .where(eq(customTools.id, old.id));
@@ -237,7 +241,7 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
         description,
         readOnlyHint: tool.readOnlyHint ?? null,
         destructiveHint: tool.destructiveHint ?? null,
-        suggestedAccess: suggestAccess(tool),
+        suggestedAccess: suggest(tool),
         access: null,
         label: humanize(tool.name).slice(0, 120),
       });

@@ -22,6 +22,12 @@ export interface McpPreset {
   /** Icon name in the app's icon set (falls back to a generic plug). */
   icon: string;
   serverUrl: string;
+  /**
+   * The server itself only reads (e.g. Supabase's `read_only=true`: SQL runs as
+   * a read-only Postgres user and the writing tools are off), so every tool is
+   * suggested as read.
+   */
+  readOnly?: boolean;
 }
 
 export const MCP_PRESETS: readonly McpPreset[] = [
@@ -96,6 +102,15 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "Projetos, banco de dados e funções do Supabase.",
     icon: "supabase",
     serverUrl: "https://mcp.supabase.com/mcp",
+  },
+  {
+    id: "supabase-readonly",
+    category: "dev",
+    label: "Supabase (somente leitura)",
+    description: "Consultas e leitura dos projetos do Supabase; o próprio Supabase bloqueia qualquer escrita.",
+    icon: "supabase",
+    serverUrl: "https://mcp.supabase.com/mcp?read_only=true",
+    readOnly: true,
   },
   {
     id: "intercom",

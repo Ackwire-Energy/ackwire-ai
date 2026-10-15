@@ -2045,6 +2045,7 @@ export const en: Translations = {
       cloudflare_bindings: "Workers, KV, R2 and D1 of the account.",
       cloudflare_observability: "Workers logs and metrics.",
       supabase: "Projects, database and functions.",
+      supabase_readonly: "Read only: queries and project data. Supabase itself blocks writes.",
       intercom: "Conversations and contacts (US accounts).",
       paypal: "Orders, invoices and transactions.",
       square: "Payments, orders and catalog.",

@@ -2049,6 +2049,7 @@ export const ptBR = {
       cloudflare_bindings: "Workers, KV, R2 e D1 da conta.",
       cloudflare_observability: "Logs e métricas dos Workers.",
       supabase: "Projetos, banco de dados e funções.",
+      supabase_readonly: "Só leitura: consultas e dados dos projetos. O próprio Supabase bloqueia escrita.",
       intercom: "Conversas e contatos (contas nos EUA).",
       paypal: "Pedidos, faturas e transações.",
       square: "Pagamentos, pedidos e catálogo.",

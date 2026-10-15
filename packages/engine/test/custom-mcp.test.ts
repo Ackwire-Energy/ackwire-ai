@@ -146,6 +146,24 @@ function depsOf(fx: Fixture, extra: Partial<CustomDeps> = {}): CustomDeps {
 }
 
 describe("custom MCP servers", () => {
+  test("a read-only preset (Supabase with read_only=true): every tool is suggested as read, even writing names", async () => {
+    f = await setup();
+    const mcp = ticketsMcp();
+    const deps = depsOf(f, { connect: mcp.connect, resolveHost: async () => ["93.184.216.34"] });
+    const started = await connectCustomServer(deps, f.owner.id, f.org.id, {
+      serverUrl: "https://mcp.supabase.com/mcp?read_only=true",
+      apiKey: "sbp_secret_12345",
+      label: "Supabase",
+    });
+    if (started.status !== "connected") throw new Error(`expected connected, got ${started.status}`);
+    expect(started.server.tools.map((t) => [t.name, t.suggestedAccess])).toEqual([
+      ["close_ticket", "read"],
+      ["list_tickets", "read"],
+    ]);
+    const accepted = await acceptCustomSuggestion(deps, f.owner.id, f.org.id, started.server.id);
+    expect(accepted.server.tools.map((t) => t.access)).toEqual(["read", "read"]);
+  });
+
   test("API key: tools come in unclassified and hidden; classified ones reach the agent with our scopes", async () => {
     f = await setup();
     const mcp = ticketsMcp();
