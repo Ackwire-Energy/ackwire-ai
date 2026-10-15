@@ -27,10 +27,36 @@ jobs:
         run: bun run check:boundaries
       - name: Typecheck
         if: success() || failure()
-        run: bun run typecheck
+        shell: bash
+        run: |
+          set -o pipefail
+          bun run typecheck 2>&1 | tee typecheck.log
       - name: Test
         if: success() || failure()
-        run: bun test
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -o pipefail
+          bun test 2>&1 | tee test.log
+      # GitHub's log storage sometimes loses logs; keep the errors as an artifact and in the summary.
+      - name: Keep errors
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### Typecheck errors'; echo '```'; grep -E 'error TS' typecheck.log 2>/dev/null | head -80; echo '```'
+            echo '### Failed tests'; echo '```'; grep -E '\(fail\)|error:' test.log 2>/dev/null | head -80; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs
+          path: |
+            typecheck.log
+            test.log
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Build web and server
         if: success() || failure()
         run: bun run build
