@@ -3,6 +3,7 @@ import {
   Card,
   Chip,
   Dialog,
+  DialogBody,
   DialogFooter,
   EmptyState,
   Field,
@@ -154,8 +155,6 @@ function RenameDialog({ machine, onClose }: { machine: Machine | null; onClose: 
       width={440}
     >
       <form
-        className="stack-4"
-        style={{ gap: 12 }}
         onSubmit={(e) => {
           e.preventDefault();
           if (!machine || !clean) return;
@@ -171,9 +170,11 @@ function RenameDialog({ machine, onClose }: { machine: Machine | null; onClose: 
           );
         }}
       >
-        <Field label={t("machines.name")} id="machine-rename" error={error ?? undefined}>
-          <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
-        </Field>
+        <DialogBody>
+          <Field label={t("machines.name")} id="machine-rename" error={error ?? undefined}>
+            <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+          </Field>
+        </DialogBody>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}
@@ -306,21 +307,21 @@ export function PairDialog({ open, onClose }: { open: boolean; onClose: () => vo
     >
       {!pairing ? (
         <form
-          className="stack-4"
-          style={{ gap: 12 }}
           onSubmit={(e) => {
             e.preventDefault();
             start();
           }}
         >
-          <Field label={t("machines.name")} id="machine-name" help={t("machines.nameHelp")} error={error ?? undefined}>
-            <Input
-              value={name}
-              maxLength={80}
-              placeholder={t("machines.namePlaceholder")}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </Field>
+          <DialogBody>
+            <Field label={t("machines.name")} id="machine-name" help={t("machines.nameHelp")} error={error ?? undefined}>
+              <Input
+                value={name}
+                maxLength={80}
+                placeholder={t("machines.namePlaceholder")}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </Field>
+          </DialogBody>
           <DialogFooter>
             <Button type="button" onClick={onClose}>
               {t("common.cancel")}
@@ -331,36 +332,38 @@ export function PairDialog({ open, onClose }: { open: boolean; onClose: () => vo
           </DialogFooter>
         </form>
       ) : (
-        <div className="stack-4 machine-pair" style={{ gap: 14 }}>
-          {paired ? (
-            <p className="machine-pair__done" role="status">
-              <Icon name="check" />
-              <span>{t("machines.connected", { name: paired.name })}</span>
-            </p>
-          ) : (
-            <>
-              <p className="small" style={{ margin: 0 }}>
-                {t("machines.runThis")}
+        <>
+          <DialogBody className="machine-pair">
+            {paired ? (
+              <p className="machine-pair__done" role="status">
+                <Icon name="check" />
+                <span>{t("machines.connected", { name: paired.name })}</span>
               </p>
-              <CommandBlock command={pairing.installCommand} />
-              <p className="small muted tabular" style={{ margin: 0 }}>
-                {left
-                  ? t("machines.expiresIn", { time: left, code: pairing.code })
-                  : t("machines.expired", { code: pairing.code })}
-              </p>
-              <ol className="machine-pair__steps small">
-                <li>{t("machines.step.run")}</li>
-                <li>{t("machines.step.noExec", { flag: NO_EXEC_FLAG })}</li>
-                <li>{t("machines.step.user")}</li>
-              </ol>
-              {left && (
-                <span className="row small muted" style={{ gap: 8 }} role="status">
-                  <Spinner />
-                  {t("machines.waiting")}
-                </span>
-              )}
-            </>
-          )}
+            ) : (
+              <>
+                <p className="small" style={{ margin: 0 }}>
+                  {t("machines.runThis")}
+                </p>
+                <CommandBlock command={pairing.installCommand} />
+                <p className="small muted tabular" style={{ margin: 0 }}>
+                  {left
+                    ? t("machines.expiresIn", { time: left, code: pairing.code })
+                    : t("machines.expired", { code: pairing.code })}
+                </p>
+                <ol className="machine-pair__steps small">
+                  <li>{t("machines.step.run")}</li>
+                  <li>{t("machines.step.noExec", { flag: NO_EXEC_FLAG })}</li>
+                  <li>{t("machines.step.user")}</li>
+                </ol>
+                {left && (
+                  <span className="row small muted" style={{ gap: 8 }} role="status">
+                    <Spinner />
+                    {t("machines.waiting")}
+                  </span>
+                )}
+              </>
+            )}
+          </DialogBody>
           <DialogFooter>
             {!paired && !left && (
               <Button
@@ -376,7 +379,7 @@ export function PairDialog({ open, onClose }: { open: boolean; onClose: () => vo
               {paired ? t("machines.done") : t("common.close")}
             </Button>
           </DialogFooter>
-        </div>
+        </>
       )}
     </Dialog>
   );
