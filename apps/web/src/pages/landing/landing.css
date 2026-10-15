@@ -263,14 +263,14 @@
 }
 
 /* Floating nav pill */
+/* The top bar sits above the hero card, in its own row (sticky: it follows the page and hides on the way down). */
 .lp .lp-nav {
-  position: fixed;
+  position: sticky;
   z-index: 50;
-  /* On the hero's blue card, which starts at the top of the page. */
-  top: calc(env(safe-area-inset-top, 0px) + 14px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(1120px, calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px)) - 32px));
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  margin: calc(env(safe-area-inset-top, 0px) + 12px) auto 0;
+  width: min(1120px, calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px))));
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -284,7 +284,7 @@
   transition: transform 0.35s var(--out);
 }
 .lp .lp-nav--hide {
-  transform: translate(-50%, -140%);
+  transform: translateY(calc(-100% - 24px));
 }
 .lp .lp-logo {
   display: inline-flex;
@@ -390,17 +390,14 @@
   width: 16px;
   height: 16px;
 }
-/* The hero card starts at the very top: the nav floats on it (no dark strip above). */
+/* The hero card starts under the top bar. */
 .lp .lp-hero .lp-sky {
-  min-height: min(880px, max(680px, calc(100svh - 12px)));
-  margin-top: 0;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
+  min-height: min(820px, max(620px, calc(100svh - 96px)));
 }
 .lp .lp-hero-in {
   position: relative;
   z-index: 2;
-  padding-block: clamp(110px, 14vw, 150px) 48px;
+  padding-block: clamp(48px, 7vw, 88px) 48px;
   max-width: 1180px;
   margin: 0 auto;
   padding-left: max(28px, env(safe-area-inset-left, 0px));
