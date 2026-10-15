@@ -154,6 +154,17 @@ test("too many attempts from one address are throttled, keyed by the address our
     headers: { "x-forwarded-for": "10.9.8.7, 203.0.113.7" },
   });
   expect(spoofed.status).toBe(429);
+  // Our proxy's internal hop (Railway appends one) is skipped: the client is the last public address.
+  const behindProxy = await anon("/api/waitlist", {
+    json: { email: "p12@acme.com" },
+    headers: { "x-forwarded-for": "203.0.113.7, 100.64.0.2" },
+  });
+  expect(behindProxy.status).toBe(429);
+  const neighbour = await anon("/api/waitlist", {
+    json: { email: "r@acme.com" },
+    headers: { "x-forwarded-for": "198.51.100.9, 100.64.0.2" },
+  });
+  expect(neighbour.status).toBe(202);
   // Another address is not affected.
   const other = await anon("/api/waitlist", {
     json: { email: "q@acme.com" },
