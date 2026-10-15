@@ -1330,7 +1330,7 @@ export const en: Translations = {
       product1: "Summarize this week's user feedback",
       product2: "Write an issue for this idea",
       product3: "Which issues are stuck?",
-      general1: "Hi! What can you do?",
+      general1: "Hi, what can you do?",
       general2: "Summarize what happened today",
       general3: "Help me plan the week?",
     },

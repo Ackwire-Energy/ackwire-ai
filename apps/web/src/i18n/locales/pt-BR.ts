@@ -1342,7 +1342,7 @@ export const ptBR = {
       product1: "Resume o feedback dos usuários desta semana",
       product2: "Escreve uma issue para esta ideia",
       product3: "Quais issues estão travadas?",
-      general1: "Oi! O que você sabe fazer?",
+      general1: "Oi, o que você sabe fazer?",
       general2: "Resume o que rolou hoje",
       general3: "Me ajuda a organizar a semana?",
     },
