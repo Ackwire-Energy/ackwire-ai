@@ -375,7 +375,7 @@ export const envVars = {
     description:
       "Name of our computer snapshot in Daytona (built from infra/sandbox/Dockerfile by `bun apps/server/scripts/sandbox-snapshot.ts`). Unset: the provider's default image, with /workspace created on first start.",
     section: "Sandbox",
-    example: "agentes-computer-v2",
+    example: "agentes-computer-v3",
   },
   SANDBOX_AUTO_STOP_MINUTES: {
     schema: z.coerce.number().int().min(1).max(120).default(10),

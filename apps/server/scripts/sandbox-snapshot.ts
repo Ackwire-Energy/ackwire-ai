@@ -5,7 +5,7 @@
  *
  * Builds infra/sandbox/Dockerfile on Daytona (POST /snapshots with the
  * Dockerfile content), waits until it is active, starts one sandbox from it
- * (no network) and runs `node -v`, `npm -v`, `pnpm -v`, `yarn -v` and
+ * (no network) and runs `node -v`, `npm -v`, `pnpm -v`, `yarn -v`, gcc, go, cargo, sudo and
  * `python3 -c "import pandas, matplotlib"`, then deletes that sandbox. Set
  * SANDBOX_SNAPSHOT to the name afterwards. Never part of `bun test`.
  */
@@ -21,7 +21,7 @@ if (!key) {
 }
 // The current image version; bump it whenever infra/sandbox/Dockerfile changes
 // (a snapshot is immutable), then point SANDBOX_SNAPSHOT at the new name.
-const name = process.argv[2] ?? "agentes-computer-v2";
+const name = process.argv[2] ?? "agentes-computer-v3";
 const api = config.DAYTONA_API_URL.replace(/\/$/, "");
 const headers = { authorization: `Bearer ${key}`, "content-type": "application/json" };
 const dockerfile = await Bun.file(resolve(import.meta.dir, "../../../infra/sandbox/Dockerfile")).text();
@@ -89,6 +89,10 @@ try {
     "command -v pnpm",
     "yarn -v",
     "python3 -c \"import pandas, matplotlib; print('ok')\"",
+    "gcc --version | head -1",
+    "go version",
+    "cargo --version",
+    "sudo -n true && echo sudo-ok",
     "pwd",
     "whoami",
   ]) {
