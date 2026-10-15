@@ -15,6 +15,7 @@ export * from "./connectors/connections";
 export * from "./connectors/custom";
 export * from "./connectors/mcp";
 export * from "./connectors/oauth-mcp";
+export * from "./connectors/presets";
 export * from "./context";
 export * from "./context/consolidate";
 export * from "./context/feedback";

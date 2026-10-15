@@ -5,7 +5,11 @@ import {
   connectCustomServer,
   connectOverHttp,
   listCustomServers,
+  MCP_PRESETS,
+  mcpPreset,
+  NotFoundError,
   refreshCustomServer,
+  requirePermission,
   revokeConnection,
   saveCustomTools,
 } from "@agenteschat/engine";
@@ -118,6 +122,62 @@ export function customConnectorRoutes(deps: AppDeps) {
         c.req.valid("param").orgId,
         c.req.valid("json"),
       );
+      return c.json(started, 200);
+    },
+  );
+
+  const Preset = z
+    .object({ id: z.string(), label: z.string(), description: z.string(), icon: z.string(), serverUrl: z.string() })
+    .openapi("McpPreset");
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/connectors/presets",
+      tags,
+      security,
+      summary: "One-click connectors: official MCP servers with OAuth and dynamic registration",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ presets: z.array(Preset) })), ...errors },
+    }),
+    async (c) => {
+      await requirePermission(db, c.get("user").id, c.req.valid("param").orgId, "read");
+      return c.json({ presets: [...MCP_PRESETS] }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/connectors/presets/{presetId}/connect",
+      tags,
+      security,
+      summary: "Connect a one-click connector (admins): returns the OAuth URL to open",
+      description:
+        "After the OAuth, our suggested classification is applied to its tools (admins can change it). No app registration needed.",
+      request: {
+        params: OrgParams.extend({ presetId: z.string().max(60) }),
+        body: body(z.object({ returnTo: z.string().max(500).optional() })),
+      },
+      responses: {
+        200: json(
+          z.union([
+            z.object({ status: z.literal("connected"), server: CustomServer }),
+            z.object({ status: z.literal("oauth"), authorizeUrl: z.string() }),
+            z.object({ status: z.literal("needs_key") }),
+          ]),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, presetId } = c.req.valid("param");
+      const preset = mcpPreset(presetId);
+      if (!preset) throw new NotFoundError("Unknown connector");
+      const started = await connectCustomServer(custom, c.get("user").id, orgId, {
+        serverUrl: preset.serverUrl,
+        label: preset.label,
+        returnTo: c.req.valid("json").returnTo,
+      });
       return c.json(started, 200);
     },
   );

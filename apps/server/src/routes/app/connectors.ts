@@ -1,5 +1,6 @@
 import { connectorOAuthApps } from "@agenteschat/config";
 import {
+  acceptCustomSuggestion,
   BUILTIN_SCOPES,
   CONNECTOR_CATALOG,
   type ConnectorDeps,
@@ -13,7 +14,9 @@ import {
   listAgentScopes,
   listConnections,
   NotFoundError,
+  presetForServer,
   requirePermission,
+  revokeAtProvider,
   revokeConnection,
   setAgentScopes,
   startOAuth,
@@ -192,6 +195,8 @@ export function connectorRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, connectionId } = c.req.valid("param");
+      await requirePermission(db, c.get("user").id, orgId, "manage_connectors");
+      await revokeAtProvider(connectorDeps, orgId, connectionId).catch(() => false);
       await revokeConnection(db, c.get("user").id, orgId, connectionId);
       return c.body(null, 204);
     },
@@ -253,6 +258,15 @@ export function connectorRoutes(deps: AppDeps) {
         if (isCustom(connection)) {
           const connect = deps.extras?.mcpConnect ?? connectOverHttp;
           await syncCustomTools({ ...connectorDeps, connect }, connection).catch(() => {});
+          // A one-click connector: its tools get our suggested classification right away.
+          if (presetForServer(connection.serverUrl)) {
+            await acceptCustomSuggestion(
+              { ...connectorDeps, connect },
+              c.get("user").id,
+              connection.orgId,
+              connection.id,
+            ).catch(() => {});
+          }
         }
         const sep = returnTo.includes("?") ? "&" : "?";
         return c.redirect(`${base}${returnTo}${sep}connected=${encodeURIComponent(connection.connector)}`, 302);

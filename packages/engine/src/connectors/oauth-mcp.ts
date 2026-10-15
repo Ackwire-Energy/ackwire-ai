@@ -96,6 +96,14 @@ export async function probeMcpServer(deps: McpOAuthDeps, serverUrl: string): Pro
       return { kind: "oauth", resource, issuer: servers[0], scopes };
     }
   }
+  // No protected-resource metadata (older servers, e.g. Atlassian or Zapier): the MCP spec's fallback
+  // is an authorization server at the server's own origin.
+  if (/^bearer\b/i.test(header)) {
+    const meta = await authServerMetadata(deps, base.origin).catch(() => null);
+    if (meta?.registration_endpoint) {
+      return { kind: "oauth", resource: canonicalResource(serverUrl), issuer: base.origin, scopes: [] };
+    }
+  }
   return { kind: "needs_key" };
 }
 

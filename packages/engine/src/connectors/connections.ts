@@ -177,6 +177,34 @@ export async function listConnections(db: Database, actorId: string, orgId: stri
 }
 
 /** Disconnects: the secret stays sealed but unused; agents lose the connection's scopes. */
+/**
+ * Best effort: tells the provider to drop our grant too (GitHub OAuth apps:
+ * `DELETE /applications/{client_id}/grant`). Never blocks disconnecting.
+ */
+export async function revokeAtProvider(deps: ConnectorDeps, orgId: string, connectionId: string) {
+  const [c] = await deps.db
+    .select()
+    .from(connectorConnections)
+    .where(and(eq(connectorConnections.id, connectionId), eq(connectorConnections.orgId, orgId)));
+  if (!c || c.revokedAt || c.connector !== "github" || c.authType !== "oauth") return false;
+  const app = deps.oauthApps?.github;
+  const secret = await openConnectionSecret(deps.keyWrappers, c).catch(() => null);
+  if (!app || !secret?.accessToken) return false;
+  const res = await (deps.http ?? fetch)(
+    `https://api.github.com/applications/${encodeURIComponent(app.clientId)}/grant`,
+    {
+      method: "DELETE",
+      headers: {
+        authorization: `Basic ${Buffer.from(`${app.clientId}:${app.clientSecret}`).toString("base64")}`,
+        accept: "application/vnd.github+json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ access_token: secret.accessToken }),
+    },
+  ).catch(() => null);
+  return Boolean(res && (res.status === 204 || res.status === 404));
+}
+
 export async function revokeConnection(db: Database, actorId: string, orgId: string, connectionId: string) {
   await requirePermission(db, actorId, orgId, "manage_connectors");
   await db.transaction(async (tx) => {
