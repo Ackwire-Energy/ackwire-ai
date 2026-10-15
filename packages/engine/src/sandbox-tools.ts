@@ -692,7 +692,7 @@ export function createSandboxToolSource(
     },
     {
       name: "upload_file",
-      description: `Send a file from your computer to the Drive as is (PDF, images, zip, Office files, anything), up to ${ARTIFACT_LIMITS.fileBytes / 1024 / 1024} MB; a folder goes as a .zip. The bytes go straight to the Drive and never through you. With artifact_id, saves a new version of that uploaded file. The path is relative to your workspace; a file elsewhere on the machine must be copied into the workspace first (run_code, e.g. `cp ~/x/report.pdf .`). To turn a text file into a native document, table, page or diagram, use export_file instead.`,
+      description: `Send a file from your computer to the Drive as is (PDF, images, zip, Office files, anything), up to ${ARTIFACT_LIMITS.fileBytes / 1024 / 1024} MB; a folder goes as a .zip. The bytes go straight to the Drive and never through you. With artifact_id, saves a new version of that uploaded file. The path is relative to your workspace; a file elsewhere on the machine must be copied into the workspace first (run_code, e.g. \`cp ~/x/report.pdf .\`). To turn a text file into a native document, table, page or diagram, use export_file instead.`,
       scope: SANDBOX_SCOPE,
       inputSchema: {
         type: "object",
