@@ -169,7 +169,7 @@ describe("repeating events", () => {
       participants: [],
     });
     const years = (
-      await calendarRange(deps(), f.owner.id, f.org.id, "2026-10-01T00:00:00Z", "2027-11-30T00:00:00Z")
+      await calendarRange(deps(), f.owner.id, f.org.id, "2026-10-15T00:00:00Z", "2027-11-15T00:00:00Z")
     ).events
       .filter((e) => e.seriesId === birthday.id)
       .map((e) => e.startDate);

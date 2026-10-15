@@ -152,7 +152,7 @@ describe("routines", () => {
     });
     await expect(
       parseScheduleForOrg(routineDeps(), f.owner.id, f.org.id, "todo dia às 8h", "Mars/Base"),
-    ).rejects.toThrow("Fuso");
+    ).rejects.toMatchObject({ code: "schedule.unknown_timezone", params: { timezone: "Mars/Base" } });
 
     await runRoutineNow(routineDeps(), f.owner.id, f.org.id, routine.id);
     await drainOutbox(f.db, f.handlers);

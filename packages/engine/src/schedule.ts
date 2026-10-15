@@ -227,12 +227,16 @@ export function parseWhen(input: string, timezone: string, now = new Date()): Wh
 // ── Phrase → structured rule (the period picker) ─────────────────────────────
 
 const RULE_DAYS = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+// Word edges by hand: `\b` is ASCII-only in JS, so it never matches before "último".
+const W = "(?<![\\p{L}\\p{N}])";
+const E = "(?![\\p{L}\\p{N}])";
+const ordinal = (body: string, extra = "") => new RegExp(`${W}(${body})${E}${extra}`, "u");
 const ORDINALS: [RegExp, number][] = [
-  [/\b(primeir[ao]|1[ºªa°o]?|first)\b/, 1],
-  [/\b(segund[ao]|2[ºªa°o]?|second)\b(?!-feira)/, 2],
-  [/\b(terceir[ao]|3[ºªa°o]?|third)\b/, 3],
-  [/\b(quart[ao]|4[ºªa°o]?|fourth)\b(?!-feira)/, 4],
-  [/\b([úu]ltim[ao]|last)\b/, -1],
+  [ordinal("primeir[ao]|1[ºªa°o]?|first"), 1],
+  [ordinal("segund[ao]|2[ºªa°o]?|second", "(?!-feira)"), 2],
+  [ordinal("terceir[ao]|3[ºªa°o]?|third"), 3],
+  [ordinal("quart[ao]|4[ºªa°o]?|fourth", "(?!-feira)"), 4],
+  [ordinal("[úu]ltim[ao]|last"), -1],
 ];
 
 /**

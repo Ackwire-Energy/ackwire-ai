@@ -336,9 +336,9 @@ describe("network mode", () => {
     await call(ctx, "write_file", { path: "a.txt", content: "a" });
     expect(provider.calls[0]?.spec?.network).toBe("blocked");
 
-    await expect(updateSandboxSettings(f.db, f.owner.id, f.org.id, { network: "allowlist" })).rejects.toThrow(
-      "domínio",
-    );
+    await expect(updateSandboxSettings(f.db, f.owner.id, f.org.id, { network: "allowlist" })).rejects.toMatchObject({
+      code: "sandbox.allowlist_empty",
+    });
     const member = await addMember(f.db, f.org.id, "member", "bia");
     await expect(updateSandboxSettings(f.db, member.id, f.org.id, { network: "open" })).rejects.toBeInstanceOf(
       ForbiddenError,
