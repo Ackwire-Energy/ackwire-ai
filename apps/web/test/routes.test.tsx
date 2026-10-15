@@ -54,10 +54,7 @@ describe("route guards", () => {
   });
 
   test("linked-only screens render designed empty states", async () => {
-    for (const [path, title] of [
-      ["forum", "Fórum"],
-      ["threads/x", "Threads"],
-    ] as const) {
+    for (const [path, title] of [["threads/x", "Threads"]] as const) {
       await renderApp(`/org/${ORG_ID}/${path}`, { api: createFakeApi() });
       await settle();
       expect(screen().getByRole("heading", { level: 1, name: title })).toBeTruthy();

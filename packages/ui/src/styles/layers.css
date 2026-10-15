@@ -5,6 +5,7 @@
  */
 :root {
   --z-raised: 1;
+  --z-lifted: 2;
   --z-sticky: 1;
   --z-scrim: 40;
   --z-dialog: 41;

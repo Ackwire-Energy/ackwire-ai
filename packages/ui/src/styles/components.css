@@ -2961,7 +2961,7 @@ a.ac-list__row:focus-visible {
 /* The row being hovered stays above its neighbours, so its bar is never under the next row. */
 .ac-msg:hover,
 .ac-msg:focus-within {
-  z-index: 2;
+  z-index: var(--z-lifted);
 }
 .ac-msg__text {
   line-height: 1.62;
