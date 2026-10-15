@@ -96,6 +96,11 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         }
       },
     },
+    waitlist: {
+      join: async (input) => {
+        await request<{ ok: true }>("/api/waitlist", { json: input });
+      },
+    },
     account: {
       authConfig: () => request<AuthConfig>("/api/app/auth-config"),
       me: () => nullOn(401, () => request<Me>("/api/app/me")),

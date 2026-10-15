@@ -31,6 +31,7 @@ import { wikiRoutes } from "./routes/app/wiki";
 import { registerGitProxy } from "./routes/git";
 import { registerHealth } from "./routes/health";
 import { machineAppRoutes, registerMachinePublicRoutes } from "./routes/machines";
+import { registerWaitlist } from "./routes/waitlist";
 import { registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
 
 export interface AppOptions {
@@ -59,6 +60,7 @@ export interface AppOptions {
  * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
  * - `/api/git/*`          git proxy for agents' computers (their own credential, D35)
  * - `/api/machines/*`     connected computers' runner: pair, uploads, install.sh (ADR 0025)
+ * - `/api/waitlist`       public: join the waiting list (landing page)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - everything else       web app (single-page app), when built
@@ -111,6 +113,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", webhookAdminRoutes(deps));
     registerWebhookReceiver(api, deps);
     registerMachinePublicRoutes(api, deps);
+    registerWaitlist(api, deps);
     if (deps.extras?.gitProxy) registerGitProxy(api, deps.extras.gitProxy);
   }
 

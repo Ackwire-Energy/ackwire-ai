@@ -14,11 +14,10 @@ afterEach(() => {
 });
 
 describe("route guards", () => {
-  test("signed out: / goes to /login with the way back", async () => {
+  test("signed out: / shows the landing page", async () => {
     const { router } = await renderApp("/", { api: createFakeApi(seedState({ me: null })) });
-    expect(router.state.location.pathname).toBe("/login");
-    expect(router.state.location.search).toEqual({ redirect: "/" });
-    expect(screen().getByRole("heading", { name: "Entrar" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/");
+    expect(screen().getByRole("heading", { level: 1, name: /na mesma conversa/ })).toBeTruthy();
   });
 
   test("signed in without organizations: / goes to onboarding", async () => {

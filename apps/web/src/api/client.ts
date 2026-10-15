@@ -456,6 +456,10 @@ export interface ApiClient {
     /** Expired invitation: ask the inviter for a new one. */
     requestNew(token: string): Promise<void>;
   };
+  /** Public waiting list (`POST /api/waitlist`, outside `/api/app`): same answer whether or not the email was there. */
+  waitlist: {
+    join(input: { email: string; locale: string }): Promise<void>;
+  };
 }
 
 /** Everything is served by the HTTP backend (apps/server/src/routes/app). */
