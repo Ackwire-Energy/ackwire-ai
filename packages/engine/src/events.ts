@@ -40,6 +40,23 @@ export type ChannelEvent =
       agentId: string;
       seq: number;
       text: string;
+      /** The model call this text belongs to (1, 2…): a new turn starts a new segment, never glued to the last one. */
+      turn: number;
+    }
+  /**
+   * The text the agent streamed before calling tools was progress narration
+   * ("Go não está instalado; vou tentar…"), not the answer: show it as a step
+   * of the work and clear it from the live reply. The message holds only the
+   * final answer.
+   */
+  | {
+      type: "agent.narration";
+      channelId: string;
+      threadId: string | null;
+      runId: string;
+      agentId: string;
+      turn: number;
+      text: string;
     }
   /** An agent run changed state (`running` = typing indicator). */
   | {

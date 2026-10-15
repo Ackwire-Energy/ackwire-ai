@@ -223,11 +223,11 @@ describe("approval flow (end to end)", () => {
     const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
     expect(approval).toMatchObject({ title: "Merge PR #42 in acme/app", canDecide: true, threadId: question.id });
 
-    // The chat shows what the agent said and an approval card.
+    // The chat shows what the agent said before the approval and the card; earlier narration is a step.
     let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
     expect(thread.map((m) => m.body)).toEqual([
       "@dev merge PR 42 if the tests pass",
-      "Let me look at the PR.\n\nTests pass, merging.",
+      "Tests pass, merging.",
       "Pedido de aprovação: Merge PR #42 in acme/app",
     ]);
     expect(thread[2]?.meta).toEqual({ approvalId: approval?.id });

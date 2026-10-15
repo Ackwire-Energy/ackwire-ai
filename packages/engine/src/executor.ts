@@ -407,7 +407,9 @@ async function executeRunInner(
       inputSchema: t.inputSchema,
     }));
 
+    const turn = run.turns + 1;
     const deltas = createDeltaPublisher(deps.pubsub, run, replyThreadId, deps.deltaFlushMs ?? 50, transcript.deltaSeq, {
+      turn,
       event: { type: "agent.typing", ...where },
       onFirst: () => deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id }),
     });
@@ -427,6 +429,9 @@ async function executeRunInner(
     } catch (error) {
       await deltas.flush();
       await deferred;
+      // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
+      transcript.deltaSeq = deltas.seq();
+      await saveTranscript(db, transcript).catch(() => {});
       const reason = userFacing(error);
       if (reason) return fail(reason);
       if (options.finalAttempt) return fail(`gave_up: ${error instanceof Error ? error.message : String(error)}`);
@@ -438,6 +443,9 @@ async function executeRunInner(
     await deferred;
     transcript.deltaSeq = deltas.seq();
     transcript.messages.push({ role: "assistant", content: result.content });
+    // Text before tool calls is narration of the work: kept on the model call's step, not part of the answer.
+    const turnText = textOf(result.content).trim();
+    const narration = result.stopReason === "tool_use" && turnText ? turnText : "";
     // Independent writes in parallel (different rows).
     const [counted] = await Promise.all([
       db
@@ -451,9 +459,20 @@ async function executeRunInner(
         usageRecordId: result.usageRecordId,
         costNanoUsd: result.costNanoUsd,
         ...result.usage,
+        turn,
+        ...(narration ? { narration: narration.slice(0, 4000) } : {}),
       }),
     ]);
     if (counted[0]) run = counted[0];
+
+    if (narration) {
+      await publishChannelEvent(deps.pubsub, {
+        type: "agent.narration",
+        ...where,
+        turn,
+        text: narration.slice(0, 4000),
+      });
+    }
 
     const toolUses = result.content.filter(
       (b): b is Extract<ContentBlock, { type: "tool_use" }> => b.type === "tool_use",
@@ -529,7 +548,8 @@ async function executeRunInner(
       const t = transcript;
       const posted = await db.transaction(async (tx) => {
         const out: Message[] = [];
-        const said = unpostedText(t);
+        // Only this turn's text (it introduces the approval or question); earlier narration is in the steps.
+        const said = turnText;
         if (said) out.push(await postAgentMessage(tx, run, replyThreadId, said, takeMemoryUpdates(t)));
         t.postedUpTo = t.messages.length;
         t.postedCount += out.length + waiting.length + asks.length;
@@ -607,9 +627,13 @@ async function executeRunInner(
     if (result.stopReason === "refusal") return fail("model_refused");
     const updates = transcript.memoryUpdates ?? [];
     const saved = (transcript.artifacts ?? []).length > 0 ? "Arquivo salvo." : "";
-    const text =
-      unpostedText(transcript) || (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "") || saved;
     const anythingPosted = transcript.postedCount > 0;
+    // The message is the final answer only: the last model call's text. Without it, a short closing line.
+    const text =
+      turnText ||
+      (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "") ||
+      saved ||
+      closingSummary(transcript, anythingPosted);
     if (!text && !anythingPosted) return fail("empty_reply");
     const t = transcript;
     const reply = await db.transaction(async (tx) => {
@@ -645,14 +669,20 @@ async function executeRunInner(
   }
 }
 
-/** Text of the assistant turns not yet posted to the chat. */
-function unpostedText(t: Transcript): string {
-  return t.messages
-    .slice(t.postedUpTo)
-    .filter((m) => m.role === "assistant")
+/**
+ * When the final model call wrote nothing: the agent's last narration since
+ * the last post ("Instalei o Go e compilei."), else a plain "Pronto." when it
+ * used tools, else nothing (an empty reply fails the run).
+ */
+function closingSummary(t: Transcript, anythingPosted: boolean): string {
+  const turns = t.messages.slice(t.postedUpTo).filter((m) => m.role === "assistant");
+  const last = turns
     .map((m) => textOf(m.content).trim())
     .filter(Boolean)
-    .join("\n\n");
+    .at(-1);
+  if (last) return last;
+  const usedTools = turns.some((m) => typeof m.content !== "string" && m.content.some((b) => b.type === "tool_use"));
+  return usedTools && !anythingPosted ? "Pronto." : "";
 }
 
 function postAgentMessage(
@@ -683,7 +713,7 @@ function createDeltaPublisher(
   threadId: string | null,
   flushMs: number,
   startSeq = 0,
-  first?: { event: ChannelEvent; onFirst?: () => void },
+  first: { turn: number; event?: ChannelEvent; onFirst?: () => void },
 ) {
   let started = false;
   const MAX_CHUNK = 2000;
@@ -706,17 +736,19 @@ function createDeltaPublisher(
         agentId: run.agentId,
         seq: seq++,
         text,
+        turn: first.turn,
       };
       pending = pending.then(() => publishChannelEvent(pubsub, evt));
     }
   };
   return {
     push(text: string) {
-      if (text && !started && first) {
+      if (text && !started) {
         started = true;
         first.onFirst?.();
         // Published in order, before the first delta.
-        pending = pending.then(() => publishChannelEvent(pubsub, first.event));
+        const typing = first.event;
+        if (typing) pending = pending.then(() => publishChannelEvent(pubsub, typing));
       }
       buffer += text;
       if (flushMs === 0 || buffer.length >= MAX_CHUNK) send();
