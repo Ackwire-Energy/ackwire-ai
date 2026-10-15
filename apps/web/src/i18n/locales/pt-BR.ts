@@ -1197,6 +1197,8 @@ export const ptBR = {
     },
   },
   code: {
+    ranSummary_one: "Rodou {{count}} linha de {{language}} · saída {{size}}",
+    ranSummary_other: "Rodou {{count}} linhas de {{language}} · saída {{size}}",
     show: "Ver código {{of}} {{name}}",
     hide: "Esconder código",
     running: "{{name}} está rodando",
@@ -1344,6 +1346,13 @@ export const ptBR = {
     savedTo: "Salvo em {{title}}.",
     fromMessage: "de uma mensagem em #{{channel}}",
     fromForum: "da síntese do fórum",
+  },
+  run: {
+    stop: "Parar",
+    stopping: "Parando…",
+    stopHint: "Parar a tarefa (Esc)",
+    canceledBy: "Interrompido por {{name}}",
+    canceled: "Interrompido",
   },
   computer: {
     title: "PC {{of}} {{name}}",

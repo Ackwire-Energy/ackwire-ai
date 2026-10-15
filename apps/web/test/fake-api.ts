@@ -827,6 +827,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return channels.map((c) => ({ id: c.channelId, name: "", autoReply: c.autoReply ?? true }));
       },
       runs: async (_orgId, filter = {}) => state.runs.filter((r) => !filter.agentId || r.agentId === filter.agentId),
+      cancelRun: async (orgId, runId) => {
+        log("agents.cancelRun", orgId, runId);
+      },
       run: async (_orgId, runId) => {
         const r = state.runs.find((x) => x.id === runId);
         if (!r) throw new ApiError(404, "not_found", "Run not found");

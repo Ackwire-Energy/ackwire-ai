@@ -163,6 +163,7 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       runs: async (orgId, filter = {}) =>
         (await request<{ runs: Run[] }>(`${org(orgId)}/runs`, { query: filter })).runs,
       run: (orgId, runId) => request<{ run: Run; steps: RunStep[] }>(`${org(orgId)}/runs/${enc(runId)}`),
+      cancelRun: (orgId, runId) => request<void>(`${org(orgId)}/runs/${enc(runId)}/cancel`, { json: {} }),
       usage: async (orgId) => {
         const res = await nullOn(403, () => request<{ usage: AgentUsage[] }>(`${org(orgId)}/usage`));
         return res ? res.usage : null;

@@ -24,8 +24,10 @@ import {
   emptyStreams,
   expectReply,
   type LiveRun,
+  markStopping,
   type StreamsState,
   staleProvisional,
+  unmarkStopping,
 } from "./streams";
 import { applyTyping, stopTyping, type TypingState, typingThrottle } from "./typing";
 
@@ -210,6 +212,10 @@ export function createStreamsStore(
     answered: (question: AgentQuestion) =>
       set({ ...state, questions: { ...state.questions, [question.id]: question } }),
     dismiss: (runId: string) => set({ ...state, streams: dismissRun(state.streams, runId) }),
+    /** "Parar" pressed (optimistic) / the cancel failed. */
+    stopping: (runId: string, byUserId: string) =>
+      set({ ...state, streams: markStopping(state.streams, runId, byUserId) }),
+    unstopping: (runId: string) => set({ ...state, streams: unmarkStopping(state.streams, runId) }),
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => {

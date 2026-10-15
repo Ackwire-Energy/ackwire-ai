@@ -1195,6 +1195,8 @@ export const en: Translations = {
     },
   },
   code: {
+    ranSummary_one: "Ran {{count}} line of {{language}} · output {{size}}",
+    ranSummary_other: "Ran {{count}} lines of {{language}} · output {{size}}",
     show: "See {{name}}'s code",
     hide: "Hide code",
     running: "{{name}} is running",
@@ -1342,6 +1344,13 @@ export const en: Translations = {
     savedTo: "Saved to {{title}}.",
     fromMessage: "from a message in #{{channel}}",
     fromForum: "from the forum synthesis",
+  },
+  run: {
+    stop: "Stop",
+    stopping: "Stopping…",
+    stopHint: "Stop the task (Esc)",
+    canceledBy: "Stopped by {{name}}",
+    canceled: "Stopped",
   },
   computer: {
     title: "{{name}}'s PC",

@@ -3801,3 +3801,97 @@ a.forum-card__title::after {
     background-color: transparent;
   }
 }
+
+/* Live work in a reply: narration lines and tool calls, stacked like a mini timeline. */
+.live-work {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 6px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+.live-work__say {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.live-call {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.live-call__head {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  margin: 0;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: var(--radius-item);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink2);
+  cursor: pointer;
+}
+button.live-call__head:hover {
+  background: var(--plate);
+}
+.live-call__head:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.live-call__head--static {
+  cursor: default;
+  color: var(--muted);
+}
+.live-call__head .ac-icon {
+  color: var(--faint);
+}
+/* "Parar": glass ghost with a stop icon. */
+.run-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.stop-run.ac-btn {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  background: var(--glass-solid);
+  box-shadow: var(--e1);
+  color: var(--ink2);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .stop-run.ac-btn {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+}
+.stop-run.ac-btn:hover {
+  color: var(--ink);
+  box-shadow: var(--e2);
+}
+.run-canceled {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--faint);
+  font-style: italic;
+}
+.ac-typing__said {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-typing__said strong {
+  color: var(--ink2);
+  font-weight: 600;
+}

@@ -17,13 +17,14 @@ import { ErrorState, LoadingPage } from "@/components/Loading";
 import { MessageWork } from "@/components/MessageWork";
 import { useOrg } from "@/components/org-context";
 import { SaveToWikiDialog } from "@/components/SaveToWiki";
+import { isStoppable, StopButton, useStopRun } from "@/components/StopRun";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useDirectory } from "@/hooks/useDirectory";
 import { formatTime, relativeTime } from "@/lib/format";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import { useChannelRealtime, useStreams } from "@/realtime/context";
-import { agentStateIn } from "@/realtime/streams";
+import { agentStateIn, runsInChannel } from "@/realtime/streams";
 
 /** The closing post (`meta.synthesis`): shown with the synthesis, not in a round. */
 export const isSynthesisPost = (p: ForumPost) => p.meta?.synthesis === true;
@@ -88,6 +89,9 @@ function TopicView({ topic }: { topic: ForumTopicDetail }) {
     ",",
   );
   const open = topic.status === "open";
+  // "Parar" for the current turn.
+  const liveRuns = useStreams((s) => runsInChannel(s, topic.channelId));
+  const { canStop, stop } = useStopRun();
   const live = open
     ? topic.agentIds
         .map((id, i) => ({
@@ -227,6 +231,10 @@ function TopicView({ topic }: { topic: ForumTopicDetail }) {
             <span key={a.id} className="forum-live__item">
               <AgentAvatar agentId={a.id} name={a.name} size="sm" state={a.state ?? undefined} />
               {t(a.state === "writing" ? "forum.writing" : "forum.thinking", { name: a.name })}
+              {(() => {
+                const run = liveRuns.find((r) => r.agentId === a.id && isStoppable(r));
+                return run && canStop(run) ? <StopButton run={run} onStop={stop} /> : null;
+              })()}
             </span>
           ))}
         </div>

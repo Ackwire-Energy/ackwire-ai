@@ -173,6 +173,8 @@ export interface ApiClient {
       filter?: { agentId?: string; status?: string; before?: string; since?: string; limit?: number },
     ): Promise<Run[]>;
     run(orgId: string, runId: string): Promise<{ run: Run; steps: RunStep[] }>;
+    /** "Parar": stops a run (the person who started it, the agent's owner, admins). */
+    cancelRun(orgId: string, runId: string): Promise<void>;
     /** This month's usage per agent; `null` without the `view_usage` permission. */
     usage(orgId: string): Promise<AgentUsage[] | null>;
   };

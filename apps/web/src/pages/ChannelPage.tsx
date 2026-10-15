@@ -62,7 +62,7 @@ import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { InlineProposal, MemoryChangeCard, QuestionCard } from "@/components/ChatCards";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { ForumMessageCard, forumTopicOfMessage } from "@/components/Forum";
-import { LiveCodeToggle } from "@/components/LiveCode";
+import { LiveCodeToggle, LiveWorkList } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
 import { MessageFeedback, ReactionPills } from "@/components/MessageFeedback";
@@ -71,6 +71,7 @@ import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
+import { isStoppable, StopButton, useStopRun } from "@/components/StopRun";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
@@ -96,7 +97,7 @@ import {
   useStreams,
   useTypingSender,
 } from "@/realtime/context";
-import { agentStateOfRun, type LiveRun, runsInChannel } from "@/realtime/streams";
+import { agentStateOfRun, type LiveRun, narrationOf, runsInChannel } from "@/realtime/streams";
 import { typingIn } from "@/realtime/typing";
 
 /** Header and empty state of a channel, or of a DM (same layout). */
@@ -222,8 +223,26 @@ function ChannelView({
   // ⌘K "Pedir a um agente" leaves the text for this DM's composer.
   const draftKey = chrome?.dmAgentId ? `agent:${chrome.dmAgentId}` : null;
   const [draft, setDraft] = useState(() => (draftKey ? (peekDraft(draftKey) ?? "") : ""));
+  // Esc (composer empty, nothing open): stops the most recent run here that I may stop.
+  const { canStop: mayStop, stop: stopRun } = useStopRun();
+  const draftRef = useRef("");
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || draftRef.current.trim()) return;
+      if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+      const target = runsInChannel(live.get().streams, channel.id)
+        .filter((r) => isStoppable(r) && !r.stopping && mayStop(r))
+        .at(-1);
+      if (!target) return;
+      e.preventDefault();
+      stopRun(target);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   // "Responder em thread": the next message goes to that thread.
   const [replyTo, setReplyTo] = useState<MessageType | null>(null);
+  draftRef.current = draft;
   useEffect(() => {
     if (draftKey) clearDraft(draftKey);
   }, [draftKey]);
@@ -938,6 +957,8 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
   const name = agent?.name ?? t("channel.unknownAgent");
   const failed = run.status === "failed";
   const waiting = run.status === "waiting_approval";
+  const canceled = run.status === "canceled";
+  const { canStop, stop } = useStopRun();
   // Same clock face as the final message ("21:10"), from when the first words showed.
   const [startedAt] = useState(() => new Date().toISOString());
   const text = useRevealedText(run.text);
@@ -950,14 +971,14 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
     <Message
       agent
       grouped={grouped}
-      streaming={!failed && !waiting}
+      streaming={!failed && !waiting && !canceled}
       avatar={<Avatar kind="agent" name={name} state={agentStateOfRun(run)} appearance={lookOf(agent)} />}
       author={name}
       time={<time dateTime={startedAt}>{formatTime(i18n.language, startedAt)}</time>}
       status={waiting ? { icon: "waiting", label: t("channel.waitingApproval") } : undefined}
       data-live={run.status}
     >
-      {!failed && !waiting && <span className="ac-visually-hidden">{t("channel.writing")}</span>}
+      {!failed && !waiting && !canceled && <span className="ac-visually-hidden">{t("channel.writing")}</span>}
       {failed ? (
         <p className="ac-msg__error" role="alert">
           <Icon name="alert" size={18} />
@@ -977,13 +998,36 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
         </p>
       ) : (
         <>
-          <MessageText>
-            <MessageBody body={text} resolveMention={dir.mentionName} />
-          </MessageText>
-          {doing && doing.kind !== "thinking" && (
-            <p className="ac-msg__activity" aria-live="polite">
-              {capitalize(activityVerb(t, doing))}…
+          {/* What it said and did before this answer: narration and each tool call (code + output). */}
+          <LiveWorkList work={run.work ?? []} />
+          {text && (
+            <MessageText>
+              <MessageBody body={text} resolveMention={dir.mentionName} />
+            </MessageText>
+          )}
+          {canceled ? (
+            <p className="ac-msg__activity run-canceled">
+              {run.canceledBy && dir.memberById.get(run.canceledBy)
+                ? t("run.canceledBy", { name: dir.memberById.get(run.canceledBy)?.name })
+                : t("run.canceled")}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                icon="close"
+                aria-label={t("common.close")}
+                onClick={() => dismissRun(run.runId)}
+              />
             </p>
+          ) : (
+            <div className="run-status">
+              {doing && doing.kind !== "thinking" && !(run.work ?? []).some((w) => w.kind === "call" && w.running) && (
+                <p className="ac-msg__activity" aria-live="polite">
+                  {capitalize(activityVerb(t, doing))}…
+                </p>
+              )}
+              {isStoppable(run) && canStop(run) && <StopButton run={run} onStop={stop} />}
+            </div>
           )}
         </>
       )}
@@ -1018,8 +1062,20 @@ function ActivityBar({ channelId }: { channelId: string }) {
   );
   const text = activityText(t, entries);
   const active = entries.length > 0;
+  const { canStop, stop } = useStopRun();
+  // "Parar" in the bar for the runs not writing yet that I may stop.
+  const barStoppable = runs.filter((r) => !isWriting(r) && isStoppable(r) && canStop(r));
   // Agents running code (not writing yet): "Ver código" with the live code and output.
   const coding = runs.filter((r) => !isWriting(r) && r.code);
+  // What they said last between tool calls ("Theo: Go não está instalado; vou tentar…").
+  const said = runs
+    .filter((r) => !isWriting(r))
+    .flatMap((r) => {
+      const last = narrationOf(r).at(-1);
+      return last
+        ? [{ id: r.runId, name: dir.agentById.get(r.agentId)?.name ?? t("channel.unknownAgent"), text: last }]
+        : [];
+    });
   return (
     <>
       {coding.map((r) =>
@@ -1032,6 +1088,11 @@ function ActivityBar({ channelId }: { channelId: string }) {
           />
         ) : null,
       )}
+      {said.map((n) => (
+        <p key={n.id} className="ac-typing__said">
+          <strong>{n.name}:</strong> {n.text}
+        </p>
+      ))}
       <div className="ac-typing" aria-live="polite" data-active={active}>
         {active && (
           <>
@@ -1060,6 +1121,9 @@ function ActivityBar({ channelId }: { channelId: string }) {
               <span />
               <span />
             </span>
+            {barStoppable.map((r) => (
+              <StopButton key={r.runId} run={r} onStop={stop} />
+            ))}
           </>
         )}
       </div>

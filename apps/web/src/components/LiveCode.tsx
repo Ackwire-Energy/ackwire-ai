@@ -1,10 +1,11 @@
-import { Button, Icon } from "@agenteschat/ui";
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { Button, Icon, Spinner } from "@agenteschat/ui";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { activityVerb, toolActivity } from "@/lib/activity";
 import { nearBottom } from "@/lib/chat";
 import { agentGrammar } from "@/lib/grammar";
 import { useToast } from "@/lib/toast";
-import type { LiveCode, LiveOutput } from "@/realtime/streams";
+import type { LiveCode, LiveOutput, LiveWork } from "@/realtime/streams";
 
 const KEYWORDS = new Set([
   // Python
@@ -187,6 +188,83 @@ export function LiveCodeToggle({ name, code, output }: { name: string; code: Liv
         {open ? t("code.hide") : t("code.show", agentGrammar(t, name))}
       </button>
       {open && <CodePanel code={code} output={output} live header={t("code.running", { name })} />}
+    </div>
+  );
+}
+
+/** "3,4 KB" / "820 B". */
+export function formatBytes(locale: string, bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(kb)} KB`;
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(kb / 1024)} MB`;
+}
+
+const outputBytes = (output: LiveOutput[]) => output.reduce((n, o) => n + new TextEncoder().encode(o.text).length, 0);
+
+/** One tool call in a live reply: the status line (a button) and, open, its code and output. */
+function LiveCallBlock({ call }: { call: Extract<LiveWork, { kind: "call" }> }) {
+  const { t, i18n } = useTranslation();
+  const activity = toolActivity(call.tool, call.connector, call.detail);
+  const hasDetail = Boolean(call.code) || call.output.length > 0;
+  // Open while it runs; it folds into a one-line summary when the call ends (the person can reopen it).
+  const [open, setOpen] = useState(call.running);
+  const wasRunning = useRef(call.running);
+  useEffect(() => {
+    if (wasRunning.current && !call.running) setOpen(false);
+    wasRunning.current = call.running;
+  }, [call.running]);
+  const lines = call.code ? call.code.source.split("\n").length : 0;
+  const label = call.running
+    ? `${capitalizeFirst(activityVerb(t, activity))}…`
+    : call.code
+      ? t("code.ranSummary", {
+          count: lines,
+          language: call.code.language,
+          size: formatBytes(i18n.language, outputBytes(call.output)),
+        })
+      : t(`chat.work.step.${activity.kind}`, { app: activity.app ?? "", tool: call.tool });
+  return (
+    <div className="live-call" data-running={call.running || undefined}>
+      {hasDetail ? (
+        <button type="button" className="live-call__head" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {call.running ? <Spinner size={12} /> : <Icon name="code" size={14} />}
+          <span>{label}</span>
+        </button>
+      ) : (
+        <p className="live-call__head live-call__head--static">
+          {call.running ? <Spinner size={12} /> : <Icon name="check" size={14} />}
+          <span>{label}</span>
+        </p>
+      )}
+      {open &&
+        hasDetail &&
+        (call.code ? (
+          <CodePanel code={call.code} output={call.output} live={call.running} />
+        ) : (
+          <OutputView output={call.output} live={call.running} />
+        ))}
+    </div>
+  );
+}
+
+const capitalizeFirst = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+
+/** The live work of a reply, stacked like a mini timeline: what it said and each tool call. */
+export function LiveWorkList({ work }: { work: LiveWork[] }) {
+  if (work.length === 0) return null;
+  return (
+    <div className="live-work">
+      {work.map((w, i) =>
+        w.kind === "say" ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: narration lines in order
+          <p key={`say-${i}`} className="live-work__say">
+            {w.text}
+          </p>
+        ) : (
+          <LiveCallBlock key={w.id} call={w} />
+        ),
+      )}
     </div>
   );
 }

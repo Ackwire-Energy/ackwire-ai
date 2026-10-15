@@ -125,6 +125,8 @@ export const extraIcons = {
       },
     ],
   ],
+  /** "Parar" (stop an agent's run). */
+  stop: [["rect", { x: "5.5", y: "5.5", width: "9", height: "9", rx: "2" }]],
   /** "Wiki" (the org's knowledge base). */
   book: [
     [

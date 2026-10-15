@@ -154,7 +154,7 @@ export function toolActivity(
 }
 
 /** An agent's run is in the timeline (its first words arrived, or it failed): not in the bar. */
-export const isWriting = (r: LiveRun) => r.status === "failed" || r.text.length > 0;
+export const isWriting = (r: LiveRun) => r.status === "failed" || r.status === "canceled" || r.text.length > 0;
 
 export interface ActivityEntry {
   id: string;

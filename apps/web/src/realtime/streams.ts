@@ -10,7 +10,58 @@ import type { ChannelEvent, RunStatus } from "@/api/types";
  * mention an agent, `expectReply` adds a provisional "thinking" row that the
  * first real event for that agent and thread replaces.
  */
-export type LiveStatus = RunStatus | "thinking";
+/** `canceled`: someone pressed "Parar" (the row keeps the text so far). */
+export type LiveStatus = RunStatus | "thinking" | "canceled";
+
+/** `run.canceled` (expected from the backend with `POST …/runs/{id}/cancel`). */
+export interface RunCanceledEvent {
+  type: "run.canceled";
+  channelId: string;
+  threadId: string | null;
+  runId: string;
+  agentId: string;
+  /** Who stopped it. */
+  byUserId?: string | null;
+}
+
+/** Pressed "Parar": "Parando…" until the event, and who stopped it ("Interrompido por Walter"). */
+export function markStopping(state: StreamsState, runId: string, byUserId: string): StreamsState {
+  const r = state.runs[runId];
+  if (!r) return state;
+  return { ...state, runs: { ...state.runs, [runId]: { ...r, stopping: true, canceledBy: byUserId } } };
+}
+
+/** The cancel failed: back to running. */
+export function unmarkStopping(state: StreamsState, runId: string): StreamsState {
+  const r = state.runs[runId];
+  if (!r) return state;
+  return { ...state, runs: { ...state.runs, [runId]: { ...r, stopping: false, canceledBy: null } } };
+}
+
+/** Stopped: a row with text stays (muted "Interrompido por…"); one with nothing written goes away. */
+function cancel(state: StreamsState, runId: string, byUserId?: string | null): StreamsState {
+  const r = state.runs[runId];
+  if (!r) return state;
+  if (!r.text) {
+    const { [runId]: _gone, ...runs } = state.runs;
+    return { ...state, runs };
+  }
+  const work = (r.work ?? []).map((w) => (w.kind === "call" && w.running ? { ...w, running: false } : w));
+  return {
+    ...state,
+    runs: {
+      ...state.runs,
+      [runId]: {
+        ...r,
+        status: "canceled",
+        stopping: false,
+        canceledBy: byUserId ?? r.canceledBy ?? null,
+        work,
+        tool: null,
+      },
+    },
+  };
+}
 
 export interface LiveRun {
   /** When a provisional row was added (for the safety timeout). */
@@ -31,11 +82,39 @@ export interface LiveRun {
   connector?: string | null;
   /** What the tool works on, when the event says (the skill name for `load_skill`). */
   toolDetail?: string | null;
+  /** "Parar" was pressed and the server hasn't confirmed yet. */
+  stopping?: boolean;
+  /** Who stopped it (user id). */
+  canceledBy?: string | null;
   /** The code the agent is running (`run_code`, a skill script), from `agent.tool`. */
   code?: LiveCode | null;
+  /**
+   * The run's live work, in order: what it said between tool calls ("Go não
+   * está instalado; vou tentar…") and each tool call (with its code and
+   * output). Text before a tool call moves here when the tool starts, so the
+   * answer that streams next starts fresh instead of being glued to it.
+   */
+  work?: LiveWork[];
   /** That call's output so far (`agent.tool.output`), in order. */
   output?: LiveOutput[];
 }
+
+export type LiveWork =
+  | { kind: "say"; text: string }
+  | {
+      kind: "call";
+      id: string;
+      tool: string;
+      connector: string | null;
+      detail: string | null;
+      code: LiveCode | null;
+      output: LiveOutput[];
+      running: boolean;
+    };
+
+/** The narration lines of a run (what it said between tool calls). */
+export const narrationOf = (r: Pick<LiveRun, "work">) =>
+  (r.work ?? []).flatMap((w) => (w.kind === "say" ? [w.text] : []));
 
 export interface LiveCode {
   language: string;
@@ -126,7 +205,7 @@ export function expectReply(
     (r) => !r.provisional && r.agentId === input.agentId && r.threadId === input.threadId,
   );
   if (alreadyLive || state.runs[runId]) return state;
-  const run: LiveRun = { ...input, runId, status: "thinking", text: "", lastSeq: 0, provisional: true, since: now };
+  const run: LiveRun = { ...input, runId, status: "thinking", text: "", lastSeq: -1, provisional: true, since: now };
   return { ...state, runs: { ...state.runs, [runId]: run } };
 }
 
@@ -152,7 +231,8 @@ function upsert(
     threadId: event.threadId,
     status: "running",
     text: "",
-    lastSeq: 0,
+    // No delta yet: the backend's first delta is seq 0, so "seen" starts below it.
+    lastSeq: -1,
     ...current,
     ...patch,
   };
@@ -168,17 +248,52 @@ function reopen(state: StreamsState, runId: string): StreamsState {
 
 export function applyChannelEvent(
   state: StreamsState,
-  event: ChannelEvent | AgentToolEvent | AgentToolOutputEvent,
+  event: ChannelEvent | AgentToolEvent | AgentToolOutputEvent | RunCanceledEvent,
 ): StreamsState {
   switch (event.type) {
+    case "run.canceled":
+      return cancel(state, event.runId, event.byUserId);
     case "agent.tool": {
       if (state.finished[event.runId]) return state;
       const current = state.runs[event.runId];
-      const status: LiveStatus = current?.text ? current.status : "thinking";
       // A new call starts fresh; `tool: null` (the call ended) keeps the last code and output on screen.
       const newCall = event.tool !== null;
+      // Text before a tool call is narration: it leaves the body (which starts over for the next call).
+      const said = newCall ? (current?.text ?? "").trim() : "";
+      const status: LiveStatus = said ? "thinking" : current?.text ? current.status : "thinking";
+      let work = current?.work ?? [];
+      if (said) work = [...work, { kind: "say" as const, text: said }];
+      if (newCall) {
+        // A new call means the previous ones ended.
+        work = [
+          ...work.map((w) => (w.kind === "call" && w.running ? { ...w, running: false } : w)),
+          {
+            kind: "call" as const,
+            id: event.toolUseId ?? `call-${work.length}`,
+            tool: event.tool ?? "",
+            connector: event.connector ?? null,
+            detail: event.detail ?? null,
+            code: event.code ?? null,
+            output: [],
+            running: true,
+          },
+        ];
+      } else {
+        // The call ended: the last running one stops.
+        let done = false;
+        work = [...work].reverse().map((w) => {
+          if (!done && w.kind === "call" && w.running) {
+            done = true;
+            return { ...w, running: false };
+          }
+          return w;
+        });
+        work.reverse();
+      }
       return upsert(state, event, {
         status,
+        work,
+        ...(said ? { text: "" } : {}),
         tool: event.tool,
         connector: event.connector ?? null,
         toolDetail: event.detail ?? null,
@@ -189,8 +304,21 @@ export function applyChannelEvent(
       if (state.finished[event.runId]) return state;
       const current = state.runs[event.runId];
       if (!current) return state;
-      const output = appendOutput(current.output ?? [], { stream: event.stream, text: event.text });
-      return { ...state, runs: { ...state.runs, [event.runId]: { ...current, output } } };
+      const chunk = { stream: event.stream, text: event.text };
+      const output = appendOutput(current.output ?? [], chunk);
+      // Into its call (by id, else the last running one).
+      const work = [...(current.work ?? [])];
+      let at = -1;
+      for (let i = work.length - 1; i >= 0; i--) {
+        const w = work[i];
+        if (w?.kind === "call" && (event.toolUseId ? w.id === event.toolUseId : w.running)) {
+          at = i;
+          break;
+        }
+      }
+      const call = work[at];
+      if (call?.kind === "call") work[at] = { ...call, output: appendOutput(call.output, chunk) };
+      return { ...state, runs: { ...state.runs, [event.runId]: { ...current, output, work } } };
     }
     case "message.created": {
       const m = event.message;
@@ -208,6 +336,8 @@ export function applyChannelEvent(
       return { ...next, runs };
     }
     case "agent.run": {
+      // A status update that says canceled works like `run.canceled`.
+      if ((event.status as string) === "canceled") return cancel(state, event.runId);
       let s = state;
       if (s.finished[event.runId]) {
         if (event.status !== "running") return state;
@@ -304,7 +434,8 @@ export function dropProvisional(state: StreamsState, threadIds: Set<string>): St
 
 /** The living avatar of one run: words arriving → writing; queued/thinking/running → thinking; else idle. */
 export function agentStateOfRun(r: LiveRun): "idle" | "thinking" | "writing" {
-  if (r.status === "failed" || r.status === "done" || r.status === "waiting_approval") return "idle";
+  if (r.status === "failed" || r.status === "done" || r.status === "waiting_approval" || r.status === "canceled")
+    return "idle";
   if (r.text.length > 0 && r.status === "running") return "writing";
   if (r.status === "running" || r.status === "queued" || r.status === "thinking") return "thinking";
   return "idle";
