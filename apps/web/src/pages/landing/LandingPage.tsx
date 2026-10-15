@@ -1,8 +1,9 @@
-import { type AgentState, Button, cx, Logo } from "@agenteschat/ui";
+import { type AgentState, Button, cx, Logo, Segmented } from "@agenteschat/ui";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ApiError } from "@/api/http";
+import { type LocaleCode, setLocale } from "@/i18n";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useTheme } from "@/lib/theme";
 import { AgentMaker } from "./AgentMaker";
@@ -109,6 +110,15 @@ export function LandingPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const locale: LocaleCode = i18n.language === "en" ? "en" : "pt-BR";
+  const languages = useMemo(
+    () => [
+      { value: "pt-BR" as const, label: t("landing.nav.langPt") },
+      { value: "en" as const, label: t("landing.nav.langEn") },
+    ],
+    [t],
+  );
+
   const toggleTheme = () => {
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
@@ -139,7 +149,7 @@ export function LandingPage() {
     clearTimeout(typingTimer.current);
     setGiantState("thinking");
     try {
-      await api.waitlist.join({ email, locale: i18n.language === "en" ? "en" : "pt-BR" });
+      await api.waitlist.join({ email, locale });
     } catch (error) {
       busy.current = false;
       setGiantState("idle");
@@ -182,6 +192,14 @@ export function LandingPage() {
               </a>
             ))}
           </nav>
+          <Segmented
+            size="sm"
+            className="lp-lang"
+            label={t("landing.nav.language")}
+            value={locale}
+            options={languages}
+            onValueChange={(code) => setLocale(code, i18n)}
+          />
           <Button variant="ghost" className="lp-theme-btn" aria-label={t("landing.nav.theme")} onClick={toggleTheme}>
             <LpIcon name={theme === "light" ? "moon" : "sun"} />
           </Button>
