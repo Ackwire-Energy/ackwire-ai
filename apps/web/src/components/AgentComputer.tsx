@@ -14,16 +14,28 @@ import {
   MenuItem,
   RadioCard,
   RadioGroup,
+  Select,
+  type SelectOption,
   Switch,
   Token,
   TokenList,
 } from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useAgents, useComputer, useComputerAction, useSandboxSettings, useSaveSandboxSettings } from "@/api/queries";
-import type { Agent, AgentComputer, SandboxNetwork, SandboxSettings } from "@/api/types";
+import {
+  useAgents,
+  useComputer,
+  useComputerAction,
+  useMachines,
+  useSandboxSettings,
+  useSaveSandboxSettings,
+  useSetComputerTarget,
+} from "@/api/queries";
+import type { Agent, AgentComputer, ComputerTarget, SandboxNetwork, SandboxSettings } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { LoadingCards, LoadingLine } from "@/components/Loading";
+import { MachineChip } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import {
   busyDisplay,
@@ -34,6 +46,7 @@ import {
   READY_FLASH_MS,
   reached,
 } from "@/lib/computer";
+import { errorText } from "@/lib/errors";
 import { formatUsd, relativeTime } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
@@ -156,7 +169,7 @@ function useComputerLifecycle(agent: Agent) {
       {
         onError: (e) => {
           setBusy(null);
-          setError({ action, message: e instanceof Error && e.message ? e.message : t("common.loadFailed") });
+          setError({ action, message: e instanceof Error && e.message ? errorText(t, e) : t("common.loadFailed") });
         },
       },
     );
@@ -260,12 +273,112 @@ function ComputerMenu({ agent, life }: { agent: Agent; life: Lifecycle }) {
   );
 }
 
+/** The computer an agent uses; older servers don't say: the cloud one. */
+export const targetOf = (pc: AgentComputer | undefined): ComputerTarget => pc?.target ?? { kind: "cloud" };
+
+/** "Na máquina Servidor do escritório · Online": a connected computer is turned on by its owner. */
+function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind: "machine" }> }) {
+  const { t } = useTranslation();
+  return (
+    <span className="stack-4" style={{ gap: 4 }}>
+      <span className="row" style={{ gap: 8, alignItems: "center" }}>
+        <Icon name="computer" size={16} />
+        <span className="computer-machine__name">{target.name}</span>
+        <MachineChip online={target.online} />
+      </span>
+      <span className="small muted">{target.online ? t("computer.machineHint") : t("computer.machineOffline")}</span>
+    </span>
+  );
+}
+
+const CLOUD = "cloud";
+
+/**
+ * "Computador: Nuvem | <máquina>". Admins pick any machine; the agent's
+ * owner, the ones they paired (the server checks again). Offline machines
+ * stay selectable, marked.
+ */
+function ComputerTargetSelect({ agent, target, admin }: { agent: Agent; target: ComputerTarget; admin: boolean }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const toast = useToast();
+  const machines = useMachines(org.id);
+  const set = useSetComputerTarget(org.id);
+  const [error, setError] = useState<string | null>(null);
+  const current = target.kind === "machine" ? target.machineId : CLOUD;
+  const list = (machines.data ?? []).filter((m) => admin || m.pairedBy?.id === me.user.id || m.id === current);
+  if (machines.isLoading) return <LoadingLine width={200} />;
+  if (list.length === 0 && target.kind === "cloud") {
+    return (
+      <Link
+        to="/org/$orgId/settings/$section"
+        params={{ orgId: org.id, section: "computers" }}
+        className="small computer-target__connect"
+      >
+        {t("computer.target.connectHint")}
+      </Link>
+    );
+  }
+  const options: SelectOption[] = [
+    { value: CLOUD, label: t("computer.target.cloud"), description: t("computer.target.cloudText") },
+    ...list.map((m) => ({
+      value: m.id,
+      label: m.online ? m.name : t("computer.target.offlineName", { name: m.name }),
+      description: m.online ? t("machines.online") : t("computer.target.offlineText"),
+    })),
+  ];
+  // The current machine may not be in the list yet (just paired, list loading).
+  if (target.kind === "machine" && !options.some((o) => o.value === target.machineId)) {
+    options.push({ value: target.machineId, label: target.name });
+  }
+  return (
+    <span className="stack-4" style={{ gap: 4 }}>
+      <span className="row computer-target" style={{ gap: 8, alignItems: "center" }}>
+        <span className="small muted">{t("computer.target.label")}</span>
+        <Select
+          size="sm"
+          aria-label={t("computer.target.label")}
+          value={current}
+          options={options}
+          disabled={set.isPending}
+          onValueChange={(value) => {
+            if (value === current) return;
+            setError(null);
+            const machine = list.find((m) => m.id === value);
+            set.mutate(
+              { agentId: agent.id, machineId: value === CLOUD ? null : value },
+              {
+                onSuccess: () =>
+                  toast.show(
+                    machine
+                      ? t("computer.target.switchedMachine", { name: agent.name, machine: machine.name })
+                      : t("computer.target.switchedCloud", { name: agent.name }),
+                  ),
+                onError: (e) => setError(errorText(t, e)),
+              },
+            );
+          }}
+        />
+      </span>
+      {error && (
+        <p className="computer-error small" role="alert">
+          <Icon name="alert" size={16} />
+          <span>{error}</span>
+        </p>
+      )}
+    </span>
+  );
+}
+
 /** Agent profile: "PC do Theo" with status, disk, cost and last use. Hidden when the server has no sandbox. */
 export function AgentComputerRow({ agent, editable }: { agent: Agent; editable: boolean }) {
   const { t } = useTranslation();
+  const { me } = useOrg();
   const life = useComputerLifecycle(agent);
   const { pc } = life;
   const g = agentGrammar(t, agent.name);
+  // Choosing the computer: admins, or the agent's owner (with machines they paired).
+  const canTarget = editable || (agent.ownerUserId != null && agent.ownerUserId === me.user.id);
   if (pc.isLoading) {
     return (
       <section aria-labelledby="sec-pc" className="summary-row">
@@ -280,7 +393,27 @@ export function AgentComputerRow({ agent, editable }: { agent: Agent; editable: 
       </section>
     );
   }
-  if (pc.isError || !pc.data || !life.display) return null;
+  if (pc.isError || !pc.data) return null;
+  const target = targetOf(pc.data);
+  const selector = canTarget ? <ComputerTargetSelect agent={agent} target={target} admin={editable} /> : null;
+  // A connected machine: no start/stop/delete, network or cost; its owner turns it on.
+  if (target.kind === "machine") {
+    return (
+      <section aria-labelledby="sec-pc" className="summary-row">
+        <div className="summary-row__text">
+          <h2 id="sec-pc" className="summary-row__title">
+            {t("computer.title", g)}
+          </h2>
+          <div className="summary-row__body stack-4" style={{ gap: 8 }}>
+            <MachineTargetView target={target} />
+            <ComputerError life={life} />
+            {selector}
+          </div>
+        </div>
+      </section>
+    );
+  }
+  if (!life.display) return null;
   // No PC yet (and nothing running): explain it and offer to create it.
   const empty = pc.data.status === "none" && !life.busy;
   return (
@@ -303,6 +436,7 @@ export function AgentComputerRow({ agent, editable }: { agent: Agent; editable: 
           {pc.data.network === "provider-default" && (
             <span className="small muted">{t("sandbox.providerDefault")}</span>
           )}
+          {selector}
         </div>
       </div>
       {editable && (
@@ -324,6 +458,19 @@ function ComputerListRow({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
   const life = useComputerLifecycle(agent);
   const { pc } = life;
+  const target = targetOf(pc.data);
+  if (target.kind === "machine") {
+    return (
+      <div className="ac-list__row computer-row">
+        <AgentAvatar agentId={agent.id} size="sm" name={agent.name} />
+        <span className="list-col" style={{ flex: "1 1 220px" }}>
+          <span style={{ fontWeight: 600 }}>{agent.name}</span>
+          <span className="small muted">{t("computer.onMachine", { machine: target.name })}</span>
+        </span>
+        <MachineChip online={target.online} />
+      </div>
+    );
+  }
   return (
     <div className="ac-list__row computer-row">
       <AgentAvatar agentId={agent.id} size="sm" name={agent.name} />

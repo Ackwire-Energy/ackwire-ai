@@ -41,6 +41,11 @@ export const keys = {
   sandbox: (orgId: string) => ["org", orgId, "sandbox"] as const,
   sandboxSettings: (orgId: string) => ["org", orgId, "sandbox", "settings"] as const,
   computer: (orgId: string, agentId: string) => ["org", orgId, "sandbox", "computer", agentId] as const,
+  /** Every agent's computer view (prefix of `computer`). */
+  computers: (orgId: string) => ["org", orgId, "sandbox", "computer"] as const,
+  machines: (orgId: string) => ["org", orgId, "machines"] as const,
+  artifactBlob: (orgId: string, id: string, version: number) =>
+    ["org", orgId, "artifacts", "blob", id, version] as const,
   skills: (orgId: string) => ["org", orgId, "skills"] as const,
   skill: (orgId: string, id: string) => ["org", orgId, "skills", "one", id] as const,
   agentSkills: (orgId: string, agentId: string) => ["org", orgId, "skills", "agent", agentId] as const,

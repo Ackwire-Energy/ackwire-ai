@@ -272,6 +272,61 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     expect(calls.at(-1)?.init.method).toBe("DELETE");
   });
 
+  test("file uploads are multipart (no JSON content-type), new versions too; previews read the bytes", async () => {
+    const detail = { ...artifact, kind: "file", shownVersion: 1 };
+    const { fetch, calls } = fakeFetch({
+      [`POST ${org}/artifacts/files`]: { status: 201, body: detail },
+      [`POST ${org}/artifacts/a1/files`]: {
+        status: 413,
+        body: { error: { code: "artifact.file_too_large", message: "The file is too large (max 50 MB)" } },
+      },
+      [`GET ${org}/artifacts/a1/file?version=1`]: { status: 200, body: { raw: true } },
+    });
+    const api = createHttpApi(fetch);
+    const file = new File(["oi"], "nota.txt", { type: "text/plain" });
+    expect((await api.artifacts.upload("o1", file, { title: "Nota", channelId: "c1" })).kind).toBe("file");
+    const form = calls[0]?.init.body as FormData;
+    expect(form).toBeInstanceOf(FormData);
+    expect((form.get("file") as File).name).toBe("nota.txt");
+    expect(form.get("title")).toBe("Nota");
+    expect(form.get("channelId")).toBe("c1");
+    expect(((calls[0] as Call).init.headers as Record<string, string>)["content-type"]).toBeUndefined();
+    const tooLarge = await api.artifacts.uploadVersion("o1", "a1", file, { note: "v2" }).catch((e) => e);
+    expect(tooLarge).toMatchObject({ status: 413, code: "artifact.file_too_large" });
+    expect(((calls[1] as Call).init.body as FormData).get("note")).toBe("v2");
+    expect(await (await api.artifacts.fileBlob("o1", "a1", 1)).text()).toBe('{"raw":true}');
+  });
+
+  test("connected computers: list, pairing, rename, remove, and the agent's target", async () => {
+    const machine = { id: "m1", name: "Escritório", online: true };
+    const { fetch, calls } = fakeFetch({
+      [`GET ${org}/machines`]: { status: 200, body: { machines: [machine] } },
+      [`POST ${org}/machines/pairings`]: {
+        status: 201,
+        body: { code: "K7QM-4XTB", expiresAt: "t", installCommand: "curl … | sh" },
+      },
+      [`PATCH ${org}/machines/m1`]: { status: 200, body: { id: "m1", name: "Sala 2" } },
+      [`DELETE ${org}/machines/m1`]: { status: 204 },
+      [`PUT ${org}/agents/ag/computer/target`]: {
+        status: 200,
+        body: { kind: "machine", machineId: "m1", name: "Sala 2", online: true },
+      },
+    });
+    const api = createHttpApi(fetch);
+    expect(await api.machines.list("o1")).toEqual([machine] as never);
+    expect((await api.machines.createPairing("o1", { name: "Escritório" })).code).toBe("K7QM-4XTB");
+    expect(await api.machines.rename("o1", "m1", "Sala 2")).toEqual({ id: "m1", name: "Sala 2" });
+    await api.machines.remove("o1", "m1");
+    expect((await api.sandbox.setTarget("o1", "ag", "m1")).kind).toBe("machine");
+    expect(calls.map((c) => `${c.init.method} ${c.url} ${c.init.body ?? ""}`)).toEqual([
+      `GET ${org}/machines `,
+      `POST ${org}/machines/pairings {"name":"Escritório"}`,
+      `PATCH ${org}/machines/m1 {"name":"Sala 2"}`,
+      `DELETE ${org}/machines/m1 `,
+      `PUT ${org}/agents/ag/computer/target {"machineId":"m1"}`,
+    ]);
+  });
+
   test("storage: get, test, save, migrate and migration status", async () => {
     const config = { kind: "agentes", s3: null, migration: null };
     const s3 = { endpoint: "https://r2", region: "auto", bucket: "b", prefix: null, pathStyle: true };

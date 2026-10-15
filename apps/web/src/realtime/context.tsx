@@ -7,19 +7,11 @@ import { useApi } from "@/api/context";
 import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
 import { cacheApproval, cacheMessage } from "@/api/queries";
-import type {
-  ActiveRun,
-  Agent,
-  AgentComputer,
-  AgentQuestion,
-  BudgetEvent,
-  ChannelEvent,
-  MemoryUpdate,
-  Message,
-} from "@/api/types";
+import type { ActiveRun, Agent, AgentQuestion, BudgetEvent, ChannelEvent, MemoryUpdate, Message } from "@/api/types";
 import { formatUsd } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { type ConnectionStatus, RealtimeConnection, realtimeUrl, type SocketFactory } from "./connection";
+import { applyComputerEvent, applyMachineEvent } from "./machines";
 import { applyReceiptEvent, guessReceipt, type ReceiptsState, seedReceipt } from "./receipts";
 import {
   applyChannelEvent,
@@ -325,13 +317,10 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
         void qc.invalidateQueries({ queryKey: keys.forumTopic(orgId, topicId) });
       }
-      // The agent's PC changed (started, stopped, deleted): no more polling needed.
-      if (event.type === "agent.computer" && "agentId" in event && typeof event.agentId === "string") {
-        const computer = (event as { computer?: AgentComputer }).computer;
-        if (computer && typeof computer.status === "string") {
-          qc.setQueryData(keys.computer(orgId, event.agentId), computer);
-        } else void qc.invalidateQueries({ queryKey: keys.computer(orgId, event.agentId) });
-      }
+      // The agent's PC changed (started, stopped, deleted, switched computers): no more polling needed.
+      applyComputerEvent(qc, orgId, event);
+      // Connected computers: online/offline, paired, renamed, removed.
+      applyMachineEvent(qc, orgId, event);
       if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
         const budgetEvent = event as BudgetEvent;
         const agent = qc.getQueryData<Agent[]>(keys.agents(orgId))?.find((a) => a.id === budgetEvent.agentId);

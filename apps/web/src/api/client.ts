@@ -26,6 +26,7 @@ import type {
   CalendarRange,
   Channel,
   ChannelMember,
+  ComputerTarget,
   Connection,
   ConnectorCatalog,
   Credential,
@@ -47,6 +48,8 @@ import type {
   IssueActivity,
   IssueInput,
   IssuePatch,
+  Machine,
+  MachinePairing,
   Me,
   Member,
   Memory,
@@ -252,6 +255,17 @@ export interface ApiClient {
     stop(orgId: string, agentId: string): Promise<AgentComputer>;
     /** Deletes the PC and all its files. */
     remove(orgId: string, agentId: string): Promise<void>;
+    /** Which computer the agent uses: a connected machine, or `null` for the cloud one. */
+    setTarget(orgId: string, agentId: string, machineId: string | null): Promise<ComputerTarget>;
+  };
+  /** Connected computers (ADR 0025): machines running `agentes-runner`. */
+  machines: {
+    list(orgId: string): Promise<Machine[]>;
+    /** A one-time pairing code (10 minutes) and the command to run on the machine. */
+    createPairing(orgId: string, input: { name: string }): Promise<MachinePairing>;
+    rename(orgId: string, machineId: string, name: string): Promise<{ id: string; name: string }>;
+    /** Revokes its token and disconnects the runner at once; agents on it go back to the cloud. */
+    remove(orgId: string, machineId: string): Promise<void>;
   };
   skills: {
     /** The org library. */
@@ -428,6 +442,16 @@ export interface ApiClient {
       orgId: string,
       input: { title: string; channelId?: string | null; content: ArtifactContent },
     ): Promise<ArtifactDetail>;
+    /** Uploads a file as is (multipart, ≤ 50 MB) to the Drive or to a channel. */
+    upload(
+      orgId: string,
+      file: File,
+      options?: { title?: string; channelId?: string | null; threadId?: string | null },
+    ): Promise<ArtifactDetail>;
+    /** A new version of an uploaded file (multipart, ≤ 50 MB). */
+    uploadVersion(orgId: string, id: string, file: File, options?: { note?: string }): Promise<ArtifactDetail>;
+    /** The bytes of a file version (inline previews of images and PDFs). */
+    fileBlob(orgId: string, id: string, version?: number): Promise<Blob>;
     /** Always a new version. `baseVersion` stale → 409. */
     update(
       orgId: string,

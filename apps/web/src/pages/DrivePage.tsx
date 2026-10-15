@@ -5,22 +5,26 @@ import {
   FilterChip,
   type FilterOption,
   Icon,
+  type IconName,
   List,
   MenuItem,
   SearchInput,
 } from "@agenteschat/ui";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { type DragEvent, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useArtifacts, useArtifactTrash, useChannels } from "@/api/queries";
-import type { ArtifactFilters, ArtifactKind } from "@/api/types";
+import type { Artifact, ArtifactFilters, ArtifactKind } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { ArtifactMoreMenu, useDeleteArtifact } from "@/components/artifacts/ArtifactActions";
 import { useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
+import { UploadButton, useDriveUpload } from "@/components/artifacts/Upload";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { ARTIFACT_KINDS, isArtifactKind, KIND_ICON } from "@/lib/artifacts";
+import { fileIcon } from "@/lib/files";
 import { relativeTime } from "@/lib/format";
+import { useToast } from "@/lib/toast";
 
 /** Drive: every artifact the viewer can see, with search and filters; opens the shared viewer. */
 export function DrivePage({ open }: { open?: { id: string; version?: number } }) {
@@ -49,6 +53,15 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
     return f;
   }, [search, kind, channelIds, authors]);
   const list = useArtifacts(org.id, filters);
+  const toast = useToast();
+  const uploader = useDriveUpload((saved) =>
+    toast.show(t("files.uploaded", { name: saved.title }), "info", {
+      label: t("artifacts.openFile"),
+      run: () => viewer.open(saved.id),
+    }),
+  );
+  const upload = (files: File[]) => void uploader.upload(files);
+  const drop = useFileDrop(upload, !trashOpen);
   const filtered = Object.keys(filters).length > 0 || channelIds.length > 1 || authors.length > 1;
   const clearFilters = () => {
     setKind([]);
@@ -101,7 +114,13 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   };
 
   return (
-    <div className="page page--xwide">
+    <div className={`page page--xwide drive-drop${drop.over ? " drive-drop--over" : ""}`} {...drop.props}>
+      {drop.over && (
+        <div className="drive-drop__hint" aria-hidden="true">
+          <Icon name="upload" />
+          <span>{t("files.dropHint")}</span>
+        </div>
+      )}
       <header
         className="page__header page__header--row"
         style={{ alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}
@@ -112,15 +131,25 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
             {trashOpen ? t("artifacts.trashHint") : t("drive.subtitle")}
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          icon={trashOpen ? "chevronLeft" : "trash"}
-          aria-pressed={trashOpen}
-          onClick={() => setTrashOpen((o) => !o)}
-        >
-          {trashOpen ? t("artifacts.backToDrive") : t("artifacts.trash")}
-        </Button>
+        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+          {uploader.current && (
+            <span className="small muted drive-upload-status" role="status">
+              {t("files.uploading", { name: uploader.current })}
+            </span>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={trashOpen ? "chevronLeft" : "trash"}
+            aria-pressed={trashOpen}
+            onClick={() => setTrashOpen((o) => !o)}
+          >
+            {trashOpen ? t("artifacts.backToDrive") : t("artifacts.trash")}
+          </Button>
+          {!trashOpen && (
+            <UploadButton label={t("files.upload")} busy={uploader.busy} multiple onFiles={upload} variant="primary" />
+          )}
+        </div>
       </header>
       {trashOpen && <DriveTrash />}
       {remover.dialog}
@@ -199,7 +228,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
       )}
       {!trashOpen && list.isSuccess && rows.length === 0 && !filtered && (
         <EmptyState sky icon="drive" title={t("drive.emptyTitle")}>
-          {t("drive.emptyText")}
+          {t("drive.emptyText")} {t("files.emptyHint")}
         </EmptyState>
       )}
       {!trashOpen && list.isSuccess && rows.length === 0 && filtered && (
@@ -239,7 +268,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
                 <tr key={a.id} data-kind={a.kind}>
                   <td>
                     <button type="button" className="drive-table__open" onClick={() => viewer.open(a.id)}>
-                      <Icon name={KIND_ICON[a.kind as ArtifactKind]} />
+                      <Icon name={rowIcon(a)} />
                       <span>{a.title}</span>
                     </button>
                   </td>
@@ -275,6 +304,45 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   );
 }
 
+/** The kind's icon; uploaded files by their name (the list has no content type). */
+const rowIcon = (a: Pick<Artifact, "kind" | "title">): IconName =>
+  a.kind === "file" ? fileIcon(a.title) : (KIND_ICON[a.kind as ArtifactKind] ?? "file");
+
+/**
+ * Drag files from the computer onto the Drive. `over` while something is
+ * dragged over the page (a counter: children fire enter/leave too).
+ */
+function useFileDrop(onFiles: (files: File[]) => void, enabled: boolean) {
+  const [depth, setDepth] = useState(0);
+  const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+  const props = enabled
+    ? {
+        onDragEnter: (e: DragEvent) => {
+          if (!hasFiles(e)) return;
+          e.preventDefault();
+          setDepth((d) => d + 1);
+        },
+        onDragOver: (e: DragEvent) => {
+          if (!hasFiles(e)) return;
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+        },
+        onDragLeave: (e: DragEvent) => {
+          if (!hasFiles(e)) return;
+          setDepth((d) => Math.max(0, d - 1));
+        },
+        onDrop: (e: DragEvent) => {
+          if (!hasFiles(e)) return;
+          e.preventDefault();
+          setDepth(0);
+          const files = Array.from(e.dataTransfer?.files ?? []);
+          if (files.length > 0) onFiles(files);
+        },
+      }
+    : {};
+  return { over: enabled && depth > 0, props };
+}
+
 /** "Lixeira": deleted files for 30 days, with Restaurar. */
 function DriveTrash() {
   const { t, i18n } = useTranslation();
@@ -289,7 +357,7 @@ function DriveTrash() {
     <List>
       {list.map((a) => (
         <div key={a.id} className="ac-list__row" data-kind={a.kind}>
-          <Icon name={KIND_ICON[a.kind as ArtifactKind]} />
+          <Icon name={rowIcon(a)} />
           <span className="list-col" style={{ flex: 1 }}>
             <span style={{ fontWeight: 600 }}>{a.title}</span>
             <span className="small muted">

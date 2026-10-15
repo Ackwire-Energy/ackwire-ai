@@ -721,7 +721,21 @@ export interface StorageMigration {
 
 // ── Artifacts (expected: `…/artifacts`, events `artifact.created` / `artifact.updated`, `meta.artifacts`) ──
 
-export type ArtifactKind = "document" | "table" | "diff" | "diagram" | "html";
+export type ArtifactKind = "document" | "table" | "diff" | "diagram" | "html" | "file";
+
+/**
+ * An uploaded file as is (ADR 0025): metadata only; the bytes come from the
+ * download link. `text`: small UTF-8 text files only.
+ */
+export interface ArtifactFileContent {
+  kind: "file";
+  name: string;
+  contentType: string;
+  /** Bytes. */
+  size: number;
+  sha256: string;
+  text?: string;
+}
 
 export interface ArtifactAuthor {
   type: "agent" | "person";
@@ -739,7 +753,8 @@ export type ArtifactContent =
   | { kind: "table"; columns: string[]; rows: string[][] }
   | { kind: "diff"; files: ArtifactDiffFile[] }
   | { kind: "diagram"; mermaid: string }
-  | { kind: "html"; html: string };
+  | { kind: "html"; html: string }
+  | ArtifactFileContent;
 
 export interface Artifact {
   id: string;
@@ -753,7 +768,7 @@ export interface Artifact {
   updatedBy: ArtifactAuthor;
   createdAt: string;
   updatedAt: string;
-  /** The viewer may save new versions (documents and tables only). */
+  /** The viewer may save new versions (documents and tables; uploaded files by uploading again). */
   canEdit: boolean;
   /** HTML: render only in a sandboxed iframe (we always do). */
   untrusted: boolean;
@@ -1232,7 +1247,53 @@ export interface AgentComputer {
   lastUsedAt: string | null;
   /** `provider-default` when the provider can't apply our domain list (plan limitation). */
   network?: "blocked" | "allowlist" | "open" | "provider-default";
+  /** Which computer the agent uses (ADR 0025). Absent on older servers: the cloud one. */
+  target?: ComputerTarget;
 }
+
+// ── Connected computers (ADR 0025; apps/server/src/routes/machines.ts) ──────
+
+/** The agent's cloud computer, or a machine someone connected with the runner. */
+export type ComputerTarget = { kind: "cloud" } | { kind: "machine"; machineId: string; name: string; online: boolean };
+
+export type MachineOs = "linux" | "darwin" | "windows" | "other";
+
+/** `GET …/machines`: a computer connected with `agentes-runner`. */
+export interface Machine {
+  id: string;
+  name: string;
+  /** Runner connected now (`machine.status` events). */
+  online: boolean;
+  lastSeenAt: string | null;
+  hostname: string;
+  /** `linux`, `darwin`, `windows` or `other` (`MachineOs`). */
+  os: string;
+  arch: string;
+  runnerVersion: string;
+  /** `false`: started with `--no-exec` (files and uploads only). */
+  execAllowed: boolean;
+  pairedBy: { id: string; name: string } | null;
+  agents: { id: string; name: string; handle: string }[];
+  /** Workspace folder on the machine; null unless admin or the person who paired it. */
+  workspace: string | null;
+  /** This person may rename or remove it. */
+  canManage: boolean;
+  createdAt: string;
+}
+
+/** `POST …/machines/pairings`: a one-time code (10 minutes) and the command to run on the machine. */
+export interface MachinePairing {
+  code: string;
+  expiresAt: string;
+  installCommand: string;
+}
+
+/** Org events about connected computers. */
+export type MachineEvent =
+  | { type: "machine.status"; machineId: string; online: boolean }
+  | { type: "machine.paired"; machineId: string; name: string }
+  | { type: "machine.updated"; machineId: string; name: string }
+  | { type: "machine.deleted"; machineId: string };
 
 // ── Forum (apps/server/src/routes/app/forum.ts) ──────────────────────────────
 

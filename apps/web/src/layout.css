@@ -5268,3 +5268,185 @@ button.live-call__head:hover {
     box-shadow: none;
   }
 }
+
+/* Uploaded files in the Drive (ADR 0025): name + size, preview, read-only text. */
+.file-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.file-summary__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+}
+.file-summary__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.file-summary__name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.file-view__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  box-shadow: var(--e1);
+}
+.file-view__preview {
+  display: flex;
+  justify-content: center;
+  min-height: 120px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.file-view__image {
+  max-width: 100%;
+  max-height: 70vh;
+  height: auto;
+  object-fit: contain;
+}
+.file-view__pdf {
+  width: 100%;
+  height: 70vh;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.file-view__text {
+  max-height: 60vh;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Drive: drop files anywhere on the page. */
+.drive-drop {
+  position: relative;
+}
+.drive-drop__hint {
+  position: absolute;
+  inset: 8px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px dashed var(--line-strong);
+  border-radius: 20px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--ink);
+  font-weight: 600;
+  pointer-events: none;
+}
+.drive-upload-status {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Settings → Computadores. */
+.machine-row {
+  align-items: flex-start;
+}
+.machine-row__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+}
+.machine-row__name {
+  font-weight: 600;
+}
+.machine-row__workspace code,
+.machine-command__code {
+  font-family: var(--font-mono);
+}
+.machine-row__workspace code {
+  font-size: 12.5px;
+  word-break: break-all;
+}
+.machine-command {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 10px 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.machine-command__code {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.machine-command__copy {
+  flex: none;
+}
+.machine-pair__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink-muted);
+}
+.machine-pair__done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Agent page: which computer. */
+.computer-machine__name {
+  font-weight: 600;
+}
+.computer-target__connect {
+  color: var(--ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
