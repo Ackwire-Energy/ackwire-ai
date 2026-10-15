@@ -812,6 +812,7 @@ p {
   flex-direction: column;
   gap: 8px;
   max-width: 560px;
+  margin-top: 10px;
 }
 .artifact-card {
   position: relative;
