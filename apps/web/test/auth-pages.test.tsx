@@ -166,6 +166,8 @@ describe("Onboarding", () => {
       role: "Dev",
       model: "claude-sonnet-5-5",
       credentialId: null,
+      // Each preset has its own face.
+      appearance: { color: "green", eyes: "wide", accessory: "headphones" },
     });
     expect(state.calls.some((c) => c.method === "chat.addMember")).toBe(true);
 

@@ -1,5 +1,6 @@
 import {
   AffixInput,
+  type AgentAppearance,
   Avatar,
   Button,
   Card,
@@ -32,6 +33,13 @@ export type Preset = (typeof PRESETS)[number];
 /** Instructions each onboarding preset starts with (same as the roles of "Criar agente"). */
 const PRESET_ROLE: Record<Preset, "pm" | "dev" | "ops" | null> = { theo: "pm", ada: "dev", lia: null, atlas: "ops" };
 const FEMININE: Record<Preset, boolean> = { theo: false, ada: true, lia: true, atlas: false };
+/** Each preset's own look (color, eyes, accessory), saved on the agent it creates. */
+const PRESET_LOOK: Record<Preset, Required<AgentAppearance>> = {
+  theo: { color: "indigo", eyes: "round", accessory: "cap" },
+  ada: { color: "green", eyes: "wide", accessory: "headphones" },
+  lia: { color: "rose", eyes: "dots", accessory: "flower" },
+  atlas: { color: "amber", eyes: "round", accessory: "antenna" },
+};
 
 export interface InviteDraft {
   email: string;
@@ -142,6 +150,7 @@ export function OnboardingPage() {
         model: suggestModel(models.models, provider, models.defaultModel),
         // null = the workspace default key.
         credentialId: null,
+        appearance: PRESET_LOOK[preset],
       });
       await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: agent.id });
       setAgentCreated(true);
@@ -263,7 +272,11 @@ export function OnboardingPage() {
                 const info = presetInfo(p);
                 return (
                   <OptionCard key={p} pressed={preset === p} onClick={() => setPreset(p)}>
-                    <AgentAvatar name={info.name} initials={p === "atlas" ? "At" : undefined} />
+                    <AgentAvatar
+                      name={info.name}
+                      initials={p === "atlas" ? "At" : undefined}
+                      appearance={PRESET_LOOK[p]}
+                    />
                     <span className="ac-option__text">
                       <span className="ac-option__title">
                         {info.name} · {info.role}
