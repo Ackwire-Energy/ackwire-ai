@@ -5,6 +5,7 @@ Fonte de verdade visual para o frontend. Cópia local dos artifacts:
 - Telas e fluxos (protótipo navegável): https://claude.ai/artifact/THb3AuEuGX8Ng3qPXumVVa (o anterior saiu do acesso)
 
 ## Conteúdo
+- `refresh-2026-10.md`: o design system atual (tokens, componentes, movimento), a partir de `telas/Componentes.dc.html` (aprovado). `telas/Componentes-proposta1.dc.html` foi substituído.
 - `design-system/README.md`: regras de uso (cor, forma, tipo, voz). Leia primeiro.
 - `design-system/tokens.json` e `tokens.css`: tokens (claro/escuro via `data-theme`).
 - `design-system/bundle.css`: estilos de referência dos componentes (classes `ac-*`).

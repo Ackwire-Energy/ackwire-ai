@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { requireUser } from "@/app/guards";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
+import { CommandMenu } from "@/components/CommandMenu";
 import { RefetchBar } from "@/components/Loading";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
@@ -53,6 +54,7 @@ function OrgLayout() {
         <ArtifactViewerProvider>
           <div className="shell">
             <RefetchBar />
+            <CommandMenu />
             <Sidebar />
             <Outlet />
           </div>

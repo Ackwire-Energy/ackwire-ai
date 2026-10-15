@@ -23,8 +23,12 @@ describe("motion", () => {
       expect(Number(ms[1])).toBeGreaterThanOrEqual(120);
       expect(Number(ms[1])).toBeLessThanOrEqual(200);
     }
-    const keyframes = section.match(/@keyframes[\s\S]*$/)?.[0] ?? "";
-    expect(keyframes).not.toMatch(/\b(width|height|top|left|margin|padding):/);
+    for (const block of all.matchAll(/@keyframes ([\w-]+) \{([\s\S]*?)\n\}/g)) {
+      expect({ name: block[1], layout: /\b(width|height|top|left|margin|padding):/.test(block[2] ?? "") }).toEqual({
+        name: block[1],
+        layout: false,
+      });
+    }
   });
 
   test("a list staggers its rows only when it first appears", async () => {

@@ -11,17 +11,19 @@ import {
   Field,
   Icon,
   Input,
+  Kbd,
   LogoMark,
   Menu,
   MenuItem,
   MenuRadioGroup,
   MenuSeparator,
+  modKey,
   Skeleton,
   SkeletonGroup,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
@@ -36,9 +38,9 @@ import { can } from "@/lib/permissions";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/SettingsPage";
-import { useStreams } from "@/realtime/context";
-import { runningAgents } from "@/realtime/streams";
 import { AudienceChip } from "./AgentAudience";
+import { AgentAvatar } from "./AgentAvatar";
+import { openPalette } from "./CommandMenu";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { useOrg } from "./org-context";
 
@@ -66,7 +68,6 @@ export function Sidebar() {
   const channels = useChannels(orgId);
   const overview = useOverview(orgId);
   const [creatingChannel, setCreatingChannel] = useState(false);
-  const running = useStreams(runningAgents);
   const pending = overview.data?.approvalsWaitingForMe ?? 0;
   const people = dir.members.filter((m) => m.userId !== me.user.id);
   const spent = overview.data ? overview.data.myAgentsSpendUsd : null;
@@ -82,8 +83,31 @@ export function Sidebar() {
     if (channelId) prefetch(channelId);
   };
 
+  // The active item's soft pill slides between items (one indicator, measured).
+  const navRef = useRef<HTMLElement>(null);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [indicator, setIndicator] = useState<{ top: number; height: number } | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure on navigation and when the lists load
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('.sidebar__item[data-status="active"]');
+    if (!nav || !active) {
+      setIndicator(null);
+      return;
+    }
+    const top = active.getBoundingClientRect().top - nav.getBoundingClientRect().top + nav.scrollTop;
+    setIndicator({ top, height: active.offsetHeight });
+  }, [pathname, channels.data, dir.agents.length, people.length]);
+
   return (
-    <nav className="sidebar" aria-label={t("shell.nav")}>
+    <nav className="sidebar" aria-label={t("shell.nav")} ref={navRef}>
+      {indicator && (
+        <span
+          className="sidebar__indicator"
+          aria-hidden="true"
+          style={{ transform: `translateY(${indicator.top}px)`, height: indicator.height }}
+        />
+      )}
       <div className="sidebar__org">
         <WorkspaceMenu
           summary={
@@ -102,6 +126,13 @@ export function Sidebar() {
           </Link>
         </Button>
       </div>
+
+      <button type="button" className="sidebar__jump" onClick={openPalette}>
+        <Icon name="search" />
+        <span className="sidebar__item-label">{t("palette.jump")}</span>
+        <Kbd>{modKey()}</Kbd>
+        <Kbd>K</Kbd>
+      </button>
 
       <div className="sidebar__group">
         <Link to="/org/$orgId/approvals" params={{ orgId }} className="sidebar__item">
@@ -188,13 +219,7 @@ export function Sidebar() {
               onClick={() => markOpen(dmWith.get(a.id) ?? a.id)}
               data-unread={(unreadWith.get(a.id) ?? 0) > 0}
             >
-              <Avatar
-                kind="agent"
-                name={a.name}
-                initials={dir.agentInitials(a.id)}
-                size="sm"
-                running={running.has(a.id)}
-              />
+              <AgentAvatar agentId={a.id} name={a.name} size="sm" />
               <span className="sidebar__item-label">{a.name}</span>
               {(unreadWith.get(a.id) ?? 0) > 0 ? (
                 <UnreadCount count={unreadWith.get(a.id) ?? 0} />

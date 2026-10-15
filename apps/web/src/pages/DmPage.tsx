@@ -7,6 +7,7 @@ import { keys } from "@/api/keys";
 import { useModels } from "@/api/queries";
 import type { DmTarget } from "@/api/types";
 import { AudienceChip } from "@/components/AgentAudience";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -55,11 +56,7 @@ export function DmPage({ target }: { target: DmTarget }) {
   const role = agent ? agent.role || `@${agent.handle}` : "";
   const header = (
     <header className="channel__header">
-      {agent ? (
-        <Avatar kind="agent" name={agent.name} initials={dir.agentInitials(agent.id)} />
-      ) : (
-        <Avatar name={name} imageUrl={person?.image} />
-      )}
+      {agent ? <AgentAvatar agentId={agent.id} name={agent.name} /> : <Avatar name={name} imageUrl={person?.image} />}
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
         <h1 className="channel__title">
           {name}

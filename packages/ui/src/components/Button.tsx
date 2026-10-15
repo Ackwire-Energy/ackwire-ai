@@ -2,6 +2,7 @@ import { Slot } from "radix-ui";
 import { type ButtonHTMLAttributes, forwardRef, type ReactNode } from "react";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
+import { Kbd } from "./Kbd";
 import { Spinner } from "./Skeleton";
 
 export type ButtonVariant = "default" | "primary" | "agent" | "danger" | "ghost";
@@ -18,6 +19,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: IconName;
   iconOnly?: boolean;
   block?: boolean;
+  /** Keyboard hints after the label: `["⌘", "↵"]`. */
+  kbd?: string[];
   /** An async action is running: inline spinner, same width, not clickable (`aria-busy`). */
   loading?: boolean;
   /** Render the child element (e.g. a router link) with the button styles. */
@@ -34,6 +37,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     block,
     asChild,
     loading,
+    kbd,
     className,
     children,
     type = "button",
@@ -71,6 +75,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       {/* The label stays (invisible) while loading, so the width never changes. */}
       {leading && <Icon name={leading} />}
       {!iconOnly && children}
+      {!iconOnly && kbd && kbd.length > 0 && (
+        <span className="ac-btn__kbd" aria-hidden="true">
+          {kbd.map((k) => (
+            <Kbd key={k}>{k}</Kbd>
+          ))}
+        </span>
+      )}
       {loading && <Spinner className="ac-btn__spinner" size={size === "sm" ? 14 : 16} />}
     </button>
   );

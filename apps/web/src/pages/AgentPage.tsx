@@ -1,6 +1,5 @@
 import {
   AttentionNote,
-  Avatar,
   Button,
   Checkbox,
   Chip,
@@ -41,6 +40,7 @@ import {
 import type { Agent, AgentAccess } from "@/api/types";
 import { AccessTree } from "@/components/AccessTree";
 import { AudienceChip, AudienceRow } from "@/components/AgentAudience";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentComputerRow } from "@/components/AgentComputer";
 import { EditDialog } from "@/components/EditDialog";
 import { LoadingLine, LoadingPage } from "@/components/Loading";
@@ -141,7 +141,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
   return (
     <div className="page page--mid agent-page">
       <header className="agent-head">
-        <Avatar kind="agent" size="lg" name={agent.name} initials={dir.agentInitials(agent.id)} />
+        <AgentAvatar agentId={agent.id} size="lg" name={agent.name} />
         <div className="agent-head__text">
           <h1 className="page-title">{agent.name}</h1>
           <span className="agent-head__meta">

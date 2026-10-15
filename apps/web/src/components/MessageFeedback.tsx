@@ -1,4 +1,4 @@
-import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Textarea } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Reaction, Reactions, Textarea } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCorrectMessage, useReactions, useToggleReaction } from "@/api/queries";
@@ -156,5 +156,49 @@ function CorrectionDialog({
         </DialogFooter>
       </form>
     </Dialog>
+  );
+}
+
+/**
+ * Reaction pills under an agent reply (only when someone reacted). Counts
+ * come from the message list (`message.reactions`, when the server sends
+ * them) or from the reactions already loaded on hover.
+ */
+export function ReactionPills({ messageId, initial }: { messageId: string; initial?: ReactionCount[] }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const loaded = useReactions(org.id, messageId, false);
+  const toggle = useToggleReaction(org.id, messageId);
+  const list = loaded.data ?? initial;
+  const up = reactionState(list, UP, me.user.id);
+  const down = reactionState(list, DOWN, me.user.id);
+  if (up.count === 0 && down.count === 0) return null;
+  const press = (reaction: string, mine: boolean, other: { reaction: string; mine: boolean }) => {
+    if (!mine && other.mine) toggle.mutate({ reaction: other.reaction, on: false });
+    toggle.mutate({ reaction, on: !mine });
+  };
+  return (
+    <Reactions label={t("channel.reactions")}>
+      {up.count > 0 && (
+        <Reaction
+          pressed={up.mine}
+          count={up.count}
+          label={t("channel.reactionCount", { name: t("channel.helpful"), count: up.count })}
+          onClick={() => press(UP, up.mine, { reaction: DOWN, mine: down.mine })}
+        >
+          <Icon name="thumbUp" size={14} />
+        </Reaction>
+      )}
+      {down.count > 0 && (
+        <Reaction
+          pressed={down.mine}
+          count={down.count}
+          label={t("channel.reactionCount", { name: t("channel.notHelpful"), count: down.count })}
+          onClick={() => press(DOWN, down.mine, { reaction: UP, mine: up.mine })}
+        >
+          <Icon name="thumbDown" size={14} />
+        </Reaction>
+      )}
+    </Reactions>
   );
 }

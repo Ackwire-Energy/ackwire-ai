@@ -163,6 +163,8 @@ export interface Message {
   clientId?: string | null;
   /** Agent receipts on a person's message (expected from the backend). */
   receipts?: MessageReceipts;
+  /** Reaction counts (expected from the backend in the message list; else loaded on hover). */
+  reactions?: ReactionCount[];
   /** Client only: an optimistic message waiting for the server, or one that failed to send. */
   local?: "pending" | "failed";
   createdAt: string;

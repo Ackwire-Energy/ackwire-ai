@@ -10,6 +10,7 @@ import {
 } from "react";
 import { cx } from "../cx";
 import { Button } from "./Button";
+import { Kbd } from "./Kbd";
 
 /** One "@" suggestion. `insert` is what goes after the "@" (the handle). */
 export interface ComposerSuggestion {
@@ -35,6 +36,25 @@ export interface ComposerMentions {
   listLabel: string;
 }
 
+/** A "/" command: picking it runs `onPick` (or puts `insert` in the box). */
+export interface ComposerCommand {
+  key: string;
+  /** "/relatório". */
+  label: string;
+  /** "Theo monta um documento". */
+  description?: ReactNode;
+  leading?: ReactNode;
+  /** Text that replaces the box (e.g. "/relatório "). Defaults to `${label} `. */
+  insert?: string;
+  onPick?: () => void;
+}
+
+export interface ComposerCommands {
+  list: ComposerCommand[];
+  /** Accessible name of the menu ("Comandos"). */
+  listLabel: string;
+}
+
 export interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
@@ -53,6 +73,12 @@ export interface ComposerProps {
   textareaRef?: React.Ref<HTMLTextAreaElement>;
   /** "@" autocomplete (combobox pattern on the text box). */
   mentions?: ComposerMentions;
+  /** "/" at the start of the box opens these commands (same combobox). */
+  commands?: ComposerCommands;
+  /** Context pills under the text (the target agent, the active skill). */
+  pills?: ReactNode;
+  /** Shown in the send button once there is text ("Enviar"); the key hint follows. */
+  sendText?: string;
 }
 
 /** "@que" right before the caret (start of text or after a space or bracket). */
@@ -78,6 +104,9 @@ export function Composer({
   className,
   textareaRef,
   mentions,
+  commands,
+  pills,
+  sendText,
 }: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -102,7 +131,23 @@ export function Composer({
     }
   }, [value]);
 
-  const items = mentions && token && token.start !== dismissed ? mentions.search(token.query) : [];
+  // "/" commands: only while the box is just "/word" (no space yet).
+  const slash = commands ? /^\/(\S*)$/.exec(value) : null;
+  const slashItems: ComposerSuggestion[] =
+    slash && dismissed !== -1
+      ? (commands?.list
+          .filter((c) => c.label.toLowerCase().includes((slash[1] ?? "").toLowerCase()))
+          .map((c) => ({
+            key: c.key,
+            insert: c.insert ?? `${c.label} `,
+            label: c.label,
+            description: c.description,
+            leading: c.leading,
+          })) ?? [])
+      : [];
+  const mentionItems = mentions && token && token.start !== dismissed ? mentions.search(token.query) : [];
+  const items = slashItems.length > 0 ? slashItems : mentionItems;
+  const isSlash = slashItems.length > 0;
   const open = items.length > 0;
   const current = Math.min(active, Math.max(0, items.length - 1));
 
@@ -117,6 +162,13 @@ export function Composer({
   };
 
   const pick = (item: ComposerSuggestion) => {
+    if (isSlash) {
+      const command = commands?.list.find((c) => c.key === item.key);
+      caretAfter.current = item.insert.length;
+      onChange(item.insert);
+      command?.onPick?.();
+      return;
+    }
     if (!token) return;
     const caret = token.start + 1 + token.query.length;
     const inserted = `@${item.insert} `;
@@ -154,7 +206,7 @@ export function Composer({
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        setDismissed(token?.start ?? null);
+        setDismissed(isSlash ? -1 : (token?.start ?? null));
         return;
       }
     }
@@ -175,12 +227,13 @@ export function Composer({
       value={value}
       disabled={disabled}
       onChange={(e) => {
+        if (dismissed === -1 && !e.target.value.startsWith("/")) setDismissed(null);
         onChange(e.target.value);
         track(e.target.value, e.target.selectionStart ?? e.target.value.length);
       }}
       onSelect={(e) => track(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
       onKeyDown={onKeyDown}
-      {...(mentions
+      {...(mentions || commands
         ? {
             role: "combobox",
             "aria-autocomplete": "list" as const,
@@ -196,36 +249,51 @@ export function Composer({
     <RPopover.Root
       open={open}
       onOpenChange={(o) => {
-        if (!o && open) setDismissed(token?.start ?? null);
+        if (!o && open) setDismissed(isSlash ? -1 : (token?.start ?? null));
       }}
     >
       <RPopover.Anchor asChild>
-        <div ref={box} className={cx("ac-composer", className)}>
-          {attachLabel && (
-            <Button
-              variant="ghost"
-              iconOnly
-              icon="attach"
-              aria-label={attachLabel}
-              onClick={onAttach}
-              disabled={!onAttach}
-            />
-          )}
+        <div ref={box} className={cx("ac-composer", className)} data-disabled={disabled || undefined}>
           {textarea}
-          <Button
-            variant="primary"
-            iconOnly
-            icon="send"
-            aria-label={sendLabel}
-            onClick={send}
-            disabled={disabled || !value.trim()}
-          />
+          <div className="ac-composer__tools">
+            {pills && <div className="ac-composer__pills">{pills}</div>}
+            {attachLabel && (
+              <Button
+                variant="ghost"
+                iconOnly
+                size="sm"
+                icon="attach"
+                aria-label={attachLabel}
+                onClick={onAttach}
+                disabled={!onAttach}
+              />
+            )}
+            {/* Grows from a dim square into "Enviar ↵" once there is text. */}
+            <button
+              type="button"
+              className="ac-composer__send"
+              data-ready={value.trim() && !disabled ? "" : undefined}
+              aria-label={sendLabel}
+              onClick={send}
+              disabled={disabled || !value.trim()}
+            >
+              {sendText && value.trim() && !disabled && (
+                <span className="ac-composer__send-text" aria-hidden="true">
+                  {sendText}
+                  <Kbd>↵</Kbd>
+                </span>
+              )}
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </div>
       </RPopover.Anchor>
-      {mentions && (
+      {(mentions || commands) && (
         <RPopover.Portal>
           <RPopover.Content
-            className="ac-menu ac-suggest"
+            className={cx("ac-menu ac-suggest", isSlash && "ac-suggest--commands")}
             side="top"
             align="start"
             sideOffset={6}
@@ -236,7 +304,11 @@ export function Composer({
               if (e.target instanceof Node && box.current?.contains(e.target)) e.preventDefault();
             }}
           >
-            <div role="listbox" id={listId} aria-label={mentions.listLabel}>
+            <div
+              role="listbox"
+              id={listId}
+              aria-label={isSlash ? (commands?.listLabel ?? "") : (mentions?.listLabel ?? "")}
+            >
               {items.map((item, i) => {
                 const heading = item.group && item.group !== items[i - 1]?.group;
                 return (

@@ -234,3 +234,27 @@ export function dropProvisional(state: StreamsState, threadIds: Set<string>): St
   );
   return { ...state, runs };
 }
+
+/** The living avatar of one run: words arriving → writing; queued/thinking/running → thinking; else idle. */
+export function agentStateOfRun(r: LiveRun): "idle" | "thinking" | "writing" {
+  if (r.status === "failed" || r.status === "done" || r.status === "waiting_approval") return "idle";
+  if (r.text.length > 0 && r.status === "running") return "writing";
+  if (r.status === "running" || r.status === "queued" || r.status === "thinking") return "thinking";
+  return "idle";
+}
+
+/** An agent's state across its live runs (optionally in one channel): writing beats thinking beats idle. */
+export function agentStateIn(
+  state: StreamsState,
+  agentId: string,
+  channelId?: string,
+): "idle" | "thinking" | "writing" {
+  let best: "idle" | "thinking" | "writing" = "idle";
+  for (const r of Object.values(state.runs)) {
+    if (r.agentId !== agentId || (channelId && r.channelId !== channelId)) continue;
+    const s = agentStateOfRun(r);
+    if (s === "writing") return "writing";
+    if (s === "thinking") best = "thinking";
+  }
+  return best;
+}

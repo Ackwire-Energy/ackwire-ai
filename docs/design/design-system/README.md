@@ -19,13 +19,13 @@
 - `success` é neutro (alias de `ink`): o azul é dos agentes, então sucesso se diz pelo ícone de check e pela palavra. `danger` é vermelho e sempre acompanha uma palavra ou ícone.
 - Texto sobre fundo colorido usa o token `on-…` correspondente, nunca branco literal.
 
-**Forma.** Pessoas são círculos (`radius-full`). Agentes são quadrados arredondados (`radius-md`) com **um canto vivo** no inferior esquerdo (`radius-cut`). O canto vivo é a assinatura do agente e só aparece em coisas de agente: avatar, botão "Pedir a …" e card de aprovação. Controles usam `radius-sm`; cards e menus `radius-md`; diálogos `radius-lg`.
+**Forma.** Pessoas são círculos (`radius-full`). Agentes são o símbolo vivo: quadrado arredondado `radius-agent` (`30% 30% 30% 9%`), com **um canto vivo** no inferior esquerdo, degradê `agent2 → agent` e dois olhos que piscam, olham em volta (pensando) ou viram traço (escrevendo); ver `../refresh-2026-10.md`. O canto vivo é a assinatura do agente e só aparece em coisas de agente: avatar, botão "Pedir a …" e card de aprovação. Controles usam `radius-sm`; cards e menus `radius-md`; diálogos `radius-lg`.
 
 **Tipo.** Onest para toda a interface: `display` em títulos de página, `title` em cabeçalhos de canal e cards, `body` nas mensagens, `small` em rodapés de thread, `label` em caixa alta nos rótulos da barra lateral. `meta` para custo, tokens e modelo ao lado do horário, com algarismos tabulares. Martian Mono (`code`) só aparece em código: inline, blocos, diffs e comandos. Nunca use mono para rótulos, metadados, botões ou texto de interface.
 
 **Espaço.** Base de 4px. Mensagens do mesmo autor ficam a `space-2`; grupos de autores diferentes a `space-6`. Cards têm padding `space-4`.
 
-**Profundidade.** Sem sombras, exceto `overlay` em menus, popovers e diálogos. Separação é por superfície (`surface-sunken` na barra lateral) e por `line`.
+**Profundidade (2026-10).** Camadas com elevação `e1`/`e2`/`e3` e a luz de topo `top`: cards e botões secundários em e1, hover de card interativo e composer em e2, vidro (menus, popovers, select, toasts, ⌘K) e diálogos em e3. Vidro usa `glass` + `backdrop-filter`, com `glass-solid` de reserva. Raios: itens de menu 10, botões 12, cards 14, composer 18, seções 20. Movimento com `--out` e `--spring`, sempre desligado com `prefers-reduced-motion`. Especificação completa em `../refresh-2026-10.md`.
 
 **Foco e estados.** Todo controle focado por teclado mostra `focus-ring`: 2px da superfície e um anel sólido de 2px em tinta. Bordas de controle usam `line-strong` (3:1). Desabilitado é `ink-muted` sobre `surface`. Um agente trabalhando ganha um anel `agent` no avatar e, enquanto escreve, um cursor `agent` no fim do texto; ambos param com `prefers-reduced-motion`.
 

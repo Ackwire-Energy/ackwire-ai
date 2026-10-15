@@ -4,6 +4,7 @@ import {
   Button,
   Checkbox,
   Composer,
+  type ComposerCommand,
   DayDivider,
   Dialog,
   DialogFooter,
@@ -21,7 +22,7 @@ import {
   Spinner,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { memo, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -54,14 +55,16 @@ import type {
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
 import { buildTimeline, groupsWith, mergeTimeline, threadRootsToLoad } from "@/chat/timeline";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { InlineProposal, MemoryChangeCard, QuestionCard } from "@/components/ChatCards";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
-import { MessageFeedback } from "@/components/MessageFeedback";
+import { MessageFeedback, ReactionPills } from "@/components/MessageFeedback";
 import { MessageReceipts } from "@/components/MessageReceipts";
+import { MessageWork } from "@/components/MessageWork";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -71,7 +74,9 @@ import { activityText, activityVerb, barEntries, isWriting, toolActivity } from 
 import { artifactRefs } from "@/lib/artifacts";
 import { audienceNotice, canTalk } from "@/lib/audience";
 import { entersWithMotion, greetingSuggestions, messageUsage, nearBottom, usageLine } from "@/lib/chat";
+import { clearDraft, peekDraft } from "@/lib/drafts";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
+import { agentGrammar } from "@/lib/grammar";
 import { reportPainted } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { routineOfMessage } from "@/lib/routines";
@@ -85,7 +90,7 @@ import {
   useStreams,
   useTypingSender,
 } from "@/realtime/context";
-import { type LiveRun, runsInChannel } from "@/realtime/streams";
+import { agentStateOfRun, type LiveRun, runsInChannel } from "@/realtime/streams";
 import { typingIn } from "@/realtime/typing";
 
 /** Header and empty state of a channel, or of a DM (same layout). */
@@ -192,7 +197,12 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
   const status = useConnectionStatus();
   const join = useJoinChannel(org.id, channel.id);
   const sendTyping = useTypingSender(channel.id);
-  const [draft, setDraft] = useState("");
+  // ⌘K "Pedir a um agente" leaves the text for this DM's composer.
+  const draftKey = chrome?.dmAgentId ? `agent:${chrome.dmAgentId}` : null;
+  const [draft, setDraft] = useState(() => (draftKey ? (peekDraft(draftKey) ?? "") : ""));
+  useEffect(() => {
+    if (draftKey) clearDraft(draftKey);
+  }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   // An agent mentioned from outside the channel: offer to add it.
   const [offer, setOffer] = useState<string | null>(null);
@@ -377,6 +387,63 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
   useEffect(() => {
     if (timeline.length > 0 || messages.isSuccess) reportPainted(channel.id, channel.name, fromCache.current);
   }, [timeline.length > 0, messages.isSuccess, channel.id, channel.name]);
+
+  // Composer context: who it goes to (the DM agent, or the agents @mentioned in the draft).
+  const dmAgent = chrome?.dmAgentId ? dir.agentById.get(chrome.dmAgentId) : undefined;
+  const draftAgents = useMemo(
+    () =>
+      [
+        ...new Set(
+          tokenizeBody(draft).flatMap((tok) =>
+            tok.type === "mention" ? [dir.agentByHandle.get(tok.handle.toLowerCase())?.id] : [],
+          ),
+        ),
+      ]
+        .map((id) => (id ? dir.agentById.get(id) : undefined))
+        .filter((a): a is Agent => Boolean(a)),
+    [draft, dir.agentByHandle, dir.agentById],
+  );
+  const pillAgents = dmAgent ? [dmAgent] : draftAgents;
+  const composerPills =
+    pillAgents.length > 0
+      ? pillAgents.map((a) => (
+          <span key={a.id} className="ac-composer__agent">
+            <AgentAvatar agentId={a.id} channelId={channel.id} name={a.name} size="xs" />
+            {a.name}
+          </span>
+        ))
+      : undefined;
+  // "/" commands, for the DM agent or the channel's first agent.
+  const commandAgent = dmAgent ?? channelAgents[0];
+  const navigateTo = useNavigate();
+  const commandPrefix = dmAgent || !commandAgent ? "" : `@${commandAgent.handle} `;
+  const cg = agentGrammar(t, commandAgent?.name ?? "");
+  const commands: ComposerCommand[] = commandAgent
+    ? [
+        {
+          key: "report",
+          label: t("composer.report"),
+          description: t("composer.reportText", cg),
+          leading: <Icon name="document" size={16} />,
+          insert: `${commandPrefix}${t("composer.reportInsert")}`,
+        },
+        {
+          key: "routine",
+          label: t("composer.routine"),
+          description: t("composer.routineText"),
+          leading: <Icon name="routines" size={16} />,
+          insert: "",
+          onPick: () => void navigateTo({ to: "/org/$orgId/routines", params: { orgId: org.id } }),
+        },
+        {
+          key: "pc",
+          label: t("composer.pc"),
+          description: t("composer.pcText", cg),
+          leading: <Icon name="code" size={16} />,
+          insert: `${commandPrefix}${t("composer.pcInsert")}`,
+        },
+      ]
+    : [];
 
   const onSend = (text: string) => {
     toBottom(true);
@@ -580,7 +647,10 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
                     : t("channel.composerPlaceholder", { channel: channel.name })
                 }
                 sendLabel={t("channel.send")}
+                sendText={t("channel.send")}
                 attachLabel={t("channel.attach")}
+                pills={composerPills}
+                commands={commandAgent ? { listLabel: t("composer.commands"), list: commands } : undefined}
                 mentions={{
                   search: mentionSearch,
                   listLabel: t("mentions.list"),
@@ -747,7 +817,7 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
       agent
       grouped={grouped}
       streaming={!failed && !waiting}
-      avatar={<Avatar kind="agent" name={name} initials={dir.agentInitials(run.agentId)} running={!failed} />}
+      avatar={<Avatar kind="agent" name={name} state={agentStateOfRun(run)} />}
       author={name}
       time={<time dateTime={startedAt}>{formatTime(i18n.language, startedAt)}</time>}
       status={waiting ? { icon: "waiting", label: t("channel.waitingApproval") } : undefined}
@@ -821,7 +891,7 @@ function ActivityBar({ channelId }: { channelId: string }) {
           <span className="ac-typing__avatars" aria-hidden="true">
             {entries.map((e) =>
               e.type === "agent" ? (
-                <Avatar key={`a:${e.id}`} kind="agent" size="xs" name={e.name} initials={dir.agentInitials(e.id)} />
+                <Avatar key={`a:${e.id}`} kind="agent" size="xs" name={e.name} state="thinking" />
               ) : (
                 <Avatar key={`p:${e.id}`} size="xs" name={e.name} imageUrl={dir.memberById.get(e.id)?.image} />
               ),
@@ -975,6 +1045,9 @@ const TimelineMessage = memo(function TimelineMessage({
       {agent &&
         memoryUpdates.map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
       {question && <QuestionCard question={question} />}
+      {m.author.type === "agent" && m.agentRunId && !card && !m.local && (
+        <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} />
+      )}
       {artifacts.length > 0 && (
         <div className="artifact-cards">
           {artifacts.map((r) => (
@@ -982,6 +1055,7 @@ const TimelineMessage = memo(function TimelineMessage({
           ))}
         </div>
       )}
+      {feedback && <ReactionPills messageId={m.id} initial={m.reactions} />}
       {feedback && (
         <MessageFeedback messageId={m.id} agentName={agent?.name ?? t("channel.unknownAgent")} active={active} />
       )}

@@ -2615,3 +2615,156 @@ p {
   content-visibility: auto;
   contain-intrinsic-size: auto 64px;
 }
+
+/* ── Design system 2026-10 in the app (docs/design/refresh-2026-10.md) ── */
+/* Artifact cards: raised, hairline + e1 + top light; lift on hover; documents get a page thumbnail. */
+.artifact-card {
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--e1), var(--top);
+  transition:
+    box-shadow 0.2s var(--out),
+    transform 0.2s var(--spring);
+}
+.artifact-card:hover {
+  border-color: transparent;
+  box-shadow: var(--e2), var(--top);
+  transform: translateY(-1px);
+}
+.artifact-card--loading {
+  box-shadow: none;
+}
+.artifact-thumb {
+  width: 42px;
+  height: 52px;
+  flex: none;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 7px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--raised), var(--sunken));
+  box-shadow: 0 0 0 1px var(--line);
+}
+.artifact-thumb span {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .artifact-card {
+    transition: none;
+  }
+  .artifact-card:hover {
+    transform: none;
+  }
+}
+
+/* Sidebar 2026-10: soft pill for the active item (one indicator slides between items), neutral badges. */
+.sidebar {
+  position: relative;
+  background: var(--sunken);
+}
+.sidebar > *:not(.sidebar__indicator) {
+  position: relative;
+  z-index: 1;
+}
+.sidebar__indicator {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  z-index: 0;
+  border-radius: var(--radius-item);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar__indicator {
+    transition:
+      transform 0.32s var(--spring),
+      height 0.2s var(--out);
+  }
+}
+.sidebar__item {
+  border-radius: var(--radius-item);
+  font-size: 14.5px;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.sidebar__item:hover {
+  background: var(--plate);
+}
+.sidebar__item[data-status="active"] {
+  background: transparent;
+  font-weight: 600;
+}
+.sidebar__item[data-status="active"]:hover {
+  background: transparent;
+}
+.sidebar__label {
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+.sidebar__unread {
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: var(--e1);
+  font-weight: 650;
+}
+/* The workspace header: a raised card with the org's name. */
+.sidebar__org {
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+}
+.sidebar__org-name {
+  font-size: 15.5px;
+  letter-spacing: -0.015em;
+}
+.sidebar__jump {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 8px 0 10px;
+  margin: -8px 0 0;
+  border: 0;
+  border-radius: var(--radius-item);
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar__jump:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+.sidebar__jump:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Composer area: the floating card sits on the page with breathing room. */
+.channel__composer {
+  padding-top: 4px;
+}
+/* Page titles: tighter, more editorial. */
+.page-title {
+  letter-spacing: var(--track-tighter);
+}
+.section-title,
+.summary-row__title {
+  letter-spacing: var(--track-tight);
+}
+/* Summary rows and settings cards follow the card elevation. */
+.summary-row {
+  border-radius: var(--radius-lg);
+}

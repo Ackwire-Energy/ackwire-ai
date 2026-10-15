@@ -34,9 +34,19 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
         aria-label={t("artifacts.open", { title: a.title })}
         onClick={() => viewer.open(a.id, a.shownVersion < a.version ? a.shownVersion : undefined)}
       >
-        <span className="artifact-card__icon">
-          <Icon name={KIND_ICON[a.kind]} />
-        </span>
+        {/* A tiny page for documents; the kind's icon for the rest. */}
+        {a.kind === "document" ? (
+          <span className="artifact-thumb" aria-hidden="true">
+            <span style={{ width: "70%" }} />
+            <span />
+            <span style={{ width: "85%" }} />
+            <span style={{ width: "55%" }} />
+          </span>
+        ) : (
+          <span className="artifact-card__icon">
+            <Icon name={KIND_ICON[a.kind]} />
+          </span>
+        )}
         <span className="artifact-card__meta">
           <span className="artifact-card__title">{a.title}</span>
           <span className="small muted">

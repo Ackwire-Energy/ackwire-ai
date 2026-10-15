@@ -7,7 +7,14 @@
  */
 
 export { ApprovalCard, type ApprovalCardProps, type ApprovalStatus } from "./components/ApprovalCard";
-export { Avatar, type AvatarKind, type AvatarProps, AvatarStack, initialsOf } from "./components/Avatar";
+export {
+  type AgentState,
+  Avatar,
+  type AvatarKind,
+  type AvatarProps,
+  AvatarStack,
+  initialsOf,
+} from "./components/Avatar";
 export { Button, type ButtonProps, type ButtonVariant } from "./components/Button";
 export {
   Checkbox,
@@ -19,8 +26,11 @@ export {
   Switch,
 } from "./components/Checkbox";
 export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge } from "./components/Chip";
+export { CommandPalette, filterPalette, type PaletteItem } from "./components/CommandPalette";
 export {
   Composer,
+  type ComposerCommand,
+  type ComposerCommands,
   type ComposerMentions,
   type ComposerProps,
   type ComposerSuggestion,
@@ -30,11 +40,13 @@ export { DatePicker, type DatePickerProps, monthGrid, parseYmd, ymd } from "./co
 export { Dialog, DialogBody, DialogFooter, type DialogProps, DialogSearchList } from "./components/Dialog";
 export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";
 export { AffixInput, Field, type FieldProps, Input, SearchInput, Textarea, useFieldControl } from "./components/Field";
+export { Kbd, modKey } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { Mention } from "./components/Mention";
 export { Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "./components/Menu";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
 export { Popover } from "./components/Popover";
+export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";
 export { Select, type SelectOption, type SelectProps } from "./components/Select";
 export { Sheet, type SheetProps } from "./components/Sheet";
 export {
@@ -65,5 +77,6 @@ export {
 export { type TabItem, TabPanel, Tabs } from "./components/Tabs";
 export { normalizeTime, TimeSelect, type TimeSelectProps, timeOptions } from "./components/TimeSelect";
 export { Token, TokenList } from "./components/Token";
+export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { cx } from "./cx";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
