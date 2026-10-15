@@ -32,26 +32,21 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
 h1,h2,h3,p{margin:0}
 button{font:inherit;color:inherit}
 .shell{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:100vh}
-/* The rail is the agents' sky (the landing's): steps on its light top, the guide agent on its halo below. */
-.rail{position:sticky;top:0;height:100vh;overflow:hidden;padding:26px 20px;display:flex;flex-direction:column;gap:20px;background:#4b93ff;color:#04203f;isolation:isolate}
-.rail canvas.sky{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;pointer-events:none;z-index:-1}
+/* The rail is the app's sidebar: its surface, the steps, and the sky only as a horizon rising from the bottom (no edge). */
+.rail{position:sticky;top:0;height:100vh;overflow:hidden;padding:26px 18px;display:flex;flex-direction:column;gap:20px;background:var(--sunken);border-right:1px solid var(--line);isolation:isolate}
+.rail canvas.sky{position:absolute;inset:auto 0 0 0;width:100%;height:46%;image-rendering:pixelated;pointer-events:none;z-index:-1}
 .brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:300;font-size:22px;letter-spacing:-.02em}
-.brand i{color:rgba(4,32,63,.6)!important}
-.guide{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:10px}
-.guide canvas{display:block}
-.bubble{align-self:stretch;padding:12px 14px;border-radius:16px 16px 16px 5px;background:rgba(241,248,255,.86);box-shadow:0 0 0 1px rgba(4,32,63,.1),0 12px 28px -14px rgba(4,32,63,.5);font-size:13.5px;line-height:1.45;color:#04203f;backdrop-filter:blur(10px)}
-.bubble b{font-weight:600}
-.rail .seg{background:rgba(241,248,255,.5)}
-.rail .seg button{color:rgba(4,32,63,.7)}
-.rail .seg button[aria-pressed="true"]{background:rgba(241,248,255,.95);color:#04203f}
-.brand i{font-style:normal;font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:.62em;color:var(--muted)}
+.guide{margin-top:auto;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.guide canvas{display:block;align-self:center}
+.bubble{padding:11px 13px;border-radius:14px 14px 14px 4px;background:var(--raised);box-shadow:var(--e2);font-size:13px;line-height:1.45;color:var(--ink2)}
+.bubble b{color:var(--ink);font-weight:600}
+.themebar{position:fixed;top:14px;right:18px;z-index:5}
 .steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;position:relative}
 .steps li button{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;color:var(--muted);font-weight:500}
-.steps li button{color:rgba(4,32,63,.72)!important}
-.steps li button[aria-current="step"]{background:rgba(241,248,255,.9);color:#04203f!important;box-shadow:0 0 0 1px rgba(4,32,63,.1),0 8px 18px -10px rgba(4,32,63,.45);font-weight:600}
-.steps .n{width:24px;height:24px;border-radius:8px 8px 8px 3px;display:grid;place-items:center;font-family:var(--dot);font-variation-settings:"ROND" 100;font-size:13px;font-weight:600;background:rgba(241,248,255,.55);color:#04203f;flex:none}
-.steps li[data-done] .n{background:#04203f;color:#eef7ff}
-.steps .opt{color:rgba(4,32,63,.55)!important}
+.steps li button[aria-current="step"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1);font-weight:600}
+.steps .n{width:24px;height:24px;border-radius:8px 8px 8px 3px;display:grid;place-items:center;font-family:var(--dot);font-variation-settings:"ROND" 100;font-size:13px;font-weight:600;background:var(--plate);flex:none}
+.steps li[data-done] .n{background:var(--ink);color:var(--bg)}
+.brand i{font-style:normal;font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:.62em;color:var(--muted)}
 .ic img{width:26px;height:26px;border-radius:7px;display:block}
 .steps .opt{margin-left:auto;font-size:11px;color:var(--faint)}
 .main{padding:40px clamp(18px,5vw,64px) 120px;max-width:860px;width:100%}
@@ -141,11 +136,11 @@ canvas.av{display:block;flex:none}
   <aside class="rail">
     <div class="brand"><canvas class="av" id="brandMark" width="52" height="52" style="width:26px;height:26px"></canvas><span>agentes<i>.chat</i></span></div>
     <ol class="steps" id="steps"></ol>
-    <div class="seg" id="theme" role="group" aria-label="Tema" style="position:relative;align-self:flex-start"><button data-v="light">Claro</button><button data-v="dark">Escuro</button></div>
     <div class="guide"><p class="bubble" id="bubble" role="status"></p><canvas id="guide"></canvas></div>
     <canvas class="sky" id="railSky"></canvas>
   </aside>
   <main class="main" id="main"></main>
+  <div class="seg themebar" id="theme" role="group" aria-label="Tema"><button data-v="light">Claro</button><button data-v="dark">Escuro</button></div>
 </div>
 <div class="foot" id="foot"></div>
 
@@ -270,39 +265,36 @@ function sky(cv, t, field) {
   g.putImageData(img, 0, 0);
 }
 /* The rail's sky: light at the top (calm behind the steps), deep at the bottom, a light halo behind the guide; pixel agents rising. */
-const sprites = Array.from({ length: 6 }, () => ({ x: Math.random() * 0.9, y: Math.random(), k: 1, v: 0.012 + Math.random() * 0.02, b: Math.random() * 5 }));
+const sprites = Array.from({ length: 3 }, (_, i) => ({ x: i % 2 ? 0.78 + Math.random() * 0.1 : 0.04 + Math.random() * 0.1, y: 0.6 + Math.random() * 0.4, k: 1, v: 0.012 + Math.random() * 0.02, b: Math.random() * 5 }));
 const SPRITE = [".XXXXXXX.", "XXXXXXXXX", "XXXXXXXXX", "XXXoXoXXX", "XXXoXoXXX", "XXXXXXXXX", "XXXXXXXXX", "XXXXXXXXX", "XXXXXXXX."];
 function railSky(t) {
   const cv = $("#railSky"), r = cv.getBoundingClientRect(); if (!r.width) return;
   const P = 4, W = Math.ceil(r.width / P), H = Math.ceil(r.height / P);
   if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
-  const g = cv.getContext("2d"), img = g.createImageData(W, H), n = SKY.length - 1;
-  const gd = $("#guide").getBoundingClientRect(), gx = (gd.left + gd.width / 2 - r.left) / P, gy = (gd.top + gd.height / 2 - r.top) / P, gr = gd.width / P * 0.9;
-  const calmBottom = ($("#theme").getBoundingClientRect().bottom - r.top) / P + 6;
-  const calm = new Float32Array(W * H);
+  const surface = getComputedStyle($(".rail")).backgroundColor.match(/\d+/g).slice(0, 3).map(Number);
+  // Tones from the rail's surface into the sky (like the app's sidebar horizon).
+  const sky = ["#a6cfff", "#78b4ff", "#4b93ff", "#2b74e6", "#0f56c4"].map((h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
+  const tones = [surface, ...[0.18, 0.4, 0.65].map((k) => surface.map((v, i) => Math.round(v + (sky[0][i] - v) * k))), ...sky];
+  const g = cv.getContext("2d"), img = g.createImageData(W, H), n = tones.length - 1;
+  const p = 0.72 + 0.25 * (S.done.size / (STEPS.length - 1));
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const u = x / W, v = y / H;
-    let f = 0.98 - 0.85 * v - 0.08 * u + 0.05 * Math.sin(u * 6 + t * 0.5) * v;
-    const top = Math.max(0, Math.min(1, (calmBottom - y) / 10));
-    const q = Math.max(0, Math.min(1, (gr - Math.hypot(x - gx, y - gy)) / (gr * 0.5)));
-    const k = Math.max(top, q * q * (3 - 2 * q));
-    calm[y * W + x] = k;
-    f = f * (1 - k) + (6 / 7) * k;
-    const kk = Math.max(0, Math.min(n, f * n)), lo = Math.floor(kk);
-    const c = SKY[Math.min(n, lo + (kk - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))];
+    const top = 1 - p * (0.82 + 0.18 * Math.sin(u * 4 + t * 0.5));
+    const e = Math.max(0, Math.min(1, (v - top) / (1 - top)));
+    const f = e * e * (3 - 2 * e) * 0.95;
+    const kk = f * n, lo = Math.floor(kk);
+    const c = tones[Math.min(n, lo + (kk - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))];
     const i = (y * W + x) * 4; img.data[i] = c[0]; img.data[i + 1] = c[1]; img.data[i + 2] = c[2]; img.data[i + 3] = 255;
   }
   for (const sp of sprites) {
-    sp.y -= sp.v * 0.04; if (sp.y < -0.1) { sp.y = 1.05; sp.x = Math.random(); }
+    sp.y -= sp.v * 0.04; if (sp.y < 0.5) { sp.y = 1.05; }
     const ox = Math.round(sp.x * W), oy = Math.round(sp.y * H), blink = (t + sp.b) % 4 < 0.12;
     for (let j = 0; j < 9; j++) for (let i2 = 0; i2 < 9; i2++) {
       const ch = SPRITE[j][i2]; if (ch === ".") continue;
-      for (let a = 0; a < sp.k; a++) for (let b2 = 0; b2 < sp.k; b2++) {
-        const X = ox + i2 * sp.k + a, Y = oy + j * sp.k + b2;
-        if (X < 0 || Y < 0 || X >= W || Y >= H || calm[Y * W + X] > 0.3) continue;
-        const o = (Y * W + X) * 4, col = ch === "o" && !blink ? [255, 255, 255] : [4, 32, 63];
-        img.data[o] = col[0]; img.data[o + 1] = col[1]; img.data[o + 2] = col[2];
-      }
+      const X = ox + i2, Y = oy + j;
+      if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+      const o = (Y * W + X) * 4, col = ch === "o" && !blink ? [255, 255, 255] : [4, 32, 63];
+      img.data[o] = col[0]; img.data[o + 1] = col[1]; img.data[o + 2] = col[2];
     }
   }
   g.putImageData(img, 0, 0);
@@ -319,15 +311,15 @@ const SAYS = [
   "Tudo pronto. Te vejo no <b>#general</b>!",
 ];
 function drawGuide(t) {
-  const cv = $("#guide"), size = 132, R = ACCESSORY_REACH, dpr = Math.min(2, devicePixelRatio || 1);
+  const cv = $("#guide"), size = 84, R = ACCESSORY_REACH, dpr = Math.min(2, devicePixelRatio || 1);
   const W = Math.round(size * (1 + R.left + R.right) * dpr), H = Math.round(size * (1 + R.top + R.bottom) * dpr);
-  if (cv.width !== W) { cv.width = W; cv.height = H; cv.style.width = W / dpr + "px"; cv.style.height = H / dpr + "px"; cv.style.marginTop = -size * R.top * 0.6 + "px"; cv.style.marginBottom = -size * R.bottom + "px"; }
+  if (cv.width !== W) { cv.width = W; cv.height = H; cv.style.width = W / dpr + "px"; cv.style.height = H / dpr + "px"; cv.style.marginTop = -size * R.top * 0.5 + "px"; cv.style.marginBottom = -size * R.bottom * 0.7 + "px"; }
   const g = cv.getContext("2d"), s = size * dpr, now = performance.now();
   g.clearRect(0, 0, W, H);
   const pose = now < GUIDE.typingUntil ? { writing: true, turn: [0.55, 0.1] } : idlePose(t, 0.7, { every: 12 });
   if (now >= GUIDE.typingUntil) pose.turn = [0.5 + 0.15 * Math.sin(t * 0.6), 0.08 + 0.06 * Math.sin(t * 0.9)];
   if (now < GUIDE.happyUntil) pose.expression = "happy";
-  drawAgent(g, R.left * s, R.top * s, s, { color: GUIDE.look.color, eyes: GUIDE.look.eyes, cells: 22, deep: true, pose,
+  drawAgent(g, R.left * s, R.top * s, s, { color: GUIDE.look.color, eyes: GUIDE.look.eyes, cells: 16, pose,
     after: (c, side, frame) => drawAccessory(c, side, GUIDE.look.accessory, frame, t) });
 }
 document.addEventListener("input", (e) => { if (e.target.closest(".main")) GUIDE.typingUntil = performance.now() + 900; });
