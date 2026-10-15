@@ -11,6 +11,7 @@ export * from "./blob";
 export * from "./blob-postgres";
 export * from "./email";
 export * from "./keys";
+export * from "./machine-protocol";
 export * from "./presence";
 export * from "./pubsub";
 export * from "./rate-limiter";
