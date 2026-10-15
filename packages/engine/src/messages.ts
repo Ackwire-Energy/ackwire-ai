@@ -13,6 +13,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { audienceSql, notifyBlocked } from "./audience";
 import { requireChannelAccess } from "./channels";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
@@ -43,6 +44,8 @@ export interface MessageView {
   receipts?: Receipts;
   /** Agent messages in lists: model, tokens and cost of the run that wrote it. */
   usage?: MessageUsage;
+  /** Only in the sender's own POST response: agents that won't answer them, and why (never stored). */
+  notices?: { agentId: string; text: string }[];
   /** Top-level messages with `include=replies`: thread summary and the latest replies. */
   replies?: { count: number; lastAt: string | null; latest: MessageView[] };
   createdAt: string;
@@ -164,6 +167,8 @@ interface RawMessage {
   edited_at: Date | string | null;
   deleted_at: Date | string | null;
   runs: { id: string; agentId: string }[] | string | null;
+  /** Agents the sender addressed but can't talk to (D31). */
+  blocked?: string[] | string | null;
 }
 
 const asDate = (v: Date | string | null) => (v === null ? null : v instanceof Date ? v : new Date(v));
@@ -185,7 +190,7 @@ export async function insertMessageWithRuns(
   tx: Executor,
   input: NewMessage,
   options: { startRuns: boolean },
-): Promise<{ message: Message; runs: { id: string; agentId: string }[] }> {
+): Promise<{ message: Message; runs: { id: string; agentId: string }[]; blocked: string[] }> {
   const body = input.body.trim();
   if (body === "") throw new ValidationError("Message is empty");
   if (body.length > MAX_MESSAGE_LENGTH)
@@ -222,6 +227,7 @@ export async function insertMessageWithRuns(
               and oq.thread_id is not distinct from ${threadId}::uuid
             order by oq.created_at desc limit 1)
           and (not exists (select 1 from mentioned) or q.agent_id in (select id from mentioned))
+          and exists (select 1 from ${agents} qa where qa.id = q.agent_id and ${audienceSql("qa", sql`${userId}::text`)})
           and (${threadId}::uuid is null or exists (
             select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
               and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))
@@ -239,8 +245,9 @@ export async function insertMessageWithRuns(
           select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
             and r.channel_id = ${input.channelId}::uuid and r.thread_id is null)
         returning *
-      ), answering as (
-        select a.id as agent_id, case when exists (select 1 from mentioned) then 'mention' else 'dm' end as trig
+      ), addressed as (
+        select a.id as agent_id, case when exists (select 1 from mentioned) then 'mention' else 'dm' end as trig,
+          ${audienceSql("a", sql`${userId}::text`)} as allowed
         from ${agents} a
         join ${channelMembers} cm on cm.agent_id = a.id and cm.channel_id = ${input.channelId}::uuid
         where ${startRuns}::boolean and a.org_id = ${input.orgId}::uuid and a.archived_at is null
@@ -248,6 +255,9 @@ export async function insertMessageWithRuns(
           and (a.id in (select id from mentioned)
             or (not exists (select 1 from mentioned) and not exists (select 1 from answered) and exists (
               select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
+      ), answering as (
+        -- Who can talk to the agent (D31): the others get no run, only a notice for the sender.
+        select agent_id, trig from addressed where allowed
       ), runs as (
         insert into ${agentRuns} (id, org_id, agent_id, channel_id, thread_root_id, trigger_message_id, trigger, hop)
         select gen_random_uuid(), ${input.orgId}::uuid, an.agent_id, ${input.channelId}::uuid,
@@ -274,6 +284,7 @@ export async function insertMessageWithRuns(
       )
       select m.*,
         coalesce((select json_agg(json_build_object('id', r.id, 'agentId', r.agent_id)) from runs r), '[]'::json) as runs,
+        coalesce((select json_agg(ad.agent_id) from addressed ad where not ad.allowed), '[]'::json) as blocked,
         (select count(*) from jobs)::int as jobs
       from m`),
   );
@@ -297,7 +308,7 @@ export async function insertMessageWithRuns(
     editedAt: asDate(row.edited_at),
     deletedAt: asDate(row.deleted_at),
   };
-  return { message, runs: parseJson(row.runs, []) };
+  return { message, runs: parseJson(row.runs, []), blocked: parseJson(row.blocked ?? null, [] as string[]) };
 }
 
 /**
@@ -323,7 +334,7 @@ export async function postPersonMessage(
   if (!can(membership.role, "post")) throw new ForbiddenError();
   const clientId = input.clientId?.trim().slice(0, 64) || null;
   // One statement: the message, its jobs, and the runs of agents that will surely answer.
-  const { message, runs } = await insertMessageWithRuns(
+  const { message, runs, blocked } = await insertMessageWithRuns(
     deps.db,
     {
       orgId,
@@ -350,6 +361,15 @@ export async function postPersonMessage(
   }
   const answers = message.meta.answersQuestionId;
   if (typeof answers === "string") await afterReplyAnswered(deps, orgId, answers);
+  // Agents this person can't talk to (D31): no run; only they hear why ("O Theo só responde a …").
+  if (blocked.length > 0) {
+    view.notices = await notifyBlocked(deps, orgId, userId, {
+      agentIds: blocked,
+      channelId,
+      threadId: message.threadId,
+      messageId: message.id,
+    });
+  }
   if (runs.length > 0) {
     // DMs are flat: replies to a top-level DM message go in the main timeline.
     const threadId = message.threadId ?? (channel.kind === "dm" ? null : message.id);

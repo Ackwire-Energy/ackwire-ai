@@ -1,4 +1,5 @@
-import { and, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { audienceSql } from "./audience";
 import { dmAgents } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
@@ -63,7 +64,7 @@ export async function eligibleChannelAgents(
   orgId: string,
   channelId: string,
   agentIds: string[],
-  options: { autoReplyOnly?: boolean } = {},
+  options: { autoReplyOnly?: boolean; requesterUserId?: string | null } = {},
 ) {
   if (agentIds.length === 0) return [];
   return db
@@ -76,8 +77,32 @@ export async function eligibleChannelAgents(
         inArray(agents.id, agentIds),
         isNull(agents.archivedAt),
         options.autoReplyOnly ? eq(channelMembers.autoReply, true) : undefined,
+        // Who can talk to the agent (D31), for the person behind the message.
+        options.requesterUserId !== undefined
+          ? audienceSql("agents", sql`${options.requesterUserId}::text`)
+          : undefined,
       ),
     );
+}
+
+/**
+ * The person behind a message: its author, or for an agent's message the
+ * person whose message started that agent's run (up to a few hops). Null when
+ * a routine, webhook or other system started the chain.
+ */
+export async function requesterOf(db: Executor, message: Pick<Message, "orgId" | "authorUserId" | "agentRunId">) {
+  let current: Pick<Message, "authorUserId" | "agentRunId"> | null = message;
+  for (let hop = 0; current && hop < 6; hop++) {
+    if (current.authorUserId) return current.authorUserId;
+    if (!current.agentRunId) return null;
+    const [run] = await db
+      .select({ trigger: agentRuns.triggerMessageId })
+      .from(agentRuns)
+      .where(and(eq(agentRuns.id, current.agentRunId), eq(agentRuns.orgId, message.orgId)));
+    if (!run) return null;
+    current = await getMessage(db, message.orgId, run.trigger);
+  }
+  return null;
 }
 
 /**
@@ -100,7 +125,10 @@ export async function dispatchMentions(
   if (message.hop >= options.maxHops) return { runs: [], skipped: "hop_limit" };
 
   // Re-check at dispatch time: the agent may have been archived or removed from the channel since.
-  const eligible = await eligibleChannelAgents(db, message.orgId, message.channelId, candidates);
+  // An agent asking another one acts for the person behind its run, who must be allowed to talk to it.
+  const eligible = await eligibleChannelAgents(db, message.orgId, message.channelId, candidates, {
+    requesterUserId: await requesterOf(db, message),
+  });
   const runs = await db.transaction((tx) =>
     createAgentRuns(
       tx,
@@ -123,7 +151,15 @@ export async function dispatchDm(
 ): Promise<DispatchResult & { agentIds: string[] }> {
   if (message.authorType !== "person") return { runs: [], agentIds: [] };
   if (message.hop >= options.maxHops) return { runs: [], skipped: "hop_limit", agentIds: [] };
-  const agentIds = (await dmAgents(db, message.orgId, message.channelId)).map((a) => a.id);
+  const dm = await dmAgents(db, message.orgId, message.channelId);
+  const allowed = await eligibleChannelAgents(
+    db,
+    message.orgId,
+    message.channelId,
+    dm.map((a) => a.id),
+    { requesterUserId: message.authorUserId },
+  );
+  const agentIds = allowed.map((a) => a.id);
   const runs = await db.transaction((tx) => createAgentRuns(tx, message, agentIds, "dm"));
   return { runs, agentIds };
 }

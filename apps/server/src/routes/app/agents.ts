@@ -2,12 +2,17 @@ import {
   type Agent as AgentRow,
   agentView,
   archiveAgent,
+  audienceOf,
+  canTalkTo,
   createAgent,
   createCredential,
   deleteCredential,
+  getAgent,
   listAgents,
   listCredentials,
+  NotFoundError,
   revokeCredential,
+  setAgentAudience,
   updateAgent,
   usageSummary,
 } from "@agenteschat/engine";
@@ -25,17 +30,20 @@ import {
   requireSession,
   security,
 } from "./context";
-import { Agent, Credential, Model, Usage } from "./schemas";
+import { Agent, AgentAudience, Credential, Model, Usage } from "./schemas";
 
 const tags = ["Agents"];
 
-const toAgent = (a: AgentRow) => {
+const toAgent = (a: AgentRow, viewerId: string) => {
   const v = agentView(a);
   const { monthlyBudgetNanoUsd, ...rest } = v;
   return {
     ...rest,
     monthlyBudgetUsd: monthlyBudgetNanoUsd === null ? null : nanoUsdToUsd(monthlyBudgetNanoUsd),
     createdAt: v.createdAt.toISOString(),
+    audience: audienceOf(a),
+    audienceMode: a.audienceMode,
+    canTalk: canTalkTo(a, viewerId),
   };
 };
 
@@ -56,6 +64,9 @@ const AgentFields = z.object({
     .nullable()
     .optional()
     .openapi({ description: "Spend cap per calendar month (UTC). Null = no cap." }),
+  audience: AgentAudience.optional().openapi({
+    description: "Who can talk to it. The agent's owner or admins can change it.",
+  }),
 });
 
 const budget = (usd: number | null | undefined) =>
@@ -191,7 +202,14 @@ export function agentRoutes(deps: AppDeps) {
       responses: { 200: json(z.object({ agents: z.array(Agent) })), ...errors },
     }),
     async (c) =>
-      c.json({ agents: (await listAgents(db, c.get("user").id, c.req.valid("param").orgId)).map(toAgent) }, 200),
+      c.json(
+        {
+          agents: (await listAgents(db, c.get("user").id, c.req.valid("param").orgId)).map((a) =>
+            toAgent(a, c.get("user").id),
+          ),
+        },
+        200,
+      ),
   );
 
   app.openapi(
@@ -205,15 +223,17 @@ export function agentRoutes(deps: AppDeps) {
       responses: { 201: json(Agent, "Created"), ...errors },
     }),
     async (c) => {
-      const { monthlyBudgetUsd, ...input } = c.req.valid("json");
-      const agent = await createAgent(
+      const { monthlyBudgetUsd, audience, ...input } = c.req.valid("json");
+      const orgId = c.req.valid("param").orgId;
+      let agent = await createAgent(
         db,
         c.get("user").id,
-        c.req.valid("param").orgId,
+        orgId,
         { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
         { model: config.AGENT_DEFAULT_MODEL },
       );
-      return c.json(toAgent(agent), 201);
+      if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
+      return c.json(toAgent(agent, c.get("user").id), 201);
     },
   );
 
@@ -230,12 +250,19 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const { monthlyBudgetUsd, ...input } = c.req.valid("json");
-      const agent = await updateAgent(db, c.get("user").id, orgId, agentId, {
-        ...input,
-        monthlyBudgetNanoUsd: budget(monthlyBudgetUsd),
-      });
-      return c.json(toAgent(agent), 200);
+      const { monthlyBudgetUsd, audience, ...input } = c.req.valid("json");
+      const actor = c.get("user").id;
+      // The audience alone can be changed by the agent's owner too; everything else needs an admin.
+      const other = !audience || Object.values(input).some((v) => v !== undefined) || monthlyBudgetUsd !== undefined;
+      let agent = other
+        ? await updateAgent(db, actor, orgId, agentId, { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) })
+        : null;
+      if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience);
+      if (!agent) {
+        agent = await getAgent(db, orgId, agentId);
+        if (!agent) throw new NotFoundError("Agent not found");
+      }
+      return c.json(toAgent(agent, actor), 200);
     },
   );
 

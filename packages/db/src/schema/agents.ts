@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { bigint, index, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
@@ -71,6 +72,13 @@ export const agents = pgTable(
     ownerUserId: text().references(() => users.id, { onDelete: "set null" }),
     /** Spend cap per calendar month (UTC) in nano-USD (1e-9 USD). Null = no cap. */
     monthlyBudgetNanoUsd: bigint({ mode: "number" }),
+    /**
+     * Who can talk to it (D31): `everyone`, `people` (`audience_user_ids`,
+     * plus the owner) or `owner`. Enforced wherever a person's message can
+     * start a run; nothing else is restricted (it still reads the channel).
+     */
+    audienceMode: text().$type<"everyone" | "people" | "owner">().notNull().default("everyone"),
+    audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),

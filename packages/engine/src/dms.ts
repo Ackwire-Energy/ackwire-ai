@@ -1,7 +1,9 @@
 import { and, type Database, desc, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
+import type { Agent } from "./agents";
+import { audienceNotice, canTalkTo } from "./audience";
 import { caches } from "./cache";
 import { sha256 } from "./crypto";
-import { NotFoundError, ValidationError } from "./errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { getMembership, requirePermission } from "./organizations";
 
 const { channels, channelMembers, channelReads, messages, agents, users } = schema;
@@ -19,6 +21,7 @@ const keyOf = (participants: string[]) => [...new Set(participants)].sort().join
 export async function openDm(db: Database, actorId: string, orgId: string, target: DmTarget) {
   await requirePermission(db, actorId, orgId, "post");
   let other: string;
+  let blockedAgent: Agent | null = null;
   if ("userId" in target) {
     if (target.userId === actorId) throw new ValidationError("Pick someone else");
     if (!(await getMembership(db, target.userId, orgId)))
@@ -26,10 +29,11 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
     other = `u:${target.userId}`;
   } else {
     const [agent] = await db
-      .select({ id: agents.id })
+      .select()
       .from(agents)
       .where(and(eq(agents.id, target.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
     if (!agent) throw new NotFoundError("Agent not found");
+    if (!canTalkTo(agent, actorId)) blockedAgent = agent;
     other = `a:${target.agentId}`;
   }
   const dmKey = keyOf([`u:${actorId}`, other]);
@@ -45,6 +49,8 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
     if (found.archivedAt) await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, found.id));
     return found;
   }
+  // A new DM with an agent this person can't talk to (D31) isn't started; an old one stays readable.
+  if (blockedAgent) throw new ForbiddenError(await audienceNotice(db, blockedAgent));
   const created = await db.transaction(async (tx) => {
     const [channel] = await tx
       .insert(channels)

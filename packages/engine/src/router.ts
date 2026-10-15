@@ -1,5 +1,6 @@
-import { and, type Database, desc, eq, inArray, isNull, lte, ne, schema } from "@agenteschat/db";
+import { and, type Database, desc, eq, inArray, isNull, lte, ne, schema, sql } from "@agenteschat/db";
 import { cheapModelOf, ProviderError } from "@agenteschat/providers";
+import { audienceSql } from "./audience";
 import { summarizeScopes } from "./capabilities";
 import { createAgentRuns } from "./dispatch";
 import { MissingCredentialError, ValidationError } from "./errors";
@@ -336,7 +337,15 @@ export async function routeMessage(
       channelMembers,
       and(eq(channelMembers.agentId, agents.id), eq(channelMembers.channelId, message.channelId)),
     )
-    .where(and(eq(agents.orgId, message.orgId), isNull(agents.archivedAt), eq(channelMembers.autoReply, true)));
+    .where(
+      and(
+        eq(agents.orgId, message.orgId),
+        isNull(agents.archivedAt),
+        eq(channelMembers.autoReply, true),
+        // Never an agent this person can't talk to (D31): not as a pick, not as "the last agent" of a follow-up.
+        audienceSql("agents", sql`${message.authorUserId}::text`),
+      ),
+    );
   const candidates: RoutingCandidate[] = rows.map((r) => ({
     agentId: r.agentId,
     handle: r.handle,

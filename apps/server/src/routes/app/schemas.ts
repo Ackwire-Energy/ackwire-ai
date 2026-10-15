@@ -43,6 +43,11 @@ export const Credential = z
   })
   .openapi("Credential");
 
+/** Who can talk to an agent (D31). `userIds` only for `people`; the owner always can. */
+export const AgentAudience = z
+  .object({ mode: z.enum(["everyone", "people", "owner"]), userIds: z.array(z.string()).max(500) })
+  .openapi("AgentAudience");
+
 export const Agent = z
   .object({
     id: z.uuid(),
@@ -55,6 +60,9 @@ export const Agent = z
     hasCredential: z.boolean(),
     monthlyBudgetUsd: z.number().nullable(),
     createdAt: z.string(),
+    audience: AgentAudience,
+    audienceMode: z.enum(["everyone", "people", "owner"]),
+    canTalk: z.boolean().openapi({ description: "Whether the current person can talk to it (mentions, DMs)." }),
   })
   .openapi("Agent");
 
@@ -109,6 +117,13 @@ const MessageBase = z.object({
 });
 
 export const Message = MessageBase.extend({
+  notices: z
+    .array(z.object({ agentId: z.uuid(), text: z.string() }))
+    .optional()
+    .openapi({
+      description:
+        "Only in the sender's POST response: agents addressed that won't answer this person (who can talk to the agent), with the text to show them.",
+    }),
   replies: z
     .object({ count: z.number(), lastAt: z.string().nullable(), latest: z.array(MessageBase) })
     .optional()

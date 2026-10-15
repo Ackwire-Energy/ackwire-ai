@@ -1,7 +1,9 @@
 import {
   agentDetail,
   agentView,
+  audienceOf,
   availableProviders,
+  canTalkTo,
   getOrgSettings,
   getRun,
   inviteMany,
@@ -23,7 +25,7 @@ import {
 import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
-import { Credential, Role } from "./schemas";
+import { AgentAudience, Credential, Role } from "./schemas";
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
@@ -96,6 +98,9 @@ const AgentDetail = z
     pendingApprovals: z.number(),
     channels: z.array(AgentChannel),
     createdAt: z.string(),
+    audience: AgentAudience,
+    audienceMode: z.enum(["everyone", "people", "owner"]),
+    canTalk: z.boolean(),
   })
   .openapi("AgentDetail");
 
@@ -543,6 +548,9 @@ export function managementRoutes(deps: AppDeps) {
           tokensThisMonth: d.month.tokens,
           runsThisMonth: d.month.runs,
           pendingApprovals: d.pendingApprovals,
+          audience: audienceOf(d.agent),
+          audienceMode: d.agent.audienceMode,
+          canTalk: canTalkTo(d.agent, c.get("user").id),
           channels: d.channels,
           createdAt: v.createdAt.toISOString(),
         },

@@ -3,6 +3,7 @@ export * from "./agents";
 export * from "./approvals";
 export * from "./artifact-tools";
 export * from "./artifacts";
+export * from "./audience";
 export * from "./audit";
 export * from "./cache";
 export * from "./calendar";
