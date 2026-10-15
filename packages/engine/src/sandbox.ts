@@ -9,11 +9,21 @@ import {
 import { and, type Database, eq, isNull, schema, sql } from "@agenteschat/db";
 import { getAgent, getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
+import { activeConnections } from "./connectors/connections";
 import { BudgetExceededError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { agentBudgetState } from "./gateway";
+import {
+  GIT_TOKEN_REFRESH_MS,
+  GIT_TOKEN_TTL_SECONDS,
+  gitProxyBase,
+  gitSetupScript,
+  issueGitToken,
+} from "./git/credential";
+import { gitAccess } from "./git/proxy";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
+import { grantedScopeKeys } from "./tools/scopes";
 import type { ToolContext } from "./tools/types";
 import { monthStartUtc } from "./usage";
 
@@ -46,7 +56,34 @@ export interface SandboxDeps {
   /** A stopped computer is archived (cheaper storage, files kept) after this many days; never deleted. */
   archiveAfterDays: number;
   now?: () => Date;
+  /**
+   * The git proxy (D35): computers get our credential helper and
+   * `insteadOf` so `git clone https://github.com/…` goes through
+   * `{publicUrl}/api/git/…`, and our host stays reachable even when the
+   * computer's network is blocked.
+   */
+  git?: { publicUrl: string; secret: string } | null;
 }
+
+/** The network a computer really gets: the org's mode, plus our own host when the git proxy is on. */
+export function effectiveNetwork(
+  settings: Pick<SandboxSettings, "network" | "allowDomains">,
+  git: SandboxDeps["git"],
+): { network: SandboxSettings["network"]; allowDomains: string[] } {
+  if (!git || settings.network === "open") return { network: settings.network, allowDomains: settings.allowDomains };
+  const host = new URL(git.publicUrl).hostname;
+  return {
+    network: "allowlist",
+    allowDomains: [...new Set([...(settings.network === "allowlist" ? settings.allowDomains : []), host])],
+  };
+}
+
+/** What the row records: the org's own mode (our host is an implementation detail), unless the provider fell back. */
+const recordedNetwork = (
+  applied: SandboxInfo["network"],
+  settings: Pick<SandboxSettings, "network">,
+  git: SandboxDeps["git"],
+) => (git && applied === "allowlist" && settings.network === "blocked" ? "blocked" : applied);
 
 export type SandboxSettings = Omit<typeof orgSandboxSettings.$inferSelect, "orgId" | "updatedAt">;
 
@@ -197,6 +234,19 @@ async function acquire(
   actor: { type: "agent" | "person"; id: string },
   onStep?: (step: "creating" | "preparing") => void | Promise<void>,
 ): Promise<{ row: SandboxRow; info: SandboxInfo; previous: Previous }> {
+  const got = await acquireMachine(deps, orgId, agentId, settings, actor, onStep);
+  await ensureGitSetup(deps, got.row, got.info.id, got.previous).catch(() => undefined);
+  return got;
+}
+
+async function acquireMachine(
+  deps: SandboxDeps,
+  orgId: string,
+  agentId: string,
+  settings: SandboxSettings & { updatedAt?: Date | null },
+  actor: { type: "agent" | "person"; id: string },
+  onStep?: (step: "creating" | "preparing") => void | Promise<void>,
+): Promise<{ row: SandboxRow; info: SandboxInfo; previous: Previous }> {
   const { db, provider } = deps;
   const key = computerKey(agentId);
   const live = await liveComputer(db, orgId, agentId);
@@ -215,6 +265,8 @@ async function acquire(
       // The org changed its network setting since this computer last got it: apply it now, in place.
       const stale =
         live.network !== settings.network ||
+        // First git setup on a computer from before the proxy: our host must be let through.
+        (Boolean(deps.git) && live.gitTokenIssuedAt === null && settings.network !== "open") ||
         (settings.updatedAt && (!live.networkAppliedAt || live.networkAppliedAt < settings.updatedAt));
       if (stale) info = { ...info, network: await applyNetwork(deps, live, settings) };
       return { row: live, info, previous: wasRunning ? "running" : "stopped" };
@@ -231,8 +283,7 @@ async function acquire(
   const info = await provider.create({
     key: `${orgId}:${key}`,
     labels: { "agentes.org": orgId, "agentes.agent": agentId },
-    allowDomains: settings.allowDomains,
-    network: settings.network,
+    ...effectiveNetwork(settings, deps.git),
     autoStopMinutes: deps.autoStopMinutes,
     autoArchiveMinutes: deps.archiveAfterDays * 24 * 60,
   });
@@ -242,7 +293,7 @@ async function acquire(
     networkAppliedAt: new Date(),
     status: "running",
     lastError: null,
-    network: info.network,
+    network: recordedNetwork(info.network, settings, deps.git),
     cpu: Math.round(info.resources.cpu),
     memoryGib: Math.round(info.resources.memoryGiB),
     diskGib: Math.round(info.resources.diskGiB),
@@ -261,7 +312,7 @@ async function acquire(
   if (!row) {
     // Another run of this agent created it at the same time: use that one.
     await provider.destroy(info.id).catch(() => undefined);
-    return acquire(deps, orgId, agentId, settings, actor);
+    return acquireMachine(deps, orgId, agentId, settings, actor);
   }
   await recordAudit(db, {
     orgId,
@@ -275,11 +326,16 @@ async function acquire(
 
 /** Applies the org's network mode to a running computer and records it. */
 async function applyNetwork(
-  deps: Pick<SandboxDeps, "db" | "provider">,
+  deps: Pick<SandboxDeps, "db" | "provider" | "git">,
   row: SandboxRow,
   settings: SandboxSettings,
 ): Promise<SandboxInfo["network"]> {
-  const applied = await deps.provider.setNetwork(row.providerId, settings.network, settings.allowDomains);
+  const wanted = effectiveNetwork(settings, deps.git);
+  const applied = recordedNetwork(
+    await deps.provider.setNetwork(row.providerId, wanted.network, wanted.allowDomains),
+    settings,
+    deps.git,
+  );
   await deps.db
     .update(sandboxes)
     .set({ network: applied, networkAppliedAt: new Date(), updatedAt: new Date() })
@@ -288,11 +344,57 @@ async function applyNetwork(
 }
 
 /**
+ * Git through our proxy (D35), when the org has GitHub connected and the
+ * agent may use git: our short-lived credential, the helper and `insteadOf`,
+ * written on each start and refreshed every few hours. Never a GitHub token.
+ */
+async function ensureGitSetup(deps: SandboxDeps, row: SandboxRow, providerId: string, previous: Previous) {
+  const git = deps.git;
+  if (!git) return;
+  const now = deps.now?.() ?? new Date();
+  const fresh =
+    previous === "running" &&
+    row.gitTokenIssuedAt !== null &&
+    now.getTime() - row.gitTokenIssuedAt.getTime() < GIT_TOKEN_REFRESH_MS;
+  if (fresh) return;
+  const connection = (await activeConnections(deps.db, row.orgId)).find((c) => c.connector === "github");
+  if (!connection) return;
+  const keys = await grantedScopeKeys(deps.db, row.orgId, row.agentId);
+  if (!gitAccess(keys, connection.id).read) return;
+  const agent = await getAgent(deps.db, row.orgId, row.agentId);
+  if (!agent) return;
+  const token = issueGitToken(git.secret, {
+    orgId: row.orgId,
+    agentId: row.agentId,
+    sandboxId: row.id,
+    gen: row.gitTokenGen,
+    exp: Math.floor(now.getTime() / 1000) + GIT_TOKEN_TTL_SECONDS,
+  });
+  const script = gitSetupScript({
+    base: gitProxyBase(git.publicUrl, row.orgId, connection.id),
+    token,
+    agentName: agent.name,
+    agentHandle: agent.handle,
+  });
+  const result = await deps.provider.exec(providerId, { command: script, timeoutSeconds: 30 });
+  if (result.exitCode !== 0) return;
+  await deps.db.update(sandboxes).set({ gitTokenIssuedAt: now }).where(eq(sandboxes.id, row.id));
+}
+
+/** Revokes every git proxy credential of an agent's computer (they stop working at once). */
+export async function revokeComputerGitCredentials(db: Database, orgId: string, agentId: string) {
+  await db
+    .update(sandboxes)
+    .set({ gitTokenGen: sql`${sandboxes.gitTokenGen} + 1`, gitTokenIssuedAt: null })
+    .where(and(eq(sandboxes.orgId, orgId), eq(sandboxes.key, computerKey(agentId)), isNull(sandboxes.deletedAt)));
+}
+
+/**
  * After the org changes its network setting: every running computer gets it
  * now (Daytona changes it in place, no restart, files untouched); stopped or
  * archived ones get it the next time they start.
  */
-export async function applyOrgNetwork(deps: Pick<SandboxDeps, "db" | "provider">, orgId: string) {
+export async function applyOrgNetwork(deps: Pick<SandboxDeps, "db" | "provider" | "git">, orgId: string) {
   const { settings } = await settingsRow(deps.db, orgId);
   const rows = await deps.db
     .select()

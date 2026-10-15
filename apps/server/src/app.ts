@@ -28,6 +28,7 @@ import { sandboxRoutes } from "./routes/app/sandboxes";
 import { skillRoutes } from "./routes/app/skills";
 import { storageRoutes } from "./routes/app/storage";
 import { wikiRoutes } from "./routes/app/wiki";
+import { registerGitProxy } from "./routes/git";
 import { registerHealth } from "./routes/health";
 import { registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
 
@@ -55,6 +56,7 @@ export interface AppOptions {
  * - `/api/auth/*`         Better Auth (sign-up, sign-in, sessions, OAuth callbacks)
  * - `/api/app/*`          private API of the web app (cookie session + CSRF)
  * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
+ * - `/api/git/*`          git proxy for agents' computers (their own credential, D35)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
  * - everything else       web app (single-page app), when built
@@ -105,6 +107,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", sandboxRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     registerWebhookReceiver(api, deps);
+    if (deps.extras?.gitProxy) registerGitProxy(api, deps.extras.gitProxy);
   }
 
   for (const module of options.modules) {

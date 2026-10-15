@@ -1,6 +1,7 @@
 import type {
   ArtifactDeps,
   ContextDeps,
+  GitProxyDeps,
   McpConnect,
   ModelGateway,
   ResolveHost,
@@ -29,4 +30,6 @@ export interface AppExtras {
   artifacts?: ArtifactDeps;
   /** Code sandbox (D30); null/absent = off on this server. */
   sandbox?: SandboxDeps | null;
+  /** The git proxy for agents' computers (D35); absent = off. */
+  gitProxy?: GitProxyDeps;
 }

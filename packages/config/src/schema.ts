@@ -266,6 +266,18 @@ export const envVars = {
     section: "Connectors",
     secret: true,
   },
+  GITHUB_APP_ID: {
+    schema: z.string().optional(),
+    description:
+      "Id of a GitHub App for agents' git and pull requests. With `GITHUB_APP_PRIVATE_KEY`, the git proxy uses short installation tokens scoped to one repository (1 hour) where the app is installed, and the org's GitHub connection elsewhere.",
+    section: "Connectors",
+  },
+  GITHUB_APP_PRIVATE_KEY: {
+    schema: z.string().optional(),
+    description: "Private key (PEM) of that GitHub App. Newlines may be written as `\\n`.",
+    section: "Connectors",
+    secret: true,
+  },
   CONNECTOR_SENTRY_CLIENT_ID: {
     schema: z.string().optional(),
     description:

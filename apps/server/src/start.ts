@@ -148,6 +148,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
         artifacts: engine.artifacts,
         context: engine.context,
         sandbox: engine.sandbox,
+        gitProxy: engine.sandbox ? engine.gitProxy : undefined,
       },
     },
     log,

@@ -54,6 +54,14 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
     scopes: {
       "repo.read": s("Ler código", "Ler arquivos e commits e buscar no código."),
       "repo.write": s("Escrever código", "Criar branches e enviar commits (nunca na branch principal sem PR)."),
+      "git.read": s(
+        "Clonar repositórios (git)",
+        "Clonar e atualizar repositórios no computador do agente com git, pelo nosso proxy; o token do GitHub nunca entra na máquina.",
+      ),
+      "git.write": s(
+        "Enviar branches (git push)",
+        "Enviar commits só para branches agentes/{agente}/…: nunca na branch principal, sem force push, sem tags.",
+      ),
       "pr.read": s("Ler pull requests", "Listar e ler pull requests e seus checks."),
       "pr.write": s("Abrir pull requests", "Abrir pull requests e comentar neles."),
       "pr.merge": s("Fazer merge", "Fazer merge de um pull request. Sempre pede aprovação."),
@@ -65,6 +73,8 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       ),
     },
     tools: {
+      git_clone: { scope: "git.read" },
+      open_pull_request: { scope: "pr.write" },
       get_file_contents: { scope: "repo.read" },
       search_code: { scope: "repo.read" },
       list_commits: { scope: "repo.read" },

@@ -49,6 +49,10 @@ export const sandboxes = pgTable(
     lastError: text(),
     /** When the org's network setting was last applied to this computer (re-applied on start if older). */
     networkAppliedAt: timestamp({ withTimezone: true }),
+    /** Git proxy credential (D35): bumping it revokes every token issued to this computer. */
+    gitTokenGen: integer().notNull().default(0),
+    /** When the computer last got a fresh git proxy token (re-issued on start and every few hours). */
+    gitTokenIssuedAt: timestamp({ withTimezone: true }),
     /** Last measured size of the workspace, in MiB. */
     diskUsedMib: integer().notNull().default(0),
     billedSeconds: integer().notNull().default(0),

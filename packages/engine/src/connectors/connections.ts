@@ -486,6 +486,12 @@ export const connectorGrantValidator = async (
       ? null
       : `Unknown scope ${grant.scope} for this server`;
   }
+  // Git: the repositories an agent may use (`github:git.repo:owner/name` or `owner/*`); none = all of the connection's.
+  if (c.connector === "github" && grant.scope.startsWith("github:git.repo:")) {
+    return /^github:git\.repo:[A-Za-z0-9_.-]{1,100}\/([A-Za-z0-9_.-]{1,100}|\*)$/.test(grant.scope)
+      ? null
+      : "Repository must be owner/name or owner/*";
+  }
   const def = CONNECTOR_CATALOG[c.connector];
   const [prefix, scope] = grant.scope.split(":");
   if (!def || prefix !== c.connector || !scope || !def.scopes[scope]) {

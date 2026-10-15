@@ -48,6 +48,8 @@ export async function createTestServer(
     resolveHost?: ResolveHost;
     /** Fake code sandbox (off by default). */
     sandbox?: SandboxProvider;
+    /** Fake GitHub (git smart HTTP and REST) for the git proxy. */
+    github?: { gitUrl: string; apiUrl: string; fetch: typeof fetch };
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -81,6 +83,7 @@ export async function createTestServer(
     s3Fetch: options.s3Fetch,
     resolveHost: options.resolveHost,
     sandbox: options.sandbox ?? null,
+    github: options.github,
   });
   const { handlers } = engine;
   const auth = createAuth({ db, config, log, emailDelivers: true });
@@ -103,6 +106,7 @@ export async function createTestServer(
         artifacts: engine.artifacts,
         context: engine.context,
         sandbox: engine.sandbox,
+        gitProxy: engine.sandbox ? engine.gitProxy : undefined,
       },
     },
     log,

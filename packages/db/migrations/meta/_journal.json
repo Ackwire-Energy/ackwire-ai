@@ -246,6 +246,13 @@
       "when": 1792078777069,
       "tag": "0034_run_cancel",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792079501595,
+      "tag": "0035_git_proxy",
+      "breakpoints": true
     }
   ]
 }

@@ -11,6 +11,7 @@ import {
   createConnectorToolSource,
   createContextToolSource,
   createForumToolSource,
+  createGitToolSource,
   createIssueToolSource,
   createJobHandlers,
   createModelGateway,
@@ -19,6 +20,7 @@ import {
   createSkillToolSource,
   createToolGateway,
   createWikiToolSource,
+  type GitProxyDeps,
   type McpConnect,
   notifyOwnerOnBudget,
   queueBudgetEmail,
@@ -52,6 +54,8 @@ export interface EngineOptions {
   onRunProfile?: RunExecutorDeps["onRunProfile"];
   /** Tests: a fake sandbox provider (default: the adapters' one, if any). */
   sandbox?: SandboxProvider | null;
+  /** Tests: a fake GitHub (git smart HTTP and REST) for the git proxy and tools. */
+  github?: { gitUrl: string; apiUrl: string; fetch: typeof fetch };
 }
 
 /**
@@ -120,8 +124,21 @@ export function buildEngine(o: EngineOptions) {
         },
         autoStopMinutes: config.SANDBOX_AUTO_STOP_MINUTES,
         archiveAfterDays: config.SANDBOX_ARCHIVE_AFTER_DAYS,
+        // Git through our proxy (D35): the computer never gets a GitHub token.
+        git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
       }
     : null;
+  const githubApp =
+    config.GITHUB_APP_ID && config.GITHUB_APP_PRIVATE_KEY
+      ? { appId: config.GITHUB_APP_ID, privateKey: config.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, "\n") }
+      : null;
+  const gitProxy: GitProxyDeps = {
+    db,
+    secret: config.AGENTES_SECRET,
+    connectors: connectorDeps,
+    upstream: o.github,
+    app: githubApp,
+  };
   const tools = createToolGateway({
     sources: [
       createAskUserToolSource(),
@@ -141,6 +158,12 @@ export function buildEngine(o: EngineOptions) {
               artifacts,
               skills: { blobs: artifacts.blobs },
               pubsub: adapters.pubsub,
+            }),
+            createGitToolSource({
+              sandbox,
+              connectors: connectorDeps,
+              app: githubApp,
+              github: o.github ? { apiUrl: o.github.apiUrl, fetch: o.github.fetch } : undefined,
             }),
           ]
         : []),
@@ -177,7 +200,7 @@ export function buildEngine(o: EngineOptions) {
         : {}),
     },
   });
-  return { gateway, tools, context, handlers, connectorDeps, storage, artifacts, sandbox };
+  return { gateway, tools, context, handlers, connectorDeps, storage, artifacts, sandbox, gitProxy };
 }
 
 export type Engine = ReturnType<typeof buildEngine>;
