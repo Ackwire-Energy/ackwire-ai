@@ -154,7 +154,8 @@ describe("agent skills", () => {
     const section = screen().getByRole("region", { name: "Skills" });
     expect(section.textContent).toContain("Revisão de PR");
     expect(section.textContent).not.toContain("Atendimento");
-    await click(within(section).getByRole("button", { name: "Gerenciar skills" }));
+    // One "Editar" per profile section opens "Gerenciar skills".
+    await click(within(section).getByRole("button", { name: "Editar Skills" }));
     const dialog = screen().getByRole("dialog", { name: "Skills de Ada" });
     expect(dialog.textContent).toContain("1 de 3 escolhidas");
     await type(within(dialog).getByRole("searchbox", { name: "Buscar skill" }), "atend");
@@ -173,7 +174,8 @@ describe("agent skills", () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/agents/new`, { api: createFakeApi(state) });
     await settle(8);
-    const step = screen().getByRole("region", { name: "Skills" });
+    // The tool tree above also has a "Skills" area: pick the step itself.
+    const step = document.querySelector('section[aria-labelledby="q-skills"]') as HTMLElement;
     const order = Array.from(document.querySelectorAll("section.section h2")).map((h) => h.textContent);
     expect(order.indexOf("Skills")).toBeGreaterThan(order.indexOf("Ferramentas"));
     // "Ligar em agentes novos" skills start checked.

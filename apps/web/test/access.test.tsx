@@ -156,8 +156,11 @@ describe("Configurações → Agentes e acesso", () => {
       .getAllByRole("columnheader")
       .map((h) => h.textContent);
     expect(headers).toEqual(["Ferramenta", "Ada", "Atlas"]);
-    expect(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Issues · 2" })).toBeTruthy();
-    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de GitHub · 3" }));
+    // Groups show how many tools they hold.
+    expect(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Issues" }).textContent).toContain(
+      "Issues · 2",
+    );
+    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de GitHub" }));
     await click(within(dialog).getByRole("button", { name: "Ada · Fazer merge: sem acesso" }));
     await click(within(dialog).getByRole("button", { name: "Atlas · Abrir PR: sem acesso" }));
     // Nothing saved yet: the footer counts the staged changes.
@@ -184,10 +187,12 @@ describe("Configurações → Agentes e acesso", () => {
     await click(section.getByRole("button", { name: "Ver todas as permissões" }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Todas as permissões" });
-    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Contexto e memória · 3" }));
+    const context = within(dialog).getByRole("button", { name: "Mostrar ferramentas de Contexto e memória" });
+    expect(context.textContent).toContain("Contexto e memória · 3");
+    await click(context);
     const memoryCell = within(dialog).getByRole("button", { name: "Ada · Lembrar: liberada" });
     expect(memoryCell.closest("td")?.getAttribute("data-state")).toBe("granted");
-    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Conversa · 1" }));
+    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Conversa" }));
     const ask = within(dialog).getByRole("button", { name: "Ada · Perguntar: Liberada por Conversa" });
     expect(ask.getAttribute("title")).toBe("Liberada por Conversa");
     expect(ask.closest("td")?.getAttribute("data-state")).toBe("inherited");
