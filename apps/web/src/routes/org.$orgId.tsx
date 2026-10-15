@@ -2,7 +2,7 @@ import { Button, EmptyState } from "@agenteschat/ui";
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { requireUser } from "@/app/guards";
+import { requireUserIn } from "@/app/guards";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
 import { RefetchBar } from "@/components/Loading";
@@ -16,7 +16,7 @@ import { RealtimeProvider } from "@/realtime/context";
 /** The workspace shell of an organization: sidebar + page, and its WebSocket. */
 export const Route = createFileRoute("/org/$orgId")({
   beforeLoad: async ({ context, location, params }) => {
-    const me = await requireUser(context, location.href);
+    const me = await requireUserIn(context, location.href, params.orgId);
     return { me, membership: membershipIn(me, params.orgId) };
   },
   component: OrgLayout,
