@@ -1,4 +1,16 @@
-import { Alert, Button, Chip, Field, Icon, Input, Sheet, Textarea } from "@agenteschat/ui";
+import {
+  Alert,
+  Button,
+  Chip,
+  Field,
+  Icon,
+  type IconName,
+  Input,
+  Menu,
+  MenuItem,
+  Sheet,
+  Textarea,
+} from "@agenteschat/ui";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -9,6 +21,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { fileName, KIND_ICON } from "@/lib/artifacts";
 import { relativeTime } from "@/lib/format";
 import { useToast } from "@/lib/toast";
+import { ArtifactMoreMenu, useDeleteArtifact } from "./ArtifactActions";
 import { ArtifactContentView, TableEditor } from "./views";
 
 /** Saves a URL as a file (an `<a download>` click). Swappable for tests. */
@@ -83,11 +96,11 @@ export function ArtifactViewer({
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
-  const toast = useToast();
   const authorName = useAuthorName();
   const channels = useChannels(org.id);
   const query = useArtifact(org.id, id, version);
   const [editing, setEditing] = useState(false);
+  const remover = useDeleteArtifact(onClose);
   const a = query.data;
   const channel = a?.channelId ? channels.data?.find((c) => c.id === a.channelId) : undefined;
   const old = a ? a.shownVersion < a.version : false;
@@ -96,76 +109,69 @@ export function ArtifactViewer({
     const { url } = await api.artifacts.download(org.id, a.id, a.shownVersion);
     fileSaver.save(url, fileName(a.title, a.content));
   };
+  const save = (format?: "pdf" | "docx" | "csv") => {
+    if (!a) return;
+    if (!format) {
+      void download();
+      return;
+    }
+    const ext = { pdf: ".pdf", docx: ".docx", csv: ".csv" }[format];
+    fileSaver.save(
+      api.artifacts.fileUrl(org.id, a.id, { version: a.shownVersion, format }),
+      fileName(a.title, a.content).replace(/\.[a-z0-9]+$/i, ext),
+    );
+  };
+  const formats: { key: string; format?: "pdf" | "docx" | "csv"; icon: IconName; label: string }[] = !a
+    ? []
+    : [
+        ...(a.kind === "document"
+          ? [
+              { key: "pdf", format: "pdf" as const, icon: "document" as const, label: t("artifacts.formatPdf") },
+              { key: "docx", format: "docx" as const, icon: "page" as const, label: t("artifacts.formatDocx") },
+            ]
+          : []),
+        ...(a.kind === "table"
+          ? [{ key: "csv", format: "csv" as const, icon: "table" as const, label: t("artifacts.formatCsv") }]
+          : []),
+        ...(a.kind !== "table"
+          ? [{ key: "original", icon: "download" as const, label: t("artifacts.formatOriginal") }]
+          : []),
+      ];
+  const canEditNow = Boolean(a?.canEdit && !old && !editing && (a?.kind === "document" || a?.kind === "table"));
   const actions = a && (
     <>
-      {a.kind === "table" && (
-        <Button
-          size="sm"
-          variant="ghost"
-          icon="download"
-          onClick={() =>
-            fileSaver.save(
-              api.artifacts.fileUrl(org.id, a.id, { version: a.shownVersion, format: "csv" }),
-              fileName(a.title, a.content),
-            )
-          }
-        >
-          {t("artifacts.downloadCsv")}
-        </Button>
-      )}
-      {a.kind === "document" && (
-        <Button
-          size="sm"
-          variant="ghost"
-          icon="download"
-          onClick={() =>
-            fileSaver.save(
-              api.artifacts.fileUrl(org.id, a.id, { version: a.shownVersion, format: "pdf" }),
-              fileName(a.title, a.content).replace(/\.md$/, ".pdf"),
-            )
-          }
-        >
-          {t("artifacts.downloadPdf")}
-        </Button>
-      )}
-      {a.kind === "document" && (
-        <Button
-          size="sm"
-          variant="ghost"
-          icon="download"
-          onClick={() =>
-            fileSaver.save(
-              api.artifacts.fileUrl(org.id, a.id, { version: a.shownVersion, format: "docx" }),
-              fileName(a.title, a.content).replace(/\.md$/, ".docx"),
-            )
-          }
-        >
-          {t("artifacts.downloadDocx")}
-        </Button>
-      )}
-      {a.kind !== "table" && (
-        <Button size="sm" variant="ghost" icon="download" onClick={() => void download()}>
-          {t("artifacts.download")}
-        </Button>
-      )}
-      <Button
-        size="sm"
-        variant="ghost"
-        icon="link"
-        onClick={async () => {
-          await navigator.clipboard.writeText(
-            artifactLink(window.location.origin, org.id, a.id, old ? a.shownVersion : undefined),
-          );
-          toast.show(t("artifacts.linkCopied"));
-        }}
+      <Menu
+        align="end"
+        label={t("artifacts.downloadMenu")}
+        trigger={
+          <Button size="sm" variant="ghost" icon="download" className="artifact-download">
+            {t("artifacts.downloadMenu")}
+          </Button>
+        }
       >
-        {t("artifacts.copyLink")}
-      </Button>
-      {a.canEdit && !old && !editing && (a.kind === "document" || a.kind === "table") && (
-        <Button size="sm" variant="ghost" icon="edit" onClick={() => setEditing(true)}>
-          {t("artifacts.edit")}
+        {formats.map((f) => (
+          <MenuItem key={f.key} icon={f.icon} onSelect={() => save(f.format)}>
+            {f.label}
+          </MenuItem>
+        ))}
+      </Menu>
+      {canEditNow && (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="edit"
+          className="artifact-edit"
+          title={t("artifacts.edit")}
+          onClick={() => setEditing(true)}
+        >
+          <span className="artifact-edit__label">{t("artifacts.edit")}</span>
         </Button>
       )}
+      <ArtifactMoreMenu
+        artifact={a}
+        onVersions={() => document.querySelector<HTMLElement>(".artifact-viewer__versions button")?.focus()}
+        onDelete={() => remover.ask(a)}
+      />
     </>
   );
   return (
@@ -173,7 +179,16 @@ export function ArtifactViewer({
       open
       onOpenChange={(o) => !o && onClose()}
       closeLabel={t("artifacts.close")}
-      title={a?.title ?? t("artifacts.loading")}
+      className="artifact-sheet"
+      title={
+        a ? (
+          <span className="artifact-sheet__title" title={a.title}>
+            {a.title}
+          </span>
+        ) : (
+          t("artifacts.loading")
+        )
+      }
       icon={a ? <Icon name={KIND_ICON[a.kind]} /> : undefined}
       subtitle={
         a
@@ -214,6 +229,7 @@ export function ArtifactViewer({
           <Versions artifact={a} onVersion={onVersion} />
         </div>
       )}
+      {remover.dialog}
     </Sheet>
   );
 }

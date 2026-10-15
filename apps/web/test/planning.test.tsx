@@ -170,26 +170,47 @@ describe("Rotinas", () => {
     const pr = screen().getByRole("article", { name: "Revisar PR aberto" });
     expect(pr.textContent).toContain("PR aberto no GitHub");
     expect(pr.textContent).toContain("Espera o próximo evento");
+    // My own zone isn't repeated on the card.
+    expect(weekly.textContent).not.toContain("Brasília");
+    expect(within(weekly).getByText("Ativa").closest(".ac-chip")?.querySelector("svg")).not.toBeNull();
     const monthly = screen().getByRole("article", { name: "Relatório mensal de reviews" });
-    expect(monthly.textContent).toContain("Pausada");
-    expect(
-      within(monthly)
-        .getByRole("checkbox", { name: "Ativa: Relatório mensal de reviews" })
-        .getAttribute("aria-checked"),
-    ).toBe("false");
+    expect(monthly.getAttribute("data-paused")).toBe("true");
+    expect(within(monthly).getByText("Pausada")).toBeTruthy();
+    // No checkbox on the card: active/paused lives in Editar.
+    expect(within(monthly).queryByRole("checkbox")).toBeNull();
   });
 
   test("pause, run now and see runs", async () => {
     await go("routines");
     const weekly = () => screen().getByRole("article", { name: "Resumo da semana" });
-    await click(within(weekly()).getByRole("checkbox", { name: "Ativa: Resumo da semana" }));
+    await click(within(weekly()).getByRole("button", { name: "Editar Resumo da semana" }));
     await settle(4);
-    expect(weekly().textContent).toContain("Pausada");
-    await click(within(weekly()).getByRole("button", { name: "Rodar agora" }));
+    const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
+    await click(within(dialog).getByRole("switch", { name: "Ativa: dispara nos horários" }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(5);
+    expect(weekly().getAttribute("data-paused")).toBe("true");
+    expect(within(weekly()).getByText("Pausada")).toBeTruthy();
+    // Paused: "Retomar" in the "…" menu.
+    const menu = async (item: string) => {
+      const trigger = within(weekly()).getByRole("button", { name: "Mais ações: Resumo da semana" });
+      trigger.focus();
+      await act(async () => {
+        fireEvent.keyDown(trigger, { key: "Enter" });
+        fireEvent.keyUp(trigger, { key: "Enter" });
+      });
+      await settle(1);
+      await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: item }));
+      await settle(4);
+    };
+    await menu("Retomar");
+    expect(weekly().hasAttribute("data-paused")).toBe(false);
+    const run = within(weekly()).getByRole("button", { name: "Rodar agora" });
+    expect(run.getAttribute("title")).toBe("Rodar agora");
+    await click(run);
     await settle(4);
     expect(within(weekly()).getByRole("button", { name: "Rodando…" }).hasAttribute("disabled")).toBe(true);
-    await click(within(weekly()).getByRole("button", { name: "Ver execuções" }));
-    await settle(4);
+    await menu("Ver execuções");
     const runs = screen().getByRole("dialog", { name: "Execuções: Resumo da semana" });
     expect(runs.textContent).toContain("Orçamento do mês esgotado");
     expect(runs.textContent).toContain("não rodou");

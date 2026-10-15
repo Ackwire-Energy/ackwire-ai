@@ -1561,27 +1561,83 @@ p {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
-  background: var(--surface-raised);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  border-bottom-left-radius: var(--radius-cut);
+  padding: 14px 16px;
+  background: var(--raised);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--e1), var(--top);
 }
-.routine-card:not([data-active]) {
+/* Paused (and fired one-offs): muted, still readable. */
+.routine-card[data-paused] {
   opacity: 0.7;
 }
-.routine-card__head,
-.routine-card__foot {
+.routine-card__head {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
 }
-.routine-card__head .ac-chip {
-  margin-left: 0;
+.routine-card__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 200px;
+  min-width: 0;
 }
 .routine-card__name {
   font-weight: 600;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.routine-card__aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.routine-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.routine-card__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px;
+}
+.routine-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.routine-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .routine-card__head {
+    flex-wrap: wrap;
+  }
+  .routine-card__aside {
+    align-items: flex-start;
+    width: 100%;
+  }
+  .routine-card__chips {
+    justify-content: flex-start;
+  }
 }
 
 /* Participant / member picker inside forms */
@@ -4012,7 +4068,7 @@ button.live-call__head:hover {
 .cal-week__bars,
 .cal-week__body {
   display: grid;
-  grid-template-columns: 56px repeat(var(--cols), minmax(0, 1fr));
+  grid-template-columns: var(--gutter, 48px) repeat(var(--cols), minmax(0, 1fr));
 }
 .cal-week__head {
   border-bottom: 1px solid var(--line);
@@ -4094,11 +4150,19 @@ button.live-call__head:hover {
   flex-direction: column;
 }
 .cal-week__hour {
+  position: relative;
   height: var(--hour-px);
-  padding-right: 8px;
-  text-align: right;
+}
+/* Centered on its hour line, never wrapping. */
+.cal-week__hour-label {
+  position: absolute;
+  top: 0;
+  right: 6px;
+  transform: translateY(-50%);
+  white-space: nowrap;
   font-size: 11px;
-  transform: translateY(-7px);
+  line-height: 1;
+  color: var(--muted);
 }
 .cal-week__col {
   position: relative;
@@ -4147,7 +4211,7 @@ button.live-call__head:hover {
 }
 .cal-week__empty {
   position: absolute;
-  left: 56px;
+  left: var(--gutter, 48px);
   right: 0;
   top: calc(var(--hour-px) * 10);
   margin: 0;
@@ -4833,4 +4897,52 @@ button.live-call__head:hover {
   justify-content: flex-end;
   padding-top: 4px;
   border-top: 1px solid var(--line);
+}
+/* Artifact viewer header: one-line title with its meta; Baixar ▾, Editar, … and × compact on the right. */
+.artifact-sheet .ac-sheet__heading {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.artifact-sheet .ac-sheet__title {
+  min-width: 0;
+}
+.artifact-sheet__title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.artifact-sheet .ac-sheet__subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.artifact-sheet .ac-sheet__actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+@media (max-width: 720px) {
+  .artifact-edit__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+.artifact-card--removed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--sunken);
+  color: var(--muted);
+}
+.drive-table__more {
+  width: 40px;
+  text-align: right;
 }

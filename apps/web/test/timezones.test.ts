@@ -39,3 +39,37 @@ describe("time zones", () => {
     expect(parseOffsetQuery("tokyo")).toBeNull();
   });
 });
+
+describe("time zone groups", () => {
+  test("regions: América, Europa, Ásia, África, Oceania, Antártida; oceans join a continent; sorted by offset then name", () => {
+    const zones = [
+      "Pacific/Auckland",
+      "Australia/Sydney",
+      "Atlantic/Azores",
+      "Indian/Maldives",
+      "Arctic/Longyearbyen",
+      "Europe/London",
+      "Europe/Lisbon",
+      "America/Sao_Paulo",
+      "Africa/Luanda",
+      "Antarctica/Troll",
+    ];
+    const { rest } = zoneOptions([], zoneDisplayName, at, zones);
+    expect(rest.map((o) => [o.region, o.zone])).toEqual([
+      ["America", "America/Sao_Paulo"],
+      ["Europe", "Atlantic/Azores"],
+      ["Europe", "Europe/Lisbon"],
+      ["Europe", "Europe/London"],
+      ["Europe", "Arctic/Longyearbyen"],
+      ["Asia", "Indian/Maldives"],
+      ["Africa", "Africa/Luanda"],
+      ["Oceania", "Australia/Sydney"],
+      ["Oceania", "Pacific/Auckland"],
+      ["Antarctica", "Antarctica/Troll"],
+    ]);
+  });
+  test("pt-BR and English names", () => {
+    expect(zoneDisplayName("America/Sao_Paulo", "pt-BR")).toBe("Horário de Brasília");
+    expect(zoneDisplayName("America/Sao_Paulo", "en")).toBe("Brasília time");
+  });
+});

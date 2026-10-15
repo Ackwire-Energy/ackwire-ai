@@ -62,6 +62,7 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
+  TrashedArtifact,
   UsageReport,
   WikiGraph,
   WikiPage,
@@ -350,6 +351,14 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       update: (orgId, id, input) =>
         request<ArtifactDetail>(`${org(orgId)}/artifacts/${enc(id)}/versions`, { json: input }),
       remove: (orgId, id) => request<void>(`${org(orgId)}/artifacts/${enc(id)}`, { method: "DELETE" }),
+      trash: async (orgId) => {
+        const res = await request<{ artifacts: TrashedArtifact[] } | TrashedArtifact[]>(
+          `${org(orgId)}/artifacts-trash`,
+        );
+        return Array.isArray(res) ? res : res.artifacts;
+      },
+      restore: (orgId, id) =>
+        request<ArtifactDetail | undefined>(`${org(orgId)}/artifacts/${enc(id)}/restore`, { json: {} }),
     },
     issues: {
       list: async (orgId, filters = {}) =>

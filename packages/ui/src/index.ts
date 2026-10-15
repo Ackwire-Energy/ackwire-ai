@@ -54,6 +54,13 @@ export { DatePicker, type DatePickerProps, monthGrid, parseYmd, ymd } from "./co
 export { Dialog, DialogBody, DialogFooter, type DialogProps, DialogSearchList } from "./components/Dialog";
 export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";
 export { AffixInput, Field, type FieldProps, Input, SearchInput, Textarea, useFieldControl } from "./components/Field";
+export {
+  FILTER_SEARCH_AFTER,
+  FilterBar,
+  FilterChip,
+  type FilterChipProps,
+  type FilterOption,
+} from "./components/FilterChip";
 export { Kbd, modKey } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { Mention } from "./components/Mention";

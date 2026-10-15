@@ -18,6 +18,8 @@ interface Stored {
   versions: (ArtifactVersion & { content: ArtifactContent })[];
   /** Opened by id only (e.g. a forum synthesis), not in the Drive list. */
   unlisted?: boolean;
+  /** In the trash since then (30 days to restore). */
+  deletedAt?: string;
 }
 
 class MockConflictError extends Error {
@@ -47,7 +49,10 @@ export function serializeContent(content: ArtifactContent): { text: string; type
   }
 }
 
-export function createMockArtifacts(ctx: MockContext): ApiClient["artifacts"] {
+export function createMockArtifacts(
+  ctx: MockContext,
+  record: (method: string, ...args: unknown[]) => void = () => {},
+): ApiClient["artifacts"] {
   const store = perOrg(async (orgId) => {
     const list: Stored[] = [];
     if (!ctx.seed) return list;
@@ -123,6 +128,7 @@ export function createMockArtifacts(ctx: MockContext): ApiClient["artifacts"] {
     ...clone(s.meta),
     canEdit: editable(s.meta.kind),
     untrusted: s.meta.kind === "html",
+    canDelete: true,
   });
   const detail = (s: Stored, version?: number): ArtifactDetail => {
     const v = s.versions.find((x) => x.version === (version ?? s.meta.version));
@@ -134,7 +140,7 @@ export function createMockArtifacts(ctx: MockContext): ApiClient["artifacts"] {
     list: async (orgId, filters = {}) => {
       const q = filters.q?.trim().toLowerCase();
       return (await store(orgId))
-        .filter((s) => !s.unlisted)
+        .filter((s) => !s.unlisted && !s.deletedAt)
         .filter((s) => !filters.kind || s.meta.kind === filters.kind)
         .filter((s) => !filters.channelId || s.meta.channelId === filters.channelId)
         .filter(
@@ -201,10 +207,23 @@ export function createMockArtifacts(ctx: MockContext): ApiClient["artifacts"] {
       return detail(s);
     },
     remove: async (orgId, id) => {
-      const list = await store(orgId);
-      const i = list.findIndex((a) => a.meta.id === id);
-      if (i < 0) throw new MockNotFoundError("Arquivo não encontrado.");
-      list.splice(i, 1);
+      record("artifacts.remove", id);
+      const s = await find(orgId, id);
+      s.deletedAt = ctx.now().toISOString();
+    },
+    trash: async (orgId) =>
+      (await store(orgId))
+        .filter((s) => s.deletedAt)
+        .map((s) => ({
+          ...view(s),
+          deletedAt: s.deletedAt as string,
+          purgeAt: new Date(new Date(s.deletedAt as string).getTime() + 30 * 86_400_000).toISOString(),
+        })),
+    restore: async (orgId, id) => {
+      record("artifacts.restore", id);
+      const s = await find(orgId, id);
+      s.deletedAt = undefined;
+      return detail(s);
     },
   };
 }

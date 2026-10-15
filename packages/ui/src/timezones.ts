@@ -76,34 +76,24 @@ export function offsetLabel(minutes: number): string {
   return `UTC${minutes < 0 ? "−" : "+"}${h}${m ? `:${String(m).padStart(2, "0")}` : ""}`;
 }
 
-export type ZoneRegion =
-  | "suggested"
-  | "America"
-  | "Europe"
-  | "Africa"
-  | "Asia"
-  | "Australia"
-  | "Pacific"
-  | "Atlantic"
-  | "Indian"
-  | "Antarctica"
-  | "Other";
+export type ZoneRegion = "suggested" | "America" | "Europe" | "Asia" | "Africa" | "Oceania" | "Antarctica" | "Other";
 
-const REGIONS: ZoneRegion[] = [
-  "America",
-  "Europe",
-  "Africa",
-  "Asia",
-  "Australia",
-  "Pacific",
-  "Atlantic",
-  "Indian",
-  "Antarctica",
-];
-export const regionOf = (zone: string): ZoneRegion => {
-  const head = zone.split("/")[0] as ZoneRegion;
-  return REGIONS.includes(head) ? head : "Other";
+/** Display order of the regions after "Sugeridos". */
+const REGIONS: ZoneRegion[] = ["America", "Europe", "Asia", "Africa", "Oceania", "Antarctica", "Other"];
+/** IANA areas → our regions (oceans join the nearest continent). */
+const AREA: Record<string, ZoneRegion> = {
+  America: "America",
+  Europe: "Europe",
+  Arctic: "Europe",
+  Atlantic: "Europe",
+  Asia: "Asia",
+  Indian: "Asia",
+  Africa: "Africa",
+  Australia: "Oceania",
+  Pacific: "Oceania",
+  Antarctica: "Antarctica",
 };
+export const regionOf = (zone: string): ZoneRegion => AREA[zone.split("/")[0] ?? ""] ?? "Other";
 
 /** "Sao_Paulo" → "Sao Paulo"; "America/Argentina/Buenos_Aires" → "Buenos Aires". */
 export const cityOf = (zone: string) => (zone.split("/").pop() ?? zone).replace(/_/g, " ");
@@ -153,9 +143,7 @@ export function zoneOptions(
     .map((z) => zoneOption(z, nameOf, at))
     .sort(
       (a, b) =>
-        REGIONS.indexOf(a.region as ZoneRegion) - REGIONS.indexOf(b.region as ZoneRegion) ||
-        a.offset - b.offset ||
-        a.name.localeCompare(b.name),
+        REGIONS.indexOf(a.region) - REGIONS.indexOf(b.region) || a.offset - b.offset || a.name.localeCompare(b.name),
     );
   return { suggested: top, rest };
 }

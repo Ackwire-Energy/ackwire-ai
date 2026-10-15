@@ -1,9 +1,10 @@
-import { Button, EmptyState, Segmented } from "@agenteschat/ui";
+import { Button, EmptyState, FilterBar, FilterChip, Segmented } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useForumTopics } from "@/api/queries";
 import type { ForumFilter, ForumTopic } from "@/api/types";
 import { ForumTopicCard, NewTopicDialog } from "@/components/Forum";
+import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 
@@ -24,7 +25,12 @@ export function ForumPage() {
   const [filter, setFilter] = useState<ForumFilter>("open");
   const [creating, setCreating] = useState(false);
   const all = topics.data ?? [];
-  const shown = filterTopics(all, filter, me.user.id).sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
+  const [agents, setAgents] = useState<string[]>([]);
+  const copy = useFilterCopy();
+  const agentOptions = useActorFilterOptions().filter((o) => o.value.startsWith("agent:"));
+  const shown = filterTopics(all, filter, me.user.id)
+    .filter((tp) => agents.length === 0 || agents.some((a) => tp.agentIds.includes(a.slice("agent:".length))))
+    .sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
   return (
     <div className="page page--mid">
       <header
@@ -46,6 +52,30 @@ export function ForumPage() {
         value={filter}
         onValueChange={setFilter}
         options={(["open", "done", "mine"] as const).map((f) => ({ value: f, label: t(`forum.filter.${f}`) }))}
+      />
+      <FilterBar
+        label={t("forum.moreFilters")}
+        clearText={copy.clearAll}
+        onClear={() => setAgents([])}
+        filters={[
+          {
+            key: "agents",
+            active: agents.length > 0,
+            node: (
+              <FilterChip
+                label={t("forum.agentFilter")}
+                icon="agent"
+                multiple
+                options={agentOptions}
+                value={agents}
+                onChange={setAgents}
+                valueText={(o) => o.label}
+                countText={copy.people}
+                clearLabel={copy.clearOf(t("forum.agentFilter"))}
+              />
+            ),
+          },
+        ]}
       />
       {topics.isLoading && <LoadingCards count={3} />}
       {topics.isError && !topics.data && <ErrorState error={topics.error} onRetry={() => void topics.refetch()} />}

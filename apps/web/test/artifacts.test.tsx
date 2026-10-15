@@ -40,14 +40,18 @@ afterEach(() => {
 });
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
-const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
-const key = async (el: Element, k: string) => {
+/** Opens a dropdown (Radix: keyboard) and picks an item. */
+const pick = async (scope: HTMLElement, trigger: string | RegExp, item: string) => {
+  const button = within(scope).getByRole("button", { name: trigger });
+  button.focus();
   await act(async () => {
-    fireEvent.keyDown(el, { key: k });
-    fireEvent.keyUp(el, { key: k });
+    fireEvent.keyDown(button, { key: "Enter" });
+    fireEvent.keyUp(button, { key: "Enter" });
   });
   await act(() => new Promise((r) => setTimeout(r, 0)));
+  await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: item }));
 };
+const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
 
 /** The seeded mock artifacts, by kind. */
 async function byKind(api: ApiClient) {
@@ -139,19 +143,19 @@ describe("artifact viewer", () => {
     expect(within(dialog).getByRole("heading", { name: "O que aconteceu" })).toBeTruthy();
     expect(dialog.querySelector("pre.md__code code")?.textContent).toContain("if (!cart.items.length)");
     expect(within(dialog).getByText("38 clientes").tagName).toBe("STRONG");
-    await click(within(dialog).getByRole("button", { name: "Baixar" }));
+    await pick(dialog, "Baixar", "Original");
     await settle(3);
     expect(saved[0]?.name).toBe("relatorio-de-incidente-checkout.md");
     expect(saved[0]?.url.startsWith("data:text/markdown")).toBe(true);
-    await click(within(dialog).getByRole("button", { name: "Baixar PDF" }));
+    await pick(dialog, "Baixar", "PDF");
     expect(saved[1]?.name).toBe("relatorio-de-incidente-checkout.pdf");
     expect(saved[1]?.url).toBe(`/api/app/organizations/${ORG_ID}/artifacts/${a.document.id}/file?version=2&format=pdf`);
-    await click(within(dialog).getByRole("button", { name: "Baixar DOCX" }));
+    await pick(dialog, "Baixar", "Word (.docx)");
     expect(saved[2]?.name).toBe("relatorio-de-incidente-checkout.docx");
     expect(saved[2]?.url).toBe(
       `/api/app/organizations/${ORG_ID}/artifacts/${a.document.id}/file?version=2&format=docx`,
     );
-    await click(within(dialog).getByRole("button", { name: "Copiar link" }));
+    await pick(dialog, /^Mais ações: /, "Copiar link");
     await settle(2);
     expect(copied[0]).toBe(`http://localhost:3000/org/${ORG_ID}/drive?artifact=${a.document.id}`);
     expect(screen().getByText("Link copiado.")).toBeTruthy();
@@ -177,7 +181,7 @@ describe("artifact viewer", () => {
     expect(firstColumn()[0]).toBe("Modo offline");
     await click(within(dialog).getByRole("button", { name: "Ordenar por Pedido" }));
     expect(firstColumn()[0]).toBe("Exportar em PDF");
-    await click(within(dialog).getByRole("button", { name: "Baixar CSV" }));
+    await pick(dialog, "Baixar", "Planilha (.csv)");
     expect(saved[0]?.name).toBe("pedidos-mais-comuns-nos-reviews.csv");
     // The server converts (`GET …/artifacts/{id}/file?format=csv`).
     expect(saved[0]?.url).toBe(`/api/app/organizations/${ORG_ID}/artifacts/${a.table.id}/file?version=1&format=csv`);
@@ -371,18 +375,27 @@ describe("Drive", () => {
     await type(screen().getByRole("searchbox", { name: "Buscar arquivos" }), "");
     await settle(4);
 
-    const kind = screen().getByRole("combobox", { name: "Tipo" });
-    kind.focus();
-    await key(kind, "Enter");
-    await click(within(screen().getByRole("listbox")).getByRole("option", { name: "Alteração de código" }));
+    // A filter chip: it reads its value once set, raised, with a × to clear.
+    await click(screen().getByRole("button", { name: "Tipo" }));
+    await click(
+      within(screen().getByRole("listbox", { name: "Tipo" })).getByRole("option", { name: "Alteração de código" }),
+    );
     await settle(4);
     expect(names()).toEqual(["Corrige o checkout com carrinho vazio"]);
+    const chip = screen().getByRole("button", { name: "Tipo: Alteração de código" });
+    expect(chip.closest(".ac-filter")?.classList.contains("ac-filter--active")).toBe(true);
+    // Active filters come first in the bar.
+    expect(document.querySelector(".ac-filterbar__item .ac-filter--active")).toBe(chip.closest(".ac-filter"));
+    expect(screen().getByRole("button", { name: "Limpar Tipo" })).toBeTruthy();
 
     // Nothing matches → explained, with a way out.
     await type(screen().getByRole("searchbox", { name: "Buscar arquivos" }), "nada disso");
     await settle(4);
     expect(screen().getByText("Nenhum arquivo com esses filtros.")).toBeTruthy();
-    await click(screen().getByRole("button", { name: "Limpar filtros" }));
+    // The bar's "Limpar filtros" and the empty state's; the latter also clears the search.
+    const clears = screen().getAllByRole("button", { name: "Limpar filtros" });
+    expect(clears).toHaveLength(2);
+    await click(clears[clears.length - 1] as HTMLElement);
     await settle(4);
     expect(names()).toHaveLength(5);
   });
@@ -391,15 +404,16 @@ describe("Drive", () => {
     const { api } = await goDrive();
     const list = await api.artifacts.list(ORG_ID);
     const doc = list.find((a) => a.kind === "document") as Artifact;
-    const author = screen().getByRole("combobox", { name: "Pessoa ou agente" });
-    author.focus();
-    await key(author, "Enter");
-    const listbox = screen().getByRole("listbox");
+    await click(screen().getByRole("button", { name: "Pessoa ou agente" }));
+    const listbox = screen().getByRole("listbox", { name: "Pessoa ou agente" });
+    expect(listbox.getAttribute("aria-multiselectable")).toBe("true");
+    expect(listbox.querySelector(".ac-avatar--agent")).not.toBeNull();
     expect(listbox.textContent).toContain("Agentes");
     expect(listbox.textContent).toContain("Pessoas");
     // The person who edited the report (v2) finds it.
     const me = (await api.account.me())?.user.name ?? "";
     await click(within(listbox).getByRole("option", { name: me }));
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
     await settle(4);
     expect(names()).toEqual([doc.title]);
 
@@ -407,16 +421,21 @@ describe("Drive", () => {
     const home = channels.find((c) => c.id === doc.channelId);
     const elsewhere = channels.find((c) => c.id !== doc.channelId);
     const pickChannel = async (name: string) => {
-      const channel = screen().getByRole("combobox", { name: "Canal" });
-      channel.focus();
-      await key(channel, "Enter");
-      await click(within(screen().getByRole("listbox")).getByRole("option", { name: `#${name}` }));
+      const trigger = screen()
+        .getAllByRole("button")
+        .find((b) => b.classList.contains("ac-filter__trigger") && /Canal|#|canais/.test(b.textContent ?? ""));
+      await click(trigger as HTMLElement);
+      await click(within(screen().getByRole("listbox", { name: "Canal" })).getByRole("option", { name: `#${name}` }));
+      await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
       await settle(4);
     };
     await pickChannel(elsewhere?.name ?? "");
     expect(screen().getByText("Nenhum arquivo com esses filtros.")).toBeTruthy();
+    expect(screen().getByRole("button", { name: `#${elsewhere?.name}` })).toBeTruthy();
+    // Several channels: any of them, and the chip counts them.
     await pickChannel(home?.name ?? "");
     expect(names()).toEqual([doc.title]);
+    expect(screen().getByRole("button", { name: "2 canais" })).toBeTruthy();
   });
 
   test("empty state when there is nothing yet", async () => {
@@ -480,5 +499,63 @@ describe("artifact helpers", () => {
       header: ["a", "b"],
       rows: [["1", "2"]],
     });
+  });
+});
+
+describe("deleting a file", () => {
+  const goDrive = async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const r = await renderApp(`/org/${ORG_ID}/drive`, { api });
+    await settle(8);
+    return { ...r, api, state };
+  };
+  test("the viewer header: one-line title with a tooltip, Baixar ▾, Editar, … with Apagar arquivo", async () => {
+    await openChannel();
+    const dialog = await openCard("Relatório de incidente: checkout");
+    const title = dialog.querySelector(".artifact-sheet__title") as HTMLElement;
+    expect(title.getAttribute("title")).toBe("Relatório de incidente: checkout");
+    expect(within(dialog).getByRole("button", { name: "Editar" }).getAttribute("title")).toBe("Editar");
+    expect(within(dialog).queryByRole("button", { name: "Baixar PDF" })).toBeNull();
+  });
+
+  test("Apagar asks, naming the file; then 'Arquivo apagado · Desfazer' restores it", async () => {
+    const { state } = await goDrive();
+    const row = screen().getByRole("button", { name: "Organograma do time" }).closest("tr") as HTMLElement;
+    await pick(row, /^Mais ações: /, "Apagar arquivo");
+    const confirm = screen().getByRole("dialog", { name: "Apagar “Organograma do time”?" });
+    expect(confirm.textContent).toContain("lixeira por 30 dias");
+    await click(within(confirm).getByRole("button", { name: "Apagar" }));
+    await settle(5);
+    expect(state.calls.some((c) => c.method === "artifacts.remove")).toBe(true);
+    expect(screen().queryByRole("button", { name: "Organograma do time" })).toBeNull();
+    expect(screen().getByText("Arquivo apagado")).toBeTruthy();
+    await click(screen().getByRole("button", { name: "Desfazer" }));
+    await settle(5);
+    expect(state.calls.some((c) => c.method === "artifacts.restore")).toBe(true);
+    expect(screen().getByRole("button", { name: "Organograma do time" })).toBeTruthy();
+  });
+
+  test("Lixeira lists deleted files with Restaurar", async () => {
+    const { api } = await goDrive();
+    const list = await api.artifacts.list(ORG_ID);
+    const chart = list.find((a) => a.title === "Organograma do time") as Artifact;
+    await act(async () => api.artifacts.remove(ORG_ID, chart.id));
+    await click(screen().getByRole("button", { name: "Lixeira" }));
+    await settle(4);
+    expect(screen().getByRole("heading", { level: 1, name: "Lixeira do Drive" })).toBeTruthy();
+    expect(screen().getByText("Organograma do time")).toBeTruthy();
+    await click(screen().getByRole("button", { name: "Restaurar" }));
+    await settle(4);
+    expect(screen().getByText("A lixeira está vazia.")).toBeTruthy();
+  });
+
+  test("a chat card for a deleted file is a quiet 'Arquivo removido'", async () => {
+    const { ArtifactCard } = await import("@/components/artifacts/ArtifactCard");
+    expect(ArtifactCard).toBeTruthy();
+    const { artifactRefs } = await import("@/lib/artifacts");
+    expect(artifactRefs({ artifacts: [{ id: "x", deleted: true, title: "Relatório" }] })).toEqual([
+      { id: "x", deleted: true, title: "Relatório" },
+    ]);
   });
 });

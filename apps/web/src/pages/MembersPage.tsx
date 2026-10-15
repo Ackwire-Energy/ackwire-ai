@@ -1,4 +1,15 @@
-import { Avatar, Button, Card, Field, Input, List, Select, type SelectOption } from "@agenteschat/ui";
+import {
+  Avatar,
+  Button,
+  Card,
+  Field,
+  FilterBar,
+  FilterChip,
+  Input,
+  List,
+  Select,
+  type SelectOption,
+} from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,6 +24,7 @@ import {
 } from "@/api/queries";
 import type { InvitationWithStatus, Role } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { useFilterCopy } from "@/components/filters";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -102,7 +114,9 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
     setCopied(email);
   };
 
-  const people = peopleQuery.data ?? [];
+  const [roles, setRoles] = useState<string[]>([]);
+  const filterCopy = useFilterCopy();
+  const people = (peopleQuery.data ?? []).filter((m) => roles.length === 0 || roles.includes(m.role));
   const pending = invitations.data ?? [];
 
   return (
@@ -199,6 +213,30 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
         <h2 id="sec-people" className="section-title">
           {t("members.people")}
         </h2>
+        <FilterBar
+          label={t("members.filters")}
+          clearText={filterCopy.clearAll}
+          onClear={() => setRoles([])}
+          filters={[
+            {
+              key: "role",
+              active: roles.length > 0,
+              node: (
+                <FilterChip
+                  label={t("members.roleFilter")}
+                  icon="members"
+                  multiple
+                  options={(["owner", "admin", "member"] as const).map((r) => ({ value: r, label: t(`roles.${r}`) }))}
+                  value={roles}
+                  onChange={setRoles}
+                  valueText={(o) => o.label}
+                  countText={(count) => t("members.rolesCount", { count })}
+                  clearLabel={filterCopy.clearOf(t("members.roleFilter"))}
+                />
+              ),
+            },
+          ]}
+        />
         {peopleQuery.isLoading && <LoadingList count={3} trailing />}
         <List>
           {people.map((m) => {

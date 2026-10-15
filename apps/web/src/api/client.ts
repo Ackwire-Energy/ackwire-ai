@@ -83,6 +83,7 @@ import type {
   StorageMigration,
   StorageTestResult,
   ToolAccess,
+  TrashedArtifact,
   UsageReport,
   WikiGraph,
   WikiPage,
@@ -433,7 +434,11 @@ export interface ApiClient {
       id: string,
       input: { content: ArtifactContent; note?: string | null; baseVersion: number; title?: string },
     ): Promise<ArtifactDetail>;
+    /** To the trash for 30 days (403 `artifact.delete_forbidden`). */
     remove(orgId: string, id: string): Promise<void>;
+    trash(orgId: string): Promise<TrashedArtifact[]>;
+    /** Back from the trash (409 `artifact.purged` after 30 days). */
+    restore(orgId: string, id: string): Promise<ArtifactDetail | undefined>;
   };
   storage: {
     get(orgId: string): Promise<StorageConfig>;

@@ -98,7 +98,14 @@ const shortDate = (locale: string, ymd: string, now = new Date()) => {
  * The live sentence: "A cada 2 semanas, seg e qua, às 09:00 (horário de
  * Brasília), até 31/12".
  */
-export function ruleSentence(t: TFunction, locale: string, rule: RecurrenceRule, now = new Date()): string {
+export function ruleSentence(
+  t: TFunction,
+  locale: string,
+  rule: RecurrenceRule,
+  now = new Date(),
+  /** Leave the zone out (the card says it only when it isn't mine). */
+  withZone = true,
+): string {
   const and = t("newAgent.and");
   const n = Math.max(1, rule.interval || 1);
   const days = (list: Weekday[]) =>
@@ -149,7 +156,7 @@ export function ruleSentence(t: TFunction, locale: string, rule: RecurrenceRule,
   const parts = [head];
   if (rule.freq === "hourly") parts.push(t("recurrence.s.from", { time: times[0] ?? "00:00" }));
   else if (times.length) parts.push(t("recurrence.s.at", { times: joinNames(times, and) }));
-  let out = `${parts.join(", ")} (${timezoneName(rule.timezone, locale)})`;
+  let out = withZone ? `${parts.join(", ")} (${timezoneName(rule.timezone, locale)})` : parts.join(", ");
   if (rule.until) out += `, ${t("recurrence.s.until", { date: shortDate(locale, rule.until, now) })}`;
   else if (rule.count) out += `, ${t("recurrence.s.count", { count: rule.count })}`;
   return out;

@@ -295,3 +295,18 @@ export function upcomingItems(items: CalItem[], now: Date, n = 5) {
     .sort((a, b) => a.start.getTime() - b.start.getTime())
     .slice(0, n);
 }
+
+/** Whether the locale writes 12-hour times ("1 PM") rather than 24-hour ("13:00"). */
+export function uses12h(locale: string) {
+  try {
+    return new Intl.DateTimeFormat(locale, { hour: "numeric" }).resolvedOptions().hour12 === true;
+  } catch {
+    return false;
+  }
+}
+
+/** The grid's hour label: "1 AM" … "12 PM" in 12-hour locales, "01:00" … "23:00" otherwise. */
+export function hourLabel(locale: string, h: number) {
+  if (uses12h(locale)) return new Intl.DateTimeFormat(locale, { hour: "numeric" }).format(new Date(2000, 0, 1, h));
+  return `${String(h).padStart(2, "0")}:00`;
+}

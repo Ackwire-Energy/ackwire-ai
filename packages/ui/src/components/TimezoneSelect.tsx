@@ -1,6 +1,7 @@
 import { Popover as RPopover } from "radix-ui";
 import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { cx } from "../cx";
+import { Icon } from "../icons/Icon";
 import { filterZones, type ZoneOption, type ZoneRegion, zoneOption, zoneOptions } from "../timezones";
 import { useFieldControl } from "./Field";
 
@@ -128,22 +129,25 @@ export function TimezoneSelect({
         </RPopover.Trigger>
         <RPopover.Portal>
           <RPopover.Content className="ac-menu ac-tz__menu" align="start" sideOffset={4}>
-            <input
-              className="ac-input ac-tz__search"
-              role="combobox"
-              aria-label={labels.search}
-              aria-expanded="true"
-              aria-controls={listId}
-              aria-autocomplete="list"
-              aria-activedescendant={flat.length ? optionId(active) : undefined}
-              placeholder={labels.searchPlaceholder}
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setActive(0);
-              }}
-              onKeyDown={onKey}
-            />
+            <div className="ac-tz__searchrow">
+              <Icon name="search" size={16} className="ac-tz__searchicon" />
+              <input
+                className="ac-tz__search"
+                role="combobox"
+                aria-label={labels.search}
+                aria-expanded="true"
+                aria-controls={listId}
+                aria-autocomplete="list"
+                aria-activedescendant={flat.length ? optionId(active) : undefined}
+                placeholder={labels.searchPlaceholder}
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setActive(0);
+                }}
+                onKeyDown={onKey}
+              />
+            </div>
             <div className="ac-tz__list" role="listbox" id={listId} aria-label={labels.list} ref={listRef}>
               {flat.length === 0 && <p className="ac-tz__empty">{labels.noResults}</p>}
               {groups.map(([region, list]) => (
@@ -168,8 +172,15 @@ export function TimezoneSelect({
                         onPointerMove={() => setActive(i)}
                         onClick={() => pick(o)}
                       >
+                        <span className="ac-tz__check" aria-hidden="true">
+                          {o.zone === value && (
+                            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+                              <path d="m5.5 10.5 3 3 6-7" fill="none" stroke="currentColor" strokeWidth="2" />
+                            </svg>
+                          )}
+                        </span>
                         <span className="ac-tz__name">{o.name}</span>
-                        <span className="ac-tz__id">{o.zone}</span>
+                        {o.name !== o.zone && <span className="ac-tz__id">{o.zone}</span>}
                         <span className="ac-tz__off tabular">{o.offsetLabel}</span>
                       </div>
                     );

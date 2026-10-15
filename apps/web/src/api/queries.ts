@@ -759,6 +759,15 @@ export const useArtifacts = (orgId: string, filters: ArtifactFilters) => {
 };
 
 /** One artifact at a version (latest when omitted). */
+/** `GET …/artifacts-trash`: deleted files (30 days). */
+export const useArtifactTrash = (orgId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...keys.artifacts(orgId), "trash"] as const,
+    queryFn: () => api.artifacts.trash(orgId),
+  });
+};
+
 export const useArtifact = (orgId: string, id: string | null, version?: number) => {
   const api = useApi();
   return useQuery({

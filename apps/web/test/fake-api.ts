@@ -1240,7 +1240,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       },
     },
     storage: createMockStorage(),
-    artifacts: createMockArtifacts(ctx),
+    artifacts: createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args })),
     ...createMockPlanning(ctx, (method, ...args) => state.calls.push({ method, args })),
     customConnectors: createMockCustomConnectors(ctx),
   };

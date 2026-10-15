@@ -7,6 +7,8 @@ import {
   DialogFooter,
   EmptyState,
   Field,
+  FilterBar,
+  FilterChip,
   Icon,
   Input,
   List,
@@ -18,6 +20,7 @@ import {
   type RecurrenceRule,
   Segmented,
   Select,
+  Switch,
   Textarea,
   zonedInstant,
 } from "@agenteschat/ui";
@@ -43,6 +46,7 @@ import type {
   RoutineTargetInput,
 } from "@/api/types";
 import { useActors } from "@/components/actors";
+import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
@@ -117,8 +121,12 @@ export function RoutinesPage() {
   const [runsFor, setRunsFor] = useState<Routine | null>(null);
   const [showDone, setShowDone] = useState(false);
   const list = routines.data ?? [];
-  const current = list.filter((r) => !isDoneOnce(r));
-  const done = list.filter(isDoneOnce);
+  const [agents, setAgents] = useState<string[]>([]);
+  const copy = useFilterCopy();
+  const agentOptions = useActorFilterOptions().filter((o) => o.value.startsWith("agent:"));
+  const byAgent = (r: Routine) => agents.length === 0 || agents.includes(`agent:${r.agentId}`);
+  const current = list.filter((r) => !isDoneOnce(r) && byAgent(r));
+  const done = list.filter((r) => isDoneOnce(r) && byAgent(r));
   return (
     <div className="page page--mid">
       <header
@@ -135,6 +143,32 @@ export function RoutinesPage() {
           {t("routines.new")}
         </Button>
       </header>
+      {list.length > 0 && (
+        <FilterBar
+          label={t("routines.filters")}
+          clearText={copy.clearAll}
+          onClear={() => setAgents([])}
+          filters={[
+            {
+              key: "agents",
+              active: agents.length > 0,
+              node: (
+                <FilterChip
+                  label={t("routines.agentFilter")}
+                  icon="agent"
+                  multiple
+                  options={agentOptions}
+                  value={agents}
+                  onChange={setAgents}
+                  valueText={(o) => o.label}
+                  countText={copy.people}
+                  clearLabel={copy.clearOf(t("routines.agentFilter"))}
+                />
+              ),
+            },
+          ]}
+        />
+      )}
       {routines.isLoading && <LoadingCards count={3} />}
       {routines.isError && !routines.data && (
         <ErrorState error={routines.error} onRetry={() => void routines.refetch()} />
@@ -177,141 +211,163 @@ export function RoutinesPage() {
   );
 }
 
+/** A title for the card: a routine made from a chat message may be named with its whole prompt. */
+export function routineTitle(r: Pick<Routine, "name" | "prompt">) {
+  const name = r.name.trim();
+  if (name !== r.prompt.trim() && name.length <= 80) return name;
+  const first = (name.split("\n")[0] ?? name).trim();
+  if (first.length <= 60) return first;
+  const cut = first.slice(0, 60);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 40)).trimEnd()}…`;
+}
+
 function RoutineCard({ routine: r, onRuns, onEdit }: { routine: Routine; onRuns: () => void; onEdit: () => void }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const actors = useActors();
   const toast = useToast();
   const action = useRoutineAction(org.id);
   const [deleting, setDeleting] = useState(false);
   const target = useTargetLabel();
   const agent = { type: "agent" as const, id: r.agentId };
-  // The zone always shows, so a routine read in UTC by mistake is easy to spot.
+  const title = routineTitle(r);
+  const myZone = actors.dir.memberById.get(me.user.id)?.timezone || browserTimezone() || "UTC";
+  const zone = r.trigger.type === "event" ? "" : r.trigger.timezone || "UTC";
+  // The zone shows only when it isn't mine ("(UTC)" for a routine still read in UTC).
+  const zoneNote = zone && zone !== myZone ? ` (${timezoneName(zone, i18n.language)})` : "";
   const when =
     r.trigger.type === "schedule"
-      ? `${r.trigger.description} (${timezoneLabel(r.trigger.timezone || "UTC", undefined, i18n.language)})`
+      ? `${
+          r.trigger.rule
+            ? ruleSentence(t, i18n.language, fromApiRule(r.trigger.rule, toYmd(new Date())), new Date(), false)
+            : r.trigger.description
+        }${zoneNote}`
       : r.trigger.type === "once"
-        ? t("routines.once", onceParts(i18n.language, r.trigger.at, r.trigger.timezone || "UTC"))
+        ? t("routines.once", { ...onceParts(i18n.language, r.trigger.at, zone), zone: zoneNote })
         : t(`routines.event.${r.trigger.event}`);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const done = isDoneOnce(r);
+  const paused = !done && !r.active;
   const next = done
-    ? r.lastRun
-      ? t("routines.fired")
-      : t("routines.canceled")
+    ? null
     : !r.active
-      ? t("routines.paused")
+      ? null
       : r.trigger.type === "event"
         ? t("routines.waitingEvent")
         : r.nextRunAt
           ? t("routines.next", { when: nextLabel(i18n.language, r.nextRunAt) })
-          : "";
+          : null;
+  const more = t("routines.more", { name: title });
   return (
     <article
       className="routine-card"
-      aria-label={r.name}
+      aria-label={title}
       data-active={r.active || undefined}
+      data-paused={paused || undefined}
       data-done={done || undefined}
     >
       <div className="routine-card__head">
         {actors.avatar(agent, "sm")}
-        <div className="list-col" style={{ flex: "1 1 200px" }}>
-          <span className="routine-card__name">{r.name}</span>
+        <div className="routine-card__main">
+          <span className="routine-card__name" title={r.name}>
+            {title}
+          </span>
           <span className="small muted">
             {r.target.type === "conversation"
               ? t("routines.deliversIn", { agent: actors.name(agent), place: target(r.target) })
               : t("routines.deliversTo", { agent: actors.name(agent), target: target(r.target) })}
           </span>
         </div>
-        {reminder && <Chip icon="bell">{t("routines.reminder")}</Chip>}
-        <Chip icon={r.trigger.type === "event" ? "bolt" : "waiting"}>{when}</Chip>
-        {!done && (
-          <span className="row" style={{ gap: 6, alignItems: "center" }}>
-            <Checkbox
-              id={`rt-${r.id}`}
-              checked={r.active}
-              aria-label={t("routines.activeLabel", { name: r.name })}
-              onCheckedChange={(v) => action.mutate({ type: "active", id: r.id, active: v })}
-            />
-            <label htmlFor={`rt-${r.id}`} aria-hidden="true">
-              {t("routines.active")}
-            </label>
-          </span>
-        )}
+        <div className="routine-card__aside">
+          <div className="routine-card__chips">
+            {reminder && <Chip icon="bell">{t("routines.reminder")}</Chip>}
+            <Chip icon={r.trigger.type === "event" ? "bolt" : "waiting"}>{when}</Chip>
+            {done ? (
+              <Chip icon="check">{r.lastRun ? t("routines.fired") : t("routines.canceled")}</Chip>
+            ) : (
+              <Chip icon={r.active ? "play" : "pause"}>{r.active ? t("routines.active") : t("routines.paused")}</Chip>
+            )}
+          </div>
+          <div className="routine-card__actions">
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="edit"
+              onClick={onEdit}
+              aria-label={t("routines.editName", { name: title })}
+            >
+              {t("routines.edit")}
+            </Button>
+            {!done && !reminder && (
+              <Button
+                size="sm"
+                variant="ghost"
+                iconOnly
+                icon={r.running ? "spinner" : "play"}
+                title={r.running ? t("routines.running") : t("routines.runNow")}
+                aria-label={r.running ? t("routines.running") : t("routines.runNow")}
+                disabled={r.running || action.isPending}
+                onClick={() => action.mutate({ type: "run", id: r.id })}
+              />
+            )}
+            <Menu
+              align="end"
+              label={more}
+              trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={more} />}
+            >
+              {paused && (
+                <MenuItem icon="play" onSelect={() => action.mutate({ type: "active", id: r.id, active: true })}>
+                  {t("routines.resume")}
+                </MenuItem>
+              )}
+              <MenuItem icon="waiting" onSelect={onRuns}>
+                {t("routines.runs")}
+              </MenuItem>
+              <MenuItem
+                icon="copy"
+                onSelect={() =>
+                  action.mutate(
+                    { type: "duplicate", id: r.id },
+                    {
+                      onSuccess: (copy) =>
+                        toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
+                    },
+                  )
+                }
+              >
+                {t("routines.duplicate")}
+              </MenuItem>
+              {r.webhookUrl && (
+                <MenuItem
+                  icon="link"
+                  onSelect={async () => {
+                    await navigator.clipboard?.writeText(r.webhookUrl ?? "");
+                    toast.show(t("routines.webhookCopied"));
+                  }}
+                >
+                  {t("routines.copyWebhook")}
+                </MenuItem>
+              )}
+              <MenuItem icon="trash" onSelect={() => setDeleting(true)}>
+                {t("routines.delete")}
+              </MenuItem>
+            </Menu>
+          </div>
+        </div>
       </div>
-      <div className="routine-card__foot small muted">
-        <span>{next}</span>
+      <p className="routine-card__foot">
         <span>
           {r.lastRun
-            ? t("routines.last", { when: whenAt(t, i18n.language, r.lastRun.at), summary: r.lastRun.summary })
+            ? t("routines.last", { when: whenAt(t, i18n.language, r.lastRun.at), summary: runSummary(t, r.lastRun) })
             : t("routines.never")}
         </span>
+        {next && <span>{next}</span>}
         <span className="tabular">{t("routines.cost", { amount: formatUsd(t, i18n.language, r.monthCostUsd) })}</span>
-        <span style={{ flex: 1 }} />
-        {!done && !reminder && (
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={r.running || action.isPending}
-            loading={action.isPending}
-            onClick={() => action.mutate({ type: "run", id: r.id })}
-          >
-            {r.running ? t("routines.running") : t("routines.runNow")}
-          </Button>
-        )}
-        <Button size="sm" variant="ghost" onClick={onRuns}>
-          {t("routines.runs")}
-        </Button>
-        <Button
-          size="sm"
-          variant="primary"
-          icon="edit"
-          onClick={onEdit}
-          aria-label={t("routines.editName", { name: r.name })}
-        >
-          {t("routines.edit")}
-        </Button>
-        <Menu
-          align="end"
-          label={t("routines.more", { name: r.name })}
-          trigger={
-            <Button variant="ghost" size="sm" iconOnly icon="more" aria-label={t("routines.more", { name: r.name })} />
-          }
-        >
-          <MenuItem
-            icon="copy"
-            onSelect={() =>
-              action.mutate(
-                { type: "duplicate", id: r.id },
-                {
-                  onSuccess: (copy) =>
-                    toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
-                },
-              )
-            }
-          >
-            {t("routines.duplicate")}
-          </MenuItem>
-          {r.webhookUrl && (
-            <MenuItem
-              icon="link"
-              onSelect={async () => {
-                await navigator.clipboard?.writeText(r.webhookUrl ?? "");
-                toast.show(t("routines.webhookCopied"));
-              }}
-            >
-              {t("routines.copyWebhook")}
-            </MenuItem>
-          )}
-          <MenuItem icon="trash" onSelect={() => setDeleting(true)}>
-            {t("routines.delete")}
-          </MenuItem>
-        </Menu>
-      </div>
+      </p>
       <Dialog
         open={deleting}
         onOpenChange={(o) => !o && setDeleting(false)}
-        title={t("routines.deleteTitle", { name: r.name })}
+        title={t("routines.deleteTitle", { name: title })}
         description={t("routines.deleteBody")}
         closeLabel={t("common.close")}
         width={440}
@@ -452,6 +508,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
     routine?.trigger.type === "event" ? routine.trigger.event : "sentry.issue_created",
   );
   const [budget, setBudget] = useState(routine?.budgetUsd ? String(routine.budgetUsd) : "");
+  const [active, setActive] = useState(routine?.active ?? true);
   const [touched, setTouched] = useState(false);
   // One source of truth for "when": the rule (the picker), with the phrase kept in step.
   const [rule, setRule] = useState<RecurrenceRule>(() => ruleOf(routine, wasUtc ? myZone : savedZone || myZone));
@@ -547,6 +604,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
           : r.trigger.type !== "schedule" || JSON.stringify(toApiRule(rule)) !== savedRule;
     if (triggerChanged) patch.trigger = trigger();
     if (budgetValue !== (r.budgetUsd ?? null)) patch.budgetUsd = budgetValue;
+    if (active !== r.active) patch.active = active;
     return patch;
   };
   const help = () => {
@@ -776,6 +834,12 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
                 options={ROUTINE_EVENTS.map((e) => ({ value: e, label: t(`routines.event.${e}`) }))}
               />
             </Field>
+          )}
+          {editing && !(routine && isDoneOnce(routine)) && (
+            <label className="routine-active" htmlFor="nr-active">
+              <Switch id="nr-active" checked={active} onCheckedChange={setActive} />
+              <span>{t("routines.form.active")}</span>
+            </label>
           )}
           <Field
             label={t("routines.form.budget")}

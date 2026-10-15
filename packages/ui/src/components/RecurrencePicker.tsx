@@ -342,9 +342,12 @@ export function RecurrencePicker({
       )}
       <div className="ac-recur__group">
         <span className="ac-recur__label">{labels.period}</span>
-        <div className="ac-recur__row">
-          <span className="ac-recur__inline">
-            <span>{labels.starts}</span>
+        {/* Two columns, labels above, every control 40px; the end's extra control sits below it. */}
+        <div className="ac-recur__period">
+          <div className="ac-recur__cell">
+            <span className="ac-recur__sublabel" id={`${id}-starts`}>
+              {labels.starts}
+            </span>
             <DatePicker
               value={rule.start}
               onChange={(v) => set({ start: v })}
@@ -352,14 +355,14 @@ export function RecurrencePicker({
               labels={labels.date}
               aria-label={labels.starts}
             />
-          </span>
+          </div>
           {rule.freq !== "once" && (
-            <span className="ac-recur__inline">
-              <span>{labels.ends}</span>
+            <div className="ac-recur__cell">
+              <span className="ac-recur__sublabel">{labels.ends}</span>
               <Segmented
                 label={labels.ends}
-                size="sm"
                 value={ends}
+                className="ac-recur__ends"
                 onValueChange={(v) =>
                   set(
                     v === "never"
@@ -386,7 +389,7 @@ export function RecurrencePicker({
                 />
               )}
               {ends === "after" && (
-                <>
+                <span className="ac-recur__inline">
                   <Input
                     className="ac-recur__n"
                     inputMode="numeric"
@@ -395,9 +398,9 @@ export function RecurrencePicker({
                     onChange={(e) => set({ count: clampInt(e.target.value, 1, 999) })}
                   />
                   <span>{labels.occurrences}</span>
-                </>
+                </span>
               )}
-            </span>
+            </div>
           )}
         </div>
       </div>

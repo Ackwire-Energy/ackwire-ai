@@ -67,20 +67,21 @@ describe("Rotinas: reminders and one-offs from the chat", () => {
     await settle(8);
   };
 
-  test("Lembrete chip, 'Uma vez · sex, 16/10 às 09:00 (horário de Brasília)', where it goes", async () => {
+  test("Lembrete chip, 'Uma vez · sex, 16/10 às 09:00' (my own zone isn't repeated), where it goes", async () => {
     await open();
     const dm = screen().getByRole("article", { name: "Lembrete: ligar para o fornecedor" });
     expect(dm.textContent).toContain("Lembrete");
     expect(dm.querySelector(".ac-chip svg")).not.toBeNull();
-    expect(dm.textContent).toContain("Uma vez · sex, 16/10 às 09:00 (horário de Brasília)");
+    expect(dm.textContent).toContain("Uma vez · sex, 16/10 às 09:00");
+    expect(dm.textContent).not.toContain("Brasília");
     expect(dm.textContent).toContain("na DM com o Jorge");
     // A plain reminder has nothing to run now.
     expect(within(dm).queryByRole("button", { name: "Rodar agora" })).toBeNull();
     const thread = screen().getByRole("article", { name: "Resumo do deploy" });
     expect(thread.textContent).toContain("no #general (thread)");
     expect(thread.textContent).not.toContain("Lembrete");
-    // Cancel = the same "Ativa" checkbox as today.
-    expect(within(thread).getByRole("checkbox", { name: "Ativa: Resumo do deploy" })).toBeTruthy();
+    // Active shows as a chip; pausing is in Editar.
+    expect(within(thread).getByText("Ativa")).toBeTruthy();
   });
 
   test("fired one-offs are muted under 'Concluídos'", async () => {

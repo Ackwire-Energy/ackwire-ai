@@ -14,6 +14,7 @@ import {
   type CalItem,
   dragRange,
   HOUR_PX,
+  hourLabel,
   initialScrollMinutes,
   layoutBars,
   layoutDay,
@@ -21,6 +22,7 @@ import {
   SNAP_MIN,
   sameDay,
   shiftDays,
+  uses12h,
   yToMinutes,
 } from "@/lib/calendar";
 import { toYmd } from "@/lib/format";
@@ -194,7 +196,15 @@ export function TimeGrid({
   return (
     <section
       className="cal-week"
-      style={{ "--hour-px": `${HOUR_PX}px`, "--cols": cols, "--lanes": lanes } as CSSProperties}
+      style={
+        {
+          "--hour-px": `${HOUR_PX}px`,
+          "--cols": cols,
+          "--lanes": lanes,
+          // "12 PM" needs a little more room than "13:00".
+          "--gutter": uses12h(i18n.language) ? "48px" : "44px",
+        } as CSSProperties
+      }
       aria-label={t("calendar.grid")}
       aria-busy={loading || undefined}
     >
@@ -245,12 +255,8 @@ export function TimeGrid({
         <div className="cal-week__body">
           <div className="cal-week__hours" aria-hidden="true">
             {HOURS.map((h) => (
-              <div key={h} className="cal-week__hour small muted tabular">
-                {h === 0
-                  ? ""
-                  : new Intl.DateTimeFormat(i18n.language, { hour: "2-digit", minute: "2-digit" }).format(
-                      new Date(2000, 0, 1, h),
-                    )}
+              <div key={h} className="cal-week__hour">
+                {h > 0 && <span className="cal-week__hour-label tabular">{hourLabel(i18n.language, h)}</span>}
               </div>
             ))}
           </div>

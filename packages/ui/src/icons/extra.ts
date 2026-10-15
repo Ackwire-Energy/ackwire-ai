@@ -169,4 +169,11 @@ export const extraIcons = {
     ["rect", { x: "3", y: "4", width: "14", height: "12", rx: "2.5" }],
     ["path", { d: "M12.5 4v12" }],
   ],
+  /** "Ativa", "Rodar agora". */
+  play: [["path", { d: "M7 4.8v10.4a.6.6 0 0 0 .9.5l8-5.2a.6.6 0 0 0 0-1L7.9 4.3a.6.6 0 0 0-.9.5z" }]],
+  /** "Pausada". */
+  pause: [
+    ["rect", { x: "5.5", y: "4.5", width: "3", height: "11", rx: "1" }],
+    ["rect", { x: "11.5", y: "4.5", width: "3", height: "11", rx: "1" }],
+  ],
 } satisfies Record<string, IconShape[]>;

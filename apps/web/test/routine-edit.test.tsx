@@ -155,3 +155,16 @@ describe("Rotinas: editar, duplicar, apagar", () => {
     expect(avatar.style.getPropertyValue("--av-top")).toBeTruthy();
   });
 });
+
+describe("routine titles", () => {
+  test("a name that is the whole prompt becomes a short title from its first line", async () => {
+    const { routineTitle } = await import("@/pages/RoutinesPage");
+    expect(routineTitle({ name: "Resumo da semana", prompt: "Resuma a semana." })).toBe("Resumo da semana");
+    const prompt =
+      "Relatório de visitantes do site wescld com origem, páginas mais vistas e conversões da semana passada\nDetalhes: …";
+    const title = routineTitle({ name: prompt, prompt });
+    expect(title.length).toBeLessThanOrEqual(61);
+    expect(title.endsWith("…")).toBe(true);
+    expect(prompt.startsWith(title.slice(0, -1))).toBe(true);
+  });
+});

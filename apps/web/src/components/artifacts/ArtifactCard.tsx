@@ -16,8 +16,17 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   const { org } = useOrg();
   const viewer = useArtifactViewer();
   const authorName = useAuthorName();
-  const query = useArtifact(org.id, ref.id, ref.version);
+  const query = useArtifact(org.id, ref.deleted ? null : ref.id, ref.version);
   const a = query.data;
+  // Deleted (to the trash): a quiet placeholder, never a broken card.
+  if (ref.deleted) {
+    return (
+      <div className="artifact-card artifact-card--removed" role="note">
+        <Icon name="trash" size={16} />
+        <span className="small muted">{t("artifacts.removedFile")}</span>
+      </div>
+    );
+  }
   if (query.isError) {
     return (
       <div className="artifact-card artifact-card--missing">

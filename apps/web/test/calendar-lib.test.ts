@@ -83,3 +83,13 @@ describe("calendar layout", () => {
     expect(rangeLabel("pt-BR", "month", [], day)).toBe("outubro de 2026");
   });
 });
+
+describe("hour labels", () => {
+  test("12-hour locales: 1 AM … 12 PM; 24-hour: 01:00 … 23:00", async () => {
+    const { hourLabel, uses12h } = await import("@/lib/calendar");
+    expect(uses12h("en")).toBe(true);
+    expect(uses12h("pt-BR")).toBe(false);
+    expect([1, 12, 13].map((h) => hourLabel("en", h).replace(/\s/g, " "))).toEqual(["1 AM", "12 PM", "1 PM"]);
+    expect([1, 13, 23].map((h) => hourLabel("pt-BR", h))).toEqual(["01:00", "13:00", "23:00"]);
+  });
+});

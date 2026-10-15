@@ -259,7 +259,13 @@ function TopicView({ topic }: { topic: ForumTopicDetail }) {
             </div>
           )}
           <div className="artifact-cards">
-            <ArtifactCard artifact={{ id: topic.synthesis.artifactId, version: topic.synthesis.version }} />
+            <ArtifactCard
+              artifact={{
+                id: topic.synthesis.artifactId,
+                version: topic.synthesis.version,
+                deleted: topic.synthesis.deleted,
+              }}
+            />
           </div>
           <div className="row" style={{ gap: 8 }}>
             {suggested.length > 0 && (

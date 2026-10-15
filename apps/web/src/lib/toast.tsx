@@ -10,10 +10,12 @@ export interface Toast {
   id: number;
   tone: "error" | "info";
   text: string;
+  /** One quick action ("Desfazer"). */
+  action?: { label: string; run: () => void };
 }
 
 interface ToastApi {
-  show: (text: string, tone?: Toast["tone"]) => void;
+  show: (text: string, tone?: Toast["tone"], action?: Toast["action"]) => void;
 }
 
 const ToastContext = createContext<ToastApi>({ show: () => {} });
@@ -28,8 +30,8 @@ export function createToastStore() {
     for (const l of listeners) l();
   };
   return {
-    show(text: string, tone: Toast["tone"] = "info") {
-      const toast = { id: nextId++, tone, text };
+    show(text: string, tone: Toast["tone"] = "info", action?: Toast["action"]) {
+      const toast = { id: nextId++, tone, text, ...(action ? { action } : {}) };
       toasts = [...toasts.filter((t) => t.text !== text), toast].slice(-3);
       emit();
       setTimeout(() => {
@@ -62,7 +64,10 @@ export function ToastProvider({
   children: ReactNode;
 }) {
   const toasts = useSyncExternalStore(store.subscribe, store.get, store.get);
-  const show = useCallback((text: string, tone?: Toast["tone"]) => store.show(text, tone), [store]);
+  const show = useCallback(
+    (text: string, tone?: Toast["tone"], action?: Toast["action"]) => store.show(text, tone, action),
+    [store],
+  );
   return (
     <ToastContext.Provider value={{ show }}>
       {children}
@@ -75,6 +80,18 @@ export function ToastProvider({
           >
             <Icon name={toast.tone === "error" ? "alert" : "check"} />
             <span className="ac-toast__text">{toast.text}</span>
+            {toast.action && (
+              <button
+                type="button"
+                className="ac-btn ac-btn--ghost ac-btn--sm"
+                onClick={() => {
+                  toast.action?.run();
+                  store.dismiss(toast.id);
+                }}
+              >
+                {toast.action.label}
+              </button>
+            )}
             <button
               type="button"
               className="ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon"

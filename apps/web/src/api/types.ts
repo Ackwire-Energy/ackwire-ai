@@ -757,6 +757,15 @@ export interface Artifact {
   canEdit: boolean;
   /** HTML: render only in a sandboxed iframe (we always do). */
   untrusted: boolean;
+  /** The creator, who asked the agent, the agent's owner and admins may delete it. */
+  canDelete?: boolean;
+}
+
+/** `GET …/artifacts-trash`: deleted files, kept for 30 days. */
+export interface TrashedArtifact extends Artifact {
+  deletedAt: string;
+  /** After this it can't be restored (409 `artifact.purged`). */
+  purgeAt: string;
 }
 
 export interface ArtifactVersion {
@@ -777,7 +786,10 @@ export interface ArtifactDetail extends Artifact {
 /** `message.meta.artifacts`: what the agent created or changed in that reply. */
 export interface ArtifactRef {
   id: string;
-  version: number;
+  version?: number;
+  /** The file was deleted: the card shows "Arquivo removido". */
+  deleted?: boolean;
+  title?: string;
 }
 
 export interface ArtifactFilters {
@@ -1258,7 +1270,13 @@ export interface ForumTopic {
   budgetUsd: number | null;
   /** Agents working right now. */
   activeAgentIds: string[];
-  synthesis: { artifactId: string; version: number; suggestedIssues: ForumSuggestedIssue[] } | null;
+  synthesis: {
+    artifactId: string;
+    version: number;
+    suggestedIssues: ForumSuggestedIssue[];
+    /** The synthesis file was deleted. */
+    deleted?: boolean;
+  } | null;
 }
 
 /** One per agent run (one per agent per round), people's posts in between. `meta.synthesis`: the closing post. */

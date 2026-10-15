@@ -6,6 +6,8 @@ import {
   DialogFooter,
   EmptyState,
   Field,
+  FilterBar,
+  FilterChip,
   Icon,
   Input,
   SearchInput,
@@ -18,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { useIssueAction, useIssues } from "@/api/queries";
 import type { Issue, IssuePriority, IssueStatus } from "@/api/types";
 import { ActorLabel, actorFromKey, NO_ACTOR, useActors } from "@/components/actors";
+import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { dueLabel, parseDayInput } from "@/lib/format";
@@ -48,6 +51,10 @@ export function IssuesPage() {
   const [view, setView] = useState<"board" | "list">("board");
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
+  const [assignees, setAssignees] = useState<string[]>([]);
+  const [priority, setPriority] = useState<string[]>([]);
+  const actorOptions = useActorFilterOptions();
+  const copy = useFilterCopy();
   const [creating, setCreating] = useState(false);
   const search = useDeferredValue(q.trim());
   const issues = useIssues(org.id, search);
@@ -57,7 +64,12 @@ export function IssuesPage() {
     (filter === "agents" && i.assignee?.type === "agent") ||
     (filter === "people" && i.assignee?.type === "person") ||
     (filter === "mine" && i.assignee?.type === "person" && i.assignee.id === me.user.id);
-  const visible = all.filter(pass);
+  const visible = all.filter(
+    (i) =>
+      pass(i) &&
+      (assignees.length === 0 || (i.assignee !== null && assignees.includes(`${i.assignee.type}:${i.assignee.id}`))) &&
+      (priority.length === 0 || priority.includes(i.priority)),
+  );
   const open = all.filter((i) => i.status !== "done" && i.status !== "canceled");
   return (
     <div className="issues-page">
@@ -98,6 +110,53 @@ export function IssuesPage() {
           </button>
         ))}
       </div>
+      <FilterBar
+        label={t("issues.moreFilters")}
+        clearText={copy.clearAll}
+        onClear={() => {
+          setAssignees([]);
+          setPriority([]);
+        }}
+        filters={[
+          {
+            key: "assignee",
+            active: assignees.length > 0,
+            node: (
+              <FilterChip
+                label={t("issues.assigneeFilter")}
+                icon="person"
+                multiple
+                options={actorOptions}
+                value={assignees}
+                onChange={setAssignees}
+                valueText={(o) => o.label}
+                countText={copy.people}
+                clearLabel={copy.clearOf(t("issues.assigneeFilter"))}
+                searchLabel={copy.searchLabel}
+                searchPlaceholder={copy.searchPlaceholder}
+                noResults={copy.noResults}
+              />
+            ),
+          },
+          {
+            key: "priority",
+            active: priority.length > 0,
+            node: (
+              <FilterChip
+                label={t("issues.priorityFilter")}
+                icon="alert"
+                options={(["high", "normal", "low"] as const).map((p) => ({
+                  value: p,
+                  label: t(`issues.priority.${p}`),
+                }))}
+                value={priority}
+                onChange={setPriority}
+                clearLabel={copy.clearOf(t("issues.priorityFilter"))}
+              />
+            ),
+          },
+        ]}
+      />
       {issues.isLoading &&
         (view === "board" ? (
           <div className="issue-board">

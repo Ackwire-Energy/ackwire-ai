@@ -19,7 +19,10 @@ export function artifactRefs(meta: Record<string, unknown> | undefined): Artifac
   if (!Array.isArray(list)) return [];
   return list.filter(
     (r): r is ArtifactRef =>
-      Boolean(r) && typeof r === "object" && typeof r.id === "string" && typeof r.version === "number",
+      Boolean(r) &&
+      typeof r === "object" &&
+      typeof r.id === "string" &&
+      (typeof r.version === "number" || r.deleted === true),
   );
 }
 
