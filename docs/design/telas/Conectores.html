@@ -45,11 +45,11 @@ button{font:inherit;color:inherit}
 .seg button[aria-pressed="true"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1)}
 .seg button:focus-visible,.btn:focus-visible,.card:focus-visible,.lvl:focus-visible,.tab:focus-visible{outline:2px solid #3d8bff;outline-offset:2px}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:8px 0 22px;overflow-x:auto}
-.tab{all:unset;cursor:pointer;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tab{all:unset;box-sizing:border-box;cursor:pointer;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
 .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
 .note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--raised);box-shadow:var(--e1);color:var(--muted);font-size:13.5px;margin-bottom:18px}
 .note b{color:var(--ink)}
-.btn{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:11px;font-weight:600;font-size:13.5px;background:var(--raised);box-shadow:var(--e1);white-space:nowrap}
+.btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:11px;font-weight:600;font-size:13.5px;background:var(--raised);box-shadow:var(--e1);white-space:nowrap}
 .btn:hover{box-shadow:var(--e2)}
 .btn.primary{color:var(--bg);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--bg)),var(--ink));box-shadow:0 6px 14px -6px rgba(0,0,0,.45)}
 .btn.ghost{background:transparent;box-shadow:none;color:var(--muted)}
@@ -71,7 +71,7 @@ svg.i{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .search{flex:1 1 260px;display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border-radius:12px;background:var(--raised);box-shadow:var(--e1);color:var(--muted)}
 .search input{all:unset;flex:1;color:var(--ink)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
-.card{all:unset;cursor:pointer;display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:18px;background:var(--raised);box-shadow:var(--e1);transition:transform .2s cubic-bezier(.34,1.4,.5,1),box-shadow .2s}
+.card{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:18px;background:var(--raised);box-shadow:var(--e1);transition:transform .2s cubic-bezier(.34,1.4,.5,1),box-shadow .2s}
 .card:hover{transform:translateY(-1px);box-shadow:var(--e2)}
 .card .t{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
 .card .n{font-weight:600;display:flex;gap:8px;align-items:center;justify-content:space-between}
@@ -99,7 +99,7 @@ th{font-size:12.5px;color:var(--muted);font-weight:600}
 th .hc{display:flex;align-items:center;gap:8px}
 td.agent{white-space:nowrap}
 td.agent .who{color:var(--ink);font-weight:600;font-size:14px}
-.lvl{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap;transition:background .15s}
+.lvl{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap;transition:background .15s}
 .lvl[data-l="none"]{background:transparent;color:var(--faint);box-shadow:inset 0 0 0 1px var(--line2)}
 .lvl[data-l="read"]{background:var(--sunken);color:var(--ink2)}
 .lvl[data-l="write"]{background:var(--ink);color:var(--bg)}
