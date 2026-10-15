@@ -48,7 +48,8 @@ describe("finding the settings", () => {
     await click(within(menu).getByRole("menuitem", { name: "Conectores" }));
     await settle(6);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/connectors`);
-    expect(screen().getByRole("heading", { level: 2, name: "Conectores" })).toBeTruthy();
+    // The section's own title (the connectors card has a "Conectores" heading too).
+    expect(document.querySelector(".settings__body > .page__header h2")?.textContent).toBe("Conectores");
   });
 
   test("members see only what they can open", async () => {

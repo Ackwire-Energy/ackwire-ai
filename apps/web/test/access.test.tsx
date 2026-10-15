@@ -196,7 +196,10 @@ describe("Configurações → Agentes e acesso", () => {
     const ask = within(dialog).getByRole("button", { name: "Ada · Perguntar: Liberada por Conversa" });
     expect(ask.getAttribute("title")).toBe("Liberada por Conversa");
     expect(ask.closest("td")?.getAttribute("data-state")).toBe("inherited");
-    await click(within(dialog).getByRole("button", { name: "Ada · Issues: sem acesso" }));
+    // Group rows only show a summary; tool cells are the buttons. Expand Issues and stage one change.
+    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Issues" }));
+    await click(within(dialog).getByRole("button", { name: "Ada · Ler issues: sem acesso" }));
+    expect(dialog.textContent).toContain("1 alteração");
     await click(within(dialog).getByRole("button", { name: "Fechar" }));
     expect(dialog.textContent).toContain("Descartar as alterações?");
   });
