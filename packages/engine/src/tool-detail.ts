@@ -40,6 +40,17 @@ export function toolDetail(name: string, input: Record<string, unknown> | undefi
       return short(i.title);
     case "update_artifact":
       return short(i.title);
+    case "run_code":
+      return short(i.language);
+    case "write_file":
+    case "read_file":
+    case "list_files":
+    case "export_file":
+      return short(i.path);
+    case "run_skill_script": {
+      const skill = short(i.skill);
+      return skill ? short(typeof i.path === "string" ? `${skill}/${i.path}` : skill) : undefined;
+    }
     default:
       return undefined;
   }
@@ -53,7 +64,7 @@ export async function artifactToolDetail(
   name: string,
   input: Record<string, unknown> | undefined,
 ): Promise<string | undefined> {
-  if (name !== "read_artifact" && name !== "update_artifact") return undefined;
+  if (!["read_artifact", "update_artifact", "share_artifact", "import_file"].includes(name)) return undefined;
   const id = input?.artifact_id;
   if (typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id)) return undefined;
   const [a] = await db

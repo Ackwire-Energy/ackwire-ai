@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, eq, gte, inArray, isNull, or, rowsOf, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -496,12 +496,26 @@ export async function listArtifacts(
   db: Database,
   actor: ArtifactActor,
   orgId: string,
-  filters: { q?: string; kind?: ArtifactKind; channelId?: string; author?: ArtifactAuthor; limit?: number } = {},
+  filters: {
+    q?: string;
+    kind?: ArtifactKind;
+    channelId?: string;
+    author?: ArtifactAuthor;
+    limit?: number;
+    /** Updated at or after this time. */
+    since?: Date;
+    /** Agents: also the conversations this person shares with the agent (see `requesterSharedChannels`). */
+    requesterUserId?: string | null;
+  } = {},
 ): Promise<ArtifactView[]> {
   await requireMember(db, actor, orgId);
   let visible: string[];
   if (actor.type === "agent") {
     visible = await agentSearchChannels(db, orgId, actor.agentId, actor.channelId);
+    if (filters.requesterUserId) {
+      const shared = await requesterSharedChannels(db, orgId, actor.agentId, filters.requesterUserId);
+      visible = [...new Set([...visible, ...shared])];
+    }
   } else {
     const member = and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, actor.userId));
     const open = and(eq(channels.visibility, "public"), eq(channels.kind, "channel"));
@@ -525,6 +539,7 @@ export async function listArtifacts(
           : isNull(artifacts.channelId),
         filters.kind ? eq(artifacts.kind, filters.kind) : undefined,
         filters.channelId ? eq(artifacts.channelId, filters.channelId) : undefined,
+        filters.since ? gte(artifacts.updatedAt, filters.since) : undefined,
         filters.author
           ? and(eq(artifacts.createdByType, filters.author.type), eq(artifacts.createdById, filters.author.id))
           : undefined,
@@ -534,6 +549,134 @@ export async function listArtifacts(
     .orderBy(desc(artifacts.updatedAt))
     .limit(Math.min(200, filters.limit ?? 100));
   return rows.map((a) => view(a, actor.type === "person" && editableKind(a.kind)));
+}
+
+/**
+ * Conversations (channels and DMs, not archived) where both the agent and
+ * this person are members: what the agent may look at on that person's
+ * behalf, never more.
+ */
+export async function requesterSharedChannels(db: Database, orgId: string, agentId: string, userId: string) {
+  const rows = rowsOf<{ id: string }>(
+    await db.execute(sql`select c.id from channels c
+      where c.org_id = ${orgId}::uuid and c.archived_at is null
+        and exists (select 1 from channel_members m where m.channel_id = c.id and m.agent_id = ${agentId}::uuid)
+        and exists (select 1 from channel_members m where m.channel_id = c.id and m.user_id = ${userId})`),
+  );
+  return rows.map((r) => r.id);
+}
+
+/** Where artifacts came from, for agents picking one ("DM com Walter", "#general", "Drive"). */
+export async function artifactOrigins(
+  db: Database,
+  orgId: string,
+  list: Pick<ArtifactView, "channelId" | "createdBy">[],
+) {
+  const channelIds = [...new Set(list.flatMap((a) => (a.channelId ? [a.channelId] : [])))];
+  const agentIds = [...new Set(list.flatMap((a) => (a.createdBy.type === "agent" ? [a.createdBy.id] : [])))];
+  const userIds = [...new Set(list.flatMap((a) => (a.createdBy.type === "person" ? [a.createdBy.id] : [])))];
+  const [chans, dmPeople, agentRows, userRows] = await Promise.all([
+    channelIds.length
+      ? db
+          .select({ id: channels.id, kind: channels.kind, name: channels.name })
+          .from(channels)
+          .where(and(eq(channels.orgId, orgId), inArray(channels.id, channelIds)))
+      : Promise.resolve([]),
+    channelIds.length
+      ? db
+          .select({ channelId: channelMembers.channelId, name: schema.users.name })
+          .from(channelMembers)
+          .innerJoin(schema.users, eq(schema.users.id, channelMembers.userId))
+          .where(inArray(channelMembers.channelId, channelIds))
+      : Promise.resolve([]),
+    agentIds.length
+      ? db
+          .select({ id: schema.agents.id, handle: schema.agents.handle })
+          .from(schema.agents)
+          .where(and(eq(schema.agents.orgId, orgId), inArray(schema.agents.id, agentIds)))
+      : Promise.resolve([]),
+    userIds.length
+      ? db
+          .select({ id: schema.users.id, name: schema.users.name })
+          .from(schema.users)
+          .where(inArray(schema.users.id, userIds))
+      : Promise.resolve([]),
+  ]);
+  const channelLabel = new Map<string, string>(
+    chans.map((c): [string, string] => {
+      if (c.kind !== "dm") return [c.id, `#${c.name}`];
+      const people = dmPeople.filter((p) => p.channelId === c.id).map((p) => p.name);
+      return [c.id, people.length ? `DM com ${people.join(", ")}` : "DM"];
+    }),
+  );
+  const creator = new Map<string, string>([
+    ...agentRows.map((a) => [a.id, `@${a.handle}`] as [string, string]),
+    ...userRows.map((u) => [u.id, u.name] as [string, string]),
+  ]);
+  return {
+    origin: (a: Pick<ArtifactView, "channelId">) =>
+      a.channelId ? (channelLabel.get(a.channelId) ?? "outra conversa") : "Drive (toda a organização)",
+    creator: (a: Pick<ArtifactView, "createdBy">) => creator.get(a.createdBy.id) ?? a.createdBy.type,
+  };
+}
+
+/**
+ * An agent brings an artifact into its run's conversation (`share_artifact`):
+ * allowed only when the person who asked can see where it came from (and the
+ * agent was there too). Visible here already (same channel, org-wide or a
+ * public channel): the same file is attached. From a DM or a private
+ * channel: a copy is saved here, so the people here can open it; the
+ * original stays where it was. Audited either way.
+ */
+export async function shareArtifact(
+  deps: ArtifactDeps,
+  actor: Extract<ArtifactActor, { type: "agent" }>,
+  orgId: string,
+  artifactId: string,
+  input: { requesterUserId: string | null; note?: string | null },
+): Promise<{ artifact: ArtifactView; copied: boolean; from: { channelId: string | null; kind: string | null } }> {
+  const { db } = deps;
+  const a = await loadArtifact(db, orgId, artifactId);
+  if (!a) throw new NotFoundError("Artifact not found");
+  const [origin] = a.channelId
+    ? await db
+        .select({ kind: channels.kind, visibility: channels.visibility })
+        .from(channels)
+        .where(and(eq(channels.id, a.channelId), eq(channels.orgId, orgId)))
+    : [];
+  const openHere =
+    !a.channelId || a.channelId === actor.channelId || (origin?.kind === "channel" && origin.visibility === "public");
+  if (!openHere) {
+    // From a DM or a private channel: the requester and the agent must both be in it.
+    const allowed =
+      input.requesterUserId !== null &&
+      (await requesterSharedChannels(db, orgId, actor.agentId, input.requesterUserId)).includes(a.channelId as string);
+    // Not visible = not found: never reveal files of conversations the requester isn't in.
+    if (!allowed) throw new NotFoundError("Artifact not found");
+  }
+  let shared: ArtifactView = view(a, editableKind(a.kind));
+  let copied = false;
+  if (!openHere) {
+    const v = await versionRow(db, a, undefined);
+    const content = decode(a.kind, (await readVersion(deps, a, v)).body);
+    const copy = await createArtifact(deps, actor, orgId, { title: a.title, content });
+    shared = copy;
+    copied = true;
+  }
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "agent", id: actor.agentId },
+    action: "artifact.shared",
+    target: { type: "artifact", id: a.id },
+    details: {
+      fromChannelId: a.channelId,
+      toChannelId: actor.channelId,
+      copyId: copied ? shared.id : null,
+      requesterUserId: input.requesterUserId,
+      note: input.note?.slice(0, 500) ?? null,
+    },
+  });
+  return { artifact: shared, copied, from: { channelId: a.channelId, kind: origin?.kind ?? null } };
 }
 
 /** Deletes an artifact (its creator or an admin). Stored versions stay until purged. */

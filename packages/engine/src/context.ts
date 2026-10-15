@@ -1,4 +1,4 @@
-import { and, asc, type Database, desc, eq, inArray, isNull, lte, ne, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, desc, eq, inArray, isNull, lte, ne, rowsOf, schema, sql } from "@agenteschat/db";
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import { caches } from "./cache";
@@ -6,8 +6,42 @@ import { summarizeScopes } from "./capabilities";
 import type { Message } from "./messages";
 import type { AgentRun } from "./runs";
 
-const { messages, users, agents, channels, channelMembers, organizations, agentScopes, agentRuns, agentRunSteps } =
-  schema;
+const { messages, users, agents, channels, channelMembers, organizations, agentScopes } = schema;
+
+type ActionRow = {
+  data: unknown;
+  created_at: string | Date;
+  handle: string | null;
+  elsewhere: boolean;
+  kind: string;
+  name: string;
+};
+
+/** Reads that would crowd "your recent work" (the actions themselves are what matters). */
+const QUIET_TOOLS = [
+  "ask_user",
+  "search_context",
+  "get_summary",
+  "expand",
+  "list_artifacts",
+  "read_artifact",
+  "list_issues",
+  "list_events",
+  "find_free_time",
+  "load_skill",
+  "read_skill_file",
+  "read_file",
+  "list_files",
+];
+
+/** "há 13 min", "há 2 h", "há 3 dias". */
+function ago(at: Date, now = Date.now()) {
+  const minutes = Math.max(0, Math.round((now - at.getTime()) / 60_000));
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `há ${hours} h`;
+  return `há ${Math.round(hours / 24)} dias`;
+}
 
 export interface RunContext {
   system: SystemBlock[];
@@ -118,31 +152,61 @@ export async function buildRunContext(
       }[]
     >,
   ]);
-  // What agents already did in this thread (or DM), so a new run doesn't forget or redo it.
-  const priorActions = await db
-    .select({ data: agentRunSteps.data, handle: agents.handle })
-    .from(agentRunSteps)
-    .innerJoin(agentRuns, eq(agentRuns.id, agentRunSteps.runId))
-    .innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .where(
-      and(
-        eq(agentRuns.orgId, run.orgId),
-        eq(agentRuns.channelId, run.channelId),
-        channel.kind === "dm" ? undefined : eq(agentRuns.threadRootId, run.threadRootId),
-        ne(agentRuns.id, run.id),
-        eq(agentRunSteps.kind, "tool_result"),
-      ),
-    )
-    .orderBy(desc(agentRunSteps.createdAt))
-    .limit(12);
-  const recentActions = priorActions.reverse().map((a) => {
-    const d = a.data as { name?: string; content?: string; isError?: boolean };
-    const target = String(d.content ?? "")
+  // One statement, two parts: what agents already did in this thread (or DM),
+  // and this agent's own work in other conversations the requester is in.
+  const requester = trigger.authorUserId;
+  const actionRows = rowsOf<ActionRow>(
+    await db.execute(sql`(select s.data, s.created_at, a.handle, false as elsewhere, c.kind, c.name
+        from agent_run_steps s
+        join agent_runs r on r.id = s.run_id
+        join agents a on a.id = r.agent_id
+        join channels c on c.id = r.channel_id
+        where r.org_id = ${run.orgId}::uuid and r.channel_id = ${run.channelId}::uuid
+          ${channel.kind === "dm" ? sql`` : sql`and r.thread_root_id = ${run.threadRootId}::uuid`}
+          and r.id <> ${run.id}::uuid and s.kind = 'tool_result'
+        order by s.created_at desc limit 12)
+      union all
+      (select s.data, s.created_at, null as handle, true as elsewhere, c.kind, c.name
+        from agent_run_steps s
+        join agent_runs r on r.id = s.run_id
+        join channels c on c.id = r.channel_id
+        where r.org_id = ${run.orgId}::uuid and r.agent_id = ${agent.id}::uuid
+          and r.created_at > now() - interval '14 days'
+          and ${requester ? sql`true` : sql`false`}
+          and s.kind = 'tool_result'
+          and coalesce(s.data->>'name', '') not in (${sql.join(
+            QUIET_TOOLS.map((n) => sql`${n}`),
+            sql`, `,
+          )})
+          and coalesce((s.data->>'isError')::boolean, false) = false
+          and not (r.channel_id = ${run.channelId}::uuid
+            ${channel.kind === "dm" ? sql`` : sql`and r.thread_root_id = ${run.threadRootId}::uuid`})
+          and exists (select 1 from channel_members m
+            where m.channel_id = r.channel_id and m.user_id = ${requester ?? ""})
+        order by s.created_at desc limit 10)`),
+  );
+  const firstLine = (d: { content?: unknown }) =>
+    String(d.content ?? "")
       .split("\n")[0]
       ?.replace(/\s+/g, " ")
-      .slice(0, 140);
-    return `- @${a.handle} ${d.name ?? "?"} → ${target ?? ""} (${d.isError ? "erro" : "ok"})`;
-  });
+      .slice(0, 140) ?? "";
+  // Oldest first in each block (a union keeps no order of its own).
+  const time = (r: ActionRow) => new Date(r.created_at).getTime();
+  actionRows.sort((x, y) => time(x) - time(y));
+  const recentActions = actionRows
+    .filter((r) => !r.elsewhere)
+    .map((a) => {
+      const d = a.data as { name?: string; content?: string; isError?: boolean };
+      return `- @${a.handle} ${d.name ?? "?"} → ${firstLine(d)} (${d.isError ? "erro" : "ok"})`;
+    });
+  const requesterName = requester ? (names.get(requester) ?? "a pessoa") : "a pessoa";
+  const workElsewhere = actionRows
+    .filter((r) => r.elsewhere)
+    .map((a) => {
+      const d = a.data as { name?: string; content?: string };
+      const where = a.kind === "dm" ? `DM com ${requesterName}` : `#${a.name}`;
+      return `- ${where}, ${ago(new Date(a.created_at))}: ${d.name ?? "?"} → ${firstLine(d)}`;
+    });
   // What the other agents here can do, so this one never answers for them.
   const others = members.filter((m) => m.agentId && m.agentId !== agent.id);
   const otherScopes = others.length
@@ -194,6 +258,9 @@ export async function buildRunContext(
           options.toolsAvailable
             ? "- Before saying something was done, or correcting it, check the current state with the matching tool (`list_issues`, `read_artifact`, `list_events`…), not with `search_context`."
             : "",
+          options.toolsAvailable
+            ? '- You work in several conversations (channels, DMs, threads). "No privado", "na DM" or "lá no #canal" point to one of them, not to where you should answer: find what they mean in "Seu trabalho recente" or with `list_artifacts` (`createdByMe`) before saying you have no record of it, and bring a file here with `share_artifact`. Never say you only answer in this channel or can\'t see the DM. When someone asks for a PDF of a document, share it: its card has "Baixar PDF".'
+            : "",
           "- Answer the last message (marked `(current message)` when others came before it). Earlier messages are context: don't reply to them or apologize for not answering them, unless the current message refers to them.",
           "- Reply with the message text only, without an author prefix. Mention another agent with @handle only when you need it to act.",
         ]
@@ -224,6 +291,18 @@ export async function buildRunContext(
               "O que os agentes já fizeram aqui, com o resultado real das ferramentas:",
               ...recentActions,
               "Isso aconteceu de verdade. Nunca diga que não fez, nem desminta, algo que aparece aqui como ok. Para conferir detalhes (critérios, labels, conteúdo), use a ferramenta específica (`list_issues`, `read_artifact`, `list_events`…), não `search_context`.",
+            ].join("\n"),
+          },
+        ]
+      : []),
+    ...(workElsewhere.length > 0
+      ? [
+          {
+            text: [
+              `# Seu trabalho recente com ${requesterName} em outras conversas`,
+              "O que você mesmo fez nos últimos 14 dias em conversas de que essa pessoa participa:",
+              ...workElsewhere,
+              'Você está em várias conversas ao mesmo tempo. "No privado", "na DM" ou "lá no #canal" falam dessas outras conversas, não pedem para você ir até lá. Para trazer um arquivo de lá para cá, use `share_artifact` (diga que está trazendo do privado, se for o caso). Nunca diga que só responde aqui ou que não acessa o privado quando o item aparece nesta lista.',
             ].join("\n"),
           },
         ]

@@ -110,6 +110,8 @@ export const agentRuns = pgTable(
     unique().on(t.triggerMessageId, t.agentId),
     index().on(t.orgId, t.status),
     index().on(t.threadRootId),
+    // An agent's recent work across conversations (context: "Seu trabalho recente").
+    index().on(t.orgId, t.agentId, t.createdAt),
   ],
 );
 

@@ -29,7 +29,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
   "": ["ask_user"],
   "context:read": ["search_context", "get_summary", "expand"],
   "memory:write": ["remember", "update_memory", "forget", "propose_instruction_change"],
-  "drive:read": ["read_artifact", "list_artifacts"],
+  "drive:read": ["read_artifact", "list_artifacts", "share_artifact"],
   "drive:write": ["create_artifact", "update_artifact"],
   "issues:read": ["list_issues"],
   "issues:write": ["create_issue", "update_issue", "comment_issue"],
@@ -79,6 +79,10 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   },
   read_artifact: { label: "Ler arquivo", description: "Lê um arquivo do Drive." },
   list_artifacts: { label: "Listar arquivos", description: "Lista os arquivos do Drive que vê." },
+  share_artifact: {
+    label: "Compartilhar arquivo",
+    description: "Traz para a conversa um arquivo que fez em outra (como uma DM), se quem pediu tem acesso.",
+  },
   create_artifact: { label: "Criar arquivo", description: "Cria documento, tabela, diff, diagrama ou página." },
   update_artifact: { label: "Atualizar arquivo", description: "Salva uma nova versão de um arquivo." },
   list_issues: { label: "Ver issues", description: "Lista e abre issues." },
@@ -90,6 +94,13 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   propose_event: { label: "Propor evento", description: "Sugere um evento; quem pediu confirma." },
   load_skill: { label: "Carregar skill", description: "Carrega as instruções de uma skill." },
   read_skill_file: { label: "Ler arquivo de skill", description: "Lê um arquivo de referência de uma skill." },
+  run_code: { label: "Rodar código", description: "Roda Python, Node ou bash no ambiente isolado da conversa." },
+  write_file: { label: "Escrever no ambiente", description: "Grava um arquivo no ambiente de código." },
+  read_file: { label: "Ler do ambiente", description: "Lê um arquivo do ambiente de código." },
+  list_files: { label: "Listar o ambiente", description: "Lista os arquivos do ambiente de código." },
+  export_file: { label: "Salvar no Drive", description: "Leva um arquivo do ambiente para o Drive." },
+  import_file: { label: "Trazer do Drive", description: "Copia um arquivo do Drive para o ambiente." },
+  run_skill_script: { label: "Rodar script de skill", description: "Roda um script de uma skill no ambiente." },
 };
 
 const humanize = (name: string) => {

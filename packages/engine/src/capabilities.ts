@@ -66,6 +66,11 @@ export function describeCapabilities(
         '- Pedidos de PDF (ou Word): crie um documento com `create_artifact` (kind `document`); o card do arquivo oferece "Baixar PDF".',
       );
     }
+    if (names.has("share_artifact")) {
+      lines.push(
+        "- Pedido de um arquivo que você já fez (aqui, no privado ou em outro canal): ache com `list_artifacts` e traga com `share_artifact`, em vez de criar de novo.",
+      );
+    }
     const approval = tools.filter((t) => isSensitive(t)).map((t) => `\`${t.name}\``);
     if (approval.length > 0) {
       lines.push(`Precisam da aprovação de uma pessoa (você pede, alguém aprova no chat): ${approval.join(", ")}.`);

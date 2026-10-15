@@ -1,13 +1,16 @@
+import { and, eq, schema } from "@agenteschat/db";
 import {
   ARTIFACT_KINDS,
   type ArtifactActor,
   type ArtifactContent,
   type ArtifactDeps,
   type ArtifactKind,
+  artifactOrigins,
   createArtifact,
   diffToPatch,
   getArtifact,
   listArtifacts,
+  shareArtifact,
   tableToCsv,
   updateArtifact,
 } from "./artifacts";
@@ -81,6 +84,15 @@ const failed = (error: unknown): ToolOutput => ({
 });
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+/** The person whose message started this run (null when an agent did). */
+async function requesterOf(ctx: ToolContext): Promise<string | null> {
+  const [m] = await ctx.db
+    .select({ userId: schema.messages.authorUserId })
+    .from(schema.messages)
+    .where(and(eq(schema.messages.orgId, ctx.orgId), eq(schema.messages.id, ctx.triggerMessageId)));
+  return m?.userId ?? null;
+}
 
 /**
  * Drive tools through the Tool Gateway: `create_artifact`, `update_artifact`
@@ -184,22 +196,83 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
     },
     {
       name: "list_artifacts",
-      description: "List Drive files you can see, newest first, optionally filtered by words or kind.",
+      description:
+        "List Drive files you can see, newest first, with where each came from (#channel, DM, Drive) and who made it. By default it includes the conversations (DMs, private channels) you share with the person who asked; filter by words, kind, your own files or date.",
       scope: "drive:read",
       inputSchema: {
         type: "object",
-        properties: { query: { type: "string", maxLength: 200 }, kind: { enum: ARTIFACT_KINDS } },
+        properties: {
+          query: { type: "string", maxLength: 200 },
+          kind: { enum: ARTIFACT_KINDS },
+          createdByMe: { type: "boolean", description: "Only files you created." },
+          visibleToRequester: {
+            type: "boolean",
+            description:
+              "Also files from other conversations of the person who asked (default true). false = only what is visible here.",
+          },
+          since: { type: "string", maxLength: 40, description: "ISO date: only files updated since then." },
+        },
         additionalProperties: false,
       },
       async execute(input, ctx) {
-        const list = await listArtifacts(deps.db, actorOf(ctx), ctx.orgId, {
-          q: str(input.query) || undefined,
-          kind: (input.kind as ArtifactKind | undefined) ?? undefined,
-          limit: 30,
-        });
-        if (list.length === 0) return { content: "No files." };
-        const lines = list.map((a) => `${a.id} "${a.title}" (${a.kind}, v${a.version}, ${a.updatedAt.slice(0, 10)})`);
-        return { content: lines.join("\n") };
+        try {
+          const since = str(input.since) ? new Date(str(input.since)) : undefined;
+          const requester = input.visibleToRequester === false ? null : await requesterOf(ctx);
+          const list = await listArtifacts(deps.db, actorOf(ctx), ctx.orgId, {
+            q: str(input.query) || undefined,
+            kind: (input.kind as ArtifactKind | undefined) ?? undefined,
+            author: input.createdByMe === true ? { type: "agent", id: ctx.agentId } : undefined,
+            since: since && !Number.isNaN(since.getTime()) ? since : undefined,
+            requesterUserId: requester,
+            limit: 30,
+          });
+          if (list.length === 0) return { content: "No files." };
+          const names = await artifactOrigins(deps.db, ctx.orgId, list);
+          const lines = list.map((a) => {
+            const here = a.channelId === ctx.channelId ? "aqui" : names.origin(a);
+            const when = a.updatedAt.slice(0, 10);
+            return `${a.id} "${a.title}" (${a.kind}, v${a.version}, ${when}) — origem: ${here}; criado por ${names.creator(a)}`;
+          });
+          return { content: lines.join("\n") };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: "share_artifact",
+      description:
+        "Bring an existing file into this conversation: its card goes with your reply (documents and tables can be downloaded as PDF from the card). Use it when someone asks for a file you made elsewhere, e.g. in a DM. Only works when the person who asked can see where the file is.",
+      scope: "drive:read",
+      inputSchema: {
+        type: "object",
+        properties: {
+          artifact_id: { type: "string", minLength: 36, maxLength: 36 },
+          note: { type: "string", maxLength: 500 },
+        },
+        required: ["artifact_id"],
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
+        try {
+          const actor = actorOf(ctx) as Extract<ArtifactActor, { type: "agent" }>;
+          const result = await shareArtifact(deps, actor, ctx.orgId, str(input.artifact_id), {
+            requesterUserId: await requesterOf(ctx),
+            note: str(input.note) || null,
+          });
+          const a = result.artifact;
+          let from = "It was already visible here.";
+          if (result.copied && result.from.kind === "dm") {
+            from =
+              'It came from a DM: a copy was saved here. Say you are bringing it from the private conversation ("trazendo do nosso privado").';
+          } else if (result.copied) from = "It came from another conversation: a copy was saved here.";
+          return {
+            content: `Shared "${a.title}" (${a.kind}) in this conversation as artifact ${a.id}; its card goes with your reply. ${from}`,
+            data: { artifact: { id: a.id, version: a.version } },
+          };
+        } catch (error) {
+          return failed(error);
+        }
       },
     },
   ];
