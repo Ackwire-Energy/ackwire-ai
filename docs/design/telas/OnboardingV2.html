@@ -32,15 +32,27 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
 h1,h2,h3,p{margin:0}
 button{font:inherit;color:inherit}
 .shell{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:100vh}
-.rail{position:relative;overflow:hidden;padding:28px 22px;display:flex;flex-direction:column;gap:22px;background:var(--sunken);border-right:1px solid var(--line)}
-.rail canvas.sky{position:absolute;inset:auto 0 0 0;width:100%;height:220px;image-rendering:pixelated;pointer-events:none}
+/* The rail is the agents' sky (the landing's): steps on its light top, the guide agent on its halo below. */
+.rail{position:sticky;top:0;height:100vh;overflow:hidden;padding:26px 20px;display:flex;flex-direction:column;gap:20px;background:#4b93ff;color:#04203f;isolation:isolate}
+.rail canvas.sky{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;pointer-events:none;z-index:-1}
 .brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:300;font-size:22px;letter-spacing:-.02em}
+.brand i{color:rgba(4,32,63,.6)!important}
+.guide{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:10px}
+.guide canvas{display:block}
+.bubble{align-self:stretch;padding:12px 14px;border-radius:16px 16px 16px 5px;background:rgba(241,248,255,.86);box-shadow:0 0 0 1px rgba(4,32,63,.1),0 12px 28px -14px rgba(4,32,63,.5);font-size:13.5px;line-height:1.45;color:#04203f;backdrop-filter:blur(10px)}
+.bubble b{font-weight:600}
+.rail .seg{background:rgba(241,248,255,.5)}
+.rail .seg button{color:rgba(4,32,63,.7)}
+.rail .seg button[aria-pressed="true"]{background:rgba(241,248,255,.95);color:#04203f}
 .brand i{font-style:normal;font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:.62em;color:var(--muted)}
 .steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;position:relative}
 .steps li button{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;color:var(--muted);font-weight:500}
-.steps li button[aria-current="step"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1);font-weight:600}
-.steps .n{width:22px;height:22px;border-radius:7px 7px 7px 2px;display:grid;place-items:center;font-size:11.5px;font-weight:700;background:var(--plate);flex:none}
-.steps li[data-done] .n{background:var(--ink);color:var(--bg)}
+.steps li button{color:rgba(4,32,63,.72)!important}
+.steps li button[aria-current="step"]{background:rgba(241,248,255,.9);color:#04203f!important;box-shadow:0 0 0 1px rgba(4,32,63,.1),0 8px 18px -10px rgba(4,32,63,.45);font-weight:600}
+.steps .n{width:24px;height:24px;border-radius:8px 8px 8px 3px;display:grid;place-items:center;font-family:var(--dot);font-variation-settings:"ROND" 100;font-size:13px;font-weight:600;background:rgba(241,248,255,.55);color:#04203f;flex:none}
+.steps li[data-done] .n{background:#04203f;color:#eef7ff}
+.steps .opt{color:rgba(4,32,63,.55)!important}
+.ic img{width:26px;height:26px;border-radius:7px;display:block}
 .steps .opt{margin-left:auto;font-size:11px;color:var(--faint)}
 .main{padding:40px clamp(18px,5vw,64px) 120px;max-width:860px;width:100%}
 .eyebrow{font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
@@ -121,7 +133,7 @@ svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .summary b{display:block;font-size:22px;font-family:var(--display);font-weight:300}
 canvas.av{display:block;flex:none}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
-@media (max-width:820px){.shell{grid-template-columns:1fr}.rail{padding:16px;gap:12px}.rail canvas.sky{display:none}.steps{flex-direction:row;overflow-x:auto}.steps .t,.steps .opt{display:none}.foot{left:0}}
+@media (max-width:820px){.shell{grid-template-columns:1fr}.rail{position:relative;height:auto;padding:16px;gap:12px}.guide{display:none}.steps{flex-direction:row;overflow-x:auto}.steps .t,.steps .opt{display:none}.foot{left:0}}
 </style>
 </head>
 <body>
@@ -130,6 +142,7 @@ canvas.av{display:block;flex:none}
     <div class="brand"><canvas class="av" id="brandMark" width="52" height="52" style="width:26px;height:26px"></canvas><span>agentes<i>.chat</i></span></div>
     <ol class="steps" id="steps"></ol>
     <div class="seg" id="theme" role="group" aria-label="Tema" style="position:relative;align-self:flex-start"><button data-v="light">Claro</button><button data-v="dark">Escuro</button></div>
+    <div class="guide"><p class="bubble" id="bubble" role="status"></p><canvas id="guide"></canvas></div>
     <canvas class="sky" id="railSky"></canvas>
   </aside>
   <main class="main" id="main"></main>
@@ -256,16 +269,78 @@ function sky(cv, t, field) {
   }
   g.putImageData(img, 0, 0);
 }
+/* The rail's sky: light at the top (calm behind the steps), deep at the bottom, a light halo behind the guide; pixel agents rising. */
+const sprites = Array.from({ length: 6 }, () => ({ x: Math.random() * 0.9, y: Math.random(), k: 1, v: 0.012 + Math.random() * 0.02, b: Math.random() * 5 }));
+const SPRITE = [".XXXXXXX.", "XXXXXXXXX", "XXXXXXXXX", "XXXoXoXXX", "XXXoXoXXX", "XXXXXXXXX", "XXXXXXXXX", "XXXXXXXXX", "XXXXXXXX."];
+function railSky(t) {
+  const cv = $("#railSky"), r = cv.getBoundingClientRect(); if (!r.width) return;
+  const P = 4, W = Math.ceil(r.width / P), H = Math.ceil(r.height / P);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const g = cv.getContext("2d"), img = g.createImageData(W, H), n = SKY.length - 1;
+  const gd = $("#guide").getBoundingClientRect(), gx = (gd.left + gd.width / 2 - r.left) / P, gy = (gd.top + gd.height / 2 - r.top) / P, gr = gd.width / P * 0.9;
+  const calmBottom = ($("#theme").getBoundingClientRect().bottom - r.top) / P + 6;
+  const calm = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const u = x / W, v = y / H;
+    let f = 0.98 - 0.85 * v - 0.08 * u + 0.05 * Math.sin(u * 6 + t * 0.5) * v;
+    const top = Math.max(0, Math.min(1, (calmBottom - y) / 10));
+    const q = Math.max(0, Math.min(1, (gr - Math.hypot(x - gx, y - gy)) / (gr * 0.5)));
+    const k = Math.max(top, q * q * (3 - 2 * q));
+    calm[y * W + x] = k;
+    f = f * (1 - k) + (6 / 7) * k;
+    const kk = Math.max(0, Math.min(n, f * n)), lo = Math.floor(kk);
+    const c = SKY[Math.min(n, lo + (kk - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))];
+    const i = (y * W + x) * 4; img.data[i] = c[0]; img.data[i + 1] = c[1]; img.data[i + 2] = c[2]; img.data[i + 3] = 255;
+  }
+  for (const sp of sprites) {
+    sp.y -= sp.v * 0.04; if (sp.y < -0.1) { sp.y = 1.05; sp.x = Math.random(); }
+    const ox = Math.round(sp.x * W), oy = Math.round(sp.y * H), blink = (t + sp.b) % 4 < 0.12;
+    for (let j = 0; j < 9; j++) for (let i2 = 0; i2 < 9; i2++) {
+      const ch = SPRITE[j][i2]; if (ch === ".") continue;
+      for (let a = 0; a < sp.k; a++) for (let b2 = 0; b2 < sp.k; b2++) {
+        const X = ox + i2 * sp.k + a, Y = oy + j * sp.k + b2;
+        if (X < 0 || Y < 0 || X >= W || Y >= H || calm[Y * W + X] > 0.3) continue;
+        const o = (Y * W + X) * 4, col = ch === "o" && !blink ? [255, 255, 255] : [4, 32, 63];
+        img.data[o] = col[0]; img.data[o + 1] = col[1]; img.data[o + 2] = col[2];
+      }
+    }
+  }
+  g.putImageData(img, 0, 0);
+}
+/* The guide: the first agent, looking at the form; happy when a step is done, writing while you type. */
+const GUIDE = { look: { color: "green", eyes: "wide", accessory: "headphones" }, happyUntil: 0, typingUntil: 0 };
+const SAYS = [
+  "Oi! Eu sou a <b>Ada</b>. Vamos montar o lugar onde você e os agentes vão trabalhar?",
+  "Me conta o que a empresa faz. Eu e os outros agentes lemos isso em toda conversa.",
+  "Já tem agentes em outro lugar? Traz eles: chegam com as instruções e ganham a cara daqui.",
+  "Quem entra no time? Eu já estou aqui; chame mais alguém se quiser.",
+  "Para rodar código e testes eu preciso de um computador. O da nuvem já resolve.",
+  "Chama o time! Eu dou oi para cada um no #general.",
+  "Tudo pronto. Te vejo no <b>#general</b>!",
+];
+function drawGuide(t) {
+  const cv = $("#guide"), size = 132, R = ACCESSORY_REACH, dpr = Math.min(2, devicePixelRatio || 1);
+  const W = Math.round(size * (1 + R.left + R.right) * dpr), H = Math.round(size * (1 + R.top + R.bottom) * dpr);
+  if (cv.width !== W) { cv.width = W; cv.height = H; cv.style.width = W / dpr + "px"; cv.style.height = H / dpr + "px"; cv.style.marginTop = -size * R.top * 0.6 + "px"; cv.style.marginBottom = -size * R.bottom + "px"; }
+  const g = cv.getContext("2d"), s = size * dpr, now = performance.now();
+  g.clearRect(0, 0, W, H);
+  const pose = now < GUIDE.typingUntil ? { writing: true, turn: [0.55, 0.1] } : idlePose(t, 0.7, { every: 12 });
+  if (now >= GUIDE.typingUntil) pose.turn = [0.5 + 0.15 * Math.sin(t * 0.6), 0.08 + 0.06 * Math.sin(t * 0.9)];
+  if (now < GUIDE.happyUntil) pose.expression = "happy";
+  drawAgent(g, R.left * s, R.top * s, s, { color: GUIDE.look.color, eyes: GUIDE.look.eyes, cells: 22, deep: true, pose,
+    after: (c, side, frame) => drawAccessory(c, side, GUIDE.look.accessory, frame, t) });
+}
+document.addEventListener("input", (e) => { if (e.target.closest(".main")) GUIDE.typingUntil = performance.now() + 900; });
 function drawSkies(t) {
-  // The rail's horizon fills as the steps get done.
-  const p = S.done.size / (STEPS.length - 1);
-  sky($("#railSky"), t, (u, v) => { const h = 1 - (0.25 + 0.6 * p) * (0.75 + 0.25 * Math.sin(u * 5 + t * 0.6)); return v < h ? -1 : 0.95 - (v - h) * 2.2; });
+  railSky(t);
+  drawGuide(t);
   const w = document.querySelector(".welcome > canvas");
   if (w) sky(w, t, (u, v) => 0.95 - 0.4 * u - 0.45 * v + 0.12 * Math.exp(-((u - 0.2) ** 2 + (v - 0.25) ** 2) / 0.03));
 }
 
 /* ---------- Steps ---------- */
 function renderRail() {
+  $("#bubble").innerHTML = SAYS[S.step] ?? "";
   $("#steps").innerHTML = STEPS.map((s, i) => `<li ${S.done.has(i) ? "data-done" : ""}><button data-go="${i}" ${i === S.step ? 'aria-current="step"' : ""}><span class="n">${S.done.has(i) ? "✓" : i + 1}</span><span class="t">${s.t}</span>${s.opt ? '<span class="opt">opcional</span>' : ""}</button></li>`).join("");
 }
 function foot({ hint = "", next = "Continuar", skip = false, back = true } = {}) {
@@ -298,8 +373,8 @@ const VIEWS = {
     const src = S.importFrom;
     $("#main").innerHTML = head("Passo 3 de 7 · opcional", "Trazer seus agentes de outro lugar", "Já usa um Grok Bot open source? Traga os bots com instruções, fotos, skills e rotinas. Eles chegam do jeito que estavam, com a cara daqui.") + `
       <div class="choices">
-        <button class="choice" data-src="mausbot" aria-pressed="${src === "mausbot"}"><span class="ic">M</span><b>OpenMausBot</b><span>O arquivo do time (Compartilhar time…) ou um link do GitHub.</span></button>
-        <button class="choice" data-src="openbot" aria-pressed="${src === "openbot"}"><span class="ic">O</span><b>OpenBot</b><span>O <code>agents.yaml</code> ou a pasta <code>agents/</code>.</span></button>
+        <button class="choice" data-src="mausbot" aria-pressed="${src === "mausbot"}"><span class="ic"><img src="assets/openmausbot.png" alt=""></span><b>OpenMausBot</b><span>O arquivo do time (Compartilhar time…) ou um link do GitHub.</span></button>
+        <button class="choice" data-src="openbot" aria-pressed="${src === "openbot"}"><span class="ic"><img src="assets/openbot.png" alt=""></span><b>OpenBot</b><span>O <code>agents.yaml</code> ou a pasta <code>agents/</code>.</span></button>
         <button class="choice" data-src="none" aria-pressed="${src === "none"}"><span class="ic">${I.plus}</span><b>Começar do zero</b><span>Escolha agentes prontos no próximo passo.</span></button>
       </div>
       <div id="importBody" style="margin-top:16px"></div>`;
@@ -445,7 +520,7 @@ document.addEventListener("click", (e) => {
   if (!el) return;
   const d = el.dataset;
   if (d.go != null) return go(Number(d.go));
-  if ("next" in d) { S.done.add(S.step); if (S.step === 0) S.org = $("#org")?.value || S.org; if (S.step === 1) S.context = $("#ctx")?.value ?? ""; return go(S.step + 1); }
+  if ("next" in d) { GUIDE.happyUntil = performance.now() + 1600; S.done.add(S.step); if (S.step === 0) S.org = $("#org")?.value || S.org; if (S.step === 1) S.context = $("#ctx")?.value ?? ""; return go(S.step + 1); }
   if ("back" in d) return go(S.step - 1);
   if ("logo" in d) { S.logo = !S.logo; return render(); }
   if ("site" in d) { S.context = "A Acme faz software de gestão de estoque para varejo (lojas físicas e e-commerce). Atendemos em português. Valores: clareza com o cliente, entregas semanais."; return render(); }
@@ -460,7 +535,8 @@ document.addEventListener("click", (e) => {
   if (el.closest("#theme") && d.v) { document.documentElement.dataset.theme = d.v; [...el.parentElement.children].forEach((b) => b.setAttribute("aria-pressed", String(b === el))); }
 });
 
-const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+// Dark by default, like the landing.
+const dark = true;
 document.documentElement.dataset.theme = dark ? "dark" : "light";
 document.querySelector(`#theme [data-v="${dark ? "dark" : "light"}"]`).setAttribute("aria-pressed", "true");
 // Direct links: #import (or a step id), #import:mausbot to land on a read file.
