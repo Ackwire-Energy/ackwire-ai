@@ -1,4 +1,4 @@
-import { type HTMLAttributes, type RefObject, useLayoutEffect, useRef } from "react";
+import { type HTMLAttributes, useLayoutEffect, useRef } from "react";
 import type { Expression } from "../agent/engine.js";
 import { addLiveAgent, type LiveAgent } from "../agent/live";
 import { cx } from "../cx";
@@ -46,13 +46,11 @@ const seedOf = (name: string) => {
  * the box (accessories reach past the body), in the shared live loop.
  */
 function AgentBody({
-  box,
   appearance,
   state,
   expression,
   name,
 }: {
-  box: RefObject<HTMLSpanElement | null>;
   appearance: AgentAppearance | undefined;
   state: AgentState;
   expression: Expression | undefined;
@@ -69,9 +67,12 @@ function AgentBody({
     seed: seedOf(name),
   };
   useLayoutEffect(() => {
-    if (!canvas.current || !box.current) return;
-    return addLiveAgent({ canvas: canvas.current, box: box.current, look: () => look.current });
-  }, [box]);
+    // The box is the canvas's parent: a parent's ref is not attached yet when a child's layout effect runs.
+    const el = canvas.current;
+    const host = el?.parentElement;
+    if (!el || !host) return;
+    return addLiveAgent({ canvas: el, box: host, look: () => look.current });
+  }, []);
   return <canvas className="ac-avatar__canvas" ref={canvas} />;
 }
 
@@ -105,13 +106,11 @@ export function Avatar({
   style,
   ...rest
 }: AvatarProps) {
-  const box = useRef<HTMLSpanElement>(null);
   const a11y = labelled ? ({ role: "img", "aria-label": name } as const) : ({ "aria-hidden": true } as const);
   const agent = kind === "agent";
   const mood: AgentState = state ?? (running ? "thinking" : "idle");
   return (
     <span
-      ref={box}
       className={cx(
         "ac-avatar",
         kind === "agent" && "ac-avatar--agent",
@@ -131,7 +130,7 @@ export function Avatar({
       {...rest}
     >
       {agent ? (
-        <AgentBody box={box} appearance={appearance} state={mood} expression={expression} name={name} />
+        <AgentBody appearance={appearance} state={mood} expression={expression} name={name} />
       ) : imageUrl ? (
         <img src={imageUrl} alt="" />
       ) : (

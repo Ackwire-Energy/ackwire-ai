@@ -5,6 +5,7 @@ setupDom();
 
 import { render } from "@testing-library/react";
 import { Avatar, ditherCells, ditherSvg, ditherTones, ditherUrl, Logo } from "../src";
+import { liveAgentCount } from "../src/agent/live";
 
 describe("agent dither", () => {
   test("covers the whole grid, light on top and deep at the bottom", () => {
@@ -31,6 +32,7 @@ describe("agent dither", () => {
   });
 
   test("agents are drawn by the engine; people are not; the logo carries the dither", () => {
+    const before = liveAgentCount();
     const { container } = render(
       <>
         <Avatar kind="agent" name="Bia" appearance={{ color: "rose" }} />
@@ -40,7 +42,8 @@ describe("agent dither", () => {
       </>,
     );
     const [agent, person] = [...container.querySelectorAll<HTMLElement>(".ac-avatar")];
-    // Agents are drawn by the engine on a canvas; people are not.
+    // Agents are drawn by the engine on a canvas, registered in the live loop; people are not.
+    expect(liveAgentCount()).toBe(before + 1);
     expect(agent?.querySelector("canvas.ac-avatar__canvas")).not.toBeNull();
     expect(person?.querySelector("canvas")).toBeNull();
     expect(container.querySelectorAll(".ac-logo__dither")).toHaveLength(2);

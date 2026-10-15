@@ -32,6 +32,11 @@ let observer: IntersectionObserver | null = null;
 const reduced = () =>
   typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches === true;
 
+/** How many agents the loop is drawing (tests). */
+export function liveAgentCount() {
+  return agents.size;
+}
+
 /** The current gaze point (client coordinates), if a page set one. */
 export function getGaze() {
   return gaze;
