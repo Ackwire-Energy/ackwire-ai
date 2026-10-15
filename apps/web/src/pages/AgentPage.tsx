@@ -42,6 +42,7 @@ import { AccessTree } from "@/components/AccessTree";
 import { AudienceChip, AudienceRow } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentComputerRow } from "@/components/AgentComputer";
+import { AgentCustomizer } from "@/components/AgentCustomizer";
 import { EditDialog } from "@/components/EditDialog";
 import { LoadingLine, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -89,7 +90,7 @@ export function AgentPage({ agentId }: { agentId: string }) {
 
 function AgentProfile({ agent }: { agent: Agent }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const models = useModels();
   const detail = useAgentDetail(org.id, agent.id);
@@ -100,6 +101,8 @@ function AgentProfile({ agent }: { agent: Agent }) {
   const memory = useMemory(org.id, agent.id);
   const proposals = useProposals(org.id);
   const editable = can(org.role, "manage_agents");
+  // The look: admins and the agent's owner.
+  const canLook = editable || (agent.ownerUserId != null && agent.ownerUserId === me.user.id);
   const g = agentGrammar(t, agent.name);
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const modelLabel = models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model;
@@ -109,7 +112,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
     .find((c) => c !== undefined);
   const month = formatMonth(i18n.language, new Date());
   const [dialog, setDialog] = useState<
-    null | "runs" | "budget" | "perms" | "instructions" | "knowledge" | "model" | "owner" | "skills"
+    null | "runs" | "budget" | "perms" | "instructions" | "knowledge" | "model" | "owner" | "skills" | "look"
   >(null);
   const close = () => setDialog(null);
   const navigate = useNavigate();
@@ -157,6 +160,11 @@ function AgentProfile({ agent }: { agent: Agent }) {
               {t("agent.chat")}
             </Link>
           </Button>
+          {canLook && (
+            <Button icon="edit" onClick={() => setDialog("look")}>
+              {t("look.open")}
+            </Button>
+          )}
           <Menu
             align="end"
             label={t("agent.moreActions")}
@@ -330,6 +338,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
       <KnowledgeDialog open={dialog === "knowledge"} onClose={close} agent={agent} />
       <ModelKeyDialog open={dialog === "model"} onClose={close} agent={agent} />
       <OwnerDialog open={dialog === "owner"} onClose={close} agent={agent} />
+      <AgentCustomizer agent={agent} open={dialog === "look"} onClose={close} />
       <ManageSkillsDialog agentId={agent.id} agentName={agent.name} open={dialog === "skills"} onClose={close} />
       <RunsDialog
         open={dialog === "runs"}

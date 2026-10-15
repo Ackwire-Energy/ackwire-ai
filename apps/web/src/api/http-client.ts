@@ -26,6 +26,9 @@ import type {
   CustomConnectStart,
   CustomServer,
   DirectMessage,
+  ForumPost,
+  ForumTopic,
+  ForumTopicDetail,
   Health,
   Invitation,
   InvitationPreview,
@@ -58,6 +61,10 @@ import type {
   StorageMigration,
   StorageTestResult,
   UsageReport,
+  WikiGraph,
+  WikiPage,
+  WikiPageSummary,
+  WikiVersion,
 } from "./types";
 
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
@@ -94,6 +101,9 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       create: (input) =>
         request<{ organization: Organization; generalChannelId: string }>("/api/app/organizations", { json: input }),
       get: (orgId) => request<Organization>(org(orgId)),
+      setAvatar: (orgId, input) =>
+        request<{ avatarUrl: string }>(`${org(orgId)}/me/avatar`, { method: "PUT", json: input }),
+      removeAvatar: (orgId) => request<void>(`${org(orgId)}/me/avatar`, { method: "DELETE" }),
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
@@ -359,6 +369,42 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         request<Routine>(`${org(orgId)}/routines/${enc(id)}`, { method: "PATCH", json: { active } }),
       runNow: (orgId, id) => request<Routine>(`${org(orgId)}/routines/${enc(id)}/run`, { json: {} }),
       runs: async (orgId, id) => (await request<{ runs: RoutineRun[] }>(`${org(orgId)}/routines/${enc(id)}/runs`)).runs,
+    },
+    wiki: {
+      tree: async (orgId) => (await request<{ pages: WikiPageSummary[] }>(`${org(orgId)}/wiki/pages`)).pages,
+      get: (orgId, slug) => request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}`),
+      search: async (orgId, q) =>
+        (await request<{ pages: WikiPageSummary[] }>(`${org(orgId)}/wiki/search`, { query: { q } })).pages,
+      create: (orgId, input) => request<WikiPage>(`${org(orgId)}/wiki/pages`, { json: input }),
+      update: (orgId, slug, input) =>
+        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}`, { method: "PUT", json: input }),
+      rename: (orgId, slug, title) =>
+        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/rename`, { json: { title } }),
+      history: async (orgId, slug) =>
+        (await request<{ versions: WikiVersion[] }>(`${org(orgId)}/wiki/pages/${enc(slug)}/history`)).versions,
+      version: (orgId, slug, version) =>
+        request<{ version: number; body: string }>(`${org(orgId)}/wiki/pages/${enc(slug)}/versions/${version}`),
+      graph: (orgId) => request<WikiGraph>(`${org(orgId)}/wiki/graph`),
+      append: (orgId, slug, input) =>
+        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/append`, { json: input }),
+    },
+    forum: {
+      list: async (orgId) => (await request<{ topics: ForumTopic[] }>(`${org(orgId)}/forum/topics`)).topics,
+      get: (orgId, topicId) => request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}`),
+      create: (orgId, input) => request<ForumTopicDetail>(`${org(orgId)}/forum/topics`, { json: input }),
+      post: (orgId, topicId, body) =>
+        request<ForumPost>(`${org(orgId)}/forum/topics/${enc(topicId)}/posts`, { json: { body } }),
+      conclude: (orgId, topicId) =>
+        request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/conclude`, { json: {} }),
+      cancel: (orgId, topicId) =>
+        request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/cancel`, { json: {} }),
+      participants: (orgId, topicId, input) =>
+        request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/participants`, {
+          method: "PUT",
+          json: input,
+        }),
+      createIssues: (orgId, topicId, items) =>
+        request<{ numbers: number[] }>(`${org(orgId)}/forum/topics/${enc(topicId)}/issues`, { json: { items } }),
     },
     calendar: {
       range: (orgId, from, to) => request<CalendarRange>(`${org(orgId)}/calendar`, { query: { from, to } }),

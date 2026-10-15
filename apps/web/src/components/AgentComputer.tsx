@@ -13,6 +13,8 @@ import {
   List,
   Menu,
   MenuItem,
+  RadioCard,
+  RadioGroup,
   Switch,
   Token,
   TokenList,
@@ -20,7 +22,7 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAgents, useComputer, useComputerAction, useSandboxSettings, useSaveSandboxSettings } from "@/api/queries";
-import type { Agent, AgentComputer, SandboxSettings } from "@/api/types";
+import type { Agent, AgentComputer, SandboxNetwork, SandboxSettings } from "@/api/types";
 import { LoadingCards, LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -344,10 +346,15 @@ function ComputerListRow({ agent }: { agent: Agent }) {
 type Draft = Pick<
   SandboxSettings,
   "enabled" | "allowDomains" | "execTimeoutSeconds" | "dailyMinutes" | "requireApproval"
->;
+> & { network: SandboxNetwork };
+/** The mode, also for older servers that only send the list. */
+export const networkOf = (s: Pick<SandboxSettings, "network" | "allowDomains">): SandboxNetwork =>
+  s.network ?? (s.allowDomains.length > 0 ? "allowlist" : "blocked");
+const NETWORKS: SandboxNetwork[] = ["blocked", "allowlist", "open"];
 const draftOf = (s: SandboxSettings): Draft => ({
   enabled: s.enabled,
   allowDomains: s.allowDomains,
+  network: networkOf(s),
   execTimeoutSeconds: s.execTimeoutSeconds,
   dailyMinutes: s.dailyMinutes,
   requireApproval: s.requireApproval,
@@ -393,6 +400,7 @@ export function SandboxSection() {
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftOf(s));
   const timeoutOk = draft.execTimeoutSeconds >= 5 && draft.execTimeoutSeconds <= s.maxTimeoutSeconds;
   const minutesOk = draft.dailyMinutes >= 0 && draft.dailyMinutes <= 1440;
+  const networkOk = draft.network !== "allowlist" || draft.allowDomains.length > 0;
   const add = (list: string[]) => {
     const next = [...new Set([...draft.allowDomains, ...list.map((d) => d.trim().toLowerCase())])];
     if (next.length > MAX_DOMAINS) {
@@ -417,8 +425,18 @@ export function SandboxSection() {
           style={{ gap: 16 }}
           onSubmit={(e) => {
             e.preventDefault();
-            if (!dirty || !timeoutOk || !minutesOk) return;
-            save.mutate(draft, { onSuccess: () => toast.show(t("sandbox.saved")) });
+            if (!dirty || !timeoutOk || !minutesOk || !networkOk) return;
+            const networkChanged =
+              draft.network !== networkOf(s) || draft.allowDomains.join() !== s.allowDomains.join();
+            save.mutate(draft, {
+              onSuccess: (saved) => {
+                toast.show(
+                  networkChanged
+                    ? t(saved.networkApply === "live" ? "sandbox.appliedNow" : "sandbox.appliedNext")
+                    : t("sandbox.saved"),
+                );
+              },
+            });
           }}
         >
           <span className="row" style={{ gap: 10, alignItems: "center" }}>
@@ -435,60 +453,91 @@ export function SandboxSection() {
           <div className="stack-4" style={{ gap: 8 }}>
             <span className="ac-field__label">{t("sandbox.internet")}</span>
             <span className="small muted">{t("sandbox.internetHelp")}</span>
-            {draft.allowDomains.length > 0 ? (
-              <TokenList label={t("sandbox.internet")}>
-                {draft.allowDomains.map((d) => (
-                  <li key={d}>
-                    <Token
-                      removeLabel={t("common.removeName", { name: d })}
-                      onRemove={() => setDraft({ ...draft, allowDomains: draft.allowDomains.filter((x) => x !== d) })}
-                    >
-                      <code>{d}</code>
-                    </Token>
-                  </li>
-                ))}
-              </TokenList>
-            ) : (
-              <span className="small">{t("sandbox.noInternet")}</span>
-            )}
-            <div className="row" style={{ gap: 8, alignItems: "flex-start" }}>
-              <Field
-                label={t("sandbox.addDomain")}
-                id="sb-domain"
-                error={domainError ?? undefined}
-                style={{ flex: "1 1 240px" }}
-              >
-                <Input
-                  value={domain}
-                  placeholder="api.exemplo.com ou *.exemplo.com"
-                  onChange={(e) => {
-                    setDomain(e.target.value);
-                    setDomainError(null);
-                  }}
+            <RadioGroup
+              value={draft.network}
+              onValueChange={(v) => setDraft({ ...draft, network: v as SandboxNetwork })}
+              aria-label={t("sandbox.internet")}
+              className="stack-4"
+              style={{ gap: 8 }}
+            >
+              {NETWORKS.map((n) => (
+                <RadioCard
+                  key={n}
+                  value={n}
+                  id={`sb-net-${n}`}
+                  checked={draft.network === n}
+                  title={t(`sandbox.network.${n}`)}
+                  description={t(`sandbox.networkText.${n}`)}
                 />
-              </Field>
-              <Button
-                type="button"
-                style={{ marginTop: 24 }}
-                onClick={() => {
-                  if (!isDomain(domain)) {
-                    setDomainError(t("sandbox.domainInvalid"));
-                    return;
-                  }
-                  if (add([domain])) setDomain("");
-                }}
-              >
-                {t("sandbox.add")}
-              </Button>
-            </div>
-            <div className="row" style={{ gap: 8 }}>
-              {DOMAIN_PRESETS.map((p) => (
-                <Button key={p.id} type="button" size="sm" icon="plus" onClick={() => add(p.domains)}>
-                  {t(`sandbox.preset.${p.id}`)}
-                </Button>
               ))}
-            </div>
+            </RadioGroup>
+            {draft.network === "open" && (
+              <p className="sandbox-warning small" role="note">
+                <Icon name="alert" size={16} />
+                {t("sandbox.openWarning")}
+              </p>
+            )}
           </div>
+          {draft.network === "allowlist" && (
+            <div className="stack-4" style={{ gap: 8 }}>
+              {!networkOk && (
+                <span className="small" style={{ color: "var(--danger)" }}>
+                  {t("sandbox.needDomain")}
+                </span>
+              )}
+              {draft.allowDomains.length > 0 ? (
+                <TokenList label={t("sandbox.internet")}>
+                  {draft.allowDomains.map((d) => (
+                    <li key={d}>
+                      <Token
+                        removeLabel={t("common.removeName", { name: d })}
+                        onRemove={() => setDraft({ ...draft, allowDomains: draft.allowDomains.filter((x) => x !== d) })}
+                      >
+                        <code>{d}</code>
+                      </Token>
+                    </li>
+                  ))}
+                </TokenList>
+              ) : null}
+              <div className="row" style={{ gap: 8, alignItems: "flex-start" }}>
+                <Field
+                  label={t("sandbox.addDomain")}
+                  id="sb-domain"
+                  error={domainError ?? undefined}
+                  style={{ flex: "1 1 240px" }}
+                >
+                  <Input
+                    value={domain}
+                    placeholder="api.exemplo.com ou *.exemplo.com"
+                    onChange={(e) => {
+                      setDomain(e.target.value);
+                      setDomainError(null);
+                    }}
+                  />
+                </Field>
+                <Button
+                  type="button"
+                  style={{ marginTop: 24 }}
+                  onClick={() => {
+                    if (!isDomain(domain)) {
+                      setDomainError(t("sandbox.domainInvalid"));
+                      return;
+                    }
+                    if (add([domain])) setDomain("");
+                  }}
+                >
+                  {t("sandbox.add")}
+                </Button>
+              </div>
+              <div className="row" style={{ gap: 8 }}>
+                {DOMAIN_PRESETS.map((p) => (
+                  <Button key={p.id} type="button" size="sm" icon="plus" onClick={() => add(p.domains)}>
+                    {t(`sandbox.preset.${p.id}`)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="grid-fields">
             <Field
               label={t("sandbox.dailyMinutes")}
@@ -533,7 +582,7 @@ export function SandboxSection() {
             <Button
               type="submit"
               variant="primary"
-              disabled={!dirty || !timeoutOk || !minutesOk || save.isPending}
+              disabled={!dirty || !timeoutOk || !minutesOk || !networkOk || save.isPending}
               loading={save.isPending}
             >
               {t("common.save")}

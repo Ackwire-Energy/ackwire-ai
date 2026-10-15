@@ -104,12 +104,42 @@ export function parseMarkdown(source: string, options: { breaks?: boolean } = {}
 
 // Code, bold, italic (not inside words, so `snake_case` and URLs stay as typed), links, bare URLs.
 const INLINE =
-  /(`[^`]+`)|(\*\*[^*]+?\*\*|__[^_]+?__)|((?<![\w*])\*[^*\s][^*]*?\*(?![\w*])|(?<![\w_])_[^_\s][^_]*?_(?![\w_]))|(\[[^\]]+\]\([^)\s]+\))|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])/;
+  /(`[^`]+`)|(\*\*[^*]+?\*\*|__[^_]+?__)|((?<![\w*])\*[^*\s][^*]*?\*(?![\w*])|(?<![\w_])_[^_\s][^_]*?_(?![\w_]))|(\[[^\]]+\]\([^)\s]+\))|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])|(\[\[[^[\]\n]+\]\])/;
 const SAFE_URL = /^(https?:|mailto:)/i;
 /** Same rule as the backend (`parseMentionHandles`): emails are not mentions. */
 const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
 
 export type MentionRenderer = (handle: string, key: string) => ReactNode;
+/** `[[Título]]` or `[[Título|texto]]`: how a wiki link shows (a chip, a dashed missing link…). */
+export type WikiLinkRenderer = (title: string, label: string, key: string) => ReactNode;
+
+/** `[[Processos/Onboarding|o onboarding]]` → { title: "Processos/Onboarding", label: "o onboarding" }. */
+export function parseWikiToken(token: string) {
+  const inner = token.slice(2, -2);
+  const bar = inner.indexOf("|");
+  const title = (bar >= 0 ? inner.slice(0, bar) : inner).trim();
+  const label = (bar >= 0 ? inner.slice(bar + 1) : inner).trim() || title;
+  return { title, label };
+}
+
+/** Every `[[link]]` title in a text, in order, without repeats. */
+export function wikiLinksIn(text: string): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(/\[\[([^[\]\n]+)\]\]/g)) {
+    const { title } = parseWikiToken(m[0]);
+    if (title && !out.includes(title)) out.push(title);
+  }
+  return out;
+}
+
+/** Heading anchor ids for the outline: "Como pedimos acesso" → "como-pedimos-acesso". */
+export const headingId = (text: string) =>
+  text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
 function withMentions(text: string, key: string, mention?: MentionRenderer): ReactNode[] {
   if (!mention) return [text];
@@ -132,7 +162,7 @@ const link = (href: string, key: string, children: ReactNode) => (
   </a>
 );
 
-export function renderInline(text: string, key = "i", mention?: MentionRenderer): ReactNode[] {
+export function renderInline(text: string, key = "i", mention?: MentionRenderer, wiki?: WikiLinkRenderer): ReactNode[] {
   const out: ReactNode[] = [];
   let rest = text;
   let n = 0;
@@ -146,12 +176,23 @@ export function renderInline(text: string, key = "i", mention?: MentionRenderer)
     const tok = m[0];
     const k = `${key}-${n++}`;
     if (m[1]) out.push(<code key={k}>{tok.slice(1, -1)}</code>);
-    else if (m[2]) out.push(<strong key={k}>{renderInline(tok.slice(2, -2), k, mention)}</strong>);
-    else if (m[3]) out.push(<em key={k}>{renderInline(tok.slice(1, -1), k, mention)}</em>);
+    else if (m[2]) out.push(<strong key={k}>{renderInline(tok.slice(2, -2), k, mention, wiki)}</strong>);
+    else if (m[3]) out.push(<em key={k}>{renderInline(tok.slice(1, -1), k, mention, wiki)}</em>);
     else if (m[4]) {
       const parts = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
       const href = parts?.[2] ?? "";
-      out.push(SAFE_URL.test(href) ? link(href, k, renderInline(parts?.[1] ?? "", k, mention)) : tok);
+      out.push(SAFE_URL.test(href) ? link(href, k, renderInline(parts?.[1] ?? "", k, mention, wiki)) : tok);
+    } else if (m[6]) {
+      const { title, label } = parseWikiToken(tok);
+      out.push(
+        wiki ? (
+          wiki(title, label, k)
+        ) : (
+          <span key={k} className="wiki-link">
+            {label}
+          </span>
+        ),
+      );
     } else out.push(link(tok, k, tok));
     rest = rest.slice(m.index + tok.length);
   }
@@ -166,11 +207,15 @@ export interface MarkdownProps {
    */
   variant?: "document" | "message";
   mention?: MentionRenderer;
+  wikiLink?: WikiLinkRenderer;
 }
 
-export function Markdown({ source, variant = "document", mention }: MarkdownProps) {
+const TASK = /^\[( |x|X)\]\s+(.*)$/;
+const CALLOUT = /^\[!(note|tip|warning|important)\]\s*(.*)$/i;
+
+export function Markdown({ source, variant = "document", mention, wikiLink }: MarkdownProps) {
   const message = variant === "message";
-  const inline = (text: string, k: string) => renderInline(text, k, mention);
+  const inline = (text: string, k: string) => renderInline(text, k, mention, wikiLink);
   const blocks = parseMarkdown(source, { breaks: message }).map((b, i) => {
     const k = `b${i}`;
     switch (b.type) {
@@ -183,7 +228,11 @@ export function Markdown({ source, variant = "document", mention }: MarkdownProp
           );
         }
         const H = `h${Math.min(6, b.level + 1)}` as "h2";
-        return <H key={k}>{inline(b.text, k)}</H>;
+        return (
+          <H key={k} id={`h-${headingId(b.text)}`}>
+            {inline(b.text, k)}
+          </H>
+        );
       }
       case "paragraph":
         return <p key={k}>{inline(b.text, k)}</p>;
@@ -197,15 +246,38 @@ export function Markdown({ source, variant = "document", mention }: MarkdownProp
         const L = b.ordered ? "ol" : "ul";
         return (
           <L key={k}>
-            {b.items.map((item, j) => (
+            {b.items.map((item, j) => {
+              // "- [ ] tarefa" / "- [x] feita": a task with our own (read-only) box.
+              const task = item.match(TASK);
+              if (task) {
+                const done = task[1] !== " ";
+                return (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: static list
+                  <li key={j} className="md__task" data-done={done || undefined}>
+                    <span className="md__task-box" role="img" aria-label={done ? "✓" : "○"} />
+                    <span>{inline(task[2] ?? "", `${k}-${j}`)}</span>
+                  </li>
+                );
+              }
               // biome-ignore lint/suspicious/noArrayIndexKey: static list
-              <li key={j}>{inline(item, `${k}-${j}`)}</li>
-            ))}
+              return <li key={j}>{inline(item, `${k}-${j}`)}</li>;
+            })}
           </L>
         );
       }
-      case "quote":
+      case "quote": {
+        // "> [!note] Título" → a callout (neutral card with an icon), as in Obsidian.
+        const callout = b.text.match(CALLOUT);
+        if (callout && !message) {
+          const kind = (callout[1] ?? "note").toLowerCase();
+          return (
+            <aside key={k} className="md__callout" data-kind={kind}>
+              {inline(callout[2] ?? "", k)}
+            </aside>
+          );
+        }
         return <blockquote key={k}>{inline(b.text, k)}</blockquote>;
+      }
       case "rule":
         return <hr key={k} />;
       case "table":

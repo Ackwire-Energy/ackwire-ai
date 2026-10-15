@@ -11,6 +11,7 @@ import {
   List,
   RadioCard,
   RadioGroup,
+  Segmented,
   Select,
   Textarea,
 } from "@agenteschat/ui";
@@ -67,6 +68,7 @@ function useTargetLabel() {
       if (!c) return t("routines.inConversation");
       return t(target.threadId ? "routines.inThread" : "routines.inChannel", { channel: c.name });
     }
+    if (target.type === "forum") return t("routines.target.forumShort");
     return t(target.type === "dm" ? "routines.target.dmShort" : "routines.target.artifactShort");
   };
 }
@@ -258,6 +260,8 @@ function RunsDialog({ routine, onClose }: { routine: Routine | null; onClose: ()
 
 const TARGET_DM = "dm";
 const TARGET_ARTIFACT = "artifact";
+const TARGET_FORUM = "forum";
+const FORUM_ROUNDS = ["1", "2", "3", "5"] as const;
 
 function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
@@ -269,6 +273,9 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const agents = actors.dir.agents;
   const [agentId, setAgentId] = useState("");
   const [target, setTarget] = useState("");
+  // "Um tópico no fórum": which agents discuss, and how many rounds.
+  const [forumAgents, setForumAgents] = useState<string[]>([]);
+  const [forumRounds, setForumRounds] = useState<(typeof FORUM_ROUNDS)[number]>("3");
   const [prompt, setPrompt] = useState("");
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"schedule" | "event">("schedule");
@@ -292,11 +299,13 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
   }));
   const scheduleOk = kind === "event" || (typed.length > 0 && parsed.data?.ok === true);
   const targetValue = (): RoutineTargetInput =>
-    target === TARGET_DM
-      ? { type: "dm" }
-      : target === TARGET_ARTIFACT
-        ? { type: "artifact" }
-        : { type: "channel", channelId: target };
+    target === TARGET_FORUM
+      ? { type: "forum", agentIds: forumAgents.length > 0 ? forumAgents : [agentId], rounds: Number(forumRounds) }
+      : target === TARGET_DM
+        ? { type: "dm" }
+        : target === TARGET_ARTIFACT
+          ? { type: "artifact" }
+          : { type: "channel", channelId: target };
   const help = () => {
     if (!typed) return t("routines.form.frequencyPlaceholder");
     if (!parsed.data) return "";
@@ -362,10 +371,44 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
                   ...(channels.data ?? []).map((c) => ({ value: c.id, label: `#${c.name}` })),
                   { value: TARGET_DM, label: t("routines.target.dm") },
                   { value: TARGET_ARTIFACT, label: t("routines.target.artifact") },
+                  { value: TARGET_FORUM, label: t("routines.target.forum") },
                 ]}
               />
             </Field>
           </div>
+          {target === TARGET_FORUM && (
+            <div className="routine-forum">
+              <span className="ac-field__label">{t("routines.form.forumAgents")}</span>
+              {agents.map((a) => {
+                const id = `nr-fa-${a.id}`;
+                return (
+                  <label key={a.id} htmlFor={id} className="scope-row">
+                    <Checkbox
+                      id={id}
+                      aria-label={a.name}
+                      checked={forumAgents.includes(a.id) || (forumAgents.length === 0 && a.id === agentId)}
+                      onCheckedChange={(on) =>
+                        setForumAgents((l) => {
+                          const base = l.length === 0 ? [agentId] : l;
+                          return on ? [...new Set([...base, a.id])] : base.filter((x) => x !== a.id);
+                        })
+                      }
+                    />
+                    <span className="scope-row__text" aria-hidden="true">
+                      <span>{a.name}</span>
+                    </span>
+                  </label>
+                );
+              })}
+              <span className="ac-field__label">{t("forum.form.rounds")}</span>
+              <Segmented
+                label={t("forum.form.rounds")}
+                value={forumRounds}
+                onValueChange={setForumRounds}
+                options={FORUM_ROUNDS.map((r) => ({ value: r, label: r }))}
+              />
+            </div>
+          )}
           <Field
             label={t("routines.form.what")}
             id="nr-what"

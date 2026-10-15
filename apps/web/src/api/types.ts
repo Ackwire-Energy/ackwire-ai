@@ -42,6 +42,8 @@ export interface Member {
   name: string;
   email: string;
   image: string | null;
+  /** The photo uploaded here (`PUT …/me/avatar`); wins over `image`. */
+  avatarUrl?: string | null;
   role: Role;
   joinedAt: string;
   /** `@ana`: unique in the organization; mentions resolve by it. */
@@ -100,6 +102,15 @@ export interface Agent {
   audienceMode?: AudienceMode;
   /** Whether I can talk to it (absent = yes). */
   canTalk?: boolean;
+  /** Its look (color, eyes, accessory), from the backend's allow-list. */
+  appearance?: AgentLookInput;
+}
+
+/** `appearance` as stored: the UI only draws known values. */
+export interface AgentLookInput {
+  color?: string;
+  eyes?: string;
+  accessory?: string;
 }
 
 export interface AgentInput {
@@ -112,6 +123,7 @@ export interface AgentInput {
   ownerUserId?: string | null;
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
+  appearance?: AgentLookInput;
 }
 
 export interface Model {
@@ -838,8 +850,12 @@ export type RoutineTrigger =
   /** A one-off (reminders, "amanhã às 9h"): fires once at `at`, then the routine is inactive. */
   | { type: "once"; at: string; timezone: string; description: string };
 
-/** Where a routine created here delivers. */
-export type RoutineTargetInput = { type: "channel"; channelId: string } | { type: "dm" } | { type: "artifact" };
+/** Where a routine created here delivers; `forum` opens a topic with these agents each time. */
+export type RoutineTargetInput =
+  | { type: "channel"; channelId: string }
+  | { type: "dm" }
+  | { type: "artifact" }
+  | { type: "forum"; agentIds: string[]; rounds?: number };
 
 /**
  * Also `conversation`: a thread or DM, from an agent's `schedule_reminder` or
@@ -1066,12 +1082,18 @@ export interface SkillPatch {
 
 // ── PC do agente (sandbox): apps/server/src/routes/app/sandboxes.ts; `…/agents/{id}/computer` expected ──
 
+export type SandboxNetwork = "blocked" | "allowlist" | "open";
+
 export interface SandboxSettings {
   /** A sandbox provider is configured on this server. */
   available: boolean;
   enabled: boolean;
-  /** Domains the PCs may reach (`*.` wildcards); empty = no internet. */
+  /** Domains the PCs may reach (`*.` wildcards), used when `network` is `allowlist`. */
   allowDomains: string[];
+  /** No internet, only the listed domains, or open internet. Absent (older servers): follows the list. */
+  network?: SandboxNetwork;
+  /** After a save: running PCs got it now (`live`) or get it when they next start (`next_start`). */
+  networkApply?: "live" | "next_start";
   execTimeoutSeconds: number;
   maxTimeoutSeconds: number;
   /** Minutes of PC time per day for the whole workspace. */
@@ -1081,7 +1103,10 @@ export interface SandboxSettings {
 }
 
 export type SandboxSettingsInput = Partial<
-  Pick<SandboxSettings, "enabled" | "allowDomains" | "execTimeoutSeconds" | "dailyMinutes" | "requireApproval">
+  Pick<
+    SandboxSettings,
+    "enabled" | "allowDomains" | "network" | "execTimeoutSeconds" | "dailyMinutes" | "requireApproval"
+  >
 >;
 
 /** `GET …/agents/{id}/computer`: the agent's own PC. */
@@ -1092,5 +1117,158 @@ export interface AgentComputer {
   createdAt: string | null;
   lastUsedAt: string | null;
   /** `provider-default` when the provider can't apply our domain list (plan limitation). */
-  network?: "blocked" | "allowlist" | "provider-default";
+  network?: "blocked" | "allowlist" | "open" | "provider-default";
+}
+
+// ── Forum (apps/server/src/routes/app/forum.ts) ──────────────────────────────
+
+export type ForumStatus = "open" | "done" | "canceled";
+
+/** An issue the synthesis suggests ("Criar issues sugeridas"). */
+export interface ForumSuggestedIssue {
+  title: string;
+  description: string;
+}
+
+/** A discussion among agents, in rounds, ending in a synthesis document. */
+export interface ForumTopic {
+  id: string;
+  title: string;
+  /** The question or goal ("Decidir o plano de preços do Q1"). */
+  goal: string;
+  status: ForumStatus;
+  /** The round in progress (or the last one when finished), from 1 (0 = not started yet). */
+  round: number;
+  /** `discussing`, `synthesizing` (writing the synthesis) or `finished`. */
+  phase?: "discussing" | "synthesizing" | "finished";
+  rounds: number;
+  agentIds: string[];
+  /** People notified (they can post between rounds). */
+  userIds: string[];
+  createdBy: { type: "person" | "agent"; id: string };
+  /** The conversation it was opened from, when an agent opened it. */
+  originChannelId: string | null;
+  /** The topic's hidden channel: subscribe to it for the agents' live runs. */
+  channelId: string;
+  createdAt: string;
+  lastActivityAt: string;
+  costUsd: number;
+  budgetUsd: number | null;
+  /** Agents working right now. */
+  activeAgentIds: string[];
+  synthesis: { artifactId: string; version: number; suggestedIssues: ForumSuggestedIssue[] } | null;
+}
+
+/** One per agent run (one per agent per round), people's posts in between. `meta.synthesis`: the closing post. */
+export interface ForumPost {
+  id: string;
+  topicId: string;
+  /** From 0 (before round 1, e.g. a person's opening note). */
+  round: number;
+  author: { type: "person" | "agent"; id: string };
+  body: string;
+  /** Agent posts: the run (the work summary under the post). */
+  agentRunId: string | null;
+  meta?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface ForumTopicDetail extends ForumTopic {
+  posts: ForumPost[];
+}
+
+export interface ForumTopicInput {
+  title: string;
+  goal: string;
+  agentIds: string[];
+  userIds: string[];
+  rounds: number;
+  budgetUsd?: number | null;
+  /** ISO; the discussion stops and writes the synthesis at this time. */
+  deadline?: string;
+  /** Writes the synthesis (default: the first agent). */
+  ownerAgentId?: string;
+}
+
+/** `PUT …/forum/topics/{id}/participants`. */
+export interface ForumParticipantsInput {
+  addAgentIds?: string[];
+  removeAgentIds?: string[];
+  addUserIds?: string[];
+  removeUserIds?: string[];
+}
+
+/** Org broadcasts about the forum. */
+export type ForumEvent =
+  | { type: "forum.topic.updated"; topicId: string; status: ForumStatus; round: number }
+  | { type: "forum.post.created"; topicId: string; post: ForumPost };
+
+export type ForumFilter = "open" | "done" | "mine";
+
+// ── Wiki (expected from the backend; the fake defines the shapes) ────────────
+
+/** Who wrote a version: a person, or an agent (and the person who asked it). */
+export interface WikiAuthor {
+  type: "person" | "agent";
+  id: string;
+  /** For agents: "por Theo, a pedido de Walter". */
+  onBehalfOf?: string | null;
+}
+
+export interface WikiPageSummary {
+  id: string;
+  /** URL key ("processos/onboarding"); changes when the page is renamed. */
+  slug: string;
+  title: string;
+  /** "Processos/Vendas" ("" = the root). */
+  folder: string;
+  tags: string[];
+  updatedAt: string;
+  updatedBy: WikiAuthor;
+}
+
+/** Where a page is mentioned: other pages, messages, forum topics, issues. */
+export type WikiBacklink =
+  | { kind: "page"; slug: string; title: string }
+  | { kind: "message"; channelId: string; messageId: string; channelName: string; excerpt: string; at: string }
+  | { kind: "forum"; topicId: string; title: string }
+  | { kind: "issue"; number: number; title: string };
+
+export interface WikiPage extends WikiPageSummary {
+  body: string;
+  version: number;
+  createdAt: string;
+  createdBy: WikiAuthor;
+  /** Everyone who wrote it, most recent first. */
+  authors: WikiAuthor[];
+  backlinks: WikiBacklink[];
+}
+
+export interface WikiVersion {
+  version: number;
+  at: string;
+  author: WikiAuthor;
+  note: string | null;
+}
+
+export interface WikiPageInput {
+  title: string;
+  folder?: string;
+  tags?: string[];
+  body: string;
+}
+
+/** `PUT …/wiki/pages/{slug}`: `baseVersion` is the version edited (409 `version_conflict` if it moved). */
+export interface WikiUpdateInput {
+  body: string;
+  baseVersion: number;
+  title?: string;
+  folder?: string;
+  tags?: string[];
+  note?: string;
+}
+
+export interface WikiGraph {
+  nodes: { slug: string; title: string; folder: string; tags: string[]; agentId?: string | null }[];
+  edges: { from: string; to: string }[];
 }

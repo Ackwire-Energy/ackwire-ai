@@ -277,6 +277,12 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
       }
       if (isAgentUnavailable(event)) streams.unavailable(event);
+      // The forum (org broadcasts): the list and the open topic refresh.
+      if ((event.type === "forum.topic.updated" || event.type === "forum.post.created") && "topicId" in event) {
+        const topicId = String(event.topicId);
+        void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
+        void qc.invalidateQueries({ queryKey: keys.forumTopic(orgId, topicId) });
+      }
       // The agent's PC changed (started, stopped, deleted): no more polling needed.
       if (event.type === "agent.computer" && "agentId" in event && typeof event.agentId === "string") {
         const computer = (event as { computer?: AgentComputer }).computer;

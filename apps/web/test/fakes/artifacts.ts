@@ -16,6 +16,8 @@ import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg 
 interface Stored {
   meta: Omit<Artifact, "canEdit" | "untrusted">;
   versions: (ArtifactVersion & { content: ArtifactContent })[];
+  /** Opened by id only (e.g. a forum synthesis), not in the Drive list. */
+  unlisted?: boolean;
 }
 
 class MockConflictError extends Error {
@@ -84,6 +86,32 @@ export function createMockArtifacts(ctx: MockContext): ApiClient["artifacts"] {
         versions,
       });
     }
+    // The forum fake's synthesis document (test/fakes/forum.ts, "topic-onboarding").
+    const at = minutesAgo(now, 60 * 26);
+    list.push({
+      unlisted: true,
+      meta: {
+        id: "art-onboarding",
+        kind: "document",
+        title: "Síntese: onboarding em 5 minutos",
+        version: 1,
+        channelId: null,
+        threadId: null,
+        createdBy: agent(0),
+        updatedBy: agent(0),
+        createdAt: at,
+        updatedAt: at,
+      },
+      versions: [
+        {
+          version: 1,
+          author: agent(0),
+          note: null,
+          createdAt: at,
+          content: { kind: "document", markdown: "# Síntese\n\n1. Pular a escolha de chave\n2. Exemplo pronto" },
+        },
+      ],
+    });
     return list;
   });
   const find = async (orgId: string, id: string) => {
@@ -106,6 +134,7 @@ export function createMockArtifacts(ctx: MockContext): ApiClient["artifacts"] {
     list: async (orgId, filters = {}) => {
       const q = filters.q?.trim().toLowerCase();
       return (await store(orgId))
+        .filter((s) => !s.unlisted)
         .filter((s) => !filters.kind || s.meta.kind === filters.kind)
         .filter((s) => !filters.channelId || s.meta.channelId === filters.channelId)
         .filter(

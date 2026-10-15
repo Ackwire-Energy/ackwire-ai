@@ -1,5 +1,5 @@
 import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Reaction, Reactions, Textarea } from "@agenteschat/ui";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCorrectMessage, useReactions, useToggleReaction } from "@/api/queries";
 import type { ReactionCount } from "@/api/types";
@@ -24,11 +24,14 @@ export function MessageFeedback({
   messageId,
   agentName,
   active,
+  more,
 }: {
   messageId: string;
   agentName: string;
   /** The row was hovered or focused: load the reactions. */
   active: boolean;
+  /** The "…" menu (Salvar na wiki, Copiar link, Responder em thread). */
+  more?: ReactNode;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -82,6 +85,7 @@ export function MessageFeedback({
           aria-label={t("channel.correct")}
           onClick={() => setCorrecting(true)}
         />
+        {more}
       </div>
       <CorrectionDialog open={correcting} onOpenChange={setCorrecting} messageId={messageId} agentName={agentName} />
     </>

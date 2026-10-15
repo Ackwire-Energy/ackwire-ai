@@ -13,6 +13,8 @@ export interface ChannelActions {
   /** A streaming reply grew: stay at the bottom if the person is there. */
   followBottom?: () => void;
   channelAgents: Agent[];
+  /** "Responder em thread": the composer replies in that message's thread. */
+  replyInThread?: (message: MessageType) => void;
 }
 export const ChannelActionsContext = createContext<ChannelActions | null>(null);
 export const useChannelActions = () => useContext(ChannelActionsContext);

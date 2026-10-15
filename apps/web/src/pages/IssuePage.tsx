@@ -7,9 +7,11 @@ import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "@/api/typ
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { useArtifactViewer } from "@/components/artifacts/ArtifactViewer";
 import { useOrg } from "@/components/org-context";
+import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { dueLabel, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
+import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import { PRIORITIES, STATUSES } from "./IssuesPage";
 
@@ -34,6 +36,7 @@ function IssueBody({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
+  const wikiLink = useWikiLinkRenderer();
   const action = useIssueAction(org.id);
   const channels = useChannels(org.id);
   const done = i.criteria.filter((c) => c.done).length;
@@ -74,9 +77,15 @@ function IssueBody({ issue: i }: { issue: Issue }) {
           <h1 className="page-title">{i.title}</h1>
         </header>
         <section aria-label={t("issues.description")}>
-          <p className="issue-description">
-            {i.description || <span className="muted">{t("issues.noDescription")}</span>}
-          </p>
+          {i.description ? (
+            <div className="issue-description">
+              <Markdown source={i.description} variant="message" wikiLink={wikiLink} />
+            </div>
+          ) : (
+            <p className="issue-description">
+              <span className="muted">{t("issues.noDescription")}</span>
+            </p>
+          )}
         </section>
         <section aria-labelledby="crit" className="issue-panel">
           <div className="row" style={{ alignItems: "center", gap: 8 }}>

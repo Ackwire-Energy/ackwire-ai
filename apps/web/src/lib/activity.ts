@@ -32,6 +32,8 @@ export type ActivityKind =
   | "fetchingFile"
   | "schedulingReminder"
   | "creatingRoutine"
+  | "openingForumTopic"
+  | "postingInForum"
   | "usingTool";
 
 export interface Activity {
@@ -73,6 +75,9 @@ const BUILTIN: Record<string, ActivityKind> = {
   // Scheduling from the chat.
   schedule_reminder: "schedulingReminder",
   create_routine: "creatingRoutine",
+  // The forum.
+  open_forum_topic: "openingForumTopic",
+  post_in_forum: "postingInForum",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */

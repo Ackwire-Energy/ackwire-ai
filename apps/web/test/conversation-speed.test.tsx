@@ -126,4 +126,26 @@ describe("conversations load fast", () => {
     await settle(4);
     expect(list.scrollTop).toBe(3000);
   });
+
+  test("?m= (a copied link): pages back to the message, scrolls to it and highlights it", async () => {
+    const state = seedState();
+    state.messages = [...history(130), ...state.messages];
+    const scrolled: string[] = [];
+    const proto = HTMLElement.prototype as unknown as { scrollIntoView?: () => void };
+    const before = proto.scrollIntoView;
+    proto.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.getAttribute("data-message-id") ?? "");
+    };
+    try {
+      await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}?m=h-10`, { api: createFakeApi(state) });
+      await settle(12);
+      // h-10 isn't in the latest page (h-30…h-129): one older page brings it.
+      expect(document.body.textContent).toContain("Mensagem antiga 10");
+      expect(scrolled).toContain("h-10");
+      const el = document.querySelector('[data-message-id="h-10"]');
+      expect(el?.classList.contains("ac-msg--focus")).toBe(true);
+    } finally {
+      proto.scrollIntoView = before;
+    }
+  });
 });

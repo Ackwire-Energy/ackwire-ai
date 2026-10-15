@@ -62,4 +62,11 @@ export const keys = {
   storageMigration: (orgId: string) => ["org", orgId, "storage", "migration"] as const,
   search: (orgId: string, q: string, kinds: string) => ["org", orgId, "search", q, kinds] as const,
   reactions: (orgId: string, messageId: string) => ["org", orgId, "reactions", messageId] as const,
+  forum: (orgId: string) => ["org", orgId, "forum"] as const,
+  forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
+  wiki: (orgId: string) => ["org", orgId, "wiki"] as const,
+  wikiTree: (orgId: string) => ["org", orgId, "wiki", "tree"] as const,
+  wikiPage: (orgId: string, slug: string) => ["org", orgId, "wiki", "page", slug] as const,
+  wikiHistory: (orgId: string, slug: string) => ["org", orgId, "wiki", "history", slug] as const,
+  wikiGraph: (orgId: string) => ["org", orgId, "wiki", "graph"] as const,
 };

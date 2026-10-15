@@ -15,6 +15,7 @@ export function createFakeSandbox(
     available: true,
     enabled: true,
     allowDomains: [],
+    network: "blocked",
     execTimeoutSeconds: 120,
     maxTimeoutSeconds: 900,
     dailyMinutes: 120,
@@ -46,7 +47,8 @@ export function createFakeSandbox(
     saveSettings: async (orgId, input) => {
       log("sandbox.saveSettings", orgId, input);
       settings = { ...settings, ...input };
-      return clone(settings);
+      // Like the server: running PCs get a new network rule in place.
+      return clone({ ...settings, networkApply: "live" as const });
     },
     computer: async (orgId, agentId) => clone(await pc(orgId, agentId)),
     start: async (orgId, agentId) => {

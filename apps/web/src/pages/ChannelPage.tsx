@@ -42,6 +42,7 @@ import {
   useRoster,
   useThreads,
   useUpdateChannel,
+  useWikiTree,
 } from "@/api/queries";
 import type {
   Agent,
@@ -60,13 +61,17 @@ import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { InlineProposal, MemoryChangeCard, QuestionCard } from "@/components/ChatCards";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
+import { ForumMessageCard, forumTopicOfMessage } from "@/components/Forum";
+import { LiveCodeToggle } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
 import { MessageFeedback, ReactionPills } from "@/components/MessageFeedback";
+import { MessageMoreMenu, PersonMessageActions } from "@/components/MessageMore";
 import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
+import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
@@ -77,6 +82,7 @@ import { entersWithMotion, greetingSuggestions, messageUsage, nearBottom, usageL
 import { clearDraft, peekDraft } from "@/lib/drafts";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
+import { lookOf } from "@/lib/look";
 import { reportPainted } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { isReminderMessage, routineOfMessage } from "@/lib/routines";
@@ -111,6 +117,9 @@ export interface ChannelChrome {
 
 const sameRuns = (a: LiveRun[], b: LiveRun[]) => a.length === b.length && a.every((r, i) => r === b[i]);
 
+/** `?m=`: how many older pages to look through for the message, and how long it stays highlighted. */
+const FOCUS_MAX_PAGES = 10;
+const HIGHLIGHT_MS = 2400;
 /** A scroll within this long after a wheel/touch/key/pointer counts as the person's. */
 const GESTURE_MS = 1500;
 /** Older messages per scroll-up page. */
@@ -125,9 +134,12 @@ export function ChannelPage({
   channelId,
   chrome,
   fallback,
+  focusMessageId,
 }: {
   channelId: string;
   chrome?: ChannelChrome;
+  /** Open at this message (a copied link): load around it, scroll to it and highlight it. */
+  focusMessageId?: string;
   /** DMs may not be in the channel list: the page still works with this. */
   fallback?: Channel;
 }) {
@@ -146,7 +158,7 @@ export function ChannelPage({
       </main>
     );
   }
-  return <ChannelView key={channel.id} channel={channel} chrome={chrome} />;
+  return <ChannelView key={channel.id} channel={channel} chrome={chrome} focusMessageId={focusMessageId} />;
 }
 
 /**
@@ -186,7 +198,15 @@ export function ChannelSkeleton() {
   );
 }
 
-function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelChrome }) {
+function ChannelView({
+  channel,
+  chrome,
+  focusMessageId,
+}: {
+  channel: Channel;
+  chrome?: ChannelChrome;
+  focusMessageId?: string;
+}) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -202,6 +222,8 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
   // ⌘K "Pedir a um agente" leaves the text for this DM's composer.
   const draftKey = chrome?.dmAgentId ? `agent:${chrome.dmAgentId}` : null;
   const [draft, setDraft] = useState(() => (draftKey ? (peekDraft(draftKey) ?? "") : ""));
+  // "Responder em thread": the next message goes to that thread.
+  const [replyTo, setReplyTo] = useState<MessageType | null>(null);
   useEffect(() => {
     if (draftKey) clearDraft(draftKey);
   }, [draftKey]);
@@ -334,7 +356,8 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
   const scroller = useRef<HTMLElement>(null);
   // Coming back to a channel scrolled up: restore that position (else the bottom).
   const savedScroll = useRef(scrollPositions.get(channel.id));
-  const stick = useRef(savedScroll.current === undefined);
+  // Opened at a message: not pinned to the bottom until the person scrolls down.
+  const stick = useRef(savedScroll.current === undefined && !focusMessageId);
   const lastScrollTop = useRef<number | null>(null);
   // A smooth scroll in progress: its intermediate positions don't mean "the person scrolled up".
   const autoScrollUntil = useRef(0);
@@ -417,6 +440,8 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
     if (timeline.length > 0 || messages.isSuccess) reportPainted(channel.id, channel.name, fromCache.current);
   }, [timeline.length > 0, messages.isSuccess, channel.id, channel.name]);
 
+  // `[[` in the composer links wiki pages.
+  const wikiPages = useWikiTree(org.id);
   // Composer context: who it goes to (the DM agent, or the agents @mentioned in the draft).
   const dmAgent = chrome?.dmAgentId ? dir.agentById.get(chrome.dmAgentId) : undefined;
   const draftAgents = useMemo(
@@ -434,14 +459,30 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
   );
   const pillAgents = dmAgent ? [dmAgent] : draftAgents;
   const composerPills =
-    pillAgents.length > 0
-      ? pillAgents.map((a) => (
+    pillAgents.length > 0 || replyTo ? (
+      <>
+        {replyTo && (
+          <span className="ac-composer__pill composer-reply">
+            <Icon name="message" size={14} />
+            {t("channel.replyingTo", { name: dir.authorName(replyTo.author) })}
+            <button
+              type="button"
+              className="composer-reply__close"
+              aria-label={t("channel.cancelReply")}
+              onClick={() => setReplyTo(null)}
+            >
+              <Icon name="close" size={14} />
+            </button>
+          </span>
+        )}
+        {pillAgents.map((a) => (
           <span key={a.id} className="ac-composer__agent">
             <AgentAvatar agentId={a.id} channelId={channel.id} name={a.name} size="xs" />
             {a.name}
           </span>
-        ))
-      : undefined;
+        ))}
+      </>
+    ) : undefined;
   // "/" commands, for the DM agent or the channel's first agent.
   const commandAgent = dmAgent ?? channelAgents[0];
   const navigateTo = useNavigate();
@@ -484,10 +525,40 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
     }
   }, [messages.dataUpdatedAt, timeline.length]);
 
+  // `?m=`: find the message (paging back up to FOCUS_MAX_PAGES), scroll to it, highlight it once.
+  const [focusDone, setFocusDone] = useState(!focusMessageId);
+  const focusPages = useRef(0);
+  const found = focusMessageId ? timeline.some((i) => i.kind === "message" && i.message.id === focusMessageId) : false;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: steps while the timeline grows
+  useEffect(() => {
+    if (focusDone || !focusMessageId || !messages.isSuccess) return;
+    if (found) {
+      setFocusDone(true);
+      stick.current = false;
+      const el = scroller.current?.querySelector<HTMLElement>(`[data-message-id="${focusMessageId}"]`);
+      el?.scrollIntoView?.({ block: "center" });
+      // A soft plate that fades (CSS; static with reduced motion).
+      el?.classList.add("ac-msg--focus");
+      setTimeout(() => el?.classList.remove("ac-msg--focus"), HIGHLIGHT_MS);
+      return;
+    }
+    if (olderState === "done" || focusPages.current >= FOCUS_MAX_PAGES) {
+      // Not here (or too far back): stay at the bottom as usual.
+      setFocusDone(true);
+      stick.current = true;
+      toBottom();
+      return;
+    }
+    if (olderState === "idle") {
+      focusPages.current += 1;
+      loadOlder();
+    }
+  }, [found, focusDone, focusMessageId, messages.isSuccess, olderState, older.length]);
   const onSend = (text: string) => {
     toBottom(true);
     setDraft("");
-    send(text);
+    send(text, replyTo ? (replyTo.threadId ?? replyTo.id) : null);
+    setReplyTo(null);
   };
   const lastMessage = useMemo(() => {
     for (let i = timeline.length - 1; i >= 0; i--) {
@@ -518,6 +589,10 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
       if (el && stick.current && Date.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
     },
     channelAgents,
+    replyInThread: (message) => {
+      setReplyTo(message);
+      composer.current?.focus();
+    },
   };
 
   const agentNames = joinNames(
@@ -553,7 +628,7 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
                   "userId" in m ? (
                     <Avatar key={m.userId} size="sm" name={m.name} imageUrl={m.image} />
                   ) : (
-                    <Avatar key={m.id} kind="agent" size="sm" name={m.name} initials={dir.agentInitials(m.id)} />
+                    <Avatar key={m.id} kind="agent" size="sm" name={m.name} appearance={lookOf(m)} />
                   ),
                 )}
               </AvatarStack>
@@ -695,6 +770,20 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
                 sendText={t("channel.send")}
                 attachLabel={t("channel.attach")}
                 pills={composerPills}
+                links={{
+                  listLabel: t("wiki.editor.suggest"),
+                  search: (q) =>
+                    (wikiPages.data ?? [])
+                      .filter((p) => p.title.toLowerCase().includes(q.trim().toLowerCase()))
+                      .slice(0, 8)
+                      .map((p) => ({
+                        key: `wiki:${p.slug}`,
+                        insert: p.title,
+                        label: p.title,
+                        description: p.folder || undefined,
+                        leading: <Icon name="book" size={16} />,
+                      })),
+                }}
                 commands={commandAgent ? { listLabel: t("composer.commands"), list: commands } : undefined}
                 mentions={{
                   search: mentionSearch,
@@ -802,7 +891,7 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
             key={c.key}
             agent
             stacked
-            avatar={<Avatar kind="agent" name={name} initials={dir.agentInitials(c.agentId)} />}
+            avatar={<Avatar kind="agent" name={name} appearance={lookOf(dir.agentById.get(c.agentId))} />}
             author={name}
             time={t("common.now")}
           >
@@ -862,7 +951,7 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
       agent
       grouped={grouped}
       streaming={!failed && !waiting}
-      avatar={<Avatar kind="agent" name={name} state={agentStateOfRun(run)} />}
+      avatar={<Avatar kind="agent" name={name} state={agentStateOfRun(run)} appearance={lookOf(agent)} />}
       author={name}
       time={<time dateTime={startedAt}>{formatTime(i18n.language, startedAt)}</time>}
       status={waiting ? { icon: "waiting", label: t("channel.waitingApproval") } : undefined}
@@ -929,31 +1018,52 @@ function ActivityBar({ channelId }: { channelId: string }) {
   );
   const text = activityText(t, entries);
   const active = entries.length > 0;
+  // Agents running code (not writing yet): "Ver código" with the live code and output.
+  const coding = runs.filter((r) => !isWriting(r) && r.code);
   return (
-    <div className="ac-typing" aria-live="polite" data-active={active}>
-      {active && (
-        <>
-          <span className="ac-typing__avatars" aria-hidden="true">
-            {entries.map((e) =>
-              e.type === "agent" ? (
-                <Avatar key={`a:${e.id}`} kind="agent" size="xs" name={e.name} state="thinking" />
-              ) : (
-                <Avatar key={`p:${e.id}`} size="xs" name={e.name} imageUrl={dir.memberById.get(e.id)?.image} />
-              ),
-            )}
-          </span>
-          {/* Keyed by the words: a new activity fades in. */}
-          <span key={text} className="ac-typing__text">
-            {text}
-          </span>
-          <span className="ac-typing__dots" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </span>
-        </>
+    <>
+      {coding.map((r) =>
+        r.code ? (
+          <LiveCodeToggle
+            key={r.runId}
+            name={dir.agentById.get(r.agentId)?.name ?? t("channel.unknownAgent")}
+            code={r.code}
+            output={r.output ?? []}
+          />
+        ) : null,
       )}
-    </div>
+      <div className="ac-typing" aria-live="polite" data-active={active}>
+        {active && (
+          <>
+            <span className="ac-typing__avatars" aria-hidden="true">
+              {entries.map((e) =>
+                e.type === "agent" ? (
+                  <Avatar
+                    key={`a:${e.id}`}
+                    kind="agent"
+                    size="xs"
+                    name={e.name}
+                    state="thinking"
+                    appearance={lookOf(dir.agentById.get(e.id))}
+                  />
+                ) : (
+                  <Avatar key={`p:${e.id}`} size="xs" name={e.name} imageUrl={dir.memberById.get(e.id)?.image} />
+                ),
+              )}
+            </span>
+            {/* Keyed by the words: a new activity fades in. */}
+            <span key={text} className="ac-typing__text">
+              {text}
+            </span>
+            <span className="ac-typing__dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -981,6 +1091,8 @@ const TimelineMessage = memo(function TimelineMessage({
   const name = dir.authorName(m.author);
   // Posted by a routine on its creator's behalf: shown as the routine, never as if the person typed it.
   const routine = routineOfMessage(m.meta);
+  const wikiLink = useWikiLinkRenderer();
+  const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Lembrete".
   const reminder = isReminderMessage(m.meta);
   const renderMention = (handle: string, key: string) => {
@@ -1008,6 +1120,8 @@ const TimelineMessage = memo(function TimelineMessage({
     : [];
   const question = isQuestion(meta.question) ? meta.question : null;
   const artifacts = m.author.type === "agent" ? artifactRefs(meta) : [];
+  // An agent opened a forum topic from here: the topic card with "Ver discussão".
+  const forumTopicId = m.author.type === "agent" ? forumTopicOfMessage(meta) : null;
   const card = approvalId || proposalId || memoryUpdates.length > 0 || question;
   const feedback = m.author.type === "agent" && !card && !m.local;
   // People see name, time and text; the date, model, tokens and cost wait behind the time.
@@ -1022,6 +1136,7 @@ const TimelineMessage = memo(function TimelineMessage({
   return (
     <Message
       agent={m.author.type === "agent"}
+      data-message-id={m.id}
       grouped={grouped}
       entering={entering && !replacesLive}
       className={m.local ? `ac-msg--local ac-msg--${m.local}` : undefined}
@@ -1040,6 +1155,7 @@ const TimelineMessage = memo(function TimelineMessage({
           <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
             <Avatar
               kind={m.author.type}
+              appearance={lookOf(agent)}
               name={name}
               imageUrl={person?.image}
               initials={agent ? dir.agentInitials(agent.id) : undefined}
@@ -1083,7 +1199,12 @@ const TimelineMessage = memo(function TimelineMessage({
     >
       {(m.body.trim() || !card) && (
         <MessageText>
-          <MessageBody body={m.body} resolveMention={dir.mentionName} renderMention={renderMention} />
+          <MessageBody
+            body={m.body}
+            resolveMention={dir.mentionName}
+            renderMention={renderMention}
+            wikiLink={wikiLink}
+          />
         </MessageText>
       )}
       {m.local === "failed" && (
@@ -1103,6 +1224,7 @@ const TimelineMessage = memo(function TimelineMessage({
       {m.author.type === "agent" && m.agentRunId && !card && !m.local && (
         <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} />
       )}
+      {forumTopicId && <ForumMessageCard topicId={forumTopicId} />}
       {artifacts.length > 0 && (
         <div className="artifact-cards">
           {artifacts.map((r) => (
@@ -1112,7 +1234,15 @@ const TimelineMessage = memo(function TimelineMessage({
       )}
       {feedback && <ReactionPills messageId={m.id} initial={m.reactions} />}
       {feedback && (
-        <MessageFeedback messageId={m.id} agentName={agent?.name ?? t("channel.unknownAgent")} active={active} />
+        <MessageFeedback
+          messageId={m.id}
+          agentName={agent?.name ?? t("channel.unknownAgent")}
+          active={active}
+          more={<MessageMoreMenu message={m} channelName={channelName ?? ""} />}
+        />
+      )}
+      {m.author.type === "person" && !m.local && (
+        <PersonMessageActions message={m} authorName={name} channelName={channelName ?? ""} />
       )}
     </Message>
   );

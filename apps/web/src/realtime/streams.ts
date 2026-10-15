@@ -31,6 +31,57 @@ export interface LiveRun {
   connector?: string | null;
   /** What the tool works on, when the event says (the skill name for `load_skill`). */
   toolDetail?: string | null;
+  /** The code the agent is running (`run_code`, a skill script), from `agent.tool`. */
+  code?: LiveCode | null;
+  /** That call's output so far (`agent.tool.output`), in order. */
+  output?: LiveOutput[];
+}
+
+export interface LiveCode {
+  language: string;
+  source: string;
+}
+
+export interface LiveOutput {
+  stream: "stdout" | "stderr";
+  text: string;
+}
+
+/** Kept per call: the newest characters of the output (older ones scroll away). */
+export const OUTPUT_LIMIT = 20_000;
+
+/** The PC's output while code runs (expected from the backend). */
+export interface AgentToolOutputEvent {
+  type: "agent.tool.output";
+  channelId: string;
+  threadId: string | null;
+  runId: string;
+  agentId: string;
+  toolUseId?: string;
+  stream: "stdout" | "stderr";
+  text: string;
+}
+
+/** Appends output, merging with the last chunk of the same stream and keeping the last OUTPUT_LIMIT chars. */
+export function appendOutput(list: LiveOutput[], chunk: LiveOutput, limit = OUTPUT_LIMIT): LiveOutput[] {
+  const last = list[list.length - 1];
+  const next =
+    last && last.stream === chunk.stream
+      ? [...list.slice(0, -1), { stream: last.stream, text: last.text + chunk.text }]
+      : [...list, chunk];
+  let total = next.reduce((n, o) => n + o.text.length, 0);
+  while (total > limit && next.length > 0) {
+    const first = next[0] as LiveOutput;
+    const over = total - limit;
+    if (first.text.length <= over) {
+      next.shift();
+      total -= first.text.length;
+    } else {
+      next[0] = { stream: first.stream, text: first.text.slice(over) };
+      total = limit;
+    }
+  }
+  return next;
 }
 
 /**
@@ -48,6 +99,9 @@ export interface AgentToolEvent {
   connector?: string | null;
   /** E.g. the skill being opened by `load_skill`. */
   detail?: string | null;
+  /** The code it runs (`run_code`, skill scripts), expected from the backend. */
+  code?: LiveCode | null;
+  toolUseId?: string;
 }
 
 export interface StreamsState {
@@ -112,18 +166,31 @@ function reopen(state: StreamsState, runId: string): StreamsState {
   return { ...state, finished };
 }
 
-export function applyChannelEvent(state: StreamsState, event: ChannelEvent | AgentToolEvent): StreamsState {
+export function applyChannelEvent(
+  state: StreamsState,
+  event: ChannelEvent | AgentToolEvent | AgentToolOutputEvent,
+): StreamsState {
   switch (event.type) {
     case "agent.tool": {
       if (state.finished[event.runId]) return state;
       const current = state.runs[event.runId];
       const status: LiveStatus = current?.text ? current.status : "thinking";
+      // A new call starts fresh; `tool: null` (the call ended) keeps the last code and output on screen.
+      const newCall = event.tool !== null;
       return upsert(state, event, {
         status,
         tool: event.tool,
         connector: event.connector ?? null,
         toolDetail: event.detail ?? null,
+        ...(newCall ? { code: event.code ?? null, output: [] } : {}),
       });
+    }
+    case "agent.tool.output": {
+      if (state.finished[event.runId]) return state;
+      const current = state.runs[event.runId];
+      if (!current) return state;
+      const output = appendOutput(current.output ?? [], { stream: event.stream, text: event.text });
+      return { ...state, runs: { ...state.runs, [event.runId]: { ...current, output } } };
     }
     case "message.created": {
       const m = event.message;

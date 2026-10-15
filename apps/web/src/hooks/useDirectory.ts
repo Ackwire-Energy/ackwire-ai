@@ -11,7 +11,9 @@ export function useDirectory(orgId: string) {
   return useMemo(() => {
     const agentById = new Map<string, Agent>((agents.data ?? []).map((a) => [a.id, a]));
     const agentByHandle = new Map<string, Agent>((agents.data ?? []).map((a) => [a.handle.toLowerCase(), a]));
-    const memberById = new Map<string, Member>((members.data ?? []).map((m) => [m.userId, m]));
+    // The uploaded photo wins over the sign-in image (`image` is what every avatar reads).
+    const people = (members.data ?? []).map((m) => (m.avatarUrl ? { ...m, image: m.avatarUrl } : m));
+    const memberById = new Map<string, Member>(people.map((m) => [m.userId, m]));
     const memberByHandle = new Map<string, Member>(
       (members.data ?? []).filter((m) => m.handle).map((m) => [m.handle.toLowerCase(), m]),
     );
@@ -34,7 +36,7 @@ export function useDirectory(orgId: string) {
       agentByHandle.get(handle.toLowerCase())?.name ?? memberByHandle.get(handle.toLowerCase())?.name ?? null;
     return {
       agents: agents.data ?? [],
-      members: members.data ?? [],
+      members: people,
       agentById,
       agentByHandle,
       memberById,

@@ -9,6 +9,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useScopeGroups } from "@/hooks/useScopeGroups";
 import { audienceNotice, audienceSummary, canTalk, modeOf } from "@/lib/audience";
 import { formatUsd, relativeTime, shortModel } from "@/lib/format";
+import { lookOf } from "@/lib/look";
 import { can } from "@/lib/permissions";
 import { scopeSummary } from "@/lib/scopes";
 
@@ -191,7 +192,7 @@ function AgentCardBody({ agent }: { agent: Agent }) {
   return (
     <div className="profile-card__body">
       <div className="profile-card__head">
-        <Avatar kind="agent" size="lg" name={agent.name} initials={dir.agentInitials(agent.id)} />
+        <Avatar kind="agent" size="lg" name={agent.name} appearance={lookOf(agent)} />
         <div className="list-col">
           <span className="profile-card__name">{agent.name}</span>
           <span className="small muted">

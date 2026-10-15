@@ -2,6 +2,7 @@ import { WorkSummary } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRun } from "@/api/queries";
+import { CodePanel } from "@/components/LiveCode";
 import { useOrg } from "@/components/org-context";
 import { agentGrammar } from "@/lib/grammar";
 import { formatDuration, stepLabel, workFromSteps, workHeader, workMeta } from "@/lib/work";
@@ -55,6 +56,8 @@ export function MessageWork({
             label: stepLabel(t, s),
             time: s.ms !== null ? formatDuration(t, s.ms) : undefined,
             failed: s.failed,
+            // The code it ran, and its output, after the fact.
+            detail: s.code ? <CodePanel code={s.code} output={s.output ?? []} /> : undefined,
           }));
   return <WorkSummary summary={summary} steps={steps} onToggle={setOpen} />;
 }

@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { Run, RunStep } from "@/api/types";
+import type { LiveCode, LiveOutput } from "@/realtime/streams";
 import { toolLabel } from "./access";
 import { type ActivityKind, toolActivity } from "./activity";
 import { joinNames } from "./format";
@@ -12,6 +13,9 @@ export interface WorkItem {
   tool: string;
   ms: number | null;
   failed: boolean;
+  /** The code it ran (`run_code`, skill scripts: `input.code`/`input.command`) and what came out. */
+  code?: LiveCode;
+  output?: LiveOutput[];
 }
 
 export interface Work {
@@ -58,13 +62,32 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
     const a = toolActivity(name);
     const app = a.kind === "consulting" ? a.app : DRIVE.includes(a.kind) ? "Drive" : undefined;
     if (app && !connectors.includes(app)) connectors.push(app);
+    const input = (s.data.input ?? {}) as Record<string, unknown>;
+    const source =
+      typeof input.code === "string" ? input.code : typeof input.command === "string" ? input.command : null;
+    const content = typeof result?.data.content === "string" ? result.data.content : "";
+    const failed = result?.data.isError === true;
     items.push({
       key: id,
       kind: a.kind,
       app: a.app,
       tool: name,
       ms: result ? Math.max(0, time(result.createdAt) - time(s.createdAt)) : null,
-      failed: result?.data.isError === true,
+      failed,
+      ...(source !== null
+        ? {
+            code: {
+              language:
+                typeof input.language === "string"
+                  ? input.language
+                  : typeof input.command === "string"
+                    ? "bash"
+                    : "python",
+              source,
+            },
+            output: content ? [{ stream: failed ? ("stderr" as const) : ("stdout" as const), text: content }] : [],
+          }
+        : {}),
     });
   }
   const first = steps[0];

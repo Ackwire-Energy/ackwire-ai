@@ -24,10 +24,12 @@ import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
 import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
+import { createFakeForum } from "./fakes/forum";
 import { createMockPlanning } from "./fakes/planning";
 import { createFakeSandbox } from "./fakes/sandbox";
 import { createFakeSkills } from "./fakes/skills";
 import { createMockStorage } from "./fakes/storage";
+import { createFakeWiki } from "./fakes/wiki";
 
 export const NOW = new Date("2026-10-14T13:44:00.000Z");
 export const ORG_ID = "00000000-0000-4000-8000-000000000001";
@@ -532,6 +534,8 @@ const id = (prefix: string) => `${prefix}-${++n}`;
 
 /** Served by the in-memory fakes in `test/fakes` (same shapes as the server). */
 type FakedParts =
+  | "wiki"
+  | "forum"
   | "sandbox"
   | "skills"
   | "access"
@@ -587,6 +591,18 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (input.handle !== undefined) m.handle = input.handle;
         if (input.timezone !== undefined) m.timezone = input.timezone ?? "America/Sao_Paulo";
         return { ...m, online: true, lastSeenAt: new Date().toISOString() };
+      },
+      setAvatar: async (orgId, input) => {
+        log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });
+        const m = state.members.find((x) => x.userId === state.me?.user.id);
+        if (!m) throw new ApiError(404, "not_found", "Member not found");
+        m.avatarUrl = `data:${input.contentType};base64,${input.imageBase64}`;
+        return { avatarUrl: m.avatarUrl };
+      },
+      removeAvatar: async (orgId) => {
+        log("orgs.removeAvatar", orgId);
+        const m = state.members.find((x) => x.userId === state.me?.user.id);
+        if (m) m.avatarUrl = null;
       },
       members: async () => state.members,
       changeRole: async (orgId, userId, role: Role) => {
@@ -1191,6 +1207,8 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   return {
     ...http,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args })),
+    forum: createFakeForum(ctx, (method, ...args) => state.calls.push({ method, args })),
+    wiki: createFakeWiki(ctx, (method, ...args) => state.calls.push({ method, args })),
     skills: createFakeSkills(ctx, (method, ...args) => state.calls.push({ method, args })),
     access: createFakeAccess(
       ctx,

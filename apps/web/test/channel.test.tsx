@@ -222,12 +222,18 @@ describe("Canal", () => {
     expect(document.body.textContent).toContain("Correção enviada. A Ada vai aprender com ela.");
   });
 
-  test("people's messages have no feedback toolbar", async () => {
+  test("people's messages have no feedback buttons, only the '…' bar", async () => {
     await open();
     const ask = screen()
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("o login está devolvendo 401")) as HTMLElement;
-    expect(within(ask).queryByRole("toolbar")).toBeNull();
+    const bar = within(ask).getByRole("toolbar", { name: "Ações da mensagem de João" });
+    expect(within(bar).queryByRole("button", { name: "Útil" })).toBeNull();
+    expect(
+      within(bar)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Mais ações da mensagem"]);
   });
 
   test("admins edit the channel topic from the details", async () => {

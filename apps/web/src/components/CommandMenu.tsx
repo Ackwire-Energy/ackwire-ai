@@ -2,11 +2,12 @@ import { Avatar, CommandPalette, Icon, type PaletteItem } from "@agenteschat/ui"
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useChannels } from "@/api/queries";
+import { useChannels, useForumTopics, useWikiTree } from "@/api/queries";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { canTalk } from "@/lib/audience";
 import { setDraftFor } from "@/lib/drafts";
+import { lookOf } from "@/lib/look";
 import { SETTINGS_SECTIONS } from "@/pages/SettingsPage";
 
 /** ⌘K / Ctrl+K anywhere in the workspace (also when typing): opens the palette. */
@@ -27,6 +28,9 @@ export function CommandMenu() {
   const channels = useChannels(org.id);
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  // Topics only when the palette is open (no request on every page).
+  const topics = useForumTopics(org.id, open);
+  const wiki = useWikiTree(org.id, open);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -65,7 +69,7 @@ export function CommandMenu() {
         label: a.name,
         sub: a.role ? t("palette.agentRole", { role: a.role }) : t("palette.agent"),
         keywords: a.handle,
-        mark: <Avatar kind="agent" size="xs" name={a.name} />,
+        mark: <Avatar kind="agent" size="xs" name={a.name} appearance={lookOf(a)} />,
         onSelect: () => void navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId, agentId: a.id } }),
       });
     }
@@ -101,6 +105,37 @@ export function CommandMenu() {
         onSelect: () => void navigate({ to: p.to as "/org/$orgId/issues", params: { orgId } }),
       });
     }
+    for (const tp of topics.data ?? []) {
+      list.push({
+        key: `f:${tp.id}`,
+        group: goTo,
+        label: tp.title,
+        sub: t("palette.forum"),
+        keywords: tp.goal,
+        mark: <Icon name="message" size={16} />,
+        onSelect: () => void navigate({ to: "/org/$orgId/forum/$topicId", params: { orgId, topicId: tp.id } }),
+      });
+    }
+    for (const p of wiki.data ?? []) {
+      list.push({
+        key: `w:${p.slug}`,
+        group: goTo,
+        label: p.title,
+        sub: p.folder ? `${t("palette.wikiPage")} · ${p.folder}` : t("palette.wikiPage"),
+        keywords: p.tags.join(" "),
+        mark: <Icon name="book" size={16} />,
+        onSelect: () => void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId, slug: p.slug } }),
+      });
+    }
+    list.push({
+      key: "w:new",
+      group: goTo,
+      label: t("palette.wikiNew"),
+      sub: t("shell.wiki"),
+      keywords: "wiki nova página criar",
+      mark: <Icon name="plus" size={16} />,
+      onSelect: () => void navigate({ to: "/org/$orgId/wiki", params: { orgId }, search: { new: "" } }),
+    });
     for (const s of SETTINGS_SECTIONS) {
       if (!s.allowed(org.role)) continue;
       list.push({
@@ -114,7 +149,7 @@ export function CommandMenu() {
       });
     }
     return list;
-  }, [channels.data, dir.agents, dir.members, me.user.id, org.id, org.role, navigate, t, goTo]);
+  }, [channels.data, topics.data, wiki.data, dir.agents, dir.members, me.user.id, org.id, org.role, navigate, t, goTo]);
 
   // "Pedir a um agente": the agents I can talk to, with what was typed.
   const askable = useMemo(() => dir.agents.filter((a) => canTalk(a)), [dir.agents]);
@@ -132,7 +167,7 @@ export function CommandMenu() {
           group: t("palette.ask"),
           label: t("palette.askLabel", { name: a.name, text: body || text }),
           sub: t("palette.newConversation"),
-          mark: <Avatar kind="agent" size="xs" name={a.name} />,
+          mark: <Avatar kind="agent" size="xs" name={a.name} appearance={lookOf(a)} />,
           onSelect: () => {
             setDraftFor(`agent:${a.id}`, body || text);
             void navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: org.id, agentId: a.id } });

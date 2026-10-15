@@ -1,4 +1,7 @@
 import { type AgentState, Avatar, type AvatarProps } from "@agenteschat/ui";
+import { useOrg } from "@/components/org-context";
+import { useDirectory } from "@/hooks/useDirectory";
+import { lookOf } from "@/lib/look";
 import { useStreams } from "@/realtime/context";
 import { agentStateIn } from "@/realtime/streams";
 
@@ -14,5 +17,7 @@ export function AgentAvatar({
   ...rest
 }: Omit<AvatarProps, "kind" | "running" | "state"> & { agentId: string; channelId?: string; state?: AgentState }) {
   const live = useStreams((s) => agentStateIn(s, agentId, channelId));
-  return <Avatar kind="agent" state={state ?? live} {...rest} />;
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  return <Avatar kind="agent" state={state ?? live} appearance={lookOf(dir.agentById.get(agentId))} {...rest} />;
 }

@@ -40,10 +40,14 @@ describe("Configurações → Sandbox", () => {
   test("on/off, the internet allowlist with presets, limits and approval; saved explicitly", async () => {
     const state = await go();
     const card = within(screen().getByRole("region", { name: "PC dos agentes" }));
-    expect(card.getByText("Sem internet.")).toBeTruthy();
+    expect(card.getByRole("radio", { name: /Sem internet/ }).getAttribute("aria-checked")).toBe("true");
     expect(screen().getByRole("region", { name: "PC dos agentes" }).textContent).toContain(
       "Por padrão, os PCs não acessam a internet.",
     );
+    // The domain list only for "Só domínios liberados".
+    expect(card.queryByLabelText("Adicionar domínio")).toBeNull();
+    await click(card.getByRole("radio", { name: /Só domínios liberados/ }));
+    expect(card.getByText("Libere pelo menos um domínio, ou escolha sem internet ou internet liberada.")).toBeTruthy();
     await type(card.getByLabelText("Adicionar domínio"), "não é domínio");
     await click(card.getByRole("button", { name: "Adicionar" }));
     expect(card.getByText("Use um domínio como api.exemplo.com ou *.exemplo.com.")).toBeTruthy();
@@ -59,6 +63,7 @@ describe("Configurações → Sandbox", () => {
     await click(card.getByRole("button", { name: "Salvar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "sandbox.saveSettings")?.args[1]).toMatchObject({
+      network: "allowlist",
       allowDomains: ["*.github.com", "pypi.org", "files.pythonhosted.org"],
       execTimeoutSeconds: 300,
       requireApproval: true,
@@ -90,6 +95,23 @@ describe("Configurações → Sandbox", () => {
     expect(isDomain("*.npmjs.org")).toBe(true);
     expect(isDomain("http://pypi.org")).toBe(false);
     expect(isDomain("*.")).toBe(false);
+  });
+});
+
+describe("internet mode", () => {
+  test("Internet liberada warns; saving says the running PCs got it", async () => {
+    const state = seedState();
+    await renderApp(`/org/${ORG_ID}/settings/sandbox`, { api: createFakeApi(state) });
+    await settle(8);
+    const card = within(screen().getByRole("region", { name: "PC dos agentes" }));
+    await click(card.getByRole("radio", { name: /Internet liberada/ }));
+    expect(card.getByRole("note").textContent).toBe(
+      "O agente acessa qualquer site. Chaves e segredos continuam fora da máquina.",
+    );
+    await click(card.getByRole("button", { name: "Salvar" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "sandbox.saveSettings")?.args[1]).toMatchObject({ network: "open" });
+    expect(document.body.textContent).toContain("Os PCs ligados já usam a nova regra de internet.");
   });
 });
 

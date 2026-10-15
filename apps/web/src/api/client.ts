@@ -30,6 +30,12 @@ import type {
   CustomServer,
   DirectMessage,
   DmTarget,
+  ForumParticipantsInput,
+  ForumPost,
+  ForumSuggestedIssue,
+  ForumTopic,
+  ForumTopicDetail,
+  ForumTopicInput,
   Health,
   Invitation,
   InvitationPreview,
@@ -72,6 +78,12 @@ import type {
   StorageTestResult,
   ToolAccess,
   UsageReport,
+  WikiGraph,
+  WikiPage,
+  WikiPageInput,
+  WikiPageSummary,
+  WikiUpdateInput,
+  WikiVersion,
 } from "./types";
 
 /**
@@ -95,6 +107,9 @@ export interface ApiClient {
     update(orgId: string, input: { name?: string; context?: string }): Promise<void>;
     /** My handle and time zone in this organization (`timezone: null` = the organization's). */
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
+    /** My profile photo: a square image (JSON only: base64), already cropped. */
+    setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
+    removeAvatar(orgId: string): Promise<void>;
     members(orgId: string): Promise<Member[]>;
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
     removeMember(orgId: string, userId: string): Promise<void>;
@@ -320,6 +335,44 @@ export interface ApiClient {
     setActive(orgId: string, id: string, active: boolean): Promise<Routine>;
     runNow(orgId: string, id: string): Promise<Routine>;
     runs(orgId: string, id: string): Promise<RoutineRun[]>;
+  };
+  /** The org wiki: pages in folders, `[[links]]`, backlinks, history and the graph. */
+  wiki: {
+    /** Every page (no bodies), for the tree, tags and recents. */
+    tree(orgId: string): Promise<WikiPageSummary[]>;
+    get(orgId: string, slug: string): Promise<WikiPage>;
+    /** Title prefix search (the `[[` autocomplete, ⌘K). */
+    search(orgId: string, q: string): Promise<WikiPageSummary[]>;
+    create(orgId: string, input: WikiPageInput): Promise<WikiPage>;
+    update(orgId: string, slug: string, input: WikiUpdateInput): Promise<WikiPage>;
+    /** New title (and slug); links to it follow. */
+    rename(orgId: string, slug: string, title: string): Promise<WikiPage>;
+    history(orgId: string, slug: string): Promise<WikiVersion[]>;
+    version(orgId: string, slug: string, version: number): Promise<{ version: number; body: string }>;
+    graph(orgId: string): Promise<WikiGraph>;
+    /** Appends a block (e.g. a chat message) with a link back to where it came from. */
+    append(
+      orgId: string,
+      slug: string,
+      input: {
+        text: string;
+        source: { kind: "message"; channelId: string; messageId: string } | { kind: "forum"; topicId: string };
+      },
+    ): Promise<WikiPage>;
+  };
+  /** The forum: agents discuss a question in rounds and end with a synthesis. */
+  forum: {
+    list(orgId: string): Promise<ForumTopic[]>;
+    get(orgId: string, topicId: string): Promise<ForumTopicDetail>;
+    create(orgId: string, input: ForumTopicInput): Promise<ForumTopicDetail>;
+    /** A person's message; it enters before the next round. */
+    post(orgId: string, topicId: string, body: string): Promise<ForumPost>;
+    /** Stops the rounds and writes the synthesis now. */
+    conclude(orgId: string, topicId: string): Promise<ForumTopicDetail>;
+    cancel(orgId: string, topicId: string): Promise<ForumTopicDetail>;
+    participants(orgId: string, topicId: string, input: ForumParticipantsInput): Promise<ForumTopicDetail>;
+    /** Creates the chosen suggested issues; returns their numbers. */
+    createIssues(orgId: string, topicId: string, items: ForumSuggestedIssue[]): Promise<{ numbers: number[] }>;
   };
   calendar: {
     /** Events, routine runs, issue deadlines and proposals between `from` and `to` (ISO). */

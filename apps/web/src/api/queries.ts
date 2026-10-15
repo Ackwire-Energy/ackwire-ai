@@ -12,6 +12,10 @@ import type {
   ArtifactContent,
   ArtifactFilters,
   CalendarEventInput,
+  ForumParticipantsInput,
+  ForumSuggestedIssue,
+  ForumTopicDetail,
+  ForumTopicInput,
   IssueInput,
   IssuePatch,
   Message,
@@ -25,6 +29,9 @@ import type {
   SkillInput,
   SkillPatch,
   ToolAccess,
+  WikiPage,
+  WikiPageInput,
+  WikiUpdateInput,
 } from "./types";
 
 /**
@@ -285,13 +292,13 @@ export function usePostMessage(
   const key = keys.messages(orgId, channelId);
   return useMutation({
     meta: { silent: true },
-    mutationFn: ({ body, clientId }: { body: string; clientId: string }) =>
-      api.chat.post(orgId, channelId, { body, clientId }),
-    onMutate: ({ body, clientId }) => {
+    mutationFn: ({ body, clientId, threadId }: { body: string; clientId: string; threadId?: string | null }) =>
+      api.chat.post(orgId, channelId, { body, clientId, ...(threadId ? { threadId } : {}) }),
+    onMutate: ({ body, clientId, threadId }) => {
       const local: Message = {
         id: `local-${clientId}`,
         channelId,
-        threadId: null,
+        threadId: threadId ?? null,
         author: { type: "person", id: options.me.id },
         body,
         mentionedAgentIds: options.mentioned?.(body) ?? [],
@@ -326,8 +333,9 @@ export function usePostMessage(
 /** `send(body)` for a new message; `retry(local)` for one that failed. */
 export function sendHelpers(mutation: ReturnType<typeof usePostMessage>) {
   return {
-    send: (body: string) => mutation.mutate({ body, clientId: newClientId() }),
-    retry: (local: Message) => mutation.mutate({ body: local.body, clientId: local.clientId ?? newClientId() }),
+    send: (body: string, threadId?: string | null) => mutation.mutate({ body, clientId: newClientId(), threadId }),
+    retry: (local: Message) =>
+      mutation.mutate({ body: local.body, clientId: local.clientId ?? newClientId(), threadId: local.threadId }),
   };
 }
 
@@ -1083,6 +1091,148 @@ export function useComputerAction(orgId: string) {
       } else if (result && typeof result === "object" && "status" in result) {
         qc.setQueryData(keys.computer(orgId, agentId), result as AgentComputer);
       }
+    },
+  });
+}
+
+// ── Forum ────────────────────────────────────────────────────────────────────
+
+export const useForumTopics = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.forum(orgId),
+    queryFn: () => api.forum.list(orgId),
+    enabled,
+    staleTime: 15_000,
+  });
+};
+
+/** A topic with its posts; refreshed every few seconds while the discussion is on. */
+export const useForumTopic = (orgId: string, topicId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.forumTopic(orgId, topicId ?? ""),
+    queryFn: () => api.forum.get(orgId, topicId ?? ""),
+    enabled: topicId !== null,
+    refetchInterval: (q) => (q.state.data?.status === "open" ? 5000 : false),
+    meta: { quiet: true },
+  });
+};
+
+export function useForumAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      action:
+        | { type: "create"; input: ForumTopicInput }
+        | { type: "post"; topicId: string; body: string }
+        | { type: "conclude"; topicId: string }
+        | { type: "cancel"; topicId: string }
+        | { type: "participants"; topicId: string; input: ForumParticipantsInput }
+        | { type: "issues"; topicId: string; items: ForumSuggestedIssue[] },
+    ): Promise<unknown> => {
+      switch (action.type) {
+        case "create":
+          return api.forum.create(orgId, action.input);
+        case "post":
+          return api.forum.post(orgId, action.topicId, action.body);
+        case "conclude":
+          return api.forum.conclude(orgId, action.topicId);
+        case "cancel":
+          return api.forum.cancel(orgId, action.topicId);
+        case "participants":
+          return api.forum.participants(orgId, action.topicId, action.input);
+        case "issues":
+          return api.forum.createIssues(orgId, action.topicId, action.items);
+      }
+    },
+    onSuccess: (result, action) => {
+      if (
+        action.type !== "issues" &&
+        action.type !== "post" &&
+        result &&
+        typeof result === "object" &&
+        "id" in result
+      ) {
+        qc.setQueryData(keys.forumTopic(orgId, (result as ForumTopicDetail).id), result);
+      }
+    },
+    onSettled: (_r, _e, action) => {
+      void qc.invalidateQueries({ queryKey: keys.forum(orgId) });
+      if (action.type === "issues") void qc.invalidateQueries({ queryKey: ["org", orgId, "issues"] });
+    },
+  });
+}
+
+// ── Wiki ─────────────────────────────────────────────────────────────────────
+
+/** Every page (titles, folders, tags): the tree, `[[link]]` resolution, ⌘K. */
+export const useWikiTree = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.wikiTree(orgId),
+    queryFn: () => api.wiki.tree(orgId),
+    enabled,
+    staleTime: 30_000,
+  });
+};
+
+export const useWikiPage = (orgId: string, slug: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.wikiPage(orgId, slug ?? ""),
+    queryFn: () => api.wiki.get(orgId, slug ?? ""),
+    enabled: slug !== null && slug !== "",
+    retry: false,
+  });
+};
+
+export const useWikiHistory = (orgId: string, slug: string, enabled: boolean) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.wikiHistory(orgId, slug),
+    queryFn: () => api.wiki.history(orgId, slug),
+    enabled,
+  });
+};
+
+export const useWikiGraph = (orgId: string, enabled: boolean) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.wikiGraph(orgId), queryFn: () => api.wiki.graph(orgId), enabled });
+};
+
+export function useWikiAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (
+      action:
+        | { type: "create"; input: WikiPageInput }
+        | { type: "update"; slug: string; input: WikiUpdateInput }
+        | { type: "rename"; slug: string; title: string }
+        | {
+            type: "append";
+            slug: string;
+            text: string;
+            source: { kind: "message"; channelId: string; messageId: string } | { kind: "forum"; topicId: string };
+          },
+    ): Promise<WikiPage> => {
+      switch (action.type) {
+        case "create":
+          return api.wiki.create(orgId, action.input);
+        case "update":
+          return api.wiki.update(orgId, action.slug, action.input);
+        case "rename":
+          return api.wiki.rename(orgId, action.slug, action.title);
+        case "append":
+          return api.wiki.append(orgId, action.slug, { text: action.text, source: action.source });
+      }
+    },
+    onSuccess: (page) => {
+      qc.setQueryData(keys.wikiPage(orgId, page.slug), page);
+      void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
     },
   });
 }

@@ -43,6 +43,7 @@ import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { useOrg } from "./org-context";
+import { ProfilePhotoDialog } from "./ProfilePhoto";
 
 /** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
 function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boolean; label: string }) {
@@ -186,6 +187,10 @@ export function Sidebar() {
         <Link to="/org/$orgId/forum" params={{ orgId }} className="sidebar__item">
           <Icon name="message" />
           <span className="sidebar__item-label">{t("shell.forum")}</span>
+        </Link>
+        <Link to="/org/$orgId/wiki" params={{ orgId }} className="sidebar__item">
+          <Icon name="book" />
+          <span className="sidebar__item-label">{t("shell.wiki")}</span>
         </Link>
         <Link to="/org/$orgId/drive" params={{ orgId }} className="sidebar__item">
           <Icon name="drive" />
@@ -331,6 +336,7 @@ function UnreadCount({ count }: { count: number }) {
 function AccountMenu({ spent }: { spent: string | null }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
   const theme = useTheme();
   const auth = useAuth();
   const qc = useQueryClient();
@@ -351,7 +357,7 @@ function AccountMenu({ spent }: { spent: string | null }) {
         label={t("shell.account")}
         trigger={
           <button type="button" className="sidebar__user" aria-label={`${t("shell.account")}: ${me.user.name}`}>
-            <Avatar name={me.user.name} size="sm" imageUrl={me.user.image} />
+            <Avatar name={me.user.name} size="sm" imageUrl={dir.memberById.get(me.user.id)?.image ?? me.user.image} />
             <span className="sidebar__user-name">{me.user.name}</span>
             {spent && <span className="sidebar__user-spend">{t("shell.spentThisMonth", { amount: spent })}</span>}
           </button>
@@ -480,6 +486,7 @@ function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null
   const [zone, setZone] = useState("");
   const [useOrgZone, setUseOrgZone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photo, setPhoto] = useState(false);
   useEffect(() => {
     if (!focus) return;
     setHandle(mine?.handle ?? "");
@@ -519,6 +526,16 @@ function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null
         }}
       >
         <DialogBody>
+          <div className="row" style={{ gap: 12, alignItems: "center" }}>
+            <Avatar name={me.user.name} size="lg" imageUrl={mine?.image ?? me.user.image} />
+            <div className="stack-4" style={{ gap: 2, flex: 1 }}>
+              <span style={{ fontWeight: 600 }}>{t("photo.label")}</span>
+              <span className="small muted">{t("photo.labelHelp")}</span>
+            </div>
+            <Button size="sm" type="button" onClick={() => setPhoto(true)}>
+              {t("photo.change")}
+            </Button>
+          </div>
           <Field label={t("shell.handle")} id="me-handle" help={t("shell.handleHelp")}>
             <AffixInput
               prefix="@"
@@ -556,6 +573,7 @@ function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null
           </Button>
         </DialogFooter>
       </form>
+      <ProfilePhotoDialog open={photo} onClose={() => setPhoto(false)} />
     </Dialog>
   );
 }

@@ -15,7 +15,8 @@ export type ServerFrame =
   | { type: "error"; code: string; channelId?: string }
   | { type: "pong" }
   | { type: "event"; channelId: string; event: ChannelEvent }
-  | { type: "event"; scope: "user"; event: UserEvent };
+  /** `user`: for me only; `org`: broadcasts to the whole organization (the forum). */
+  | { type: "event"; scope: "user" | "org"; event: UserEvent };
 
 export type ConnectionStatus = "idle" | "connecting" | "open" | "reconnecting" | "closed";
 

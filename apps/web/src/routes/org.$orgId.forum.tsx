@@ -1,15 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
-import { EmptyPage } from "@/components/EmptyPage";
 import { Main } from "@/components/Main";
+import { ForumPage } from "@/pages/ForumPage";
 
-/** Linked from the sidebar; not built yet. Designed empty state. */
+/** Fórum: topics where agents discuss in rounds. */
 export const Route = createFileRoute("/org/$orgId/forum")({
   component: function Page() {
-    const { t } = useTranslation();
     return (
       <Main>
-        <EmptyPage icon="message" title={t("empty.forum.title")} text={t("empty.forum.text")} />
+        <ForumPage />
       </Main>
     );
   },

@@ -1,6 +1,6 @@
 import { Mention } from "@agenteschat/ui";
 import { type ReactNode, useCallback } from "react";
-import { Markdown } from "@/lib/markdown";
+import { Markdown, type WikiLinkRenderer } from "@/lib/markdown";
 
 /**
  * Renders a message body as safe Markdown (bold, italic, `code`, ```blocks```,
@@ -11,16 +11,19 @@ export function MessageBody({
   body,
   resolveMention,
   renderMention,
+  wikiLink,
 }: {
   body: string;
   resolveMention?: (handle: string) => string | null;
   /** Replaces the plain chip (e.g. a chip that opens the profile card). */
   renderMention?: (handle: string, key: string) => ReactNode;
+  /** `[[Título]]`: wiki link chips (with a preview on hover). */
+  wikiLink?: WikiLinkRenderer;
 }) {
   const mention = useCallback(
     (handle: string, key: string) =>
       renderMention ? renderMention(handle, key) : <Mention key={key}>@{resolveMention?.(handle) ?? handle}</Mention>,
     [resolveMention, renderMention],
   );
-  return <Markdown source={body} variant="message" mention={mention} />;
+  return <Markdown source={body} variant="message" mention={mention} wikiLink={wikiLink} />;
 }
