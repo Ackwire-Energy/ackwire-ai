@@ -61,13 +61,17 @@ canvas.av{display:block}
   <div class="top">
     <div>
       <h1>Acessórios</h1>
-      <p>Os acessórios redesenhados em pixel na mesma grade 16×16 do corpo. Agente, olhos e cores vêm do motor único (packages/ui/src/agent/engine.js), o mesmo do app. Os de hoje (sem os óculos) mais 6 novos. Clique num card para ver grande no céu.</p>
+      <p>Os acessórios redesenhados em pixel na mesma grade 16×16 do corpo. Agente, olhos e cores vêm do motor único (packages/ui/src/agent/engine.js), o mesmo do app. Os de hoje (sem os óculos) mais 6 novos. Clique num card para ver grande no céu; o grandão segue o cursor (vira a cabeça em pseudo-3D).</p>
     </div>
     <div class="ctl">
       <div class="swatches" id="colors" role="group" aria-label="Cor"></div>
       <div class="seg" id="state" role="group" aria-label="Estado">
         <button data-v="idle">Parado</button>
         <button data-v="thinking">Pensando</button>
+      </div>
+      <div class="seg" id="speed" role="group" aria-label="Movimento">
+        <button data-v="1">Calmo</button>
+        <button data-v="1.8">Vivo</button>
       </div>
       <div class="seg" id="theme" role="group" aria-label="Tema">
         <button data-v="light">Claro</button>
@@ -87,6 +91,10 @@ canvas.av{display:block}
   </div>
 
   <section>
+    <h2>Expressões <span>passam por um instante; o motor sorteia uma de vez em quando</span></h2>
+    <div class="grid" id="expr"></div>
+  </section>
+  <section>
     <h2>De hoje <span>redesenhados em pixel</span></h2>
     <div class="grid" id="current"></div>
   </section>
@@ -102,7 +110,7 @@ canvas.av{display:block}
 
 <script type="module">
 /* The same agent engine the app uses (serve the repo root over http to open this page). */
-import { AGENT_GRADIENTS as GRAD, drawAgent } from "../../../packages/ui/src/agent/engine.js";
+import { AGENT_GRADIENTS as GRAD, drawAgent, EXPRESSIONS, idlePose } from "../../../packages/ui/src/agent/engine.js";
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 const SKY = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"];
 const rgb = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
@@ -251,30 +259,50 @@ function draw(it, t) {
   const ctx = it.cv.getContext("2d");
   ctx.clearRect(0, 0, W, H);
   const X0 = Math.round(0.25 * it.size * dpr), Y0 = Math.round(0.62 * it.size * dpr);
-  const u = S / 16;
   const a = it.acc ? ACC[it.acc] : null;
   const c = it.color || color;
-  // Body and eyes: the engine, on a 16×16 grid so the accessories' pixels line up with the body's.
   const st = it.state || state;
-  const look = st === "thinking" ? [-1, 0, 1, 0][Math.floor((t + it.seed) / 0.8) % 4] : 0;
-  const blink = ((t + it.seed) % 4.6) < 0.13;
-  drawAgent(ctx, X0, Y0, S, { color: c, cells: 16, pose: { blink, look: [look / 16, 0] }, withEyes: !(a && a.hides) });
-  if (!a) return;
-  const shift = a.face ? look : 0;
-  a.rows.forEach((row, j) => {
-    for (let i = 0; i < row.length; i++) {
-      let ch = row[i];
-      if (ch === " ") continue;
-      const gx = a.ox + i + shift, gy = a.oy + j;
-      if (CHECK[ch]) ch = CHECK[ch][(gx + gy) & 1];
-      let col = PAL[ch];
-      if (ch === "A") col = st === "thinking" ? (Math.floor(t * 3) % 2 ? "#ff6b5e" : "#ffd0c9") : "#ff6b5e";
-      ctx.fillStyle = col;
-      const x0 = Math.round(X0 + gx * u), y0 = Math.round(Y0 + gy * u);
-      ctx.fillRect(x0, y0, Math.round(X0 + (gx + 1) * u) - x0, Math.round(Y0 + (gy + 1) * u) - y0);
-    }
+  // The engine's idle life: head turns (pseudo-3D), blinks, breath, now and then an expression.
+  const pose = idlePose(t * speed, it.seed, { active: st === "thinking", expressions: it.expression ? [] : undefined });
+  if (it.expression) pose.expression = it.expression;
+  if (it.follow && pointer.on) pose.turn = followTurn(it.cv);
+  drawAgent(ctx, X0, Y0, S, {
+    color: c,
+    cells: 16,
+    pose,
+    withEyes: !(a && a.hides),
+    after: (g, s, frame) => {
+      if (!a) return;
+      // Accessories on the body's 16×16 grid, with a little parallax (less than the eyes).
+      const u = s / 16;
+      const hx = frame.head[0] * s, hy = frame.head[1] * s;
+      a.rows.forEach((row, j) => {
+        for (let i = 0; i < row.length; i++) {
+          let ch = row[i];
+          if (ch === " ") continue;
+          const gx = a.ox + i, gy = a.oy + j;
+          if (CHECK[ch]) ch = CHECK[ch][(gx + gy) & 1];
+          let col = PAL[ch];
+          if (ch === "A") col = st === "thinking" ? (Math.floor(t * 3) % 2 ? "#ff6b5e" : "#ffd0c9") : "#ff6b5e";
+          g.fillStyle = col;
+          g.fillRect(gx * u + hx, gy * u + hy, u + 0.6, u + 0.6);
+        }
+      });
+    },
   });
 }
+
+/* The big agent on the stage follows the pointer (turn), and goes back to its idle life after a while. */
+const pointer = { x: 0, y: 0, on: false, at: 0 };
+addEventListener("pointermove", (e) => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.on = true; pointer.at = performance.now(); });
+setInterval(() => { if (performance.now() - pointer.at > 2500) pointer.on = false; }, 500);
+function followTurn(cv) {
+  const r = cv.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height * 0.6;
+  const k = (v) => Math.max(-1, Math.min(1, v));
+  return [k((pointer.x - cx) / 420), k((pointer.y - cy) / 320)];
+}
+let speed = 1;
 
 /* Cards. */
 function card(key) {
@@ -291,9 +319,20 @@ const cur = document.getElementById("current"), fr = document.getElementById("fr
 for (const k of CURRENT) cur.append(card(k));
 for (const k of FRESH) fr.append(card(k));
 
+/* Expressions: each card holds one, while the head keeps turning. */
+const EXPR_NAMES = { closed: "Olhos fechados", happy: "Feliz", dizzy: "Tonto (@ @)", heart: "Apaixonado", star: "Brilho", cross: "Fora do ar (× ×)", surprised: "Surpreso", angry: "Bravo", wink: "Piscadinha" };
+const exprEl = document.getElementById("expr");
+for (const k of Object.keys(EXPRESSIONS)) {
+  const b = document.createElement("div");
+  b.className = "card";
+  b.innerHTML = `<div class="row"></div><div class="name"><span>${EXPR_NAMES[k] ?? k}</span></div>`;
+  b.querySelector(".row").append(makeAvatar(72, null, { expression: k }), makeAvatar(36, null, { expression: k }), makeAvatar(24, null, { expression: k }));
+  exprEl.append(b);
+}
+
 /* The stage: big on the sky. */
 const big = document.getElementById("big");
-const bigItems = [makeAvatar(150, selected), makeAvatar(56, selected)];
+const bigItems = [makeAvatar(150, selected, { follow: true }), makeAvatar(56, selected)];
 big.append(...bigItems.map((c) => c));
 function select(key) {
   selected = key;
@@ -331,6 +370,8 @@ for (const k of Object.keys(GRAD)) {
 colorsEl.firstElementChild.setAttribute("aria-pressed", "true");
 const bindSeg = (id, fn) => document.getElementById(id).addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; for (const x of b.parentElement.children) x.setAttribute("aria-pressed", String(x === b)); fn(b.dataset.v); });
 bindSeg("state", (v) => { state = v; });
+bindSeg("speed", (v) => { speed = Number(v); });
+document.querySelector('#speed [data-v="1"]').setAttribute("aria-pressed", "true");
 bindSeg("theme", (v) => { document.documentElement.dataset.theme = v; });
 document.querySelector('#state [data-v="idle"]').setAttribute("aria-pressed", "true");
 const dark = matchMedia("(prefers-color-scheme: dark)").matches;
