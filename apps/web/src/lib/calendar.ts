@@ -37,6 +37,9 @@ export interface CalItem {
 export const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 export const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 export const addMinutes = (d: Date, n: number) => new Date(d.getTime() + n * 60_000);
+/** The same wall-clock time `n` days later (addDays drops the time). */
+export const shiftDays = (d: Date, n: number) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, d.getHours(), d.getMinutes(), d.getSeconds());
 export function mondayOf(d: Date) {
   return addDays(startOfDay(d), -((d.getDay() + 6) % 7));
 }
@@ -281,8 +284,8 @@ export function dragRange(day: Date, y0: number, y1: number, hourPx = HOUR_PX) {
 /** Where the week opens: around 07:00, or a little before the first timed item. */
 export function initialScrollMinutes(items: CalItem[], days: Date[]) {
   const firsts = days.flatMap((d) => layoutDay(items, d).map((p) => p.top));
-  const first = firsts.length ? Math.min(...firsts) : 7 * 60;
-  return Math.max(0, Math.min(7 * 60, first - 30));
+  if (firsts.length === 0) return 7 * 60;
+  return Math.max(0, Math.min(7 * 60, Math.min(...firsts) - 30));
 }
 
 /** The next `n` items from `now` (for "Próximos"). */

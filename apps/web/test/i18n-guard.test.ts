@@ -20,7 +20,11 @@ describe("locales", () => {
     const enKeys = new Set(enLeaves.map(([k]) => base(k)));
     expect([...ptKeys].filter((k) => !enKeys.has(k))).toEqual([]);
     expect([...enKeys].filter((k) => !ptKeys.has(k))).toEqual([]);
-    const empty = [...pt, ...enLeaves].filter(([, v]) => typeof v !== "string" || v.trim() === "").map(([k]) => k);
+    // Empty on purpose: English has no gendered articles; the custom role starts with no instructions.
+    const EMPTY_OK = [/^grammar\./, /^newAgent\.roles\.custom\.instructions$/];
+    const empty = [...pt, ...enLeaves]
+      .filter(([k, v]) => typeof v !== "string" || (v.trim() === "" && !EMPTY_OK.some((re) => re.test(k))))
+      .map(([k]) => k);
     expect(empty).toEqual([]);
   });
 });

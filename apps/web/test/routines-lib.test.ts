@@ -37,7 +37,9 @@ describe("time zones", () => {
     const at = new Date(Date.UTC(2026, 9, 15, 12));
     expect(utcOffset("America/Sao_Paulo", at)).toBe("UTC−3");
     expect(timezoneLabel("America/Sao_Paulo", at)).toBe("horário de Brasília (UTC−3)");
-    expect(timezoneLabel("Asia/Kolkata", at)).toBe("Asia/Kolkata (UTC+5:30)");
+    expect(timezoneLabel("Asia/Kolkata", at)).toBe("Índia (UTC+5:30)");
+    // A zone without a friendly name keeps its IANA id (as in the selector, which shows the city).
+    expect(timezoneLabel("Asia/Kathmandu", at)).toBe("Asia/Kathmandu (UTC+5:45)");
     expect(timezoneLabel("UTC", at)).toBe("UTC");
   });
 });

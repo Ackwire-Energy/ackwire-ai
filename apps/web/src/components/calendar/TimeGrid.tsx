@@ -10,7 +10,6 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  addDays,
   addMinutes,
   type CalItem,
   dragRange,
@@ -21,6 +20,7 @@ import {
   minutesOfDay,
   SNAP_MIN,
   sameDay,
+  shiftDays,
   yToMinutes,
 } from "@/lib/calendar";
 import { toYmd } from "@/lib/format";
@@ -140,7 +140,7 @@ export function TimeGrid({
       suppressClick.current = true;
       const it = g.item;
       if (g.kind === "move") {
-        const start = addMinutes(addDays(it.start, g.dDay), g.dMin);
+        const start = addMinutes(shiftDays(it.start, g.dDay), g.dMin);
         onMove(it, { start, end: new Date(start.getTime() + (it.end.getTime() - it.start.getTime())) });
       } else {
         const end = addMinutes(it.end, g.dMin);

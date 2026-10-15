@@ -458,7 +458,16 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   // What the routine had, to tell whether "when" changed.
   const [savedRule] = useState(() => JSON.stringify(toApiRule(ruleOf(routine, savedZone || myZone))));
   const zone = rule.timezone;
-  const setZone = (z: string) => setRule((r) => ({ ...r, timezone: z }));
+  // My zone may arrive after the form opens (the people list loads): follow it until a zone is picked.
+  const [zoneTouched, setZoneTouched] = useState(false);
+  const setZone = (z: string) => {
+    setZoneTouched(true);
+    setRule((r) => ({ ...r, timezone: z }));
+  };
+  const followsMyZone = !routine || wasUtc;
+  useEffect(() => {
+    if (followsMyZone && !zoneTouched) setRule((r) => (r.timezone === myZone ? r : { ...r, timezone: myZone }));
+  }, [myZone, followsMyZone, zoneTouched]);
   // The phrase was typed (its parse fills the picker) or follows the picker.
   const [phraseTyped, setPhraseTyped] = useState(false);
   const pickRule = (next: RecurrenceRule) => {
