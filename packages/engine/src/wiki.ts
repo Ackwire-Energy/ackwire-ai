@@ -104,8 +104,8 @@ export class WikiVersionConflictError extends ConflictError {
 
 function cleanTitle(title: string) {
   const t = title.replace(/\s+/g, " ").trim().slice(0, WIKI_LIMITS.title);
-  if (!t) throw new ValidationError("O título é obrigatório.");
-  if (/[[\]|#]/.test(t)) throw new ValidationError("O título não pode ter [ ] | ou #.");
+  if (!t) throw new ValidationError("A title is required", "wiki.title_required");
+  if (/[[\]|#]/.test(t)) throw new ValidationError("The title can't contain [ ] | or #", "wiki.title_characters");
   return t;
 }
 
@@ -116,7 +116,7 @@ export function cleanFolder(folder: string | undefined | null) {
     .split("/")
     .map((p) => p.replace(/\s+/g, " ").trim().slice(0, 80))
     .filter(Boolean);
-  if (parts.length > 8) throw new ValidationError("No máximo 8 níveis de pasta.");
+  if (parts.length > 8) throw new ValidationError("At most 8 folder levels", "wiki.folder_depth", { max: 8 });
   return parts.join("/").slice(0, WIKI_LIMITS.folder);
 }
 
@@ -130,7 +130,8 @@ function cleanTags(tags: string[] | undefined) {
 
 function cleanBody(body: string | undefined) {
   const b = body ?? "";
-  if (b.length > WIKI_LIMITS.body) throw new ValidationError("A página pode ter até 200 mil caracteres.");
+  if (b.length > WIKI_LIMITS.body)
+    throw new ValidationError("A page can have up to 200,000 characters", "wiki.body_too_long", { max: 200_000 });
   return b;
 }
 
@@ -153,7 +154,7 @@ async function requireWriter(db: Database, actor: WikiActor, orgId: string, page
   const membership = await requireReader(db, actor, orgId);
   if (membership && !can(membership.role, "post")) throw new ForbiddenError();
   if (page?.locked && !(membership && can(membership.role, "configure"))) {
-    throw new ForbiddenError("Esta página está trancada: só admins editam.");
+    throw new ForbiddenError("This page is locked: only admins edit it", "wiki.locked");
   }
   return membership;
 }
@@ -179,7 +180,7 @@ async function findPage(db: Executor, orgId: string, ref: string, options: { del
       .from(wikiPages)
       .where(and(eq(wikiPages.orgId, orgId), eq(wikiPages.id, key)));
     if (row && (options.deleted ? row.deletedAt : !row.deletedAt)) return row;
-    throw new NotFoundError("Página não encontrada");
+    throw new NotFoundError("Page not found", "wiki.page_not_found");
   }
   const slug = wikiSlug(key) || key;
   if (options.deleted) {
@@ -189,13 +190,13 @@ async function findPage(db: Executor, orgId: string, ref: string, options: { del
       .where(and(eq(wikiPages.orgId, orgId), eq(wikiPages.slug, slug), sql`${wikiPages.deletedAt} is not null`))
       .orderBy(desc(wikiPages.deletedAt))
       .limit(1);
-    if (!row) throw new NotFoundError("Página não encontrada");
+    if (!row) throw new NotFoundError("Page not found", "wiki.page_not_found");
     return row;
   }
   const page = (await pagesBySlug(db, orgId, [slug])).get(slug);
-  if (!page) throw new NotFoundError("Página não encontrada");
+  if (!page) throw new NotFoundError("Page not found", "wiki.page_not_found");
   const [row] = await db.select().from(wikiPages).where(eq(wikiPages.id, page.id));
-  if (!row) throw new NotFoundError("Página não encontrada");
+  if (!row) throw new NotFoundError("Page not found", "wiki.page_not_found");
   return row;
 }
 
@@ -457,7 +458,7 @@ async function freeSlug(tx: Executor, orgId: string, wanted: string) {
       .where(and(eq(wikiPages.orgId, orgId), eq(wikiPages.slug, slug), isNull(wikiPages.deletedAt)));
     if (!taken) return slug;
   }
-  throw new ConflictError("Não achei um endereço livre para esta página.");
+  throw new ConflictError("No free address for this page", "wiki.no_free_slug");
 }
 
 export interface WikiPageInput {
@@ -489,10 +490,13 @@ export async function createWikiPage(
   const author = authorCols(actor);
   const row = await db.transaction(async (tx) => {
     const wanted = wikiSlug(leafTitle);
-    if (!wanted) throw new ValidationError("O título precisa de letras ou números.");
+    if (!wanted) throw new ValidationError("The title needs letters or numbers", "wiki.title_empty_slug");
     const existing = (await pagesBySlug(tx, orgId, [wanted])).get(wanted);
     if (existing && existing.slug === wanted && !options.allowDuplicate) {
-      throw new ConflictError(`Já existe a página "${existing.title}" (${existing.slug}).`, "slug_taken");
+      throw new ConflictError(`A page "${existing.title}" already exists`, "slug_taken", {
+        title: existing.title,
+        slug: existing.slug,
+      });
     }
     const slug = existing && existing.slug === wanted ? await freeSlug(tx, orgId, wanted) : wanted;
     const [page] = await tx
@@ -693,7 +697,7 @@ export async function renameWikiPage(
   await requireWriter(db, actor, orgId, current);
   const title = cleanTitle(input.title.split("/").pop() ?? input.title);
   const wanted = wikiSlug(title);
-  if (!wanted) throw new ValidationError("O título precisa de letras ou números.");
+  if (!wanted) throw new ValidationError("The title needs letters or numbers", "wiki.title_empty_slug");
   const author = authorCols(actor);
   const oldSlugs = new Set([current.slug, ...current.aliases]);
   const { row, touched } = await db.transaction(async (tx) => {
@@ -703,7 +707,10 @@ export async function renameWikiPage(
         .select({ id: wikiPages.id, title: wikiPages.title })
         .from(wikiPages)
         .where(and(eq(wikiPages.orgId, orgId), eq(wikiPages.slug, wanted), isNull(wikiPages.deletedAt)));
-      if (taken) throw new ConflictError(`Já existe a página "${taken.title}" com esse endereço.`, "slug_taken");
+      if (taken)
+        throw new ConflictError(`A page "${taken.title}" already uses this address`, "slug_taken", {
+          title: taken.title,
+        });
       slug = wanted;
     }
     const aliases = [...new Set([...current.aliases, current.slug])].filter((a) => a !== slug).slice(-20);
@@ -720,7 +727,7 @@ export async function renameWikiPage(
       })
       .where(eq(wikiPages.id, current.id))
       .returning();
-    if (!page) throw new NotFoundError("Página não encontrada");
+    if (!page) throw new NotFoundError("Page not found", "wiki.page_not_found");
     await addVersion(tx, page, actor, await defaultNote(tx, actor, `renomeou de "${current.title}" para "${title}"`));
     await claimLinks(tx, page);
     // Pages that link here: rewrite their `[[…]]` to the new title, as a new version each.
@@ -844,13 +851,18 @@ export async function restoreWikiPage(deps: WikiDeps, actor: WikiActor, orgId: s
       .select({ title: wikiPages.title })
       .from(wikiPages)
       .where(and(eq(wikiPages.orgId, orgId), eq(wikiPages.slug, page.slug), isNull(wikiPages.deletedAt)));
-    if (taken) throw new ConflictError(`Outra página já usa esse endereço ("${taken.title}"): renomeie-a antes.`);
+    if (taken)
+      throw new ConflictError(
+        `Another page uses this address ("${taken.title}"): rename it first`,
+        "wiki.restore_slug_taken",
+        { title: taken.title },
+      );
     const [restored] = await tx
       .update(wikiPages)
       .set({ deletedAt: null, updatedAt: new Date() })
       .where(eq(wikiPages.id, page.id))
       .returning();
-    if (!restored) throw new NotFoundError("Página não encontrada");
+    if (!restored) throw new NotFoundError("Page not found", "wiki.page_not_found");
     await claimLinks(tx, restored);
     await enqueueIndex(tx, { orgId, kind: "wiki", sourceId: page.id });
     await recordAudit(tx, {
@@ -872,10 +884,10 @@ export async function setWikiPageLock(deps: WikiDeps, userId: string, orgId: str
   const { db } = deps;
   const membership = await getMembership(db, userId, orgId);
   if (!membership) throw new ForbiddenError("You are not a member of this organization");
-  if (!can(membership.role, "configure")) throw new ForbiddenError("Só admins trancam páginas.");
+  if (!can(membership.role, "configure")) throw new ForbiddenError("Only admins lock pages", "wiki.lock_admins_only");
   const page = await findPage(db, orgId, ref);
   const [row] = await db.update(wikiPages).set({ locked }).where(eq(wikiPages.id, page.id)).returning();
-  if (!row) throw new NotFoundError("Página não encontrada");
+  if (!row) throw new NotFoundError("Page not found", "wiki.page_not_found");
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: userId },
@@ -1003,7 +1015,7 @@ export async function getWikiVersion(db: Database, actor: WikiActor, orgId: stri
     .select()
     .from(wikiPageVersions)
     .where(and(eq(wikiPageVersions.pageId, page.id), eq(wikiPageVersions.version, version)));
-  if (!v) throw new NotFoundError("Versão não encontrada");
+  if (!v) throw new NotFoundError("Version not found", "wiki.version_not_found");
   return {
     version: v.version,
     title: v.title,
@@ -1236,7 +1248,8 @@ async function sourceBlock(deps: WikiDeps, userId: string, orgId: string, source
   if (source.kind === "message") {
     await requireChannelAccess(db, userId, orgId, source.channelId);
     const m = await getMessage(db, orgId, source.messageId);
-    if (!m || m.deletedAt || m.channelId !== source.channelId) throw new NotFoundError("Mensagem não encontrada");
+    if (!m || m.deletedAt || m.channelId !== source.channelId)
+      throw new NotFoundError("Message not found", "message.not_found");
     const [channel] = await db
       .select({ name: channels.name, kind: channels.kind })
       .from(channels)
@@ -1261,8 +1274,8 @@ async function sourceBlock(deps: WikiDeps, userId: string, orgId: string, source
     };
   }
   const topic = await getForumTopic(db, userId, orgId, source.topicId);
-  if (!topic.synthesis) throw new ValidationError("Este tópico ainda não tem síntese.");
-  if (!deps.artifacts) throw new ValidationError("Arquivos não estão disponíveis neste servidor.");
+  if (!topic.synthesis) throw new ValidationError("This topic has no synthesis yet", "forum.no_synthesis");
+  if (!deps.artifacts) throw new ValidationError("Files aren't available on this server", "drive.unavailable");
   const doc = await getArtifact(deps.artifacts, { type: "person", userId }, orgId, topic.synthesis.artifactId);
   const markdown = doc.content.kind === "document" ? doc.content.markdown : "";
   return {

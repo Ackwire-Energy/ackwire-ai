@@ -1,13 +1,27 @@
-/** Domain errors. The HTTP layer maps them to status codes (`apps/server/src/http/errors.ts`). */
+/**
+ * Domain errors. The HTTP layer maps them to status codes (`apps/server/src/http/errors.ts`).
+ * Each may carry a stable `code` and `params` the app translates (`t(code, params)`);
+ * `message` is the English fallback.
+ */
+export type ErrorParams = Record<string, string | number | boolean | string[] | null>;
+
 export class ForbiddenError extends Error {
-  constructor(message = "You don't have permission to do this") {
+  constructor(
+    message = "You don't have permission to do this",
+    readonly code: string = "forbidden",
+    readonly params?: ErrorParams,
+  ) {
     super(message);
     this.name = "ForbiddenError";
   }
 }
 
 export class NotFoundError extends Error {
-  constructor(message = "Not found") {
+  constructor(
+    message = "Not found",
+    readonly code: string = "not_found",
+    readonly params?: ErrorParams,
+  ) {
     super(message);
     this.name = "NotFoundError";
   }
@@ -18,6 +32,7 @@ export class ConflictError extends Error {
   constructor(
     message: string,
     readonly code: string = "conflict",
+    readonly params?: ErrorParams,
   ) {
     super(message);
     this.name = "ConflictError";
@@ -25,7 +40,11 @@ export class ConflictError extends Error {
 }
 
 export class ValidationError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly code: string = "invalid_request",
+    readonly params?: ErrorParams,
+  ) {
     super(message);
     this.name = "ValidationError";
   }

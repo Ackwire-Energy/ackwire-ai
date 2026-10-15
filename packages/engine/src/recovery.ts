@@ -151,7 +151,8 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
       threadId,
       author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
       body: said ? `${said}\n\n${note}` : note,
-      meta: { interrupted: true },
+      // `text`: what the agent wrote; the app explains the interruption in the person's language.
+      meta: { interrupted: { reason: "deploy", text: said } },
     });
     await tx.update(agentRuns).set({ replyMessageId: message.id }).where(eq(agentRuns.id, run.id));
     await addRunStep(tx, run, "error", { reason: "interrupted", message: INTERRUPTED_BY_RESTART });

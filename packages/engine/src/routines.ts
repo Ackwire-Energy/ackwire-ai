@@ -15,7 +15,7 @@ import {
 } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import type { ArtifactDeps } from "./artifacts";
-import { audienceNotice, canTalkTo } from "./audience";
+import { audienceError, audienceNotice, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
 import { type ContextDeps, resolveSummaryModel } from "./context/summaries";
 import { nextCronTime, zonedTime } from "./cron";
@@ -80,7 +80,10 @@ export interface RoutineRunView {
   id: string;
   at: string;
   status: "ok" | "failed" | "skipped";
+  /** Fallback text (pt-BR); the app shows `summaryCode` with `t()`. */
   summary: string;
+  summaryCode: string | null;
+  summaryParams?: Record<string, string>;
   costUsd: number;
 }
 
@@ -191,7 +194,45 @@ function runView(run: RunRow, agentRun: { status: string; error: string | null }
       summary = agentRun.status === "waiting_approval" ? "Esperando aprovação" : "Em andamento";
     }
   } else if (run.status === "queued") summary = "Na fila";
-  return { id: run.id, at: run.at.toISOString(), status, summary, costUsd: costNanoUsd / 1e9 };
+  const coded = summaryCode(summary, agentRun?.error ?? null);
+  return {
+    id: run.id,
+    at: run.at.toISOString(),
+    status,
+    summary,
+    summaryCode: coded?.code ?? null,
+    ...(coded?.params ? { summaryParams: coded.params } : {}),
+    costUsd: costNanoUsd / 1e9,
+  };
+}
+
+const SUMMARY_CODES: Record<string, string> = {
+  "Rotina apagada": "routine_run.deleted",
+  "Orçamento da rotina esgotado neste mês": "routine_run.routine_budget",
+  "Rotina pausada": "routine_run.paused",
+  "Quem criou a rotina saiu da organização": "routine_run.creator_left",
+  "O agente foi arquivado": "routine_run.agent_archived",
+  "Lembrete enviado": "routine_run.reminder_sent",
+  "O agente não está no canal": "routine_run.agent_not_in_channel",
+  "Esperando aprovação": "routine_run.waiting_approval",
+  "Em andamento": "routine_run.running",
+  "Na fila": "routine_run.queued",
+  "Orçamento do mês esgotado": "routine_run.agent_budget",
+  "Resposta no canal": "routine_run.delivered_channel",
+  "Arquivo no Drive": "routine_run.delivered_drive",
+  "Enviado na DM": "routine_run.delivered_dm",
+};
+
+/** The stable code of a run summary (the summaries we write), for the app to translate. */
+function summaryCode(summary: string, error: string | null): { code: string; params?: Record<string, string> } | null {
+  const fixed = SUMMARY_CODES[summary];
+  if (fixed) return { code: fixed };
+  if (summary.startsWith("Pausada: ")) return { code: "routine_run.audience" };
+  if (summary.startsWith("Fórum aberto: ")) {
+    return { code: "routine_run.forum_opened", params: { title: summary.slice("Fórum aberto: ".length) } };
+  }
+  if (summary.startsWith("Falhou: ")) return { code: "routine_run.failed", params: { reason: error ?? "" } };
+  return null;
 }
 
 async function runDetails(db: Database, runs: RunRow[]) {
@@ -298,7 +339,8 @@ const isTimeZone = (tz: string) => {
 /** The zone a person's routine phrase means: the one they chose, else their own, else the org's, else UTC. */
 export async function routineTimezone(db: Database, actorId: string, orgId: string, chosen?: string | null) {
   if (chosen) {
-    if (!isTimeZone(chosen)) throw new ValidationError("Fuso horário desconhecido.");
+    if (!isTimeZone(chosen))
+      throw new ValidationError("Unknown time zone", "schedule.unknown_timezone", { timezone: chosen });
     return chosen;
   }
   const settings = await getOrgSettings(db, actorId, orgId);
@@ -324,7 +366,8 @@ export async function parseScheduleForOrg(
 const budgetNano = (usd: number | null | undefined) => {
   if (usd === undefined) return undefined;
   if (usd === null) return null;
-  if (!Number.isFinite(usd) || usd < 0 || usd > 100_000) throw new ValidationError("Orçamento inválido.");
+  if (!Number.isFinite(usd) || usd < 0 || usd > 100_000)
+    throw new ValidationError("Invalid budget", "routine.invalid_budget");
   return Math.round(usd * 1e9);
 };
 
@@ -345,7 +388,7 @@ async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string,
     const [y, m, d] = (rule.start ?? "").split("-").map(Number) as [number, number, number];
     const [h, mi] = (rule.times?.[0] ?? rule.time ?? "09:00").split(":").map(Number) as [number, number];
     const at = y && m && d ? zonedTime(y, m, d, h, mi, zone) : null;
-    if (!at) throw new ValidationError("Escolha o dia e o horário.");
+    if (!at) throw new ValidationError("Pick the day and time", "routine.once_needs_time");
     return resolveTrigger(deps, actorId, orgId, { type: "once", at: at.toISOString(), timezone: zone });
   }
   if (trigger.type === "schedule") {
@@ -358,11 +401,11 @@ async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string,
       : phrase
         ? phraseToRule(phrase, zone, now)
         : null;
-    if (!asRule && !phrase) throw new ValidationError("Diga quando a rotina deve rodar.");
+    if (!asRule && !phrase) throw new ValidationError("Say when the routine should run", "routine.schedule_required");
     if (asRule) {
       const rule = normalizeRule(asRule, now);
       const next = nextOccurrence(rule, now);
-      if (!next) throw new ValidationError("Esse horário nunca acontece (ou a série já terminou).");
+      if (!next) throw new ValidationError("This schedule never happens (or the series ended)", "schedule.never");
       return {
         ...none,
         triggerType: "schedule",
@@ -375,9 +418,9 @@ async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string,
       };
     }
     const parsed = await parseScheduleForOrg(deps, actorId, orgId, phrase, zone);
-    if (!parsed.ok) throw new ValidationError(parsed.error);
+    if (!parsed.ok) throw new ValidationError(parsed.error, parsed.code);
     const next = nextCronTime(parsed.cron, parsed.timezone, now);
-    if (!next) throw new ValidationError("Esse horário nunca acontece.");
+    if (!next) throw new ValidationError("This schedule never happens", "schedule.never");
     return {
       ...none,
       triggerType: "schedule",
@@ -390,8 +433,8 @@ async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string,
   }
   if (trigger.type === "once") {
     const at = new Date(trigger.at);
-    if (Number.isNaN(at.getTime())) throw new ValidationError("Data e hora inválidas.");
-    if (at.getTime() <= Date.now()) throw new ValidationError("Escolha um momento no futuro.");
+    if (Number.isNaN(at.getTime())) throw new ValidationError("Invalid date and time", "schedule.invalid_datetime");
+    if (at.getTime() <= Date.now()) throw new ValidationError("Pick a moment in the future", "schedule.in_the_past");
     const timezone = await routineTimezone(deps.db, actorId, orgId, trigger.timezone);
     const description = new Intl.DateTimeFormat("pt-BR", {
       timeZone: timezone,
@@ -415,7 +458,7 @@ async function requireRoutineManager(db: Database, actorId: string, orgId: strin
 async function checkTarget(db: Database, orgId: string, agentId: string, target: RoutineTarget) {
   if (target.type === "forum") {
     if (target.agentIds.length === 0 || target.agentIds.length > 8) {
-      throw new ValidationError("Escolha de 1 a 8 agentes para o fórum.");
+      throw new ValidationError("Pick 1 to 8 agents for the forum", "routine.forum_agents", { min: 1, max: 8 });
     }
     return;
   }
@@ -425,7 +468,11 @@ async function checkTarget(db: Database, orgId: string, agentId: string, target:
     .from(channelMembers)
     .innerJoin(channels, eq(channels.id, channelMembers.channelId))
     .where(and(eq(channels.id, target.channelId), eq(channels.orgId, orgId), eq(channelMembers.agentId, agentId)));
-  if (!row) throw new ValidationError("Adicione o agente ao canal antes de criar a rotina.");
+  if (!row)
+    throw new ValidationError(
+      "Add the agent to the channel before creating the routine",
+      "routine.agent_not_in_channel",
+    );
 }
 
 export async function createRoutine(
@@ -439,9 +486,9 @@ export async function createRoutine(
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
   // A routine asks the agent on its creator's behalf: only people who can talk to it create one (D31).
-  if (!canTalkTo(agent, actorId)) throw new ForbiddenError(await audienceNotice(db, agent));
+  if (!canTalkTo(agent, actorId)) throw await audienceError(db, agent);
   const prompt = input.prompt.trim().slice(0, 10_000);
-  if (!prompt) throw new ValidationError("Diga o que o agente deve fazer.");
+  if (!prompt) throw new ValidationError("Say what the agent should do", "routine.prompt_required");
   await checkTarget(db, orgId, agent.id, input.target);
   const trigger = await resolveTrigger(deps, actorId, orgId, input.trigger);
   const name = input.name?.trim().slice(0, 120) || prompt.split("\n")[0]?.slice(0, 60) || "Rotina";
@@ -495,7 +542,10 @@ async function requireRoutineEditor(db: Database, actorId: string, orgId: string
   if (routine.createdByUserId === actorId || can(membership.role, "manage_agents")) return;
   const agent = await getAgent(db, orgId, routine.agentId);
   if (agent?.ownerUserId !== actorId) {
-    throw new ForbiddenError("Só quem criou a rotina, o dono do agente ou um admin pode mudar isso.");
+    throw new ForbiddenError(
+      "Only who created the routine, the agent's owner or an admin can change it",
+      "routine.editor_only",
+    );
   }
 }
 
@@ -533,15 +583,15 @@ export async function updateRoutine(
   }
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (set.agentId && !canTalkTo(agent, actorId)) throw new ForbiddenError(await audienceNotice(db, agent));
+  if (set.agentId && !canTalkTo(agent, actorId)) throw await audienceError(db, agent);
   if (patch.name !== undefined) {
     const name = patch.name.trim().slice(0, 120);
-    if (!name) throw new ValidationError("Dê um nome à rotina.");
+    if (!name) throw new ValidationError("Give the routine a name", "routine.name_required");
     set.name = name;
   }
   if (patch.prompt !== undefined) {
     const prompt = patch.prompt.trim().slice(0, 10_000);
-    if (!prompt) throw new ValidationError("Diga o que o agente deve fazer.");
+    if (!prompt) throw new ValidationError("Say what the agent should do", "routine.prompt_required");
     set.prompt = prompt;
   }
   if (patch.target !== undefined || set.agentId) {
@@ -617,7 +667,7 @@ export async function duplicateRoutine(deps: RoutineDeps, actorId: string, orgId
   await requireRoutineManager(db, actorId, orgId, current.agentId);
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, actorId)) throw new ForbiddenError(await audienceNotice(db, agent));
+  if (!canTalkTo(agent, actorId)) throw await audienceError(db, agent);
   const { id: _id, createdAt: _c, updatedAt: _u, lastRunAt: _l, deletedAt: _d, ...copy } = current;
   const [row] = await db
     .insert(routines)
@@ -898,6 +948,9 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
           author: { type: "agent", agentId: agent.id, runId: null, hop: 0 },
           body: `${mention}Lembrete: ${routine.prompt}`,
           meta: {
+            // The app shows its own "Lembrete" label (translated) with this text.
+            reminderText: routine.prompt,
+            reminderFor: who,
             routineId: routine.id,
             routineRunId: run.id,
             routine: { id: routine.id, name: routine.name, runId: run.id },
@@ -1023,15 +1076,15 @@ export async function createReminder(
   await requirePermission(db, requesterId, orgId, "post");
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, requesterId)) throw new ForbiddenError(await audienceNotice(db, agent));
+  if (!canTalkTo(agent, requesterId)) throw await audienceError(db, agent);
   const message = input.message.trim().slice(0, 2000);
-  if (!message) throw new ValidationError("Diga do que lembrar.");
+  if (!message) throw new ValidationError("Say what to remind", "reminder.text_required");
   if (input.forUserId && input.forUserId !== requesterId) {
     const [member] = await db
       .select({ id: channelMembers.id })
       .from(channelMembers)
       .where(and(eq(channelMembers.channelId, input.channelId), eq(channelMembers.userId, input.forUserId)));
-    if (!member) throw new ValidationError("Essa pessoa não está nesta conversa.");
+    if (!member) throw new ValidationError("That person isn't in this conversation", "reminder.person_not_here");
   }
   const target: RoutineTarget = {
     type: "conversation",

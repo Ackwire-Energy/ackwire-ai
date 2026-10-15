@@ -108,12 +108,13 @@ export async function cancelRun(
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!row) throw new NotFoundError("Run not found");
   const allowed = row.requester === userId || row.ownerUserId === userId || can(membership.role, "manage_agents");
-  if (!allowed) throw new ForbiddenError("Só quem pediu, o dono do agente ou um admin pode interromper.");
+  if (!allowed)
+    throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
   let run = row.run;
   let previous: RunStatus = run.status;
   for (let attempt = 0; ; attempt++) {
-    if (isTerminal(run.status)) throw new ConflictError("Esse trabalho já terminou.", "run_finished");
+    if (isTerminal(run.status)) throw new ConflictError("This task already ended", "run_finished");
     previous = run.status;
     const status = run.status;
     const done = await db.transaction(async (tx) => {
@@ -151,7 +152,7 @@ export async function cancelRun(
       run = done;
       break;
     }
-    if (attempt >= 3) throw new ConflictError("Esse trabalho mudou de estado; tente de novo.");
+    if (attempt >= 3) throw new ConflictError("This task changed state; try again", "run.state_changed");
     const [fresh] = await db.select().from(agentRuns).where(eq(agentRuns.id, run.id));
     if (!fresh) throw new NotFoundError("Run not found");
     run = fresh;

@@ -13,7 +13,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { type ArtifactDeps, createArtifact } from "./artifacts";
-import { audienceNotice, canTalkTo } from "./audience";
+import { audienceError, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { createAgentRuns } from "./dispatch";
@@ -308,28 +308,32 @@ export async function createForumTopic(
   await requirePermission(db, requester, orgId, "post");
   const title = input.title.trim().slice(0, 200);
   const goal = input.goal.trim().slice(0, 5000);
-  if (!title) throw new ValidationError("Dê um título ao tópico.");
-  if (!goal) throw new ValidationError("Diga o que o fórum deve decidir ou responder.");
+  if (!title) throw new ValidationError("Give the topic a title", "forum.title_required");
+  if (!goal) throw new ValidationError("Say what the forum should decide or answer", "forum.goal_required");
   const agentIds = [...new Set(input.agentIds)];
-  if (agentIds.length === 0) throw new ValidationError("Escolha pelo menos um agente.");
-  if (agentIds.length > FORUM_LIMITS.maxAgents) throw new ValidationError("No máximo 8 agentes por tópico.");
+  if (agentIds.length === 0) throw new ValidationError("Pick at least one agent", "forum.agents_required");
+  if (agentIds.length > FORUM_LIMITS.maxAgents)
+    throw new ValidationError("At most 8 agents per topic", "forum.too_many_agents", { max: 8 });
   const rounds = Math.min(FORUM_LIMITS.maxRounds, Math.max(1, Math.round(input.rounds ?? FORUM_LIMITS.defaultRounds)));
   const rows = await db
     .select()
     .from(agents)
     .where(and(eq(agents.orgId, orgId), inArray(agents.id, agentIds), isNull(agents.archivedAt)));
-  if (rows.length !== agentIds.length) throw new ValidationError("Algum agente não existe nesta organização.");
+  if (rows.length !== agentIds.length)
+    throw new ValidationError("An agent isn't in this organization", "forum.unknown_agent");
   for (const a of rows) {
-    if (!canTalkTo(a, requester)) throw new ForbiddenError(await audienceNotice(db, a));
+    if (!canTalkTo(a, requester)) throw await audienceError(db, a);
   }
   const userIds = [...new Set([requester, ...(input.userIds ?? [])])];
   const members = await db
     .select({ userId: schema.organizationMembers.userId })
     .from(schema.organizationMembers)
     .where(and(eq(schema.organizationMembers.orgId, orgId), inArray(schema.organizationMembers.userId, userIds)));
-  if (members.length !== userIds.length) throw new ValidationError("Todas as pessoas precisam ser da organização.");
+  if (members.length !== userIds.length)
+    throw new ValidationError("Everyone must be in the organization", "forum.unknown_person");
   const budget = input.budgetUsd === null ? null : Math.round((input.budgetUsd ?? FORUM_LIMITS.defaultBudgetUsd) * 1e9);
-  if (budget !== null && budget <= 0) throw new ValidationError("O teto de gasto precisa ser positivo.");
+  if (budget !== null && budget <= 0)
+    throw new ValidationError("The spend cap must be positive", "forum.invalid_budget");
   const ownerAgentId = input.ownerAgentId && agentIds.includes(input.ownerAgentId) ? input.ownerAgentId : null;
 
   const topic = await db.transaction(async (tx) => {
@@ -405,7 +409,7 @@ async function requireTopicManager(db: Database, actorId: string, orgId: string,
     .select({ id: forumParticipants.id })
     .from(forumParticipants)
     .where(and(eq(forumParticipants.topicId, topic.id), eq(forumParticipants.userId, actorId)));
-  if (!p) throw new ForbiddenError("Só quem abriu, quem participa ou um admin pode fazer isso.");
+  if (!p) throw new ForbiddenError("Only who opened it, a participant or an admin can do this", "forum.manager_only");
 }
 
 /**
@@ -423,7 +427,7 @@ export async function postInForumAsPerson(
   const { db } = deps;
   await requirePermission(db, userId, orgId, "post");
   const topic = await loadTopic(db, orgId, topicId);
-  if (topic.status !== "open") throw new ValidationError("Este tópico já terminou.");
+  if (topic.status !== "open") throw new ValidationError("This topic has ended", "forum.topic_ended");
   const text = body.trim().slice(0, FORUM_LIMITS.postChars);
   if (!text) throw new ValidationError("Escreva algo.");
   // Reading the forum is open to the org; posting adds the person to the topic.
@@ -460,7 +464,7 @@ export async function postInForumAsPerson(
 export async function concludeForumTopic(deps: ForumDeps, userId: string, orgId: string, topicId: string) {
   const topic = await loadTopic(deps.db, orgId, topicId);
   await requireTopicManager(deps.db, userId, orgId, topic);
-  if (topic.status !== "open") throw new ValidationError("Este tópico já terminou.");
+  if (topic.status !== "open") throw new ValidationError("This topic has ended", "forum.topic_ended");
   await deps.db
     .update(forumTopics)
     .set({ stopRequested: true, updatedAt: new Date() })
@@ -484,7 +488,7 @@ export async function concludeForumTopic(deps: ForumDeps, userId: string, orgId:
 export async function cancelForumTopic(deps: ForumDeps, userId: string, orgId: string, topicId: string) {
   const topic = await loadTopic(deps.db, orgId, topicId);
   await requireTopicManager(deps.db, userId, orgId, topic);
-  if (topic.status !== "open") throw new ValidationError("Este tópico já terminou.");
+  if (topic.status !== "open") throw new ValidationError("This topic has ended", "forum.topic_ended");
   await deps.db
     .update(forumTopics)
     .set({ status: "canceled", phase: "finished", concludedAt: new Date(), updatedAt: new Date() })
@@ -517,10 +521,12 @@ export async function setForumParticipants(
       .select()
       .from(agents)
       .where(and(eq(agents.orgId, orgId), inArray(agents.id, add), isNull(agents.archivedAt)));
-    if (rows.length !== add.length) throw new ValidationError("Algum agente não existe nesta organização.");
-    for (const a of rows) if (!canTalkTo(a, requester)) throw new ForbiddenError(await audienceNotice(db, a));
+    if (rows.length !== add.length)
+      throw new ValidationError("An agent isn't in this organization", "forum.unknown_agent");
+    for (const a of rows) if (!canTalkTo(a, requester)) throw await audienceError(db, a);
     const current = (await participantsOf(db, [topicId])).filter((p) => p.agentId);
-    if (current.length + add.length > FORUM_LIMITS.maxAgents) throw new ValidationError("No máximo 8 agentes.");
+    if (current.length + add.length > FORUM_LIMITS.maxAgents)
+      throw new ValidationError("At most 8 agents", "forum.too_many_agents", { max: 8 });
     for (const [i, agentId] of add.entries()) {
       await db
         .insert(forumParticipants)
@@ -540,7 +546,8 @@ export async function setForumParticipants(
       .select({ userId: schema.organizationMembers.userId })
       .from(schema.organizationMembers)
       .where(and(eq(schema.organizationMembers.orgId, orgId), inArray(schema.organizationMembers.userId, addUsers)));
-    if (members.length !== addUsers.length) throw new ValidationError("Todas as pessoas precisam ser da organização.");
+    if (members.length !== addUsers.length)
+      throw new ValidationError("Everyone must be in the organization", "forum.unknown_person");
     for (const u of addUsers) {
       await db.insert(forumParticipants).values({ orgId, topicId, userId: u }).onConflictDoNothing();
       await db.insert(channelMembers).values({ orgId, channelId: topic.channelId, userId: u }).onConflictDoNothing();
@@ -762,7 +769,12 @@ async function finalizeSynthesis(deps: ForumDeps, topic: TopicRow, runId: string
         threadId: topic.originMessageId,
         author: { type: "agent", agentId: run.agentId, runId: null, hop: 0 },
         body: `O fórum "${topic.title}" terminou. A síntese está no arquivo abaixo${suggested.length ? `, com ${suggested.length} issue(s) sugerida(s) para aprovar` : ""}.`,
-        meta: { artifacts: [artifact], forumTopicId: topic.id },
+        meta: {
+          artifacts: [artifact],
+          forumTopicId: topic.id,
+          // For the app to say it in the person's language.
+          forumConcluded: { topicId: topic.id, title: topic.title, suggestedIssues: suggested.length },
+        },
       },
       { startRuns: false },
     ).catch(() => ({ message: null }));
@@ -807,17 +819,17 @@ export async function postInForumAsAgent(
 ): Promise<ForumPostView> {
   const { db } = deps;
   const topic = await loadTopic(db, orgId, topicId);
-  if (topic.status !== "open") throw new ValidationError("Este tópico já terminou.");
+  if (topic.status !== "open") throw new ValidationError("This topic has ended", "forum.topic_ended");
   const [participant] = await db
     .select({ id: forumParticipants.id })
     .from(forumParticipants)
     .where(and(eq(forumParticipants.topicId, topicId), eq(forumParticipants.agentId, agentId)));
-  if (!participant) throw new ForbiddenError("Você não participa deste tópico.");
+  if (!participant) throw new ForbiddenError("You aren't in this topic", "forum.not_participant");
   const round = Math.max(1, topic.round);
   const already = postsOf(topicId, await channelMessages(db, orgId, topic.channelId)).some(
     (p) => p.author.type === "agent" && p.author.id === agentId && p.round === round,
   );
-  if (already) throw new ValidationError("Você já falou nesta rodada; espere a próxima.");
+  if (already) throw new ValidationError("You already posted this round; wait for the next", "forum.already_posted");
   const text = body.trim().slice(0, FORUM_LIMITS.postChars);
   if (!text) throw new ValidationError("Escreva algo.");
   const { message } = await insertMessageWithRuns(
@@ -848,7 +860,8 @@ export async function createForumIssues(
 ) {
   const topic = await loadTopic(deps.db, orgId, topicId);
   await requirePermission(deps.db, userId, orgId, "post");
-  if (items.length === 0 || items.length > 10) throw new ValidationError("Escolha de 1 a 10 issues.");
+  if (items.length === 0 || items.length > 10)
+    throw new ValidationError("Pick 1 to 10 issues", "forum.issue_count", { min: 1, max: 10 });
   const numbers: number[] = [];
   for (const item of items) {
     const issue = await createIssue({ db: deps.db, pubsub: deps.pubsub }, { type: "person", userId }, orgId, {

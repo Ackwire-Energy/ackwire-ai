@@ -269,7 +269,7 @@ export async function connectCustomServer(
   const label = input.label?.trim() || url.hostname;
   const apiKey = input.apiKey?.trim();
   if (apiKey) {
-    if (apiKey.length < 8) throw new ValidationError("A chave parece curta demais.");
+    if (apiKey.length < 8) throw new ValidationError("The key looks too short", "connector.key_too_short");
     const c = await storeCustomConnection(deps, {
       orgId,
       actorId,

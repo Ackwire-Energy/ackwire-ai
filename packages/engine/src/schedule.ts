@@ -3,7 +3,8 @@ import { cronToRule, type ScheduleRule } from "./rrule";
 
 export type ScheduleParse =
   | { ok: true; cron: string; description: string; timezone: string }
-  | { ok: false; error: string };
+  /** `code` is stable (the app translates it); `error` is the English fallback. */
+  | { ok: false; error: string; code: string };
 
 const WEEKDAYS: [RegExp, number][] = [
   [/\bdomingos?\b|\bsundays?\b/, 0],
@@ -102,15 +103,17 @@ export async function parseSchedule(
   options: { timezone: string; llm?: (phrase: string) => Promise<string | null>; now?: Date },
 ): Promise<ScheduleParse> {
   const trimmed = phrase.trim();
-  if (!trimmed) return { ok: false, error: "Diga quando a rotina deve rodar." };
+  if (!trimmed) return { ok: false, error: "Say when the routine should run", code: "routine.schedule_required" };
   let parsed = phraseToCron(trimmed);
   if (!parsed && options.llm) {
     const cron = (await options.llm(trimmed).catch(() => null))?.trim() ?? null;
     if (cron && isValidCron(cron)) parsed = { cron, description: trimmed };
   }
-  if (!parsed) return { ok: false, error: 'Não entendi o horário. Tente "dias úteis às 9h" ou "toda segunda às 10h".' };
+  if (!parsed) {
+    return { ok: false, error: 'Couldn\'t read the schedule. Try "weekdays at 9am".', code: "schedule.unreadable" };
+  }
   if (!nextCronTime(parsed.cron, options.timezone, options.now ?? new Date())) {
-    return { ok: false, error: "Esse horário nunca acontece." };
+    return { ok: false, error: "This schedule never happens", code: "schedule.never" };
   }
   return { ok: true, cron: parsed.cron, description: parsed.description, timezone: options.timezone };
 }

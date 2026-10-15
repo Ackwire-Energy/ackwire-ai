@@ -332,7 +332,7 @@ const dayStart = (date: string, timezone: string) => {
     const at = zonedTime(y, m, d, Math.floor(minute / 60), minute % 60, timezone);
     if (at) return at;
   }
-  throw new ValidationError("Data inválida nesse fuso.");
+  throw new ValidationError("Invalid date in this time zone", "calendar.invalid_date");
 };
 const nextDay = (date: string) => {
   const [y, m, d] = date.split("-").map(Number) as [number, number, number];
@@ -1173,7 +1173,10 @@ export async function resolveParticipants(db: Database, orgId: string, refs: str
   ];
   const known = new Set([...people.map((p) => p.handle), ...bots.map((b) => b.handle)]);
   const unknown = handles.filter((h) => !known.has(h));
-  if (unknown.length > 0) throw new ValidationError(`Não encontrei ${unknown.map((h) => `@${h}`).join(", ")}`);
+  if (unknown.length > 0)
+    throw new ValidationError(`Not found: ${unknown.map((h) => `@${h}`).join(", ")}`, "participants.unknown", {
+      handles: unknown,
+    });
   return out;
 }
 

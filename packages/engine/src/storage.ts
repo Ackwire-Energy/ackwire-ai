@@ -37,6 +37,8 @@ export interface StorageMigrationView {
   copied: number;
   total: number;
   error: string | null;
+  /** Stable code of the failure (`storage.auth`, `url.internal`…), for the app to translate. */
+  code?: string | null;
 }
 
 /** The org's storage as the app shows it (`agentes` = platform storage). Keys only as hints. */
@@ -57,7 +59,7 @@ export interface StorageView {
 export type StorageStep = "write" | "read" | "list" | "delete";
 export interface StorageTestResult {
   ok: boolean;
-  steps: { step: StorageStep; ok: boolean; error: string | null }[];
+  steps: { step: StorageStep; ok: boolean; error: string | null; code?: string | null }[];
 }
 
 export interface StorageDeps {
@@ -149,27 +151,34 @@ export function createBlobStoreResolver(deps: StorageDeps): BlobStoreResolver {
   };
 }
 
-/** A clear, pt-BR reason for a failed storage step. */
+/** A stable code for a failed storage step (the app translates it). */
+export function storageErrorCode(error: unknown): string {
+  if (error instanceof ValidationError) return error.code;
+  if (!(error instanceof StorageError)) return "storage.unexpected";
+  return `storage.${error.code}`;
+}
+
+/** The English reason for a failed storage step (fallback of `storageErrorCode`). */
 export function storageErrorText(error: unknown): string {
   if (error instanceof ValidationError) return error.message;
-  if (!(error instanceof StorageError)) return "Falha inesperada ao falar com o armazenamento.";
+  if (!(error instanceof StorageError)) return "Unexpected failure talking to the storage.";
   switch (error.code) {
     case "auth":
-      return "A chave de acesso ou o segredo não foram aceitos.";
+      return "The access key or secret was not accepted.";
     case "bucket_missing":
-      return "Esse bucket não existe nesse endpoint.";
+      return "This bucket doesn't exist at this endpoint.";
     case "region":
-      return "A região não confere com a do bucket.";
+      return "The region doesn't match the bucket's.";
     case "permission":
-      return "A chave não tem permissão para esta operação.";
+      return "The key has no permission for this operation.";
     case "network":
-      return "Não foi possível conectar ao endpoint.";
+      return "Couldn't reach the endpoint.";
     case "invalid_endpoint":
-      return "O endpoint não é um endereço válido.";
+      return "The endpoint isn't a valid address.";
     case "not_found":
-      return "O arquivo de teste não voltou na leitura.";
+      return "The test file didn't come back on read.";
     default:
-      return `O armazenamento respondeu com erro (${error.message.slice(0, 200)}).`;
+      return `The storage answered with an error (${error.message.slice(0, 200)}).`;
   }
 }
 
@@ -178,13 +187,14 @@ async function resolveInput(deps: StorageDeps, orgId: string, input: S3Input) {
   const endpoint = input.endpoint.trim().replace(/\/+$/, "");
   const bucket = input.bucket.trim();
   const region = input.region.trim() || "auto";
-  if (!bucket || !/^[a-z0-9][a-z0-9.-]{1,62}$/.test(bucket)) throw new ValidationError("Nome de bucket inválido.");
+  if (!bucket || !/^[a-z0-9][a-z0-9.-]{1,62}$/.test(bucket))
+    throw new ValidationError("Invalid bucket name", "storage.invalid_bucket");
   await assertPublicHttpsUrl(endpoint, deps.resolveHost);
   let accessKeyId = input.accessKeyId?.trim() ?? "";
   let secretAccessKey = input.secretAccessKey?.trim() ?? "";
   if (!accessKeyId || !secretAccessKey) {
     const active = await activeConfig(deps.db, orgId);
-    if (!active) throw new ValidationError("Informe a chave de acesso e o segredo.");
+    if (!active) throw new ValidationError("Give the access key and secret", "storage.credentials_required");
     accessKeyId ||= optionsOf(active).accessKeyId;
     secretAccessKey ||= await secretOf(deps, active);
   }
@@ -217,7 +227,7 @@ async function probe(store: BlobStore, prefix: string): Promise<StorageTestResul
       await run();
       steps.push({ step: name, ok: true, error: null });
     } catch (error) {
-      steps.push({ step: name, ok: false, error: storageErrorText(error) });
+      steps.push({ step: name, ok: false, error: storageErrorText(error), code: storageErrorCode(error) });
     }
   };
   await step("write", () => store.put(key, body, { contentType: "text/plain" }));
@@ -339,7 +349,8 @@ export async function saveStorage(
     )
     .orderBy(desc(storageConfigs.createdAt))
     .limit(1);
-  if (!tested) throw new ValidationError("Teste a conexão com estas configurações antes de ativar.");
+  if (!tested)
+    throw new ValidationError("Test the connection with these settings before turning it on", "storage.test_first");
   await deps.db.transaction(async (tx) => {
     await tx
       .update(storageConfigs)

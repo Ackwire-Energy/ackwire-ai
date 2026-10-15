@@ -456,7 +456,8 @@ async function executeRunInner(
     const message = await db.transaction(async (tx) => {
       const m = await postAgentMessage(tx, run, replyThreadId, said ? `${said}\n\n${note}` : note, {
         ...(takeMemoryUpdates(t) ?? {}),
-        canceled: { byUserId: by },
+        // `text`: what the agent wrote; the app adds "Interrompido por …" in the person's language.
+        canceled: { byUserId: by, text: said },
       });
       t.postedUpTo = t.messages.length;
       t.postedCount++;

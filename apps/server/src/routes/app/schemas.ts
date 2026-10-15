@@ -128,7 +128,17 @@ const MessageBase = z.object({
 
 export const Message = MessageBase.extend({
   notices: z
-    .array(z.object({ agentId: z.uuid(), text: z.string() }))
+    .array(
+      z.object({
+        agentId: z.uuid(),
+        text: z.string(),
+        code: z
+          .string()
+          .optional()
+          .openapi({ description: "`audience.only` / `audience.nobody`: translate with `params`." }),
+        params: z.record(z.string(), z.unknown()).optional(),
+      }),
+    )
     .optional()
     .openapi({
       description:

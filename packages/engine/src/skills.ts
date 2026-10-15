@@ -84,9 +84,14 @@ export function parseSkillMarkdown(text: string): ParsedSkill {
 
 export function validateSkill(s: { name: string; description: string; body: string }) {
   if (!SKILL_NAME.test(s.name) || s.name.length > 64) {
-    throw new ValidationError("name: kebab-case (letras minúsculas, números e hífens), até 64 caracteres");
+    throw new ValidationError(
+      "name: kebab-case (lowercase letters, numbers and hyphens), up to 64 characters",
+      "skill.invalid_name",
+      { max: 64 },
+    );
   }
-  if (!s.description || s.description.length > 1024) throw new ValidationError("description: 1 a 1024 caracteres");
+  if (!s.description || s.description.length > 1024)
+    throw new ValidationError("description: 1 to 1024 characters", "skill.invalid_description", { max: 1024 });
   if (s.body.length > SKILL_LIMITS.bodyChars) throw new ValidationError("The skill body is too long");
 }
 

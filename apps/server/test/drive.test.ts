@@ -54,7 +54,7 @@ test("storage API: masked settings, test before switching, migrate", async () =>
     await api("/storage/test", { json: { ...settings, endpoint: "https://169.254.169.254" } })
   ).json()) as { ok: boolean; steps: { error: string | null }[] };
   expect(ssrf.ok).toBe(false);
-  expect(ssrf.steps[0]?.error).toContain("rede interna");
+  expect(ssrf.steps[0]?.error).toContain("internal network");
 });
 
 test("Drive API: create, new version, versions, download link, file, delete", async () => {

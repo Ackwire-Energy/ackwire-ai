@@ -143,7 +143,10 @@ export async function updateSandboxSettings(
       : current.network);
   if (!["blocked", "allowlist", "open"].includes(network)) throw new ValidationError("Unknown network mode");
   if (network === "allowlist" && allowDomains.length === 0) {
-    throw new ValidationError("Libere pelo menos um domínio, ou escolha sem internet ou internet liberada.");
+    throw new ValidationError(
+      "Allow at least one domain, or pick no internet or open internet",
+      "sandbox.allowlist_empty",
+    );
   }
   const next: SandboxSettings = {
     enabled: patch.enabled ?? current.enabled,

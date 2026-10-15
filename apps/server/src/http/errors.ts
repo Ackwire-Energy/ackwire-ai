@@ -15,14 +15,24 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 export const ErrorResponse = z
   .object({
     error: z.object({
-      code: z.string().openapi({ example: "invalid_request" }),
-      message: z.string().openapi({ example: "name: Required" }),
+      code: z.string().openapi({ example: "invalid_request", description: "Stable: the app translates it." }),
+      message: z.string().openapi({ example: "name: Required", description: "English fallback." }),
+      params: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .openapi({ description: "Values for the translated message (names, limits…)." }),
     }),
   })
   .openapi("Error");
 
-export function apiError<S extends ContentfulStatusCode>(c: Context, status: S, code: string, message: string) {
-  return c.json({ error: { code, message } }, status);
+export function apiError<S extends ContentfulStatusCode>(
+  c: Context,
+  status: S,
+  code: string,
+  message: string,
+  params?: Record<string, unknown>,
+) {
+  return c.json({ error: { code, message, ...(params ? { params } : {}) } }, status);
 }
 
 /** OpenAPI response entry for an error status. */
@@ -45,11 +55,13 @@ export function validationHook<E extends Env>(): Hook<unknown, E, string, unknow
 
 /** Maps domain errors from `@agenteschat/engine` to HTTP responses. Returns null for unknown errors. */
 export function domainErrorResponse(error: unknown, c: Context) {
-  if (error instanceof ForbiddenError) return apiError(c, 403, "forbidden", error.message);
-  if (error instanceof NotFoundError) return apiError(c, 404, "not_found", error.message);
-  if (error instanceof ConflictError) return apiError(c, 409, error.code, error.message);
-  if (error instanceof ValidationError) return apiError(c, 400, "invalid_request", error.message);
-  if (error instanceof BudgetExceededError) return apiError(c, 402, "budget_exceeded", error.message);
+  if (error instanceof ForbiddenError) return apiError(c, 403, error.code, error.message, error.params);
+  if (error instanceof NotFoundError) return apiError(c, 404, error.code, error.message, error.params);
+  if (error instanceof ConflictError) return apiError(c, 409, error.code, error.message, error.params);
+  if (error instanceof ValidationError) return apiError(c, 400, error.code, error.message, error.params);
+  if (error instanceof BudgetExceededError) {
+    return apiError(c, 402, "budget_exceeded", error.message, { agentId: error.agentId });
+  }
   if (error instanceof MissingCredentialError) return apiError(c, 400, "missing_credential", error.message);
   return null;
 }

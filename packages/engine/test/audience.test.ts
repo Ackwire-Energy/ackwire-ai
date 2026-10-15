@@ -87,7 +87,14 @@ describe("who can talk to the agent", () => {
     f.pubsub.subscribe(userTopic(f.org.id, bia.id), (e) => heard.push(e));
     const sent = await postPersonMessage(deps(), bia.id, f.org.id, f.general.id, { body: "@dev faz o relatório" });
     expect(await runsOf(sent.id)).toEqual([]);
-    expect(sent.notices).toEqual([{ agentId: f.agent.id, text: "O Dev só responde a ana." }]);
+    expect(sent.notices).toEqual([
+      {
+        agentId: f.agent.id,
+        text: "O Dev só responde a ana.",
+        code: "audience.only",
+        params: { agentId: f.agent.id, agentName: "Dev", userIds: [f.owner.id], names: ["ana"] },
+      },
+    ]);
     await Bun.sleep(5);
     expect(heard).toContainEqual(
       expect.objectContaining({ type: "agent.unavailable", agentId: f.agent.id, text: "O Dev só responde a ana." }),
@@ -109,7 +116,10 @@ describe("who can talk to the agent", () => {
     await drainOutbox(f.db, f.handlers);
     expect(await runsOf(sent.id)).toEqual([]);
     const cara = await addMember(f.db, f.org.id, "member", "cara");
-    await expect(openDm(f.db, cara.id, f.org.id, { agentId: f.agent.id })).rejects.toThrow("O Dev só responde a ana.");
+    await expect(openDm(f.db, cara.id, f.org.id, { agentId: f.agent.id })).rejects.toMatchObject({
+      code: "audience.only",
+      params: { agentName: "Dev", names: ["ana"] },
+    });
     expect((await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id })).kind).toBe("dm");
   });
 
@@ -188,7 +198,7 @@ describe("who can talk to the agent", () => {
       .where(eq(schema.organizationMembers.userId, bia.id));
     const routine = await createRoutine(routineDeps, bia.id, f.org.id, input);
     await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "owner", userIds: [] });
-    await expect(createRoutine(routineDeps, bia.id, f.org.id, input)).rejects.toThrow("O Dev só responde a ana.");
+    await expect(createRoutine(routineDeps, bia.id, f.org.id, input)).rejects.toMatchObject({ code: "audience.only" });
     const [run] = await f.db
       .insert(schema.routineRuns)
       .values({ orgId: f.org.id, routineId: routine.id, at: new Date(), trigger: "schedule", status: "queued" })

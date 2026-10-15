@@ -51,7 +51,7 @@ export interface MessageView {
   /** Agent messages in lists: model, tokens and cost of the run that wrote it. */
   usage?: MessageUsage;
   /** Only in the sender's own POST response: agents that won't answer them, and why (never stored). */
-  notices?: { agentId: string; text: string }[];
+  notices?: { agentId: string; text: string; code?: string; params?: Record<string, unknown> }[];
   /** Top-level messages with `include=replies`: thread summary and the latest replies. */
   replies?: { count: number; lastAt: string | null; latest: MessageView[] };
   createdAt: string;
@@ -384,7 +384,8 @@ export async function postPersonMessage(
   const { channel, membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
   if (!can(membership.role, "post")) throw new ForbiddenError();
   // A forum topic is written through the forum (its turns), never as a plain chat (D33).
-  if (channel.kind === "forum") throw new ValidationError("Escreva no fórum pela página do tópico.");
+  if (channel.kind === "forum")
+    throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
   const clientId = input.clientId?.trim().slice(0, 64) || null;
   // One statement: the message, its jobs, and the runs of agents that will surely answer.
   const { message, runs, blocked, steered } = await insertMessageWithRuns(

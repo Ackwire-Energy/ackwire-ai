@@ -68,46 +68,53 @@ export function normalizeRule(input: ScheduleRule, now = new Date()): ScheduleRu
   if (rule.until === null) delete rule.until;
   if (rule.count === null) delete rule.count;
   if (typeof rule.bySetPos === "number") rule.bySetPos = [rule.bySetPos];
-  if (!FREQS.includes(rule.freq)) throw new ValidationError("Frequência desconhecida.");
+  if (!FREQS.includes(rule.freq)) throw new ValidationError("Unknown frequency", "schedule.unknown_freq");
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: rule.timezone });
   } catch {
-    throw new ValidationError("Fuso horário desconhecido.");
+    throw new ValidationError("Unknown time zone", "schedule.unknown_timezone", { timezone: rule.timezone });
   }
   const interval = rule.interval ?? 1;
-  if (!Number.isInteger(interval) || interval < 1 || interval > 1000) throw new ValidationError("Intervalo inválido.");
+  if (!Number.isInteger(interval) || interval < 1 || interval > 1000)
+    throw new ValidationError("Invalid interval", "schedule.invalid_interval");
   rule.interval = interval;
   const times = rule.times ?? (rule.time ? [rule.time] : ["09:00"]);
   if (times.length === 0 || times.length > 24 || times.some((t) => !TIME.test(t))) {
-    throw new ValidationError("Horário inválido (use HH:MM).");
+    throw new ValidationError("Invalid time (use HH:MM)", "schedule.invalid_time");
   }
   rule.times = [...new Set(times)].sort();
   delete rule.time;
   for (const w of rule.byWeekday ?? []) {
     const m = DAY_SPEC.exec(w);
-    if (!m) throw new ValidationError(`Dia da semana inválido: ${w}`);
+    if (!m) throw new ValidationError(`Invalid weekday: ${w}`, "schedule.invalid_weekday", { value: w });
     if (m[1] && rule.freq !== "monthly" && rule.freq !== "yearly") {
-      throw new ValidationError("Posições como 2ª terça só valem por mês ou por ano.");
+      throw new ValidationError(
+        "Positions like 2nd Tuesday only work monthly or yearly",
+        "schedule.position_needs_month",
+      );
     }
   }
   for (const d of rule.byMonthDay ?? []) {
-    if (!Number.isInteger(d) || d === 0 || d < -31 || d > 31) throw new ValidationError("Dia do mês inválido.");
+    if (!Number.isInteger(d) || d === 0 || d < -31 || d > 31)
+      throw new ValidationError("Invalid day of the month", "schedule.invalid_month_day");
   }
   for (const m of rule.byMonth ?? []) {
-    if (!Number.isInteger(m) || m < 1 || m > 12) throw new ValidationError("Mês inválido.");
+    if (!Number.isInteger(m) || m < 1 || m > 12) throw new ValidationError("Invalid month", "schedule.invalid_month");
   }
   for (const p of setPos(rule)) {
-    if (!Number.isInteger(p) || p === 0 || p < -31 || p > 31) throw new ValidationError("Posição inválida.");
+    if (!Number.isInteger(p) || p === 0 || p < -31 || p > 31)
+      throw new ValidationError("Invalid position", "schedule.invalid_position");
   }
   rule.start = rule.start ? rule.start.slice(0, 10) : localDate(now, rule.timezone);
-  if (!DATE.test(rule.start)) throw new ValidationError("Data de início inválida.");
+  if (!DATE.test(rule.start)) throw new ValidationError("Invalid start date", "schedule.invalid_start");
   if (rule.until !== undefined) {
     rule.until = rule.until.slice(0, 10);
-    if (!DATE.test(rule.until)) throw new ValidationError("Data final inválida.");
-    if (rule.until < rule.start) throw new ValidationError("A data final vem antes do início.");
+    if (!DATE.test(rule.until)) throw new ValidationError("Invalid end date", "schedule.invalid_until");
+    if (rule.until < rule.start)
+      throw new ValidationError("The end date is before the start", "schedule.until_before_start");
   }
   if (rule.count !== undefined && (!Number.isInteger(rule.count) || rule.count < 1 || rule.count > 10_000)) {
-    throw new ValidationError("Número de vezes inválido.");
+    throw new ValidationError("Invalid number of times", "schedule.invalid_count");
   }
   for (const k of ["byWeekday", "byMonthDay", "byMonth", "bySetPos"] as const) {
     if (rule[k] && (rule[k] as unknown[]).length === 0) delete rule[k];
@@ -300,7 +307,7 @@ const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "
 const WORKDAYS = ["MO", "TU", "WE", "TH", "FR"];
 
 /** "A cada 2 semanas, seg e qua, às 09:00 (horário de Brasília), até 31/12" */
-export function describeRule(rule: ScheduleRule): string {
+function describeRulePt(rule: ScheduleRule): string {
   const n = rule.interval ?? 1;
   const plain = (rule.byWeekday ?? []).every((w) => w.length === 2);
   const weekdays = (rule.byWeekday ?? []).filter((w) => w.length === 2);
@@ -470,4 +477,100 @@ export function cronToRule(cron: string, timezone: string): ScheduleRule | null 
   }
   if (byWeekday) return { freq: "weekly", byWeekday, times, timezone };
   return { freq: "daily", times, timezone };
+}
+
+const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const EN_DAYS_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const EN_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const enOrdinal = (n: number) =>
+  n === -1
+    ? "last"
+    : n === -2
+      ? "second to last"
+      : `${n}${n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th"}`;
+const enList = (items: string[]) =>
+  items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+
+/** "Every 2 weeks, Mon and Wed, at 09:00 (America/Sao_Paulo), until 12/31" */
+function describeRuleEn(rule: ScheduleRule): string {
+  const n = rule.interval ?? 1;
+  const plain = (rule.byWeekday ?? []).every((w) => w.length === 2);
+  const weekdays = (rule.byWeekday ?? []).filter((w) => w.length === 2);
+  const isWorkdays = plain && weekdays.length === 5 && WORKDAYS.every((w) => weekdays.includes(w));
+  const dayList = () => enList(weekdays.map((w) => EN_DAYS[WEEKDAYS.indexOf(w as Weekday)] as string));
+  const every = (unit: string) => (n === 1 ? `Every ${unit}` : `Every ${n} ${unit}s`);
+  const monthPart = () => {
+    if (rule.byWeekday && !plain) {
+      return rule.byWeekday
+        .map((w) => {
+          const [, pos, code] = DAY_SPEC.exec(w) as unknown as [string, string, Weekday];
+          return `on the ${enOrdinal(Number(pos))} ${EN_DAYS_LONG[WEEKDAYS.indexOf(code)]}`;
+        })
+        .join(" and ");
+    }
+    if (isWorkdays && rule.bySetPos !== undefined) {
+      return setPos(rule)
+        .map((p) => `on the ${enOrdinal(p)} business day`)
+        .join(" and ");
+    }
+    if (weekdays.length && rule.bySetPos !== undefined) {
+      const names = enList(weekdays.map((w) => EN_DAYS_LONG[WEEKDAYS.indexOf(w as Weekday)] as string));
+      return setPos(rule)
+        .map((p) => `on the ${enOrdinal(p)} ${names}`)
+        .join(" and ");
+    }
+    if (rule.byMonthDay) {
+      return `on the ${enList(rule.byMonthDay.map((d) => (d === -1 ? "last day" : d < 0 ? `${enOrdinal(d)} day` : enOrdinal(d))))}`;
+    }
+    return rule.start ? `on the ${enOrdinal(Number(rule.start.slice(8, 10)))}` : "";
+  };
+  const parts: string[] = [];
+  switch (rule.freq) {
+    case "hourly":
+      parts.push(every("hour"));
+      if (weekdays.length) parts.push(isWorkdays ? "on weekdays" : dayList());
+      break;
+    case "daily":
+      if (isWorkdays && n === 1) parts.push("Weekdays");
+      else {
+        parts.push(every("day"));
+        if (weekdays.length) parts.push(dayList());
+      }
+      break;
+    case "weekly":
+      parts.push(every("week"));
+      if (isWorkdays) parts.push("on weekdays");
+      else if (weekdays.length) parts.push(dayList());
+      else if (rule.start) parts.push(EN_DAYS[fromDayNumber(parseDate(rule.start)).weekday] as string);
+      break;
+    case "monthly":
+      parts.push(every("month"));
+      parts.push(monthPart());
+      break;
+    case "yearly": {
+      parts.push(every("year"));
+      const months = rule.byMonth ?? (rule.start ? [Number(rule.start.slice(5, 7))] : []);
+      parts.push(
+        `${monthPart()}${months.length ? ` of ${enList(months.map((m) => EN_MONTHS[m - 1] as string))}` : ""}`,
+      );
+      break;
+    }
+  }
+  const times = rule.times ?? (rule.time ? [rule.time] : []);
+  if (rule.freq === "hourly") {
+    const minute = times[0]?.slice(3) ?? "00";
+    if (minute !== "00") parts.push(`at minute ${minute}`);
+  } else if (times.length) parts.push(`at ${enList(times)}`);
+  let text = `${parts.filter(Boolean).join(", ")} (${rule.timezone})`;
+  if (rule.until) {
+    const [y, m, d] = rule.until.split("-");
+    text += `, until ${m}/${d}${y === String(new Date().getUTCFullYear()) ? "" : `/${y}`}`;
+  }
+  if (rule.count) text += `, ${rule.count} ${rule.count === 1 ? "time" : "times"}`;
+  return text;
+}
+
+/** A rule in words: pt-BR (default) or English. */
+export function describeRule(rule: ScheduleRule, locale: "pt-BR" | "en" | string = "pt-BR"): string {
+  return locale.toLowerCase().startsWith("en") ? describeRuleEn(rule) : describeRulePt(rule);
 }

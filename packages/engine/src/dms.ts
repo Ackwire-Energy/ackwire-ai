@@ -1,9 +1,9 @@
 import { and, type Database, desc, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import type { Agent } from "./agents";
-import { audienceNotice, canTalkTo } from "./audience";
+import { audienceError, canTalkTo } from "./audience";
 import { caches } from "./cache";
 import { sha256 } from "./crypto";
-import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { NotFoundError, ValidationError } from "./errors";
 import { getMembership, requirePermission } from "./organizations";
 
 const { channels, channelMembers, channelReads, messages, agents, users } = schema;
@@ -50,7 +50,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
     return found;
   }
   // A new DM with an agent this person can't talk to (D31) isn't started; an old one stays readable.
-  if (blockedAgent) throw new ForbiddenError(await audienceNotice(db, blockedAgent));
+  if (blockedAgent) throw await audienceError(db, blockedAgent);
   const created = await db.transaction(async (tx) => {
     const [channel] = await tx
       .insert(channels)

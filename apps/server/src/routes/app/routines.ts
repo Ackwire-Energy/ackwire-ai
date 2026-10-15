@@ -207,7 +207,7 @@ export function routineRoutes(deps: AppDeps) {
         200: json(
           z.union([
             z.object({ ok: z.literal(true), cron: z.string(), description: z.string(), timezone: z.string() }),
-            z.object({ ok: z.literal(false), error: z.string() }),
+            z.object({ ok: z.literal(false), error: z.string(), code: z.string() }),
           ]),
         ),
         ...errors,
@@ -230,14 +230,19 @@ export function routineRoutes(deps: AppDeps) {
       cron: z.string().nullable().openapi({ description: "When cron can say it." }),
       nextRuns: z.array(z.string()).openapi({ description: "The next 5 times." }),
     }),
-    z.object({ ok: z.literal(false), error: z.string() }),
+    z.object({
+      ok: z.literal(false),
+      error: z.string(),
+      code: z.string(),
+      params: z.record(z.string(), z.unknown()).optional(),
+    }),
   ]);
-  const answer = (rule: ScheduleRule) => {
+  const answer = (rule: ScheduleRule, locale?: string) => {
     const normal = normalizeRule(rule);
     return {
       ok: true as const,
       rule: normal,
-      description: describeRule(normal),
+      description: describeRule(normal, locale),
       cron: ruleToCron(normal),
       nextRuns: ruleOccurrences(normal, new Date(), new Date(Date.now() + 5 * 366 * 86_400_000), 5).map((d) =>
         d.toISOString(),
@@ -254,25 +259,49 @@ export function routineRoutes(deps: AppDeps) {
       summary: "A schedule phrase → a structured rule (to fill the period picker), with its description and next runs",
       request: {
         params: OrgParams,
-        body: body(z.object({ phrase: z.string().min(1).max(300), timezone: z.string().max(64).optional() })),
+        body: body(
+          z.object({
+            phrase: z.string().min(1).max(300),
+            timezone: z.string().max(64).optional(),
+            locale: z
+              .string()
+              .max(10)
+              .optional()
+              .openapi({ description: '"pt-BR" (default) or "en": the description\'s language.' }),
+          }),
+        ),
       },
       responses: { 200: json(RuleAnswer), ...errors },
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      const { phrase, timezone } = c.req.valid("json");
+      const { phrase, timezone, locale } = c.req.valid("json");
       const zone = await routineTimezone(db, c.get("user").id, orgId, timezone);
       const rule = phraseToRule(phrase, zone);
       if (!rule) {
         return c.json(
-          { ok: false as const, error: 'Não entendi o período. Tente "a cada 2 semanas na segunda às 9h".' },
+          {
+            ok: false as const,
+            error: 'Couldn\'t read the period. Try "every 2 weeks on Monday at 9am".',
+            code: "schedule.unreadable",
+          },
           200,
         );
       }
       try {
-        return c.json(answer(rule), 200);
+        return c.json(answer(rule, locale), 200);
       } catch (error) {
-        return c.json({ ok: false as const, error: error instanceof Error ? error.message : String(error) }, 200);
+        return c.json(
+          {
+            ok: false as const,
+            error: error instanceof Error ? error.message : String(error),
+            code: (error as { code?: string }).code ?? "schedule.invalid",
+            ...((error as { params?: Record<string, unknown> }).params
+              ? { params: (error as { params?: Record<string, unknown> }).params }
+              : {}),
+          },
+          200,
+        );
       }
     },
   );
@@ -284,15 +313,34 @@ export function routineRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "A rule from the picker → its description in pt-BR, cron (when possible) and next runs",
-      request: { params: OrgParams, body: body(z.object({ rule: ScheduleRuleSchema })) },
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            rule: ScheduleRuleSchema,
+            locale: z.string().max(10).optional().openapi({ description: '"pt-BR" (default) or "en".' }),
+          }),
+        ),
+      },
       responses: { 200: json(RuleAnswer), ...errors },
     }),
     async (c) => {
       await requirePermission(db, c.get("user").id, c.req.valid("param").orgId, "read");
       try {
-        return c.json(answer(c.req.valid("json").rule as ScheduleRule), 200);
+        const input = c.req.valid("json");
+        return c.json(answer(input.rule as ScheduleRule, input.locale), 200);
       } catch (error) {
-        return c.json({ ok: false as const, error: error instanceof Error ? error.message : String(error) }, 200);
+        return c.json(
+          {
+            ok: false as const,
+            error: error instanceof Error ? error.message : String(error),
+            code: (error as { code?: string }).code ?? "schedule.invalid",
+            ...((error as { params?: Record<string, unknown> }).params
+              ? { params: (error as { params?: Record<string, unknown> }).params }
+              : {}),
+          },
+          200,
+        );
       }
     },
   );

@@ -269,18 +269,21 @@ export async function updateMyProfile(
   if (input.handle !== undefined) {
     const handle = input.handle.trim().replace(/^@/, "").toLowerCase();
     if (!PERSON_HANDLE_PATTERN.test(handle)) {
-      throw new ValidationError("handle: 2 a 32 letras minúsculas, números, - ou _");
+      throw new ValidationError("handle: 2 to 32 lowercase letters, numbers, - or _", "handle.invalid", {
+        min: 2,
+        max: 32,
+      });
     }
     const [agent] = await db
       .select({ id: schema.agents.id })
       .from(schema.agents)
       .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.handle, handle), isNull(schema.agents.archivedAt)));
-    if (agent) throw new ConflictError(`@${handle} já é de um agente`);
+    if (agent) throw new ConflictError(`@${handle} belongs to an agent`, "handle.taken_by_agent", { handle });
     const [other] = await db
       .select({ userId: organizationMembers.userId })
       .from(organizationMembers)
       .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.handle, handle)));
-    if (other && other.userId !== userId) throw new ConflictError(`@${handle} já está em uso`);
+    if (other && other.userId !== userId) throw new ConflictError(`@${handle} is taken`, "handle.taken", { handle });
     set.handle = handle;
   }
   if (input.timezone !== undefined) {

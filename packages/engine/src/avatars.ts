@@ -104,13 +104,14 @@ export async function setAvatar(
   input: { imageBase64: string; contentType: string },
 ): Promise<{ avatarUrl: string }> {
   const clean = input.imageBase64.replace(/^data:[^;]+;base64,/, "").replace(/\s+/g, "");
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(clean)) throw new ValidationError("A imagem não está em base64.");
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(clean)) throw new ValidationError("The image isn't base64", "avatar.not_base64");
   const bytes = new Uint8Array(Buffer.from(clean, "base64"));
-  if (bytes.length === 0) throw new ValidationError("A imagem veio vazia.");
-  if (bytes.length > AVATAR_LIMITS.maxBytes) throw new ValidationError("A foto pode ter até 2 MB.");
+  if (bytes.length === 0) throw new ValidationError("The image is empty", "avatar.empty");
+  if (bytes.length > AVATAR_LIMITS.maxBytes)
+    throw new ValidationError("The photo can be up to 2 MB", "avatar.too_large", { maxMb: 2 });
   const type = sniffImage(bytes);
   if (!type || !TYPES[input.contentType] || type !== input.contentType) {
-    throw new ValidationError("Use uma imagem JPEG, PNG ou WebP.");
+    throw new ValidationError("Use a JPEG, PNG or WebP image", "avatar.type");
   }
   const body = stripImageMetadata(bytes, type);
   const file = `${createHash("sha256").update(body).digest("hex").slice(0, 16)}.${TYPES[type]}`;

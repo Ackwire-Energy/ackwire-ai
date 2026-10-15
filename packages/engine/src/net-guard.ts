@@ -51,26 +51,27 @@ export async function assertPublicHttpsUrl(raw: string, resolve: ResolveHost = r
   try {
     url = new URL(raw);
   } catch {
-    throw new ValidationError("Endereço inválido");
+    throw new ValidationError("Invalid address", "url.invalid");
   }
-  if (url.protocol !== "https:") throw new ValidationError("Use um endereço https://");
-  if (url.username || url.password) throw new ValidationError("O endereço não pode ter usuário ou senha");
+  if (url.protocol !== "https:") throw new ValidationError("Use an https:// address", "url.https_required");
+  if (url.username || url.password)
+    throw new ValidationError("The address can't have a user or password", "url.credentials");
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) {
-    throw new ValidationError("Esse endereço aponta para uma rede interna");
+    throw new ValidationError("This address points to an internal network", "url.internal");
   }
   if (isIP(host)) {
-    if (isBlockedAddress(host)) throw new ValidationError("Esse endereço aponta para uma rede interna");
+    if (isBlockedAddress(host)) throw new ValidationError("This address points to an internal network", "url.internal");
     return url;
   }
   let addresses: string[];
   try {
     addresses = await resolve(host);
   } catch {
-    throw new ValidationError(`Não encontramos o endereço ${host}`);
+    throw new ValidationError(`Couldn't find ${host}`, "url.not_found", { host });
   }
   if (addresses.length === 0 || addresses.some(isBlockedAddress)) {
-    throw new ValidationError("Esse endereço aponta para uma rede interna");
+    throw new ValidationError("This address points to an internal network", "url.internal");
   }
   return url;
 }

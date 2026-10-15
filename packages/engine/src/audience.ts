@@ -41,7 +41,39 @@ export function audienceSql(alias: string, userId: SQL): SQL {
     or (${a}.audience_mode = 'people' and ${userId} = any(${a}.audience_user_ids)))))`;
 }
 
-/** "O Theo só responde a Walter e Ana." */
+/** Who the agent answers, as a stable code and params (the app says it in the person's language). */
+export async function audienceDetail(db: Database, a: Agent) {
+  const ids = [
+    ...new Set([...(a.ownerUserId ? [a.ownerUserId] : []), ...(a.audienceMode === "people" ? a.audienceUserIds : [])]),
+  ];
+  const rows = ids.length
+    ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ids))
+    : [];
+  const people = ids.flatMap((id) => {
+    const name = rows.find((r) => r.id === id)?.name;
+    return name ? [{ id, name }] : [];
+  });
+  const code = people.length === 0 ? "audience.nobody" : "audience.only";
+  const params = {
+    agentId: a.id,
+    agentName: a.name,
+    userIds: people.map((p) => p.id),
+    names: people.map((p) => p.name),
+  };
+  const english =
+    people.length === 0
+      ? `${a.name} isn't answering anyone right now`
+      : `${a.name} only answers ${people.map((p) => p.name).join(", ")}`;
+  return { code, params, english };
+}
+
+/** The ForbiddenError for someone the agent doesn't answer (D31), with code and params. */
+export async function audienceError(db: Database, a: Agent) {
+  const d = await audienceDetail(db, a);
+  return new ForbiddenError(d.english, d.code, d.params);
+}
+
+/** "O Theo só responde a Walter e Ana." (pt-BR text for agents' context and old clients; the app uses `audienceDetail`). */
 export async function audienceNotice(db: Database, a: Agent): Promise<string> {
   const ids = [
     ...new Set([...(a.ownerUserId ? [a.ownerUserId] : []), ...(a.audienceMode === "people" ? a.audienceUserIds : [])]),
@@ -65,12 +97,13 @@ export async function notifyBlocked(
   userId: string,
   input: { agentIds: string[]; channelId: string; threadId: string | null; messageId: string },
 ) {
-  const out: { agentId: string; text: string }[] = [];
+  const out: { agentId: string; text: string; code: string; params: Record<string, unknown> }[] = [];
   for (const agentId of input.agentIds) {
     const agent = await getAgent(deps.db, orgId, agentId);
     if (!agent) continue;
     const text = await audienceNotice(deps.db, agent);
-    out.push({ agentId, text });
+    const detail = await audienceDetail(deps.db, agent);
+    out.push({ agentId, text, code: detail.code, params: detail.params });
     await publishUserEvent(deps.pubsub, orgId, userId, {
       type: "agent.unavailable",
       agentId,
@@ -78,6 +111,8 @@ export async function notifyBlocked(
       threadId: input.threadId,
       messageId: input.messageId,
       text,
+      code: detail.code,
+      params: detail.params,
     });
   }
   return out;

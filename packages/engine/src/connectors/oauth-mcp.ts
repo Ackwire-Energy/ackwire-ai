@@ -71,11 +71,11 @@ export async function probeMcpServer(deps: McpOAuthDeps, serverUrl: string): Pro
       }),
     });
   } catch {
-    throw new ValidationError("Não foi possível conectar ao servidor MCP.");
+    throw new ValidationError("Couldn't connect to the MCP server", "connector.mcp_unreachable");
   }
   if (res.status !== 401 && res.status !== 403) {
     if (res.ok) return { kind: "open" };
-    throw new ValidationError(`O servidor MCP respondeu ${res.status}.`);
+    throw new ValidationError(`The MCP server answered ${res.status}`, "connector.mcp_status", { status: res.status });
   }
   const header = res.headers.get("www-authenticate") ?? "";
   const fromHeader = /resource_metadata="([^"]+)"/.exec(header)?.[1];

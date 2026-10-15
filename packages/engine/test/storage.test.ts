@@ -70,17 +70,17 @@ describe("org storage", () => {
   test("a failing test blocks activation, with a clear reason per failure", async () => {
     f = await setup();
     const cases: [Partial<S3Input>, string][] = [
-      [{ secretAccessKey: "wrong-secret" }, "não foram aceitos"],
-      [{ bucket: "missing" }, "não existe"],
-      [{ region: "eu-west-1" }, "região"],
+      [{ secretAccessKey: "wrong-secret" }, "was not accepted"],
+      [{ bucket: "missing" }, "doesn't exist"],
+      [{ region: "eu-west-1" }, "region"],
     ];
     for (const [over, reason] of cases) {
       const result = await testStorage(f.storage, f.owner.id, f.org.id, bucket(over));
       expect(result.ok).toBe(false);
-      expect(result.steps[0]).toMatchObject({ step: "write", ok: false });
+      expect(result.steps[0]).toMatchObject({ step: "write", ok: false, code: expect.stringMatching(/^storage\./) });
       expect(result.steps[0]?.error).toContain(reason);
       await expect(saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket(over) })).rejects.toThrow(
-        "Teste a conexão",
+        "Test the connection",
       );
     }
     f.s3.state.denyDelete = true;
@@ -91,7 +91,7 @@ describe("org storage", () => {
       ["list", true],
       ["delete", false],
     ]);
-    expect(noDelete.steps[3]?.error).toContain("permissão");
+    expect(noDelete.steps[3]?.error).toContain("no permission");
     expect((await getStorage(f.db, f.owner.id, f.org.id)).kind).toBe("agentes");
   });
 
