@@ -5,7 +5,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { useDecideApproval } from "@/api/queries";
 import type { Agent, Approval, Channel, Member } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { prepareBurst } from "@/components/Sky";
+import { CardSky, colorOf, prepareBurst } from "@/components/Sky";
 import { relativeTime, timeLeft, whenAt } from "@/lib/format";
 import { useOrg } from "./org-context";
 
@@ -116,6 +116,7 @@ export function InlineApproval({
     <ApprovalCard
       status="waiting"
       aria-label={t("approval.group")}
+      sky={<CardSky color={colorOf(agent)} />}
       who={<Trans i18nKey="approval.asks" values={{ agent: name }} components={{ b: <b /> }} />}
       statusLabel={approval.canDecide ? t("approval.waitingYou") : waitingFor(t, agent, members)}
       title={approval.title}

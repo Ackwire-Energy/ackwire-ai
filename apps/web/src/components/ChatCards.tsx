@@ -12,6 +12,7 @@ import { agentGrammar } from "@/lib/grammar";
 import { useToast } from "@/lib/toast";
 import { useLive, useLiveStore } from "@/realtime/context";
 import { useChannelActions } from "./channel-actions";
+import { CardSky, colorOf } from "./Sky";
 import { useOrg } from "./org-context";
 
 /**
@@ -193,7 +194,8 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
     onError: (err) =>
       setError((err as { status?: number }).status === 409 ? t("question.alreadyAnswered") : t("question.failed")),
   });
-  const name = dir.agentById.get(question.agentId)?.name ?? t("channel.unknownAgent");
+  const agent = dir.agentById.get(question.agentId);
+  const name = agent?.name ?? t("channel.unknownAgent");
   const done = current.status === "answered";
   const who = current.answeredByUserId === me.user.id ? null : dir.memberById.get(current.answeredByUserId ?? "")?.name;
   return (
@@ -203,6 +205,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       role="group"
       aria-label={t("question.group", { agent: name })}
     >
+      {!done && <CardSky color={colorOf(agent)} />}
       <div className="ac-approval__head">
         <span className="ac-approval__who">
           <Trans i18nKey="question.asks" values={{ agent: name }} components={{ b: <b /> }} />

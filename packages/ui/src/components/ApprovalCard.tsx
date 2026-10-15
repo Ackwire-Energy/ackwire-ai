@@ -21,6 +21,8 @@ export interface ApprovalCardProps extends Omit<HTMLAttributes<HTMLElement>, "ti
   /** Decided cards shrink to one line. */
   compact?: boolean;
   wide?: boolean;
+  /** Decorative backdrop at the top of the card (the agent's pixel sky while it waits). */
+  sky?: ReactNode;
   as?: "div" | "article";
 }
 
@@ -38,6 +40,7 @@ export function ApprovalCard({
   avatar,
   compact,
   wide,
+  sky,
   as: Tag = "div",
   className,
   ...rest
@@ -50,6 +53,7 @@ export function ApprovalCard({
       role={Tag === "div" ? "group" : undefined}
       {...rest}
     >
+      {sky}
       <div className="ac-approval__head">
         {avatar}
         <span className="ac-approval__who">{who}</span>

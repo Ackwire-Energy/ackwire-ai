@@ -212,6 +212,26 @@ export function ActivitySky({ color }: { color: AgentColor }) {
   );
 }
 
+/** The top of a card where an agent waits on a person (question, approval): a light drift in its color. */
+export function CardSky({ color }: { color: AgentColor }) {
+  return (
+    <span className="ac-approval__sky" aria-hidden="true">
+      <PixelSky
+        options={{
+          pixel: 3,
+          surface: "--raised",
+          palette: (bg) => softTones(color, bg),
+          light: 0,
+          base: (u, v, tt) => {
+            const fade = Math.max(0, 1 - v);
+            return fade * fade * (0.18 + 0.32 * u * u + 0.06 * S(u * 7 + tt * 0.5));
+          },
+        }}
+      />
+    </span>
+  );
+}
+
 /** The whole app loading (the workspace's first load): the sky rises and agents pass through it. */
 export function BootSplash() {
   const { t } = useTranslation();
@@ -261,21 +281,25 @@ export function prepareBurst(from: HTMLElement): () => void {
 
 /* ---------- Sidebar ---------- */
 
-/** The workspace header's little sky (calm behind its name). */
+/** The workspace header's little sky: light tones, a touch deeper at the right (calm behind its name). */
 export function SidebarOrgSky({ calm }: { calm: () => (Element | null)[] }) {
   return (
     <PixelSky
       className="sidebar__org-sky"
       options={{
         pixel: 3,
-        palette: SKY_TONES,
-        sprites: 4,
+        surface: "--sunken",
+        // Soft tones run from the surface (0) toward the color: low values stay light.
+        palette: (bg) => softTones("sky", bg),
+        eye: eyeTone("sky"),
+        sprites: 2,
         near: 0,
         calm,
+        calmV: 0.08,
         calmPad: 10,
-        light: 0.12,
-        base: (u, v) => 0.82 - 0.35 * u - 0.4 * v,
-        blobs: (tt) => [[0.88 + 0.05 * S(tt * 0.3), 0.7, 0.08, -0.22]],
+        light: 0,
+        base: (u, v) => 0.1 + 0.32 * u * u * (0.6 + 0.4 * v),
+        blobs: (tt) => [[0.9 + 0.04 * S(tt * 0.3), 0.75, 0.07, 0.08]],
       }}
     />
   );
