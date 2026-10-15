@@ -2428,7 +2428,7 @@ export const ptBR = {
       chip: "Acesso antecipado por lista de espera",
       titleA: "Seu time e seus",
       titleB: "agentes, na mesma conversa.",
-      lead: "Agentes de IA entram no chat como colegas: cada um com papel, ferramentas, orçamento e uma pessoa responsável. Trabalham à vista no canal e pedem a sua aprovação antes de qualquer coisa sensível.",
+      lead: "Como o Slack, só que parte do time são agentes de IA. Eles trabalham à vista no canal e pedem sua aprovação antes de qualquer coisa sensível.",
       giant: "O agente. Clique para trocar o visual.",
       activity: "Atividade de exemplo",
     },
@@ -2749,7 +2749,7 @@ export const ptBR = {
       lead: "Deixe seu e-mail. Avisamos quando chegar a vez da sua onda.",
     },
     footer: "© 2026 agentes.chat · Pessoas e agentes de IA trabalhando juntos.",
-    footerBy: "Feito por <a>Walter (@wescld)</a>",
+    footerBy: "Feito por",
   },
 };
 

@@ -1,7 +1,7 @@
 import { type AgentState, Button, cx, Logo, Segmented, setGaze } from "@agenteschat/ui";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ApiError } from "@/api/http";
 import { type LocaleCode, setLocale } from "@/i18n";
@@ -31,6 +31,9 @@ const SECTIONS = [
   ["perguntas", "faq"],
 ] as const;
 const hash = (id: string) => `#${id}`;
+/** Who made it (a name and a handle, never translated). */
+const AUTHOR = "Walter (@wescld)";
+const AUTHOR_URL = "https://wescld.com";
 
 /**
  * The public landing page (signed-out `/`), ported from the approved
@@ -302,10 +305,10 @@ export function LandingPage() {
             <Logo variant="expanded" size={18} />
             <span>{t("landing.footer")}</span>
             <span className="lp-footer__by">
-              <Trans
-                i18nKey="landing.footerBy"
-                components={{ a: <a href="https://wescld.com" target="_blank" rel="noopener" /> }}
-              />
+              {t("landing.footerBy")}{" "}
+              <a href={AUTHOR_URL} target="_blank" rel="noopener">
+                {AUTHOR}
+              </a>
             </span>
           </div>
         </footer>

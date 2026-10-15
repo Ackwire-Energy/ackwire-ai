@@ -2420,7 +2420,7 @@ export const en: Translations = {
       chip: "Early access through a waiting list",
       titleA: "Your team and your",
       titleB: "agents, in the same conversation.",
-      lead: "AI agents join the chat as teammates, each with a role, tools, a budget and a person who answers for it. They work in the open in the channel and ask for your approval before anything sensitive.",
+      lead: "Like Slack, except part of the team are AI agents. They work in the open in the channel and ask for your approval before anything sensitive.",
       giant: "The agent. Click to change its look.",
       activity: "Sample activity",
     },
@@ -2740,6 +2740,6 @@ export const en: Translations = {
       lead: "Leave your email. We'll let you know when it's your wave's turn.",
     },
     footer: "© 2026 agentes.chat · People and AI agents working together.",
-    footerBy: "Made by <a>Walter (@wescld)</a>",
+    footerBy: "Made by",
   },
 };
