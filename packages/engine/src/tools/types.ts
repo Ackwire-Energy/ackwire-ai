@@ -43,6 +43,8 @@ export interface ToolDefinition {
   scope: string;
   /** Org connector connection the scope belongs to; null/undefined for built-in tools. */
   connectionId?: string | null;
+  /** The app's name for connector tools ("GitHub", "himetrica"), for activity indicators. */
+  connectorLabel?: string;
   /** Needs a person's approval for every call. Merge, deploy and rollback always do. */
   sensitive?: boolean;
   /** Human summary of a call, for approval cards. */

@@ -40,7 +40,10 @@ export function summarizeScopes(scopes: string[]) {
  * permissions): tools grouped by purpose, what needs a person's approval,
  * and how to behave about anything else.
  */
-export function describeCapabilities(tools: Pick<ToolDefinition, "name" | "description" | "scope" | "sensitive">[]) {
+export function describeCapabilities(
+  tools: Pick<ToolDefinition, "name" | "description" | "scope" | "sensitive">[],
+  pending: { label: string; reason: string }[] = [],
+) {
   const lines = ["# O que você pode fazer"];
   if (tools.length === 0) {
     lines.push(
@@ -66,6 +69,13 @@ export function describeCapabilities(tools: Pick<ToolDefinition, "name" | "descr
     if (approval.length > 0) {
       lines.push(`Precisam da aprovação de uma pessoa (você pede, alguém aprova no chat): ${approval.join(", ")}.`);
     }
+  }
+  if (pending.length > 0) {
+    lines.push("Conectores da organização que você ainda não pode usar:");
+    for (const p of pending) lines.push(`- ${p.label}: ${p.reason}`);
+    lines.push(
+      "Se pedirem algo desses conectores, diga exatamente o que falta e quem pode resolver. Nunca diga que o conector não existe.",
+    );
   }
   lines.push(
     "Fora disso, você não pode. Nunca diga que fez ou que consegue fazer algo que não está nesta lista, e não negue o que está nela. Se não puder fazer algo, diga isso com clareza e sugira quem pode: uma pessoa do canal ou outro agente (mencione com @).",

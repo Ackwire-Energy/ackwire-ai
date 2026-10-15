@@ -144,3 +144,23 @@ describe("agent access", () => {
     await expect(accessMatrix(f.db, bia.id, f.org.id)).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
+
+test("write implies read for built-ins: issues:write lets the agent list its issues", async () => {
+  f = await setup();
+  await setAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id, {
+    ...none,
+    scopes: [
+      { connectionId: null, scope: "issues:write" },
+      { connectionId: null, scope: "drive:write" },
+    ],
+  });
+  const keys = new Set([grantKey(null, "issues:write")]);
+  expect(toolAccess(keys, { name: "list_issues", scope: "issues:read", connectionId: null })).toBe("inherited");
+  expect(toolAccess(keys, { name: "list_events", scope: "calendar:read", connectionId: null })).toBe("off");
+  const tree = await getAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id);
+  const issuesRead = tree.builtins.find((b) => b.scope === "issues:read");
+  expect(issuesRead?.state).toBe("inherited");
+  expect(issuesRead?.tools.map((t) => [t.name, t.state])).toEqual([["list_issues", "inherited"]]);
+  expect(tree.builtins.find((b) => b.scope === "drive:read")?.tools.every((t) => t.state === "inherited")).toBe(true);
+  expect(tree.builtins.find((b) => b.scope === "calendar:read")?.state).toBe("off");
+});

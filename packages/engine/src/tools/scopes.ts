@@ -81,8 +81,17 @@ export function toolAccess(
   if (tool.scope === "" && !conn) return "inherited";
   if (conn && granted.has(grantKey(conn, CONNECTOR_ALL))) return "inherited";
   if (granted.has(grantKey(conn, tool.scope))) return "granted";
+  // Write implies read for built-ins (`issues:write` ⇒ `list_issues`, `drive:write` ⇒ `read_artifact`…).
+  const writeScope = impliedByWrite(tool.scope);
+  if (!conn && writeScope && granted.has(grantKey(null, writeScope))) return "inherited";
   if (granted.has(grantKey(null, ALL_TOOLS))) return "inherited";
   return "off";
+}
+
+/** `drive:read` → `drive:write` for built-in scopes that have both; otherwise null. */
+export function impliedByWrite(scope: string) {
+  const m = /^(drive|issues|calendar):read$/.exec(scope);
+  return m ? `${m[1]}:write` : null;
 }
 
 export const isAllowed = (state: AccessState) => state === "granted" || state === "inherited";

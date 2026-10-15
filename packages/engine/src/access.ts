@@ -15,6 +15,7 @@ import {
   BUILTIN_SCOPES,
   CONNECTOR_ALL,
   grantKey,
+  impliedByWrite,
   type ScopeGrant,
   toolAccess,
   toolAllowScope,
@@ -152,6 +153,8 @@ async function grantsOf(db: Database, orgId: string, agentId: string) {
 
 function scopeState(granted: Set<string>, connectionId: string | null, scope: string): AccessState {
   if (granted.has(grantKey(connectionId, scope))) return "granted";
+  const writeScope = impliedByWrite(scope);
+  if (!connectionId && writeScope && granted.has(grantKey(null, writeScope))) return "inherited";
   if (connectionId && granted.has(grantKey(connectionId, CONNECTOR_ALL))) return "inherited";
   if (granted.has(grantKey(null, ALL_TOOLS))) return "inherited";
   return "off";
@@ -370,11 +373,14 @@ export async function pendingConnectors(
       out.push({
         label: c.label,
         reason: c.custom
-          ? "conectado, mas aguardando um admin classificar as ferramentas"
+          ? "conectado, aguardando um admin classificar as ferramentas"
           : "conectado, sem ferramentas disponíveis",
       });
     } else if (!tools.some((t) => offeredToolNames.has(t.name))) {
-      out.push({ label: c.label, reason: "você não tem permissão; peça a um admin ou ao responsável por você" });
+      out.push({
+        label: c.label,
+        reason: "conectado, mas as ferramentas não foram liberadas para você; peça a um admin em Editar permissões",
+      });
     }
   }
   return out;

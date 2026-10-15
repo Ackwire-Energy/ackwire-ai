@@ -1,5 +1,6 @@
 import { connectorOAuthApps } from "@agenteschat/config";
 import {
+  acceptCustomSuggestion,
   type CustomDeps,
   connectCustomServer,
   connectOverHttp,
@@ -35,6 +36,7 @@ const CustomServer = z
         name: z.string(),
         description: z.string(),
         readOnlyHint: z.boolean().nullable(),
+        suggestedAccess: Access.nullable().openapi({ description: "Our suggestion until an admin decides." }),
         access: Access.nullable().openapi({ description: "Null = not classified yet: hidden from agents." }),
         label: z.string(),
         firstSeenAt: z.string(),
@@ -157,6 +159,31 @@ export function customConnectorRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, serverId } = c.req.valid("param");
       return c.json(await saveCustomTools(custom, c.get("user").id, orgId, serverId, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/connectors/custom/{serverId}/accept-suggestion",
+      tags,
+      security,
+      summary: "Classify every pending tool as suggested, in one call; lists agents that could get access",
+      request: { params: ServerParams },
+      responses: {
+        200: json(
+          z.object({
+            server: CustomServer,
+            agentsWithoutAccess: z.array(z.object({ id: z.uuid(), name: z.string(), handle: z.string() })),
+            suggestedGrant: z.object({ connectors: z.record(z.string(), z.boolean()) }),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, serverId } = c.req.valid("param");
+      return c.json(await acceptCustomSuggestion(custom, c.get("user").id, orgId, serverId), 200);
     },
   );
 

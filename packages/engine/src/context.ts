@@ -6,7 +6,8 @@ import { summarizeScopes } from "./capabilities";
 import type { Message } from "./messages";
 import type { AgentRun } from "./runs";
 
-const { messages, users, agents, channels, channelMembers, organizations, agentScopes } = schema;
+const { messages, users, agents, channels, channelMembers, organizations, agentScopes, agentRuns, agentRunSteps } =
+  schema;
 
 export interface RunContext {
   system: SystemBlock[];
@@ -115,6 +116,31 @@ export async function buildRunContext(
       }[]
     >,
   ]);
+  // What agents already did in this thread (or DM), so a new run doesn't forget or redo it.
+  const priorActions = await db
+    .select({ data: agentRunSteps.data, handle: agents.handle })
+    .from(agentRunSteps)
+    .innerJoin(agentRuns, eq(agentRuns.id, agentRunSteps.runId))
+    .innerJoin(agents, eq(agents.id, agentRuns.agentId))
+    .where(
+      and(
+        eq(agentRuns.orgId, run.orgId),
+        eq(agentRuns.channelId, run.channelId),
+        channel.kind === "dm" ? undefined : eq(agentRuns.threadRootId, run.threadRootId),
+        ne(agentRuns.id, run.id),
+        eq(agentRunSteps.kind, "tool_result"),
+      ),
+    )
+    .orderBy(desc(agentRunSteps.createdAt))
+    .limit(12);
+  const recentActions = priorActions.reverse().map((a) => {
+    const d = a.data as { name?: string; content?: string; isError?: boolean };
+    const target = String(d.content ?? "")
+      .split("\n")[0]
+      ?.replace(/\s+/g, " ")
+      .slice(0, 140);
+    return `- @${a.handle} ${d.name ?? "?"} → ${target ?? ""} (${d.isError ? "erro" : "ok"})`;
+  });
   // What the other agents here can do, so this one never answers for them.
   const others = members.filter((m) => m.agentId && m.agentId !== agent.id);
   const otherScopes = others.length
@@ -163,6 +189,9 @@ export async function buildRunContext(
           options.askUser
             ? "- When a request is ambiguous, key information is missing, or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait. Don't ask about simple requests you can just do, and never ask more than you need."
             : "",
+          options.toolsAvailable
+            ? "- Before saying something was done, or correcting it, check the current state with the matching tool (`list_issues`, `read_artifact`, `list_events`…), not with `search_context`."
+            : "",
           "- Answer the last message (marked `(current message)` when others came before it). Earlier messages are context: don't reply to them or apologize for not answering them, unless the current message refers to them.",
           "- Reply with the message text only, without an author prefix. Mention another agent with @handle only when you need it to act.",
         ]
@@ -174,6 +203,18 @@ export async function buildRunContext(
       cache: true,
     },
     ...(options.capabilities ? [{ text: options.capabilities }] : []),
+    ...(recentActions.length > 0
+      ? [
+          {
+            text: [
+              `# Ações recentes ${channel.kind === "dm" ? "nesta DM" : "neste thread"}`,
+              "O que os agentes já fizeram aqui, com o resultado real das ferramentas:",
+              ...recentActions,
+              "Isso aconteceu de verdade. Nunca diga que não fez, nem desminta, algo que aparece aqui como ok. Para conferir detalhes (critérios, labels, conteúdo), use a ferramenta específica (`list_issues`, `read_artifact`, `list_events`…), não `search_context`.",
+            ].join("\n"),
+          },
+        ]
+      : []),
     {
       text:
         channel.kind === "dm"

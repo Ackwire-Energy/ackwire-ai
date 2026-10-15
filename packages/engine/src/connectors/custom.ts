@@ -16,7 +16,7 @@ import {
 import type { McpConnect, McpTool } from "./mcp";
 import { authServerMetadata, ensureOAuthClient, type McpOAuthDeps, probeMcpServer } from "./oauth-mcp";
 
-const { connectorConnections, customTools, oauthStates } = schema;
+const { connectorConnections, customTools, oauthStates, agentScopes, agents } = schema;
 
 export const CUSTOM_PREFIX = "custom:";
 export const isCustom = (c: Pick<ConnectorConnection, "connector">) => c.connector.startsWith(CUSTOM_PREFIX);
@@ -27,10 +27,25 @@ const ACCESS: readonly ToolAccess[] = ["read", "write", "approval"];
 export const customScope = (connectionId: string, access: ToolAccess) =>
   `custom:${connectionId}:${access === "read" ? "read" : "write"}`;
 
+/**
+ * What we suggest for a tool before an admin decides: read-only → read;
+ * destructive or write-like names (create, update, delete, send, post,
+ * merge, deploy…) → approval; anything else → write.
+ */
+export function suggestAccess(tool: { name: string; readOnlyHint?: boolean | null; destructiveHint?: boolean | null }) {
+  if (tool.readOnlyHint === true) return "read" as const;
+  const writeLike =
+    /(^|[_-])(create|update|delete|remove|send|post|merge|deploy|publish|write|set|cancel|close|archive|drop|refund|pay)([_-]|$)/i;
+  if (tool.destructiveHint === true || writeLike.test(tool.name)) return "approval" as const;
+  return "write" as const;
+}
+
 export interface CustomToolView {
   name: string;
   description: string;
   readOnlyHint: boolean | null;
+  /** Our suggestion until an admin decides (`accept-suggestion` applies it). */
+  suggestedAccess: ToolAccess | null;
   access: ToolAccess | null;
   label: string;
   firstSeenAt: string;
@@ -86,6 +101,7 @@ function view(c: ConnectorConnection, tools: (typeof customTools.$inferSelect)[]
         name: t.name,
         description: t.description,
         readOnlyHint: t.readOnlyHint,
+        suggestedAccess: ACCESS.includes(t.suggestedAccess as ToolAccess) ? (t.suggestedAccess as ToolAccess) : null,
         access: ACCESS.includes(t.access as ToolAccess) ? (t.access as ToolAccess) : null,
         label: t.label,
         firstSeenAt: t.firstSeenAt.toISOString(),
@@ -201,7 +217,13 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
     if (old) {
       await deps.db
         .update(customTools)
-        .set({ description, readOnlyHint: tool.readOnlyHint ?? null, removedAt: null })
+        .set({
+          description,
+          readOnlyHint: tool.readOnlyHint ?? null,
+          destructiveHint: tool.destructiveHint ?? null,
+          suggestedAccess: suggestAccess(tool),
+          removedAt: null,
+        })
         .where(eq(customTools.id, old.id));
     } else {
       await deps.db.insert(customTools).values({
@@ -210,6 +232,8 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
         name: tool.name,
         description,
         readOnlyHint: tool.readOnlyHint ?? null,
+        destructiveHint: tool.destructiveHint ?? null,
+        suggestedAccess: suggestAccess(tool),
         access: null,
         label: humanize(tool.name).slice(0, 120),
       });
@@ -393,4 +417,44 @@ export async function saveCustomTools(
 export async function classifiedTools(db: Database, connectionId: string) {
   const rows = await toolRows(db, [connectionId]);
   return rows.filter((t) => ACCESS.includes(t.access as ToolAccess));
+}
+
+/**
+ * Applies our suggestion to every tool not classified yet (admins), in one
+ * call. Returns the server and the agents that don't have access to it yet,
+ * so the app can offer to grant it.
+ */
+export async function acceptCustomSuggestion(deps: CustomDeps, actorId: string, orgId: string, id: string) {
+  await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const c = await loadCustom(deps.db, orgId, id);
+  const rows = await toolRows(deps.db, [c.id]);
+  const tools = rows.map((t) => ({
+    name: t.name,
+    access: (ACCESS.includes(t.access as ToolAccess)
+      ? t.access
+      : ACCESS.includes(t.suggestedAccess as ToolAccess)
+        ? t.suggestedAccess
+        : suggestAccess(t)) as ToolAccess,
+    label: t.label,
+  }));
+  const server = await saveCustomTools(deps, actorId, orgId, id, { label: c.label, tools });
+  const grants = await deps.db
+    .select({ agentId: agentScopes.agentId, scope: agentScopes.scope, connectionId: agentScopes.connectionId })
+    .from(agentScopes)
+    .where(eq(agentScopes.orgId, orgId));
+  const withAccess = new Set(
+    grants
+      .filter((g) => g.scope === "*" || (g.connectionId === c.id && g.scope !== "" && !g.scope.startsWith("deny:")))
+      .map((g) => g.agentId),
+  );
+  const agentRows = await deps.db
+    .select({ id: agents.id, name: agents.name, handle: agents.handle })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)));
+  return {
+    server,
+    agentsWithoutAccess: agentRows.filter((a) => !withAccess.has(a.id)),
+    /** Body for `PUT …/agents/{id}/access` that adds this server whole (merge with the agent's current access). */
+    suggestedGrant: { connectors: { [c.id]: true } },
+  };
 }

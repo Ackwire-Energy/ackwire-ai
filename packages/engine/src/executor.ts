@@ -8,6 +8,7 @@ import {
   type ToolSpec,
   textOf,
 } from "@agenteschat/providers";
+import { pendingConnectors } from "./access";
 import { getAgentCached } from "./agents";
 import { publishApproval } from "./approvals";
 import { describeCapabilities } from "./capabilities";
@@ -261,12 +262,15 @@ async function executeRunInner(
   let transcript = run.transcript as unknown as Transcript | null;
   if (!transcript) {
     const contextDeps = deps.context;
+    const pending = deps.tools
+      ? await pendingConnectors(db, run.orgId, new Set(tools.map((t) => t.name))).catch(() => [])
+      : [];
     const [context, memory] = await Promise.all([
       buildRunContext(db, run, agent, {
         maxMessages: deps.contextMessages,
         toolsAvailable: tools.length > 0,
         askUser: tools.some((t) => t.name === ASK_USER_TOOL),
-        capabilities: describeCapabilities(tools),
+        capabilities: describeCapabilities(tools, pending),
         trigger,
       }),
       contextDeps
@@ -415,7 +419,16 @@ async function executeRunInner(
       const waiting: Approval[] = [];
       const asks: { id: string; toolUseId: string; text: string; choices: string[] | null }[] = [];
       for (const use of toolUses) {
-        const outcome = await deps.tools.invoke(ctx, { toolUseId: use.id, name: use.name, input: use.input });
+        const connector = turnTools.find((t) => t.name === use.name)?.connectorLabel;
+        await publishChannelEvent(deps.pubsub, {
+          type: "agent.tool",
+          ...where,
+          tool: use.name,
+          ...(connector ? { connector } : {}),
+        });
+        const outcome = await deps.tools
+          .invoke(ctx, { toolUseId: use.id, name: use.name, input: use.input })
+          .finally(() => publishChannelEvent(deps.pubsub, { type: "agent.tool", ...where, tool: null }));
         const update =
           outcome.type === "result" ? (outcome.output.data?.memoryUpdate as MemoryUpdate | undefined) : undefined;
         const data = outcome.type === "result" ? outcome.output.data : undefined;

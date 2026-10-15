@@ -123,6 +123,10 @@ export const customTools = pgTable(
     name: text().notNull(),
     description: text().notNull().default(""),
     readOnlyHint: boolean(),
+    /** The server's `destructiveHint` annotation, when it sends one. */
+    destructiveHint: boolean(),
+    /** What we suggest before an admin decides: `read`, `write` or `approval`. */
+    suggestedAccess: text(),
     access: text(),
     /** Shown to people (approval cards, permissions), in pt-BR. */
     label: text().notNull().default(""),

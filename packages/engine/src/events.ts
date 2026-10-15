@@ -57,6 +57,16 @@ export type ChannelEvent =
    * before the run exists.
    */
   | { type: "agent.thinking"; channelId: string; threadId: string | null; agentId: string; runId: string | null }
+  /** The agent started a tool call (`tool` = its name; `connector` = the app, for MCP tools) or finished (`tool: null`). */
+  | {
+      type: "agent.tool";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      tool: string | null;
+      connector?: string;
+    }
   /** The agent's first words arrived (switch "thinking" to "typing"). */
   | { type: "agent.typing"; channelId: string; threadId: string | null; agentId: string; runId: string }
   /** The agent stopped (done, failed or waiting for approval). */

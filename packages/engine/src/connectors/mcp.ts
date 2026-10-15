@@ -13,6 +13,8 @@ export interface McpTool {
   inputSchema: Record<string, unknown>;
   /** The server's `readOnlyHint` annotation, when it sends one. */
   readOnlyHint?: boolean | null;
+  /** The server's `destructiveHint` annotation, when it sends one. */
+  destructiveHint?: boolean | null;
 }
 
 export interface McpCallResult {
@@ -46,6 +48,7 @@ export async function mcpSessionOver(transport: Transport): Promise<McpSession> 
             description: t.description,
             inputSchema: t.inputSchema as Record<string, unknown>,
             readOnlyHint: (t.annotations as { readOnlyHint?: boolean } | undefined)?.readOnlyHint ?? null,
+            destructiveHint: (t.annotations as { destructiveHint?: boolean } | undefined)?.destructiveHint ?? null,
           });
         }
         cursor = res.nextCursor;
@@ -133,6 +136,7 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
           inputSchema: tool.inputSchema?.type === "object" ? tool.inputSchema : { type: "object" },
           scope: customScope(connection.id, access),
           connectionId: connection.id,
+          connectorLabel: connection.label,
           sensitive: access === "approval",
           describe: (input) => ({
             title: `${connection.label}: ${row.label}`,
@@ -179,6 +183,7 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
             inputSchema: tool.inputSchema?.type === "object" ? tool.inputSchema : { type: "object" },
             scope: connectorScope(def.id, mapped.scope),
             connectionId: connection.id,
+            connectorLabel: def.label,
             sensitive: mapped.sensitive === true,
             describe: (input) => ({
               title: mapped.title ? fillTitle(mapped.title, input) : `${def.label}: ${tool.name}`,

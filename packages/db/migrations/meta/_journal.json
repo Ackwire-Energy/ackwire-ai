@@ -162,6 +162,13 @@
       "when": 1792020363029,
       "tag": "0022_calendar",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792022910885,
+      "tag": "0023_custom_tool_suggestions",
+      "breakpoints": true
     }
   ]
 }
