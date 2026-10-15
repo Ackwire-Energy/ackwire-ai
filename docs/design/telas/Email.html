@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-mail da lista</title>
+<!--
+  Prototype of the waiting list confirmation email: three directions, PT/EN,
+  light/dark inbox and phone width. Serve the repo root over http and open:
+    python3 -m http.server 8765 --bind 127.0.0.1
+    http://127.0.0.1:8765/docs/design/telas/Email.html
+  In the real email the canvases become PNGs (rendered from this page, like
+  og.png) served from PUBLIC_URL/email/*. Funnel Display loads in Apple Mail
+  and iOS; Gmail falls back to the system font, so the layout must hold with it.
+-->
+<style>
+@font-face { font-family: "Funnel Display"; font-weight: 300 800; src: url("../../../apps/web/src/fonts/funnel-display-latin.woff2") format("woff2"); }
+@font-face { font-family: "Doto"; font-weight: 100 900; src: url("../../../apps/web/src/fonts/doto-latin.woff2") format("woff2"); }
+:root {
+  --page: #eceae6; --ink: #161614; --muted: #6b6a66; --line: #dcdad5; --chrome: #ffffff;
+  --ui: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+:root[data-inbox="dark"] { --page: #121211; --ink: #ecebe7; --muted: #9a9993; --line: #2a2a27; --chrome: #1b1b19; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--ui); }
+
+/* Prototype controls */
+.bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 20px; background: color-mix(in srgb, var(--page) 85%, transparent); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+.bar b { font-weight: 600; font-size: 14px; margin-right: 6px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 12px; background: var(--chrome); box-shadow: 0 0 0 1px var(--line); }
+.seg button { border: 0; background: none; color: var(--muted); font: 500 13px var(--ui); padding: 7px 12px; border-radius: 9px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--page); }
+.note { flex-basis: 100%; font-size: 13px; color: var(--muted); }
+
+/* Inbox mock: the row a person sees before opening it, then the opened email */
+.stage { padding: 28px 16px 80px; display: grid; justify-items: center; gap: 18px; }
+.inbox { width: min(680px, 100%); background: var(--chrome); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 12px 16px; display: grid; grid-template-columns: 36px 1fr auto; gap: 2px 12px; align-items: center; font-size: 14px; }
+.inbox canvas { grid-row: span 2; width: 36px; height: 36px; }
+.inbox .from { font-weight: 600; }
+.inbox .when { color: var(--muted); font-size: 12px; }
+.inbox .line { grid-column: 2 / 4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inbox .pre { color: var(--muted); }
+.frame { width: min(680px, 100%); background: var(--chrome); border-radius: 14px; box-shadow: 0 0 0 1px var(--line), 0 20px 50px rgba(0,0,0,0.08); padding: 28px 0; overflow: hidden; }
+:root[data-device="phone"] .frame, :root[data-device="phone"] .inbox { width: 375px; }
+:root[data-device="phone"] .frame { padding: 0; }
+
+/* ── The email itself. Everything below mirrors what can ship: a 600 px column,
+      inline-able styles, system font for body text, images for the art. ── */
+.mail { width: 600px; max-width: 100%; margin: 0 auto; font-family: var(--ui); font-size: 16px; line-height: 1.55; }
+.mail img, .mail canvas { display: block; max-width: 100%; height: auto; }
+.mail h1 { font-family: "Funnel Display", var(--ui); font-weight: 300; letter-spacing: -0.03em; line-height: 1.05; margin: 0; }
+.mail p { margin: 0 0 14px; }
+.btn { display: inline-block; text-decoration: none; font-weight: 600; font-size: 16px; padding: 14px 24px; border-radius: 12px; }
+.doto { font-family: "Doto", monospace; font-variation-settings: "ROND" 100; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.wordmark { display: inline-flex; align-items: center; gap: 9px; font-family: "Funnel Display", var(--ui); font-weight: 300; font-size: 22px; letter-spacing: -0.02em; }
+.wordmark i { font-style: normal; font-family: "Doto", monospace; font-variation-settings: "ROND" 100; font-weight: 600; font-size: 0.62em; opacity: 0.7; margin-left: 1px; }
+.wordmark canvas { width: 26px; height: 26px; }
+.url { word-break: break-all; }
+
+/* A — Céu: the sky on top, a calm white letter below */
+.a { --bg: #ffffff; --tx: #161614; --mu: #5f5e59; --ln: #e6e4df; background: var(--bg); color: var(--tx); }
+.a .sky { position: relative; }
+.a .sky > canvas { width: 600px; height: 230px; }
+.a .sky .wordmark { position: absolute; left: 40px; top: 30px; color: #04203f; }
+.a .body { padding: 40px 40px 8px; }
+.a h1 { font-size: 44px; margin-bottom: 18px; }
+.a .btn { background: #161614; color: #ffffff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 2px rgba(0,0,0,0.2); }
+.a .small { font-size: 14px; color: var(--mu); }
+.a .foot { margin: 28px 40px 0; padding: 22px 0 6px; border-top: 1px solid var(--ln); font-size: 13px; color: var(--mu); }
+.a .foot .wordmark { font-size: 16px; color: var(--tx); margin-bottom: 8px; }
+.a .foot .wordmark canvas { width: 18px; height: 18px; }
+.dark .a { --bg: #141413; --tx: #ecebe7; --mu: #9a9993; --ln: #2c2c29; }
+.dark .a .btn { background: #ecebe7; color: #141413; }
+
+/* B — Noite: like the landing (dark), the sky as a panel */
+.b { background: #0b0b0a; color: #ecebe7; padding: 36px 32px 28px; }
+.b .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 26px; }
+.b .top .doto { font-size: 12px; color: #8fb9ff; }
+.b .panel { border-radius: 20px; overflow: hidden; }
+.b .panel > canvas { width: 536px; height: 300px; }
+.b h1 { font-size: 46px; margin: 34px 0 16px; color: #ffffff; }
+.b p { color: #c9c8c2; }
+.b .btn { background: linear-gradient(#ffffff, #e9e8e4); color: #0b0b0a; box-shadow: inset 0 1px 0 #fff, 0 6px 20px rgba(120,180,255,0.18); }
+.b .small { font-size: 14px; color: #8d8c86; }
+.b .foot { margin-top: 30px; padding-top: 20px; border-top: 1px solid #23231f; font-size: 13px; color: #7d7c76; }
+
+/* C — Pedido: the email is a message in the workspace, an approval request */
+.c { --bg: #ffffff; --tx: #161614; --mu: #6b6a66; --ln: #e4e2dd; --card: #fafaf8; background: var(--bg); color: var(--tx); padding: 36px 40px 28px; }
+.c .head { margin-bottom: 30px; }
+.c .msg { display: grid; grid-template-columns: 44px 1fr; gap: 0 14px; }
+.c .msg canvas { width: 44px; height: 44px; }
+.c .who { font-weight: 600; font-size: 15px; }
+.c .who span { font-weight: 400; color: var(--mu); font-size: 13px; margin-left: 6px; }
+.c h1 { font-size: 34px; margin: 6px 0 12px; }
+.c .req { margin-top: 18px; border-radius: 16px; background: var(--card); box-shadow: 0 0 0 1px var(--ln); padding: 18px 20px; }
+.c .req .label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--mu); margin-bottom: 8px; }
+.c .req .label svg { flex: none; }
+.c .req .what { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+.c .req .email { color: var(--mu); font-size: 14px; margin-bottom: 16px; }
+.c .btn { background: #161614; color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 2px rgba(0,0,0,0.2); }
+.c .deny { display: inline-block; margin-left: 14px; font-size: 14px; color: var(--mu); }
+.c .small { font-size: 13px; color: var(--mu); margin-top: 14px; }
+.c .strip canvas { width: 520px; height: 28px; border-radius: 6px; margin-top: 30px; }
+.c .foot { margin-top: 18px; font-size: 13px; color: var(--mu); }
+.dark .c { --bg: #141413; --tx: #ecebe7; --mu: #9a9993; --ln: #2c2c29; --card: #1c1c1a; }
+.dark .c .btn { background: #ecebe7; color: #141413; }
+
+:root[data-device="phone"] .a .sky > canvas { height: auto; }
+:root[data-device="phone"] .a .body, :root[data-device="phone"] .c { padding-left: 22px; padding-right: 22px; }
+:root[data-device="phone"] .a .foot { margin-left: 22px; margin-right: 22px; }
+:root[data-device="phone"] .a h1, :root[data-device="phone"] .b h1 { font-size: 36px; }
+:root[data-device="phone"] .b { padding: 24px 18px; }
+:root[data-device="phone"] .c .msg { grid-template-columns: 1fr; }
+:root[data-device="phone"] .c .msg > canvas { margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>E-mail de confirmação</b>
+  <div class="seg" data-key="dir"><button data-v="a">A · Céu</button><button data-v="b">B · Noite</button><button data-v="c">C · Pedido</button></div>
+  <div class="seg" data-key="lang"><button data-v="pt">PT</button><button data-v="en">EN</button></div>
+  <div class="seg" data-key="inbox"><button data-v="light">Claro</button><button data-v="dark">Escuro</button></div>
+  <div class="seg" data-key="device"><button data-v="desktop">Desktop</button><button data-v="phone">Celular</button></div>
+  <div class="note" id="note"></div>
+</div>
+<div class="stage">
+  <div class="inbox"><canvas width="72" height="72" data-mark></canvas><span class="from">agentes.chat</span><span class="when" id="when"></span><span class="line"><span id="subject"></span> <span class="pre">— <span id="pre"></span></span></span></div>
+  <div class="frame"><div id="mail"></div></div>
+</div>
+
+<script type="module">
+import { drawAgent, spriteGrid, spriteBody } from "../../../packages/ui/src/agent/engine.js";
+
+const COPY = {
+  pt: {
+    when: "agora",
+    subject: "Confirme seu lugar na lista do agentes.chat",
+    pre: "Um clique e seu lugar está guardado.",
+    eyebrow: "Lista de espera",
+    title: "Falta um clique.",
+    lead: "Você pediu para entrar na lista de espera do agentes.chat, o lugar onde seu time e seus agentes trabalham na mesma conversa. Confirme que este e-mail é seu e a gente guarda seu lugar.",
+    button: "Confirmar meu e-mail",
+    expires: "O link vale por 48 horas.",
+    fallback: "Se o botão não funcionar, copie este endereço:",
+    footer: "Alguém colocou este endereço no agentes.chat. Se não foi você, é só ignorar: sem confirmação, ele não entra na lista.",
+    sender: "Agente da lista",
+    request: "Pedido de confirmação",
+    what: "Entrar na lista de espera",
+    deny: "Não fui eu? Ignore este e-mail.",
+    cTitle: "Oi! Só falta você aprovar.",
+    cLead: "Recebi um pedido para colocar este e-mail na lista de espera do agentes.chat. Aqui, nada importante acontece sem uma pessoa aprovar, e isso vale para mim também.",
+  },
+  en: {
+    when: "now",
+    subject: "Confirm your spot on the agentes.chat waiting list",
+    pre: "One click and your spot is saved.",
+    eyebrow: "Waiting list",
+    title: "One click to go.",
+    lead: "You asked to join the agentes.chat waiting list, where your team and your agents work in the same conversation. Confirm this email is yours and we'll save your spot.",
+    button: "Confirm my email",
+    expires: "The link works for 48 hours.",
+    fallback: "If the button doesn't work, copy this address:",
+    footer: "Someone entered this address on agentes.chat. If it wasn't you, just ignore this: without confirmation it never joins the list.",
+    sender: "Waiting list agent",
+    request: "Confirmation request",
+    what: "Join the waiting list",
+    deny: "Wasn't you? Ignore this email.",
+    cTitle: "Hi! It just needs your approval.",
+    cLead: "I got a request to put this email on the agentes.chat waiting list. Here nothing important happens without a person approving it, and that goes for me too.",
+  },
+};
+const NOTES = {
+  a: "A · Céu: o céu em dither no topo com o agente gigante feliz; carta branca e calma embaixo. A mais segura em qualquer cliente.",
+  b: "B · Noite: o tom da landing (escuro), o céu como painel. Forte, mas o Gmail pode clarear fundos escuros no modo claro do app.",
+  c: "C · Pedido: o e-mail parece uma mensagem do produto, um pedido de aprovação do agente. Conta o que o agentes.chat é sem dizer.",
+};
+const URL = "https://agentes.chat/?confirm=Qm9vX3Rva2VuX2V4YW1wbGVfMTIzNDU2";
+const state = { dir: "a", lang: "pt", inbox: "light", device: "desktop" };
+try { Object.assign(state, JSON.parse(localStorage.getItem("email-proto") || "{}")); } catch {}
+
+const wm = (mark = 52) => `<span class="wordmark"><canvas width="${mark}" height="${mark}" data-mark></canvas><span>agentes<i>.chat</i></span></span>`;
+const fallback = (t) => `<p class="small">${t.fallback} <a class="url" href="${URL}" style="color:inherit">${URL}</a></p>`;
+
+const TEMPLATES = {
+  a: (t) => `<div class="mail a">
+    <div class="sky"><canvas width="600" height="230" data-sky="a"></canvas>${wm()}</div>
+    <div class="body">
+      <h1>${t.title}</h1>
+      <p>${t.lead}</p>
+      <p style="margin:26px 0 22px"><a class="btn" href="${URL}">${t.button}</a></p>
+      <p class="small">${t.expires}</p>
+      ${fallback(t)}
+    </div>
+    <div class="foot">${wm(36)}<div>${t.footer}</div></div>
+  </div>`,
+  b: (t) => `<div class="mail b">
+    <div class="top">${wm()}<span class="doto">${t.eyebrow} · 48 h</span></div>
+    <div class="panel"><canvas width="536" height="300" data-sky="b"></canvas></div>
+    <h1>${t.title}</h1>
+    <p>${t.lead}</p>
+    <p style="margin:26px 0 22px"><a class="btn" href="${URL}">${t.button}</a></p>
+    <p class="small">${t.expires}</p>
+    ${fallback(t)}
+    <div class="foot">${t.footer}</div>
+  </div>`,
+  c: (t) => `<div class="mail c">
+    <div class="head">${wm()}</div>
+    <div class="msg">
+      <canvas width="88" height="88" data-avatar></canvas>
+      <div>
+        <div class="who">${t.sender}<span>${t.when}</span></div>
+        <h1>${t.cTitle}</h1>
+        <p>${t.cLead}</p>
+        <div class="req">
+          <div class="label"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5l5 2v4c0 3.2-2.2 5.6-5 7-2.8-1.4-5-3.8-5-7v-4l5-2z"/><path d="M5.6 8.1l1.7 1.7 3.2-3.4"/></svg>${t.request}</div>
+          <div class="what">${t.what}</div>
+          <div class="email">ana@empresa.com</div>
+          <a class="btn" href="${URL}">${t.button}</a><span class="deny">${t.deny}</span>
+        </div>
+        <p class="small">${t.expires} ${t.fallback} <a class="url" href="${URL}" style="color:inherit">${URL}</a></p>
+      </div>
+    </div>
+    <div class="strip"><canvas width="520" height="28" data-sky="strip"></canvas></div>
+    <div class="foot">${t.footer}</div>
+  </div>`,
+};
+
+/* ── Art, drawn by the engine (becomes PNGs in the real email) ── */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+const SKY = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"];
+const rgb = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const COLS = SKY.map(rgb);
+
+/** A dithered sky, `field(u, v)` = lightness 0..1; pixel agents where `calm` is low. */
+function paintSky(canvas, P, field, sprites = []) {
+  const W = Math.ceil(canvas.width / P), H = Math.ceil(canvas.height / P);
+  const off = document.createElement("canvas"); off.width = W; off.height = H;
+  const ctx = off.getContext("2d"), img = ctx.createImageData(W, H), n = COLS.length - 1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const f = Math.max(0, Math.min(1, field(x / W, y / H)));
+    const k = f * n, lo = Math.floor(k);
+    const c = COLS[Math.min(n, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))];
+    const i = (y * W + x) * 4; img.data[i] = c[0]; img.data[i + 1] = c[1]; img.data[i + 2] = c[2]; img.data[i + 3] = 255;
+  }
+  const grid = spriteGrid(9), body = rgb(spriteBody("sky"));
+  for (const [sx, sy] of sprites) for (let j = 0; j < 9; j++) for (let i = 0; i < 9; i++) {
+    const ch = grid[j][i]; if (ch === ".") continue;
+    const X = Math.round(sx * W) + i, Y = Math.round(sy * H) + j;
+    if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+    const c = ch === "o" ? [255, 255, 255] : body, o = (Y * W + X) * 4;
+    img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2];
+  }
+  ctx.putImageData(img, 0, 0);
+  const g = canvas.getContext("2d");
+  g.imageSmoothingEnabled = false;
+  g.drawImage(off, 0, 0, W * P, H * P);
+  return g;
+}
+const halo = (u, v, cx, cy, r) => { const q = Math.max(0, Math.min(1, (r - Math.hypot(u - cx, (v - cy) * 0.45)) / (r * 0.5))); return q * q * (3 - 2 * q); };
+
+function art(root) {
+  root.querySelectorAll("[data-mark]").forEach((c) => {
+    const g = c.getContext("2d"); g.clearRect(0, 0, c.width, c.height);
+    drawAgent(g, 0, 0, c.width, { color: "sky", cells: 12 });
+  });
+  root.querySelectorAll("[data-avatar]").forEach((c) => {
+    const g = c.getContext("2d"); g.clearRect(0, 0, c.width, c.height);
+    drawAgent(g, 0, 0, c.width, { color: "sky", cells: 14, pose: { expression: "happy" } });
+  });
+  root.querySelectorAll("[data-sky]").forEach((c) => {
+    const kind = c.dataset.sky;
+    if (kind === "a") {
+      // Light behind the wordmark (top left), deep at the bottom right, halo behind the giant.
+      const g = paintSky(c, 4, (u, v) => {
+        const base = 0.95 - 0.35 * u - 0.5 * v;
+        const k = Math.max(halo(u, v, 0.76, 0.62, 0.2), Math.max(0, 1 - Math.hypot(u - 0.12, v - 0.2) / 0.28) * 0.7);
+        return base * (1 - k) + 0.9 * k;
+      }, [[0.05, 0.62], [0.36, 0.14], [0.5, 0.7], [0.94, 0.08]]);
+      g.filter = "drop-shadow(0 18px 24px rgba(0, 30, 90, 0.45))";
+      drawAgent(g, 380, 42, 170, { color: "sky", cells: 22, deep: true, pose: { turn: [-0.3, 0.05], expression: "happy" } });
+      g.filter = "none";
+    } else if (kind === "b") {
+      const g = paintSky(c, 4, (u, v) => {
+        const base = 0.25 + 0.55 * (1 - v) - 0.15 * u;
+        return base * (1 - halo(u, v, 0.5, 0.58, 0.26)) + 0.92 * halo(u, v, 0.5, 0.58, 0.26);
+      }, [[0.08, 0.12], [0.2, 0.7], [0.82, 0.18], [0.9, 0.72], [0.66, 0.06]]);
+      g.filter = "drop-shadow(0 22px 30px rgba(0, 20, 70, 0.55))";
+      drawAgent(g, 268 - 95, 72, 190, { color: "sky", cells: 24, deep: true, pose: { expression: "heart" } });
+      g.filter = "none";
+    } else {
+      paintSky(c, 4, (u) => 0.85 - 0.6 * u, [[0.3, 0.05], [0.72, 0.05]]);
+    }
+  });
+}
+
+function render() {
+  const t = COPY[state.lang];
+  document.documentElement.dataset.inbox = state.inbox;
+  document.documentElement.dataset.device = state.device;
+  document.documentElement.lang = state.lang === "en" ? "en" : "pt-BR";
+  document.getElementById("subject").textContent = t.subject;
+  document.getElementById("pre").textContent = t.pre;
+  document.getElementById("when").textContent = t.when;
+  document.getElementById("note").textContent = NOTES[state.dir];
+  const mail = document.getElementById("mail");
+  mail.className = state.inbox === "dark" ? "dark" : "";
+  mail.innerHTML = TEMPLATES[state.dir](t);
+  document.querySelectorAll(".seg").forEach((s) => s.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(state[s.dataset.key] === b.dataset.v))));
+  art(document);
+  try { localStorage.setItem("email-proto", JSON.stringify(state)); } catch {}
+}
+document.querySelectorAll(".seg").forEach((s) => s.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  state[s.dataset.key] = b.dataset.v; render();
+}));
+const q = new URLSearchParams(location.search);
+for (const k of Object.keys(state)) if (q.get(k)) state[k] = q.get(k);
+document.fonts.ready.then(render);
+render();
+</script>
+</body>
+</html>
