@@ -8,7 +8,7 @@ import {
   agentGradient,
   agentTones,
   EmptyState,
-  eyeTone,
+  EYE,
   glowTones,
   mix,
   PixelSky,
@@ -17,6 +17,7 @@ import {
   SKY_TONES,
   SkyGlow,
   softTones,
+  spriteTone,
   startSky,
 } from "../src";
 
@@ -56,9 +57,13 @@ describe("sky tones", () => {
     expect(softTones("sky", "#0a0a09").at(-1)).not.toBe(agentGradient("sky")[1]);
   });
 
-  test("the pixel agents' eyes take the agent color", () => {
-    expect(eyeTone("sky")).toBe("#1c63d6");
-    expect(eyeTone("rose")).toBe(agentGradient("rose")[1]);
+  test("eyes are white everywhere; the pixel agents' body is the agent's deep tone", () => {
+    expect(EYE).toBe("#ffffff");
+    expect(spriteTone("sky")).toBe("#04203f");
+    const light = (c: string) =>
+      (Number.parseInt(c.slice(1, 3), 16) + Number.parseInt(c.slice(3, 5), 16) + Number.parseInt(c.slice(5, 7), 16)) /
+      3;
+    expect(light(spriteTone("rose"))).toBeLessThan(light(agentGradient("rose")[1]));
   });
 });
 

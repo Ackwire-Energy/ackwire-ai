@@ -18,8 +18,8 @@ interface Particle {
   sprite: boolean;
 }
 
-/** `at` in viewport coordinates; `tones` the agent's colors; `eye` the sprites' eye color. */
-export function pixelBurst(at: { x: number; y: number }, tones: readonly string[], eye: string) {
+/** `at` in viewport coordinates; `tones` the agent's colors; `body` the little agents' body (their eyes are white). */
+export function pixelBurst(at: { x: number; y: number }, tones: readonly string[], body: string) {
   if (prefersReducedMotion() || typeof requestAnimationFrame !== "function" || typeof document === "undefined") return;
   const canvas = document.createElement("canvas");
   const ctx = context2d(canvas);
@@ -60,7 +60,7 @@ export function pixelBurst(at: { x: number; y: number }, tones: readonly string[
       vx: (Math.random() - 0.5) * 10,
       vy: -18 - Math.random() * 10,
       life: 1.5,
-      color: "#ffffff",
+      color: body,
       size: 1,
       sprite: true,
     });
@@ -87,7 +87,7 @@ export function pixelBurst(at: { x: number; y: number }, tones: readonly string[
           for (let sx = 0; sx < 9; sx++) {
             const c = (SPRITE[sy] as string)[sx];
             if (c === ".") continue;
-            ctx.fillStyle = c === "o" ? eye : p.color;
+            ctx.fillStyle = c === "o" ? "#ffffff" : p.color;
             ctx.fillRect(Math.round(p.x) + sx, Math.round(p.y) + sy, 1, 1);
           }
       } else {

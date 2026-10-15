@@ -2,7 +2,6 @@ import {
   type AgentColor,
   agentGradient,
   agentTones,
-  eyeTone,
   Icon,
   Logo,
   mix,
@@ -12,6 +11,7 @@ import {
   SKY_TONES,
   type SkyOptions,
   softTones,
+  spriteTone,
 } from "@agenteschat/ui";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -150,7 +150,7 @@ export function AgentCover({ agent }: { agent: Agent }) {
         options={{
           pixel: 4,
           palette: agentTones(color),
-          eye: eyeTone(color),
+          body: spriteTone(color),
           speed: busy ? 3.2 : 1,
           rise: busy ? 2.4 : 1,
           sprites: busy ? { area: 420, max: 60 } : { area: 900, max: 34 },
@@ -291,7 +291,7 @@ export function SidebarOrgSky({ calm }: { calm: () => (Element | null)[] }) {
         surface: "--sunken",
         // Soft tones run from the surface (0) toward the color: low values stay light.
         palette: (bg) => softTones("sky", bg),
-        eye: eyeTone("sky"),
+        body: spriteTone("sky"),
         sprites: 2,
         near: 0,
         calm,
@@ -359,7 +359,7 @@ export function SidebarHorizon({ working, total }: { working: number; total: num
     pixel: 4,
     surface: "--sunken",
     palette: (bg) => softTones("sky", bg),
-    eye: eyeTone("sky"),
+    body: spriteTone("sky"),
     near: 0,
     ceil: 0.3,
     light: 0.06,

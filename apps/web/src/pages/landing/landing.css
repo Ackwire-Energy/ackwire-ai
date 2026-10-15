@@ -650,13 +650,34 @@
     0 0 0 4px #fff,
     0 0 0 7px var(--sky-ink);
 }
+/* The giant's body is a canvas that forms from the sky (Hero.tsx); the avatar on top keeps the eyes, accessories and states. */
+.lp .lp-giant__in {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.lp .lp-giant__body {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 50px 70px rgba(0, 30, 90, 0.55));
+}
 .lp .lp-giant .lp-giant__av.ac-avatar {
   --s: inherit;
   display: block;
   width: 100%;
   height: 100%;
-  /* Flat dither like every agent: no gloss, only the shadow on the sky. */
-  box-shadow: 0 60px 120px -30px rgba(0, 30, 90, 0.7);
+  background: none;
+  box-shadow: none;
+}
+.lp .lp-giant .lp-giant__av > * {
+  transition: opacity 0.3s;
+}
+.lp .lp-giant:not([data-formed]) .lp-giant__av > * {
+  opacity: 0;
 }
 .lp .lp-giant .lp-giant__av.ac-avatar--running::after {
   border-width: 3px;
@@ -738,7 +759,7 @@
     right: 50%;
     transform: translateX(50%);
   }
-  .lp .lp-giant .lp-giant__av {
+  .lp .lp-giant .lp-giant__in {
     animation: none;
   }
   .lp .lp-bubs {

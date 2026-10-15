@@ -137,7 +137,7 @@ export {
   SPRITE,
   startSky,
 } from "./sky/engine";
-export { agentTones, eyeTone, glowTones, mix, parseColor, pixelOf, SKY_TONES, softTones } from "./sky/tones";
+export { agentTones, EYE, glowTones, mix, parseColor, pixelOf, SKY_TONES, softTones, spriteTone } from "./sky/tones";
 export {
   allZones,
   cityOf,

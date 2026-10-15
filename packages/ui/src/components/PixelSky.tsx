@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { cx } from "../cx";
 import { drawSprite, redrawSkies, type SkyOptions, startSky } from "../sky/engine";
-import { eyeTone, glowTones, pixelOf } from "../sky/tones";
+import { glowTones, pixelOf, spriteTone } from "../sky/tones";
 import type { AgentColor } from "./AgentLook";
 
 /**
@@ -44,7 +44,7 @@ export function SkyGlow({
 const WHITE = pixelOf("#ffffff");
 
 export function glowOptions(color: AgentColor, surface = "--bg"): SkyOptions {
-  const eye = pixelOf(eyeTone(color));
+  const body = pixelOf(spriteTone(color));
   return {
     pixel: 4,
     surface,
@@ -60,7 +60,7 @@ export function glowOptions(color: AgentColor, surface = "--bg"): SkyOptions {
     after: (f) => {
       const k = 2;
       const y = Math.round(f.h * 0.5 - 9 + Math.sin(f.t * 1.6) * 2);
-      drawSprite(f, Math.round(f.w / 2 - 9), y, k, WHITE, eye, f.t % 4.2 > 4.04);
+      drawSprite(f, Math.round(f.w / 2 - 9), y, k, body, WHITE, f.t % 4.2 > 4.04);
     },
   };
 }

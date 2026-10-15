@@ -84,5 +84,9 @@ export function softTones(color: AgentColor, surface: string): string[] {
   ];
 }
 
-/** The pixel agents' eye color on a sky of this color. */
-export const eyeTone = (color: AgentColor = "sky") => (color === "sky" ? "#1c63d6" : agentGradient(color)[1]);
+/** Eyes are white on every agent, everywhere. */
+export const EYE = "#ffffff";
+
+/** The pixel agents' body on a sky of this color: deep enough for the white eyes (navy on the sky). */
+export const spriteTone = (color: AgentColor = "sky") =>
+  color === "sky" ? "#04203f" : mix(agentGradient(color)[1], "#000000", 0.45);

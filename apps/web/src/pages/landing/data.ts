@@ -45,12 +45,12 @@ export const GRAD: Record<Exclude<AgentColor, "sky">, [string, string]> = {
 /** What a click on the giant cycles through. */
 export const GIANT_LOOKS: AgentAppearance[] = [
   {},
-  { accessory: "glasses" },
-  { accessory: "crown" },
-  { eyes: "wide" },
-  { accessory: "sunglasses" },
-  { accessory: "hat" },
-  { accessory: "bow" },
+  { color: "violet", accessory: "glasses" },
+  { color: "amber", accessory: "crown" },
+  { color: "green", eyes: "wide" },
+  { color: "rose", accessory: "sunglasses" },
+  { color: "teal", accessory: "hat" },
+  { color: "indigo", accessory: "bow" },
 ];
 
 /** The crew at the bottom of the closing sky: look and largest size in px. */

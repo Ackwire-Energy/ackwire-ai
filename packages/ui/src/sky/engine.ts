@@ -10,7 +10,7 @@
  * on resize or a theme change). Without a 2D context (tests, old browsers)
  * nothing is drawn and the element's CSS background shows.
  */
-import { pixelOf } from "./tones";
+import { pixelOf, spriteTone } from "./tones";
 
 /** A soft blob added to the field: [x, y, spread, strength] in 0..1 units of the panel. */
 export type SkyBlob = [x: number, y: number, spread: number, strength: number];
@@ -36,8 +36,8 @@ export interface SkyOptions {
   rise?: number;
   /** Sprites leave above this fraction of the height (default: the top edge). */
   ceil?: number;
-  /** The sprites' eye color. */
-  eye?: string;
+  /** The sprites' body color (their eyes are always white), e.g. `spriteTone(color)`. */
+  body?: string;
   /** The pointer light's strength (default 0.22; 0 turns it off) and radius (share of the height). */
   light?: number;
   lightR?: number;
@@ -324,9 +324,9 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     const want = wanted(o);
     while (flock.length < want) flock.push(spawn(o, false));
     if (flock.length > want) flock.length = want;
-    const eye = pixelOf(o.eye ?? "#1c63d6");
+    const body = pixelOf(o.body ?? spriteTone("sky"));
+    // Far agents are faint light silhouettes; near ones are solid, both with white eyes.
     const ghostBody = tones[Math.max(0, levels - 1)] as number;
-    const ghostEye = tones[Math.min(levels, 4)] as number;
     const rise = (o.rise ?? 1) * (o.speed ?? 1);
     const top = o.ceil ? h * o.ceil : 0;
     const skip = zones.length ? (x: number, y: number) => calmAt(x, y) > 0.35 : undefined;
@@ -342,16 +342,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
         continue;
       }
       const ox = Math.round(p.x + Math.sin(p.ph) * 2 * p.k - mx * 10 * p.k);
-      drawSprite(
-        { buf, w, h },
-        ox,
-        Math.round(p.y),
-        p.k,
-        p.ghost ? ghostBody : WHITE,
-        p.ghost ? ghostEye : eye,
-        p.blink < 0,
-        skip,
-      );
+      drawSprite({ buf, w, h }, ox, Math.round(p.y), p.k, p.ghost ? ghostBody : body, WHITE, p.blink < 0, skip);
     }
     o.after?.({ buf, w, h, t, tones });
     ctx?.putImageData(img, 0, 0);

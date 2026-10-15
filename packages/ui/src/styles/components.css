@@ -807,8 +807,9 @@ textarea.ac-input {
 .ac-logo__body {
   fill: var(--agent);
 }
+/* Eyes are white on every agent, in both themes. */
 .ac-logo__eyes {
-  fill: var(--on-agent);
+  fill: #ffffff;
 }
 .ac-logo__tld {
   color: var(--ink-muted);

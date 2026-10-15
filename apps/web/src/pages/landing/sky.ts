@@ -16,7 +16,8 @@ export const hex = (h: string) => {
 };
 export const SKY = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"].map(hex);
 const WHITE = hex("#ffffff");
-const EYE = hex("#1c63d6");
+// Eyes are white on every agent; the near pixel agents get a navy body so they show.
+const BODY = hex("#04203f");
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 // 9×9 agent sprite: rounded corners, the cut corner at bottom-left, two eyes (o).
 const SPRITE = [
@@ -61,6 +62,8 @@ export interface SkyOptions {
   calmV?: number;
   lightR?: number;
   calm?: () => (Element | null | undefined)[];
+  /** Elements with a round light halo (calm level) around them, so a dithered agent reads on the sky. */
+  halo?: () => (Element | null | undefined)[];
   base: (u: number, v: number) => number;
   blobs: (t: number) => Blob[];
 }
@@ -182,10 +185,23 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
       ];
       if (z[2] > z[0]) zones.push(z);
     }
+    // Halos: full calm out to 55% of the radius, fading to the sky at 0.8 × the element's width.
+    const rings: [number, number, number][] = [];
+    for (const el of opts.halo ? opts.halo() : []) {
+      if (!el) continue;
+      const e = el.getBoundingClientRect();
+      if (e.width > 0)
+        rings.push([(e.left + e.width / 2 - r.left) / P, (e.top + e.height / 2 - r.top) / P, (e.width * 0.8) / P]);
+    }
     const PAD = 26;
     const calmV = opts.calmV ?? 0.9;
     const calmAt = (x: number, y: number) => {
       let k = 0;
+      for (const [cx, cy, rad] of rings) {
+        const q = Math.min(1, Math.max(0, (rad - Math.hypot(x - cx, y - cy)) / (rad * 0.45)));
+        const s2 = q * q * (3 - 2 * q);
+        if (s2 > k) k = s2;
+      }
       for (const z of zones) {
         const dx = x < z[0] ? z[0] - x : x > z[2] ? x - z[2] : 0;
         const dy = y < z[1] ? z[1] - y : y > z[3] ? y - z[3] : 0;
@@ -214,7 +230,7 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
         const ldx = x - lx;
         const ldy = y - ly;
         f += 0.22 * Math.exp(-(ldx * ldx + ldy * ldy) * lr2);
-        if (zones.length) {
+        if (zones.length || rings.length) {
           const k = calmAt(x, y);
           if (k) f += (calmV - f) * k;
         }
@@ -245,13 +261,14 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
         for (let sx = 0; sx < 9; sx++) {
           const c = line[sx];
           if (c === ".") continue;
-          let col = p.ghost ? (SKY[levels - 1] as number) : WHITE;
-          if (c === "o" && !(closed && sy === 3)) col = p.ghost ? (SKY[4] as number) : EYE;
+          let col = p.ghost ? (SKY[levels - 1] as number) : BODY;
+          if (c === "o" && !(closed && sy === 3)) col = WHITE;
           for (let ky = 0; ky < p.k; ky++)
             for (let kx = 0; kx < p.k; kx++) {
               const X = ox + sx * p.k + kx;
               const Y = oy + sy * p.k + ky;
-              if (X >= 0 && X < w && Y >= 0 && Y < h && !(zones.length && calmAt(X, Y) > 0.35)) buf[Y * w + X] = col;
+              if (X >= 0 && X < w && Y >= 0 && Y < h && !((zones.length || rings.length) && calmAt(X, Y) > 0.35))
+                buf[Y * w + X] = col;
             }
         }
       }
