@@ -238,6 +238,23 @@ describe("limits and cost", () => {
   });
 });
 
+describe("blocked network", () => {
+  test("a DNS or connection failure says plainly there's no internet, and where to allow a domain", async () => {
+    const provider = sandboxSetup(() => ({
+      exitCode: 6,
+      stdout: "",
+      stderr: "curl: (6) Could not resolve host: example.com",
+      timedOut: false,
+    }));
+    f = await setup({ sandbox: provider, reply: () => ({ chunks: ["ok"] }) });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    const out = await call(await runCtx(), "run_code", { language: "bash", code: "curl https://example.com" });
+    expect(out.content).toContain("sem internet");
+    expect(out.content).toContain("Configurações → Sandbox");
+    expect(out.content).not.toMatch(/permiss(ão|ões) negada/i);
+  });
+});
+
 describe("Drive and skills", () => {
   test("export a sandbox file to the Drive (new and as a version), import one back", async () => {
     const provider = sandboxSetup();

@@ -56,6 +56,13 @@ function timeoutOf(input: Record<string, unknown>, fallback: number) {
   return Math.max(1, Math.min(SANDBOX_LIMITS.maxTimeoutSeconds, Math.round(asked)));
 }
 
+/** DNS failures and refused or unreachable connections: what blocked network looks like. */
+const NO_NETWORK =
+  /temporary failure in name resolution|could not resolve host|name or service not known|getaddrinfo|enotfound|eai_again|connection refused|econnrefused|network is unreachable|enetunreach|failed to establish a new connection|newconnectionerror|no address associated with hostname/i;
+
+export const NO_NETWORK_NOTE =
+  "sem internet: este computador não acessa a internet, a não ser os domínios liberados em Configurações → Sandbox. Diga isso à pessoa (não é falta de permissão) e sugira liberar o domínio.";
+
 /** What the model sees from a command: exit code first (it is the line kept in "Ações recentes"). */
 function execOutput(label: string, r: ExecResult, seconds: number, timeout: number): ToolOutput {
   const head = r.timedOut
@@ -65,6 +72,7 @@ function execOutput(label: string, r: ExecResult, seconds: number, timeout: numb
   if (r.stdout) parts.push(`stdout:\n${truncateOutput(r.stdout, SANDBOX_LIMITS.stdoutChars)}`);
   if (r.stderr) parts.push(`stderr:\n${truncateOutput(r.stderr, SANDBOX_LIMITS.stderrChars)}`);
   if (!r.stdout && !r.stderr) parts.push("(no output)");
+  if (r.exitCode !== 0 && NO_NETWORK.test(`${r.stderr}\n${r.stdout}`)) parts.push(NO_NETWORK_NOTE);
   return {
     content: parts.join("\n"),
     isError: r.timedOut || r.exitCode !== 0,

@@ -45,7 +45,6 @@ else {
     body: JSON.stringify({
       name,
       buildInfo: { dockerfileContent: dockerfile },
-      entrypoint: ["sleep", "infinity"],
       cpu: 1,
       memory: 2,
       disk: 5,

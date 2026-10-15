@@ -215,6 +215,36 @@ describe("no provider name or home in what agents see", () => {
     expect(scripts.some((x) => x.includes("mkdir -p /workspace"))).toBe(true);
   });
 
+  test("default image: /workspace made with sudo when it can; else the home, still shown as /workspace", async () => {
+    const withSudo = fakeDaytona({
+      execResult: (script) => (script.includes("sudo -n mkdir") ? { exitCode: 0, result: "/workspace\n" } : null),
+    });
+    const p = createDaytonaSandboxProvider({ apiKey: "k", fetch: withSudo.fetch, pollMs: 0 });
+    await p.create(spec);
+    await p.writeFile("sb1", "a.txt", new TextEncoder().encode("a"));
+    const up = withSudo.calls.filter((c) => c.url.includes("/files/upload-v2")).at(-1);
+    expect(new URL(up?.url ?? "").searchParams.get("path")).toBe("/workspace/a.txt");
+
+    const noSudo = fakeDaytona({
+      execResult: (script) => {
+        if (script.includes("sudo -n mkdir")) return { exitCode: 0, result: "/home/daytona/workspace\n" };
+        const marker = /printf '\\n%s\\n' '([^']+)'/.exec(script)?.[1] ?? "";
+        return { exitCode: 0, result: `saved /home/daytona/workspace/out.csv\n${marker}\n` };
+      },
+    });
+    const q = createDaytonaSandboxProvider({ apiKey: "k", fetch: noSudo.fetch, pollMs: 0 });
+    await q.create(spec);
+    await q.writeFile("sb1", "out/b.txt", new TextEncoder().encode("b"));
+    const up2 = noSudo.calls.filter((c) => c.url.includes("/files/upload-v2")).at(-1);
+    expect(new URL(up2?.url ?? "").searchParams.get("path")).toBe("/home/daytona/workspace/out/b.txt");
+    const r = await q.exec("sb1", { command: "python3 a.py", timeoutSeconds: 5 });
+    expect(r.stdout).toBe("saved /workspace/out.csv");
+    const exec = noSudo.calls.filter((c) => c.url.endsWith("/process/execute")).at(-1);
+    expect(exec?.body).toMatchObject({ cwd: "/home/daytona/workspace" });
+    // Found once per computer.
+    expect(noSudo.calls.filter((c) => c.url.endsWith("/process/execute"))).toHaveLength(2);
+  });
+
   test("output and errors are masked", async () => {
     expect(maskProvider("cd /home/daytona/workspace/out && ls /home/daytona/.cache (Daytona)")).toBe(
       "cd /workspace/out && ls ~/.cache (computador)",

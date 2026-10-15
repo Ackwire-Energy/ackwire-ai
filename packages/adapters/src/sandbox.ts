@@ -93,8 +93,19 @@ export class SandboxProviderError extends Error {
   }
 }
 
-/** Where agents' files live inside every computer. */
+/** Where agents' files live inside every computer (as agents and people see it). */
 export const WORKSPACE = "/workspace";
+
+/**
+ * Finds (and makes) the workspace on an image that isn't ours: `/workspace`
+ * when it exists or passwordless sudo can create it for this user, else
+ * `$HOME/workspace`. Prints the path on its last line.
+ */
+export const WORKSPACE_PROBE = [
+  "if [ -d /workspace ] && [ -w /workspace ]; then echo /workspace;",
+  'elif sudo -n mkdir -p /workspace 2>/dev/null && sudo -n chown "$(id -u):$(id -g)" /workspace 2>/dev/null; then echo /workspace;',
+  'else mkdir -p "$HOME/workspace" && echo "$HOME/workspace"; fi',
+].join(" ");
 
 /**
  * Hides the provider from what agents and people read: its home paths become
@@ -191,8 +202,9 @@ export function createDaytonaSandboxProvider(options: {
 }): SandboxProvider {
   const http = options.fetch ?? ((url: string, init?: RequestInit) => fetch(url, init));
   const api = (options.apiUrl ?? "https://app.daytona.io/api").replace(/\/$/, "");
-  // Always `/workspace`: agents and people never see the provider's home directory.
-  const root = WORKSPACE;
+  // Agents and people always see `/workspace`. With our snapshot it is the real path; on the
+  // provider's default image it may have to live in the user's home (no root to create it).
+  const roots = new Map<string, string>();
   const pollMs = options.pollMs ?? 1000;
   const readyTimeoutMs = options.readyTimeoutMs ?? 90_000;
   const toolbox = new Map<string, string>();
@@ -269,32 +281,66 @@ export function createDaytonaSandboxProvider(options: {
     return `${base}/${encodeURIComponent(id)}${path}`;
   };
 
-  const abs = (path: string) => {
-    const rel = workspacePath(path);
-    return rel ? `${root}/${rel}` : root;
-  };
-
-  async function exec(id: string, request: ExecRequest): Promise<ExecResult> {
-    const marker = `__agentes_${crypto.randomUUID().replace(/-/g, "")}__`;
-    const script = splitOutputScript(request.command, marker);
+  /** Runs a shell script as is (base64 through `sh`), in `cwd`. No `envs`, ever. */
+  async function run(id: string, script: string, cwd: string, timeoutSeconds: number) {
     const encoded = Buffer.from(script, "utf8").toString("base64");
     const res = await call(await toolboxUrl(id, "/process/execute"), {
       method: "POST",
       headers: { "content-type": "application/json" },
-      // No `envs`: nothing from our side reaches the command's environment.
-      body: JSON.stringify({
-        command: `sh -c "echo ${encoded} | base64 -d | sh"`,
-        cwd: request.cwd ? abs(request.cwd) : root,
-        timeout: request.timeoutSeconds,
-      }),
-      timeoutMs: (request.timeoutSeconds + 30) * 1000,
+      body: JSON.stringify({ command: `sh -c "echo ${encoded} | base64 -d | sh"`, cwd, timeout: timeoutSeconds }),
+      timeoutMs: (timeoutSeconds + 30) * 1000,
     });
+    return res;
+  }
+
+  /**
+   * The real workspace of a sandbox: `/workspace` (our snapshot, or created
+   * with passwordless sudo), else `$HOME/workspace`. Found once per sandbox;
+   * never fails a command (falls back to `/workspace`).
+   */
+  async function rootOf(id: string): Promise<string> {
+    if (options.snapshot) return WORKSPACE;
+    const known = roots.get(id);
+    if (known) return known;
+    let root = WORKSPACE;
+    try {
+      const res = await run(id, WORKSPACE_PROBE, "/", 20);
+      if (res.ok) {
+        const body = (await res.json()) as { result?: string };
+        const last = (body.result ?? "").trim().split("\n").at(-1)?.trim() ?? "";
+        if (/^\/[\w./-]+$/.test(last)) root = last;
+      }
+    } catch {
+      // Keep /workspace.
+    }
+    roots.set(id, root);
+    return root;
+  }
+
+  const absIn = (root: string, path: string) => {
+    const rel = workspacePath(path);
+    return rel ? `${root}/${rel}` : root;
+  };
+  const abs = async (id: string, path: string) => absIn(await rootOf(id), path);
+  /** What agents read: the real root shown as `/workspace`, and no provider name. */
+  const mask = (text: string, root: string) =>
+    maskProvider(root === WORKSPACE ? text : text.split(root).join(WORKSPACE));
+
+  async function exec(id: string, request: ExecRequest): Promise<ExecResult> {
+    const root = await rootOf(id);
+    const marker = `__agentes_${crypto.randomUUID().replace(/-/g, "")}__`;
+    const res = await run(
+      id,
+      splitOutputScript(request.command, marker),
+      request.cwd ? absIn(root, request.cwd) : root,
+      request.timeoutSeconds,
+    );
     if (res.status === 408) return { exitCode: 124, stdout: "", stderr: "", timedOut: true };
     if (!res.ok) return fail(res, "the command");
     const body = (await res.json()) as { exitCode?: number; result?: string };
     const { stdout, stderr } = parseSplitOutput(body.result ?? "", marker);
     const exitCode = body.exitCode ?? 0;
-    return { exitCode, stdout: maskProvider(stdout), stderr: maskProvider(stderr), timedOut: exitCode === 124 };
+    return { exitCode, stdout: mask(stdout, root), stderr: mask(stderr, root), timedOut: exitCode === 124 };
   }
 
   return {
@@ -336,13 +382,8 @@ export function createDaytonaSandboxProvider(options: {
       networks.set(created.id, mode);
       info(created);
       const ready = await waitStarted(created.id);
-      if (!options.snapshot) {
-        // The default image has no /workspace: make it, owned by the sandbox user.
-        await exec(created.id, {
-          command: `mkdir -p ${root} 2>/dev/null || sudo mkdir -p ${root}; sudo chown "$(id -u):$(id -g)" ${root} 2>/dev/null || true`,
-          timeoutSeconds: 15,
-        }).catch(() => undefined);
-      }
+      // The default image has no /workspace: make it now (or settle on the home fallback).
+      if (!options.snapshot) await rootOf(created.id).catch(() => undefined);
       return ready;
     },
     async get(id) {
@@ -365,7 +406,8 @@ export function createDaytonaSandboxProvider(options: {
     async writeFile(id, path, data) {
       const rel = workspacePath(path);
       if (!rel) throw new Error("a file path is required");
-      const res = await call(`${await toolboxUrl(id, "/files/upload-v2")}?path=${encodeURIComponent(abs(rel))}`, {
+      const target = await abs(id, rel);
+      const res = await call(`${await toolboxUrl(id, "/files/upload-v2")}?path=${encodeURIComponent(target)}`, {
         method: "POST",
         headers: { "content-type": "application/octet-stream" },
         body: data,
@@ -374,7 +416,8 @@ export function createDaytonaSandboxProvider(options: {
       if (!res.ok) return fail(res, "the upload");
     },
     async readFile(id, path) {
-      const res = await call(`${await toolboxUrl(id, "/files/download")}?path=${encodeURIComponent(abs(path))}`, {
+      const target = await abs(id, path);
+      const res = await call(`${await toolboxUrl(id, "/files/download")}?path=${encodeURIComponent(target)}`, {
         timeoutMs: 60_000,
       });
       if (res.status === 404 || res.status === 400) return null;
@@ -382,7 +425,8 @@ export function createDaytonaSandboxProvider(options: {
       return new Uint8Array(await res.arrayBuffer());
     },
     async listFiles(id, path, depth = 1) {
-      const dir = abs(path);
+      const root = await rootOf(id);
+      const dir = absIn(root, path);
       const res = await call(
         `${await toolboxUrl(id, "/files")}?path=${encodeURIComponent(dir)}&depth=${Math.max(1, Math.min(depth, 5))}`,
       );
@@ -403,6 +447,7 @@ export function createDaytonaSandboxProvider(options: {
       const res = await call(`${api}/sandbox/${encodeURIComponent(id)}`, { method: "DELETE", timeoutMs: 60_000 });
       toolbox.delete(id);
       networks.delete(id);
+      roots.delete(id);
       if (!res.ok && res.status !== 404) return fail(res, "delete sandbox");
     },
   };
