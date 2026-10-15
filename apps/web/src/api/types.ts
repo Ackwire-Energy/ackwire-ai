@@ -26,6 +26,8 @@ export interface OrgSummary {
   id: string;
   name: string;
   role: Role;
+  /** The workspace logo (`/api/app/org-logos/…`); null or absent = the agent mark. */
+  logo?: string | null;
 }
 
 export interface Me {

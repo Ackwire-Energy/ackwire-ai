@@ -1445,6 +1445,17 @@ export const en: Translations = {
     notImage: "Choose an image (JPG, PNG or WebP).",
     tooBig: "The image is over 8 MB.",
   },
+  orgLogo: {
+    label: "Logo",
+    labelHelp: "Shows in the sidebar for everyone in the workspace.",
+    add: "Upload logo",
+    change: "Change logo",
+    title: "Workspace logo",
+    help: "Drag to frame it; the square is what shows. A PNG with a transparent background works best.",
+    remove: "Remove logo",
+    saved: "Logo updated.",
+    removed: "Logo removed.",
+  },
   look: {
     open: "Appearance",
     title: "{{name}}'s appearance",

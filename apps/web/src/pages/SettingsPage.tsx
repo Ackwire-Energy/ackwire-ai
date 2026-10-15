@@ -41,6 +41,7 @@ import { ConnectCustomDialog, CustomServerRow, GrantAgentsDialog, ReviewToolsDia
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { MachinesSection } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
@@ -181,6 +182,7 @@ function OrgSection() {
   const [name, setName] = useState("");
   const [context, setContext] = useState("");
   const [timezone, setTimezone] = useState("");
+  const [logo, setLogo] = useState(false);
   useEffect(() => {
     if (!settings.data) return;
     setName(settings.data.name);
@@ -206,6 +208,18 @@ function OrgSection() {
           );
         }}
       >
+        <div className="row" style={{ gap: 12, alignItems: "center" }}>
+          <OrgMark logo={org.logo} size={48} className="settings__org-logo" />
+          <div className="stack-4" style={{ gap: 2, flex: 1 }}>
+            <span style={{ fontWeight: 600 }}>{t("orgLogo.label")}</span>
+            <span className="small muted">{t("orgLogo.labelHelp")}</span>
+          </div>
+          {editable && (
+            <Button size="sm" type="button" onClick={() => setLogo(true)}>
+              {org.logo ? t("orgLogo.change") : t("orgLogo.add")}
+            </Button>
+          )}
+        </div>
         <div className="grid-fields">
           <Field label={t("settings.name")} id="set-name">
             <Input value={name} onChange={(e) => setName(e.target.value)} readOnly={!editable} />
@@ -230,6 +244,7 @@ function OrgSection() {
           </div>
         )}
       </form>
+      <OrgLogoDialog open={logo} onClose={() => setLogo(false)} />
     </Card>
   );
 }

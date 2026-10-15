@@ -13,6 +13,8 @@ export const organizations = pgTable("organizations", {
    * rules). Goes into the system prompt of every agent of the organization.
    */
   context: text().notNull().default(""),
+  /** The workspace logo (`/api/app/org-logos/{orgId}/{hash}.{ext}`), uploaded by an admin; null = the agent mark. */
+  logo: text(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -1447,6 +1447,17 @@ export const ptBR = {
     notImage: "Escolha uma imagem (JPG, PNG ou WebP).",
     tooBig: "A imagem passa de 8 MB.",
   },
+  orgLogo: {
+    label: "Logo",
+    labelHelp: "Aparece na barra lateral para todo mundo do workspace.",
+    add: "Enviar logo",
+    change: "Trocar logo",
+    title: "Logo do workspace",
+    help: "Arraste para enquadrar; o quadrado é o que aparece. PNG com fundo transparente fica melhor.",
+    remove: "Remover logo",
+    saved: "Logo atualizado.",
+    removed: "Logo removido.",
+  },
   look: {
     open: "Aparência",
     title: "Aparência {{of}} {{name}}",

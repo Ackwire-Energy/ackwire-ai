@@ -11,7 +11,6 @@ import {
   Field,
   Icon,
   Kbd,
-  LogoMark,
   Menu,
   MenuItem,
   MenuRadioGroup,
@@ -47,7 +46,7 @@ import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { useOrg } from "./org-context";
-import { ProfilePhotoDialog } from "./ProfilePhoto";
+import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
 import { AgentGlow, AgentTrail, colorOf, SidebarHorizon, SidebarOrgSky } from "./Sky";
 
 /** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
@@ -491,7 +490,7 @@ function WorkspaceMenu({ summary }: { summary: string | null }) {
           className="sidebar__org-button"
           aria-label={t("shell.workspaceMenuOf", { name: org.name })}
         >
-          <LogoMark className="sidebar__org-mark" />
+          <OrgMark logo={org.logo} className="sidebar__org-mark" />
           <span className="sidebar__org-text">
             <span className="sidebar__org-name">{org.name}</span>
             {summary && <span className="sidebar__org-meta">{summary}</span>}

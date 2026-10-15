@@ -120,6 +120,9 @@ export interface ApiClient {
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;
+    /** The workspace logo (admins): a square image (JSON only: base64), already cropped. */
+    setLogo(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ logo: string }>;
+    removeLogo(orgId: string): Promise<void>;
     members(orgId: string): Promise<Member[]>;
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
     removeMember(orgId: string, userId: string): Promise<void>;

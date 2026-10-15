@@ -288,6 +288,13 @@
       "when": 1792097620548,
       "tag": "0040_waitlist_confirmation",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792099527236,
+      "tag": "0041_org_logo",
+      "breakpoints": true
     }
   ]
 }

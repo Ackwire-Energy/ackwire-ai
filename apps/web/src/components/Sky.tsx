@@ -292,7 +292,8 @@ export function SidebarOrgSky({ calm }: { calm: () => (Element | null)[] }) {
         // Soft tones run from the surface (0) toward the color: low values stay light.
         palette: (bg) => softTones("sky", bg),
         body: spriteTone("sky"),
-        sprites: 2,
+        // No pixel agents here: the strip is too small, they would pass behind the logo.
+        sprites: 0,
         near: 0,
         calm,
         calmV: 0,

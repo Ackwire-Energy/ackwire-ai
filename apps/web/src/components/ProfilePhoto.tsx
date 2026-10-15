@@ -1,6 +1,6 @@
-import { Avatar, Button, Dialog, DialogBody, DialogFooter } from "@agenteschat/ui";
+import { Avatar, Button, cx, Dialog, DialogBody, DialogFooter, LogoMark } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type PointerEvent, useEffect, useRef, useState } from "react";
+import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
@@ -61,8 +61,13 @@ export async function fileToBase64(file: Blob): Promise<string> {
   return url.slice(url.indexOf(",") + 1);
 }
 
-/** The square crop as JPEG; where there is no usable canvas (or it fails), the original file as is. */
-export async function encode(file: File, img: HTMLImageElement | null, crop: Crop) {
+/** The square crop (JPEG, or PNG to keep transparency); where there is no usable canvas (or it fails), the original file as is. */
+export async function encode(
+  file: File,
+  img: HTMLImageElement | null,
+  crop: Crop,
+  format: "image/jpeg" | "image/png" = "image/jpeg",
+) {
   try {
     const canvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
     const ctx = canvas?.getContext?.("2d");
@@ -71,9 +76,9 @@ export async function encode(file: File, img: HTMLImageElement | null, crop: Cro
       canvas.height = OUT_PX;
       const r = cropRect(crop, img.naturalWidth, img.naturalHeight);
       ctx.drawImage(img, r.sx, r.sy, r.size, r.size, 0, 0, OUT_PX, OUT_PX);
-      const url = canvas.toDataURL("image/jpeg", 0.9);
+      const url = canvas.toDataURL(format, 0.9);
       const data = url.slice(url.indexOf(",") + 1);
-      if (url.startsWith("data:image/") && data) return { imageBase64: data, contentType: "image/jpeg" };
+      if (url.startsWith(`data:${format}`) && data) return { imageBase64: data, contentType: format };
     }
   } catch {
     // No canvas here: send the original.
@@ -81,13 +86,40 @@ export async function encode(file: File, img: HTMLImageElement | null, crop: Cro
   return { imageBase64: await fileToBase64(file), contentType: file.type || "image/jpeg" };
 }
 
-/** "Foto do perfil": drop or pick an image, zoom and drag to frame the square, then Salvar (or Remover). */
-export function ProfilePhotoDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** What a square image dialog shows and does (profile photo, workspace logo). */
+interface ImageCropProps {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  help: string;
+  /** Shown in the drop area before an image is picked. */
+  placeholder: ReactNode;
+  /** There is an image now: Remover shows. */
+  hasImage: boolean;
+  removeLabel: string;
+  format?: "image/jpeg" | "image/png";
+  save: (image: { imageBase64: string; contentType: string }) => Promise<unknown>;
+  remove: () => Promise<unknown>;
+  onSaved: () => void;
+  onRemoved: () => void;
+}
+
+/** A square image: drop or pick an image, zoom and drag to frame the square, then Salvar (or Remover). */
+export function ImageCropDialog({
+  open,
+  onClose,
+  title,
+  help,
+  placeholder,
+  hasImage,
+  removeLabel,
+  format = "image/jpeg",
+  save: send,
+  remove: drop,
+  onSaved,
+  onRemoved,
+}: ImageCropProps) {
   const { t } = useTranslation();
-  const { org, me } = useOrg();
-  const api = useApi();
-  const qc = useQueryClient();
-  const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const img = useRef<HTMLImageElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -97,8 +129,6 @@ export function ProfilePhotoDialog({ open, onClose }: { open: boolean; onClose: 
   const [over, setOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const drag = useRef<{ x: number; y: number; crop: Crop } | null>(null);
-  const members = qc.getQueryData<{ userId: string; avatarUrl?: string | null }[]>(keys.members(org.id));
-  const hasPhoto = Boolean(members?.find((m) => m.userId === me.user.id)?.avatarUrl);
 
   useEffect(() => {
     if (open) return;
@@ -124,26 +154,20 @@ export function ProfilePhotoDialog({ open, onClose }: { open: boolean; onClose: 
     setSize({ w: 0, h: 0 });
     setUrl(typeof URL.createObjectURL === "function" ? URL.createObjectURL(f) : await readAsDataUrl(f));
   };
-  const done = () => {
-    void qc.invalidateQueries({ queryKey: keys.members(org.id) });
-    void qc.invalidateQueries({ queryKey: keys.people(org.id) });
-  };
   const save = useMutation({
     mutationFn: async () => {
       if (!file) return;
-      await api.orgs.setAvatar(org.id, await encode(file, img.current, crop));
+      await send(await encode(file, img.current, crop, format));
     },
     onSuccess: () => {
-      done();
-      toast.show(t("photo.saved"));
+      onSaved();
       onClose();
     },
   });
   const remove = useMutation({
-    mutationFn: () => api.orgs.removeAvatar(org.id),
+    mutationFn: drop,
     onSuccess: () => {
-      done();
-      toast.show(t("photo.removed"));
+      onRemoved();
       onClose();
     },
   });
@@ -155,8 +179,8 @@ export function ProfilePhotoDialog({ open, onClose }: { open: boolean; onClose: 
     <Dialog
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      title={t("photo.title")}
-      description={t("photo.help")}
+      title={title}
+      description={help}
       closeLabel={t("common.close")}
       width={420}
     >
@@ -246,7 +270,7 @@ export function ProfilePhotoDialog({ open, onClose }: { open: boolean; onClose: 
               void choose(e.dataTransfer?.files?.[0]);
             }}
           >
-            <Avatar name={me.user.name} size="lg" imageUrl={undefined} />
+            {placeholder}
             <span style={{ fontWeight: 600 }}>{t("photo.drop")}</span>
             <span className="small muted">{t("photo.dropHelp")}</span>
           </button>
@@ -258,14 +282,14 @@ export function ProfilePhotoDialog({ open, onClose }: { open: boolean; onClose: 
         )}
       </DialogBody>
       <DialogFooter>
-        {hasPhoto && !file && (
+        {hasImage && !file && (
           <Button
             variant="danger"
             onClick={() => remove.mutate()}
             loading={remove.isPending}
             disabled={remove.isPending}
           >
-            {t("photo.remove")}
+            {removeLabel}
           </Button>
         )}
         <span style={{ flex: 1 }} />
@@ -281,4 +305,80 @@ export function ProfilePhotoDialog({ open, onClose }: { open: boolean; onClose: 
       </DialogFooter>
     </Dialog>
   );
+}
+
+/** "Foto do perfil": the person's photo, theirs in every organization. */
+export function ProfilePhotoDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const members = qc.getQueryData<{ userId: string; avatarUrl?: string | null }[]>(keys.members(org.id));
+  const done = () => {
+    void qc.invalidateQueries({ queryKey: keys.members(org.id) });
+    void qc.invalidateQueries({ queryKey: keys.people(org.id) });
+  };
+  return (
+    <ImageCropDialog
+      open={open}
+      onClose={onClose}
+      title={t("photo.title")}
+      help={t("photo.help")}
+      placeholder={<Avatar name={me.user.name} size="lg" imageUrl={undefined} />}
+      hasImage={Boolean(members?.find((m) => m.userId === me.user.id)?.avatarUrl)}
+      removeLabel={t("photo.remove")}
+      save={(image) => api.orgs.setAvatar(org.id, image)}
+      remove={() => api.orgs.removeAvatar(org.id)}
+      onSaved={() => {
+        done();
+        toast.show(t("photo.saved"));
+      }}
+      onRemoved={() => {
+        done();
+        toast.show(t("photo.removed"));
+      }}
+    />
+  );
+}
+
+/** "Logo do workspace": an admin's square logo (PNG keeps transparency); everyone in the org sees it. */
+export function OrgLogoDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const done = () => {
+    void qc.invalidateQueries({ queryKey: keys.me });
+    void qc.invalidateQueries({ queryKey: keys.org(org.id) });
+  };
+  return (
+    <ImageCropDialog
+      open={open}
+      onClose={onClose}
+      title={t("orgLogo.title")}
+      help={t("orgLogo.help")}
+      placeholder={<OrgMark logo={org.logo} size={56} />}
+      hasImage={Boolean(org.logo)}
+      removeLabel={t("orgLogo.remove")}
+      format="image/png"
+      save={(image) => api.orgs.setLogo(org.id, image)}
+      remove={() => api.orgs.removeLogo(org.id)}
+      onSaved={() => {
+        done();
+        toast.show(t("orgLogo.saved"));
+      }}
+      onRemoved={() => {
+        done();
+        toast.show(t("orgLogo.removed"));
+      }}
+    />
+  );
+}
+
+/** The workspace's mark: its logo when there is one, else the agent mark. */
+export function OrgMark({ logo, size = 28, className }: { logo?: string | null; size?: number; className?: string }) {
+  if (logo) return <img className={cx("org-mark", className)} src={logo} alt="" width={size} height={size} />;
+  return <LogoMark className={className} size={size} />;
 }

@@ -70,3 +70,28 @@ describe("profile photo", () => {
     expect(document.body.textContent).toContain("Foto atualizada.");
   });
 });
+
+describe("workspace logo", () => {
+  test("Configurações → Geral → Enviar logo: crop, save; the sidebar shows the logo", async () => {
+    const state = seedState();
+    await renderApp(`/org/${ORG_ID}/settings`, { api: createFakeApi(state) });
+    await settle(8);
+    // No logo yet: the agent mark in the sidebar.
+    expect(document.querySelector(".sidebar__org-mark.org-mark")).toBeNull();
+    await click(screen().getByRole("button", { name: "Enviar logo" }));
+    const dialog = screen().getByRole("dialog", { name: "Logo do workspace" });
+    const input = within(dialog).getByLabelText("Escolher imagem") as HTMLInputElement;
+    await act(async () =>
+      fireEvent.change(input, { target: { files: [new File(["png-bytes"], "logo.png", { type: "image/png" })] } }),
+    );
+    await settle(3);
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(8);
+    const call = state.calls.find((c) => c.method === "orgs.setLogo");
+    expect(call?.args[0]).toBe(ORG_ID);
+    expect(document.body.textContent).toContain("Logo atualizado.");
+    const mark = document.querySelector<HTMLImageElement>("img.sidebar__org-mark.org-mark");
+    expect(mark?.getAttribute("src")).toStartWith("data:image/png;base64,");
+    expect(screen().getByRole("button", { name: "Trocar logo" })).toBeTruthy();
+  });
+});

@@ -3,7 +3,17 @@ import { z } from "@hono/zod-openapi";
 export const Role = z.enum(["owner", "admin", "member"]).openapi("Role");
 
 export const Organization = z
-  .object({ id: z.uuid(), name: z.string(), role: Role, context: z.string().optional() })
+  .object({
+    id: z.uuid(),
+    name: z.string(),
+    role: Role,
+    context: z.string().optional(),
+    logo: z
+      .string()
+      .nullable()
+      .optional()
+      .openapi({ description: "The workspace logo (`/api/app/org-logos/…`); null = the agent mark." }),
+  })
   .openapi("Organization");
 
 export const Member = z

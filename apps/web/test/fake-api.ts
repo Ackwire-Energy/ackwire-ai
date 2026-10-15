@@ -623,6 +623,18 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const m = state.members.find((x) => x.userId === state.me?.user.id);
         if (m) m.avatarUrl = null;
       },
+      setLogo: async (orgId, input) => {
+        log("orgs.setLogo", orgId, { contentType: input.contentType });
+        const o = state.me?.organizations.find((x) => x.id === orgId);
+        if (!o) throw new ApiError(404, "not_found", "Organization not found");
+        o.logo = `data:${input.contentType};base64,${input.imageBase64}`;
+        return { logo: o.logo };
+      },
+      removeLogo: async (orgId) => {
+        log("orgs.removeLogo", orgId);
+        const o = state.me?.organizations.find((x) => x.id === orgId);
+        if (o) o.logo = null;
+      },
       members: async () => state.members,
       changeRole: async (orgId, userId, role: Role) => {
         log("orgs.changeRole", orgId, userId, role);

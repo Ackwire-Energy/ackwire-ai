@@ -57,11 +57,18 @@ export interface Membership {
   orgId: string;
   orgName: string;
   role: MemberRole;
+  /** The workspace logo URL, when one was uploaded (listMemberships). */
+  orgLogo?: string | null;
 }
 
 export async function listMemberships(db: Database, userId: string): Promise<Membership[]> {
   return db
-    .select({ orgId: organizations.id, orgName: organizations.name, role: organizationMembers.role })
+    .select({
+      orgId: organizations.id,
+      orgName: organizations.name,
+      role: organizationMembers.role,
+      orgLogo: organizations.logo,
+    })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
     .where(eq(organizationMembers.userId, userId))

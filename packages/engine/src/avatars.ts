@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto";
 import type { BlobStore } from "@agenteschat/adapters";
 import { and, type Database, eq, schema, sql } from "@agenteschat/db";
+import { recordAudit } from "./audit";
+import { caches } from "./cache";
 import { NotFoundError, ValidationError } from "./errors";
+import { requirePermission } from "./organizations";
 
-const { users, organizationMembers } = schema;
+const { users, organizationMembers, organizations } = schema;
 
 export const AVATAR_LIMITS = { maxBytes: 2 * 1024 * 1024 };
 const TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -93,6 +96,26 @@ export function stripImageMetadata(bytes: Uint8Array, type: "image/jpeg" | "imag
 const AVATAR_PATH = /^\/api\/app\/avatars\/([^/]+)\/([0-9a-f]{16}\.(jpg|png|webp))$/;
 
 /**
+ * An uploaded image (base64): JPEG, PNG or WebP up to 2 MB, checked by its
+ * bytes, without metadata; named by a hash of its content.
+ */
+function readImage(input: { imageBase64: string; contentType: string }, code: "avatar" | "logo") {
+  const clean = input.imageBase64.replace(/^data:[^;]+;base64,/, "").replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(clean)) throw new ValidationError("The image isn't base64", `${code}.not_base64`);
+  const bytes = new Uint8Array(Buffer.from(clean, "base64"));
+  if (bytes.length === 0) throw new ValidationError("The image is empty", `${code}.empty`);
+  if (bytes.length > AVATAR_LIMITS.maxBytes)
+    throw new ValidationError("The image can be up to 2 MB", `${code}.too_large`, { maxMb: 2 });
+  const type = sniffImage(bytes);
+  if (!type || !TYPES[input.contentType] || type !== input.contentType) {
+    throw new ValidationError("Use a JPEG, PNG or WebP image", `${code}.type`);
+  }
+  const body = stripImageMetadata(bytes, type);
+  const file = `${createHash("sha256").update(body).digest("hex").slice(0, 16)}.${TYPES[type]}`;
+  return { body, type, file };
+}
+
+/**
  * Sets a person's photo (`PUT …/me/avatar`): JPEG, PNG or WebP up to 2 MB,
  * checked by its bytes, stripped of metadata, stored in the platform bucket,
  * served by `GET /api/app/avatars/{userId}/{file}` (people sharing an org).
@@ -103,18 +126,7 @@ export async function setAvatar(
   userId: string,
   input: { imageBase64: string; contentType: string },
 ): Promise<{ avatarUrl: string }> {
-  const clean = input.imageBase64.replace(/^data:[^;]+;base64,/, "").replace(/\s+/g, "");
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(clean)) throw new ValidationError("The image isn't base64", "avatar.not_base64");
-  const bytes = new Uint8Array(Buffer.from(clean, "base64"));
-  if (bytes.length === 0) throw new ValidationError("The image is empty", "avatar.empty");
-  if (bytes.length > AVATAR_LIMITS.maxBytes)
-    throw new ValidationError("The photo can be up to 2 MB", "avatar.too_large", { maxMb: 2 });
-  const type = sniffImage(bytes);
-  if (!type || !TYPES[input.contentType] || type !== input.contentType) {
-    throw new ValidationError("Use a JPEG, PNG or WebP image", "avatar.type");
-  }
-  const body = stripImageMetadata(bytes, type);
-  const file = `${createHash("sha256").update(body).digest("hex").slice(0, 16)}.${TYPES[type]}`;
+  const { body, type, file } = readImage(input, "avatar");
   await deps.blobs.put(`avatars/${userId}/${file}`, body, { contentType: type });
   const [before] = await deps.db.select({ image: users.image }).from(users).where(eq(users.id, userId));
   const avatarUrl = `/api/app/avatars/${encodeURIComponent(userId)}/${file}`;
@@ -161,6 +173,82 @@ export async function avatarFile(
     if (!shared) throw new NotFoundError("Not found");
   }
   const object = await deps.blobs.get(`avatars/${userId}/${file}`);
+  if (!object) throw new NotFoundError("Not found");
+  return object;
+}
+
+// ── The workspace logo ───────────────────────────────────────────────────────
+
+const LOGO_PATH = /^\/api\/app\/org-logos\/([^/]+)\/([0-9a-f]{16}\.(jpg|png|webp))$/;
+
+/**
+ * Sets the workspace logo (`PUT …/organizations/{orgId}/logo`): an admin
+ * (`configure`); same checks as a photo; stored in the platform bucket and
+ * served to the org's members by `GET /api/app/org-logos/{orgId}/{file}`.
+ * The app crops it square (512×512) before sending. Audited.
+ */
+export async function setOrgLogo(
+  deps: { db: Database; blobs: BlobStore },
+  actorId: string,
+  orgId: string,
+  input: { imageBase64: string; contentType: string },
+): Promise<{ logo: string }> {
+  await requirePermission(deps.db, actorId, orgId, "configure");
+  const { body, type, file } = readImage(input, "logo");
+  await deps.blobs.put(`org-logos/${orgId}/${file}`, body, { contentType: type });
+  const [before] = await deps.db
+    .select({ logo: organizations.logo })
+    .from(organizations)
+    .where(eq(organizations.id, orgId));
+  const logo = `/api/app/org-logos/${encodeURIComponent(orgId)}/${file}`;
+  await deps.db.update(organizations).set({ logo }).where(eq(organizations.id, orgId));
+  caches.orgs.delete(`${orgId}:`);
+  await removeStoredLogo(deps.blobs, orgId, before?.logo, file);
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "organization.logo_changed",
+    target: { type: "organization", id: orgId },
+  });
+  return { logo };
+}
+
+/** Removes the workspace logo (`DELETE …/organizations/{orgId}/logo`): back to the agent mark. Audited. */
+export async function removeOrgLogo(deps: { db: Database; blobs: BlobStore }, actorId: string, orgId: string) {
+  await requirePermission(deps.db, actorId, orgId, "configure");
+  const [before] = await deps.db
+    .select({ logo: organizations.logo })
+    .from(organizations)
+    .where(eq(organizations.id, orgId));
+  await deps.db.update(organizations).set({ logo: null }).where(eq(organizations.id, orgId));
+  caches.orgs.delete(`${orgId}:`);
+  await removeStoredLogo(deps.blobs, orgId, before?.logo, null);
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "organization.logo_removed",
+    target: { type: "organization", id: orgId },
+  });
+}
+
+async function removeStoredLogo(blobs: BlobStore, orgId: string, logo: string | null | undefined, keep: string | null) {
+  const m = logo ? LOGO_PATH.exec(logo) : null;
+  if (!m || decodeURIComponent(m[1] ?? "") !== orgId || m[2] === keep) return;
+  await blobs.delete(`org-logos/${orgId}/${m[2]}`).catch(() => undefined);
+}
+
+/** The stored logo for `GET /api/app/org-logos/{orgId}/{file}`: only for the org's members. */
+export async function orgLogoFile(
+  deps: { db: Database; blobs: BlobStore },
+  viewerId: string,
+  orgId: string,
+  file: string,
+) {
+  if (!/^[0-9a-f]{16}\.(jpg|png|webp)$/.test(file)) throw new NotFoundError("Not found");
+  await requirePermission(deps.db, viewerId, orgId, "read").catch(() => {
+    throw new NotFoundError("Not found");
+  });
+  const object = await deps.blobs.get(`org-logos/${orgId}/${file}`);
   if (!object) throw new NotFoundError("Not found");
   return object;
 }

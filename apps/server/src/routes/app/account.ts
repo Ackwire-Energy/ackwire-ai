@@ -10,13 +10,16 @@ import {
   listInvitations,
   listMembers,
   listMemberships,
+  orgLogoFile,
   previewInvitation,
   queueInvitationEmail,
   removeAvatar,
   removeMember,
+  removeOrgLogo,
   requirePermission,
   revokeInvitation,
   setAvatar,
+  setOrgLogo,
   updateOrganization,
   updateOrgSettings,
 } from "@agenteschat/engine";
@@ -46,7 +49,14 @@ export function accountRoutes(deps: AppDeps) {
   const { db, config } = deps;
   const app = createAppRouter(deps);
   const session = requireSession(deps.auth);
-  for (const path of ["/me", "/avatars/*", "/organizations", "/organizations/*", "/invitations/:token/accept"])
+  for (const path of [
+    "/me",
+    "/avatars/*",
+    "/org-logos/*",
+    "/organizations",
+    "/organizations/*",
+    "/invitations/:token/accept",
+  ])
     app.use(path, session);
 
   // ── Public ────────────────────────────────────────────────────────────────
@@ -126,7 +136,12 @@ export function accountRoutes(deps: AppDeps) {
       return c.json(
         {
           user: { id: user.id, name: user.name, email: user.email, image: user.image ?? null },
-          organizations: memberships.map((m) => ({ id: m.orgId, name: m.orgName, role: m.role })),
+          organizations: memberships.map((m) => ({
+            id: m.orgId,
+            name: m.orgName,
+            role: m.role,
+            logo: m.orgLogo ?? null,
+          })),
         },
         200,
       );
@@ -184,6 +199,81 @@ export function accountRoutes(deps: AppDeps) {
       return c.body(null, 204);
     },
   );
+
+  // The workspace logo: an admin uploads it; every member sees it.
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/logo",
+      tags,
+      security,
+      summary: "Set the workspace logo (JPEG, PNG or WebP up to 2 MB; metadata is removed). Admins.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            imageBase64: z
+              .string()
+              .min(1)
+              .max(3_000_000)
+              .openapi({ description: "The image bytes in base64 (a data: URL prefix is accepted)." }),
+            contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+          }),
+        ),
+      },
+      responses: {
+        200: json(z.object({ logo: z.string() })),
+        429: errorResponse("Too many logo changes"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const { orgId } = c.req.valid("param");
+      await requirePermission(db, user.id, orgId, "configure");
+      const limit = await deps.adapters.rateLimiter.consume(`org-logo:${orgId}`, { limit: 20, windowMs: 3600_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many logo changes; try again later");
+      return c.json(
+        await setOrgLogo({ db, blobs: deps.adapters.platformBlobs }, user.id, orgId, c.req.valid("json")),
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/logo",
+      tags,
+      security,
+      summary: "Remove the workspace logo (back to the agent mark). Admins.",
+      request: { params: OrgParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      await removeOrgLogo({ db, blobs: deps.adapters.platformBlobs }, c.get("user").id, c.req.valid("param").orgId);
+      return c.body(null, 204);
+    },
+  );
+
+  // The logo file, for the org's members (content-hash names: cached for good).
+  app.get("/org-logos/:orgId/:file", async (c) => {
+    const file = await orgLogoFile(
+      { db, blobs: deps.adapters.platformBlobs },
+      c.get("user").id,
+      c.req.param("orgId"),
+      c.req.param("file"),
+    );
+    return new Response(file.body, {
+      status: 200,
+      headers: {
+        "content-type": file.contentType,
+        "x-content-type-options": "nosniff",
+        "content-security-policy": "sandbox",
+        "cache-control": "private, max-age=31536000, immutable",
+      },
+    });
+  });
 
   // A person's photo, for people who share an organization with them. The file
   // name is a content hash, so a new photo gets a new URL and the old one can be cached.
@@ -265,7 +355,16 @@ export function accountRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const membership = await requirePermission(db, c.get("user").id, orgId, "read");
       const org = await getOrganization(db, orgId);
-      return c.json({ id: orgId, name: membership.orgName, role: membership.role, context: org?.context ?? "" }, 200);
+      return c.json(
+        {
+          id: orgId,
+          name: membership.orgName,
+          role: membership.role,
+          context: org?.context ?? "",
+          logo: org?.logo ?? null,
+        },
+        200,
+      );
     },
   );
 
