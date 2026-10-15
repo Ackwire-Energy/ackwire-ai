@@ -30,6 +30,9 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   labelled?: boolean;
 }
 
+/** Rendered size of each avatar size (accessories simplify when small). */
+const SIZE_PX: Record<NonNullable<AvatarProps["size"]>, number> = { xs: 18, sm: 24, md: 36, lg: 56, xl: 112 };
+
 /** 1–2 letters: "Ada" → "A", "Atlas" → "At" when asked; "Marina Souza" → "MS". */
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -74,15 +77,22 @@ export function Avatar({
       {...a11y}
       data-kind={kind}
       data-state={agent ? mood : undefined}
+      data-accessory={
+        agent && appearance?.accessory && appearance.accessory !== "none" ? appearance.accessory : undefined
+      }
       data-eyes={agent && appearance?.eyes && appearance.eyes !== "round" ? appearance.eyes : undefined}
       style={agent ? { ...appearanceStyle(appearance), ...style } : style}
       {...rest}
     >
       {agent ? (
         <>
-          <span className="ac-avatar__eye ac-avatar__eye--l" />
-          <span className="ac-avatar__eye ac-avatar__eye--r" />
-          <AgentAccessoryLayer accessory={appearance?.accessory} />
+          {/* The eyes and what sits on them (glasses) look around together; the blink is the eyes' own. */}
+          <span className="ac-avatar__face">
+            <span className="ac-avatar__eye ac-avatar__eye--l" />
+            <span className="ac-avatar__eye ac-avatar__eye--r" />
+            <AgentAccessoryLayer accessory={appearance?.accessory} px={SIZE_PX[size]} layer="face" />
+          </span>
+          <AgentAccessoryLayer accessory={appearance?.accessory} px={SIZE_PX[size]} layer="head" />
         </>
       ) : imageUrl ? (
         <img src={imageUrl} alt="" />

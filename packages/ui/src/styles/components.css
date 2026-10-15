@@ -2889,7 +2889,11 @@ a.ac-list__row:focus-visible {
   .ac-avatar--agent .ac-avatar__eye {
     animation: ac-eye-blink 5s infinite;
   }
+  /* The eyes and the glasses on them look around together (the face group). */
   .ac-avatar--thinking .ac-avatar__eye {
+    animation: none;
+  }
+  .ac-avatar--thinking .ac-avatar__face {
     animation: ac-look 2.4s var(--out) infinite;
   }
   .ac-avatar--writing .ac-avatar__eye {
@@ -2915,11 +2919,12 @@ a.ac-list__row:focus-visible {
   100% {
     transform: translateX(0);
   }
+  /* Fractions of the symbol (the eye is 15% wide, 20% tall). */
   30% {
-    transform: translateX(-35%);
+    transform: translateX(-5.25%);
   }
   60% {
-    transform: translateX(40%) translateY(-15%);
+    transform: translateX(6%) translateY(-3%);
   }
 }
 @keyframes ac-halo {
@@ -3362,6 +3367,11 @@ a.ac-list__row:focus-visible {
   height: 112px;
   font-size: 36px;
 }
+.ac-avatar__face {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
 .ac-avatar__accessory {
   position: absolute;
   inset: 0;
@@ -3369,6 +3379,10 @@ a.ac-list__row:focus-visible {
   height: 100%;
   overflow: visible;
   pointer-events: none;
+}
+/* Sunglasses cover the eyes: nothing peeks out under the lenses. */
+.ac-avatar[data-accessory="sunglasses"] .ac-avatar__eye {
+  visibility: hidden;
 }
 /* Eyes */
 .ac-avatar[data-eyes="dots"] .ac-avatar__eye {

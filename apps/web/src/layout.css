@@ -3178,7 +3178,8 @@ a.forum-card__title::after {
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  padding: 28px 16px 20px;
+  /* Room above for a hat or crown (they rise past the symbol). */
+  padding: 48px 16px 20px;
   border-radius: var(--radius-lg);
   background:
     radial-gradient(120% 100% at 50% 0%, color-mix(in srgb, var(--sunken) 60%, transparent), transparent 70%), var(--bg);
@@ -3199,9 +3200,11 @@ a.forum-card__title::after {
 }
 .look-choice {
   display: inline-grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
+  /* The avatar sits low: hats and crowns rise into the space above it. */
+  place-items: end center;
+  padding-bottom: 6px;
+  width: 64px;
+  height: 64px;
   border: 0;
   border-radius: var(--radius-lg);
   background: var(--raised);
@@ -3223,9 +3226,19 @@ a.forum-card__title::after {
     var(--top),
     0 0 0 1.5px var(--ink);
 }
+.look-choice .ac-avatar {
+  width: 44px;
+  height: 44px;
+}
 .look-choice:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--e1), var(--field-ring);
+}
+.look-choice[aria-checked="true"]:focus-visible {
+  box-shadow:
+    var(--e1),
+    0 0 0 1.5px var(--ink),
+    var(--field-ring);
 }
 @media (prefers-reduced-motion: reduce) {
   .look-choice {
