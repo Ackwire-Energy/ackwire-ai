@@ -1,5 +1,12 @@
 import { eq, schema } from "@agenteschat/db";
-import { agentEvents, type CalendarDeps, findFreeTime, proposeCalendarEvent, resolveParticipants } from "./calendar";
+import {
+  agentEvents,
+  type CalendarDeps,
+  type EventRule,
+  findFreeTime,
+  proposeCalendarEvent,
+  resolveParticipants,
+} from "./calendar";
 import { agentSearchChannels } from "./search";
 import type { ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -107,6 +114,23 @@ export function createCalendarToolSource(deps: CalendarDeps): ToolSource {
           end: { type: "string", description: "ISO 8601 with offset" },
           participants: { type: "array", items: { type: "string" }, maxItems: 30, description: "@handles" },
           note: { type: "string", maxLength: 300 },
+          recurrence: {
+            type: "object",
+            description:
+              'Only if it repeats. E.g. {"freq":"weekly","byWeekday":["MO","WE"]}, {"freq":"weekly","interval":2}, {"freq":"monthly","byWeekday":["2TU"]}, {"freq":"daily","until":"2026-12-31"}. Time and start come from `start`.',
+            properties: {
+              freq: { enum: ["daily", "weekly", "monthly", "yearly"] },
+              interval: { type: "integer", minimum: 1, maximum: 52 },
+              byWeekday: { type: "array", items: { type: "string", maxLength: 4 }, maxItems: 7 },
+              byMonthDay: { type: "array", items: { type: "integer", minimum: -31, maximum: 31 }, maxItems: 31 },
+              byMonth: { type: "array", items: { type: "integer", minimum: 1, maximum: 12 }, maxItems: 12 },
+              bySetPos: { type: "array", items: { type: "integer", minimum: -31, maximum: 31 }, maxItems: 5 },
+              until: { type: "string", description: "YYYY-MM-DD" },
+              count: { type: "integer", minimum: 1, maximum: 1000 },
+            },
+            required: ["freq"],
+            additionalProperties: false,
+          },
         },
         required: ["title", "start", "end"],
         additionalProperties: false,
@@ -121,6 +145,7 @@ export function createCalendarToolSource(deps: CalendarDeps): ToolSource {
             end: str(input.end),
             participants,
             note: str(input.note) || undefined,
+            recurrence: (input.recurrence as EventRule | undefined) ?? null,
           });
           return {
             content: `Proposed "${p.title}" (${p.start} → ${p.end}). It waits for the person's confirmation.`,

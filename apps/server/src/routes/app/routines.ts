@@ -1,13 +1,21 @@
 import {
   createRoutine,
   deleteRoutine,
+  describeRule,
   duplicateRoutine,
   listRoutineRuns,
   listRoutines,
+  normalizeRule,
   parseScheduleForOrg,
+  phraseToRule,
   ROUTINE_EVENTS,
   type RoutineDeps,
+  requirePermission,
+  routineTimezone,
+  ruleOccurrences,
+  ruleToCron,
   runRoutineNow,
+  type ScheduleRule,
   updateRoutine,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -50,6 +58,43 @@ const TargetView = z.union([
     forUserId: z.string().optional(),
   }),
 ]);
+/** A structured schedule (the period picker): RRULE-like, in a time zone. */
+const ScheduleRuleSchema = z
+  .object({
+    freq: z.enum(["once", "hourly", "daily", "weekly", "monthly", "yearly"]),
+    interval: z.number().int().min(1).max(1000).optional(),
+    byWeekday: z
+      .array(z.string().regex(/^([+-]?[1-5])?(MO|TU|WE|TH|FR|SA|SU)$/))
+      .max(14)
+      .optional()
+      .openapi({ description: '"MO"…"SU"; monthly/yearly may carry a position: "2TU", "-1FR".' }),
+    byMonthDay: z.array(z.number().int().min(-31).max(31)).max(31).optional(),
+    byMonth: z.array(z.number().int().min(1).max(12)).max(12).optional(),
+    bySetPos: z
+      .union([z.number().int().min(-31).max(31), z.array(z.number().int().min(-31).max(31)).max(10)])
+      .optional(),
+    time: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/)
+      .optional(),
+    times: z
+      .array(z.string().regex(/^\d{2}:\d{2}$/))
+      .max(24)
+      .optional(),
+    timezone: z.string().max(64),
+    start: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    until: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable()
+      .optional(),
+    count: z.number().int().min(1).max(10_000).nullable().optional(),
+  })
+  .openapi("ScheduleRule");
+
 const RoutineRun = z
   .object({
     id: z.uuid(),
@@ -73,6 +118,7 @@ const Routine = z
         cron: z.string(),
         timezone: z.string(),
         description: z.string(),
+        rule: ScheduleRuleSchema.nullable(),
       }),
       z.object({ type: z.literal("event"), event: Event }),
       z.object({
@@ -93,11 +139,14 @@ const Routine = z
   .openapi("Routine");
 
 const TriggerInput = z.union([
-  z.object({
-    type: z.literal("schedule"),
-    phrase: z.string().min(1).max(300),
-    timezone: z.string().max(64).optional(),
-  }),
+  z
+    .object({
+      type: z.literal("schedule"),
+      phrase: z.string().min(1).max(300).optional(),
+      rule: ScheduleRuleSchema.optional(),
+      timezone: z.string().max(64).optional(),
+    })
+    .openapi({ description: "A phrase (`dias úteis às 9h`) or a `rule` from the picker." }),
   z.object({ type: z.literal("event"), event: Event }),
   z.object({
     type: z.literal("once"),
@@ -168,6 +217,83 @@ export function routineRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const { phrase, timezone } = c.req.valid("json");
       return c.json(await parseScheduleForOrg(routines, c.get("user").id, orgId, phrase, timezone), 200);
+    },
+  );
+
+  const RuleAnswer = z.union([
+    z.object({
+      ok: z.literal(true),
+      rule: ScheduleRuleSchema,
+      description: z
+        .string()
+        .openapi({ description: '"A cada 2 semanas, seg e qua, às 09:00 (horário de Brasília)".' }),
+      cron: z.string().nullable().openapi({ description: "When cron can say it." }),
+      nextRuns: z.array(z.string()).openapi({ description: "The next 5 times." }),
+    }),
+    z.object({ ok: z.literal(false), error: z.string() }),
+  ]);
+  const answer = (rule: ScheduleRule) => {
+    const normal = normalizeRule(rule);
+    return {
+      ok: true as const,
+      rule: normal,
+      description: describeRule(normal),
+      cron: ruleToCron(normal),
+      nextRuns: ruleOccurrences(normal, new Date(), new Date(Date.now() + 5 * 366 * 86_400_000), 5).map((d) =>
+        d.toISOString(),
+      ),
+    };
+  };
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/routines/parse-rule",
+      tags,
+      security,
+      summary: "A schedule phrase → a structured rule (to fill the period picker), with its description and next runs",
+      request: {
+        params: OrgParams,
+        body: body(z.object({ phrase: z.string().min(1).max(300), timezone: z.string().max(64).optional() })),
+      },
+      responses: { 200: json(RuleAnswer), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { phrase, timezone } = c.req.valid("json");
+      const zone = await routineTimezone(db, c.get("user").id, orgId, timezone);
+      const rule = phraseToRule(phrase, zone);
+      if (!rule) {
+        return c.json(
+          { ok: false as const, error: 'Não entendi o período. Tente "a cada 2 semanas na segunda às 9h".' },
+          200,
+        );
+      }
+      try {
+        return c.json(answer(rule), 200);
+      } catch (error) {
+        return c.json({ ok: false as const, error: error instanceof Error ? error.message : String(error) }, 200);
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/routines/describe-rule",
+      tags,
+      security,
+      summary: "A rule from the picker → its description in pt-BR, cron (when possible) and next runs",
+      request: { params: OrgParams, body: body(z.object({ rule: ScheduleRuleSchema })) },
+      responses: { 200: json(RuleAnswer), ...errors },
+    }),
+    async (c) => {
+      await requirePermission(db, c.get("user").id, c.req.valid("param").orgId, "read");
+      try {
+        return c.json(answer(c.req.valid("json").rule as ScheduleRule), 200);
+      } catch (error) {
+        return c.json({ ok: false as const, error: error instanceof Error ? error.message : String(error) }, 200);
+      }
     },
   );
 

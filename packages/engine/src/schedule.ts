@@ -1,4 +1,5 @@
 import { isValidCron, nextCronTime, zonedParts, zonedTime } from "./cron";
+import { cronToRule, type ScheduleRule } from "./rrule";
 
 export type ScheduleParse =
   | { ok: true; cron: string; description: string; timezone: string }
@@ -218,4 +219,93 @@ export function parseWhen(input: string, timezone: string, now = new Date()): Wh
     if (!at || at.getTime() <= now.getTime()) date = addDays(today.year, today.month, today.day, 1);
   }
   return done(zonedTime(date.year, date.month, date.day, time[0], time[1], timezone));
+}
+
+// ── Phrase → structured rule (the period picker) ─────────────────────────────
+
+const RULE_DAYS = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+const ORDINALS: [RegExp, number][] = [
+  [/\b(primeir[ao]|1[ºªa°o]?|first)\b/, 1],
+  [/\b(segund[ao]|2[ºªa°o]?|second)\b(?!-feira)/, 2],
+  [/\b(terceir[ao]|3[ºªa°o]?|third)\b/, 3],
+  [/\b(quart[ao]|4[ºªa°o]?|fourth)\b(?!-feira)/, 4],
+  [/\b([úu]ltim[ao]|last)\b/, -1],
+];
+
+/**
+ * A schedule phrase as a structured rule, for the picker (and the way back:
+ * `describeRule`). Understands what cron can't: "a cada 2 semanas na
+ * segunda e quarta às 9h", "último dia útil do mês às 18h", "2ª terça do
+ * mês", "até 31/12", "10 vezes". Falls back to the cron reading of the phrase.
+ */
+export function phraseToRule(phrase: string, timezone: string, now = new Date()): ScheduleRule | null {
+  const text = plain(phrase);
+  const time = timeOf(text);
+  const times = time ? [hhmm(time)] : undefined;
+  const today = zonedParts(now, timezone);
+  const extras: Partial<ScheduleRule> = {};
+  const until = /\b(?:até|ate|until)\s+(?:o dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/.exec(text);
+  if (until) {
+    let year = until[3] ? Number(until[3].length === 2 ? `20${until[3]}` : until[3]) : today.year;
+    const month = Number(until[2]);
+    const day = Number(until[1]);
+    if (!until[3] && (month < today.month || (month === today.month && day < today.day))) year++;
+    extras.until = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  const count = /\b(\d+)\s*(?:vezes|times)\b/.exec(text);
+  if (count) extras.count = Number(count[1]);
+  const days = WEEKDAYS.filter(([re]) => re.test(text)).map(([, d]) => RULE_DAYS[d] as string);
+  const workdays = /(dias? [úu]teis|de segunda a sexta|weekdays?|business days?)/.test(text);
+  const interval =
+    /(?:a cada|every)\s+(\d+)\s*(dias?|semanas?|meses|m[eê]s|anos?|horas?|days?|weeks?|months?|years?|hours?)\b/.exec(
+      text,
+    );
+  const base = { timezone, ...(times ? { times } : {}), ...extras };
+  const n = interval ? Number(interval[1]) : 1;
+  const unit = interval?.[2] ?? "";
+
+  // "último dia útil do mês", "primeiro dia útil".
+  if (/dia [úu]til/.test(text) && /(m[eê]s|month)/.test(text)) {
+    const pos = ORDINALS.find(([re]) => re.test(text))?.[1] ?? 1;
+    return {
+      freq: "monthly",
+      interval: /mes|m[eê]s|month/.test(unit) ? n : 1,
+      byWeekday: ["MO", "TU", "WE", "TH", "FR"],
+      bySetPos: [pos],
+      ...base,
+    };
+  }
+  // "último dia do mês".
+  if (/[úu]ltimo dia (do|de cada) m[eê]s|last day of (the )?month/.test(text)) {
+    return { freq: "monthly", byMonthDay: [-1], ...base };
+  }
+  // "2ª terça do mês", "última sexta de cada mês".
+  if (days.length > 0 && /(do|de cada|of the|of every) m[eê]s|month/.test(text)) {
+    const pos = ORDINALS.find(([re]) => re.test(text))?.[1];
+    if (pos) return { freq: "monthly", byWeekday: days.map((d) => `${pos}${d}`), ...base };
+  }
+  // "dia 15 de cada mês", "todo dia 1".
+  const monthDay = /(?:todo|no|cada)\s+dia\s+(\d{1,2})\b|(?:on the|day)\s+(\d{1,2})(?:st|nd|rd|th)?\b/.exec(text);
+  if (monthDay && /(m[eê]s|month|todo dia \d)/.test(text)) {
+    return {
+      freq: "monthly",
+      interval: /mes|m[eê]s|month/.test(unit) ? n : 1,
+      byMonthDay: [Number(monthDay[1] ?? monthDay[2])],
+      ...base,
+    };
+  }
+  if (/^(semana|week)/.test(unit) || (days.length > 0 && interval)) {
+    return { freq: "weekly", interval: n, ...(days.length ? { byWeekday: days } : {}), ...base };
+  }
+  if (/^(dia|day)/.test(unit)) return { freq: "daily", interval: n, ...base };
+  if (/^(m[eê]s|meses|month)/.test(unit)) return { freq: "monthly", interval: n, ...base };
+  if (/^(ano|year)/.test(unit)) return { freq: "yearly", interval: n, ...base };
+  if (/^(hora|hour)/.test(unit))
+    return { freq: "hourly", interval: n, times: [`00:${time ? hhmm(time).slice(3) : "00"}`], ...extras, timezone };
+  if (workdays) return { freq: "weekly", byWeekday: ["MO", "TU", "WE", "TH", "FR"], ...base };
+  if (days.length > 0) return { freq: "weekly", byWeekday: days, ...base };
+  // Everything else: the cron reading, as a rule.
+  const cron = phraseToCron(phrase);
+  const fromCron = cron ? cronToRule(cron.cron, timezone) : null;
+  return fromCron ? { ...fromCron, ...extras } : null;
 }

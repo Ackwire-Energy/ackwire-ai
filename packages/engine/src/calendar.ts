@@ -1,13 +1,15 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, gte, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, gte, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
-import { nextCronTime, zonedParts, zonedTime } from "./cron";
+import { zonedParts, zonedTime } from "./cron";
 import { queueEmail } from "./email";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { getOrgSettings } from "./management";
 import { insertMessage, messageView } from "./messages";
 import { can, getMembership, requirePermission } from "./organizations";
+import { routineSlots } from "./routines";
+import { endRuleBefore, localDate, normalizeRule, ruleOccurrences, type ScheduleRule } from "./rrule";
 
 const {
   calendarEvents,
@@ -23,8 +25,9 @@ const {
   organizations,
 } = schema;
 
-export type Recurrence = "none" | "weekdays" | "weekly" | "monthly";
-export const RECURRENCES: readonly Recurrence[] = ["none", "weekdays", "weekly", "monthly"];
+/** Legacy presets; `custom` = a rule they can't say (see `rule`). */
+export type Recurrence = "none" | "weekdays" | "weekly" | "monthly" | "custom";
+export const RECURRENCES: readonly Recurrence[] = ["none", "weekdays", "weekly", "monthly", "custom"];
 export interface CalendarActor {
   type: "person" | "agent";
   id: string;
@@ -37,8 +40,20 @@ export interface CalendarEventView {
   start: string;
   end: string;
   allDay: boolean;
+  location: string | null;
+  /** Days left out of the series (local "YYYY-MM-DD"). */
+  exdates: string[];
+  /** All-day events: the local days, inclusive ("YYYY-MM-DD"). */
+  startDate: string | null;
+  endDate: string | null;
   timezone: string;
   recurrence: Recurrence;
+  /** The series rule, complete (with the event's zone, first day and time); null = doesn't repeat. */
+  rule: ScheduleRule | null;
+  /** The series this occurrence belongs to (its own id, or the series of an edited occurrence). */
+  seriesId: string;
+  /** For occurrences of a series: the occurrence's original start (use it for "só este" / "este e os próximos"). */
+  occurrenceStart: string | null;
   participants: CalendarActor[];
   /** RSVP of each person attending. */
   rsvp: { type: "person" | "agent"; id: string; status: "needs_action" | "accepted" | "declined" }[];
@@ -56,16 +71,35 @@ export interface CalendarProposalView {
   participants: CalendarActor[];
   note: string | null;
   status: "pending" | "confirmed" | "dismissed";
+  /** A repeating proposal. */
+  rule: EventRule | null;
 }
+
+/** A series rule for events: the `ScheduleRule` fields without times, zone or start (they come from the event). */
+export type EventRule = Omit<ScheduleRule, "time" | "times" | "timezone" | "start" | "freq"> & {
+  /** `once` = doesn't repeat (the picker's "Não repete"). */
+  freq: "once" | "daily" | "weekly" | "monthly" | "yearly";
+  /** Accepted and ignored: an event's times, zone and first day are its own. */
+  times?: string[];
+  timezone?: string;
+  start?: string;
+};
 
 export interface CalendarEventInput {
   title: string;
   description?: string;
-  start: string;
-  end: string;
+  /** Timed events: instants (ISO 8601). All-day events may give `startDate`/`endDate` instead. */
+  start?: string;
+  end?: string;
   allDay?: boolean;
+  /** All-day: first and last local day, inclusive ("YYYY-MM-DD"); several days for a multi-day event. */
+  startDate?: string;
+  endDate?: string;
   timezone?: string;
-  recurrence: Recurrence;
+  /** A preset (legacy) or a full `rule`; the rule wins. */
+  recurrence?: Recurrence;
+  rule?: EventRule | null;
+  location?: string | null;
   participants: CalendarActor[];
   channelId?: string | null;
   issueId?: string | null;
@@ -82,6 +116,7 @@ type ProposalRow = typeof calendarProposals.$inferSelect;
 
 const RRULES: Record<Recurrence, string | null> = {
   none: null,
+  custom: null,
   weekdays: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
   weekly: "FREQ=WEEKLY",
   monthly: "FREQ=MONTHLY",
@@ -89,40 +124,82 @@ const RRULES: Record<Recurrence, string | null> = {
 
 const MAX_OCCURRENCES = 400;
 
+const LEGACY_RULES: Record<string, EventRule> = {
+  weekdays: { freq: "weekly", byWeekday: ["MO", "TU", "WE", "TH", "FR"] },
+  weekly: { freq: "weekly" },
+  monthly: { freq: "monthly" },
+};
+
+type SeriesFields = Pick<EventRow, "startAt" | "endAt" | "recurrence" | "timezone"> &
+  Partial<Pick<EventRow, "rule" | "exdates">>;
+
+/** The stored rule of an event (or its legacy preset), or null when it doesn't repeat. */
+export function storedRule(e: Pick<EventRow, "recurrence"> & Partial<Pick<EventRow, "rule">>): EventRule | null {
+  if (e.rule) return e.rule as unknown as EventRule;
+  return LEGACY_RULES[e.recurrence] ?? null;
+}
+
+/** The full rule of a series: its stored rule with the event's zone, first day and wall-clock time. */
+export function eventRule(e: SeriesFields): ScheduleRule | null {
+  const rule = storedRule(e);
+  if (!rule || rule.freq === "once") return null;
+  const tz = e.timezone || "UTC";
+  const p = zonedParts(e.startAt, tz);
+  const time = `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
+  return normalizeRule(
+    { ...rule, freq: rule.freq, timezone: tz, start: localDate(e.startAt, tz), times: [time] },
+    e.startAt,
+  );
+}
+
+/** The legacy preset a rule equals, else `custom`. */
+function presetOf(rule: EventRule | null): Recurrence {
+  if (!rule) return "none";
+  const { times: _t, timezone: _z, start: _s, ...own } = rule;
+  const plain = JSON.stringify({ ...own, interval: own.interval ?? 1 });
+  for (const [name, preset] of Object.entries(LEGACY_RULES)) {
+    if (plain === JSON.stringify({ ...preset, interval: 1 })) return name as Recurrence;
+  }
+  return "custom";
+}
+
 /**
  * Occurrences of an event between `from` and `to`, keeping its wall-clock
  * time in its time zone (so a 9:00 meeting stays at 9:00 across DST).
+ * Removed occurrences (`exdates`) are skipped; `occurrenceStart` is each one's original start.
  */
-export function occurrences(e: Pick<EventRow, "startAt" | "endAt" | "recurrence" | "timezone">, from: Date, to: Date) {
+export function occurrences(e: SeriesFields, from: Date, to: Date) {
   const duration = e.endAt.getTime() - e.startAt.getTime();
   const overlaps = (start: Date) => start.getTime() < to.getTime() && start.getTime() + duration > from.getTime();
-  if (e.recurrence === "none") return overlaps(e.startAt) ? [{ start: e.startAt, end: e.endAt }] : [];
-  const tz = e.timezone || "UTC";
-  const base = zonedParts(e.startAt, tz);
-  const out: { start: Date; end: Date }[] = [];
-  for (let i = 0; i < 5000 && out.length < MAX_OCCURRENCES; i++) {
-    let y = base.year;
-    let mo = base.month;
-    let d = base.day;
-    if (e.recurrence === "monthly") {
-      mo = base.month + i;
-      y = base.year + Math.floor((mo - 1) / 12);
-      mo = ((mo - 1) % 12) + 1;
-    } else {
-      const step = e.recurrence === "weekly" ? 7 * i : i;
-      const day = new Date(Date.UTC(base.year, base.month - 1, base.day + step));
-      y = day.getUTCFullYear();
-      mo = day.getUTCMonth() + 1;
-      d = day.getUTCDate();
-      const weekday = day.getUTCDay();
-      if (e.recurrence === "weekdays" && (weekday === 0 || weekday === 6)) continue;
-    }
-    const start = zonedTime(y, mo, d, base.hour, base.minute, tz);
-    if (!start) continue; // the day doesn't exist (31st) or the time was skipped by DST
-    if (start.getTime() >= to.getTime()) break;
-    if (overlaps(start)) out.push({ start, end: new Date(start.getTime() + duration) });
+  const rule = eventRule(e);
+  if (!rule) {
+    return overlaps(e.startAt) ? [{ start: e.startAt, end: e.endAt, occurrenceStart: null as string | null }] : [];
   }
-  return out;
+  const removed = new Set((e.exdates ?? []).map((d) => new Date(d).toISOString()));
+  return ruleOccurrences(rule, new Date(from.getTime() - duration), to, MAX_OCCURRENCES)
+    .filter((start) => overlaps(start) && !removed.has(start.toISOString()))
+    .map((start) => ({
+      start,
+      end: new Date(start.getTime() + duration),
+      occurrenceStart: start.toISOString() as string | null,
+    }));
+}
+
+/** Expands rows (series, single events and edited occurrences) into what the calendar shows. */
+function expand(rows: EventRow[], from: Date, to: Date) {
+  const edited = new Set(
+    rows.filter((r) => r.overrideOf && r.originalStart).map((r) => `${r.overrideOf}|${r.originalStart?.toISOString()}`),
+  );
+  return rows.flatMap((r) => {
+    if (r.overrideOf) {
+      const start = r.startAt;
+      if (!(start.getTime() < to.getTime() && r.endAt.getTime() > from.getTime())) return [];
+      return [{ row: r, start, end: r.endAt, occurrenceStart: r.originalStart?.toISOString() ?? null }];
+    }
+    return occurrences(r, from, to)
+      .filter((o) => !o.occurrenceStart || !edited.has(`${r.id}|${o.occurrenceStart}`))
+      .map((o) => ({ row: r, ...o }));
+  });
 }
 
 async function attendeesOf(db: Database, eventIds: string[]) {
@@ -133,18 +210,29 @@ async function attendeesOf(db: Database, eventIds: string[]) {
 function view(
   e: EventRow,
   attendees: (typeof calendarAttendees.$inferSelect)[],
-  occurrence?: { start: Date; end: Date },
+  occurrence?: { start: Date; end: Date; occurrenceStart?: string | null },
 ): CalendarEventView {
   const mine = attendees.filter((a) => a.eventId === e.id);
+  const start = occurrence?.start ?? e.startAt;
+  const end = occurrence?.end ?? e.endAt;
+  const rule = e.overrideOf ? null : storedRule(e);
+  const full = e.overrideOf ? null : eventRule(e);
   return {
     id: e.id,
     title: e.title,
     description: e.description,
-    start: (occurrence?.start ?? e.startAt).toISOString(),
-    end: (occurrence?.end ?? e.endAt).toISOString(),
+    start: start.toISOString(),
+    end: end.toISOString(),
     allDay: e.allDay,
+    startDate: e.allDay ? localDate(start, e.timezone) : null,
+    endDate: e.allDay ? localDate(new Date(end.getTime() - 1), e.timezone) : null,
     timezone: e.timezone,
-    recurrence: (RECURRENCES.includes(e.recurrence as Recurrence) ? e.recurrence : "none") as Recurrence,
+    recurrence: presetOf(rule),
+    rule: full,
+    location: e.location ?? null,
+    exdates: (e.exdates ?? []).map((d) => localDate(new Date(d), e.timezone)),
+    seriesId: e.overrideOf ?? e.id,
+    occurrenceStart: occurrence?.occurrenceStart ?? e.originalStart?.toISOString() ?? null,
     participants: mine.map((a) => ({ type: a.attendeeType as CalendarActor["type"], id: a.attendeeId })),
     rsvp: mine.map((a) => ({
       type: a.attendeeType as CalendarActor["type"],
@@ -166,6 +254,7 @@ const proposalView = (p: ProposalRow): CalendarProposalView => ({
   participants: p.participants as CalendarActor[],
   note: p.note,
   status: p.status as CalendarProposalView["status"],
+  rule: (p.rule as EventRule | null) ?? null,
 });
 
 async function checkParticipants(db: Database, orgId: string, participants: CalendarActor[]) {
@@ -226,6 +315,72 @@ async function notifyInvited(deps: CalendarDeps, e: EventRow, inviterId: string,
   }
 }
 
+function checkZone(timezone: string) {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+  } catch {
+    throw new ValidationError("timezone must be an IANA time zone");
+  }
+  return timezone;
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const dayStart = (date: string, timezone: string) => {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  // Midnight, or the first valid minute when DST skips it (Brazil used to start DST at 00:00).
+  for (let minute = 0; minute <= 120; minute++) {
+    const at = zonedTime(y, m, d, Math.floor(minute / 60), minute % 60, timezone);
+    if (at) return at;
+  }
+  throw new ValidationError("Data inválida nesse fuso.");
+};
+const nextDay = (date: string) => {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+};
+
+/**
+ * The instants of an event. All-day events span whole local days: from the
+ * first day's midnight to the midnight after the last one (multi-day ranges).
+ */
+export function eventTimes(
+  input: Pick<CalendarEventInput, "start" | "end" | "allDay" | "startDate" | "endDate">,
+  timezone: string,
+): { start: Date; end: Date; allDay: boolean } {
+  if (input.allDay) {
+    const first = input.startDate ?? (input.start ? localDate(new Date(input.start), timezone) : "");
+    const last =
+      input.endDate ?? (input.end ? localDate(new Date(new Date(input.end).getTime() - 1), timezone) : first);
+    if (!DAY.test(first) || !DAY.test(last)) throw new ValidationError("All-day events need startDate (YYYY-MM-DD)");
+    if (last < first) throw new ValidationError("endDate must not be before startDate");
+    return { start: dayStart(first, timezone), end: dayStart(nextDay(last), timezone), allDay: true };
+  }
+  const start = new Date(input.start ?? "");
+  const end = new Date(input.end ?? "");
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    throw new ValidationError("end must be after start");
+  }
+  return { start, end, allDay: false };
+}
+
+/** A series rule, checked against the event's first occurrence; times and zone are the event's. */
+function checkEventRule(rule: EventRule | null, start: Date, timezone: string): EventRule | null {
+  if (!rule || rule.freq === "once") return null;
+  const { freq, interval, byWeekday, byMonthDay, byMonth, bySetPos, until, count } = rule;
+  const clean: EventRule = { freq, ...(interval && interval > 1 ? { interval } : {}) };
+  if (byWeekday?.length) clean.byWeekday = byWeekday;
+  if (byMonthDay?.length) clean.byMonthDay = byMonthDay;
+  if (byMonth?.length) clean.byMonth = byMonth;
+  if (typeof bySetPos === "number" || bySetPos?.length) clean.bySetPos = bySetPos;
+  if (until) clean.until = until;
+  if (count) clean.count = count;
+  if (!["daily", "weekly", "monthly", "yearly"].includes(freq))
+    throw new ValidationError("Events repeat at most daily.");
+  // Validates (throws in pt-BR) with the event's own start.
+  normalizeRule({ ...clean, timezone, start: localDate(start, timezone), times: ["00:00"] } as ScheduleRule, start);
+  return clean;
+}
+
 /** People create events; attendees (people and agents) are invited, the creator has accepted. */
 export async function createCalendarEvent(
   deps: CalendarDeps,
@@ -237,19 +392,12 @@ export async function createCalendarEvent(
   await requirePermission(db, userId, orgId, "post");
   const title = input.title.trim().slice(0, 200);
   if (!title) throw new ValidationError("title is required");
-  const start = new Date(input.start);
-  const end = new Date(input.end);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
-    throw new ValidationError("end must be after start");
-  }
-  if (!RECURRENCES.includes(input.recurrence)) throw new ValidationError("invalid recurrence");
   const settings = await getOrgSettings(db, userId, orgId);
-  const timezone = input.timezone ?? settings.timezone;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
-  } catch {
-    throw new ValidationError("timezone must be an IANA time zone");
-  }
+  const timezone = checkZone(input.timezone ?? settings.timezone);
+  const { start, end, allDay } = eventTimes(input, timezone);
+  const recurrence = input.recurrence ?? "none";
+  if (!RECURRENCES.includes(recurrence)) throw new ValidationError("invalid recurrence");
+  const rule = checkEventRule(input.rule ?? LEGACY_RULES[recurrence] ?? null, start, timezone);
   const participants = input.participants.filter((p) => !(p.type === "person" && p.id === userId));
   await checkParticipants(db, orgId, participants);
   if (input.channelId) {
@@ -275,10 +423,12 @@ export async function createCalendarEvent(
         description: (input.description ?? "").slice(0, 10_000),
         startAt: start,
         endAt: end,
-        allDay: input.allDay === true,
+        allDay,
         timezone,
-        recurrence: input.recurrence,
-        rrule: RRULES[input.recurrence],
+        location: input.location?.trim().slice(0, 300) || null,
+        recurrence: rule ? presetOf(rule) : "none",
+        rrule: rule ? RRULES[presetOf(rule)] : null,
+        rule: rule as Record<string, unknown> | null,
         channelId: input.channelId ?? null,
         issueId: input.issueId ?? null,
         createdByType: "person",
@@ -320,6 +470,345 @@ export async function createCalendarEvent(
     });
   }
   return result;
+}
+
+export type EditScope = "this" | "following" | "all";
+
+export interface CalendarEventPatch {
+  /** For a repeating event: just this occurrence, this and the next ones, or the whole series (default). */
+  scope?: EditScope;
+  /** The occurrence being edited (its `occurrenceStart`); needed for `this` and `following`. */
+  occurrenceStart?: string;
+  title?: string;
+  description?: string;
+  start?: string;
+  end?: string;
+  allDay?: boolean;
+  startDate?: string;
+  endDate?: string;
+  timezone?: string;
+  recurrence?: Recurrence;
+  rule?: EventRule | null;
+  location?: string | null;
+}
+
+/** The event's creator or admins change or delete it. */
+async function requireEventEditor(db: Database, userId: string, orgId: string, eventId: string) {
+  const membership = await getMembership(db, userId, orgId);
+  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const [row] = await db
+    .select()
+    .from(calendarEvents)
+    .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.orgId, orgId), isNull(calendarEvents.deletedAt)));
+  if (!row) throw new NotFoundError("Event not found");
+  const own = row.createdByType === "person" && row.createdById === userId;
+  if (!own && !can(membership.role, "configure"))
+    throw new ForbiddenError("Only who created the event (or an admin) can change it");
+  return row;
+}
+
+async function copyAttendees(tx: Executor, orgId: string, fromId: string, toId: string) {
+  const rows = await tx.select().from(calendarAttendees).where(eq(calendarAttendees.eventId, fromId));
+  if (rows.length === 0) return;
+  await tx
+    .insert(calendarAttendees)
+    .values(rows.map(({ id: _id, eventId: _e, ...a }) => ({ ...a, orgId, eventId: toId })))
+    .onConflictDoNothing();
+}
+
+/** The occurrence a "só este / este e os próximos" refers to, checked against the series. */
+function occurrenceOf(series: EventRow, occurrenceStart: string | undefined) {
+  if (!occurrenceStart) throw new ValidationError("occurrenceStart is required for this scope");
+  const at = new Date(occurrenceStart);
+  if (Number.isNaN(at.getTime())) throw new ValidationError("occurrenceStart must be a date-time");
+  const found = occurrences(series, at, new Date(at.getTime() + 1)).find((o) => o.occurrenceStart === at.toISOString());
+  if (!found) throw new ValidationError("That occurrence isn't part of the series");
+  return at;
+}
+
+/** Fields of a patch, resolved against what the row has. */
+function patched(row: EventRow, patch: CalendarEventPatch, base: { start: Date; end: Date }) {
+  const timezone = checkZone(patch.timezone ?? row.timezone);
+  const timesGiven =
+    patch.start !== undefined || patch.end !== undefined || patch.startDate !== undefined || patch.allDay !== undefined;
+  const times = timesGiven
+    ? eventTimes(
+        {
+          allDay: patch.allDay ?? row.allDay,
+          start: patch.start ?? base.start.toISOString(),
+          end: patch.end ?? base.end.toISOString(),
+          startDate: patch.startDate,
+          endDate: patch.endDate,
+        },
+        timezone,
+      )
+    : { start: base.start, end: base.end, allDay: row.allDay };
+  return {
+    title: patch.title !== undefined ? patch.title.trim().slice(0, 200) || row.title : row.title,
+    location: patch.location !== undefined ? patch.location?.trim().slice(0, 300) || null : row.location,
+    description: patch.description !== undefined ? patch.description.slice(0, 10_000) : row.description,
+    timezone,
+    startAt: times.start,
+    endAt: times.end,
+    allDay: times.allDay,
+  };
+}
+
+/**
+ * Edits an event. For a repeating one:
+ * - `this`: only that occurrence (an edited copy keyed by its original start);
+ * - `following`: the series ends the day before, and a new series starts there with the changes
+ *   (removed and edited occurrences after that move along);
+ * - `all`: the whole series (a time change moves every occurrence).
+ */
+export async function updateCalendarEvent(
+  deps: CalendarDeps,
+  userId: string,
+  orgId: string,
+  eventId: string,
+  patch: CalendarEventPatch,
+): Promise<CalendarEventView> {
+  const { db } = deps;
+  const row = await requireEventEditor(db, userId, orgId, eventId);
+  const scope = patch.scope ?? "all";
+  const repeating = !row.overrideOf && storedRule(row) !== null;
+  const result = await db.transaction(async (tx) => {
+    // An edited occurrence, or a single event: change it in place.
+    if (row.overrideOf || !repeating) {
+      const fields = patched(row, patch, { start: row.startAt, end: row.endAt });
+      const rule =
+        !row.overrideOf && (patch.rule !== undefined || patch.recurrence !== undefined)
+          ? checkEventRule(
+              patch.rule ?? LEGACY_RULES[patch.recurrence ?? "none"] ?? null,
+              fields.startAt,
+              fields.timezone,
+            )
+          : undefined;
+      const [updated] = await tx
+        .update(calendarEvents)
+        .set({
+          ...fields,
+          ...(rule !== undefined ? { rule: rule as Record<string, unknown> | null, recurrence: presetOf(rule) } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(calendarEvents.id, row.id))
+        .returning();
+      return updated ?? row;
+    }
+    const duration = row.endAt.getTime() - row.startAt.getTime();
+    if (scope === "this") {
+      const at = occurrenceOf(row, patch.occurrenceStart);
+      const fields = patched(row, patch, { start: at, end: new Date(at.getTime() + duration) });
+      const [existing] = await tx
+        .select()
+        .from(calendarEvents)
+        .where(
+          and(
+            eq(calendarEvents.overrideOf, row.id),
+            eq(calendarEvents.originalStart, at),
+            isNull(calendarEvents.deletedAt),
+          ),
+        );
+      if (existing) {
+        const [updated] = await tx
+          .update(calendarEvents)
+          .set({ ...fields, updatedAt: new Date() })
+          .where(eq(calendarEvents.id, existing.id))
+          .returning();
+        return updated ?? existing;
+      }
+      const { id: _id, createdAt: _c, updatedAt: _u, ...copy } = row;
+      const [override] = await tx
+        .insert(calendarEvents)
+        .values({
+          ...copy,
+          ...fields,
+          recurrence: "none",
+          rrule: null,
+          rule: null,
+          exdates: [],
+          overrideOf: row.id,
+          originalStart: at,
+        })
+        .returning();
+      if (!override) throw new Error("override insert returned nothing");
+      await copyAttendees(tx, orgId, row.id, override.id);
+      return override;
+    }
+    if (scope === "following") {
+      const at = occurrenceOf(row, patch.occurrenceStart);
+      const first = occurrences(row, row.startAt, new Date(row.startAt.getTime() + 1))[0]?.start;
+      if (!first || at.getTime() > first.getTime()) {
+        // Split: the old series ends the day before; a new one starts here.
+        const stored = storedRule(row) as EventRule;
+        const ended = endRuleBefore(
+          { ...stored, timezone: row.timezone, start: localDate(row.startAt, row.timezone) } as ScheduleRule,
+          localDate(at, row.timezone),
+        );
+        const { id: _id, createdAt: _c, updatedAt: _u, ...copy } = row;
+        const fields = patched(row, patch, { start: at, end: new Date(at.getTime() + duration) });
+        let nextRule: EventRule | null =
+          patch.rule !== undefined || patch.recurrence !== undefined
+            ? (patch.rule ?? LEGACY_RULES[patch.recurrence ?? "none"] ?? null)
+            : stored;
+        if (nextRule?.count) {
+          // The new series gets the occurrences the old one had left.
+          const before = occurrences({ ...row, exdates: [] }, row.startAt, at).length;
+          nextRule = { ...nextRule, count: Math.max(1, nextRule.count - before) };
+        }
+        nextRule = checkEventRule(nextRule, fields.startAt, fields.timezone);
+        const exdates = (row.exdates ?? []).map((d) => new Date(d).toISOString());
+        const [next] = await tx
+          .insert(calendarEvents)
+          .values({
+            ...copy,
+            ...fields,
+            rule: nextRule as Record<string, unknown> | null,
+            recurrence: presetOf(nextRule),
+            rrule: null,
+            exdates: exdates.filter((d) => d >= at.toISOString()),
+          })
+          .returning();
+        if (!next) throw new Error("series insert returned nothing");
+        await copyAttendees(tx, orgId, row.id, next.id);
+        const { timezone: _tz, times: _t, start: _s, time: _tm, ...endedRule } = ended ?? ({} as ScheduleRule);
+        await tx
+          .update(calendarEvents)
+          .set({
+            rule: (ended ? endedRule : null) as Record<string, unknown> | null,
+            recurrence: ended ? "custom" : "none",
+            exdates: exdates.filter((d) => d < at.toISOString()),
+            updatedAt: new Date(),
+          })
+          .where(eq(calendarEvents.id, row.id));
+        await tx
+          .update(calendarEvents)
+          .set({ overrideOf: next.id })
+          .where(and(eq(calendarEvents.overrideOf, row.id), gte(calendarEvents.originalStart, at)));
+        return next;
+      }
+      // "Este e os próximos" from the first one is the whole series.
+    }
+    // The whole series: a time change moves every occurrence (and its removed/edited ones).
+    const at = patch.occurrenceStart ? new Date(patch.occurrenceStart) : row.startAt;
+    const fields = patched(row, patch, { start: at, end: new Date(at.getTime() + duration) });
+    const shift = fields.startAt.getTime() - at.getTime();
+    const rule =
+      patch.rule !== undefined || patch.recurrence !== undefined
+        ? checkEventRule(patch.rule ?? LEGACY_RULES[patch.recurrence ?? "none"] ?? null, row.startAt, fields.timezone)
+        : storedRule(row);
+    const [updated] = await tx
+      .update(calendarEvents)
+      .set({
+        title: fields.title,
+        description: fields.description,
+        location: fields.location,
+        timezone: fields.timezone,
+        allDay: fields.allDay,
+        startAt: new Date(row.startAt.getTime() + shift),
+        endAt: new Date(row.startAt.getTime() + shift + (fields.endAt.getTime() - fields.startAt.getTime())),
+        rule: rule as Record<string, unknown> | null,
+        recurrence: presetOf(rule),
+        exdates: (row.exdates ?? []).map((d) => new Date(new Date(d).getTime() + shift).toISOString()),
+        updatedAt: new Date(),
+      })
+      .where(eq(calendarEvents.id, row.id))
+      .returning();
+    if (shift !== 0) {
+      await tx
+        .update(calendarEvents)
+        .set({ originalStart: sql`${calendarEvents.originalStart} + ${`${shift} milliseconds`}::interval` })
+        .where(eq(calendarEvents.overrideOf, row.id));
+    }
+    return updated ?? row;
+  });
+  const out = view(result, await attendeesOf(db, [result.id]));
+  if (result.channelId) {
+    await publishChannelEvent(deps.pubsub, { type: "calendar.event_updated", channelId: result.channelId, event: out });
+  }
+  return out;
+}
+
+/** Deletes an event: one occurrence, this and the next ones, or the whole series. */
+export async function deleteCalendarEvent(
+  deps: CalendarDeps,
+  userId: string,
+  orgId: string,
+  eventId: string,
+  options: { scope?: EditScope; occurrenceStart?: string } = {},
+) {
+  const { db } = deps;
+  const row = await requireEventEditor(db, userId, orgId, eventId);
+  const scope = options.scope ?? "all";
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    if (row.overrideOf) {
+      // An edited occurrence: remove it, and keep it out of the series.
+      await tx.update(calendarEvents).set({ deletedAt: now }).where(eq(calendarEvents.id, row.id));
+      if (row.originalStart) {
+        await tx
+          .update(calendarEvents)
+          .set({
+            exdates: sql`${calendarEvents.exdates} || ${JSON.stringify([row.originalStart.toISOString()])}::jsonb`,
+          })
+          .where(eq(calendarEvents.id, row.overrideOf));
+      }
+      return;
+    }
+    const repeating = storedRule(row) !== null;
+    if (!repeating || scope === "all") {
+      await tx
+        .update(calendarEvents)
+        .set({ deletedAt: now })
+        .where(or(eq(calendarEvents.id, row.id), eq(calendarEvents.overrideOf, row.id)));
+      return;
+    }
+    const at = occurrenceOf(row, options.occurrenceStart);
+    if (scope === "this") {
+      await tx
+        .update(calendarEvents)
+        .set({ exdates: [...(row.exdates ?? []), at.toISOString()], updatedAt: now })
+        .where(eq(calendarEvents.id, row.id));
+      await tx
+        .update(calendarEvents)
+        .set({ deletedAt: now })
+        .where(and(eq(calendarEvents.overrideOf, row.id), eq(calendarEvents.originalStart, at)));
+      return;
+    }
+    const ended = endRuleBefore(
+      {
+        ...(storedRule(row) as EventRule),
+        timezone: row.timezone,
+        start: localDate(row.startAt, row.timezone),
+      } as ScheduleRule,
+      localDate(at, row.timezone),
+    );
+    if (!ended) {
+      await tx
+        .update(calendarEvents)
+        .set({ deletedAt: now })
+        .where(or(eq(calendarEvents.id, row.id), eq(calendarEvents.overrideOf, row.id)));
+      return;
+    }
+    const { timezone: _tz, times: _t, start: _s, time: _tm, ...endedRule } = ended;
+    await tx
+      .update(calendarEvents)
+      .set({ rule: endedRule as Record<string, unknown>, recurrence: "custom", updatedAt: now })
+      .where(eq(calendarEvents.id, row.id));
+    await tx
+      .update(calendarEvents)
+      .set({ deletedAt: now })
+      .where(and(eq(calendarEvents.overrideOf, row.id), gte(calendarEvents.originalStart, at)));
+  });
+  if (row.channelId) {
+    await publishChannelEvent(deps.pubsub, {
+      type: "calendar.event_deleted",
+      channelId: row.channelId,
+      eventId: row.id,
+      scope,
+      ...(options.occurrenceStart ? { occurrenceStart: options.occurrenceStart } : {}),
+    });
+  }
 }
 
 /** RSVP of a person to an event they're invited to. */
@@ -372,7 +861,11 @@ async function visibleEvents(db: Database, userId: string, orgId: string, from: 
         eq(calendarEvents.orgId, orgId),
         isNull(calendarEvents.deletedAt),
         lte(calendarEvents.startAt, to),
-        or(sql`${calendarEvents.recurrence} <> 'none'`, gte(calendarEvents.endAt, from)),
+        or(
+          sql`${calendarEvents.recurrence} <> 'none'`,
+          sql`${calendarEvents.rule} is not null`,
+          gte(calendarEvents.endAt, from),
+        ),
         or(inArray(calendarEvents.id, invited), inArray(calendarEvents.channelId, myChannels)),
       ),
     );
@@ -393,8 +886,8 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
     db,
     rows.map((r) => r.id),
   );
-  const events = rows
-    .flatMap((r) => occurrences(r, from, to).map((o) => view(r, attendees, o)))
+  const events = expand(rows, from, to)
+    .map((o) => view(o.row, attendees, o))
     .sort((a, b) => a.start.localeCompare(b.start));
 
   const routineRows = await db
@@ -403,11 +896,9 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
     .where(and(eq(routines.orgId, orgId), eq(routines.active, true), eq(routines.triggerType, "schedule")));
   const routineRuns: { routineId: string; name: string; agentId: string; at: string; target: unknown }[] = [];
   for (const r of routineRows) {
-    if (!r.cron) continue;
-    let at = nextCronTime(r.cron, r.timezone ?? "UTC", new Date(from.getTime() - 1));
-    for (let i = 0; at && at < to && i < 200; i++) {
+    if (r.deletedAt) continue;
+    for (const at of routineSlots(r, from, to)) {
       routineRuns.push({ routineId: r.id, name: r.name, agentId: r.agentId, at: at.toISOString(), target: r.target });
-      at = nextCronTime(r.cron, r.timezone ?? "UTC", at);
     }
   }
 
@@ -476,7 +967,11 @@ async function busy(db: Database, orgId: string, who: CalendarActor[], from: Dat
         lte(calendarEvents.startAt, to),
       ),
     );
-  return rows.flatMap((r) => occurrences(r.event, from, to));
+  return expand(
+    rows.map((r) => r.event),
+    from,
+    to,
+  );
 }
 
 /**
@@ -535,6 +1030,8 @@ export async function proposeCalendarEvent(
     end: string;
     participants: CalendarActor[];
     note?: string;
+    /** A repeating event (`EventRule`), in the org's time zone. */
+    recurrence?: EventRule | null;
   },
 ): Promise<CalendarProposalView> {
   const { db } = deps;
@@ -550,6 +1047,8 @@ export async function proposeCalendarEvent(
     throw new ValidationError("end must be after start");
   }
   await checkParticipants(db, run.orgId, input.participants);
+  const zone = (await getOrgSettings(db, trigger.userId, run.orgId).catch(() => null))?.timezone ?? "UTC";
+  const rule = checkEventRule(input.recurrence ?? null, start, zone);
   const flat = trigger.channelKind === "dm" && run.threadRootId === run.triggerMessageId;
   const proposal = await db.transaction(async (tx) => {
     const [row] = await tx
@@ -565,6 +1064,7 @@ export async function proposeCalendarEvent(
         startAt: start,
         endAt: end,
         participants: input.participants,
+        rule: rule as Record<string, unknown> | null,
         note: input.note?.slice(0, 300) ?? null,
       })
       .returning();
@@ -630,7 +1130,7 @@ export async function confirmCalendarProposal(deps: CalendarDeps, userId: string
     description: p.description,
     start: p.startAt.toISOString(),
     end: p.endAt.toISOString(),
-    recurrence: "none",
+    rule: (p.rule as EventRule | null) ?? null,
     participants,
     channelId: null,
   });
@@ -713,5 +1213,5 @@ export async function agentEvents(
     db,
     rows.map((r) => r.id),
   );
-  return rows.flatMap((r) => occurrences(r, from, to).map((o) => view(r, attendees, o)));
+  return expand(rows, from, to).map((o) => view(o.row, attendees, o));
 }

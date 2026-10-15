@@ -63,6 +63,7 @@ export * from "./recovery";
 export * from "./router";
 export * from "./router-jev";
 export * from "./routines";
+export * from "./rrule";
 export * from "./runs";
 export * from "./sandbox";
 export * from "./sandbox-tools";

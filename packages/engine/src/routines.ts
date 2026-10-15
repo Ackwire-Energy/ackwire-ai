@@ -18,7 +18,7 @@ import type { ArtifactDeps } from "./artifacts";
 import { audienceNotice, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
 import { type ContextDeps, resolveSummaryModel } from "./context/summaries";
-import { nextCronTime } from "./cron";
+import { nextCronTime, zonedTime } from "./cron";
 import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishUserEvent } from "./events";
@@ -27,7 +27,16 @@ import { getOrgSettings } from "./management";
 import { insertMessageWithRuns, messageView, postPersonMessage } from "./messages";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
-import { parseSchedule, type ScheduleParse } from "./schedule";
+import {
+  cronToRule,
+  describeRule,
+  nextOccurrence,
+  normalizeRule,
+  ruleOccurrences,
+  ruleToCron,
+  type ScheduleRule,
+} from "./rrule";
+import { parseSchedule, phraseToRule, type ScheduleParse } from "./schedule";
 import { monthStartUtc } from "./usage";
 
 const { routines, routineRuns, agentRuns, usageRecords, channelMembers, channels } = schema;
@@ -53,7 +62,16 @@ export const ROUTINE_EVENTS = [
 export type RoutineEvent = (typeof ROUTINE_EVENTS)[number];
 
 export type RoutineTrigger =
-  | { type: "schedule"; phrase: string; cron: string; timezone: string; description: string }
+  | {
+      type: "schedule";
+      phrase: string;
+      /** Empty when only the rule can say it ("a cada 2 semanas"). */
+      cron: string;
+      timezone: string;
+      description: string;
+      /** The structured form (always present when it can be derived; null for exotic cron). */
+      rule: ScheduleRule | null;
+    }
   | { type: "event"; event: RoutineEvent }
   /** A one-off (reminders): fires once at `at`, then the routine is done (inactive). */
   | { type: "once"; at: string; timezone: string; description: string };
@@ -95,7 +113,14 @@ export interface RoutineInput {
 }
 
 export type RoutineTriggerInput =
-  | { type: "schedule"; phrase: string; timezone?: string }
+  /** A phrase ("a cada 2 semanas na segunda às 9h") or a structured rule (the period picker). */
+  | {
+      type: "schedule";
+      phrase?: string;
+      /** `freq: "once"` (the picker's "uma vez") becomes a one-off at its first day and time. */
+      rule?: Omit<ScheduleRule, "freq"> & { freq: ScheduleRule["freq"] | "once" };
+      timezone?: string;
+    }
   | { type: "event"; event: RoutineEvent }
   /** Once, at this moment (ISO 8601). */
   | { type: "once"; at: string; timezone?: string };
@@ -114,6 +139,24 @@ type RunRow = typeof routineRuns.$inferSelect;
 
 const targetOf = (r: RoutineRow) => r.target as unknown as RoutineTarget;
 
+/** The next slot of a scheduled routine after `after`: its rule, else its cron (older routines). */
+export function nextRoutineTime(r: Pick<RoutineRow, "rule" | "cron" | "timezone">, after: Date): Date | null {
+  if (r.rule) return nextOccurrence(r.rule as unknown as ScheduleRule, after);
+  return r.cron ? nextCronTime(r.cron, r.timezone ?? "UTC", after) : null;
+}
+
+/** Slots of a scheduled routine in [from, to) (the calendar). */
+export function routineSlots(r: Pick<RoutineRow, "rule" | "cron" | "timezone">, from: Date, to: Date, limit = 200) {
+  if (r.rule) return ruleOccurrences(r.rule as unknown as ScheduleRule, from, to, limit);
+  const out: Date[] = [];
+  let at = r.cron ? nextCronTime(r.cron, r.timezone ?? "UTC", new Date(from.getTime() - 1)) : null;
+  while (at && at < to && out.length < limit) {
+    out.push(at);
+    at = nextCronTime(r.cron as string, r.timezone ?? "UTC", at);
+  }
+  return out;
+}
+
 function triggerOf(r: RoutineRow): RoutineTrigger {
   if (r.triggerType === "event") return { type: "event", event: (r.event ?? "issue.created") as RoutineEvent };
   if (r.triggerType === "once") {
@@ -130,6 +173,7 @@ function triggerOf(r: RoutineRow): RoutineTrigger {
     cron: r.cron ?? "",
     timezone: r.timezone ?? "UTC",
     description: r.description ?? "",
+    rule: (r.rule as ScheduleRule | null) ?? (r.cron ? cronToRule(r.cron, r.timezone ?? "UTC") : null),
   };
 }
 
@@ -286,16 +330,58 @@ const budgetNano = (usd: number | null | undefined) => {
 
 /** The trigger columns of a routine, validated like on create; `nextRunAt` computed from now. */
 async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string, trigger: RoutineTriggerInput) {
-  const none = { phrase: null, cron: null, timezone: null, description: null, event: null };
+  const none = {
+    phrase: null as string | null,
+    cron: null as string | null,
+    timezone: null as string | null,
+    description: null as string | null,
+    event: null as string | null,
+    rule: null as Record<string, unknown> | null,
+  };
+  // The picker's "uma vez": a one-off at its first day and time.
+  if (trigger.type === "schedule" && (trigger.rule?.freq as string | undefined) === "once") {
+    const rule = trigger.rule as unknown as ScheduleRule;
+    const zone = await routineTimezone(deps.db, actorId, orgId, rule.timezone ?? trigger.timezone);
+    const [y, m, d] = (rule.start ?? "").split("-").map(Number) as [number, number, number];
+    const [h, mi] = (rule.times?.[0] ?? rule.time ?? "09:00").split(":").map(Number) as [number, number];
+    const at = y && m && d ? zonedTime(y, m, d, h, mi, zone) : null;
+    if (!at) throw new ValidationError("Escolha o dia e o horário.");
+    return resolveTrigger(deps, actorId, orgId, { type: "once", at: at.toISOString(), timezone: zone });
+  }
   if (trigger.type === "schedule") {
-    const parsed = await parseScheduleForOrg(deps, actorId, orgId, trigger.phrase, trigger.timezone);
+    const now = new Date();
+    const phrase = trigger.phrase?.trim() ?? "";
+    // A rule from the picker, or the phrase read as a rule when it can be (it says more than cron).
+    const zone = await routineTimezone(deps.db, actorId, orgId, trigger.rule?.timezone ?? trigger.timezone);
+    const asRule = trigger.rule
+      ? ({ ...trigger.rule, timezone: zone } as ScheduleRule)
+      : phrase
+        ? phraseToRule(phrase, zone, now)
+        : null;
+    if (!asRule && !phrase) throw new ValidationError("Diga quando a rotina deve rodar.");
+    if (asRule) {
+      const rule = normalizeRule(asRule, now);
+      const next = nextOccurrence(rule, now);
+      if (!next) throw new ValidationError("Esse horário nunca acontece (ou a série já terminou).");
+      return {
+        ...none,
+        triggerType: "schedule",
+        phrase: phrase || null,
+        cron: ruleToCron(rule),
+        timezone: rule.timezone,
+        description: describeRule(rule),
+        rule: rule as unknown as Record<string, unknown>,
+        nextRunAt: next as Date | null,
+      };
+    }
+    const parsed = await parseScheduleForOrg(deps, actorId, orgId, phrase, zone);
     if (!parsed.ok) throw new ValidationError(parsed.error);
-    const next = nextCronTime(parsed.cron, parsed.timezone, new Date());
+    const next = nextCronTime(parsed.cron, parsed.timezone, now);
     if (!next) throw new ValidationError("Esse horário nunca acontece.");
     return {
       ...none,
       triggerType: "schedule",
-      phrase: trigger.phrase.trim(),
+      phrase,
       cron: parsed.cron,
       timezone: parsed.timezone,
       description: parsed.description,
@@ -471,12 +557,10 @@ export async function updateRoutine(
   // Next slot: from the (new) trigger, only while active; paused routines have none.
   if (patch.trigger !== undefined || patch.active !== undefined) {
     const type = set.triggerType ?? current.triggerType;
-    const cron = set.cron !== undefined ? set.cron : current.cron;
-    const zone = (set.timezone !== undefined ? set.timezone : current.timezone) ?? "UTC";
     set.nextRunAt = !active
       ? null
-      : type === "schedule" && cron
-        ? nextCronTime(cron, zone, new Date())
+      : type === "schedule"
+        ? nextRoutineTime({ ...current, ...set } as RoutineRow, new Date())
         : type === "once"
           ? (set.nextRunAt ?? current.nextRunAt)
           : null;
@@ -567,10 +651,7 @@ export async function setRoutineActive(
 ): Promise<RoutineView> {
   const current = await loadRoutine(deps.db, orgId, id);
   await requireRoutineManager(deps.db, actorId, orgId, current.agentId);
-  const nextRunAt =
-    active && current.triggerType === "schedule" && current.cron
-      ? nextCronTime(current.cron, current.timezone ?? "UTC", new Date())
-      : null;
+  const nextRunAt = active && current.triggerType === "schedule" ? nextRoutineTime(current, new Date()) : null;
   const [row] = await deps.db
     .update(routines)
     .set({ active, nextRunAt, updatedAt: new Date() })
@@ -661,7 +742,7 @@ export async function fireDueRoutines(deps: RoutineDeps, now = new Date()) {
       );
       if (lock[0]?.ok === false) continue;
       const slot = r.nextRunAt as Date;
-      const next = r.cron ? nextCronTime(r.cron, r.timezone ?? "UTC", now) : null;
+      const next = r.triggerType === "schedule" ? nextRoutineTime(r, now) : null;
       await tx.update(routines).set({ nextRunAt: next, updatedAt: now }).where(eq(routines.id, r.id));
       const [run] = await tx
         .insert(routineRuns)

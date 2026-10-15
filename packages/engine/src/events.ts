@@ -178,7 +178,15 @@ export type ChannelEvent =
   | { type: "issue.created" | "issue.updated"; channelId: string; issue: IssueView }
   | { type: "issue.comment"; channelId: string; issueId: string; activity: IssueActivityView }
   /** An event of this channel's calendar was created. */
-  | { type: "calendar.event_created"; channelId: string; event: CalendarEventView }
+  | { type: "calendar.event_created" | "calendar.event_updated"; channelId: string; event: CalendarEventView }
+  /** An event (or some of its occurrences: `scope`) was deleted. */
+  | {
+      type: "calendar.event_deleted";
+      channelId: string;
+      eventId: string;
+      scope: "this" | "following" | "all";
+      occurrenceStart?: string;
+    }
   /** A file was created or got a new version (Drive preview card). */
   | { type: "artifact.created" | "artifact.updated"; channelId: string; artifact: ArtifactView }
   /** Channel membership changed (agents carry `autoReply`). */

@@ -3,8 +3,10 @@ import {
   calendarRange,
   confirmCalendarProposal,
   createCalendarEvent,
+  deleteCalendarEvent,
   dismissCalendarProposal,
   respondToEvent,
+  updateCalendarEvent,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
@@ -21,7 +23,43 @@ import {
 
 const tags = ["Calendar"];
 const Actor = z.object({ type: z.enum(["person", "agent"]), id: z.string() });
-const Recurrence = z.enum(["none", "weekdays", "weekly", "monthly"]);
+const Recurrence = z.enum(["none", "weekdays", "weekly", "monthly", "custom"]);
+const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+/** A series rule: dates and time come from the event (RRULE-like). */
+export const EventRule = z
+  .object({
+    freq: z.enum(["once", "daily", "weekly", "monthly", "yearly"]).openapi({ description: "`once` = doesn't repeat." }),
+    interval: z.number().int().min(1).max(1000).optional(),
+    byWeekday: z
+      .array(z.string().regex(/^([+-]?[1-5])?(MO|TU|WE|TH|FR|SA|SU)$/))
+      .max(14)
+      .optional()
+      .openapi({
+        description: '"MO"…"SU"; monthly/yearly may carry a position: "2TU" (2nd Tuesday), "-1FR" (last Friday).',
+      }),
+    byMonthDay: z.array(z.number().int().min(-31).max(31)).max(31).optional(),
+    byMonth: z.array(z.number().int().min(1).max(12)).max(12).optional(),
+    bySetPos: z
+      .union([z.number().int().min(-31).max(31), z.array(z.number().int().min(-31).max(31)).max(10)])
+      .optional(),
+    until: Day.nullable().optional().openapi({ description: "Last day, inclusive." }),
+    count: z.number().int().min(1).max(10_000).nullable().optional(),
+    times: z.array(z.string()).max(24).optional().openapi({ description: "Ignored: the event's start sets the time." }),
+    timezone: z.string().max(64).optional().openapi({ description: "Ignored: the event's zone." }),
+    start: Day.optional().openapi({ description: "Ignored: the event's first day." }),
+  })
+  .openapi("EventRule");
+/** A series rule as returned: complete, with the event's zone, first day and time. */
+const FullRule = EventRule.extend({
+  freq: z.enum(["hourly", "daily", "weekly", "monthly", "yearly"]),
+  times: z.array(z.string()).optional().openapi({ description: "The event's local time." }),
+  timezone: z.string().optional().openapi({ description: "The event's zone." }),
+  start: Day.optional().openapi({ description: "The series' first day." }),
+  time: z.string().optional(),
+}).openapi("EventSeriesRule");
+const Scope = z.enum(["this", "following", "all"]).openapi({
+  description: "Repeating events: only this occurrence, this and the next ones, or the whole series.",
+});
 const CalendarEvent = z
   .object({
     id: z.uuid(),
@@ -30,8 +68,18 @@ const CalendarEvent = z
     start: z.string(),
     end: z.string(),
     allDay: z.boolean(),
+    startDate: Day.nullable().openapi({ description: "All-day events: first local day." }),
+    endDate: Day.nullable().openapi({ description: "All-day events: last local day (inclusive)." }),
     timezone: z.string(),
     recurrence: Recurrence,
+    rule: FullRule.nullable(),
+    location: z.string().nullable(),
+    exdates: z.array(Day).openapi({ description: "Days left out of the series." }),
+    seriesId: z.uuid(),
+    occurrenceStart: z
+      .string()
+      .nullable()
+      .openapi({ description: "Occurrences of a series: send it back to edit or delete this one / the next ones." }),
     participants: z.array(Actor),
     rsvp: z.array(Actor.extend({ status: z.enum(["needs_action", "accepted", "declined"]) })),
     channelId: z.uuid().nullable(),
@@ -49,6 +97,7 @@ const Proposal = z
     participants: z.array(Actor),
     note: z.string().nullable(),
     status: z.enum(["pending", "confirmed", "dismissed"]),
+    rule: EventRule.nullable(),
   })
   .openapi("CalendarProposal");
 
@@ -109,11 +158,15 @@ export function calendarRoutes(deps: AppDeps) {
           z.object({
             title: z.string().min(1).max(200),
             description: z.string().max(10_000).optional(),
-            start: z.string(),
-            end: z.string(),
+            start: z.string().optional(),
+            end: z.string().optional(),
             allDay: z.boolean().optional(),
+            startDate: Day.optional(),
+            endDate: Day.optional(),
             timezone: z.string().max(64).optional(),
-            recurrence: Recurrence,
+            recurrence: Recurrence.optional(),
+            rule: EventRule.nullable().optional(),
+            location: z.string().max(300).nullable().optional(),
             participants: z.array(Actor).max(100),
             channelId: z.uuid().nullable().optional(),
             issueId: z.uuid().nullable().optional(),
@@ -130,6 +183,62 @@ export function calendarRoutes(deps: AppDeps) {
         c.req.valid("json"),
       );
       return c.json(created, 201);
+    },
+  );
+
+  const EventParams = OrgParams.extend({ eventId: z.uuid() });
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/calendar/events/{eventId}",
+      tags,
+      security,
+      summary: "Edit an event (its creator or admins); repeating ones: only this, this and the next ones, or all",
+      request: {
+        params: EventParams,
+        body: body(
+          z.object({
+            scope: Scope.optional(),
+            occurrenceStart: z.string().optional(),
+            title: z.string().min(1).max(200).optional(),
+            description: z.string().max(10_000).optional(),
+            start: z.string().optional(),
+            end: z.string().optional(),
+            allDay: z.boolean().optional(),
+            startDate: Day.optional(),
+            endDate: Day.optional(),
+            timezone: z.string().max(64).optional(),
+            recurrence: Recurrence.optional(),
+            rule: EventRule.nullable().optional(),
+            location: z.string().max(300).nullable().optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(CalendarEvent), ...errors },
+    }),
+    async (c) => {
+      const { orgId, eventId } = c.req.valid("param");
+      return c.json(await updateCalendarEvent(calendar, c.get("user").id, orgId, eventId, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/calendar/events/{eventId}",
+      tags,
+      security,
+      summary: "Delete an event; repeating ones: only this, this and the next ones, or all",
+      request: {
+        params: EventParams,
+        query: z.object({ scope: Scope.optional(), occurrenceStart: z.string().optional() }),
+      },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, eventId } = c.req.valid("param");
+      await deleteCalendarEvent(calendar, c.get("user").id, orgId, eventId, c.req.valid("query"));
+      return c.body(null, 204);
     },
   );
 

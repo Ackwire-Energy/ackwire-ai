@@ -118,6 +118,8 @@ export const routines = pgTable(
     timezone: text(),
     description: text(),
     event: text(),
+    /** A structured schedule (`ScheduleRule`): wins over `cron`, which is kept when it can express it. */
+    rule: jsonb().$type<Record<string, unknown>>(),
     active: boolean().notNull().default(true),
     nextRunAt: timestamp({ withTimezone: true }),
     lastRunAt: timestamp({ withTimezone: true }),
@@ -198,10 +200,18 @@ export const calendarEvents = pgTable(
     startAt: timestamp({ withTimezone: true }).notNull(),
     endAt: timestamp({ withTimezone: true }).notNull(),
     allDay: boolean().notNull().default(false),
+    location: text(),
     timezone: text().notNull().default("UTC"),
     /** `none`, `weekdays`, `weekly` or `monthly` (stored as an RRULE in `rrule`). */
     recurrence: text().notNull().default("none"),
     rrule: text(),
+    /** The series rule (`ScheduleRule`, no times: the event's own); null = the legacy `recurrence`. */
+    rule: jsonb().$type<Record<string, unknown>>(),
+    /** Original starts (ISO) of occurrences removed from the series ("só este"). */
+    exdates: jsonb().$type<string[]>().notNull().default([]),
+    /** An edited occurrence ("só este"): the series it belongs to, and that occurrence's original start. */
+    overrideOf: uuid(),
+    originalStart: timestamp({ withTimezone: true }),
     channelId: uuid(),
     issueId: uuid(),
     createdByType: text().notNull(),
@@ -251,6 +261,8 @@ export const calendarProposals = pgTable(
     startAt: timestamp({ withTimezone: true }).notNull(),
     endAt: timestamp({ withTimezone: true }).notNull(),
     participants: jsonb().$type<{ type: string; id: string }[]>().notNull().default([]),
+    /** A repeating proposal (`ScheduleRule`). */
+    rule: jsonb().$type<Record<string, unknown>>(),
     note: text(),
     /** `pending`, `confirmed` or `dismissed`. */
     status: text().notNull().default("pending"),
