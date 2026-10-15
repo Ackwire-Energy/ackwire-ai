@@ -41,7 +41,7 @@ describe("finding the settings", () => {
       "Configurações do workspace",
       "Conectores",
       "Skills",
-      "Acesso dos agentes",
+      "Agentes e acesso",
       "Membros",
       "Convidar pessoas",
     ]);
