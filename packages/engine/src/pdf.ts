@@ -1,9 +1,16 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { deflateSync } from "node:zlib";
+import { parseTrueType, type TrueTypeFont } from "./ttf";
+
 /**
  * Markdown → PDF, in pure TypeScript (no headless browser, no dependency):
  * headings, paragraphs with **bold**, *italic* and `code`, bullet and
  * numbered lists, quotes, code blocks in a monospace font, tables and rules.
- * Uses the PDF standard fonts (Helvetica, Courier) with WinAnsi encoding,
- * which covers Portuguese; characters outside it become "?".
+ * Uses our brand fonts when their files are there (Onest for text, Martian
+ * Mono for code; embedded as subsets, any Unicode they cover), else the PDF
+ * standard fonts (Helvetica, Courier) with WinAnsi encoding, which covers
+ * Portuguese; characters outside it become "?".
  */
 
 type FontKey = "F1" | "F2" | "F3" | "F4";
@@ -60,7 +67,48 @@ function toWinAnsi(text: string): number[] {
   return out;
 }
 
+// ── Brand fonts (OFL; files in packages/engine/assets/fonts) ─────────────────
+
+interface Brand {
+  F1: TrueTypeFont;
+  F2: TrueTypeFont;
+  F3: TrueTypeFont;
+}
+
+let brand: Brand | null | undefined;
+
+/** Onest Regular/Bold and Martian Mono, read once; null when the files aren't there (fallback: standard fonts). */
+export function brandFonts(): Brand | null {
+  if (brand !== undefined) return brand;
+  try {
+    const load = (file: string, name: string) =>
+      parseTrueType(
+        new Uint8Array(readFileSync(fileURLToPath(new URL(`../assets/fonts/${file}`, import.meta.url)))),
+        name,
+      );
+    brand = {
+      F1: load("Onest-Regular.ttf", "Onest-Regular"),
+      F2: load("Onest-Bold.ttf", "Onest-Bold"),
+      F3: load("MartianMono-Regular.ttf", "MartianMono-Regular"),
+    };
+  } catch {
+    brand = null;
+  }
+  return brand;
+}
+
+/** Fonts of one document: brand (embedded, glyphs used are tracked) or the standard ones. */
+let active: Brand | null = null;
+let usedGlyphs: Record<"F1" | "F2" | "F3", Map<number, number>> = { F1: new Map(), F2: new Map(), F3: new Map() };
+/** Italic has no file of its own: the regular face, slanted. */
+const brandKey = (font: FontKey) => (font === "F4" ? "F1" : font);
+
 function charWidth(ch: string, font: FontKey): number {
+  if (active) {
+    const f = active[brandKey(font)];
+    const gid = f.glyphOf(ch.codePointAt(0) ?? 63);
+    return (f.advance(gid) * 1000) / f.unitsPerEm;
+  }
   if (font === "F3") return 600; // Courier
   const base = ch.normalize("NFD").charAt(0);
   const code = base.charCodeAt(0);
@@ -254,9 +302,27 @@ class Canvas {
     let cursor = x;
     for (const r of runs) {
       if (!r.text) continue;
-      this.ops.push(
-        `BT /${r.font} ${size} Tf ${cursor.toFixed(2)} ${baseline.toFixed(2)} Td (${escapePdfString(r.text)}) Tj ET`,
-      );
+      if (active) {
+        const key = brandKey(r.font);
+        const f = active[key];
+        let hex = "";
+        for (const ch of r.text) {
+          const cp = ch === "\t" ? 32 : (ch.codePointAt(0) ?? 63);
+          const gid = f.glyphOf(cp);
+          usedGlyphs[key].set(gid, cp);
+          hex += gid.toString(16).padStart(4, "0");
+        }
+        // Italic: the regular face with an 12° slant.
+        const at =
+          r.font === "F4"
+            ? `1 0 0.21 1 ${cursor.toFixed(2)} ${baseline.toFixed(2)} Tm`
+            : `${cursor.toFixed(2)} ${baseline.toFixed(2)} Td`;
+        this.ops.push(`BT /${key} ${size} Tf ${at} <${hex}> Tj ET`);
+      } else {
+        this.ops.push(
+          `BT /${r.font} ${size} Tf ${cursor.toFixed(2)} ${baseline.toFixed(2)} Td (${escapePdfString(r.text)}) Tj ET`,
+        );
+      }
       cursor += textWidth(r.text, r.font, size);
     }
   }
@@ -320,7 +386,20 @@ function drawTable(c: Canvas, rows: string[][]) {
 }
 
 /** Renders Markdown (and an optional title) as a PDF document. */
-export function markdownToPdf(markdown: string, options: { title?: string } = {}): Uint8Array {
+export function markdownToPdf(
+  markdown: string,
+  options: { title?: string; fonts?: "brand" | "standard" } = {},
+): Uint8Array {
+  active = options.fonts === "standard" ? null : brandFonts();
+  usedGlyphs = { F1: new Map(), F2: new Map(), F3: new Map() };
+  try {
+    return renderPdf(markdown, options);
+  } finally {
+    active = null;
+  }
+}
+
+function renderPdf(markdown: string, options: { title?: string }): Uint8Array {
   const c = new Canvas();
   if (options.title) c.paragraph([{ text: options.title, font: "F2" }], { size: 22, leading: 28 });
   if (options.title) c.y -= 10;
@@ -353,7 +432,7 @@ export function markdownToPdf(markdown: string, options: { title?: string } = {}
         const size = 9.5;
         const leading = 12.5;
         // Monospace: split long lines by character count, keeping every space.
-        const perLine = Math.floor((CONTENT_WIDTH - 16) / ((600 * size) / 1000));
+        const perLine = Math.floor((CONTENT_WIDTH - 16) / ((charWidth("M", "F3") * size) / 1000));
         for (const raw of block.lines.length > 0 ? block.lines : [""]) {
           const text = raw.replace(/\t/g, "  ");
           for (let at = 0; at === 0 || at < text.length; at += perLine) {
@@ -389,12 +468,18 @@ function writePdf(pages: string[][], title: string): Uint8Array {
   };
   const catalog = add("");
   const pagesId = add("");
-  const fonts = {
-    F1: add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
-    F2: add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"),
-    F3: add("<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>"),
-    F4: add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>"),
-  };
+  const fonts: Record<string, number> = active
+    ? {
+        F1: embedFont(add, active.F1, usedGlyphs.F1),
+        F2: embedFont(add, active.F2, usedGlyphs.F2),
+        F3: embedFont(add, active.F3, usedGlyphs.F3),
+      }
+    : {
+        F1: add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+        F2: add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"),
+        F3: add("<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>"),
+        F4: add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>"),
+      };
   const fontRefs = Object.entries(fonts)
     .map(([k, id]) => `/${k} ${id} 0 R`)
     .join(" ");
@@ -430,3 +515,60 @@ function writePdf(pages: string[][], title: string): Uint8Array {
 
 /** Every char of the assembled file is one byte (WinAnsi), so length in bytes = length in chars. */
 const latin1Length = (s: string) => s.length;
+
+const bytesToLatin1 = (bytes: Uint8Array) => {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 8192) out += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return out;
+};
+
+/**
+ * A TrueType font as a Type0 / CIDFontType2 with Identity-H (two-byte glyph
+ * ids in the text), the glyph subset as FontFile2 (deflated), widths of the
+ * glyphs used and a ToUnicode map so text can be copied and searched.
+ */
+function embedFont(add: (body: string) => number, f: TrueTypeFont, used: Map<number, number>) {
+  const scale = 1000 / f.unitsPerEm;
+  const file = deflateSync(f.subset(used.keys()));
+  const fontFile = add(`<< /Length ${file.length} /Filter /FlateDecode >>\nstream\n${bytesToLatin1(file)}\nendstream`);
+  const descriptor = add(
+    `<< /Type /FontDescriptor /FontName /${f.name} /Flags 32 /FontBBox [${f.bbox.map((v) => Math.round(v * scale)).join(" ")}] /ItalicAngle 0 /Ascent ${Math.round(f.ascent * scale)} /Descent ${Math.round(f.descent * scale)} /CapHeight ${Math.round(f.capHeight * scale)} /StemV 80 /FontFile2 ${fontFile} 0 R >>`,
+  );
+  const gids = [...used.keys()].sort((a, b) => a - b);
+  const widths = gids.map((g) => `${g} [${Math.round(f.advance(g) * scale)}]`).join(" ");
+  const cid = add(
+    `<< /Type /Font /Subtype /CIDFontType2 /BaseFont /${f.name} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor ${descriptor} 0 R /CIDToGIDMap /Identity /DW ${Math.round(f.advance(0) * scale)} /W [${widths}] >>`,
+  );
+  const hex4 = (n: number) => n.toString(16).padStart(4, "0");
+  const utf16 = (cp: number) => {
+    if (cp <= 0xffff) return hex4(cp);
+    const v = cp - 0x10000;
+    return hex4(0xd800 + (v >> 10)) + hex4(0xdc00 + (v & 0x3ff));
+  };
+  const entries = gids.filter((g) => g !== 0).map((g) => `<${hex4(g)}> <${utf16(used.get(g) ?? 63)}>`);
+  const chunks: string[] = [];
+  for (let i = 0; i < entries.length; i += 100) {
+    const part = entries.slice(i, i + 100);
+    chunks.push(`${part.length} beginbfchar\n${part.join("\n")}\nendbfchar`);
+  }
+  const cmap = [
+    "/CIDInit /ProcSet findresource begin",
+    "12 dict begin",
+    "begincmap",
+    "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def",
+    "/CMapName /Adobe-Identity-UCS def",
+    "/CMapType 2 def",
+    "1 begincodespacerange",
+    "<0000> <ffff>",
+    "endcodespacerange",
+    ...chunks,
+    "endcmap",
+    "CMapName currentdict /CMap defineresource pop",
+    "end",
+    "end",
+  ].join("\n");
+  const toUnicode = add(`<< /Length ${cmap.length} >>\nstream\n${cmap}\nendstream`);
+  return add(
+    `<< /Type /Font /Subtype /Type0 /BaseFont /${f.name} /Encoding /Identity-H /DescendantFonts [${cid} 0 R] /ToUnicode ${toUnicode} 0 R >>`,
+  );
+}

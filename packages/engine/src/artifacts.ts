@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gte, inArray, isNull, or, rowsOf, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
+import { markdownToDocx } from "./docx";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { can, getMembership } from "./organizations";
@@ -743,7 +744,7 @@ export async function artifactFile(
   userId: string,
   orgId: string,
   artifactId: string,
-  options: { version?: number; format?: "csv" | "patch" | "pdf" } = {},
+  options: { version?: number; format?: "csv" | "patch" | "pdf" | "docx" } = {},
 ): Promise<{ body: Uint8Array; contentType: string; filename: string }> {
   const a = await readable(deps, { type: "person", userId }, orgId, artifactId);
   const v = await versionRow(deps.db, a, options.version);
@@ -754,14 +755,22 @@ export async function artifactFile(
     const body = new TextEncoder().encode(tableToCsv(content.columns, content.rows));
     return { body, contentType: "text/csv; charset=utf-8", filename: fileName(a, v.version, "csv") };
   }
-  if (options.format === "pdf") {
+  if (options.format === "pdf" || options.format === "docx") {
     const markdown =
       content.kind === "document"
         ? content.markdown
         : content.kind === "table"
           ? tableToMarkdown(content.columns, content.rows)
           : null;
-    if (markdown === null) throw new ValidationError("PDF export is for documents and tables");
+    if (markdown === null)
+      throw new ValidationError(`${options.format.toUpperCase()} export is for documents and tables`);
+    if (options.format === "docx") {
+      return {
+        body: markdownToDocx(markdown, { title: a.title }),
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename: fileName(a, v.version, "docx"),
+      };
+    }
     const body = markdownToPdf(markdown, { title: a.title });
     return { body, contentType: "application/pdf", filename: fileName(a, v.version, "pdf") };
   }

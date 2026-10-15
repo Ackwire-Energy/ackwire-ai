@@ -1,5 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
-import { artifactFile, createArtifact, markdownToPdf, parseMarkdown } from "../src";
+import {
+  artifactFile,
+  brandFonts,
+  createArtifact,
+  markdownToPdf,
+  parseMarkdown,
+  parseTrueType,
+  type TrueTypeFont,
+} from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -40,9 +48,12 @@ test("markdown blocks: headings, lists, code, tables, quotes, rules", () => {
   });
 });
 
-test("a valid PDF with Portuguese text, standard fonts, and pages as needed", () => {
+test("a valid PDF with Portuguese text, standard fonts (the fallback), and pages as needed", () => {
   const pdf = latin1(
-    markdownToPdf("# Relatório de março\n\nVendas **subiram** 20% — ação `deploy`.", { title: "Março" }),
+    markdownToPdf("# Relatório de março\n\nVendas **subiram** 20% — ação `deploy`.", {
+      title: "Março",
+      fonts: "standard",
+    }),
   );
   expect(pdf.startsWith("%PDF-1.4")).toBe(true);
   expect(pdf.trimEnd().endsWith("%%EOF")).toBe(true);
@@ -54,7 +65,7 @@ test("a valid PDF with Portuguese text, standard fonts, and pages as needed", ()
   checkXref(pdf);
 
   const long = Array.from({ length: 120 }, (_, i) => `Parágrafo ${i} com algum texto para ocupar espaço.`).join("\n\n");
-  const many = latin1(markdownToPdf(long));
+  const many = latin1(markdownToPdf(long, { fonts: "standard" }));
   const pages = Number(/\/Count (\d+)/.exec(many)?.[1]);
   expect(pages).toBeGreaterThan(2);
   checkXref(many);
@@ -77,7 +88,7 @@ test("a document artifact downloads as PDF; tables too; other kinds can't", asyn
   });
   expect(
     latin1((await artifactFile(f.artifactDeps, f.owner.id, f.org.id, table.id, { format: "pdf" })).body),
-  ).toContain("(jan)");
+  ).toContain("/FontFile2");
   const diagram = await createArtifact(f.artifactDeps, person, f.org.id, {
     title: "Fluxo",
     content: { kind: "diagram", mermaid: "graph TD; A-->B" },
@@ -85,4 +96,30 @@ test("a document artifact downloads as PDF; tables too; other kinds can't", asyn
   await expect(artifactFile(f.artifactDeps, f.owner.id, f.org.id, diagram.id, { format: "pdf" })).rejects.toThrow(
     "PDF",
   );
+});
+
+test("brand fonts: Onest and Martian Mono embedded as subsets, with ToUnicode; text by glyph id", () => {
+  const fonts = brandFonts();
+  expect(fonts).not.toBeNull();
+  const onest = fonts?.F1 as TrueTypeFont;
+  const a = onest.glyphOf("A".codePointAt(0) ?? 0);
+  expect(a).toBeGreaterThan(0);
+  expect(onest.glyphOf("ç".codePointAt(0) ?? 0)).toBeGreaterThan(0);
+  // The subset keeps A's outline and drops the tables a PDF reader doesn't need.
+  const subset = onest.subset([a]);
+  const again = parseTrueType(subset, "check");
+  expect(again.advance(a)).toBe(onest.advance(a));
+  expect(subset.length).toBeLessThan(90_000 / 2);
+
+  const pdf = latin1(markdownToPdf("# Relatório\n\nTexto *itálico* e `código`.", { title: "Marca" }));
+  expect(pdf).toContain("/BaseFont /Onest-Regular");
+  expect(pdf).toContain("/BaseFont /Onest-Bold");
+  expect(pdf).toContain("/BaseFont /MartianMono-Regular");
+  expect(pdf).toContain("/Encoding /Identity-H");
+  expect(pdf).toContain("/FontFile2");
+  expect(pdf).toContain("/ToUnicode");
+  expect(pdf).toMatch(/<[0-9a-f]{4}> <0052>/); // "R" can be copied back out
+  expect(pdf).toContain("1 0 0.21 1"); // italic: the regular face, slanted
+  expect(pdf).not.toContain("/Helvetica");
+  checkXref(pdf);
 });
