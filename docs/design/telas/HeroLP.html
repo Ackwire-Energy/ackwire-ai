@@ -40,7 +40,7 @@ button.go{font:inherit;font-weight:600;font-size:15px;padding:13px 18px;border-r
 .giant:hover{transform:translateY(-6px) rotate(-1.5deg)}
 .giant:active{transform:scale(.97)}
 .giant canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
-.eye{position:absolute;top:36%;width:8.5%;height:22%;border-radius:999px;background:#fff;transition:opacity .3s,height .12s,top .12s;animation:blink 4.6s infinite}
+.eye{position:absolute;top:36%;width:8.5%;height:22%;border-radius:999px;background:var(--eye,#fff);transition:opacity .3s,height .12s,top .12s;animation:blink 4.6s infinite}
 .eye.l{left:34.5%}.eye.r{left:57%}
 @keyframes blink{0%,95%,100%{transform:scaleY(1)}97%{transform:scaleY(.12)}}
 .bubs{position:absolute;right:-2%;top:-4%;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
@@ -54,12 +54,12 @@ button.go{font:inherit;font-weight:600;font-size:15px;padding:13px 18px;border-r
 .hero[data-v="3"] .giant{width:min(42vw,200px)}
 .hero[data-v="3"] .bubs{display:none}
 .hero[data-v="3"] form{justify-content:center}
-.board{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:8px;width:min(680px,calc(100vw - 32px))}
+.board{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:5;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;width:min(680px,calc(100vw - 32px))}
 .seg{display:flex;gap:3px;padding:4px;border-radius:14px;background:rgba(22,22,21,.86);box-shadow:0 0 0 1px var(--line),0 20px 40px -12px rgba(0,0,0,.6);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 .seg button{all:unset;cursor:pointer;padding:8px 14px;border-radius:10px;font-weight:600;font-size:13.5px;color:var(--muted);white-space:nowrap}
 .seg button[aria-pressed="true"]{background:#2a2a28;color:var(--ink)}
 .seg button:focus-visible{outline:2px solid #4b93ff}
-.desc{font-size:13px;color:var(--ink);background:rgba(22,22,21,.86);padding:8px 14px;border-radius:12px;box-shadow:0 0 0 1px var(--line);text-align:center;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.desc{flex-basis:100%;font-size:13px;color:var(--ink);background:rgba(22,22,21,.86);padding:8px 14px;border-radius:12px;box-shadow:0 0 0 1px var(--line);text-align:center;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 .after{height:140px}
 @media (max-width:860px){
   .in{grid-template-columns:1fr}
@@ -103,6 +103,10 @@ button.go{font:inherit;font-weight:600;font-size:15px;padding:13px 18px;border-r
 
 <div class="board">
   <p class="desc" id="desc"></p>
+  <div class="seg" id="eyes" role="group" aria-label="Olhos">
+    <button data-v="white">Olhos brancos</button>
+    <button data-v="black">Olhos pretos</button>
+  </div>
   <div class="seg" id="seg" role="group" aria-label="Variante">
     <button data-v="1">1 · Gigante</button>
     <button data-v="2">2 · Nasce do céu</button>
@@ -130,6 +134,12 @@ const GRAD = {
 const LOOKS = ["giant", "violet", "green", "amber", "rose", "teal", "indigo"];
 const SKY = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"];
 const SPRITE = [".XXXXXXX.", "XXXXXXXXX", "XXXXXXXXX", "XXoXXXoXX", "XXoXXXoXX", "XXXXXXXXX", "XXXXXXXXX", "XXXXXXXXX", "XXXXXXXX."];
+/* One eye color everywhere. White eyes need the sky's little agents in a dark body; black eyes keep them white. */
+const EYE_SETS = {
+  white: { eye: "#ffffff", spriteBody: [4, 32, 63], spriteEye: [255, 255, 255] },
+  black: { eye: "#0d0d0c", spriteBody: [255, 255, 255], spriteEye: [13, 13, 12] },
+};
+let EYES = EYE_SETS.white;
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const rgb = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
@@ -161,7 +171,7 @@ function drawMark(cv, color, px) {
   ctx.save(); ctx.beginPath(); ctx.roundRect(0, 0, S, S, [S * R, S * R, S * R, S * CUT]); ctx.clip();
   for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) { ctx.fillStyle = tn[toneAt(x, y, D)]; ctx.fillRect(Math.floor(x * p), Math.floor(y * p), Math.ceil(p) + 1, Math.ceil(p) + 1); }
   ctx.restore();
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = EYES.eye;
   const w = S * 0.085, H = S * 0.22;
   for (const cx of [0.39, 0.615]) { ctx.beginPath(); ctx.roundRect(S * cx - w / 2, S * 0.36, w, H, w / 2); ctx.fill(); }
 }
@@ -219,7 +229,7 @@ function bubble() {
   const [c, text, when] = EVENTS[ev++ % EVENTS.length];
   const el = document.createElement("div");
   el.className = "bub";
-  const cv = document.createElement("canvas"); drawMark(cv, c, 22);
+  const cv = document.createElement("canvas"); cv.dataset.c = c; drawMark(cv, c, 22);
   el.append(cv, Object.assign(document.createElement("span"), { innerHTML: `${text} <small>· ${when}</small>` }));
   bubs.append(el);
   while (bubs.children.length > 3) bubs.firstElementChild.remove();
@@ -238,7 +248,7 @@ function drawSky(t) {
   const c = copy.getBoundingClientRect(), g = giant.getBoundingClientRect();
   const cx0 = (c.left - r.left) / P - 6, cx1 = (c.right - r.left) / P + 6, cy0 = (c.top - r.top) / P - 6, cy1 = (c.bottom - r.top) / P + 6;
   // A light halo behind the giant so its dither reads against the sky.
-  const gx = (g.left + g.width / 2 - r.left) / P, gy = (g.top + g.height / 2 - r.top) / P, gr = (g.width / P) * 0.62;
+  const gx = (g.left + g.width / 2 - r.left) / P, gy = (g.top + g.height / 2 - r.top) / P, gr = (g.width / P) * 0.95;
   const ctx = sky.getContext("2d"), img = ctx.createImageData(W, H), d = img.data, n = SKYC.length - 1;
   const calm = new Float32Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -248,7 +258,7 @@ function drawSky(t) {
       - 0.16 * Math.exp(-((u - 0.86 - 0.04 * Math.cos(t * 0.15)) ** 2 + (v - 0.92) ** 2) / 0.05)
       + 0.03 * Math.sin(u * 8 + t * 0.6);
     const dx = Math.max(cx0 - x, 0, x - cx1), dy = Math.max(cy0 - y, 0, y - cy1);
-    const halo = Math.max(0, Math.min(1, (gr - Math.hypot(x - gx, y - gy)) / (gr * 0.45)));
+    const halo = Math.max(0, Math.min(1, (gr - Math.hypot(x - gx, y - gy)) / (gr * 0.4)));
     const w = Math.max(Math.max(0, 1 - Math.hypot(dx, dy) / 10), halo * halo * (3 - 2 * halo));
     calm[y * W + x] = w;
     f = f * (1 - w) + (6 / 7) * w;
@@ -266,13 +276,25 @@ function drawSky(t) {
         const X = Math.round(s.x) + i * s.s + a, Y = Math.round(s.y) + j * s.s + b;
         if (X < 0 || Y < 0 || X >= W || Y >= H || calm[Y * W + X] > 0.3) continue;
         const o = (Y * W + X) * 4;
-        const col = ch === "o" && !blink ? [28, 99, 214] : [255, 255, 255];
+        const col = ch === "o" && !blink ? EYES.spriteEye : EYES.spriteBody;
         d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2];
       }
     }
   }
   ctx.putImageData(img, 0, 0);
 }
+
+/* Eye switch: redraws every small mark. */
+function setEyes(k) {
+  EYES = EYE_SETS[k];
+  document.documentElement.style.setProperty("--eye", EYES.eye);
+  for (const b of document.querySelectorAll("#eyes button")) b.setAttribute("aria-pressed", String(b.dataset.v === k));
+  for (const cv of document.querySelectorAll("canvas[data-mark]")) drawMark(cv, cv.dataset.mark, Number(cv.dataset.px));
+  for (const cv of bubs.querySelectorAll("canvas")) drawMark(cv, cv.dataset.c, 22);
+  sizeInline();
+  try { localStorage.setItem("hero-eyes", k); } catch {}
+}
+document.getElementById("eyes").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setEyes(b.dataset.v); });
 
 /* Variant switch. */
 function setV(v) {
@@ -287,6 +309,8 @@ function setV(v) {
 document.getElementById("seg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setV(b.dataset.v); });
 let v0 = "2"; try { v0 = localStorage.getItem("hero-v") || "2"; } catch {}
 setV(v0);
+let e0 = "white"; try { e0 = localStorage.getItem("hero-eyes") || "white"; } catch {}
+setEyes(e0);
 
 let last = 0;
 function frame(now) {
