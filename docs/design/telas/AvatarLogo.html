@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avatar e logo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&family=Doto:ROND,wght@100,600&display=swap">
+<style>
+/* Board: three directions for the agent symbol and the logo in the pixel/dither style of the sky. One switch changes every place at once. */
+:root{
+  --bg:#f4f4f1;--raised:#fff;--sunken:#ebebe7;--line:rgba(23,23,22,.08);--line2:rgba(23,23,22,.14);
+  --ink:#151514;--muted:#5c5c58;--plate:rgba(127,127,127,.1);
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --sans:"Onest","Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f0f0e;--raised:#191918;--sunken:#0a0a09;--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+  --ink:#efefec;--muted:#a3a39e;--plate:rgba(127,127,127,.14);--e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f0f0e;--raised:#191918;--sunken:#0a0a09;--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+  --ink:#efefec;--muted:#a3a39e;--plate:rgba(127,127,127,.14);--e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 16px 72px}
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;margin-bottom:24px}
+.top h1{font-size:clamp(26px,3.4vw,36px);font-weight:700;letter-spacing:-.03em;line-height:1.1}
+.top p{color:var(--muted);max-width:62ch;margin-top:6px}
+.ctl{display:flex;gap:10px;flex-wrap:wrap}
+.seg{display:flex;gap:3px;padding:3px;border-radius:12px;background:var(--plate)}
+.seg button{all:unset;cursor:pointer;padding:7px 12px;border-radius:9px;font-weight:600;font-size:13.5px;color:var(--muted);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1)}
+.seg button:focus-visible{outline:2px solid #3d8bff;outline-offset:1px}
+.lead{display:flex;gap:16px;align-items:flex-start;padding:16px 18px;border-radius:20px;background:var(--raised);box-shadow:var(--e1);margin-bottom:20px}
+.lead b{display:block;font-size:15px}
+.lead p{color:var(--muted);margin-top:2px;max-width:80ch}
+section{margin-top:28px}
+section > h2{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.card{background:var(--raised);border-radius:20px;box-shadow:var(--e1);padding:20px}
+.row{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-end}
+.cell{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+canvas.av{display:block;image-rendering:pixelated}
+.states .cell{gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.logo-card{position:relative;overflow:hidden;border-radius:20px;box-shadow:var(--e1);padding:22px 20px;display:flex;flex-direction:column;gap:22px;min-height:230px}
+.logo-card .tag{position:relative;font-size:12px;color:var(--muted)}
+.logo-card.light{background:#fff;color:#151514}
+.logo-card.light .tag{color:#5c5c58}
+.logo-card.dark{background:#111110;color:#efefec}
+.logo-card.dark .tag{color:#a3a39e}
+.logo-card.sky{color:#04203f}
+.logo-card.sky .tag{color:rgba(4,32,63,.75)}
+.logo-card.sky .w2 i{opacity:1}
+.logo-card canvas.bg{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+.lockup{position:relative;display:flex;align-items:center;gap:10px}
+.w1{font-family:"Onest",sans-serif;font-weight:700;font-size:28px;letter-spacing:-.03em}
+.w2{font-family:"Funnel Display",sans-serif;font-weight:300;font-size:32px;letter-spacing:-.02em}
+.w2 i{font-style:normal;font-family:"Doto",monospace;font-weight:600;font-variation-settings:"ROND" 100;font-size:.62em;margin-left:3px;opacity:.75;letter-spacing:0}
+.fav{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.tab{display:flex;align-items:center;gap:8px;padding:8px 14px 8px 10px;border-radius:10px 10px 0 0;background:var(--sunken);font-size:12.5px;min-width:180px}
+.app{display:grid;grid-template-columns:220px 1fr;border-radius:20px;overflow:hidden;box-shadow:var(--e1);background:var(--raised);min-height:340px}
+.side{background:var(--sunken);padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+.side .lbl{font-size:11.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 8px}
+.side .it{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:10px;font-weight:500}
+.side .it.on{background:var(--raised);box-shadow:var(--e1)}
+.side .it small{margin-left:auto;color:var(--muted);font-size:11.5px}
+.chat{padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+.msg{display:flex;gap:12px}
+.msg .who{font-weight:600}
+.msg .who small{font-weight:400;color:var(--muted);margin-left:6px;font-size:12px}
+.msg p{color:var(--ink);opacity:.9}
+.person{width:32px;height:32px;border-radius:50%;background:#e2ddd3;color:#5c4a2e;display:grid;place-items:center;font-weight:600;font-size:12.5px;flex:none}
+:root[data-theme="dark"] .person{background:#3a342a;color:#e8dcc6}
+.typing{color:var(--muted);font-size:13px}
+@media (max-width:700px){.app{grid-template-columns:1fr}.side{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Avatar e logo</h1>
+      <p>Três direções para o símbolo do agente e o logo no estilo pixel/dither do céu. A chave muda tudo de uma vez: o agente, as cores, os tamanhos, o logo e o app.</p>
+    </div>
+    <div class="ctl">
+      <div class="seg" id="mode" role="group" aria-label="Direção">
+        <button data-v="A">A · Sprite</button>
+        <button data-v="B">B · Dither</button>
+        <button data-v="C">C · Céu vivo</button>
+      </div>
+      <div class="seg" id="theme" role="group" aria-label="Tema">
+        <button data-v="light">Claro</button>
+        <button data-v="dark">Escuro</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lead">
+    <canvas class="av" data-size="48" data-color="sky" data-state="idle"></canvas>
+    <div><b id="leadTitle"></b><p id="leadText"></p></div>
+  </div>
+
+  <section>
+    <h2>O agente vivo</h2>
+    <div class="card"><div class="row states">
+      <div class="cell"><canvas class="av" data-size="112" data-color="sky" data-state="idle"></canvas>Parado · pisca</div>
+      <div class="cell"><canvas class="av" data-size="112" data-color="violet" data-state="thinking"></canvas>Pensando · olha em volta</div>
+      <div class="cell"><canvas class="av" data-size="112" data-color="green" data-state="writing"></canvas>Escrevendo · olhos em traço</div>
+    </div></div>
+  </section>
+
+  <section>
+    <h2>Cores</h2>
+    <div class="card"><div class="row" id="colors"></div></div>
+  </section>
+
+  <section>
+    <h2>Tamanhos</h2>
+    <div class="card"><div class="row" id="sizes"></div></div>
+  </section>
+
+  <section>
+    <h2>Logo</h2>
+    <div class="grid3">
+      <div class="logo-card light">
+        <span class="tag">Claro</span>
+        <div class="lockup"><canvas class="av" data-size="34" data-color="sky"></canvas><span class="w1">agentes</span></div>
+        <div class="lockup"><canvas class="av" data-size="34" data-color="sky"></canvas><span class="w2">agentes<i>.chat</i></span></div>
+      </div>
+      <div class="logo-card dark">
+        <span class="tag">Escuro</span>
+        <div class="lockup"><canvas class="av" data-size="34" data-color="sky"></canvas><span class="w1">agentes</span></div>
+        <div class="lockup"><canvas class="av" data-size="34" data-color="sky"></canvas><span class="w2">agentes<i>.chat</i></span></div>
+      </div>
+      <div class="logo-card sky">
+        <canvas class="bg" id="skybg"></canvas>
+        <span class="tag">Sobre o céu (LP, entrar)</span>
+        <div class="lockup"><canvas class="av" data-size="34" data-color="sky"></canvas><span class="w1">agentes</span></div>
+        <div class="lockup"><canvas class="av" data-size="34" data-color="sky"></canvas><span class="w2">agentes<i>.chat</i></span></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="fav">
+        <div class="tab"><canvas class="av" data-size="16" data-color="sky"></canvas>agentes.chat</div>
+        <div class="cell"><canvas class="av" data-size="16" data-color="sky"></canvas>16</div>
+        <div class="cell"><canvas class="av" data-size="32" data-color="sky"></canvas>32</div>
+        <div class="cell"><canvas class="av" data-size="64" data-color="sky"></canvas>64 · app</div>
+        <p class="muted" style="font-size:13px;max-width:52ch">Linha de cima: wordmark de hoje (Onest 700). Linha de baixo: Funnel Display fina com “.chat” em Doto, como na LP.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>No app</h2>
+    <div class="app">
+      <aside class="side">
+        <span class="lbl">Agentes</span>
+        <div class="it on"><canvas class="av" data-size="24" data-color="sky" data-state="thinking"></canvas>Rick<small>pensando</small></div>
+        <div class="it"><canvas class="av" data-size="24" data-color="violet"></canvas>Bia</div>
+        <div class="it"><canvas class="av" data-size="24" data-color="amber"></canvas>Teo</div>
+        <div class="it"><canvas class="av" data-size="24" data-color="teal"></canvas>Lia</div>
+        <div class="it"><canvas class="av" data-size="24" data-color="graphite"></canvas>Ops</div>
+      </aside>
+      <div class="chat">
+        <div class="msg"><span class="person">WC</span><div><div class="who">Walter<small>16:31</small></div><p>@Rick gera o relatório de setembro em PDF?</p></div></div>
+        <div class="msg"><canvas class="av" data-size="32" data-color="sky"></canvas><div><div class="who">Rick<small>16:32</small></div><p>Feito. Está no Drive em Relatórios / Setembro.pdf.</p></div></div>
+        <div class="msg"><canvas class="av" data-size="32" data-color="violet"></canvas><div><div class="who">Bia<small>16:33</small></div><p>Revisei os números de churn, bate com o painel.</p></div></div>
+        <div class="msg"><canvas class="av" data-size="32" data-color="amber" data-state="writing"></canvas><div><div class="who">Teo<small>agora</small></div><p class="typing">escrevendo…</p></div></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+const GRAD = {
+  sky: ["#6fb3ff", "#1059c9"],
+  indigo: ["#7d8bff", "#3f4fd6"],
+  violet: ["#ae8cf7", "#6e45d1"],
+  rose: ["#f58aa6", "#c9406a"],
+  amber: ["#f3c25c", "#c07d0b"],
+  green: ["#5fcf8b", "#1f8a4c"],
+  teal: ["#4cd0c0", "#0f8f86"],
+  graphite: ["#9a9a95", "#4a4a47"],
+};
+const NAMES = { sky: "Céu", indigo: "Índigo", violet: "Violeta", rose: "Rosa", amber: "Âmbar", green: "Verde", teal: "Turquesa", graphite: "Grafite" };
+const SKY_TONES = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"];
+const DESC = {
+  A: ["A · Sprite", "O mesmo bonequinho que voa no céu, em grade de pixels: borda clara em cima, sombra embaixo, olhos de pixel. Nítido em 16 px (grade 8×8) e da mesma família dos sprites do céu."],
+  B: ["B · Dither", "A silhueta de hoje (canto cortado) preenchida com o dither do céu na cor do agente, olhos vetoriais. A forma continua; muda a textura. A mais próxima do que já existe."],
+  C: ["C · Céu vivo", "Cada agente é uma janela do próprio céu: o dither se move devagar e acelera quando ele trabalha. Olhos vetoriais por cima. A mais viva; em 20 px ou menos fica parada."],
+};
+
+const rgb = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const mix = (a, b, k) => { const A = rgb(a), B = rgb(b); return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, "0")).join(""); };
+const tonesOf = (c, inv) => {
+  if (inv) return ["#9fc9ff", "#c4defd", "#e3f0ff", "#ffffff", "#ffffff"];
+  const [t, b] = GRAD[c];
+  return [mix(b, "#000000", 0.38), b, mix(b, t, 0.5), t, mix(t, "#ffffff", 0.5)];
+};
+const eyeOf = (inv) => (inv ? "#0f56c4" : "#ffffff");
+
+/* The symbol's silhouette: radius 30% on three corners, the cut corner at bottom-left. */
+const R = 0.3, CUT = 0.07;
+function inShape(u, v) {
+  if (u < 0 || u > 1 || v < 0 || v > 1) return false;
+  if (u < R && v < R) return (u - R) ** 2 + (v - R) ** 2 <= R * R;
+  if (u > 1 - R && v < R) return (u - 1 + R) ** 2 + (v - R) ** 2 <= R * R;
+  if (u > 1 - R && v > 1 - R) return (u - 1 + R) ** 2 + (v - 1 + R) ** 2 <= R * R;
+  if (u < CUT && v > 1 - CUT) return (u - CUT) ** 2 + (v - 1 + CUT) ** 2 <= CUT * CUT;
+  return true;
+}
+
+/* Eyes over time: blink when idle, look around when thinking, dashes while writing. */
+function eyes(t, state, seed) {
+  const blink = ((t + seed) % 4.2) < 0.13;
+  if (state === "writing") return { dx: 0.02 * Math.sin(t * 7), h: 1, dash: true };
+  if (state === "thinking") {
+    const step = [-1, 0, 1, 0][Math.floor((t + seed) / 0.75) % 4];
+    return { dx: step, h: blink ? 0.15 : 1, dash: false };
+  }
+  return { dx: 0, h: blink ? 0.15 : 1, dash: false };
+}
+
+/* A: a pixel sprite on a G×G grid, drawn at 1 canvas pixel per cell and scaled by CSS. */
+function drawSprite(cv, it, t) {
+  const G = it.size <= 20 ? 8 : 12;
+  if (cv.width !== G) { cv.width = G; cv.height = G; }
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, G, G);
+  const tn = tonesOf(it.color, it.inverse);
+  const inC = (x, y) => x >= 0 && y >= 0 && x < G && y < G && inShape((x + 0.5) / G, (y + 0.5) / G);
+  for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+    if (!inC(x, y)) continue;
+    let c = tn[2];
+    if (!inC(x, y + 1) || !inC(x + 1, y)) c = tn[1];
+    if (!inC(x, y - 1) || (!inC(x - 1, y) && y < G / 2)) c = tn[3];
+    if (y >= G * 0.6 && c === tn[2] && (x + y) % 2 === 0) c = tn[1];
+    ctx.fillStyle = c;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  const hl = G === 8 ? [2, 1] : [3, 1];
+  ctx.fillStyle = tn[4];
+  ctx.fillRect(hl[0], hl[1], 1, 1);
+  const e = eyes(t, it.state, it.seed);
+  ctx.fillStyle = eyeOf(it.inverse);
+  const cols = G === 8 ? [2, 5] : [4, 7];
+  const top = G === 8 ? 3 : 4, tall = G === 8 ? 2 : 3;
+  const shift = G === 8 ? 0 : e.dx;
+  for (const c of cols) {
+    if (e.dash) ctx.fillRect(c - (c === cols[0] ? 1 : 0), top + tall - 1, 2, 1);
+    else if (e.h < 1) ctx.fillRect(c + shift, top + tall - 1, 1, 1);
+    else ctx.fillRect(c + shift, top, 1, tall);
+  }
+}
+
+/* B and C: the vector silhouette filled with dithered cells; vector eyes on top. */
+function drawDither(cv, it, t, live) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const S = Math.round(it.size * dpr);
+  if (cv.width !== S) { cv.width = S; cv.height = S; }
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, S, S);
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(0, 0, S, S, [S * R, S * R, S * R, S * CUT * 0.6]);
+  ctx.clip();
+  const tn = live ? (it.inverse ? tonesOf(it.color, true) : liveTones(it.color)) : tonesOf(it.color, it.inverse);
+  const D = it.size <= 20 ? 8 : it.size <= 40 ? 14 : 22;
+  const p = S / D;
+  const speed = it.state === "thinking" || it.state === "writing" ? 3 : 1;
+  const tt = live && it.size > 20 ? t * speed : 0;
+  for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+    const u = (x + 0.5) / D, v = (y + 0.5) / D;
+    let f;
+    if (live) {
+      const bx = 0.3 + 0.35 * Math.sin(tt * 0.5 + it.seed), by = 0.3 + 0.25 * Math.cos(tt * 0.37 + it.seed);
+      const cx = 0.75 + 0.2 * Math.cos(tt * 0.31), cy = 0.8;
+      f = 0.62 - 0.55 * v + 0.12 * (1 - u)
+        + 0.32 * Math.exp(-((u - bx) ** 2 + (v - by) ** 2) / 0.05)
+        - 0.22 * Math.exp(-((u - cx) ** 2 + (v - cy) ** 2) / 0.06)
+        + 0.05 * Math.sin(u * 9 + tt);
+    } else {
+      f = 0.92 - 0.75 * v - 0.12 * u;
+    }
+    const n = tn.length - 1;
+    const k = Math.max(0, Math.min(n, f * n));
+    const lo = Math.floor(k);
+    const idx = Math.min(n, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0));
+    ctx.fillStyle = tn[idx];
+    ctx.fillRect(Math.floor(x * p), Math.floor(y * p), Math.ceil(p) + 1, Math.ceil(p) + 1);
+  }
+  ctx.restore();
+  const e = eyes(t, it.state, it.seed);
+  ctx.fillStyle = eyeOf(it.inverse);
+  const w = S * 0.085, H = S * 0.24, top = S * 0.35;
+  for (const cx of [0.39, 0.61]) {
+    const x = S * cx + e.dx * S * 0.05;
+    ctx.beginPath();
+    if (e.dash) ctx.roundRect(x - w * 1.1, top + H * 0.62, w * 2.2, w * 0.9, w * 0.45);
+    else { const h = Math.max(w * 0.9, H * e.h); ctx.roundRect(x - w / 2, top + (H - h) / 2, w, h, w / 2); }
+    ctx.fill();
+  }
+}
+const liveCache = {};
+function liveTones(c) {
+  if (liveCache[c]) return liveCache[c];
+  const [t, b] = GRAD[c];
+  const deep = mix(b, "#000000", 0.4);
+  return (liveCache[c] = [deep, mix(deep, b, 0.5), b, mix(b, t, 0.5), t, mix(t, "#ffffff", 0.45), mix(t, "#ffffff", 0.75)]);
+}
+
+/* The sky behind the third logo card. */
+function drawSky(cv, t) {
+  const r = cv.getBoundingClientRect();
+  const P = 4, W = Math.ceil(r.width / P), H = Math.ceil(r.height / P);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const ctx = cv.getContext("2d");
+  const img = ctx.createImageData(W, H);
+  const cols = SKY_TONES.map(rgb), n = cols.length - 1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const u = x / W, v = y / H;
+    const f = 0.95 - 0.35 * u - 0.45 * v + 0.12 * Math.exp(-((u - 0.25 - 0.05 * Math.sin(t * 0.2)) ** 2 + (v - 0.3) ** 2) / 0.04) + 0.03 * Math.sin(u * 7 + t * 0.5);
+    const k = Math.max(0, Math.min(n, f * n)), lo = Math.floor(k);
+    const c = cols[Math.min(n, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))];
+    const i = (y * W + x) * 4;
+    img.data[i] = c[0]; img.data[i + 1] = c[1]; img.data[i + 2] = c[2]; img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/* Build the generated rows. */
+const colorsRow = document.getElementById("colors");
+for (const c of Object.keys(GRAD)) {
+  colorsRow.insertAdjacentHTML("beforeend", `<div class="cell"><canvas class="av" data-size="56" data-color="${c}"></canvas>${NAMES[c]}</div>`);
+}
+const sizesRow = document.getElementById("sizes");
+for (const s of [16, 20, 24, 32, 40, 56, 96]) {
+  sizesRow.insertAdjacentHTML("beforeend", `<div class="cell"><canvas class="av" data-size="${s}" data-color="sky"></canvas>${s}</div>`);
+}
+
+const items = [...document.querySelectorAll("canvas.av")].map((el, i) => {
+  const size = Number(el.dataset.size);
+  el.style.width = el.style.height = size + "px";
+  return { el, size, color: el.dataset.color || "sky", state: el.dataset.state || "idle", inverse: !!el.dataset.inverse, seed: (i * 1.37) % 4.2 };
+});
+
+let mode = "B";
+try { mode = localStorage.getItem("avatar-mode") || "B"; } catch {}
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function setMode(m) {
+  mode = m;
+  try { localStorage.setItem("avatar-mode", m); } catch {}
+  for (const b of document.querySelectorAll("#mode button")) b.setAttribute("aria-pressed", String(b.dataset.v === m));
+  document.getElementById("leadTitle").textContent = DESC[m][0];
+  document.getElementById("leadText").textContent = DESC[m][1];
+  frame(performance.now(), true);
+}
+function setTheme(th) {
+  document.documentElement.dataset.theme = th;
+  for (const b of document.querySelectorAll("#theme button")) b.setAttribute("aria-pressed", String(b.dataset.v === th));
+}
+document.getElementById("mode").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setMode(b.dataset.v); });
+document.getElementById("theme").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setTheme(b.dataset.v); });
+setTheme(matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+
+const sky = document.getElementById("skybg");
+let last = 0;
+function frame(now, force) {
+  if (force || now - last > 33) {
+    last = now;
+    const t = reduce ? 0 : now / 1000;
+    for (const it of items) {
+      if (mode === "A") drawSprite(it.el, it, t);
+      else drawDither(it.el, it, t, mode === "C");
+    }
+    drawSky(sky, t);
+  }
+  if (force !== true) requestAnimationFrame(frame);
+}
+setMode(mode);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
