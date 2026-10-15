@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ApiError } from "@/api/http";
 import { type LocaleCode, setLocale } from "@/i18n";
+import { loadAnalytics, track } from "@/lib/analytics";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useTheme } from "@/lib/theme";
 import { AgentMaker } from "./AgentMaker";
@@ -143,6 +144,8 @@ export function LandingPage() {
     }, 700);
   };
 
+  useEffect(loadAnalytics, []);
+
   // The waiting list (both forms share it).
   const [joined, setJoined] = useState<string | null>(() => storage.get(STORAGE_KEYS.waitlist));
   const [confirmed, setConfirmed] = useState(() => storage.get(STORAGE_KEYS.waitlistConfirmed) === "1");
@@ -160,6 +163,7 @@ export function LandingPage() {
     void api.waitlist.confirm({ token: confirmToken }).then(
       () => {
         storage.set(STORAGE_KEYS.waitlistConfirmed, "1");
+        track("waitlist_confirmed");
         setConfirmed(true);
         setLinkProblem(null);
         hop(2400);
@@ -167,6 +171,7 @@ export function LandingPage() {
       },
       (error) => {
         const expired = error instanceof ApiError && error.code === "invalid_token";
+        track("waitlist_confirm_failed", { reason: expired ? "expired" : "error" });
         if (expired) {
           // Back to the form, so they can ask for a new link.
           storage.remove(STORAGE_KEYS.waitlist);
@@ -194,6 +199,7 @@ export function LandingPage() {
     }
     busy.current = false;
     storage.set(STORAGE_KEYS.waitlist, email);
+    track("waitlist_joined", { locale });
     setJoined(email);
     setLinkProblem(null);
     setGiantState("idle");
