@@ -280,12 +280,12 @@ describe("work summary and reactions", () => {
 });
 
 describe("reduced motion (2026-10 block)", () => {
-  test("blink, look, halo, mark and tab animations only run without reduced motion", async () => {
+  test("halo, mark and tab animations only run without reduced motion (the agent's own motion is the engine's)", async () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const block = css.slice(css.indexOf("Design system 2026-10 (docs/design"));
     const outside = block.replace(/@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*?\n\}/g, "");
     expect(outside).not.toMatch(/\banimation:\s*ac-/);
-    expect(block).toContain("ac-eye-blink");
+    expect(block).toContain("ac-halo");
     expect(block).toContain("backdrop-filter");
     // Glass has a solid fallback first.
     expect(block.indexOf("var(--glass-solid)")).toBeLessThan(block.indexOf("backdrop-filter: blur"));

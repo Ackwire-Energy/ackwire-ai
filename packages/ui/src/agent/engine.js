@@ -127,7 +127,7 @@ export function toneAt(x, y, n, turn) {
   const v = (y + 0.5) / n;
   const tx = turn ? turn[0] : 0;
   const ty = turn ? turn[1] : 0;
-  const f = 0.92 - 0.75 * v - 0.12 * u - 0.42 * tx * (u - 0.5) - 0.3 * ty * (v - 0.5);
+  const f = 0.92 - 0.75 * v - 0.12 * u - 0.16 * tx * (u - 0.5) - 0.12 * ty * (v - 0.5);
   const k = Math.max(0, Math.min(4, f * 4));
   const lo = Math.floor(k);
   return Math.min(4, k - lo > BAYER[(x & 3) + (y & 3) * 4] ? lo + 1 : lo);
@@ -181,16 +181,17 @@ export function eyeShapes(style = "round", pose = {}) {
   const base = pose.writing ? { ...WRITING_EYE, kind: "pill" } : (ex ?? EYE_STYLES[style] ?? EYE_STYLES.round);
   const [lx, ly] = pose.look ?? [0, 0];
   const [tx, ty] = pose.turn ?? [0, 0];
-  const dx = lx + 0.08 * tx;
-  const dy = ly + 0.055 * ty;
-  const spread = 1 - 0.14 * Math.abs(tx);
+  // The face turns with the body (drawAgent); the eyes only lean a little toward where it looks.
+  const dx = lx + 0.025 * tx;
+  const dy = ly + 0.02 * ty;
+  const spread = 1;
   return EYE_X.map((cx, side) => {
     const e = side === 1 && base.right ? base.right : base;
     const kind = e.kind ?? "pill";
     const blink = pose.blink && (kind === "pill" || kind === "ring" || kind === "slant");
     // The eye on the side the head turns to is farther away: narrower.
     const far = (side === 1 && tx > 0) || (side === 0 && tx < 0) ? Math.abs(tx) : 0;
-    const w = e.w * (1 - 0.32 * far);
+    const w = e.w * (1 - 0.12 * far);
     const h = blink ? Math.max(0.03, e.h * 0.12) : e.h;
     const center = 0.5 + (cx - 0.5) * spread + dx;
     return { x: center - w / 2, y: e.cy - h / 2 + dy, w, h, kind: blink ? "pill" : kind, side };
@@ -340,10 +341,11 @@ export function bodyFrame(pose = {}) {
   const [tx, ty] = pose.turn ?? [0, 0];
   const sq = pose.squash ?? 0;
   return {
-    sx: (1 - 0.07 * Math.abs(tx)) * (1 + 0.035 * sq),
+    sx: 1 + 0.035 * sq,
     sy: 1 - 0.045 * sq,
-    dx: 0.035 * tx,
-    head: [0.05 * tx, 0.035 * ty - 0.03 * sq],
+    dx: 0,
+    // Accessories sit on the turning face; a touch of lean so hats feel on top of the head.
+    head: [0.02 * tx, 0.015 * ty - 0.03 * sq],
   };
 }
 
@@ -368,10 +370,40 @@ export function drawAgent(ctx, x, y, s, opts = {}) {
   const pose = opts.pose ?? {};
   const frame = bodyFrame(pose);
   const p = s / n;
+  // Pseudo-3D: the agent is a block with depth. Turning narrows the front face
+  // (cos) and shows the side; looking down/up shows the top/bottom. The block
+  // is drawn as stacked slices from the back to the front (a pixel extrusion).
+  const [tx, ty] = pose.turn ?? [0, 0];
+  const ax = tx * 0.62;
+  const ay = ty * 0.42;
+  const depth = s * 0.3;
+  const fw = s * Math.cos(ax);
+  const fh = s * Math.cos(ay);
+  const backX = -Math.sin(ax) * depth;
+  const backY = -Math.sin(ay) * depth;
+  // Front face placed so the whole block stays centred in the box.
+  const fx = (s - fw) / 2 - backX / 2;
+  const fy = (s - fh) / 2 - backY / 2;
   ctx.save();
-  ctx.translate(x + s / 2 + frame.dx * s, y + s);
+  ctx.translate(x + s / 2, y + s);
   ctx.scale(frame.sx, frame.sy);
   ctx.translate(-s / 2, -s);
+  const radii = (w, h) =>
+    [w * BODY_RADIUS, w * BODY_RADIUS, w * BODY_RADIUS, w * BODY_CUT].map((r) => Math.min(r, h / 2));
+  if (progress >= 1 && (Math.abs(backX) > 0.5 || Math.abs(backY) > 0.5)) {
+    const slices = Math.max(2, Math.round(Math.hypot(backX, backY) / (s / 24)));
+    for (let k = slices; k >= 1; k--) {
+      const f = k / slices;
+      // Back slices darkest; the one right behind the face catches a little light (the edge).
+      ctx.fillStyle = k === 1 ? tones[1] : k % 2 && slices > 3 ? tones[0] : mixHex(tones[0], tones[1], 0.35);
+      ctx.beginPath();
+      ctx.roundRect(fx + backX * f, fy + backY * f, fw, fh, radii(fw, fh));
+      ctx.fill();
+    }
+  }
+  // The front face: the dithered body, the eyes and whatever sits on it, squeezed by the turn.
+  ctx.translate(fx, fy);
+  ctx.scale(fw / s, fh / s);
   ctx.save();
   if (progress >= 1) {
     ctx.beginPath();

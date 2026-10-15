@@ -266,8 +266,8 @@
 .lp .lp-nav {
   position: fixed;
   z-index: 50;
-  /* Inside the hero's blue card (12px from the page edge), not on its border. */
-  top: calc(env(safe-area-inset-top, 0px) + 28px);
+  /* On the hero's blue card, which starts at the top of the page. */
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
   left: 50%;
   transform: translateX(-50%);
   width: min(1120px, calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px)) - 32px));
@@ -353,7 +353,8 @@
   background: #73b2ff;
   color: var(--sky-ink);
 }
-.lp .lp-sky canvas {
+/* Only the sky's own canvas (agents inside the sky draw on their own canvases). */
+.lp .lp-sky > canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -389,8 +390,12 @@
   width: 16px;
   height: 16px;
 }
+/* The hero card starts at the very top: the nav floats on it (no dark strip above). */
 .lp .lp-hero .lp-sky {
-  min-height: min(880px, max(680px, calc(100svh - 24px)));
+  min-height: min(880px, max(680px, calc(100svh - 12px)));
+  margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 .lp .lp-hero-in {
   position: relative;
@@ -1574,7 +1579,7 @@
   overflow: hidden;
   background: var(--sunken);
 }
-.lp .lp-mk-hero canvas {
+.lp .lp-mk-hero > canvas {
   position: absolute;
   inset: 0;
   width: 100%;
