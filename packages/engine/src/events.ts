@@ -17,6 +17,9 @@ export interface MemoryUpdate {
   /** For `proposed`: the proposal to accept inline, and whether the requester can decide it. */
   proposalId?: string;
   canDecide?: boolean;
+  /** `memory.remembered` | `memory.updated` | `memory.forgot` | `memory.proposed`: the app's own words, with `params`. */
+  code?: string;
+  params?: { text: string; previousText?: string | null };
 }
 
 import type { AgentQuestion } from "./questions";
@@ -67,6 +70,9 @@ export type ChannelEvent =
       agentId: string;
       status: RunStatus;
       error?: string;
+      /** Stable code of `error` (`run.budget_exceeded`, `run.provider_error`…) and its params. */
+      errorCode?: string;
+      errorParams?: Record<string, string>;
     }
   /**
    * An agent will answer (mention, DM, router pick, or a run was claimed):
@@ -113,6 +119,8 @@ export type ChannelEvent =
       runId: string;
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       error?: string;
+      errorCode?: string;
+      errorParams?: Record<string, string>;
     }
   /**
    * A person's message went to the agent's task already in progress (one

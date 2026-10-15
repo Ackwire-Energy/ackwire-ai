@@ -18,6 +18,7 @@ import {
   requirePermission,
   resendInvitation,
   rotateCredential,
+  runErrorDetail,
   setAgentChannels,
   updateMyProfile,
   updateOrgSettings,
@@ -116,6 +117,8 @@ const Run = z
     trigger: z.string(),
     status: z.string(),
     error: z.string().nullable(),
+    errorCode: z.string().optional().openapi({ description: "Stable code of `error` (translate with `errorParams`)." }),
+    errorParams: z.record(z.string(), z.string()).optional(),
     what: z.string().openapi({ description: "Start of the message that started the run." }),
     turns: z.number(),
     inputTokens: z.number(),
@@ -128,6 +131,7 @@ const Run = z
 
 const toRun = (r: Awaited<ReturnType<typeof listRuns>>[number]) => ({
   ...r,
+  ...runErrorDetail(r.error),
   costUsd: nanoUsdToUsd(r.costNanoUsd),
   costNanoUsd: undefined,
   createdAt: r.createdAt.toISOString(),

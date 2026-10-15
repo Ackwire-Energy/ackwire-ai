@@ -16,12 +16,17 @@ test("routines API: parse, create, run now, history, pause", async () => {
   const api = (path: string, init?: Parameters<typeof owner>[1]) =>
     owner(`/api/app/organizations/${orgId}${path}`, init);
 
-  expect(await (await api("/routines/parse-schedule", { json: { phrase: "dias úteis às 9h" } })).json()).toEqual({
+  expect(await (await api("/routines/parse-schedule", { json: { phrase: "dias úteis às 9h" } })).json()).toMatchObject({
     ok: true,
     cron: "0 9 * * 1-5",
     description: "Dias úteis às 09:00",
     timezone: "UTC",
+    rule: { freq: "weekly", byWeekday: ["MO", "TU", "WE", "TH", "FR"], times: ["09:00"] },
   });
+  // The same in English, for the app in English.
+  expect(
+    await (await api("/routines/parse-schedule", { json: { phrase: "dias úteis às 9h", locale: "en" } })).json(),
+  ).toMatchObject({ ok: true, description: "Every week, on weekdays, at 09:00 (UTC)" });
   const created = await api("/routines", {
     json: {
       agentId,

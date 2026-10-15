@@ -1,5 +1,6 @@
 import {
   createRoutine,
+  cronToRule,
   deleteRoutine,
   describeRule,
   duplicateRoutine,
@@ -200,13 +201,26 @@ export function routineRoutes(deps: AppDeps) {
               .max(64)
               .optional()
               .openapi({ description: "IANA zone; default: the person's own, then the organization's, then UTC." }),
+            locale: z
+              .string()
+              .max(10)
+              .optional()
+              .openapi({ description: '"pt-BR" (default) or "en": the description\'s language.' }),
           }),
         ),
       },
       responses: {
         200: json(
           z.union([
-            z.object({ ok: z.literal(true), cron: z.string(), description: z.string(), timezone: z.string() }),
+            z.object({
+              ok: z.literal(true),
+              cron: z.string(),
+              description: z.string(),
+              timezone: z.string(),
+              rule: ScheduleRuleSchema.nullable().openapi({
+                description: "The same schedule as a rule (for the picker), when it maps.",
+              }),
+            }),
             z.object({ ok: z.literal(false), error: z.string(), code: z.string() }),
           ]),
         ),
@@ -215,8 +229,14 @@ export function routineRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      const { phrase, timezone } = c.req.valid("json");
-      return c.json(await parseScheduleForOrg(routines, c.get("user").id, orgId, phrase, timezone), 200);
+      const { phrase, timezone, locale } = c.req.valid("json");
+      const parsed = await parseScheduleForOrg(routines, c.get("user").id, orgId, phrase, timezone);
+      if (!parsed.ok) return c.json(parsed, 200);
+      const asRule = cronToRule(parsed.cron, parsed.timezone);
+      const rule = asRule ? normalizeRule(asRule) : null;
+      const description =
+        rule && locale && !locale.toLowerCase().startsWith("pt") ? describeRule(rule, locale) : parsed.description;
+      return c.json({ ...parsed, description, rule }, 200);
     },
   );
 

@@ -6,7 +6,7 @@ import { publishChannelEvent, publishMessageCreated } from "./events";
 import { onForumRunFinished } from "./forum";
 import { insertMessage, messageView } from "./messages";
 import { enqueue } from "./outbox";
-import { type AgentRun, addRunStep, transitionRun } from "./runs";
+import { type AgentRun, addRunStep, runErrorDetail, transitionRun } from "./runs";
 
 const { agentRuns, agentRunSteps, outbox, channels } = schema;
 
@@ -177,6 +177,7 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
     ...where,
     status: "failed",
     error: INTERRUPTED_BY_RESTART,
+    ...runErrorDetail(INTERRUPTED_BY_RESTART),
   });
   await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
   await publishChannelEvent(deps.pubsub, {
@@ -184,6 +185,7 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
     ...where,
     status: "failed",
     error: INTERRUPTED_BY_RESTART,
+    ...runErrorDetail(INTERRUPTED_BY_RESTART),
   });
   await publishChannelEvent(deps.pubsub, {
     type: "message.handled",

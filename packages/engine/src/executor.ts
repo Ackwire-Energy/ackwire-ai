@@ -42,7 +42,7 @@ import {
   questionView,
   syncQuestionMessage,
 } from "./questions";
-import { type AgentRun, addRunStep, isTerminal, type RunStatus, transitionRun } from "./runs";
+import { type AgentRun, addRunStep, isTerminal, type RunStatus, runErrorDetail, transitionRun } from "./runs";
 import { SANDBOX_SCOPE } from "./sandbox";
 import { enabledSkills } from "./skills";
 import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
@@ -226,7 +226,12 @@ async function executeRunInner(
     error?: string,
   ) => {
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
-    await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, status, ...(error ? { error } : {}) });
+    await publishChannelEvent(deps.pubsub, {
+      type: "run.finished",
+      ...where,
+      status,
+      ...(error ? { error, ...runErrorDetail(error) } : {}),
+    });
     await publishChannelEvent(deps.pubsub, {
       type: "message.handled",
       channelId: run.channelId,
@@ -249,7 +254,7 @@ async function executeRunInner(
     runId: run.id,
     agentId: run.agentId,
     status,
-    ...(error ? { error } : {}),
+    ...(error ? { error, ...runErrorDetail(error) } : {}),
   });
   /** Writes that don't need to finish before the model call (steps, usage log); flushed after it. */
   let deferred: Promise<unknown> = Promise.resolve();

@@ -21,6 +21,9 @@ export interface ApprovalView {
   title: string;
   detail: string;
   params: Record<string, unknown>;
+  /** Stable key for the card's title (the tool), and the values it shows: the app words it in the person's language. */
+  kind: string;
+  titleParams: Record<string, string | number | boolean>;
   status: Approval["status"];
   expiresAt: string;
   createdAt: string;
@@ -29,6 +32,16 @@ export interface ApprovalView {
   reason: string | null;
   /** Whether the person asking may approve or refuse it. */
   canDecide: boolean;
+}
+
+/** Top-level scalar inputs of an approved action ("pullNumber", "owner", "repo", "environment"…), short. */
+export function scalarParams(params: Record<string, unknown>) {
+  const out: Record<string, string | number | boolean> = {};
+  for (const [k, v] of Object.entries(params ?? {}).slice(0, 20)) {
+    if (typeof v === "number" || typeof v === "boolean") out[k] = v;
+    else if (typeof v === "string") out[k] = v.slice(0, 200);
+  }
+  return out;
 }
 
 export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
@@ -43,6 +56,8 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
   title: a.title,
   detail: a.detail,
   params: a.params,
+  kind: a.tool,
+  titleParams: scalarParams(a.params),
   status: a.status,
   expiresAt: a.expiresAt.toISOString(),
   createdAt: a.createdAt.toISOString(),

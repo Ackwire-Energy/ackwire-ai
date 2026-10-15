@@ -36,6 +36,7 @@ import {
   ruleToCron,
   type ScheduleRule,
 } from "./rrule";
+import { runErrorDetail } from "./runs";
 import { parseSchedule, phraseToRule, type ScheduleParse } from "./schedule";
 import { monthStartUtc } from "./usage";
 
@@ -231,7 +232,12 @@ function summaryCode(summary: string, error: string | null): { code: string; par
   if (summary.startsWith("Fórum aberto: ")) {
     return { code: "routine_run.forum_opened", params: { title: summary.slice("Fórum aberto: ".length) } };
   }
-  if (summary.startsWith("Falhou: ")) return { code: "routine_run.failed", params: { reason: error ?? "" } };
+  if (summary.startsWith("Falhou: ")) {
+    return {
+      code: "routine_run.failed",
+      params: { reason: error ?? "", errorCode: runErrorDetail(error)?.errorCode ?? "" },
+    };
+  }
   return null;
 }
 

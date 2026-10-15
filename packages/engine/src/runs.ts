@@ -23,6 +23,43 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
   canceled: [],
 };
 
+/**
+ * The stable code (and params) of a run's stored `error`, for the app to
+ * word it in the person's language; the stored text stays as the fallback.
+ */
+export function runErrorDetail(error: string | null | undefined): {
+  errorCode: string;
+  errorParams?: Record<string, string>;
+} | null {
+  if (!error) return null;
+  const simple = ["budget_exceeded", "too_many_tool_calls", "empty_reply", "model_refused", "agent_archived"];
+  if (simple.includes(error)) return { errorCode: `run.${error}` };
+  if (error.startsWith("provider_error:")) {
+    return { errorCode: "run.provider_error", errorParams: { detail: error.slice(15).trim() } };
+  }
+  if (error.startsWith("gave_up:"))
+    return { errorCode: "run.provider_unavailable", errorParams: { detail: error.slice(8).trim() } };
+  if (error.startsWith("canceled_by:"))
+    return { errorCode: "run.canceled", errorParams: { byUserId: error.slice(12) } };
+  if (error === "Interrompida por uma atualização do servidor") {
+    return { errorCode: "run.interrupted", errorParams: { reason: "deploy" } };
+  }
+  const none = /^Configure uma chave da API da (.+) nas configurações do workspace$/.exec(error);
+  if (none) return { errorCode: "run.missing_credential", errorParams: { provider: none[1] as string } };
+  if (error.startsWith("A chave da API deste agente foi revogada")) return { errorCode: "run.credential_revoked" };
+  const wrong = /^O modelo deste agente é da (.+), mas a chave escolhida é da (.+)$/.exec(error);
+  if (wrong) {
+    return {
+      errorCode: "run.credential_wrong_provider",
+      errorParams: { modelProvider: wrong[1] as string, keyProvider: wrong[2] as string },
+    };
+  }
+  const unregistered = /^No provider registered for (.+)$/.exec(error);
+  if (unregistered)
+    return { errorCode: "run.provider_unavailable", errorParams: { detail: unregistered[1] as string } };
+  return { errorCode: "run.failed", errorParams: { detail: error.slice(0, 300) } };
+}
+
 export const isTerminal = (status: RunStatus) => RUN_TRANSITIONS[status].length === 0;
 export const canTransition = (from: RunStatus, to: RunStatus) => RUN_TRANSITIONS[from].includes(to);
 

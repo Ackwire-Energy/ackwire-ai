@@ -374,6 +374,11 @@ function memoryResult(ctx: ToolContext, content: string, update: MemoryUpdate) {
     data: {
       memoryUpdate: {
         ...update,
+        code: `memory.${update.action}`,
+        params: {
+          text: update.text,
+          ...(update.previousText !== undefined ? { previousText: update.previousText } : {}),
+        },
         ...(update.action === "proposed"
           ? {}
           : {

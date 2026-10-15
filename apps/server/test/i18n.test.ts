@@ -38,3 +38,26 @@ test("errors carry a stable code and params (English message as fallback); rule 
   ).json()) as { ok: boolean; code: string };
   expect(bad).toMatchObject({ ok: false, code: "schedule.position_needs_month" });
 });
+
+test("run failures, approvals and memory updates carry codes", async () => {
+  const { runErrorDetail, scalarParams } = await import("@agenteschat/engine");
+  expect(runErrorDetail("budget_exceeded")).toEqual({ errorCode: "run.budget_exceeded" });
+  expect(runErrorDetail("provider_error: rate limited")).toEqual({
+    errorCode: "run.provider_error",
+    errorParams: { detail: "rate limited" },
+  });
+  expect(runErrorDetail("canceled_by:u1")).toEqual({ errorCode: "run.canceled", errorParams: { byUserId: "u1" } });
+  expect(runErrorDetail("Configure uma chave da API da Anthropic nas configurações do workspace")).toEqual({
+    errorCode: "run.missing_credential",
+    errorParams: { provider: "Anthropic" },
+  });
+  expect(runErrorDetail("Interrompida por uma atualização do servidor")).toMatchObject({
+    errorCode: "run.interrupted",
+  });
+  expect(runErrorDetail(null)).toBeNull();
+  expect(scalarParams({ owner: "acme", repo: "app", pullNumber: 42, body: { x: 1 } })).toEqual({
+    owner: "acme",
+    repo: "app",
+    pullNumber: 42,
+  });
+});
