@@ -44,7 +44,7 @@ export function LogoMark({ size, className, label }: { size?: number; className?
 }
 
 export interface LogoProps {
-  /** `main` (app) or `expanded` (+ "chat" bubble, where the domain matters). */
+  /** `main` (app) or `expanded` (+ ".chat" in dot matrix, where the domain matters). */
   variant?: "main" | "expanded";
   /** One-color version. */
   mono?: boolean;
@@ -54,7 +54,7 @@ export interface LogoProps {
   style?: CSSProperties;
 }
 
-/** "agentes" logo: mark + wordmark in Onest 700. Accessible name "agentes" (or "agentes.chat" expanded). */
+/** "agentes" logo: mark + wordmark in Funnel Display light (".chat" in Doto). Accessible name "agentes" (or "agentes.chat" expanded). */
 export function Logo({ variant = "main", mono, size = 24, className, style }: LogoProps) {
   const expanded = variant === "expanded";
   return (
@@ -68,7 +68,7 @@ export function Logo({ variant = "main", mono, size = 24, className, style }: Lo
       {expanded ? (
         <span className="ac-logo__word" aria-hidden="true">
           <span>agentes</span>
-          <span className="ac-logo__chat">chat</span>
+          <span className="ac-logo__chat">.chat</span>
         </span>
       ) : (
         <span aria-hidden="true">agentes</span>

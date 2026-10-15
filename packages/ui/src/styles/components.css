@@ -791,9 +791,10 @@ textarea.ac-input {
   display: inline-flex;
   align-items: center;
   gap: 0.16em;
-  font-family: var(--font-sans);
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  /* Funnel Display light (the landing's headings); the app falls back to its sans. */
+  font-family: var(--font-display, var(--font-sans));
+  font-weight: 300;
+  letter-spacing: -0.02em;
   color: var(--ink);
   line-height: 1;
   font-size: 24px;
@@ -827,20 +828,17 @@ textarea.ac-input {
 }
 .ac-logo__word {
   display: inline-flex;
-  align-items: flex-start;
-  gap: 0.12em;
+  align-items: baseline;
 }
+/* ".chat" in dot matrix (Doto, rounded dots), smaller and quieter than the name. */
 .ac-logo__chat {
-  font-size: 0.36em;
-  font-weight: 700;
+  font-family: var(--font-dot, var(--font-mono));
+  font-variation-settings: "ROND" 100;
+  font-size: 0.62em;
+  font-weight: 600;
   letter-spacing: 0;
-  line-height: 1;
-  padding: 0.28em 0.5em 0.34em;
-  margin-top: 0.12em;
-  border-radius: 0.6em;
-  border-bottom-left-radius: 0.12em;
-  background: var(--agent);
-  color: var(--on-agent);
+  margin-left: 0.08em;
+  color: var(--ink-muted);
 }
 .ac-logo--mono .ac-logo__chat {
   background: var(--ink);

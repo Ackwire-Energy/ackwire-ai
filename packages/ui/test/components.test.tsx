@@ -317,7 +317,7 @@ describe("Logo, Icon, Meter", () => {
       </>,
     );
     expect(body().getByRole("img", { name: "agentes" })).toBeTruthy();
-    expect(body().getByRole("img", { name: "agentes.chat" }).textContent).toBe("agenteschat");
+    expect(body().getByRole("img", { name: "agentes.chat" }).textContent).toBe("agentes.chat");
     expect(container.querySelector(".ac-logo__body")).not.toBeNull();
   });
 
