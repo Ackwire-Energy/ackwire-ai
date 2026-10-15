@@ -50,6 +50,11 @@ export function randomAppearance(current: AgentAppearance = {}, rand: () => numb
   return { color: one(AGENT_COLORS), eyes: one(AGENT_EYES), accessory: one(AGENT_ACCESSORIES) };
 }
 
+/** Top and bottom of an agent color as fixed hex (sky as on the landing: the same in both themes). For drawing, e.g. the pixel sky. */
+export function agentGradient(color: AgentColor = "sky"): [string, string] {
+  return color === "sky" ? ["#8cc3ff", "#0063d1"] : GRADIENT[color];
+}
+
 /** CSS variables for the symbol's color (none for sky: the tokens). */
 export function appearanceStyle(a: AgentAppearance | undefined): CSSProperties | undefined {
   if (!a?.color || a.color === "sky") return undefined;

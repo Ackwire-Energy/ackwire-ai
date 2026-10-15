@@ -198,7 +198,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
         <ErrorState error={list.error} onRetry={() => void list.refetch()} />
       )}
       {!trashOpen && list.isSuccess && rows.length === 0 && !filtered && (
-        <EmptyState icon="drive" title={t("drive.emptyTitle")}>
+        <EmptyState sky icon="drive" title={t("drive.emptyTitle")}>
           {t("drive.emptyText")}
         </EmptyState>
       )}

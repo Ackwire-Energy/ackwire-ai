@@ -27,6 +27,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useChannels, useDms, useOverview, usePrefetchMessages } from "@/api/queries";
+import type { Agent } from "@/api/types";
 import { useAuth } from "@/auth/context";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -39,12 +40,15 @@ import { browserTimezone } from "@/lib/routines";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/SettingsPage";
+import { useStreams } from "@/realtime/context";
+import { agentStateIn, runningAgents } from "@/realtime/streams";
 import { AudienceChip } from "./AgentAudience";
 import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { useOrg } from "./org-context";
 import { ProfilePhotoDialog } from "./ProfilePhoto";
+import { AgentGlow, AgentTrail, colorOf, SidebarHorizon, SidebarOrgSky } from "./Sky";
 
 /** Sidebar rows loading: an icon (or avatar) and a name bar, at the real row height. */
 function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boolean; label: string }) {
@@ -84,6 +88,14 @@ export function Sidebar() {
     const channelId = dmWith.get(partnerId);
     if (channelId) prefetch(channelId);
   };
+
+  // How many of the workspace's agents are working now: the sky at the bottom rises with it.
+  const agentIds = dir.agents.map((a) => a.id).join();
+  const working = useStreams((st) => {
+    const busy = runningAgents(st);
+    return agentIds ? agentIds.split(",").filter((id) => busy.has(id)).length : 0;
+  });
+  const orgRef = useRef<HTMLDivElement>(null);
 
   // The active item's soft pill slides between items (one indicator, measured).
   const navRef = useRef<HTMLElement>(null);
@@ -139,7 +151,8 @@ export function Sidebar() {
           }}
         />
       )}
-      <div className="sidebar__org">
+      <div className="sidebar__org" ref={orgRef}>
+        <SidebarOrgSky calm={() => [orgRef.current?.querySelector(".sidebar__org-text") ?? null]} />
         <WorkspaceMenu
           summary={
             overview.data
@@ -245,29 +258,13 @@ export function Sidebar() {
         <div className="sidebar__group">
           <span className="sidebar__label">{t("shell.agents")}</span>
           {dir.agents.map((a) => (
-            <Link
+            <AgentRow
               key={a.id}
-              to="/org/$orgId/dm/agent/$agentId"
-              params={{ orgId, agentId: a.id }}
-              className="sidebar__item"
-              title={a.role ? `${a.name} · ${a.role}` : a.name}
-              onMouseEnter={() => prefetchDm(a.id)}
-              onFocus={() => prefetchDm(a.id)}
-              onClick={() => markOpen(dmWith.get(a.id) ?? a.id)}
-              data-unread={(unreadWith.get(a.id) ?? 0) > 0}
-            >
-              <AgentAvatar agentId={a.id} name={a.name} size="sm" />
-              <span className="sidebar__item-label">{a.name}</span>
-              {(unreadWith.get(a.id) ?? 0) > 0 ? (
-                <UnreadCount count={unreadWith.get(a.id) ?? 0} />
-              ) : (
-                (audienceChip(t, a) ?? a.role) && (
-                  <span className="sidebar__item-meta">
-                    {audienceChip(t, a) ? <AudienceChip agent={a} compact /> : a.role}
-                  </span>
-                )
-              )}
-            </Link>
+              agent={a}
+              unread={unreadWith.get(a.id) ?? 0}
+              onPrefetch={() => prefetchDm(a.id)}
+              onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
+            />
           ))}
         </div>
       )}
@@ -301,6 +298,7 @@ export function Sidebar() {
       <NewChannelDialog open={creatingChannel} onOpenChange={setCreatingChannel} />
 
       <div className="sidebar__foot">
+        <SidebarHorizon working={working} total={dir.agents.length} />
         {can(org.role, "manage_agents") && (
           <Button asChild block className="ac-btn--cut sidebar__create">
             <Link to="/org/$orgId/agents/new" params={{ orgId }} title={t("shell.createAgent")}>
@@ -324,6 +322,53 @@ export function Sidebar() {
         </div>
       </div>
     </nav>
+  );
+}
+
+/** An agent in the sidebar; while it works, a light sweep in its color runs behind the row (a pulse in the rail). */
+function AgentRow({
+  agent: a,
+  unread,
+  onPrefetch,
+  onOpen,
+}: {
+  agent: Agent;
+  unread: number;
+  onPrefetch: () => void;
+  onOpen: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const state = useStreams((st) => agentStateIn(st, a.id));
+  const busy = state !== "idle";
+  const color = colorOf(a);
+  const chip = audienceChip(t, a);
+  return (
+    <Link
+      to="/org/$orgId/dm/agent/$agentId"
+      params={{ orgId: org.id, agentId: a.id }}
+      className="sidebar__item"
+      title={a.role ? `${a.name} · ${a.role}` : a.name}
+      onMouseEnter={onPrefetch}
+      onFocus={onPrefetch}
+      onClick={onOpen}
+      data-unread={unread > 0}
+      data-busy={busy}
+    >
+      {busy && <AgentTrail color={color} />}
+      {busy && <AgentGlow color={color} />}
+      <AgentAvatar agentId={a.id} name={a.name} size="sm" />
+      <span className="sidebar__item-label">{a.name}</span>
+      {unread > 0 ? (
+        <UnreadCount count={unread} />
+      ) : busy ? (
+        <span className="sidebar__item-meta sidebar__busy">{t(`sky.busy.${state}`)}</span>
+      ) : (
+        (chip ?? a.role) && (
+          <span className="sidebar__item-meta">{chip ? <AudienceChip agent={a} compact /> : a.role}</span>
+        )
+      )}
+    </Link>
   );
 }
 

@@ -32,6 +32,7 @@ export function EmptyPage({
       </header>
       {children}
       <EmptyState
+        sky
         icon={icon}
         title={t("empty.soon")}
         actions={

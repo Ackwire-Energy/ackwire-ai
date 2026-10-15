@@ -8,6 +8,7 @@ import { CommandMenu } from "@/components/CommandMenu";
 import { RefetchBar } from "@/components/Loading";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
+import { BootSplash } from "@/components/Sky";
 import { membershipIn } from "@/lib/guards";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { RealtimeProvider } from "@/realtime/context";
@@ -19,6 +20,8 @@ export const Route = createFileRoute("/org/$orgId")({
     return { me, membership: membershipIn(me, params.orgId) };
   },
   component: OrgLayout,
+  // Opening the workspace takes a moment (the session check): the sky rises meanwhile.
+  pendingComponent: BootSplash,
 });
 
 function OrgLayout() {

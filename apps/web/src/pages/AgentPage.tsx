@@ -47,6 +47,7 @@ import { EditDialog } from "@/components/EditDialog";
 import { LoadingLine, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { ManageSkillsDialog } from "@/components/Skills";
+import { AgentCover } from "@/components/Sky";
 import { useAreaLabel } from "@/hooks/useAreaLabel";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useScopeGroups } from "@/hooks/useScopeGroups";
@@ -143,8 +144,9 @@ function AgentProfile({ agent }: { agent: Agent }) {
 
   return (
     <div className="page page--mid agent-page">
+      <AgentCover agent={agent} />
       <header className="agent-head">
-        <AgentAvatar agentId={agent.id} size="lg" name={agent.name} />
+        <AgentAvatar agentId={agent.id} size="xl" name={agent.name} className="agent-head__avatar" />
         <div className="agent-head__text">
           <h1 className="page-title">{agent.name}</h1>
           <span className="agent-head__meta">
