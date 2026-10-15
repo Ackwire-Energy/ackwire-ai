@@ -1,0 +1,113 @@
+import { afterEach, expect, test } from "bun:test";
+import { mkdirSync } from "node:fs";
+import path from "node:path";
+import { OutputBuffer, runCommand } from "../../runner/exec";
+import { handleRequest } from "../../runner/handlers";
+import { errorCode, removeDirs, tempDir } from "./helpers";
+
+const dirs: string[] = [];
+afterEach(() => removeDirs(dirs));
+
+const posix = process.platform !== "win32";
+
+test("OutputBuffer keeps everything under the limit, head and tail above it", () => {
+  const small = new OutputBuffer(10);
+  small.push(Buffer.from("12345"));
+  small.push(Buffer.from("6789"));
+  expect(small.text()).toBe("123456789");
+
+  const big = new OutputBuffer(10);
+  big.push(Buffer.from("abcdefgh"));
+  big.push(Buffer.from("ijklmnopqrstuvwxyz"));
+  expect(big.totalBytes).toBe(26);
+  expect(big.text()).toBe("abcde\n[… cut …]\nvwxyz");
+});
+
+test.skipIf(!posix)("exec: runs a command in the workspace and reports its output and exit code", async () => {
+  const ws = tempDir();
+  dirs.push(ws);
+  mkdirSync(path.join(ws, "sub"));
+  const signal = new AbortController().signal;
+  const ok = await runCommand({ command: "echo hi; pwd", cwd: ws, timeoutSeconds: 10, signal });
+  expect(ok.exitCode).toBe(0);
+  expect(ok.stdout).toBe(`hi\n${ws}\n`);
+  expect(ok.timedOut).toBe(false);
+
+  const failed = await runCommand({ command: "echo oops >&2; exit 3", cwd: ws, timeoutSeconds: 10 });
+  expect(failed).toEqual({ exitCode: 3, stdout: "", stderr: "oops\n", timedOut: false });
+
+  const ctx = { workspaceReal: ws, exec: true, token: "agm_x" };
+  const scope = { signal, output: () => {} };
+  const inSub = (await handleRequest(
+    ctx,
+    { op: "exec", command: "pwd", cwd: "/workspace/sub", timeoutSeconds: 10, stream: false },
+    scope,
+  )) as { stdout: string };
+  expect(inSub.stdout).toBe(`${path.join(ws, "sub")}\n`);
+  expect(
+    await errorCode(() =>
+      handleRequest(ctx, { op: "exec", command: "pwd", cwd: "../", timeoutSeconds: 10, stream: false }, scope),
+    ),
+  ).toBe("outside_workspace");
+});
+
+test("exec is refused when the runner was paired with --no-exec", async () => {
+  const ws = tempDir();
+  dirs.push(ws);
+  const ctx = { workspaceReal: ws, exec: false, token: "agm_x" };
+  const scope = { signal: new AbortController().signal, output: () => {} };
+  expect(
+    await errorCode(() =>
+      handleRequest(ctx, { op: "exec", command: "echo hi", timeoutSeconds: 5, stream: false }, scope),
+    ),
+  ).toBe("exec_disabled");
+});
+
+test.skipIf(!posix)("exec streams output in batches while it runs", async () => {
+  const ws = tempDir();
+  dirs.push(ws);
+  const chunks: string[] = [];
+  const result = await runCommand({
+    command: "echo a; sleep 0.3; echo b",
+    cwd: ws,
+    timeoutSeconds: 10,
+    batchMs: 20,
+    onOutput: (stream, chunk) => {
+      if (stream === "stdout") chunks.push(chunk);
+    },
+  });
+  expect(result.stdout).toBe("a\nb\n");
+  expect(chunks.join("")).toBe("a\nb\n");
+  expect(chunks.length).toBeGreaterThanOrEqual(2);
+});
+
+test.skipIf(!posix)(
+  "exec times out: exit 124 and the process group is killed",
+  async () => {
+    const ws = tempDir();
+    dirs.push(ws);
+    const started = Date.now();
+    const result = await runCommand({ command: "sleep 5", cwd: ws, timeoutSeconds: 1 });
+    expect(result.exitCode).toBe(124);
+    expect(result.timedOut).toBe(true);
+    expect(Date.now() - started).toBeLessThan(4500);
+  },
+  10_000,
+);
+
+test.skipIf(!posix)(
+  "exec cancel: exit 130 with canceled.killed",
+  async () => {
+    const ws = tempDir();
+    dirs.push(ws);
+    const controller = new AbortController();
+    const started = Date.now();
+    setTimeout(() => controller.abort(), 200);
+    const result = await runCommand({ command: "sleep 5", cwd: ws, timeoutSeconds: 30, signal: controller.signal });
+    expect(result.exitCode).toBe(130);
+    expect(result.canceled).toEqual({ killed: true });
+    expect(result.timedOut).toBe(false);
+    expect(Date.now() - started).toBeLessThan(4500);
+  },
+  10_000,
+);

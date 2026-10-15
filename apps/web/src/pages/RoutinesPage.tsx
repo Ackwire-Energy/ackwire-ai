@@ -173,7 +173,11 @@ export function RoutinesPage() {
       {routines.isError && !routines.data && (
         <ErrorState error={routines.error} onRetry={() => void routines.refetch()} />
       )}
-      {routines.isSuccess && list.length === 0 && <EmptyState icon="routines">{t("routines.empty")}</EmptyState>}
+      {routines.isSuccess && list.length === 0 && (
+        <EmptyState sky icon="routines">
+          {t("routines.empty")}
+        </EmptyState>
+      )}
       <div className="stack-4" style={{ gap: 12 }}>
         {current.map((r) => (
           <RoutineCard key={r.id} routine={r} onRuns={() => setRunsFor(r)} onEdit={() => setEditing(r)} />

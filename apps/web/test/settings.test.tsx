@@ -179,7 +179,7 @@ describe("Configurações da organização", () => {
       within(nav)
         .getAllByRole("link")
         .map((l) => l.textContent),
-    ).toEqual(["Geral", "Membros e convites", "Conectores"]);
+    ).toEqual(["Geral", "Membros e convites", "Conectores", "Computadores"]);
     cleanup();
     await go(state, "settings/connectors");
     expect(screen().queryByRole("button", { name: "Adicionar conector" })).toBeNull();

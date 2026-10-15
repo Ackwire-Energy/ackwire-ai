@@ -486,6 +486,7 @@ describe("the agent's computer API", () => {
       costMonthUsd: 0,
       createdAt: null,
       lastUsedAt: null,
+      target: { kind: "cloud" },
     });
     // Start returns at once; the job does the provider work and reports each step.
     expect(await startAgentComputer(deps, f.owner.id, f.org.id, f.agent.id)).toEqual({ status: "starting" });

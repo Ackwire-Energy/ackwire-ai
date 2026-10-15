@@ -71,6 +71,7 @@ import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
+import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { askToStop, isStoppable, StopButton, useStopRun } from "@/components/StopRun";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -651,6 +652,9 @@ function ChannelView({
             </Button>
           </header>
         )}
+        {!chrome && isMember && (
+          <ChannelWelcome channelId={channel.id} messages={messages.data} agents={channelAgents} />
+        )}
 
         {!isMember ? (
           <div className="channel__empty">
@@ -1207,6 +1211,8 @@ function ActivityBar({ channelId }: { channelId: string }) {
   );
   const text = activityText(t, entries);
   const active = entries.length > 0;
+  // The strip behind the bar takes the color of the first agent at work.
+  const skyAgent = entries.find((e) => e.type === "agent");
   const { canStop, stop } = useStopRun();
   // "Parar" in the bar for the runs not writing yet that I may stop.
   const barStoppable = runs.filter((r) => !isWriting(r) && isStoppable(r) && canStop(r));
@@ -1259,6 +1265,7 @@ function ActivityBar({ channelId }: { channelId: string }) {
       <div className="ac-typing" aria-live="polite" data-active={active}>
         {active && (
           <>
+            {skyAgent && <ActivitySky color={colorOf(dir.agentById.get(skyAgent.id))} />}
             <span className="ac-typing__avatars" aria-hidden="true">
               {entries.map((e) =>
                 e.type === "agent" ? (

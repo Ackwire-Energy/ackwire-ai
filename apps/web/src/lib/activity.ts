@@ -70,6 +70,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   read_file: "pcFiles",
   list_files: "pcFiles",
   export_file: "exportingFile",
+  upload_file: "exportingFile",
   import_file: "importingFile",
   share_artifact: "fetchingFile",
   // Scheduling from the chat.

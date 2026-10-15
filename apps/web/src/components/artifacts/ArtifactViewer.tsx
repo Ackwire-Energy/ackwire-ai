@@ -19,23 +19,15 @@ import type { ArtifactAuthor, ArtifactContent, ArtifactDetail } from "@/api/type
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { fileName, KIND_ICON } from "@/lib/artifacts";
+import { fileIcon } from "@/lib/files";
 import { relativeTime } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { ArtifactMoreMenu, useDeleteArtifact } from "./ArtifactActions";
+import { fileSaver } from "./fileSaver";
+import { UploadButton, useDriveUpload } from "./Upload";
 import { ArtifactContentView, TableEditor } from "./views";
 
-/** Saves a URL as a file (an `<a download>` click). Swappable for tests. */
-export const fileSaver = {
-  save(url: string, name: string) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.rel = "noopener";
-    document.body.append(a);
-    a.click();
-    a.remove();
-  },
-};
+export { fileSaver };
 
 /** Link to an artifact (opens Drive with the viewer). */
 export const artifactLink = (origin: string, orgId: string, id: string, version?: number) =>
@@ -96,6 +88,7 @@ export function ArtifactViewer({
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
+  const toast = useToast();
   const authorName = useAuthorName();
   const channels = useChannels(org.id);
   const query = useArtifact(org.id, id, version);
@@ -104,8 +97,17 @@ export function ArtifactViewer({
   const a = query.data;
   const channel = a?.channelId ? channels.data?.find((c) => c.id === a.channelId) : undefined;
   const old = a ? a.shownVersion < a.version : false;
+  const uploader = useDriveUpload((saved) => {
+    toast.show(t("artifacts.saved", { version: saved.version }));
+    onVersion(undefined);
+  });
   const download = async () => {
     if (!a) return;
+    // Uploaded files: the same-origin attachment, with their real name.
+    if (a.content.kind === "file") {
+      fileSaver.save(api.artifacts.fileUrl(org.id, a.id, { version: a.shownVersion }), a.content.name);
+      return;
+    }
     const { url } = await api.artifacts.download(org.id, a.id, a.shownVersion);
     fileSaver.save(url, fileName(a.title, a.content));
   };
@@ -138,23 +140,38 @@ export function ArtifactViewer({
           : []),
       ];
   const canEditNow = Boolean(a?.canEdit && !old && !editing && (a?.kind === "document" || a?.kind === "table"));
+  const canUploadVersion = Boolean(a?.canEdit && !old && a?.kind === "file");
   const actions = a && (
     <>
-      <Menu
-        align="end"
-        label={t("artifacts.downloadMenu")}
-        trigger={
-          <Button size="sm" variant="ghost" icon="download" className="artifact-download">
-            {t("artifacts.downloadMenu")}
-          </Button>
-        }
-      >
-        {formats.map((f) => (
-          <MenuItem key={f.key} icon={f.icon} onSelect={() => save(f.format)}>
-            {f.label}
-          </MenuItem>
-        ))}
-      </Menu>
+      {a.kind === "file" ? (
+        <Button size="sm" variant="ghost" icon="download" className="artifact-download" onClick={() => void download()}>
+          {t("artifacts.download")}
+        </Button>
+      ) : (
+        <Menu
+          align="end"
+          label={t("artifacts.downloadMenu")}
+          trigger={
+            <Button size="sm" variant="ghost" icon="download" className="artifact-download">
+              {t("artifacts.downloadMenu")}
+            </Button>
+          }
+        >
+          {formats.map((f) => (
+            <MenuItem key={f.key} icon={f.icon} onSelect={() => save(f.format)}>
+              {f.label}
+            </MenuItem>
+          ))}
+        </Menu>
+      )}
+      {canUploadVersion && (
+        <UploadButton
+          variant="ghost"
+          label={uploader.busy ? t("files.uploadingVersion") : t("files.uploadVersion")}
+          busy={uploader.busy}
+          onFiles={(files) => void uploader.upload(files.slice(0, 1), { artifactId: a.id })}
+        />
+      )}
       {canEditNow && (
         <Button
           size="sm"
@@ -189,7 +206,13 @@ export function ArtifactViewer({
           t("artifacts.loading")
         )
       }
-      icon={a ? <Icon name={KIND_ICON[a.kind]} /> : undefined}
+      icon={
+        a ? (
+          <Icon
+            name={a.content.kind === "file" ? fileIcon(a.content.name, a.content.contentType) : KIND_ICON[a.kind]}
+          />
+        ) : undefined
+      }
       subtitle={
         a
           ? t("artifacts.subtitle", {
@@ -223,7 +246,7 @@ export function ArtifactViewer({
                 }}
               />
             ) : (
-              <ArtifactContentView content={a.content} title={a.title} />
+              <ArtifactContentView content={a.content} title={a.title} source={{ id: a.id, version: a.shownVersion }} />
             )}
           </div>
           <Versions artifact={a} onVersion={onVersion} />

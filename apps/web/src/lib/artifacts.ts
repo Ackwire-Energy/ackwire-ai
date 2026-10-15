@@ -1,7 +1,7 @@
 import type { IconName } from "@agenteschat/ui";
 import type { ArtifactContent, ArtifactKind, ArtifactRef } from "@/api/types";
 
-export const ARTIFACT_KINDS: ArtifactKind[] = ["document", "table", "diff", "diagram", "html"];
+export const ARTIFACT_KINDS: ArtifactKind[] = ["document", "table", "diff", "diagram", "html", "file"];
 
 export const KIND_ICON: Record<ArtifactKind, IconName> = {
   document: "document",
@@ -9,6 +9,7 @@ export const KIND_ICON: Record<ArtifactKind, IconName> = {
   diff: "code",
   diagram: "diagram",
   html: "page",
+  file: "file",
 };
 
 export const isArtifactKind = (v: unknown): v is ArtifactKind => ARTIFACT_KINDS.includes(v as ArtifactKind);
@@ -139,6 +140,8 @@ export function sortRows(rows: string[][], col: number, dir: "asc" | "desc", loc
 // ── Files ────────────────────────────────────────────────────────────────────
 
 export function fileName(title: string, content: ArtifactContent, table: "csv" = "csv") {
+  // Uploaded files keep their original name.
+  if (content.kind === "file") return content.name;
   const slug =
     title
       .normalize("NFD")

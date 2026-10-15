@@ -81,6 +81,7 @@ describe("finding the settings", () => {
       ["skills", "Skills"],
       ["keys", "Chaves de API"],
       ["storage", "Armazenamento"],
+      ["computers", "Computadores"],
       ["usage", "Orçamento e uso"],
     ];
     for (const [id, heading] of sections) {

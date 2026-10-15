@@ -46,6 +46,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "read_file",
     "list_files",
     "export_file",
+    "upload_file",
     "import_file",
     "run_skill_script",
     "computer_start",
@@ -130,6 +131,10 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   read_file: { label: "Ler do ambiente", description: "Lê um arquivo do ambiente de código." },
   list_files: { label: "Listar o ambiente", description: "Lista os arquivos do ambiente de código." },
   export_file: { label: "Salvar no Drive", description: "Leva um arquivo do ambiente para o Drive." },
+  upload_file: {
+    label: "Enviar para o Drive",
+    description: "Envia um arquivo ou pasta do computador para o Drive como está (PDF, imagens, zip…).",
+  },
   import_file: { label: "Trazer do Drive", description: "Copia um arquivo do Drive para o ambiente." },
   run_skill_script: { label: "Rodar script de skill", description: "Roda um script de uma skill no ambiente." },
   computer_start: { label: "Ligar o computador", description: "Liga o computador do agente (cria na primeira vez)." },

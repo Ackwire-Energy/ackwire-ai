@@ -11,6 +11,7 @@ import type {
   ApiRule,
   Approval,
   ArtifactContent,
+  ArtifactDetail,
   ArtifactFilters,
   CalendarEventInput,
   CalendarEventPatch,
@@ -20,6 +21,7 @@ import type {
   ForumTopicInput,
   IssueInput,
   IssuePatch,
+  Machine,
   Message,
   OrgSettings,
   Role,
@@ -800,6 +802,40 @@ export function useSaveArtifact(orgId: string, id: string) {
   });
 }
 
+/** Uploads a file to the Drive, or a new version of `artifactId`. Errors are shown by the caller. */
+export function useUploadFile(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      file: File;
+      title?: string;
+      channelId?: string | null;
+      artifactId?: string;
+      note?: string;
+    }): Promise<ArtifactDetail> =>
+      input.artifactId
+        ? api.artifacts.uploadVersion(orgId, input.artifactId, input.file, { note: input.note })
+        : api.artifacts.upload(orgId, input.file, { title: input.title, channelId: input.channelId }),
+    meta: { silent: true },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.artifacts(orgId) }),
+  });
+}
+
+/** The bytes of a file version as an object URL (previews); never refetched (versions don't change). */
+export const useArtifactBlob = (orgId: string, id: string, version: number, enabled: boolean) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.artifactBlob(orgId, id, version),
+    queryFn: () => api.artifacts.fileBlob(orgId, id, version),
+    enabled,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: 60_000,
+    retry: false,
+    meta: { quiet: true },
+  });
+};
+
 // ── Issues ───────────────────────────────────────────────────────────────────
 
 export const useIssues = (orgId: string, q = "") => {
@@ -1145,6 +1181,69 @@ export function useComputerAction(orgId: string) {
       } else if (result && typeof result === "object" && "status" in result) {
         qc.setQueryData(keys.computer(orgId, agentId), result as AgentComputer);
       }
+    },
+  });
+}
+
+/** Cloud or a connected machine for the agent; the computer view follows the answer. */
+export function useSetComputerTarget(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, machineId }: { agentId: string; machineId: string | null }) =>
+      api.sandbox.setTarget(orgId, agentId, machineId),
+    meta: { silent: true },
+    onSuccess: (target, { agentId }) => {
+      qc.setQueryData<AgentComputer>(keys.computer(orgId, agentId), (old) => (old ? { ...old, target } : old));
+      void qc.invalidateQueries({ queryKey: keys.computer(orgId, agentId) });
+      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
+    },
+  });
+}
+
+// ── Connected computers ─────────────────────────────────────────────────────
+
+/** `pollMs`: also refetch this often (while waiting for a new machine to pair); events keep it live otherwise. */
+export const useMachines = (orgId: string, enabled = true, pollMs: number | false = false) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.machines(orgId),
+    queryFn: () => api.machines.list(orgId),
+    enabled,
+    retry: false,
+    refetchInterval: pollMs,
+    meta: { quiet: true },
+  });
+};
+
+export function useCreatePairing(orgId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (name: string) => api.machines.createPairing(orgId, { name }),
+    meta: { silent: true },
+  });
+}
+
+export function useMachineAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      input: { machineId: string; action: "rename"; name: string } | { machineId: string; action: "remove" },
+    ) =>
+      input.action === "rename"
+        ? api.machines.rename(orgId, input.machineId, input.name).then(() => undefined)
+        : api.machines.remove(orgId, input.machineId),
+    meta: { silent: true },
+    onSuccess: (_r, input) => {
+      qc.setQueryData<Machine[]>(keys.machines(orgId), (list) =>
+        input.action === "remove"
+          ? list?.filter((m) => m.id !== input.machineId)
+          : list?.map((m) => (m.id === input.machineId ? { ...m, name: input.name } : m)),
+      );
+      void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
+      // Agents on a removed machine go back to the cloud; a renamed one shows its new name.
+      void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
     },
   });
 }

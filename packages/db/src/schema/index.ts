@@ -4,6 +4,7 @@ export * from "./chat";
 export * from "./connectors";
 export * from "./context";
 export * from "./forum";
+export * from "./machines";
 export * from "./runtime";
 export * from "./sandbox";
 export * from "./skills";

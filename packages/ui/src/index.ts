@@ -15,6 +15,7 @@ export {
   type AgentAppearance,
   type AgentColor,
   type AgentEyes,
+  agentGradient,
   appearanceStyle,
   normalizeAppearance,
   randomAppearance,
@@ -66,6 +67,7 @@ export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { Mention } from "./components/Mention";
 export { Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "./components/Menu";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
+export { glowOptions, PixelSky, SkyGlow } from "./components/PixelSky";
 export { Popover } from "./components/Popover";
 export {
   modeOf,
@@ -123,6 +125,18 @@ export {
   weekdayPosition,
   zonedInstant,
 } from "./recurrence";
+export { pixelBurst } from "./sky/burst";
+export {
+  drawSprite,
+  prefersReducedMotion,
+  redrawSkies,
+  type SkyBlob,
+  type SkyFrame,
+  type SkyOptions,
+  SPRITE,
+  startSky,
+} from "./sky/engine";
+export { agentTones, eyeTone, glowTones, mix, parseColor, pixelOf, SKY_TONES, softTones } from "./sky/tones";
 export {
   allZones,
   cityOf,

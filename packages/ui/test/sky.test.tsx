@@ -1,0 +1,109 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { setupDom } from "../testing/dom";
+
+setupDom();
+
+import { cleanup, render } from "@testing-library/react";
+import {
+  agentGradient,
+  agentTones,
+  EmptyState,
+  eyeTone,
+  glowTones,
+  mix,
+  PixelSky,
+  parseColor,
+  pixelOf,
+  SKY_TONES,
+  SkyGlow,
+  softTones,
+  startSky,
+} from "../src";
+
+afterEach(() => cleanup());
+
+const opts = { palette: SKY_TONES, base: () => 0.5 };
+
+describe("sky tones", () => {
+  test("parses hex (short and long) and rgb(); anything else is mid gray", () => {
+    expect(parseColor("#0063d1")).toEqual([0, 99, 209]);
+    expect(parseColor("#fff")).toEqual([255, 255, 255]);
+    expect(parseColor("rgb(10, 20, 30)")).toEqual([10, 20, 30]);
+    expect(parseColor("rgba(10 20 30 / 0.5)")).toEqual([10, 20, 30]);
+    expect(parseColor("var(--bg)")).toEqual([128, 128, 128]);
+  });
+
+  test("mixes two colors and packs pixels as little-endian RGBA", () => {
+    expect(mix("#000000", "#ffffff", 0.5)).toBe("#808080");
+    expect(mix("#123456", "#abcdef", 0)).toBe("#123456");
+    expect(mix("#123456", "#abcdef", 1)).toBe("#abcdef");
+    expect(pixelOf("#0063d1")).toBe(0xffd16300);
+  });
+
+  test("an agent's sky goes from deep to light; sky is the landing's tones", () => {
+    expect(agentTones("sky")).toEqual(SKY_TONES);
+    const violet = agentTones("violet");
+    expect(violet).toHaveLength(8);
+    expect(violet[2]).toBe(agentGradient("violet")[1]);
+    expect(violet[4]).toBe(agentGradient("violet")[0]);
+    const light = (c: string) => parseColor(c).reduce((a, b) => a + b, 0);
+    expect(light(violet[0] ?? "")).toBeLessThan(light(violet[7] ?? ""));
+  });
+
+  test("glows start on the surface, so they meet the page without a seam", () => {
+    expect(glowTones("teal", "#f4f4f1")[0]).toBe("#f4f4f1");
+    expect(softTones("sky", "#0a0a09")[0]).toBe("#0a0a09");
+    expect(softTones("sky", "#0a0a09").at(-1)).not.toBe(agentGradient("sky")[1]);
+  });
+
+  test("the pixel agents' eyes take the agent color", () => {
+    expect(eyeTone("sky")).toBe("#1c63d6");
+    expect(eyeTone("rose")).toBe(agentGradient("rose")[1]);
+  });
+});
+
+describe("PixelSky", () => {
+  test("a decorative canvas with nothing to read", () => {
+    const { container } = render(
+      <div>
+        <PixelSky options={opts} />
+      </div>,
+    );
+    const canvas = container.querySelector("canvas");
+    expect(canvas?.textContent).toBe("");
+    expect(canvas?.classList.contains("ac-sky")).toBe(true);
+  });
+
+  test("without a 2D context nothing is drawn and the cleanup is safe", () => {
+    const host = document.createElement("div");
+    const canvas = document.createElement("canvas");
+    canvas.getContext = (() => null) as typeof canvas.getContext;
+    host.append(canvas);
+    const stop = startSky(canvas, () => opts);
+    expect(() => stop()).not.toThrow();
+  });
+
+  test("the glow is a decorative block", () => {
+    const { container } = render(<SkyGlow color="green" />);
+    expect(container.querySelector(".ac-sky-glow")?.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+describe("EmptyState with sky", () => {
+  test("the glow stands in for the icon; the text stays", () => {
+    const { container, getByText } = render(
+      <EmptyState sky icon="issues" title="Nada aqui">
+        Quando alguém abrir uma issue, ela aparece aqui.
+      </EmptyState>,
+    );
+    expect(container.querySelector(".ac-empty--sky .ac-sky-glow")).not.toBeNull();
+    expect(container.querySelector(".ac-empty__icon")).toBeNull();
+    expect(getByText("Nada aqui")).toBeTruthy();
+  });
+
+  test("without sky it keeps the icon (errors, no results)", () => {
+    const { container } = render(<EmptyState icon="alert">Falhou</EmptyState>);
+    expect(container.querySelector(".ac-empty__icon")).not.toBeNull();
+    expect(container.querySelector(".ac-sky")).toBeNull();
+  });
+});

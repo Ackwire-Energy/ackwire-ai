@@ -4,13 +4,29 @@
  * `GET …/agents/{id}/computer`, `POST …/computer/stop|start`, `DELETE …/computer`.
  */
 import type { ApiClient } from "@/api/client";
-import type { AgentComputer, SandboxSettings } from "@/api/types";
+import { ApiError } from "@/api/http";
+import type { AgentComputer, ComputerTarget, SandboxSettings } from "@/api/types";
 import { clone, type MockContext } from "./context";
+import type { FakeMachines } from "./machines";
 
 export function createFakeSandbox(
   ctx: MockContext,
   log: (method: string, ...args: unknown[]) => void,
+  machines?: FakeMachines,
 ): ApiClient["sandbox"] {
+  /** `PUT …/computer/target`: agent → machine id (absent = the cloud). */
+  const targets = new Map<string, string>();
+  const targetOf = (agentId: string): ComputerTarget => {
+    const id = targets.get(agentId);
+    const m = id ? machines?.peek(id) : undefined;
+    return m ? { kind: "machine", machineId: m.id, name: m.name, online: m.online } : { kind: "cloud" };
+  };
+  /** Like the server: start/stop on a machine is `400 machine.no_lifecycle`. */
+  const refuseOnMachine = (agentId: string) => {
+    if (targetOf(agentId).kind === "machine") {
+      throw new ApiError(400, "machine.no_lifecycle", "This agent uses a connected computer");
+    }
+  };
   let settings: SandboxSettings = {
     available: true,
     enabled: true,
@@ -50,9 +66,10 @@ export function createFakeSandbox(
       // Like the server: running PCs get a new network rule in place.
       return clone({ ...settings, networkApply: "live" as const });
     },
-    computer: async (orgId, agentId) => clone(await pc(orgId, agentId)),
+    computer: async (orgId, agentId) => clone({ ...(await pc(orgId, agentId)), target: targetOf(agentId) }),
     start: async (orgId, agentId) => {
       log("sandbox.start", orgId, agentId);
+      refuseOnMachine(agentId);
       const c = await pc(orgId, agentId);
       c.status = "running";
       c.lastUsedAt = ctx.now().toISOString();
@@ -61,6 +78,7 @@ export function createFakeSandbox(
     },
     stop: async (orgId, agentId) => {
       log("sandbox.stop", orgId, agentId);
+      refuseOnMachine(agentId);
       const c = await pc(orgId, agentId);
       c.status = "stopped";
       return clone(c);
@@ -68,6 +86,22 @@ export function createFakeSandbox(
     remove: async (orgId, agentId) => {
       log("sandbox.remove", orgId, agentId);
       pcs.set(agentId, { status: "none", diskUsedGib: 0, costMonthUsd: 0, createdAt: null, lastUsedAt: null });
+    },
+    setTarget: async (orgId, agentId, machineId) => {
+      log("sandbox.setTarget", orgId, agentId, machineId);
+      const before = targets.get(agentId);
+      if (machineId) targets.set(agentId, machineId);
+      else targets.delete(agentId);
+      if (machines) {
+        const agents = await ctx.lookup.agents(orgId);
+        for (const id of new Set([before, machineId].filter((x): x is string => Boolean(x)))) {
+          machines.setAgents(
+            id,
+            agents.filter((a) => targets.get(a.id) === id).map((a) => ({ id: a.id, name: a.name, handle: a.handle })),
+          );
+        }
+      }
+      return targetOf(agentId);
     },
   };
 }

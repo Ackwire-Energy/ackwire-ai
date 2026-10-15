@@ -27,6 +27,15 @@ export const orgTopic = (orgId: string) => `org:${orgId}`;
 /** Events for one person in one organization (approvals waiting for them, DMs). */
 export const userTopic = (orgId: string, userId: string) => `user:${orgId}:${userId}`;
 
+/** Server-side signal that one upload to the Drive finished (`upload_file`, ADR 0025). Never forwarded to clients. */
+export const uploadTopic = (uploadId: string) => `upload:${uploadId}`;
+
+/** Server-side: a request (`machine_rpc` row) for a machine whose socket this replica holds (ADR 0025). */
+export const machineRpcTopic = (replicaId: string) => `machine-rpc:${replicaId}`;
+
+/** Server-side: the reply to one `machine_rpc` row is written. */
+export const machineRpcReplyTopic = (rpcId: string) => `machine-rpc-reply:${rpcId}`;
+
 function deliver(handlers: Set<(event: RealtimeEvent) => void> | undefined, event: RealtimeEvent) {
   for (const handler of handlers ?? []) {
     try {

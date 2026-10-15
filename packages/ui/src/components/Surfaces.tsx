@@ -1,6 +1,7 @@
 import { type HTMLAttributes, type ReactNode, useEffect, useState } from "react";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
+import { SkyGlow } from "./PixelSky";
 
 /** Neutral card (`surface-raised` + `line`). State never tints it: use a Chip. */
 export function Card({
@@ -31,13 +32,16 @@ export interface EmptyStateProps {
   children?: ReactNode;
   actions?: ReactNode;
   className?: string;
+  /** An empty place (not an error): a dithered sky glow with a pixel agent instead of the icon. */
+  sky?: boolean;
 }
 
 /** Dashed box with a short explanation (and optional icon, title and actions). */
-export function EmptyState({ icon, title, children, actions, className }: EmptyStateProps) {
+export function EmptyState({ icon, title, children, actions, className, sky }: EmptyStateProps) {
   return (
-    <div className={cx("ac-empty", className)}>
-      {icon && (
+    <div className={cx("ac-empty", sky && "ac-empty--sky", className)}>
+      {sky && <SkyGlow className="ac-empty__sky" />}
+      {icon && !sky && (
         <span className="ac-empty__icon">
           <Icon name={icon} />
         </span>

@@ -176,4 +176,26 @@ export const extraIcons = {
     ["rect", { x: "5.5", y: "4.5", width: "3", height: "11", rx: "1" }],
     ["rect", { x: "11.5", y: "4.5", width: "3", height: "11", rx: "1" }],
   ],
+  /** An uploaded file of any type (Drive). */
+  file: [["path", { d: "M6 3h6l3.5 3.5V17H6zM12 3v3.5h3.5" }]],
+  /** An image file. */
+  image: [
+    ["rect", { x: "3.5", y: "4.5", width: "13", height: "11", rx: "2" }],
+    ["circle", { cx: "8", cy: "8.5", r: "1.3" }],
+    ["path", { d: "m4 14 4-3.5 3 2.5 2.5-2 3 2.5" }],
+  ],
+  /** A zip or other archive. */
+  archive: [
+    ["path", { d: "M6 3h6l3.5 3.5V17H6zM12 3v3.5h3.5" }],
+    ["path", { d: "M9 5v1.5M9 8v1.5M8 11.5h2V14H8z" }],
+  ],
+  /** "Enviar arquivo". */
+  upload: [["path", { d: "M10 13V4M6 7.5 10 3.5l4 4M4.5 16.5h11" }]],
+  /** A connected computer. */
+  computer: [
+    ["rect", { x: "3", y: "4", width: "14", height: "9.5", rx: "2" }],
+    ["path", { d: "M7.5 16.5h5M10 13.5v3" }],
+  ],
+  /** The cloud computer. */
+  cloud: [["path", { d: "M6 15.5a3.5 3.5 0 0 1-.4-7 4.5 4.5 0 0 1 8.7-.9A3.5 3.5 0 0 1 14 15.5z" }]],
 } satisfies Record<string, IconShape[]>;

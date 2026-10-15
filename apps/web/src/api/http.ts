@@ -43,26 +43,56 @@ export function createRequester(fetchImpl: FetchLike = (input, init) => fetch(in
       credentials: "same-origin",
       body: hasBody ? JSON.stringify(options.json ?? {}) : undefined,
     });
-    if (res.status === 204) return undefined as T;
-    const text = await res.text();
-    let data: unknown;
-    try {
-      data = text ? JSON.parse(text) : undefined;
-    } catch {
-      data = undefined;
-    }
-    if (!res.ok) {
-      const error = (data as { error?: { code?: string; message?: string } } | undefined)?.error;
-      throw new ApiError(
-        res.status,
-        error?.code ?? `http_${res.status}`,
-        error?.message ?? (res.statusText || `HTTP ${res.status}`),
-      );
-    }
-    return data as T;
+    return parseResponse<T>(res);
   };
 }
 
+/** JSON body, or `ApiError` from `{ error: { code, message } }`. */
+async function parseResponse<T>(res: Response): Promise<T> {
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  let data: unknown;
+  try {
+    data = text ? JSON.parse(text) : undefined;
+  } catch {
+    data = undefined;
+  }
+  if (!res.ok) {
+    const error = (data as { error?: { code?: string; message?: string } } | undefined)?.error;
+    throw new ApiError(
+      res.status,
+      error?.code ?? `http_${res.status}`,
+      error?.message ?? (res.statusText || `HTTP ${res.status}`),
+    );
+  }
+  return data as T;
+}
+
 export type Requester = ReturnType<typeof createRequester>;
+
+/**
+ * Multipart uploads (only the Drive's two file routes accept them) and raw
+ * downloads (file previews). Same origin and cookie as the JSON requests.
+ */
+export function createFileRequester(fetchImpl: FetchLike = (input, init) => fetch(input, init), base = "") {
+  return {
+    /** `POST` a form; the browser sets the multipart boundary. */
+    async upload<T>(path: string, form: FormData): Promise<T> {
+      const res = await fetchImpl(base + path, {
+        method: "POST",
+        headers: { accept: "application/json" },
+        credentials: "same-origin",
+        body: form,
+      });
+      return parseResponse<T>(res);
+    },
+    /** The bytes of a download. */
+    async blob(path: string): Promise<Blob> {
+      const res = await fetchImpl(base + path, { method: "GET", credentials: "same-origin" });
+      if (!res.ok) await parseResponse<never>(res);
+      return res.blob();
+    },
+  };
+}
 
 export const enc = encodeURIComponent;

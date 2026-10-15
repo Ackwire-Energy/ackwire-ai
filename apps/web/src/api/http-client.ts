@@ -1,5 +1,5 @@
 import type { HttpApi } from "./client";
-import { ApiError, createRequester, enc, type FetchLike } from "./http";
+import { ApiError, createFileRequester, createRequester, enc, type FetchLike } from "./http";
 import type {
   AccessMatrix,
   ActiveRun,
@@ -21,6 +21,7 @@ import type {
   CalendarRange,
   Channel,
   ChannelMember,
+  ComputerTarget,
   Connection,
   ConnectorCatalog,
   Credential,
@@ -36,6 +37,8 @@ import type {
   InvitationWithStatus,
   Issue,
   IssueActivity,
+  Machine,
+  MachinePairing,
   Me,
   Member,
   Memory,
@@ -75,6 +78,7 @@ const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
 /** The real backend: `/api/health` and `/api/app/*` (apps/server/src/routes/app). */
 export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
   const request = createRequester(fetchImpl);
+  const files = createFileRequester(fetchImpl);
   const nullOn = async <T>(status: number, run: () => Promise<T>): Promise<T | null> => {
     try {
       return await run();
@@ -287,6 +291,21 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       stop: (orgId, agentId) =>
         request<AgentComputer>(`${org(orgId)}/agents/${enc(agentId)}/computer/stop`, { json: {} }),
       remove: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/computer`, { method: "DELETE" }),
+      setTarget: (orgId, agentId, machineId) =>
+        request<ComputerTarget>(`${org(orgId)}/agents/${enc(agentId)}/computer/target`, {
+          method: "PUT",
+          json: { machineId },
+        }),
+    },
+    machines: {
+      list: async (orgId) => (await request<{ machines: Machine[] }>(`${org(orgId)}/machines`)).machines,
+      createPairing: (orgId, input) => request<MachinePairing>(`${org(orgId)}/machines/pairings`, { json: input }),
+      rename: (orgId, machineId, name) =>
+        request<{ id: string; name: string }>(`${org(orgId)}/machines/${enc(machineId)}`, {
+          method: "PATCH",
+          json: { name },
+        }),
+      remove: (orgId, machineId) => request<void>(`${org(orgId)}/machines/${enc(machineId)}`, { method: "DELETE" }),
     },
     skills: {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,
@@ -352,6 +371,22 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         const qs = params.toString();
         return `${org(orgId)}/artifacts/${enc(id)}/file${qs ? `?${qs}` : ""}`;
       },
+      upload: (orgId, file, options = {}) => {
+        const form = new FormData();
+        form.append("file", file, file.name);
+        if (options.title) form.append("title", options.title);
+        if (options.channelId) form.append("channelId", options.channelId);
+        if (options.threadId) form.append("threadId", options.threadId);
+        return files.upload<ArtifactDetail>(`${org(orgId)}/artifacts/files`, form);
+      },
+      uploadVersion: (orgId, id, file, options = {}) => {
+        const form = new FormData();
+        form.append("file", file, file.name);
+        if (options.note) form.append("note", options.note);
+        return files.upload<ArtifactDetail>(`${org(orgId)}/artifacts/${enc(id)}/files`, form);
+      },
+      fileBlob: (orgId, id, version) =>
+        files.blob(`${org(orgId)}/artifacts/${enc(id)}/file${version ? `?version=${version}` : ""}`),
       create: (orgId, input) => request<ArtifactDetail>(`${org(orgId)}/artifacts`, { json: input }),
       update: (orgId, id, input) =>
         request<ArtifactDetail>(`${org(orgId)}/artifacts/${enc(id)}/versions`, { json: input }),

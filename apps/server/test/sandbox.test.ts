@@ -68,5 +68,11 @@ test("without a provider the sandbox is reported as unavailable", async () => {
   expect(await (await owner(`/api/app/organizations/${orgId}/sandbox-settings`)).json()).toMatchObject({
     available: false,
   });
-  expect((await owner(`/api/app/organizations/${orgId}/agents/${agentId}/computer`)).status).toBe(404);
+  // Connected machines may still give agents a computer: the status answers, cloud start is refused.
+  expect(await (await owner(`/api/app/organizations/${orgId}/agents/${agentId}/computer`)).json()).toMatchObject({
+    status: "none",
+    target: { kind: "cloud" },
+  });
+  const start = await owner(`/api/app/organizations/${orgId}/agents/${agentId}/computer/start`, { json: {} });
+  expect(start.status).toBe(404);
 });

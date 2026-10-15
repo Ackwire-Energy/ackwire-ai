@@ -4,7 +4,9 @@ import { useArtifact } from "@/api/queries";
 import type { ArtifactContent, ArtifactRef } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { documentPreview, KIND_ICON, patchCounts } from "@/lib/artifacts";
+import { fileIcon } from "@/lib/files";
 import { useArtifactViewer, useAuthorName } from "./ArtifactViewer";
+import { FileSummary } from "./FileView";
 import { MermaidDiagram } from "./Mermaid";
 
 const PREVIEW_ROWS = 3;
@@ -53,7 +55,9 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
           </span>
         ) : (
           <span className="artifact-card__icon">
-            <Icon name={KIND_ICON[a.kind]} />
+            <Icon
+              name={a.content.kind === "file" ? fileIcon(a.content.name, a.content.contentType) : KIND_ICON[a.kind]}
+            />
           </span>
         )}
         <span className="artifact-card__meta">
@@ -145,6 +149,12 @@ function Preview({ content, title }: { content: ArtifactContent; title: string }
         <div className="artifact-card__thumb">
           <Icon name="page" />
           <span className="small muted">{t("artifacts.htmlPreview")}</span>
+        </div>
+      );
+    case "file":
+      return (
+        <div className="artifact-card__thumb">
+          <FileSummary content={content} />
         </div>
       );
   }

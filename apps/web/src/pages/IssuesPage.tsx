@@ -181,7 +181,9 @@ export function IssuesPage() {
       )}
       {issues.isSuccess && all.length === 0 && !search && (
         <div className="issues-page__pad">
-          <EmptyState icon="issues">{t("issues.empty")}</EmptyState>
+          <EmptyState sky icon="issues">
+            {t("issues.empty")}
+          </EmptyState>
         </div>
       )}
       {issues.isSuccess && visible.length === 0 && (all.length > 0 || search) && (

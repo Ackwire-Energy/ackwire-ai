@@ -4,11 +4,20 @@ import { useTranslation } from "react-i18next";
 import type { ArtifactContent, ArtifactDiffFile } from "@/api/types";
 import { parsePatch, patchCounts, sideBySide, sortRows } from "@/lib/artifacts";
 import { Markdown } from "@/lib/markdown";
+import { FileSummary, FileView } from "./FileView";
 import { HtmlFrame } from "./HtmlFrame";
 import { MermaidDiagram } from "./Mermaid";
 
-/** Read-only view of one artifact version, per kind. */
-export function ArtifactContentView({ content, title }: { content: ArtifactContent; title: string }) {
+/** Read-only view of one artifact version, per kind. `source`: which artifact and version (uploaded files load from it). */
+export function ArtifactContentView({
+  content,
+  title,
+  source,
+}: {
+  content: ArtifactContent;
+  title: string;
+  source?: { id: string; version: number };
+}) {
   const { t } = useTranslation();
   switch (content.kind) {
     case "document":
@@ -25,6 +34,12 @@ export function ArtifactContentView({ content, title }: { content: ArtifactConte
           <p className="small muted">{t("artifacts.htmlNote")}</p>
           <HtmlFrame html={content.html} title={t("artifacts.htmlFrame", { title })} />
         </div>
+      );
+    case "file":
+      return source ? (
+        <FileView content={content} artifactId={source.id} version={source.version} title={title} />
+      ) : (
+        <FileSummary content={content} />
       );
   }
 }

@@ -11,15 +11,36 @@ import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./se
 
 const { artifacts, artifactVersions, channels, channelMembers } = schema;
 
-export type ArtifactKind = "document" | "table" | "diff" | "html" | "diagram";
-export const ARTIFACT_KINDS: readonly ArtifactKind[] = ["document", "table", "diff", "html", "diagram"];
+export type ArtifactKind = "document" | "table" | "diff" | "html" | "diagram" | "file";
+export const ARTIFACT_KINDS: readonly ArtifactKind[] = ["document", "table", "diff", "html", "diagram", "file"];
+/** Kinds made from content (JSON); `file` is made only from bytes (`createFileArtifact`, ADR 0025). */
+export const TEXT_ARTIFACT_KINDS: readonly Exclude<ArtifactKind, "file">[] = [
+  "document",
+  "table",
+  "diff",
+  "html",
+  "diagram",
+];
+
+/** A binary file as is: metadata only (the bytes are the blob); `text` for small UTF-8 text files. */
+export interface FileContent {
+  kind: "file";
+  name: string;
+  contentType: string;
+  size: number;
+  sha256: string;
+  text?: string;
+}
 
 export type ArtifactContent =
   | { kind: "document"; markdown: string }
   | { kind: "table"; columns: string[]; rows: string[][] }
   | { kind: "diff"; files: { path: string; patch: string }[] }
   | { kind: "diagram"; mermaid: string }
-  | { kind: "html"; html: string };
+  | { kind: "html"; html: string }
+  | FileContent;
+
+type TextContent = Exclude<ArtifactContent, FileContent>;
 
 export interface ArtifactAuthor {
   type: "agent" | "person";
@@ -38,9 +59,9 @@ export interface ArtifactView {
   updatedBy: ArtifactAuthor;
   createdAt: string;
   updatedAt: string;
-  /** The viewer may save new versions (documents and tables). */
+  /** The viewer may save new versions (documents, tables, and uploads of files). */
   canEdit: boolean;
-  /** HTML pages: render only in a sandboxed iframe on another origin, never inline. */
+  /** HTML pages and files: never rendered on the app's origin (sandboxed iframe on another origin, or download). */
   untrusted: boolean;
 }
 
@@ -79,6 +100,11 @@ export const ARTIFACT_LIMITS = {
   tableBytes: 5_000_000,
   diffFiles: 500,
   diffBytes: 2_000_000,
+  /** One `file` version (ADR 0025). */
+  fileBytes: 50 * 1024 * 1024,
+  fileNameChars: 255,
+  /** `file` versions whose text `read_artifact` and the app get (UTF-8 text files only). */
+  fileTextChars: 40_000,
 };
 
 type ArtifactRow = typeof artifacts.$inferSelect;
@@ -88,8 +114,8 @@ const sha256Hex = (body: Uint8Array) => createHash("sha256").update(body).digest
 const bytes = (s: string) => new TextEncoder().encode(s).byteLength;
 const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
 
-/** Checks kind, shape and size; returns a clean copy. */
-export function validateContent(raw: unknown): ArtifactContent {
+/** Checks kind, shape and size; returns a clean copy. Never a `file`: those come from bytes. */
+export function validateContent(raw: unknown): TextContent {
   const c = (raw ?? {}) as Record<string, unknown>;
   const tooBig = (what: string) => new ValidationError(`${what} is too large`);
   switch (c.kind) {
@@ -136,13 +162,15 @@ export function validateContent(raw: unknown): ArtifactContent {
       if (bytes(JSON.stringify(clean)) > ARTIFACT_LIMITS.diffBytes) throw tooBig("diff");
       return { kind: "diff", files: clean };
     }
+    case "file":
+      throw new ValidationError("files are uploaded as bytes (upload_file, or an upload in the Drive), not as content");
     default:
-      throw new ValidationError(`kind must be one of ${ARTIFACT_KINDS.join(", ")}`);
+      throw new ValidationError(`kind must be one of ${TEXT_ARTIFACT_KINDS.join(", ")}`);
   }
 }
 
 /** How each kind is stored: documents, pages and diagrams as text; tables and diffs as JSON. */
-function encode(content: ArtifactContent): { body: Uint8Array; contentType: string } {
+function encode(content: TextContent): { body: Uint8Array; contentType: string } {
   const text = (s: string, contentType: string) => ({ body: new TextEncoder().encode(s), contentType });
   switch (content.kind) {
     case "document":
@@ -158,7 +186,7 @@ function encode(content: ArtifactContent): { body: Uint8Array; contentType: stri
   }
 }
 
-function decode(kind: ArtifactKind, body: Uint8Array): ArtifactContent {
+function decode(kind: Exclude<ArtifactKind, "file">, body: Uint8Array): TextContent {
   const s = new TextDecoder().decode(body);
   switch (kind) {
     case "document":
@@ -182,20 +210,134 @@ const EXTENSIONS: Record<ArtifactKind, string> = {
   diagram: "mmd",
   table: "json",
   diff: "json",
+  file: "bin",
 };
 
-/** Plain text for search: what a person would look for in the file. */
+// ── Files (ADR 0025) ─────────────────────────────────────────────────────────
+
+const CONTENT_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  zip: "application/zip",
+  gz: "application/gzip",
+  tgz: "application/gzip",
+  tar: "application/x-tar",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  doc: "application/msword",
+  xls: "application/vnd.ms-excel",
+  ppt: "application/vnd.ms-powerpoint",
+  odt: "application/vnd.oasis.opendocument.text",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+  txt: "text/plain; charset=utf-8",
+  log: "text/plain; charset=utf-8",
+  md: "text/markdown; charset=utf-8",
+  csv: "text/csv; charset=utf-8",
+  tsv: "text/tab-separated-values; charset=utf-8",
+  json: "application/json",
+  xml: "application/xml",
+  yaml: "application/yaml",
+  yml: "application/yaml",
+  html: "text/html; charset=utf-8",
+  htm: "text/html; charset=utf-8",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+};
+
+/** Text-like extensions whose small files get `text` (beyond `text/*` types). */
+const TEXT_EXTENSIONS = new Set(["md", "csv", "tsv", "json", "txt", "log", "yaml", "yml", "xml"]);
+const TEXT_READ_BYTES = 200_000;
+
+const extensionOf = (name: string) => /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toLowerCase() ?? "";
+
+/**
+ * The type a file is stored and served with: from its extension; otherwise
+ * the one given, when it is plain (never a type a browser would run);
+ * otherwise `application/octet-stream`.
+ */
+export function fileContentType(name: string, given?: string | null): string {
+  const known = CONTENT_TYPES[extensionOf(name)];
+  if (known) return known;
+  const g = given?.split(";")[0]?.trim().toLowerCase() ?? "";
+  const plain = /^[a-z]+\/[a-z0-9.+-]+$/.test(g) && !/html|xml|svg|javascript|ecmascript/.test(g);
+  return plain ? g : "application/octet-stream";
+}
+
+/** The original file name, cleaned: no folders, no control characters, at most 255 characters (extension kept). */
+export function cleanFileName(raw: string): string {
+  const base = (raw.split(/[\\/]/).at(-1) ?? "")
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping them is the point
+    .replace(/[\u0000-\u001f\u007f"]/g, "")
+    .trim();
+  if (!base || base === "." || base === "..")
+    throw new ValidationError("the file needs a name", "artifact.file_name_required");
+  const max = ARTIFACT_LIMITS.fileNameChars;
+  if (base.length <= max) return base;
+  const ext = extensionOf(base);
+  return ext && ext.length < 20 ? `${base.slice(0, max - ext.length - 1)}.${ext}` : base.slice(0, max);
+}
+
+const isTextFile = (name: string, contentType: string) =>
+  contentType.startsWith("text/") ||
+  contentType.startsWith("application/json") ||
+  TEXT_EXTENSIONS.has(extensionOf(name));
+
+/** A `file` version as content: metadata, plus its text when it is a small UTF-8 text file. */
+function fileContent(
+  v: Pick<VersionRow, "fileName" | "contentType" | "size" | "sha256">,
+  body: Uint8Array | null,
+): FileContent {
+  const name = v.fileName ?? "file";
+  const content: FileContent = { kind: "file", name, contentType: v.contentType, size: v.size, sha256: v.sha256 };
+  if (body && isTextFile(name, v.contentType)) {
+    try {
+      const text = new TextDecoder("utf-8", { fatal: true }).decode(body);
+      if (text.length <= ARTIFACT_LIMITS.fileTextChars) content.text = text;
+    } catch {
+      // Not UTF-8: metadata only.
+    }
+  }
+  return content;
+}
+
+/** Whether a `file` version's bytes are worth reading for `text`. */
+const wantsFileText = (v: Pick<VersionRow, "fileName" | "contentType" | "size">) =>
+  v.size <= TEXT_READ_BYTES && isTextFile(v.fileName ?? "", v.contentType);
+
+/** The content of a `file` version just written from `body`. */
+const storedFileContent = (
+  name: string,
+  blob: { contentType: string; size: number; sha: string },
+  body: Uint8Array,
+) => {
+  const v = { fileName: name, contentType: blob.contentType, size: blob.size, sha256: blob.sha };
+  return fileContent(v, wantsFileText(v) ? body : null);
+};
+
+/** Plain text for search: what a person would look for in the file (a `file`: its name only). */
 function excerptOf(content: ArtifactContent): string {
   const s =
-    content.kind === "document"
-      ? content.markdown
-      : content.kind === "html"
-        ? content.html.replace(/<[^>]+>/g, " ")
-        : content.kind === "diagram"
-          ? content.mermaid
-          : content.kind === "table"
-            ? [content.columns.join(" "), ...content.rows.map((r) => r.join(" "))].join("\n")
-            : content.files.map((f) => f.path).join("\n");
+    content.kind === "file"
+      ? content.name
+      : content.kind === "document"
+        ? content.markdown
+        : content.kind === "html"
+          ? content.html.replace(/<[^>]+>/g, " ")
+          : content.kind === "diagram"
+            ? content.mermaid
+            : content.kind === "table"
+              ? [content.columns.join(" "), ...content.rows.map((r) => r.join(" "))].join("\n")
+              : content.files.map((f) => f.path).join("\n");
   return s.replace(/\s+/g, " ").trim().slice(0, 20_000);
 }
 
@@ -263,7 +405,8 @@ function view(a: ArtifactRow, canEdit: boolean): ArtifactView {
   };
 }
 
-const editableKind = (kind: ArtifactKind) => kind === "document" || kind === "table";
+/** People save new versions of documents and tables (editor) and of files (an upload). */
+const editableKind = (kind: ArtifactKind) => kind === "document" || kind === "table" || kind === "file";
 
 async function loadArtifact(db: Database, orgId: string, id: string) {
   const [a] = await db
@@ -283,39 +426,59 @@ async function readable(deps: ArtifactDeps, actor: ArtifactActor, orgId: string,
 
 // ── Writes ───────────────────────────────────────────────────────────────────
 
-async function writeBlob(deps: ArtifactDeps, orgId: string, artifactId: string, version: number, c: ArtifactContent) {
+/** What a version stores: the bytes and their type (and, for a `file`, its name). */
+interface Stored {
+  body: Uint8Array;
+  contentType: string;
+  fileName?: string | null;
+}
+
+async function writeBlob(deps: ArtifactDeps, orgId: string, artifactId: string, version: number, stored: Stored) {
   const location = await deps.blobs.forOrg(orgId);
-  const { body, contentType } = encode(c);
+  const { body, contentType } = stored;
   const key = `${location.prefix}artifacts/${artifactId}/v${version}`;
   await location.store.put(key, body, { contentType });
   return { storageConfigId: location.storageConfigId, key, contentType, size: body.byteLength, sha: sha256Hex(body) };
 }
 
-/**
- * Creates an artifact (version 1). People create in the Drive (no channel:
- * the whole org sees it) or in a channel they belong to; agents create in
- * the channel and thread of their run. `html` is stored as is and marked
- * untrusted.
- */
-export async function createArtifact(
-  deps: ArtifactDeps,
+/** Who may create, and where: people in the Drive or a channel they see; agents in their run's channel and thread. */
+async function placeNew(
+  db: Database,
   actor: ArtifactActor,
   orgId: string,
-  input: { title: string; content: unknown; channelId?: string | null; threadId?: string | null },
-): Promise<ArtifactDetailView> {
-  const { db } = deps;
+  input: { title: string; channelId?: string | null; threadId?: string | null },
+) {
   const membership = await requireMember(db, actor, orgId);
   if (membership && !can(membership.role, "post")) throw new ForbiddenError();
   const title = input.title.trim().slice(0, ARTIFACT_LIMITS.titleChars);
   if (!title) throw new ValidationError("title is required");
-  const content = validateContent(input.content);
   const channelId = actor.type === "agent" ? actor.channelId : (input.channelId ?? null);
   const threadId = actor.type === "agent" ? (actor.threadId ?? null) : (input.threadId ?? null);
   if (channelId && actor.type === "person" && !(await personCanRead(db, actor.userId, orgId, { channelId }))) {
     throw new NotFoundError("Channel not found");
   }
+  return { title, channelId, threadId };
+}
+
+/** Version 1 of a new artifact: blob, rows, index, audit and the channel event. */
+async function insertArtifact(
+  deps: ArtifactDeps,
+  actor: ArtifactActor,
+  orgId: string,
+  input: {
+    kind: ArtifactKind;
+    title: string;
+    channelId: string | null;
+    threadId: string | null;
+    untrusted: boolean;
+    excerpt: string;
+    stored: Stored;
+    note?: string | null;
+  },
+) {
+  const { db } = deps;
   const id = Bun.randomUUIDv7();
-  const blob = await writeBlob(deps, orgId, id, 1, content);
+  const blob = await writeBlob(deps, orgId, id, 1, input.stored);
   const author = authorOf(actor);
   const row = await db.transaction(async (tx) => {
     const [a] = await tx
@@ -323,12 +486,12 @@ export async function createArtifact(
       .values({
         id,
         orgId,
-        kind: content.kind,
-        title,
-        channelId,
-        threadId,
-        untrusted: content.kind === "html",
-        excerpt: excerptOf(content),
+        kind: input.kind,
+        title: input.title,
+        channelId: input.channelId,
+        threadId: input.threadId,
+        untrusted: input.untrusted,
+        excerpt: input.excerpt,
         currentVersion: 1,
         createdByType: author.type,
         createdById: author.id,
@@ -346,7 +509,8 @@ export async function createArtifact(
       contentType: blob.contentType,
       size: blob.size,
       sha256: blob.sha,
-      note: null,
+      fileName: input.stored.fileName ?? null,
+      note: input.note?.trim().slice(0, 500) || null,
       authorType: author.type,
       authorId: author.id,
       runId: actor.type === "agent" ? (actor.runId ?? null) : null,
@@ -357,7 +521,7 @@ export async function createArtifact(
       actor: author,
       action: "artifact.created",
       target: { type: "artifact", id },
-      details: { kind: content.kind, version: 1, size: blob.size },
+      details: { kind: input.kind, version: 1, size: blob.size },
     });
     return a;
   });
@@ -365,32 +529,21 @@ export async function createArtifact(
   if (row.channelId) {
     await publishChannelEvent(deps.pubsub, { type: "artifact.created", channelId: row.channelId, artifact });
   }
-  return { ...artifact, shownVersion: 1, content };
+  return { artifact, blob };
 }
 
-/**
- * Saves a new version (always; old versions stay). People pass the version
- * they edited (`baseVersion`): a newer one in between is a conflict (409).
- */
-export async function updateArtifact(
+/** A new version of `current`: blob, rows (a newer version in between is a conflict), index, audit, event. */
+async function insertVersion(
   deps: ArtifactDeps,
   actor: ArtifactActor,
   orgId: string,
-  artifactId: string,
-  input: { content: unknown; note?: string | null; baseVersion?: number; title?: string },
-): Promise<ArtifactDetailView> {
+  current: ArtifactRow,
+  input: { stored: Stored; excerpt: string; note?: string | null; title?: string },
+) {
   const { db } = deps;
-  const current = await readable(deps, actor, orgId, artifactId);
-  const content = validateContent(input.content);
-  if (content.kind !== current.kind) throw new ValidationError(`this artifact is a ${current.kind}`);
-  if (actor.type === "person" && !editableKind(current.kind)) {
-    throw new ForbiddenError("Only documents and tables can be edited here");
-  }
-  if (input.baseVersion !== undefined && input.baseVersion !== current.currentVersion) {
-    throw new ConflictError("Someone saved a newer version; reload and try again");
-  }
+  const artifactId = current.id;
   const version = current.currentVersion + 1;
-  const blob = await writeBlob(deps, orgId, artifactId, version, content);
+  const blob = await writeBlob(deps, orgId, artifactId, version, input.stored);
   const author = authorOf(actor);
   const title = input.title?.trim().slice(0, ARTIFACT_LIMITS.titleChars) || current.title;
   const note = input.note?.trim().slice(0, 500) || null;
@@ -400,7 +553,7 @@ export async function updateArtifact(
       .set({
         currentVersion: version,
         title,
-        excerpt: excerptOf(content),
+        excerpt: input.excerpt,
         updatedByType: author.type,
         updatedById: author.id,
         updatedAt: new Date(),
@@ -417,6 +570,7 @@ export async function updateArtifact(
       contentType: blob.contentType,
       size: blob.size,
       sha256: blob.sha,
+      fileName: input.stored.fileName ?? null,
       note,
       authorType: author.type,
       authorId: author.id,
@@ -436,7 +590,138 @@ export async function updateArtifact(
   if (row.channelId) {
     await publishChannelEvent(deps.pubsub, { type: "artifact.updated", channelId: row.channelId, artifact });
   }
+  return { artifact, blob, version };
+}
+
+/**
+ * Creates an artifact (version 1). People create in the Drive (no channel:
+ * the whole org sees it) or in a channel they belong to; agents create in
+ * the channel and thread of their run. `html` is stored as is and marked
+ * untrusted. Never a `file` (see `createFileArtifact`).
+ */
+export async function createArtifact(
+  deps: ArtifactDeps,
+  actor: ArtifactActor,
+  orgId: string,
+  input: { title: string; content: unknown; channelId?: string | null; threadId?: string | null },
+): Promise<ArtifactDetailView> {
+  const place = await placeNew(deps.db, actor, orgId, input);
+  const content = validateContent(input.content);
+  const { artifact } = await insertArtifact(deps, actor, orgId, {
+    ...place,
+    kind: content.kind,
+    untrusted: content.kind === "html",
+    excerpt: excerptOf(content),
+    stored: encode(content),
+  });
+  return { ...artifact, shownVersion: 1, content };
+}
+
+/**
+ * Saves a new version (always; old versions stay). People pass the version
+ * they edited (`baseVersion`): a newer one in between is a conflict (409).
+ */
+export async function updateArtifact(
+  deps: ArtifactDeps,
+  actor: ArtifactActor,
+  orgId: string,
+  artifactId: string,
+  input: { content: unknown; note?: string | null; baseVersion?: number; title?: string },
+): Promise<ArtifactDetailView> {
+  const current = await readable(deps, actor, orgId, artifactId);
+  if (current.kind === "file") {
+    throw new ValidationError("this artifact is an uploaded file: send a new version of the file instead");
+  }
+  const content = validateContent(input.content);
+  if (content.kind !== current.kind) throw new ValidationError(`this artifact is a ${current.kind}`);
+  if (actor.type === "person" && !editableKind(current.kind)) {
+    throw new ForbiddenError("Only documents and tables can be edited here");
+  }
+  if (input.baseVersion !== undefined && input.baseVersion !== current.currentVersion) {
+    throw new ConflictError("Someone saved a newer version; reload and try again");
+  }
+  const { artifact, version } = await insertVersion(deps, actor, orgId, current, {
+    stored: encode(content),
+    excerpt: excerptOf(content),
+    note: input.note,
+    title: input.title,
+  });
   return { ...artifact, shownVersion: version, content };
+}
+
+/** Checks a file's name and size and describes it (ADR 0025). */
+function fileInput(input: { name: string; bytes: Uint8Array; contentType?: string | null }) {
+  const name = cleanFileName(input.name);
+  if (input.bytes.byteLength > ARTIFACT_LIMITS.fileBytes) {
+    const maxMb = ARTIFACT_LIMITS.fileBytes / 1024 / 1024;
+    throw new ValidationError(`the file is too large (max ${maxMb} MB)`, "artifact.file_too_large", { maxMb });
+  }
+  const contentType = fileContentType(name, input.contentType);
+  return { name, stored: { body: input.bytes, contentType, fileName: name } satisfies Stored };
+}
+
+/**
+ * Stores any bytes as a `file` artifact (version 1), with the original name,
+ * type, size and SHA-256 (ADR 0025). Always untrusted: downloaded as an
+ * attachment, never rendered on the app's origin. Placed like `createArtifact`.
+ */
+export async function createFileArtifact(
+  deps: ArtifactDeps,
+  actor: ArtifactActor,
+  orgId: string,
+  input: {
+    title: string;
+    name: string;
+    bytes: Uint8Array;
+    contentType?: string | null;
+    channelId?: string | null;
+    threadId?: string | null;
+    note?: string | null;
+  },
+): Promise<ArtifactDetailView> {
+  const place = await placeNew(deps.db, actor, orgId, input);
+  const file = fileInput(input);
+  const { artifact, blob } = await insertArtifact(deps, actor, orgId, {
+    ...place,
+    kind: "file",
+    untrusted: true,
+    excerpt: file.name,
+    stored: file.stored,
+    note: input.note,
+  });
+  return { ...artifact, shownVersion: 1, content: storedFileContent(file.name, blob, input.bytes) };
+}
+
+/** A new version of a `file` artifact from bytes (who may: like documents and tables). */
+export async function addFileVersion(
+  deps: ArtifactDeps,
+  actor: ArtifactActor,
+  orgId: string,
+  artifactId: string,
+  input: {
+    name: string;
+    bytes: Uint8Array;
+    contentType?: string | null;
+    note?: string | null;
+    title?: string;
+    baseVersion?: number;
+  },
+): Promise<ArtifactDetailView> {
+  const current = await readable(deps, actor, orgId, artifactId);
+  if (current.kind !== "file") {
+    throw new ValidationError(`this artifact is a ${current.kind}, not an uploaded file`);
+  }
+  if (input.baseVersion !== undefined && input.baseVersion !== current.currentVersion) {
+    throw new ConflictError("Someone saved a newer version; reload and try again");
+  }
+  const file = fileInput(input);
+  const { artifact, blob, version } = await insertVersion(deps, actor, orgId, current, {
+    stored: file.stored,
+    excerpt: file.name,
+    note: input.note,
+    title: input.title,
+  });
+  return { ...artifact, shownVersion: version, content: storedFileContent(file.name, blob, input.bytes) };
 }
 
 async function versionRow(db: Database, a: ArtifactRow, version?: number) {
@@ -455,6 +740,36 @@ async function readVersion(deps: ArtifactDeps, a: ArtifactRow, v: VersionRow) {
   return object;
 }
 
+/** A version's content: decoded text kinds; a `file`'s metadata (its bytes read only for a small text file). */
+async function contentOf(deps: ArtifactDeps, a: ArtifactRow, v: VersionRow): Promise<ArtifactContent> {
+  if (a.kind === "file") return fileContent(v, wantsFileText(v) ? (await readVersion(deps, a, v)).body : null);
+  return decode(a.kind, (await readVersion(deps, a, v)).body);
+}
+
+/**
+ * The bytes of a `file` artifact at `version` (default: latest), after the
+ * visibility check: for `import_file` and the like.
+ */
+export async function readFileArtifact(
+  deps: ArtifactDeps,
+  actor: ArtifactActor,
+  orgId: string,
+  artifactId: string,
+  version?: number,
+): Promise<{ title: string; version: number; name: string; contentType: string; bytes: Uint8Array }> {
+  const a = await readable(deps, actor, orgId, artifactId);
+  if (a.kind !== "file") throw new ValidationError(`this artifact is a ${a.kind}, not an uploaded file`);
+  const v = await versionRow(deps.db, a, version);
+  const object = await readVersion(deps, a, v);
+  return {
+    title: a.title,
+    version: v.version,
+    name: v.fileName ?? "file",
+    contentType: v.contentType,
+    bytes: object.body,
+  };
+}
+
 /** One artifact at `version` (default: latest), with content. */
 export async function getArtifact(
   deps: ArtifactDeps,
@@ -465,8 +780,7 @@ export async function getArtifact(
 ): Promise<ArtifactDetailView> {
   const a = await readable(deps, actor, orgId, artifactId);
   const v = await versionRow(deps.db, a, version);
-  const object = await readVersion(deps, a, v);
-  return { ...view(a, editableKind(a.kind)), shownVersion: v.version, content: decode(a.kind, object.body) };
+  return { ...view(a, editableKind(a.kind)), shownVersion: v.version, content: await contentOf(deps, a, v) };
 }
 
 export async function listArtifactVersions(
@@ -659,9 +973,16 @@ export async function shareArtifact(
   let copied = false;
   if (!openHere) {
     const v = await versionRow(db, a, undefined);
-    const content = decode(a.kind, (await readVersion(deps, a, v)).body);
-    const copy = await createArtifact(deps, actor, orgId, { title: a.title, content });
-    shared = copy;
+    const body = (await readVersion(deps, a, v)).body;
+    shared =
+      a.kind === "file"
+        ? await createFileArtifact(deps, actor, orgId, {
+            title: a.title,
+            name: v.fileName ?? "file",
+            bytes: body,
+            contentType: v.contentType,
+          })
+        : await createArtifact(deps, actor, orgId, { title: a.title, content: decode(a.kind, body) });
     copied = true;
   }
   await recordAudit(db, {
@@ -892,6 +1213,14 @@ const fileName = (a: ArtifactRow, version: number, ext: string) => {
 
 export const DOWNLOAD_URL_TTL_SECONDS = 300;
 
+/** A file name safe in any header: non-ASCII, quotes and separators become `_`. */
+const asciiName = (name: string) => name.replace(/[^\x20-\x7e]|["\\;]/g, "_");
+
+/** `Content-Disposition: attachment` with the name as is (RFC 6266 `filename*`) and an ASCII fallback. */
+export function attachmentDisposition(filename: string) {
+  return `attachment; filename="${asciiName(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
 /**
  * A short-lived download link, after the visibility check: a signed URL of
  * the bucket, or (stores that can't sign) our own streaming endpoint.
@@ -906,7 +1235,10 @@ export async function artifactDownload(
   const a = await readable(deps, { type: "person", userId }, orgId, artifactId);
   const v = await versionRow(deps.db, a, version);
   const store = await deps.blobs.forConfig(orgId, v.storageConfigId);
-  const filename = fileName(a, v.version, EXTENSIONS[a.kind]);
+  const filename =
+    a.kind === "file"
+      ? asciiName(v.fileName ?? fileName(a, v.version, "bin"))
+      : fileName(a, v.version, EXTENSIONS[a.kind]);
   const signed = await store.signedUrl(v.blobKey, { expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS, filename });
   const expiresAt = new Date(Date.now() + DOWNLOAD_URL_TTL_SECONDS * 1000).toISOString();
   const url = signed ?? `/api/app/organizations/${orgId}/artifacts/${artifactId}/file?version=${v.version}`;
@@ -926,6 +1258,14 @@ export async function artifactFile(
 ): Promise<{ body: Uint8Array; contentType: string; filename: string }> {
   const a = await readable(deps, { type: "person", userId }, orgId, artifactId);
   const v = await versionRow(deps.db, a, options.version);
+  if (a.kind === "file") {
+    // Uploaded files download as they are: original bytes, name and type.
+    if (options.format) {
+      throw new ValidationError(`${options.format.toUpperCase()} export is not available for uploaded files`);
+    }
+    const object = await readVersion(deps, a, v);
+    return { body: object.body, contentType: v.contentType, filename: v.fileName ?? fileName(a, v.version, "bin") };
+  }
   const object = await readVersion(deps, a, v);
   const content = decode(a.kind, object.body);
   if (options.format === "csv") {

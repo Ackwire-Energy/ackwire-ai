@@ -39,6 +39,7 @@ import { SandboxSection } from "@/components/AgentComputer";
 import { ConnectorCatalogDialog } from "@/components/ConnectorCatalog";
 import { ConnectCustomDialog, CustomServerRow, GrantAgentsDialog, ReviewToolsDialog } from "@/components/CustomMcp";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { MachinesSection } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
@@ -66,6 +67,7 @@ export type SettingsSection =
   | "keys"
   | "storage"
   | "sandbox"
+  | "computers"
   | "usage";
 
 /** The settings sub-nav, in order, with who can open each. */
@@ -78,6 +80,8 @@ export const SETTINGS_SECTIONS: { id: SettingsSection; icon: IconName; allowed: 
   { id: "keys", icon: "approve", allowed: (r) => can(r, "manage_credentials") },
   { id: "storage", icon: "drive", allowed: (r) => can(r, "configure") },
   { id: "sandbox", icon: "code", allowed: (r) => can(r, "configure") },
+  // Every member sees the connected computers and can pair one (ADR 0025).
+  { id: "computers", icon: "computer", allowed: (r) => can(r, "read") },
   { id: "usage", icon: "waiting", allowed: (r) => can(r, "view_usage") },
 ];
 
@@ -160,6 +164,7 @@ export function SettingsPage({
         {current === "keys" && <KeysSection />}
         {current === "storage" && <StorageSection />}
         {current === "sandbox" && <SandboxSection />}
+        {current === "computers" && <MachinesSection />}
         {current === "usage" && <UsageSection />}
       </div>
     </div>

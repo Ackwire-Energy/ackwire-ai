@@ -3815,3 +3815,35 @@ a.ac-list__row:focus-visible {
     transition: none;
   }
 }
+
+/* Pixel sky (the agents' world): a canvas filling its parent, blocky when scaled. */
+.ac-sky {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.ac-sky-burst {
+  position: fixed;
+  z-index: var(--z-toast);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.ac-sky-glow {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+/* An empty place: the glow and its pixel agent stand in for the icon; no dashed box. */
+.ac-empty--sky {
+  border: 0;
+  padding-top: 8px;
+}
+.ac-empty__sky {
+  width: min(320px, 100%);
+  height: 140px;
+  margin: 0 auto var(--space-2);
+}

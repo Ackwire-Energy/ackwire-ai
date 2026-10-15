@@ -14,6 +14,8 @@ import {
   createGitToolSource,
   createIssueToolSource,
   createJobHandlers,
+  createMachineHub,
+  createMachineSandboxProvider,
   createModelGateway,
   createSandboxToolSource,
   createScheduleToolSource,
@@ -56,6 +58,8 @@ export interface EngineOptions {
   sandbox?: SandboxProvider | null;
   /** Tests: a fake GitHub (git smart HTTP and REST) for the git proxy and tools. */
   github?: { gitUrl: string; apiUrl: string; fetch: typeof fetch };
+  /** Tests: this process's replica id for the machine hub (default: random). */
+  replicaId?: string;
 }
 
 /**
@@ -111,23 +115,25 @@ export function buildEngine(o: EngineOptions) {
     resolveHost: o.resolveHost,
   };
   const artifacts: ArtifactDeps = { db, blobs: createBlobStoreResolver(storage), pubsub: adapters.pubsub };
-  // Code sandbox (D30): only when a provider is configured (Daytona in the Cloud).
+  // Code sandbox (D30): cloud computers only when a provider is configured (Daytona in the Cloud);
+  // connected machines (ADR 0025) always, through the hub that holds their sockets.
   const sandboxProvider = o.sandbox !== undefined ? o.sandbox : (adapters.sandbox ?? null);
-  const sandbox: SandboxDeps | null = sandboxProvider
-    ? {
-        db,
-        provider: sandboxProvider,
-        pricing: {
-          vcpuHourUsd: config.SANDBOX_PRICE_VCPU_HOUR_USD,
-          memoryGibHourUsd: config.SANDBOX_PRICE_MEMORY_GIB_HOUR_USD,
-          diskGibHourUsd: config.SANDBOX_PRICE_DISK_GIB_HOUR_USD,
-        },
-        autoStopMinutes: config.SANDBOX_AUTO_STOP_MINUTES,
-        archiveAfterDays: config.SANDBOX_ARCHIVE_AFTER_DAYS,
-        // Git through our proxy (D35): the computer never gets a GitHub token.
-        git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
-      }
-    : null;
+  const machineHub = createMachineHub({ db, pubsub: adapters.pubsub, replicaId: o.replicaId });
+  const sandbox: SandboxDeps = {
+    db,
+    provider: sandboxProvider,
+    machines: { provider: createMachineSandboxProvider(machineHub), hub: machineHub },
+    pricing: {
+      vcpuHourUsd: config.SANDBOX_PRICE_VCPU_HOUR_USD,
+      memoryGibHourUsd: config.SANDBOX_PRICE_MEMORY_GIB_HOUR_USD,
+      diskGibHourUsd: config.SANDBOX_PRICE_DISK_GIB_HOUR_USD,
+    },
+    autoStopMinutes: config.SANDBOX_AUTO_STOP_MINUTES,
+    archiveAfterDays: config.SANDBOX_ARCHIVE_AFTER_DAYS,
+    // Git through our proxy (D35): the computer never gets a GitHub token.
+    git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
+    publicUrl: config.PUBLIC_URL,
+  };
   const githubApp =
     config.GITHUB_APP_ID && config.GITHUB_APP_PRIVATE_KEY
       ? { appId: config.GITHUB_APP_ID, privateKey: config.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, "\n") }
@@ -151,14 +157,15 @@ export function buildEngine(o: EngineOptions) {
       createWikiToolSource({ pubsub: adapters.pubsub, search: context, artifacts }),
       createContextToolSource(context),
       createConnectorToolSource(connectorDeps),
-      ...(sandbox
+      createSandboxToolSource({
+        ...sandbox,
+        artifacts,
+        skills: { blobs: artifacts.blobs },
+        pubsub: adapters.pubsub,
+      }),
+      // Git through our proxy needs cloud computers (we never set up git on a person's machine).
+      ...(sandboxProvider
         ? [
-            createSandboxToolSource({
-              ...sandbox,
-              artifacts,
-              skills: { blobs: artifacts.blobs },
-              pubsub: adapters.pubsub,
-            }),
             createGitToolSource({
               sandbox,
               connectors: connectorDeps,
@@ -200,7 +207,7 @@ export function buildEngine(o: EngineOptions) {
         : {}),
     },
   });
-  return { gateway, tools, context, handlers, connectorDeps, storage, artifacts, sandbox, gitProxy };
+  return { gateway, tools, context, handlers, connectorDeps, storage, artifacts, sandbox, gitProxy, machineHub };
 }
 
 export type Engine = ReturnType<typeof buildEngine>;

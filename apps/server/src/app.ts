@@ -30,6 +30,7 @@ import { storageRoutes } from "./routes/app/storage";
 import { wikiRoutes } from "./routes/app/wiki";
 import { registerGitProxy } from "./routes/git";
 import { registerHealth } from "./routes/health";
+import { machineAppRoutes, registerMachinePublicRoutes } from "./routes/machines";
 import { registerWaitlist } from "./routes/waitlist";
 import { registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
 
@@ -58,6 +59,7 @@ export interface AppOptions {
  * - `/api/app/*`          private API of the web app (cookie session + CSRF)
  * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
  * - `/api/git/*`          git proxy for agents' computers (their own credential, D35)
+ * - `/api/machines/*`     connected computers' runner: pair, uploads, install.sh (ADR 0025)
  * - `/api/waitlist`       public: join the waiting list (landing page)
  * - `/api/ws`             WebSocket (real-time)
  * - `/api/openapi.json`   OpenAPI 3.1 document; `/api/reference` interactive docs
@@ -107,8 +109,10 @@ export function createApp(options: AppOptions) {
     api.route("/app", calendarRoutes(deps));
     api.route("/app", skillRoutes(deps));
     api.route("/app", sandboxRoutes(deps));
+    api.route("/app", machineAppRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     registerWebhookReceiver(api, deps);
+    registerMachinePublicRoutes(api, deps);
     registerWaitlist(api, deps);
     if (deps.extras?.gitProxy) registerGitProxy(api, deps.extras.gitProxy);
   }
@@ -146,6 +150,14 @@ export function createApp(options: AppOptions) {
     // Client-side routing: unknown non-API paths render the web app.
     const spa = serveStatic({ root: options.webDir, path: "index.html" });
     const isApi = (path: string) => path.startsWith("/api/");
+    // The runner bundle (ADR 0025): always revalidated, JavaScript, and never the SPA when missing.
+    app.get("/runner/*", async (c) => {
+      const res = await assets(c, async () => {});
+      if (!res) return c.text("Not found", 404);
+      res.headers.set("cache-control", "no-cache");
+      if (c.req.path.endsWith(".mjs")) res.headers.set("content-type", "text/javascript; charset=utf-8");
+      return res;
+    });
     app.use("/*", (c, next) => (isApi(c.req.path) ? next() : assets(c, next)));
     app.get("/*", (c, next) => (isApi(c.req.path) ? next() : spa(c, next)));
   }

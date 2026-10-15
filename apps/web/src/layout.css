@@ -4946,3 +4946,507 @@ button.live-call__head:hover {
   width: 40px;
   text-align: right;
 }
+
+/* ---------- The pixel sky in the app (docs/design/telas/CeuNoApp.html) ----------
+ * The sky is the agents' world: the same blue in both themes, ink on it is
+ * the deep sky ink. It shows only where the subject is the agents. */
+:root {
+  --sky-ink: #04203f;
+  --sky-ink2: rgba(4, 32, 63, 0.78);
+  --sky-glass: rgba(241, 248, 255, 0.74);
+  --sky-line: rgba(4, 32, 63, 0.12);
+}
+
+/* Channel: the greeting of a new day */
+.sky-welcome {
+  position: relative;
+  flex: none;
+  height: 196px;
+  margin: 12px 16px 0;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #2b74e6;
+  color: var(--sky-ink);
+}
+.sky-welcome__text {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: fit-content;
+  max-width: min(52ch, calc(100% - 220px));
+  padding: 22px 26px;
+}
+.sky-welcome__when {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sky-ink2);
+}
+.sky-welcome__title {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.04;
+  font-weight: 780;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.sky-welcome__lead {
+  margin: 0;
+  color: var(--sky-ink2);
+  font-weight: 500;
+  text-wrap: pretty;
+}
+.sky-welcome__crew {
+  position: absolute;
+  right: 28px;
+  bottom: -8px;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.sky-welcome__crew .ac-avatar:nth-child(2) {
+  width: 68px;
+  height: 68px;
+}
+.sky-welcome__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: var(--sky-glass);
+  color: var(--sky-ink);
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--sky-line);
+}
+.sky-welcome__close:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px var(--sky-ink);
+}
+@media (max-width: 640px) {
+  .sky-welcome {
+    height: auto;
+    min-height: 170px;
+  }
+  .sky-welcome__text {
+    max-width: 100%;
+    padding-right: 48px;
+  }
+  .sky-welcome__crew {
+    display: none;
+  }
+}
+
+/* Agent page: a cover in the agent's color; the avatar rises from it */
+.agent-cover {
+  position: relative;
+  height: 176px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  margin-bottom: -24px;
+}
+.agent-page .agent-head {
+  align-items: flex-end;
+  padding: 0 8px;
+}
+.agent-head__avatar {
+  margin-top: -84px;
+  box-shadow:
+    0 0 0 5px var(--bg),
+    0 14px 30px -12px color-mix(in srgb, var(--av-bottom, var(--agent)) 70%, transparent);
+}
+@media (max-width: 640px) {
+  .agent-cover {
+    height: 132px;
+  }
+  .agent-head__avatar {
+    width: 88px;
+    height: 88px;
+    margin-top: -64px;
+  }
+}
+
+/* Sign in / sign up: the landing's sky aside */
+.auth__aside {
+  position: relative;
+  overflow: hidden;
+  background: #2b74e6;
+  color: var(--sky-ink);
+  min-height: 420px;
+}
+.auth__aside > :not(.ac-sky):not(.auth__giant) {
+  position: relative;
+}
+.auth__logo {
+  width: fit-content;
+}
+.auth__aside .auth__tagline {
+  width: fit-content;
+  max-width: 18ch;
+  margin: 0 0 4px;
+  font-size: clamp(24px, 2.6vw, 32px);
+  line-height: 1.06;
+  font-weight: 780;
+  letter-spacing: -0.035em;
+  color: var(--sky-ink);
+}
+.auth__aside .auth__demo .ac-msg {
+  background: var(--sky-glass);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 0 0 1px var(--sky-line),
+    0 10px 30px -14px rgba(4, 32, 63, 0.45);
+  color: var(--sky-ink);
+}
+.auth__aside .auth__demo .ac-msg * {
+  color: inherit;
+}
+.auth__aside .auth__steps li {
+  width: fit-content;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--sky-glass);
+  box-shadow: 0 0 0 1px var(--sky-line);
+}
+.auth__aside .auth__steps .muted {
+  color: var(--sky-ink2);
+}
+.auth__aside .auth__step-n {
+  background: var(--sky-ink);
+  color: #fff;
+}
+.auth__giant {
+  position: absolute;
+  right: -24px;
+  bottom: -44px;
+  width: 200px;
+  height: 200px;
+}
+@media (max-width: 760px) {
+  .auth__giant {
+    width: 120px;
+    height: 120px;
+    bottom: -30px;
+  }
+}
+
+/* Channel activity bar: a light sweep in the working agent's color */
+.ac-typing[data-active="true"] {
+  position: relative;
+  overflow: hidden;
+}
+.ac-typing[data-active="true"] > :not(.ac-typing__sky) {
+  position: relative;
+}
+.ac-typing__sky {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* The workspace opening */
+.sky-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #0a3f9c;
+}
+.sky-boot__in {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #fff;
+  font-weight: 650;
+  text-shadow: 0 1px 6px rgba(4, 32, 63, 0.6);
+}
+
+/* Sidebar: the workspace's little sky, working agents, the horizon */
+.sidebar__org {
+  position: relative;
+  overflow: hidden;
+  min-height: 56px;
+  padding: 8px 6px;
+  border-radius: 14px;
+  background: #4b93ff;
+  color: var(--sky-ink);
+}
+.sidebar__org > :not(.ac-sky) {
+  position: relative;
+}
+.sidebar__org .sidebar__org-button,
+.sidebar__org .sidebar__org-button > .ac-icon,
+.sidebar__org .sidebar__org-meta,
+.sidebar__org .ac-btn {
+  color: var(--sky-ink);
+}
+.sidebar__org .sidebar__org-meta {
+  opacity: 0.8;
+}
+.sidebar__org .sidebar__org-button:hover,
+.sidebar__org .ac-btn:hover {
+  background: var(--sky-glass);
+}
+.sidebar__item[data-busy="true"] {
+  position: relative;
+  overflow: hidden;
+}
+.sidebar__item[data-busy="true"] > :not(.sidebar__trail):not(.sidebar__glow) {
+  position: relative;
+}
+.sidebar__trail,
+.sidebar__glow {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.sidebar__glow {
+  display: none;
+}
+.sidebar__busy {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--glass-solid);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.sidebar__foot {
+  isolation: isolate;
+}
+.sidebar__horizon {
+  position: absolute;
+  inset: 0 -12px -16px;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.sidebar__me {
+  border-radius: 12px;
+  background: var(--glass-solid);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 8px 20px -12px rgba(0, 0, 0, 0.35);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .sidebar__me,
+  .sidebar__busy {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+}
+@media (min-width: 761px) and (max-width: 1199px) {
+  .sidebar__org {
+    min-height: 0;
+    padding: 6px;
+  }
+  .sidebar__trail {
+    display: none;
+  }
+  .sidebar__glow {
+    display: block;
+  }
+  .sidebar__me {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+/* Uploaded files in the Drive (ADR 0025): name + size, preview, read-only text. */
+.file-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.file-summary__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+}
+.file-summary__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.file-summary__name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.file-view__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  box-shadow: var(--e1);
+}
+.file-view__preview {
+  display: flex;
+  justify-content: center;
+  min-height: 120px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.file-view__image {
+  max-width: 100%;
+  max-height: 70vh;
+  height: auto;
+  object-fit: contain;
+}
+.file-view__pdf {
+  width: 100%;
+  height: 70vh;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.file-view__text {
+  max-height: 60vh;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Drive: drop files anywhere on the page. */
+.drive-drop {
+  position: relative;
+}
+.drive-drop__hint {
+  position: absolute;
+  inset: 8px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px dashed var(--line-strong);
+  border-radius: 20px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--ink);
+  font-weight: 600;
+  pointer-events: none;
+}
+.drive-upload-status {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Settings → Computadores. */
+.machine-row {
+  align-items: flex-start;
+}
+.machine-row__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+}
+.machine-row__name {
+  font-weight: 600;
+}
+.machine-row__workspace code,
+.machine-command__code {
+  font-family: var(--font-mono);
+}
+.machine-row__workspace code {
+  font-size: 12.5px;
+  word-break: break-all;
+}
+.machine-command {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 10px 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.machine-command__code {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.machine-command__copy {
+  flex: none;
+}
+.machine-pair__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink-muted);
+}
+.machine-pair__done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Agent page: which computer. */
+.computer-machine__name {
+  font-weight: 600;
+}
+.computer-target__connect {
+  color: var(--ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

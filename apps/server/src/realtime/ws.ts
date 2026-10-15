@@ -1,5 +1,6 @@
 import {
   channelTopic,
+  MAX_FRAME_BYTES,
   orgTopic,
   type Presence,
   type PubSub,
@@ -20,6 +21,7 @@ import {
 import { type Auth, type SessionUser, sessionUser } from "../auth";
 import type { Logger } from "../logger";
 import { allowedOrigins } from "../routes/app/context";
+import type { MachineSocketData, MachineSockets } from "./machines";
 
 /**
  * WebSocket endpoint `GET /api/ws?orgId=<uuid>` (docs/adr/0010-realtime.md).
@@ -51,9 +53,13 @@ export interface RealtimeDeps {
   presence: Presence;
   rateLimiter: RateLimiter;
   log: Logger;
+  /** Connected computers' runners (`/api/machines/connect`, ADR 0025): same server, own handlers. */
+  machines?: MachineSockets;
 }
 
-export interface SocketData {
+/** A browser tab of the web app. */
+export interface BrowserSocketData {
+  kind: "browser";
   connectionId: string;
   user: SessionUser;
   orgId: string;
@@ -63,6 +69,13 @@ export interface SocketData {
   /** Channels being authorized right now; a revocation during the check marks them. */
   pending: Map<string, { revoked: boolean }>;
 }
+
+/** Every socket of the server: browsers (`/api/ws`) and runners (`/api/machines/connect`). */
+export type SocketData = BrowserSocketData | MachineSocketData;
+
+type BrowserSocket = Bun.ServerWebSocket<BrowserSocketData>;
+type MachineSocket = Bun.ServerWebSocket<MachineSocketData>;
+const isMachine = (ws: Bun.ServerWebSocket<SocketData>): ws is MachineSocket => ws.data.kind === "machine";
 
 export type ClientFrame =
   | { type: "subscribe" | "unsubscribe"; channelId: string }
@@ -117,14 +130,31 @@ export async function authorizeSubscription(
 
 export function createRealtime(deps: RealtimeDeps) {
   const origins = allowedOrigins(deps.config);
-  const send = (ws: Bun.ServerWebSocket<SocketData>, frame: unknown): void => {
+  const send = (ws: BrowserSocket, frame: unknown): void => {
     ws.send(JSON.stringify(frame));
   };
 
-  return {
+  const realtime = {
     path: "/api/ws",
 
     /** Called from `Bun.serve`'s fetch for `/api/ws`. Returns a Response on refusal, undefined once upgraded. */
+    /**
+     * `Bun.serve`'s fetch: upgrades `/api/ws` and `/api/machines/connect`,
+     * and hands everything else to `next` (the HTTP app).
+     */
+    fetch(
+      req: Request,
+      server: Bun.Server<SocketData>,
+      next: (req: Request) => Response | Promise<Response>,
+    ): Response | Promise<Response | undefined> | undefined {
+      const path = new URL(req.url).pathname;
+      if (path === realtime.path) return realtime.upgrade(req, server);
+      if (deps.machines && path === deps.machines.path) {
+        return deps.machines.upgrade(req, server as unknown as Bun.Server<MachineSocketData>);
+      }
+      return next(req);
+    },
+
     async upgrade(req: Request, server: Bun.Server<SocketData>): Promise<Response | undefined> {
       const origin = req.headers.get("origin");
       if (!origin || !origins.has(origin)) return new Response("Cross-origin WebSocket refused", { status: 403 });
@@ -134,7 +164,8 @@ export function createRealtime(deps: RealtimeDeps) {
       if (!user) return new Response("Sign in to continue", { status: 401 });
       if (!(await getMembership(deps.db, user.id, orgId)))
         return new Response("Not a member of this organization", { status: 403 });
-      const data: SocketData = {
+      const data: BrowserSocketData = {
+        kind: "browser",
         connectionId: crypto.randomUUID(),
         user,
         orgId,
@@ -146,9 +177,12 @@ export function createRealtime(deps: RealtimeDeps) {
     },
 
     websocket: {
-      maxPayloadLength: 16 * 1024,
+      // Runners send files inline (up to MAX_FRAME_BYTES); browser frames are still capped at 4096 by `parseClientFrame`.
+      maxPayloadLength: MAX_FRAME_BYTES,
       idleTimeout: 120,
-      async open(ws: Bun.ServerWebSocket<SocketData>) {
+      async open(socket: Bun.ServerWebSocket<SocketData>) {
+        if (isMachine(socket)) return deps.machines?.open(socket);
+        const ws = socket as BrowserSocket;
         const { orgId, user } = ws.data;
         const drop = (channelId: string, reason: string) => {
           const pending = ws.data.pending.get(channelId);
@@ -185,7 +219,9 @@ export function createRealtime(deps: RealtimeDeps) {
         await touchLastSeen(deps.db, orgId, user.id).catch(() => {});
         send(ws, { type: "ready", orgId: ws.data.orgId, userId: ws.data.user.id });
       },
-      async message(ws: Bun.ServerWebSocket<SocketData>, raw: string | Buffer): Promise<void> {
+      async message(socket: Bun.ServerWebSocket<SocketData>, raw: string | Buffer): Promise<void> {
+        if (isMachine(socket)) return deps.machines?.message(socket, raw);
+        const ws = socket as BrowserSocket;
         const limit = await deps.rateLimiter.consume(`ws:${ws.data.connectionId}`, { limit: 60, windowMs: 10_000 });
         if (!limit.allowed) return send(ws, { type: "error", code: "rate_limited" });
         const frame = parseClientFrame(raw);
@@ -238,7 +274,9 @@ export function createRealtime(deps: RealtimeDeps) {
         ws.data.subscriptions.set(channelId, off);
         send(ws, { type: "subscribed", channelId });
       },
-      async close(ws: Bun.ServerWebSocket<SocketData>) {
+      async close(socket: Bun.ServerWebSocket<SocketData>) {
+        if (isMachine(socket)) return deps.machines?.close(socket);
+        const ws = socket as BrowserSocket;
         for (const off of ws.data.subscriptions.values()) off();
         ws.data.subscriptions.clear();
         for (const off of ws.data.system) off();
@@ -248,6 +286,7 @@ export function createRealtime(deps: RealtimeDeps) {
       },
     },
   };
+  return realtime;
 }
 
 export type Realtime = ReturnType<typeof createRealtime>;

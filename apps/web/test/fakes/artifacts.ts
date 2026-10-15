@@ -10,12 +10,14 @@
  * Seeded in development only; lost on reload.
  */
 import type { ApiClient } from "@/api/client";
+import { ApiError } from "@/api/http";
 import type { Artifact, ArtifactAuthor, ArtifactContent, ArtifactDetail, ArtifactVersion } from "@/api/types";
 import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg } from "./context";
 
 interface Stored {
   meta: Omit<Artifact, "canEdit" | "untrusted">;
-  versions: (ArtifactVersion & { content: ArtifactContent })[];
+  /** `bytes`: an uploaded file's version. */
+  versions: (ArtifactVersion & { content: ArtifactContent; bytes?: Blob })[];
   /** Opened by id only (e.g. a forum synthesis), not in the Drive list. */
   unlisted?: boolean;
   /** In the trash since then (30 days to restore). */
@@ -27,7 +29,7 @@ class MockConflictError extends Error {
   readonly code = "stale_version";
 }
 
-const editable = (kind: Artifact["kind"]) => kind === "document" || kind === "table";
+const editable = (kind: Artifact["kind"]) => kind === "document" || kind === "table" || kind === "file";
 
 export function serializeContent(content: ArtifactContent): { text: string; type: string } {
   switch (content.kind) {
@@ -46,8 +48,46 @@ export function serializeContent(content: ArtifactContent): { text: string; type
       return { text: content.mermaid, type: "text/plain" };
     case "html":
       return { text: content.html, type: "text/html" };
+    case "file":
+      return { text: content.text ?? "", type: content.contentType };
   }
 }
+
+/** Like the server: the type from the name, else what the browser said, else octet-stream. */
+const TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  pdf: "application/pdf",
+  txt: "text/plain",
+  md: "text/markdown",
+  csv: "text/csv",
+  json: "application/json",
+  zip: "application/zip",
+};
+const typeOf = (name: string, sent: string) =>
+  TYPES[/\.([a-z0-9]+)$/i.exec(name)?.[1]?.toLowerCase() ?? ""] ?? (sent || "application/octet-stream");
+
+/** A `file` content from an upload (small text files carry their text). */
+async function fileContent(file: File): Promise<ArtifactContent> {
+  const contentType = typeOf(file.name, file.type);
+  const isText = contentType.startsWith("text/") || contentType === "application/json";
+  const text = isText && file.size <= 40_000 ? await file.text() : undefined;
+  return {
+    kind: "file",
+    name: file.name,
+    contentType,
+    size: file.size,
+    sha256: "0".repeat(64),
+    ...(text !== undefined ? { text } : {}),
+  };
+}
+
+const MAX_FILE_BYTES = 50 * 1024 * 1024;
+const tooLarge = () => new ApiError(413, "artifact.file_too_large", "The file is too large (max 50 MB)");
 
 export function createMockArtifacts(
   ctx: MockContext,
@@ -127,7 +167,7 @@ export function createMockArtifacts(
   const view = (s: Stored): Artifact => ({
     ...clone(s.meta),
     canEdit: editable(s.meta.kind),
-    untrusted: s.meta.kind === "html",
+    untrusted: s.meta.kind === "html" || s.meta.kind === "file",
     canDelete: true,
   });
   const detail = (s: Stored, version?: number): ArtifactDetail => {
@@ -153,7 +193,8 @@ export function createMockArtifacts(
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
     get: async (orgId, id, version) => detail(await find(orgId, id), version),
-    versions: async (orgId, id) => (await find(orgId, id)).versions.map(({ content: _c, ...v }) => clone(v)).reverse(),
+    versions: async (orgId, id) =>
+      (await find(orgId, id)).versions.map(({ content: _c, bytes: _b, ...v }) => clone(v)).reverse(),
     fileUrl: (orgId, id, options = {}) => {
       const params = new URLSearchParams();
       if (options.version) params.set("version", String(options.version));
@@ -188,6 +229,58 @@ export function createMockArtifacts(
       };
       (await store(orgId)).push(s);
       return detail(s);
+    },
+    upload: async (orgId, file, options = {}) => {
+      record("artifacts.upload", orgId, file.name, options);
+      if (file.size > MAX_FILE_BYTES) throw tooLarge();
+      const author = await me();
+      const at = ctx.now().toISOString();
+      const content = await fileContent(file);
+      const s: Stored = {
+        meta: {
+          id: mockId("art"),
+          kind: "file",
+          title: options.title?.trim() || file.name,
+          version: 1,
+          channelId: options.channelId ?? null,
+          threadId: options.threadId ?? null,
+          createdBy: author,
+          updatedBy: author,
+          createdAt: at,
+          updatedAt: at,
+        },
+        versions: [{ version: 1, author, note: null, createdAt: at, content, bytes: file }],
+      };
+      (await store(orgId)).push(s);
+      return detail(s);
+    },
+    uploadVersion: async (orgId, id, file, options = {}) => {
+      record("artifacts.uploadVersion", orgId, id, file.name, options);
+      const s = await find(orgId, id);
+      if (s.meta.kind !== "file") throw new Error("Só arquivos enviados ganham versão por upload.");
+      if (file.size > MAX_FILE_BYTES) throw tooLarge();
+      const author = await me();
+      const at = ctx.now().toISOString();
+      const version = s.meta.version + 1;
+      s.versions.push({
+        version,
+        author,
+        note: options.note?.trim() || null,
+        createdAt: at,
+        content: await fileContent(file),
+        bytes: file,
+      });
+      Object.assign(s.meta, { version, updatedBy: author, updatedAt: at });
+      return detail(s);
+    },
+    fileBlob: async (orgId, id, version) => {
+      record("artifacts.fileBlob", orgId, id, version);
+      const s = await find(orgId, id);
+      const v = s.versions.find((x) => x.version === (version ?? s.meta.version));
+      if (!v) throw new MockNotFoundError("Versão não encontrada.");
+      if (v.bytes) return v.bytes;
+      const { text, type } = serializeContent(v.content);
+      return new Blob([text], { type });
     },
     update: async (orgId, id, input) => {
       const s = await find(orgId, id);

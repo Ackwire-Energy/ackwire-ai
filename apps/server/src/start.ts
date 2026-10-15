@@ -24,6 +24,7 @@ import { createApp } from "./app";
 import { createAuth } from "./auth";
 import { buildEngine } from "./engine";
 import { createLogger } from "./logger";
+import { createMachineSockets } from "./realtime/machines";
 import { createRealtime, type SocketData } from "./realtime/ws";
 import { version } from "./version";
 import { startWorkers } from "./workers";
@@ -149,7 +150,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
         artifacts: engine.artifacts,
         context: engine.context,
         sandbox: engine.sandbox,
-        gitProxy: engine.sandbox ? engine.gitProxy : undefined,
+        gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
       },
     },
     log,
@@ -158,11 +159,18 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
   });
   if (!existsSync(webDir)) log.warn("web app not found; serving API only", { webDir });
 
-  const realtime = createRealtime({ db: database.db, auth, config, log, ...adapters });
+  const realtime = createRealtime({
+    db: database.db,
+    auth,
+    config,
+    log,
+    ...adapters,
+    machines: createMachineSockets(engine.machineHub),
+  });
   const server = Bun.serve<SocketData>({
     hostname: config.HOST,
     port: config.PORT,
-    fetch: (req, srv) => (new URL(req.url).pathname === realtime.path ? realtime.upgrade(req, srv) : app.fetch(req)),
+    fetch: (req, srv) => realtime.fetch(req, srv, (r) => app.fetch(r)),
     websocket: realtime.websocket,
   });
   log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
@@ -177,6 +185,8 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     // No new jobs; HTTP stops taking requests (the new deploy serves them).
     workers.stop();
     await server.stop();
+    // Runners reconnect to the next instance.
+    await engine.machineHub.stop();
     // Runs in progress get up to 20 s to finish; the rest are checkpointed and resume on the next instance.
     const interrupted = await drainLocalRuns(RUN_DRAIN_MS);
     if (interrupted.length > 0) log.info("runs handed back for the next instance", { runs: interrupted });

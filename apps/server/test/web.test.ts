@@ -17,6 +17,8 @@ beforeAll(() => {
   mkdirSync(join(dir, "assets"));
   writeFileSync(join(dir, "index.html"), '<!doctype html><div id="root"></div>');
   writeFileSync(join(dir, "assets", "app.js"), "console.log(1)");
+  mkdirSync(join(dir, "runner"));
+  writeFileSync(join(dir, "runner", "agentes-runner.mjs"), "#!/usr/bin/env node\nconsole.log('runner')");
   app = createApp({ edition: "cloud", version: "test", modules: [], pingDatabase: async () => {}, webDir: dir });
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -40,5 +42,16 @@ describe("web app serving", () => {
     const res = await app.request("/api/app/nothing-here");
     expect(res.status).toBe(404);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe("not_found");
+  });
+
+  test("the runner bundle: JavaScript, revalidated, and never index.html when missing", async () => {
+    const res = await app.request("/runner/agentes-runner.mjs");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("javascript");
+    expect(res.headers.get("cache-control")).toBe("no-cache");
+    expect(await res.text()).toContain("runner");
+    const missing = await app.request("/runner/other.mjs");
+    expect(missing.status).toBe(404);
+    expect(await missing.text()).not.toContain('<div id="root">');
   });
 });

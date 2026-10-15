@@ -21,6 +21,8 @@ import {
   issueGitToken,
 } from "./git/credential";
 import { gitAccess } from "./git/proxy";
+import type { MachineCaller } from "./machine-hub";
+import { type ComputerTarget, computerTarget, MachineOfflineError } from "./machines";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { grantedScopeKeys } from "./tools/scopes";
@@ -50,7 +52,10 @@ export interface SandboxPricing {
 
 export interface SandboxDeps {
   db: Database;
-  provider: SandboxProvider;
+  /** The cloud computers (Daytona); null when this server has none (agents may still use connected machines). */
+  provider: SandboxProvider | null;
+  /** Connected machines (ADR 0025): the provider over the hub, and the hub for names and online state. */
+  machines?: { provider: SandboxProvider; hub: Pick<MachineCaller, "status"> } | null;
   pricing: SandboxPricing;
   autoStopMinutes: number;
   /** A stopped computer is archived (cheaper storage, files kept) after this many days; never deleted. */
@@ -63,6 +68,29 @@ export interface SandboxDeps {
    * computer's network is blocked.
    */
   git?: { publicUrl: string; secret: string } | null;
+  /** Our public base URL: computers that push files (`pushFile`) send them to `{publicUrl}/api/machines/uploads/{id}`. */
+  publicUrl?: string;
+}
+
+/** `SandboxDeps` with a cloud provider (what the Daytona paths need). */
+export type CloudSandboxDeps = Omit<SandboxDeps, "provider"> & { provider: SandboxProvider };
+
+/** Told when an agent with no connected machine has no cloud computer either. */
+export const NO_COMPUTER_MESSAGE =
+  "You have no computer: this server has no cloud computers and no connected computer was chosen for you. Ask an admin or your owner to connect one (Settings → Computers).";
+
+/**
+ * The computer a tool acts on (ADR 0025): the provider's id for it and the
+ * channel to talk to it, never a global provider, so Daytona computers and
+ * connected machines can be served at once.
+ */
+export interface ComputerHandle {
+  id: string;
+  provider: SandboxProvider;
+  /** Our name for it, recorded with uploads: `daytona:<sandbox row id>` or `machine:<machine id>`. */
+  ref: string;
+  /** Set for a connected machine: only it may complete its uploads. */
+  machineId?: string | null;
 }
 
 /** The network a computer really gets: the org's mode, plus our own host when the git proxy is on. */
@@ -190,7 +218,7 @@ type SandboxRow = typeof sandboxes.$inferSelect;
  * Refuses before anything runs: sandbox off for the org, the org's daily
  * minutes used up, or the agent's monthly budget can't cover `seconds`.
  */
-async function checkLimits(deps: SandboxDeps, ctx: ToolContext, settings: SandboxSettings, seconds: number) {
+async function checkLimits(deps: CloudSandboxDeps, ctx: ToolContext, settings: SandboxSettings, seconds: number) {
   const now = deps.now?.() ?? new Date();
   if (!settings.enabled)
     throw new SandboxUnavailableError("The agents' computers are turned off for this organization.");
@@ -230,7 +258,7 @@ type Previous = "running" | "stopped" | "new" | "recreated";
  * (empty) one made, and the caller is told (`recreated`).
  */
 async function acquire(
-  deps: SandboxDeps,
+  deps: CloudSandboxDeps,
   orgId: string,
   agentId: string,
   settings: SandboxSettings & { updatedAt?: Date | null },
@@ -243,7 +271,7 @@ async function acquire(
 }
 
 async function acquireMachine(
-  deps: SandboxDeps,
+  deps: CloudSandboxDeps,
   orgId: string,
   agentId: string,
   settings: SandboxSettings & { updatedAt?: Date | null },
@@ -329,7 +357,7 @@ async function acquireMachine(
 
 /** Applies the org's network mode to a running computer and records it. */
 async function applyNetwork(
-  deps: Pick<SandboxDeps, "db" | "provider" | "git">,
+  deps: Pick<CloudSandboxDeps, "db" | "provider" | "git">,
   row: SandboxRow,
   settings: SandboxSettings,
 ): Promise<SandboxInfo["network"]> {
@@ -351,7 +379,7 @@ async function applyNetwork(
  * agent may use git: our short-lived credential, the helper and `insteadOf`,
  * written on each start and refreshed every few hours. Never a GitHub token.
  */
-async function ensureGitSetup(deps: SandboxDeps, row: SandboxRow, providerId: string, previous: Previous) {
+async function ensureGitSetup(deps: CloudSandboxDeps, row: SandboxRow, providerId: string, previous: Previous) {
   const git = deps.git;
   if (!git) return;
   const now = deps.now?.() ?? new Date();
@@ -398,6 +426,8 @@ export async function revokeComputerGitCredentials(db: Database, orgId: string, 
  * archived ones get it the next time they start.
  */
 export async function applyOrgNetwork(deps: Pick<SandboxDeps, "db" | "provider" | "git">, orgId: string) {
+  const provider = deps.provider;
+  if (!provider) return { applied: 0, later: 0 };
   const { settings } = await settingsRow(deps.db, orgId);
   const rows = await deps.db
     .select()
@@ -407,13 +437,13 @@ export async function applyOrgNetwork(deps: Pick<SandboxDeps, "db" | "provider" 
   let later = 0;
   for (const row of rows) {
     if (!row.providerId) continue;
-    const info = await deps.provider.get(row.providerId).catch(() => null);
+    const info = await provider.get(row.providerId).catch(() => null);
     if (info?.state !== "started") {
       later++;
       continue;
     }
     try {
-      await applyNetwork(deps, row, settings);
+      await applyNetwork({ ...deps, provider }, row, settings);
       applied++;
     } catch {
       later++;
@@ -432,7 +462,7 @@ export const RECREATED_NOTICE =
  * the org's day. Billed time is the call itself plus the idle time the
  * computer stayed up since its last use (until it auto-stopped).
  */
-async function charge(deps: SandboxDeps, ctx: ToolContext, row: SandboxRow, info: SandboxInfo, seconds: number) {
+async function charge(deps: CloudSandboxDeps, ctx: ToolContext, row: SandboxRow, info: SandboxInfo, seconds: number) {
   const now = deps.now?.() ?? new Date();
   const cost = sandboxCostNanoUsd(seconds, info.resources, deps.pricing);
   await deps.db.insert(usageRecords).values({
@@ -494,14 +524,19 @@ export async function withSandbox<T>(
   deps: SandboxDeps,
   ctx: ToolContext,
   budgetSeconds: number,
-  fn: (sandboxId: string) => Promise<T>,
+  fn: (computer: ComputerHandle) => Promise<T>,
   onNotice?: (notice: string) => void,
 ): Promise<T> {
+  const agent = await getAgentCached(deps.db, ctx.orgId, ctx.agentId);
+  if (agent?.machineId) return withMachine(deps, ctx, agent.machineId, fn);
   const { settings, updatedAt } = await settingsRow(deps.db, ctx.orgId);
-  await checkLimits(deps, ctx, settings, budgetSeconds);
+  const provider = deps.provider;
+  if (!provider) throw new SandboxUnavailableError(NO_COMPUTER_MESSAGE);
+  const cloud: CloudSandboxDeps = { ...deps, provider };
+  await checkLimits(cloud, ctx, settings, budgetSeconds);
   const clock = () => (deps.now?.() ?? new Date()).getTime();
   const { row, info, previous } = await acquire(
-    deps,
+    cloud,
     ctx.orgId,
     ctx.agentId,
     { ...settings, updatedAt },
@@ -517,11 +552,61 @@ export async function withSandbox<T>(
   // Up since its last use: that gap; it had auto-stopped: the idle tail before stopping.
   const idle = previous === "running" ? Math.min(sinceLast, idleCap) : previous === "stopped" ? idleCap : 0;
   try {
-    return await fn(info.id);
+    return await fn({ id: info.id, provider, ref: `${row.provider}:${row.id}` });
   } finally {
     const used = Math.max(1, Math.ceil((clock() - started) / 1000));
-    await charge(deps, ctx, row, info, used + idle).catch(() => undefined);
+    await charge(cloud, ctx, row, info, used + idle).catch(() => undefined);
   }
+}
+
+/**
+ * The agent's connected machine (ADR 0025): online or a clear refusal. It
+ * costs us nothing (no usage rows, daily minutes or budget), and the org's
+ * network mode and git setup don't apply: we don't control that machine.
+ */
+async function withMachine<T>(
+  deps: SandboxDeps,
+  ctx: ToolContext,
+  machineId: string,
+  fn: (computer: ComputerHandle) => Promise<T>,
+): Promise<T> {
+  const settings = await getSandboxSettings(deps.db, ctx.orgId);
+  if (!settings.enabled)
+    throw new SandboxUnavailableError("The agents' computers are turned off for this organization.");
+  const machines = deps.machines;
+  if (!machines) throw new SandboxUnavailableError("Connected computers are not available on this server.");
+  const status = await machines.hub.status(machineId);
+  if (!status || status.orgId !== ctx.orgId) {
+    throw new SandboxUnavailableError(
+      "Your connected computer was removed; ask an admin or your owner to choose another one.",
+    );
+  }
+  if (!status.online) throw new MachineOfflineError(status.name);
+  return fn({ id: machineId, provider: machines.provider, ref: `machine:${machineId}`, machineId });
+}
+
+/** Which computer the agent's tools act on, as the agent reads it (tool descriptions, `computer_status`). */
+export async function agentComputerInfo(
+  deps: Pick<SandboxDeps, "db" | "provider" | "machines">,
+  orgId: string,
+  agentId: string,
+): Promise<
+  | { kind: "cloud"; available: boolean }
+  | { kind: "machine"; machineId: string; name: string; online: boolean; execAllowed: boolean; os: string }
+  | { kind: "removed" }
+> {
+  const agent = await getAgentCached(deps.db, orgId, agentId);
+  if (!agent?.machineId) return { kind: "cloud", available: Boolean(deps.provider) };
+  const status = await deps.machines?.hub.status(agent.machineId);
+  if (!status || status.orgId !== orgId) return { kind: "removed" };
+  return {
+    kind: "machine",
+    machineId: status.id,
+    name: status.name,
+    online: status.online,
+    execAllowed: status.execAllowed,
+    os: status.os,
+  };
 }
 
 export type ComputerStatus = "starting" | "running" | "stopping" | "stopped" | "archived" | "error" | "none";
@@ -535,6 +620,8 @@ export interface AgentComputerView {
   lastUsedAt: string | null;
   network?: "blocked" | "allowlist" | "open" | "provider-default";
   error?: { message: string };
+  /** Which computer the agent uses (ADR 0025); the fields above describe its cloud computer. */
+  target?: ComputerTarget;
 }
 
 /** The agent's owner or an admin (`manage_agents`). */
@@ -609,12 +696,14 @@ async function computerView(
     const status = (row.providerId ? row.status : row.status === "error" ? "error" : "starting") as ComputerStatus;
     return { ...base, status, ...(row.lastError ? { error: { message: row.lastError } } : {}) };
   }
-  const info = await deps.provider.get(row.providerId).catch(() => null);
+  const provider = deps.provider;
+  if (!provider) return { ...base, status: "none" };
+  const info = await provider.get(row.providerId).catch(() => null);
   const status: ComputerStatus = info ? (STATUS[info.state] ?? "stopped") : "none";
   let diskMib = row.diskUsedMib;
   if (info?.state === "started") {
     // Measured while it runs (cheap), kept for when it's stopped.
-    const du = await deps.provider
+    const du = await provider
       .exec(row.providerId, { command: "du -sm . 2>/dev/null | cut -f1", timeoutSeconds: 15 })
       .catch(() => null);
     const mib = Number(du?.stdout.trim());
@@ -641,7 +730,7 @@ export async function stopOwnComputer(
   agentId: string,
 ) {
   const row = await liveComputer(deps.db, orgId, agentId);
-  if (!row?.providerId) return ownComputerStatus(deps, orgId, agentId);
+  if (!row?.providerId || !deps.provider) return ownComputerStatus(deps, orgId, agentId);
   await deps.provider.stop(row.providerId);
   await deps.db.update(sandboxes).set({ status: "stopped", updatedAt: new Date() }).where(eq(sandboxes.id, row.id));
   await recordAudit(deps.db, {
@@ -662,7 +751,20 @@ export async function getAgentComputer(
   agentId: string,
 ) {
   await requireComputerManager(deps.db, actorId, orgId, agentId);
-  return computerView(deps, orgId, agentId, await liveComputer(deps.db, orgId, agentId));
+  const view = await computerView(deps, orgId, agentId, await liveComputer(deps.db, orgId, agentId));
+  return { ...view, target: await computerTarget(deps.db, orgId, agentId) };
+}
+
+/** Start and stop are for cloud computers: a connected machine is on while its owner runs the runner. */
+export async function refuseLifecycleOnMachine(db: Database, orgId: string, agentId: string) {
+  const target = await computerTarget(db, orgId, agentId);
+  if (target.kind === "machine") {
+    throw new ValidationError(
+      `This agent uses the connected computer ${target.name}: it is turned on and off by its owner (by running the agentes runner), not from here.`,
+      "machine.no_lifecycle",
+      { name: target.name },
+    );
+  }
 }
 
 /**
@@ -677,6 +779,7 @@ export async function startAgentComputer(
   agentId: string,
 ): Promise<{ status: ComputerStatus }> {
   await requireComputerManager(deps.db, actorId, orgId, agentId);
+  await refuseLifecycleOnMachine(deps.db, orgId, agentId);
   const settings = await getSandboxSettings(deps.db, orgId);
   if (!settings.enabled) throw new ValidationError("The agents' computers are turned off for this organization.");
   const live = await liveComputer(deps.db, orgId, agentId);
@@ -722,7 +825,7 @@ export async function startAgentComputer(
 
 /** Job `sandbox.start`: the provider work behind `startAgentComputer`. Failures land on the row as `error`. */
 export async function runComputerStart(
-  deps: SandboxDeps & { pubsub?: PubSub },
+  deps: CloudSandboxDeps & { pubsub?: PubSub },
   orgId: string,
   agentId: string,
   actorId: string,
@@ -766,6 +869,7 @@ export async function stopAgentComputer(
   agentId: string,
 ): Promise<{ status: ComputerStatus }> {
   await requireComputerManager(deps.db, actorId, orgId, agentId);
+  await refuseLifecycleOnMachine(deps.db, orgId, agentId);
   const row = await liveComputer(deps.db, orgId, agentId);
   if (!row?.providerId) throw new NotFoundError("This agent has no computer yet");
   await deps.db.transaction(async (tx) => {
@@ -784,7 +888,7 @@ export async function stopAgentComputer(
 
 /** Job `sandbox.stop`. */
 export async function runComputerStop(
-  deps: Pick<SandboxDeps, "db" | "provider"> & { pubsub?: PubSub },
+  deps: Pick<CloudSandboxDeps, "db" | "provider"> & { pubsub?: PubSub },
   orgId: string,
   agentId: string,
   actorId: string,
@@ -822,7 +926,10 @@ export async function deleteAgentComputer(
   await requireComputerManager(deps.db, actorId, orgId, agentId);
   const row = await liveComputer(deps.db, orgId, agentId);
   if (!row) throw new NotFoundError("This agent has no computer");
-  if (row.providerId) await deps.provider.destroy(row.providerId);
+  if (row.providerId) {
+    if (!deps.provider) throw new NotFoundError("Agent computers are not available on this server");
+    await deps.provider.destroy(row.providerId);
+  }
   await deps.db
     .update(sandboxes)
     .set({ status: "deleted", deletedAt: new Date(), updatedAt: new Date() })

@@ -26,6 +26,7 @@ import { createMockArtifacts } from "./fakes/artifacts";
 import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
 import { createFakeForum } from "./fakes/forum";
+import { createFakeMachines, type FakeMachines } from "./fakes/machines";
 import { createMockPlanning } from "./fakes/planning";
 import { createFakeSandbox } from "./fakes/sandbox";
 import { createFakeSkills } from "./fakes/skills";
@@ -542,6 +543,7 @@ type FakedParts =
   | "wiki"
   | "forum"
   | "sandbox"
+  | "machines"
   | "skills"
   | "access"
   | "invites"
@@ -1211,6 +1213,9 @@ function newInvitation(email: string, role: Role): InvitationWithStatus {
   };
 }
 
+/** The connected-computers fake behind each `createFakeApi` client (tests pair machines with it). */
+export const fakeMachinesOf = new WeakMap<ApiClient, FakeMachines>();
+
 /** Full client: fake HTTP + the real in-memory mocks (seeded like development). */
 export function createFakeApi(state: FakeState = seedState(), options: { seed?: boolean } = {}): ApiClient {
   const http = createFakeHttpApi(state);
@@ -1224,9 +1229,11 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       members: (orgId) => http.orgs.members(orgId),
     },
   };
-  return {
+  const machines = createFakeMachines(ctx, (method, ...args) => state.calls.push({ method, args }));
+  const client: ApiClient = {
     ...http,
-    sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args })),
+    sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
+    machines: machines.client,
     forum: createFakeForum(ctx, (method, ...args) => state.calls.push({ method, args })),
     wiki: createFakeWiki(ctx, (method, ...args) => state.calls.push({ method, args })),
     skills: createFakeSkills(ctx, (method, ...args) => state.calls.push({ method, args })),
@@ -1252,4 +1259,6 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     ...createMockPlanning(ctx, (method, ...args) => state.calls.push({ method, args })),
     customConnectors: createMockCustomConnectors(ctx),
   };
+  fakeMachinesOf.set(client, machines);
+  return client;
 }
