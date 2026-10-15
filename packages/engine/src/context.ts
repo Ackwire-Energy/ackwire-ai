@@ -33,6 +33,8 @@ export async function buildRunContext(
     askUser?: boolean;
     /** "What you can do", built from the granted tools (`describeCapabilities`). */
     capabilities?: string;
+    /** Skills enabled for the agent (name and description; the body loads on demand). */
+    skills?: { name: string; description: string }[];
     trigger?: Message;
   },
 ): Promise<RunContext> {
@@ -203,6 +205,17 @@ export async function buildRunContext(
       cache: true,
     },
     ...(options.capabilities ? [{ text: options.capabilities }] : []),
+    ...(options.skills && options.skills.length > 0
+      ? [
+          {
+            text: [
+              "# Skills disponíveis",
+              ...options.skills.map((s) => `- ${s.name}: ${s.description}`),
+              "Quando a tarefa combinar com uma skill, carregue-a com `load_skill` antes de agir e siga as instruções dela.",
+            ].join("\n"),
+          },
+        ]
+      : []),
     ...(recentActions.length > 0
       ? [
           {

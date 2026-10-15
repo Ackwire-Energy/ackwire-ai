@@ -9,6 +9,7 @@ const GROUPS: Record<string, string> = {
   drive: "Arquivos (Drive)",
   issues: "Issues",
   calendar: "Calendário",
+  skills: "Skills",
   sandbox: "Código",
   github: "GitHub",
   sentry: "Sentry",

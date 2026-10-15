@@ -1,0 +1,557 @@
+import type { BlobStoreResolver } from "@agenteschat/adapters";
+import { and, asc, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { getAgent } from "./agents";
+import { recordAudit } from "./audit";
+import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
+import { can, requirePermission } from "./organizations";
+import { readZip } from "./zip";
+
+const { skills, skillFiles, agentSkills } = schema;
+
+export type SkillRow = typeof skills.$inferSelect;
+
+export const SKILL_LIMITS = { maxFiles: 200, maxBytes: 2 * 1024 * 1024, bodyChars: 200_000, fileReadChars: 40_000 };
+export const SKILL_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/** Files we store and can show the model; everything else (scripts, binaries) is listed as ignored. */
+const SHOWABLE: Record<string, string> = {
+  md: "text/markdown",
+  markdown: "text/markdown",
+  txt: "text/plain",
+  csv: "text/csv",
+  json: "application/json",
+  yaml: "application/yaml",
+  yml: "application/yaml",
+  html: "text/html",
+  htm: "text/html",
+  svg: "image/svg+xml",
+};
+
+export interface ParsedSkill {
+  name: string;
+  description: string;
+  body: string;
+  metadata: Record<string, unknown>;
+}
+
+function unquote(v: string) {
+  const t = v.trim();
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) return t.slice(1, -1);
+  return t;
+}
+
+/**
+ * Parses a `SKILL.md`: YAML frontmatter (top-level `key: value`, quoted
+ * strings, `|`/`>` blocks and `- item` lists) and the Markdown body. `name`
+ * and `description` are required (kebab-case ≤ 64; ≤ 1024 characters); other
+ * fields are kept as metadata.
+ */
+export function parseSkillMarkdown(text: string): ParsedSkill {
+  const src = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(src);
+  if (!m) throw new ValidationError("SKILL.md needs a frontmatter block (--- name/description ---)");
+  const fields: Record<string, unknown> = {};
+  const lines = (m[1] ?? "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const kv = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
+    if (!kv) continue;
+    const key = kv[1] as string;
+    const value = kv[2] ?? "";
+    if (value === "|" || value === ">" || value === "|-" || value === ">-") {
+      const block: string[] = [];
+      while (i + 1 < lines.length && /^(\s+|$)/.test(lines[i + 1] ?? "")) block.push((lines[++i] ?? "").trim());
+      fields[key] = value.startsWith(">") ? block.join(" ").trim() : block.join("\n").trim();
+    } else if (value === "") {
+      const items: string[] = [];
+      while (i + 1 < lines.length && /^\s+-\s+/.test(lines[i + 1] ?? "")) {
+        items.push(unquote((lines[++i] ?? "").replace(/^\s+-\s+/, "")));
+      }
+      fields[key] = items.length > 0 ? items : "";
+    } else fields[key] = unquote(value);
+  }
+  const { name, description, ...metadata } = fields;
+  const parsed = {
+    name: typeof name === "string" ? name.trim() : "",
+    description: typeof description === "string" ? description.trim() : "",
+    body: (m[2] ?? "").trim(),
+    metadata,
+  };
+  validateSkill(parsed);
+  return parsed;
+}
+
+export function validateSkill(s: { name: string; description: string; body: string }) {
+  if (!SKILL_NAME.test(s.name) || s.name.length > 64) {
+    throw new ValidationError("name: kebab-case (letras minúsculas, números e hífens), até 64 caracteres");
+  }
+  if (!s.description || s.description.length > 1024) throw new ValidationError("description: 1 a 1024 caracteres");
+  if (s.body.length > SKILL_LIMITS.bodyChars) throw new ValidationError("The skill body is too long");
+}
+
+/** Is this path something we keep for the model to read? (Never scripts.) */
+export function classifyFile(path: string): { mime: string; status: "stored" | "ignored" } {
+  const ext = /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase() ?? "";
+  const mime = SHOWABLE[ext];
+  return mime ? { mime, status: "stored" } : { mime: "application/octet-stream", status: "ignored" };
+}
+
+function safePath(path: string) {
+  const clean = path.replace(/\\/g, "/").replace(/^\.?\/+/, "");
+  if (!clean || clean.split("/").some((p) => p === ".." || p === "") || clean.startsWith("/")) {
+    throw new ValidationError(`Invalid path in the skill: ${path}`);
+  }
+  return clean;
+}
+
+export interface SkillFileInput {
+  path: string;
+  data: Uint8Array;
+}
+
+/** A skill folder's files → the SKILL.md (found at the root, or under one top folder) and the rest. */
+export function splitSkillFolder(files: SkillFileInput[]) {
+  const normalized = files.map((f) => ({ path: safePath(f.path), data: f.data }));
+  const firstSegments = new Set(normalized.map((f) => f.path.split("/")[0]));
+  let root = "";
+  if (!normalized.some((f) => f.path.toLowerCase() === "skill.md") && firstSegments.size === 1) {
+    root = `${[...firstSegments][0]}/`;
+  }
+  const inRoot = normalized
+    .filter((f) => f.path.startsWith(root) && !f.path.split("/").some((p) => p.startsWith(".") && p !== "."))
+    .map((f) => ({ path: f.path.slice(root.length), data: f.data }));
+  const main = inRoot.find((f) => f.path.toLowerCase() === "skill.md");
+  if (!main) throw new ValidationError("No SKILL.md at the top of the skill folder");
+  return { skillMd: new TextDecoder().decode(main.data), files: inRoot.filter((f) => f !== main) };
+}
+
+export interface SkillDeps {
+  db: Database;
+  blobs: BlobStoreResolver;
+  /** Tests: fake HTTP and DNS for URL imports. */
+  fetch?: (url: string, init?: RequestInit) => Promise<Response>;
+  resolveHost?: ResolveHost;
+}
+
+export interface SkillView {
+  id: string;
+  name: string;
+  description: string;
+  version: number;
+  source: string;
+  sourceUrl: string | null;
+  defaultForNewAgents: boolean;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SkillDetail extends SkillView {
+  body: string;
+  files: { path: string; size: number; mime: string; status: "stored" | "ignored" }[];
+}
+
+const view = (s: SkillRow): SkillView => ({
+  id: s.id,
+  name: s.name,
+  description: s.description,
+  version: s.version,
+  source: s.source,
+  sourceUrl: s.sourceUrl,
+  defaultForNewAgents: s.defaultForNewAgents,
+  metadata: s.metadata,
+  createdAt: s.createdAt.toISOString(),
+  updatedAt: s.updatedAt.toISOString(),
+});
+
+/** Files of the skill's current version. */
+export async function skillFilesOf(db: Database, s: SkillRow) {
+  const rows = await db
+    .select()
+    .from(skillFiles)
+    .where(and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, s.version)))
+    .orderBy(asc(skillFiles.path));
+  return rows.map((f) => ({ path: f.path, size: f.size, mime: f.mime, status: f.status as "stored" | "ignored" }));
+}
+
+async function loadSkill(db: Database, orgId: string, id: string) {
+  const [s] = await db
+    .select()
+    .from(skills)
+    .where(and(eq(skills.id, id), eq(skills.orgId, orgId), isNull(skills.deletedAt)));
+  if (!s) throw new NotFoundError("Skill not found");
+  return s;
+}
+
+/** Stores a version's files: showable ones in the blob store, the rest only listed as ignored. */
+async function storeFiles(deps: SkillDeps, s: { id: string; orgId: string }, version: number, files: SkillFileInput[]) {
+  if (files.length > SKILL_LIMITS.maxFiles) throw new ValidationError(`Too many files (max ${SKILL_LIMITS.maxFiles})`);
+  const total = files.reduce((n, f) => n + f.data.byteLength, 0);
+  if (total > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
+  const location = await deps.blobs.forOrg(s.orgId);
+  for (const f of files) {
+    const path = safePath(f.path);
+    const { mime, status } = classifyFile(path);
+    let blobKey: string | null = null;
+    if (status === "stored") {
+      blobKey = `${location.prefix}skills/${s.id}/v${version}/${path}`;
+      await location.store.put(blobKey, f.data, { contentType: mime });
+    }
+    await deps.db
+      .insert(skillFiles)
+      .values({
+        orgId: s.orgId,
+        skillId: s.id,
+        version,
+        path,
+        size: f.data.byteLength,
+        mime,
+        status,
+        storageConfigId: status === "stored" ? location.storageConfigId : null,
+        blobKey,
+      })
+      .onConflictDoNothing();
+  }
+}
+
+/**
+ * Installs or updates a skill from parsed content (admins, `manage_agents`).
+ * The same name again is a new version of that skill; every change is audited.
+ */
+export async function saveSkill(
+  deps: SkillDeps,
+  actorId: string,
+  orgId: string,
+  input: ParsedSkill & {
+    source: "upload" | "url" | "manual";
+    sourceUrl?: string | null;
+    files?: SkillFileInput[];
+    defaultForNewAgents?: boolean;
+  },
+): Promise<SkillDetail> {
+  await requirePermission(deps.db, actorId, orgId, "manage_agents");
+  validateSkill(input);
+  const [existing] = await deps.db
+    .select()
+    .from(skills)
+    .where(and(eq(skills.orgId, orgId), eq(skills.slug, input.name)));
+  let row: SkillRow;
+  if (existing && !existing.deletedAt) {
+    const [updated] = await deps.db
+      .update(skills)
+      .set({
+        description: input.description,
+        body: input.body,
+        metadata: input.metadata,
+        source: input.source,
+        sourceUrl: input.sourceUrl ?? existing.sourceUrl,
+        version: existing.version + 1,
+        ...(input.defaultForNewAgents !== undefined ? { defaultForNewAgents: input.defaultForNewAgents } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(skills.id, existing.id))
+      .returning();
+    if (!updated) throw new Error("skill update returned nothing");
+    row = updated;
+  } else {
+    if (existing) await deps.db.delete(skills).where(eq(skills.id, existing.id)); // a deleted one with that name
+    const [created] = await deps.db
+      .insert(skills)
+      .values({
+        orgId,
+        slug: input.name,
+        name: input.name,
+        description: input.description,
+        body: input.body,
+        metadata: input.metadata,
+        source: input.source,
+        sourceUrl: input.sourceUrl ?? null,
+        defaultForNewAgents: input.defaultForNewAgents ?? false,
+        createdByUserId: actorId,
+      })
+      .returning();
+    if (!created) throw new Error("skill insert returned nothing");
+    row = created;
+  }
+  await storeFiles(deps, row, row.version, input.files ?? []);
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: existing && !existing.deletedAt ? "skill.updated" : "skill.installed",
+    target: { type: "skill", id: row.id },
+    details: { name: row.name, version: row.version, source: row.source, sourceUrl: row.sourceUrl },
+  });
+  return { ...view(row), body: row.body, files: await skillFilesOf(deps.db, row) };
+}
+
+/** Import from a zip of the skill folder (`SKILL.md` + files). */
+export async function importSkillZip(deps: SkillDeps, actorId: string, orgId: string, zip: Uint8Array) {
+  const entries = readZip(zip, { maxFiles: SKILL_LIMITS.maxFiles, maxBytes: SKILL_LIMITS.maxBytes });
+  const { skillMd, files } = splitSkillFolder(entries);
+  return saveSkill(deps, actorId, orgId, { ...parseSkillMarkdown(skillMd), source: "upload", files });
+}
+
+const GITHUB_HOSTS = new Set(["github.com", "raw.githubusercontent.com", "api.github.com"]);
+
+async function fetchChecked(deps: SkillDeps, url: string, accept: string) {
+  const u = await assertPublicHttpsUrl(url, deps.resolveHost);
+  if (!GITHUB_HOSTS.has(u.hostname)) throw new ValidationError("Only GitHub URLs can be imported for now");
+  const http = deps.fetch ?? ((input: string, init?: RequestInit) => fetch(input, init));
+  const res = await http(u.toString(), {
+    headers: { accept, "user-agent": "agentes.chat" },
+    redirect: "error",
+    signal: AbortSignal.timeout(15_000),
+  }).catch(() => {
+    throw new ValidationError("Could not reach GitHub");
+  });
+  if (!res.ok) throw new ValidationError(`GitHub answered ${res.status} for ${u.pathname}`);
+  const length = Number(res.headers.get("content-length") ?? 0);
+  if (length > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
+  const data = new Uint8Array(await res.arrayBuffer());
+  if (data.byteLength > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
+  return data;
+}
+
+/**
+ * Where a GitHub URL points: a folder (`/tree/{ref}/{path}`) or one
+ * `SKILL.md` (`/blob/…` or raw.githubusercontent).
+ */
+export function parseGithubUrl(url: string) {
+  const u = new URL(url);
+  if (u.hostname === "raw.githubusercontent.com") {
+    const [owner, repo, ref, ...rest] = u.pathname.split("/").filter(Boolean);
+    if (!owner || !repo || !ref || rest.length === 0) throw new ValidationError("Unrecognized GitHub URL");
+    return { kind: "file" as const, owner, repo, ref, path: rest.join("/") };
+  }
+  if (u.hostname !== "github.com") throw new ValidationError("Only GitHub URLs can be imported for now");
+  const [owner, repo, mode, ref, ...rest] = u.pathname.split("/").filter(Boolean);
+  if (!owner || !repo) throw new ValidationError("Unrecognized GitHub URL");
+  if (mode === "blob" && ref) return { kind: "file" as const, owner, repo, ref, path: rest.join("/") };
+  return { kind: "folder" as const, owner, repo, ref: mode === "tree" && ref ? ref : "HEAD", path: rest.join("/") };
+}
+
+/**
+ * Import from GitHub (a folder or a `SKILL.md`), fetched by the backend with
+ * a 2 MB / 200 files limit; only GitHub hosts, and the SSRF guard on every
+ * request. Importing the same skill again makes a new version.
+ */
+export async function importSkillFromUrl(deps: SkillDeps, actorId: string, orgId: string, url: string) {
+  await requirePermission(deps.db, actorId, orgId, "manage_agents");
+  const target = parseGithubUrl(url);
+  const raw = (path: string) =>
+    `https://raw.githubusercontent.com/${target.owner}/${target.repo}/${target.ref}/${path.split("/").map(encodeURIComponent).join("/")}`;
+  if (target.kind === "file") {
+    const text = new TextDecoder().decode(await fetchChecked(deps, raw(target.path), "text/plain"));
+    return saveSkill(deps, actorId, orgId, { ...parseSkillMarkdown(text), source: "url", sourceUrl: url });
+  }
+  // Folder: list it through the contents API (recursively, within limits), then fetch each file raw.
+  const files: SkillFileInput[] = [];
+  let total = 0;
+  const walk = async (dir: string, depth: number) => {
+    if (depth > 4) return;
+    const listing = JSON.parse(
+      new TextDecoder().decode(
+        await fetchChecked(
+          deps,
+          `https://api.github.com/repos/${target.owner}/${target.repo}/contents/${dir}?ref=${encodeURIComponent(target.ref)}`,
+          "application/vnd.github+json",
+        ),
+      ),
+    ) as { type: string; path: string; size: number }[];
+    if (!Array.isArray(listing)) throw new ValidationError("That URL is not a folder");
+    for (const item of listing) {
+      if (files.length >= SKILL_LIMITS.maxFiles) throw new ValidationError("Too many files (max 200)");
+      const relative = target.path ? item.path.slice(target.path.length + 1) : item.path;
+      if (item.type === "dir") await walk(item.path, depth + 1);
+      else if (item.type === "file") {
+        total += item.size;
+        if (total > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
+        // Scripts aren't downloaded: they are only listed as ignored.
+        const data =
+          classifyFile(item.path).status === "stored"
+            ? await fetchChecked(deps, raw(item.path), "*/*")
+            : new Uint8Array();
+        files.push({ path: relative, data });
+      }
+    }
+  };
+  await walk(target.path, 0);
+  const { skillMd, files: rest } = splitSkillFolder(files);
+  return saveSkill(deps, actorId, orgId, {
+    ...parseSkillMarkdown(skillMd),
+    source: "url",
+    sourceUrl: url,
+    files: rest,
+  });
+}
+
+/** Imports the skill again from where it came (a new version). */
+export async function reimportSkill(deps: SkillDeps, actorId: string, orgId: string, id: string) {
+  const s = await loadSkill(deps.db, orgId, id);
+  if (!s.sourceUrl) throw new ValidationError("This skill wasn't imported from a URL");
+  return importSkillFromUrl(deps, actorId, orgId, s.sourceUrl);
+}
+
+export async function listSkills(db: Database, actorId: string, orgId: string) {
+  await requirePermission(db, actorId, orgId, "read");
+  const rows = await db
+    .select()
+    .from(skills)
+    .where(and(eq(skills.orgId, orgId), isNull(skills.deletedAt)))
+    .orderBy(asc(skills.name));
+  return rows.map(view);
+}
+
+export async function getSkill(db: Database, actorId: string, orgId: string, id: string): Promise<SkillDetail> {
+  await requirePermission(db, actorId, orgId, "read");
+  const s = await loadSkill(db, orgId, id);
+  return { ...view(s), body: s.body, files: await skillFilesOf(db, s) };
+}
+
+/** Edits by hand (a new version); renaming isn't allowed (the name is the skill's identity). */
+export async function updateSkill(
+  deps: SkillDeps,
+  actorId: string,
+  orgId: string,
+  id: string,
+  input: { description?: string; body?: string; defaultForNewAgents?: boolean },
+) {
+  const s = await loadSkill(deps.db, orgId, id);
+  if (input.description === undefined && input.body === undefined && input.defaultForNewAgents !== undefined) {
+    await requirePermission(deps.db, actorId, orgId, "manage_agents");
+    await deps.db
+      .update(skills)
+      .set({ defaultForNewAgents: input.defaultForNewAgents, updatedAt: new Date() })
+      .where(eq(skills.id, s.id));
+    return getSkill(deps.db, actorId, orgId, id);
+  }
+  return saveSkill(deps, actorId, orgId, {
+    name: s.name,
+    description: input.description ?? s.description,
+    body: input.body ?? s.body,
+    metadata: s.metadata,
+    source: "manual",
+    sourceUrl: s.sourceUrl,
+    defaultForNewAgents: input.defaultForNewAgents,
+  });
+}
+
+export async function deleteSkill(db: Database, actorId: string, orgId: string, id: string) {
+  await requirePermission(db, actorId, orgId, "manage_agents");
+  const s = await loadSkill(db, orgId, id);
+  await db.update(skills).set({ deletedAt: new Date() }).where(eq(skills.id, s.id));
+  await db.delete(agentSkills).where(eq(agentSkills.skillId, s.id));
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "skill.deleted",
+    target: { type: "skill", id: s.id },
+    details: { name: s.name },
+  });
+}
+
+/** The org's skills with whether this agent has each one on. */
+export async function agentSkillList(db: Database, actorId: string, orgId: string, agentId: string) {
+  await requirePermission(db, actorId, orgId, "read");
+  if (!(await getAgent(db, orgId, agentId))) throw new NotFoundError("Agent not found");
+  const [all, mine] = await Promise.all([
+    listSkills(db, actorId, orgId),
+    db
+      .select()
+      .from(agentSkills)
+      .where(and(eq(agentSkills.orgId, orgId), eq(agentSkills.agentId, agentId))),
+  ]);
+  const on = new Map(mine.map((m) => [m.skillId, m.enabled]));
+  return all.map((s) => ({ ...s, enabled: on.get(s.id) ?? false }));
+}
+
+/** Turns skills on or off for an agent (admins or its owner). */
+export async function setAgentSkills(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  agentId: string,
+  input: { skillId: string; enabled: boolean }[],
+) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const agent = await getAgent(db, orgId, agentId);
+  if (!agent) throw new NotFoundError("Agent not found");
+  if (!can(membership.role, "manage_agents") && agent.ownerUserId !== actorId) {
+    throw new ForbiddenError("Only an admin or the agent's owner can change its skills");
+  }
+  const ids = [...new Set(input.map((i) => i.skillId))];
+  if (ids.length > 0) {
+    const found = await db
+      .select({ id: skills.id })
+      .from(skills)
+      .where(and(eq(skills.orgId, orgId), inArray(skills.id, ids), isNull(skills.deletedAt)));
+    if (found.length !== ids.length) throw new ValidationError("Every skill must belong to this organization");
+  }
+  for (const i of input) {
+    await db
+      .insert(agentSkills)
+      .values({ orgId, agentId, skillId: i.skillId, enabled: i.enabled })
+      .onConflictDoUpdate({ target: [agentSkills.agentId, agentSkills.skillId], set: { enabled: i.enabled } });
+  }
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "agent.skills_changed",
+    target: { type: "agent", id: agentId },
+    details: { skills: input },
+  });
+  return agentSkillList(db, actorId, orgId, agentId);
+}
+
+/** The agent's enabled skills (name and description only: the body loads on demand). */
+export async function enabledSkills(db: Database, orgId: string, agentId: string) {
+  return db
+    .select({ id: skills.id, name: skills.name, description: skills.description, version: skills.version })
+    .from(agentSkills)
+    .innerJoin(skills, eq(skills.id, agentSkills.skillId))
+    .where(
+      and(
+        eq(agentSkills.orgId, orgId),
+        eq(agentSkills.agentId, agentId),
+        eq(agentSkills.enabled, true),
+        eq(skills.orgId, orgId),
+        isNull(skills.deletedAt),
+      ),
+    )
+    .orderBy(asc(skills.name));
+}
+
+/** A skill this agent has on, by name, with its files (for `load_skill` / `read_skill_file`). */
+export async function agentSkillByName(db: Database, orgId: string, agentId: string, name: string) {
+  const [row] = await db
+    .select({ skill: skills })
+    .from(agentSkills)
+    .innerJoin(skills, eq(skills.id, agentSkills.skillId))
+    .where(
+      and(
+        eq(agentSkills.orgId, orgId),
+        eq(agentSkills.agentId, agentId),
+        eq(agentSkills.enabled, true),
+        eq(skills.orgId, orgId),
+        eq(skills.slug, name.trim().toLowerCase()),
+        isNull(skills.deletedAt),
+      ),
+    );
+  return row?.skill ?? null;
+}
+
+export async function skillFileText(deps: SkillDeps, s: SkillRow, path: string) {
+  const [f] = await deps.db
+    .select()
+    .from(skillFiles)
+    .where(and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, s.version), eq(skillFiles.path, path)));
+  if (!f) throw new NotFoundError(`No file ${path} in this skill`);
+  if (f.status !== "stored" || !f.blobKey) {
+    throw new ValidationError(`${path} is not available: scripts and binaries need a sandbox, which doesn't exist yet`);
+  }
+  const store = await deps.blobs.forConfig(s.orgId, f.storageConfigId);
+  const object = await store.get(f.blobKey);
+  if (!object) throw new NotFoundError(`The stored file ${path} is missing`);
+  return new TextDecoder().decode(object.body);
+}

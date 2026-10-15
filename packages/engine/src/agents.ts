@@ -80,6 +80,23 @@ export async function createAgent(
       agent.id,
       DEFAULT_AGENT_SCOPES.map((scope) => ({ connectionId: null, scope })),
     );
+    // Skills the org marked "default for new agents".
+    const defaults = await db
+      .select({ id: schema.skills.id })
+      .from(schema.skills)
+      .where(
+        and(
+          eq(schema.skills.orgId, orgId),
+          eq(schema.skills.defaultForNewAgents, true),
+          isNull(schema.skills.deletedAt),
+        ),
+      );
+    if (defaults.length > 0) {
+      await db
+        .insert(schema.agentSkills)
+        .values(defaults.map((s) => ({ orgId, agentId: agent.id, skillId: s.id, enabled: true })))
+        .onConflictDoNothing();
+    }
     // The month's counter exists from the start, so the first call reserves in one statement.
     if (agent.monthlyBudgetNanoUsd !== null) await resyncBudgetCounter(db, orgId, agent.id);
     return agent;

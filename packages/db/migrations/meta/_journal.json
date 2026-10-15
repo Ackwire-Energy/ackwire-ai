@@ -169,6 +169,13 @@
       "when": 1792022910885,
       "tag": "0023_custom_tool_suggestions",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792025917747,
+      "tag": "0024_skills",
+      "breakpoints": true
     }
   ]
 }

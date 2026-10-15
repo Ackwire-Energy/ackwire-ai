@@ -35,6 +35,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
   "issues:write": ["create_issue", "update_issue", "comment_issue"],
   "calendar:read": ["list_events", "find_free_time"],
   "calendar:write": ["propose_event"],
+  "skills:read": ["load_skill", "read_skill_file"],
 };
 
 export interface ToolRef {
@@ -52,11 +53,51 @@ export interface AccessInput {
 
 export interface AccessTool {
   name: string;
+  /** Human name, pt-BR when we have one. */
+  label: string;
+  description: string;
   connectionId: string | null;
   scope: string;
   sensitive: boolean;
+  /** Only reads (built-in `:read` scopes, MCP `readOnlyHint` or classified as read, catalog read scopes). */
+  readOnly: boolean;
   state: AccessState;
 }
+
+/** Labels and descriptions of the built-in tools (pt-BR). */
+export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: string }> = {
+  ask_user: { label: "Perguntar à pessoa", description: "Faz uma pergunta curta e espera a resposta." },
+  search_context: { label: "Buscar no contexto", description: "Busca mensagens, resumos, fatos e lições." },
+  get_summary: { label: "Ler resumo", description: "Lê o resumo de um thread ou período." },
+  expand: { label: "Abrir item", description: "Abre uma memória ou mensagem por inteiro." },
+  remember: { label: "Lembrar", description: "Guarda uma nota quando alguém pede." },
+  update_memory: { label: "Atualizar memória", description: "Corrige uma nota guardada." },
+  forget: { label: "Esquecer", description: "Arquiva uma nota quando alguém pede." },
+  propose_instruction_change: {
+    label: "Propor mudança de instruções",
+    description: "Sugere mudar as próprias instruções ou o contexto da org; uma pessoa decide.",
+  },
+  read_artifact: { label: "Ler arquivo", description: "Lê um arquivo do Drive." },
+  list_artifacts: { label: "Listar arquivos", description: "Lista os arquivos do Drive que vê." },
+  create_artifact: { label: "Criar arquivo", description: "Cria documento, tabela, diff, diagrama ou página." },
+  update_artifact: { label: "Atualizar arquivo", description: "Salva uma nova versão de um arquivo." },
+  list_issues: { label: "Ver issues", description: "Lista e abre issues." },
+  create_issue: { label: "Criar issue", description: "Cria uma issue com critérios de aceite." },
+  update_issue: { label: "Atualizar issue", description: "Muda status, prioridade ou liga um PR." },
+  comment_issue: { label: "Comentar issue", description: "Comenta o andamento numa issue." },
+  list_events: { label: "Ver agenda", description: "Lista eventos." },
+  find_free_time: { label: "Achar horário livre", description: "Procura horários livres em comum." },
+  propose_event: { label: "Propor evento", description: "Sugere um evento; quem pediu confirma." },
+  load_skill: { label: "Carregar skill", description: "Carrega as instruções de uma skill." },
+  read_skill_file: { label: "Ler arquivo de skill", description: "Lê um arquivo de referência de uma skill." },
+};
+
+const humanize = (name: string) => {
+  const words = name.replace(/[_-]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+type CatalogTool = { name: string; label: string; description: string; sensitive: boolean; readOnly: boolean };
 
 export interface AccessScope {
   scope: string;
@@ -90,7 +131,7 @@ export async function orgToolCatalog(db: Database, orgId: string) {
     connector: string;
     label: string;
     custom: boolean;
-    scopes: { scope: string; label: string; tools: { name: string; sensitive: boolean }[] }[];
+    scopes: { scope: string; label: string; tools: CatalogTool[] }[];
   }[] = [];
   for (const c of connections) {
     if (isCustom(c)) {
@@ -101,11 +142,17 @@ export async function orgToolCatalog(db: Database, orgId: string) {
           .replace(/[^a-z0-9]+/g, "_")
           .replace(/^_|_$/g, "")
           .slice(0, 24) || "mcp";
-      const byScope = new Map<string, { name: string; sensitive: boolean }[]>();
+      const byScope = new Map<string, CatalogTool[]>();
       for (const t of tools) {
         const scope = customScope(c.id, t.access as ToolAccess);
         const list = byScope.get(scope) ?? [];
-        list.push({ name: exposedToolName(prefix, t.name), sensitive: t.access === "approval" });
+        list.push({
+          name: exposedToolName(prefix, t.name),
+          label: t.label || humanize(t.name),
+          description: t.description,
+          sensitive: t.access === "approval",
+          readOnly: t.access === "read" || t.readOnlyHint === true,
+        });
         byScope.set(scope, list);
       }
       out.push({
@@ -135,7 +182,13 @@ export async function orgToolCatalog(db: Database, orgId: string) {
           .filter(([, t]) => t.scope === id)
           .map(([name, t]) => {
             const exposed = exposedToolName(def.id, name);
-            return { name: exposed, sensitive: t.sensitive === true || ALWAYS_SENSITIVE.test(exposed) };
+            return {
+              name: exposed,
+              label: humanize(name),
+              description: s.description,
+              sensitive: t.sensitive === true || ALWAYS_SENSITIVE.test(exposed),
+              readOnly: id.endsWith(".read"),
+            };
           }),
       })),
     });
@@ -160,16 +213,26 @@ function scopeState(granted: Set<string>, connectionId: string | null, scope: st
   return "off";
 }
 
+function builtinInfo(name: string, scope: string): Omit<AccessTool, "state"> {
+  const info = BUILTIN_TOOL_INFO[name];
+  return {
+    name,
+    label: info?.label ?? humanize(name),
+    description: info?.description ?? "",
+    connectionId: null,
+    scope,
+    sensitive: false,
+    readOnly: scope.endsWith(":read"),
+  };
+}
+
 function treeFor(granted: Set<string>, catalog: Awaited<ReturnType<typeof orgToolCatalog>>): AccessTree {
   const builtins: AccessScope[] = Object.entries(BUILTIN_TOOLS).map(([scope, names]) => ({
     scope,
     label: scope === "" ? "Perguntar à pessoa" : (BUILTIN_SCOPES[scope]?.label ?? scope),
     state: scope === "" ? "inherited" : scopeState(granted, null, scope),
     tools: names.map((name) => ({
-      name,
-      connectionId: null,
-      scope,
-      sensitive: false,
+      ...builtinInfo(name, scope),
       state: toolAccess(granted, { name, scope, connectionId: null }),
     })),
   }));
@@ -191,10 +254,9 @@ function treeFor(granted: Set<string>, catalog: Awaited<ReturnType<typeof orgToo
         label: s.label,
         state: scopeState(granted, c.connectionId, s.scope),
         tools: s.tools.map((t) => ({
-          name: t.name,
+          ...t,
           connectionId: c.connectionId,
           scope: s.scope,
-          sensitive: t.sensitive,
           state: toolAccess(granted, { name: t.name, scope: s.scope, connectionId: c.connectionId }),
         })),
       })),
@@ -299,22 +361,14 @@ export async function accessMatrix(db: Database, actorId: string, orgId: string)
   const catalog = await orgToolCatalog(db, orgId);
   const tools: (Omit<AccessTool, "state"> & { group: string; key: string })[] = [
     ...Object.entries(BUILTIN_TOOLS).flatMap(([scope, names]) =>
-      names.map((name) => ({
-        name,
-        connectionId: null,
-        scope,
-        sensitive: false,
-        group: "agentes",
-        key: `builtin|${name}`,
-      })),
+      names.map((name) => ({ ...builtinInfo(name, scope), group: "agentes", key: `builtin|${name}` })),
     ),
     ...catalog.flatMap((c) =>
       c.scopes.flatMap((s) =>
         s.tools.map((t) => ({
-          name: t.name,
+          ...t,
           connectionId: c.connectionId,
           scope: s.scope,
-          sensitive: t.sensitive,
           group: c.label,
           key: `${c.connectionId}|${t.name}`,
         })),

@@ -28,6 +28,7 @@ import {
   createLocalKeyWrapper,
   createModelGateway,
   createOrganization,
+  createSkillToolSource,
   createToolGateway,
   type MemberRole,
   type StorageDeps,
@@ -70,6 +71,8 @@ export async function setup(
     issueTools?: boolean;
     /** Add the calendar tools (list_events, find_free_time, propose_event). */
     calendarTools?: boolean;
+    /** Add the skill tools (load_skill, read_skill_file). */
+    skillTools?: boolean;
     /** Fake embeddings (hybrid search). Off: full-text only, no embedding usage rows. */
     embeddings?: boolean;
   } = {},
@@ -144,6 +147,7 @@ export async function setup(
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
     ...(options.calendarTools ? [createCalendarToolSource({ db, pubsub })] : []),
+    ...(options.skillTools ? [createSkillToolSource({ db, blobs: artifactDeps.blobs })] : []),
     ...(options.contextTools ? [createContextToolSource(context)] : []),
     ...(options.toolSources ?? []),
   ];

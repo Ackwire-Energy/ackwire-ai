@@ -33,6 +33,7 @@ import {
   syncQuestionMessage,
 } from "./questions";
 import { type AgentRun, addRunStep, type RunStatus, transitionRun } from "./runs";
+import { enabledSkills } from "./skills";
 import type { Approval, ToolGateway } from "./tools/gateway";
 import type { ToolContext } from "./tools/types";
 
@@ -265,12 +266,15 @@ async function executeRunInner(
     const pending = deps.tools
       ? await pendingConnectors(db, run.orgId, new Set(tools.map((t) => t.name))).catch(() => [])
       : [];
+    // Skills: only names and descriptions here; the body loads with `load_skill` (progressive disclosure).
+    const skillList = tools.some((t) => t.name === "load_skill") ? await enabledSkills(db, run.orgId, agent.id) : [];
     const [context, memory] = await Promise.all([
       buildRunContext(db, run, agent, {
         maxMessages: deps.contextMessages,
         toolsAvailable: tools.length > 0,
         askUser: tools.some((t) => t.name === ASK_USER_TOOL),
         capabilities: describeCapabilities(tools, pending),
+        skills: skillList,
         trigger,
       }),
       contextDeps

@@ -6,9 +6,14 @@ const tags = ["Agents"];
 const State = z.enum(["granted", "inherited", "denied", "off"]);
 const Tool = z.object({
   name: z.string(),
+  label: z.string().openapi({ description: "Human name (pt-BR when we have one)." }),
+  description: z.string(),
   connectionId: z.uuid().nullable(),
   scope: z.string(),
   sensitive: z.boolean(),
+  readOnly: z
+    .boolean()
+    .openapi({ description: "Only reads: built-in :read scopes, MCP readOnlyHint or classified read." }),
   state: State,
 });
 const Scope = z.object({ scope: z.string(), label: z.string(), state: State, tools: z.array(Tool) });
