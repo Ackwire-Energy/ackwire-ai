@@ -50,7 +50,10 @@ export function createAppRouter(deps: AppDeps) {
     const origin = c.req.header("origin");
     if (!origin || !origins.has(origin)) return apiError(c, 403, "bad_origin", "Cross-origin request refused");
     const type = c.req.header("content-type") ?? "";
-    const upload = c.req.method === "POST" && type.startsWith("multipart/form-data") && MULTIPART_PATHS.some((p) => p.test(c.req.path));
+    const upload =
+      c.req.method === "POST" &&
+      type.startsWith("multipart/form-data") &&
+      MULTIPART_PATHS.some((p) => p.test(c.req.path));
     if (c.req.method !== "DELETE" && !type.startsWith("application/json") && !upload) {
       return apiError(c, 415, "unsupported_media_type", "Send JSON");
     }
