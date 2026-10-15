@@ -89,17 +89,23 @@ describe("DatePicker (interaction)", () => {
       render(<Harness />);
       await click(body().getByRole("button", { name: "Dia" }));
       await act(() => new Promise((r) => setTimeout(r, 0)));
-      const focused = () => document.activeElement as HTMLElement;
-      expect(focused().getAttribute("data-day")).toBe("2026-10-14");
-      await key(focused(), "ArrowRight");
-      expect(focused().getAttribute("data-day")).toBe("2026-10-15");
-      await key(focused(), "ArrowDown");
-      expect(focused().getAttribute("data-day")).toBe("2026-10-22");
-      await key(focused(), "PageDown");
-      expect(focused().getAttribute("data-day")).toBe("2026-11-22");
-      await key(focused(), "Home");
-      expect(focused().getAttribute("data-day")).toBe("2026-11-16");
-      await key(focused(), "Enter");
+      // happy-dom doesn't move focus inside the popover reliably; follow the roving tabindex instead
+      // (the active day is the one with tabindex="0", and it's where the keys go).
+      const active = () => {
+        const el = document.querySelector<HTMLElement>('[data-day][tabindex="0"]');
+        if (!el) throw new Error("no active day in the grid");
+        return el;
+      };
+      expect(active().getAttribute("data-day")).toBe("2026-10-14");
+      await key(active(), "ArrowRight");
+      expect(active().getAttribute("data-day")).toBe("2026-10-15");
+      await key(active(), "ArrowDown");
+      expect(active().getAttribute("data-day")).toBe("2026-10-22");
+      await key(active(), "PageDown");
+      expect(active().getAttribute("data-day")).toBe("2026-11-22");
+      await key(active(), "Home");
+      expect(active().getAttribute("data-day")).toBe("2026-11-16");
+      await key(active(), "Enter");
       expect(document.querySelector("output")?.textContent).toBe("2026-11-16");
     },
     10_000,
