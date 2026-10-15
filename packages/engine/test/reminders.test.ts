@@ -125,6 +125,39 @@ describe("reminders from the chat", () => {
     expect(await listReminders(f.db, f.owner.id, f.org.id)).toEqual([]);
   });
 
+  test("asking for the same routine again (an interrupted run asked again) doesn't schedule it twice", async () => {
+    await world((req) => {
+      const last = JSON.stringify(req.messages.at(-1)?.content);
+      if (last.includes("tool_result")) return { chunks: ["Feito."] };
+      if (last.includes("rotina"))
+        return {
+          chunks: [],
+          toolUses: [
+            {
+              name: "create_routine",
+              input: {
+                schedule: "toda hora",
+                prompt: "Veja os reviews  da última hora e avise aqui.",
+                title: "Reviews",
+              },
+            },
+          ],
+        };
+      return { chunks: ["ok"] };
+    });
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    for (const body of ["cria uma rotina de reviews", "a rotina de reviews, de novo"]) {
+      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dm.id, { body });
+      await drainOutbox(f.db, f.handlers);
+    }
+    const created = (await results()).filter((r) => r.name === "create_routine");
+    expect(created).toHaveLength(2);
+    expect(created[0]?.content).toContain("Created routine");
+    // Same agent, conversation and instructions (spacing and case aside): the existing one.
+    expect(created[1]?.content).toContain("already exists");
+    expect(await listRoutines(f.db, f.owner.id, f.org.id)).toHaveLength(1);
+  });
+
   test("in a channel thread it lands in that thread; ask_agent makes the agent do it then", async () => {
     await world((req) => {
       const last = JSON.stringify(req.messages.at(-1)?.content);

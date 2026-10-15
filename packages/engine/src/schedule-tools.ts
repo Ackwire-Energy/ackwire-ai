@@ -1,4 +1,4 @@
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, isNull, schema, sql } from "@agenteschat/db";
 import { getChannelCached } from "./context";
 import {
   cancelReminder,
@@ -32,6 +32,43 @@ async function requesterOf(ctx: ToolContext): Promise<string | null> {
 async function conversationOf(ctx: ToolContext) {
   const channel = await getChannelCached(ctx.db, ctx.orgId, ctx.channelId);
   return { channelId: ctx.channelId, threadId: channel?.kind === "dm" ? null : ctx.threadRootId };
+}
+
+const sameText = (a: string, b: string) =>
+  a.replace(/\s+/g, " ").trim().toLowerCase() === b.replace(/\s+/g, " ").trim().toLowerCase();
+
+/**
+ * The agent's active routine in this conversation with the same instructions,
+ * if any: asking twice (an interrupted run asked again, a repeated message)
+ * must not schedule the same job twice.
+ */
+async function sameRoutine(ctx: ToolContext, conv: { channelId: string; threadId: string | null }, prompt: string) {
+  const { routines } = schema;
+  const rows = await ctx.db
+    .select({
+      id: routines.id,
+      name: routines.name,
+      prompt: routines.prompt,
+      target: routines.target,
+      nextRunAt: routines.nextRunAt,
+      timezone: routines.timezone,
+    })
+    .from(routines)
+    .where(
+      and(
+        eq(routines.orgId, ctx.orgId),
+        eq(routines.agentId, ctx.agentId),
+        eq(routines.active, true),
+        isNull(routines.deletedAt),
+        sql`${routines.target}->>'channelId' = ${conv.channelId}`,
+      ),
+    );
+  return (
+    rows.find(
+      (r) =>
+        ((r.target as { threadId?: string | null }).threadId ?? null) === conv.threadId && sameText(r.prompt, prompt),
+    ) ?? null
+  );
 }
 
 const noRequester: ToolOutput = {
@@ -125,6 +162,14 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           const requester = await requesterOf(ctx);
           if (!requester) return noRequester;
           const conv = await conversationOf(ctx);
+          const existing = await sameRoutine(ctx, conv, str(input.prompt));
+          if (existing) {
+            const next = existing.nextRunAt ? describeWhen(existing.nextRunAt, existing.timezone ?? "UTC") : "";
+            return {
+              content: `Routine ${existing.id} "${existing.name}" already exists in this conversation with these instructions (next: ${next}). Don't create another: tell the person it's already set up. To change when it runs, they edit it in Rotinas.`,
+              data: { routine: { id: existing.id }, existing: true },
+            };
+          }
           const routine = await createRoutine(routineDeps(ctx), requester, ctx.orgId, {
             name: str(input.title) || undefined,
             agentId: ctx.agentId,
