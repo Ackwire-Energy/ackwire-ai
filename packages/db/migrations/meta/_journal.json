@@ -267,6 +267,13 @@
       "when": 1792082101880,
       "tag": "0037_schedule_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792088755327,
+      "tag": "0038_connected_computers",
+      "breakpoints": true
     }
   ]
 }

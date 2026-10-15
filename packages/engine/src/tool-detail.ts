@@ -46,6 +46,7 @@ export function toolDetail(name: string, input: Record<string, unknown> | undefi
     case "read_file":
     case "list_files":
     case "export_file":
+    case "upload_file":
       return short(i.path);
     case "run_skill_script": {
       const skill = short(i.skill);

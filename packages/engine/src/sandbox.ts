@@ -63,6 +63,22 @@ export interface SandboxDeps {
    * computer's network is blocked.
    */
   git?: { publicUrl: string; secret: string } | null;
+  /** Our public base URL: computers that push files (`pushFile`) send them to `{publicUrl}/api/machines/uploads/{id}`. */
+  publicUrl?: string;
+}
+
+/**
+ * The computer a tool acts on (ADR 0025): the provider's id for it and the
+ * channel to talk to it, never a global provider, so Daytona computers and
+ * connected machines can be served at once.
+ */
+export interface ComputerHandle {
+  id: string;
+  provider: SandboxProvider;
+  /** Our name for it, recorded with uploads: `daytona:<sandbox row id>` or `machine:<machine id>`. */
+  ref: string;
+  /** Set for a connected machine: only it may complete its uploads. */
+  machineId?: string | null;
 }
 
 /** The network a computer really gets: the org's mode, plus our own host when the git proxy is on. */
@@ -494,7 +510,7 @@ export async function withSandbox<T>(
   deps: SandboxDeps,
   ctx: ToolContext,
   budgetSeconds: number,
-  fn: (sandboxId: string) => Promise<T>,
+  fn: (computer: ComputerHandle) => Promise<T>,
   onNotice?: (notice: string) => void,
 ): Promise<T> {
   const { settings, updatedAt } = await settingsRow(deps.db, ctx.orgId);
@@ -517,7 +533,7 @@ export async function withSandbox<T>(
   // Up since its last use: that gap; it had auto-stopped: the idle tail before stopping.
   const idle = previous === "running" ? Math.min(sinceLast, idleCap) : previous === "stopped" ? idleCap : 0;
   try {
-    return await fn(info.id);
+    return await fn({ id: info.id, provider: deps.provider, ref: `${row.provider}:${row.id}` });
   } finally {
     const used = Math.max(1, Math.ceil((clock() - started) / 1000));
     await charge(deps, ctx, row, info, used + idle).catch(() => undefined);

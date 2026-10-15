@@ -78,6 +78,7 @@ export * from "./tools/json-schema";
 export * from "./tools/scopes";
 export * from "./tools/types";
 export * from "./ttf";
+export * from "./uploads";
 export * from "./usage";
 export * from "./webhooks";
 export * from "./wiki";

@@ -33,7 +33,13 @@ export function allowedOrigins(config: Config): Set<string> {
  * CSRF protection, free to change between versions. Documented in the
  * OpenAPI document so the web app can generate a typed client.
  */
-export function createAppRouter(deps: AppDeps) {
+export function createAppRouter(
+  deps: AppDeps,
+  options: {
+    /** POSTs to these paths may also be `multipart/form-data` (file uploads); the origin check still applies. */
+    multipart?: (path: string) => boolean;
+  } = {},
+) {
   const app = new OpenAPIHono<AppEnv>({ defaultHook: validationHook<AppEnv>() });
   const origins = allowedOrigins(deps.config);
 
@@ -43,7 +49,9 @@ export function createAppRouter(deps: AppDeps) {
     if (c.req.method === "GET" || c.req.method === "HEAD") return next();
     const origin = c.req.header("origin");
     if (!origin || !origins.has(origin)) return apiError(c, 403, "bad_origin", "Cross-origin request refused");
-    if (c.req.method !== "DELETE" && !c.req.header("content-type")?.startsWith("application/json")) {
+    const type = c.req.header("content-type") ?? "";
+    const upload = c.req.method === "POST" && type.startsWith("multipart/form-data") && options.multipart?.(c.req.path);
+    if (c.req.method !== "DELETE" && !type.startsWith("application/json") && !upload) {
       return apiError(c, 415, "unsupported_media_type", "Send JSON");
     }
     return next();

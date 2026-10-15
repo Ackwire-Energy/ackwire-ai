@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -12,6 +13,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { agents } from "./agents";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
@@ -140,11 +142,11 @@ export const auditLog = pgTable(
   (t) => [index().on(t.orgId, t.createdAt)],
 );
 
-export const artifactKindEnum = pgEnum("artifact_kind", ["document", "table", "diff", "html", "diagram"]);
+export const artifactKindEnum = pgEnum("artifact_kind", ["document", "table", "diff", "html", "diagram", "file"]);
 
 /**
  * Files people and agents make (Drive): documents, tables, diffs, HTML
- * pages, diagrams. Visibility comes from the channel of origin (null =
+ * pages, diagrams, and binary files as is (`file`, ADR 0025). Visibility comes from the channel of origin (null =
  * the whole organization). Content lives in the blob store, one object per
  * version (`artifact_versions`).
  */
@@ -195,6 +197,8 @@ export const artifactVersions = pgTable(
     contentType: text().notNull(),
     size: integer().notNull(),
     sha256: text().notNull(),
+    /** `file` versions: the original file name (`report.pdf`). */
+    fileName: text(),
     note: text(),
     authorType: text().notNull(),
     authorId: text().notNull(),
@@ -202,4 +206,50 @@ export const artifactVersions = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique().on(t.artifactId, t.version), index().on(t.orgId, t.storageConfigId)],
+);
+
+/**
+ * A one-time upload of a file from an agent's computer to the Drive
+ * (`upload_file`, ADR 0025): pending until the bytes arrive (pushed by the
+ * machine, or read by the server), then `done` with the artifact and
+ * version it became. Expires after 10 minutes.
+ */
+export const artifactUploads = pgTable(
+  "artifact_uploads",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    agentId: uuid().notNull(),
+    runId: uuid(),
+    /** The run's channel and thread: completion acts as the agent there. */
+    channelId: uuid().notNull(),
+    threadId: uuid(),
+    /** `daytona:<sandbox row id>` or `machine:<machine id>`. */
+    computer: text().notNull(),
+    /** Connected machines: only this machine may complete it. */
+    machineId: uuid(),
+    /** Workspace-relative path on the computer. */
+    path: text().notNull(),
+    title: text(),
+    note: text(),
+    /** Set: the upload is a new version of this `file` artifact. */
+    targetArtifactId: uuid(),
+    /** `pending`, `storing` (bytes arrived, being saved), `done` or `failed`. */
+    status: text().notNull().default("pending"),
+    maxBytes: integer().notNull(),
+    artifactId: uuid(),
+    version: integer(),
+    error: text(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    index().on(t.orgId, t.createdAt),
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+  ],
 );

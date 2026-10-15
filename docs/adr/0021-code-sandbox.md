@@ -41,7 +41,7 @@ Migration 0030 maps existing rows: domains present means `allowlist`, otherwise 
 
 **Start and stop don't block.** `POST …/computer/start` and `POST …/computer/stop` mark the computer `starting` or `stopping`, queue an outbox job (`sandbox.start`, `sandbox.stop`) and return `202`. On a first start, a placeholder row (no provider id) holds `starting` until the job fills it in. Each change is broadcast to the organization as `agent.computer { agentId, status, step?: creating|preparing|ready, error? }`; every member can see its agents. A failure leaves `status: error` with the masked reason in `last_error` (migration 0028).
 
-**Tools.** The `sandbox:run` scope covers `run_code`, `write_file`, `read_file`, `list_files`, `export_file`, `import_file` and `run_skill_script`. It is not in the default scopes, and the `*` ("all tools") grant does not cover it (`NOT_IN_ALL` in `tools/scopes.ts`).
+**Tools.** The `sandbox:run` scope covers `run_code`, `write_file`, `read_file`, `list_files`, `export_file`, `upload_file` (any file or folder as is, ADR 0025), `import_file` and `run_skill_script`. It is not in the default scopes, and the `*` ("all tools") grant does not cover it (`NOT_IN_ALL` in `tools/scopes.ts`).
 - An organization can make `run_code` and `run_skill_script` sensitive, so every call waits for an approval.
 - `export_file` maps `.md`/`.txt`, `.csv`, `.html` and `.mmd` to Drive kinds, as a new file or a new version.
 - `import_file` writes a Drive file's text form into the workspace.

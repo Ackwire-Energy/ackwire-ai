@@ -79,8 +79,8 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
               const dir = str(input.dir).trim() || repo.repo;
               if (dir.startsWith("/") || dir.split("/").includes(".."))
                 return { content: "dir must stay in the workspace", isError: true };
-              const result = await withSandbox(deps.sandbox, c, 300, (id) =>
-                deps.sandbox.provider.exec(id, {
+              const result = await withSandbox(deps.sandbox, c, 300, (computer) =>
+                computer.provider.exec(computer.id, {
                   command: `git clone --quiet https://github.com/${repo.owner}/${repo.repo} ${quote(dir)} 2>&1 && cd ${quote(dir)} && git log --oneline -1 && git branch --show-current`,
                   timeoutSeconds: 290,
                   ...(c.signal ? { signal: c.signal } : {}),

@@ -126,6 +126,7 @@ export function buildEngine(o: EngineOptions) {
         archiveAfterDays: config.SANDBOX_ARCHIVE_AFTER_DAYS,
         // Git through our proxy (D35): the computer never gets a GitHub token.
         git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
+        publicUrl: config.PUBLIC_URL,
       }
     : null;
   const githubApp =

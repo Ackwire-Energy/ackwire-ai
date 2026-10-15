@@ -4,6 +4,9 @@
  * secret ever goes in: no environment variables are passed, at creation or
  * per command, and the network is blocked unless the org allows domains.
  */
+import { createHash } from "node:crypto";
+import type { MachineReplies } from "./machine-protocol";
+
 export interface SandboxResources {
   cpu: number;
   /** GiB. */
@@ -81,14 +84,33 @@ export interface SandboxFile {
   size: number;
 }
 
-export interface SandboxProvider {
-  readonly id: string;
+/** Where a computer sends a file (`pushFile`): our one-time upload URL, authenticated by the computer's own token. */
+export interface PushTarget {
+  /** Absolute URL of our upload endpoint (`PUT`). */
+  url: string;
+  uploadId: string;
+  maxBytes: number;
+}
+
+/** What a computer sent: the uploaded name (`report.pdf`, or `folder.zip`), size, SHA-256 (hex) and type. */
+export type PushReceipt = MachineReplies["push"];
+
+/** Turning a computer on and off (ADR 0025). Connected machines have none: they are on while their runner is. */
+export interface ComputerLifecycle {
   /** Creates a sandbox and waits until it runs. */
   create(spec: SandboxSpec): Promise<SandboxInfo>;
   /** Null when it no longer exists. */
   get(id: string): Promise<SandboxInfo | null>;
   /** Starts a stopped or archived sandbox and waits; throws SandboxGoneError when it can't come back. */
   ensureStarted(id: string): Promise<SandboxInfo>;
+  stop(id: string): Promise<void>;
+  destroy(id: string): Promise<void>;
+  /** Changes the network of an existing (running) sandbox in place; returns what applies now. */
+  setNetwork(id: string, mode: NetworkMode, allowDomains: string[]): Promise<SandboxInfo["network"]>;
+}
+
+/** Talking to a running computer: commands and files (ADR 0025). */
+export interface ComputerChannel {
   /** Runs a shell command in the workspace. No environment variables are passed. */
   exec(id: string, request: ExecRequest): Promise<ExecResult>;
   /**
@@ -105,11 +127,15 @@ export interface SandboxProvider {
   /** Null when the file doesn't exist. */
   readFile(id: string, path: string): Promise<Uint8Array | null>;
   listFiles(id: string, path: string, depth?: number): Promise<SandboxFile[]>;
-  stop(id: string): Promise<void>;
-  destroy(id: string): Promise<void>;
-  /** Changes the network of an existing (running) sandbox in place; returns what applies now. */
-  setNetwork(id: string, mode: NetworkMode, allowDomains: string[]): Promise<SandboxInfo["network"]>;
+  /**
+   * The computer sends a file (a folder: zipped) straight to `target`, so the
+   * bytes never pass through the model. Channels without it: the server reads
+   * the file itself (`readFile`).
+   */
+  pushFile?(id: string, path: string, target: PushTarget): Promise<PushReceipt>;
 }
+
+export type SandboxProvider = ComputerLifecycle & ComputerChannel & { readonly id: string };
 
 /** The sandbox was deleted or broke for good: the caller makes a new one. */
 export class SandboxGoneError extends Error {
@@ -596,7 +622,7 @@ function networkBody(mode: NetworkMode, allowDomains: string[]): Record<string, 
 
 /** What the fake saw, for tests. */
 export interface FakeSandboxCall {
-  op: "create" | "exec" | "write" | "read" | "list" | "stop" | "destroy" | "start" | "network" | "kill";
+  op: "create" | "exec" | "write" | "read" | "list" | "stop" | "destroy" | "start" | "network" | "kill" | "push";
   id?: string;
   spec?: SandboxSpec;
   request?: ExecRequest;
@@ -604,9 +630,21 @@ export interface FakeSandboxCall {
   network?: { mode: NetworkMode; allowDomains: string[] };
 }
 
+/** What the fake's `pushFile` hands the test: the bytes it would PUT to `target.url`. */
+export interface FakePush {
+  target: PushTarget;
+  name: string;
+  bytes: Uint8Array;
+  sha256: string;
+  contentType: string;
+}
+
 /**
  * In-memory sandboxes for tests (no network). `exec` runs a handler the test
- * gives (default: echo-like results); files live in a map per sandbox.
+ * gives (default: echo-like results); files live in a map per sandbox. With
+ * `push`, the fake also has `pushFile` (like a connected machine): it hands
+ * the file (a folder: a stand-in `.zip` listing its files) to `push`, which
+ * the test forwards to the upload endpoint; without it there is no `pushFile`.
  */
 export function createFakeSandboxProvider(
   options: {
@@ -615,6 +653,7 @@ export function createFakeSandboxProvider(
       files: Map<string, Uint8Array>,
     ): ExecResult | Promise<ExecResult> | { delayMs: number; result: ExecResult };
     resources?: SandboxResources;
+    push?(upload: FakePush): void | Promise<void>;
   } = {},
 ) {
   const boxes = new Map<
@@ -732,6 +771,27 @@ export function createFakeSandboxProvider(
       return mode;
     },
   };
+  const push = options.push;
+  if (push) {
+    provider.pushFile = async (id, path, target) => {
+      calls.push({ op: "push", id, path });
+      const files = box(id).files;
+      const rel = workspacePath(path);
+      let name = rel.split("/").at(-1) ?? rel;
+      let bytes = files.get(rel);
+      if (!bytes) {
+        const inside = [...files.keys()].filter((p) => p.startsWith(`${rel}/`));
+        if (!rel || inside.length === 0) throw new SandboxProviderError(`not_found: ${path}`);
+        name = `${name}.zip`;
+        bytes = new TextEncoder().encode(`fake zip\n${inside.sort().join("\n")}\n`);
+      }
+      if (bytes.byteLength > target.maxBytes) throw new SandboxProviderError(`too_large: ${path}`);
+      const sha256 = createHash("sha256").update(bytes).digest("hex");
+      const contentType = "application/octet-stream";
+      await push({ target, name, bytes, sha256, contentType });
+      return { name, size: bytes.byteLength, sha256, contentType };
+    };
+  }
   return provider;
 }
 
