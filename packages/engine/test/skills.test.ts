@@ -4,11 +4,15 @@ import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
   createOrganization,
+  deleteSkill,
   drainOutbox,
+  enabledSkills,
   getSkill,
+  getSkillFile,
   importSkillFromUrl,
   importSkillZip,
   listAgentScopes,
+  listSkills,
   NotFoundError,
   parseSkillMarkdown,
   postPersonMessage,
@@ -17,6 +21,7 @@ import {
   setAgentSkills,
   ValidationError,
 } from "../src";
+import { toolDetail } from "../src/tool-detail";
 import { addUser, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -261,5 +266,75 @@ describe("runtime", () => {
     await expect(
       setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: crypto.randomUUID(), enabled: true }]),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+});
+
+describe("files, counts and delete", () => {
+  const folder = {
+    "relatorio-semanal/SKILL.md": SKILL_MD,
+    "relatorio-semanal/templates/relatorio.md": "# Semana {{n}}",
+    "relatorio-semanal/run.sh": "echo no",
+  };
+
+  test("a stored file by version; ignored files are 404", async () => {
+    f = await setup();
+    const v1 = await importSkillZip(skillDeps(), f.owner.id, f.org.id, zip(folder));
+    await importSkillZip(
+      skillDeps(),
+      f.owner.id,
+      f.org.id,
+      zip({ ...folder, "relatorio-semanal/templates/relatorio.md": "# Semana v2" }),
+    );
+    const current = await getSkillFile(skillDeps(), f.owner.id, f.org.id, v1.id, "templates/relatorio.md");
+    expect(current).toMatchObject({ version: 2, mime: "text/markdown", content: "# Semana v2" });
+    const old = await getSkillFile(skillDeps(), f.owner.id, f.org.id, v1.id, "templates/relatorio.md", 1);
+    expect(old.content).toBe("# Semana {{n}}");
+    await expect(getSkillFile(skillDeps(), f.owner.id, f.org.id, v1.id, "run.sh")).rejects.toThrow(/sandbox/);
+    await expect(getSkillFile(skillDeps(), f.owner.id, f.org.id, v1.id, "run.sh")).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+    await expect(getSkillFile(skillDeps(), f.owner.id, f.org.id, v1.id, "nope.md")).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+
+  test("agentsCount; deleting keeps assignments and the same name again brings them back", async () => {
+    f = await setup();
+    const skill = await importSkillZip(skillDeps(), f.owner.id, f.org.id, zip(folder));
+    expect((await listSkills(f.db, f.owner.id, f.org.id))[0]).toMatchObject({ id: skill.id, agentsCount: 0 });
+    await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
+    expect((await listSkills(f.db, f.owner.id, f.org.id))[0]?.agentsCount).toBe(1);
+
+    await deleteSkill(f.db, f.owner.id, f.org.id, skill.id);
+    expect(await listSkills(f.db, f.owner.id, f.org.id)).toEqual([]);
+    expect(await enabledSkills(f.db, f.org.id, f.agent.id)).toEqual([]);
+    await expect(getSkill(f.db, f.owner.id, f.org.id, skill.id)).rejects.toBeInstanceOf(NotFoundError);
+    expect(await f.db.select().from(schema.agentSkills)).toHaveLength(1);
+
+    const back = await saveSkill(skillDeps(), f.owner.id, f.org.id, {
+      ...parseSkillMarkdown(SKILL_MD),
+      source: "manual",
+    });
+    expect(back).toMatchObject({ id: skill.id, version: 2 });
+    expect((await enabledSkills(f.db, f.org.id, f.agent.id)).map((s) => s.id)).toEqual([skill.id]);
+    expect((await listSkills(f.db, f.owner.id, f.org.id))[0]?.agentsCount).toBe(1);
+    const audit = await f.db.select().from(schema.auditLog);
+    expect(audit.some((a) => a.action === "skill.restored")).toBe(true);
+  });
+});
+
+describe("agent.tool detail", () => {
+  test("only the safe field of built-in tools, ≤ 80 chars", () => {
+    expect(toolDetail("load_skill", { name: "relatorio-semanal" })).toBe("relatorio-semanal");
+    expect(toolDetail("read_skill_file", { name: "relatorio-semanal", path: "templates/a.md" })).toBe(
+      "relatorio-semanal/templates/a.md",
+    );
+    expect(toolDetail("create_issue", { title: "Corrigir login", body: "segredo" })).toBe("Corrigir login");
+    expect(toolDetail("update_issue", { issue: "131", status: "done" })).toBe("#131");
+    expect(toolDetail("comment_issue", { issue: "#7", text: "x" })).toBe("#7");
+    expect(toolDetail("create_artifact", { title: "Relatório Q3", content: "..." })).toBe("Relatório Q3");
+    expect(toolDetail("create_issue", { title: "a".repeat(200) })?.length).toBe(80);
+    expect(toolDetail("search_context", { query: "salários" })).toBeUndefined();
+    expect(toolDetail("load_skill", { name: 42 })).toBeUndefined();
   });
 });

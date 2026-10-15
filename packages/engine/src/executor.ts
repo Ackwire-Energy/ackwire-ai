@@ -34,6 +34,7 @@ import {
 } from "./questions";
 import { type AgentRun, addRunStep, type RunStatus, transitionRun } from "./runs";
 import { enabledSkills } from "./skills";
+import { artifactToolDetail, toolDetail } from "./tool-detail";
 import type { Approval, ToolGateway } from "./tools/gateway";
 import type { ToolContext } from "./tools/types";
 
@@ -423,12 +424,21 @@ async function executeRunInner(
       const waiting: Approval[] = [];
       const asks: { id: string; toolUseId: string; text: string; choices: string[] | null }[] = [];
       for (const use of toolUses) {
-        const connector = turnTools.find((t) => t.name === use.name)?.connectorLabel;
+        const def = turnTools.find((t) => t.name === use.name);
+        const connector = def?.connectorLabel;
+        // A short label for the UI (skill, issue, file); built-in tools only, never connector inputs.
+        const input = use.input as Record<string, unknown> | undefined;
+        const detail =
+          connector || def?.connectionId
+            ? undefined
+            : (toolDetail(use.name, input) ??
+              (await artifactToolDetail(db, run.orgId, run.channelId, use.name, input).catch(() => undefined)));
         await publishChannelEvent(deps.pubsub, {
           type: "agent.tool",
           ...where,
           tool: use.name,
           ...(connector ? { connector } : {}),
+          ...(detail ? { detail } : {}),
         });
         const outcome = await deps.tools
           .invoke(ctx, { toolUseId: use.id, name: use.name, input: use.input })

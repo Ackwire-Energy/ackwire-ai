@@ -1,5 +1,5 @@
 import type { BlobStoreResolver } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -237,7 +237,8 @@ export async function saveSkill(
     .from(skills)
     .where(and(eq(skills.orgId, orgId), eq(skills.slug, input.name)));
   let row: SkillRow;
-  if (existing && !existing.deletedAt) {
+  if (existing) {
+    // Same name: a new version of that skill. A deleted one comes back (with its agents' assignments).
     const [updated] = await deps.db
       .update(skills)
       .set({
@@ -248,6 +249,7 @@ export async function saveSkill(
         sourceUrl: input.sourceUrl ?? existing.sourceUrl,
         version: existing.version + 1,
         ...(input.defaultForNewAgents !== undefined ? { defaultForNewAgents: input.defaultForNewAgents } : {}),
+        deletedAt: null,
         updatedAt: new Date(),
       })
       .where(eq(skills.id, existing.id))
@@ -255,7 +257,6 @@ export async function saveSkill(
     if (!updated) throw new Error("skill update returned nothing");
     row = updated;
   } else {
-    if (existing) await deps.db.delete(skills).where(eq(skills.id, existing.id)); // a deleted one with that name
     const [created] = await deps.db
       .insert(skills)
       .values({
@@ -278,7 +279,7 @@ export async function saveSkill(
   await recordAudit(deps.db, {
     orgId,
     actor: { type: "person", id: actorId },
-    action: existing && !existing.deletedAt ? "skill.updated" : "skill.installed",
+    action: existing && !existing.deletedAt ? "skill.updated" : existing ? "skill.restored" : "skill.installed",
     target: { type: "skill", id: row.id },
     details: { name: row.name, version: row.version, source: row.source, sourceUrl: row.sourceUrl },
   });
@@ -400,7 +401,15 @@ export async function listSkills(db: Database, actorId: string, orgId: string) {
     .from(skills)
     .where(and(eq(skills.orgId, orgId), isNull(skills.deletedAt)))
     .orderBy(asc(skills.name));
-  return rows.map(view);
+  const counts = await db
+    .select({ skillId: agentSkills.skillId, n: sql<number>`count(*)::int` })
+    .from(agentSkills)
+    .innerJoin(schema.agents, eq(schema.agents.id, agentSkills.agentId))
+    .where(and(eq(agentSkills.orgId, orgId), eq(agentSkills.enabled, true), isNull(schema.agents.archivedAt)))
+    .groupBy(agentSkills.skillId);
+  const byId = new Map(counts.map((c) => [c.skillId, Number(c.n)]));
+  /** How many active agents have each skill on. */
+  return rows.map((r) => ({ ...view(r), agentsCount: byId.get(r.id) ?? 0 }));
 }
 
 export async function getSkill(db: Database, actorId: string, orgId: string, id: string): Promise<SkillDetail> {
@@ -440,8 +449,8 @@ export async function updateSkill(
 export async function deleteSkill(db: Database, actorId: string, orgId: string, id: string) {
   await requirePermission(db, actorId, orgId, "manage_agents");
   const s = await loadSkill(db, orgId, id);
+  // Soft delete: agents stop seeing it at once; their assignments come back if the skill is installed again.
   await db.update(skills).set({ deletedAt: new Date() }).where(eq(skills.id, s.id));
-  await db.delete(agentSkills).where(eq(agentSkills.skillId, s.id));
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: actorId },
@@ -541,17 +550,33 @@ export async function agentSkillByName(db: Database, orgId: string, agentId: str
   return row?.skill ?? null;
 }
 
-export async function skillFileText(deps: SkillDeps, s: SkillRow, path: string) {
+export async function skillFileText(deps: SkillDeps, s: SkillRow, path: string, version = s.version) {
   const [f] = await deps.db
     .select()
     .from(skillFiles)
-    .where(and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, s.version), eq(skillFiles.path, path)));
+    .where(and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, version), eq(skillFiles.path, path)));
   if (!f) throw new NotFoundError(`No file ${path} in this skill`);
   if (f.status !== "stored" || !f.blobKey) {
-    throw new ValidationError(`${path} is not available: scripts and binaries need a sandbox, which doesn't exist yet`);
+    throw new NotFoundError(`${path} is not available: scripts and binaries need a sandbox, which doesn't exist yet`);
   }
   const store = await deps.blobs.forConfig(s.orgId, f.storageConfigId);
   const object = await store.get(f.blobKey);
   if (!object) throw new NotFoundError(`The stored file ${path} is missing`);
   return new TextDecoder().decode(object.body);
+}
+
+/** `GET …/skills/{id}/files/{path}`: a stored text file of a version (default: current). */
+export async function getSkillFile(
+  deps: SkillDeps,
+  actorId: string,
+  orgId: string,
+  skillId: string,
+  path: string,
+  version?: number,
+) {
+  await requirePermission(deps.db, actorId, orgId, "read");
+  const s = await loadSkill(deps.db, orgId, skillId);
+  const text = await skillFileText(deps, s, path, version ?? s.version);
+  const { mime } = classifyFile(path);
+  return { path, version: version ?? s.version, mime, content: text };
 }

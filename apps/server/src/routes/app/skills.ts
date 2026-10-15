@@ -2,6 +2,7 @@ import {
   agentSkillList,
   deleteSkill,
   getSkill,
+  getSkillFile,
   importSkillFromUrl,
   importSkillZip,
   listSkills,
@@ -48,6 +49,9 @@ const SkillDetail = Skill.extend({
   ),
 }).openapi("SkillDetail");
 const SkillParams = OrgParams.extend({ skillId: z.uuid() });
+const SkillListItem = Skill.extend({
+  agentsCount: z.number().openapi({ description: "Active agents with this skill turned on." }),
+}).openapi("SkillListItem");
 
 /**
  * Skills in Markdown (`SKILL.md`, D29): install by zip, GitHub URL or by
@@ -72,7 +76,7 @@ export function skillRoutes(deps: AppDeps) {
       security,
       summary: "The organization's skills",
       request: { params: OrgParams },
-      responses: { 200: json(z.object({ skills: z.array(Skill) })), ...errors },
+      responses: { 200: json(z.object({ skills: z.array(SkillListItem) })), ...errors },
     }),
     async (c) => c.json({ skills: await listSkills(db, c.get("user").id, c.req.valid("param").orgId) }, 200),
   );
@@ -171,6 +175,37 @@ export function skillRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/skills/{skillId}/files/{path}",
+      tags,
+      security,
+      summary: "A stored text file of the skill (scripts and binaries are ignored: 404)",
+      request: {
+        params: SkillParams.extend({
+          path: z
+            .string()
+            .min(1)
+            .max(300)
+            .openapi({ description: "The file's path inside the skill, URL-encoded (`templates%2Frelatorio.md`)." }),
+        }),
+        query: z.object({
+          version: z.coerce.number().int().min(1).optional().openapi({ description: "Default: the current one." }),
+        }),
+      },
+      responses: {
+        200: json(z.object({ path: z.string(), version: z.number(), mime: z.string(), content: z.string() })),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, skillId, path } = c.req.valid("param");
+      const { version } = c.req.valid("query");
+      return c.json(await getSkillFile(skills(), c.get("user").id, orgId, skillId, path, version), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "patch",
       path: "/organizations/{orgId}/skills/{skillId}",
       tags,
@@ -216,7 +251,7 @@ export function skillRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/skills/{skillId}",
       tags,
       security,
-      summary: "Delete a skill (agents lose it)",
+      summary: "Delete a skill (agents lose it; installing the same name again brings it back with its assignments)",
       request: { params: SkillParams },
       responses: { 204: noContent[204], ...errors },
     }),
