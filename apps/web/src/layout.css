@@ -3895,3 +3895,45 @@ button.live-call__head:hover {
   color: var(--ink2);
   font-weight: 600;
 }
+/* "Theo ainda trabalhando" (a live row above newer messages) and the composer hint while it works. */
+.still-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--sunken);
+  color: var(--ink2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.still-working:hover {
+  background: var(--plate);
+}
+.still-working:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.composer-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.msg-steered {
+  margin: 4px 0 0;
+  font-style: italic;
+}
+.live-work__steer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink2);
+  font-weight: 600;
+}

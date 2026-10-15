@@ -1,4 +1,4 @@
-import type { ChannelEvent, RunStatus } from "@/api/types";
+import type { ActiveRun, ChannelEvent, RunStatus } from "@/api/types";
 
 /**
  * Live agent runs per channel, from `agent.run`, `agent.delta` and (expected
@@ -12,6 +12,14 @@ import type { ChannelEvent, RunStatus } from "@/api/types";
  */
 /** `canceled`: someone pressed "Parar" (the row keeps the text so far). */
 export type LiveStatus = RunStatus | "thinking" | "canceled";
+
+/** `agent.run.steered`: a new message went into this run (one active run per agent and conversation). */
+export interface RunSteeredEvent {
+  type: "agent.run.steered";
+  channelId: string;
+  runId: string;
+  messageId: string;
+}
 
 /** `run.canceled` (expected from the backend with `POST …/runs/{id}/cancel`). */
 export interface RunCanceledEvent {
@@ -66,6 +74,10 @@ function cancel(state: StreamsState, runId: string, byUserId?: string | null): S
 export interface LiveRun {
   /** When a provisional row was added (for the safety timeout). */
   since?: number;
+  /** When this client first saw the run (places the live row by time in the timeline). */
+  startedAt?: number;
+  /** Last event seen for this run (a run silent for minutes may be orphaned on the server). */
+  lastEventAt?: number;
   runId: string;
   agentId: string;
   channelId: string;
@@ -101,6 +113,8 @@ export interface LiveRun {
 
 export type LiveWork =
   | { kind: "say"; text: string }
+  /** A new message reached the running task ("Nova mensagem de Walter"). */
+  | { kind: "steer"; messageId: string }
   | {
       kind: "call";
       id: string;
@@ -205,7 +219,16 @@ export function expectReply(
     (r) => !r.provisional && r.agentId === input.agentId && r.threadId === input.threadId,
   );
   if (alreadyLive || state.runs[runId]) return state;
-  const run: LiveRun = { ...input, runId, status: "thinking", text: "", lastSeq: -1, provisional: true, since: now };
+  const run: LiveRun = {
+    ...input,
+    runId,
+    status: "thinking",
+    text: "",
+    lastSeq: -1,
+    provisional: true,
+    since: now,
+    startedAt: now,
+  };
   return { ...state, runs: { ...state.runs, [runId]: run } };
 }
 
@@ -222,6 +245,7 @@ function upsert(
   event: { runId: string; agentId: string; channelId: string; threadId: string },
   patch: Partial<LiveRun>,
 ) {
+  const provisional = state.runs[provisionalId(event.agentId, event.threadId)];
   const base = settleProvisional(state, event.agentId, event.threadId);
   const current = base.runs[event.runId];
   const next: LiveRun = {
@@ -233,6 +257,7 @@ function upsert(
     text: "",
     // No delta yet: the backend's first delta is seq 0, so "seen" starts below it.
     lastSeq: -1,
+    startedAt: provisional?.startedAt ?? Date.now(),
     ...current,
     ...patch,
   };
@@ -246,11 +271,37 @@ function reopen(state: StreamsState, runId: string): StreamsState {
   return { ...state, finished };
 }
 
-export function applyChannelEvent(
-  state: StreamsState,
-  event: ChannelEvent | AgentToolEvent | AgentToolOutputEvent | RunCanceledEvent,
-): StreamsState {
+type StreamEvent = ChannelEvent | AgentToolEvent | AgentToolOutputEvent | RunCanceledEvent | RunSteeredEvent;
+
+export function applyChannelEvent(state: StreamsState, event: StreamEvent, now = Date.now()): StreamsState {
+  const next = applyEvent(state, event);
+  // Any news about a run keeps it "alive" (see `isQuiet`).
+  const runId = "runId" in event && typeof event.runId === "string" ? event.runId : null;
+  const r = runId ? next.runs[runId] : undefined;
+  if (!runId || !r || r.provisional || (next === state && r.lastEventAt !== undefined)) return next;
+  return { ...next, runs: { ...next.runs, [runId]: { ...r, lastEventAt: now } } };
+}
+
+function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
   switch (event.type) {
+    case "agent.run.steered": {
+      const r = state.runs[event.runId];
+      if (!r) return state;
+      // Text so far is narration: the answer continues after the new message.
+      const said = r.text.trim();
+      const work: LiveWork[] = [
+        ...(r.work ?? []),
+        ...(said ? [{ kind: "say" as const, text: said }] : []),
+        { kind: "steer", messageId: event.messageId },
+      ];
+      return {
+        ...state,
+        runs: {
+          ...state.runs,
+          [event.runId]: { ...r, work, ...(said ? { text: "", status: "thinking" as const } : {}) },
+        },
+      };
+    }
     case "run.canceled":
       return cancel(state, event.runId, event.byUserId);
     case "agent.tool": {
@@ -400,6 +451,55 @@ export function applyChannelEvent(
 function finish(state: StreamsState, runId: string): StreamsState {
   const { [runId]: _done, ...runs } = state.runs;
   return { runs, finished: { ...state.finished, [runId]: true } };
+}
+
+/** No event for this long: the row says "sem notícias há 3 min · Atualizar". */
+export const QUIET_AFTER_MS = 3 * 60_000;
+
+/** A live run that went silent (orphaned by a server restart, a lost socket…). */
+export const isQuiet = (r: LiveRun, now = Date.now()) =>
+  !r.provisional &&
+  r.status !== "failed" &&
+  r.status !== "canceled" &&
+  now - (r.lastEventAt ?? r.startedAt ?? now) >= QUIET_AFTER_MS;
+
+/** "Atualizar" found the run still active: quiet again for another while. */
+export function touchRun(state: StreamsState, runId: string, now = Date.now()): StreamsState {
+  const r = state.runs[runId];
+  return r ? { ...state, runs: { ...state.runs, [runId]: { ...r, lastEventAt: now } } } : state;
+}
+
+const ACTIVE: ReadonlySet<string> = new Set(["queued", "running", "waiting_approval"]);
+export const isActiveStatus = (status: string) => ACTIVE.has(status);
+
+/**
+ * The server's list of active runs in a channel is the truth: live rows it
+ * doesn't know are dropped (a failed or canceled row stays until seen), and
+ * active runs we never heard of get a "pensando…" row.
+ */
+export function reconcileRuns(
+  state: StreamsState,
+  channelId: string,
+  active: ActiveRun[],
+  now = Date.now(),
+  askedAt = now,
+): StreamsState {
+  const known = new Set(active.filter((a) => isActiveStatus(a.status)).map((a) => a.runId));
+  let s = state;
+  for (const r of runsInChannel(state, channelId)) {
+    if (r.provisional || r.status === "failed" || r.status === "canceled" || known.has(r.runId)) continue;
+    // News after we asked: the list may be older than this run.
+    if ((r.lastEventAt ?? 0) > askedAt) continue;
+    s = finish(s, r.runId);
+  }
+  for (const a of active) {
+    if (!known.has(a.runId) || a.channelId !== channelId || s.runs[a.runId] || s.finished[a.runId]) continue;
+    // Waiting for an approval: the card shows it, not a live row.
+    if (a.status === "waiting_approval") continue;
+    const startedAt = a.startedAt ? Date.parse(a.startedAt) : now;
+    s = upsert(s, a, { status: "thinking", startedAt, lastEventAt: now });
+  }
+  return s;
 }
 
 /** Forget a failed run after the person has seen it. */

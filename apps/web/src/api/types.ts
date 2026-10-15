@@ -191,6 +191,16 @@ export interface MessageReceipts {
 
 export type RunStatus = "queued" | "running" | "waiting_approval" | "done" | "failed";
 
+/** A run the server still considers active in a channel (`GET …/channels/{id}/active-runs`). */
+export interface ActiveRun {
+  runId: string;
+  agentId: string;
+  channelId: string;
+  threadId: string;
+  status: RunStatus;
+  startedAt?: string | null;
+}
+
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
 export type ChannelEvent =
   | { type: "message.created"; channelId: string; messageId: string; message?: Message }

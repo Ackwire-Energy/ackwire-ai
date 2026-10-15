@@ -1,6 +1,7 @@
 import type { ApiClient, HttpApi } from "@/api/client";
 import { ApiError } from "@/api/http";
 import type {
+  ActiveRun,
   Agent,
   AgentQuestion,
   Approval,
@@ -55,6 +56,8 @@ export interface FakeState {
   connections: Connection[];
   scopes: Record<string, ScopeGrant[]>;
   runs: Run[];
+  /** `GET …/channels/{id}/active-runs`; unset = the endpoint doesn't exist yet (404). */
+  activeRuns?: Record<string, ActiveRun[]>;
   platformKey: boolean;
   online: Set<string>;
   memories: Memory[];
@@ -829,6 +832,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       runs: async (_orgId, filter = {}) => state.runs.filter((r) => !filter.agentId || r.agentId === filter.agentId),
       cancelRun: async (orgId, runId) => {
         log("agents.cancelRun", orgId, runId);
+      },
+      activeRuns: async (_orgId, channelId) => {
+        log("agents.activeRuns", channelId);
+        return state.activeRuns ? (state.activeRuns[channelId] ?? []) : null;
       },
       run: async (_orgId, runId) => {
         const r = state.runs.find((x) => x.id === runId);

@@ -250,8 +250,16 @@ function LiveCallBlock({ call }: { call: Extract<LiveWork, { kind: "call" }> }) 
 
 const capitalizeFirst = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
-/** The live work of a reply, stacked like a mini timeline: what it said and each tool call. */
-export function LiveWorkList({ work }: { work: LiveWork[] }) {
+/** The live work of a reply, stacked like a mini timeline: what it said, new messages and each tool call. */
+export function LiveWorkList({
+  work,
+  messageAuthor,
+}: {
+  work: LiveWork[];
+  /** "Nova mensagem de Walter": who wrote a message that went into the task. */
+  messageAuthor?: (messageId: string) => string | undefined;
+}) {
+  const { t } = useTranslation();
   if (work.length === 0) return null;
   return (
     <div className="live-work">
@@ -260,6 +268,13 @@ export function LiveWorkList({ work }: { work: LiveWork[] }) {
           // biome-ignore lint/suspicious/noArrayIndexKey: narration lines in order
           <p key={`say-${i}`} className="live-work__say">
             {w.text}
+          </p>
+        ) : w.kind === "steer" ? (
+          <p key={`steer-${w.messageId}`} className="live-work__steer">
+            <Icon name="message" size={14} />
+            {messageAuthor?.(w.messageId)
+              ? t("run.steeredStep", { name: messageAuthor(w.messageId) })
+              : t("run.steeredStepAnon")}
           </p>
         ) : (
           <LiveCallBlock key={w.id} call={w} />

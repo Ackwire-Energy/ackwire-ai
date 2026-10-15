@@ -23,7 +23,7 @@ import {
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { memo, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
@@ -55,7 +55,7 @@ import type {
 } from "@/api/types";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
-import { buildTimeline, groupsWith, mergeTimeline, threadRootsToLoad } from "@/chat/timeline";
+import { buildTimeline, mergeTimeline, threadRootsToLoad } from "@/chat/timeline";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
@@ -89,6 +89,7 @@ import { can } from "@/lib/permissions";
 import { isReminderMessage, routineOfMessage } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
 import {
+  reconcileChannelRuns,
   useChannelRealtime,
   useConnectionStatus,
   useDismissRun,
@@ -97,7 +98,7 @@ import {
   useStreams,
   useTypingSender,
 } from "@/realtime/context";
-import { agentStateOfRun, type LiveRun, narrationOf, runsInChannel } from "@/realtime/streams";
+import { agentStateOfRun, isQuiet, type LiveRun, narrationOf, runsInChannel } from "@/realtime/streams";
 import { typingIn } from "@/realtime/typing";
 
 /** Header and empty state of a channel, or of a DM (same layout). */
@@ -240,6 +241,8 @@ function ChannelView({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+  // An agent working here: the composer says the message goes into its task.
+  const workingRun = useStreams((s) => runsInChannel(s, channel.id).find((r) => isStoppable(r) && !r.stopping));
   // "Responder em thread": the next message goes to that thread.
   const [replyTo, setReplyTo] = useState<MessageType | null>(null);
   draftRef.current = draft;
@@ -579,13 +582,15 @@ function ChannelView({
     send(text, replyTo ? (replyTo.threadId ?? replyTo.id) : null);
     setReplyTo(null);
   };
-  const lastMessage = useMemo(() => {
-    for (let i = timeline.length - 1; i >= 0; i--) {
-      const item = timeline[i];
-      if (item?.kind === "message") return item.message;
-    }
-    return null;
-  }, [timeline]);
+  // Live rows sit by time: right after the message that started them (never at the bottom glued
+  // to a later reply). `liveKey` only changes when runs start or end.
+  const liveKey = useStreams((s) =>
+    runsInChannel(s, channel.id)
+      .filter(isWriting)
+      .map((r) => JSON.stringify([r.runId, r.startedAt ?? 0, r.threadId]))
+      .join("\n"),
+  );
+  const { anchors, unanchored } = useMemo(() => liveAnchors(liveKey, timeline), [liveKey, timeline]);
   const emptySuggestions = useMemo(() => {
     if (chrome?.suggestions) return chrome.suggestions;
     const first = channelAgents[0];
@@ -744,10 +749,12 @@ function ChannelView({
                   </EmptyState>
                 </div>
               )}
-              <Timeline items={timeline} ready={messages.isSuccess} />
+              <Timeline items={timeline} ready={messages.isSuccess} anchors={anchors} />
               <LiveMemoryCards channelId={channel.id} />
               <LiveNotices channelId={channel.id} />
-              <LiveRuns channelId={channel.id} last={lastMessage} />
+              {unanchored.map((runId) => (
+                <LiveRunSlot key={runId} runId={runId} />
+              ))}
             </section>
             {unseen && (
               <div className="channel__pill">
@@ -814,11 +821,25 @@ function ChannelView({
               />
               {offer && <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />}
               <p className="ac-composer__hint">
-                {chrome?.locked
-                  ? chrome.locked
-                  : channelAgents.length > 0
-                    ? t("channel.footerAgents", { count: channelAgents.length, names: agentNames })
-                    : t("channel.footerNoAgents")}
+                {workingRun && !chrome?.locked ? (
+                  <span className="composer-working">
+                    {t("run.working", {
+                      name: dir.agentById.get(workingRun.agentId)?.name ?? t("channel.unknownAgent"),
+                    })}
+                    {mayStop(workingRun) && (
+                      <>
+                        {" · "}
+                        <StopButton run={workingRun} onStop={stopRun} />
+                      </>
+                    )}
+                  </span>
+                ) : chrome?.locked ? (
+                  chrome.locked
+                ) : channelAgents.length > 0 ? (
+                  t("channel.footerAgents", { count: channelAgents.length, names: agentNames })
+                ) : (
+                  t("channel.footerNoAgents")
+                )}
               </p>
             </div>
           </>
@@ -834,10 +855,13 @@ function ChannelView({
 const Timeline = memo(function Timeline({
   items,
   ready,
+  anchors,
 }: {
   items: ReturnType<typeof buildTimeline>;
   /** The first page loaded: rows from then on slide in. */
   ready: boolean;
+  /** Live runs to show right after a row (by item key). */
+  anchors: Map<string, string[]>;
 }) {
   const { t, i18n } = useTranslation();
   const models = useModels();
@@ -850,24 +874,74 @@ const Timeline = memo(function Timeline({
   const initialKeys = useRef<Set<string> | null>(null);
   if (ready && initialKeys.current === null) initialKeys.current = new Set(items.map((i) => i.key));
   const initial = initialKeys.current;
+  let afterLive = false;
   return (
     <>
-      {items.map((item) =>
-        item.kind === "day" ? (
-          <DayDivider key={item.key}>{dayLabel(t, i18n.language, item.iso)}</DayDivider>
-        ) : item.kind === "message" ? (
-          <TimelineMessage
-            key={item.key}
-            message={item.message}
-            grouped={item.grouped}
-            entering={initial !== null && entersWithMotion(item.key, item.message.createdAt, initial, mountedAt)}
-            modelLabels={modelLabels}
-          />
-        ) : null,
-      )}
+      {items.map((item) => {
+        const live = anchors.get(item.key);
+        const row =
+          item.kind === "day" ? (
+            <DayDivider key={item.key}>{dayLabel(t, i18n.language, item.iso)}</DayDivider>
+          ) : item.kind === "message" ? (
+            <TimelineMessage
+              key={item.key}
+              message={item.message}
+              // Right after a live row, always a full header (never "grouped" under it).
+              grouped={item.grouped && !afterLive}
+              entering={initial !== null && entersWithMotion(item.key, item.message.createdAt, initial, mountedAt)}
+              modelLabels={modelLabels}
+            />
+          ) : null;
+        afterLive = Boolean(live?.length);
+        return live?.length ? (
+          <Fragment key={item.key}>
+            {row}
+            {live.map((runId) => (
+              <LiveRunSlot key={runId} runId={runId} />
+            ))}
+          </Fragment>
+        ) : (
+          row
+        );
+      })}
     </>
   );
 });
+
+const CLOCK_SLACK_MS = 3000;
+
+/** Where each live run goes: after the message that started it (else at the end). */
+
+export function liveAnchors(liveKey: string, items: ReturnType<typeof buildTimeline>) {
+  const anchors = new Map<string, string[]>();
+  const unanchored: string[] = [];
+  if (!liveKey) return { anchors, unanchored };
+  for (const line of liveKey.split("\n")) {
+    const [runId, started, threadId] = JSON.parse(line) as [string, number, string];
+    // Anchor: the last message of its conversation sent before the run started (a little slack
+    // for clock skew); messages that came later stay below the row.
+    const startedAt = Number(started) || Number.POSITIVE_INFINITY;
+    let key: string | null = null;
+    let fallback: string | null = null;
+    for (const item of items) {
+      if (item.kind !== "message") continue;
+      if (item.message.id !== threadId && item.message.threadId !== threadId) continue;
+      fallback = item.key;
+      if (Date.parse(item.message.createdAt) <= startedAt + CLOCK_SLACK_MS) key = item.key;
+    }
+    key ??= fallback;
+    if (key) anchors.set(key, [...(anchors.get(key) ?? []), runId]);
+    else unanchored.push(runId);
+  }
+  return { anchors, unanchored };
+}
+
+/** One live run, subscribed by id (deltas re-render only this row). Never grouped. */
+function LiveRunSlot({ runId }: { runId: string }) {
+  const run = useStreams((s) => s.runs[runId]);
+  if (!run || !isWriting(run)) return null;
+  return <LiveRunRow run={run} grouped={false} />;
+}
 
 /**
  * "O Theo só responde a Walter.": only I see it (`agent.unavailable`, never
@@ -922,29 +996,6 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
   );
 }
 
-/**
- * Replies being written: they appear at the end of the timeline once the
- * first words arrive. A reply right after the same agent's message (within
- * 5 minutes) is grouped already, so the final message takes its place
- * without the header popping in.
- */
-function LiveRuns({ channelId, last }: { channelId: string; last: MessageType | null }) {
-  const runs = useStreams((s) => runsInChannel(s, channelId).filter(isWriting), sameRuns);
-  const memoryCards = useLive((s) => s.memory[channelId]?.length ?? 0);
-  const [now] = useState(() => new Date().toISOString());
-  return (
-    <>
-      {runs.map((run, i) => {
-        const prev = i === 0 ? (memoryCards > 0 ? null : last) : { author: agentAuthor(runs[i - 1]), createdAt: now };
-        const grouped = run.status !== "failed" && groupsWith(prev, agentAuthor(run), new Date().toISOString());
-        return <LiveRunRow key={run.runId} run={run} grouped={grouped} />;
-      })}
-    </>
-  );
-}
-
-const agentAuthor = (r: LiveRun | undefined) => ({ type: "agent" as const, id: r?.agentId ?? null });
-
 const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
 const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; grouped: boolean }) {
@@ -959,8 +1010,37 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
   const waiting = run.status === "waiting_approval";
   const canceled = run.status === "canceled";
   const { canStop, stop } = useStopRun();
-  // Same clock face as the final message ("21:10"), from when the first words showed.
-  const [startedAt] = useState(() => new Date().toISOString());
+  const qc = useQueryClient();
+  const messageAuthor = (messageId: string) => {
+    const m = qc.getQueryData<MessageType[]>(keys.messages(org.id, run.channelId))?.find((x) => x.id === messageId);
+    return m ? dir.authorName(m.author) : undefined;
+  };
+  // Same clock face as the final message ("21:10"), from when the run started.
+  const [startedAt] = useState(() => new Date(run.startedAt ?? Date.now()).toISOString());
+  // A run with no news for minutes (orphaned by a restart?): say so and offer to check.
+  const api = useApi();
+  const liveStore = useLiveStore();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const again = () => tick((n) => n + 1);
+    const timer = setInterval(again, 15_000);
+    // Back to the tab after a while: check right away.
+    window.addEventListener("focus", again);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", again);
+    };
+  }, []);
+  const quiet = !failed && !canceled && isQuiet(run);
+  const [checking, setChecking] = useState(false);
+  const recheck = () => {
+    setChecking(true);
+    void reconcileChannelRuns(api, liveStore, org.id, run.channelId, [run.runId])
+      .then((dropped) => {
+        if (dropped) void qc.invalidateQueries({ queryKey: keys.messages(org.id, run.channelId) });
+      })
+      .finally(() => setChecking(false));
+  };
   const text = useRevealedText(run.text);
   const followBottom = actions?.followBottom;
   useLayoutEffect(() => {
@@ -973,10 +1053,19 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
       grouped={grouped}
       streaming={!failed && !waiting && !canceled}
       avatar={<Avatar kind="agent" name={name} state={agentStateOfRun(run)} appearance={lookOf(agent)} />}
-      author={name}
+      author={
+        failed || canceled ? (
+          name
+        ) : (
+          <span>
+            {name} <span className="small muted">· {t("run.inProgress")}</span>
+          </span>
+        )
+      }
       time={<time dateTime={startedAt}>{formatTime(i18n.language, startedAt)}</time>}
       status={waiting ? { icon: "waiting", label: t("channel.waitingApproval") } : undefined}
       data-live={run.status}
+      data-run-id={run.runId}
     >
       {!failed && !waiting && !canceled && <span className="ac-visually-hidden">{t("channel.writing")}</span>}
       {failed ? (
@@ -999,7 +1088,7 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
       ) : (
         <>
           {/* What it said and did before this answer: narration and each tool call (code + output). */}
-          <LiveWorkList work={run.work ?? []} />
+          <LiveWorkList work={run.work ?? []} messageAuthor={messageAuthor} />
           {text && (
             <MessageText>
               <MessageBody body={text} resolveMention={dir.mentionName} />
@@ -1021,11 +1110,25 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
             </p>
           ) : (
             <div className="run-status">
-              {doing && doing.kind !== "thinking" && !(run.work ?? []).some((w) => w.kind === "call" && w.running) && (
-                <p className="ac-msg__activity" aria-live="polite">
-                  {capitalize(activityVerb(t, doing))}…
+              {quiet && (
+                <p className="ac-msg__activity run-quiet">
+                  {t("run.quiet", {
+                    minutes: Math.max(3, Math.floor((Date.now() - (run.lastEventAt ?? run.startedAt ?? 0)) / 60_000)),
+                  })}
+                  {" · "}
+                  <Button variant="ghost" size="sm" loading={checking} onClick={recheck}>
+                    {t("run.refresh")}
+                  </Button>
                 </p>
               )}
+              {!quiet &&
+                doing &&
+                doing.kind !== "thinking" &&
+                !(run.work ?? []).some((w) => w.kind === "call" && w.running) && (
+                  <p className="ac-msg__activity" aria-live="polite">
+                    {capitalize(activityVerb(t, doing))}…
+                  </p>
+                )}
               {isStoppable(run) && canStop(run) && <StopButton run={run} onStop={stop} />}
             </div>
           )}
@@ -1034,6 +1137,50 @@ const LiveRunRow = memo(function LiveRunRow({ run, grouped }: { run: LiveRun; gr
     </Message>
   );
 });
+
+/** A live row with a message after it in the timeline (checked as the DOM changes). */
+function hasNewerMessage(runId: string) {
+  let el = document.querySelector(`[data-run-id="${runId}"]`)?.nextElementSibling;
+  while (el) {
+    if (el.matches(".ac-msg") || el.querySelector(".ac-msg")) return true;
+    el = el.nextElementSibling;
+  }
+  return false;
+}
+
+/** Ids of the writing runs whose live row has newer messages below it. */
+function useRowsBehind(runs: LiveRun[]) {
+  const ids = runs
+    .filter((r) => isWriting(r) && r.status !== "failed" && r.status !== "canceled")
+    .map((r) => r.runId)
+    .join(" ");
+  const [behind, setBehind] = useState<string[]>([]);
+  useEffect(() => {
+    if (!ids) {
+      setBehind([]);
+      return;
+    }
+    const check = () => {
+      const next = ids.split(" ").filter(hasNewerMessage);
+      setBehind((prev) => (prev.join(" ") === next.join(" ") ? prev : next));
+    };
+    check();
+    let frame = 0;
+    const observer = new MutationObserver(() => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        check();
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [ids]);
+  return behind;
+}
 
 /**
  * The typing bar right above the composer: small avatars + what each one is
@@ -1065,6 +1212,9 @@ function ActivityBar({ channelId }: { channelId: string }) {
   const { canStop, stop } = useStopRun();
   // "Parar" in the bar for the runs not writing yet that I may stop.
   const barStoppable = runs.filter((r) => !isWriting(r) && isStoppable(r) && canStop(r));
+  // A live row with newer messages below it: "Theo ainda trabalhando" jumps back to it.
+  const behindIds = useRowsBehind(runs);
+  const behind = runs.filter((r) => behindIds.includes(r.runId));
   // Agents running code (not writing yet): "Ver código" with the live code and output.
   const coding = runs.filter((r) => !isWriting(r) && r.code);
   // What they said last between tool calls ("Theo: Go não está instalado; vou tentar…").
@@ -1088,6 +1238,21 @@ function ActivityBar({ channelId }: { channelId: string }) {
           />
         ) : null,
       )}
+      {behind.map((r) => (
+        <button
+          key={`behind-${r.runId}`}
+          type="button"
+          className="still-working"
+          onClick={() =>
+            document
+              .querySelector(`[data-run-id="${r.runId}"]`)
+              ?.scrollIntoView?.({ block: "center", behavior: "smooth" })
+          }
+        >
+          <Icon name="waiting" size={14} />
+          {t("run.stillWorking", { name: dir.agentById.get(r.agentId)?.name ?? t("channel.unknownAgent") })}
+        </button>
+      ))}
       {said.map((n) => (
         <p key={n.id} className="ac-typing__said">
           <strong>{n.name}:</strong> {n.text}
@@ -1156,6 +1321,8 @@ const TimelineMessage = memo(function TimelineMessage({
   // Posted by a routine on its creator's behalf: shown as the routine, never as if the person typed it.
   const routine = routineOfMessage(m.meta);
   const wikiLink = useWikiLinkRenderer();
+  // `agent.run.steered`: this message went into a running task.
+  const steeredAgent = useLive((s) => s.steered[m.id]);
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Lembrete".
   const reminder = isReminderMessage(m.meta);
@@ -1304,6 +1471,11 @@ const TimelineMessage = memo(function TimelineMessage({
           active={active}
           more={<MessageMoreMenu message={m} channelName={channelName ?? ""} />}
         />
+      )}
+      {steeredAgent && (
+        <p className="msg-steered small muted">
+          {t("run.steered", { name: dir.agentById.get(steeredAgent)?.name ?? t("channel.unknownAgent") })}
+        </p>
       )}
       {m.author.type === "person" && !m.local && (
         <PersonMessageActions message={m} authorName={name} channelName={channelName ?? ""} />

@@ -2,6 +2,7 @@ import type { HttpApi } from "./client";
 import { ApiError, createRequester, enc, type FetchLike } from "./http";
 import type {
   AccessMatrix,
+  ActiveRun,
   Agent,
   AgentAccess,
   AgentChannel,
@@ -164,6 +165,12 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         (await request<{ runs: Run[] }>(`${org(orgId)}/runs`, { query: filter })).runs,
       run: (orgId, runId) => request<{ run: Run; steps: RunStep[] }>(`${org(orgId)}/runs/${enc(runId)}`),
       cancelRun: (orgId, runId) => request<void>(`${org(orgId)}/runs/${enc(runId)}/cancel`, { json: {} }),
+      activeRuns: async (orgId, channelId) => {
+        const res = await nullOn(404, () =>
+          request<{ runs: ActiveRun[] }>(`${org(orgId)}/channels/${enc(channelId)}/active-runs`),
+        );
+        return res ? res.runs : null;
+      },
       usage: async (orgId) => {
         const res = await nullOn(403, () => request<{ usage: AgentUsage[] }>(`${org(orgId)}/usage`));
         return res ? res.usage : null;

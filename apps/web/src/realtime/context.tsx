@@ -2,9 +2,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { ApiClient } from "@/api/client";
+import { useApi } from "@/api/context";
+import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
 import { cacheApproval, cacheMessage } from "@/api/queries";
 import type {
+  ActiveRun,
   Agent,
   AgentComputer,
   AgentQuestion,
@@ -23,10 +27,14 @@ import {
   dropProvisional,
   emptyStreams,
   expectReply,
+  isActiveStatus,
   type LiveRun,
   markStopping,
+  reconcileRuns,
+  runsInChannel,
   type StreamsState,
   staleProvisional,
+  touchRun,
   unmarkStopping,
 } from "./streams";
 import { applyTyping, stopTyping, type TypingState, typingThrottle } from "./typing";
@@ -42,6 +50,8 @@ export interface LiveState {
   memory: Record<string, LiveMemoryCard[]>;
   /** "O Theo só responde a Walter." per channel: only for me, never stored. */
   notices: Record<string, LiveNotice[]>;
+  /** Messages that went into a running task (`agent.run.steered`): message id → agent id. */
+  steered: Record<string, string>;
 }
 
 export interface LiveNotice {
@@ -89,7 +99,15 @@ export function createStreamsStore(
   now: () => number = () => Date.now(),
   provisionalTtlMs = PROVISIONAL_TTL_MS,
 ) {
-  let state: LiveState = { streams: initial, receipts: {}, typing: {}, memory: {}, questions: {}, notices: {} };
+  let state: LiveState = {
+    streams: initial,
+    receipts: {},
+    typing: {},
+    memory: {},
+    questions: {},
+    notices: {},
+    steered: {},
+  };
   const listeners = new Set<() => void>();
   const set = (next: LiveState) => {
     if (
@@ -98,7 +116,8 @@ export function createStreamsStore(
       next.typing === state.typing &&
       next.memory === state.memory &&
       next.questions === state.questions &&
-      next.notices === state.notices
+      next.notices === state.notices &&
+      next.steered === state.steered
     )
       return;
     state = next;
@@ -137,11 +156,19 @@ export function createStreamsStore(
         event.type === "question.asked" || event.type === "question.answered"
           ? { ...state.questions, [event.question.id]: event.question }
           : state.questions;
+      const steeredRun =
+        event.type === ("agent.run.steered" as string)
+          ? state.streams.runs[(event as unknown as { runId: string }).runId]
+          : undefined;
+      const steered = steeredRun
+        ? { ...state.steered, [(event as unknown as { messageId: string }).messageId]: steeredRun.agentId }
+        : state.steered;
       set({
         ...state,
+        steered,
         questions,
         memory,
-        streams: applyChannelEvent(state.streams, event),
+        streams: applyChannelEvent(state.streams, event, now()),
         receipts: applyReceiptEvent(
           event.type === "message.created" && event.message
             ? seedReceipt(state.receipts, event.message)
@@ -216,6 +243,11 @@ export function createStreamsStore(
     stopping: (runId: string, byUserId: string) =>
       set({ ...state, streams: markStopping(state.streams, runId, byUserId) }),
     unstopping: (runId: string) => set({ ...state, streams: unmarkStopping(state.streams, runId) }),
+    /** The server's active runs for a channel (load, reconnect): stale rows go away. */
+    reconcile: (channelId: string, active: ActiveRun[], askedAt = now()) =>
+      set({ ...state, streams: reconcileRuns(state.streams, channelId, active, now(), askedAt) }),
+    /** "Atualizar" found the run still active. */
+    touch: (runId: string) => set({ ...state, streams: touchRun(state.streams, runId, now()) }),
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => {
@@ -333,10 +365,71 @@ function useRealtime() {
   return value;
 }
 
+/**
+ * Brings the live rows of a channel in line with the server: the active-runs
+ * list when the server has it, else each live run's detail. Rows of runs that
+ * ended while we weren't listening go away (their message, if any, refetches).
+ * `runIds` limits the check to those runs ("Atualizar" on one row).
+ */
+export async function reconcileChannelRuns(
+  api: ApiClient,
+  store: StreamsStore,
+  orgId: string,
+  channelId: string,
+  runIds?: string[],
+): Promise<boolean> {
+  const live = runsInChannel(store.get().streams, channelId).filter(
+    (r) => !r.provisional && r.status !== "failed" && r.status !== "canceled" && (!runIds || runIds.includes(r.runId)),
+  );
+  const askedAt = Date.now();
+  const active = await api.agents.activeRuns(orgId, channelId).catch(() => undefined);
+  if (active === undefined) return false;
+  if (active) {
+    if (runIds) {
+      const known = new Set(active.map((a) => a.runId));
+      for (const r of live) if (!known.has(r.runId)) store.dismiss(r.runId);
+      for (const r of live) if (known.has(r.runId)) store.touch(r.runId);
+    } else store.reconcile(channelId, active, askedAt);
+    return live.some((r) => !active.some((a) => a.runId === r.runId));
+  }
+  // No endpoint yet: ask about each live run.
+  let dropped = false;
+  await Promise.all(
+    live.map(async (r) => {
+      try {
+        const { run } = await api.agents.run(orgId, r.runId);
+        if (isActiveStatus(run.status)) store.touch(r.runId);
+        else {
+          store.dismiss(r.runId);
+          dropped = true;
+        }
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          store.dismiss(r.runId);
+          dropped = true;
+        }
+      }
+    }),
+  );
+  return dropped;
+}
+
 /** Subscribes to a channel while mounted: live runs + message cache updates. */
 export function useChannelRealtime(orgId: string, channelId: string, enabled: boolean) {
   const { connection, streams } = useRealtime();
   const qc = useQueryClient();
+  const api = useApi();
+  // On load and after every reconnect: drop live rows the server no longer runs.
+  useEffect(() => {
+    if (!connection || !enabled) return;
+    const check = () => {
+      void reconcileChannelRuns(api, streams, orgId, channelId).then((dropped) => {
+        if (dropped) void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
+      });
+    };
+    check();
+    return connection.onReconnect(check);
+  }, [connection, enabled, orgId, channelId, qc, streams, api]);
   useEffect(() => {
     if (!connection || !enabled) return;
     return connection.subscribe(channelId, (event) => {

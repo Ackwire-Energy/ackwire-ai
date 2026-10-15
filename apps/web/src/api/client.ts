@@ -1,6 +1,7 @@
 import type {
   AccessInput,
   AccessMatrix,
+  ActiveRun,
   Agent,
   AgentAccess,
   AgentChannel,
@@ -175,6 +176,8 @@ export interface ApiClient {
     run(orgId: string, runId: string): Promise<{ run: Run; steps: RunStep[] }>;
     /** "Parar": stops a run (the person who started it, the agent's owner, admins). */
     cancelRun(orgId: string, runId: string): Promise<void>;
+    /** Runs still active in a channel (reconciles the live rows); `null` while the server lacks the endpoint. */
+    activeRuns(orgId: string, channelId: string): Promise<ActiveRun[] | null>;
     /** This month's usage per agent; `null` without the `view_usage` permission. */
     usage(orgId: string): Promise<AgentUsage[] | null>;
   };
