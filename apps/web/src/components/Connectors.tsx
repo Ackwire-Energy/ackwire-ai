@@ -17,7 +17,7 @@ import { ConnectFlow, type FlowState, useAgentsAccess } from "@/components/Conne
 import { ConnectorCatalogDialog, ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { type ConnectedItem, connectedIds, connectedItems } from "@/lib/connected";
+import { type ConnectedItem, connectedIds, connectedItems, itemName } from "@/lib/connected";
 import { levelOf } from "@/lib/connector-access";
 import { relativeTime } from "@/lib/format";
 import { can } from "@/lib/permissions";
@@ -152,10 +152,10 @@ function ConnectedRow({
   ].filter(Boolean);
   return (
     <div className="ac-list__row connected-row">
-      <ConnectorIcon def={item.def} label={item.label} size="lg" />
+      <ConnectorIcon def={item.def} label={itemName(t, item)} size="lg" />
       <span className="list-col connected-row__text">
         <span className="connected-row__name">
-          <span>{item.label}</span>
+          <span>{itemName(t, item)}</span>
           {item.pending > 0 && item.server?.reviewedAt ? (
             <Chip icon="waiting" tone="waiting">
               {t("connectors.toReview", { count: item.pending })}
@@ -188,19 +188,19 @@ function ConnectedRow({
             <Button
               size="sm"
               variant="primary"
-              aria-label={t("connectors.reviewName", { name: item.label })}
+              aria-label={t("connectors.reviewName", { name: itemName(t, item) })}
               onClick={onTools}
             >
               {t("connectors.review")}
             </Button>
           )}
-          <Button size="sm" aria-label={t("connectors.whoName", { name: item.label })} onClick={onWho}>
+          <Button size="sm" aria-label={t("connectors.whoName", { name: itemName(t, item) })} onClick={onWho}>
             {t("connectors.who")}
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            aria-label={t("connectors.toolsName", { name: item.label })}
+            aria-label={t("connectors.toolsName", { name: itemName(t, item) })}
             onClick={onTools}
           >
             {t("connectors.tools")}
@@ -208,7 +208,7 @@ function ConnectedRow({
           <Button
             size="sm"
             variant="ghost"
-            aria-label={t("connectors.disconnectName", { name: item.label })}
+            aria-label={t("connectors.disconnectName", { name: itemName(t, item) })}
             onClick={onDisconnect}
           >
             {t("connectors.disconnect")}
@@ -236,7 +236,7 @@ function DisconnectDialog({
   const catalogDisconnect = useDisconnect(org.id);
   const { disconnect: customDisconnect } = useCustomServerAction(org.id);
   const pending = catalogDisconnect.isPending || customDisconnect.isPending;
-  const name = item?.label ?? "";
+  const name = item ? itemName(t, item) : "";
   return (
     <Dialog
       open={item !== null}

@@ -2033,6 +2033,12 @@ export const en: Translations = {
     disconnected: "{{name}} disconnected.",
     connectedToast: "{{name}} connected.",
     errorToast: "Couldn't connect: {{reason}}",
+    names: {
+      atlassian: "Atlassian (Jira and Confluence)",
+      cloudflare_bindings: "Cloudflare (Workers)",
+      cloudflare_observability: "Cloudflare (logs)",
+      supabase_readonly: "Supabase (read-only)",
+    },
     descriptions: {
       github: "Code, PRs, issues and Actions.",
       sentry: "Errors, events and releases.",
@@ -2045,7 +2051,7 @@ export const en: Translations = {
       cloudflare_bindings: "Workers, KV, R2 and D1 of the account.",
       cloudflare_observability: "Workers logs and metrics.",
       supabase: "Projects, database and functions.",
-      supabase_readonly: "Read only: queries and project data. Supabase itself blocks writes.",
+      supabase_readonly: "Database, docs and debugging. SQL runs as a read-only Postgres user.",
       intercom: "Conversations and contacts (US accounts).",
       paypal: "Orders, invoices and transactions.",
       square: "Payments, orders and catalog.",

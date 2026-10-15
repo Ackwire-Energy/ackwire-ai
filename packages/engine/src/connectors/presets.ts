@@ -16,6 +16,7 @@ import { canonicalResource } from "./oauth-mcp";
  */
 export interface McpPreset {
   id: string;
+  /** The brand only ("Supabase"): what a variant is ("somente leitura") is the app's to say, in each language. */
   label: string;
   description: string;
   category: ConnectorCategory;
@@ -23,11 +24,11 @@ export interface McpPreset {
   icon: string;
   serverUrl: string;
   /**
-   * The server itself only reads (e.g. Supabase's `read_only=true`: SQL runs as
-   * a read-only Postgres user and the writing tools are off), so every tool is
-   * suggested as read.
+   * Tools the server itself keeps read-only, suggested as read whatever their
+   * name (Supabase's `execute_sql` with `read_only=true` runs as a read-only
+   * Postgres user). Every other tool keeps our usual suggestion.
    */
-  readOnly?: boolean;
+  readTools?: readonly string[];
 }
 
 export const MCP_PRESETS: readonly McpPreset[] = [
@@ -58,7 +59,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   {
     id: "atlassian",
     category: "product",
-    label: "Atlassian (Jira e Confluence)",
+    label: "Atlassian",
     description: "Issues do Jira e páginas do Confluence.",
     icon: "atlassian",
     serverUrl: "https://mcp.atlassian.com/v1/mcp",
@@ -82,7 +83,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   {
     id: "cloudflare-bindings",
     category: "dev",
-    label: "Cloudflare (Workers)",
+    label: "Cloudflare",
     description: "Workers, KV, R2 e D1 da conta Cloudflare.",
     icon: "cloudflare",
     serverUrl: "https://bindings.mcp.cloudflare.com/mcp",
@@ -90,7 +91,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   {
     id: "cloudflare-observability",
     category: "dev",
-    label: "Cloudflare (logs)",
+    label: "Cloudflare",
     description: "Logs e métricas dos Workers.",
     icon: "cloudflare",
     serverUrl: "https://observability.mcp.cloudflare.com/mcp",
@@ -106,11 +107,14 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   {
     id: "supabase-readonly",
     category: "dev",
-    label: "Supabase (somente leitura)",
-    description: "Consultas e leitura dos projetos do Supabase; o próprio Supabase bloqueia qualquer escrita.",
+    label: "Supabase",
+    description: "Read-only queries on Supabase projects: SQL runs as a read-only Postgres user.",
     icon: "supabase",
-    serverUrl: "https://mcp.supabase.com/mcp?read_only=true",
-    readOnly: true,
+    // Supabase enforces read_only on its side (SQL as a read-only Postgres user); `features` keeps only the
+    // database, docs and debugging tools, so functions, storage, projects and account tools never show up.
+    // Its OAuth screen still lists read + write scopes: Supabase requires all of them (documented).
+    serverUrl: "https://mcp.supabase.com/mcp?read_only=true&features=database,docs,debugging",
+    readTools: ["execute_sql"],
   },
   {
     id: "intercom",

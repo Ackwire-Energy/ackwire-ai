@@ -21,6 +21,12 @@ export function scopeText(t: TFunction, scope: ScopeInfo) {
   };
 }
 
+/** The connector's name in the app's language: the brand, plus what a variant is ("Supabase (somente leitura)"). */
+export function connectorName(t: TFunction, def: Pick<ConnectorDef, "id" | "label">) {
+  const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
+  return tt(`connectors.names.${safe(def.id)}`, { defaultValue: def.label });
+}
+
 export function connectorDescription(t: TFunction, def: ConnectorDef) {
   const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
   return tt(`connectors.descriptions.${safe(def.id)}`, { defaultValue: def.description });

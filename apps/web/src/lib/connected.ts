@@ -1,5 +1,7 @@
+import type { TFunction } from "i18next";
 import type { Connection, ConnectorDef, CustomServer } from "@/api/types";
 import { exposedTools, sameServer, toolsToReview } from "@/lib/custom-tools";
+import { connectorName } from "@/lib/scopes";
 
 /**
  * One row of "Conectados", whatever the kind: a catalog connection (GitHub
@@ -76,4 +78,9 @@ export function connectedItems(connections: Connection[], servers: CustomServer[
 /** Catalog ids that are connected (a preset counts when a server has its address). */
 export function connectedIds(items: ConnectedItem[]) {
   return new Set(items.flatMap((i) => (i.def ? [i.def.id] : [])));
+}
+
+/** The name a connected service shows, in the app's language (the catalog's name when it came from the catalog). */
+export function itemName(t: TFunction, item: Pick<ConnectedItem, "def" | "label">) {
+  return item.def ? connectorName(t, item.def) : item.label;
 }

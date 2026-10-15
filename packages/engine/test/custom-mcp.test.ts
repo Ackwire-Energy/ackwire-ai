@@ -20,6 +20,7 @@ import {
   saveCustomTools,
   setAgentAccess,
   setAgentScopes,
+  suggestFor,
   ValidationError,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -146,22 +147,30 @@ function depsOf(fx: Fixture, extra: Partial<CustomDeps> = {}): CustomDeps {
 }
 
 describe("custom MCP servers", () => {
-  test("a read-only preset (Supabase with read_only=true): every tool is suggested as read, even writing names", async () => {
+  test("Supabase (read-only): its execute_sql is suggested as read; other tools keep our usual suggestion", async () => {
+    expect(suggestFor({ name: "execute_sql" }, ["execute_sql"])).toBe("read");
+    expect(suggestFor({ name: "execute_sql" })).toBe("write");
+    expect(suggestFor({ name: "apply_migration" }, ["execute_sql"])).toBe("write");
+    expect(suggestFor({ name: "delete_branch" }, ["execute_sql"])).toBe("approval");
+  });
+
+  test("a preset's connection keeps its URL (query and all) and our usual suggestions", async () => {
     f = await setup();
     const mcp = ticketsMcp();
     const deps = depsOf(f, { connect: mcp.connect, resolveHost: async () => ["93.184.216.34"] });
     const started = await connectCustomServer(deps, f.owner.id, f.org.id, {
-      serverUrl: "https://mcp.supabase.com/mcp?read_only=true",
+      serverUrl: "https://mcp.supabase.com/mcp?read_only=true&features=database,docs,debugging",
       apiKey: "sbp_secret_12345",
       label: "Supabase",
     });
     if (started.status !== "connected") throw new Error(`expected connected, got ${started.status}`);
+    expect(started.server.serverUrl).toBe(
+      "https://mcp.supabase.com/mcp?read_only=true&features=database,docs,debugging",
+    );
     expect(started.server.tools.map((t) => [t.name, t.suggestedAccess])).toEqual([
-      ["close_ticket", "read"],
+      ["close_ticket", "approval"],
       ["list_tickets", "read"],
     ]);
-    const accepted = await acceptCustomSuggestion(deps, f.owner.id, f.org.id, started.server.id);
-    expect(accepted.server.tools.map((t) => t.access)).toEqual(["read", "read"]);
   });
 
   test("API key: tools come in unclassified and hidden; classified ones reach the agent with our scopes", async () => {

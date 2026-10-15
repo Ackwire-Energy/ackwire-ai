@@ -44,6 +44,14 @@ export function suggestAccess(tool: { name: string; readOnlyHint?: boolean | nul
   return "write" as const;
 }
 
+/** Our suggestion, except tools the server itself keeps read-only (a preset's `readTools`). */
+export function suggestFor(
+  tool: { name: string; readOnlyHint?: boolean | null; destructiveHint?: boolean | null },
+  readTools: readonly string[] = [],
+) {
+  return readTools.includes(tool.name) ? ("read" as const) : suggestAccess(tool);
+}
+
 export interface CustomToolView {
   name: string;
   description: string;
@@ -214,9 +222,8 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
   }
   const existing = await deps.db.select().from(customTools).where(eq(customTools.connectionId, c.id));
   const byName = new Map(existing.map((t) => [t.name, t]));
-  // A read-only server (Supabase with `read_only=true`) enforces it itself: every tool only reads.
-  const readOnly = presetForServer(c.serverUrl)?.readOnly === true;
-  const suggest = (tool: McpTool) => (readOnly ? ("read" as const) : suggestAccess(tool));
+  const preset = presetForServer(c.serverUrl);
+  const suggest = (tool: McpTool) => suggestFor(tool, preset?.readTools);
   const seen = new Set<string>();
   for (const tool of listed) {
     seen.add(tool.name);

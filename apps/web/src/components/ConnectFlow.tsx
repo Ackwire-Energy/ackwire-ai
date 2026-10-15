@@ -22,7 +22,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { type ConnectedItem, fromConnection, fromServer } from "@/lib/connected";
+import { type ConnectedItem, fromConnection, fromServer, itemName } from "@/lib/connected";
 import {
   type ConnectorLevel,
   catalogToolClass,
@@ -33,7 +33,7 @@ import {
 } from "@/lib/connector-access";
 import { decisionsOf, draftFrom, humanize, isHttpsUrl, type ToolDraft } from "@/lib/custom-tools";
 import { navigateAway } from "@/lib/navigate";
-import { connectorDescription } from "@/lib/scopes";
+import { connectorDescription, connectorName } from "@/lib/scopes";
 import { useToast } from "@/lib/toast";
 
 /**
@@ -82,7 +82,7 @@ export function ConnectFlow({
 }) {
   const { t } = useTranslation();
   if (!flow) return null;
-  const name = flow.step === 0 ? (flow.def?.label ?? null) : flow.item.label;
+  const name = flow.step === 0 ? (flow.def ? connectorName(t, flow.def) : null) : itemName(t, flow.item);
   const icon = flow.step === 0 ? flow.def : flow.item.def;
   const title =
     flow.step === 0
@@ -183,7 +183,7 @@ function ConnectStep({
   const keyError = touched === "key" && apiKey.trim().length < 8 ? t("connectors.apiKeyInvalid") : undefined;
 
   const done = (item: ConnectedItem) => {
-    toast.show(t("connectors.connectedToast", { name: item.label }));
+    toast.show(t("connectors.connectedToast", { name: itemName(t, item) }));
     onConnected(item);
   };
   const byAddressResult = (result: Awaited<ReturnType<typeof connect.mutateAsync>>) => {
@@ -194,7 +194,7 @@ function ConnectStep({
       setTouched(null);
     } else done(fromServer(result.server, catalog.data?.connectors ?? []));
   };
-  const name = (def?.label ?? label.trim()) || undefined;
+  const name = (def ? connectorName(t, def) : label.trim()) || undefined;
 
   const startOAuth = () => {
     setTouched("oauth");
@@ -363,7 +363,7 @@ function ToolsStep({
     return (
       <>
         <DialogBody className="cflow__body">
-          <p className="muted cflow__text">{t("connectFlow.catalogToolsText", { name: item.label })}</p>
+          <p className="muted cflow__text">{t("connectFlow.catalogToolsText", { name: itemName(t, item) })}</p>
           {tools.length === 0 && <p className="muted">{t("connectFlow.noTools")}</p>}
           {CLASSES.map((access) => {
             const list = tools.filter((x) => x.access === access);
@@ -514,7 +514,7 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
       void qc.invalidateQueries({ queryKey: keys.access(org.id) });
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "org" && q.queryKey[4] === "scopes" });
       const count = list.filter((a) => (who[a.id] ?? "none") !== "none").length;
-      toast.show(t("connectFlow.saved", { count, name: item.label }));
+      toast.show(t("connectFlow.saved", { count, name: itemName(t, item) }));
       onClose();
     },
   });

@@ -2037,6 +2037,12 @@ export const ptBR = {
     disconnected: "{{name}} desconectado.",
     connectedToast: "{{name}} conectado.",
     errorToast: "Não deu para conectar: {{reason}}",
+    names: {
+      atlassian: "Atlassian (Jira e Confluence)",
+      cloudflare_bindings: "Cloudflare (Workers)",
+      cloudflare_observability: "Cloudflare (logs)",
+      supabase_readonly: "Supabase (somente leitura)",
+    },
     descriptions: {
       github: "Código, PRs, issues e Actions.",
       sentry: "Erros, eventos e releases.",
@@ -2049,7 +2055,7 @@ export const ptBR = {
       cloudflare_bindings: "Workers, KV, R2 e D1 da conta.",
       cloudflare_observability: "Logs e métricas dos Workers.",
       supabase: "Projetos, banco de dados e funções.",
-      supabase_readonly: "Só leitura: consultas e dados dos projetos. O próprio Supabase bloqueia escrita.",
+      supabase_readonly: "Banco, documentação e diagnóstico. O SQL roda com um usuário só de leitura do Postgres.",
       intercom: "Conversas e contatos (contas nos EUA).",
       paypal: "Pedidos, faturas e transações.",
       square: "Pagamentos, pedidos e catálogo.",

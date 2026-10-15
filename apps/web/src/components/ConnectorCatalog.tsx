@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { ConnectorCategory, ConnectorDef } from "@/api/types";
 import { LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { connectorDescription } from "@/lib/scopes";
+import { connectorDescription, connectorName } from "@/lib/scopes";
 
 export const CATEGORIES: ConnectorCategory[] = [
   "dev",
@@ -16,10 +16,10 @@ export const CATEGORIES: ConnectorCategory[] = [
   "automation",
 ];
 
-/** Connector search over label, id and description. */
-export function searchCatalog(list: ConnectorDef[], query: string) {
+/** Connector search over label, id and description, plus the text shown (`shown`: the name and description in the app's language). */
+export function searchCatalog(list: ConnectorDef[], query: string, shown: (d: ConnectorDef) => string = () => "") {
   const q = query.trim().toLowerCase();
-  return q ? list.filter((d) => `${d.label} ${d.id} ${d.description}`.toLowerCase().includes(q)) : list;
+  return q ? list.filter((d) => `${d.label} ${d.id} ${d.description} ${shown(d)}`.toLowerCase().includes(q)) : list;
 }
 
 /** How it connects, for the card: one click (OAuth), OAuth or a key, or a key only. */
@@ -93,7 +93,9 @@ export function ConnectorCatalogDialog({
   const [q, setQ] = useState("");
   const [category, setCategory] = useState<ConnectorCategory | "all">("all");
   const present = CATEGORIES.filter((c) => connectors.some((d) => d.category === c));
-  const shown = searchCatalog(connectors, q).filter((d) => category === "all" || d.category === category);
+  const shown = searchCatalog(connectors, q, (d) => `${connectorName(t, d)} ${connectorDescription(t, d)}`).filter(
+    (d) => category === "all" || d.category === category,
+  );
   // Ready to connect first; "Em breve" last.
   const sorted = [...shown].sort((a, b) => Number(b.available) - Number(a.available));
   return (
@@ -144,14 +146,14 @@ export function ConnectorCatalogDialog({
                     className="catalog-card"
                     disabled={!d.available}
                     aria-label={t(isConnected ? "connectors.reconnectName" : "connectors.connectName", {
-                      name: d.label,
+                      name: connectorName(t, d),
                     })}
                     onClick={() => onPick(d)}
                   >
                     <ConnectorIcon def={d} label={d.label} />
                     <span className="catalog-card__text">
                       <span className="catalog-card__head">
-                        <span className="catalog-card__name">{d.label}</span>
+                        <span className="catalog-card__name">{connectorName(t, d)}</span>
                         {isConnected && (
                           <Chip icon="check" tone="done">
                             {t("connectors.connected")}

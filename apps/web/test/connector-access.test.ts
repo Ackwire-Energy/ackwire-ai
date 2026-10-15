@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentAccess, Connection, CustomServer, ToolDecision } from "@/api/types";
+import { createI18n } from "@/i18n";
 import { connectedIds, connectedItems } from "@/lib/connected";
 import { catalogToolClass, inputFromAccess, levelOf, readScopesOf, withLevel } from "@/lib/connector-access";
 import { decisionsOf, defaultAccess, draftFrom, exposedTools, humanize, toolsToReview } from "@/lib/custom-tools";
+import { connectorName } from "@/lib/scopes";
 import { CATALOG } from "./fake-api";
 
 const server = (reviewedAt: string | null, accesses: (ToolDecision | null)[]): CustomServer => ({
@@ -215,5 +217,19 @@ describe("one level per agent and connection", () => {
     expect(catalogToolClass({ scope: "github:pr.merge", sensitive: true })).toBe("approval");
     expect(catalogToolClass({ scope: "github:repo.read", sensitive: false })).toBe("read");
     expect(catalogToolClass({ scope: "github:pr.write", sensitive: false })).toBe("write");
+  });
+});
+
+describe("connector names", () => {
+  test("the server sends the brand; what a variant is comes from the app's language", () => {
+    const tOf = (lng: "en" | "pt-BR") => {
+      const i18n = createI18n(lng);
+      return i18n.t.bind(i18n);
+    };
+    const def = { id: "supabase-readonly", label: "Supabase" };
+    expect(connectorName(tOf("pt-BR"), def)).toBe("Supabase (somente leitura)");
+    expect(connectorName(tOf("en"), def)).toBe("Supabase (read-only)");
+    // No translation: the brand as is.
+    expect(connectorName(tOf("en"), { id: "stripe", label: "Stripe" })).toBe("Stripe");
   });
 });
