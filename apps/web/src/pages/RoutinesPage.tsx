@@ -16,13 +16,14 @@ import {
 } from "@agenteschat/ui";
 import { useDeferredValue, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useChannels, useRoutineAction, useRoutineRuns, useRoutines, useScheduleParse } from "@/api/queries";
-import type { Routine, RoutineEvent, RoutineTarget } from "@/api/types";
+import { useChannels, useDms, useRoutineAction, useRoutineRuns, useRoutines, useScheduleParse } from "@/api/queries";
+import type { Routine, RoutineEvent, RoutineTarget, RoutineTargetInput } from "@/api/types";
 import { useActors } from "@/components/actors";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { formatUsd, whenAt } from "@/lib/format";
-import { COMMON_TIMEZONES, timezoneLabel } from "@/lib/routines";
+import { agentGrammar } from "@/lib/grammar";
+import { COMMON_TIMEZONES, onceParts, timezoneLabel } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
 
 export const ROUTINE_EVENTS: RoutineEvent[] = [
@@ -45,14 +46,26 @@ const nextLabel = (locale: string, iso: string) =>
     .replace(/\./g, "")
     .replace(/ de /g, " ");
 
+/** A one-off that already fired (or was cancelled): shown muted, under "Concluídos". */
+export const isDoneOnce = (r: Routine) => r.trigger.type === "once" && !r.active;
+
 function useTargetLabel() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const channels = useChannels(org.id);
+  const dms = useDms(org.id);
   return (target: RoutineTarget) => {
     if (target.type === "channel") {
       const c = channels.data?.find((x) => x.id === target.channelId);
       return c ? `#${c.name}` : "#";
+    }
+    // From the chat: "na DM com o Jorge", "no #general (thread)".
+    if (target.type === "conversation") {
+      const dm = dms.data?.find((d) => d.channelId === target.channelId);
+      if (dm) return t("routines.inDm", agentGrammar(t, dm.with.name));
+      const c = channels.data?.find((x) => x.id === target.channelId);
+      if (!c) return t("routines.inConversation");
+      return t(target.threadId ? "routines.inThread" : "routines.inChannel", { channel: c.name });
     }
     return t(target.type === "dm" ? "routines.target.dmShort" : "routines.target.artifactShort");
   };
@@ -65,7 +78,10 @@ export function RoutinesPage() {
   const routines = useRoutines(org.id);
   const [creating, setCreating] = useState(false);
   const [runsFor, setRunsFor] = useState<Routine | null>(null);
+  const [showDone, setShowDone] = useState(false);
   const list = routines.data ?? [];
+  const current = list.filter((r) => !isDoneOnce(r));
+  const done = list.filter(isDoneOnce);
   return (
     <div className="page page--mid">
       <header
@@ -88,10 +104,30 @@ export function RoutinesPage() {
       )}
       {routines.isSuccess && list.length === 0 && <EmptyState icon="routines">{t("routines.empty")}</EmptyState>}
       <div className="stack-4" style={{ gap: 12 }}>
-        {list.map((r) => (
+        {current.map((r) => (
           <RoutineCard key={r.id} routine={r} onRuns={() => setRunsFor(r)} />
         ))}
       </div>
+      {done.length > 0 && (
+        <section className="routines-done" aria-label={t("routines.done")}>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={showDone}
+            aria-controls="routines-done-list"
+            onClick={() => setShowDone((v) => !v)}
+          >
+            {t("routines.doneToggle", { count: done.length })}
+          </Button>
+          {showDone && (
+            <div id="routines-done-list" className="stack-4" style={{ gap: 12 }}>
+              {done.map((r) => (
+                <RoutineCard key={r.id} routine={r} onRuns={() => setRunsFor(r)} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
       <NewRoutineDialog open={creating} onClose={() => setCreating(false)} />
       <RunsDialog routine={runsFor} onClose={() => setRunsFor(null)} />
     </div>
@@ -109,36 +145,54 @@ function RoutineCard({ routine: r, onRuns }: { routine: Routine; onRuns: () => v
   const when =
     r.trigger.type === "schedule"
       ? `${r.trigger.description} (${timezoneLabel(r.trigger.timezone || "UTC")})`
-      : t(`routines.event.${r.trigger.event}`);
-  const next = !r.active
-    ? t("routines.paused")
-    : r.trigger.type === "event"
-      ? t("routines.waitingEvent")
-      : r.nextRunAt
-        ? t("routines.next", { when: nextLabel(i18n.language, r.nextRunAt) })
-        : "";
+      : r.trigger.type === "once"
+        ? t("routines.once", onceParts(i18n.language, r.trigger.at, r.trigger.timezone || "UTC"))
+        : t(`routines.event.${r.trigger.event}`);
+  const reminder = r.target.type === "conversation" && r.target.reminder === true;
+  const done = isDoneOnce(r);
+  const next = done
+    ? r.lastRun
+      ? t("routines.fired")
+      : t("routines.canceled")
+    : !r.active
+      ? t("routines.paused")
+      : r.trigger.type === "event"
+        ? t("routines.waitingEvent")
+        : r.nextRunAt
+          ? t("routines.next", { when: nextLabel(i18n.language, r.nextRunAt) })
+          : "";
   return (
-    <article className="routine-card" aria-label={r.name} data-active={r.active || undefined}>
+    <article
+      className="routine-card"
+      aria-label={r.name}
+      data-active={r.active || undefined}
+      data-done={done || undefined}
+    >
       <div className="routine-card__head">
         {actors.avatar(agent, "sm")}
         <div className="list-col" style={{ flex: "1 1 200px" }}>
           <span className="routine-card__name">{r.name}</span>
           <span className="small muted">
-            {t("routines.deliversTo", { agent: actors.name(agent), target: target(r.target) })}
+            {r.target.type === "conversation"
+              ? t("routines.deliversIn", { agent: actors.name(agent), place: target(r.target) })
+              : t("routines.deliversTo", { agent: actors.name(agent), target: target(r.target) })}
           </span>
         </div>
+        {reminder && <Chip icon="bell">{t("routines.reminder")}</Chip>}
         <Chip icon={r.trigger.type === "event" ? "bolt" : "waiting"}>{when}</Chip>
-        <span className="row" style={{ gap: 6, alignItems: "center" }}>
-          <Checkbox
-            id={`rt-${r.id}`}
-            checked={r.active}
-            aria-label={t("routines.activeLabel", { name: r.name })}
-            onCheckedChange={(v) => action.mutate({ type: "active", id: r.id, active: v })}
-          />
-          <label htmlFor={`rt-${r.id}`} aria-hidden="true">
-            {t("routines.active")}
-          </label>
-        </span>
+        {!done && (
+          <span className="row" style={{ gap: 6, alignItems: "center" }}>
+            <Checkbox
+              id={`rt-${r.id}`}
+              checked={r.active}
+              aria-label={t("routines.activeLabel", { name: r.name })}
+              onCheckedChange={(v) => action.mutate({ type: "active", id: r.id, active: v })}
+            />
+            <label htmlFor={`rt-${r.id}`} aria-hidden="true">
+              {t("routines.active")}
+            </label>
+          </span>
+        )}
       </div>
       <div className="routine-card__foot small muted">
         <span>{next}</span>
@@ -149,15 +203,17 @@ function RoutineCard({ routine: r, onRuns }: { routine: Routine; onRuns: () => v
         </span>
         <span className="tabular">{t("routines.cost", { amount: formatUsd(t, i18n.language, r.monthCostUsd) })}</span>
         <span style={{ flex: 1 }} />
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={r.running || action.isPending}
-          loading={action.isPending}
-          onClick={() => action.mutate({ type: "run", id: r.id })}
-        >
-          {r.running ? t("routines.running") : t("routines.runNow")}
-        </Button>
+        {!done && !reminder && (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={r.running || action.isPending}
+            loading={action.isPending}
+            onClick={() => action.mutate({ type: "run", id: r.id })}
+          >
+            {r.running ? t("routines.running") : t("routines.runNow")}
+          </Button>
+        )}
         <Button size="sm" variant="ghost" onClick={onRuns}>
           {t("routines.runs")}
         </Button>
@@ -235,7 +291,7 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
     label: timezoneLabel(z),
   }));
   const scheduleOk = kind === "event" || (typed.length > 0 && parsed.data?.ok === true);
-  const targetValue = (): RoutineTarget =>
+  const targetValue = (): RoutineTargetInput =>
     target === TARGET_DM
       ? { type: "dm" }
       : target === TARGET_ARTIFACT

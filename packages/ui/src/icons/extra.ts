@@ -125,6 +125,8 @@ export const extraIcons = {
       },
     ],
   ],
+  /** "Lembrete" (a reminder routine). */
+  bell: [["path", { d: "M5.5 13.5V9a4.5 4.5 0 0 1 9 0v4.5l1.2 1.5H4.3zM8.5 17h3" }]],
   /** Something is in progress (spins unless reduced motion). */
   spinner: [["path", { d: "M10 3.5a6.5 6.5 0 1 1-6.5 6.5" }]],
   /** "Quem pode falar": restricted agent. */

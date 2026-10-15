@@ -1,5 +1,12 @@
-/** A message a routine posted (`meta.routine`): shown as the routine's, not as its creator's. */
+/** A plain reminder the agent posted (`meta.reminder`): shown as the agent's message with a "Lembrete" label. */
+export const isReminderMessage = (meta: Record<string, unknown> | undefined) => meta?.reminder === true;
+
+/**
+ * A message a routine posted (`meta.routine`): shown as the routine's, not as
+ * its creator's. Plain reminders are the agent's own messages, so not here.
+ */
 export function routineOfMessage(meta: Record<string, unknown> | undefined): { id: string; name: string } | null {
+  if (isReminderMessage(meta)) return null;
   const r = meta?.routine as { id?: unknown; name?: unknown } | undefined;
   return r && typeof r.id === "string" && typeof r.name === "string" ? { id: r.id, name: r.name } : null;
 }
@@ -68,4 +75,40 @@ export function browserTimezone(): string | null {
   } catch {
     return null;
   }
+}
+
+/** "horário de Brasília" (the zone's name, without the offset). */
+export const timezoneName = (timeZone: string) =>
+  timeZone === "UTC" || timeZone === "Etc/UTC" ? "UTC" : (NAMES[timeZone] ?? timeZone);
+
+/** A one-off's moment in its own zone: { weekday: "qui", date: "16/10", time: "09:00", zone: "horário de Brasília" }. */
+export function onceParts(locale: string, at: string, timeZone: string) {
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone,
+    }).formatToParts(new Date(at));
+  } catch {
+    parts = new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(at));
+  }
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  return {
+    weekday: get("weekday").replace(/\.$/, ""),
+    date: `${get("day")}/${get("month")}`,
+    time: `${get("hour")}:${get("minute")}`,
+    zone: timezoneName(timeZone),
+  };
 }

@@ -79,7 +79,7 @@ import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { reportPainted } from "@/lib/perf";
 import { can } from "@/lib/permissions";
-import { routineOfMessage } from "@/lib/routines";
+import { isReminderMessage, routineOfMessage } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
 import {
   useChannelRealtime,
@@ -981,6 +981,8 @@ const TimelineMessage = memo(function TimelineMessage({
   const name = dir.authorName(m.author);
   // Posted by a routine on its creator's behalf: shown as the routine, never as if the person typed it.
   const routine = routineOfMessage(m.meta);
+  // A plain reminder: the agent's own message, with a small "Lembrete".
+  const reminder = isReminderMessage(m.meta);
   const renderMention = (handle: string, key: string) => {
     const a = dir.agentByHandle.get(handle.toLowerCase());
     const p = a ? undefined : dir.memberByHandle.get(handle.toLowerCase());
@@ -1054,13 +1056,21 @@ const TimelineMessage = memo(function TimelineMessage({
             <span className="muted small">{t("channel.routineBy", { name })}</span>
           </span>
         ) : m.author.id ? (
-          <ProfileTrigger
-            actor={{ type: m.author.type, id: m.author.id }}
-            label={t("profile.of", { name })}
-            className="profile-trigger--name"
-          >
-            {name}
-          </ProfileTrigger>
+          <>
+            <ProfileTrigger
+              actor={{ type: m.author.type, id: m.author.id }}
+              label={t("profile.of", { name })}
+              className="profile-trigger--name"
+            >
+              {name}
+            </ProfileTrigger>
+            {reminder && (
+              <span className="msg-reminder">
+                <Icon name="bell" size={14} />
+                {t("channel.reminder")}
+              </span>
+            )}
+          </>
         ) : (
           name
         )

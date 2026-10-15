@@ -30,6 +30,8 @@ export type ActivityKind =
   | "runningSkillScript"
   | "runningSkillScriptAny"
   | "fetchingFile"
+  | "schedulingReminder"
+  | "creatingRoutine"
   | "usingTool";
 
 export interface Activity {
@@ -68,6 +70,9 @@ const BUILTIN: Record<string, ActivityKind> = {
   export_file: "exportingFile",
   import_file: "importingFile",
   share_artifact: "fetchingFile",
+  // Scheduling from the chat.
+  schedule_reminder: "schedulingReminder",
+  create_routine: "creatingRoutine",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */

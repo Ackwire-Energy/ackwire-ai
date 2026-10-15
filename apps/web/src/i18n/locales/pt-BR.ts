@@ -221,6 +221,7 @@ export const ptBR = {
     pendingApprovals_other: "{{count}} aprovações pendentes",
   },
   channel: {
+    reminder: "Lembrete",
     reactions: "Reações",
     reactionCount: "{{name}}, {{count}}",
     loadingOlder: "Carregando mensagens anteriores…",
@@ -878,6 +879,17 @@ export const ptBR = {
     labels: "Etiquetas",
   },
   routines: {
+    once: "Uma vez · {{weekday}}, {{date}} às {{time}} ({{zone}})",
+    reminder: "Lembrete",
+    fired: "Disparado",
+    canceled: "Cancelado",
+    done: "Concluídos",
+    doneToggle: "Concluídos ({{count}})",
+    deliversIn: "{{agent}} · {{place}}",
+    inDm: "na DM com {{article}} {{name}}",
+    inChannel: "no #{{channel}}",
+    inThread: "no #{{channel}} (thread)",
+    inConversation: "numa conversa",
     title: "Rotinas",
     subtitle:
       "Tarefas que os agentes fazem sozinhos, num horário ou quando algo acontece. Cada execução respeita o orçamento do agente, e ações sensíveis continuam pedindo aprovação.",
@@ -1643,6 +1655,8 @@ export const ptBR = {
       seconds: "{{n}} s",
       minutes: "{{n}} min",
       step: {
+        schedulingReminder: "Agendou um lembrete",
+        creatingRoutine: "Criou uma rotina",
         consulting: "Consultou o {{app}}",
         creatingIssue: "Criou uma issue",
         updatingIssue: "Atualizou uma issue",
@@ -1669,6 +1683,8 @@ export const ptBR = {
       },
     },
     activity: {
+      schedulingReminder: "agendando um lembrete",
+      creatingRoutine: "criando uma rotina",
       thinking: "pensando",
       typing: "digitando",
       consulting: "consultando o {{app}}",

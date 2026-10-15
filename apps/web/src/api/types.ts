@@ -834,9 +834,21 @@ export type RoutineEvent = "sentry.issue_created" | "github.pr_opened" | "issue.
 
 export type RoutineTrigger =
   | { type: "schedule"; phrase: string; cron: string; timezone: string; description: string }
-  | { type: "event"; event: RoutineEvent };
+  | { type: "event"; event: RoutineEvent }
+  /** A one-off (reminders, "amanhã às 9h"): fires once at `at`, then the routine is inactive. */
+  | { type: "once"; at: string; timezone: string; description: string };
 
-export type RoutineTarget = { type: "channel"; channelId: string } | { type: "dm" } | { type: "artifact" };
+/** Where a routine created here delivers. */
+export type RoutineTargetInput = { type: "channel"; channelId: string } | { type: "dm" } | { type: "artifact" };
+
+/**
+ * Also `conversation`: a thread or DM, from an agent's `schedule_reminder` or
+ * `create_routine` in the chat. `reminder`: a plain reminder (the agent's
+ * message mentioning `forUserId`, no run).
+ */
+export type RoutineTarget =
+  | RoutineTargetInput
+  | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string };
 
 export interface Routine {
   id: string;
@@ -867,7 +879,7 @@ export interface RoutineInput {
   name?: string;
   agentId: string;
   prompt: string;
-  target: RoutineTarget;
+  target: RoutineTargetInput;
   trigger: { type: "schedule"; phrase: string } | { type: "event"; event: RoutineEvent };
 }
 

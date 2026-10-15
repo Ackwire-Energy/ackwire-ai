@@ -216,6 +216,7 @@ export const en: Translations = {
     pendingApprovals_other: "{{count}} pending approvals",
   },
   channel: {
+    reminder: "Reminder",
     reactions: "Reactions",
     reactionCount: "{{name}}, {{count}}",
     loadingOlder: "Loading earlier messages…",
@@ -872,6 +873,17 @@ export const en: Translations = {
     labels: "Labels",
   },
   routines: {
+    once: "Once · {{weekday}}, {{date}} at {{time}} ({{zone}})",
+    reminder: "Reminder",
+    fired: "Fired",
+    canceled: "Canceled",
+    done: "Done",
+    doneToggle: "Done ({{count}})",
+    deliversIn: "{{agent}} · {{place}}",
+    inDm: "in the DM with {{name}}",
+    inChannel: "in #{{channel}}",
+    inThread: "in #{{channel}} (thread)",
+    inConversation: "in a conversation",
     title: "Routines",
     subtitle:
       "Tasks agents do on their own, on a schedule or when something happens. Every run respects the agent's budget, and sensitive actions still ask for approval.",
@@ -1634,6 +1646,8 @@ export const en: Translations = {
       seconds: "{{n}} s",
       minutes: "{{n}} min",
       step: {
+        schedulingReminder: "Scheduled a reminder",
+        creatingRoutine: "Created a routine",
         consulting: "Checked {{app}}",
         creatingIssue: "Created an issue",
         updatingIssue: "Updated an issue",
@@ -1660,6 +1674,8 @@ export const en: Translations = {
       },
     },
     activity: {
+      schedulingReminder: "scheduling a reminder",
+      creatingRoutine: "creating a routine",
       thinking: "thinking",
       typing: "typing",
       consulting: "checking {{app}}",

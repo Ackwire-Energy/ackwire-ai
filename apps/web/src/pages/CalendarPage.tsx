@@ -307,6 +307,10 @@ function Selected({ item }: { item: Item }) {
   const channels = useChannels(org.id);
   const target = (tg: RoutineTarget) => {
     if (tg.type === "channel") return `#${channels.data?.find((c) => c.id === tg.channelId)?.name ?? ""}`;
+    if (tg.type === "conversation") {
+      const c = channels.data?.find((x) => x.id === tg.channelId);
+      return c ? `#${c.name}` : t("routines.inConversation");
+    }
     return t(tg.type === "dm" ? "routines.target.dmShort" : "routines.target.artifactShort");
   };
   const people =
