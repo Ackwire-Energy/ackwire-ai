@@ -295,10 +295,10 @@ export function SidebarOrgSky({ calm }: { calm: () => (Element | null)[] }) {
         sprites: 2,
         near: 0,
         calm,
-        calmV: 0.08,
+        calmV: 0,
         calmPad: 10,
         light: 0,
-        base: (u, v) => 0.1 + 0.32 * u * u * (0.6 + 0.4 * v),
+        base: (u, v) => 0.36 * u * u * u * (0.6 + 0.4 * v),
         blobs: (tt) => [[0.9 + 0.04 * S(tt * 0.3), 0.75, 0.07, 0.08]],
       }}
     />

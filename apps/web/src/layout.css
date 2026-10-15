@@ -5183,24 +5183,25 @@ button.live-call__head:hover {
   min-height: 56px;
   padding: 8px 6px;
   border-radius: 14px;
-  background: #4b93ff;
-  color: var(--sky-ink);
+  /* The sky is light tones faded from this surface, so the text keeps the theme's own ink. */
+  border: 1px solid var(--line);
+  background: var(--sunken);
+  color: var(--ink);
 }
 .sidebar__org > :not(.ac-sky) {
   position: relative;
 }
 .sidebar__org .sidebar__org-button,
 .sidebar__org .sidebar__org-button > .ac-icon,
-.sidebar__org .sidebar__org-meta,
 .sidebar__org .ac-btn {
-  color: var(--sky-ink);
+  color: var(--ink);
 }
 .sidebar__org .sidebar__org-meta {
-  opacity: 0.8;
+  color: var(--ink-muted);
 }
 .sidebar__org .sidebar__org-button:hover,
 .sidebar__org .ac-btn:hover {
-  background: var(--sky-glass);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 .sidebar__item[data-busy="true"] {
   position: relative;
