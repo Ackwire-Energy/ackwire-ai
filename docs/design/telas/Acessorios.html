@@ -61,7 +61,7 @@ canvas.av{display:block}
   <div class="top">
     <div>
       <h1>Acessórios</h1>
-      <p>Os acessórios redesenhados em pixel na mesma grade 16×16 do corpo. Agente, olhos e cores vêm do motor único (packages/ui/src/agent/engine.js), o mesmo do app. Os 7 de hoje mais 6 novos. Clique num card para ver grande no céu.</p>
+      <p>Os acessórios redesenhados em pixel na mesma grade 16×16 do corpo. Agente, olhos e cores vêm do motor único (packages/ui/src/agent/engine.js), o mesmo do app. Os de hoje (sem os óculos) mais 6 novos. Clique num card para ver grande no céu.</p>
     </div>
     <div class="ctl">
       <div class="swatches" id="colors" role="group" aria-label="Cor"></div>
@@ -132,24 +132,6 @@ const ACC = {
     "  GGGgGGGGGG      ",
     " GGGGGGGGGGGG     ",
     " GGGGGGGGGGGGKKKKK",
-  ] },
-  glasses: { name: "Óculos", text: "Aro preto em volta dos olhos, ponte e hastes até a borda. Olham em volta junto com os olhos.", face: true, ox: 0, oy: 4, rows: [
-    "    KKKKKKKK    ",
-    "KKKKK  KK  KKKKK",
-    "    K  KK  K    ",
-    "    K  KK  K    ",
-    "    K  KK  K    ",
-    "    K  KK  K    ",
-    "    KKKKKKKK    ",
-  ] },
-  sunglasses: { name: "Óculos escuros", text: "Lentes cheias com um reflexo de pixel. Cobrem os olhos.", face: true, hides: true, ox: 0, oy: 4, rows: [
-    "    KKKKKKKK    ",
-    "KKKKKgGKKgGKKKKK",
-    "    KGGKKGGK    ",
-    "    KGGKKGGK    ",
-    "    KGGKKGGK    ",
-    "    KGGKKGGK    ",
-    "    KKKKKKKK    ",
   ] },
   headphones: { name: "Fone", text: "Arco por cima da cabeça e conchas nas laterais.", ox: -1, oy: -3, rows: [
     "     KKKKKKKK     ",
@@ -246,7 +228,7 @@ const ACC = {
     "             R R  ",
   ] },
 };
-const CURRENT = ["hat", "cap", "glasses", "sunglasses", "headphones", "bow", "crown"];
+const CURRENT = ["hat", "cap", "headphones", "bow", "crown"];
 const FRESH = ["antenna", "headset", "beanie", "party", "flower", "scarf"];
 
 let color = "sky", state = "idle", selected = "crown";
@@ -325,7 +307,7 @@ function select(key) {
 
 /* The chat: a few agents with accessories at the real size. */
 const chat = document.getElementById("chat");
-const LINES = [["Lia", "crown", "sky", "Abri o PR #213 com a correção do checkout."], ["Teo", "headphones", "amber", "Relatório semanal publicado em #dados."], ["Bia", "glasses", "violet", "Revisei os números de churn, bate com o painel."], ["Ops", "antenna", "teal", "Deploy da v2.14.4 rodando…", "thinking"], ["Rita", "headset", "rose", "Respondi os 3 tickets novos do suporte."]];
+const LINES = [["Lia", "crown", "sky", "Abri o PR #213 com a correção do checkout."], ["Teo", "headphones", "amber", "Relatório semanal publicado em #dados."], ["Bia", "bow", "violet", "Revisei os números de churn, bate com o painel."], ["Ops", "antenna", "teal", "Deploy da v2.14.4 rodando…", "thinking"], ["Rita", "headset", "rose", "Respondi os 3 tickets novos do suporte."]];
 for (const [name, acc, c, text, st] of LINES) {
   const m = document.createElement("div");
   m.className = "msg";
