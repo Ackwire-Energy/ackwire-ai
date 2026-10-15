@@ -7,6 +7,8 @@ import {
   getArtifact,
   listArtifacts,
   listArtifactVersions,
+  listDeletedArtifacts,
+  restoreArtifact,
   updateArtifact,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -246,7 +248,8 @@ export function artifactRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/artifacts/{artifactId}",
       tags,
       security,
-      summary: "Delete a file (its creator or an admin)",
+      summary:
+        "Delete a file (who created it, who asked the agent, the agent's owner, or an admin). Restorable for 30 days",
       request: { params: ArtifactParams },
       responses: { 204: noContent[204], ...errors },
     }),
@@ -254,6 +257,55 @@ export function artifactRoutes(deps: AppDeps) {
       const { orgId, artifactId } = c.req.valid("param");
       await deleteArtifact(artifacts(), c.get("user").id, orgId, artifactId);
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/artifacts/{artifactId}/restore",
+      tags,
+      security,
+      summary: "Restore a deleted file (within 30 days)",
+      request: { params: ArtifactParams },
+      responses: { 200: json(z.object({ id: z.uuid(), title: z.string() }).passthrough()), ...errors },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      return c.json(await restoreArtifact(artifacts(), c.get("user").id, orgId, artifactId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/artifacts-trash",
+      tags,
+      security,
+      summary: "Lixeira: files deleted in the last 30 days that I may restore",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            files: z.array(
+              z.object({
+                id: z.uuid(),
+                title: z.string(),
+                kind: z.string(),
+                channelId: z.uuid().nullable(),
+                createdBy: z.object({ type: z.enum(["person", "agent"]), id: z.string() }),
+                deletedAt: z.string(),
+                purgeAt: z.string().openapi({ description: "When its contents go for good." }),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ files: await listDeletedArtifacts(db, c.get("user").id, orgId) }, 200);
     },
   );
 

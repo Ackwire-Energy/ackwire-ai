@@ -1276,7 +1276,17 @@ async function sourceBlock(deps: WikiDeps, userId: string, orgId: string, source
   const topic = await getForumTopic(db, userId, orgId, source.topicId);
   if (!topic.synthesis) throw new ValidationError("This topic has no synthesis yet", "forum.no_synthesis");
   if (!deps.artifacts) throw new ValidationError("Files aren't available on this server", "drive.unavailable");
-  const doc = await getArtifact(deps.artifacts, { type: "person", userId }, orgId, topic.synthesis.artifactId);
+  if (topic.synthesis.deleted) {
+    throw new ValidationError("The synthesis file was deleted", "forum.synthesis_deleted");
+  }
+  const doc = await getArtifact(deps.artifacts, { type: "person", userId }, orgId, topic.synthesis.artifactId).catch(
+    (error: unknown) => {
+      if (error instanceof NotFoundError) {
+        throw new ValidationError("The synthesis file was deleted", "forum.synthesis_deleted");
+      }
+      throw error;
+    },
+  );
   const markdown = doc.content.kind === "document" ? doc.content.markdown : "";
   return {
     text: `${markdown.trim()}\n\n_Síntese do fórum "${topic.title}" (${topic.lastActivityAt.slice(0, 10)})._`,

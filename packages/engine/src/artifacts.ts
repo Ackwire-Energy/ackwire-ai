@@ -681,13 +681,49 @@ export async function shareArtifact(
 }
 
 /** Deletes an artifact (its creator or an admin). Stored versions stay until purged. */
+/** Deleted files can be restored for this long; then the purge job removes their contents (all versions). */
+export const ARTIFACT_TRASH_DAYS = 30;
+
+/**
+ * Who may delete (and restore) a file: whoever created it; for files an
+ * agent made, the person who asked it and the agent's owner; admins always.
+ */
+async function canDeleteArtifact(db: Database, userId: string, orgId: string, a: ArtifactRow) {
+  const membership = await getMembership(db, userId, orgId);
+  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  if (can(membership.role, "configure")) return true;
+  if (a.createdByType === "person") return a.createdById === userId;
+  const [agent] = await db
+    .select({ ownerUserId: schema.agents.ownerUserId })
+    .from(schema.agents)
+    .where(and(eq(schema.agents.id, a.createdById), eq(schema.agents.orgId, orgId)));
+  if (agent?.ownerUserId === userId) return true;
+  // The person behind the run that made the first version.
+  const [asked] = await db
+    .select({ userId: schema.messages.authorUserId })
+    .from(artifactVersions)
+    .innerJoin(schema.agentRuns, eq(schema.agentRuns.id, artifactVersions.runId))
+    .innerJoin(
+      schema.messages,
+      and(eq(schema.messages.id, schema.agentRuns.triggerMessageId), eq(schema.messages.orgId, orgId)),
+    )
+    .where(and(eq(artifactVersions.artifactId, a.id), eq(artifactVersions.version, 1)));
+  return asked?.userId === userId;
+}
+
+/**
+ * Deletes a file (people only; agents have no such tool). It leaves the Drive
+ * and search; messages that show it say it was removed. It can be restored
+ * for 30 days; then its contents are purged. Audited.
+ */
 export async function deleteArtifact(deps: ArtifactDeps, userId: string, orgId: string, artifactId: string) {
   const actor: ArtifactActor = { type: "person", userId };
-  const membership = await requireMember(deps.db, actor, orgId);
   const a = await readable(deps, actor, orgId, artifactId);
-  const creator = a.createdByType === "person" && a.createdById === userId;
-  if (!creator && !(membership && can(membership.role, "configure"))) {
-    throw new ForbiddenError("Only its creator or an admin can delete this");
+  if (!(await canDeleteArtifact(deps.db, userId, orgId, a))) {
+    throw new ForbiddenError(
+      "Only who created it, who asked the agent, the agent's owner or an admin can delete this",
+      "artifact.delete_forbidden",
+    );
   }
   await deps.db.transaction(async (tx) => {
     await tx.update(artifacts).set({ deletedAt: new Date() }).where(eq(artifacts.id, a.id));
@@ -697,7 +733,149 @@ export async function deleteArtifact(deps: ArtifactDeps, userId: string, orgId: 
       actor: { type: "person", id: userId },
       action: "artifact.deleted",
       target: { type: "artifact", id: a.id },
+      details: { title: a.title },
     });
+  });
+  if (a.channelId) {
+    await publishChannelEvent(deps.pubsub, { type: "artifact.deleted", channelId: a.channelId, artifactId: a.id });
+  }
+}
+
+/** A deleted file as the trash shows it. */
+export interface TrashedArtifactView {
+  id: string;
+  title: string;
+  kind: ArtifactRow["kind"];
+  channelId: string | null;
+  createdBy: ArtifactAuthor;
+  deletedAt: string;
+  /** When its contents go for good. */
+  purgeAt: string;
+}
+
+async function deletedRow(db: Database, orgId: string, id: string) {
+  const [a] = await db
+    .select()
+    .from(artifacts)
+    .where(and(eq(artifacts.id, id), eq(artifacts.orgId, orgId), sql`${artifacts.deletedAt} is not null`));
+  return a ?? null;
+}
+
+const purgeAt = (deletedAt: Date) => new Date(deletedAt.getTime() + ARTIFACT_TRASH_DAYS * 86_400_000);
+
+/** "Lixeira": files deleted in the last 30 days that this person may restore. */
+export async function listDeletedArtifacts(
+  db: Database,
+  userId: string,
+  orgId: string,
+): Promise<TrashedArtifactView[]> {
+  const membership = await getMembership(db, userId, orgId);
+  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const since = new Date(Date.now() - ARTIFACT_TRASH_DAYS * 86_400_000);
+  const rows = await db
+    .select()
+    .from(artifacts)
+    .where(and(eq(artifacts.orgId, orgId), sql`${artifacts.deletedAt} > ${since.toISOString()}::timestamptz`))
+    .orderBy(desc(artifacts.deletedAt))
+    .limit(500);
+  const out: TrashedArtifactView[] = [];
+  for (const a of rows) {
+    if (!(await canDeleteArtifact(db, userId, orgId, a))) continue;
+    out.push({
+      id: a.id,
+      title: a.title,
+      kind: a.kind,
+      channelId: a.channelId,
+      createdBy: { type: a.createdByType as ArtifactAuthor["type"], id: a.createdById },
+      deletedAt: (a.deletedAt as Date).toISOString(),
+      purgeAt: purgeAt(a.deletedAt as Date).toISOString(),
+    });
+  }
+  return out;
+}
+
+/** Brings a deleted file back (within 30 days), for the same people who may delete it. */
+export async function restoreArtifact(deps: ArtifactDeps, userId: string, orgId: string, artifactId: string) {
+  const a = await deletedRow(deps.db, orgId, artifactId);
+  if (!a?.deletedAt) throw new NotFoundError("Artifact not found", "artifact.not_found");
+  if (purgeAt(a.deletedAt).getTime() <= Date.now()) {
+    throw new ConflictError("This file was deleted more than 30 days ago", "artifact.purged", {
+      days: ARTIFACT_TRASH_DAYS,
+    });
+  }
+  if (!(await canDeleteArtifact(deps.db, userId, orgId, a))) {
+    throw new ForbiddenError("Only who could delete it can restore it", "artifact.restore_forbidden");
+  }
+  const [row] = await deps.db.transaction(async (tx) => {
+    const updated = await tx.update(artifacts).set({ deletedAt: null }).where(eq(artifacts.id, a.id)).returning();
+    await enqueueIndex(tx, { orgId, kind: "file", sourceId: a.id });
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "artifact.restored",
+      target: { type: "artifact", id: a.id },
+      details: { title: a.title },
+    });
+    return updated;
+  });
+  if (!row) throw new NotFoundError("Artifact not found", "artifact.not_found");
+  return view(row, true);
+}
+
+/**
+ * Job: files deleted more than 30 days ago lose their contents (every
+ * version's blob and row). The artifact row stays as a tombstone, so old
+ * messages can still say "Arquivo removido" with its title.
+ */
+export async function purgeDeletedArtifacts(deps: ArtifactDeps, now = new Date()) {
+  const cutoff = new Date(now.getTime() - ARTIFACT_TRASH_DAYS * 86_400_000);
+  const versions = await deps.db
+    .select({ version: artifactVersions, orgId: artifacts.orgId })
+    .from(artifactVersions)
+    .innerJoin(artifacts, eq(artifacts.id, artifactVersions.artifactId))
+    .where(sql`${artifacts.deletedAt} is not null and ${artifacts.deletedAt} < ${cutoff.toISOString()}::timestamptz`)
+    .limit(500);
+  let purged = 0;
+  for (const { version: v, orgId } of versions) {
+    const store = await deps.blobs.forConfig(orgId, v.storageConfigId).catch(() => null);
+    await store?.delete(v.blobKey).catch(() => undefined);
+    await deps.db.delete(artifactVersions).where(eq(artifactVersions.id, v.id));
+    purged++;
+  }
+  return purged;
+}
+
+/** Message attachments (`meta.artifacts`) of deleted files, as `{ id, deleted: true, title }`. */
+export async function withDeletedArtifacts<T extends { meta: Record<string, unknown> }>(
+  db: Database,
+  orgId: string,
+  list: T[],
+): Promise<T[]> {
+  const ids = new Set<string>();
+  for (const m of list) {
+    const files = m.meta.artifacts;
+    if (Array.isArray(files)) for (const f of files) if (f && typeof f.id === "string") ids.add(f.id);
+  }
+  if (ids.size === 0) return list;
+  const gone = await db
+    .select({ id: artifacts.id, title: artifacts.title })
+    .from(artifacts)
+    .where(and(eq(artifacts.orgId, orgId), inArray(artifacts.id, [...ids]), sql`${artifacts.deletedAt} is not null`));
+  if (gone.length === 0) return list;
+  const byId = new Map(gone.map((g) => [g.id, g]));
+  return list.map((m) => {
+    const files = m.meta.artifacts;
+    if (!Array.isArray(files) || !files.some((f) => byId.has(f?.id))) return m;
+    return {
+      ...m,
+      meta: {
+        ...m.meta,
+        artifacts: files.map((f) => {
+          const g = byId.get(f?.id);
+          return g ? { id: g.id, deleted: true, title: g.title } : f;
+        }),
+      },
+    };
   });
 }
 

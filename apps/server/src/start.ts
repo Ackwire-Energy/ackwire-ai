@@ -125,6 +125,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     handlers: engine.handlers,
     pubsub: adapters.pubsub,
     context: engine.context,
+    artifacts: engine.artifacts,
     approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
     log,
   });

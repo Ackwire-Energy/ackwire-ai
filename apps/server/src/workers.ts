@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { type Database, ensureMessagePartitions, schema } from "@agenteschat/db";
 import {
+  type ArtifactDeps,
   type ContextDeps,
   enqueue,
   enqueueIdleReflections,
@@ -10,6 +11,7 @@ import {
   type JobHandlers,
   listenForRunCancels,
   processOutbox,
+  purgeDeletedArtifacts,
   queueApprovalDigests,
   recoverStaleRuns,
 } from "@agenteschat/engine";
@@ -21,6 +23,8 @@ export interface WorkerDeps {
   pubsub: PubSub;
   /** Memory jobs (idle reflection, nightly consolidation). */
   context?: ContextDeps;
+  /** Drive files (purging deleted ones after 30 days). */
+  artifacts?: ArtifactDeps;
   /** Approval reminder emails. */
   approvalDigest?: { publicUrl: string; afterHours: number };
   log: Logger;
@@ -41,6 +45,8 @@ export const WORKER_INTERVALS_MS = {
   routines: 30_000,
   /** Runs whose worker died (deploy, crash): also once at boot. */
   recovery: 60_000,
+  /** Deleted files past 30 days lose their contents. */
+  artifactPurge: 6 * 3600_000,
 };
 
 /**
@@ -120,6 +126,14 @@ export function startWorkers(deps: WorkerDeps) {
     const r = await recoverStaleRuns({ db, pubsub: deps.pubsub });
     if (r.resumed.length + r.failed.length + r.requeued.length > 0) log.info("stale runs recovered", r);
   });
+
+  const files = deps.artifacts;
+  if (files) {
+    every("artifactPurge", WORKER_INTERVALS_MS.artifactPurge, async () => {
+      const purged = await purgeDeletedArtifacts(files);
+      if (purged > 0) log.info("deleted files purged", { versions: purged });
+    });
+  }
 
   every("routines", WORKER_INTERVALS_MS.routines, async () => {
     const fired = await fireDueRoutines({ db, pubsub: deps.pubsub });

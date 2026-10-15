@@ -13,6 +13,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { withDeletedArtifacts } from "./artifacts";
 import { audienceSql, notifyBlocked } from "./audience";
 import { cancelRun } from "./cancel";
 import { requireChannelAccess } from "./channels";
@@ -599,5 +600,5 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
       ...(runUsage ? { usage: runUsage } : {}),
     };
   });
-  return withWikiLinks(db, orgId, views);
+  return withDeletedArtifacts(db, orgId, await withWikiLinks(db, orgId, views));
 }

@@ -197,6 +197,8 @@ export type ChannelEvent =
     }
   /** A file was created or got a new version (Drive preview card). */
   | { type: "artifact.created" | "artifact.updated"; channelId: string; artifact: ArtifactView }
+  /** A file was deleted (it shows as removed; restorable for 30 days). */
+  | { type: "artifact.deleted"; channelId: string; artifactId: string }
   /** Channel membership changed (agents carry `autoReply`). */
   | {
       type: "channel.member_added" | "channel.member_removed" | "channel.member_updated";

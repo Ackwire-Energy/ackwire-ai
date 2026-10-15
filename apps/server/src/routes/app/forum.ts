@@ -35,7 +35,12 @@ const Topic = z
     budgetUsd: z.number().nullable(),
     activeAgentIds: z.array(z.uuid()),
     synthesis: z
-      .object({ artifactId: z.uuid(), version: z.number(), suggestedIssues: z.array(SuggestedIssue) })
+      .object({
+        artifactId: z.uuid(),
+        version: z.number(),
+        suggestedIssues: z.array(SuggestedIssue),
+        deleted: z.boolean().optional().openapi({ description: "The synthesis file was deleted." }),
+      })
       .nullable(),
   })
   .openapi("ForumTopic");

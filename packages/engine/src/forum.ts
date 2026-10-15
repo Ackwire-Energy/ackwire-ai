@@ -62,7 +62,7 @@ export interface ForumTopicView {
   costUsd: number;
   budgetUsd: number | null;
   activeAgentIds: string[];
-  synthesis: { artifactId: string; version: number; suggestedIssues: ForumSuggestedIssue[] } | null;
+  synthesis: { artifactId: string; version: number; suggestedIssues: ForumSuggestedIssue[]; deleted?: boolean } | null;
 }
 
 export interface ForumPostView {
@@ -130,6 +130,17 @@ async function views(db: Database, rows: TopicRow[]): Promise<ForumTopicView[]> 
         .from(agentRuns)
         .where(and(inArray(agentRuns.id, running), inArray(agentRuns.status, ["queued", "running"])))
     : [];
+  const fileIds = rows.flatMap((r) => (r.synthesisArtifactId ? [r.synthesisArtifactId] : []));
+  const deletedFiles = new Set(
+    fileIds.length
+      ? (
+          await db
+            .select({ id: schema.artifacts.id })
+            .from(schema.artifacts)
+            .where(and(inArray(schema.artifacts.id, fileIds), sql`${schema.artifacts.deletedAt} is not null`))
+        ).map((a) => a.id)
+      : [],
+  );
   return rows.map((r) => {
     const mine = parts.filter((p) => p.topicId === r.id);
     return {
@@ -154,6 +165,8 @@ async function views(db: Database, rows: TopicRow[]): Promise<ForumTopicView[]> 
             artifactId: r.synthesisArtifactId,
             version: r.synthesisVersion ?? 1,
             suggestedIssues: r.suggestedIssues,
+            /** The synthesis file was deleted (the app shows "Arquivo removido"). */
+            deleted: deletedFiles.has(r.synthesisArtifactId),
           }
         : null,
     };
