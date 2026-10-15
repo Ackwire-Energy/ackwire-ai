@@ -111,6 +111,8 @@ export interface ChannelChrome {
 
 const sameRuns = (a: LiveRun[], b: LiveRun[]) => a.length === b.length && a.every((r, i) => r === b[i]);
 
+/** A scroll within this long after a wheel/touch/key/pointer counts as the person's. */
+const GESTURE_MS = 1500;
 /** Older messages per scroll-up page. */
 const OLDER_PAGE = 50;
 /** Per channel, for this session: older pages already loaded, channels with no more, and scroll positions. */
@@ -336,6 +338,33 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
   const lastScrollTop = useRef<number | null>(null);
   // A smooth scroll in progress: its intermediate positions don't mean "the person scrolled up".
   const autoScrollUntil = useRef(0);
+  // The last wheel/touch/key/pointer on the list: scroll events without one are layout, not the person.
+  const lastGesture = useRef(0);
+  const markGesture = () => {
+    lastGesture.current = Date.now();
+  };
+  // Pinned to the bottom: anything that grows later (images, cards, the skeleton turning into
+  // messages, fonts) keeps the latest message in view until the person scrolls.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the list only exists for members; re-attach when it appears
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const pin = () => {
+      if (stick.current && Date.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
+    };
+    const ro = new ResizeObserver(pin);
+    const watch = () => {
+      for (const child of Array.from(el.children)) ro.observe(child);
+    };
+    watch();
+    ro.observe(el);
+    const mo = typeof MutationObserver === "undefined" ? null : new MutationObserver(watch);
+    mo?.observe(el, { childList: true });
+    return () => {
+      ro.disconnect();
+      mo?.disconnect();
+    };
+  }, [isMember]);
   const reducedMotion = usePrefersReducedMotion();
   const [unseen, setUnseen] = useState(false);
   const runCount = useStreams((s) => runsInChannel(s, channel.id).length);
@@ -444,6 +473,16 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
         },
       ]
     : [];
+
+  // Any new page of data (first load, refetch, cache → server) re-pins while at the bottom,
+  // without waiting for observers (some environments have none).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the data changes
+  useLayoutEffect(() => {
+    if (stick.current && Date.now() >= autoScrollUntil.current) {
+      const el = scroller.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
+  }, [messages.dataUpdatedAt, timeline.length]);
 
   const onSend = (text: string) => {
     toBottom(true);
@@ -561,11 +600,17 @@ function ChannelView({ channel, chrome }: { channel: Channel; chrome?: ChannelCh
               aria-label={t("channel.messages")}
               aria-live="polite"
               aria-relevant="additions"
+              onWheel={markGesture}
+              onTouchMove={markGesture}
+              onPointerDown={markGesture}
+              onKeyDown={markGesture}
               onScroll={(e) => {
                 lastScrollTop.current = e.currentTarget.scrollTop;
-                if (e.currentTarget.scrollTop < 240) loadOlder();
+                // Only the person scrolling unpins (or loads older pages); layout changes never do.
+                const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
+                if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
                 const near = nearBottom(e.currentTarget);
-                if (!near && Date.now() < autoScrollUntil.current) return;
+                if (!near && (!byPerson || Date.now() < autoScrollUntil.current)) return;
                 stick.current = near;
                 if (near) setUnseen(false);
               }}

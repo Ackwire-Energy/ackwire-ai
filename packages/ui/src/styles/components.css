@@ -180,31 +180,54 @@ samp {
   line-height: 18px;
   color: var(--danger);
 }
+/*
+ * Fields (v2): a soft surface with a hairline; focus lifts (e2 + a 4px ring
+ * at ~10% ink). Never a black border.
+ */
+:root,
+[data-theme] {
+  --field-bg: color-mix(in srgb, var(--sunken) 40%, var(--raised));
+  --field-line: var(--line2);
+  --field-ring: 0 0 0 4px color-mix(in srgb, var(--ink) 10%, transparent);
+  --field-ring-danger: 0 0 0 4px color-mix(in srgb, var(--danger) 14%, transparent);
+}
 .ac-input {
   box-sizing: border-box;
-  height: 36px;
+  height: 40px;
   width: 100%;
-  padding: 0 var(--space-3);
+  padding: 0 14px;
   font: inherit;
   font-size: 15px;
   color: var(--ink);
-  background: var(--surface-raised);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  background: var(--field-bg);
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-item);
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.18s var(--out);
 }
 .ac-input::placeholder {
-  color: var(--ink-muted);
+  color: var(--faint);
+}
+.ac-input:hover {
+  border-color: var(--line-strong);
 }
 .ac-input:focus {
   outline: none;
-  box-shadow: var(--focus-ring);
+  background: var(--raised);
+  border-color: var(--field-line);
+  box-shadow: var(--e2), var(--field-ring);
 }
 .ac-input[aria-invalid="true"] {
   border-color: var(--danger);
 }
+.ac-input[aria-invalid="true"]:focus {
+  box-shadow: var(--e2), var(--field-ring-danger);
+}
 .ac-input[readonly] {
-  background: var(--surface);
-  color: var(--ink-muted);
+  background: var(--sunken);
+  color: var(--muted);
 }
 textarea.ac-input {
   height: auto;
@@ -216,15 +239,24 @@ textarea.ac-input {
 .ac-input-affix {
   display: flex;
   align-items: center;
-  height: 36px;
+  height: 40px;
   box-sizing: border-box;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-item);
+  background: var(--field-bg);
   overflow: hidden;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.18s var(--out);
+}
+.ac-input-affix:hover {
+  border-color: var(--line-strong);
 }
 .ac-input-affix:focus-within {
-  box-shadow: var(--focus-ring);
+  background: var(--raised);
+  border-color: var(--field-line);
+  box-shadow: var(--e2), var(--field-ring);
 }
 .ac-input-affix__prefix {
   padding: 0 2px 0 var(--space-3);
@@ -253,13 +285,13 @@ textarea.ac-input {
 }
 .ac-search .ac-icon {
   position: absolute;
-  left: 10px;
-  top: 8px;
+  left: 12px;
+  top: 10px;
   color: var(--ink-muted);
   pointer-events: none;
 }
 .ac-search .ac-input {
-  padding-left: 36px;
+  padding-left: 38px;
 }
 
 /* Composer */
@@ -797,36 +829,40 @@ textarea.ac-input {
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  height: 36px;
+  height: 40px;
   box-sizing: border-box;
-  padding: 0 var(--space-2) 0 var(--space-3);
+  padding: 0 var(--space-2) 0 14px;
   font: inherit;
   font-size: 15px;
   color: var(--ink);
-  background: var(--surface-raised);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  background: var(--field-bg);
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-item);
   cursor: pointer;
   text-align: left;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.18s var(--out);
 }
 .ac-select__trigger:hover {
-  border-color: var(--ink-muted);
+  border-color: var(--line-strong);
 }
-.ac-select__trigger:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
+.ac-select__trigger:focus-visible,
 .ac-select__trigger[aria-expanded="true"] {
-  border-color: var(--ink);
+  outline: none;
+  background: var(--raised);
+  border-color: var(--field-line);
+  box-shadow: var(--e2), var(--field-ring);
 }
 .ac-select__trigger[aria-invalid="true"] {
   border-color: var(--danger);
 }
 .ac-select__trigger[data-disabled] {
   cursor: not-allowed;
-  color: var(--ink-muted);
+  color: var(--muted);
   border-color: var(--line);
-  background: var(--surface);
+  background: var(--sunken);
 }
 .ac-select__value {
   flex: 1;
@@ -854,7 +890,7 @@ textarea.ac-input {
   transform: rotate(180deg);
 }
 .ac-select--sm .ac-select__trigger {
-  height: 32px;
+  height: 34px;
   font-size: 14px;
 }
 
@@ -998,10 +1034,20 @@ textarea.ac-input {
   border-radius: 999px;
 }
 .ac-check__mark {
-  width: 10px;
-  height: 10px;
-  background: var(--on-action);
-  clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 22%, 86% 8%, 38% 72%);
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+  color: var(--on-action);
+}
+.ac-check__svg {
+  width: 12px;
+  height: 12px;
+}
+.ac-check__svg path {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .ac-radio__dot {
   width: 8px;
@@ -1009,10 +1055,7 @@ textarea.ac-input {
   border-radius: 999px;
   background: var(--on-action);
 }
-.ac-check[data-state="indeterminate"] .ac-check__mark {
-  height: 2px;
-  clip-path: none;
-}
+
 .ac-check[data-state="checked"],
 .ac-check[data-state="indeterminate"],
 .ac-radio[data-state="checked"] {
@@ -1040,11 +1083,18 @@ textarea.ac-input {
   color: var(--ink);
   text-align: left;
   cursor: pointer;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--line);
-  background: var(--surface-raised);
+  border-radius: var(--radius-lg);
+  border: 0;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
   box-sizing: border-box;
   min-width: 0;
+  transition:
+    box-shadow 0.18s var(--out),
+    transform 0.18s var(--spring);
+}
+.ac-option:hover {
+  box-shadow: var(--e2), var(--top);
 }
 .ac-option--stacked {
   flex-direction: column;
@@ -1053,15 +1103,27 @@ textarea.ac-input {
 .ac-option--agent {
   border-bottom-left-radius: var(--radius-cut);
 }
+/* Chosen: the raised card with a 1.5px ink ring (no fill change, no heavy border). */
 .ac-option[aria-pressed="true"],
 .ac-option[data-state="checked"] {
-  border-color: var(--ink);
-  background: var(--surface-sunken);
+  background: var(--raised);
+  box-shadow:
+    var(--e1),
+    var(--top),
+    0 0 0 1.5px var(--ink);
 }
 .ac-option:focus-visible,
 .ac-option:has(:focus-visible) {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--e1), var(--field-ring);
+}
+.ac-option[aria-pressed="true"]:has(:focus-visible),
+.ac-option[data-state="checked"]:has(:focus-visible),
+.ac-option[aria-pressed="true"]:focus-visible {
+  box-shadow:
+    var(--e1),
+    0 0 0 1.5px var(--ink),
+    var(--field-ring);
 }
 .ac-option__text {
   display: flex;
@@ -1094,16 +1156,19 @@ textarea.ac-input {
   min-height: 36px;
   box-sizing: border-box;
   padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-item);
   font-size: 14px;
   cursor: pointer;
   color: var(--ink);
-  border: 1px solid var(--line-strong);
-  background: var(--surface-raised);
+  border: 0;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
 }
 .ac-pill[data-checked="true"] {
-  border-color: var(--ink);
-  background: var(--surface-sunken);
+  box-shadow:
+    var(--e1),
+    var(--top),
+    0 0 0 1.5px var(--ink);
 }
 .ac-pill .ac-check {
   margin: 0;
@@ -1586,8 +1651,12 @@ a.ac-list__row:focus-visible {
   background: transparent;
 }
 .ac-navcard[aria-current="true"] {
-  border-color: var(--ink);
-  background: var(--surface-raised);
+  border-color: transparent;
+  background: var(--raised);
+  box-shadow:
+    var(--e1),
+    var(--top),
+    0 0 0 1.5px var(--ink);
 }
 .ac-navcard:focus-visible {
   outline: none;
@@ -2679,25 +2748,6 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--e1), var(--top);
   overflow: hidden;
 }
-.ac-option {
-  border-radius: var(--radius-lg);
-}
-
-/* Inputs: a softer surface; focus lifts (border + ring) */
-.ac-input,
-.ac-select__trigger,
-.ac-input-affix {
-  border-radius: var(--radius-item);
-  transition:
-    border-color 0.15s,
-    box-shadow 0.18s var(--out);
-}
-.ac-input:focus,
-.ac-select__trigger:focus-visible,
-.ac-input-affix:focus-within {
-  border-color: var(--ink);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 12%, transparent);
-}
 
 /* Checkbox: the mark pops in; switch: the thumb springs */
 .ac-check {
@@ -2710,7 +2760,10 @@ a.ac-list__row:focus-visible {
   transition: transform 0.25s var(--spring);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .ac-check[data-state="checked"] .ac-check__mark,
+  .ac-check__tick {
+    stroke-dasharray: 14;
+    animation: ac-check-draw 0.2s ease 0.03s both;
+  }
   .ac-radio[data-state="checked"] .ac-radio__dot {
     animation: ac-mark-in 0.2s var(--spring) both;
   }
@@ -2726,6 +2779,14 @@ a.ac-list__row:focus-visible {
   .ac-input,
   .ac-select__trigger {
     transition: none;
+  }
+}
+@keyframes ac-check-draw {
+  from {
+    stroke-dashoffset: 14;
+  }
+  to {
+    stroke-dashoffset: 0;
   }
 }
 @keyframes ac-mark-in {
@@ -2881,11 +2942,26 @@ a.ac-list__row:focus-visible {
   background: var(--plate-soft);
 }
 .ac-msg__actions {
+  top: -14px;
+  right: 12px;
+  z-index: var(--z-sticky);
   border: 0;
   border-radius: var(--radius-item);
   background: var(--glass-solid);
   box-shadow: var(--e2), var(--top);
   transition: opacity 0.15s var(--out);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .ac-msg__actions {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(18px) saturate(1.6);
+    backdrop-filter: blur(18px) saturate(1.6);
+  }
+}
+/* The row being hovered stays above its neighbours, so its bar is never under the next row. */
+.ac-msg:hover,
+.ac-msg:focus-within {
+  z-index: 2;
 }
 .ac-msg__text {
   line-height: 1.62;

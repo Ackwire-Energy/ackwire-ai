@@ -25,7 +25,16 @@ export function Checkbox({ checked, onCheckedChange, className, ...rest }: Check
       onCheckedChange={(v) => onCheckedChange?.(v === true)}
       {...rest}
     >
-      <RCheckbox.Indicator className="ac-check__mark" />
+      {/* v2: the check is drawn (stroke-dashoffset); indeterminate is a dash. */}
+      <RCheckbox.Indicator className="ac-check__mark">
+        <svg viewBox="0 0 12 12" fill="none" aria-hidden="true" className="ac-check__svg">
+          {checked === "indeterminate" ? (
+            <path className="ac-check__dash" d="M3 6h6" />
+          ) : (
+            <path className="ac-check__tick" d="m2.5 6.2 2.3 2.3 4.7-5" />
+          )}
+        </svg>
+      </RCheckbox.Indicator>
     </RCheckbox.Root>
   );
 }

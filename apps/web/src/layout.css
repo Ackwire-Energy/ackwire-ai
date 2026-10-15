@@ -1241,25 +1241,35 @@ p {
   gap: 6px;
   min-width: 0;
 }
+/* v2 segmented (track + raised choice), same as the design system's Segmented. */
 .segmented {
   display: inline-flex;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  overflow: hidden;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-btn);
+  background: var(--sunken);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 .segmented button {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  height: 34px;
+  height: 30px;
   padding: 0 12px;
   border: 0;
+  border-radius: 9px;
   cursor: pointer;
-  color: var(--ink);
-  background: var(--surface-raised);
+  color: var(--muted);
+  background: transparent;
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    box-shadow 0.18s var(--out);
 }
 .segmented button[aria-pressed="true"] {
-  background: var(--surface-sunken);
+  color: var(--ink);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
 }
 .segmented button:focus-visible,
 .pill:focus-visible {
@@ -1280,13 +1290,20 @@ p {
   padding: 0 12px;
   border-radius: 999px;
   cursor: pointer;
+  color: var(--muted);
+  border: 0;
+  background: var(--sunken);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.pill:hover {
   color: var(--ink);
-  border: 1px solid var(--line);
-  background: var(--surface-raised);
 }
 .pill[aria-pressed="true"] {
-  border-color: var(--ink);
-  background: var(--surface-sunken);
+  color: var(--ink);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
 }
 .issue-label {
   margin-left: 0;
@@ -1355,7 +1372,8 @@ p {
   text-decoration: none;
 }
 .issue-card:hover {
-  border-color: var(--ink-muted);
+  border-color: transparent;
+  box-shadow: var(--e2), var(--top);
 }
 .issue-card:focus-visible,
 .issue-list__row:focus-visible {
@@ -1663,7 +1681,7 @@ p {
   border: 1px dashed var(--line-strong);
 }
 .calendar-item[aria-pressed="true"] {
-  border-color: var(--ink);
+  box-shadow: 0 0 0 1.5px var(--ink);
 }
 .calendar-item:focus-visible,
 .calendar-deadline:focus-visible {
@@ -2387,7 +2405,9 @@ p {
 }
 .catalog__cat[aria-pressed="true"] {
   color: var(--ink);
-  border-color: var(--ink);
+  border-color: transparent;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
 }
 .catalog__cat:focus-visible {
   outline: none;
@@ -2611,10 +2631,13 @@ p {
   box-shadow: var(--overlay);
   white-space: nowrap;
 }
-/* Long timelines: the browser skips rendering rows far off screen. */
-.channel__messages .ac-msg {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 64px;
+/*
+ * No content-visibility on messages: it implies paint containment and clipped
+ * the floating action bar. Room at the top so the first row's bar isn't cut
+ * by the scroll container.
+ */
+.channel__messages {
+  padding-top: 28px;
 }
 
 /* ── Design system 2026-10 in the app (docs/design/refresh-2026-10.md) ── */
@@ -2768,4 +2791,12 @@ p {
 /* Summary rows and settings cards follow the card elevation. */
 .summary-row {
   border-radius: var(--radius-lg);
+}
+
+/* Issue cards: v2 neutral card (hairline ring + e1 + top light). */
+.issue-card {
+  border-color: transparent;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--e1), var(--top);
+  transition: box-shadow 0.18s var(--out);
 }

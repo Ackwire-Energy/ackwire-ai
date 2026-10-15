@@ -158,7 +158,10 @@ describe("bottom anchoring", () => {
     expect(log.scrollTop).toBe(2000);
     // The person scrolls up.
     log.scrollTop = 100;
-    await act(async () => fireEvent.scroll(log));
+    await act(async () => {
+      fireEvent.wheel(log);
+      fireEvent.scroll(log);
+    });
     await push(socket, {
       type: "message.created",
       messageId: "m-new",
