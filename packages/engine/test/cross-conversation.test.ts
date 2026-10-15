@@ -47,12 +47,13 @@ describe("work done in other conversations", () => {
             ],
           };
         }
-        if (last.includes("aquele pdf")) {
-          prompts.ana = systemText(req.system ?? "");
-          return { chunks: [], toolUses: [{ name: "share_artifact", input: { artifact_id: originalId } }] };
-        }
+        // Bob's turn also holds Ana's earlier message (consecutive user messages merge): match his first.
         if (last.includes("pdf da ana")) {
           prompts.bob = systemText(req.system ?? "");
+          return { chunks: [], toolUses: [{ name: "share_artifact", input: { artifact_id: originalId } }] };
+        }
+        if (last.includes("aquele pdf")) {
+          prompts.ana = systemText(req.system ?? "");
           return { chunks: [], toolUses: [{ name: "share_artifact", input: { artifact_id: originalId } }] };
         }
         return { chunks: ["ok"] };
