@@ -159,8 +159,8 @@ export function ConnectorCatalogDialog({
                         )}
                       </span>
                       <span className="catalog-card__desc">{connectorDescription(t, d)}</span>
+                      {/* One tag, at the bottom: how it connects (the category is the filter above). */}
                       <span className="catalog-card__meta">
-                        <Chip icon="link">{t(`connectors.category.${d.category}`)}</Chip>
                         {d.available ? (
                           <Chip icon={authKind(d) === "key" ? "lock" : "bolt"}>
                             {t(`connectors.auth.${authKind(d)}`)}

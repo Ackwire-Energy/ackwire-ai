@@ -26,11 +26,13 @@ const names = (dialog: HTMLElement) =>
     .map((li) => li.querySelector(".catalog-card__name")?.textContent);
 
 describe("Adicionar conector: one catalog", () => {
-  test("cards with brand icon, one line, category and how it connects; categories and search", async () => {
+  test("cards with brand icon, one line and how it connects (one tag); categories and search", async () => {
     const { dialog } = await open();
     const notion = within(dialog).getByRole("button", { name: "Conectar Notion" });
     expect(notion.textContent).toContain("Páginas e bancos de dados.");
-    expect(notion.textContent).toContain("Docs");
+    // The category is the filter above, not a tag on the card: one tag, how it connects.
+    expect(notion.textContent).not.toContain("Docs");
+    expect(notion.querySelectorAll(".catalog-card__meta .ac-chip")).toHaveLength(1);
     expect(notion.textContent).toContain("Um clique");
     // The brand icon is a mask of our own file; Notion takes the ink, Linear its color.
     expect(notion.querySelector(".connector-icon__mark")?.getAttribute("style")).toContain("/connectors/notion.svg");

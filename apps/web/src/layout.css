@@ -2247,6 +2247,10 @@ p {
   flex-direction: column;
   gap: 10px;
 }
+/* In this column the search box keeps its own height (it grows sideways elsewhere). */
+.catalog__tools .ac-search {
+  flex: none;
+}
 .catalog__cats {
   display: flex;
   flex-wrap: wrap;
@@ -2342,6 +2346,7 @@ p {
   gap: 2px;
   min-width: 0;
   flex: 1;
+  align-self: stretch;
 }
 .catalog-card__head {
   display: flex;
@@ -2367,9 +2372,10 @@ p {
 }
 .catalog-card__meta {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  margin-top: 6px;
+  /* Pinned to the bottom, so the tags line up across a row of cards. */
+  margin-top: auto;
+  padding-top: 8px;
 }
 
 /* A connector's brand icon (Simple Icons, CC0) as a mask in its color, or a monogram. */
