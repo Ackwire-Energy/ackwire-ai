@@ -28,6 +28,8 @@ import {
   createIssueToolSource,
   createJobHandlers,
   createLocalKeyWrapper,
+  createMachineHub,
+  createMachineSandboxProvider,
   createModelGateway,
   createOrganization,
   createSandboxToolSource,
@@ -89,6 +91,8 @@ export async function setup(
     wikiTools?: boolean;
     /** Add the sandbox tools with this (fake) provider. */
     sandbox?: SandboxProvider;
+    /** Add the sandbox tools with connected machines (a machine hub on this db; with or without `sandbox`). */
+    machines?: boolean;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -156,15 +160,19 @@ export async function setup(
     resolveHost: async (host) => (host.endsWith("example.com") ? ["93.184.216.34"] : ["10.0.0.5"]),
   };
   const artifactDeps: ArtifactDeps = { db, blobs: createBlobStoreResolver(storage), pubsub };
-  const sandboxDeps: SandboxDeps | null = options.sandbox
-    ? {
-        db,
-        provider: options.sandbox,
-        pricing: { vcpuHourUsd: 0.0504, memoryGibHourUsd: 0.0162, diskGibHourUsd: 0.000108 },
-        autoStopMinutes: 10,
-        archiveAfterDays: 7,
-      }
-    : null;
+  const machineHub = options.machines ? createMachineHub({ db, pubsub, replicaId: "replica-a" }) : null;
+  const sandboxDeps: SandboxDeps | null =
+    options.sandbox || machineHub
+      ? {
+          db,
+          provider: options.sandbox ?? null,
+          machines: machineHub ? { provider: createMachineSandboxProvider(machineHub), hub: machineHub } : null,
+          pricing: { vcpuHourUsd: 0.0504, memoryGibHourUsd: 0.0162, diskGibHourUsd: 0.000108 },
+          autoStopMinutes: 10,
+          archiveAfterDays: 7,
+          ...(machineHub ? { publicUrl: "http://localhost:3000" } : {}),
+        }
+      : null;
   const sources = [
     ...(options.askUser ? [createAskUserToolSource()] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
@@ -237,6 +245,7 @@ export async function setup(
     storage,
     artifactDeps,
     sandboxDeps,
+    machineHub,
   };
 }
 

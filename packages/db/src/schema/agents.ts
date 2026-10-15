@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
-import { bigint, index, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, foreignKey, index, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
+import { machines } from "./machines";
 import { organizations } from "./tenancy";
 
 /**
@@ -81,11 +82,18 @@ export const agents = pgTable(
     audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
     /** Its look in the app (color, eyes, accessory from a fixed allow-list). Null = the default look. */
     appearance: jsonb().$type<{ color: string; eyes: string; accessory: string }>(),
+    /** Its computer (ADR 0025): null = the cloud computer (Daytona); set = that connected machine. */
+    machineId: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [unique().on(t.orgId, t.handle), unique().on(t.orgId, t.id)],
+  (t) => [
+    unique().on(t.orgId, t.handle),
+    unique().on(t.orgId, t.id),
+    // Machines are only soft-deleted (and `deleteMachine` clears this column first).
+    foreignKey({ columns: [t.orgId, t.machineId], foreignColumns: [machines.orgId, machines.id] }),
+  ],
 );
 
 /**

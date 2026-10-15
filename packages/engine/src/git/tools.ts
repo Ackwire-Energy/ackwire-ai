@@ -1,3 +1,4 @@
+import { getAgentCached } from "../agents";
 import { connectorScope } from "../connectors/catalog";
 import { activeConnections, type ConnectorDeps, connectionHeaders } from "../connectors/connections";
 import { SANDBOX_SCOPE, type SandboxDeps, truncateOutput, withSandbox } from "../sandbox";
@@ -73,6 +74,14 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
               if (!keys.has(grantKey(null, SANDBOX_SCOPE))) {
                 return {
                   content: "Cloning needs your computer (scope sandbox:run), which you don't have.",
+                  isError: true,
+                };
+              }
+              const agent = await getAgentCached(c.db, c.orgId, c.agentId);
+              if (agent?.machineId) {
+                return {
+                  content:
+                    "Your computer is a connected machine: git_clone works only on cloud computers (through our proxy). Run git there with run_code; it uses that machine's own credentials.",
                   isError: true,
                 };
               }

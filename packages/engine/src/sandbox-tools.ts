@@ -11,11 +11,14 @@ import {
   tableToCsv,
   updateArtifact,
 } from "./artifacts";
+import { recordAudit } from "./audit";
 import { getChannelCached } from "./context";
 import { publishChannelEvent } from "./events";
 import {
+  agentComputerInfo,
   type ComputerHandle,
   getSandboxSettings,
+  NO_COMPUTER_MESSAGE,
   ownComputerStatus,
   SANDBOX_LIMITS,
   SANDBOX_SCOPE,
@@ -81,7 +84,35 @@ export const NO_NETWORK_NOTE =
 export const OPEN_NETWORK_NOTE =
   "falha de rede: este computador tem internet liberada, então o problema é o endereço ou o site (fora do ar, DNS, recusou a conexão). Diga isso à pessoa; não é bloqueio nem permissão.";
 
-type Network = { mode: NetworkMode; domains: string[] };
+/** On a connected machine the network is that machine's own: we don't block anything there. */
+export const MACHINE_NETWORK_NOTE =
+  "falha de rede: este é um computador conectado, com a rede da própria máquina (não bloqueamos nada lá), então o problema é o endereço, o site ou a rede dessa máquina. Diga isso à pessoa.";
+
+type Network = { mode: NetworkMode | "machine"; domains: string[] };
+
+/** Which computer the agent's tools act on (from `agentComputerInfo`). */
+type ComputerInfo = Awaited<ReturnType<typeof agentComputerInfo>>;
+
+/** One or two sentences the agent reads about its computer, in `run_code`'s description. */
+export function computerSentence(info: ComputerInfo, network: Network) {
+  if (info.kind === "removed") {
+    return "Your connected computer was removed; ask an admin or your owner to choose another one (calls fail until then).";
+  }
+  if (info.kind === "cloud") {
+    if (!info.available) return NO_COMPUTER_MESSAGE;
+    return `Runs on your own computer (an isolated machine just for you: files in the workspace persist across all your conversations; no secrets). ${networkSentence(network)}`;
+  }
+  const os = info.os === "darwin" ? "macOS" : info.os === "windows" ? "Windows" : info.os === "linux" ? "Linux" : "";
+  return [
+    `Runs on the connected computer "${info.name}"${os ? ` (${os})` : ""}: a real machine people connected, not an isolated sandbox. It has its own internet and installed tools; commands run in its workspace folder as the user that runs the runner.`,
+    info.online
+      ? "It is online now."
+      : "It is offline now: calls fail until its owner starts the runner; tell the people.",
+    info.execAllowed ? "" : "Commands are turned off on it (files and uploads only).",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 
 const networkOf = (mode: string | undefined): Network => ({
   mode: mode === "open" || mode === "allowlist" ? mode : "blocked",
@@ -90,6 +121,7 @@ const networkOf = (mode: string | undefined): Network => ({
 
 /** One sentence the agent reads about its internet, from the org's setting. */
 export function networkSentence(n: Network) {
+  if (n.mode === "machine") return "It uses that machine's own network.";
   if (n.mode === "open") return "This computer has open internet access (no secrets inside).";
   if (n.mode === "allowlist") {
     return n.domains.length > 0
@@ -111,7 +143,13 @@ function execOutput(label: string, r: ExecResult, seconds: number, timeout: numb
   if (r.stderr) parts.push(`stderr:\n${truncateOutput(r.stderr, SANDBOX_LIMITS.stderrChars)}`);
   if (!r.stdout && !r.stderr) parts.push("(no output)");
   if (r.exitCode !== 0 && NO_NETWORK.test(`${r.stderr}\n${r.stdout}`)) {
-    parts.push(network?.mode === "open" ? OPEN_NETWORK_NOTE : NO_NETWORK_NOTE);
+    parts.push(
+      network?.mode === "machine"
+        ? MACHINE_NETWORK_NOTE
+        : network?.mode === "open"
+          ? OPEN_NETWORK_NOTE
+          : NO_NETWORK_NOTE,
+    );
   }
   return {
     content: parts.join("\n"),
@@ -379,14 +417,42 @@ export function createSandboxToolSource(
   };
   const pathProp = { type: "string", minLength: 1, maxLength: 300, description: "Path inside the workspace" };
 
+  /** `machine.exec` in the audit log: what ran on a connected machine (command head and exit code). */
+  const auditMachineExec = async (ctx: ToolContext, computer: ComputerHandle, command: string, r: ExecResult) => {
+    if (!computer.machineId) return;
+    await recordAudit(deps.db, {
+      orgId: ctx.orgId,
+      actor: { type: "agent", id: ctx.agentId },
+      action: "machine.exec",
+      target: { type: "machine", id: computer.machineId },
+      details: {
+        command: maskSecrets(command.slice(0, 200)),
+        exitCode: r.exitCode,
+        timedOut: r.timedOut,
+        runId: ctx.runId ?? null,
+      },
+    }).catch(() => undefined);
+  };
+
+  /**
+   * The command for a script: on cloud computers wrapped in `timeout` (we
+   * kill it there); on connected machines plain (the runner enforces the
+   * timeout, and macOS or Windows have no `timeout`).
+   */
+  const scriptCommand = (computer: ComputerHandle, bin: string, file: string, timeout: number, args = "") =>
+    computer.machineId
+      ? `${bin} ${/^[\w./-]+$/.test(file) ? file : quote(file)}${args ? ` ${args}` : ""}`
+      : `timeout -k 5 ${timeout} ${bin} ${quote(file)}${args ? ` ${args}` : ""}`;
+
   const build = (
     requireApproval: boolean,
     execTimeout: number,
     network: Network = { mode: "blocked", domains: [] },
+    computerInfo: ComputerInfo = { kind: "cloud", available: true },
   ): ToolDefinition[] => [
     {
       name: "run_code",
-      description: `Run Python, Node.js or bash code on your own computer (an isolated machine just for you: files in the workspace persist across all your conversations; no secrets). ${networkSentence(network)} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${SANDBOX_LIMITS.maxTimeoutSeconds} s.`,
+      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo, network)} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${SANDBOX_LIMITS.maxTimeoutSeconds} s.`,
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
       inputSchema: {
@@ -410,10 +476,12 @@ export function createSandboxToolSource(
           const started = Date.now();
           const result = await run(ctx, timeout + 15, async (computer) => {
             await computer.provider.writeFile(computer.id, file, new TextEncoder().encode(str(input.code)));
-            return execLive(ctx, computer, {
-              command: `timeout -k 5 ${timeout} ${runner.bin} ${quote(file)}`,
-              timeoutSeconds: timeout + 10,
+            const r = await execLive(ctx, computer, {
+              command: scriptCommand(computer, runner.bin, file, timeout),
+              timeoutSeconds: computer.machineId ? timeout : timeout + 10,
             });
+            await auditMachineExec(ctx, computer, `${lang}: ${str(input.code)}`, r);
+            return r;
           });
           return execOutput(`run_code ${lang}`, result, Math.round((Date.now() - started) / 1000), timeout, network);
         } catch (error) {
@@ -429,6 +497,11 @@ export function createSandboxToolSource(
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       async execute(_input, ctx) {
         try {
+          const target = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
+          if (target.kind === "machine") {
+            await run(ctx, 30, async () => undefined);
+            return { content: `The connected computer "${target.name}" is online.` };
+          }
           await run(ctx, 30, async () => undefined);
           const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
           return {
@@ -447,6 +520,12 @@ export function createSandboxToolSource(
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       async execute(_input, ctx) {
         try {
+          const target = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
+          if (target.kind === "machine") {
+            return {
+              content: `Your computer is the connected computer "${target.name}": only its owner turns it on and off (by running the agentes runner). Nothing to stop.`,
+            };
+          }
           const s = await stopOwnComputer(deps, ctx.orgId, ctx.agentId);
           return { content: `Your computer is ${s.status}; files kept.`, data: { computer: s } };
         } catch (error) {
@@ -456,11 +535,36 @@ export function createSandboxToolSource(
     },
     {
       name: "computer_status",
-      description: "Is your computer on? Disk used, this month's cost, and its internet access.",
+      description: "Is your computer on? Which computer it is, disk used, this month's cost, and its internet access.",
       scope: SANDBOX_SCOPE,
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       async execute(_input, ctx) {
         try {
+          const target = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
+          if (target.kind !== "cloud") {
+            if (target.kind === "removed") return { content: computerSentence(target, network), isError: true };
+            const os =
+              target.os === "darwin"
+                ? "macOS"
+                : target.os === "windows"
+                  ? "Windows"
+                  : target.os === "linux"
+                    ? "Linux"
+                    : "unknown OS";
+            return {
+              content: `You are on the connected computer "${target.name}" (${os}), ${target.online ? "online" : "offline (ask its owner to start the runner)"}. Paths are relative to its workspace folder. Commands: ${target.execAllowed ? "allowed" : "turned off (files and uploads only)"}. Network: the machine's own. No cost to the organization.`,
+              data: {
+                computer: {
+                  kind: "machine",
+                  name: target.name,
+                  online: target.online,
+                  os: target.os,
+                  execAllowed: target.execAllowed,
+                },
+              },
+            };
+          }
+          if (!target.available) return { content: NO_COMPUTER_MESSAGE, isError: true };
           const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
           return {
             content: `Status: ${s.status}; disk used: ${s.diskUsedGib} GB; cost this month: US$ ${s.costMonthUsd.toFixed(2)}; network: ${s.network ?? "none yet"}.`,
@@ -709,10 +813,12 @@ export function createSandboxToolSource(
           const started = Date.now();
           const result = await run(ctx, timeout + 30, async (computer) => {
             for (const f of files) await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
-            return execLive(ctx, computer, {
-              command: `timeout -k 5 ${timeout} ${bin} ${quote(`${base}/${target.path}`)}${args ? ` ${args}` : ""}`,
-              timeoutSeconds: timeout + 10,
+            const r = await execLive(ctx, computer, {
+              command: scriptCommand(computer, bin, `${base}/${target.path}`, timeout, args),
+              timeoutSeconds: computer.machineId ? timeout : timeout + 10,
             });
+            await auditMachineExec(ctx, computer, `${skill.name}/${target.path} ${args}`.trim(), r);
+            return r;
           });
           const seconds = Math.round((Date.now() - started) / 1000);
           return execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout, network);
@@ -746,12 +852,12 @@ export function createSandboxToolSource(
       if (!granted) return withNotices(build(false, 60));
       const settings = await getSandboxSettings(ctx.db, ctx.orgId);
       if (!settings.enabled) return [];
-      return withNotices(
-        build(settings.requireApproval, settings.execTimeoutSeconds, {
-          mode: settings.network,
-          domains: settings.allowDomains,
-        }),
-      );
+      const computer = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
+      const network: Network =
+        computer.kind === "machine"
+          ? { mode: "machine", domains: [] }
+          : { mode: settings.network, domains: settings.allowDomains };
+      return withNotices(build(settings.requireApproval, settings.execTimeoutSeconds, network, computer));
     },
   };
 }

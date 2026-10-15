@@ -24,6 +24,7 @@ import { createApp } from "../src/app";
 import { createAuth } from "../src/auth";
 import { buildEngine } from "../src/engine";
 import { createLogger } from "../src/logger";
+import { createMachineSockets } from "../src/realtime/machines";
 import { createRealtime, type SocketData } from "../src/realtime/ws";
 
 export const ORIGIN = "http://localhost:3000";
@@ -106,15 +107,25 @@ export async function createTestServer(
         artifacts: engine.artifacts,
         context: engine.context,
         sandbox: engine.sandbox,
-        gitProxy: engine.sandbox ? engine.gitProxy : undefined,
+        gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
       },
     },
     log,
   });
-  const realtime = createRealtime({ db, auth, config, log, ...adapters });
+  const realtime = createRealtime({
+    db,
+    auth,
+    config,
+    log,
+    ...adapters,
+    machines: createMachineSockets(engine.machineHub),
+  });
   return {
     db,
-    close,
+    close: async () => {
+      await engine.machineHub.stop();
+      await close();
+    },
     config,
     adapters,
     provider,
@@ -136,8 +147,7 @@ export function listen(t: TestServer) {
   return Bun.serve<SocketData>({
     port: 0,
     hostname: "127.0.0.1",
-    fetch: (req, srv) =>
-      new URL(req.url).pathname === t.realtime.path ? t.realtime.upgrade(req, srv) : t.app.fetch(req),
+    fetch: (req, srv) => t.realtime.fetch(req, srv, (r) => t.app.fetch(r)),
     websocket: t.realtime.websocket,
   });
 }

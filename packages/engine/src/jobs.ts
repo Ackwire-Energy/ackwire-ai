@@ -316,18 +316,20 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       );
     },
     "sandbox.start": async (job) => {
-      if (!deps.sandbox) throw new PermanentJobError("no computer provider configured");
+      const provider = deps.sandbox?.provider;
+      if (!deps.sandbox || !provider) throw new PermanentJobError("no computer provider configured");
       await runComputerStart(
-        { ...deps.sandbox, pubsub: deps.pubsub },
+        { ...deps.sandbox, provider, pubsub: deps.pubsub },
         orgOf(job),
         String(job.payload.agentId),
         String(job.payload.actorId),
       );
     },
     "sandbox.stop": async (job) => {
-      if (!deps.sandbox) throw new PermanentJobError("no computer provider configured");
+      const provider = deps.sandbox?.provider;
+      if (!deps.sandbox || !provider) throw new PermanentJobError("no computer provider configured");
       await runComputerStop(
-        { ...deps.sandbox, pubsub: deps.pubsub },
+        { ...deps.sandbox, provider, pubsub: deps.pubsub },
         orgOf(job),
         String(job.payload.agentId),
         String(job.payload.actorId),

@@ -4,6 +4,7 @@ import {
   getAgentComputer,
   getSandboxSettings,
   NotFoundError,
+  refuseLifecycleOnMachine,
   requirePermission,
   SANDBOX_LIMITS,
   startAgentComputer,
@@ -11,6 +12,7 @@ import {
   updateSandboxSettings,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
+import { ComputerTarget } from "../machines";
 import {
   type AppDeps,
   body,
@@ -38,6 +40,10 @@ const Computer = z
       .optional()
       .openapi({ description: "`provider-default`: the provider's plan can't apply our domain list." }),
     error: z.object({ message: z.string() }).optional().openapi({ description: "With `status: error`." }),
+    target: ComputerTarget.openapi({
+      description:
+        "Which computer the agent uses (ADR 0025): its cloud computer (the fields above) or a connected machine. Set with `PUT …/computer/target`.",
+    }),
   })
   .openapi("AgentComputer");
 const Accepted = z
@@ -73,8 +79,14 @@ export function sandboxRoutes(deps: AppDeps) {
     if (!s) throw new NotFoundError("Agent computers are not available on this server");
     return s;
   };
+  /** Start, stop and delete need cloud computers (connected machines are turned on by their owners). */
+  const cloud = () => {
+    const s = sandbox();
+    if (!s.provider) throw new NotFoundError("Cloud computers are not available on this server");
+    return { ...s, provider: s.provider };
+  };
   const settingsView = async (orgId: string) => ({
-    available: Boolean(deps.extras?.sandbox),
+    available: Boolean(deps.extras?.sandbox?.provider),
     ...(await getSandboxSettings(db, orgId)),
     maxTimeoutSeconds: SANDBOX_LIMITS.maxTimeoutSeconds,
   });
@@ -106,7 +118,8 @@ export function sandboxRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const deps2 = { ...sandbox(), pubsub: deps.adapters.pubsub };
+      await refuseLifecycleOnMachine(db, orgId, agentId);
+      const deps2 = { ...cloud(), pubsub: deps.adapters.pubsub };
       return c.json(await startAgentComputer(deps2, c.get("user").id, orgId, agentId), 202);
     },
   );
@@ -123,7 +136,8 @@ export function sandboxRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const deps2 = { ...sandbox(), pubsub: deps.adapters.pubsub };
+      await refuseLifecycleOnMachine(db, orgId, agentId);
+      const deps2 = { ...cloud(), pubsub: deps.adapters.pubsub };
       return c.json(await stopAgentComputer(deps2, c.get("user").id, orgId, agentId), 202);
     },
   );
