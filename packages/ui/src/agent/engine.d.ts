@@ -87,7 +87,7 @@ export const EXPRESSIONS: Record<
 export function idlePose(
   t: number,
   seed?: number,
-  opts?: { active?: boolean; expressions?: Expression[] },
+  opts?: { active?: boolean; expressions?: Expression[]; every?: number },
 ): { turn: [number, number]; blink: boolean; squash: number; expression?: Expression };
 export function bodyFrame(pose?: Pose): BodyFrame;
 
@@ -105,3 +105,28 @@ export function eyeShapes(style?: EyeStyle | string, pose?: Pose): EyeShape[];
 export function drawEyes(ctx: Ctx2D, x: number, y: number, s: number, shapes: EyeShape[], color?: string): void;
 export function drawAgent(ctx: Ctx2D, x: number, y: number, s: number, opts?: DrawAgentOptions): void;
 export function spriteGrid(n?: number, style?: EyeStyle | string): string[];
+
+export type AccessoryName =
+  | "hat"
+  | "cap"
+  | "headphones"
+  | "bow"
+  | "crown"
+  | "antenna"
+  | "headset"
+  | "beanie"
+  | "party"
+  | "flower"
+  | "scarf";
+export const ACCESSORY_PALETTE: Record<string, string>;
+export const ACCESSORIES: Record<AccessoryName, { ox: number; oy: number; rows: string[] }>;
+export const ACCESSORY_NAMES: ["none", ...AccessoryName[]];
+export const ACCESSORY_REACH: { top: number; left: number; right: number; bottom: number };
+export function drawAccessory(
+  ctx: Ctx2D,
+  s: number,
+  name: string,
+  frame?: BodyFrame,
+  t?: number,
+  active?: boolean,
+): void;

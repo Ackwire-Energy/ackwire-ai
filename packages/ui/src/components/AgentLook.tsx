@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { AGENT_GRADIENTS } from "../agent/engine.js";
 
 /** The agent symbol's colors (sky is the default identity). */
@@ -8,7 +8,21 @@ export type AgentColor = (typeof AGENT_COLORS)[number];
 export const AGENT_EYES = ["round", "dots", "wide", "happy", "sleepy"] as const;
 export type AgentEyes = (typeof AGENT_EYES)[number];
 
-export const AGENT_ACCESSORIES = ["none", "hat", "cap", "glasses", "sunglasses", "headphones", "bow", "crown"] as const;
+/** Pixel accessories drawn by the agent engine (ACCESSORIES in ../agent/engine.js; same list, "none" first). */
+export const AGENT_ACCESSORIES = [
+  "none",
+  "hat",
+  "cap",
+  "headphones",
+  "bow",
+  "crown",
+  "antenna",
+  "headset",
+  "beanie",
+  "party",
+  "flower",
+  "scarf",
+] as const;
 export type AgentAccessory = (typeof AGENT_ACCESSORIES)[number];
 
 export interface AgentAppearance {
@@ -50,144 +64,4 @@ export function appearanceStyle(a: AgentAppearance | undefined): CSSProperties |
   if (!a?.color || a.color === "sky") return undefined;
   const [top, bottom] = AGENT_GRADIENTS[a.color];
   return { "--av-top": top, "--av-bottom": bottom } as CSSProperties;
-}
-
-const INK = "#1d1d1b";
-
-/** How an accessory is drawn at a given avatar size (px). */
-interface Draw {
-  /** ≤ 24px: no highlights, glints or gems. */
-  simple: boolean;
-  /** Stroke props: `units` in the 100×100 box, never thinner than 1.5px on screen. */
-  stroke: (units: number) => { strokeWidth: number; vectorEffect?: "non-scaling-stroke" };
-}
-
-export function accessoryDraw(px: number): Draw {
-  const scale = px / 100;
-  return {
-    simple: px <= 24,
-    stroke: (units) =>
-      units * scale < 1.5 ? { strokeWidth: 1.5, vectorEffect: "non-scaling-stroke" } : { strokeWidth: units },
-  };
-}
-
-/** Temples of glasses and sunglasses. */
-const temples = (d: Draw) => (
-  <path d="M27 44 L10 41 M73 44 L90 41" stroke={INK} {...d.stroke(3)} strokeLinecap="round" />
-);
-
-/** On the head: still while the eyes look around. */
-const HEAD: Record<"hat" | "cap" | "headphones" | "bow" | "crown", (d: Draw) => ReactNode> = {
-  hat: (d) => (
-    <g transform="rotate(-4 50 2)">
-      <rect x="30" y="-30" width="40" height="32" rx="3" fill={INK} />
-      {!d.simple && <rect x="33" y="-27" width="6" height="26" rx="2" fill="#fff" opacity=".12" />}
-      <rect x="30" y="-6" width="40" height="7" fill="#c8453b" />
-      <ellipse cx="50" cy="2" rx="31" ry="5.5" fill={INK} />
-    </g>
-  ),
-  cap: (d) => (
-    <g>
-      <path d="M22 6 C22 -14 78 -14 78 6 Z" fill="#2b2f36" />
-      {!d.simple && <path d="M50 -9 V6" stroke="#fff" strokeOpacity=".18" strokeWidth="2" />}
-      {!d.simple && <circle cx="50" cy="-9" r="2.5" fill="#3a404a" />}
-      <path d="M60 4 C80 2 96 6 98 11 C86 12 70 10 58 9 Z" fill="#232730" />
-    </g>
-  ),
-  headphones: (d) => (
-    <g>
-      <path d="M10 44 C10 -8 90 -8 90 44" stroke="#2b2f36" {...d.stroke(7)} fill="none" strokeLinecap="round" />
-      <rect x="-2" y="36" width="16" height="28" rx="7" fill="#2b2f36" />
-      <rect x="86" y="36" width="16" height="28" rx="7" fill="#2b2f36" />
-      {!d.simple && <rect x="9" y="39" width="5" height="22" rx="2.5" fill="#4a5160" />}
-      {!d.simple && <rect x="86" y="39" width="5" height="22" rx="2.5" fill="#4a5160" />}
-    </g>
-  ),
-  bow: (d) => (
-    <g transform="rotate(18 76 4)">
-      <path d="M76 4 L60 -6 L60 14 Z" fill="#ec6f9a" />
-      <path d="M76 4 L92 -6 L92 14 Z" fill="#ec6f9a" />
-      {!d.simple && <path d="M76 4 L64 0 L64 8 Z" fill="#c9507b" />}
-      {!d.simple && <path d="M76 4 L88 0 L88 8 Z" fill="#c9507b" />}
-      <circle cx="76" cy="4" r="4.5" fill="#d65a87" />
-    </g>
-  ),
-  crown: (d) => (
-    <g>
-      <path
-        d="M27 6 L27 -14 L38.5 -3 L50 -20 L61.5 -3 L73 -14 L73 6 Z"
-        fill="#f2c14e"
-        stroke="#c99a2e"
-        {...d.stroke(2)}
-        strokeLinejoin="round"
-      />
-      <rect x="27" y="1" width="46" height="6" rx="1.5" fill="#e0ab3a" />
-      {!d.simple && (
-        <>
-          <circle cx="50" cy="-1" r="3" fill="#d6455a" />
-          <circle cx="38" cy="2" r="2" fill="#3b82c4" />
-          <circle cx="62" cy="2" r="2" fill="#3b82c4" />
-        </>
-      )}
-    </g>
-  ),
-};
-
-/** On the eyes: they move with the eyes' look-around (same group). */
-const FACE: Record<"glasses" | "sunglasses", (d: Draw) => ReactNode> = {
-  glasses: (d) => (
-    <g>
-      <circle cx="37.5" cy="46.5" r="10.5" fill="#fff" fillOpacity=".14" stroke={INK} {...d.stroke(3.5)} />
-      <circle cx="62.5" cy="46.5" r="10.5" fill="#fff" fillOpacity=".14" stroke={INK} {...d.stroke(3.5)} />
-      <path d="M48 45 Q50 43 52 45" stroke={INK} {...d.stroke(3)} fill="none" />
-      {temples(d)}
-    </g>
-  ),
-  sunglasses: (d) => (
-    <g>
-      <rect x="27" y="35" width="21" height="21" rx="7" fill="#111" />
-      <rect x="52" y="35" width="21" height="21" rx="7" fill="#111" />
-      {!d.simple && (
-        <path d="M31 39 L36 39 M56 39 L61 39" stroke="#fff" strokeOpacity=".5" strokeWidth="2" strokeLinecap="round" />
-      )}
-      <rect x="47" y="40" width="6" height="3" rx="1.5" fill="#111" />
-      {temples(d)}
-    </g>
-  ),
-};
-
-export const isFaceAccessory = (a: AgentAccessory | undefined): a is "glasses" | "sunglasses" =>
-  a === "glasses" || a === "sunglasses";
-
-/**
- * An accessory over the symbol: one `0 0 100 100` box like the symbol (eyes
- * at 37.5/62.5, 46.5, from the agent engine), free to go past the edges. `layer` picks the head items
- * (hat, cap, headphones, bow, crown) or the face items (glasses), which the
- * avatar puts inside the eyes' group so they look around together.
- */
-export function AgentAccessoryLayer({
-  accessory,
-  px = 36,
-  layer = "head",
-}: {
-  accessory?: AgentAccessory;
-  /** Rendered size of the avatar (simplifies and thickens below 24–36px). */
-  px?: number;
-  layer?: "head" | "face";
-}) {
-  if (!accessory || accessory === "none") return null;
-  const face = isFaceAccessory(accessory);
-  if ((layer === "face") !== face) return null;
-  const draw = accessoryDraw(px);
-  return (
-    <svg
-      className="ac-avatar__accessory"
-      viewBox="0 0 100 100"
-      aria-hidden="true"
-      data-accessory={accessory}
-      data-simple={draw.simple ? "" : undefined}
-    >
-      {face ? FACE[accessory](draw) : HEAD[accessory as keyof typeof HEAD](draw)}
-    </svg>
-  );
 }

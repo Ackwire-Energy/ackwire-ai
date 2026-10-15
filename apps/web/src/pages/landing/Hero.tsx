@@ -1,4 +1,16 @@
-import { type AgentColor, type AgentState, Avatar, Chip, cx, drawAgent } from "@agenteschat/ui";
+import {
+  ACCESSORY_REACH,
+  type AgentAppearance,
+  type AgentState,
+  Avatar,
+  Chip,
+  cx,
+  drawAccessory,
+  drawAgent,
+  getGaze,
+  idlePose,
+  type Pose,
+} from "@agenteschat/ui";
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLanding } from "./context";
@@ -89,81 +101,123 @@ export function Hero({
 /* ---------- The giant: the engine's agent, forming from the sky and coming apart into it ---------- */
 
 const CELLS = 26;
-const CANVAS = CELLS * 8;
-
-/** Paints the body at `progress` (0 = only sky, 1 = whole), one step deeper: it sits on a light halo. */
-function paintBody(canvas: HTMLCanvasElement, color: AgentColor | undefined, progress: number) {
-  let ctx: CanvasRenderingContext2D | null = null;
-  try {
-    ctx = canvas.getContext("2d");
-  } catch {
-    return;
-  }
-  if (!ctx) return;
-  if (canvas.width !== CANVAS) {
-    canvas.width = CANVAS;
-    canvas.height = CANVAS;
-  }
-  ctx.clearRect(0, 0, CANVAS, CANVAS);
-  // The eyes come from the avatar on top (same engine), so they keep the states and the aim.
-  drawAgent(ctx, 0, 0, CANVAS, { color, cells: CELLS, deep: true, progress, withEyes: false });
-}
 
 type Tween = { from: number; to: number; start: number; dur: number; done: (() => void) | null };
 const tweenAt = (a: Tween, now: number) => {
-  const k = Math.min(1, (now - a.start) / a.dur);
+  const k = Math.min(1, (now - a.start) / Math.max(1, a.dur));
   const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
   return a.from + (a.to - a.from) * e;
 };
 
-/** The giant's body: forms on mount; `play(to, ms, done)` dissolves or forms it. `formed` shows the eyes. */
-function useGiantBody(canvas: RefObject<HTMLCanvasElement | null>, color: AgentColor | undefined, reduced: boolean) {
-  const raf$ = typeof requestAnimationFrame === "function" && !reduced ? requestAnimationFrame : null;
-  const tween = useRef<Tween>({ from: raf$ ? 0 : 1, to: raf$ ? 0 : 1, start: 0, dur: 1, done: null });
-  const [formed, setFormed] = useState(!raf$);
-  const colorRef = useRef(color);
-  colorRef.current = color;
-  const frame = useRef(0);
-  const step = useCallback(
+/**
+ * Draws the giant from the agent engine on `canvas` (sized to `box`, with room
+ * for the accessory): its idle life, states and joy, turned toward the gaze,
+ * at `progress` of forming. `play(to, ms, done)` dissolves or forms it.
+ */
+function useGiant(
+  canvas: RefObject<HTMLCanvasElement | null>,
+  box: RefObject<HTMLElement | null>,
+  live: { look: AgentAppearance; state: AgentState; joy: boolean },
+  reduced: boolean,
+) {
+  const animate = typeof requestAnimationFrame === "function" && !reduced;
+  const tween = useRef<Tween>({ from: animate ? 0 : 1, to: animate ? 0 : 1, start: 0, dur: 1, done: null });
+  const now$ = useRef(live);
+  now$.current = live;
+  const draw = useCallback(
     (now: number) => {
+      const el = canvas.current;
+      const b = box.current;
+      if (!el || !b) return;
+      let ctx: CanvasRenderingContext2D | null = null;
+      try {
+        ctx = el.getContext("2d");
+      } catch {
+        return;
+      }
+      if (!ctx) return;
+      const size = b.clientWidth;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const R = ACCESSORY_REACH;
+      const w = Math.round(size * (1 + R.left + R.right) * dpr);
+      const h = Math.round(size * (1 + R.top + R.bottom) * dpr);
+      if (el.width !== w || el.height !== h) {
+        el.width = w;
+        el.height = h;
+      }
+      ctx.clearRect(0, 0, w, h);
+      const { look, state, joy } = now$.current;
+      const t = animate ? now / 1000 : 0;
+      const pose: Pose =
+        state === "writing" ? { writing: true } : idlePose(t, 1.3, { active: state === "thinking", every: 7 });
+      if (joy) pose.expression = "happy";
+      const gaze = getGaze();
+      if (gaze && state === "idle") {
+        const r = b.getBoundingClientRect();
+        const k = (v: number) => Math.max(-1, Math.min(1, v));
+        pose.turn = [k((gaze.x - (r.left + r.width / 2)) / 500), k((gaze.y - (r.top + r.height / 2)) / 400)];
+      }
+      const s = size * dpr;
+      const accessory = look.accessory && look.accessory !== "none" ? look.accessory : undefined;
+      drawAgent(ctx, R.left * s, R.top * s, s, {
+        color: look.color,
+        eyes: look.eyes,
+        cells: CELLS,
+        deep: true,
+        progress: tweenAt(tween.current, now),
+        pose,
+        after: accessory
+          ? (g, side, frame) => drawAccessory(g, side, accessory, frame, t, state === "thinking")
+          : undefined,
+      });
       const a = tween.current;
-      const p = tweenAt(a, now);
-      if (canvas.current) paintBody(canvas.current, colorRef.current, p);
-      setFormed(p > 0.92);
-      if (now - a.start < a.dur && raf$) frame.current = raf$(step);
-      else if (a.done) {
+      if (a.done && now - a.start >= a.dur) {
         const done = a.done;
         a.done = null;
         done();
       }
     },
-    [canvas, raf$],
+    [animate, box, canvas],
   );
+  useEffect(() => {
+    if (!animate) {
+      draw(performance.now());
+      return;
+    }
+    let raf = 0;
+    const loop = (now: number) => {
+      draw(now);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [animate, draw]);
+  // Still pages redraw when the look or the state changes.
+  useEffect(() => {
+    if (!animate) draw(performance.now());
+  });
   const play = useCallback(
     (to: number, ms: number, done?: () => void) => {
       const now = performance.now();
       const a = tween.current;
+      if (!animate) {
+        a.from = to;
+        a.to = to;
+        done?.();
+        return;
+      }
       a.from = tweenAt(a, now);
       a.to = to;
       a.start = now;
-      a.dur = raf$ ? ms : 1;
+      a.dur = ms;
       a.done = done ?? null;
-      if (frame.current) cancelAnimationFrame(frame.current);
-      if (raf$) frame.current = raf$(step);
-      else step(now + 1);
     },
-    [raf$, step],
+    [animate],
   );
   useEffect(() => {
     play(1, 1500);
-    return () => {
-      if (frame.current) cancelAnimationFrame(frame.current);
-    };
   }, [play]);
-  useEffect(() => {
-    if (canvas.current) paintBody(canvas.current, color, tweenAt(tween.current, performance.now()));
-  }, [canvas, color]);
-  return { formed, play };
+  return play;
 }
 
 function Giant({
@@ -192,9 +246,13 @@ function Giant({
     },
     [aimRef, buttonRef],
   );
-  const appearance = GIANT_LOOKS[look] ?? {};
   const body = useRef<HTMLCanvasElement>(null);
-  const { formed, play } = useGiantBody(body, appearance.color, reduced);
+  const play = useGiant(
+    body,
+    button,
+    { look: GIANT_LOOKS[look] ?? {}, state, joy: joy.split(" ").includes("lp-joy") },
+    reduced,
+  );
   // A click: it comes apart into the sky, changes look, and forms again.
   const change = () =>
     play(0, 520, () => {
@@ -210,22 +268,9 @@ function Giant({
   return (
     <div className="lp-giant-zone" ref={zone}>
       <Bubbles />
-      <button
-        type="button"
-        className="lp-giant"
-        ref={setButton}
-        aria-label={t("landing.hero.giant")}
-        data-formed={formed || undefined}
-        onClick={change}
-      >
+      <button type="button" className="lp-giant" ref={setButton} aria-label={t("landing.hero.giant")} onClick={change}>
         <span className={cx("lp-giant__in", joy)}>
           <canvas className="lp-giant__body" ref={body} />
-          <LpAvatar
-            look={appearance}
-            state={state}
-            size="xl"
-            className={cx("lp-giant__av", joy.includes("lp-joy") && "lp-joy")}
-          />
         </span>
       </button>
     </div>

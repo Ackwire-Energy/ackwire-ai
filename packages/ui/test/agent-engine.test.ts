@@ -57,7 +57,7 @@ describe("agent engine: one agent everywhere", () => {
     expect(spriteBody("sky")).toBe("#04203f");
     expect(inBody(0.5, 0.5)).toBe(true);
     expect(inBody(0.01, 0.01)).toBe(false);
-    expect(inBody(0.01, 0.99)).toBe(true);
+    expect(inBody(0.04, 0.96)).toBe(true);
     expect(bodyPath(0, 0, 1).startsWith("M")).toBe(true);
   });
 });

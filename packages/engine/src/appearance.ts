@@ -11,7 +11,22 @@ const { agents } = schema;
 export const AGENT_LOOK = {
   colors: ["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"],
   eyes: ["round", "dots", "wide", "happy", "sleepy"],
-  accessories: ["none", "hat", "cap", "glasses", "sunglasses", "headphones", "bow", "crown"],
+  // Pixel accessories drawn by the agent engine (packages/ui/src/agent/engine.js). Glasses were
+  // dropped (2026-10-15): stored ones still load, and the app shows them with no accessory.
+  accessories: [
+    "none",
+    "hat",
+    "cap",
+    "headphones",
+    "bow",
+    "crown",
+    "antenna",
+    "headset",
+    "beanie",
+    "party",
+    "flower",
+    "scarf",
+  ],
 } as const;
 
 export interface AgentAppearance {

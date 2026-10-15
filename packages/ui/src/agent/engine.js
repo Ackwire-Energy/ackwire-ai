@@ -306,7 +306,8 @@ const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2);
  * An agent's idle life at time `t` (seconds): it turns its head toward a new
  * spot every couple of seconds (faster while `active`), blinks, breathes
  * (`squash`), and now and then shows an expression for a moment. `seed`
- * keeps several agents out of step. Returns a pose for drawAgent/eyeShapes.
+ * keeps several agents out of step; `every` (seconds, default 6.5) spaces the
+ * expressions (each lasts 1.7 s). Returns a pose for drawAgent/eyeShapes.
  */
 export function idlePose(t, seed = 0, opts = {}) {
   const period = opts.active ? 1.2 : 2.6;
@@ -322,9 +323,10 @@ export function idlePose(t, seed = 0, opts = {}) {
   let expression;
   const list = opts.expressions ?? Object.keys(EXPRESSIONS);
   if (list.length) {
-    const slot = Math.floor((t + seed * 5) / 6.5);
-    const phase = (t + seed * 5) % 6.5;
-    if (phase > 4.8) expression = list[Math.floor(hash(slot, seed + 2) * list.length)];
+    const every = opts.every ?? 6.5;
+    const slot = Math.floor((t + seed * 5) / every);
+    const phase = (t + seed * 5) % every;
+    if (phase > every - 1.7) expression = list[Math.floor(hash(slot, seed + 2) * list.length)];
   }
   return { turn, blink, squash, expression };
 }
@@ -416,4 +418,182 @@ export function spriteGrid(n = 9, style = "round") {
     rows.push(row);
   }
   return rows;
+}
+
+/* ---------- Accessories: pixel art on the body's 16×16 grid ---------- */
+
+/** Accessory colors. A lowercase letter in CHECK is a 2-tone checker (dither) of two of these. */
+export const ACCESSORY_PALETTE = {
+  K: "#1d1d1b",
+  k: "#3a3a37",
+  W: "#ffffff",
+  R: "#d0473c",
+  r: "#9e3029",
+  Y: "#f2c14e",
+  y: "#c99a2e",
+  P: "#ec6f9a",
+  p: "#b9466f",
+  B: "#3b82c4",
+  G: "#23272e",
+  g: "#7d8796",
+  N: "#e0604f",
+  n: "#a84436",
+  V: "#8f6ff0",
+  F: "#ffffff",
+  f: "#f7c9da",
+  O: "#f2c14e",
+  M: "#5b6270",
+  L: "#3fae6a",
+};
+const CHECK = { c: ["K", "k"], h: ["Y", "y"], s: ["R", "r"], m: ["N", "n"] };
+
+/**
+ * Each accessory as rows of palette letters on the body's 16×16 grid: (ox, oy)
+ * is where row 0 starts, (0, 0) being the body's top-left; they may reach
+ * past the body. "A" is the antenna's light (it blinks while the agent works).
+ */
+export const ACCESSORIES = {
+  hat: {
+    ox: 2,
+    oy: -6,
+    rows: [
+      "  KKKKKKKK  ",
+      "  KkKKKKKK  ",
+      "  KkKKKKKK  ",
+      "  KKKKKKKK  ",
+      "  RRRRRRRR  ",
+      "KKKKKKKKKKKK",
+      " KKKKKKKKKK ",
+    ],
+  },
+  cap: {
+    ox: 1,
+    oy: -3,
+    rows: ["    GGgGGG        ", "  GGGgGGGGGG      ", " GGGGGGGGGGGG     ", " GGGGGGGGGGGGKKKKK"],
+  },
+  headphones: {
+    ox: -1,
+    oy: -3,
+    rows: [
+      "     KKKKKKKK     ",
+      "   KK        KK   ",
+      "  K            K  ",
+      " K              K ",
+      " K              K ",
+      "K                K",
+      "K                K",
+      "K                K",
+      "KKK            KKK",
+      "KgK            KgK",
+      "KgK            KgK",
+      "KgK            KgK",
+      "KKK            KKK",
+    ],
+  },
+  bow: {
+    ox: 10,
+    oy: -3,
+    rows: ["PP   PP", "PPP PPP", "PPPpPPP", "PPP PPP", "PP   PP"],
+  },
+  crown: {
+    ox: 3,
+    oy: -5,
+    rows: ["Y   YY   Y", "YY  YY  YY", "YhYYYYYYhY", "YYYRYYBYYY", "yyyyyyyyyy"],
+  },
+  antenna: {
+    ox: 6,
+    oy: -6,
+    rows: [" AA ", "AAAA", " AA ", " kk ", " kk ", " kk ", "KKKK"],
+  },
+  headset: {
+    ox: -1,
+    oy: -3,
+    rows: [
+      "     kkkkkkkk     ",
+      "   kk        kk   ",
+      "  k            k  ",
+      " k              k ",
+      " k              k ",
+      "k                k",
+      "k                k",
+      "k                k",
+      "KKK              k",
+      "KgK               ",
+      "KgK               ",
+      "KgK               ",
+      "KKK               ",
+      " k                ",
+      " k                ",
+      "  k               ",
+      "   kkMM           ",
+    ],
+  },
+  beanie: {
+    ox: 1,
+    oy: -5,
+    rows: [
+      "      WW      ",
+      "     WWWW     ",
+      "   NNNNNNNN   ",
+      "  NNNNNNNNNN  ",
+      " NNNNNNNNNNNN ",
+      "mmmmmmmmmmmmmm",
+      "mmmmmmmmmmmmmm",
+    ],
+  },
+  party: {
+    ox: 7,
+    oy: -8,
+    rows: ["   W   ", "  WWW  ", "   V   ", "  VVV  ", "  YYY  ", " VVVVV ", " YYYYY ", "VVVVVVV"],
+  },
+  flower: {
+    ox: 10,
+    oy: -3,
+    rows: [" FfF ", "FFOFF", "fOOOf", "FFOFF", " FfF ", "  L  ", " LL  "],
+  },
+  scarf: {
+    ox: -1,
+    oy: 12,
+    rows: [
+      " ssssssssssssssss ",
+      "RRRRRRRRRRRRRRRRRR",
+      "ssssssssssssssssRR",
+      "             RRR  ",
+      "             sss  ",
+      "             RRR  ",
+      "             R R  ",
+    ],
+  },
+};
+
+/** The accessories an agent can wear ("none" first). */
+export const ACCESSORY_NAMES = ["none", ...Object.keys(ACCESSORIES)];
+
+/** How far an accessory reaches past the body, in body fractions: room to leave around a drawn agent. */
+export const ACCESSORY_REACH = { top: 9 / 16, left: 1 / 16, right: 2 / 16, bottom: 7 / 16 };
+
+/**
+ * Draws an accessory on a body of side `s` in the body's own space (inside
+ * drawAgent's `after`): `frame` adds the head's parallax, `t` and `active`
+ * blink the antenna.
+ */
+export function drawAccessory(ctx, s, name, frame, t = 0, active = false) {
+  const a = ACCESSORIES[name];
+  if (!a) return;
+  const u = s / 16;
+  const hx = (frame?.head?.[0] ?? 0) * s;
+  const hy = (frame?.head?.[1] ?? 0) * s;
+  for (let j = 0; j < a.rows.length; j++) {
+    const row = a.rows[j];
+    for (let i = 0; i < row.length; i++) {
+      let ch = row[i];
+      if (ch === " ") continue;
+      const gx = a.ox + i;
+      const gy = a.oy + j;
+      if (CHECK[ch]) ch = CHECK[ch][(gx + gy) & 1];
+      ctx.fillStyle =
+        ch === "A" ? (active && Math.floor(t * 3) % 2 ? "#ffd0c9" : "#ff6b5e") : (ACCESSORY_PALETTE[ch] ?? "#000000");
+      ctx.fillRect(gx * u + hx, gy * u + hy, u + 0.6, u + 0.6);
+    }
+  }
 }

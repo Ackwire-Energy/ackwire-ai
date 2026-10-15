@@ -45,6 +45,10 @@
 .lp a {
   color: inherit;
 }
+/* A link styled as the primary button keeps the button's text color (not the link's inherited one). */
+.lp a.ac-btn--primary {
+  color: var(--bg);
+}
 .lp code {
   font-family: var(--font-mono);
   font-size: 0.82em;
@@ -208,15 +212,8 @@
   width: var(--s);
   height: var(--s);
 }
-.lp .ac-avatar__face {
-  transition: transform 0.4s var(--out);
-}
 .lp .ac-avatar--running::after {
   inset: calc(var(--s) * -0.1);
-}
-/* Joy: happy eyes (the engine's "happy" style, set by LpAvatar) hold still. */
-.lp .lp-joy .ac-avatar__eye {
-  animation: none;
 }
 @media (prefers-reduced-motion: no-preference) {
   .lp .lp-hop-a {
@@ -269,10 +266,11 @@
 .lp .lp-nav {
   position: fixed;
   z-index: 50;
-  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  /* Inside the hero's blue card (12px from the page edge), not on its border. */
+  top: calc(env(safe-area-inset-top, 0px) + 28px);
   left: 50%;
   transform: translateX(-50%);
-  width: min(1120px, calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px))));
+  width: min(1120px, calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px)) - 32px));
   display: flex;
   align-items: center;
   gap: 12px;
@@ -644,38 +642,21 @@
     0 0 0 4px #fff,
     0 0 0 7px var(--sky-ink);
 }
-/* The giant's body is a canvas that forms from the sky (Hero.tsx); the avatar on top keeps the eyes, accessories and states. */
+/* The giant is the agent engine on a canvas: it forms from the sky (Hero.tsx). */
 .lp .lp-giant__in {
   position: relative;
   display: block;
   width: 100%;
   height: 100%;
 }
+/* The canvas leaves room around the body for the accessory (ACCESSORY_REACH in the agent engine). */
 .lp .lp-giant__body {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  image-rendering: pixelated;
+  left: -6.25%;
+  top: -56.25%;
+  width: 118.75%;
+  height: 200%;
   filter: drop-shadow(0 50px 70px rgba(0, 30, 90, 0.55));
-}
-.lp .lp-giant .lp-giant__av.ac-avatar {
-  --s: inherit;
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: none;
-  box-shadow: none;
-}
-.lp .lp-giant .lp-giant__av > * {
-  transition: opacity 0.3s;
-}
-.lp .lp-giant:not([data-formed]) .lp-giant__av > * {
-  opacity: 0;
-}
-.lp .lp-giant .lp-giant__av.ac-avatar--running::after {
-  border-width: 3px;
-  border-color: rgba(255, 255, 255, 0.6);
 }
 .lp .lp-bubs {
   position: absolute;

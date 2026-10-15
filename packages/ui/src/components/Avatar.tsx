@@ -1,8 +1,8 @@
-import type { CSSProperties, HTMLAttributes } from "react";
-import { eyeShapes } from "../agent/engine.js";
+import { type HTMLAttributes, type RefObject, useLayoutEffect, useRef } from "react";
+import type { Expression } from "../agent/engine.js";
+import { addLiveAgent, type LiveAgent } from "../agent/live";
 import { cx } from "../cx";
-import { ditherCells, ditherUrl } from "../sky/dither";
-import { AgentAccessoryLayer, type AgentAppearance, appearanceStyle } from "./AgentLook";
+import { type AgentAppearance, appearanceStyle } from "./AgentLook";
 
 export type AvatarKind = "person" | "agent";
 
@@ -30,16 +30,49 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   presence?: boolean;
   /** Set when no visible name is next to the avatar: exposes `name` to screen readers. */
   labelled?: boolean;
+  /** A held expression (agents only), e.g. "happy" for a moment of joy. */
+  expression?: Expression;
 }
 
-/** Rendered size of each avatar size (accessories simplify when small). */
-const SIZE_PX: Record<NonNullable<AvatarProps["size"]>, number> = { xs: 18, sm: 24, md: 36, lg: 56, xl: 112 };
+/** A steady number per name, so agents next to each other move out of step. */
+const seedOf = (name: string) => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return (Math.abs(h) % 1000) / 100;
+};
 
-const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
-
-/** The body's dithered texture in the agent's color, with a grid that fits the size. */
-function ditherStyle(a: AgentAppearance | undefined, px: number): CSSProperties {
-  return { "--av-dither": `url("${ditherUrl(a?.color ?? "sky", ditherCells(px))}")` } as CSSProperties;
+/**
+ * The agent itself, drawn by the agent engine on a canvas a bit larger than
+ * the box (accessories reach past the body), in the shared live loop.
+ */
+function AgentBody({
+  box,
+  appearance,
+  state,
+  expression,
+  name,
+}: {
+  box: RefObject<HTMLSpanElement | null>;
+  appearance: AgentAppearance | undefined;
+  state: AgentState;
+  expression: Expression | undefined;
+  name: string;
+}) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const look = useRef<ReturnType<LiveAgent["look"]>>({ state, seed: 0 });
+  look.current = {
+    color: appearance?.color,
+    eyes: appearance?.eyes,
+    accessory: appearance?.accessory && appearance.accessory !== "none" ? appearance.accessory : undefined,
+    state,
+    expression,
+    seed: seedOf(name),
+  };
+  useLayoutEffect(() => {
+    if (!canvas.current || !box.current) return;
+    return addLiveAgent({ canvas: canvas.current, box: box.current, look: () => look.current });
+  }, [box]);
+  return <canvas className="ac-avatar__canvas" ref={canvas} />;
 }
 
 /** 1–2 letters: "Ada" → "A", "Atlas" → "At" when asked; "Marina Souza" → "MS". */
@@ -52,8 +85,9 @@ export function initialsOf(name: string): string {
 
 /**
  * People are circles with initials (or a photo) and an optional presence
- * dot. Agents are the living symbol: a rounded square with the cut
- * bottom-left corner and two eyes (see `state`).
+ * dot. Agents are the living symbol from the agent engine: the dithered body
+ * with the cut corner, white eyes and a pixel accessory, turning its head,
+ * blinking and now and then making a face (see `state` and `expression`).
  */
 export function Avatar({
   kind = "person",
@@ -66,15 +100,18 @@ export function Avatar({
   appearance,
   presence,
   labelled,
+  expression,
   className,
   style,
   ...rest
 }: AvatarProps) {
+  const box = useRef<HTMLSpanElement>(null);
   const a11y = labelled ? ({ role: "img", "aria-label": name } as const) : ({ "aria-hidden": true } as const);
   const agent = kind === "agent";
   const mood: AgentState = state ?? (running ? "thinking" : "idle");
   return (
     <span
+      ref={box}
       className={cx(
         "ac-avatar",
         kind === "agent" && "ac-avatar--agent",
@@ -90,28 +127,11 @@ export function Avatar({
         agent && appearance?.accessory && appearance.accessory !== "none" ? appearance.accessory : undefined
       }
       data-eyes={agent && appearance?.eyes && appearance.eyes !== "round" ? appearance.eyes : undefined}
-      style={agent ? { ...appearanceStyle(appearance), ...ditherStyle(appearance, SIZE_PX[size]), ...style } : style}
+      style={agent ? { ...appearanceStyle(appearance), ...style } : style}
       {...rest}
     >
       {agent ? (
-        <>
-          {/* The eyes and what sits on them (glasses) look around together; the blink is the eyes' own. */}
-          <span className="ac-avatar__face">
-            {eyeShapes(appearance?.eyes, { writing: mood === "writing" }).map((e, i) => (
-              <span
-                key={i === 0 ? "l" : "r"}
-                className={cx(
-                  "ac-avatar__eye",
-                  i === 0 ? "ac-avatar__eye--l" : "ac-avatar__eye--r",
-                  e.kind !== "pill" && `ac-avatar__eye--${e.kind}`,
-                )}
-                style={{ left: pct(e.x), top: pct(e.y), width: pct(e.w), height: pct(e.h) }}
-              />
-            ))}
-            <AgentAccessoryLayer accessory={appearance?.accessory} px={SIZE_PX[size]} layer="face" />
-          </span>
-          <AgentAccessoryLayer accessory={appearance?.accessory} px={SIZE_PX[size]} layer="head" />
-        </>
+        <AgentBody box={box} appearance={appearance} state={mood} expression={expression} name={name} />
       ) : imageUrl ? (
         <img src={imageUrl} alt="" />
       ) : (

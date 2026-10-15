@@ -70,9 +70,9 @@ describe("Avatar", () => {
     expect(person?.textContent).toBe("M");
     expect(agent?.className).toContain("ac-avatar--agent");
     expect(agent?.className).toContain("ac-avatar--running");
-    // The agent symbol has eyes, not initials; running = thinking.
+    // The agent symbol is drawn by the engine (no initials); running = thinking.
     expect(agent?.textContent).toBe("");
-    expect(agent?.querySelectorAll(".ac-avatar__eye")).toHaveLength(2);
+    expect(agent?.querySelector("canvas.ac-avatar__canvas")).not.toBeNull();
     expect(agent?.getAttribute("data-state")).toBe("thinking");
     expect(notAgent?.className).not.toContain("ac-avatar--running");
     expect(person?.getAttribute("aria-hidden")).toBe("true");

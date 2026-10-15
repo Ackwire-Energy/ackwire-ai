@@ -30,7 +30,7 @@ describe("agent dither", () => {
     expect(ditherUrl("sky", 10).startsWith("data:image/svg+xml,")).toBe(true);
   });
 
-  test("agents get the dither in their color; people do not; the logo carries it too", () => {
+  test("agents are drawn by the engine; people are not; the logo carries the dither", () => {
     const { container } = render(
       <>
         <Avatar kind="agent" name="Bia" appearance={{ color: "rose" }} />
@@ -40,8 +40,9 @@ describe("agent dither", () => {
       </>,
     );
     const [agent, person] = [...container.querySelectorAll<HTMLElement>(".ac-avatar")];
-    expect(agent?.style.getPropertyValue("--av-dither")).toContain(encodeURIComponent(ditherTones("rose")[0] ?? ""));
-    expect(person?.style.getPropertyValue("--av-dither")).toBe("");
+    // Agents are drawn by the engine on a canvas; people are not.
+    expect(agent?.querySelector("canvas.ac-avatar__canvas")).not.toBeNull();
+    expect(person?.querySelector("canvas")).toBeNull();
     expect(container.querySelectorAll(".ac-logo__dither")).toHaveLength(2);
   });
 });

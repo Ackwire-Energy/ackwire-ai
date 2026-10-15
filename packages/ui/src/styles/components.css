@@ -653,15 +653,16 @@ textarea.ac-input {
   border-bottom-left-radius: var(--radius-cut);
   max-width: 520px;
   box-sizing: border-box;
-  /* The sky backdrop sits under the content without lifting every child. */
   position: relative;
-  isolation: isolate;
+}
+/* The sky backdrop sits under the content: the content is lifted above it. */
+.ac-approval > :not(.ac-approval__sky) {
+  position: relative;
 }
 .ac-approval__sky {
   position: absolute;
   inset: 0 0 auto;
   height: 76px;
-  z-index: -1;
   overflow: hidden;
   border-radius: inherit;
   border-bottom-left-radius: 0;
@@ -2871,40 +2872,24 @@ a.ac-list__row:focus-visible {
   background: var(--ok);
   box-shadow: 0 0 0 2px var(--raised);
 }
-/* Agents: the living symbol */
+/* Agents: the living symbol, drawn by the agent engine on a canvas (Avatar); the box only holds its place. */
 .ac-avatar--agent {
-  /* The body is the sky's dither in the agent's color (set by Avatar); the gradient shows until it paints. */
-  background: linear-gradient(160deg, var(--agent2), var(--agent));
-  background-image: var(--av-dither, linear-gradient(160deg, var(--agent2), var(--agent)));
-  background-size: 100% 100%;
-  image-rendering: pixelated;
+  background: none;
   color: var(--on-agent);
   border-radius: var(--radius-agent);
-  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--agent) 70%, transparent);
 }
 .ac-avatar--sm.ac-avatar--agent,
 .ac-avatar--xs.ac-avatar--agent {
   border-radius: var(--radius-agent);
 }
-.ac-avatar--xs.ac-avatar--agent {
-  box-shadow: none;
-}
-/* The eyes: place, size and style come from the agent engine (Avatar sets them inline). */
-.ac-avatar__eye {
+/* Room around the body for the accessories (ACCESSORY_REACH in the engine: 1/16 left, 2/16 right, 9/16 up, 7/16 down). */
+.ac-avatar__canvas {
   position: absolute;
-  border-radius: 999px;
-  background: var(--agent-eye);
-  transform-origin: center;
-}
-.ac-avatar__eye--arc {
-  box-sizing: border-box;
-  background: transparent;
-  border: max(1.5px, 0.14em) solid var(--agent-eye);
-  border-bottom: 0;
-  border-radius: 999px 999px 0 0;
-}
-.ac-avatar__eye--lid {
-  border-radius: 0 0 999px 999px;
+  left: -6.25%;
+  top: -56.25%;
+  width: 118.75%;
+  height: 200%;
+  pointer-events: none;
 }
 .ac-avatar--running::after {
   inset: -4px;
@@ -2913,45 +2898,8 @@ a.ac-list__row:focus-visible {
   border-bottom-left-radius: inherit;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .ac-avatar--agent .ac-avatar__eye {
-    animation: ac-eye-blink 5s infinite;
-  }
-  /* The eyes and the glasses on them look around together (the face group). */
-  .ac-avatar--thinking .ac-avatar__eye {
-    animation: none;
-  }
-  .ac-avatar--thinking .ac-avatar__face {
-    animation: ac-look 2.4s var(--out) infinite;
-  }
-  .ac-avatar--writing .ac-avatar__eye {
-    animation: none;
-  }
   .ac-avatar--running::after {
     animation: ac-halo 1.6s var(--out) infinite;
-  }
-}
-@keyframes ac-eye-blink {
-  0%,
-  46%,
-  50%,
-  100% {
-    transform: scaleY(1);
-  }
-  48% {
-    transform: scaleY(0.1);
-  }
-}
-@keyframes ac-look {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  /* Fractions of the symbol (the eye is 15% wide, 20% tall). */
-  30% {
-    transform: translateX(-5.25%);
-  }
-  60% {
-    transform: translateX(6%) translateY(-3%);
   }
 }
 @keyframes ac-halo {
@@ -3379,13 +3327,7 @@ a.ac-list__row:focus-visible {
   min-width: 0;
 }
 
-/* Agent look (customizer): color, eyes and accessories, at every size, still alive. */
-.ac-avatar--agent[style*="--av-top"] {
-  background: linear-gradient(160deg, var(--av-top), var(--av-bottom));
-  background-image: var(--av-dither, linear-gradient(160deg, var(--av-top), var(--av-bottom)));
-  background-size: 100% 100%;
-  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--av-bottom) 70%, transparent);
-}
+/* Agent look: the halo takes the agent's color. */
 .ac-avatar--agent[style*="--av-top"].ac-avatar--running::after {
   border-color: color-mix(in srgb, var(--av-bottom) 45%, transparent);
 }
@@ -3393,23 +3335,6 @@ a.ac-list__row:focus-visible {
   width: 112px;
   height: 112px;
   font-size: 36px;
-}
-.ac-avatar__face {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.ac-avatar__accessory {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-/* Sunglasses cover the eyes: nothing peeks out under the lenses. */
-.ac-avatar[data-accessory="sunglasses"] .ac-avatar__eye {
-  visibility: hidden;
 }
 /* Recurrence picker: the sentence, the frequency tabs, then days, times, period and zone */
 .ac-recur {

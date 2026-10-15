@@ -98,7 +98,7 @@ describe("the living agent symbol", () => {
     expect(thinking?.className).toContain("ac-avatar--thinking");
     expect(thinking?.className).toContain("ac-avatar--running");
     expect(writing?.className).toContain("ac-avatar--writing");
-    expect(writing?.querySelectorAll(".ac-avatar__eye")).toHaveLength(2);
+    expect(writing?.querySelector("canvas.ac-avatar__canvas")).not.toBeNull();
     expect(person?.textContent).toBe("W");
     expect(person?.querySelector(".ac-avatar__presence")).not.toBeNull();
     expect(person?.hasAttribute("data-state")).toBe(false);

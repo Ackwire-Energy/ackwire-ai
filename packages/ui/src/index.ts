@@ -7,24 +7,31 @@
  */
 
 export {
+  ACCESSORIES,
+  ACCESSORY_REACH,
   AGENT_GRADIENTS,
   BODY_CUT,
   BODY_RADIUS,
   bodyPath,
   bodySvg,
   bodyTones,
+  drawAccessory,
   drawAgent,
   drawEyes,
+  EXPRESSIONS,
+  type Expression,
   EYE_STYLES,
   eyeShapes,
+  idlePose,
+  type Pose,
   spriteGrid,
 } from "./agent/engine.js";
+export { addLiveAgent, getGaze, setGaze } from "./agent/live";
 export {
   AGENT_ACCESSORIES,
   AGENT_COLORS,
   AGENT_EYES,
   type AgentAccessory,
-  AgentAccessoryLayer,
   type AgentAppearance,
   type AgentColor,
   type AgentEyes,

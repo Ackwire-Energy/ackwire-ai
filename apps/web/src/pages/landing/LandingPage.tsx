@@ -1,4 +1,4 @@
-import { type AgentState, Button, cx, Logo, Segmented } from "@agenteschat/ui";
+import { type AgentState, Button, cx, Logo, Segmented, setGaze } from "@agenteschat/ui";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -42,41 +42,35 @@ export function LandingPage() {
   const [reduced] = useState(readReducedMotion);
   const [theme, setTheme] = useState<"light" | "dark">(preference === "light" ? "light" : "dark");
 
-  // Eyes that follow the pointer.
-  const aimEls = useRef(new Set<HTMLElement>());
+  // Agents that turn toward the pointer: the engine's gaze, for avatars inside a registered element.
   const locked = useRef(false);
-  const aim = useMemo<AimRegistry>(() => {
-    const at = (x: number, y: number) => {
-      for (const el of aimEls.current) {
-        const av = el.classList.contains("ac-avatar") ? el : el.querySelector<HTMLElement>(".ac-avatar");
-        const face = av?.querySelector<HTMLElement>(".ac-avatar__face");
-        if (!av || !face) continue;
-        if (av.classList.contains("ac-avatar--thinking")) {
-          face.style.transform = "";
-          continue;
-        }
-        const r = av.getBoundingClientRect();
-        if (r.bottom < -200 || r.top > window.innerHeight + 200) continue;
-        const dx = x - (r.left + r.width / 2);
-        const dy = y - (r.top + r.height / 2);
-        const d = Math.hypot(dx, dy) || 1;
-        const k = Math.min(1, d / 320);
-        face.style.transform = `translate(${(dx / d) * k * r.width * 0.075}px, ${(dy / d) * k * r.height * 0.055}px)`;
-      }
-    };
-    return {
+  const aim = useMemo<AimRegistry>(
+    () => ({
       register(el) {
-        aimEls.current.add(el);
-        return () => {
-          aimEls.current.delete(el);
-        };
+        el.setAttribute("data-gaze", "");
+        return () => el.removeAttribute("data-gaze");
       },
-      at,
+      at: (x: number, y: number) => setGaze({ x, y }),
       lock(on) {
         locked.current = on;
       },
+    }),
+    [],
+  );
+  useEffect(() => () => setGaze(null), []);
+  // The page behind the landing takes its background, so no app-theme strip shows at the edges or in the scroll bounce.
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const html = document.documentElement;
+    const bg = root.current ? getComputedStyle(root.current).backgroundColor : "";
+    const before = { bg: html.style.backgroundColor, scheme: html.style.colorScheme };
+    html.style.backgroundColor = bg;
+    html.style.colorScheme = theme;
+    return () => {
+      html.style.backgroundColor = before.bg;
+      html.style.colorScheme = before.scheme;
     };
-  }, []);
+  }, [theme]);
   useEffect(() => {
     if (reduced) return;
     const onMove = (e: PointerEvent) => {
@@ -180,7 +174,7 @@ export function LandingPage() {
 
   return (
     <LandingContext.Provider value={ctx}>
-      <div className="lp" data-theme={theme}>
+      <div className="lp" data-theme={theme} ref={root}>
         <header className={cx("lp-nav", navHidden && "lp-nav--hide")}>
           <a className="lp-logo" href={hash("top")} onClick={go("top")}>
             <Logo variant="expanded" size={21} />

@@ -110,131 +110,26 @@ canvas.av{display:block}
 
 <script type="module">
 /* The same agent engine the app uses (serve the repo root over http to open this page). */
-import { AGENT_GRADIENTS as GRAD, drawAgent, EXPRESSIONS, idlePose } from "../../../packages/ui/src/agent/engine.js";
+import { AGENT_GRADIENTS as GRAD, drawAccessory, drawAgent, EXPRESSIONS, idlePose } from "../../../packages/ui/src/agent/engine.js";
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 const SKY = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"];
 const rgb = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const mix = (a, b, k) => { const A = rgb(a), B = rgb(b); return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, "0")).join(""); };
 
-/* Accessory palette. Lowercase pairs with uppercase for the 2-tone dither ("c" = checker of K/k, "h" = Y/y, "s" = R/r). */
-const PAL = {
-  K: "#1d1d1b", k: "#3a3a37", W: "#ffffff", R: "#d0473c", r: "#9e3029", Y: "#f2c14e", y: "#c99a2e", P: "#ec6f9a", p: "#b9466f",
-  B: "#3b82c4", G: "#23272e", g: "#7d8796", N: "#e0604f", n: "#a84436", V: "#8f6ff0", F: "#ffffff", f: "#f7c9da", O: "#f2c14e",
-  M: "#5b6270", L: "#3fae6a",
-};
-const CHECK = { c: ["K", "k"], h: ["Y", "y"], s: ["R", "r"], m: ["N", "n"] };
 
-/* Sprites on the avatar's 16×16 grid: (0,0) is the body's top-left; they may reach outside it. `face` ones move with the eyes. */
+/* Names and notes; the pixel art lives in the engine (ACCESSORIES). */
 const ACC = {
-  hat: { name: "Cartola", text: "Copa alta com faixa vermelha e aba larga sobre a cabeça. Brilho em pixel na lateral.", ox: 2, oy: -6, rows: [
-    "  KKKKKKKK  ",
-    "  KkKKKKKK  ",
-    "  KkKKKKKK  ",
-    "  KKKKKKKK  ",
-    "  RRRRRRRR  ",
-    "KKKKKKKKKKKK",
-    " KKKKKKKKKK ",
-  ] },
-  cap: { name: "Boné", text: "Copa arredondada e aba para a direita, com botão em cima.", ox: 1, oy: -3, rows: [
-    "    GGgGGG        ",
-    "  GGGgGGGGGG      ",
-    " GGGGGGGGGGGG     ",
-    " GGGGGGGGGGGGKKKKK",
-  ] },
-  headphones: { name: "Fone", text: "Arco por cima da cabeça e conchas nas laterais.", ox: -1, oy: -3, rows: [
-    "     KKKKKKKK     ",
-    "   KK        KK   ",
-    "  K            K  ",
-    " K              K ",
-    " K              K ",
-    "K                K",
-    "K                K",
-    "K                K",
-    "KKK            KKK",
-    "KgK            KgK",
-    "KgK            KgK",
-    "KgK            KgK",
-    "KKK            KKK",
-  ] },
-  bow: { name: "Laço", text: "Laço rosa no canto de cima, com nó mais escuro.", ox: 10, oy: -3, rows: [
-    "PP   PP",
-    "PPP PPP",
-    "PPPpPPP",
-    "PPP PPP",
-    "PP   PP",
-  ] },
-  crown: { name: "Coroa", text: "Três pontas, dither de ouro e duas pedras.", ox: 3, oy: -5, rows: [
-    "Y   YY   Y",
-    "YY  YY  YY",
-    "YhYYYYYYhY",
-    "YYYRYYBYYY",
-    "yyyyyyyyyy",
-  ] },
-  antenna: { fresh: true, name: "Antena", text: "Uma antena com luz que pisca enquanto o agente trabalha. Bem “agente”.", ox: 6, oy: -6, rows: [
-    " AA ",
-    "AAAA",
-    " AA ",
-    " kk ",
-    " kk ",
-    " kk ",
-    "KKKK",
-  ] },
-  headset: { fresh: true, name: "Headset", text: "Fone de um lado com microfone. Para agentes de suporte e vendas.", ox: -1, oy: -3, rows: [
-    "     kkkkkkkk     ",
-    "   kk        kk   ",
-    "  k            k  ",
-    " k              k ",
-    " k              k ",
-    "k                k",
-    "k                k",
-    "k                k",
-    "KKK              k",
-    "KgK               ",
-    "KgK               ",
-    "KgK               ",
-    "KKK               ",
-    " k                ",
-    " k                ",
-    "  k               ",
-    "   kkMM           ",
-  ] },
-  beanie: { fresh: true, name: "Gorro", text: "Gorro de tricô com pompom e barra em ponto canelado (dither).", ox: 1, oy: -5, rows: [
-    "      WW      ",
-    "     WWWW     ",
-    "   NNNNNNNN   ",
-    "  NNNNNNNNNN  ",
-    " NNNNNNNNNNNN ",
-    "mmmmmmmmmmmmmm",
-    "mmmmmmmmmmmmmm",
-  ] },
-  party: { fresh: true, name: "Chapéu de festa", text: "Para comemorar: aparece sozinho por um tempo quando uma tarefa grande termina?", ox: 7, oy: -8, rows: [
-    "   W   ",
-    "  WWW  ",
-    "   V   ",
-    "  VVV  ",
-    "  YYY  ",
-    " VVVVV ",
-    " YYYYY ",
-    "VVVVVVV",
-  ] },
-  flower: { fresh: true, name: "Flor", text: "Uma flor no canto, como o laço, mais leve.", ox: 10, oy: -3, rows: [
-    " FfF ",
-    "FFOFF",
-    "fOOOf",
-    "FFOFF",
-    " FfF ",
-    "  L  ",
-    " LL  ",
-  ] },
-  scarf: { fresh: true, name: "Cachecol", text: "Cachecol listrado na parte de baixo com a ponta caindo para fora.", ox: -1, oy: 12, rows: [
-    " ssssssssssssssss ",
-    "RRRRRRRRRRRRRRRRRR",
-    "ssssssssssssssssRR",
-    "             RRR  ",
-    "             sss  ",
-    "             RRR  ",
-    "             R R  ",
-  ] },
+  hat: { name: "Cartola", text: "Copa alta com faixa vermelha e aba larga sobre a cabeça. Brilho em pixel na lateral." },
+  cap: { name: "Boné", text: "Copa arredondada e aba para a direita, com botão em cima." },
+  headphones: { name: "Fone", text: "Arco por cima da cabeça e conchas nas laterais." },
+  bow: { name: "Laço", text: "Laço rosa no canto de cima, com nó mais escuro." },
+  crown: { name: "Coroa", text: "Três pontas, dither de ouro e duas pedras." },
+  antenna: { fresh: true, name: "Antena", text: "Uma antena com luz que pisca enquanto o agente trabalha. Bem “agente”." },
+  headset: { fresh: true, name: "Headset", text: "Fone de um lado com microfone. Para agentes de suporte e vendas." },
+  beanie: { fresh: true, name: "Gorro", text: "Gorro de tricô com pompom e barra em ponto canelado (dither)." },
+  party: { fresh: true, name: "Chapéu de festa", text: "Para comemorar: aparece sozinho por um tempo quando uma tarefa grande termina?" },
+  flower: { fresh: true, name: "Flor", text: "Uma flor no canto, como o laço, mais leve." },
+  scarf: { fresh: true, name: "Cachecol", text: "Cachecol listrado na parte de baixo com a ponta caindo para fora." },
 };
 const CURRENT = ["hat", "cap", "headphones", "bow", "crown"];
 const FRESH = ["antenna", "headset", "beanie", "party", "flower", "scarf"];
@@ -259,7 +154,6 @@ function draw(it, t) {
   const ctx = it.cv.getContext("2d");
   ctx.clearRect(0, 0, W, H);
   const X0 = Math.round(0.25 * it.size * dpr), Y0 = Math.round(0.62 * it.size * dpr);
-  const a = it.acc ? ACC[it.acc] : null;
   const c = it.color || color;
   const st = it.state || state;
   // The engine's idle life: head turns (pseudo-3D), blinks, breath, now and then an expression.
@@ -270,25 +164,7 @@ function draw(it, t) {
     color: c,
     cells: 16,
     pose,
-    withEyes: !(a && a.hides),
-    after: (g, s, frame) => {
-      if (!a) return;
-      // Accessories on the body's 16×16 grid, with a little parallax (less than the eyes).
-      const u = s / 16;
-      const hx = frame.head[0] * s, hy = frame.head[1] * s;
-      a.rows.forEach((row, j) => {
-        for (let i = 0; i < row.length; i++) {
-          let ch = row[i];
-          if (ch === " ") continue;
-          const gx = a.ox + i, gy = a.oy + j;
-          if (CHECK[ch]) ch = CHECK[ch][(gx + gy) & 1];
-          let col = PAL[ch];
-          if (ch === "A") col = st === "thinking" ? (Math.floor(t * 3) % 2 ? "#ff6b5e" : "#ffd0c9") : "#ff6b5e";
-          g.fillStyle = col;
-          g.fillRect(gx * u + hx, gy * u + hy, u + 0.6, u + 0.6);
-        }
-      });
-    },
+        after: (g, s, frame) => { if (it.acc) drawAccessory(g, s, it.acc, frame, t, st === "thinking"); },
   });
 }
 

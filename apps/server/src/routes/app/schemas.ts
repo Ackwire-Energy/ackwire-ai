@@ -53,7 +53,20 @@ export const AgentAppearance = z
   .object({
     color: z.enum(["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"]),
     eyes: z.enum(["round", "dots", "wide", "happy", "sleepy"]),
-    accessory: z.enum(["none", "hat", "cap", "glasses", "sunglasses", "headphones", "bow", "crown"]),
+    accessory: z.enum([
+      "none",
+      "hat",
+      "cap",
+      "headphones",
+      "bow",
+      "crown",
+      "antenna",
+      "headset",
+      "beanie",
+      "party",
+      "flower",
+      "scarf",
+    ]),
   })
   .openapi("AgentAppearance");
 
