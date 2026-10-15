@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
+import type { ModelRequest } from "@agenteschat/providers";
 import {
   createIssue,
   createRoutine,
@@ -9,6 +10,7 @@ import {
   listRoutines,
   nextCronTime,
   parseSchedule,
+  parseScheduleForOrg,
   phraseToCron,
   runRoutineNow,
   setRoutineActive,
@@ -114,6 +116,52 @@ describe("routines", () => {
     expect(view?.monthCostUsd).toBeGreaterThan(0);
     expect(view?.running).toBe(false);
     expect(new Date(view?.nextRunAt ?? 0).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  test("read in the creator's own time zone (org stays UTC); posted as the routine, not as the person", async () => {
+    let prompt: ModelRequest | undefined;
+    f = await setup({
+      reply: (req: ModelRequest) => {
+        prompt = req;
+        return { chunks: ["ok"] };
+      },
+    });
+    await f.db
+      .update(schema.organizationMembers)
+      .set({ timezone: "America/Sao_Paulo" })
+      .where(eq(schema.organizationMembers.userId, f.owner.id));
+    expect(await parseScheduleForOrg(routineDeps(), f.owner.id, f.org.id, "toda segunda às 9h")).toMatchObject({
+      ok: true,
+      cron: "0 9 * * 1",
+      timezone: "America/Sao_Paulo",
+    });
+    const routine = await createRoutine(routineDeps(), f.owner.id, f.org.id, {
+      name: "Relatório semanal",
+      agentId: f.agent.id,
+      prompt: "quero um relatorio",
+      target: { type: "channel", channelId: f.general.id },
+      trigger: { type: "schedule", phrase: "toda segunda às 9h" },
+    });
+    expect(routine.trigger).toMatchObject({ cron: "0 9 * * 1", timezone: "America/Sao_Paulo" });
+    const next = new Date(routine.nextRunAt ?? 0);
+    expect(next.getUTCDay()).toBe(1);
+    expect(next.toISOString().endsWith("T12:00:00.000Z")).toBe(true); // 09:00 in São Paulo
+    // A zone picked in the form wins; an unknown one is refused.
+    expect(await parseScheduleForOrg(routineDeps(), f.owner.id, f.org.id, "toda segunda às 9h", "UTC")).toMatchObject({
+      timezone: "UTC",
+    });
+    await expect(
+      parseScheduleForOrg(routineDeps(), f.owner.id, f.org.id, "todo dia às 8h", "Mars/Base"),
+    ).rejects.toThrow("Fuso");
+
+    await runRoutineNow(routineDeps(), f.owner.id, f.org.id, routine.id);
+    await drainOutbox(f.db, f.handlers);
+    const posted = (await f.db.select().from(schema.messages)).find((m) => m.meta.routineId === routine.id);
+    expect(posted?.meta.routine).toMatchObject({ id: routine.id, name: "Relatório semanal" });
+    // The creator stays the requester (same run path), and the agent reads it as the routine's message.
+    expect(posted?.authorUserId).toBe(f.owner.id);
+    const turns = JSON.stringify(prompt?.messages);
+    expect(turns).toContain('[Rotina \\"Relatório semanal\\", criada por ana]: @dev quero um relatorio');
   });
 
   test("missed slots during downtime run once, not as a burst; pause, resume and run now", async () => {

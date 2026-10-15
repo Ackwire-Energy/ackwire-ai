@@ -1,4 +1,5 @@
 import type { Approval, Message } from "@/api/types";
+import { routineOfMessage } from "@/lib/routines";
 import type { LiveRun } from "@/realtime/streams";
 
 const byTime = (a: { createdAt: string; id: string }, b: { createdAt: string; id: string }) =>
@@ -93,7 +94,10 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
     }
     if (entry.item.kind === "message") {
       const m = entry.item.message;
-      out.push({ ...entry.item, grouped: groupsWith(prev, m.author, m.createdAt) });
+      // A routine's message always shows its own header, and nothing groups under it.
+      const routine = Boolean(routineOfMessage(m.meta));
+      const prevRoutine = Boolean(prev && routineOfMessage(prev.meta));
+      out.push({ ...entry.item, grouped: !routine && !prevRoutine && groupsWith(prev, m.author, m.createdAt) });
       prev = m;
     } else {
       out.push(entry.item);

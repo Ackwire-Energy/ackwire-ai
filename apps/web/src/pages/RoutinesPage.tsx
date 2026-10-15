@@ -21,6 +21,7 @@ import type { Routine, RoutineEvent, RoutineTarget } from "@/api/types";
 import { useActors } from "@/components/actors";
 import { useOrg } from "@/components/org-context";
 import { formatUsd, whenAt } from "@/lib/format";
+import { COMMON_TIMEZONES, timezoneLabel } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
 
 export const ROUTINE_EVENTS: RoutineEvent[] = [
@@ -99,7 +100,11 @@ function RoutineCard({ routine: r, onRuns }: { routine: Routine; onRuns: () => v
   const action = useRoutineAction(org.id);
   const target = useTargetLabel();
   const agent = { type: "agent" as const, id: r.agentId };
-  const when = r.trigger.type === "schedule" ? r.trigger.description : t(`routines.event.${r.trigger.event}`);
+  // The zone always shows, so a routine read in UTC by mistake is easy to spot.
+  const when =
+    r.trigger.type === "schedule"
+      ? `${r.trigger.description} (${timezoneLabel(r.trigger.timezone || "UTC")})`
+      : t(`routines.event.${r.trigger.event}`);
   const next = !r.active
     ? t("routines.paused")
     : r.trigger.type === "event"
@@ -207,6 +212,8 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const [phrase, setPhrase] = useState("toda segunda às 9h");
   const [event, setEvent] = useState<RoutineEvent>("sentry.issue_created");
   const [touched, setTouched] = useState(false);
+  /** Empty = let the server read it in the person's own zone; set once they pick one. */
+  const [zone, setZone] = useState("");
   useEffect(() => {
     if (!agentId && agents[0]) setAgentId(agents[0].id);
   }, [agentId, agents]);
@@ -214,7 +221,12 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
     if (!target && channels.data?.[0]) setTarget(channels.data[0].id);
   }, [target, channels.data]);
   const typed = useDeferredValue(phrase.trim());
-  const parsed = useScheduleParse(org.id, typed, open && kind === "schedule" && typed.length > 0);
+  const parsed = useScheduleParse(org.id, typed, open && kind === "schedule" && typed.length > 0, zone || undefined);
+  const shownZone = zone || (parsed.data?.ok ? parsed.data.timezone : "");
+  const zoneOptions = [...new Set([...(shownZone ? [shownZone] : []), ...COMMON_TIMEZONES])].map((z) => ({
+    value: z,
+    label: timezoneLabel(z),
+  }));
   const scheduleOk = kind === "event" || (typed.length > 0 && parsed.data?.ok === true);
   const targetValue = (): RoutineTarget =>
     target === TARGET_DM
@@ -226,7 +238,10 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
     if (!typed) return t("routines.form.frequencyPlaceholder");
     if (!parsed.data) return "";
     return parsed.data.ok
-      ? t("routines.form.parsed", { description: parsed.data.description, timezone: parsed.data.timezone })
+      ? t("routines.form.parsed", {
+          description: parsed.data.description,
+          timezone: timezoneLabel(parsed.data.timezone),
+        })
       : parsed.data.error;
   };
   return (
@@ -251,7 +266,7 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
                 agentId,
                 prompt: prompt.trim(),
                 target: targetValue(),
-                trigger: kind === "schedule" ? { type: "schedule", phrase: phrase.trim() } : { type: "event", event },
+                trigger: kind === "schedule" ? scheduleTrigger(phrase.trim(), shownZone) : { type: "event", event },
               },
             },
             {
@@ -325,7 +340,13 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
                 placeholder={t("routines.form.frequencyPlaceholder")}
               />
             </Field>
-          ) : (
+          ) : null}
+          {kind === "schedule" && shownZone ? (
+            <Field label={t("routines.form.timezone")} id="nr-zone">
+              <Select value={shownZone} onValueChange={setZone} options={zoneOptions} />
+            </Field>
+          ) : null}
+          {kind === "schedule" ? null : (
             <Field
               label={t("routines.form.event")}
               id="nr-event"
@@ -350,4 +371,10 @@ function NewRoutineDialog({ open, onClose }: { open: boolean; onClose: () => voi
       </form>
     </Dialog>
   );
+}
+
+/** The schedule trigger with the zone the person saw in the preview (the server reads the phrase in it). */
+function scheduleTrigger(phrase: string, timezone: string) {
+  const trigger = { type: "schedule" as const, phrase, ...(timezone ? { timezone } : {}) };
+  return trigger as { type: "schedule"; phrase: string };
 }

@@ -67,6 +67,7 @@ import { artifactRefs } from "@/lib/artifacts";
 import { entersWithMotion, greetingSuggestions, messageUsage, nearBottom, usageLine } from "@/lib/chat";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
 import { can } from "@/lib/permissions";
+import { routineOfMessage } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
 import {
   useChannelRealtime,
@@ -688,6 +689,8 @@ const TimelineMessage = memo(function TimelineMessage({
   const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
   const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
   const name = dir.authorName(m.author);
+  // Posted by a routine on its creator's behalf: shown as the routine, never as if the person typed it.
+  const routine = routineOfMessage(m.meta);
   const renderMention = (handle: string, key: string) => {
     const a = dir.agentByHandle.get(handle.toLowerCase());
     const p = a ? undefined : dir.memberByHandle.get(handle.toLowerCase());
@@ -733,7 +736,15 @@ const TimelineMessage = memo(function TimelineMessage({
       onMouseEnter={feedback ? () => setActive(true) : undefined}
       onFocus={feedback ? () => setActive(true) : undefined}
       avatar={
-        m.author.id ? (
+        routine ? (
+          <span
+            className="ac-avatar ac-avatar--routine"
+            role="img"
+            aria-label={t("channel.routineAuthor", { name: routine.name })}
+          >
+            <Icon name="routines" size={18} />
+          </span>
+        ) : m.author.id ? (
           <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
             <Avatar
               kind={m.author.type}
@@ -747,7 +758,12 @@ const TimelineMessage = memo(function TimelineMessage({
         )
       }
       author={
-        m.author.id ? (
+        routine ? (
+          <span>
+            {t("channel.routineAuthor", { name: routine.name })}{" "}
+            <span className="muted small">{t("channel.routineBy", { name })}</span>
+          </span>
+        ) : m.author.id ? (
           <ProfileTrigger
             actor={{ type: m.author.type, id: m.author.id }}
             label={t("profile.of", { name })}

@@ -56,7 +56,8 @@ export interface RoutineInput {
   agentId: string;
   prompt: string;
   target: RoutineTarget;
-  trigger: { type: "schedule"; phrase: string } | { type: "event"; event: RoutineEvent };
+  /** `timezone`: IANA zone the phrase is read in; default: the creator's, then the org's, then UTC. */
+  trigger: { type: "schedule"; phrase: string; timezone?: string } | { type: "event"; event: RoutineEvent };
 }
 
 export interface RoutineDeps {
@@ -190,15 +191,39 @@ function llmParser(deps: RoutineDeps, orgId: string) {
   };
 }
 
-/** Natural language → cron in the workspace time zone (code first, then the cheap model). */
+const isTimeZone = (tz: string) => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** The zone a person's routine phrase means: the one they chose, else their own, else the org's, else UTC. */
+export async function routineTimezone(db: Database, actorId: string, orgId: string, chosen?: string | null) {
+  if (chosen) {
+    if (!isTimeZone(chosen)) throw new ValidationError("Fuso horário desconhecido.");
+    return chosen;
+  }
+  const settings = await getOrgSettings(db, actorId, orgId);
+  const [me] = await db
+    .select({ timezone: schema.organizationMembers.timezone })
+    .from(schema.organizationMembers)
+    .where(and(eq(schema.organizationMembers.orgId, orgId), eq(schema.organizationMembers.userId, actorId)));
+  return me?.timezone || settings.timezone || "UTC";
+}
+
+/** Natural language → cron in the creator's time zone (code first, then the cheap model). */
 export async function parseScheduleForOrg(
   deps: RoutineDeps,
   actorId: string,
   orgId: string,
   phrase: string,
+  timezone?: string | null,
 ): Promise<ScheduleParse> {
-  const settings = await getOrgSettings(deps.db, actorId, orgId);
-  return parseSchedule(phrase, { timezone: settings.timezone, llm: llmParser(deps, orgId) });
+  const zone = await routineTimezone(deps.db, actorId, orgId, timezone);
+  return parseSchedule(phrase, { timezone: zone, llm: llmParser(deps, orgId) });
 }
 
 /** Admins, or the agent's owner. */
@@ -234,7 +259,7 @@ export async function createRoutine(
   await checkTarget(db, orgId, agent.id, input.target);
   let schedule: { phrase: string; cron: string; timezone: string; description: string; nextRunAt: Date } | null = null;
   if (input.trigger.type === "schedule") {
-    const parsed = await parseScheduleForOrg(deps, actorId, orgId, input.trigger.phrase);
+    const parsed = await parseScheduleForOrg(deps, actorId, orgId, input.trigger.phrase, input.trigger.timezone);
     if (!parsed.ok) throw new ValidationError(parsed.error);
     const next = nextCronTime(parsed.cron, parsed.timezone, new Date());
     if (!next) throw new ValidationError("Esse horário nunca acontece.");
@@ -473,9 +498,16 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
           ? `${routine.prompt}${eventText}\n\nSalve o resultado como um arquivo no Drive (create_artifact).`
           : `${routine.prompt}${eventText}`;
     }
+    // Posted on the creator's behalf (their permissions start the run, they stay the requester),
+    // but shown as the routine's message: `meta.routine` makes the app and the agent's context
+    // read "Rotina · {name}" instead of the person, who didn't type it.
     const message = await postPersonMessage({ db, pubsub: deps.pubsub }, creator, routine.orgId, channelId, {
       body,
-      meta: { routineId: routine.id, routineRunId: run.id },
+      meta: {
+        routineId: routine.id,
+        routineRunId: run.id,
+        routine: { id: routine.id, name: routine.name, runId: run.id },
+      },
     });
     const [agentRun] = await db
       .select({ id: agentRuns.id })

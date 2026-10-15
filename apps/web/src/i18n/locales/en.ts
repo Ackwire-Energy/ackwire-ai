@@ -212,6 +212,8 @@ export const en: Translations = {
     pendingApprovals_other: "{{count}} pending approvals",
   },
   channel: {
+    routineAuthor: "Routine · {{name}}",
+    routineBy: "created by {{name}}",
     messages: "Messages",
     members: "Members: {{names}}",
     details: "Channel details",
@@ -902,7 +904,8 @@ export const en: Translations = {
       onEvent: "When something happens",
       frequency: "Frequency",
       frequencyPlaceholder: "E.g.: every Monday at 9am",
-      parsed: "{{description}} ({{timezone}})",
+      parsed: "{{description}} · {{timezone}}",
+      timezone: "Time zone",
       event: "Event",
       eventHelp: "Comes through {{org}}'s connectors. The agent gets the event as context.",
       cancel: "Cancel",

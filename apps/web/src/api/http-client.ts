@@ -339,8 +339,8 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
     },
     routines: {
       list: async (orgId) => (await request<{ routines: Routine[] }>(`${org(orgId)}/routines`)).routines,
-      parseSchedule: (orgId, phrase) =>
-        request<ScheduleParse>(`${org(orgId)}/routines/parse-schedule`, { json: { phrase } }),
+      parseSchedule: (orgId, phrase, timezone) =>
+        request<ScheduleParse>(`${org(orgId)}/routines/parse-schedule`, { json: { phrase, timezone } }),
       create: (orgId, input) => request<Routine>(`${org(orgId)}/routines`, { json: input }),
       setActive: (orgId, id, active) =>
         request<Routine>(`${org(orgId)}/routines/${enc(id)}`, { method: "PATCH", json: { active } }),

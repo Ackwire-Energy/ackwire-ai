@@ -217,6 +217,8 @@ export const ptBR = {
     pendingApprovals_other: "{{count}} aprovações pendentes",
   },
   channel: {
+    routineAuthor: "Rotina · {{name}}",
+    routineBy: "criada por {{name}}",
     messages: "Mensagens",
     members: "Membros: {{names}}",
     details: "Detalhes do canal",
@@ -908,7 +910,8 @@ export const ptBR = {
       onEvent: "Quando algo acontecer",
       frequency: "Frequência",
       frequencyPlaceholder: "Ex.: toda segunda às 9h",
-      parsed: "{{description}} ({{timezone}})",
+      parsed: "{{description}} · {{timezone}}",
+      timezone: "Fuso horário",
       event: "Evento",
       eventHelp: "Vem pelos conectores da {{org}}. O agente recebe o evento como contexto.",
       cancel: "Cancelar",

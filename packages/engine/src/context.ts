@@ -385,7 +385,11 @@ export function toTurns(
     const own = m.authorAgentId === agentId;
     const role = own ? "assistant" : "user";
     const authorId = m.authorUserId ?? m.authorAgentId;
-    const text = own ? m.body : `[${(authorId && names.get(authorId)) || "unknown"}]: ${m.body}`;
+    const routine = m.meta?.routine as { name?: unknown } | undefined;
+    const who = (authorId && names.get(authorId)) || "unknown";
+    // A routine's message: posted for its creator on a schedule, not typed by them.
+    const label = routine && typeof routine.name === "string" ? `Rotina "${routine.name}", criada por ${who}` : who;
+    const text = own ? m.body : `[${label}]: ${m.body}`;
     const last = turns.at(-1);
     if (last && last.role === role) last.parts.push({ id: m.id, text });
     else turns.push({ role, parts: [{ id: m.id, text }] });

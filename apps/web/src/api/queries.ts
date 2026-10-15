@@ -826,11 +826,11 @@ export const useRoutineRuns = (orgId: string, id: string | null) => {
   });
 };
 
-export const useScheduleParse = (orgId: string, phrase: string, enabled: boolean) => {
+export const useScheduleParse = (orgId: string, phrase: string, enabled: boolean, timezone?: string) => {
   const api = useApi();
   return useQuery({
-    queryKey: ["org", orgId, "routines", "parse", phrase] as const,
-    queryFn: () => api.routines.parseSchedule(orgId, phrase),
+    queryKey: ["org", orgId, "routines", "parse", phrase, timezone ?? ""] as const,
+    queryFn: () => api.routines.parseSchedule(orgId, phrase, timezone),
     enabled,
     placeholderData: (prev) => prev,
     staleTime: Number.POSITIVE_INFINITY,

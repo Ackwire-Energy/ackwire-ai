@@ -301,7 +301,8 @@ export interface ApiClient {
   };
   routines: {
     list(orgId: string): Promise<Routine[]>;
-    parseSchedule(orgId: string, phrase: string): Promise<ScheduleParse>;
+    /** `timezone`: IANA zone to read the phrase in (default: the person's own, then the org's). */
+    parseSchedule(orgId: string, phrase: string, timezone?: string): Promise<ScheduleParse>;
     create(orgId: string, input: RoutineInput): Promise<Routine>;
     setActive(orgId: string, id: string, active: boolean): Promise<Routine>;
     runNow(orgId: string, id: string): Promise<Routine>;

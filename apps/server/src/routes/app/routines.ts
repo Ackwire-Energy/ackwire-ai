@@ -81,8 +81,20 @@ export function routineRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/routines/parse-schedule",
       tags,
       security,
-      summary: "Natural language → cron, in the workspace time zone",
-      request: { params: OrgParams, body: body(z.object({ phrase: z.string().max(300) })) },
+      summary: "Natural language → cron, in the person's time zone (or the one given)",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            phrase: z.string().max(300),
+            timezone: z
+              .string()
+              .max(64)
+              .optional()
+              .openapi({ description: "IANA zone; default: the person's own, then the organization's, then UTC." }),
+          }),
+        ),
+      },
       responses: {
         200: json(
           z.union([
@@ -95,7 +107,8 @@ export function routineRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      return c.json(await parseScheduleForOrg(routines, c.get("user").id, orgId, c.req.valid("json").phrase), 200);
+      const { phrase, timezone } = c.req.valid("json");
+      return c.json(await parseScheduleForOrg(routines, c.get("user").id, orgId, phrase, timezone), 200);
     },
   );
 
@@ -115,7 +128,11 @@ export function routineRoutes(deps: AppDeps) {
             prompt: z.string().min(1).max(10_000),
             target: Target,
             trigger: z.union([
-              z.object({ type: z.literal("schedule"), phrase: z.string().min(1).max(300) }),
+              z.object({
+                type: z.literal("schedule"),
+                phrase: z.string().min(1).max(300),
+                timezone: z.string().max(64).optional(),
+              }),
               z.object({ type: z.literal("event"), event: Event }),
             ]),
           }),
