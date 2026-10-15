@@ -625,8 +625,10 @@
   .lp .lp-wl {
     flex-direction: column;
   }
+  /* In a column, flex: 1 would shrink the field to its text: give it the button's height. */
   .lp .lp-wl input {
-    height: 46px;
+    flex: none;
+    height: 50px;
   }
 }
 @media (prefers-reduced-motion: no-preference) {
