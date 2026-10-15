@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
+import { isWriting } from "@/lib/activity";
 
 setupDom();
 
@@ -49,6 +50,9 @@ describe("narration keyed by turn", () => {
       { type: "agent.run.steered", channelId: "c", runId: "r", messageId: "m9", stop: true } as Ev,
     ]);
     expect(s.runs.r?.stopping).toBe(true);
+    // The text so far became narration, but the row keeps its place in the timeline.
+    expect(s.runs.r?.text).toBe("");
+    expect(isWriting(s.runs.r as NonNullable<typeof s.runs.r>)).toBe(true);
     expect(s.runs.r?.work?.at(-1)).toEqual({ kind: "steer", messageId: "m9" });
   });
 });

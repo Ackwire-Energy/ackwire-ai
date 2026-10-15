@@ -154,7 +154,16 @@ export function toolActivity(
 }
 
 /** An agent's run is in the timeline (its first words arrived, or it failed): not in the bar. */
-export const isWriting = (r: LiveRun) => r.status === "failed" || r.status === "canceled" || r.text.length > 0;
+/**
+ * The run has its own row in the timeline: it wrote something, ended badly,
+ * or took a new message into the task (`agent.run.steered`: the row stays put
+ * with "Nova mensagem de…" even though its text so far became narration).
+ */
+export const isWriting = (r: LiveRun) =>
+  r.status === "failed" ||
+  r.status === "canceled" ||
+  r.text.length > 0 ||
+  (r.work ?? []).some((w) => w.kind === "steer");
 
 export interface ActivityEntry {
   id: string;
