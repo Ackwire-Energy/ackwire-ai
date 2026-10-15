@@ -35,7 +35,8 @@ export function createFakeSkills(
       files: [
         { path: "SKILL.md", size: 120, mime: "text/markdown", status: "stored" },
         { path: "checklist.md", size: 40, mime: "text/markdown", status: "stored" },
-        { path: "scripts/lint.sh", size: 30, mime: "text/x-sh", status: "ignored" },
+        { path: "scripts/lint.sh", size: 30, mime: "text/x-sh", status: "script" },
+        { path: "scripts/old.py", size: 20, mime: "text/x-python", status: "ignored" },
       ],
     });
     add({

@@ -45,7 +45,15 @@ const Skill = z
 const SkillDetail = Skill.extend({
   body: z.string(),
   files: z.array(
-    z.object({ path: z.string(), size: z.number(), mime: z.string(), status: z.enum(["stored", "ignored"]) }),
+    z.object({
+      path: z.string(),
+      size: z.number(),
+      mime: z.string(),
+      status: z.enum(["stored", "script", "ignored"]).openapi({
+        description:
+          "`stored`: text agents can read; `script`: runs only in the sandbox, never shown; `ignored`: binary.",
+      }),
+    }),
   ),
 }).openapi("SkillDetail");
 const SkillParams = OrgParams.extend({ skillId: z.uuid() });

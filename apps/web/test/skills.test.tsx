@@ -55,8 +55,12 @@ describe("Configurações → Skills", () => {
     expect(within(sheet).getAllByRole("heading", { name: "Revisão de PR" }).length).toBeGreaterThanOrEqual(2);
     expect(sheet.querySelector("pre.md__code code")?.textContent).toBe("bun test");
     const files = within(sheet).getByRole("navigation", { name: "Arquivos" });
+    // Scripts run on the agent's PC; old imports kept them as ignored.
     const script = within(files).getByText("scripts/lint.sh").closest(".skill-file") as HTMLElement;
-    expect(script.textContent).toContain("precisa de sandbox");
+    expect(script.textContent).toContain("roda no PC do agente");
+    const old = within(files).getByText("scripts/old.py").closest(".skill-file") as HTMLElement;
+    expect(old.textContent).toContain("precisa de sandbox");
+    expect(old.textContent).toContain("Reinstale para usar os scripts.");
     const text = within(files).getByText("checklist.md").closest(".skill-file") as HTMLElement;
     expect(text.textContent).toContain("text/markdown");
     expect(text.textContent).not.toContain("precisa de sandbox");

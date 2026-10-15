@@ -4,6 +4,7 @@ import type {
   McpConnect,
   ModelGateway,
   ResolveHost,
+  SandboxDeps,
   StorageDeps,
 } from "@agenteschat/engine";
 
@@ -26,4 +27,6 @@ export interface AppExtras {
   /** Org storage settings and the blob resolver (Drive, artifacts). */
   storage?: StorageDeps;
   artifacts?: ArtifactDeps;
+  /** Code sandbox (D30); null/absent = off on this server. */
+  sandbox?: SandboxDeps | null;
 }

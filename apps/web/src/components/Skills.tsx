@@ -423,14 +423,19 @@ export function SkillSheet({
   );
 }
 
-/** A file of the skill. Ignored files (scripts) are kept but never run. */
+/** A file of the skill. Scripts run on the agent's PC; old imports kept them as `ignored` (reinstall). */
 function FileEntry({ file }: { file: SkillFile }) {
   const { t } = useTranslation();
   return (
     <span className="skill-file" data-status={file.status}>
       <code>{file.path}</code>
-      {file.status === "ignored" ? (
-        <Chip icon="block">{t("skills.needsSandbox")}</Chip>
+      {file.status === "script" ? (
+        <Chip icon="code">{t("skills.runsOnPc")}</Chip>
+      ) : file.status === "ignored" ? (
+        <>
+          <Chip icon="block">{t("skills.needsSandbox")}</Chip>
+          <span className="small muted">{t("skills.reinstall")}</span>
+        </>
       ) : (
         <span className="small muted">{file.mime}</span>
       )}

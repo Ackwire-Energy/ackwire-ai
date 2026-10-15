@@ -28,7 +28,11 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   },
   "issues:write": { label: "Issues", description: "Criar e atualizar issues." },
   "skills:read": { label: "Usar skills", description: "Carregar as skills ligadas para o agente." },
-  "sandbox:exec": { label: "Rodar código", description: "Rodar comandos num ambiente isolado." },
+  "sandbox:run": {
+    label: "Rodar código",
+    description:
+      "Rodar código e scripts de skills no computador do agente (isolado, sem segredos, arquivos guardados entre conversas); custa tempo de máquina. Nunca vem ligado por padrão.",
+  },
 };
 
 /**
@@ -85,7 +89,8 @@ export function toolAccess(
   // Write implies read for built-ins (`issues:write` ⇒ `list_issues`, `drive:write` ⇒ `read_artifact`…).
   const writeScope = impliedByWrite(tool.scope);
   if (!conn && writeScope && granted.has(grantKey(null, writeScope))) return "inherited";
-  if (granted.has(grantKey(null, ALL_TOOLS))) return "inherited";
+  // "All tools" never includes running code: that is always a separate, explicit grant (D30).
+  if (granted.has(grantKey(null, ALL_TOOLS)) && !NOT_IN_ALL.has(tool.scope)) return "inherited";
   return "off";
 }
 
@@ -94,6 +99,9 @@ export function impliedByWrite(scope: string) {
   const m = /^(drive|issues|calendar):read$/.exec(scope);
   return m ? `${m[1]}:write` : null;
 }
+
+/** Scopes that "all tools" (`*`) doesn't cover. */
+const NOT_IN_ALL = new Set(["sandbox:run"]);
 
 export const isAllowed = (state: AccessState) => state === "granted" || state === "inherited";
 

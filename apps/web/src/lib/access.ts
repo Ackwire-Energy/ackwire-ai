@@ -23,6 +23,8 @@ export interface AccessNode {
   locked: boolean;
   /** A custom MCP server ("servidor MCP" next to its own label). */
   custom?: boolean;
+  /** Not covered by "Todas as ferramentas" ("Rodar código"): granted on its own. */
+  notInAll?: boolean;
   /** What the backend calls it: a built-in area is one or more scopes. */
   ref:
     | { kind: "scopes"; connectionId: null; scopes: string[] }
@@ -47,8 +49,10 @@ export const toolLabel = (name: string) => name.replace(/[_-]+/g, " ").trim();
 const toolId = (connectionId: string | null, name: string) => `tool:${connectionId ?? "builtin"}|${name}`;
 
 /** Built-in scopes grouped by area, with consistent names ("Issues": ler + criar e editar). */
-export type BuiltinArea = "context" | "issues" | "calendar" | "drive" | "skills" | "chat" | "other";
-const AREA_ORDER: BuiltinArea[] = ["context", "issues", "calendar", "drive", "skills", "chat", "other"];
+export type BuiltinArea = "context" | "issues" | "calendar" | "drive" | "skills" | "sandbox" | "chat" | "other";
+const AREA_ORDER: BuiltinArea[] = ["context", "issues", "calendar", "drive", "skills", "sandbox", "chat", "other"];
+/** "Rodar código" is not covered by "Todas as ferramentas" (same as the backend's NOT_IN_ALL). */
+export const NOT_IN_ALL: ReadonlySet<BuiltinArea> = new Set(["sandbox"]);
 export function builtinArea(scope: string): BuiltinArea {
   if (scope === "") return "chat";
   const prefix = scope.split(":")[0] ?? "";
@@ -57,6 +61,7 @@ export function builtinArea(scope: string): BuiltinArea {
   if (prefix === "calendar") return "calendar";
   if (prefix === "drive" || prefix === "artifacts") return "drive";
   if (prefix === "skills") return "skills";
+  if (prefix === "sandbox") return "sandbox";
   return "other";
 }
 /** pt-BR names of the areas (the UI passes translated ones; these are the fallback). */
@@ -66,6 +71,7 @@ export const AREA_LABEL: Record<BuiltinArea, string> = {
   calendar: "Agenda",
   drive: "Drive",
   skills: "Skills",
+  sandbox: "Rodar código",
   chat: "Conversa",
   other: "Outras",
 };
@@ -90,6 +96,7 @@ function areaGroups<T extends { scope: string }>(
         sensitive: false,
         readOnly: false,
         locked: scopes.every((x) => x === ""),
+        notInAll: NOT_IN_ALL.has(area),
         ref: { kind: "scopes", connectionId: null, scopes: scopes.filter((x) => x !== "") },
       },
     };
@@ -270,7 +277,7 @@ export function resolve(tree: AccessNode[], model: AccessModel): ResolvedNode[] 
     }
     return { ...n, state, checked, children };
   };
-  return tree.map((n) => go(n, model.allTools));
+  return tree.map((n) => go(n, model.allTools && !n.notInAll));
 }
 
 const tools = (nodes: ResolvedNode[]): ResolvedNode[] =>

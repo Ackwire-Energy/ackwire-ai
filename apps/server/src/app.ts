@@ -23,6 +23,7 @@ import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
 import { questionRoutes } from "./routes/app/questions";
 import { routineRoutes } from "./routes/app/routines";
+import { sandboxRoutes } from "./routes/app/sandboxes";
 import { skillRoutes } from "./routes/app/skills";
 import { storageRoutes } from "./routes/app/storage";
 import { registerHealth } from "./routes/health";
@@ -97,6 +98,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", routineRoutes(deps));
     api.route("/app", calendarRoutes(deps));
     api.route("/app", skillRoutes(deps));
+    api.route("/app", sandboxRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     registerWebhookReceiver(api, deps);
   }

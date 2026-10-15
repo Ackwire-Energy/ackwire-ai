@@ -75,6 +75,15 @@ export interface Credential {
   revokedAt: string | null;
 }
 
+/** Who can talk to an agent: everyone, some people, or only its owner. */
+export type AudienceMode = "everyone" | "people" | "owner";
+
+export interface AgentAudience {
+  mode: AudienceMode;
+  /** For `people` (the owner can always talk to it). */
+  userIds: string[];
+}
+
 export interface Agent {
   id: string;
   name: string;
@@ -86,6 +95,11 @@ export interface Agent {
   hasCredential: boolean;
   monthlyBudgetUsd: number | null;
   createdAt: string;
+  /** Expected from the backend; absent = everyone. */
+  audience?: AgentAudience;
+  audienceMode?: AudienceMode;
+  /** Whether I can talk to it (absent = yes). */
+  canTalk?: boolean;
 }
 
 export interface AgentInput {
@@ -97,6 +111,7 @@ export interface AgentInput {
   credentialId?: string | null;
   ownerUserId?: string | null;
   monthlyBudgetUsd?: number | null;
+  audience?: AgentAudience;
 }
 
 export interface Model {
@@ -477,7 +492,7 @@ export interface UsageReport {
   since: string;
   totalUsd: number;
   byKind: {
-    kind: "agent" | "router" | "embedding" | "summary";
+    kind: "agent" | "router" | "embedding" | "summary" | "sandbox";
     calls: number;
     partialCalls: number;
     inputTokens: number;
@@ -988,8 +1003,8 @@ export interface SkillFile {
   path: string;
   size: number;
   mime: string;
-  /** `ignored`: scripts and other files that would need a sandbox; never run. */
-  status: "stored" | "ignored";
+  /** `script`: runs on the agent's PC; `ignored`: old imports whose scripts never run (reinstall to use them). */
+  status: "stored" | "ignored" | "script";
 }
 
 export interface SkillDetail extends Skill {
@@ -1016,4 +1031,35 @@ export interface SkillPatch {
   description?: string;
   body?: string;
   defaultForNewAgents?: boolean;
+}
+
+// ── PC do agente (sandbox): apps/server/src/routes/app/sandboxes.ts; `…/agents/{id}/computer` expected ──
+
+export interface SandboxSettings {
+  /** A sandbox provider is configured on this server. */
+  available: boolean;
+  enabled: boolean;
+  /** Domains the PCs may reach (`*.` wildcards); empty = no internet. */
+  allowDomains: string[];
+  execTimeoutSeconds: number;
+  maxTimeoutSeconds: number;
+  /** Minutes of PC time per day for the whole workspace. */
+  dailyMinutes: number;
+  /** Ask a person before running code. */
+  requireApproval: boolean;
+}
+
+export type SandboxSettingsInput = Partial<
+  Pick<SandboxSettings, "enabled" | "allowDomains" | "execTimeoutSeconds" | "dailyMinutes" | "requireApproval">
+>;
+
+/** `GET …/agents/{id}/computer`: the agent's own PC. */
+export interface AgentComputer {
+  status: "running" | "stopped" | "archived" | "none";
+  diskUsedGib: number;
+  costMonthUsd: number;
+  createdAt: string | null;
+  lastUsedAt: string | null;
+  /** `provider-default` when the provider can't apply our domain list (plan limitation). */
+  network?: "blocked" | "allowlist" | "provider-default";
 }

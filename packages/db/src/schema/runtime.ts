@@ -144,7 +144,7 @@ export const agentRunSteps = pgTable(
   (t) => [unique().on(t.runId, t.seq)],
 );
 
-export const usageKindEnum = pgEnum("usage_kind", ["agent", "router", "embedding", "summary"]);
+export const usageKindEnum = pgEnum("usage_kind", ["agent", "router", "embedding", "summary", "sandbox"]);
 
 /**
  * One row per model call, written by the Model Gateway only. Same numbers in

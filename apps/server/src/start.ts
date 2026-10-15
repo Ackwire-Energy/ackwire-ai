@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   type Adapters,
+  createDaytonaSandboxProvider,
   createLogEmailSender,
   createMemoryPresence,
   createMemoryRateLimiter,
@@ -86,8 +87,16 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
       anthropic: { apiKey: config.PLATFORM_ANTHROPIC_API_KEY, workspaceId: config.PLATFORM_ANTHROPIC_WORKSPACE_ID },
     }),
     platformBlobs: platformBlobStore(config, database.db),
+    sandbox: config.DAYTONA_API_KEY
+      ? createDaytonaSandboxProvider({
+          apiKey: config.DAYTONA_API_KEY,
+          apiUrl: config.DAYTONA_API_URL,
+          target: config.DAYTONA_TARGET,
+        })
+      : null,
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
+  log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
   const base = { config, db: database.db, edition, version };
   const { adapters, modelProviders, overridden } = await resolveAdapters(modules, base, defaults, {
     anthropic: createAnthropicProvider(),
@@ -133,6 +142,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
         storage: engine.storage,
         artifacts: engine.artifacts,
         context: engine.context,
+        sandbox: engine.sandbox,
       },
     },
     log,

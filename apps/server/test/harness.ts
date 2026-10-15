@@ -8,6 +8,7 @@ import {
   createPostgresSearchResolver,
   noPlatformCredentials,
   type S3Fetch,
+  type SandboxProvider,
 } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
 import { createTestDatabase } from "@agenteschat/db/testing";
@@ -45,6 +46,8 @@ export async function createTestServer(
     /** Fake S3 server and DNS for org buckets. */
     s3Fetch?: S3Fetch;
     resolveHost?: ResolveHost;
+    /** Fake code sandbox (off by default). */
+    sandbox?: SandboxProvider;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -77,6 +80,7 @@ export async function createTestServer(
     deltaFlushMs: 0,
     s3Fetch: options.s3Fetch,
     resolveHost: options.resolveHost,
+    sandbox: options.sandbox ?? null,
   });
   const { handlers } = engine;
   const auth = createAuth({ db, config, log, emailDelivers: true });
@@ -98,6 +102,7 @@ export async function createTestServer(
         storage: engine.storage,
         artifacts: engine.artifacts,
         context: engine.context,
+        sandbox: engine.sandbox,
       },
     },
     log,

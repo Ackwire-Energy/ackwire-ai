@@ -4,6 +4,7 @@ import type { KeyWrapper, PlatformCredentials } from "./keys";
 import type { Presence } from "./presence";
 import type { PubSub } from "./pubsub";
 import type { RateLimiter } from "./rate-limiter";
+import type { SandboxProvider } from "./sandbox";
 import type { SearchIndexResolver } from "./search";
 
 export * from "./blob";
@@ -15,6 +16,7 @@ export * from "./pubsub";
 export * from "./rate-limiter";
 export * from "./s3";
 export * from "./s3-fake";
+export * from "./sandbox";
 export * from "./search";
 
 /**
@@ -38,4 +40,6 @@ export interface Adapters {
    * their own bucket are resolved on top of it by the engine.
    */
   platformBlobs: BlobStore;
+  /** Where agents run code (D30): Daytona in the Cloud; null/absent = the sandbox tools are off. */
+  sandbox?: SandboxProvider | null;
 }

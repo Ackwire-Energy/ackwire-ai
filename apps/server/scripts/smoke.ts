@@ -10,9 +10,12 @@
  * Steps: migrate → throwaway user, org, credential, agent and channel → post
  * an @mention → run the real worker loop until the streamed reply is saved →
  * print the reply and its usage record → delete the throwaway org and user.
+ * With DAYTONA_API_KEY: also a tiny sandbox (no network) runs
+ * `python3 -c "print(1+1)"` and is deleted.
  */
 import {
   channelTopic,
+  createDaytonaSandboxProvider,
   createLogEmailSender,
   createMemoryPresence,
   createMemoryPubSub,
@@ -181,6 +184,30 @@ try {
       2,
     ),
   );
+  if (config.DAYTONA_API_KEY) {
+    step("sandbox: creating (Daytona, no network)");
+    const sandbox = createDaytonaSandboxProvider({
+      apiKey: config.DAYTONA_API_KEY,
+      apiUrl: config.DAYTONA_API_URL,
+      target: config.DAYTONA_TARGET,
+    });
+    const box = await sandbox.create({
+      key: `smoke:${userId}`,
+      labels: { "agentes.smoke": "1" },
+      allowDomains: [],
+      autoStopMinutes: 5,
+      autoArchiveMinutes: 60,
+    });
+    try {
+      step(`sandbox ${box.id} started (network: ${box.network}); running python`);
+      const r = await sandbox.exec(box.id, { command: 'python3 -c "print(1+1)"', timeoutSeconds: 30 });
+      console.log(JSON.stringify(r));
+      if (r.exitCode !== 0 || r.stdout.trim() !== "2") throw new Error("sandbox python did not print 2");
+    } finally {
+      await sandbox.destroy(box.id);
+      step("sandbox deleted");
+    }
+  } else step("sandbox: skipped (no DAYTONA_API_KEY)");
   step("smoke ok");
 } catch (error) {
   console.error("smoke FAILED:", error instanceof Error ? error.message : error);

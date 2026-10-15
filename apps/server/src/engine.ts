@@ -1,4 +1,4 @@
-import type { Adapters, S3Fetch } from "@agenteschat/adapters";
+import type { Adapters, S3Fetch, SandboxProvider } from "@agenteschat/adapters";
 import { type Config, connectorOAuthApps } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
@@ -13,6 +13,7 @@ import {
   createIssueToolSource,
   createJobHandlers,
   createModelGateway,
+  createSandboxToolSource,
   createSkillToolSource,
   createToolGateway,
   type McpConnect,
@@ -20,6 +21,7 @@ import {
   queueBudgetEmail,
   type ResolveHost,
   type RunExecutorDeps,
+  type SandboxDeps,
   type StorageDeps,
   type ToolSource,
 } from "@agenteschat/engine";
@@ -45,6 +47,8 @@ export interface EngineOptions {
   resolveHost?: ResolveHost;
   /** Per-run stage breakdown (debug log). */
   onRunProfile?: RunExecutorDeps["onRunProfile"];
+  /** Tests: a fake sandbox provider (default: the adapters' one, if any). */
+  sandbox?: SandboxProvider | null;
 }
 
 /**
@@ -100,6 +104,21 @@ export function buildEngine(o: EngineOptions) {
     resolveHost: o.resolveHost,
   };
   const artifacts: ArtifactDeps = { db, blobs: createBlobStoreResolver(storage), pubsub: adapters.pubsub };
+  // Code sandbox (D30): only when a provider is configured (Daytona in the Cloud).
+  const sandboxProvider = o.sandbox !== undefined ? o.sandbox : (adapters.sandbox ?? null);
+  const sandbox: SandboxDeps | null = sandboxProvider
+    ? {
+        db,
+        provider: sandboxProvider,
+        pricing: {
+          vcpuHourUsd: config.SANDBOX_PRICE_VCPU_HOUR_USD,
+          memoryGibHourUsd: config.SANDBOX_PRICE_MEMORY_GIB_HOUR_USD,
+          diskGibHourUsd: config.SANDBOX_PRICE_DISK_GIB_HOUR_USD,
+        },
+        autoStopMinutes: config.SANDBOX_AUTO_STOP_MINUTES,
+        archiveAfterDays: config.SANDBOX_ARCHIVE_AFTER_DAYS,
+      }
+    : null;
   const tools = createToolGateway({
     sources: [
       createAskUserToolSource(),
@@ -109,6 +128,7 @@ export function buildEngine(o: EngineOptions) {
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),
       createContextToolSource(context),
       createConnectorToolSource(connectorDeps),
+      ...(sandbox ? [createSandboxToolSource({ ...sandbox, artifacts, skills: { blobs: artifacts.blobs } })] : []),
       ...(o.toolSources ?? []),
     ],
   });
@@ -140,7 +160,7 @@ export function buildEngine(o: EngineOptions) {
         : {}),
     },
   });
-  return { gateway, tools, context, handlers, connectorDeps, storage, artifacts };
+  return { gateway, tools, context, handlers, connectorDeps, storage, artifacts, sandbox };
 }
 
 export type Engine = ReturnType<typeof buildEngine>;

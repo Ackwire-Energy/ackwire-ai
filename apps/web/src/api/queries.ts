@@ -17,6 +17,7 @@ import type {
   Role,
   RoutineInput,
   S3Input,
+  SandboxSettingsInput,
   ScopeGrant,
   SearchKind,
   SkillInput,
@@ -1000,5 +1001,51 @@ export function useSkillAction(orgId: string) {
       }
     },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.skills(orgId) }),
+  });
+}
+
+// ── PC do agente (sandbox) ───────────────────────────────────────────────────
+
+/** `retry: false`: 404 = no sandbox on this server (the UI hides it). */
+export const useSandboxSettings = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.sandboxSettings(orgId),
+    queryFn: () => api.sandbox.settings(orgId),
+    enabled,
+    retry: false,
+  });
+};
+
+export function useSaveSandboxSettings(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SandboxSettingsInput) => api.sandbox.saveSettings(orgId, input),
+    onSuccess: (saved) => qc.setQueryData(keys.sandboxSettings(orgId), saved),
+  });
+}
+
+export const useComputer = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.computer(orgId, agentId),
+    queryFn: () => api.sandbox.computer(orgId, agentId),
+    enabled,
+    retry: false,
+  });
+};
+
+export function useComputerAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, action }: { agentId: string; action: "start" | "stop" | "remove" }): Promise<unknown> =>
+      action === "start"
+        ? api.sandbox.start(orgId, agentId)
+        : action === "stop"
+          ? api.sandbox.stop(orgId, agentId)
+          : api.sandbox.remove(orgId, agentId),
+    onSettled: (_d, _e, { agentId }) => qc.invalidateQueries({ queryKey: keys.computer(orgId, agentId) }),
   });
 }

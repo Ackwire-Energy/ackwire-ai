@@ -23,6 +23,13 @@ export type ActivityKind =
   | "askingQuestion"
   | "openingSkill"
   | "consultingSkill"
+  | "runningCode"
+  | "pcFiles"
+  | "exportingFile"
+  | "importingFile"
+  | "runningSkillScript"
+  | "runningSkillScriptAny"
+  | "fetchingFile"
   | "usingTool";
 
 export interface Activity {
@@ -53,6 +60,14 @@ const BUILTIN: Record<string, ActivityKind> = {
   find_free_time: "checkingCalendar",
   propose_event: "schedulingEvent",
   ask_user: "askingQuestion",
+  // The agent's PC (sandbox).
+  run_code: "runningCode",
+  write_file: "pcFiles",
+  read_file: "pcFiles",
+  list_files: "pcFiles",
+  export_file: "exportingFile",
+  import_file: "importingFile",
+  share_artifact: "fetchingFile",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */
@@ -108,6 +123,9 @@ export function toolActivity(
   const name = (tool ?? "").trim().toLowerCase();
   if (!name) return { kind: "thinking" };
   // "Theo está abrindo a skill Revisão de PR…", or "consultando uma skill" without the name.
+  if (name === "run_skill_script") {
+    return detail?.trim() ? { kind: "runningSkillScript", app: detail.trim() } : { kind: "runningSkillScriptAny" };
+  }
   if (name === "load_skill")
     return detail?.trim() ? { kind: "openingSkill", app: detail.trim() } : { kind: "consultingSkill" };
   const builtin = BUILTIN[name];

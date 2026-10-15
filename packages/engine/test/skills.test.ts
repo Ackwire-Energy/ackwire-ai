@@ -113,7 +113,7 @@ describe("SKILL.md", () => {
 });
 
 describe("import", () => {
-  test("a zip of the folder: SKILL.md + text files stored, scripts listed as ignored", async () => {
+  test("a zip of the folder: SKILL.md + text files stored, scripts kept as scripts, binaries ignored", async () => {
     f = await setup();
     const skill = await importSkillZip(
       skillDeps(),
@@ -124,12 +124,14 @@ describe("import", () => {
         "relatorio-semanal/templates/relatorio.md": "# Semana {{n}}",
         "relatorio-semanal/scripts/build.py": "print('no')",
         "relatorio-semanal/run.sh": "rm -rf /",
+        "relatorio-semanal/logo.png": "PNG",
       }),
     );
     expect(skill).toMatchObject({ name: "relatorio-semanal", version: 1, source: "upload" });
     expect(skill.files.map((x) => [x.path, x.status])).toEqual([
-      ["run.sh", "ignored"],
-      ["scripts/build.py", "ignored"],
+      ["logo.png", "ignored"],
+      ["run.sh", "script"],
+      ["scripts/build.py", "script"],
       ["templates/relatorio.md", "stored"],
     ]);
     const audit = await f.db.select().from(schema.auditLog);
@@ -159,6 +161,7 @@ describe("import", () => {
       }
       if (url.endsWith("/relatorio-semanal/SKILL.md")) return new Response(SKILL_MD);
       if (url.endsWith("/templates/relatorio.md")) return new Response("# Semana {{n}}");
+      if (url.endsWith("/relatorio-semanal/build.py")) return new Response("print(1)");
       return new Response("not found", { status: 404 });
     };
     const deps = { ...skillDeps(), fetch: fake };
@@ -166,10 +169,11 @@ describe("import", () => {
     const skill = await importSkillFromUrl(deps, f.owner.id, f.org.id, url);
     expect(skill).toMatchObject({ name: "relatorio-semanal", source: "url", sourceUrl: url });
     expect(skill.files.map((x) => [x.path, x.status])).toEqual([
-      ["build.py", "ignored"],
+      ["build.py", "script"],
       ["templates/relatorio.md", "stored"],
     ]);
-    expect(fetched.some((u) => u.endsWith("build.py"))).toBe(false); // scripts are never downloaded
+    // Scripts are kept for the sandbox (never shown to the model).
+    expect(fetched.some((u) => u.endsWith("build.py"))).toBe(true);
 
     await expect(importSkillFromUrl(deps, f.owner.id, f.org.id, "https://example.com/SKILL.md")).rejects.toThrow(
       "GitHub",
@@ -232,7 +236,8 @@ describe("runtime", () => {
     expect(results[0]).toMatchObject({ name: "load_skill", isError: false });
     expect(results[0]?.content).toContain('Skill "relatorio-semanal" (v1) loaded.');
     expect(results[0]?.content).toContain("1. Junte as entregas da semana.");
-    expect(results[0]?.content).toContain("run.sh (ignorado: precisa de sandbox");
+    expect(results[0]?.content).toContain("run.sh (script: roda com run_skill_script");
+    expect(results[0]?.content).not.toContain("echo");
     expect(results[1]).toMatchObject({ name: "read_skill_file", isError: false });
     expect(results[1]?.content).toContain("# Semana {{n}}");
     expect(results[2]).toMatchObject({ name: "read_skill_file", isError: true });
@@ -289,7 +294,7 @@ describe("files, counts and delete", () => {
     expect(current).toMatchObject({ version: 2, mime: "text/markdown", content: "# Semana v2" });
     const old = await getSkillFile(skillDeps(), f.owner.id, f.org.id, v1.id, "templates/relatorio.md", 1);
     expect(old.content).toBe("# Semana {{n}}");
-    await expect(getSkillFile(skillDeps(), f.owner.id, f.org.id, v1.id, "run.sh")).rejects.toThrow(/sandbox/);
+    await expect(getSkillFile(skillDeps(), f.owner.id, f.org.id, v1.id, "run.sh")).rejects.toThrow(/script/);
     await expect(getSkillFile(skillDeps(), f.owner.id, f.org.id, v1.id, "run.sh")).rejects.toBeInstanceOf(
       NotFoundError,
     );

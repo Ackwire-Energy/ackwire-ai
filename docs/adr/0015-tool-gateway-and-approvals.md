@@ -8,7 +8,7 @@
 
 **Tools.** A `ToolDefinition` (name, description, JSON Schema input, `scope`, optional `connectionId`, `sensitive`, `describe`, `execute`) comes from a `ToolSource` (built-in tools, MCP connectors, sandbox). Sources never decide permissions.
 
-**Scopes.** `agent_scopes (agent_id, connection_id, scope)` holds what an agent may do; `connection_id` null is a built-in scope (`context:read`, `memory:write`, `drive:*`, `issues:write`, `sandbox:exec`). Grants are validated against the built-in list or the connector catalogs; nothing else can be granted.
+**Scopes.** `agent_scopes (agent_id, connection_id, scope)` holds what an agent may do; `connection_id` null is a built-in scope (`context:read`, `memory:write`, `drive:*`, `issues:write`, `sandbox:run`). Grants are validated against the built-in list or the connector catalogs; nothing else can be granted.
 
 **Tool Gateway** (`createToolGateway`), the only path from a model's tool call to execution:
 1. look the tool up by name among the run's sources (the model's description of it is irrelevant);

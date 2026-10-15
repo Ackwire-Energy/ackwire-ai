@@ -64,6 +64,7 @@ export function AccessTree({
           {model.allTools && (
             <span id="acc-all-note" className="small muted">
               {t("access.allToolsNote")}
+              {tree.some((g) => g.notInAll) && <> {t("access.notInAllNote")}</>}
             </span>
           )}
         </span>

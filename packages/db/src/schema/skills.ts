@@ -51,7 +51,7 @@ export const skillFiles = pgTable(
     path: text().notNull(),
     size: integer().notNull(),
     mime: text().notNull(),
-    /** `stored`, or `ignored` (scripts and other files that need a sandbox or can't be shown). */
+    /** `stored` (text the model may read), `script` (kept for the sandbox, never shown) or `ignored` (binaries, listed only). */
     status: text().notNull(),
     storageConfigId: uuid(),
     blobKey: text(),

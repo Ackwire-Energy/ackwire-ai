@@ -36,6 +36,15 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
   "calendar:read": ["list_events", "find_free_time"],
   "calendar:write": ["propose_event"],
   "skills:read": ["load_skill", "read_skill_file"],
+  "sandbox:run": [
+    "run_code",
+    "write_file",
+    "read_file",
+    "list_files",
+    "export_file",
+    "import_file",
+    "run_skill_script",
+  ],
 };
 
 export interface ToolRef {

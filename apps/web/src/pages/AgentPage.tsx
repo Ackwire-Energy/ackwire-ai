@@ -40,6 +40,7 @@ import {
 } from "@/api/queries";
 import type { Agent, AgentAccess } from "@/api/types";
 import { AccessTree } from "@/components/AccessTree";
+import { AgentComputerRow } from "@/components/AgentComputer";
 import { EditDialog } from "@/components/EditDialog";
 import { useOrg } from "@/components/org-context";
 import { ManageSkillsDialog } from "@/components/Skills";
@@ -253,6 +254,8 @@ function AgentProfile({ agent }: { agent: Agent }) {
             <span className="muted">{t("skills.agentEmpty", { name: agent.name })}</span>
           )}
         </SummaryRow>
+
+        <AgentComputerRow agent={agent} editable={editable} />
 
         <SummaryRow
           id="sec-budget"

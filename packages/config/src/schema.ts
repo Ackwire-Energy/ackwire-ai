@@ -353,6 +353,49 @@ export const envVars = {
     section: "Storage",
     secret: true,
   },
+  DAYTONA_API_KEY: {
+    schema: z.string().optional(),
+    description:
+      "Daytona API key: sandboxes where agents run code (`run_code`, skill scripts). Platform secret, never sent to a sandbox or a client. Without it the sandbox tools are off.",
+    section: "Sandbox",
+    secret: true,
+  },
+  DAYTONA_API_URL: {
+    schema: z.url().default("https://app.daytona.io/api"),
+    description: "Daytona API base URL.",
+    section: "Sandbox",
+  },
+  DAYTONA_TARGET: {
+    schema: z.string().optional(),
+    description: "Daytona region for new sandboxes (e.g. `us` or `eu`). Default: the Daytona organization's default.",
+    section: "Sandbox",
+  },
+  SANDBOX_AUTO_STOP_MINUTES: {
+    schema: z.coerce.number().int().min(1).max(120).default(10),
+    description: "An agent's computer stops after this many idle minutes (its next use starts it again, files kept).",
+    section: "Sandbox",
+  },
+  SANDBOX_ARCHIVE_AFTER_DAYS: {
+    schema: z.coerce.number().int().min(1).max(30).default(7),
+    description:
+      "A stopped computer is archived after this many days (files kept; starting it takes longer). Computers are never deleted automatically.",
+    section: "Sandbox",
+  },
+  SANDBOX_PRICE_VCPU_HOUR_USD: {
+    schema: z.coerce.number().min(0).default(0.0504),
+    description: "Price of one vCPU per hour, for the sandbox usage recorded per agent (Daytona list price).",
+    section: "Sandbox",
+  },
+  SANDBOX_PRICE_MEMORY_GIB_HOUR_USD: {
+    schema: z.coerce.number().min(0).default(0.0162),
+    description: "Price of one GiB of memory per hour, for sandbox usage.",
+    section: "Sandbox",
+  },
+  SANDBOX_PRICE_DISK_GIB_HOUR_USD: {
+    schema: z.coerce.number().min(0).default(0.000108),
+    description: "Price of one GiB of disk per hour, for sandbox usage.",
+    section: "Sandbox",
+  },
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),
     description: "Minimum log level written to stdout.",

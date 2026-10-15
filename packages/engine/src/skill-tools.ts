@@ -11,7 +11,7 @@ const failed = (error: unknown): ToolOutput => ({
  * Skills through the Tool Gateway (`skills:read`, on by default):
  * `load_skill` returns a skill's instructions and its files, and
  * `read_skill_file` one of its text files. Only skills enabled for the agent;
- * scripts are never offered (no sandbox yet).
+ * scripts are never shown: `run_skill_script` (sandbox tools, D30) runs them.
  */
 export function createSkillToolSource(deps: SkillDeps): ToolSource {
   const tools: ToolDefinition[] = [
@@ -33,11 +33,13 @@ export function createSkillToolSource(deps: SkillDeps): ToolSource {
           const files = await skillFilesOf(ctx.db, skill);
           const list = files.length
             ? files
-                .map((f) =>
-                  f.status === "stored"
-                    ? `- ${f.path} (${f.mime}, ${f.size} bytes)`
-                    : `- ${f.path} (ignorado: precisa de sandbox, não está disponível)`,
-                )
+                .map((f) => {
+                  if (f.status === "stored") return `- ${f.path} (${f.mime}, ${f.size} bytes)`;
+                  if (f.status === "script") {
+                    return `- ${f.path} (script: roda com run_skill_script se você tiver o ambiente de código; o conteúdo não é mostrado)`;
+                  }
+                  return `- ${f.path} (ignorado: arquivo binário)`;
+                })
                 .join("\n")
             : "(no files)";
           return {

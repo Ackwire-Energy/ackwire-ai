@@ -33,9 +33,11 @@ import {
   syncQuestionMessage,
 } from "./questions";
 import { type AgentRun, addRunStep, type RunStatus, transitionRun } from "./runs";
+import { SANDBOX_SCOPE } from "./sandbox";
 import { enabledSkills } from "./skills";
 import { artifactToolDetail, toolDetail } from "./tool-detail";
 import type { Approval, ToolGateway } from "./tools/gateway";
+import { grantedScopeKeys, grantKey } from "./tools/scopes";
 import type { ToolContext } from "./tools/types";
 
 const { agentRuns, approvals, agentQuestions } = schema;
@@ -264,9 +266,19 @@ async function executeRunInner(
   let transcript = run.transcript as unknown as Transcript | null;
   if (!transcript) {
     const contextDeps = deps.context;
-    const pending = deps.tools
+    const pending: { label: string; reason: string }[] = deps.tools
       ? await pendingConnectors(db, run.orgId, new Set(tools.map((t) => t.name))).catch(() => [])
       : [];
+    // Granted code sandbox, but it is off (no provider on this server, or turned off by the org): say so.
+    if (deps.tools && !tools.some((t) => t.scope === SANDBOX_SCOPE)) {
+      const keys = await grantedScopeKeys(db, run.orgId, run.agentId).catch(() => new Set<string>());
+      if (keys.has(grantKey(null, SANDBOX_SCOPE))) {
+        pending.push({
+          label: "Rodar código (sandbox)",
+          reason: "liberado para você, mas o ambiente de código está desligado nesta organização ou neste servidor",
+        });
+      }
+    }
     // Skills: only names and descriptions here; the body loads with `load_skill` (progressive disclosure).
     const skillList = tools.some((t) => t.name === "load_skill") ? await enabledSkills(db, run.orgId, agent.id) : [];
     const [context, memory] = await Promise.all([

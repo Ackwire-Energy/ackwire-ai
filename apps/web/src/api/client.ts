@@ -4,6 +4,7 @@ import type {
   Agent,
   AgentAccess,
   AgentChannel,
+  AgentComputer,
   AgentDetail,
   AgentInput,
   AgentQuestion,
@@ -56,6 +57,8 @@ import type {
   Run,
   RunStep,
   S3Input,
+  SandboxSettings,
+  SandboxSettingsInput,
   ScheduleParse,
   ScopeGrant,
   SearchHit,
@@ -213,6 +216,16 @@ export interface ApiClient {
   };
   search: {
     query(orgId: string, input: { q: string; kinds?: SearchKind[]; limit?: number }): Promise<SearchHit[]>;
+  };
+  sandbox: {
+    settings(orgId: string): Promise<SandboxSettings>;
+    saveSettings(orgId: string, input: SandboxSettingsInput): Promise<SandboxSettings>;
+    /** The agent's PC (404 = this server has no sandbox). */
+    computer(orgId: string, agentId: string): Promise<AgentComputer>;
+    start(orgId: string, agentId: string): Promise<AgentComputer>;
+    stop(orgId: string, agentId: string): Promise<AgentComputer>;
+    /** Deletes the PC and all its files. */
+    remove(orgId: string, agentId: string): Promise<void>;
   };
   skills: {
     /** The org library. */

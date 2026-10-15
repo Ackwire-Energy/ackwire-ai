@@ -25,6 +25,7 @@ import { createMockArtifacts } from "./fakes/artifacts";
 import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
 import { createMockPlanning } from "./fakes/planning";
+import { createFakeSandbox } from "./fakes/sandbox";
 import { createFakeSkills } from "./fakes/skills";
 import { createMockStorage } from "./fakes/storage";
 
@@ -485,6 +486,7 @@ const id = (prefix: string) => `${prefix}-${++n}`;
 
 /** Served by the in-memory fakes in `test/fakes` (same shapes as the server). */
 type FakedParts =
+  | "sandbox"
   | "skills"
   | "access"
   | "invites"
@@ -637,7 +639,17 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       }),
     },
     agents: {
-      list: async () => state.agents,
+      // Same rule as the backend: everyone, the listed people, or only the owner (who can always talk to it).
+      list: async () =>
+        state.agents.map((a) => {
+          const mode = a.audience?.mode ?? "everyone";
+          const me = state.me?.user.id ?? "";
+          const canTalk =
+            mode === "everyone" ||
+            a.ownerUserId === me ||
+            (mode === "people" && (a.audience?.userIds ?? []).includes(me));
+          return { ...a, audienceMode: mode, canTalk };
+        }),
       create: async (orgId, input) => {
         log("agents.create", orgId, input);
         const agent: Agent = {
@@ -651,6 +663,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           hasCredential: Boolean(input.credentialId),
           monthlyBudgetUsd: input.monthlyBudgetUsd ?? null,
           createdAt: NOW.toISOString(),
+          audience: input.audience ?? { mode: "everyone", userIds: [] },
         };
         state.agents.push(agent);
         return agent;
@@ -1129,6 +1142,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   };
   return {
     ...http,
+    sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args })),
     skills: createFakeSkills(ctx, (method, ...args) => state.calls.push({ method, args })),
     access: createFakeAccess(
       ctx,

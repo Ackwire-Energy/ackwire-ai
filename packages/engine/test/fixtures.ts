@@ -8,6 +8,7 @@ import {
   noPlatformCredentials,
   type PlatformCredentials,
   type RealtimeEvent,
+  type SandboxProvider,
 } from "@agenteschat/adapters";
 import { type Database, schema } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
@@ -28,9 +29,11 @@ import {
   createLocalKeyWrapper,
   createModelGateway,
   createOrganization,
+  createSandboxToolSource,
   createSkillToolSource,
   createToolGateway,
   type MemberRole,
+  type SandboxDeps,
   type StorageDeps,
   type ToolSource,
 } from "../src";
@@ -75,6 +78,8 @@ export async function setup(
     skillTools?: boolean;
     /** Fake embeddings (hybrid search). Off: full-text only, no embedding usage rows. */
     embeddings?: boolean;
+    /** Add the sandbox tools with this (fake) provider. */
+    sandbox?: SandboxProvider;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -142,6 +147,15 @@ export async function setup(
     resolveHost: async (host) => (host.endsWith("example.com") ? ["93.184.216.34"] : ["10.0.0.5"]),
   };
   const artifactDeps: ArtifactDeps = { db, blobs: createBlobStoreResolver(storage), pubsub };
+  const sandboxDeps: SandboxDeps | null = options.sandbox
+    ? {
+        db,
+        provider: options.sandbox,
+        pricing: { vcpuHourUsd: 0.0504, memoryGibHourUsd: 0.0162, diskGibHourUsd: 0.000108 },
+        autoStopMinutes: 15,
+        archiveAfterDays: 7,
+      }
+    : null;
   const sources = [
     ...(options.askUser ? [createAskUserToolSource()] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
@@ -149,6 +163,9 @@ export async function setup(
     ...(options.calendarTools ? [createCalendarToolSource({ db, pubsub })] : []),
     ...(options.skillTools ? [createSkillToolSource({ db, blobs: artifactDeps.blobs })] : []),
     ...(options.contextTools ? [createContextToolSource(context)] : []),
+    ...(sandboxDeps
+      ? [createSandboxToolSource({ ...sandboxDeps, artifacts: artifactDeps, skills: { blobs: artifactDeps.blobs } })]
+      : []),
     ...(options.toolSources ?? []),
   ];
   const tools = sources.length > 0 ? createToolGateway({ sources }) : undefined;
@@ -198,6 +215,7 @@ export async function setup(
     s3,
     storage,
     artifactDeps,
+    sandboxDeps,
   };
 }
 

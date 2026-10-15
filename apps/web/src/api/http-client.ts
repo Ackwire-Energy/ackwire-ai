@@ -5,6 +5,7 @@ import type {
   Agent,
   AgentAccess,
   AgentChannel,
+  AgentComputer,
   AgentDetail,
   AgentQuestion,
   AgentSkill,
@@ -47,6 +48,7 @@ import type {
   RoutineRun,
   Run,
   RunStep,
+  SandboxSettings,
   ScheduleParse,
   ScopeGrant,
   SearchHit,
@@ -249,6 +251,17 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       list: async (orgId) => (await request<{ dms: DirectMessage[] }>(`${org(orgId)}/dms`)).dms,
       open: (orgId, target) => request<{ channelId: string }>(`${org(orgId)}/dms`, { json: target }),
       markRead: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/read`, { json: {} }),
+    },
+    sandbox: {
+      settings: (orgId) => request<SandboxSettings>(`${org(orgId)}/sandbox-settings`),
+      saveSettings: (orgId, input) =>
+        request<SandboxSettings>(`${org(orgId)}/sandbox-settings`, { method: "PUT", json: input }),
+      computer: (orgId, agentId) => request<AgentComputer>(`${org(orgId)}/agents/${enc(agentId)}/computer`),
+      start: (orgId, agentId) =>
+        request<AgentComputer>(`${org(orgId)}/agents/${enc(agentId)}/computer/start`, { json: {} }),
+      stop: (orgId, agentId) =>
+        request<AgentComputer>(`${org(orgId)}/agents/${enc(agentId)}/computer/stop`, { json: {} }),
+      remove: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/computer`, { method: "DELETE" }),
     },
     skills: {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,

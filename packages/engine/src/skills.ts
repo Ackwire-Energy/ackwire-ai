@@ -90,11 +90,26 @@ export function validateSkill(s: { name: string; description: string; body: stri
   if (s.body.length > SKILL_LIMITS.bodyChars) throw new ValidationError("The skill body is too long");
 }
 
-/** Is this path something we keep for the model to read? (Never scripts.) */
-export function classifyFile(path: string): { mime: string; status: "stored" | "ignored" } {
+/** Scripts we keep (never shown to the model) so `run_skill_script` can run them in a sandbox (D30). */
+export const SKILL_SCRIPTS: Record<string, string> = {
+  py: "text/x-python",
+  sh: "text/x-shellscript",
+  bash: "text/x-shellscript",
+  js: "text/javascript",
+  mjs: "text/javascript",
+  cjs: "text/javascript",
+};
+
+export type SkillFileStatus = "stored" | "script" | "ignored";
+
+/** `stored`: text the model may read; `script`: kept for the sandbox, never shown; `ignored`: listed only. */
+export function classifyFile(path: string): { mime: string; status: SkillFileStatus } {
   const ext = /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase() ?? "";
   const mime = SHOWABLE[ext];
-  return mime ? { mime, status: "stored" } : { mime: "application/octet-stream", status: "ignored" };
+  if (mime) return { mime, status: "stored" };
+  const script = SKILL_SCRIPTS[ext];
+  if (script) return { mime: script, status: "script" };
+  return { mime: "application/octet-stream", status: "ignored" };
 }
 
 function safePath(path: string) {
@@ -149,7 +164,7 @@ export interface SkillView {
 
 export interface SkillDetail extends SkillView {
   body: string;
-  files: { path: string; size: number; mime: string; status: "stored" | "ignored" }[];
+  files: { path: string; size: number; mime: string; status: SkillFileStatus }[];
 }
 
 const view = (s: SkillRow): SkillView => ({
@@ -172,7 +187,7 @@ export async function skillFilesOf(db: Database, s: SkillRow) {
     .from(skillFiles)
     .where(and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, s.version)))
     .orderBy(asc(skillFiles.path));
-  return rows.map((f) => ({ path: f.path, size: f.size, mime: f.mime, status: f.status as "stored" | "ignored" }));
+  return rows.map((f) => ({ path: f.path, size: f.size, mime: f.mime, status: f.status as SkillFileStatus }));
 }
 
 async function loadSkill(db: Database, orgId: string, id: string) {
@@ -194,7 +209,7 @@ async function storeFiles(deps: SkillDeps, s: { id: string; orgId: string }, ver
     const path = safePath(f.path);
     const { mime, status } = classifyFile(path);
     let blobKey: string | null = null;
-    if (status === "stored") {
+    if (status !== "ignored") {
       blobKey = `${location.prefix}skills/${s.id}/v${version}/${path}`;
       await location.store.put(blobKey, f.data, { contentType: mime });
     }
@@ -208,7 +223,7 @@ async function storeFiles(deps: SkillDeps, s: { id: string; orgId: string }, ver
         size: f.data.byteLength,
         mime,
         status,
-        storageConfigId: status === "stored" ? location.storageConfigId : null,
+        storageConfigId: status !== "ignored" ? location.storageConfigId : null,
         blobKey,
       })
       .onConflictDoNothing();
@@ -368,9 +383,9 @@ export async function importSkillFromUrl(deps: SkillDeps, actorId: string, orgId
       else if (item.type === "file") {
         total += item.size;
         if (total > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
-        // Scripts aren't downloaded: they are only listed as ignored.
+        // Binaries aren't downloaded (only listed); text and scripts are.
         const data =
-          classifyFile(item.path).status === "stored"
+          classifyFile(item.path).status !== "ignored"
             ? await fetchChecked(deps, raw(item.path), "*/*")
             : new Uint8Array();
         files.push({ path: relative, data });
@@ -556,8 +571,11 @@ export async function skillFileText(deps: SkillDeps, s: SkillRow, path: string, 
     .from(skillFiles)
     .where(and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, version), eq(skillFiles.path, path)));
   if (!f) throw new NotFoundError(`No file ${path} in this skill`);
+  if (f.status === "script") {
+    throw new NotFoundError(`${path} is a script: it is never shown, only run in the sandbox with run_skill_script`);
+  }
   if (f.status !== "stored" || !f.blobKey) {
-    throw new NotFoundError(`${path} is not available: scripts and binaries need a sandbox, which doesn't exist yet`);
+    throw new NotFoundError(`${path} is not available: binaries are listed only, never stored`);
   }
   const store = await deps.blobs.forConfig(s.orgId, f.storageConfigId);
   const object = await store.get(f.blobKey);
@@ -579,4 +597,20 @@ export async function getSkillFile(
   const text = await skillFileText(deps, s, path, version ?? s.version);
   const { mime } = classifyFile(path);
   return { path, version: version ?? s.version, mime, content: text };
+}
+
+/** Every kept file of the skill's version (text and scripts), with bytes: what `run_skill_script` copies into the sandbox. */
+export async function skillFolderFiles(deps: SkillDeps, s: SkillRow) {
+  const rows = await deps.db
+    .select()
+    .from(skillFiles)
+    .where(and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, s.version)));
+  const out: { path: string; status: SkillFileStatus; data: Uint8Array }[] = [];
+  for (const f of rows) {
+    if (f.status === "ignored" || !f.blobKey) continue;
+    const store = await deps.blobs.forConfig(s.orgId, f.storageConfigId);
+    const object = await store.get(f.blobKey);
+    if (object) out.push({ path: f.path, status: f.status as SkillFileStatus, data: object.body });
+  }
+  return out;
 }

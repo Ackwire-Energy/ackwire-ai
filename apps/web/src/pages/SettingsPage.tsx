@@ -37,6 +37,7 @@ import {
 } from "@/api/queries";
 import type { Connection, ConnectorDef, Credential, CustomServer, Role } from "@/api/types";
 import { AccessMatrixSection } from "@/components/AccessMatrix";
+import { SandboxSection } from "@/components/AgentComputer";
 import { ConnectCustomDialog, CustomServerRow, GrantAgentsDialog, ReviewToolsDialog } from "@/components/CustomMcp";
 import { useOrg } from "@/components/org-context";
 import { SkillsSection } from "@/components/Skills";
@@ -58,7 +59,16 @@ export function searchCatalog(list: ConnectorDef[], query: string) {
   return q ? list.filter((d) => `${d.label} ${d.id} ${d.description}`.toLowerCase().includes(q)) : list;
 }
 
-export type SettingsSection = "general" | "members" | "access" | "connectors" | "skills" | "keys" | "storage" | "usage";
+export type SettingsSection =
+  | "general"
+  | "members"
+  | "access"
+  | "connectors"
+  | "skills"
+  | "keys"
+  | "storage"
+  | "sandbox"
+  | "usage";
 
 /** The settings sub-nav, in order, with who can open each. */
 export const SETTINGS_SECTIONS: { id: SettingsSection; icon: IconName; allowed: (role: Role) => boolean }[] = [
@@ -69,6 +79,7 @@ export const SETTINGS_SECTIONS: { id: SettingsSection; icon: IconName; allowed: 
   { id: "skills", icon: "document", allowed: (r) => can(r, "configure") },
   { id: "keys", icon: "approve", allowed: (r) => can(r, "manage_credentials") },
   { id: "storage", icon: "drive", allowed: (r) => can(r, "configure") },
+  { id: "sandbox", icon: "code", allowed: (r) => can(r, "configure") },
   { id: "usage", icon: "waiting", allowed: (r) => can(r, "view_usage") },
 ];
 
@@ -150,6 +161,7 @@ export function SettingsPage({
         {current === "skills" && <SkillsSection />}
         {current === "keys" && <KeysSection />}
         {current === "storage" && <StorageSection />}
+        {current === "sandbox" && <SandboxSection />}
         {current === "usage" && <UsageSection />}
       </div>
     </div>
