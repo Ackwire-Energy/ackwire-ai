@@ -1,15 +1,27 @@
 import {
   createRoutine,
+  deleteRoutine,
+  duplicateRoutine,
   listRoutineRuns,
   listRoutines,
   parseScheduleForOrg,
   ROUTINE_EVENTS,
   type RoutineDeps,
   runRoutineNow,
-  setRoutineActive,
+  updateRoutine,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
+import {
+  type AppDeps,
+  body,
+  createAppRouter,
+  errors,
+  json,
+  noContent,
+  OrgParams,
+  requireSession,
+  security,
+} from "./context";
 
 const tags = ["Routines"];
 const Event = z.enum(ROUTINE_EVENTS);
@@ -75,9 +87,25 @@ const Routine = z
     running: z.boolean(),
     lastRun: RoutineRun.nullable(),
     monthCostUsd: z.number(),
+    budgetUsd: z.number().nullable().openapi({ description: "Monthly spend cap of this routine (null = none)." }),
     createdAt: z.string(),
   })
   .openapi("Routine");
+
+const TriggerInput = z.union([
+  z.object({
+    type: z.literal("schedule"),
+    phrase: z.string().min(1).max(300),
+    timezone: z.string().max(64).optional(),
+  }),
+  z.object({ type: z.literal("event"), event: Event }),
+  z.object({
+    type: z.literal("once"),
+    at: z.iso.datetime({ offset: true }),
+    timezone: z.string().max(64).optional(),
+  }),
+]);
+const Budget = z.number().min(0).max(100_000).nullable().optional();
 
 const RoutineParams = OrgParams.extend({ routineId: z.uuid() });
 
@@ -158,14 +186,8 @@ export function routineRoutes(deps: AppDeps) {
             agentId: z.uuid(),
             prompt: z.string().min(1).max(10_000),
             target: Target,
-            trigger: z.union([
-              z.object({
-                type: z.literal("schedule"),
-                phrase: z.string().min(1).max(300),
-                timezone: z.string().max(64).optional(),
-              }),
-              z.object({ type: z.literal("event"), event: Event }),
-            ]),
+            trigger: TriggerInput,
+            budgetUsd: Budget,
           }),
         ),
       },
@@ -183,14 +205,64 @@ export function routineRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/routines/{routineId}",
       tags,
       security,
-      summary: "Pause or resume",
-      request: { params: RoutineParams, body: body(z.object({ active: z.boolean() })) },
+      summary:
+        "Edit a routine (its creator, admins or the agent's owner): name, prompt, agent, trigger, target, budget, pause/resume",
+      request: {
+        params: RoutineParams,
+        body: body(
+          z.object({
+            name: z.string().min(1).max(120).optional(),
+            prompt: z.string().min(1).max(10_000).optional(),
+            agentId: z.uuid().optional(),
+            trigger: TriggerInput.optional().openapi({
+              description:
+                "A schedule phrase is parsed again (in `timezone`, else the person's); `nextRunAt` is recomputed.",
+            }),
+            target: TargetView.optional(),
+            budgetUsd: Budget,
+            active: z.boolean().optional(),
+          }),
+        ),
+      },
       responses: { 200: json(Routine), ...errors },
     }),
     async (c) => {
       const { orgId, routineId } = c.req.valid("param");
-      const routine = await setRoutineActive(routines, c.get("user").id, orgId, routineId, c.req.valid("json").active);
+      const routine = await updateRoutine(routines, c.get("user").id, orgId, routineId, c.req.valid("json"));
       return c.json(routine, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/routines/{routineId}",
+      tags,
+      security,
+      summary: "Delete a routine (it stops firing; its run history stays)",
+      request: { params: RoutineParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, routineId } = c.req.valid("param");
+      await deleteRoutine(routines, c.get("user").id, orgId, routineId);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/routines/{routineId}/duplicate",
+      tags,
+      security,
+      summary: "A paused copy of a routine",
+      request: { params: RoutineParams },
+      responses: { 201: json(Routine, "Created"), ...errors },
+    }),
+    async (c) => {
+      const { orgId, routineId } = c.req.valid("param");
+      return c.json(await duplicateRoutine(routines, c.get("user").id, orgId, routineId), 201);
     },
   );
 

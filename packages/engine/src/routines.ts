@@ -1,5 +1,18 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, eq, gte, inArray, isNotNull, lte, rowsOf, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  type Database,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  rowsOf,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { getAgent } from "./agents";
 import type { ArtifactDeps } from "./artifacts";
 import { audienceNotice, canTalkTo } from "./audience";
@@ -65,6 +78,8 @@ export interface RoutineView {
   running: boolean;
   lastRun: RoutineRunView | null;
   monthCostUsd: number;
+  /** Spend cap of this routine per calendar month; null = only the agent's own budget. */
+  budgetUsd: number | null;
   createdAt: string;
 }
 
@@ -74,8 +89,16 @@ export interface RoutineInput {
   prompt: string;
   target: RoutineTarget;
   /** `timezone`: IANA zone the phrase is read in; default: the creator's, then the org's, then UTC. */
-  trigger: { type: "schedule"; phrase: string; timezone?: string } | { type: "event"; event: RoutineEvent };
+  trigger: RoutineTriggerInput;
+  /** Monthly spend cap of this routine, in USD (null/absent = none). */
+  budgetUsd?: number | null;
 }
+
+export type RoutineTriggerInput =
+  | { type: "schedule"; phrase: string; timezone?: string }
+  | { type: "event"; event: RoutineEvent }
+  /** Once, at this moment (ISO 8601). */
+  | { type: "once"; at: string; timezone?: string };
 
 export interface RoutineDeps {
   db: Database;
@@ -193,6 +216,7 @@ async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
         ? runView(last, agentRun, last.agentRunId ? (details.costById.get(last.agentRunId) ?? 0) : 0)
         : null,
       monthCostUsd: monthCost / 1e9,
+      budgetUsd: r.monthlyBudgetNanoUsd === null ? null : r.monthlyBudgetNanoUsd / 1e9,
       createdAt: r.createdAt.toISOString(),
     };
   });
@@ -253,6 +277,47 @@ export async function parseScheduleForOrg(
   return parseSchedule(phrase, { timezone: zone, llm: llmParser(deps, orgId) });
 }
 
+const budgetNano = (usd: number | null | undefined) => {
+  if (usd === undefined) return undefined;
+  if (usd === null) return null;
+  if (!Number.isFinite(usd) || usd < 0 || usd > 100_000) throw new ValidationError("Orçamento inválido.");
+  return Math.round(usd * 1e9);
+};
+
+/** The trigger columns of a routine, validated like on create; `nextRunAt` computed from now. */
+async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string, trigger: RoutineTriggerInput) {
+  const none = { phrase: null, cron: null, timezone: null, description: null, event: null };
+  if (trigger.type === "schedule") {
+    const parsed = await parseScheduleForOrg(deps, actorId, orgId, trigger.phrase, trigger.timezone);
+    if (!parsed.ok) throw new ValidationError(parsed.error);
+    const next = nextCronTime(parsed.cron, parsed.timezone, new Date());
+    if (!next) throw new ValidationError("Esse horário nunca acontece.");
+    return {
+      ...none,
+      triggerType: "schedule",
+      phrase: trigger.phrase.trim(),
+      cron: parsed.cron,
+      timezone: parsed.timezone,
+      description: parsed.description,
+      nextRunAt: next as Date | null,
+    };
+  }
+  if (trigger.type === "once") {
+    const at = new Date(trigger.at);
+    if (Number.isNaN(at.getTime())) throw new ValidationError("Data e hora inválidas.");
+    if (at.getTime() <= Date.now()) throw new ValidationError("Escolha um momento no futuro.");
+    const timezone = await routineTimezone(deps.db, actorId, orgId, trigger.timezone);
+    const description = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: timezone,
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(at);
+    return { ...none, triggerType: "once", timezone, description, nextRunAt: at as Date | null };
+  }
+  if (!ROUTINE_EVENTS.includes(trigger.event)) throw new ValidationError("Evento desconhecido.");
+  return { ...none, triggerType: "event", event: trigger.event as string | null, nextRunAt: null as Date | null };
+}
+
 /** Admins, or the agent's owner. */
 async function requireRoutineManager(db: Database, actorId: string, orgId: string, agentId: string) {
   const membership = await requirePermission(db, actorId, orgId, "read");
@@ -292,16 +357,7 @@ export async function createRoutine(
   const prompt = input.prompt.trim().slice(0, 10_000);
   if (!prompt) throw new ValidationError("Diga o que o agente deve fazer.");
   await checkTarget(db, orgId, agent.id, input.target);
-  let schedule: { phrase: string; cron: string; timezone: string; description: string; nextRunAt: Date } | null = null;
-  if (input.trigger.type === "schedule") {
-    const parsed = await parseScheduleForOrg(deps, actorId, orgId, input.trigger.phrase, input.trigger.timezone);
-    if (!parsed.ok) throw new ValidationError(parsed.error);
-    const next = nextCronTime(parsed.cron, parsed.timezone, new Date());
-    if (!next) throw new ValidationError("Esse horário nunca acontece.");
-    schedule = { phrase: input.trigger.phrase.trim(), ...parsed, nextRunAt: next };
-  } else if (!ROUTINE_EVENTS.includes(input.trigger.event)) {
-    throw new ValidationError("Evento desconhecido.");
-  }
+  const trigger = await resolveTrigger(deps, actorId, orgId, input.trigger);
   const name = input.name?.trim().slice(0, 120) || prompt.split("\n")[0]?.slice(0, 60) || "Rotina";
   const [row] = await db
     .insert(routines)
@@ -311,13 +367,8 @@ export async function createRoutine(
       name,
       prompt,
       target: input.target as unknown as Record<string, unknown>,
-      triggerType: input.trigger.type,
-      phrase: schedule?.phrase ?? null,
-      cron: schedule?.cron ?? null,
-      timezone: schedule?.timezone ?? null,
-      description: schedule?.description ?? null,
-      event: input.trigger.type === "event" ? input.trigger.event : null,
-      nextRunAt: schedule?.nextRunAt ?? null,
+      ...trigger,
+      monthlyBudgetNanoUsd: budgetNano(input.budgetUsd) ?? null,
       createdByUserId: actorId,
     })
     .returning();
@@ -335,17 +386,175 @@ export async function createRoutine(
 
 export async function listRoutines(db: Database, actorId: string, orgId: string) {
   await requirePermission(db, actorId, orgId, "read");
-  const rows = await db.select().from(routines).where(eq(routines.orgId, orgId)).orderBy(routines.createdAt);
+  const rows = await db
+    .select()
+    .from(routines)
+    .where(and(eq(routines.orgId, orgId), isNull(routines.deletedAt)))
+    .orderBy(routines.createdAt);
   return views(db, rows);
 }
 
-async function loadRoutine(db: Database, orgId: string, id: string) {
+async function loadRoutine(db: Database, orgId: string, id: string, options: { deleted?: boolean } = {}) {
   const [row] = await db
     .select()
     .from(routines)
     .where(and(eq(routines.id, id), eq(routines.orgId, orgId)));
-  if (!row) throw new NotFoundError("Routine not found");
+  if (!row || (row.deletedAt && !options.deleted)) throw new NotFoundError("Routine not found");
   return row;
+}
+
+/** Edit: its creator, admins, or the agent's owner. */
+async function requireRoutineEditor(db: Database, actorId: string, orgId: string, routine: RoutineRow) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  if (routine.createdByUserId === actorId || can(membership.role, "manage_agents")) return;
+  const agent = await getAgent(db, orgId, routine.agentId);
+  if (agent?.ownerUserId !== actorId) {
+    throw new ForbiddenError("Só quem criou a rotina, o dono do agente ou um admin pode mudar isso.");
+  }
+}
+
+export interface RoutinePatch {
+  name?: string;
+  prompt?: string;
+  agentId?: string;
+  trigger?: RoutineTriggerInput;
+  target?: RoutineTarget;
+  budgetUsd?: number | null;
+  active?: boolean;
+}
+
+/**
+ * Edits a routine (`PATCH …/routines/{id}`), validated like create: a new
+ * agent must be one the person manages and can talk to (D31); the target is
+ * checked against the agent; a new schedule is parsed again in its zone and
+ * `nextRunAt` recomputed. Audited with the before/after of what changed.
+ */
+export async function updateRoutine(
+  deps: RoutineDeps,
+  actorId: string,
+  orgId: string,
+  id: string,
+  patch: RoutinePatch,
+): Promise<RoutineView> {
+  const { db } = deps;
+  const current = await loadRoutine(db, orgId, id);
+  await requireRoutineEditor(db, actorId, orgId, current);
+  const set: Partial<typeof routines.$inferInsert> = {};
+  const agentId = patch.agentId ?? current.agentId;
+  if (patch.agentId !== undefined && patch.agentId !== current.agentId) {
+    await requireRoutineManager(db, actorId, orgId, patch.agentId);
+    set.agentId = patch.agentId;
+  }
+  const agent = await getAgent(db, orgId, agentId);
+  if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
+  if (set.agentId && !canTalkTo(agent, actorId)) throw new ForbiddenError(await audienceNotice(db, agent));
+  if (patch.name !== undefined) {
+    const name = patch.name.trim().slice(0, 120);
+    if (!name) throw new ValidationError("Dê um nome à rotina.");
+    set.name = name;
+  }
+  if (patch.prompt !== undefined) {
+    const prompt = patch.prompt.trim().slice(0, 10_000);
+    if (!prompt) throw new ValidationError("Diga o que o agente deve fazer.");
+    set.prompt = prompt;
+  }
+  if (patch.target !== undefined || set.agentId) {
+    const target = patch.target ?? targetOf(current);
+    await checkTarget(db, orgId, agentId, target);
+    if (patch.target !== undefined) set.target = target as unknown as Record<string, unknown>;
+  }
+  if (patch.trigger !== undefined) Object.assign(set, await resolveTrigger(deps, actorId, orgId, patch.trigger));
+  const budget = budgetNano(patch.budgetUsd);
+  if (budget !== undefined) set.monthlyBudgetNanoUsd = budget;
+  const active = patch.active ?? current.active;
+  if (patch.active !== undefined) set.active = active;
+  // Next slot: from the (new) trigger, only while active; paused routines have none.
+  if (patch.trigger !== undefined || patch.active !== undefined) {
+    const type = set.triggerType ?? current.triggerType;
+    const cron = set.cron !== undefined ? set.cron : current.cron;
+    const zone = (set.timezone !== undefined ? set.timezone : current.timezone) ?? "UTC";
+    set.nextRunAt = !active
+      ? null
+      : type === "schedule" && cron
+        ? nextCronTime(cron, zone, new Date())
+        : type === "once"
+          ? (set.nextRunAt ?? current.nextRunAt)
+          : null;
+  }
+  const changed = Object.keys(set).filter((k) => k !== "nextRunAt") as (keyof typeof set)[];
+  if (changed.length === 0 && set.nextRunAt === undefined) {
+    const [view] = await views(db, [current]);
+    return view as RoutineView;
+  }
+  const [row] = await db
+    .update(routines)
+    .set({ ...set, updatedAt: new Date() })
+    .where(and(eq(routines.id, current.id), eq(routines.orgId, orgId)))
+    .returning();
+  if (!row) throw new NotFoundError("Routine not found");
+  const before: Record<string, unknown> = {};
+  const after: Record<string, unknown> = {};
+  for (const key of changed) {
+    before[key] = current[key as keyof RoutineRow];
+    after[key] = row[key as keyof RoutineRow];
+  }
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "routine.updated",
+    target: { type: "routine", id: row.id },
+    details: { before, after },
+  });
+  const [view] = await views(db, [row]);
+  return view as RoutineView;
+}
+
+/** Deletes a routine: it never fires again; its run history stays. */
+export async function deleteRoutine(deps: RoutineDeps, actorId: string, orgId: string, id: string) {
+  const current = await loadRoutine(deps.db, orgId, id);
+  await requireRoutineEditor(deps.db, actorId, orgId, current);
+  await deps.db
+    .update(routines)
+    .set({ active: false, nextRunAt: null, deletedAt: new Date(), updatedAt: new Date() })
+    .where(eq(routines.id, current.id));
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "routine.deleted",
+    target: { type: "routine", id: current.id },
+    details: { name: current.name, agentId: current.agentId },
+  });
+}
+
+/** A copy of a routine, paused (so it doesn't fire twice until someone turns it on), owned by whoever copies it. */
+export async function duplicateRoutine(deps: RoutineDeps, actorId: string, orgId: string, id: string) {
+  const { db } = deps;
+  const current = await loadRoutine(db, orgId, id);
+  await requireRoutineManager(db, actorId, orgId, current.agentId);
+  const agent = await getAgent(db, orgId, current.agentId);
+  if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
+  if (!canTalkTo(agent, actorId)) throw new ForbiddenError(await audienceNotice(db, agent));
+  const { id: _id, createdAt: _c, updatedAt: _u, lastRunAt: _l, deletedAt: _d, ...copy } = current;
+  const [row] = await db
+    .insert(routines)
+    .values({
+      ...copy,
+      name: `${current.name} (cópia)`.slice(0, 120),
+      active: false,
+      nextRunAt: null,
+      createdByUserId: actorId,
+    })
+    .returning();
+  if (!row) throw new Error("routine insert returned nothing");
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "routine.duplicated",
+    target: { type: "routine", id: row.id },
+    details: { from: current.id },
+  });
+  const [view] = await views(db, [row]);
+  return view as RoutineView;
 }
 
 /** Pause (no next run) or resume (next run computed from now: missed slots don't pile up). */
@@ -405,7 +614,7 @@ export async function runRoutineNow(deps: RoutineDeps, actorId: string, orgId: s
 
 export async function listRoutineRuns(db: Database, actorId: string, orgId: string, id: string) {
   await requirePermission(db, actorId, orgId, "read");
-  const routine = await loadRoutine(db, orgId, id);
+  const routine = await loadRoutine(db, orgId, id, { deleted: true });
   const runs = await db
     .select()
     .from(routineRuns)
@@ -496,6 +705,16 @@ export async function fireRoutineEvent(
   return fired;
 }
 
+/** What this routine's runs cost this calendar month (UTC), nano-USD. */
+async function routineMonthCost(db: Database, routineId: string) {
+  const [row] = await db
+    .select({ cost: sql<number>`coalesce(sum(${usageRecords.costNanoUsd}), 0)::bigint` })
+    .from(usageRecords)
+    .innerJoin(routineRuns, eq(routineRuns.agentRunId, usageRecords.runId))
+    .where(and(eq(routineRuns.routineId, routineId), gte(usageRecords.createdAt, monthStartUtc(new Date()))));
+  return Number(row?.cost ?? 0);
+}
+
 async function finishRun(db: Database, runId: string, status: "skipped" | "failed", summary: string) {
   await db.update(routineRuns).set({ status, summary }).where(eq(routineRuns.id, runId));
 }
@@ -510,7 +729,13 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
   const [run] = await db.select().from(routineRuns).where(eq(routineRuns.id, routineRunId));
   if (run?.status !== "queued") return;
   const [routine] = await db.select().from(routines).where(eq(routines.id, run.routineId));
-  if (!routine) return finishRun(db, run.id, "skipped", "Rotina apagada");
+  if (!routine || routine.deletedAt) return finishRun(db, run.id, "skipped", "Rotina apagada");
+  if (
+    routine.monthlyBudgetNanoUsd !== null &&
+    (await routineMonthCost(db, routine.id)) >= routine.monthlyBudgetNanoUsd
+  ) {
+    return finishRun(db, run.id, "skipped", "Orçamento da rotina esgotado neste mês");
+  }
   if (!routine.active && run.trigger !== "manual") return finishRun(db, run.id, "skipped", "Rotina pausada");
   const creator = routine.createdByUserId;
   if (!creator) return finishRun(db, run.id, "skipped", "Quem criou a rotina saiu da organização");
