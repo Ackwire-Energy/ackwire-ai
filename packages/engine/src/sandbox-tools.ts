@@ -109,6 +109,9 @@ export function computerSentence(info: ComputerInfo, network: Network) {
       ? "It is online now."
       : "It is offline now: calls fail until its owner starts the runner; tell the people.",
     info.execAllowed ? "" : "Commands are turned off on it (files and uploads only).",
+    info.execAllowed
+      ? "When asked about something on it, find out yourself before answering: run the tool's CLI in a non-interactive form (--help, --json, -p) or a tool made for that question (e.g. `npx ccusage` sums Claude Code's token use and cost from its local session logs). A command that only works interactively is not a dead end: look for another way to the same data. Never read or show credential files, tokens, keys or .env files, even when you can reach them. Hand work back to the person only when it truly needs them (a sign-in, a password, a screen only they can see), and then say exactly what to do."
+      : "",
   ]
     .filter(Boolean)
     .join(" ");
