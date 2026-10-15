@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero da LP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&family=Doto:ROND,wght@100,600&display=swap">
+<style>
+/* Board: three hero variants for the landing with the dithered agent (direction B). Dark page by default; the sky is the hero panel. */
+:root{
+  --bg:#0b0b0a;--raised:#161615;--line:rgba(255,255,255,.08);--ink:#efefec;--muted:#a3a39e;
+  --sky-ink:#04203f;--sky-ink2:rgba(4,32,63,.82);--sky-glass:rgba(241,248,255,.72);--sky-line:rgba(4,32,63,.14);
+  --sans:"Onest",system-ui,sans-serif;--display:"Funnel Display",var(--sans);--dot:"Doto",monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,p{margin:0}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px max(16px,3vw)}
+.logo{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:300;font-size:22px;letter-spacing:-.02em}
+.logo i{font-style:normal;font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:.62em;color:var(--muted);margin-left:1px}
+.nav a{color:var(--ink);text-decoration:none;font-weight:600;font-size:14px;padding:9px 14px;border-radius:12px;background:rgba(255,255,255,.08)}
+.hero{position:relative;margin:0 max(10px,1.4vw);border-radius:28px;overflow:hidden;min-height:min(780px,calc(100svh - 80px));background:#4b93ff;isolation:isolate}
+canvas.sky{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;z-index:-1}
+.in{position:relative;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);align-items:center;gap:24px;min-height:inherit;padding:clamp(28px,5vw,72px)}
+.copy{max-width:600px;color:var(--sky-ink)}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 7px;border-radius:999px;background:var(--sky-glass);box-shadow:0 0 0 1px var(--sky-line);font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:12.5px;letter-spacing:.02em;text-transform:uppercase}
+h1{font-family:var(--display);font-weight:300;font-size:clamp(40px,5.6vw,78px);line-height:1.02;letter-spacing:-.035em;margin:22px 0 18px;text-wrap:balance}
+h1 canvas{display:inline-block;vertical-align:-.08em;margin:0 .06em}
+.lead{font-size:clamp(16px,1.35vw,18.5px);line-height:1.55;color:var(--sky-ink2);max-width:52ch}
+form{display:flex;gap:8px;margin-top:26px;max-width:480px;flex-wrap:wrap}
+input{flex:1 1 220px;min-width:0;font:inherit;font-size:15px;padding:13px 16px;border-radius:14px;border:0;background:var(--sky-glass);color:var(--sky-ink);box-shadow:0 0 0 1px var(--sky-line)}
+input::placeholder{color:rgba(4,32,63,.55)}
+button.go{font:inherit;font-weight:600;font-size:15px;padding:13px 18px;border-radius:14px;border:0;color:#fff;background:linear-gradient(180deg,#123b73,#04203f);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 8px 20px -8px rgba(4,32,63,.6);cursor:pointer}
+.note{font-size:12.5px;color:var(--sky-ink2);margin-top:10px;opacity:.85}
+.stage{position:relative;display:grid;place-items:center;min-height:420px}
+.giant{position:relative;width:min(34vw,400px);aspect-ratio:1;cursor:pointer;border:0;padding:0;background:none;filter:drop-shadow(0 40px 60px rgba(0,30,90,.55));transition:transform .5s cubic-bezier(.34,1.4,.5,1)}
+.giant:hover{transform:translateY(-6px) rotate(-1.5deg)}
+.giant:active{transform:scale(.97)}
+.giant canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+.eye{position:absolute;top:36%;width:8.5%;height:22%;border-radius:999px;background:#fff;transition:opacity .3s,height .12s,top .12s;animation:blink 4.6s infinite}
+.eye.l{left:34.5%}.eye.r{left:57%}
+@keyframes blink{0%,95%,100%{transform:scaleY(1)}97%{transform:scaleY(.12)}}
+.bubs{position:absolute;right:-2%;top:-4%;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+.bub{display:flex;align-items:center;gap:8px;padding:7px 12px 7px 7px;border-radius:14px 14px 14px 4px;background:var(--sky-glass);box-shadow:0 0 0 1px var(--sky-line),0 10px 24px -12px rgba(4,32,63,.5);color:var(--sky-ink);font-size:13.5px;font-weight:500;animation:pop .5s cubic-bezier(.34,1.4,.5,1) both;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.bub small{font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;color:var(--sky-ink2);font-size:11.5px}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.96)}}
+/* V3: centered, the mark as the brand moment */
+.hero[data-v="3"] .in{grid-template-columns:1fr;justify-items:center;text-align:center;align-content:center;gap:8px}
+.hero[data-v="3"] .copy{display:flex;flex-direction:column;align-items:center;max-width:780px}
+.hero[data-v="3"] .stage{min-height:0;order:-1;margin-bottom:18px}
+.hero[data-v="3"] .giant{width:min(42vw,200px)}
+.hero[data-v="3"] .bubs{display:none}
+.hero[data-v="3"] form{justify-content:center}
+.board{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:8px;width:min(680px,calc(100vw - 32px))}
+.seg{display:flex;gap:3px;padding:4px;border-radius:14px;background:rgba(22,22,21,.86);box-shadow:0 0 0 1px var(--line),0 20px 40px -12px rgba(0,0,0,.6);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.seg button{all:unset;cursor:pointer;padding:8px 14px;border-radius:10px;font-weight:600;font-size:13.5px;color:var(--muted);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:#2a2a28;color:var(--ink)}
+.seg button:focus-visible{outline:2px solid #4b93ff}
+.desc{font-size:13px;color:var(--ink);background:rgba(22,22,21,.86);padding:8px 14px;border-radius:12px;box-shadow:0 0 0 1px var(--line);text-align:center;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.after{height:140px}
+@media (max-width:860px){
+  .in{grid-template-columns:1fr}
+  .stage{min-height:300px;order:-1}
+  .giant{width:min(62vw,260px)}
+  .bubs{display:none}
+  .seg button{padding:8px 10px}
+}
+@media (prefers-reduced-motion:reduce){.eye,.bub{animation:none}}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <span class="logo"><canvas data-mark="sky" data-px="26"></canvas>agentes<i>.chat</i></span>
+  <a href="#lista">Entrar na lista</a>
+</nav>
+
+<section class="hero" id="hero" data-v="2">
+  <canvas class="sky" id="sky"></canvas>
+  <div class="in">
+    <div class="copy" id="copy">
+      <span class="chip"><canvas data-mark="sky" data-px="20"></canvas>Acesso antecipado</span>
+      <h1>Seu time e seus <canvas data-mark="sky" data-px="56" id="inlineAv"></canvas> agentes, na mesma conversa.</h1>
+      <p class="lead">Agentes de IA entram no chat como colegas: cada um com papel, ferramentas, orçamento e uma pessoa responsável. Trabalham à vista no canal e pedem a sua aprovação antes de qualquer coisa sensível.</p>
+      <form id="lista" onsubmit="event.preventDefault()">
+        <input type="email" placeholder="voce@empresa.com" aria-label="Seu e-mail de trabalho">
+        <button class="go" type="submit">Entrar na lista</button>
+      </form>
+      <p class="note">Só usamos o e-mail para o convite.</p>
+    </div>
+    <div class="stage">
+      <button class="giant" id="giant" type="button" aria-label="O agente. Clique para trocar a cor.">
+        <canvas id="giantCv"></canvas>
+        <span class="eye l"></span><span class="eye r"></span>
+      </button>
+      <div class="bubs" id="bubs"></div>
+    </div>
+  </div>
+</section>
+<div class="after"></div>
+
+<div class="board">
+  <p class="desc" id="desc"></p>
+  <div class="seg" id="seg" role="group" aria-label="Variante">
+    <button data-v="1">1 · Gigante</button>
+    <button data-v="2">2 · Nasce do céu</button>
+    <button data-v="3">3 · Marca no centro</button>
+  </div>
+</div>
+
+<script>
+const DESC = {
+  1: "O layout de hoje com o agente novo: gigante em dither à direita, bolhas de atividade. Clique troca a cor na hora.",
+  2: "O agente se forma com os pixels do céu ao abrir a página. Clique: ele se desfaz e volta em outra cor. Os olhos seguem o cursor.",
+  3: "Marca no centro: o agente menor em cima, título e lista centralizados. Mais calmo, com cara de marca.",
+};
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+const GRAD = {
+  sky: ["#8cc3ff", "#0063d1"],
+  giant: ["#62adff", "#0047b3"],
+  violet: ["#ae8cf7", "#6e45d1"],
+  green: ["#5fcf8b", "#1f8a4c"],
+  amber: ["#f3c25c", "#c07d0b"],
+  rose: ["#f58aa6", "#c9406a"],
+  teal: ["#4cd0c0", "#0f8f86"],
+  indigo: ["#7d8bff", "#3f4fd6"],
+};
+const LOOKS = ["giant", "violet", "green", "amber", "rose", "teal", "indigo"];
+const SKY = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"];
+const SPRITE = [".XXXXXXX.", "XXXXXXXXX", "XXXXXXXXX", "XXoXXXoXX", "XXoXXXoXX", "XXXXXXXXX", "XXXXXXXXX", "XXXXXXXXX", "XXXXXXXX."];
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const rgb = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const mix = (a, b, k) => { const A = rgb(a), B = rgb(b); return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, "0")).join(""); };
+const tones = (c) => { const [t, b] = GRAD[c]; return [mix(b, "#000000", 0.38), b, mix(b, t, 0.5), t, mix(t, "#ffffff", 0.5)]; };
+/* The giant sits on a light halo: its tones run one step deeper so the top still reads. */
+const deepTones = (c) => { const [t, b] = GRAD[c]; return [mix(b, "#000000", 0.5), mix(b, "#000000", 0.22), b, mix(b, t, 0.5), t]; };
+const hash = (x, y) => { const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return s - Math.floor(s); };
+const R = 0.3, CUT = 0.05;
+function inShape(u, v) {
+  if (u < R && v < R) return (u - R) ** 2 + (v - R) ** 2 <= R * R;
+  if (u > 1 - R && v < R) return (u - 1 + R) ** 2 + (v - R) ** 2 <= R * R;
+  if (u > 1 - R && v > 1 - R) return (u - 1 + R) ** 2 + (v - 1 + R) ** 2 <= R * R;
+  if (u < CUT && v > 1 - CUT) return (u - CUT) ** 2 + (v - 1 + CUT) ** 2 <= CUT * CUT;
+  return true;
+}
+const toneAt = (x, y, D) => {
+  const u = (x + 0.5) / D, v = (y + 0.5) / D;
+  const k = Math.max(0, Math.min(4, (0.92 - 0.75 * v - 0.12 * u) * 4)), lo = Math.floor(k);
+  return Math.min(4, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0));
+};
+
+/* A small dithered mark (logo, chip, bubbles), eyes drawn in. */
+function drawMark(cv, color, px) {
+  const dpr = Math.min(2, devicePixelRatio || 1), S = Math.round(px * dpr);
+  cv.width = cv.height = S; cv.style.width = cv.style.height = px + "px";
+  const ctx = cv.getContext("2d");
+  const D = px <= 20 ? 8 : px <= 28 ? 10 : px <= 40 ? 14 : 18, p = S / D, tn = tones(color);
+  ctx.save(); ctx.beginPath(); ctx.roundRect(0, 0, S, S, [S * R, S * R, S * R, S * CUT]); ctx.clip();
+  for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) { ctx.fillStyle = tn[toneAt(x, y, D)]; ctx.fillRect(Math.floor(x * p), Math.floor(y * p), Math.ceil(p) + 1, Math.ceil(p) + 1); }
+  ctx.restore();
+  ctx.fillStyle = "#fff";
+  const w = S * 0.085, H = S * 0.22;
+  for (const cx of [0.39, 0.615]) { ctx.beginPath(); ctx.roundRect(S * cx - w / 2, S * 0.36, w, H, w / 2); ctx.fill(); }
+}
+for (const cv of document.querySelectorAll("canvas[data-mark]")) drawMark(cv, cv.dataset.mark, Number(cv.dataset.px));
+const inline = document.getElementById("inlineAv");
+const sizeInline = () => { const fs = parseFloat(getComputedStyle(document.querySelector("h1")).fontSize); drawMark(inline, "sky", Math.round(fs * 0.82)); };
+addEventListener("resize", sizeInline); document.fonts.ready.then(sizeInline); sizeInline();
+
+/* The giant: a coarse dither that can assemble from (and dissolve into) the sky. */
+const giant = document.getElementById("giant"), gcv = document.getElementById("giantCv");
+const eyes = [...giant.querySelectorAll(".eye")];
+const G = { look: 0, from: 0, to: 1, start: 0, dur: 1, next: null, D: 26 };
+function animate(to, dur, then) { G.from = progress(performance.now()); G.to = to; G.start = performance.now(); G.dur = reduce ? 1 : dur; G.next = then || null; }
+function progress(now) { const k = Math.min(1, (now - G.start) / G.dur); const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2; return G.from + (G.to - G.from) * e; }
+function drawGiant(now) {
+  const D = G.D, P = 8; // P canvas pixels per cell
+  if (gcv.width !== D * P) gcv.width = gcv.height = D * P;
+  const ctx = gcv.getContext("2d"), tn = deepTones(LOOKS[G.look]);
+  const pr = progress(now);
+  if (G.next && now - G.start >= G.dur) { const f = G.next; G.next = null; f(); }
+  ctx.clearRect(0, 0, gcv.width, gcv.height);
+  for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+    const u = (x + 0.5) / D, v = (y + 0.5) / D;
+    if (!inShape(u, v)) continue;
+    // Cells arrive from the bottom-left first, with noise: it reads as the sky condensing.
+    const order = 0.55 * hash(x, y) + 0.45 * ((1 - v) * 0.6 + u * 0.4);
+    const show = pr * 1.15 - order;
+    if (show <= 0) continue;
+    ctx.fillStyle = show < 0.08 ? "#eef7ff" : tn[toneAt(x, y, D)];
+    ctx.fillRect(x * P, y * P, P, P);
+  }
+  for (const e of eyes) e.style.opacity = pr > 0.92 ? "1" : "0";
+}
+const hero = document.getElementById("hero");
+giant.addEventListener("click", () => {
+  const v = hero.dataset.v;
+  if (v === "2") animate(0, 520, () => { G.look = (G.look + 1) % LOOKS.length; animate(1, 900); });
+  else { G.look = (G.look + 1) % LOOKS.length; }
+});
+/* Eyes follow the pointer a little. */
+let px = 0, py = 0;
+addEventListener("pointermove", (e) => { px = e.clientX; py = e.clientY; });
+function aim() {
+  const r = giant.getBoundingClientRect();
+  const dx = Math.max(-1, Math.min(1, (px - (r.left + r.width / 2)) / (r.width * 1.5)));
+  const dy = Math.max(-1, Math.min(1, (py - (r.top + r.height / 2)) / (r.height * 1.5)));
+  for (const e of eyes) e.style.translate = `${(dx * r.width * 0.05).toFixed(1)}px ${(dy * r.height * 0.04).toFixed(1)}px`;
+}
+
+/* Activity bubbles. */
+const EVENTS = [["giant", "Lia abriu o PR #213", "agora"], ["amber", "Teo terminou o relatório semanal", "09:00"], ["violet", "Bia pediu aprovação para publicar", "agora"], ["giant", "Lia achou a causa do erro 500", "14:22"], ["amber", "Teo respondeu em #dados", "há 2 min"], ["violet", "Bia salvou 3 versões no Drive", "11:04"]];
+const bubs = document.getElementById("bubs");
+let ev = 0;
+function bubble() {
+  const [c, text, when] = EVENTS[ev++ % EVENTS.length];
+  const el = document.createElement("div");
+  el.className = "bub";
+  const cv = document.createElement("canvas"); drawMark(cv, c, 22);
+  el.append(cv, Object.assign(document.createElement("span"), { innerHTML: `${text} <small>· ${when}</small>` }));
+  bubs.append(el);
+  while (bubs.children.length > 3) bubs.firstElementChild.remove();
+}
+bubble(); bubble(); bubble();
+if (!reduce) setInterval(() => { if (!document.hidden) bubble(); }, 2600);
+
+/* The sky: dither field, calm behind the copy, pixel agents rising. */
+const sky = document.getElementById("sky"), copy = document.getElementById("copy");
+const SKYC = SKY.map(rgb);
+const sprites = [];
+function drawSky(t) {
+  const r = hero.getBoundingClientRect(), P = 4;
+  const W = Math.ceil(r.width / P), H = Math.ceil(r.height / P);
+  if (sky.width !== W || sky.height !== H) { sky.width = W; sky.height = H; sprites.length = 0; for (let i = 0; i < Math.min(18, (W * H) / 2000); i++) sprites.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() < 0.15 ? 2 : 1, sp: 0.06 + Math.random() * 0.1, b: Math.random() * 5 }); }
+  const c = copy.getBoundingClientRect(), g = giant.getBoundingClientRect();
+  const cx0 = (c.left - r.left) / P - 6, cx1 = (c.right - r.left) / P + 6, cy0 = (c.top - r.top) / P - 6, cy1 = (c.bottom - r.top) / P + 6;
+  // A light halo behind the giant so its dither reads against the sky.
+  const gx = (g.left + g.width / 2 - r.left) / P, gy = (g.top + g.height / 2 - r.top) / P, gr = (g.width / P) * 0.62;
+  const ctx = sky.getContext("2d"), img = ctx.createImageData(W, H), d = img.data, n = SKYC.length - 1;
+  const calm = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const u = x / W, v = y / H;
+    let f = 0.86 - 0.42 * u - 0.48 * v
+      + 0.14 * Math.exp(-((u - 0.2 - 0.05 * Math.sin(t * 0.21)) ** 2 + (v - 0.22) ** 2) / 0.03)
+      - 0.16 * Math.exp(-((u - 0.86 - 0.04 * Math.cos(t * 0.15)) ** 2 + (v - 0.92) ** 2) / 0.05)
+      + 0.03 * Math.sin(u * 8 + t * 0.6);
+    const dx = Math.max(cx0 - x, 0, x - cx1), dy = Math.max(cy0 - y, 0, y - cy1);
+    const halo = Math.max(0, Math.min(1, (gr - Math.hypot(x - gx, y - gy)) / (gr * 0.45)));
+    const w = Math.max(Math.max(0, 1 - Math.hypot(dx, dy) / 10), halo * halo * (3 - 2 * halo));
+    calm[y * W + x] = w;
+    f = f * (1 - w) + (6 / 7) * w;
+    const k = Math.max(0, Math.min(n, f * n)), lo = Math.floor(k);
+    const col = SKYC[Math.min(n, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))];
+    const i = (y * W + x) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
+  }
+  for (const s of sprites) {
+    if (!reduce) s.y -= s.sp * s.s;
+    if (s.y < -10 * s.s) { s.y = H + 2; s.x = Math.random() * W; }
+    const blink = ((t + s.b) % 5) < 0.15;
+    for (let j = 0; j < 9; j++) for (let i = 0; i < 9; i++) {
+      const ch = SPRITE[j][i]; if (ch === ".") continue;
+      for (let a = 0; a < s.s; a++) for (let b = 0; b < s.s; b++) {
+        const X = Math.round(s.x) + i * s.s + a, Y = Math.round(s.y) + j * s.s + b;
+        if (X < 0 || Y < 0 || X >= W || Y >= H || calm[Y * W + X] > 0.3) continue;
+        const o = (Y * W + X) * 4;
+        const col = ch === "o" && !blink ? [28, 99, 214] : [255, 255, 255];
+        d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2];
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/* Variant switch. */
+function setV(v) {
+  hero.dataset.v = v;
+  for (const b of document.querySelectorAll("#seg button")) b.setAttribute("aria-pressed", String(b.dataset.v === v));
+  document.getElementById("desc").textContent = DESC[v];
+  try { localStorage.setItem("hero-v", v); } catch {}
+  G.look = 0;
+  if (v === "2") { G.from = 0; G.to = 0; animate(1, 1500); } else { G.from = G.to = 1; G.next = null; }
+  sizeInline();
+}
+document.getElementById("seg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setV(b.dataset.v); });
+let v0 = "2"; try { v0 = localStorage.getItem("hero-v") || "2"; } catch {}
+setV(v0);
+
+let last = 0;
+function frame(now) {
+  if (now - last > 33) { last = now; const t = reduce ? 0 : now / 1000; drawSky(t); drawGiant(now); aim(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
