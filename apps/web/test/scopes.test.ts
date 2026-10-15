@@ -27,6 +27,28 @@ describe("agent permissions model", () => {
     });
   });
 
+  test("a custom MCP server shows up with its read and write scopes", () => {
+    const server = {
+      id: "conn-mcp",
+      serverUrl: "https://app.himetrica.com/api/v1/mcp",
+      label: "himetrica",
+      authType: "oauth" as const,
+      tools: [],
+      reviewedAt: "2026-10-14T00:00:00Z",
+      createdAt: "2026-10-14T00:00:00Z",
+    };
+    const g = scopeGroups(t, CATALOG, [], { name: "agentes", note: "" }, [
+      server,
+      { ...server, id: "x", reviewedAt: null },
+    ]);
+    expect(g.map((x) => x.name)).toEqual(["agentes", "himetrica"]);
+    expect(g[1]?.scopes.map((s) => s.grant)).toEqual([
+      { connectionId: "conn-mcp", scope: "custom:conn-mcp:read" },
+      { connectionId: "conn-mcp", scope: "custom:conn-mcp:write" },
+    ]);
+    expect(g[1]?.scopes[1]?.sensitive).toBe(true);
+  });
+
   test("summary counts and approval-gated scopes", () => {
     const summary = scopeSummary(groups, state.scopes[Object.keys(state.scopes)[0] ?? ""] ?? [], "Nenhuma permissão");
     expect(summary).toMatchObject({ total: 7, granted: 4, connectors: 1 });

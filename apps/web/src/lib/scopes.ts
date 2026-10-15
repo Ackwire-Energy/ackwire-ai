@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { Connection, ConnectorCatalog, ConnectorDef, ScopeGrant, ScopeInfo } from "@/api/types";
+import type { Connection, ConnectorCatalog, ConnectorDef, CustomServer, ScopeGrant, ScopeInfo } from "@/api/types";
 
 /**
  * Agent permissions in two layers (D7): built-in scopes, plus the scopes of
@@ -47,6 +47,7 @@ export function scopeGroups(
   catalog: ConnectorCatalog,
   connections: Connection[],
   builtinName: { name: string; note: string },
+  customServers: CustomServer[] = [],
 ): ScopeGroup[] {
   const row = (connectionId: string | null, s: ScopeInfo): ScopeRow => {
     const grant = { connectionId, scope: s.id };
@@ -64,6 +65,10 @@ export function scopeGroups(
       note: c.accountLabel ?? c.label,
       scopes: def.scopes.map((s) => row(c.id, s)),
     });
+  }
+  // Custom MCP servers come from their own endpoint; nothing is exposed until an admin reviews the tools.
+  for (const c of customServers.filter((x) => x.reviewedAt)) {
+    groups.push({ id: c.id, name: c.label, note: c.serverUrl, scopes: customScopes(t, c.id) });
   }
   return groups;
 }
@@ -107,4 +112,26 @@ export function toggleGrant(grants: ScopeGrant[], grant: ScopeGrant, on: boolean
   const key = grantKey(grant);
   const rest = grants.filter((g) => grantKey(g) !== key);
   return on ? [...rest, grant] : rest;
+}
+
+/** A custom MCP server has two scopes: its read tools, and its write tools (those that ask approval included). */
+function customScopes(t: TFunction, connectionId: string): ScopeRow[] {
+  const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
+  return (["read", "write"] as const).map((access) => {
+    const grant = { connectionId, scope: `custom:${connectionId}:${access}` };
+    return {
+      key: grantKey(grant),
+      grant,
+      label: tt(`scopes.custom_${access}.label`, {
+        defaultValue: access === "read" ? "Ferramentas de leitura" : "Ferramentas de escrita",
+      }),
+      description: tt(`scopes.custom_${access}.description`, {
+        defaultValue:
+          access === "read"
+            ? "Consultar dados pelas ferramentas classificadas como leitura."
+            : "Usar as ferramentas de escrita. As marcadas como sensíveis sempre pedem aprovação.",
+      }),
+      sensitive: access === "write",
+    };
+  });
 }
