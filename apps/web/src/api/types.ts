@@ -905,6 +905,11 @@ export type AccessState = "granted" | "inherited" | "denied" | "off";
 export interface AccessTool {
   /** As exposed to the model ("github_merge_pull_request"). */
   name: string;
+  /** Human name (pt-BR when the backend has one). */
+  label: string;
+  description: string;
+  /** Only reads (built-in `:read` scopes, MCP `readOnlyHint`, or classified as read). */
+  readOnly: boolean;
   connectionId: string | null;
   scope: string;
   /** Always asks a person, whatever the grant. */
@@ -955,4 +960,60 @@ export interface AccessMatrix {
   tools: (Omit<AccessTool, "state"> & { group: string; key: string })[];
   /** cells[agentId][tool.key]. */
   cells: Record<string, Record<string, AccessState>>;
+}
+
+// ── Skills (apps/server/src/routes/app/skills.ts) ────────────────────────────
+
+/** How it was installed: a zip, a link (GitHub), or written here. */
+export type SkillSourceKind = "upload" | "url" | "manual";
+
+export interface Skill {
+  id: string;
+  name: string;
+  /** From SKILL.md's front matter: when to use it. */
+  description: string;
+  /** Every edit is a new version (1, 2, …). */
+  version: number;
+  source: SkillSourceKind;
+  /** The link it came from (`url` skills). */
+  sourceUrl: string | null;
+  /** Turned on for agents created from now on. */
+  defaultForNewAgents: boolean;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SkillFile {
+  path: string;
+  size: number;
+  mime: string;
+  /** `ignored`: scripts and other files that would need a sandbox; never run. */
+  status: "stored" | "ignored";
+}
+
+export interface SkillDetail extends Skill {
+  /** SKILL.md without the front matter (Markdown). */
+  body: string;
+  files: SkillFile[];
+}
+
+/** `GET …/agents/{id}/skills`: every skill of the library, with whether this agent has it. */
+export interface AgentSkill extends Skill {
+  enabled: boolean;
+}
+
+/** "Escrever": a skill made here. */
+export interface SkillInput {
+  name: string;
+  description: string;
+  body: string;
+  defaultForNewAgents?: boolean;
+}
+
+/** An edit (new version unless only the flag changes). */
+export interface SkillPatch {
+  description?: string;
+  body?: string;
+  defaultForNewAgents?: boolean;
 }

@@ -132,23 +132,23 @@ describe("Agente", () => {
     await click(screen().getByRole("button", { name: "Editar permissões" }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Permissões da Ada" });
-    expect(dialog.textContent).toContain("3 de 13 ferramentas");
+    expect(dialog.textContent).toContain("5 de 15 ferramentas");
     const memory = within(dialog).getByRole("region", { name: "Memória" });
     expect(within(memory).getByRole("checkbox", { name: "Memória" }).getAttribute("aria-checked")).toBe("true");
     const github = within(dialog).getByRole("region", { name: "GitHub" });
-    const merge = within(github).getByRole("checkbox", { name: "github merge pull request" });
+    const merge = within(github).getByRole("checkbox", { name: "Fazer merge" });
     expect(merge.closest("li")?.textContent).toContain("pede aprovação");
     // One tool of the connector: the connector checkbox goes indeterminate.
-    await click(within(github).getByRole("checkbox", { name: "github create pull request" }));
+    await click(within(github).getByRole("checkbox", { name: "Abrir PR" }));
     expect(within(github).getByRole("checkbox", { name: "Todas deste conector" }).getAttribute("aria-checked")).toBe(
       "mixed",
     );
     // All tools: children inherited; deny one.
     await click(within(dialog).getByRole("switch", { name: "Todas as ferramentas (atuais e futuras)" }));
     expect(dialog.textContent).toContain("Ações sensíveis continuam pedindo aprovação.");
-    await click(within(github).getByRole("button", { name: "Bloquear github merge pull request" }));
+    await click(within(github).getByRole("button", { name: "Bloquear Fazer merge" }));
     expect(merge.closest("li")?.textContent).toContain("Bloqueada");
-    expect(dialog.textContent).toContain("12 de 13 ferramentas");
+    expect(dialog.textContent).toContain("14 de 15 ferramentas");
     await type(within(dialog).getByRole("searchbox", { name: "Buscar ferramenta" }), "merge");
     expect(
       within(dialog)

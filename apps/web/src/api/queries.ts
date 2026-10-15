@@ -19,6 +19,8 @@ import type {
   S3Input,
   ScopeGrant,
   SearchKind,
+  SkillInput,
+  SkillPatch,
   ToolAccess,
 } from "./types";
 
@@ -915,5 +917,88 @@ export function useSetAgentAccess(orgId: string) {
       void qc.invalidateQueries({ queryKey: keys.accessMatrix(orgId) });
       void qc.invalidateQueries({ queryKey: keys.scopes(orgId, agentId) });
     },
+  });
+}
+
+// ── Skills ───────────────────────────────────────────────────────────────────
+
+/** The org library. `retry: false`: a 404 means the server doesn't have skills. */
+export const useSkills = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.skills(orgId), queryFn: () => api.skills.list(orgId), enabled, retry: false });
+};
+
+export const useSkill = (orgId: string, id: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.skill(orgId, id ?? ""),
+    queryFn: () => api.skills.get(orgId, id ?? ""),
+    enabled: Boolean(id),
+  });
+};
+
+export const useAgentSkills = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentSkills(orgId, agentId),
+    queryFn: () => api.skills.forAgent(orgId, agentId),
+    enabled,
+    retry: false,
+  });
+};
+
+/** Which agents use each skill (the API lists skills per agent): skillId → agents. */
+export function useSkillUsage(orgId: string, enabled: boolean) {
+  const api = useApi();
+  const agents = useAgents(orgId);
+  const list = enabled ? (agents.data ?? []) : [];
+  const per = useQueries({
+    queries: list.map((a) => ({
+      queryKey: keys.agentSkills(orgId, a.id),
+      queryFn: () => api.skills.forAgent(orgId, a.id),
+      retry: false,
+    })),
+  });
+  const usage = new Map<string, { id: string; name: string }[]>();
+  per.forEach((q, i) => {
+    const agent = list[i];
+    if (!agent) return;
+    for (const s of q.data ?? []) {
+      if (!s.enabled) continue;
+      usage.set(s.id, [...(usage.get(s.id) ?? []), { id: agent.id, name: agent.name }]);
+    }
+  });
+  return usage;
+}
+
+export function useSkillAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      action:
+        | { type: "import"; input: { url: string } | { zipBase64: string } }
+        | { type: "create"; input: SkillInput }
+        | { type: "update"; id: string; patch: SkillPatch }
+        | { type: "reimport"; id: string }
+        | { type: "remove"; id: string }
+        | { type: "assign"; agentId: string; skills: { skillId: string; enabled: boolean }[] },
+    ): Promise<unknown> => {
+      switch (action.type) {
+        case "import":
+          return api.skills.import(orgId, action.input);
+        case "create":
+          return api.skills.create(orgId, action.input);
+        case "update":
+          return api.skills.update(orgId, action.id, action.patch);
+        case "reimport":
+          return api.skills.reimport(orgId, action.id);
+        case "remove":
+          return api.skills.remove(orgId, action.id);
+        case "assign":
+          return api.skills.setForAgent(orgId, action.agentId, action.skills);
+      }
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.skills(orgId) }),
   });
 }

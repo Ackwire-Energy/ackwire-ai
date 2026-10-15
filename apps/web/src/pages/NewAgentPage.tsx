@@ -28,10 +28,12 @@ import {
   useModels,
   usePlatformKey,
   useSettings,
+  useSkills,
 } from "@/api/queries";
 import type { Agent, Credential, Model } from "@/api/types";
 import { AccessTree } from "@/components/AccessTree";
 import { useOrg } from "@/components/org-context";
+import { SkillPicker } from "@/components/Skills";
 import { type AccessModel, type Preset, presetModel, toInput, treeFromMatrix } from "@/lib/access";
 import { joinNames } from "@/lib/format";
 import { can } from "@/lib/permissions";
@@ -152,6 +154,14 @@ export function NewAgentPage() {
     );
   }, [accessMatrix.data, catalog.data, t]);
   const [preset, setPreset] = useState<Preset>("standard");
+  // "Skills" (optional): only when the library exists and has something.
+  const library = useSkills(org.id);
+  const [skillIds, setSkillIds] = useState<Set<string> | null>(null);
+  // Skills marked "Ligar em agentes novos" start checked.
+  useEffect(() => {
+    if (library.data && skillIds === null)
+      setSkillIds(new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)));
+  }, [library.data, skillIds]);
   const [access, setAccess] = useState<AccessModel | null>(null);
   useEffect(() => {
     if (toolTree && !access) setAccess(presetModel(toolTree, "standard"));
@@ -237,6 +247,14 @@ export function NewAgentPage() {
       await api.scopes.set(org.id, agent.id, [...current, ...extra]);
     }
     if (toolTree && access) await api.access.set(org.id, agent.id, toInput(access, toolTree));
+    const libraryList = library.data ?? [];
+    if (libraryList.length > 0) {
+      await api.skills.setForAgent(
+        org.id,
+        agent.id,
+        libraryList.map((s) => ({ skillId: s.id, enabled: skillIds?.has(s.id) ?? s.defaultForNewAgents })),
+      );
+    }
     setCreated({ agent, channels: joined.map((c) => ({ id: c.id, name: c.name })) });
   };
 
@@ -421,6 +439,16 @@ export function NewAgentPage() {
             ))}
           </div>
           <AccessTree tree={toolTree} model={access} onChange={setAccess} />
+        </section>
+      )}
+
+      {(library.data ?? []).length > 0 && (
+        <section aria-labelledby="q-skills" className="section">
+          <h2 id="q-skills" className="section-title">
+            {t("skills.step")}
+          </h2>
+          <span className="small muted">{t("skills.stepText")}</span>
+          <SkillPicker skills={library.data ?? []} selected={skillIds ?? new Set()} onChange={setSkillIds} />
         </section>
       )}
 

@@ -7,6 +7,7 @@ import type {
   AgentChannel,
   AgentDetail,
   AgentQuestion,
+  AgentSkill,
   AgentUsage,
   Approval,
   Artifact,
@@ -49,6 +50,8 @@ import type {
   ScheduleParse,
   ScopeGrant,
   SearchHit,
+  Skill,
+  SkillDetail,
   StorageConfig,
   StorageMigration,
   StorageTestResult,
@@ -245,6 +248,25 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       list: async (orgId) => (await request<{ dms: DirectMessage[] }>(`${org(orgId)}/dms`)).dms,
       open: (orgId, target) => request<{ channelId: string }>(`${org(orgId)}/dms`, { json: target }),
       markRead: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/read`, { json: {} }),
+    },
+    skills: {
+      list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,
+      get: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}`),
+      create: (orgId, input) => request<SkillDetail>(`${org(orgId)}/skills`, { json: input }),
+      import: (orgId, input) => request<SkillDetail>(`${org(orgId)}/skills/import`, { json: input }),
+      update: (orgId, id, patch) =>
+        request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}`, { method: "PATCH", json: patch }),
+      reimport: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/reimport`, { json: {} }),
+      remove: (orgId, id) => request<void>(`${org(orgId)}/skills/${enc(id)}`, { method: "DELETE" }),
+      forAgent: async (orgId, agentId) =>
+        (await request<{ skills: AgentSkill[] }>(`${org(orgId)}/agents/${enc(agentId)}/skills`)).skills,
+      setForAgent: async (orgId, agentId, skills) =>
+        (
+          await request<{ skills: AgentSkill[] }>(`${org(orgId)}/agents/${enc(agentId)}/skills`, {
+            method: "PUT",
+            json: { skills },
+          })
+        ).skills,
     },
     access: {
       get: (orgId, agentId) => request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`),

@@ -123,7 +123,9 @@ export function AccessMatrixSection() {
               <tbody>
                 {groups.map((g) => {
                   const groupHit = !q || fold(g.label).includes(q);
-                  const hits = g.tools.filter((x) => groupHit || fold(`${toolLabel(x.name)} ${x.name}`).includes(q));
+                  const hits = g.tools.filter(
+                    (x) => groupHit || fold(`${x.label || toolLabel(x.name)} ${x.name} ${x.description}`).includes(q),
+                  );
                   if (!groupHit && hits.length === 0) return null;
                   const expanded = open.has(g.id) || (q !== "" && !groupHit);
                   return (
@@ -164,13 +166,13 @@ export function AccessMatrixSection() {
                         hits.map((x) => (
                           <tr key={x.key} className="access-matrix__tool">
                             <th scope="row" className="access-matrix__sticky">
-                              <span className="access-matrix__tool-name">{toolLabel(x.name)}</span>
+                              <span className="access-matrix__tool-name">{x.label || toolLabel(x.name)}</span>
                             </th>
                             {m.agents.map((a) => {
                               const state = m.cells[a.id]?.[x.key] ?? "off";
                               const label = t("access.cell", {
                                 agent: a.name,
-                                tool: toolLabel(x.name),
+                                tool: x.label || toolLabel(x.name),
                                 state: stateLabel(state),
                               });
                               return (

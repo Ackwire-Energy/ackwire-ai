@@ -39,25 +39,31 @@ export type Preset = "readonly" | "standard" | "all";
 
 export const isOn = (s: AccessState) => s === "granted" || s === "inherited";
 
-/** "github_merge_pull_request" → "github merge pull request" (the backend has no tool labels yet). */
+/** Fallback when a tool has no label: "github_merge_pull_request" → "github merge pull request". */
 export const toolLabel = (name: string) => name.replace(/[_-]+/g, " ").trim();
-const READ = /(^|_)(list|get|read|search|find|fetch|query|view|show|describe)(_|$)/i;
-export const looksReadOnly = (name: string, scope: string) => READ.test(name) || /(^|[:._])read$/i.test(scope);
 
 const toolId = (connectionId: string | null, name: string) => `tool:${connectionId ?? "builtin"}|${name}`;
 
 function toolNode(
-  t: { name: string; connectionId: string | null; scope: string; sensitive: boolean; state?: AccessState },
-  description: string | null,
+  t: {
+    name: string;
+    label?: string;
+    description?: string;
+    connectionId: string | null;
+    sensitive: boolean;
+    readOnly?: boolean;
+    state?: AccessState;
+  },
+  fallbackDescription: string | null,
 ): AccessNode {
   return {
     id: toolId(t.connectionId, t.name),
     kind: "tool",
-    label: toolLabel(t.name),
-    description,
+    label: t.label?.trim() || toolLabel(t.name),
+    description: t.description?.trim() || fallbackDescription,
     state: t.state ?? "off",
     sensitive: t.sensitive,
-    readOnly: looksReadOnly(t.name, t.scope),
+    readOnly: t.readOnly === true,
     locked: false,
     ref: { kind: "tool", connectionId: t.connectionId, name: t.name },
     children: [],

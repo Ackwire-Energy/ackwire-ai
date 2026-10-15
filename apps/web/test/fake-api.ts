@@ -25,6 +25,7 @@ import { createMockArtifacts } from "./fakes/artifacts";
 import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
 import { createMockPlanning } from "./fakes/planning";
+import { createFakeSkills } from "./fakes/skills";
 import { createMockStorage } from "./fakes/storage";
 
 export const NOW = new Date("2026-10-14T13:44:00.000Z");
@@ -1119,6 +1120,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   };
   return {
     ...http,
+    skills: createFakeSkills(ctx, (method, ...args) => state.calls.push({ method, args })),
     access: createFakeAccess(
       ctx,
       (orgId) => http.connectors.list(orgId),

@@ -83,7 +83,7 @@ describe("access model (same order as the gateway: deny > tool > connector > sco
     model = setDenied(model, "tool:conn-gh|github_merge_pull_request", true);
     const r = resolve(tree, model);
     expect(r.find((g) => g.id === "scope:|issues:write")?.children[0]?.state).toBe("inherited");
-    expect(countTools(r)).toEqual({ on: 12, total: 13 });
+    expect(countTools(r)).toEqual({ on: 14, total: 15 });
     // Unchecking an inherited tool is a denial; checking it again lifts it.
     const issues = tree.find((g) => g.id === "scope:|issues:write");
     const first = issues?.children[0];
@@ -141,7 +141,7 @@ describe("Configurações → Acesso dos agentes", () => {
     expect(headers).toEqual(["Ferramenta", "Ada", "Atlas"]);
     expect(section.querySelector("th.access-matrix__sticky")).not.toBeNull();
     await click(within(section).getByRole("button", { name: "Mostrar ferramentas de GitHub" }));
-    const cell = within(section).getByRole("button", { name: "Ada · github merge pull request: sem acesso" });
+    const cell = within(section).getByRole("button", { name: "Ada · Fazer merge: sem acesso" });
     await click(cell);
     await settle(6);
     const put = state.calls.filter((c) => c.method === "access.set").at(-1)?.args;
@@ -149,10 +149,10 @@ describe("Configurações → Acesso dos agentes", () => {
     expect((put?.[2] as AccessInput | undefined)?.tools.allow).toEqual([
       { connectionId: "conn-gh", name: "github_merge_pull_request" },
     ]);
-    expect(within(section).getByRole("button", { name: "Ada · github merge pull request: liberada" })).toBeTruthy();
+    expect(within(section).getByRole("button", { name: "Ada · Fazer merge: liberada" })).toBeTruthy();
     // Search finds a tool inside a collapsed group.
-    await type(within(section).getByRole("searchbox", { name: "Buscar ferramenta ou grupo" }), "issues create");
-    expect(within(section).getByText("issues create")).toBeTruthy();
+    await type(within(section).getByRole("searchbox", { name: "Buscar ferramenta ou grupo" }), "criar issue");
+    expect(within(section).getByText("Criar issue")).toBeTruthy();
   });
 
   test("members don't see the matrix", async () => {
@@ -175,13 +175,9 @@ describe("Criar agente → Ferramentas", () => {
         .getByRole("button", { name: /Padrão/ })
         .getAttribute("aria-pressed"),
     ).toBe("true");
-    expect(
-      within(tools).getByRole("checkbox", { name: "github merge pull request" }).getAttribute("aria-checked"),
-    ).toBe("false");
+    expect(within(tools).getByRole("checkbox", { name: "Fazer merge" }).getAttribute("aria-checked")).toBe("false");
     await click(within(tools).getByRole("button", { name: /Só leitura/ }));
-    expect(
-      within(tools).getByRole("checkbox", { name: "github create pull request" }).getAttribute("aria-checked"),
-    ).toBe("false");
+    expect(within(tools).getByRole("checkbox", { name: "Abrir PR" }).getAttribute("aria-checked")).toBe("false");
     await click(within(tools).getByRole("button", { name: /Todas/ }));
     expect(
       within(tools)

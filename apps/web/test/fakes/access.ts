@@ -8,32 +8,91 @@ import type { ApiClient } from "@/api/client";
 import type { AccessInput, AccessMatrix, AccessScope, AccessState, AgentAccess, Connection } from "@/api/types";
 import type { MockContext } from "./context";
 
-const BUILTINS: { scope: string; label: string; tools: string[] }[] = [
-  { scope: "memory:write", label: "Memória", tools: ["memory_remember", "memory_search"] },
-  { scope: "context:read", label: "Busca", tools: ["search_workspace"] },
-  { scope: "drive:write", label: "Drive", tools: ["drive_create_document", "drive_read_file"] },
-  { scope: "issues:write", label: "Issues", tools: ["issues_create", "issues_list"] },
-  { scope: "calendar:write", label: "Calendário", tools: ["calendar_propose_event", "calendar_list_events"] },
-  { scope: "", label: "Perguntar à pessoa", tools: ["ask_user"] },
+type FakeTool = { name: string; label: string; description: string; sensitive: boolean; readOnly: boolean };
+const tool = (name: string, label: string, description: string, readOnly = false, sensitive = false): FakeTool => ({
+  name,
+  label,
+  description,
+  sensitive,
+  readOnly,
+});
+const BUILTINS: { scope: string; label: string; tools: FakeTool[] }[] = [
+  {
+    scope: "memory:write",
+    label: "Memória",
+    tools: [
+      tool("memory_remember", "Lembrar", "Guarda fatos e preferências."),
+      tool("memory_search", "Buscar na memória", "Consulta o que já aprendeu.", true),
+    ],
+  },
+  {
+    scope: "context:read",
+    label: "Busca",
+    tools: [tool("search_workspace", "Buscar no workspace", "Mensagens e issues.", true)],
+  },
+  {
+    scope: "drive:write",
+    label: "Drive",
+    tools: [
+      tool("drive_create_document", "Criar arquivo", "Relatórios e tabelas."),
+      tool("drive_read_file", "Ler arquivo", "Abre documentos.", true),
+    ],
+  },
+  {
+    scope: "issues:write",
+    label: "Issues",
+    tools: [
+      tool("issues_create", "Criar issue", "Abre uma issue."),
+      tool("issues_list", "Ver issues", "Lista issues.", true),
+    ],
+  },
+  {
+    scope: "calendar:write",
+    label: "Calendário",
+    tools: [
+      tool("calendar_propose_event", "Propor horário", "Uma pessoa confirma."),
+      tool("calendar_list_events", "Ver agenda", "Eventos do workspace.", true),
+    ],
+  },
+  {
+    scope: "skills:read",
+    label: "Skills",
+    tools: [
+      tool("load_skill", "Abrir skill", "Lê o SKILL.md.", true),
+      tool("read_skill_file", "Ler arquivo da skill", "Arquivos de texto da skill.", true),
+    ],
+  },
+  {
+    scope: "",
+    label: "Perguntar à pessoa",
+    tools: [tool("ask_user", "Perguntar", "Faz uma pergunta curta e espera.")],
+  },
 ];
-const GITHUB = [
+const GITHUB: { scope: string; label: string; tools: FakeTool[] }[] = [
   {
     scope: "github:repo.read",
     label: "Ler o repositório",
-    tools: [{ name: "github_list_pull_requests", sensitive: false }],
+    tools: [tool("github_list_pull_requests", "Ver PRs", "Lista pull requests.", true)],
   },
   {
     scope: "github:pr.write",
     label: "Abrir e comentar PRs",
-    tools: [{ name: "github_create_pull_request", sensitive: false }],
+    tools: [tool("github_create_pull_request", "Abrir PR", "Cria um pull request.")],
   },
-  { scope: "github:pr.merge", label: "Fazer merge", tools: [{ name: "github_merge_pull_request", sensitive: true }] },
+  {
+    scope: "github:pr.merge",
+    label: "Fazer merge",
+    tools: [tool("github_merge_pull_request", "Fazer merge", "Merge de um PR.", false, true)],
+  },
 ];
 
 const empty = (): AccessInput => ({
   all: false,
   connectors: {},
-  scopes: [{ connectionId: null, scope: "memory:write" }],
+  scopes: [
+    { connectionId: null, scope: "memory:write" },
+    { connectionId: null, scope: "skills:read" },
+  ],
   tools: { allow: [], deny: [] },
 });
 
@@ -56,12 +115,11 @@ export function fakeAccessTree(input: AccessInput, connections: Connection[]): A
     scope: b.scope,
     label: b.label,
     state: scopeState(null, b.scope),
-    tools: b.tools.map((name) => ({
-      name,
+    tools: b.tools.map((t) => ({
+      ...t,
       connectionId: null,
       scope: b.scope,
-      sensitive: false,
-      state: toolState(null, name, b.scope),
+      state: toolState(null, t.name, b.scope),
     })),
   }));
   const connectors = connections
@@ -77,10 +135,9 @@ export function fakeAccessTree(input: AccessInput, connections: Connection[]): A
         label: s.label,
         state: scopeState(c.id, s.scope),
         tools: s.tools.map((t) => ({
-          name: t.name,
+          ...t,
           connectionId: c.id,
           scope: s.scope,
-          sensitive: t.sensitive,
           state: toolState(c.id, t.name, s.scope),
         })),
       })),

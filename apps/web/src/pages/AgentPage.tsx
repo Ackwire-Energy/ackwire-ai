@@ -39,6 +39,7 @@ import {
 import type { Agent, AgentAccess } from "@/api/types";
 import { AccessTree } from "@/components/AccessTree";
 import { useOrg } from "@/components/org-context";
+import { AgentSkillsSection } from "@/components/Skills";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useScopeGroups } from "@/hooks/useScopeGroups";
 import { type AccessModel, modelFrom, toInput, treeFromAccess } from "@/lib/access";
@@ -207,6 +208,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
       </div>
 
       <PermissionsSection agent={agent} editable={editable} onEdit={() => setDialog("perms")} />
+      <AgentSkillsSection agentId={agent.id} agentName={agent.name} editable={editable} />
       <MemorySection agent={agent} />
 
       <RunsDialog

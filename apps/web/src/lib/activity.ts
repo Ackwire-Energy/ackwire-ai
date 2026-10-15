@@ -21,11 +21,13 @@ export type ActivityKind =
   | "checkingCalendar"
   | "schedulingEvent"
   | "askingQuestion"
+  | "openingSkill"
+  | "consultingSkill"
   | "usingTool";
 
 export interface Activity {
   kind: ActivityKind;
-  /** The app being consulted ("GitHub", "himetrica"), for `consulting`. */
+  /** The app being consulted ("GitHub", "himetrica"), for `consulting`; the skill name for `openingSkill`. */
   app?: string;
 }
 
@@ -98,9 +100,16 @@ const isDrive = (id: string) => id === "drive" || id === "gdrive" || id === "goo
  * The friendly activity of a tool call. `connector` is the app label when the
  * event carries it; otherwise it is guessed from the tool name's prefix.
  */
-export function toolActivity(tool: string | null | undefined, connector?: string | null): Activity {
+export function toolActivity(
+  tool: string | null | undefined,
+  connector?: string | null,
+  detail?: string | null,
+): Activity {
   const name = (tool ?? "").trim().toLowerCase();
   if (!name) return { kind: "thinking" };
+  // "Theo está abrindo a skill Revisão de PR…", or "consultando uma skill" without the name.
+  if (name === "load_skill")
+    return detail?.trim() ? { kind: "openingSkill", app: detail.trim() } : { kind: "consultingSkill" };
   const builtin = BUILTIN[name];
   if (builtin) return { kind: builtin };
   const label = connector?.trim();
@@ -138,7 +147,12 @@ export function barEntries(
   for (const r of runs) {
     if (isWriting(r) || r.status === "waiting_approval" || seen.has(r.agentId)) continue;
     seen.add(r.agentId);
-    out.push({ id: r.agentId, type: "agent", name: agentName(r.agentId), activity: toolActivity(r.tool, r.connector) });
+    out.push({
+      id: r.agentId,
+      type: "agent",
+      name: agentName(r.agentId),
+      activity: toolActivity(r.tool, r.connector, r.toolDetail),
+    });
   }
   for (const id of typingUserIds) {
     const name = personName(id);

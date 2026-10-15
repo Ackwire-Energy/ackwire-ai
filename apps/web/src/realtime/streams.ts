@@ -29,6 +29,8 @@ export interface LiveRun {
   tool?: string | null;
   /** The app of that tool, when the event names it ("GitHub"). */
   connector?: string | null;
+  /** What the tool works on, when the event says (the skill name for `load_skill`). */
+  toolDetail?: string | null;
 }
 
 /**
@@ -44,6 +46,8 @@ export interface AgentToolEvent {
   agentId: string;
   tool: string | null;
   connector?: string | null;
+  /** E.g. the skill being opened by `load_skill`. */
+  detail?: string | null;
 }
 
 export interface StreamsState {
@@ -114,7 +118,12 @@ export function applyChannelEvent(state: StreamsState, event: ChannelEvent | Age
       if (state.finished[event.runId]) return state;
       const current = state.runs[event.runId];
       const status: LiveStatus = current?.text ? current.status : "thinking";
-      return upsert(state, event, { status, tool: event.tool, connector: event.connector ?? null });
+      return upsert(state, event, {
+        status,
+        tool: event.tool,
+        connector: event.connector ?? null,
+        toolDetail: event.detail ?? null,
+      });
     }
     case "message.created": {
       const m = event.message;

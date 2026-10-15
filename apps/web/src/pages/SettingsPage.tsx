@@ -36,6 +36,7 @@ import type { Connection, ConnectorDef, Credential, CustomServer } from "@/api/t
 import { AccessMatrixSection } from "@/components/AccessMatrix";
 import { ConnectCustomDialog, CustomServerRow, GrantAgentsDialog, ReviewToolsDialog } from "@/components/CustomMcp";
 import { useOrg } from "@/components/org-context";
+import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { toolsToReview } from "@/lib/custom-tools";
 import { formatShortDate, formatUsd, relativeTime } from "@/lib/format";
@@ -78,6 +79,7 @@ export function SettingsPage({ connected, review }: { connected?: string; review
       <OrgSection />
       <ConnectorsSection review={review} />
       <AccessMatrixSection />
+      <SkillsSection />
       <KeysSection />
       <StorageSection />
       <UsageSection />

@@ -7,6 +7,7 @@ import type {
   AgentDetail,
   AgentInput,
   AgentQuestion,
+  AgentSkill,
   AgentUsage,
   Approval,
   Artifact,
@@ -59,6 +60,10 @@ import type {
   ScopeGrant,
   SearchHit,
   SearchKind,
+  Skill,
+  SkillDetail,
+  SkillInput,
+  SkillPatch,
   StorageConfig,
   StorageMigration,
   StorageTestResult,
@@ -206,6 +211,22 @@ export interface ApiClient {
   };
   search: {
     query(orgId: string, input: { q: string; kinds?: SearchKind[]; limit?: number }): Promise<SearchHit[]>;
+  };
+  skills: {
+    /** The org library. */
+    list(orgId: string): Promise<Skill[]>;
+    get(orgId: string, id: string): Promise<SkillDetail>;
+    /** "Escrever". */
+    create(orgId: string, input: SkillInput): Promise<SkillDetail>;
+    /** A GitHub link (folder or SKILL.md) or the folder as a zip in base64 (writes are JSON only). */
+    import(orgId: string, input: { url: string } | { zipBase64: string }): Promise<SkillDetail>;
+    update(orgId: string, id: string, patch: SkillPatch): Promise<SkillDetail>;
+    /** Fetch the link again (`url` skills). */
+    reimport(orgId: string, id: string): Promise<SkillDetail>;
+    remove(orgId: string, id: string): Promise<void>;
+    /** Every library skill with `enabled` for this agent. */
+    forAgent(orgId: string, agentId: string): Promise<AgentSkill[]>;
+    setForAgent(orgId: string, agentId: string, skills: { skillId: string; enabled: boolean }[]): Promise<AgentSkill[]>;
   };
   access: {
     /** The agent's tool tree with each node's state. 404 while the backend doesn't have it. */
