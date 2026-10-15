@@ -152,7 +152,7 @@ export async function setup(
         db,
         provider: options.sandbox,
         pricing: { vcpuHourUsd: 0.0504, memoryGibHourUsd: 0.0162, diskGibHourUsd: 0.000108 },
-        autoStopMinutes: 15,
+        autoStopMinutes: 10,
         archiveAfterDays: 7,
       }
     : null;

@@ -35,7 +35,8 @@ test("computer API: settings, the agent's computer, and the access tree shows 'R
   // The agent's computer: none yet, then on, off, deleted.
   expect(await (await api(`/agents/${agentId}/computer`)).json()).toMatchObject({ status: "none", diskUsedGib: 0 });
   const on = await api(`/agents/${agentId}/computer/start`, { json: {} });
-  expect(await on.json()).toMatchObject({ status: "running", network: "blocked", costMonthUsd: 0 });
+  // The org allowlist was set above, so the computer is created with it.
+  expect(await on.json()).toMatchObject({ status: "running", network: "allowlist", costMonthUsd: 0 });
   expect(await (await api(`/agents/${agentId}/computer/stop`, { json: {} })).json()).toMatchObject({
     status: "stopped",
   });

@@ -206,7 +206,7 @@ describe("limits and cost", () => {
 
     await f.db.update(schema.agents).set({ monthlyBudgetNanoUsd: null }).where(eq(schema.agents.id, f.agent.id));
     await updateSandboxSettings(f.db, f.owner.id, f.org.id, { dailyMinutes: 0 });
-    expect((await call(ctx, "run_code", { language: "node", code: "1" })).content).toContain("sandbox minutes");
+    expect((await call(ctx, "run_code", { language: "node", code: "1" })).content).toContain("computer minutes");
     await updateSandboxSettings(f.db, f.owner.id, f.org.id, { dailyMinutes: 60, enabled: false });
     expect((await f.tools?.list(ctx))?.map((t) => t.name)).not.toContain("run_code");
   });
@@ -246,7 +246,7 @@ describe("Drive and skills", () => {
     const ctx = await runCtx();
     await call(ctx, "write_file", { path: "out/vendas.csv", content: 'mês,total\njan,"1,5"\n' });
     const saved = await call(ctx, "export_file", { path: "out/vendas.csv", title: "Vendas" });
-    expect(saved).toMatchObject({ isError: false });
+    expect(saved.isError).toBeFalsy();
     const [table] = await f.db.select().from(schema.artifacts);
     expect(table).toMatchObject({ kind: "table", title: "Vendas", channelId: f.general.id });
     expect(saved.data).toEqual({ artifact: { id: table?.id, version: 1 } });
