@@ -2674,8 +2674,7 @@ p {
 .sidebar__indicator {
   position: absolute;
   top: 0;
-  left: 12px;
-  right: 12px;
+  left: 0;
   z-index: 0;
   border-radius: var(--radius-item);
   background: var(--raised);
@@ -2686,6 +2685,7 @@ p {
   .sidebar__indicator {
     transition:
       transform 0.32s var(--spring),
+      width 0.2s var(--out),
       height 0.2s var(--out);
   }
 }

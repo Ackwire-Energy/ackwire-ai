@@ -86,17 +86,42 @@ export function Sidebar() {
   // The active item's soft pill slides between items (one indicator, measured).
   const navRef = useRef<HTMLElement>(null);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [indicator, setIndicator] = useState<{ top: number; height: number } | null>(null);
+  const [indicator, setIndicator] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  // Measure from the active item itself, and again whenever anything in the sidebar changes size
+  // (lists loading, fonts swapping in, the workspace card), so the pill never sits off its item.
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure on navigation and when the lists load
   useLayoutEffect(() => {
     const nav = navRef.current;
-    const active = nav?.querySelector<HTMLElement>('.sidebar__item[data-status="active"]');
-    if (!nav || !active) {
-      setIndicator(null);
-      return;
-    }
-    const top = active.getBoundingClientRect().top - nav.getBoundingClientRect().top + nav.scrollTop;
-    setIndicator({ top, height: active.offsetHeight });
+    if (!nav) return;
+    const measure = () => {
+      const active = nav.querySelector<HTMLElement>('.sidebar__item[data-status="active"]');
+      if (!active) {
+        setIndicator(null);
+        return;
+      }
+      const n = nav.getBoundingClientRect();
+      const a = active.getBoundingClientRect();
+      const next = { top: a.top - n.top + nav.scrollTop, left: a.left - n.left, width: a.width, height: a.height };
+      setIndicator((prev) =>
+        prev &&
+        prev.top === next.top &&
+        prev.left === next.left &&
+        prev.width === next.width &&
+        prev.height === next.height
+          ? prev
+          : next,
+      );
+    };
+    measure();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    ro?.observe(nav);
+    for (const child of Array.from(nav.children)) ro?.observe(child);
+    document.fonts?.ready.then(measure).catch(() => {});
+    window.addEventListener("resize", measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
   }, [pathname, channels.data, dir.agents.length, people.length]);
 
   return (
@@ -105,7 +130,11 @@ export function Sidebar() {
         <span
           className="sidebar__indicator"
           aria-hidden="true"
-          style={{ transform: `translateY(${indicator.top}px)`, height: indicator.height }}
+          style={{
+            transform: `translate(${indicator.left}px, ${indicator.top}px)`,
+            width: indicator.width,
+            height: indicator.height,
+          }}
         />
       )}
       <div className="sidebar__org">
