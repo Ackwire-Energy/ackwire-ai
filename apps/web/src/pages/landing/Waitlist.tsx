@@ -88,6 +88,9 @@ export const Waitlist = forwardRef<HTMLDivElement, WaitlistProps>(function Waitl
               type="email"
               inputMode="email"
               autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               placeholder={t("landing.waitlist.placeholder")}
               value={email}
               onChange={(e) => {
