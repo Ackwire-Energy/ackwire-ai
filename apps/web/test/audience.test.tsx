@@ -38,7 +38,7 @@ describe("Quem pode falar com a Ada", () => {
     await click(within(row).getByRole("button", { name: "Editar Quem pode falar" }));
     const dialog = screen().getByRole("dialog", { name: "Quem pode falar com a Ada" });
     expect(within(dialog).getByRole("button", { name: "Salvar" }).hasAttribute("disabled")).toBe(true);
-    await click(within(dialog).getByLabelText(/Só algumas pessoas/));
+    await click(within(dialog).getAllByLabelText(/Só algumas pessoas/)[0] as HTMLElement);
     // The owner (João) always can; he isn't in the list.
     expect(dialog.textContent).toContain("João sempre pode, como responsável.");
     await click(within(dialog).getByLabelText(/Walter/));

@@ -41,10 +41,10 @@ export function audienceNotice(t: TFunction, agent: Agent, nameOf: (userId: stri
   const mode = modeOf(agent);
   if (mode === "everyone") return "";
   const g = agentGrammar(t, agent.name);
+  // From the directory list (mode only, no user ids): don't guess names.
+  if (mode === "people" && !agent.audience) return t("audience.notice.some", g);
   const names = audienceNames(agent, nameOf);
-  if (names.length === 0) {
-    return mode === "people" && !agent.audience ? t("audience.notice.some", g) : t("audience.notice.nobody", g);
-  }
+  if (names.length === 0) return t("audience.notice.nobody", g);
   return t("audience.notice.only", { ...g, names: joinNames(names, t("newAgent.and")) });
 }
 
