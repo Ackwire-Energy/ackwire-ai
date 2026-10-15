@@ -47,6 +47,8 @@ export const sandboxes = pgTable(
     diskGib: integer().notNull(),
     /** Why the last start or stop failed (shown with `status = 'error'`). */
     lastError: text(),
+    /** When the org's network setting was last applied to this computer (re-applied on start if older). */
+    networkAppliedAt: timestamp({ withTimezone: true }),
     /** Last measured size of the workspace, in MiB. */
     diskUsedMib: integer().notNull().default(0),
     billedSeconds: integer().notNull().default(0),
@@ -69,8 +71,10 @@ export const orgSandboxSettings = pgTable("org_sandbox_settings", {
     .primaryKey()
     .references(() => organizations.id, { onDelete: "cascade" }),
   enabled: boolean().notNull().default(true),
-  /** Domains sandboxes may reach (`pypi.org`, `*.npmjs.org`); empty = no network. */
+  /** Domains sandboxes may reach (`pypi.org`, `*.npmjs.org`), for `network = 'allowlist'`. */
   allowDomains: jsonb().$type<string[]>().notNull().default([]),
+  /** `blocked` (no internet), `allowlist` (only `allow_domains`) or `open` (full egress; still no secrets). */
+  network: text().$type<"blocked" | "allowlist" | "open">().notNull().default("blocked"),
   /** Default timeout of one command, in seconds. */
   execTimeoutSeconds: integer().notNull().default(60),
   /** Sandbox minutes the whole organization may use per day (UTC). */

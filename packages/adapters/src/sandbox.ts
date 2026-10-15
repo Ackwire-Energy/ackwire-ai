@@ -14,12 +14,21 @@ export interface SandboxResources {
 
 export type SandboxState = "creating" | "starting" | "started" | "stopped" | "archived" | "error" | "destroyed";
 
+/** The organization's choice: no internet, only some domains, or open egress (never secrets either way). */
+export type NetworkMode = "blocked" | "allowlist" | "open";
+
+/** The mode a spec asks for (`allowDomains` alone means allowlist when it has entries). */
+export const networkModeOf = (spec: { network?: NetworkMode; allowDomains: string[] }): NetworkMode =>
+  spec.network ?? (spec.allowDomains.length > 0 ? "allowlist" : "blocked");
+
 export interface SandboxSpec {
   /** Our key ("org:…:thread:…"), kept as a label for support; never a secret. */
   key: string;
   labels: Record<string, string>;
-  /** Domains the sandbox may reach (`pypi.org`, `*.npmjs.org`). Empty = no network at all. */
+  /** Domains the sandbox may reach (`pypi.org`, `*.npmjs.org`), for `allowlist`. */
   allowDomains: string[];
+  /** Default: `allowlist` when there are domains, else `blocked`. */
+  network?: NetworkMode;
   /** Stop after this many idle minutes. */
   autoStopMinutes: number;
   /** Archive (files kept, cheaper storage) this many minutes after stopping. Never deleted automatically. */
@@ -30,8 +39,8 @@ export interface SandboxInfo {
   id: string;
   state: SandboxState;
   resources: SandboxResources;
-  /** How the network ended up: `blocked`, `allowlist`, or `provider-default` (the provider refused a per-sandbox policy). */
-  network: "blocked" | "allowlist" | "provider-default";
+  /** How the network ended up: `blocked`, `allowlist`, `open`, or `provider-default` (the provider refused a per-sandbox policy). */
+  network: NetworkMode | "provider-default";
 }
 
 export interface ExecRequest {
@@ -72,6 +81,8 @@ export interface SandboxProvider {
   listFiles(id: string, path: string, depth?: number): Promise<SandboxFile[]>;
   stop(id: string): Promise<void>;
   destroy(id: string): Promise<void>;
+  /** Changes the network of an existing (running) sandbox in place; returns what applies now. */
+  setNetwork(id: string, mode: NetworkMode, allowDomains: string[]): Promise<SandboxInfo["network"]>;
 }
 
 /** The sandbox was deleted or broke for good: the caller makes a new one. */
@@ -357,11 +368,9 @@ export function createDaytonaSandboxProvider(options: {
         ...(options.target ? { target: options.target } : {}),
         ...(options.snapshot ? { snapshot: options.snapshot, user: "agente" } : {}),
       };
-      const network =
-        spec.allowDomains.length > 0
-          ? { domainAllowList: spec.allowDomains.slice(0, 100).join(",") }
-          : { networkBlockAll: true };
-      let mode: SandboxInfo["network"] = spec.allowDomains.length > 0 ? "allowlist" : "blocked";
+      const wanted = networkModeOf(spec);
+      const network = networkBody(wanted, spec.allowDomains);
+      let mode: SandboxInfo["network"] = wanted;
       let res = await call(`${api}/sandbox`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -450,16 +459,43 @@ export function createDaytonaSandboxProvider(options: {
       roots.delete(id);
       if (!res.ok && res.status !== 404) return fail(res, "delete sandbox");
     },
+    async setNetwork(id, mode, allowDomains) {
+      // `networkBlockAll: false` lifts the block and clears the lists (open); one setting at a time.
+      const body = mode === "open" ? { networkBlockAll: false } : networkBody(mode, allowDomains);
+      const res = await call(`${api}/sandbox/${encodeURIComponent(id)}/network-settings`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        timeoutMs: 30_000,
+      });
+      if ((res.status === 400 || res.status === 403) && /network|tier/i.test(await res.clone().text())) {
+        networks.set(id, "provider-default");
+        return "provider-default";
+      }
+      if (!res.ok) return fail(res, "the network settings");
+      networks.set(id, mode);
+      return mode;
+    },
   };
+}
+
+/** The create/update body of a network mode (Daytona takes at most one of these). */
+function networkBody(mode: NetworkMode, allowDomains: string[]): Record<string, unknown> {
+  if (mode === "open") return {};
+  if (mode === "allowlist" && allowDomains.length > 0) {
+    return { domainAllowList: allowDomains.slice(0, 100).join(",") };
+  }
+  return { networkBlockAll: true };
 }
 
 /** What the fake saw, for tests. */
 export interface FakeSandboxCall {
-  op: "create" | "exec" | "write" | "read" | "list" | "stop" | "destroy" | "start";
+  op: "create" | "exec" | "write" | "read" | "list" | "stop" | "destroy" | "start" | "network";
   id?: string;
   spec?: SandboxSpec;
   request?: ExecRequest;
   path?: string;
+  network?: { mode: NetworkMode; allowDomains: string[] };
 }
 
 /**
@@ -475,7 +511,10 @@ export function createFakeSandboxProvider(
     resources?: SandboxResources;
   } = {},
 ) {
-  const boxes = new Map<string, { state: SandboxState; files: Map<string, Uint8Array>; spec: SandboxSpec }>();
+  const boxes = new Map<
+    string,
+    { state: SandboxState; files: Map<string, Uint8Array>; spec: SandboxSpec; network: NetworkMode }
+  >();
   const calls: FakeSandboxCall[] = [];
   const resources = options.resources ?? { cpu: 1, memoryGiB: 1, diskGiB: 3 };
   const box = (id: string) => {
@@ -485,7 +524,7 @@ export function createFakeSandboxProvider(
   };
   const view = (id: string): SandboxInfo => {
     const b = box(id);
-    return { id, state: b.state, resources, network: b.spec.allowDomains.length ? "allowlist" : "blocked" };
+    return { id, state: b.state, resources, network: b.network };
   };
   const provider: SandboxProvider & {
     calls: FakeSandboxCall[];
@@ -502,7 +541,7 @@ export function createFakeSandboxProvider(
     },
     async create(spec) {
       const id = `sbx_${boxes.size + 1}_${crypto.randomUUID().slice(0, 6)}`;
-      boxes.set(id, { state: "started", files: new Map(), spec });
+      boxes.set(id, { state: "started", files: new Map(), spec, network: networkModeOf(spec) });
       calls.push({ op: "create", id, spec });
       return view(id);
     },
@@ -555,6 +594,11 @@ export function createFakeSandboxProvider(
       calls.push({ op: "destroy", id });
       const b = boxes.get(id);
       if (b) b.state = "destroyed";
+    },
+    async setNetwork(id, mode, allowDomains) {
+      calls.push({ op: "network", id, network: { mode, allowDomains } });
+      box(id).network = mode;
+      return mode;
     },
   };
   return provider;

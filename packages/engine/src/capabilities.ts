@@ -69,7 +69,7 @@ export function describeCapabilities(
     }
     if (names.has("run_code")) {
       lines.push(
-        "- Seu computador não tem internet, a não ser os domínios liberados pela organização. Se um comando falhar por rede (DNS, conexão recusada), diga exatamente isso e sugira liberar o domínio em Configurações → Sandbox; não atribua a permissões.",
+        "- O acesso à internet do seu computador está na descrição de `run_code` (sem internet, só alguns domínios, ou internet liberada). Se um comando falhar por rede (DNS, conexão recusada), diga exatamente o que a ferramenta disser sobre isso; não atribua a permissões.",
       );
     }
     if (names.has("schedule_reminder")) {

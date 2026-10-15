@@ -1,4 +1,4 @@
-import { type ExecResult, workspacePath } from "@agenteschat/adapters";
+import { type ExecResult, type NetworkMode, workspacePath } from "@agenteschat/adapters";
 import {
   type ArtifactActor,
   type ArtifactDeps,
@@ -63,8 +63,21 @@ const NO_NETWORK =
 export const NO_NETWORK_NOTE =
   "sem internet: este computador não acessa a internet, a não ser os domínios liberados em Configurações → Sandbox. Diga isso à pessoa (não é falta de permissão) e sugira liberar o domínio.";
 
+/** With open internet a network failure is the site or the address, not our block. */
+export const OPEN_NETWORK_NOTE =
+  "falha de rede: este computador tem internet liberada, então o problema é o endereço ou o site (fora do ar, DNS, recusou a conexão). Diga isso à pessoa; não é bloqueio nem permissão.";
+
+type Network = { mode: NetworkMode; domains: string[] };
+
+/** One sentence the agent reads about its internet, from the org's setting. */
+export function networkSentence(n: Network) {
+  if (n.mode === "open") return "This computer has open internet access (no secrets inside).";
+  if (n.mode === "allowlist") return `Internet only for these domains: ${n.domains.slice(0, 20).join(", ")}.`;
+  return "No internet access (the organization can allow domains or open it in Configurações → Sandbox).";
+}
+
 /** What the model sees from a command: exit code first (it is the line kept in "Ações recentes"). */
-function execOutput(label: string, r: ExecResult, seconds: number, timeout: number): ToolOutput {
+function execOutput(label: string, r: ExecResult, seconds: number, timeout: number, network?: Network): ToolOutput {
   const head = r.timedOut
     ? `${label}: timed out after ${timeout} s (stopped)`
     : `${label}: exit code ${r.exitCode} (${seconds} s)`;
@@ -72,7 +85,9 @@ function execOutput(label: string, r: ExecResult, seconds: number, timeout: numb
   if (r.stdout) parts.push(`stdout:\n${truncateOutput(r.stdout, SANDBOX_LIMITS.stdoutChars)}`);
   if (r.stderr) parts.push(`stderr:\n${truncateOutput(r.stderr, SANDBOX_LIMITS.stderrChars)}`);
   if (!r.stdout && !r.stderr) parts.push("(no output)");
-  if (r.exitCode !== 0 && NO_NETWORK.test(`${r.stderr}\n${r.stdout}`)) parts.push(NO_NETWORK_NOTE);
+  if (r.exitCode !== 0 && NO_NETWORK.test(`${r.stderr}\n${r.stdout}`)) {
+    parts.push(network?.mode === "open" ? OPEN_NETWORK_NOTE : NO_NETWORK_NOTE);
+  }
   return {
     content: parts.join("\n"),
     isError: r.timedOut || r.exitCode !== 0,
@@ -180,10 +195,14 @@ export function createSandboxToolSource(
   const skillDeps = (ctx: ToolContext): SkillDeps => ({ db: ctx.db, blobs: deps.skills.blobs });
   const pathProp = { type: "string", minLength: 1, maxLength: 300, description: "Path inside the workspace" };
 
-  const build = (requireApproval: boolean, execTimeout: number): ToolDefinition[] => [
+  const build = (
+    requireApproval: boolean,
+    execTimeout: number,
+    network: Network = { mode: "blocked", domains: [] },
+  ): ToolDefinition[] => [
     {
       name: "run_code",
-      description: `Run Python, Node.js or bash code on your own computer (an isolated machine just for you: files in the workspace persist across all your conversations; no internet unless the organization allows some domains; no secrets). Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${SANDBOX_LIMITS.maxTimeoutSeconds} s.`,
+      description: `Run Python, Node.js or bash code on your own computer (an isolated machine just for you: files in the workspace persist across all your conversations; no secrets). ${networkSentence(network)} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${SANDBOX_LIMITS.maxTimeoutSeconds} s.`,
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
       inputSchema: {
@@ -212,7 +231,7 @@ export function createSandboxToolSource(
               timeoutSeconds: timeout + 10,
             });
           });
-          return execOutput(`run_code ${lang}`, result, Math.round((Date.now() - started) / 1000), timeout);
+          return execOutput(`run_code ${lang}`, result, Math.round((Date.now() - started) / 1000), timeout, network);
         } catch (error) {
           return failed(error);
         }
@@ -405,7 +424,7 @@ export function createSandboxToolSource(
             });
           });
           const seconds = Math.round((Date.now() - started) / 1000);
-          return execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout);
+          return execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout, network);
         } catch (error) {
           return failed(error);
         }
@@ -426,7 +445,12 @@ export function createSandboxToolSource(
       if (!granted) return withNotices(build(false, 60));
       const settings = await getSandboxSettings(ctx.db, ctx.orgId);
       if (!settings.enabled) return [];
-      return withNotices(build(settings.requireApproval, settings.execTimeoutSeconds));
+      return withNotices(
+        build(settings.requireApproval, settings.execTimeoutSeconds, {
+          mode: settings.network,
+          domains: settings.allowDomains,
+        }),
+      );
     },
   };
 }

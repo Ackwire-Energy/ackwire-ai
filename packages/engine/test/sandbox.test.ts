@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createFakeSandboxProvider, type ExecRequest, type FakeSandboxProvider, orgTopic } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { eq, schema, sql } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
+  applyOrgNetwork,
   createAgent,
   createOrganization,
   deleteAgentComputer,
@@ -123,6 +124,7 @@ describe("one computer per agent", () => {
       "autoStopMinutes",
       "key",
       "labels",
+      "network",
     ]);
     expect(creates[0]?.spec).toMatchObject({ allowDomains: [], autoStopMinutes: 10, autoArchiveMinutes: 7 * 24 * 60 });
     expect(JSON.stringify(creates[0]?.spec)).not.toContain("sk-ant");
@@ -235,6 +237,82 @@ describe("limits and cost", () => {
       input: { language: "bash", code: "echo oi" },
     });
     expect(outcome?.type).toBe("approval");
+  });
+});
+
+describe("network mode", () => {
+  test("open internet: new computers get it; running ones switch in place; stopped ones on next start", async () => {
+    const provider = sandboxSetup();
+    f = await setup({ sandbox: provider, reply: () => ({ chunks: ["ok"] }) });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    const deps = f.sandboxDeps as NonNullable<typeof f.sandboxDeps>;
+    // Blocked by default: the agent reads it in run_code's description.
+    const ctx = await runCtx();
+    expect((await f.tools?.list(ctx))?.find((t) => t.name === "run_code")?.description).toContain("No internet access");
+    await call(ctx, "write_file", { path: "a.txt", content: "a" });
+    expect(provider.calls[0]?.spec?.network).toBe("blocked");
+
+    await expect(updateSandboxSettings(f.db, f.owner.id, f.org.id, { network: "allowlist" })).rejects.toThrow(
+      "domínio",
+    );
+    const member = await addMember(f.db, f.org.id, "member", "bia");
+    await expect(updateSandboxSettings(f.db, member.id, f.org.id, { network: "open" })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    expect((await updateSandboxSettings(f.db, f.owner.id, f.org.id, { network: "open" })).network).toBe("open");
+    expect(await applyOrgNetwork(deps, f.org.id)).toEqual({ applied: 1, later: 0 });
+    expect(provider.calls.filter((c) => c.op === "network").map((c) => c.network?.mode)).toEqual(["open"]);
+    const [row] = await f.db.select().from(schema.sandboxes);
+    expect(row?.network).toBe("open");
+    expect((await f.tools?.list(ctx))?.find((t) => t.name === "run_code")?.description).toContain(
+      "open internet access",
+    );
+
+    // Stopped: nothing now; applied when it starts again.
+    provider.setState(row?.providerId ?? "", "stopped");
+    await updateSandboxSettings(f.db, f.owner.id, f.org.id, { network: "allowlist", allowDomains: ["pypi.org"] });
+    expect(await applyOrgNetwork(deps, f.org.id)).toEqual({ applied: 0, later: 1 });
+    await call(await runCtx(), "list_files", {});
+    const last = provider.calls.filter((c) => c.op === "network").at(-1);
+    expect(last?.network).toEqual({ mode: "allowlist", allowDomains: ["pypi.org"] });
+    expect(provider.calls.filter((c) => c.op === "create")).toHaveLength(1); // same machine, files kept
+  });
+
+  test("the migration maps existing settings: domains = allowlist, none = blocked", async () => {
+    f = await setup();
+    const zed = await addUser(f.db, "zed");
+    const { organization } = await createOrganization(f.db, zed.id, { name: "Outra" });
+    await f.db.insert(schema.orgSandboxSettings).values([
+      { orgId: f.org.id, allowDomains: ["pypi.org"], network: "blocked" },
+      { orgId: organization.id, allowDomains: [], network: "blocked" },
+    ]);
+    const file = await Bun.file(new URL("../../db/migrations/0030_sandbox_network.sql", import.meta.url)).text();
+    const update =
+      file
+        .split("--> statement-breakpoint")
+        .find((s) => s.includes("UPDATE"))
+        ?.trim() ?? "";
+    await f.db.execute(sql.raw(update));
+    const rows = await f.db.select().from(schema.orgSandboxSettings);
+    expect(Object.fromEntries(rows.map((r) => [r.orgId, r.network]))).toEqual({
+      [f.org.id]: "allowlist",
+      [organization.id]: "blocked",
+    });
+  });
+
+  test("with open internet a network failure is explained as the site, not a block", async () => {
+    const provider = sandboxSetup(() => ({
+      exitCode: 6,
+      stdout: "",
+      stderr: "curl: (6) Could not resolve host: nao-existe.example",
+      timedOut: false,
+    }));
+    f = await setup({ sandbox: provider, reply: () => ({ chunks: ["ok"] }) });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    await updateSandboxSettings(f.db, f.owner.id, f.org.id, { network: "open" });
+    const out = await call(await runCtx(), "run_code", { language: "bash", code: "curl https://nao-existe.example" });
+    expect(out.content).toContain("tem internet liberada");
+    expect(out.content).not.toContain("sem internet:");
   });
 });
 

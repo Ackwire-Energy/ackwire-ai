@@ -40,6 +40,9 @@ function fakeDaytona(options: { refuseNetworkPolicy?: boolean; execResult?: (scr
         toolboxProxyUrl: "https://proxy.app.daytona.io/toolbox",
       });
     }
+    if (u.host === "app.daytona.io" && /^\/api\/sandbox\/[^/]+\/network-settings$/.test(u.pathname)) {
+      return Response.json({});
+    }
     const m = /^\/api\/sandbox\/([^/]+)(\/start|\/stop)?$/.exec(u.pathname);
     if (u.host === "app.daytona.io" && m) {
       const id = m[1] as string;
@@ -186,6 +189,26 @@ describe("Daytona sandbox provider (REST)", () => {
     await p.destroy("sb1");
     expect(await p.get("sb1")).toBeNull();
     await expect(p.ensureStarted("sb1")).rejects.toBeInstanceOf(SandboxGoneError);
+  });
+});
+
+describe("network modes", () => {
+  test("open: created with no network fields; switched in place, without a restart", async () => {
+    const d = fakeDaytona();
+    const p = createDaytonaSandboxProvider({ apiKey: "k", fetch: d.fetch, pollMs: 0 });
+    const info = await p.create({ ...spec, network: "open" });
+    expect(info.network).toBe("open");
+    const body = d.calls[0]?.body as Record<string, unknown>;
+    expect(body).not.toHaveProperty("networkBlockAll");
+    expect(body).not.toHaveProperty("domainAllowList");
+    expect(body).not.toHaveProperty("networkAllowList");
+
+    expect(await p.setNetwork("sb1", "allowlist", ["pypi.org"])).toBe("allowlist");
+    expect(await p.setNetwork("sb1", "blocked", [])).toBe("blocked");
+    expect(await p.setNetwork("sb1", "open", [])).toBe("open");
+    const updates = d.calls.filter((c) => c.url.endsWith("/sandbox/sb1/network-settings")).map((c) => c.body);
+    expect(updates).toEqual([{ domainAllowList: "pypi.org" }, { networkBlockAll: true }, { networkBlockAll: false }]);
+    expect(d.calls.some((c) => c.url.endsWith("/start"))).toBe(false);
   });
 });
 

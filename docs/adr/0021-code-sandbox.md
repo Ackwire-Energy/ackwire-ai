@@ -25,6 +25,13 @@ We call the REST API directly instead of the official `@daytonaio/sdk`. Adding t
 
 **API.** `GET …/agents/{id}/computer` returns `{ status, diskUsedGib, costMonthUsd, createdAt, lastUsedAt, network }`, where `status` is `running`, `stopped`, `archived` or `none`. The disk size is measured with `du` while the computer runs and kept for when it is stopped. `POST …/computer/start|stop` and `DELETE …/computer` complete the set. The agent's owner and admins can use all of it; everything is audited.
 
+**Network mode.** `org_sandbox_settings.network` is one of three modes:
+- `blocked`, the default (`networkBlockAll`);
+- `allowlist` (`domainAllowList`);
+- `open`, with no network field at create, so egress is full and there are still no secrets inside.
+
+Migration 0030 maps existing rows: domains present means `allowlist`, otherwise `blocked`. A change applies in place with `POST /sandbox/{id}/network-settings`: no restart, `/workspace` untouched. Running computers get it right after `PUT …/sandbox-settings`. The others get it when they next start, because `sandboxes.network_applied_at` is older than the settings. `run_code`'s description states the mode, and a network failure is explained to match it ("sem internet" vs "o site ou o endereço").
+
 **Image.** `infra/sandbox/Dockerfile` defines the computer: a non-root user `agente` with `WORKDIR /workspace` owned by it, Python 3.12 with pandas, numpy, matplotlib, openpyxl, python-docx and reportlab, Node 22 LTS with npm and corepack (so pnpm and yarn work, and global npm installs go to the user's home, no root needed), git, curl, and the DejaVu and Noto fonts.
 - `apps/server/scripts/sandbox-snapshot.ts [name]` registers it as a Daytona snapshot (`POST /snapshots` with the Dockerfile content) and waits until it is active.
 - The script then checks one sandbox made from it (`node -v`, `npm -v`, `pnpm -v`, `python3 -c "import pandas, matplotlib"`) and deletes that sandbox.

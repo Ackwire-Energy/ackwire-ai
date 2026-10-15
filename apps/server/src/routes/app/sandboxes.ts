@@ -1,4 +1,5 @@
 import {
+  applyOrgNetwork,
   deleteAgentComputer,
   getAgentComputer,
   getSandboxSettings,
@@ -33,7 +34,7 @@ const Computer = z
     createdAt: z.string().nullable(),
     lastUsedAt: z.string().nullable(),
     network: z
-      .enum(["blocked", "allowlist", "provider-default"])
+      .enum(["blocked", "allowlist", "open", "provider-default"])
       .optional()
       .openapi({ description: "`provider-default`: the provider's plan can't apply our domain list." }),
     error: z.object({ message: z.string() }).optional().openapi({ description: "With `status: error`." }),
@@ -46,7 +47,11 @@ const Settings = z
   .object({
     available: z.boolean().openapi({ description: "A sandbox provider is configured on this server." }),
     enabled: z.boolean(),
-    allowDomains: z.array(z.string()).openapi({ description: "Domains the computers may reach; empty = no network." }),
+    network: z.enum(["blocked", "allowlist", "open"]).openapi({
+      description:
+        "`blocked`: no internet; `allowlist`: only `allowDomains`; `open`: full internet (still no secrets inside).",
+    }),
+    allowDomains: z.array(z.string()).openapi({ description: "Domains the computers may reach in `allowlist` mode." }),
     execTimeoutSeconds: z.number(),
     maxTimeoutSeconds: z.number(),
     dailyMinutes: z.number(),
@@ -169,6 +174,7 @@ export function sandboxRoutes(deps: AppDeps) {
         body: body(
           z.object({
             enabled: z.boolean().optional(),
+            network: z.enum(["blocked", "allowlist", "open"]).optional(),
             allowDomains: z.array(z.string().max(253)).max(SANDBOX_LIMITS.maxAllowDomains).optional(),
             execTimeoutSeconds: z.number().int().min(5).max(SANDBOX_LIMITS.maxTimeoutSeconds).optional(),
             dailyMinutes: z.number().int().min(0).max(1440).optional(),
@@ -181,6 +187,8 @@ export function sandboxRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       await updateSandboxSettings(db, c.get("user").id, orgId, c.req.valid("json"));
+      // Running computers get the new network now; stopped ones when they next start.
+      if (deps.extras?.sandbox) await applyOrgNetwork(deps.extras.sandbox, orgId).catch(() => undefined);
       return c.json(await settingsView(orgId), 200);
     },
   );

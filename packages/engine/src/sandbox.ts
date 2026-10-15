@@ -53,6 +53,7 @@ export type SandboxSettings = Omit<typeof orgSandboxSettings.$inferSelect, "orgI
 export const DEFAULT_SANDBOX_SETTINGS: SandboxSettings = {
   enabled: true,
   allowDomains: [],
+  network: "blocked",
   execTimeoutSeconds: 60,
   dailyMinutes: 120,
   requireApproval: false,
@@ -67,10 +68,15 @@ export class SandboxUnavailableError extends Error {
 }
 
 export async function getSandboxSettings(db: Database, orgId: string): Promise<SandboxSettings> {
+  return (await settingsRow(db, orgId)).settings;
+}
+
+/** The settings and when they last changed (null = never set: the defaults). */
+async function settingsRow(db: Database, orgId: string) {
   const [row] = await db.select().from(orgSandboxSettings).where(eq(orgSandboxSettings.orgId, orgId));
-  if (!row) return { ...DEFAULT_SANDBOX_SETTINGS };
-  const { orgId: _o, updatedAt: _u, ...settings } = row;
-  return settings;
+  if (!row) return { settings: { ...DEFAULT_SANDBOX_SETTINGS }, updatedAt: null as Date | null };
+  const { orgId: _o, updatedAt, ...settings } = row;
+  return { settings, updatedAt };
 }
 
 const DOMAIN = /^(\*\.)?([a-z0-9-]+\.)+[a-z]{2,63}$/;
@@ -90,9 +96,22 @@ export async function updateSandboxSettings(
   if (allowDomains.length > SANDBOX_LIMITS.maxAllowDomains) throw new ValidationError("At most 100 domains");
   const bad = allowDomains.find((d) => !DOMAIN.test(d));
   if (bad) throw new ValidationError(`Not a domain: ${bad} (use pypi.org or *.example.com)`);
+  // The mode: given, or (old clients that only send domains) follows the list, unless it's open.
+  const network =
+    patch.network ??
+    (patch.allowDomains !== undefined && current.network !== "open"
+      ? allowDomains.length > 0
+        ? "allowlist"
+        : "blocked"
+      : current.network);
+  if (!["blocked", "allowlist", "open"].includes(network)) throw new ValidationError("Unknown network mode");
+  if (network === "allowlist" && allowDomains.length === 0) {
+    throw new ValidationError("Libere pelo menos um domínio, ou escolha sem internet ou internet liberada.");
+  }
   const next: SandboxSettings = {
     enabled: patch.enabled ?? current.enabled,
     allowDomains,
+    network,
     execTimeoutSeconds: Math.min(
       SANDBOX_LIMITS.maxTimeoutSeconds,
       Math.max(5, patch.execTimeoutSeconds ?? current.execTimeoutSeconds),
@@ -174,7 +193,7 @@ async function acquire(
   deps: SandboxDeps,
   orgId: string,
   agentId: string,
-  settings: SandboxSettings,
+  settings: SandboxSettings & { updatedAt?: Date | null },
   actor: { type: "agent" | "person"; id: string },
   onStep?: (step: "creating" | "preparing") => void | Promise<void>,
 ): Promise<{ row: SandboxRow; info: SandboxInfo; previous: Previous }> {
@@ -189,10 +208,15 @@ async function acquire(
     try {
       const before = await provider.get(live.providerId);
       const wasRunning = before?.state === "started";
-      const info = await provider.ensureStarted(live.providerId);
+      let info = await provider.ensureStarted(live.providerId);
       if (!wasRunning) {
         await db.update(sandboxes).set({ status: "running", updatedAt: new Date() }).where(eq(sandboxes.id, live.id));
       }
+      // The org changed its network setting since this computer last got it: apply it now, in place.
+      const stale =
+        live.network !== settings.network ||
+        (settings.updatedAt && (!live.networkAppliedAt || live.networkAppliedAt < settings.updatedAt));
+      if (stale) info = { ...info, network: await applyNetwork(deps, live, settings) };
       return { row: live, info, previous: wasRunning ? "running" : "stopped" };
     } catch (error) {
       if (!(error instanceof SandboxGoneError)) throw error;
@@ -208,12 +232,14 @@ async function acquire(
     key: `${orgId}:${key}`,
     labels: { "agentes.org": orgId, "agentes.agent": agentId },
     allowDomains: settings.allowDomains,
+    network: settings.network,
     autoStopMinutes: deps.autoStopMinutes,
     autoArchiveMinutes: deps.archiveAfterDays * 24 * 60,
   });
   const machine = {
     provider: provider.id,
     providerId: info.id,
+    networkAppliedAt: new Date(),
     status: "running",
     lastError: null,
     network: info.network,
@@ -245,6 +271,50 @@ async function acquire(
     details: { provider: provider.id, network: info.network, agentId },
   });
   return { row, info, previous: lost ? "recreated" : "new" };
+}
+
+/** Applies the org's network mode to a running computer and records it. */
+async function applyNetwork(
+  deps: Pick<SandboxDeps, "db" | "provider">,
+  row: SandboxRow,
+  settings: SandboxSettings,
+): Promise<SandboxInfo["network"]> {
+  const applied = await deps.provider.setNetwork(row.providerId, settings.network, settings.allowDomains);
+  await deps.db
+    .update(sandboxes)
+    .set({ network: applied, networkAppliedAt: new Date(), updatedAt: new Date() })
+    .where(eq(sandboxes.id, row.id));
+  return applied;
+}
+
+/**
+ * After the org changes its network setting: every running computer gets it
+ * now (Daytona changes it in place, no restart, files untouched); stopped or
+ * archived ones get it the next time they start.
+ */
+export async function applyOrgNetwork(deps: Pick<SandboxDeps, "db" | "provider">, orgId: string) {
+  const { settings } = await settingsRow(deps.db, orgId);
+  const rows = await deps.db
+    .select()
+    .from(sandboxes)
+    .where(and(eq(sandboxes.orgId, orgId), isNull(sandboxes.deletedAt)));
+  let applied = 0;
+  let later = 0;
+  for (const row of rows) {
+    if (!row.providerId) continue;
+    const info = await deps.provider.get(row.providerId).catch(() => null);
+    if (info?.state !== "started") {
+      later++;
+      continue;
+    }
+    try {
+      await applyNetwork(deps, row, settings);
+      applied++;
+    } catch {
+      later++;
+    }
+  }
+  return { applied, later };
 }
 
 /** Told to the agent (and so to the people) when the provider lost the computer and a new one was made. */
@@ -322,13 +392,19 @@ export async function withSandbox<T>(
   fn: (sandboxId: string) => Promise<T>,
   onNotice?: (notice: string) => void,
 ): Promise<T> {
-  const settings = await getSandboxSettings(deps.db, ctx.orgId);
+  const { settings, updatedAt } = await settingsRow(deps.db, ctx.orgId);
   await checkLimits(deps, ctx, settings, budgetSeconds);
   const clock = () => (deps.now?.() ?? new Date()).getTime();
-  const { row, info, previous } = await acquire(deps, ctx.orgId, ctx.agentId, settings, {
-    type: "agent",
-    id: ctx.agentId,
-  });
+  const { row, info, previous } = await acquire(
+    deps,
+    ctx.orgId,
+    ctx.agentId,
+    { ...settings, updatedAt },
+    {
+      type: "agent",
+      id: ctx.agentId,
+    },
+  );
   if (previous === "recreated") onNotice?.(RECREATED_NOTICE);
   const started = clock();
   const idleCap = deps.autoStopMinutes * 60;
@@ -352,7 +428,7 @@ export interface AgentComputerView {
   costMonthUsd: number;
   createdAt: string | null;
   lastUsedAt: string | null;
-  network?: "blocked" | "allowlist" | "provider-default";
+  network?: "blocked" | "allowlist" | "open" | "provider-default";
   error?: { message: string };
 }
 
@@ -520,10 +596,15 @@ export async function runComputerStart(
   agentId: string,
   actorId: string,
 ) {
-  const settings = await getSandboxSettings(deps.db, orgId);
+  const { settings, updatedAt } = await settingsRow(deps.db, orgId);
   try {
-    const { row } = await acquire(deps, orgId, agentId, settings, { type: "person", id: actorId }, (step) =>
-      publishComputerEvent(deps.pubsub, orgId, { agentId, status: "starting", step }),
+    const { row } = await acquire(
+      deps,
+      orgId,
+      agentId,
+      { ...settings, updatedAt },
+      { type: "person", id: actorId },
+      (step) => publishComputerEvent(deps.pubsub, orgId, { agentId, status: "starting", step }),
     );
     await recordAudit(deps.db, {
       orgId,

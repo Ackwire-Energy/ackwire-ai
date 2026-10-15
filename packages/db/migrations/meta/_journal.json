@@ -211,6 +211,13 @@
       "when": 1792070797856,
       "tag": "0029_schedule_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792073330776,
+      "tag": "0030_sandbox_network",
+      "breakpoints": true
     }
   ]
 }
