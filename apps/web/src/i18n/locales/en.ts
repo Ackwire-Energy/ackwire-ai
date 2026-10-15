@@ -2374,6 +2374,9 @@ export const en: Translations = {
       control: "Control",
       faq: "Questions",
       theme: "Switch theme",
+      language: "Language",
+      langPt: "PT",
+      langEn: "EN",
       join: "Join the list",
     },
     hero: {

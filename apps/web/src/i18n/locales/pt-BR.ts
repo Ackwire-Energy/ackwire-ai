@@ -2383,6 +2383,9 @@ export const ptBR = {
       control: "Controle",
       faq: "Perguntas",
       theme: "Trocar tema",
+      language: "Idioma",
+      langPt: "PT",
+      langEn: "EN",
       join: "Entrar na lista",
     },
     hero: {

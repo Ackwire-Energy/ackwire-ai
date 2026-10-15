@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { act, cleanup, fireEvent } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ApiError } from "@/api/http";
 import { createFakeApi, type FakeState, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -121,5 +121,35 @@ describe("landing page", () => {
     await settle();
     expect(joins(state)).toEqual([{ method: "waitlist.join", args: [{ email: "ana@company.com", locale: "en" }] }]);
     expect(screen().getAllByText("You're on the list.").length).toBe(2);
+  });
+
+  test("the PT | EN switch in the nav changes the language, and a later join sends locale en", async () => {
+    const lang = document.documentElement.lang;
+    const { state, api } = signedOut();
+    await renderApp("/", { api });
+    const switcher = screen().getByRole("radiogroup", { name: "Idioma" });
+    await act(async () => {
+      fireEvent.click(within(switcher).getByRole("radio", { name: "EN" }));
+    });
+    await settle();
+    expect(
+      screen().getByRole("heading", { level: 1, name: /Your team and your.*in the same conversation/ }),
+    ).toBeTruthy();
+    expect(screen().getByRole("radiogroup", { name: "Language" })).toBeTruthy();
+    expect(screen().getByRole("radio", { name: "EN" }).getAttribute("aria-checked")).toBe("true");
+    expect(localStorage.getItem("agentes.locale")).toBe("en");
+    expect(document.documentElement.lang).toBe("en");
+    const input = screen().getAllByPlaceholderText("you@company.com")[0] as HTMLInputElement;
+    const form = input.closest("form");
+    if (!form) throw new Error("no waiting list form");
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "ana@company.com" } });
+    });
+    await act(async () => {
+      fireEvent.submit(form);
+    });
+    await settle();
+    expect(joins(state)).toEqual([{ method: "waitlist.join", args: [{ email: "ana@company.com", locale: "en" }] }]);
+    document.documentElement.lang = lang;
   });
 });
