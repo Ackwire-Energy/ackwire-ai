@@ -3,6 +3,7 @@
  * to light (last); the dither picks between neighbours. The agents' world is
  * the sky blue (same in both themes); an agent's own sky uses its color.
  */
+import { EYE_COLOR, spriteBody } from "../agent/engine.js";
 import { type AgentColor, agentGradient } from "../components/AgentLook";
 
 /** The landing's sky, deep blue to almost white. */
@@ -84,9 +85,8 @@ export function softTones(color: AgentColor, surface: string): string[] {
   ];
 }
 
-/** Eyes are white on every agent, everywhere. */
-export const EYE = "#ffffff";
+/** Eyes are white on every agent, everywhere (the agent engine). */
+export const EYE = EYE_COLOR;
 
 /** The pixel agents' body on a sky of this color: deep enough for the white eyes (navy on the sky). */
-export const spriteTone = (color: AgentColor = "sky") =>
-  color === "sky" ? "#04203f" : mix(agentGradient(color)[1], "#000000", 0.45);
+export const spriteTone = (color: AgentColor = "sky") => spriteBody(color);

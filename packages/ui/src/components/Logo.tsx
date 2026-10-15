@@ -1,15 +1,18 @@
 import { type CSSProperties, useId } from "react";
+import { bodyPath, eyeShapes } from "../agent/engine.js";
 import { cx } from "../cx";
 import { ditherUrl } from "../sky/dither";
 
 /** The domain in the expanded logo: a brand name, never translated. */
 const TLD = ".chat";
 
-const BODY = "M10 2h12a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H3.5A1.5 1.5 0 0 1 2 28.5V10a8 8 0 0 1 8-8z";
+/** The mark is the agent from the engine: body at (2, 2), side 28, and its eyes. */
+const BODY = bodyPath(2, 2, 28);
+const EYES = eyeShapes("round").map((e) => ({ x: 2 + e.x * 28, y: 2 + e.y * 28, w: e.w * 28, h: e.h * 28 }));
 
 /**
  * The agent mark: the square with the cut corner in the sky's dither (solid
- * `agent` under it, and alone in the mono logo) and two `on-agent` eyes.
+ * `agent` under it, and alone in the mono logo) and the engine's white eyes.
  */
 export function LogoMark({ size, className, label }: { size?: number; className?: string; label?: string }) {
   const clip = `ac-logo-${useId().replace(/[^\w-]/g, "")}`;
@@ -38,10 +41,11 @@ export function LogoMark({ size, className, label }: { size?: number; className?
         preserveAspectRatio="none"
         clipPath={`url(#${clip})`}
       />
-      <path
-        className="ac-logo__eyes"
-        d="M11.2 12.5a1.3 1.3 0 0 1 2.6 0v5a1.3 1.3 0 0 1-2.6 0zM18.2 12.5a1.3 1.3 0 0 1 2.6 0v5a1.3 1.3 0 0 1-2.6 0z"
-      />
+      <g className="ac-logo__eyes">
+        {EYES.map((e) => (
+          <rect key={e.x} x={e.x} y={e.y} width={e.w} height={e.h} rx={e.w / 2} />
+        ))}
+      </g>
     </svg>
   );
 }

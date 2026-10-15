@@ -6,7 +6,7 @@
  * (docs/design/telas/Landing.html). Every canvas call is guarded: without a 2D
  * context (tests, old browsers) nothing is drawn and the CSS background shows.
  */
-import type { AgentColor } from "@agenteschat/ui";
+import { type AgentColor, SPRITE, spriteTone } from "@agenteschat/ui";
 import { GRAD } from "./data";
 
 /** "#rrggbb" → a little-endian RGBA pixel for a Uint32Array over ImageData. */
@@ -17,20 +17,9 @@ export const hex = (h: string) => {
 export const SKY = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"].map(hex);
 const WHITE = hex("#ffffff");
 // Eyes are white on every agent; the near pixel agents get a navy body so they show.
-const BODY = hex("#04203f");
+const BODY = hex(spriteTone("sky"));
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
-// 9×9 agent sprite: rounded corners, the cut corner at bottom-left, two eyes (o).
-const SPRITE = [
-  ".XXXXXXX.",
-  "XXXXXXXXX",
-  "XXXXXXXXX",
-  "XXoXXXoXX",
-  "XXoXXXoXX",
-  "XXXXXXXXX",
-  "XXXXXXXXX",
-  "XXXXXXXXX",
-  "XXXXXXXX.",
-];
+// The pixel agent comes from the agent engine (same shape and eyes as every agent).
 
 /** The pointer, shared by every sky (one listener while any sky is mounted). */
 export const pointer = { x: 0, y: 0 };
@@ -130,7 +119,7 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
   const raf$ = typeof requestAnimationFrame === "function" ? requestAnimationFrame : null;
 
   function spawn(anywhere: boolean): Sprite {
-    const near = Math.random() < 0.3;
+    const near = Math.random() < 0.15;
     return {
       x: Math.random() * w,
       y: anywhere ? Math.random() * h : h + 12,
@@ -150,7 +139,7 @@ export function startSky(canvas: HTMLCanvasElement, getOptions: () => SkyOptions
     canvas.height = h;
     img = ctx?.createImageData(w, h) ?? null;
     buf = img ? new Uint32Array(img.data.buffer) : new Uint32Array(0);
-    const n = getOptions().sprites ? Math.min(34, Math.round((w * h) / 1500)) : 0;
+    const n = getOptions().sprites ? Math.min(18, Math.round((w * h) / 2000)) : 0;
     flock = Array.from({ length: n }, () => spawn(true));
   }
   function frame(now: number) {

@@ -1,4 +1,5 @@
 import type { CSSProperties, HTMLAttributes } from "react";
+import { eyeShapes } from "../agent/engine.js";
 import { cx } from "../cx";
 import { ditherCells, ditherUrl } from "../sky/dither";
 import { AgentAccessoryLayer, type AgentAppearance, appearanceStyle } from "./AgentLook";
@@ -33,6 +34,8 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
 
 /** Rendered size of each avatar size (accessories simplify when small). */
 const SIZE_PX: Record<NonNullable<AvatarProps["size"]>, number> = { xs: 18, sm: 24, md: 36, lg: 56, xl: 112 };
+
+const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 
 /** The body's dithered texture in the agent's color, with a grid that fits the size. */
 function ditherStyle(a: AgentAppearance | undefined, px: number): CSSProperties {
@@ -94,8 +97,17 @@ export function Avatar({
         <>
           {/* The eyes and what sits on them (glasses) look around together; the blink is the eyes' own. */}
           <span className="ac-avatar__face">
-            <span className="ac-avatar__eye ac-avatar__eye--l" />
-            <span className="ac-avatar__eye ac-avatar__eye--r" />
+            {eyeShapes(appearance?.eyes, { writing: mood === "writing" }).map((e, i) => (
+              <span
+                key={i === 0 ? "l" : "r"}
+                className={cx(
+                  "ac-avatar__eye",
+                  i === 0 ? "ac-avatar__eye--l" : "ac-avatar__eye--r",
+                  e.kind !== "pill" && `ac-avatar__eye--${e.kind}`,
+                )}
+                style={{ left: pct(e.x), top: pct(e.y), width: pct(e.w), height: pct(e.h) }}
+              />
+            ))}
             <AgentAccessoryLayer accessory={appearance?.accessory} px={SIZE_PX[size]} layer="face" />
           </span>
           <AgentAccessoryLayer accessory={appearance?.accessory} px={SIZE_PX[size]} layer="head" />

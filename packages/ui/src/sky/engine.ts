@@ -10,6 +10,7 @@
  * on resize or a theme change). Without a 2D context (tests, old browsers)
  * nothing is drawn and the element's CSS background shows.
  */
+import { spriteGrid } from "../agent/engine.js";
 import { pixelOf, spriteTone } from "./tones";
 
 /** A soft blob added to the field: [x, y, spread, strength] in 0..1 units of the panel. */
@@ -59,18 +60,8 @@ export interface SkyFrame {
 }
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
-/** 9×9 agent: rounded corners, the cut corner at bottom-left, two eyes (o). */
-export const SPRITE = [
-  ".XXXXXXX.",
-  "XXXXXXXXX",
-  "XXXXXXXXX",
-  "XXoXXXoXX",
-  "XXoXXXoXX",
-  "XXXXXXXXX",
-  "XXXXXXXXX",
-  "XXXXXXXXX",
-  "XXXXXXXX.",
-];
+/** 9×9 pixel agent from the agent engine: the same shape and eyes as every agent ("X" body, "o" eye). */
+export const SPRITE = spriteGrid(9);
 const WHITE = pixelOf("#ffffff");
 
 /** Draws one pixel agent at (x, y), `k` sky pixels per sprite pixel, skipping pixels where `skip` says so. */

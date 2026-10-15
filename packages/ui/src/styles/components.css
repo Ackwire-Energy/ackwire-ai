@@ -2889,25 +2889,22 @@ a.ac-list__row:focus-visible {
 .ac-avatar--xs.ac-avatar--agent {
   box-shadow: none;
 }
+/* The eyes: place, size and style come from the agent engine (Avatar sets them inline). */
 .ac-avatar__eye {
   position: absolute;
-  top: 40%;
-  width: 15%;
-  height: 20%;
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--agent-eye);
   transform-origin: center;
 }
-.ac-avatar__eye--l {
-  left: 27%;
+.ac-avatar__eye--arc {
+  box-sizing: border-box;
+  background: transparent;
+  border: max(1.5px, 0.14em) solid var(--agent-eye);
+  border-bottom: 0;
+  border-radius: 999px 999px 0 0;
 }
-.ac-avatar__eye--r {
-  right: 27%;
-}
-.ac-avatar--writing .ac-avatar__eye {
-  height: 9%;
-  top: 46%;
-  border-radius: 4px;
+.ac-avatar__eye--lid {
+  border-radius: 0 0 999px 999px;
 }
 .ac-avatar--running::after {
   inset: -4px;
@@ -3414,52 +3411,6 @@ a.ac-list__row:focus-visible {
 .ac-avatar[data-accessory="sunglasses"] .ac-avatar__eye {
   visibility: hidden;
 }
-/* Eyes */
-.ac-avatar[data-eyes="dots"] .ac-avatar__eye {
-  width: 10%;
-  height: 12%;
-  top: 44%;
-}
-.ac-avatar[data-eyes="dots"] .ac-avatar__eye--l {
-  left: 30%;
-}
-.ac-avatar[data-eyes="dots"] .ac-avatar__eye--r {
-  right: 30%;
-}
-.ac-avatar[data-eyes="wide"] .ac-avatar__eye {
-  width: 19%;
-  height: 26%;
-  top: 37%;
-}
-.ac-avatar[data-eyes="wide"] .ac-avatar__eye--l {
-  left: 24%;
-}
-.ac-avatar[data-eyes="wide"] .ac-avatar__eye--r {
-  right: 24%;
-}
-.ac-avatar[data-eyes="happy"] .ac-avatar__eye {
-  background: transparent;
-  border: 0.14em solid var(--agent-eye);
-  border-bottom: 0;
-  border-radius: 999px 999px 0 0;
-  height: 9%;
-  top: 44%;
-  box-sizing: border-box;
-}
-.ac-avatar[data-eyes="sleepy"] .ac-avatar__eye {
-  height: 8%;
-  top: 48%;
-  border-radius: 0 0 999px 999px;
-}
-/* Writing always shows dash eyes, whatever the style. */
-.ac-avatar--writing[data-eyes] .ac-avatar__eye {
-  background: var(--agent-eye);
-  border: 0;
-  height: 9%;
-  top: 46%;
-  border-radius: 4px;
-}
-
 /* Recurrence picker: the sentence, the frequency tabs, then days, times, period and zone */
 .ac-recur {
   display: flex;

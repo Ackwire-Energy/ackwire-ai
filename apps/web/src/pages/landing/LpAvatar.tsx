@@ -25,12 +25,15 @@ export function LpAvatar({
 }) {
   const sized =
     px === undefined ? style : ({ ...style, "--s": typeof px === "number" ? `${px}px` : px } as CSSProperties);
+  // Joy shows the engine's happy eyes; a pixel size picks the nearest avatar size (for the dither grid).
+  const joy = className?.split(" ").includes("lp-joy") && state !== "writing";
+  const near = typeof px === "number" ? (px >= 96 ? "xl" : px >= 48 ? "lg" : px >= 30 ? "md" : "sm") : undefined;
   return (
     <AgentAvatar
       name={name}
-      size={size}
+      size={size ?? near}
       state={state}
-      appearance={look ?? {}}
+      appearance={joy ? { ...look, eyes: "happy" } : (look ?? {})}
       className={cx("lp-av", px !== undefined && "lp-av--px", className)}
       style={sized}
     />

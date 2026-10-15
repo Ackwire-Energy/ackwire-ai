@@ -7,6 +7,19 @@
  */
 
 export {
+  AGENT_GRADIENTS,
+  BODY_CUT,
+  BODY_RADIUS,
+  bodyPath,
+  bodySvg,
+  bodyTones,
+  drawAgent,
+  drawEyes,
+  EYE_STYLES,
+  eyeShapes,
+  spriteGrid,
+} from "./agent/engine.js";
+export {
   AGENT_ACCESSORIES,
   AGENT_COLORS,
   AGENT_EYES,

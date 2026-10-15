@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { AGENT_GRADIENTS } from "../agent/engine.js";
 
 /** The agent symbol's colors (sky is the default identity). */
 export const AGENT_COLORS = ["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"] as const;
@@ -15,17 +16,6 @@ export interface AgentAppearance {
   eyes?: AgentEyes;
   accessory?: AgentAccessory;
 }
-
-/** Top and bottom of the symbol's gradient (sky follows the theme tokens). */
-const GRADIENT: Record<Exclude<AgentColor, "sky">, [string, string]> = {
-  indigo: ["#7d8bff", "#3f4fd6"],
-  violet: ["#ae8cf7", "#6e45d1"],
-  rose: ["#f58aa6", "#c9406a"],
-  amber: ["#f3c25c", "#c07d0b"],
-  green: ["#5fcf8b", "#1f8a4c"],
-  teal: ["#4cd0c0", "#0f8f86"],
-  graphite: ["#9a9a95", "#4a4a47"],
-};
 
 const pick = <T extends string>(list: readonly T[], v: unknown): T | undefined =>
   typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : undefined;
@@ -52,13 +42,13 @@ export function randomAppearance(current: AgentAppearance = {}, rand: () => numb
 
 /** Top and bottom of an agent color as fixed hex (sky as on the landing: the same in both themes). For drawing, e.g. the pixel sky. */
 export function agentGradient(color: AgentColor = "sky"): [string, string] {
-  return color === "sky" ? ["#8cc3ff", "#0063d1"] : GRADIENT[color];
+  return AGENT_GRADIENTS[color];
 }
 
 /** CSS variables for the symbol's color (none for sky: the tokens). */
 export function appearanceStyle(a: AgentAppearance | undefined): CSSProperties | undefined {
   if (!a?.color || a.color === "sky") return undefined;
-  const [top, bottom] = GRADIENT[a.color];
+  const [top, bottom] = AGENT_GRADIENTS[a.color];
   return { "--av-top": top, "--av-bottom": bottom } as CSSProperties;
 }
 
@@ -83,7 +73,7 @@ export function accessoryDraw(px: number): Draw {
 
 /** Temples of glasses and sunglasses. */
 const temples = (d: Draw) => (
-  <path d="M22.5 48 L10 45 M77.5 48 L90 45" stroke={INK} {...d.stroke(3)} strokeLinecap="round" />
+  <path d="M27 44 L10 41 M73 44 L90 41" stroke={INK} {...d.stroke(3)} strokeLinecap="round" />
 );
 
 /** On the head: still while the eyes look around. */
@@ -147,20 +137,20 @@ const HEAD: Record<"hat" | "cap" | "headphones" | "bow" | "crown", (d: Draw) => 
 const FACE: Record<"glasses" | "sunglasses", (d: Draw) => ReactNode> = {
   glasses: (d) => (
     <g>
-      <circle cx="34.5" cy="50" r="12" fill="#fff" fillOpacity=".14" stroke={INK} {...d.stroke(3.5)} />
-      <circle cx="65.5" cy="50" r="12" fill="#fff" fillOpacity=".14" stroke={INK} {...d.stroke(3.5)} />
-      <path d="M46.5 48 Q50 45 53.5 48" stroke={INK} {...d.stroke(3)} fill="none" />
+      <circle cx="37.5" cy="46.5" r="10.5" fill="#fff" fillOpacity=".14" stroke={INK} {...d.stroke(3.5)} />
+      <circle cx="62.5" cy="46.5" r="10.5" fill="#fff" fillOpacity=".14" stroke={INK} {...d.stroke(3.5)} />
+      <path d="M48 45 Q50 43 52 45" stroke={INK} {...d.stroke(3)} fill="none" />
       {temples(d)}
     </g>
   ),
   sunglasses: (d) => (
     <g>
-      <rect x="21" y="41" width="27" height="17" rx="7" fill="#111" />
-      <rect x="52" y="41" width="27" height="17" rx="7" fill="#111" />
+      <rect x="27" y="35" width="21" height="21" rx="7" fill="#111" />
+      <rect x="52" y="35" width="21" height="21" rx="7" fill="#111" />
       {!d.simple && (
-        <path d="M25 45 L31 45 M56 45 L62 45" stroke="#fff" strokeOpacity=".5" strokeWidth="2" strokeLinecap="round" />
+        <path d="M31 39 L36 39 M56 39 L61 39" stroke="#fff" strokeOpacity=".5" strokeWidth="2" strokeLinecap="round" />
       )}
-      <rect x="47" y="45" width="6" height="3" rx="1.5" fill="#111" />
+      <rect x="47" y="40" width="6" height="3" rx="1.5" fill="#111" />
       {temples(d)}
     </g>
   ),
@@ -171,7 +161,7 @@ export const isFaceAccessory = (a: AgentAccessory | undefined): a is "glasses" |
 
 /**
  * An accessory over the symbol: one `0 0 100 100` box like the symbol (eyes
- * at 34.5/65.5, 50), free to go past the edges. `layer` picks the head items
+ * at 37.5/62.5, 46.5, from the agent engine), free to go past the edges. `layer` picks the head items
  * (hat, cap, headphones, bow, crown) or the face items (glasses), which the
  * avatar puts inside the eyes' group so they look around together.
  */

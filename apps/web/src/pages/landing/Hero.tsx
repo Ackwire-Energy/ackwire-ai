@@ -1,14 +1,5 @@
-import { type AgentColor, type AgentState, Avatar, agentGradient, Chip, cx, mix } from "@agenteschat/ui";
-import {
-  type CSSProperties,
-  type ReactNode,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type AgentColor, type AgentState, Avatar, Chip, cx, drawAgent } from "@agenteschat/ui";
+import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLanding } from "./context";
 import { AGENTS, type AgentKey, GIANT_LOOKS, PEOPLE } from "./data";
@@ -18,9 +9,6 @@ import { LpAvatar, SampleAgent } from "./LpAvatar";
 import { PixelSky } from "./PixelSky";
 import { RichText } from "./rich";
 import { HERO_SKY } from "./sky";
-
-const GIANT_SKY: [string, string] = ["#62adff", "#0047b3"];
-const GIANT_COLORS = { "--av-top": GIANT_SKY[0], "--av-bottom": GIANT_SKY[1] } as CSSProperties;
 
 /** The hero: the sky, the headline, the waiting list, the giant agent and its activity bubbles. */
 export function Hero({
@@ -98,36 +86,13 @@ export function Hero({
   );
 }
 
-/* ---------- The giant: a coarse dither that forms from the sky and comes apart into it ---------- */
+/* ---------- The giant: the engine's agent, forming from the sky and coming apart into it ---------- */
 
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 const CELLS = 26;
-const CELL_PX = 8;
+const CANVAS = CELLS * 8;
 
-/** The giant sits on a light halo: its tones run one step deeper than an avatar's so the top still reads. */
-function giantTones(color: AgentColor | undefined): string[] {
-  const [top, bottom] = !color || color === "sky" ? GIANT_SKY : agentGradient(color);
-  return [mix(bottom, "#000000", 0.5), mix(bottom, "#000000", 0.22), bottom, mix(bottom, top, 0.5), top];
-}
-
-/** The symbol's outline in 0..1: radius 30% on three corners, the cut corner (9%) at bottom-left. */
-function inBody(u: number, v: number) {
-  const r = 0.3;
-  const c = 0.09;
-  if (u < r && v < r) return (u - r) ** 2 + (v - r) ** 2 <= r * r;
-  if (u > 1 - r && v < r) return (u - 1 + r) ** 2 + (v - r) ** 2 <= r * r;
-  if (u > 1 - r && v > 1 - r) return (u - 1 + r) ** 2 + (v - 1 + r) ** 2 <= r * r;
-  if (u < c && v > 1 - c) return (u - c) ** 2 + (v - 1 + c) ** 2 <= c * c;
-  return true;
-}
-
-const noise = (x: number, y: number) => {
-  const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-  return s - Math.floor(s);
-};
-
-/** Paints the body at `progress` (0 = only sky, 1 = whole): cells arrive from the bottom-left, with noise. */
-function paintBody(canvas: HTMLCanvasElement, tones: string[], progress: number) {
+/** Paints the body at `progress` (0 = only sky, 1 = whole), one step deeper: it sits on a light halo. */
+function paintBody(canvas: HTMLCanvasElement, color: AgentColor | undefined, progress: number) {
   let ctx: CanvasRenderingContext2D | null = null;
   try {
     ctx = canvas.getContext("2d");
@@ -135,28 +100,13 @@ function paintBody(canvas: HTMLCanvasElement, tones: string[], progress: number)
     return;
   }
   if (!ctx) return;
-  const size = CELLS * CELL_PX;
-  if (canvas.width !== size) {
-    canvas.width = size;
-    canvas.height = size;
+  if (canvas.width !== CANVAS) {
+    canvas.width = CANVAS;
+    canvas.height = CANVAS;
   }
-  ctx.clearRect(0, 0, size, size);
-  const n = tones.length - 1;
-  for (let y = 0; y < CELLS; y++)
-    for (let x = 0; x < CELLS; x++) {
-      const u = (x + 0.5) / CELLS;
-      const v = (y + 0.5) / CELLS;
-      if (!inBody(u, v)) continue;
-      const order = 0.55 * noise(x, y) + 0.45 * ((1 - v) * 0.6 + u * 0.4);
-      const show = progress * 1.15 - order;
-      if (show <= 0) continue;
-      const k = Math.max(0, Math.min(n, (0.92 - 0.75 * v - 0.12 * u) * n));
-      const lo = Math.floor(k);
-      const idx = Math.min(n, k - lo > (BAYER[(x & 3) + (y & 3) * 4] ?? 0.5) ? lo + 1 : lo);
-      // A cell that just arrived flashes the sky's lightest tone.
-      ctx.fillStyle = show < 0.08 ? "#eef7ff" : (tones[idx] ?? "#0047b3");
-      ctx.fillRect(x * CELL_PX, y * CELL_PX, CELL_PX, CELL_PX);
-    }
+  ctx.clearRect(0, 0, CANVAS, CANVAS);
+  // The eyes come from the avatar on top (same engine), so they keep the states and the aim.
+  drawAgent(ctx, 0, 0, CANVAS, { color, cells: CELLS, deep: true, progress, withEyes: false });
 }
 
 type Tween = { from: number; to: number; start: number; dur: number; done: (() => void) | null };
@@ -171,15 +121,14 @@ function useGiantBody(canvas: RefObject<HTMLCanvasElement | null>, color: AgentC
   const raf$ = typeof requestAnimationFrame === "function" && !reduced ? requestAnimationFrame : null;
   const tween = useRef<Tween>({ from: raf$ ? 0 : 1, to: raf$ ? 0 : 1, start: 0, dur: 1, done: null });
   const [formed, setFormed] = useState(!raf$);
-  const tones = useMemo(() => giantTones(color), [color]);
-  const tonesRef = useRef(tones);
-  tonesRef.current = tones;
+  const colorRef = useRef(color);
+  colorRef.current = color;
   const frame = useRef(0);
   const step = useCallback(
     (now: number) => {
       const a = tween.current;
       const p = tweenAt(a, now);
-      if (canvas.current) paintBody(canvas.current, tonesRef.current, p);
+      if (canvas.current) paintBody(canvas.current, colorRef.current, p);
       setFormed(p > 0.92);
       if (now - a.start < a.dur && raf$) frame.current = raf$(step);
       else if (a.done) {
@@ -212,8 +161,8 @@ function useGiantBody(canvas: RefObject<HTMLCanvasElement | null>, color: AgentC
     };
   }, [play]);
   useEffect(() => {
-    if (canvas.current) paintBody(canvas.current, tones, tweenAt(tween.current, performance.now()));
-  }, [canvas, tones]);
+    if (canvas.current) paintBody(canvas.current, color, tweenAt(tween.current, performance.now()));
+  }, [canvas, color]);
   return { formed, play };
 }
 
@@ -274,8 +223,8 @@ function Giant({
           <LpAvatar
             look={appearance}
             state={state}
-            className="lp-giant__av"
-            style={appearance.color ? undefined : GIANT_COLORS}
+            size="xl"
+            className={cx("lp-giant__av", joy.includes("lp-joy") && "lp-joy")}
           />
         </span>
       </button>

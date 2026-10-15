@@ -214,14 +214,8 @@
 .lp .ac-avatar--running::after {
   inset: calc(var(--s) * -0.1);
 }
-.lp .lp-joy:not(.ac-avatar--writing) .ac-avatar__eye {
-  box-sizing: border-box;
-  background: transparent;
-  border: calc(var(--s) * 0.045) solid var(--agent-eye);
-  border-bottom: 0;
-  border-radius: 999px 999px 0 0;
-  height: 10%;
-  top: 43%;
+/* Joy: happy eyes (the engine's "happy" style, set by LpAvatar) hold still. */
+.lp .lp-joy .ac-avatar__eye {
   animation: none;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -465,9 +459,7 @@
   width: 100%;
   height: 100%;
   font-size: 0.256em;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    0 10px 24px -8px rgba(0, 50, 140, 0.6);
+  box-shadow: 0 10px 24px -8px rgba(0, 50, 140, 0.6);
 }
 @media (prefers-reduced-motion: no-preference) {
   .lp .lp-hero h1 .lp-w {
@@ -630,11 +622,13 @@
   height: 100%;
   pointer-events: none;
 }
+/* The giant stands whole in the right column, on its halo (the approved prototype HeroLP.html, variant 2). */
 .lp .lp-giant {
-  --s: clamp(300px, 38vw, 560px);
+  --s: clamp(260px, 30vw, 420px);
   position: absolute;
-  right: clamp(20px, 7%, 110px);
-  bottom: calc(var(--s) * -0.3);
+  right: clamp(24px, 7%, 110px);
+  top: 50%;
+  transform: translateY(-44%);
   width: var(--s);
   height: var(--s);
   pointer-events: auto;
@@ -685,8 +679,8 @@
 }
 .lp .lp-bubs {
   position: absolute;
-  right: clamp(16px, 4%, 64px);
-  bottom: calc(var(--gs) * 0.76);
+  right: clamp(8px, 3%, 48px);
+  bottom: calc(50% + var(--gs) * 0.42);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -755,8 +749,10 @@
     height: clamp(320px, 72vw, 440px);
   }
   .lp .lp-giant {
-    --s: clamp(230px, 56vw, 340px);
+    --s: clamp(200px, 52vw, 300px);
     right: 50%;
+    top: auto;
+    bottom: 16px;
     transform: translateX(50%);
   }
   .lp .lp-giant .lp-giant__in {
