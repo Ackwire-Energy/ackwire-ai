@@ -1,3 +1,4 @@
+export * from "./access";
 export * from "./agents";
 export * from "./approvals";
 export * from "./artifact-tools";

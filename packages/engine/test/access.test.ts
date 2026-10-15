@@ -1,0 +1,146 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { schema } from "@agenteschat/db";
+import {
+  accessMatrix,
+  type ConnectorDeps,
+  createApiKeyConnection,
+  createConnectorToolSource,
+  createToolGateway,
+  ForbiddenError,
+  getAgentAccess,
+  grantKey,
+  postPersonMessage,
+  setAgentAccess,
+  toolAccess,
+} from "../src";
+import { fakeGithubMcp } from "./fake-mcp";
+import { addMember, type Fixture, setup } from "./fixtures";
+
+let f: Fixture;
+afterEach(async () => {
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
+
+const none = { all: false, connectors: {}, scopes: [], tools: { allow: [], deny: [] } };
+
+test("resolution: deny > tool allow > connector wildcard > scope > all", () => {
+  const tool = { name: "github_delete_branch", scope: "github:repo.write", connectionId: "c1" };
+  const keys = (...k: [string | null, string][]) => new Set(k.map(([c, s]) => grantKey(c, s)));
+  expect(toolAccess(keys([null, "*"]), tool)).toBe("inherited");
+  expect(toolAccess(keys(["c1", "connector:*"]), tool)).toBe("inherited");
+  expect(toolAccess(keys(["c1", "github:repo.write"]), tool)).toBe("granted");
+  expect(toolAccess(keys(["c1", "tool:github_delete_branch"]), tool)).toBe("granted");
+  expect(toolAccess(keys([null, "*"], ["c1", "connector:*"], ["c1", "deny:github_delete_branch"]), tool)).toBe(
+    "denied",
+  );
+  expect(toolAccess(keys(), tool)).toBe("off");
+  expect(toolAccess(keys(), { name: "ask_user", scope: "", connectionId: null })).toBe("inherited");
+});
+
+describe("agent access", () => {
+  async function withGithub() {
+    const mcp = fakeGithubMcp();
+    const deps: ConnectorDeps = { db: f.db, keyWrappers: [f.keyWrapper], publicUrl: "https://chat.example.com" };
+    const gateway = createToolGateway({ sources: [createConnectorToolSource({ ...deps, connect: mcp.connect })] });
+    const msg = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "x",
+    });
+    const [run] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: msg.id,
+        triggerMessageId: msg.id,
+        trigger: "mention",
+        hop: 1,
+      })
+      .returning();
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run?.id ?? "",
+      channelId: f.general.id,
+      threadRootId: msg.id,
+      triggerMessageId: msg.id,
+    };
+    return { deps, gateway, ctx };
+  }
+
+  test("all covers a connector added later; deny overrides all; sensitive tools still ask for approval", async () => {
+    f = await setup();
+    const { deps, gateway, ctx } = await withGithub();
+    await setAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id, { ...none, all: true });
+    expect(await gateway.list(ctx)).toEqual([]); // nothing connected yet
+    const github = await createApiKeyConnection(deps, f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_secret_123456",
+    });
+    const names = (await gateway.list(ctx)).map((t) => t.name);
+    expect(names).toContain("github_get_pull_request");
+    expect(names).toContain("github_merge_pull_request");
+
+    const merge = await gateway.invoke(ctx, {
+      toolUseId: "t1",
+      name: "github_merge_pull_request",
+      input: { owner: "acme", repo: "app", pullNumber: 1 },
+    });
+    expect(merge.type).toBe("approval"); // `all` never removes approvals
+
+    await setAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id, {
+      ...none,
+      all: true,
+      connectors: { [github.id]: true },
+      tools: { allow: [], deny: [{ connectionId: github.id, name: "github_merge_pull_request" }] },
+    });
+    expect((await gateway.list(ctx)).map((t) => t.name)).not.toContain("github_merge_pull_request");
+    const denied = await gateway.invoke(ctx, {
+      toolUseId: "t2",
+      name: "github_merge_pull_request",
+      input: { owner: "acme", repo: "app", pullNumber: 1 },
+    });
+    expect(denied).toMatchObject({ type: "result", output: { isError: true } });
+
+    const tree = await getAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id);
+    expect(tree.all).toBe(true);
+    const gh = tree.connectors.find((c) => c.connectionId === github.id);
+    expect(gh?.state).toBe("granted");
+    const tools = gh?.scopes.flatMap((s) => s.tools) ?? [];
+    expect(tools.find((t) => t.name === "github_merge_pull_request")).toMatchObject({
+      state: "denied",
+      sensitive: true,
+    });
+    expect(tools.find((t) => t.name === "github_get_pull_request")?.state).toBe("inherited");
+    expect(tree.builtins.find((b) => b.scope === "drive:write")?.state).toBe("inherited");
+    const audit = await f.db.select().from(schema.auditLog);
+    expect(audit.filter((a) => a.action === "agent.access_changed")).toHaveLength(2);
+  });
+
+  test("only admins or the owner change access; the matrix shows effective states", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await expect(setAgentAccess(f.db, bia.id, f.org.id, f.agent.id, { ...none, all: true })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    await setAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id, {
+      ...none,
+      scopes: [{ connectionId: null, scope: "drive:read" }],
+      tools: {
+        allow: [{ connectionId: null, name: "create_issue" }],
+        deny: [{ connectionId: null, name: "list_artifacts" }],
+      },
+    });
+    const matrix = await accessMatrix(f.db, f.owner.id, f.org.id);
+    const cells = matrix.cells[f.agent.id] ?? {};
+    expect(cells["builtin|read_artifact"]).toBe("granted");
+    expect(cells["builtin|list_artifacts"]).toBe("denied");
+    expect(cells["builtin|create_issue"]).toBe("granted");
+    expect(cells["builtin|update_issue"]).toBe("off");
+    expect(cells["builtin|ask_user"]).toBe("inherited");
+    await expect(accessMatrix(f.db, bia.id, f.org.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});

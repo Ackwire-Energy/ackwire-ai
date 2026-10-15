@@ -3,7 +3,7 @@ import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { addRunStep } from "../runs";
 import { canonicalJson, validateJson } from "./json-schema";
-import { grantedScopeKeys, grantKey, hasScope } from "./scopes";
+import { freshGrantedKeys, grantedScopeKeys, isAllowed, toolAccess } from "./scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
 
 const { approvals, agents } = schema;
@@ -63,7 +63,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
   async function list(ctx: ToolContext): Promise<ToolDefinition[]> {
     const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
     return [...(await allTools(ctx)).values()]
-      .filter((t) => (t.scope === "" && !t.connectionId) || granted.has(grantKey(t.connectionId, t.scope)))
+      .filter((t) => isAllowed(toolAccess(granted, t)))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -109,8 +109,11 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       const tool = (await allTools(ctx)).get(call.name);
       if (!tool) return finish({ content: `Unknown tool ${call.name}`, isError: true });
       const builtIn = tool.scope === "" && !tool.connectionId;
-      if (!builtIn && !(await hasScope(ctx.db, ctx.orgId, ctx.agentId, tool.connectionId, tool.scope))) {
-        return finish({ content: `Not allowed: this agent lacks the scope ${tool.scope}`, isError: true });
+      const access = toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
+      if (!isAllowed(access)) {
+        const reason =
+          access === "denied" ? "this tool is turned off for this agent" : `this agent lacks the scope ${tool.scope}`;
+        return finish({ content: `Not allowed: ${reason}`, isError: true });
       }
       const problems = validateJson(tool.inputSchema, call.input);
       if (problems.length > 0) return finish({ content: `Invalid input: ${problems.join("; ")}`, isError: true });
@@ -180,7 +183,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       if (expected !== approval.actionHash) output = { content: "Approval does not match the action", isError: true };
       else if (!tool || tool.scope !== approval.scope || (tool.connectionId ?? null) !== approval.connectionId)
         output = { content: `The tool ${approval.tool} is no longer available`, isError: true };
-      else if (!(await hasScope(ctx.db, ctx.orgId, ctx.agentId, tool.connectionId, tool.scope)))
+      else if (!isAllowed(toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool)))
         output = { content: `Not allowed: this agent lost the scope ${tool.scope}`, isError: true };
       else {
         // Claim the execution first: a retried job never runs the action twice.

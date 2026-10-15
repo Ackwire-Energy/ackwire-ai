@@ -17,6 +17,7 @@ import {
   postPersonMessage,
   refreshCustomServer,
   saveCustomTools,
+  setAgentAccess,
   setAgentScopes,
   ValidationError,
 } from "../src";
@@ -190,6 +191,11 @@ describe("custom MCP servers", () => {
       triggerMessageId: msg.id,
     };
     expect(await source.tools(ctx)).toEqual([]); // nothing classified yet
+    // Not even `all` shows unclassified tools.
+    const none = { all: false, connectors: {}, scopes: [], tools: { allow: [], deny: [] } };
+    await setAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id, { ...none, all: true });
+    expect(await gateway.list(ctx)).toEqual([]);
+    await setAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id, none);
 
     await saveCustomTools(deps, f.owner.id, f.org.id, server.id, {
       label: "Suporte",

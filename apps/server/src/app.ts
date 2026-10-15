@@ -4,6 +4,7 @@ import { Scalar } from "@scalar/hono-api-reference";
 import { serveStatic } from "hono/bun";
 import { apiError, domainErrorResponse, validationHook } from "./http/errors";
 import { createLogger, type Logger } from "./logger";
+import { accessRoutes } from "./routes/app/access";
 import { accountRoutes } from "./routes/app/account";
 import { agentRoutes } from "./routes/app/agents";
 import { approvalRoutes } from "./routes/app/approvals";
@@ -76,6 +77,7 @@ export function createApp(options: AppOptions) {
     api.on(["GET", "POST"], "/auth/*", (c) => auth.handler(c.req.raw));
     const deps = options.services;
     api.route("/app", accountRoutes(deps));
+    api.route("/app", accessRoutes(deps));
     api.route("/app", agentRoutes(deps));
     api.route("/app", chatRoutes(deps));
     api.route("/app", channelRoutes(deps));

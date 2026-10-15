@@ -52,6 +52,46 @@ export async function grantedScopeKeys(db: Executor, orgId: string, agentId: str
   >;
 }
 
+/**
+ * Grant rows beyond plain scopes (all in `agent_scopes`):
+ * `*` (no connection) = every tool of the org, now and later;
+ * `connector:*` (a connection) = every tool of that connection;
+ * `tool:{name}` = one tool; `deny:{name}` = never that tool, whatever else is granted.
+ */
+export const ALL_TOOLS = "*";
+export const CONNECTOR_ALL = "connector:*";
+export const toolAllowScope = (name: string) => `tool:${name}`;
+export const toolDenyScope = (name: string) => `deny:${name}`;
+
+export type AccessState = "granted" | "inherited" | "denied" | "off";
+
+/**
+ * Effective access of an agent to one tool: deny > tool allow > connector
+ * wildcard > scope > all. Built-in tools without a scope (`ask_user`) are
+ * always on unless denied. Approvals are separate: a sensitive tool still
+ * asks a person whatever the grant.
+ */
+export function toolAccess(
+  granted: Set<string>,
+  tool: { name: string; scope: string; connectionId?: string | null },
+): AccessState {
+  const conn = tool.connectionId ?? null;
+  if (granted.has(grantKey(conn, toolDenyScope(tool.name)))) return "denied";
+  if (granted.has(grantKey(conn, toolAllowScope(tool.name)))) return "granted";
+  if (tool.scope === "" && !conn) return "inherited";
+  if (conn && granted.has(grantKey(conn, CONNECTOR_ALL))) return "inherited";
+  if (granted.has(grantKey(conn, tool.scope))) return "granted";
+  if (granted.has(grantKey(null, ALL_TOOLS))) return "inherited";
+  return "off";
+}
+
+export const isAllowed = (state: AccessState) => state === "granted" || state === "inherited";
+
+/** The agent's grants straight from the database (no cache): for checks right before a call runs. */
+export async function freshGrantedKeys(db: Executor, orgId: string, agentId: string) {
+  return loadScopeKeys(db, orgId, agentId);
+}
+
 async function loadScopeKeys(db: Executor, orgId: string, agentId: string): Promise<Set<string>> {
   const rows = await db
     .select({ connectionId: agentScopes.connectionId, scope: agentScopes.scope })
