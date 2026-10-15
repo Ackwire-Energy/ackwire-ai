@@ -246,19 +246,6 @@ export async function insertMessageWithRuns(
             select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
               and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))
         returning q.id, q.run_id, q.agent_id
-      ), m as (
-        insert into ${messages} (id, created_at, org_id, channel_id, thread_id, author_type, author_user_id,
-          author_agent_id, agent_run_id, hop, body, mentioned_agent_ids, mentioned_user_ids, meta)
-        select ${id}::uuid, now(), ${input.orgId}::uuid, ${input.channelId}::uuid, ${threadId}::uuid,
-          ${input.author.type}::author_type, ${userId}, ${agentId}::uuid, ${runId}::uuid, ${hop}, ${body},
-          coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
-          coalesce((select array_agg(user_id) from mentioned_people), '{}'::text[]),
-          ${JSON.stringify(input.meta ?? {})}::jsonb
-            || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
-        where ${threadId}::uuid is null or exists (
-          select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
-            and r.channel_id = ${input.channelId}::uuid and r.thread_id is null)
-        returning *
       ), addressed as (
         select a.id as agent_id, case when exists (select 1 from mentioned) then 'mention' else 'dm' end as trig,
           ${audienceSql("a", sql`${userId}::text`)} as allowed
@@ -274,13 +261,37 @@ export async function insertMessageWithRuns(
         select agent_id, trig from addressed where allowed
       ), active as (
         -- One active run per agent and conversation: a new message goes to it instead of a second run.
+        -- Addressed agents (mention, DM) with a run in this conversation, and, for a reply in a
+        -- thread, any agent working in that thread (no mention needed to talk to it there).
         select distinct on (r.agent_id) r.id, r.agent_id from ${agentRuns} r
+        join ${agents} ra on ra.id = r.agent_id
         where ${person}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
-          and r.agent_id in (select agent_id from answering)
           and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
-          and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid) or exists (
-            select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm'))
+          and r.agent_id not in (select agent_id from answered)
+          and (
+            (r.agent_id in (select agent_id from answering)
+              and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid) or exists (
+                select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
+            or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
+              and ${audienceSql("ra", sql`${userId}::text`)})
+          )
         order by r.agent_id, r.created_at desc
+      ), m as (
+        insert into ${messages} (id, created_at, org_id, channel_id, thread_id, author_type, author_user_id,
+          author_agent_id, agent_run_id, hop, body, mentioned_agent_ids, mentioned_user_ids, meta)
+        select ${id}::uuid, now(), ${input.orgId}::uuid, ${input.channelId}::uuid, ${threadId}::uuid,
+          ${input.author.type}::author_type, ${userId}, ${agentId}::uuid, ${runId}::uuid, ${hop}, ${body},
+          coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
+          coalesce((select array_agg(user_id) from mentioned_people), '{}'::text[]),
+          ${JSON.stringify(input.meta ?? {})}::jsonb
+            || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
+            -- Delivered to a task in progress: nobody routes it again (no second run).
+            || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(ac.id)) from active ac
+                having count(*) > 0), '{}'::jsonb)
+        where ${threadId}::uuid is null or exists (
+          select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
+            and r.channel_id = ${input.channelId}::uuid and r.thread_id is null)
+        returning *
       ), steered as (
         update ${agentRuns} r set pending_message_ids = array_append(r.pending_message_ids, ${id}::uuid),
           updated_at = now()

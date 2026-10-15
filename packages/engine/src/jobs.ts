@@ -265,6 +265,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       }
       // An answer to an agent's question resumes that run; nobody else is routed.
       if (typeof message.meta.answersQuestionId === "string") return;
+      // Delivered to an agent's task already in progress (steering): no second run.
+      if (Array.isArray(message.meta.steeredRunIds)) return;
       const channel = where;
       if (channel?.kind === "dm") {
         await dispatchDm(deps.db, message, { maxHops: deps.maxHops }); // idempotent safety net
