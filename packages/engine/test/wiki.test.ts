@@ -122,7 +122,12 @@ describe("links", () => {
     const page = await getWikiPage(f.db, me, f.org.id, "guia-de-deploy");
     expect(page.backlinks).toEqual(
       expect.arrayContaining([
-        { kind: "page", slug: "runbook", title: "Runbook" },
+        {
+          kind: "page",
+          slug: "runbook",
+          title: "Runbook",
+          excerpt: "Antes, leia [[Guia de Deploy#Rollback|o rollback]].",
+        },
         expect.objectContaining({
           kind: "message",
           channelId: f.general.id,

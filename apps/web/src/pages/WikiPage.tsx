@@ -434,7 +434,7 @@ function WikiHome({
               {p.sourceType === "obsidian" && (
                 <span className="wiki-card__src">
                   <ObsidianMark size={14} />
-                  Obsidian
+                  {t("wiki.legend.obsidian")}
                 </span>
               )}
               <b className="wiki-card__title">{p.title}</b>

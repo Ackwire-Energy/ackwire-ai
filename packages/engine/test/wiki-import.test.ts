@@ -63,7 +63,7 @@ describe("importing an Obsidian vault", () => {
     expect(home.links.map((l) => [l.slug, l.exists])).toEqual([
       ["mercado-bom", true],
       ["casa-verde", true],
-      ["home", true],
+      ["inicio", true],
     ]);
     // The alias reaches the page.
     expect((await getWikiPage(f.db, me, f.org.id, "home")).slug).toBe("inicio");

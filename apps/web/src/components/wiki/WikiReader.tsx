@@ -14,6 +14,7 @@ import {
   Menu,
   MenuItem,
   MenuSeparator,
+  modKey,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -589,7 +590,7 @@ export function WikiReader({
         </Button>
         <Button variant="primary" loading={action.isPending} disabled={action.isPending} onClick={() => void save()}>
           {t("common.save")}
-          <Kbd>⌘S</Kbd>
+          <Kbd>{`${modKey()} S`}</Kbd>
         </Button>
       </>
     );
