@@ -423,8 +423,10 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         }),
       activity: async (orgId, id) =>
         (await request<{ activity: IssueActivity[] }>(`${org(orgId)}/issues/${enc(id)}/activity`)).activity,
-      comment: (orgId, id, text) =>
-        request<IssueActivity>(`${org(orgId)}/issues/${enc(id)}/comments`, { json: { text } }),
+      comment: (orgId, id, text, attachmentIds) =>
+        request<IssueActivity>(`${org(orgId)}/issues/${enc(id)}/comments`, {
+          json: { text, ...(attachmentIds?.length ? { attachmentIds } : {}) },
+        }),
       askAgent: (orgId, id, agentId) =>
         request<Issue>(`${org(orgId)}/issues/${enc(id)}/ask-agent`, { json: { agentId } }),
     },

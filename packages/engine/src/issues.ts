@@ -79,6 +79,8 @@ export interface IssueActivityView {
   textParams?: Record<string, string>;
   /** The system moved it on its own (status follows the agent's runs and PRs). */
   auto?: boolean;
+  /** Files attached to a comment (Drive files; they are linked to the issue too). */
+  attachments?: { id: string; title: string }[];
   createdAt: string;
 }
 
@@ -320,6 +322,9 @@ const activityView = (a: typeof issueActivity.$inferSelect): IssueActivityView =
   ...(a.event ? { event: a.event } : {}),
   ...(a.kind === "event" ? eventDetail(a.event, a.data as Record<string, unknown>) : {}),
   ...((a.data as Record<string, unknown>).auto === true ? { auto: true } : {}),
+  ...(Array.isArray((a.data as Record<string, unknown>).attachments)
+    ? { attachments: (a.data as { attachments: { id: string; title: string }[] }).attachments }
+    : {}),
   createdAt: a.createdAt.toISOString(),
 });
 
@@ -667,14 +672,51 @@ export async function listIssueActivity(db: Database, actor: IssueActor, orgId: 
   return rows.map(activityView);
 }
 
-/** A comment by a person or an agent (agents report progress this way). */
-export async function commentIssue(deps: IssueDeps, actor: IssueActor, orgId: string, issueId: string, text: string) {
+/**
+ * A comment by a person or an agent (agents report progress this way). It may
+ * carry Drive files (uploaded from the comment box): they show on the comment
+ * and are linked to the issue.
+ */
+export async function commentIssue(
+  deps: IssueDeps,
+  actor: IssueActor,
+  orgId: string,
+  issueId: string,
+  text: string,
+  options: { attachmentIds?: string[] } = {},
+) {
   const body = text.trim().slice(0, 20_000);
-  if (!body) throw new ValidationError("Comment is empty");
+  const ids = [...new Set(options.attachmentIds ?? [])].slice(0, 10);
+  if (!body && ids.length === 0) throw new ValidationError("Comment is empty");
   const issue = await findVisible(deps.db, actor, orgId, { id: issueId });
+  const files = ids.length
+    ? await deps.db
+        .select({ id: artifacts.id, title: artifacts.title })
+        .from(artifacts)
+        // Only files this author uploaded (from the comment box): an id alone can't pull in someone else's file.
+        .where(
+          and(
+            eq(artifacts.orgId, orgId),
+            inArray(artifacts.id, ids),
+            isNull(artifacts.deletedAt),
+            eq(artifacts.createdByType, actorOf(actor).type),
+            eq(artifacts.createdById, actorOf(actor).id),
+          ),
+        )
+    : [];
+  if (files.length !== ids.length) throw new ValidationError("An attached file does not exist");
   const row = await deps.db.transaction(async (tx) => {
-    const a = await addActivity(tx, issue, { kind: "comment", author: actorOf(actor), text: body });
-    await tx.update(issues).set({ updatedAt: new Date() }).where(eq(issues.id, issue.id));
+    const a = await addActivity(tx, issue, {
+      kind: "comment",
+      author: actorOf(actor),
+      text: body,
+      ...(files.length ? { data: { attachments: files } } : {}),
+    });
+    const linked = [...issue.artifactIds, ...files.map((f) => f.id).filter((id) => !issue.artifactIds.includes(id))];
+    await tx
+      .update(issues)
+      .set({ updatedAt: new Date(), ...(files.length ? { artifactIds: linked } : {}) })
+      .where(eq(issues.id, issue.id));
     return a;
   });
   const view = activityView(row);

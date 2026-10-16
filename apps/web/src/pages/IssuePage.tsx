@@ -4,9 +4,12 @@ import {
   Checkbox,
   Chip,
   Composer,
+  type ComposerFormatLabels,
   CriteriaPixels,
   cx,
   Field,
+  FORMAT_KINDS,
+  type FormatKind,
   Icon,
   Message,
   MessageText,
@@ -15,17 +18,19 @@ import {
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
-import { useChannels, useIssue, useIssueAction, useIssueActivity } from "@/api/queries";
+import { useChannels, useIssue, useIssueAction, useIssueActivity, useWikiTree } from "@/api/queries";
 import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { useArtifactViewer } from "@/components/artifacts/ArtifactViewer";
 import { useOrg } from "@/components/org-context";
+import { useEmojiLabels } from "@/components/Reactions";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
+import { useComposerFiles } from "@/hooks/useComposerFiles";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { dueLabel, relativeTime, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
@@ -344,6 +349,22 @@ function Activity({ issue }: { issue: Issue }) {
   const actors = useActors();
   const [text, setText] = useState("");
   const mentionSearch = useMentionSearch();
+  const wikiLink = useWikiLinkRenderer();
+  const viewer = useArtifactViewer();
+  const wikiPages = useWikiTree(org.id);
+  const box = useRef<HTMLTextAreaElement>(null);
+  // The same box as the chat: formatting, emoji, wiki links and files (to the issue's channel Drive).
+  const files = useComposerFiles(issue.channelId, () => box.current?.focus());
+  const emojiPicker = useEmojiLabels();
+  const emoji = useMemo(() => ({ ...emojiPicker, button: t("channel.emoji") }), [emojiPicker, t]);
+  const format: ComposerFormatLabels = useMemo(
+    () => ({
+      ...(Object.fromEntries(FORMAT_KINDS.map((k) => [k, t(`composer.format.${k}`)])) as Record<FormatKind, string>),
+      toolbar: t("composer.format.toolbar"),
+      linkText: t("composer.format.linkText"),
+    }),
+    [t],
+  );
   // The event in the person's language from its code (`issues.event.*`); the server's words as the fallback.
   const eventText = (a: IssueActivity) => {
     if (!a.textCode) return a.text;
@@ -381,21 +402,66 @@ function Activity({ issue }: { issue: Issue }) {
             author={actors.name(a.author)}
             time={<time dateTime={a.createdAt}>{whenAt(t, i18n.language, a.createdAt)}</time>}
           >
-            <MessageText style={{ whiteSpace: "pre-line" }}>{a.text}</MessageText>
+            {a.text && (
+              <MessageText>
+                <Markdown source={a.text} variant="message" wikiLink={wikiLink} />
+              </MessageText>
+            )}
+            {a.attachments && a.attachments.length > 0 && (
+              <span className="issue-comment__files">
+                {a.attachments.map((f) => (
+                  <button key={f.id} type="button" className="issue-link" onClick={() => viewer.open(f.id)}>
+                    <Icon name="attach" size={16} />
+                    {f.title}
+                  </button>
+                ))}
+              </span>
+            )}
           </Message>
         ),
       )}
       <Composer
         value={text}
         onChange={setText}
+        textareaRef={box}
         label={t("issues.comment")}
         placeholder={t("issues.commentPlaceholder")}
         sendLabel={t("issues.send")}
+        sendText={t("issues.send")}
+        attachLabel={t("channel.attach")}
+        format={format}
+        emoji={emoji}
+        attachments={files.attachments}
+        onFiles={files.onFiles}
+        canSendEmpty={files.attached.length > 0}
+        sendBlocked={files.uploading}
         mentions={{ search: mentionSearch, listLabel: t("mentions.list") }}
+        links={{
+          listLabel: t("wiki.editor.suggest"),
+          search: (q) =>
+            (wikiPages.data ?? [])
+              .filter((p) => p.title.toLowerCase().includes(q.trim().toLowerCase()))
+              .slice(0, 8)
+              .map((p) => ({
+                key: `wiki:${p.slug}`,
+                insert: p.title,
+                label: p.title,
+                description: p.folder || undefined,
+                leading: <Icon name="book" size={16} />,
+              })),
+        }}
         disabled={action.isPending}
         onSend={(body) => {
-          if (!body) return;
-          action.mutate({ type: "comment", id: issue.id, text: body }, { onSuccess: () => setText("") });
+          if (files.uploading || (!body && files.attached.length === 0)) return;
+          action.mutate(
+            { type: "comment", id: issue.id, text: body, attachmentIds: files.attached.map((f) => f.id) },
+            {
+              onSuccess: () => {
+                setText("");
+                files.clear();
+              },
+            },
+          );
         }}
       />
     </section>

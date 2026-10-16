@@ -70,6 +70,7 @@ const Activity = z
     textCode: z.string().optional(),
     textParams: z.record(z.string(), z.string()).optional(),
     auto: z.boolean().optional().openapi({ description: "The system moved it on its own (runs and PRs)." }),
+    attachments: z.array(z.object({ id: z.uuid(), title: z.string() })).optional(),
     createdAt: z.string(),
   })
   .openapi("IssueActivity");
@@ -250,12 +251,25 @@ export function issueRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Comment on an issue",
-      request: { params: IssueParams, body: body(z.object({ text: z.string().min(1).max(20_000) })) },
+      request: {
+        params: IssueParams,
+        body: body(
+          z.object({
+            text: z.string().max(20_000),
+            attachmentIds: z
+              .array(z.uuid())
+              .max(10)
+              .optional()
+              .openapi({ description: "Drive files uploaded from the comment box (also linked to the issue)." }),
+          }),
+        ),
+      },
       responses: { 201: json(Activity, "Created"), ...errors },
     }),
     async (c) => {
       const { orgId, issueId } = c.req.valid("param");
-      const comment = await commentIssue(issues, person(c.get("user").id), orgId, issueId, c.req.valid("json").text);
+      const { text, attachmentIds } = c.req.valid("json");
+      const comment = await commentIssue(issues, person(c.get("user").id), orgId, issueId, text, { attachmentIds });
       return c.json(comment, 201);
     },
   );

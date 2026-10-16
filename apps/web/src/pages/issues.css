@@ -797,11 +797,18 @@
 }
 
 /* Activity events. */
+/* Events sit on the comments' avatar column: the icon centered under a 36px avatar, the words beside it. */
 .issue-event {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 4px 4px 48px;
+  gap: 18px;
+  padding: 4px 4px 4px 10px;
+}
+.issue-comment__files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 6px;
 }
 .issue-event__who {
   color: var(--ink);

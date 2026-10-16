@@ -990,6 +990,8 @@ export interface IssueActivity {
   textParams?: Record<string, string>;
   /** The system moved it on its own (the agent's runs, a linked PR). */
   auto?: boolean;
+  /** Files attached to a comment (Drive). */
+  attachments?: { id: string; title: string }[];
   createdAt: string;
 }
 

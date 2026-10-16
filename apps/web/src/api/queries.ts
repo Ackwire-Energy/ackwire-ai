@@ -906,7 +906,7 @@ export function useIssueAction(orgId: string) {
         | { type: "create"; input: IssueInput }
         | { type: "update"; id: string; patch: IssuePatch }
         | { type: "criterion"; id: string; criterionId: string; done: boolean }
-        | { type: "comment"; id: string; text: string }
+        | { type: "comment"; id: string; text: string; attachmentIds?: string[] }
         | { type: "ask"; id: string; agentId: string },
     ): Promise<unknown> => {
       switch (action.type) {
@@ -917,7 +917,7 @@ export function useIssueAction(orgId: string) {
         case "criterion":
           return api.issues.setCriterion(orgId, action.id, action.criterionId, action.done);
         case "comment":
-          return api.issues.comment(orgId, action.id, action.text);
+          return api.issues.comment(orgId, action.id, action.text, action.attachmentIds);
         case "ask":
           return api.issues.askAgent(orgId, action.id, action.agentId);
       }

@@ -203,6 +203,38 @@ describe("issues", () => {
     expect(last).toMatchObject({ event: "status_changed", auto: true, textParams: { status: "in_review" } });
   });
 
+  test("a comment can carry the author's Drive files; they link to the issue; someone else's can't be attached", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Tela quebra no Safari" });
+    const file = async (by: string, title: string) => {
+      const [row] = await f.db
+        .insert(schema.artifacts)
+        .values({
+          orgId: f.org.id,
+          kind: "file",
+          title,
+          createdByType: "person",
+          createdById: by,
+          updatedByType: "person",
+          updatedById: by,
+        })
+        .returning();
+      return row?.id ?? "";
+    };
+    const mine = await file(f.owner.id, "print.png");
+    const comment = await commentIssue(deps, person(f.owner.id), f.org.id, issue.id, "", { attachmentIds: [mine] });
+    expect(comment.attachments).toEqual([{ id: mine, title: "print.png" }]);
+    expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id })).artifacts.map((a) => a.id)).toEqual([
+      mine,
+    ]);
+    const other = await addMember(f.db, f.org.id, "member", "Ana");
+    const theirs = await file(other.id, "deles.pdf");
+    await expect(
+      commentIssue(deps, person(f.owner.id), f.org.id, issue.id, "olha", { attachmentIds: [theirs] }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
   test("an agent without issues:write can't create issues; one in another channel can't see private ones", async () => {
     f = await setup({
       issueTools: true,
