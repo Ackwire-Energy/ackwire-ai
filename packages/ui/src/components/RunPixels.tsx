@@ -25,9 +25,12 @@ const CELL = 2;
 const reduced = () =>
   typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches === true;
 
+/** A color token as "#rrggbb" (the mixer reads six digits: "#fff" would come out blue). */
 function token(el: Element, name: string, fallback: string) {
   const v = getComputedStyle(el).getPropertyValue(name).trim();
-  return /^#[0-9a-f]{3,8}$/i.test(v) ? v : fallback;
+  if (/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v)) return v.slice(0, 7);
+  if (/^#[0-9a-f]{3,4}$/i.test(v)) return `#${[...v.slice(1, 4)].map((c) => c + c).join("")}`;
+  return fallback;
 }
 
 /** Bayer between a column's tones: deep at the base, light at the top. */
@@ -296,20 +299,16 @@ export function CriteriaPixels({
     const pal = tones
       ? [t(1), t(2), t(3)]
       : [mixHex(ink, raised, 0.1), mixHex(ink, raised, 0.3), mixHex(ink, raised, 0.5)];
-    const dot = mixHex(ink, raised, 0.72);
+    // Open: a quiet solid block, so the row reads as slots to fill (not noise).
+    const open = mixHex(raised, ink, 0.1);
     ctx.clearRect(0, 0, width, H);
     done.forEach((d, k) => {
       const x0 = k * (W + G);
-      if (d) {
-        column(ctx, x0, W, H, H - 1, pal);
-        return;
+      if (d) column(ctx, x0, W, H, H - 1, pal);
+      else {
+        ctx.fillStyle = open;
+        ctx.fillRect(x0, 0, W, H);
       }
-      for (let y = 0; y < H; y++)
-        for (let x = 0; x < W; x++)
-          if ((y === 0 || y === H - 1 || x === 0 || x === W - 1) && (x + y) % 2 === 0) {
-            ctx.fillStyle = dot;
-            ctx.fillRect(x0 + x, y, 1, 1);
-          }
     });
   }, false);
   return (

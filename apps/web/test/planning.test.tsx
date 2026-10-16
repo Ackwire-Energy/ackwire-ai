@@ -90,7 +90,7 @@ describe("Issues (board and list)", () => {
     expect(screen().getAllByRole("link", { name: /^#\d+/ })).toHaveLength(1);
     await type(screen().getByRole("searchbox", { name: "Buscar issues" }), "");
     await settle(4);
-    await click(screen().getByRole("button", { name: "Lista" }));
+    await click(screen().getByRole("radio", { name: "Lista" }));
     const rows = screen().getAllByRole("listitem");
     expect(rows).toHaveLength(7);
     expect(rows[0]?.textContent).toContain("#132");

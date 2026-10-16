@@ -2681,6 +2681,11 @@ a.ac-list__row:focus-visible {
 .ac-seg__item {
   position: relative;
   z-index: var(--z-raised);
+  /* An icon next to the words keeps its distance. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
