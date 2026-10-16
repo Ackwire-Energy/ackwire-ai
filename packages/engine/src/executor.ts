@@ -274,12 +274,38 @@ async function executeRunInner(
   const later = (write: () => Promise<unknown>) => {
     deferred = deferred.then(write).catch(() => {});
   };
+  /** Messages people sent to this conversation while the run was active (one run per agent and conversation). */
+  const takeSteering = async () =>
+    db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ pending: agentRuns.pendingMessageIds })
+        .from(agentRuns)
+        .where(eq(agentRuns.id, run.id))
+        .for("update");
+      const ids = row?.pending ?? [];
+      if (ids.length === 0) return [];
+      await tx.update(agentRuns).set({ pendingMessageIds: [] }).where(eq(agentRuns.id, run.id));
+      return ids;
+    });
+  /**
+   * Messages taken by this run that it never read get their own run (the
+   * last one; it reads the thread), so a failure never swallows them.
+   */
+  const redispatchPending = async () => {
+    const pending = await takeSteering().catch(() => [] as string[]);
+    const last = pending.at(-1);
+    if (!last || run.trigger === "forum") return;
+    const message = await getMessage(db, run.orgId, last);
+    if (message && !message.deletedAt) await createAgentRuns(db, message, [run.agentId], run.trigger);
+  };
   const fail = async (reason: string) => {
     await deferred;
     await addRunStep(db, run, "error", { reason });
     await transitionRun(db, run.id, "running", "failed", { error: reason });
     await publishChannelEvent(deps.pubsub, event("failed", reason));
     await finished("failed", reason);
+    // An archived agent answers nobody; any other failure leaves the waiting messages a run of their own.
+    if (reason !== "agent_archived") await redispatchPending();
   };
 
   const ctx: ToolContext = {
@@ -525,19 +551,6 @@ async function executeRunInner(
     await finished("canceled");
   };
 
-  /** Messages people sent to this conversation while the run was active (one run per agent and conversation). */
-  const takeSteering = async () =>
-    db.transaction(async (tx) => {
-      const [row] = await tx
-        .select({ pending: agentRuns.pendingMessageIds })
-        .from(agentRuns)
-        .where(eq(agentRuns.id, run.id))
-        .for("update");
-      const ids = row?.pending ?? [];
-      if (ids.length === 0) return [];
-      await tx.update(agentRuns).set({ pendingMessageIds: [] }).where(eq(agentRuns.id, run.id));
-      return ids;
-    });
   /** Appends them to the conversation as "New message from …" (a step records it), so the model reads them next. */
   const deliverSteering = async () => {
     const ids = await takeSteering();
@@ -959,12 +972,7 @@ async function executeRunInner(
       await finished("done");
       prof.mark("events");
       // A message that slipped in between the last check and `done` gets its own run (never lost).
-      const orphans = await takeSteering().catch(() => [] as string[]);
-      const lastOrphan = orphans.at(-1);
-      if (lastOrphan && run.trigger !== "forum") {
-        const message = await getMessage(db, run.orgId, lastOrphan);
-        if (message && !message.deletedAt) await createAgentRuns(db, message, [run.agentId], run.trigger);
-      }
+      await redispatchPending();
       return;
     }
   } catch (error) {
