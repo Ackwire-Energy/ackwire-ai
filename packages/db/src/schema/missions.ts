@@ -28,7 +28,19 @@ import { organizations } from "./tenancy";
  * the home thread; acting is the owner's and the `decide` participants'.
  * No budget: what runs on the machine costs us nothing.
  */
-export const missionStatusEnum = pgEnum("mission_status", ["proposed", "active", "paused", "done", "canceled"]);
+/**
+ * `awaiting_close` (migration 0053): every plan item is done or dropped and
+ * nothing runs; the mission waits for its owner to conclude it (a delivery
+ * card). New work brings it back to `active`. Counts as open.
+ */
+export const missionStatusEnum = pgEnum("mission_status", [
+  "proposed",
+  "active",
+  "paused",
+  "done",
+  "canceled",
+  "awaiting_close",
+]);
 export const missionRoleEnum = pgEnum("mission_role", ["decide", "comment"]);
 export const missionDecisionStatusEnum = pgEnum("mission_decision_status", ["pending", "provisional", "taken"]);
 export const missionReviewStatusEnum = pgEnum("mission_review_status", ["pending", "approved", "changes_requested"]);
@@ -294,4 +306,49 @@ export const missionJoinRequests = pgTable(
     uniqueIndex("mission_join_requests_one_pending").on(t.missionId, t.userId).where(sql`${t.status} = 'pending'`),
     index().on(t.missionId, t.status),
   ],
+);
+
+/** A delivery's checklist item ("O que conferir"). */
+export interface MissionDeliveryItem {
+  id: string;
+  text: string;
+}
+
+/**
+ * Delivery cards (migration 0053): the executor's `complete_mission` (what it
+ * delivered, the files, what to check) or, when every plan item is done and
+ * nothing runs without that call, an automatic one ("Tudo pronto"). The owner
+ * or a decider concludes the mission (`accepted`) or asks for changes. Each
+ * person checks the checklist on their own (`checks`: user id → item ids).
+ * Status (text, validated in code): `pending | accepted | changes_requested | superseded`.
+ */
+export const missionDeliveries = pgTable(
+  "mission_deliveries",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    missionId: uuid()
+      .notNull()
+      .references(() => missions.id, { onDelete: "cascade" }),
+    taskId: uuid(),
+    /** The card in the thread. */
+    messageId: uuid(),
+    /** Made by us (all items done, no `complete_mission`). */
+    auto: boolean().notNull().default(false),
+    summary: text().notNull().default(""),
+    artifactIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** The paths the executor gave (as uploaded). */
+    paths: jsonb().$type<string[]>().notNull().default([]),
+    checklist: jsonb().$type<MissionDeliveryItem[]>().notNull().default([]),
+    checks: jsonb().$type<Record<string, string[]>>().notNull().default({}),
+    status: text().notNull().default("pending"),
+    note: text(),
+    saveToWiki: boolean().notNull().default(false),
+    decidedBy: text().references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.missionId, t.status)],
 );

@@ -372,6 +372,13 @@
       "when": 1792220000000,
       "tag": "0052_mission_command_approval",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792230000000,
+      "tag": "0053_mission_delivery",
+      "breakpoints": true
     }
   ]
 }
