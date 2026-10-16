@@ -1815,8 +1815,26 @@ export interface Mission {
   status: MissionStatus;
   repoDir: string;
   resumeTasks: boolean;
-  plan: { version: number; done: number; total: number; waiting: number };
-  pending: { decisions: number; provisional: number; reviews: number; suggestions: number };
+  plan: {
+    version: number;
+    done: number;
+    total: number;
+    waiting: number;
+    /** Items in progress now. */
+    doing: number;
+    /** The latest plan in order (at most 40), for the strip. */
+    items: Pick<PlanItem, "id" | "title" | "status">[];
+  };
+  pending: {
+    decisions: number;
+    provisional: number;
+    reviews: number;
+    suggestions: number;
+    /** Requests to join (0 unless you can answer them). */
+    joinRequests: number;
+  };
+  /** You asked to join and nobody answered yet. */
+  joinRequested: boolean;
   runningTasks: number;
   machine: { id: string; name: string; online: boolean; lentBy: string | null } | null;
   /** Handed over without a computer: the owner sets one. */
@@ -1835,7 +1853,60 @@ export interface Mission {
   wikiPageId: string | null;
 }
 
-export type MissionListStatus = "open" | "closed" | MissionStatus;
+export type MissionListStatus = "open" | "closed" | "waiting_you" | MissionStatus;
+
+/** `GET …/missions` filters (the server's; the Missões tab sends them). */
+export interface MissionListQuery {
+  status?: MissionListStatus;
+  channelId?: string;
+  agentId?: string;
+  /** Words of the title or the goal. */
+  q?: string;
+  limit?: number;
+}
+
+/** Same filters, any status: the tabs and the sidebar's count. */
+export interface MissionCounts {
+  active: number;
+  waitingYou: number;
+  closed: number;
+}
+
+export interface MissionList {
+  missions: Mission[];
+  counts: MissionCounts;
+}
+
+/** "Pedir para participar": answered by the owner and those who decide. */
+export interface MissionJoinRequest {
+  id: string;
+  missionId: string;
+  userId: string;
+  name: string;
+  status: "pending" | "accepted" | "declined";
+  role: MissionParticipantRole | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+/** An agent that can run a mission for you (a connected computer it may use). */
+export interface MissionEligibleAgent {
+  agentId: string;
+  handle: string;
+  name: string;
+  machine: { id: string; name: string; online: boolean };
+  ready: boolean;
+}
+
+/** "Ver saída": the last lines of a task, from the computer or what the server kept. */
+export interface TaskOutput {
+  taskId: string;
+  status: MachineTaskStatus;
+  source: "computer" | "saved";
+  lines: string[];
+  truncated: boolean;
+}
 
 export interface MissionCreateInput {
   agentId: string;
@@ -1914,6 +1985,8 @@ export interface MachineTask {
   seconds: number | null;
   lastLine: string | null;
   files: string[];
+  /** A pull request it opened (detected by the server). */
+  prUrl?: string | null;
   branch: string | null;
   cwd: string | null;
   resumedFromId: string | null;

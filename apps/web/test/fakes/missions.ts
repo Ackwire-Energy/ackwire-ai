@@ -10,6 +10,7 @@ import type {
   MachineTask,
   Mission,
   MissionDecision,
+  MissionJoinRequest,
   MissionParticipants,
   MissionPlanVersion,
   MissionReview,
@@ -24,6 +25,9 @@ interface Store {
   plans: Map<string, MissionPlanVersion[]>;
   people: Map<string, MissionParticipants["participants"]>;
   files: Map<string, Record<string, string>>;
+  joins: MissionJoinRequest[];
+  /** What "Ver saída" answers, per task. */
+  outputs: Map<string, string[]>;
 }
 
 export function createFakeMissions(
@@ -39,6 +43,8 @@ export function createFakeMissions(
       plans: new Map(),
       people: new Map(),
       files: new Map(),
+      joins: [],
+      outputs: new Map(),
     }),
   );
   const find = async (orgId: string, missionId: string) => {
@@ -55,13 +61,109 @@ export function createFakeMissions(
     };
   };
   return {
-    list: async (orgId, status = "open") => {
+    list: async (orgId, query = {}) => {
       const open = (m: Mission) => ["proposed", "active", "paused"].includes(m.status);
-      return clone(
-        (await store(orgId)).missions.filter((m) =>
-          status === "open" ? open(m) : status === "closed" ? !open(m) : m.status === status,
-        ),
+      const waiting = (m: Mission) =>
+        m.canAct &&
+        m.plan.waiting +
+          m.pending.decisions +
+          m.pending.provisional +
+          m.pending.reviews +
+          m.pending.suggestions +
+          m.pending.joinRequests >
+          0;
+      const q = query.q?.trim().toLowerCase();
+      const scope = (await store(orgId)).missions.filter(
+        (m) =>
+          (!query.channelId || m.channelId === query.channelId) &&
+          (!query.agentId || m.agentId === query.agentId) &&
+          (!q || `${m.title} ${m.goal}`.toLowerCase().includes(q)),
       );
+      const status = query.status;
+      const missions = scope.filter((m) =>
+        !status
+          ? true
+          : status === "open"
+            ? open(m)
+            : status === "closed"
+              ? !open(m)
+              : status === "waiting_you"
+                ? open(m) && waiting(m)
+                : m.status === status,
+      );
+      return clone({
+        missions: missions.slice(0, query.limit ?? 50),
+        counts: {
+          active: scope.filter(open).length,
+          waitingYou: scope.filter((m) => open(m) && waiting(m)).length,
+          closed: scope.filter((m) => !open(m)).length,
+        },
+      });
+    },
+    eligibleAgents: async (orgId) =>
+      (await ctx.lookup.agents(orgId)).map((a) => ({
+        agentId: a.id,
+        handle: a.handle,
+        name: a.name,
+        machine: { id: "machine_1", name: "MacBook", online: true },
+        ready: true,
+      })),
+    taskOutput: async (orgId, taskId) => {
+      const s = await store(orgId);
+      const task = s.tasks.find((x) => x.id === taskId);
+      if (!task) throw new ApiError(404, "task.not_found", "Task not found");
+      const lines = s.outputs.get(taskId) ?? (task.lastLine ? [task.lastLine] : []);
+      return { taskId, status: task.status, source: "computer" as const, lines: clone(lines), truncated: false };
+    },
+    joinRequests: async (orgId, missionId) =>
+      clone((await store(orgId)).joins.filter((j) => j.missionId === missionId && j.status === "pending")),
+    requestJoin: async (orgId, missionId) => {
+      log("missions.requestJoin", orgId, missionId);
+      const m = await find(orgId, missionId);
+      const me = await ctx.lookup.me();
+      const s = await store(orgId);
+      const userId = me?.user.id ?? "";
+      const existing = s.joins.find((j) => j.missionId === missionId && j.userId === userId && j.status === "pending");
+      if (existing) return clone(existing);
+      const row: MissionJoinRequest = {
+        id: mockId("join"),
+        missionId,
+        userId,
+        name: me?.user.name ?? "",
+        status: "pending",
+        role: null,
+        decidedBy: null,
+        decidedAt: null,
+        createdAt: ctx.now().toISOString(),
+      };
+      s.joins.push(row);
+      touch(m, { joinRequested: true });
+      return clone(row);
+    },
+    decideJoin: async (orgId, missionId, userId, outcome, role) => {
+      log("missions.decideJoin", orgId, missionId, userId, outcome, role);
+      const m = await find(orgId, missionId);
+      const s = await store(orgId);
+      const row = s.joins.find((j) => j.missionId === missionId && j.userId === userId && j.status === "pending");
+      if (!row) throw new ApiError(404, "mission.join_not_found", "No request to join from this person");
+      Object.assign(row, {
+        status: outcome === "accept" ? "accepted" : "declined",
+        role: outcome === "accept" ? (role ?? "comment") : null,
+        decidedAt: ctx.now().toISOString(),
+      });
+      if (outcome === "accept") {
+        const list = s.people.get(m.id) ?? [];
+        list.push({
+          userId,
+          name: row.name,
+          role: role ?? "comment",
+          addedBy: null,
+          createdAt: ctx.now().toISOString(),
+        });
+        s.people.set(m.id, list);
+      }
+      touch(m, { pending: { ...m.pending, joinRequests: Math.max(0, m.pending.joinRequests - 1) } });
+      return clone(row);
     },
     create: async (orgId, input) => {
       log("missions.create", orgId, input);
@@ -79,8 +181,9 @@ export function createFakeMissions(
         status: "proposed",
         repoDir: input.folder ?? "",
         resumeTasks: true,
-        plan: { version: 0, done: 0, total: 0, waiting: 0 },
-        pending: { decisions: 0, provisional: 0, reviews: 0, suggestions: 0 },
+        plan: { version: 0, done: 0, total: 0, waiting: 0, doing: 0, items: [] },
+        pending: { decisions: 0, provisional: 0, reviews: 0, suggestions: 0, joinRequests: 0 },
+        joinRequested: false,
         runningTasks: 1,
         machine: { id: "machine_1", name: "MacBook", online: true, lentBy: null },
         needsComputer: false,

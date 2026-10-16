@@ -30,7 +30,8 @@ describe("Missões (Threads.html)", () => {
     await settle(6);
     const card = screen().getByRole("article", { name: /Missão Construir o app mobile/ });
     expect(within(card).getByText("Plano proposto")).toBeTruthy();
-    expect(within(card).getByText("0 de 0 itens")).toBeTruthy();
+    // No plan yet (the executor is still exploring): no "0 de 0" count.
+    expect(within(card).getByText("Sem itens ainda")).toBeTruthy();
     expect(within(card).getAllByText(/MacBook/).length).toBeGreaterThan(0);
     expect(within(card).getAllByRole("button", { name: /Abrir thread/ }).length).toBeGreaterThan(0);
   });

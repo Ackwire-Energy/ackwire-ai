@@ -592,6 +592,14 @@ a.mi-pr:hover {
   overflow-wrap: anywhere;
   color: var(--ink2);
 }
+.mi-log-wrap {
+  display: grid;
+  gap: 6px;
+}
+.mi-log-wrap .mi-log {
+  max-height: 280px;
+  overflow-y: auto;
+}
 
 /* ── Decision and review cards ───────────────────────────────────────────── */
 .mi-q h3 {
@@ -1146,4 +1154,25 @@ a.mi-pr:hover {
   .mi-cursor {
     animation: none;
   }
+}
+
+/* ── Requests to join ─────────────────────────────────────────────────────── */
+.mi-join {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mi-person__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* ── Agent picker of "Nova missão" ────────────────────────────────────────── */
+.mi-agent-empty {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
 }

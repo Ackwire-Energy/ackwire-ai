@@ -5,9 +5,11 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import {
   cacheMission,
+  useMissionAct,
   useMissionControl,
   useMissionParticipants,
   useMissionPlan,
+  useRequestJoin,
   useThreadTasks,
 } from "@/api/missions";
 import { useMachines } from "@/api/queries";
@@ -16,7 +18,7 @@ import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { errorText } from "@/lib/errors";
-import { cellsFromCounts, formatSpan, isOpenMission, missionTasks, planCells } from "@/lib/missions";
+import { formatSpan, isOpenMission, missionCells, missionTasks, planCells } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
 import { MachineChip, MissionStatusChip, MissionStrip, useMissionPanel, useNow } from "./MissionBits";
 import { CloseMissionDialog, ShareMissionDialog } from "./MissionDialogs";
@@ -39,12 +41,14 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
   const tasks = useThreadTasks(org.id, m.threadId);
   const people = useMissionParticipants(org.id, m.id);
   const control = useMissionControl(org.id);
+  const api = useApi();
+  const approveAll = useMissionAct(org.id, m.id, () => api.missions.approveProvisional(org.id, m.id));
   const [dialog, setDialog] = useState<"share" | "close" | null>(null);
   const open = isOpenMission(m);
   const offline = Boolean(m.machine && !m.machine.online);
   const now = useNow(open, 30_000);
   const items = plan.data?.current?.items;
-  const cells = items ? planCells(items, { offline }) : cellsFromCounts(m.plan, m.runningTasks, { offline });
+  const cells = items ? planCells(items, { offline }) : missionCells(m, { offline });
   const sessions = missionTasks(tasks.data ?? [], m.id);
   const interrupted = sessions.filter((x) => x.status === "interrupted" && !x.endedAt).length;
   const waiting = m.pending.decisions + m.pending.reviews + m.pending.provisional;
@@ -90,6 +94,12 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
               ))}
             </AvatarStack>
             {who.length > 3 && <small>+{who.length - 3}</small>}
+          </button>
+        )}
+        {open && m.canAct && m.pending.joinRequests > 0 && (
+          <button type="button" className="mi-pill mi-pill--need" onClick={() => setDialog("share")}>
+            <Icon name="members" size={14} />
+            {t("missions.join.pendingCount", { count: m.pending.joinRequests })}
           </button>
         )}
         {panel && (
@@ -167,6 +177,21 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
           </span>
         )}
         {(offline || !m.machine) && <MachineChip machine={m.machine} />}
+        {open && m.canAct && m.pending.provisional > 0 && (
+          <Button
+            size="sm"
+            icon="check"
+            loading={approveAll.isPending}
+            onClick={() =>
+              approveAll.mutate(undefined, {
+                onSuccess: (out) => toast.show(t("missions.decision.approvedAll", { count: out.length })),
+                onError: (error) => toast.show(errorText(t, error), "error"),
+              })
+            }
+          >
+            {t("missions.decision.approveAll", { count: m.pending.provisional })}
+          </Button>
+        )}
       </div>
       {m.needsComputer && (
         <div className="mi-notes" style={{ marginTop: 0, marginBottom: 12 }}>
@@ -231,5 +256,43 @@ function PickComputer({ mission }: { mission: Mission }) {
         </MenuItem>
       ))}
     </Menu>
+  );
+}
+
+/**
+ * The composer's note for someone who sees a mission and takes no part: they
+ * can read, and ask its owner to join ("Pedir para participar"; then
+ * "Pedido enviado" until someone answers). Nothing is posted in the thread.
+ */
+export function MissionJoinNote({ mission }: { mission: Mission }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const ask = useRequestJoin(org.id, mission.id);
+  const sent = mission.joinRequested || ask.isSuccess;
+  return (
+    <span className="mi-join">
+      <span>{t("missions.readOnlyNote")}</span>
+      {sent ? (
+        <span className="mi-pill">
+          <Icon name="check" size={14} />
+          {t("missions.join.sent")}
+        </span>
+      ) : (
+        <Button
+          size="sm"
+          icon="members"
+          loading={ask.isPending}
+          onClick={() =>
+            ask.mutate(undefined, {
+              onSuccess: () => toast.show(t("missions.join.sentToast")),
+              onError: (error) => toast.show(errorText(t, error), "error"),
+            })
+          }
+        >
+          {t("missions.join.ask")}
+        </Button>
+      )}
+    </span>
   );
 }

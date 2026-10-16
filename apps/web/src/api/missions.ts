@@ -2,7 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./context";
 import { ApiError } from "./http";
 import { keys } from "./keys";
-import type { MachineTask, Mission, MissionControl, MissionCreateInput, MissionListStatus } from "./types";
+import type {
+  MachineTask,
+  Mission,
+  MissionControl,
+  MissionCreateInput,
+  MissionListQuery,
+  MissionParticipantRole,
+} from "./types";
 
 /**
  * React Query hooks for missions (ADR 0029). `mission.updated` and
@@ -20,14 +27,37 @@ export function cacheMission(qc: QC, orgId: string, mission: Mission) {
   void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
 }
 
-/** The Missões tab (and the sidebar's count): open missions by default. */
-export function useMissionList(orgId: string, status: MissionListStatus = "open", enabled = true) {
+/** The Missões tab (server filters) and the sidebar's count (`counts.waitingYou`): open missions by default. */
+export function useMissionList(orgId: string, query: MissionListQuery = { status: "open" }, enabled = true) {
   const api = useApi();
   return useQuery({
-    queryKey: keys.missionList(orgId, status),
-    queryFn: () => api.missions.list(orgId, status),
+    queryKey: keys.missionList(orgId, JSON.stringify(query)),
+    queryFn: () => api.missions.list(orgId, query),
     enabled,
     staleTime: 15_000,
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** "Nova missão": the agents that can run one for me (a connected computer they may use). */
+export function useEligibleAgents(orgId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...keys.missions(orgId), "eligible"],
+    queryFn: () => api.missions.eligibleAgents(orgId),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+/** "Ver saída": the last lines of a task (from the computer when it is online). */
+export function useTaskOutput(orgId: string, taskId: string, enabled: boolean) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...keys.missions(orgId), "output", taskId],
+    queryFn: () => api.missions.taskOutput(orgId, taskId, 100),
+    enabled,
+    staleTime: 5_000,
   });
 }
 
@@ -118,6 +148,48 @@ export function useMissionParticipants(orgId: string, missionId: string | null |
     () => api.missions.participants(orgId, missionId ?? ""),
     enabled,
   );
+}
+
+/** Pending requests to join (the Compartilhar dialog; the pinned card's count). */
+export function useMissionJoinRequests(orgId: string, missionId: string | null | undefined, enabled = true) {
+  const api = useApi();
+  return useMissionPart(
+    orgId,
+    missionId,
+    "joinRequests",
+    () => api.missions.joinRequests(orgId, missionId ?? ""),
+    enabled,
+  );
+}
+
+/** "Pedir para participar". */
+export function useRequestJoin(orgId: string, missionId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: () => api.missions.requestJoin(orgId, missionId),
+    onSuccess: () => refreshMission(qc, orgId, missionId, ["joinRequests"]),
+  });
+}
+
+/** Aceitar (with a role) or Recusar a request to join. */
+export function useDecideJoin(orgId: string, missionId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: ({
+      userId,
+      outcome,
+      role,
+    }: {
+      userId: string;
+      outcome: "accept" | "decline";
+      role?: MissionParticipantRole;
+    }) => api.missions.decideJoin(orgId, missionId, userId, outcome, role),
+    onSuccess: () => refreshMission(qc, orgId, missionId, ["joinRequests", "participants"]),
+  });
 }
 
 /** Refetch what a mission change touches (one part, or all of them). */

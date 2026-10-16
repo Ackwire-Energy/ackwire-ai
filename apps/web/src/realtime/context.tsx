@@ -479,8 +479,9 @@ export function applyMissionEvent(
     plan: ["plan", "files"],
     file_edited: ["files"],
     files: ["files"],
-    participants: ["participants"],
+    participants: ["participants", "joinRequests"],
     owner: ["participants"],
+    join_requests: ["joinRequests"],
     suggestion: [],
     task: [],
   };

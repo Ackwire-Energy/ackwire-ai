@@ -16,7 +16,7 @@ import {
   Textarea,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -26,9 +26,12 @@ import {
   refreshMission,
   useCloseMission,
   useCreateMission,
+  useDecideJoin,
+  useEligibleAgents,
+  useMissionJoinRequests,
   useMissionParticipants,
 } from "@/api/missions";
-import { useChannels, useComputer } from "@/api/queries";
+import { useChannels } from "@/api/queries";
 import type { Mission, MissionParticipantRole } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -72,17 +75,24 @@ export function NewMissionDialog({
   const navigate = useNavigate();
   const channels = useChannels(org.id);
   const create = useCreateMission(org.id);
-  const agents = dir.agents.filter((a) => canTalk(a));
+  // Only agents with a computer they can run a mission on, for me (the server checks audience and runner).
+  const eligible = useEligibleAgents(org.id, open);
+  const ready = eligible.data ?? [];
+  const agents = ready.flatMap((e) => {
+    const a = dir.agentById.get(e.agentId);
+    return a ? [{ ...a, machine: e.machine }] : [];
+  });
   const [goal, setGoal] = useState(initialGoal);
-  const [agentId, setAgentId] = useState(initialAgentId ?? agents[0]?.id ?? "");
+  const [agentId, setAgentId] = useState(initialAgentId ?? "");
   const memberChannels = (channels.data ?? []).filter((c) => c.isMember);
   const [home, setHome] = useState<"channel" | "dm">(initialChannelId || memberChannels.length ? "channel" : "dm");
   const [channelId, setChannelId] = useState(initialChannelId ?? memberChannels[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
-  const agent = dir.agentById.get(agentId) ?? agents[0];
-  const computer = useComputer(org.id, agent?.id ?? "", open && Boolean(agent));
-  const target = computer.data?.target;
-  const machine = target?.kind === "machine" ? target : null;
+  const agent = agents.find((a) => a.id === agentId) ?? agents[0];
+  const machine = agent?.machine ?? null;
+  // Nobody can run one yet: where to connect a computer (an agent I can talk to).
+  const setupAgent = dir.agents.find((a) => canTalk(a));
+  const none = eligible.isSuccess && agents.length === 0;
   const goalId = useId();
   const submit = async () => {
     if (!agent || !goal.trim()) return;
@@ -134,30 +144,55 @@ export function NewMissionDialog({
             onChange={(e) => setGoal(e.target.value)}
           />
         </div>
-        <div className="mi-grid2">
-          <div className="mi-field">
-            <span className="mi-field__label">{t("missions.new.agent")}</span>
-            <Select
-              aria-label={t("missions.new.agent")}
-              value={agent?.id}
-              onValueChange={setAgentId}
-              options={agents.map((a) => ({
-                value: a.id,
-                label: a.name,
-                description: a.role,
-                leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
-              }))}
-            />
-          </div>
-          <div className="mi-field">
-            <span className="mi-field__label">{t("missions.new.computer")}</span>
-            <span className="mi-pill" style={{ height: 40, borderRadius: 12 }}>
-              <Icon name="computer" size={14} />
-              {machine ? machine.name : computer.isPending ? "…" : t("missions.new.noMachine")}
-              {machine && <small>{machine.online ? t("missions.online") : t("missions.offline")}</small>}
+        {none ? (
+          <div className="mi-notes mi-agent-empty" role="status">
+            <span>
+              <Icon name="computer" size={14} /> <b>{t("missions.new.noEligibleTitle")}</b>
             </span>
+            <span>{t("missions.new.noEligibleText")}</span>
+            {setupAgent && (
+              <Link
+                className="mi-lnk"
+                to="/org/$orgId/agents/$agentId"
+                params={{ orgId: org.id, agentId: setupAgent.id }}
+                search={{ tab: "settings", sec: "computer" }}
+                onClick={() => onOpenChange(false)}
+              >
+                <Icon name="settings" size={14} />
+                {t("missions.new.connectComputer", { name: setupAgent.name })}
+              </Link>
+            )}
           </div>
-        </div>
+        ) : (
+          <div className="mi-grid2">
+            <div className="mi-field">
+              <span className="mi-field__label">{t("missions.new.agent")}</span>
+              <Select
+                aria-label={t("missions.new.agent")}
+                value={agent?.id}
+                onValueChange={setAgentId}
+                placeholder={eligible.isPending ? "…" : undefined}
+                options={agents.map((a) => ({
+                  value: a.id,
+                  label: a.name,
+                  description: t("missions.new.agentOn", {
+                    computer: a.machine.name,
+                    state: a.machine.online ? t("missions.online") : t("missions.offline"),
+                  }),
+                  leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
+                }))}
+              />
+            </div>
+            <div className="mi-field">
+              <span className="mi-field__label">{t("missions.new.computer")}</span>
+              <span className="mi-pill" style={{ height: 40, borderRadius: 12 }}>
+                <Icon name="computer" size={14} />
+                {machine ? machine.name : eligible.isPending ? "…" : t("missions.new.noMachine")}
+                {machine && <small>{machine.online ? t("missions.online") : t("missions.offline")}</small>}
+              </span>
+            </div>
+          </div>
+        )}
         <div className="mi-field">
           <span className="mi-field__label">{t("missions.new.home")}</span>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -195,12 +230,6 @@ export function NewMissionDialog({
           <div className="mi-notes">
             <Icon name="computer" size={14} />
             <span>{t("missions.new.offline", { name: machine.name })}</span>
-          </div>
-        )}
-        {!machine && computer.isSuccess && (
-          <div className="mi-notes">
-            <Icon name="info" size={14} />
-            <span>{t("missions.new.needsMachine", { name: agent?.name ?? "" })}</span>
           </div>
         )}
         <div className="mi-notes">
@@ -472,6 +501,7 @@ export function ShareMissionDialog({
               {query && matches.length === 0 && <p className="mi-hint">{t("missions.share.noMatch")}</p>}
             </>
           )}
+          {mission.canAct && <JoinRequests mission={mission} enabled={open} />}
           <h3 className="mi-section-title">{t("missions.share.who")}</h3>
           <ul className="mi-people">
             {list?.owner && (
@@ -587,6 +617,73 @@ export function ShareMissionDialog({
           </Button>
         </DialogFooter>
       </Dialog>
+    </>
+  );
+}
+
+/** Requests to join, for the owner and those who decide: Aceitar (with a role) or Recusar. */
+function JoinRequests({ mission, enabled }: { mission: Mission; enabled: boolean }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const requests = useMissionJoinRequests(org.id, mission.id, enabled && mission.pending.joinRequests > 0);
+  const decide = useDecideJoin(org.id, mission.id);
+  const [roles, setRoles] = useState<Record<string, MissionParticipantRole>>({});
+  const list = (requests.data ?? []).filter((r) => r.status === "pending");
+  if (list.length === 0) return null;
+  const roleOptions = [
+    { value: "decide" as const, label: t("missions.share.decide") },
+    { value: "comment" as const, label: t("missions.share.comment") },
+  ];
+  const answer = (userId: string, name: string, outcome: "accept" | "decline") =>
+    decide.mutate(
+      { userId, outcome, role: roles[userId] ?? "comment" },
+      {
+        onSuccess: () =>
+          toast.show(
+            outcome === "accept" ? t("missions.join.accepted", { name }) : t("missions.join.declined", { name }),
+          ),
+        onError: (error) => toast.show(errorText(t, error), "error"),
+      },
+    );
+  return (
+    <>
+      <h3 className="mi-section-title">{t("missions.join.title", { count: list.length })}</h3>
+      <ul className="mi-people">
+        {list.map((r) => (
+          <li key={r.id} className="mi-person">
+            <ActorAvatar actor={{ type: "person", id: r.userId }} name={r.name} size="sm" />
+            <span className="mi-person__name">{r.name}</span>
+            <span className="mi-person__actions">
+              <div style={{ width: 150 }}>
+                <Select
+                  size="sm"
+                  aria-label={t("missions.join.roleOf", { name: r.name })}
+                  value={roles[r.userId] ?? "comment"}
+                  onValueChange={(v) => setRoles((prev) => ({ ...prev, [r.userId]: v }))}
+                  options={roleOptions}
+                />
+              </div>
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={decide.isPending}
+                onClick={() => answer(r.userId, r.name, "accept")}
+              >
+                {t("missions.join.accept")}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={decide.isPending}
+                onClick={() => answer(r.userId, r.name, "decline")}
+              >
+                {t("missions.join.decline")}
+              </Button>
+            </span>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }

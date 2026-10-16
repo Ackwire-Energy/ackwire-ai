@@ -16,6 +16,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useMissionList } from "@/api/missions";
 import { useChannels, useThreadList } from "@/api/queries";
 import type { ThreadActor, ThreadInfo, ThreadTab } from "@/api/types";
 import { ActorAvatar } from "@/components/AgentAvatar";
@@ -72,6 +73,8 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
     ...(query ? { q: query } : {}),
   };
   const list = useThreadList(org.id, filters, !missions);
+  // "Missões · N": the open missions I see (the server counts them).
+  const missionCounts = useMissionList(org.id, { status: "open", limit: 1 }).data?.counts;
   const threads = useMemo(() => list.data?.pages.flatMap((p) => p.threads) ?? [], [list.data]);
   const controls = useThreadControls();
   const open = threads.find((x) => x.id === openId) ?? null;
@@ -140,7 +143,13 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
               setTab(v);
               setOpenId(null);
             }}
-            options={THREAD_TABS.map((v) => ({ value: v, label: t(`threads.tabs.${v}`) }))}
+            options={THREAD_TABS.map((v) => ({
+              value: v,
+              label:
+                v === "missions" && missionCounts?.active
+                  ? t("missions.tabCount", { label: t("threads.tabs.missions"), count: missionCounts.active })
+                  : t(`threads.tabs.${v}`),
+            }))}
           />
         </div>
         <div className="threads-tools">
@@ -405,6 +414,15 @@ function ThreadRow({
             <Icon name={thread.channelKind === "dm" ? "person" : "channel"} size={14} />
             {where}
           </span>
+          {thread.mission && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="thread-row__where">
+                <Icon name="flag" size={14} />
+                {t("missions.chip", { done: thread.mission.planDone, count: thread.mission.planTotal })}
+              </span>
+            </>
+          )}
           {last && (
             <>
               <span aria-hidden="true">·</span>

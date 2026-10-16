@@ -4,6 +4,7 @@ import type { MachineTask, Message, Mission } from "@/api/types";
 import { threadRootsToLoad } from "@/chat/timeline";
 import { createI18n } from "@/i18n";
 import {
+  appendOutputLine,
   cellsFromCounts,
   editDiff,
   formatSpan,
@@ -11,6 +12,7 @@ import {
   machineTaskOf,
   mdLines,
   missionCardRef,
+  missionCells,
   missionPlanChangeOf,
   missionPlanOf,
   missionReportOf,
@@ -24,6 +26,7 @@ import {
   prOf,
   summaryParts,
   taskNoticeOf,
+  taskPr,
   taskSeconds,
   waitingParts,
   waitingText,
@@ -46,8 +49,9 @@ const mission = (over: Partial<Mission> = {}): Mission => ({
   status: "active",
   repoDir: "",
   resumeTasks: true,
-  plan: { version: 1, done: 4, total: 12, waiting: 1 },
-  pending: { decisions: 2, provisional: 0, reviews: 1, suggestions: 0 },
+  plan: { version: 1, done: 4, total: 12, waiting: 1, doing: 2, items: [] },
+  pending: { decisions: 2, provisional: 0, reviews: 1, suggestions: 0, joinRequests: 0 },
+  joinRequested: false,
   runningTasks: 2,
   machine: { id: "mac", name: "MacBook do Walter", online: true, lentBy: null },
   needsComputer: false,
@@ -137,6 +141,30 @@ describe("what waits for you", () => {
     expect(waitingParts(mission({ canAct: false }))).toEqual([]);
   });
 
+  test("the strip of a view: its plan items when sent, else the counts with what is in progress", () => {
+    const withItems = mission({
+      plan: {
+        version: 2,
+        done: 1,
+        total: 3,
+        waiting: 1,
+        doing: 1,
+        items: [
+          { id: "a", title: "A", status: "done" },
+          { id: "b", title: "B", status: "doing" },
+          { id: "c", title: "C", status: "waiting_you" },
+          { id: "d", title: "D", status: "dropped" },
+        ],
+      },
+    });
+    expect(missionCells(withItems)).toEqual(["done", "doing", "waiting", "dropped"]);
+    expect(missionCells(withItems, { offline: true })).toEqual(["done", "stopped", "waiting", "dropped"]);
+    // No items (an older server): the counts, with `doing` as the moving cells.
+    expect(missionCells(mission({ plan: { version: 1, done: 1, total: 4, waiting: 0, doing: 2, items: [] } }))).toEqual(
+      ["done", "doing", "doing", "todo"],
+    );
+  });
+
   test("open missions", () => {
     expect(isOpenMission(mission())).toBe(true);
     expect(isOpenMission(mission({ status: "proposed" }))).toBe(true);
@@ -181,6 +209,24 @@ describe("time and sessions", () => {
     });
     expect(prOf("Writing apps/mobile/app.json")).toBeNull();
     expect(prOf(null)).toBeNull();
+  });
+
+  test("a session's PR: the server's prUrl first, the last line only for older rows", () => {
+    expect(taskPr(task({ prUrl: "https://github.com/acme/app/pull/431", lastLine: "PR #9" }))).toEqual({
+      number: "431",
+      url: "https://github.com/acme/app/pull/431",
+    });
+    expect(taskPr(task({ prUrl: "https://gitlab.com/acme/app/-/merge_requests/7" }))?.number).toBe("7");
+    expect(taskPr(task({ prUrl: null, lastLine: "✓ gh pr create · PR #12" }))).toEqual({ number: "12", url: null });
+    expect(taskPr(task({ lastLine: "Reading a.ts" }))).toBeNull();
+  });
+
+  test("Ver saída while it runs: a new live line joins the log once", () => {
+    expect(appendOutputLine(["a", "b"], "c")).toEqual(["a", "b", "c"]);
+    expect(appendOutputLine(["a", "b"], "b")).toEqual(["a", "b"]);
+    expect(appendOutputLine(["a"], "  ")).toEqual(["a"]);
+    expect(appendOutputLine(["a"], null)).toEqual(["a"]);
+    expect(appendOutputLine(["a", "b", "c"], "d", 3)).toEqual(["b", "c", "d"]);
   });
 });
 

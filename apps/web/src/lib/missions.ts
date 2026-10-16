@@ -54,6 +54,20 @@ export function cellsFromCounts(
   ];
 }
 
+/**
+ * The strip of a mission view: its plan items when the server sent them
+ * (`plan.items`), else the counts (an older server), with what is in
+ * progress (`plan.doing`) as the moving cells.
+ */
+export function missionCells(
+  m: Pick<Mission, "plan" | "runningTasks">,
+  options: { offline?: boolean } = {},
+): PlanCell[] {
+  const items = m.plan.items ?? [];
+  if (items.length > 0) return planCells(items, options);
+  return cellsFromCounts(m.plan, m.plan.doing ?? m.runningTasks, options);
+}
+
 /** "N de M itens": dropped items don't count (same as the server's plan counts). */
 export function planCounts(items: Pick<PlanItem, "status">[]) {
   const live = items.filter((i) => i.status !== "dropped");
@@ -127,6 +141,22 @@ export function prOf(text: string | null | undefined): { number: string; url: st
   if (url?.[1]) return { number: url[1], url: url[0] };
   const short = /\bPR #(\d+)\b/i.exec(text);
   return short?.[1] ? { number: short[1], url: null } : null;
+}
+
+/** The pull request of a session: the server's `prUrl`, else (older rows) one named in its last line. */
+export function taskPr(task: Pick<MachineTask, "prUrl" | "lastLine">): { number: string; url: string | null } | null {
+  if (task.prUrl) {
+    const n = /\/(?:pull|merge_requests)\/(\d+)/.exec(task.prUrl);
+    return { number: n?.[1] ?? "", url: task.prUrl };
+  }
+  return prOf(task.lastLine);
+}
+
+/** "Ver saída" while it runs: the live last line joins the log when it is new (at most `max` lines kept). */
+export function appendOutputLine(lines: string[], line: string | null | undefined, max = 200): string[] {
+  const l = (line ?? "").trim();
+  if (!l || lines.at(-1) === l) return lines;
+  return [...lines, l].slice(-max);
 }
 
 /** The plan change line: "+ Notificações · − Drawer lateral" (renames and status changes too). */

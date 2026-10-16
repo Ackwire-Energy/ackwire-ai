@@ -6,7 +6,7 @@ import { useThreadMission } from "@/api/missions";
 import { useThreadInfo } from "@/api/queries";
 import { ErrorState } from "@/components/Loading";
 import { Main } from "@/components/Main";
-import { MissionPinned } from "@/components/missions/MissionPinned";
+import { MissionJoinNote, MissionPinned } from "@/components/missions/MissionPinned";
 import { useOrg } from "@/components/org-context";
 import { ArchivedNote, ContextBlock, ThreadHeader, ThreadOrigin } from "@/components/threads/ThreadView";
 import { isOpenMission } from "@/lib/missions";
@@ -75,7 +75,9 @@ export function ThreadPage({ threadId, reply }: { threadId: string; reply?: bool
           </>
         ),
         composerNote:
-          mission && isOpenMission(mission) && mission.role === "none" ? t("missions.readOnlyNote") : undefined,
+          mission && isOpenMission(mission) && mission.role === "none" ? (
+            <MissionJoinNote mission={mission} />
+          ) : undefined,
         composerLabel: t("threads.view.composer"),
         composerReplacement: archived ? <ArchivedNote thread={thread} /> : undefined,
       }}

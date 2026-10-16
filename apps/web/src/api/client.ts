@@ -59,8 +59,11 @@ import type {
   MissionControl,
   MissionCreateInput,
   MissionDecision,
+  MissionEligibleAgent,
   MissionFiles,
-  MissionListStatus,
+  MissionJoinRequest,
+  MissionList,
+  MissionListQuery,
   MissionParticipantRole,
   MissionParticipants,
   MissionPlan,
@@ -99,6 +102,7 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
+  TaskOutput,
   ThreadAction,
   ThreadCreateInput,
   ThreadFilters,
@@ -412,8 +416,24 @@ export interface ApiClient {
   };
   /** Missions (ADR 0029): long work by the agent's executor on a connected computer, in one thread. */
   missions: {
-    /** Missions you can see (the Missões tab), most recently changed first. */
-    list(orgId: string, status?: MissionListStatus): Promise<Mission[]>;
+    /** Missions you can see (the Missões tab), most recently changed first, with the counts for the tabs. */
+    list(orgId: string, query?: MissionListQuery): Promise<MissionList>;
+    /** "Nova missão": agents that can run a mission for you. */
+    eligibleAgents(orgId: string): Promise<MissionEligibleAgent[]>;
+    /** "Ver saída": the last lines of a background task. */
+    taskOutput(orgId: string, taskId: string, tail?: number): Promise<TaskOutput>;
+    /** Pending requests to join (all for whoever answers them; else your own). */
+    joinRequests(orgId: string, missionId: string): Promise<MissionJoinRequest[]>;
+    /** "Pedir para participar". */
+    requestJoin(orgId: string, missionId: string): Promise<MissionJoinRequest>;
+    /** Aceitar (with a role) or Recusar. */
+    decideJoin(
+      orgId: string,
+      missionId: string,
+      userId: string,
+      outcome: "accept" | "decline",
+      role?: MissionParticipantRole,
+    ): Promise<MissionJoinRequest>;
     /** `/mission <goal>` and "Nova missão": the executor plans it; a plan card follows. */
     create(orgId: string, input: MissionCreateInput): Promise<Mission>;
     get(orgId: string, missionId: string): Promise<Mission>;

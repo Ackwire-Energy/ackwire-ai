@@ -1,9 +1,11 @@
 import { Button, Icon, type IconName } from "@agenteschat/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useTaskOutput } from "@/api/missions";
 import type { MachineTask } from "@/api/types";
+import { useOrg } from "@/components/org-context";
 import { formatTime } from "@/lib/format";
-import { formatSpan, prOf, type SessionState, sessionState, taskSeconds } from "@/lib/missions";
+import { appendOutputLine, formatSpan, type SessionState, sessionState, taskPr, taskSeconds } from "@/lib/missions";
 import { useNow } from "./MissionBits";
 
 /**
@@ -75,7 +77,7 @@ function SessionRow({ task, now }: { task: MachineTask; now: number }) {
   const [output, setOutput] = useState(false);
   const [all, setAll] = useState(false);
   const state = sessionState(task);
-  const pr = prOf(task.lastLine);
+  const pr = taskPr(task);
   const live = state === "running";
   const files = task.files ?? [];
   const shown = all ? files : files.slice(0, 3);
@@ -160,13 +162,7 @@ function SessionRow({ task, now }: { task: MachineTask; now: number }) {
               <span className="mi-session__none">{t("missions.sessions.nothingYet")}</span>
             </>
           )}
-          {output && (
-            // Only the last line for now: the full output isn't served yet.
-            <pre className="mi-log">
-              {task.lastLine || t("missions.sessions.noOutput")}
-              {live && <span className="mi-cursor" aria-hidden="true" />}
-            </pre>
-          )}
+          {output && <TaskLog task={task} live={live} />}
           <div>
             <Button size="sm" variant="ghost" icon="code" aria-expanded={output} onClick={() => setOutput((v) => !v)}>
               {output ? t("missions.sessions.hideOutput") : t("missions.sessions.showOutput")}
@@ -175,5 +171,47 @@ function SessionRow({ task, now }: { task: MachineTask; now: number }) {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * "Ver saída": the session's last lines (the computer reads its log; offline,
+ * the lines the server kept), in mono; while it runs, each new live line
+ * joins at the end.
+ */
+function TaskLog({ task, live }: { task: MachineTask; live: boolean }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const output = useTaskOutput(org.id, task.id, true);
+  const [lines, setLines] = useState<string[]>([]);
+  useEffect(() => {
+    if (output.data) setLines(output.data.lines);
+  }, [output.data]);
+  useEffect(() => {
+    if (live) setLines((prev) => appendOutputLine(prev, task.lastLine));
+  }, [live, task.lastLine]);
+  const empty = lines.length === 0;
+  return (
+    <div className="mi-log-wrap">
+      {output.data?.source === "saved" && !empty && (
+        <span className="mi-hint">
+          <Icon name="computer" size={14} />
+          {t("missions.sessions.savedOutput")}
+        </span>
+      )}
+      <pre
+        className="mi-log"
+        role="log"
+        aria-label={t("missions.sessions.outputLabel", { title: task.title })}
+        aria-busy={output.isPending}
+      >
+        {output.isPending && empty
+          ? t("missions.sessions.loadingOutput")
+          : empty
+            ? t("missions.sessions.noOutput")
+            : lines.join("\n")}
+        {live && <span className="mi-cursor" aria-hidden="true" />}
+      </pre>
+    </div>
   );
 }

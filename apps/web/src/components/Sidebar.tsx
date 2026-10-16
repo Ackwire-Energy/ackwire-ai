@@ -80,11 +80,9 @@ export function Sidebar() {
   const overview = useOverview(orgId);
   const [creatingChannel, setCreatingChannel] = useState(false);
   const pending = overview.data?.approvalsWaitingForMe ?? 0;
-  // Missões: how many open missions wait for me (a decision, a review, a suggestion).
-  const missionList = useMissionList(orgId);
-  const missionsWaiting = (missionList.data ?? []).filter(
-    (m) => m.canAct && m.pending.decisions + m.pending.provisional + m.pending.reviews + m.pending.suggestions > 0,
-  ).length;
+  // Missões: how many open missions wait for me (the server counts: a decision, a review, a suggestion…).
+  const missionList = useMissionList(orgId, { status: "waiting_you", limit: 1 });
+  const missionsWaiting = missionList.data?.counts.waitingYou ?? 0;
   const onMissionsTab = useRouterState({
     select: (s) =>
       s.location.pathname.endsWith("/threads") && (s.location.search as { tab?: string }).tab === "missions",

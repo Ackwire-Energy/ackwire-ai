@@ -10,7 +10,7 @@ import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { formatShortDate, relativeTime } from "@/lib/format";
-import { cellsFromCounts, isOpenMission, waitingText } from "@/lib/missions";
+import { isOpenMission, missionCells, waitingText } from "@/lib/missions";
 import { MachineChip, MissionStatusChip, MissionStrip } from "./MissionBits";
 import { CloseMissionDialog } from "./MissionDialogs";
 
@@ -29,15 +29,18 @@ export function MissionsTab({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const open = useMissionList(org.id, "open");
-  const closed = useMissionList(org.id, "closed");
-  const q = filters.q.trim().toLowerCase();
-  const keep = (m: Mission) =>
-    (!filters.agentId || m.agentId === filters.agentId) &&
-    (!filters.channelId || m.channelId === filters.channelId) &&
-    (!q || `${m.title} ${m.goal}`.toLowerCase().includes(q));
-  const active = (open.data ?? []).filter(keep);
-  const ended = (closed.data ?? []).filter(keep);
+  const q = filters.q.trim();
+  // The server filters (conversation, agent, words) and counts with the same filters.
+  const where = {
+    ...(q ? { q } : {}),
+    ...(filters.agentId ? { agentId: filters.agentId } : {}),
+    ...(filters.channelId ? { channelId: filters.channelId } : {}),
+  };
+  const open = useMissionList(org.id, { status: "open", ...where });
+  const closed = useMissionList(org.id, { status: "closed", ...where });
+  const active: Mission[] = open.data?.missions ?? [];
+  const ended: Mission[] = closed.data?.missions ?? [];
+  const counts = open.data?.counts ?? closed.data?.counts;
   if (open.isPending) return <LoadingList count={3} />;
   if (open.isError && !open.data) return <ErrorState error={open.error} onRetry={() => void open.refetch()} />;
   if (active.length === 0 && ended.length === 0) {
@@ -64,7 +67,13 @@ export function MissionsTab({
       {active.length > 0 && (
         <section>
           <h2 className="mi-section-title">
-            {t("missions.list.active")} · {active.length}
+            {t("missions.list.active")} · {counts?.active ?? active.length}
+            {(counts?.waitingYou ?? 0) > 0 && (
+              <span className="mi-section-title__aside">
+                {" "}
+                · {t("missions.list.waitingYouCount", { count: counts?.waitingYou ?? 0 })}
+              </span>
+            )}
           </h2>
           <div className="mi-mcs">
             {active.map((m) => (
@@ -76,7 +85,7 @@ export function MissionsTab({
       {ended.length > 0 && (
         <section>
           <h2 className="mi-section-title">
-            {t("missions.list.ended")} · {ended.length}
+            {t("missions.list.ended")} · {counts?.closed ?? ended.length}
           </h2>
           <div className="mi-mcs">
             {ended.map((m) => (
@@ -144,9 +153,13 @@ function MissionCard({ mission: m }: { mission: Mission }) {
         </div>
       </div>
       <div className="mi-mc__strip">
-        <b>{t("missions.items", { done: m.plan.done, count: m.plan.total })}</b>
+        <b>
+          {m.plan.total > 0
+            ? t("missions.items", { done: m.plan.done, count: m.plan.total })
+            : t("missions.list.noItems")}
+        </b>
         <MissionStrip
-          cells={cellsFromCounts(m.plan, m.runningTasks, { offline })}
+          cells={missionCells(m, { offline })}
           agentId={m.agentId}
           label={t("missions.itemsLabel", { done: m.plan.done, count: m.plan.total })}
         />

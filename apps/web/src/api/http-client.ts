@@ -46,7 +46,10 @@ import type {
   Message,
   Mission,
   MissionDecision,
+  MissionEligibleAgent,
   MissionFiles,
+  MissionJoinRequest,
+  MissionList,
   MissionParticipants,
   MissionPlan,
   MissionReview,
@@ -74,6 +77,7 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
+  TaskOutput,
   ThreadFilters,
   ThreadInfo,
   ThreadPage,
@@ -468,8 +472,30 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
     missions: ((): HttpApi["missions"] => {
       const one = (orgId: string, missionId: string) => `${org(orgId)}/missions/${enc(missionId)}`;
       return {
-        list: async (orgId, status) =>
-          (await request<{ missions: Mission[] }>(`${org(orgId)}/missions`, { query: { status } })).missions,
+        list: (orgId, query = {}) =>
+          request<MissionList>(`${org(orgId)}/missions`, {
+            query: {
+              status: query.status,
+              channelId: query.channelId,
+              agentId: query.agentId,
+              q: query.q || undefined,
+              limit: query.limit === undefined ? undefined : String(query.limit),
+            },
+          }),
+        eligibleAgents: async (orgId) =>
+          (await request<{ agents: MissionEligibleAgent[] }>(`${org(orgId)}/missions/eligible-agents`)).agents,
+        taskOutput: (orgId, taskId, tail) =>
+          request<TaskOutput>(`${org(orgId)}/tasks/${enc(taskId)}/output`, {
+            query: { tail: tail === undefined ? undefined : String(tail) },
+          }),
+        joinRequests: async (orgId, missionId) =>
+          (await request<{ requests: MissionJoinRequest[] }>(`${one(orgId, missionId)}/join-requests`)).requests,
+        requestJoin: (orgId, missionId) =>
+          request<MissionJoinRequest>(`${one(orgId, missionId)}/join-requests`, { json: {} }),
+        decideJoin: (orgId, missionId, userId, outcome, role) =>
+          request<MissionJoinRequest>(`${one(orgId, missionId)}/join-requests/${enc(userId)}/${outcome}`, {
+            json: outcome === "accept" ? { role: role ?? "comment" } : {},
+          }),
         create: (orgId, input) => request<Mission>(`${org(orgId)}/missions`, { json: input }),
         get: (orgId, missionId) => request<Mission>(one(orgId, missionId)),
         ofThread: (orgId, threadId) => request<Mission>(`${org(orgId)}/threads/${enc(threadId)}/mission`),
