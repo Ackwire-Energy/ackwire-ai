@@ -364,7 +364,11 @@ test.skipIf(!posix)(
     expect(MISSION_RULES_NO_GIT).toContain("upload_artifact");
     expect(MISSION_RULES).toContain("language the people use");
     const item = path.join(folder, "work", "contact-sheet");
-    await waitFor(() => existsSync(path.join(item, ".seen-prompt")), 10_000);
+    await waitFor(
+      () =>
+        existsSync(path.join(item, ".seen-prompt")) && readFileSync(path.join(item, ".seen-prompt"), "utf8").length > 0,
+      10_000,
+    );
     expect(readFileSync(path.join(item, ".seen-prompt"), "utf8")).toStartWith("Your folder: work/contact-sheet/");
     // It reads the mission's files from its subfolder.
     expect(readFileSync(path.join(item, ".agentes", "mission.md"), "utf8")).toBe("# Mission\n");
@@ -416,7 +420,10 @@ test.skipIf(!posix || !hasGit)(
     expect(started).toMatchObject({ branch: "agentes/000000bb/nav", cwd: `.worktrees/${id(23)}` });
     expect(started.command).toContain("own branch");
     const wt = path.join(folder, ".worktrees", id(23));
-    await waitFor(() => existsSync(path.join(wt, ".seen-prompt")), 10_000);
+    await waitFor(
+      () => existsSync(path.join(wt, ".seen-prompt")) && readFileSync(path.join(wt, ".seen-prompt"), "utf8").length > 0,
+      10_000,
+    );
     expect(readFileSync(path.join(wt, ".seen-prompt"), "utf8")).toStartWith("Your branch: agentes/000000bb/nav");
   },
   20_000,

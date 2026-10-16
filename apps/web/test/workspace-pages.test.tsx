@@ -18,36 +18,51 @@ const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
 
 describe("Aprovações", () => {
-  test("tabs with counts; refusing calls the real endpoint and moves the card to Decididas", async () => {
+  const pills = () =>
+    within(screen().getByRole("group", { name: "Filtro" }))
+      .getAllByRole("button")
+      .map((b) => b.textContent);
+
+  test("waiting cards with the exact action; refusing sends the reason and moves it to the history", async () => {
     const { state } = await go("approvals");
-    const tabs = screen().getByRole("tablist", { name: "Filtro" });
-    expect(
-      within(tabs)
-        .getAllByRole("tab")
-        .map((t) => t.textContent),
-    ).toEqual(["Pendentes 2", "Decididas 1"]);
+    expect(pills()).toEqual(["Esperando você2", "Aprovados1", "Recusados0", "Expirados0", "Todos3"]);
     const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
-    expect(merge.textContent).toContain("Ada em #eng");
-    expect(merge.querySelector(".ac-chip--waiting")?.textContent).toMatch(/^Expira em \d+ h$/);
+    expect(merge.textContent).toContain("Ada");
+    expect(merge.textContent).toContain("#eng");
+    expect(merge.querySelector(".ac-chip")?.textContent).toMatch(/\d+ h para decidir$/);
     expect(within(merge).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
-    expect(within(merge).getByRole("link", { name: "Ver no canal" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/c/${ENG_ID}`,
-    );
+    // Deploy is high risk: the button asks for a hold.
     const deploy = screen().getByRole("article", { name: "Run deploy workflow" });
-    expect(within(deploy).getByRole("button", { name: "Aprovar deploy" })).toBeTruthy();
+    expect(within(deploy).getByRole("button", { name: "Aprovar deploy: segure para confirmar" })).toBeTruthy();
+    expect(deploy.textContent).toContain("Produção");
+
     await click(within(merge).getByRole("button", { name: "Recusar" }));
+    await click(within(merge).getByRole("button", { name: "Falta teste" }));
+    await click(within(merge).getByRole("button", { name: /Recusar e avisar/ }));
     await settle(4);
-    expect(state.calls.find((c) => c.method === "approvals.refuse")?.args).toEqual([ORG_ID, "ap-merge", undefined]);
-    expect(
-      within(tabs)
-        .getAllByRole("tab")
-        .map((t) => t.textContent),
-    ).toEqual(["Pendentes 1", "Decididas 2"]);
-    await act(async () => fireEvent.mouseDown(within(tabs).getByRole("tab", { name: /Decididas/ }), { button: 0 }));
-    const refused = screen().getByRole("article", { name: "Merge PR #42 into main" });
-    expect(refused.textContent).toContain("Recusado por você · agora");
-    expect(within(refused).queryByRole("button")).toBeNull();
-    expect(screen().getByRole("article", { name: "Run rollback workflow" }).textContent).toContain("Aprovado por João");
+    expect(state.calls.find((c) => c.method === "approvals.refuse")?.args).toEqual([ORG_ID, "ap-merge", "Falta teste"]);
+    expect(pills()).toEqual(["Esperando você1", "Aprovados1", "Recusados1", "Expirados0", "Todos3"]);
+    expect(screen().queryByRole("article", { name: "Merge PR #42 into main" })).toBeNull();
+    expect(screen().getByText("Decididos há pouco")).toBeTruthy();
+  });
+
+  test("a normal-risk approval goes with one click", async () => {
+    const { state } = await go("approvals");
+    const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
+    await click(within(merge).getByRole("button", { name: "Aprovar merge" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "approvals.approve")?.args[1]).toBe("ap-merge");
+  });
+
+  test("the panel shows the exact action and who may decide", async () => {
+    await go("approvals");
+    const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
+    await click(within(merge).getByRole("button", { name: "Detalhes" }));
+    await settle(2);
+    const panel = screen().getByRole("region", { name: "Detalhes do pedido" });
+    expect(panel.textContent).toContain("A ação exata");
+    expect(panel.textContent).toContain("Quem pode decidir");
+    expect(within(panel).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
   });
 
   test("approvals you can't decide show who they wait for, without buttons", async () => {
@@ -55,8 +70,8 @@ describe("Aprovações", () => {
     for (const a of state.approvals) a.canDecide = false;
     await go("approvals", state);
     const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
-    expect(merge.querySelector(".ac-chip--waiting")?.textContent).toBe("Aguardando João");
-    expect(within(merge).queryByRole("button")).toBeNull();
+    expect(merge.querySelector(".ac-chip")?.textContent).toBe("Aguardando João");
+    expect(within(merge).queryByRole("button", { name: "Recusar" })).toBeNull();
   });
 });
 

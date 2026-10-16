@@ -302,7 +302,7 @@ export const extraIcons = {
   ],
   /** ThreadContexto.html: "Tirar do canal" (out of the conversation, into the thread). */
   move: [["path", { d: "M3.5 10h9M9 6l4 4-4 4M16.5 4v12" }]],
-  /** ThreadContexto.html: the drag handle on a range's start and end caps. */
+  /** ThreadContexto.html: the drag handle on a range's start and end caps; Forum.html: drag to reorder the table. */
   grip: [
     ["circle", { cx: "7.5", cy: "5", r: "0.6" }],
     ["circle", { cx: "12.5", cy: "5", r: "0.6" }],
@@ -323,6 +323,29 @@ export const extraIcons = {
     ["rect", { x: "3", y: "3.75", width: "14", height: "3.3", rx: "1" }],
     ["path", { d: "M4.2 7v8.2a.8.8 0 0 0 .8.8h10a.8.8 0 0 0 .8-.8V7M10 14v-4.2M7.9 11.9 10 9.8l2.1 2.1" }],
   ],
-  /** Threads.html: Missões (a flag on a pole). */
+  /** Threads.html: Missões (a flag on a pole); Forum.html: conclude, a turn, where a round starts. */
   flag: [["path", { d: "M5 17V3.5M5 3.5h9l-1.7 3.3L14 10H5" }]],
+  /** Forum.html: a stance that proposes. */
+  bulb: [["path", { d: "M7.5 15h5M8.3 17.5h3.4M10 2.5a5 5 0 0 0-2.9 9.1v1.7h5.8v-1.7A5 5 0 0 0 10 2.5z" }]],
+  /** Forum.html: a stance that disagrees. */
+  disagree: [["path", { d: "M4 7.5h12M4 12.5h12M12.5 3.5l-5 13" }]],
+  /** Forum.html: a stance that changes position. */
+  shift: [["path", { d: "M3.5 6.5h11L12 4M16.5 13.5h-11L8 16" }]],
+  /** Forum.html: a stance that asks. */
+  question: [
+    ["circle", { cx: "10", cy: "10", r: "7" }],
+    ["path", { d: "M8 7.9a2.1 2.1 0 1 1 2.8 1.9c-.5.3-.8.7-.8 1.3v.3M10 14v.01" }],
+  ],
+  /** Forum.html: an agent's budget ("Ver orçamento"). */
+  coin: [
+    ["circle", { cx: "10", cy: "10", r: "7" }],
+    [
+      "path",
+      {
+        d: "M12 7.9c-.3-.8-1.2-1.3-2.1-1.3-1.2 0-2.1.7-2.1 1.7s.8 1.4 2.1 1.7 2.1.7 2.1 1.7-.8 1.7-2.1 1.7c-.9 0-1.8-.5-2.1-1.3M10 5.4v1.2M10 13.4v1.2",
+      },
+    ],
+  ],
+  /** Forum.html: move up in the table. */
+  chevronUp: [["path", { d: "m6 12 4-4 4 4" }]],
 } satisfies Record<string, IconShape[]>;

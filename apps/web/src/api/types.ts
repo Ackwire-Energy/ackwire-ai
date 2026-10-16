@@ -255,6 +255,14 @@ export type ChannelEvent =
       startedAt?: string | null;
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
+  /** An agent's forum suggestion card was accepted or dismissed: its `meta.forumSuggestion` now. */
+  | {
+      type: "forum.suggestion.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      suggestion: ForumSuggestion;
+    }
   // ── Chat latency batch (packages/engine/src/events.ts) ──────────────────────
   /** An agent will answer: show "thinking" at once. `runId` is null when announced at post time. */
   | { type: "agent.thinking"; channelId: string; threadId: string; agentId: string; runId: string | null }
@@ -340,7 +348,7 @@ export type UserEvent =
 
 // ── Approvals, connectors, scopes ─────────────────────────────────────────────
 
-export type ApprovalStatus = "pending" | "approved" | "refused" | "expired";
+export type ApprovalStatus = "pending" | "approved" | "refused" | "expired" | "canceled";
 
 /** A sensitive action waiting for a person (apps/server/src/routes/app/approvals.ts). */
 export interface Approval {
@@ -369,6 +377,20 @@ export interface Approval {
   reason: string | null;
   /** You are the agent's owner or an admin, and it is pending. */
   canDecide: boolean;
+  /** The agent's owner (they and admins may decide). */
+  ownerUserId?: string | null;
+  /** When the approved action ran; null while it runs (or if it never did). */
+  executedAt?: string | null;
+  /** What the action returned once it ran (raw tool output, short). */
+  result?: { ok: boolean; text: string } | null;
+  /** The connector it goes through ("github") and its account. */
+  connector?: string | null;
+  connectorAccount?: string | null;
+  /** What the agent said right before asking. */
+  why?: string | null;
+  issue?: { id: string; number: number; title: string } | null;
+  /** One approval only: what the agent said at each turn before asking. */
+  trail?: { text: string; at: string }[];
 }
 
 export interface ScopeInfo {
@@ -1006,6 +1028,12 @@ export interface Issue {
   pullRequests: { number: number; url: string; openedBy: Actor | null }[];
   artifacts: { id: string; title: string; createdBy: Actor }[];
   work?: IssueWork | null;
+  /** The issue this one is a sub-issue of (a plan step from the forum, D45). */
+  parentIssueId?: string | null;
+  /** On the detail: its sub-issues. */
+  subIssues?: { id: string; number: number; title: string; status: IssueStatus; assignee: Actor | null }[];
+  /** On the detail: forum topics opened from it ("Avaliar no fórum"), oldest first. */
+  forumTopics?: { id: string; title: string; status: ForumStatus; format: ForumFormat }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -1445,80 +1473,277 @@ export type MachineEvent =
   | { type: "machine.updated"; machineId: string; name: string }
   | { type: "machine.deleted"; machineId: string };
 
-// ── Forum (apps/server/src/routes/app/forum.ts) ──────────────────────────────
+// ── Forum (apps/server/src/routes/app/forum.ts, D33 revised by D45) ─────────
 
-export type ForumStatus = "open" | "done" | "canceled";
+/** `stalled`: a person stopped the turn (or it failed) and nobody speaks until "Retomar". */
+export type ForumStatus = "open" | "stalled" | "done" | "canceled";
+export type ForumPhase = "discussing" | "waiting_person" | "synthesizing" | "finished";
+/** What comes out: a decision (pros and cons, next steps) or a plan (scope, steps, risks, metrics). */
+export type ForumFormat = "decision" | "plan";
 
-/** An issue the synthesis suggests ("Criar issues sugeridas"). */
+/** A place at the table: an agent, or a person who sat down (speaking order). */
+export interface ForumSeat {
+  type: "agent" | "person";
+  id: string;
+}
+
+export interface ForumOwner {
+  type: "agent" | "person";
+  id: string;
+}
+
+/** An issue the synthesis suggests; created only when a person approves it. */
 export interface ForumSuggestedIssue {
   title: string;
   description: string;
+  /** The plan step it comes from (1-based). */
+  step?: number;
+  /** Becomes the assignee when the issue is created. */
+  owner?: ForumOwner | null;
 }
 
-/** A discussion among agents, in rounds, ending in a synthesis document. */
+/**
+ * How a seat's turn in a round went: `skipped_budget` (the agent's own budget
+ * was out), `passed` (a seated person passed), `skipped` (the round ended
+ * early, or not chosen for a new round), `stopped` / `failed` (the turn that
+ * stalled the topic), `live` (writing now), `waiting` (a seated person's
+ * turn), `pending` (to come).
+ */
+export type ForumTrackStatus =
+  | "spoke"
+  | "skipped_budget"
+  | "passed"
+  | "skipped"
+  | "stopped"
+  | "failed"
+  | "live"
+  | "waiting"
+  | "pending";
+
+export interface ForumTrackEntry {
+  seat: ForumSeat;
+  status: ForumTrackStatus;
+  postId: string | null;
+  /** The post's length in characters (the column's height). */
+  length: number;
+}
+
+export interface ForumTrackRound {
+  round: number;
+  /** People's free posts that lead this round (not seated turns). */
+  personPosts: { userId: string; postId: string | null; length: number }[];
+  entries: ForumTrackEntry[];
+}
+
+/** The round track: each round (up to `rounds`), each seat's turn in order; the synthesis at the end. */
+export interface ForumTrack {
+  rounds: ForumTrackRound[];
+  synthesis: { agentId: string | null; status: "live" | "done" | "stalled"; revision: number } | null;
+}
+
+export type ForumOriginKind = "direct" | "channel" | "agent" | "suggestion" | "issue" | "routine";
+
+export interface ForumOrigin {
+  kind: ForumOriginKind;
+  channelId: string | null;
+  messageId: string | null;
+  issueId: string | null;
+  issueNumber: number | null;
+  routineId: string | null;
+  /** The agent that opened it when asked (`agent`) or suggested it (`suggestion`). */
+  agentId: string | null;
+}
+
+export interface ForumNextStep {
+  text: string;
+  owner: ForumOwner | null;
+  ownerLabel: string | null;
+  when: string | null;
+}
+
+export interface ForumDecisionCards {
+  format: "decision";
+  decision: string;
+  positions: { agentId: string | null; name: string; pros: string[]; cons: string[] }[];
+  openQuestions: string[];
+  nextSteps: ForumNextStep[];
+  suggestedIssues: ForumSuggestedIssue[];
+  /** Version 2+: what changed. */
+  changes: string[];
+}
+
+export interface ForumPlanStep {
+  title: string;
+  owner: ForumOwner | null;
+  ownerLabel: string | null;
+  /** The step it waits for (1-based), or null: it can start now. */
+  after: number | null;
+  size: string | null;
+}
+
+export interface ForumPlanCards {
+  format: "plan";
+  objective: string;
+  summaryForRequester: string;
+  inScope: string[];
+  outOfScope: string[];
+  steps: ForumPlanStep[];
+  risks: string[];
+  metrics: string[];
+  openQuestions: string[];
+  suggestedIssues: ForumSuggestedIssue[];
+  changes: string[];
+}
+
+export type ForumSynthesisCards = ForumDecisionCards | ForumPlanCards;
+
+export interface ForumSynthesis {
+  /** The Drive document (null when it couldn't be written). */
+  artifactId: string | null;
+  /** The document's version. */
+  version: number;
+  /** Which synthesis: 1, then 2… after each new round asked from a comment. */
+  revision: number;
+  format: ForumFormat;
+  suggestedIssues: ForumSuggestedIssue[];
+  structured: ForumSynthesisCards | null;
+  /** The synthesis file was deleted. */
+  deleted?: boolean;
+  versions: {
+    revision: number;
+    artifactVersion: number | null;
+    createdAt: string;
+    afterRound: number;
+    changes: string[];
+  }[];
+  /** Issues already created from it (by a person's approval). */
+  createdIssues: { id: string; number: number; title: string }[];
+}
+
+export interface ForumStall {
+  reason: "stopped" | "failed";
+  byUserId: string | null;
+  agentId: string | null;
+  round: number;
+  /** The synthesis was the turn that stopped. */
+  synthesis: boolean;
+  at: string;
+}
+
+/** A discussion among agents (and seated people), in rounds, ending in a synthesis. No money here. */
 export interface ForumTopic {
   id: string;
   title: string;
-  /** The question or goal ("Decidir o plano de preços do Q1"). */
+  /** The question or goal. */
   goal: string;
   status: ForumStatus;
-  /** The round in progress (or the last one when finished), from 1 (0 = not started yet). */
+  phase: ForumPhase;
+  format: ForumFormat;
+  /** The round in progress (or the last one when finished), from 1. */
   round: number;
-  /** `discussing`, `synthesizing` (writing the synthesis) or `finished`. */
-  phase?: "discussing" | "synthesizing" | "finished";
   rounds: number;
   agentIds: string[];
-  /** People notified (they can post between rounds). */
+  /** People notified (they can post any time). */
   userIds: string[];
+  /** The speaking order: agents and the people who sat down. */
+  seats: ForumSeat[];
   createdBy: { type: "person" | "agent"; id: string };
-  /** The conversation it was opened from, when an agent opened it. */
+  origin: ForumOrigin;
   originChannelId: string | null;
+  /** "Responsável": runs run on their behalf. */
+  responsibleUserId: string | null;
+  /** "Pedido de" (e.g. the origin issue's author). */
+  requestedByUserId: string | null;
+  /** Writes the synthesis (null: the first agent). */
+  ownerAgentId: string | null;
+  deadline: string | null;
+  /** The seated person whose turn it is ("Sua vez"). */
+  waitingUserId: string | null;
+  stall: ForumStall | null;
+  reopened: { byUserId: string; at: string } | null;
   /** The topic's hidden channel: subscribe to it for the agents' live runs. */
   channelId: string;
   createdAt: string;
   lastActivityAt: string;
-  /** Share of the discussion's spend cap used, in %; null without a cap. */
-  budgetUsedPercent: number | null;
   /** Agents working right now. */
   activeAgentIds: string[];
-  synthesis: {
-    artifactId: string;
-    version: number;
-    suggestedIssues: ForumSuggestedIssue[];
-    /** The synthesis file was deleted. */
-    deleted?: boolean;
-  } | null;
+  track: ForumTrack;
+  synthesis: ForumSynthesis | null;
 }
 
-/** One per agent run (one per agent per round), people's posts in between. `meta.synthesis`: the closing post. */
+export type ForumStanceKind = "propose" | "agree" | "disagree" | "shift" | "ask" | "reply";
+
+/** What a post says about the proposal on the table, and toward whom. */
+export interface ForumStance {
+  kind: ForumStanceKind;
+  target?: { type: "agent" | "person" | "people"; id?: string; handle?: string };
+}
+
+/** `turn`: an agent's (or seated person's `seat`) turn; `free`: a person's post that leads the next round; `comment`: after the synthesis. */
+export type ForumPostKind = "turn" | "free" | "seat" | "comment" | "synthesis";
+
 export interface ForumPost {
   id: string;
   topicId: string;
-  /** From 0 (before round 1, e.g. a person's opening note). */
   round: number;
   author: { type: "person" | "agent"; id: string };
   body: string;
   /** Agent posts: the run (the work summary under the post). */
   agentRunId: string | null;
+  kind: ForumPostKind;
+  stance: ForumStance | null;
+  /** The post this one answers. */
+  replyTo: string | null;
+  /** The agent's position in one line. */
+  position: string | null;
+  /** A person asked for one more round from this post. */
+  requestRound?: { agentIds: string[] | null };
   meta?: Record<string, unknown>;
   createdAt: string;
 }
 
+/** One synthesis written (version 2+ after a new round asked from a comment). */
+export interface ForumSynthesisVersion {
+  revision: number;
+  artifactId: string | null;
+  artifactVersion: number | null;
+  agentId: string;
+  format: ForumFormat;
+  afterRound: number;
+  createdAt: string;
+  structured: ForumSynthesisCards;
+  markdown: string;
+}
+
 export interface ForumTopicDetail extends ForumTopic {
   posts: ForumPost[];
+  syntheses: ForumSynthesisVersion[];
 }
 
 export interface ForumTopicInput {
   title: string;
   goal: string;
   agentIds: string[];
-  userIds: string[];
-  rounds: number;
-  budgetUsd?: number | null;
-  /** ISO; the discussion stops and writes the synthesis at this time. */
+  userIds?: string[];
+  rounds?: number;
+  /** ISO; when it passes, a seated person's turn is skipped, then the synthesis. */
   deadline?: string;
   /** Writes the synthesis (default: the first agent). */
   ownerAgentId?: string;
+  format?: ForumFormat;
+  /** The speaking order, agents and seated people mixed (default: the agents in order). */
+  seats?: ForumSeat[];
+  /** "Avaliar no fórum": the result comes back to the issue. */
+  originIssueId?: string;
+  /** From a thread: the synthesis comes back to that thread. */
+  originMessageId?: string;
+}
+
+/** `POST …/posts`: `requestRound` asks for one more round (reopens a concluded topic). */
+export interface ForumPostInput {
+  body: string;
+  requestRound?: { agentIds?: string[] };
+  replyTo?: string;
 }
 
 /** `PUT …/forum/topics/{id}/participants`. */
@@ -1527,12 +1752,45 @@ export interface ForumParticipantsInput {
   removeAgentIds?: string[];
   addUserIds?: string[];
   removeUserIds?: string[];
+  seatUserIds?: string[];
+  unseatUserIds?: string[];
 }
+
+/** An agent's "Vale um fórum?" card (`meta.forumSuggestion` of its message). Only a person opens it. */
+export interface ForumSuggestion {
+  title: string;
+  goal: string;
+  agentIds: string[];
+  rounds: number;
+  format: ForumFormat;
+  suggestedByAgentId: string;
+  state: "pending" | "accepted" | "dismissed";
+  topicId: string | null;
+  decidedByUserId: string | null;
+  decidedAt: string | null;
+}
+
+/** "Abrir fórum" with the fields adjusted ("Editar"). */
+export type ForumSuggestionOverrides = Partial<Omit<ForumTopicInput, "originIssueId" | "originMessageId">>;
 
 /** Org broadcasts about the forum. */
 export type ForumEvent =
-  | { type: "forum.topic.updated"; topicId: string; status: ForumStatus; round: number }
+  | {
+      type: "forum.topic.updated";
+      topicId: string;
+      status: ForumStatus;
+      round: number;
+      phase?: ForumPhase;
+      waitingUserId?: string;
+      activeAgentIds?: string[];
+    }
   | { type: "forum.post.created"; topicId: string; post: ForumPost };
+
+/** For me: my seated turn, a topic opened on my request, a topic I asked for concluded. */
+export type ForumUserEvent =
+  | { type: "forum.your_turn"; topicId: string; title: string; round: number; deadline: string | null }
+  | { type: "forum.requested"; topicId: string; title: string; byUserId: string; issueNumber?: number }
+  | { type: "forum.concluded"; topicId: string; title: string; revision: number };
 
 export type ForumFilter = "open" | "done" | "mine";
 

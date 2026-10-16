@@ -98,6 +98,20 @@ export {
   type FilterChipProps,
   type FilterOption,
 } from "./components/FilterChip";
+export {
+  Convergence,
+  type ForumTrackItem,
+  type ForumTrackKind,
+  layoutTrack,
+  RoundTrack,
+  roundLabelBoxes,
+  StanceLane,
+  TRACK_SIZES,
+  type TrackLayout,
+  type TrackLayoutItem,
+  type TrackSize,
+  trackItemAt,
+} from "./components/ForumPixels";
 export { Kbd, modKey } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { Mention } from "./components/Mention";
@@ -123,6 +137,7 @@ export {
 } from "./components/RecurrencePicker";
 export {
   CriteriaPixels,
+  ExpiryFuse,
   PlanStrip,
   type PlanStripCell,
   planCellPixel,

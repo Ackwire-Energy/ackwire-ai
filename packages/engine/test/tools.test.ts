@@ -9,6 +9,7 @@ import {
   drainOutbox,
   expireApprovals,
   ForbiddenError,
+  getApproval,
   grantScopes,
   isSensitive,
   listApprovals,
@@ -286,7 +287,15 @@ describe("approval flow (end to end)", () => {
     ]);
     // Usage for all three model calls.
     expect(await f.db.select().from(schema.usageRecords)).toHaveLength(3);
-    expect(events.filter((e) => e.type === "approval.decided")).toHaveLength(1);
+    // Decided, then ran: the second event carries the result.
+    const decidedEvents = events.filter((e) => e.type === "approval.decided");
+    expect(decidedEvents).toHaveLength(2);
+    expect(decidedEvents[1]).toMatchObject({ approval: { status: "approved", result: { ok: true } } });
+    const [ran] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "decided" });
+    expect(ran?.executedAt).not.toBeNull();
+    expect(ran).toMatchObject({ why: "Tests pass, merging.", issue: null });
+    const detail = await getApproval(f.db, f.owner.id, f.org.id, ran?.id ?? "");
+    expect(detail.trail?.map((s) => s.text)).toEqual(["Let me look at the PR.", "Tests pass, merging."]);
   });
 
   test("refused: the model is told why, nothing is merged", async () => {

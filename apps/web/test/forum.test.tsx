@@ -4,11 +4,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { ForumTopic } from "@/api/types";
 import { createI18n } from "@/i18n";
 import { activityText, toolActivity } from "@/lib/activity";
-import { filterTopics } from "@/pages/ForumPage";
-import { postsByRound } from "@/pages/ForumTopicPage";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -21,177 +18,136 @@ const go = async (path: string, state = seedState()) => {
   await settle(8);
   return { ...r, state };
 };
-const card = (title: string) => screen().getByRole("article", { name: title });
 
 describe("Fórum: the list", () => {
-  test("cards: title, goal, participants, status with round, last activity, cap used; filters", async () => {
+  test("discussing now, what needs me, aligned rows with status and no money; filters", async () => {
     await go("forum");
-    const pricing = card("Plano de preços do Q1");
-    expect(pricing.textContent).toContain("Decidir se mudamos o plano de entrada");
-    expect(pricing.textContent).toContain("Em discussão · rodada 2 de 3");
-    // The cap used as a percentage, never money (everyone reads the forum).
-    expect(pricing.textContent).toContain("21% do limite de gasto");
-    expect(pricing.textContent).not.toContain("0,42");
-    expect(pricing.textContent).toContain("Última atividade");
-    expect(within(pricing).getByRole("img", { name: /Participantes: Ada/ })).toBeTruthy();
-    expect(screen().queryByRole("article", { name: "Onboarding em 5 minutos" })).toBeNull();
+    expect(screen().getByRole("heading", { name: "Discutindo agora" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Precisa de você" })).toBeTruthy();
+    // The concluded topic of mine waits for its issues to be approved.
+    expect(document.body.textContent).toContain("A síntese sugere 2 issues");
+    const row = screen().getByRole("link", { name: "Plano de preços do Q1" });
+    expect(row.textContent).toContain("Em discussão");
+    expect(row.textContent).toContain("Decidir se mudamos o plano de entrada");
+    expect(row.textContent).toContain("rodada 2 de 3");
+    // No spend cap anymore: each agent runs on its own budget.
+    expect(document.body.textContent).not.toContain("limite de gasto");
+    expect(screen().queryByRole("link", { name: "Onboarding em 5 minutos" })).toBeNull();
     const filters = screen().getByRole("radiogroup", { name: "Filtrar tópicos" });
-    await click(within(filters).getByRole("radio", { name: "Concluídos" }));
-    expect(card("Onboarding em 5 minutos").textContent).toContain("Concluído");
-    await click(within(filters).getByRole("radio", { name: "Meus" }));
-    expect(card("Plano de preços do Q1")).toBeTruthy();
+    await click(within(filters).getByRole("radio", { name: /Concluídos/ }));
+    const done = screen().getByRole("link", { name: "Onboarding em 5 minutos" });
+    expect(done.textContent).toContain("Concluído");
+    expect(done.textContent).toContain("Cortar a escolha de chave");
   });
 
-  test("rules: filters and rounds", () => {
-    const topic = (over: Partial<ForumTopic>): ForumTopic => ({
-      id: "t",
-      channelId: "c",
-      originChannelId: null,
-      activeAgentIds: [],
-      title: "",
-      goal: "",
-      status: "open",
-      round: 1,
-      rounds: 3,
-      agentIds: [],
-      userIds: [],
-      createdBy: { type: "agent", id: "a" },
-      createdAt: "",
-      lastActivityAt: "",
-      budgetUsedPercent: null,
-      synthesis: null,
-      ...over,
-    });
-    const list = [
-      topic({ id: "1" }),
-      topic({ id: "2", status: "done" }),
-      topic({ id: "3", status: "canceled", userIds: ["me"] }),
-    ];
-    expect(filterTopics(list, "open", "me").map((t) => t.id)).toEqual(["1"]);
-    expect(filterTopics(list, "done", "me").map((t) => t.id)).toEqual(["2", "3"]);
-    expect(filterTopics(list, "mine", "me").map((t) => t.id)).toEqual(["3"]);
-    const p = (id: string, round: number, m: number) => ({
-      id,
-      topicId: "t",
-      round,
-      author: { type: "agent" as const, id: "a" },
-      body: "",
-      agentRunId: null,
-      createdAt: new Date(Date.UTC(2026, 9, 15, 10, m)).toISOString(),
-    });
-    expect(
-      postsByRound({ round: 3, posts: [p("b", 2, 5), p("a", 1, 1), p("c", 2, 3)] }).map(([r, ps]) => [
-        r,
-        ps.map((x) => x.id),
-      ]),
-    ).toEqual([
-      [1, ["a"]],
-      [2, ["c", "b"]],
-      [3, []],
-    ]);
-  });
-});
-
-describe("Novo tópico", () => {
-  test("members don't see the spending cap (money); their topics get the default", async () => {
-    const state = seedState();
-    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
-    await go("forum", state);
+  test("Novo tópico: from scratch, the table in order (two agents at least), rounds → opens it", async () => {
+    const { state, router } = await go("forum");
     await click(screen().getByRole("button", { name: "Novo tópico" }));
+    await click(within(screen().getByRole("dialog", { name: "Novo tópico" })).getByRole("button", { name: /Do zero/ }));
     const dialog = screen().getByRole("dialog", { name: "Novo tópico" });
-    expect(within(dialog).queryByLabelText("Limite de gasto (opcional)")).toBeNull();
-    await type(within(dialog).getByLabelText("Título"), "Roadmap do Q2");
-    await type(within(dialog).getByLabelText("Pergunta ou objetivo"), "O que entra no Q2?");
-    await click(within(dialog).getByRole("checkbox", { name: "Ada" }));
-    await click(within(dialog).getByRole("button", { name: "Abrir tópico" }));
-    await settle(8);
-    expect(state.calls.find((c) => c.method === "forum.create")?.args[1]).not.toHaveProperty("budgetUsd");
-  });
-
-  test("title, question, agents (only those that answer me), people, rounds, cap → opens the topic", async () => {
-    const state = seedState();
-    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
-    if (atlas) atlas.audience = { mode: "owner", userIds: [] };
-    const { router } = await go("forum", state);
-    await click(screen().getByRole("button", { name: "Novo tópico" }));
-    const dialog = screen().getByRole("dialog", { name: "Novo tópico" });
-    await click(within(dialog).getByRole("button", { name: "Abrir tópico" }));
-    expect(dialog.textContent).toContain("Dê um título, a pergunta e pelo menos um agente.");
-    await type(within(dialog).getByLabelText("Título"), "Roadmap do Q2");
-    await type(within(dialog).getByLabelText("Pergunta ou objetivo"), "O que entra no Q2?");
-    // Atlas only answers its owner: can't be picked.
-    const atlasBox = within(dialog).getByRole("checkbox", { name: "Atlas" });
-    expect((atlasBox as HTMLButtonElement).disabled).toBe(true);
-    expect(atlasBox.getAttribute("aria-describedby")).toBeTruthy();
-    expect(document.getElementById(atlasBox.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
-      "não responde a você",
-    );
-    await click(within(dialog).getByRole("checkbox", { name: "Ada" }));
-    await click(within(within(dialog).getByRole("radiogroup", { name: "Rodadas" })).getByRole("radio", { name: "5" }));
-    await type(within(dialog).getByLabelText("Limite de gasto (opcional)"), "3");
+    const open = within(dialog).getByRole("button", { name: "Abrir tópico" }) as HTMLButtonElement;
+    expect(open.disabled).toBe(true);
+    expect(dialog.textContent).toContain("Escolha pelo menos 2 agentes");
+    // No money in the forum.
+    expect(dialog.textContent).not.toContain("Limite de gasto");
+    await type(within(dialog).getByLabelText("Pergunta"), "Roadmap do Q2");
+    await type(within(dialog).getByLabelText("Objetivo"), "O que entra no Q2?");
+    await click(within(dialog).getByRole("button", { name: "Adicionar Ada à mesa" }));
+    expect(dialog.textContent).toContain("Com um agente só");
+    await click(within(dialog).getByRole("button", { name: "Adicionar Atlas à mesa" }));
+    // Atlas speaks first.
+    await click(within(dialog).getByRole("button", { name: "Subir Atlas" }));
+    await click(within(within(dialog).getByRole("radiogroup", { name: "Rodadas" })).getByRole("radio", { name: "4" }));
     await click(within(dialog).getByRole("button", { name: "Abrir tópico" }));
     await settle(8);
     expect(state.calls.find((c) => c.method === "forum.create")?.args[1]).toEqual({
       title: "Roadmap do Q2",
       goal: "O que entra no Q2?",
-      agentIds: [ADA_ID],
+      agentIds: [ATLAS_ID, ADA_ID],
       userIds: [],
-      rounds: 5,
-      budgetUsd: 3,
+      rounds: 4,
+      format: "decision",
     });
     expect(router.state.location.pathname).toStartWith(`/org/${ORG_ID}/forum/topic_`);
     expect(screen().getByRole("heading", { level: 1, name: "Roadmap do Q2" })).toBeTruthy();
-    // The agents start: the living avatar and the words.
-    expect(document.querySelector(".forum-live")?.textContent).toContain("Ada está pensando…");
-    expect(document.querySelector(".forum-live .ac-avatar--thinking")).not.toBeNull();
   });
 });
 
 describe("a topic", () => {
-  test("rounds grouped, people's posts stand out, composer before the next round; conclude", async () => {
+  test("the table, posts by round with stances and replies, a person's post leads a round; post and conclude", async () => {
     const { state } = await go("forum/topic-pricing");
     expect(screen().getByRole("heading", { level: 1, name: "Plano de preços do Q1" })).toBeTruthy();
+    expect(screen().getByRole("region", { name: "A mesa" })).toBeTruthy();
     const r1 = screen().getByRole("region", { name: "Rodada 1" });
     const r2 = screen().getByRole("region", { name: "Rodada 2" });
-    expect(within(r1).getAllByRole("article").length).toBe(3);
-    expect(within(r2).getAllByRole("article").length).toBe(1);
-    expect(r1.querySelector(".forum-post--person")?.textContent).toContain("Lembrem do custo do PC");
-    expect(document.body.textContent).toContain("Sua mensagem entra antes da próxima rodada.");
-    const box = screen().getByRole("textbox", { name: "Mensagem para o fórum" });
+    expect(within(r1).getAllByRole("article").length).toBe(2);
+    expect(r1.textContent).toContain("Concorda com Ada");
+    expect(within(r1).getByRole("button", { name: "Ir para o post de Ada" })).toBeTruthy();
+    expect(r2.querySelector(".forum-post--person")?.textContent).toContain("Lembrem do custo do PC");
+    expect(r2.textContent).toContain("A rodada 2 começou por aqui");
+    const box = screen().getByRole("textbox", { name: "Entrar na discussão" });
     await type(box, "E o plano anual?");
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "forum.post")?.args).toEqual([
       ORG_ID,
       "topic-pricing",
-      "E o plano anual?",
+      { body: "E o plano anual?" },
     ]);
-    await click(screen().getByRole("button", { name: "Concluir agora" }));
+    await click(screen().getByRole("button", { name: "Concluir" }));
+    const dialog = screen().getByRole("dialog", { name: "Concluir o tópico?" });
+    await click(within(dialog).getByRole("button", { name: "Concluir" }));
     await settle(6);
     expect(state.calls.some((c) => c.method === "forum.conclude")).toBe(true);
     expect(document.body.textContent).toContain("Concluído");
   });
 
-  test("synthesis: the document card and 'Criar issues sugeridas' with a review", async () => {
+  test("the synthesis: the decision, suggested issues checked inline, create the chosen ones", async () => {
     const { state } = await go("forum/topic-onboarding");
     const synthesis = screen().getByRole("region", { name: "Síntese" });
+    expect(synthesis.textContent).toContain("Cortar a escolha de chave");
+    expect(synthesis.textContent).toContain("Prós e contras de cada um");
     expect(synthesis.querySelector(".artifact-card")).not.toBeNull();
-    await click(within(synthesis).getByRole("button", { name: "Criar issues sugeridas (2)" }));
-    const dialog = screen().getByRole("dialog", { name: "Criar issues sugeridas" });
-    const boxes = within(dialog).getAllByRole("checkbox");
+    const issues = within(synthesis).getByRole("region", { name: "Issues sugeridas" });
+    const boxes = within(issues).getAllByRole("checkbox");
     expect(boxes.map((b) => b.getAttribute("aria-checked"))).toEqual(["true", "true"]);
     await click(boxes[1] as HTMLElement);
-    await click(within(dialog).getByRole("button", { name: "Criar 1 issue" }));
+    await click(within(issues).getByRole("button", { name: "Criar 1 issue" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "forum.createIssues")?.args[2]).toEqual([
       { title: "Pular a escolha de chave no onboarding", description: "Usar a chave da plataforma por padrão." },
     ]);
     expect(document.body.textContent).toContain("1 issue criada.");
   });
+
+  test("participants: 'Editar participantes' → Editar sends only the difference", async () => {
+    const { state } = await go("forum/topic-pricing");
+    const more = screen().getByRole("button", { name: "Mais ações" });
+    more.focus();
+    await act(async () => {
+      fireEvent.keyDown(more, { key: "Enter" });
+      fireEvent.keyUp(more, { key: "Enter" });
+    });
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Editar participantes" }));
+    const dialog = screen().getByRole("dialog", { name: "Participantes" });
+    await click(within(dialog).getByRole("button", { name: "Editar" }));
+    await click(within(dialog).getByRole("checkbox", { name: "João" }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "forum.participants")?.args[2]).toEqual({
+      addAgentIds: [],
+      removeAgentIds: [],
+      addUserIds: ["u-joao"],
+      removeUserIds: [],
+      seatUserIds: [],
+      unseatUserIds: [],
+    });
+  });
 });
 
 describe("in channels and the palette", () => {
-  test("an agent opened a topic: the message shows the card with 'Ver discussão'", async () => {
+  test("an agent opened a topic: the card with the track and 'Ver discussão' (no %)", async () => {
     const state = seedState();
     state.messages.push({
       id: "m-forum",
@@ -207,9 +163,50 @@ describe("in channels and the palette", () => {
     await go(`c/${ENG_ID}`, state);
     const forumCard = screen().getByRole("region", { name: "Tópico no fórum" });
     expect(forumCard.textContent).toContain("Plano de preços do Q1");
+    expect(forumCard.textContent).toContain("rodada 2 de 3");
+    expect(forumCard.textContent).not.toContain("%");
     expect(within(forumCard).getByRole("link", { name: "Ver discussão" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/forum/topic-pricing`,
     );
+  });
+
+  test("an agent suggests a topic: 'Vale um fórum?' → Abrir fórum (only a person opens it)", async () => {
+    const state = seedState();
+    state.messages.push({
+      id: "m-sug",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: 'Worth a forum? "Entrar só por link mágico?"',
+      mentionedAgentIds: [],
+      agentRunId: null,
+      meta: {
+        bodyCode: "forum_suggestion",
+        bodyParams: { title: "Entrar só por link mágico?" },
+        forumSuggestion: {
+          title: "Entrar só por link mágico?",
+          goal: "Decidir se o cadastro troca a senha por um link no e-mail.",
+          agentIds: [ADA_ID, ATLAS_ID],
+          rounds: 3,
+          format: "decision",
+          suggestedByAgentId: ADA_ID,
+          state: "pending",
+          topicId: null,
+          decidedByUserId: null,
+          decidedAt: null,
+        },
+      },
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    const card = screen().getByRole("region", { name: "Sugestão de fórum" });
+    expect(card.textContent).toContain("Vale um fórum?");
+    expect(card.textContent).toContain("Ada sugere");
+    expect(card.textContent).toContain("3 rodadas");
+    await click(within(card).getByRole("button", { name: "Abrir fórum" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "forum.acceptSuggestion")?.args.slice(0, 2)).toEqual([ORG_ID, "m-sug"]);
+    expect(screen().getByRole("region", { name: "Fórum aberto" })).toBeTruthy();
   });
 
   test("⌘K lists topics", async () => {
@@ -229,60 +226,6 @@ describe("in channels and the palette", () => {
       activityText(t, [{ id: "a", type: "agent", name: "Iris", activity: toolActivity(tool) }]);
     expect(say("open_forum_topic")).toBe("Iris está abrindo um tópico no fórum…");
     expect(say("post_in_forum")).toBe("Iris está escrevendo no fórum…");
-  });
-});
-
-describe("real backend shapes", () => {
-  test("round 0 groups before round 1; the synthesis post stays out of the rounds", () => {
-    const p = (id: string, round: number, m: number, meta?: Record<string, unknown>) => ({
-      id,
-      topicId: "t",
-      round,
-      author: { type: "agent" as const, id: "a" },
-      body: "",
-      agentRunId: null,
-      meta,
-      createdAt: new Date(Date.UTC(2026, 9, 15, 10, m)).toISOString(),
-    });
-    expect(
-      postsByRound({ round: 2, posts: [p("z", 0, 0), p("a", 1, 1), p("s", 2, 9, { synthesis: true })] }).map(
-        ([r, ps]) => [r, ps.map((x) => x.id)],
-      ),
-    ).toEqual([
-      [0, ["z"]],
-      [1, ["a"]],
-      [2, []],
-    ]);
-  });
-
-  test("participants: '…' → Participantes sends only the difference", async () => {
-    const { state } = await go("forum/topic-pricing");
-    const more = screen().getByRole("button", { name: "Mais ações" });
-    more.focus();
-    await act(async () => {
-      fireEvent.keyDown(more, { key: "Enter" });
-      fireEvent.keyUp(more, { key: "Enter" });
-    });
-    await act(() => new Promise((r) => setTimeout(r, 0)));
-    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Participantes" }));
-    const dialog = screen().getByRole("dialog", { name: "Participantes" });
-    await click(within(dialog).getByRole("checkbox", { name: "Atlas" }));
-    await click(within(dialog).getByRole("checkbox", { name: "João" }));
-    await click(within(dialog).getByRole("button", { name: "Salvar" }));
-    await settle(4);
-    expect(state.calls.find((c) => c.method === "forum.participants")?.args[2]).toEqual({
-      addAgentIds: [],
-      removeAgentIds: [ATLAS_ID],
-      addUserIds: ["u-joao"],
-      removeUserIds: [],
-    });
-  });
-
-  test("the synthesis section shows the closing post", async () => {
-    await go("forum/topic-onboarding");
-    const synthesis = screen().getByRole("region", { name: "Síntese" });
-    expect(synthesis.textContent).toContain("Síntese: três passos a cortar.");
-    expect(screen().getByRole("region", { name: "Rodada 2" }).textContent).not.toContain("três passos a cortar");
   });
 
   test("Rotinas: a routine can open a forum topic with chosen agents and rounds", async () => {

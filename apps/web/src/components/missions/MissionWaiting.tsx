@@ -1,4 +1,4 @@
-import { Chip, Icon, type IconName } from "@agenteschat/ui";
+import { Chip, type IconName } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useMissionCommands, useMissionDecisions, useMissionList, useMissionReviews } from "@/api/missions";
@@ -18,7 +18,8 @@ import "./missions.css";
  * thread), and "Esperando você em missões": the decisions and reviews that
  * wait on you, each a link to its card in the thread. Only missions you own
  * or decide in (`status=waiting_you`); live through the mission events
- * (`mission.needs_you` reaches you in any channel).
+ * (`mission.needs_you` reaches you in any channel). Drawn in the Approvals
+ * screen's own language (telas/Aprovacoes.html): request cards and rows.
  */
 export function useMissionsWaitingYou() {
   const { org } = useOrg();
@@ -27,77 +28,101 @@ export function useMissionsWaitingYou() {
   return { list, missions };
 }
 
-/** How many command cards wait on me across missions (the Pendentes count). */
+/** How many command cards wait on me across missions (counted with the requests waiting for you). */
 export const pendingCommandCount = (missions: Mission[]) => missions.reduce((n, m) => n + m.pending.commands, 0);
 
-export function MissionCommandsPending({ missions }: { missions: Mission[] }) {
+/** Missions with a decision or review waiting on you. */
+export const missionsWaiting = (missions: Mission[]) =>
+  missions.filter((m) => m.pending.decisions + m.pending.provisional + m.pending.reviews > 0);
+
+/** The search box: a mission matches by its title, a command by its text too. */
+const hit = (query: string, ...texts: string[]) => !query || texts.join(" ").toLowerCase().includes(query);
+
+export function MissionCommandsPending({ missions, query = "" }: { missions: Mission[]; query?: string }) {
   const { t } = useTranslation();
   const asking = missions.filter((m) => m.pending.commands > 0);
   if (asking.length === 0) return null;
   return (
-    <section className="mi-wait" aria-label={t("approvals.missions.commands")}>
-      <h2 className="mi-wait__title">{t("approvals.missions.commands")}</h2>
-      {asking.map((m) => (
-        <MissionCommands key={m.id} mission={m} />
-      ))}
+    <section className="ap-mi" aria-label={t("approvals.missions.commands")}>
+      <div className="ap-section-head">
+        <h2>{t("approvals.missions.commands")}</h2>
+        <span className="ap-section-head__count">{pendingCommandCount(asking)}</span>
+      </div>
+      <div className="ap-cards">
+        {asking.map((m) => (
+          <MissionCommands key={m.id} mission={m} query={query} />
+        ))}
+      </div>
     </section>
   );
 }
 
-function MissionCommands({ mission: m }: { mission: Mission }) {
+/** One request card per pending command: the agent, its mission and who programs, then the command card itself. */
+function MissionCommands({ mission: m, query }: { mission: Mission; query: string }) {
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const dir = useDirectory(org.id);
   const commands = useMissionCommands(org.id, m.id);
-  const pending: MissionCommand[] = (commands.data?.commands ?? []).filter((c) => c.state === "pending");
+  const agentName = dir.agentById.get(m.agentId)?.name ?? "";
+  const pending: MissionCommand[] = (commands.data?.commands ?? []).filter(
+    (c) => c.state === "pending" && hit(query, c.command, m.title, agentName),
+  );
   return (
     <>
       {pending.map((c) => (
-        <div key={c.id} className="mi-wait__cmd">
-          <MissionContext mission={m} />
-          <MissionCommandCard
-            command={{ id: c.id, missionId: m.id, taskId: c.taskId, tool: c.tool, command: c.command }}
-          />
-        </div>
+        <article key={c.id} className="ap-card ap-mi-cmd" tabIndex={-1} aria-label={c.command}>
+          <span className="ap-card__face">
+            <AgentAvatar agentId={m.agentId} name={agentName} size="md" state="waiting" />
+          </span>
+          <div className="ap-card__meta">
+            <b>{agentName}</b>
+            <span>·</span>
+            <Link
+              to="/org/$orgId/threads/$threadId"
+              params={{ orgId: org.id, threadId: m.threadId }}
+              className="ap-mi__mission"
+            >
+              {m.title}
+            </Link>
+            <span>· {relativeTime(t, i18n.language, c.createdAt)}</span>
+            <span className="ap-grow" />
+            {m.machine && <ExecutorChip mission={m} agentName={agentName} />}
+          </div>
+          <div className="ap-card__body">
+            <MissionCommandCard
+              command={{ id: c.id, missionId: m.id, taskId: c.taskId, tool: c.tool, command: c.command }}
+            />
+          </div>
+        </article>
       ))}
     </>
   );
 }
 
-/** "[agent] App mobile · [mark] Claude Code no mac": whose mission a card belongs to, a link to its thread. */
-function MissionContext({ mission: m }: { mission: Mission }) {
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
-  const agentName = dir.agentById.get(m.agentId)?.name ?? "";
-  return (
-    <div className="mi-wait__ctx">
-      <AgentAvatar agentId={m.agentId} name={agentName} size="xs" />
-      <Link to="/org/$orgId/threads/$threadId" params={{ orgId: org.id, threadId: m.threadId }} className="mi-wait__m">
-        {m.title}
-      </Link>
-      {m.machine && <ExecutorChip mission={m} agentName={agentName} />}
-    </div>
-  );
-}
-
 /** "Esperando você em missões": one row per pending decision or review, linking to its card. */
-export function MissionsWaitingList({ missions }: { missions: Mission[] }) {
+export function MissionsWaitingList({ missions, query = "" }: { missions: Mission[]; query?: string }) {
   const { t } = useTranslation();
-  const waiting = missions.filter((m) => m.pending.decisions + m.pending.provisional + m.pending.reviews > 0);
+  const waiting = missionsWaiting(missions);
   if (waiting.length === 0) return null;
   return (
-    <section className="mi-wait" aria-label={t("approvals.missions.waiting")}>
-      <h2 className="mi-wait__title">{t("approvals.missions.waiting")}</h2>
-      <ul className="mi-wait__list">
+    <section className="ap-mi" aria-label={t("approvals.missions.waiting")}>
+      <div className="ap-section-head">
+        <h2>{t("approvals.missions.waiting")}</h2>
+      </div>
+      <ul className="ap-list ap-mi__list">
         {waiting.map((m) => (
-          <MissionWaitingRows key={m.id} mission={m} />
+          <MissionWaitingRows key={m.id} mission={m} query={query} />
         ))}
       </ul>
     </section>
   );
 }
 
-function MissionWaitingRows({ mission: m }: { mission: Mission }) {
+function MissionWaitingRows({ mission: m, query }: { mission: Mission; query: string }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const agentName = dir.agentById.get(m.agentId)?.name ?? "";
   const decisions = useMissionDecisions(org.id, m.pending.decisions + m.pending.provisional > 0 ? m.id : null);
   const reviews = useMissionReviews(org.id, m.pending.reviews > 0 ? m.id : null);
   const rows: { key: string; icon: IconName; kind: string; text: string; messageId: string | null; at: string }[] = [
@@ -121,30 +146,29 @@ function MissionWaitingRows({ mission: m }: { mission: Mission }) {
         messageId: r.messageId,
         at: r.createdAt,
       })),
-  ];
+  ].filter((row) => hit(query, row.text, m.title, agentName));
   return (
     <>
       {rows.map((row) => (
-        <li key={row.key} className="mi-wait__row">
-          <span className="mi-wait__icon" aria-hidden="true">
-            <Icon name={row.icon} size={16} />
-          </span>
-          <span className="mi-wait__t">
+        <li key={row.key} className="ap-row ap-mi__row">
+          <AgentAvatar agentId={m.agentId} name={agentName} size="sm" state="waiting" />
+          <div className="ap-row__text">
             <b>{row.text}</b>
             <small>
-              <Chip icon={row.icon}>{row.kind}</Chip>
-              <MissionContext mission={m} />
-              <span>{relativeTime(t, i18n.language, row.at)}</span>
+              {m.title} · {relativeTime(t, i18n.language, row.at)}
             </small>
-          </span>
-          <Link
-            to="/org/$orgId/threads/$threadId"
-            params={{ orgId: org.id, threadId: m.threadId }}
-            search={row.messageId ? { m: row.messageId } : {}}
-            className="ac-btn ac-btn--sm"
-          >
-            {t("approvals.missions.open")}
-          </Link>
+          </div>
+          <div className="ap-row__end">
+            <Chip icon={row.icon}>{row.kind}</Chip>
+            <Link
+              to="/org/$orgId/threads/$threadId"
+              params={{ orgId: org.id, threadId: m.threadId }}
+              search={row.messageId ? { m: row.messageId } : {}}
+              className="ac-btn ac-btn--sm"
+            >
+              {t("approvals.missions.open")}
+            </Link>
+          </div>
         </li>
       ))}
     </>

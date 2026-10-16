@@ -262,7 +262,7 @@ export function BootSplash() {
  * collapse once decided. Call the result when the action went through.
  */
 export function prepareBurst(from: HTMLElement): () => void {
-  const avatar = from.closest(".ac-approval")?.querySelector<HTMLElement>(".ac-avatar") ?? null;
+  const avatar = from.closest(".ac-approval, [data-burst]")?.querySelector<HTMLElement>(".ac-avatar") ?? null;
   const box = (avatar ?? from).getBoundingClientRect();
   const css = avatar ? getComputedStyle(avatar) : null;
   const [skyTop, skyBottom] = agentGradient("sky");

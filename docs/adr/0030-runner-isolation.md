@@ -21,7 +21,7 @@ A shell command still reaches anything that user can: `~/.gitconfig`, `~/.ssh`, 
 
 ## Decision
 
-Three levels. Level 1 is the default for every connected machine; levels 2 and 3 are choices made at pairing.
+Three levels. Level 1 is the default for every connected machine; level 2 is a choice per agent on machines that support it; level 3 is how the owner sets up the machine.
 
 ### Level 1: an environment per agent (cross-platform)
 
@@ -40,7 +40,10 @@ The runner builds each command's environment for the requesting agent, without t
 - **Linux:** the same with bubblewrap (or landlock where bubblewrap is missing).
 - **Windows:** not available; level 1 only, and the pairing screen says so.
 - **Executor sandbox:** when the executor has its own sandbox (Claude Code's sandbox settings), the runner turns it on through the settings it already passes, as a second layer. To be confirmed against the executor's docs when built.
-- Turned on per machine at pairing (`--protected`) or later from the machine page; the agent's `computer_status` says which mode it is in.
+- **Per agent, not per machine.** The machine reports whether it supports the sandbox (macOS/Linux, runner version); each agent has protected mode on or off (`agents.protected`) on its page. Pairing with `--protected` sets the default for agents that start using the machine. On one machine, one agent can run protected while another is not.
+- An agent given the owner's real desktop (ADR 0031) can't be protected: driving the screen escapes any process sandbox. Choosing one turns the other off.
+- Protected mode limits what that agent reaches; it doesn't hide its folder from an unprotected agent on the same machine.
+- The agent's `computer_status` says which mode it is in.
 
 ### Level 3: real separation (documented)
 
@@ -52,7 +55,7 @@ The runner builds each command's environment for the requesting agent, without t
 
 1. Level 1 git: `GIT_CONFIG_GLOBAL`, agent authorship, credential helper with `request_secret` tokens.
 2. Short-lived GitHub tokens from our connector with server-side branch policy; merges only through the connector after approval.
-3. Level 2 on macOS and Linux behind a pairing option.
+3. Level 2 on macOS and Linux, chosen per agent.
 4. Level 3 docs and detection.
 
 ## Consequences

@@ -67,7 +67,7 @@ async function setup() {
 }
 
 describe("Aprovações: missions", () => {
-  test("a pending command card with its mission, Aprovar / Recusar / Aprovar sempre, counted in Pendentes", async () => {
+  test("a pending command card with its mission, Aprovar / Recusar / Aprovar sempre, counted in Esperando você", async () => {
     const { api, decided } = await setup();
     const approvals = (await api.approvals.list(ORG_ID)).filter((a) => a.status === "pending").length;
     await renderApp(`/org/${ORG_ID}/approvals`, { api });
@@ -78,7 +78,10 @@ describe("Aprovações: missions", () => {
     expect(within(section).getByRole("link", { name: "App mobile" })).toBeTruthy();
     expect(within(section).getByRole("button", { name: "Recusar" })).toBeTruthy();
     expect(within(section).getByRole("button", { name: /Aprovar sempre/ })).toBeTruthy();
-    expect(screen().getByRole("tab", { name: /Pendentes/ }).textContent).toContain(String(approvals + 1));
+    const pill = within(screen().getByRole("group", { name: "Filtro" })).getByRole("button", {
+      name: "Esperando você",
+    });
+    expect(pill.textContent).toBe(`Esperando você${approvals + 1}`);
     await act(async () => fireEvent.click(within(section).getByRole("button", { name: "Aprovar" })));
     await settle(4);
     expect(decided).toEqual(["allow"]);

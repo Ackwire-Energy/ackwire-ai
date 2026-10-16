@@ -4674,6 +4674,20 @@ a.ac-list__row:focus-visible {
   display: block;
   image-rendering: pixelated;
 }
+/* The forum's pixels (ForumPixels.tsx): the round track, stance lanes, convergence. */
+.ac-round-track,
+.ac-stance-lane,
+.ac-convergence {
+  display: block;
+  image-rendering: pixelated;
+  flex: none;
+}
+.ac-round-track--big {
+  height: auto;
+}
+.ac-round-track.is-clickable {
+  cursor: pointer;
+}
 /* An agent at work: a 4px dithered line along the bottom of its holder. */
 .ac-work-sweep {
   position: absolute;

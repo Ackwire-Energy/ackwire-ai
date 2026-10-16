@@ -29,7 +29,7 @@ import { organizations } from "./tenancy";
  * No budget: what runs on the machine costs us nothing.
  */
 /**
- * `awaiting_close` (migration 0053): every plan item is done or dropped and
+ * `awaiting_close` (migration 0054): every plan item is done or dropped and
  * nothing runs; the mission waits for its owner to conclude it (a delivery
  * card). New work brings it back to `active`. Counts as open.
  */
@@ -315,7 +315,7 @@ export interface MissionDeliveryItem {
 }
 
 /**
- * Delivery cards (migration 0053): the executor's `complete_mission` (what it
+ * Delivery cards (migration 0054): the executor's `complete_mission` (what it
  * delivered, the files, what to check) or, when every plan item is done and
  * nothing runs without that call, an automatic one ("Tudo pronto"). The owner
  * or a decider concludes the mission (`accepted`) or asks for changes. Each

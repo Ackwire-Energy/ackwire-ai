@@ -8,7 +8,16 @@ import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import type { Approval } from "./tools/gateway";
 
-const { approvals, organizationMembers, channelMembers, agents } = schema;
+const {
+  approvals,
+  organizationMembers,
+  channelMembers,
+  agents,
+  agentRuns,
+  agentRunSteps,
+  connectorConnections,
+  issues,
+} = schema;
 
 export interface ApprovalView {
   id: string;
@@ -35,6 +44,115 @@ export interface ApprovalView {
   reason: string | null;
   /** Whether the person asking may approve or refuse it. */
   canDecide: boolean;
+  /** The agent's owner at request time (they and admins may decide). */
+  ownerUserId: string | null;
+  /** When the approved action ran (null: not yet, or never). */
+  executedAt: string | null;
+  /** What the action returned once it ran (raw tool output, short). */
+  result: { ok: boolean; text: string } | null;
+  /** The connector the action goes through (`github`), and its account (`acme`); null for built-in tools. */
+  connector: string | null;
+  connectorAccount: string | null;
+  /** What the agent said right before asking (its narration of that turn): the why, in its own words. */
+  why: string | null;
+  /** The issue the run works on, when there is one. */
+  issue: { id: string; number: number; title: string } | null;
+  /** How the run got here: what the agent said at each turn before asking (one approval only). */
+  trail?: { text: string; at: string }[];
+}
+
+/** What the approval row alone doesn't say: the connector, the agent's why, the issue (and, for one, the trail). */
+interface ApprovalContext {
+  connector: string | null;
+  connectorAccount: string | null;
+  why: string | null;
+  issue: { id: string; number: number; title: string } | null;
+  trail: { text: string; at: string }[];
+}
+
+const resultOf = (a: Approval): ApprovalView["result"] => {
+  const r = a.result as { content?: unknown; isError?: unknown } | null;
+  if (!r) return null;
+  return { ok: r.isError !== true, text: typeof r.content === "string" ? r.content.slice(0, 600) : "" };
+};
+
+/** Batched: connections, the runs' narration up to each approval step, the runs' issues. */
+async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<string, ApprovalContext>> {
+  const out = new Map<string, ApprovalContext>();
+  if (rows.length === 0) return out;
+  // Mission approvals (ADR 0029) have no run.
+  const runIds = [...new Set(rows.map((r) => r.runId).filter((id): id is string => !!id))];
+  const connectionIds = [...new Set(rows.map((r) => r.connectionId).filter((id): id is string => !!id))];
+  const [connections, steps, runs] = await Promise.all([
+    connectionIds.length
+      ? db
+          .select({
+            id: connectorConnections.id,
+            connector: connectorConnections.connector,
+            account: connectorConnections.accountLabel,
+          })
+          .from(connectorConnections)
+          .where(inArray(connectorConnections.id, connectionIds))
+      : Promise.resolve([]),
+    runIds.length
+      ? db
+          .select({
+            runId: agentRunSteps.runId,
+            kind: agentRunSteps.kind,
+            narration: sql<string | null>`${agentRunSteps.data}->>'narration'`,
+            approvalId: sql<string | null>`${agentRunSteps.data}->>'approvalId'`,
+            createdAt: agentRunSteps.createdAt,
+          })
+          .from(agentRunSteps)
+          .where(and(inArray(agentRunSteps.runId, runIds), inArray(agentRunSteps.kind, ["model_call", "approval"])))
+          .orderBy(agentRunSteps.runId, agentRunSteps.seq)
+      : Promise.resolve([]),
+    runIds.length
+      ? db.select({ id: agentRuns.id, issueId: agentRuns.issueId }).from(agentRuns).where(inArray(agentRuns.id, runIds))
+      : Promise.resolve([]),
+  ]);
+  const issueIds = [...new Set(runs.map((r) => r.issueId).filter((id): id is string => !!id))];
+  const issueRows = issueIds.length
+    ? await db
+        .select({ id: issues.id, number: issues.number, title: issues.title })
+        .from(issues)
+        .where(inArray(issues.id, issueIds))
+    : [];
+  const connectionOf = new Map(connections.map((c) => [c.id, c]));
+  const issueOfRun = new Map(runs.map((r) => [r.id, issueRows.find((i) => i.id === r.issueId) ?? null]));
+  for (const row of rows) {
+    // The narration of every turn before this approval's step; the last one is the why.
+    const trail: ApprovalContext["trail"] = [];
+    for (const s of steps) {
+      if (s.runId !== row.runId) continue;
+      if (s.kind === "approval" && s.approvalId === row.id) break;
+      if (s.kind === "model_call" && s.narration) trail.push({ text: s.narration, at: s.createdAt.toISOString() });
+    }
+    const connection = row.connectionId ? connectionOf.get(row.connectionId) : undefined;
+    out.set(row.id, {
+      connector: connection?.connector ?? null,
+      connectorAccount: connection?.account ?? null,
+      why: trail.at(-1)?.text.slice(0, 1000) ?? null,
+      issue: row.runId ? (issueOfRun.get(row.runId) ?? null) : null,
+      trail: trail.slice(-12),
+    });
+  }
+  return out;
+}
+
+/** Views with their context (connector, why, issue); `trail` only when asked (one approval's details). */
+async function viewsOf(db: Database, rows: Approval[], canDecide: (row: Approval) => boolean, trail = false) {
+  const contexts = await approvalContexts(db, rows).catch(() => new Map<string, ApprovalContext>());
+  return rows.map((r) => {
+    const { trail: steps, ...context } = contexts.get(r.id) ?? {
+      connector: null,
+      connectorAccount: null,
+      why: null,
+      issue: null,
+      trail: [],
+    };
+    return { ...approvalView(r, canDecide(r)), ...context, ...(trail ? { trail: steps } : {}) };
+  });
 }
 
 /** Top-level scalar inputs of an approved action ("pullNumber", "owner", "repo", "environment"…), short. */
@@ -69,6 +187,13 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
   decidedAt: a.decidedAt ? a.decidedAt.toISOString() : null,
   reason: a.reason,
   canDecide: canDecide && a.status === "pending",
+  ownerUserId: a.ownerUserId,
+  executedAt: a.executedAt ? a.executedAt.toISOString() : null,
+  result: resultOf(a),
+  connector: null,
+  connectorAccount: null,
+  why: null,
+  issue: null,
 });
 
 /** People who may decide: the agent's owner and the organization's admins and owners. */
@@ -94,7 +219,7 @@ export async function publishApproval(
   approval: Approval,
   type: "approval.created" | "approval.decided",
 ) {
-  const view = approvalView(approval);
+  const [view = approvalView(approval)] = await viewsOf(deps.db, [approval], () => false);
   await publishChannelEvent(deps.pubsub, { type, channelId: approval.channelId, approval: view });
   for (const userId of await approverIds(deps.db, approval)) {
     await publishUserEvent(deps.pubsub, approval.orgId, userId, { type, approval: { ...view, canDecide: true } });
@@ -180,7 +305,8 @@ export async function decideApproval(
   if (outcome.error || !outcome.row) throw new ConflictError(outcome.error ?? "approval vanished");
   // A refusal (with its reason) becomes an outcome and a lesson for the agent.
   if (outcome.row.status === "refused") await learnFromRefusal(deps, outcome.row).catch(() => null);
-  return approvalView(outcome.row);
+  const [view = approvalView(outcome.row)] = await viewsOf(db, [outcome.row], () => false);
+  return view;
 }
 
 /** Marks pending approvals past their deadline as expired and resumes their runs (worker, every minute). */
@@ -231,7 +357,7 @@ export async function listApprovals(
     )
     .orderBy(desc(approvals.createdAt))
     .limit(Math.min(options.limit ?? 100, 500));
-  return rows.map((r) => approvalView(r, admin || r.ownerUserId === actorId));
+  return viewsOf(db, rows, (r) => admin || r.ownerUserId === actorId);
 }
 
 export async function getApproval(db: Database, actorId: string, orgId: string, approvalId: string) {
@@ -245,7 +371,8 @@ export async function getApproval(db: Database, actorId: string, orgId: string, 
     (a) => a.id === row.id,
   );
   if (!visible) throw new NotFoundError("Approval not found");
-  return visible;
+  const [detailed] = await viewsOf(db, [row], () => visible.canDecide, true);
+  return { ...visible, trail: detailed?.trail ?? [] };
 }
 
 /** Pending approvals per agent, for badges. */

@@ -42,6 +42,8 @@ export interface IssueView {
   createdBy: WorkActor;
   source: IssueSource;
   channelId: string | null;
+  /** The issue this one is a sub-issue of (e.g. a plan step from the forum, D45). */
+  parentIssueId: string | null;
   pullRequests: { number: number; url: string; openedBy: WorkActor | null }[];
   artifacts: { id: string; title: string; createdBy: WorkActor }[];
   /** The assigned agent's work on it, from its runs (null: a person has it, nobody, or it is closed). */
@@ -66,6 +68,12 @@ export interface IssueWork {
   steps: { tool: string; detail?: string; at: string }[];
   /** Stalled: how the last run ended, when it did not finish on its own. */
   reason?: "failed" | "canceled" | "budget";
+}
+
+/** One issue with what hangs from it: its sub-issues and the forum topics that evaluate it. */
+export interface IssueDetailView extends IssueView {
+  subIssues: { id: string; number: number; title: string; status: IssueStatus; assignee: WorkActor | null }[];
+  forumTopics: { id: string; title: string; status: string; format: string }[];
 }
 
 export interface IssueActivityView {
@@ -275,6 +283,7 @@ async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
     createdBy: { type: r.createdByType as WorkActor["type"], id: r.createdById },
     source: r.source as unknown as IssueSource,
     channelId: r.channelId,
+    parentIssueId: r.parentIssueId,
     pullRequests: r.pullRequests as unknown as IssueView["pullRequests"],
     artifacts: r.artifactIds.flatMap((id) => {
       const f = byId.get(id);
@@ -355,6 +364,9 @@ function eventDetail(event: string | null, data: Record<string, unknown>) {
         : {};
     case "agent_asked":
       return s(data.agentName) ? out(event, { name: s(data.agentName) as string }) : {};
+    case "forum_opened":
+    case "forum_evaluated":
+      return s(data.title) ? out(event, { title: s(data.title) as string, topicId: s(data.topicId) ?? "" }) : {};
     default:
       return {};
   }
@@ -381,7 +393,7 @@ export async function createIssue(
   deps: IssueDeps,
   actor: IssueActor,
   orgId: string,
-  input: IssueInput & { source?: IssueSource; channelId?: string | null },
+  input: IssueInput & { source?: IssueSource; channelId?: string | null; parentIssueId?: string | null },
 ): Promise<IssueView> {
   const { db } = deps;
   const membership = await requireOrgMember(db, actor, orgId);
@@ -395,6 +407,13 @@ export async function createIssue(
     .filter(Boolean)
     .slice(0, 50)
     .map((text) => ({ id: Bun.randomUUIDv7(), text, done: false }));
+  if (input.parentIssueId) {
+    const [parent] = await db
+      .select({ id: issues.id })
+      .from(issues)
+      .where(and(eq(issues.id, input.parentIssueId), eq(issues.orgId, orgId)));
+    if (!parent) throw new ValidationError("The parent issue does not exist");
+  }
   const author = actorOf(actor);
   const source: IssueSource =
     input.source ?? (actor.type === "agent" ? { type: "agent", agentId: actor.agentId } : { type: "manual" });
@@ -419,6 +438,7 @@ export async function createIssue(
         criteria,
         source: source as unknown as Record<string, unknown>,
         channelId: input.channelId ?? null,
+        parentIssueId: input.parentIssueId ?? null,
         createdByType: author.type,
         createdById: author.id,
       })
@@ -460,12 +480,101 @@ export async function getIssue(db: Database, actor: IssueActor, orgId: string, r
   return one(db, await findVisible(db, actor, orgId, ref));
 }
 
+/** An issue with its sub-issues (the ones the actor can see) and the forum topics that evaluate it. */
+export async function getIssueDetail(
+  db: Database,
+  actor: IssueActor,
+  orgId: string,
+  ref: { id?: string; number?: number },
+): Promise<IssueDetailView> {
+  const row = await findVisible(db, actor, orgId, ref);
+  const [view, children, topics] = await Promise.all([
+    one(db, row),
+    db
+      .select()
+      .from(issues)
+      .where(and(eq(issues.orgId, orgId), eq(issues.parentIssueId, row.id)))
+      .orderBy(asc(issues.number)),
+    db
+      .select({
+        id: schema.forumTopics.id,
+        title: schema.forumTopics.title,
+        status: schema.forumTopics.status,
+        format: schema.forumTopics.format,
+      })
+      .from(schema.forumTopics)
+      .where(and(eq(schema.forumTopics.orgId, orgId), eq(schema.forumTopics.originIssueId, row.id)))
+      .orderBy(asc(schema.forumTopics.createdAt)),
+  ]);
+  const subIssues: IssueDetailView["subIssues"] = [];
+  for (const c of children) {
+    if (!(await canSee(db, actor, orgId, c.channelId))) continue;
+    subIssues.push({
+      id: c.id,
+      number: c.number,
+      title: c.title,
+      status: c.status,
+      assignee: c.assigneeType && c.assigneeId ? { type: c.assigneeType as WorkActor["type"], id: c.assigneeId } : null,
+    });
+  }
+  return { ...view, subIssues, forumTopics: topics };
+}
+
+/**
+ * The forum's mark on an issue's activity (D45): `forum_opened` ("in
+ * evaluation in the forum") when a topic opens from it, `forum_evaluated`
+ * when its synthesis is written (with `comment`: the summary and the link,
+ * and the synthesis file linked to the issue). No visibility check: the
+ * forum calls it for the topic it opened from this issue.
+ */
+export async function recordIssueForumEvent(
+  deps: IssueDeps,
+  orgId: string,
+  issueId: string,
+  author: WorkActor,
+  event: "forum_opened" | "forum_evaluated",
+  data: { topicId: string; title: string; artifactId?: string | null; version?: number | null },
+  options: { comment?: string } = {},
+) {
+  const [issue] = await deps.db
+    .select()
+    .from(issues)
+    .where(and(eq(issues.id, issueId), eq(issues.orgId, orgId)));
+  if (!issue) return null;
+  const row = await deps.db.transaction(async (tx) => {
+    const a = await addActivity(tx, issue, {
+      kind: "event",
+      author,
+      text:
+        event === "forum_opened" ? `took it to the forum: "${data.title}"` : `the forum evaluated it: "${data.title}"`,
+      event,
+      data,
+    });
+    const comment = options.comment?.trim()
+      ? await addActivity(tx, issue, { kind: "comment", author, text: options.comment.trim().slice(0, 20_000) })
+      : null;
+    const file = data.artifactId && !issue.artifactIds.includes(data.artifactId) ? data.artifactId : null;
+    await tx
+      .update(issues)
+      .set({ updatedAt: new Date(), ...(file ? { artifactIds: [...issue.artifactIds, file] } : {}) })
+      .where(eq(issues.id, issue.id));
+    return [a, ...(comment ? [comment] : [])];
+  });
+  const activities = row.map(activityView);
+  for (const activity of activities) {
+    const e = { type: "issue.comment" as const, issueId: issue.id, activity };
+    if (issue.channelId) await publishChannelEvent(deps.pubsub, { ...e, channelId: issue.channelId });
+    else await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event: e });
+  }
+  return activities;
+}
+
 /** Issues the actor can see, open first then by most recent update. */
 export async function listIssues(
   db: Database,
   actor: IssueActor,
   orgId: string,
-  filters: { q?: string; status?: IssueStatus; assignee?: WorkActor; limit?: number } = {},
+  filters: { q?: string; status?: IssueStatus; assignee?: WorkActor; parentIssueId?: string; limit?: number } = {},
 ): Promise<IssueView[]> {
   await requireOrgMember(db, actor, orgId);
   const q = filters.q?.trim();
@@ -476,6 +585,7 @@ export async function listIssues(
       and(
         eq(issues.orgId, orgId),
         filters.status ? eq(issues.status, filters.status) : undefined,
+        filters.parentIssueId ? eq(issues.parentIssueId, filters.parentIssueId) : undefined,
         filters.assignee
           ? and(eq(issues.assigneeType, filters.assignee.type), eq(issues.assigneeId, filters.assignee.id))
           : undefined,

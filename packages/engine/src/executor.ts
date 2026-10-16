@@ -257,8 +257,9 @@ async function executeRunInner(
       status,
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
-    // A forum turn ended: announce the post and move the topic on (D33).
-    if (channelRow?.kind === "forum" && (status === "done" || status === "failed" || status === "canceled")) {
+    // A forum turn ended: announce the post and move the topic on (D33). A question to people
+    // (`waiting_input`) doesn't hold the discussion either (D45).
+    if (channelRow?.kind === "forum" && status !== "waiting_approval") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
     }
   };
@@ -487,6 +488,9 @@ async function executeRunInner(
         if (approval?.status === "approved" && deps.tools) {
           const output = await deps.tools.executeApproved(ctx, approval);
           result = { content: output.content, isError: output.isError === true };
+          // The approvals screen shows it ran (and what came back).
+          const [ran] = await db.select().from(approvals).where(eq(approvals.id, approval.id));
+          if (ran) await publishApproval({ db, pubsub: deps.pubsub }, ran, "approval.decided").catch(() => {});
         } else result = toolResultFor(approval);
       }
       blocks.push({
