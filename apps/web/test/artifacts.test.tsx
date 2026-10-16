@@ -527,12 +527,14 @@ describe("Drive", () => {
 
     // Esc closes it.
     await keyDown("Escape");
-    expect(document.querySelector(".drive-details")).toBeNull();
+    await settle(2);
+    expect(screen().queryByRole("dialog", { name: "Organograma do time" })).toBeNull();
 
     // Abrir: the same viewer as everywhere.
     await click(card("Organograma do time"));
     await settle(4);
-    await click(within(document.querySelector(".drive-details") as HTMLElement).getByRole("button", { name: "Abrir" }));
+    const details = screen().getByRole("dialog", { name: "Organograma do time" });
+    await click(within(details).getByRole("button", { name: "Abrir" }));
     await settle(4);
     expect(screen().getByRole("dialog", { name: "Organograma do time" })).toBeTruthy();
   });
