@@ -8,7 +8,7 @@ import {
   useId,
 } from "react";
 import { cx } from "../cx";
-import { Icon } from "../icons/Icon";
+import { SearchField } from "./Toolbar";
 
 interface FieldContextValue {
   id: string;
@@ -116,12 +116,8 @@ export const AffixInput = forwardRef<HTMLInputElement, InputProps & { prefix: Re
   );
 });
 
-/** Search box with the search icon, used above long lists (dialogs, pages). */
-export const SearchInput = forwardRef<HTMLInputElement, InputProps>(function SearchInput({ className, ...rest }, ref) {
-  return (
-    <span className={cx("ac-search", className)}>
-      <Icon name="search" />
-      <input ref={ref} type="search" className="ac-input" autoComplete="off" {...rest} />
-    </span>
-  );
-});
+/**
+ * Search box above a list: the shared SearchField (a pill; `size="sm"` in
+ * dialogs and panels). Kept under this name for existing screens.
+ */
+export const SearchInput = SearchField;

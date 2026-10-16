@@ -1,4 +1,4 @@
-import { appearanceStyle } from "@agenteschat/ui";
+import { appearanceStyle, FilterToggle } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -245,15 +245,9 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
         <fieldset className="wiki-graph__filter">
           <legend className="ac-visually-hidden">{t("wiki.graphFilter")}</legend>
           {chips.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className="wiki-graph__chip"
-              aria-pressed={filter === value}
-              onClick={() => setFilter(value)}
-            >
+            <FilterToggle key={value} pressed={filter === value} onPressedChange={() => setFilter(value)}>
               {label}
-            </button>
+            </FilterToggle>
           ))}
         </fieldset>
         {svg}

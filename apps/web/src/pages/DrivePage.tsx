@@ -5,13 +5,15 @@ import {
   FilterBar,
   FilterChip,
   type FilterOption,
+  FilterToggle,
   Icon,
   Kbd,
   Menu,
   MenuRadioGroup,
   MenuSeparator,
-  SearchInput,
+  SearchField,
   Segmented,
+  Toolbar,
 } from "@agenteschat/ui";
 import { type MouseEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -351,9 +353,9 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
 
         {!trashOpen && (
           <>
-            <div className="drive-tools">
-              <span className="drive-search">
-                <SearchInput
+            <Toolbar
+              search={
+                <SearchField
                   ref={searchRef}
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
@@ -363,14 +365,77 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
                       setQ("");
                     }
                   }}
+                  onClear={() => setQ("")}
+                  clearLabel={t("filters.clearSearch")}
                   placeholder={t("drive.search")}
                   aria-label={t("drive.search")}
-                  className="drive-search__input"
+                  shortcut={
+                    <Kbd title={t("drive.searchHint")} aria-hidden="true">
+                      /
+                    </Kbd>
+                  }
                 />
-                <Kbd className="drive-search__kbd" title={t("drive.searchHint")} aria-hidden="true">
-                  /
-                </Kbd>
-              </span>
+              }
+              actions={
+                <>
+                  <Menu
+                    align="end"
+                    label={t("drive.arrange")}
+                    trigger={
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon="layers"
+                        aria-label={t("drive.arrangeValue", { group: t(`drive.group.${group}`) })}
+                      >
+                        {t(`drive.group.${group}`)}
+                      </Button>
+                    }
+                  >
+                    <MenuRadioGroup
+                      label={t("drive.groupBy")}
+                      value={group}
+                      onValueChange={(v) => setGroup(v as DriveGroup)}
+                      options={DRIVE_GROUPS.map((g) => ({ value: g, label: t(`drive.group.${g}`) }))}
+                    />
+                    <MenuSeparator />
+                    <MenuRadioGroup
+                      label={t("drive.sortBy")}
+                      value={sort}
+                      onValueChange={(v) => setSort(v as DriveSort)}
+                      options={DRIVE_SORTS.map((s) => ({ value: s, label: t(`drive.sort.${s}`) }))}
+                    />
+                  </Menu>
+                  <Segmented<DriveView>
+                    size="sm"
+                    label={t("drive.view")}
+                    value={view}
+                    onValueChange={setView}
+                    className="drive-view"
+                    options={[
+                      {
+                        value: "grid",
+                        label: (
+                          <>
+                            <Icon name="grid" size={16} />
+                            <span className="ac-visually-hidden">{t("drive.viewGrid")}</span>
+                          </>
+                        ),
+                      },
+                      {
+                        value: "list",
+                        label: (
+                          <>
+                            <Icon name="list" size={16} />
+                            <span className="ac-visually-hidden">{t("drive.viewList")}</span>
+                          </>
+                        ),
+                      },
+                    ]}
+                  />
+                </>
+              }
+            >
               <Segmented<DriveWho>
                 label={t("drive.who")}
                 value={who}
@@ -399,7 +464,6 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
               />
               <FilterBar
                 label={t("drive.filters")}
-                className="drive-filters"
                 clearText={t("drive.clear")}
                 onClear={clearFilters}
                 filters={[
@@ -441,83 +505,23 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
                   },
                 ]}
               />
-              <span className="drive-tools__end">
-                <Menu
-                  align="end"
-                  label={t("drive.arrange")}
-                  trigger={
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      icon="layers"
-                      aria-label={t("drive.arrangeValue", { group: t(`drive.group.${group}`) })}
-                    >
-                      {t(`drive.group.${group}`)}
-                    </Button>
-                  }
-                >
-                  <MenuRadioGroup
-                    label={t("drive.groupBy")}
-                    value={group}
-                    onValueChange={(v) => setGroup(v as DriveGroup)}
-                    options={DRIVE_GROUPS.map((g) => ({ value: g, label: t(`drive.group.${g}`) }))}
-                  />
-                  <MenuSeparator />
-                  <MenuRadioGroup
-                    label={t("drive.sortBy")}
-                    value={sort}
-                    onValueChange={(v) => setSort(v as DriveSort)}
-                    options={DRIVE_SORTS.map((s) => ({ value: s, label: t(`drive.sort.${s}`) }))}
-                  />
-                </Menu>
-                <Segmented<DriveView>
-                  size="sm"
-                  label={t("drive.view")}
-                  value={view}
-                  onValueChange={setView}
-                  className="drive-view"
-                  options={[
-                    {
-                      value: "grid",
-                      label: (
-                        <>
-                          <Icon name="grid" size={16} />
-                          <span className="ac-visually-hidden">{t("drive.viewGrid")}</span>
-                        </>
-                      ),
-                    },
-                    {
-                      value: "list",
-                      label: (
-                        <>
-                          <Icon name="list" size={16} />
-                          <span className="ac-visually-hidden">{t("drive.viewList")}</span>
-                        </>
-                      ),
-                    },
-                  ]}
-                />
-              </span>
-            </div>
+            </Toolbar>
 
             {kindChips.length > 0 && (
-              // biome-ignore lint/a11y/useSemanticElements: a group of toggles, styled as chips
-              <div className="drive-kinds" role="group" aria-label={t("drive.kinds")}>
+              <Toolbar label={t("drive.kinds")}>
                 {kindChips.map((k) => (
-                  <button
+                  <FilterToggle
                     key={k}
-                    type="button"
-                    className="drive-kind"
-                    aria-pressed={kinds.includes(k)}
+                    icon={KIND_ICON[k]}
+                    pressed={kinds.includes(k)}
+                    count={counts.get(k) ?? 0}
                     aria-label={t("drive.kindCount", { kind: t(`drive.kindMany.${k}`), count: counts.get(k) ?? 0 })}
-                    onClick={() => setKinds((ks) => (ks.includes(k) ? ks.filter((x) => x !== k) : [...ks, k]))}
+                    onPressedChange={() => setKinds((ks) => (ks.includes(k) ? ks.filter((x) => x !== k) : [...ks, k]))}
                   >
-                    <Icon name={KIND_ICON[k]} size={16} />
                     {t(`drive.kindMany.${k}`)}
-                    <span className="drive-kind__count tabular">{counts.get(k) ?? 0}</span>
-                  </button>
+                  </FilterToggle>
                 ))}
-              </div>
+              </Toolbar>
             )}
 
             {filtered && list.isSuccess && rows.length > 0 && (

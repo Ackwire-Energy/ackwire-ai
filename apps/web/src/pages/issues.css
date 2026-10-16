@@ -43,73 +43,6 @@
   margin: 6px 0 0;
   color: var(--muted);
 }
-.issues-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-.issues-tools__search {
-  flex: 0 1 260px;
-  min-width: 0;
-}
-.issues-pills {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding: 2px;
-  min-width: 0;
-}
-.issues-pills::-webkit-scrollbar {
-  display: none;
-}
-.issues-pill {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  color: var(--ink2);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    transform 0.18s var(--spring),
-    box-shadow 0.15s,
-    background 0.15s,
-    color 0.15s;
-}
-.issues-pill:hover {
-  box-shadow: var(--e2), var(--top);
-}
-.issues-pill:active {
-  transform: scale(0.96);
-}
-.issues-pill:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.issues-pill[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--bg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-.issues-pill__count {
-  font-weight: 500;
-  font-size: 12px;
-  color: var(--faint);
-}
-.issues-pill[aria-pressed="true"] .issues-pill__count {
-  color: color-mix(in srgb, var(--bg) 65%, transparent);
-}
 
 /* ── Agents working now ─────────────────────────────────────────────────── */
 .issues-now {
@@ -846,9 +779,6 @@
 @media (max-width: 720px) {
   .issues-head > .ac-btn {
     width: 100%;
-  }
-  .issues-tools__search {
-    flex: 1 1 100%;
   }
   .issues-board {
     grid-template-columns: repeat(4, minmax(min(280px, 82vw), 1fr));

@@ -1,12 +1,13 @@
 import {
   ApprovalCard,
   Button,
-  Icon,
+  FilterToggle,
   type IconName,
   Kbd,
   offsetMinutes,
   Popover,
   Segmented,
+  Toolbar,
   useDelayed,
 } from "@agenteschat/ui";
 import { useEffect, useMemo, useState } from "react";
@@ -239,23 +240,19 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
   );
   const inGrid = items.filter((it) => days.some((d) => onDay(it, d)));
   const filterChips = (
-    // biome-ignore lint/a11y/useSemanticElements: a group of toggle chips
-    <div className="cal-filters" role="group" aria-label={t("calendar.filters")}>
+    <Toolbar size="sm" label={t("calendar.filters")}>
       {SOURCES.map(({ source, icon }) => (
-        <button
+        <FilterToggle
           key={source}
-          type="button"
-          className="cal-filter"
-          data-source={source}
-          aria-pressed={filters[source]}
-          onClick={() => setFilters((f) => ({ ...f, [source]: !f[source] }))}
+          icon={icon}
+          pressed={filters[source]}
+          count={counts[source] ?? 0}
+          onPressedChange={() => setFilters((f) => ({ ...f, [source]: !f[source] }))}
         >
-          <Icon name={icon} size={14} aria-hidden="true" />
-          <span>{t(`calendar.filter.${source}`)}</span>
-          <span className="cal-filter__count tabular">{counts[source] ?? 0}</span>
-        </button>
+          {t(`calendar.filter.${source}`)}
+        </FilterToggle>
       ))}
-    </div>
+    </Toolbar>
   );
 
   return (
@@ -297,14 +294,9 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
           options={VIEWS.map((v) => ({ value: v, label: t(`calendar.views.${v}`) }))}
         />
         {view === "week" && (
-          <button
-            type="button"
-            className="cal-toggle"
-            aria-pressed={businessOnly}
-            onClick={() => setBusinessOnly((b) => !b)}
-          >
+          <FilterToggle pressed={businessOnly} onPressedChange={setBusinessOnly}>
             {t("calendar.businessDays")}
-          </button>
+          </FilterToggle>
         )}
         <span className="cal-page__spacer" />
         {!panel && (

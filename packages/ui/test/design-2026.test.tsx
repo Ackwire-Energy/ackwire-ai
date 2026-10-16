@@ -11,11 +11,14 @@ import {
   CommandPalette,
   Composer,
   CountChip,
+  FilterToggle,
   filterPalette,
   Kbd,
   type PaletteItem,
   Reaction,
+  SearchField,
   Segmented,
+  Toolbar,
   WorkSummary,
 } from "../src";
 
@@ -125,6 +128,66 @@ describe("the count chip", () => {
     ]) {
       expect(rule).toContain(decl);
     }
+  });
+});
+
+describe("list toolbars", () => {
+  function Harness() {
+    const [q, setQ] = useState("");
+    const [mine, setMine] = useState(false);
+    return (
+      <Toolbar
+        label="Filtros"
+        search={
+          <SearchField
+            aria-label="Buscar issues"
+            placeholder="Buscar"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onClear={() => setQ("")}
+            clearLabel="Limpar busca"
+            shortcut={<Kbd>/</Kbd>}
+          />
+        }
+        actions={<Button size="sm">Novo</Button>}
+      >
+        <FilterToggle pressed={mine} onPressedChange={setMine} icon="person" count={2}>
+          Minhas
+        </FilterToggle>
+      </Toolbar>
+    );
+  }
+
+  test("search (a pill searchbox with × and a key hint), filters as a named group, actions at the end", async () => {
+    const { container } = render(<Harness />);
+    const box = body().getByRole("searchbox", { name: "Buscar issues" }) as HTMLInputElement;
+    expect(box.closest(".ac-searchfield")).toBeTruthy();
+    expect(container.querySelector(".ac-toolbar__search .ac-searchfield")).toBeTruthy();
+    expect(container.querySelector(".ac-searchfield__hint")?.textContent).toBe("/");
+    expect(body().queryByRole("button", { name: "Limpar busca" })).toBeNull();
+    await act(async () => fireEvent.change(box, { target: { value: "login" } }));
+    expect(container.querySelector(".ac-searchfield__hint")).toBeNull();
+    await act(async () => fireEvent.click(body().getByRole("button", { name: "Limpar busca" })));
+    expect(box.value).toBe("");
+    const group = body().getByRole("group", { name: "Filtros" });
+    const mine = within(group).getByRole("button", { name: "Minhas" });
+    expect(mine.getAttribute("aria-pressed")).toBe("false");
+    expect(mine.querySelector(".ac-countchip")?.textContent).toBe("2");
+    await act(async () => fireEvent.click(mine));
+    expect(mine.getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelector(".ac-toolbar__actions")?.textContent).toBe("Novo");
+  });
+
+  test("one shape: pills on the field surface; pressed and set chips are filled neutral; phones scroll the filters", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) =>
+      new RegExp(`(^|\\n)${selector.replace(/[.[\]()"=]/g, "\\$&")} \\{([^}]*)\\}`).exec(css)?.[2] ?? "";
+    expect(rule(".ac-searchfield")).toContain("border-radius: var(--radius-full)");
+    expect(rule(".ac-searchfield")).toContain("background: var(--field-bg)");
+    expect(rule(".ac-filtertoggle")).toContain("background: var(--field-bg)");
+    expect(rule('.ac-filtertoggle[aria-pressed="true"]')).toContain("background: var(--ink)");
+    expect(rule(".ac-filter--active")).toContain("background: var(--ink)");
+    expect(css).toMatch(/\.ac-toolbar__search \{\s*flex: 1 1 100%;/);
   });
 });
 

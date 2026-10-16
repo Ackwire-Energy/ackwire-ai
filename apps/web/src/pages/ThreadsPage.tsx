@@ -6,12 +6,14 @@ import {
   EmptyState,
   FilterBar,
   FilterChip,
+  FilterToggle,
   Icon,
   Menu,
   MenuItem,
   MenuSeparator,
-  SearchInput,
+  SearchField,
   Segmented,
+  Toolbar,
 } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
@@ -151,16 +153,20 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
             }))}
           />
         </div>
-        <div className="threads-tools">
-          <SearchInput
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={
-              tab === "archived" ? t("threads.searchArchived") : missions ? t("missions.search") : t("threads.search")
-            }
-            aria-label={t("threads.search")}
-            className="threads-tools__search"
-          />
+        <Toolbar
+          search={
+            <SearchField
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onClear={() => setQ("")}
+              clearLabel={copy.clearSearch}
+              placeholder={
+                tab === "archived" ? t("threads.searchArchived") : missions ? t("missions.search") : t("threads.search")
+              }
+              aria-label={t("threads.search")}
+            />
+          }
+        >
           <FilterBar
             label={t("threads.filters")}
             clearText={copy.clearAll}
@@ -209,36 +215,24 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
                       key: "needsYou",
                       active: needsYou,
                       node: (
-                        <button
-                          type="button"
-                          className="threads-toggle"
-                          aria-pressed={needsYou}
-                          onClick={() => setNeedsYou((v) => !v)}
-                        >
-                          <Icon name="waiting" size={14} />
+                        <FilterToggle icon="waiting" pressed={needsYou} onPressedChange={setNeedsYou}>
                           {t("threads.needsYou")}
-                        </button>
+                        </FilterToggle>
                       ),
                     },
                     {
                       key: "mine",
                       active: mine,
                       node: (
-                        <button
-                          type="button"
-                          className="threads-toggle"
-                          aria-pressed={mine}
-                          onClick={() => setMine((v) => !v)}
-                        >
-                          <Icon name="person" size={14} />
+                        <FilterToggle icon="person" pressed={mine} onPressedChange={setMine}>
                           {t("threads.mine")}
-                        </button>
+                        </FilterToggle>
                       ),
                     },
                   ]),
             ]}
           />
-        </div>
+        </Toolbar>
         {tab === "archived" && (
           <p className="threads-note">
             <Icon name="lock" size={14} />

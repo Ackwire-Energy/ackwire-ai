@@ -10,7 +10,7 @@ import {
   Field,
   type IconName,
   Input,
-  SearchInput,
+  SearchField,
   Segmented,
   Textarea,
 } from "@agenteschat/ui";
@@ -197,11 +197,14 @@ export function NewTopicDialog({ open, onClose }: { open: boolean; onClose: () =
           </Field>
           <div className="people-picker">
             <span className="ac-field__label">{t("forum.form.agents")}</span>
-            <SearchInput
+            <SearchField
+              size="sm"
               aria-label={t("forum.form.searchAgents")}
               placeholder={t("forum.form.searchAgents")}
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              onClear={() => setQ("")}
+              clearLabel={t("filters.clearSearch")}
             />
             {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
             <div className="people-picker__results" role="region" aria-label={t("forum.form.agents")}>

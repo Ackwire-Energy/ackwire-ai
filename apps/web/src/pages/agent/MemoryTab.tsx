@@ -7,9 +7,10 @@ import {
   diffLines,
   Field,
   Icon,
-  SearchInput,
+  SearchField,
   Segmented,
   Textarea,
+  Toolbar,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -197,14 +198,21 @@ export function MemoryTab() {
                 </Link>
               }
             />
-            <div className="agp-toolbar agp-toolbar--in">
-              <SearchInput
-                className="agp-search"
-                aria-label={t("memory.search")}
-                placeholder={t("memory.searchPlaceholder", g)}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
+            <Toolbar
+              size="sm"
+              className="agp-toolbar agp-toolbar--in"
+              search={
+                <SearchField
+                  size="sm"
+                  aria-label={t("memory.search")}
+                  placeholder={t("memory.searchPlaceholder", g)}
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  onClear={() => setQ("")}
+                  clearLabel={t("filters.clearSearch")}
+                />
+              }
+            >
               <Segmented
                 size="sm"
                 label={t("memory.tabsLabel")}
@@ -212,15 +220,11 @@ export function MemoryTab() {
                 onValueChange={setKind}
                 options={(["known", "lessons", "archived"] as const).map((k) => ({
                   value: k,
-                  label: (
-                    <>
-                      {t(k === "lessons" ? "agentPage.memory.lessons" : `memory.tabs.${k}`)}{" "}
-                      <span className="agp-cnt">{count(k)}</span>
-                    </>
-                  ),
+                  label: t(k === "lessons" ? "agentPage.memory.lessons" : `memory.tabs.${k}`),
+                  count: count(k),
                 }))}
               />
-            </div>
+            </Toolbar>
             {memory.isLoading ? (
               <LoadingLine width={260} />
             ) : shown.length === 0 ? (

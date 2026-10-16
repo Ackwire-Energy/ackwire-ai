@@ -1,4 +1,4 @@
-import { Button, Card, Chip, Icon, SearchInput, Segmented } from "@agenteschat/ui";
+import { Button, Card, Chip, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -129,17 +129,27 @@ export function ActivityTab() {
         )}
       </div>
       <Card as="section" className="agp-card" aria-label={t("agentPage.activity.title")}>
-        <div className="agp-toolbar agp-toolbar--in">
-          <SearchInput
-            className="agp-search"
-            aria-label={t("agent.runsSearch")}
-            placeholder={t("agent.runsPlaceholder")}
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setShown(RUNS_PAGE);
-            }}
-          />
+        <Toolbar
+          size="sm"
+          className="agp-toolbar agp-toolbar--in"
+          search={
+            <SearchField
+              size="sm"
+              aria-label={t("agent.runsSearch")}
+              placeholder={t("agent.runsPlaceholder")}
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setShown(RUNS_PAGE);
+              }}
+              onClear={() => {
+                setQ("");
+                setShown(RUNS_PAGE);
+              }}
+              clearLabel={t("filters.clearSearch")}
+            />
+          }
+        >
           <Segmented
             size="sm"
             label={t("agentPage.activity.filter")}
@@ -152,31 +162,22 @@ export function ActivityTab() {
               { value: "all" as const, label: t("agentPage.activity.filters.all") },
               {
                 value: "failed" as const,
-                label: (
-                  <>
-                    {t("agentPage.activity.filters.failed")} <span className="agp-cnt">{failures}</span>
-                  </>
-                ),
+                label: t("agentPage.activity.filters.failed"),
+                count: failures,
               },
               {
                 value: "waiting" as const,
-                label: (
-                  <>
-                    {t("agentPage.activity.filters.waiting")} <span className="agp-cnt">{waiting}</span>
-                  </>
-                ),
+                label: t("agentPage.activity.filters.waiting"),
+                count: waiting,
               },
               {
                 value: "routines" as const,
-                label: (
-                  <>
-                    {t("agentPage.activity.filters.routines")} <span className="agp-cnt">{routineCount}</span>
-                  </>
-                ),
+                label: t("agentPage.activity.filters.routines"),
+                count: routineCount,
               },
             ]}
           />
-        </div>
+        </Toolbar>
         {runs.isLoading ? (
           <LoadingList count={4} />
         ) : visible.length === 0 ? (

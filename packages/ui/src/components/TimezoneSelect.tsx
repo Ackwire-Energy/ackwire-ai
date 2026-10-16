@@ -1,9 +1,9 @@
 import { Popover as RPopover } from "radix-ui";
 import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { cx } from "../cx";
-import { Icon } from "../icons/Icon";
 import { filterZones, type ZoneOption, type ZoneRegion, zoneOption, zoneOptions } from "../timezones";
 import { useFieldControl } from "./Field";
+import { SearchField } from "./Toolbar";
 
 export interface TimezoneSelectLabels {
   /** Accessible name of the search field ("Buscar fuso"). */
@@ -130,9 +130,8 @@ export function TimezoneSelect({
         <RPopover.Portal>
           <RPopover.Content className="ac-menu ac-tz__menu" align="start" sideOffset={4}>
             <div className="ac-tz__searchrow">
-              <Icon name="search" size={16} className="ac-tz__searchicon" />
-              <input
-                className="ac-tz__search"
+              <SearchField
+                size="sm"
                 role="combobox"
                 aria-label={labels.search}
                 aria-expanded="true"

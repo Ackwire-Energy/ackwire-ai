@@ -2519,6 +2519,7 @@ export const ptBR = {
     people_one: "{{count}} pessoa ou agente",
     people_other: "{{count}} pessoas ou agentes",
     clearAll: "Limpar filtros",
+    clearSearch: "Limpar busca",
   },
   timezone: {
     search: "Buscar fuso",

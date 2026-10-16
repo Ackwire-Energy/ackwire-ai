@@ -4,7 +4,7 @@ import {
   Chip,
   RadioCard,
   RadioGroup,
-  SearchInput,
+  SearchField,
   Segmented,
   Token,
   TokenList,
@@ -130,11 +130,14 @@ export function AudienceChoice({
                 ))}
             </TokenList>
           )}
-          <SearchInput
+          <SearchField
+            size="sm"
             aria-label={t("audience.search")}
             placeholder={t("audience.search")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onClear={() => setQuery("")}
+            clearLabel={t("filters.clearSearch")}
           />
           {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
           <div className="people-picker__results" role="region" aria-label={t("audience.search")}>

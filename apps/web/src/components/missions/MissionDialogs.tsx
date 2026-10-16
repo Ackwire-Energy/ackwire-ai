@@ -9,11 +9,12 @@ import {
   MenuSeparator,
   RadioCard,
   RadioGroup,
-  SearchInput,
+  SearchField,
   Segmented,
   Select,
   Switch,
   Textarea,
+  Toolbar,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -538,15 +539,20 @@ export function ShareMissionDialog({
         <DialogBody>
           {manage && (
             <>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <div style={{ flex: 1, minWidth: 180 }}>
-                  <SearchInput
+              <Toolbar
+                size="sm"
+                search={
+                  <SearchField
+                    size="sm"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     placeholder={t("missions.share.search")}
                     aria-label={t("missions.share.search")}
+                    onClear={() => setQ("")}
+                    clearLabel={t("filters.clearSearch")}
                   />
-                </div>
+                }
+              >
                 <Segmented
                   size="sm"
                   label={t("missions.share.newRole")}
@@ -554,7 +560,7 @@ export function ShareMissionDialog({
                   onValueChange={setRole}
                   options={roleOptions}
                 />
-              </div>
+              </Toolbar>
               {matches.length > 0 && (
                 <ul className="mi-people" style={{ marginTop: 8 }}>
                   {matches.map((m) => (

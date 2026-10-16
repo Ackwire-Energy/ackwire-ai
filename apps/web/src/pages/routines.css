@@ -206,21 +206,6 @@
 }
 
 /* ── Toolbar ────────────────────────────────────────────────────────────── */
-.routines-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-.routines-tools__search {
-  flex: 0 1 280px;
-  min-width: 0;
-}
-.routines-tools__count {
-  font-weight: 500;
-  font-size: 12px;
-  color: var(--faint);
-}
 
 /* ── Groups and rows ────────────────────────────────────────────────────── */
 .routines-group {
@@ -745,9 +730,6 @@
 @media (max-width: 720px) {
   .routines-head > .ac-btn {
     width: 100%;
-  }
-  .routines-tools__search {
-    flex: 1 1 100%;
   }
   .routine-row {
     grid-template-columns: 36px minmax(0, 1fr) auto;

@@ -54,101 +54,6 @@
   display: none;
 }
 /* One toolbar: search, filter menus and toggles share a height (36), the pill radius and the field look. */
-.threads-tools {
-  --threads-tool-h: 36px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-.threads-tools__search {
-  flex: 0 1 280px;
-  min-width: 0;
-}
-.threads-tools__search .ac-input {
-  height: var(--threads-tool-h);
-  border-radius: var(--radius-full);
-  font-size: 14px;
-}
-.threads-tools__search .ac-icon {
-  top: 50%;
-  width: 16px;
-  height: 16px;
-  transform: translateY(-50%);
-}
-.threads-tools .ac-filter {
-  height: var(--threads-tool-h);
-}
-.threads-tools .ac-filter--active {
-  background: color-mix(in srgb, var(--ink) 8%, var(--field-bg));
-  box-shadow: inset 0 0 0 1px var(--line2);
-}
-/* "Precisa de você" / "Minhas": the same pill as the filter menus; pressed = filled neutral. */
-.threads-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: var(--threads-tool-h);
-  padding: 0 12px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: var(--field-bg);
-  box-shadow: inset 0 0 0 1px var(--line);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink2);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    transform 0.18s var(--spring),
-    background-color 0.15s var(--out),
-    color 0.15s,
-    box-shadow 0.15s var(--out);
-}
-.threads-toggle .ac-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--faint);
-}
-.threads-toggle:hover {
-  background: var(--plate-soft);
-}
-.threads-toggle:active {
-  transform: scale(0.97);
-}
-.threads-toggle:focus-visible {
-  outline: none;
-  box-shadow: var(--field-ring);
-}
-.threads-toggle[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--ink) 8%, var(--field-bg));
-  color: var(--ink);
-  box-shadow: inset 0 0 0 1px var(--line2);
-}
-.threads-toggle[aria-pressed="true"] .ac-icon {
-  color: var(--ink2);
-}
-@media (max-width: 760px) {
-  /* Phone: search on its own line, the filters scroll sideways in one row. */
-  .threads-tools__search {
-    flex: 1 1 100%;
-  }
-  .threads-tools .ac-filterbar {
-    flex-wrap: nowrap;
-    max-width: 100%;
-    overflow-x: auto;
-    scrollbar-width: none;
-    margin: 0 -4px;
-    padding: 2px 4px;
-  }
-  .threads-tools .ac-filterbar::-webkit-scrollbar {
-    display: none;
-  }
-  .threads-tools .ac-filterbar > * {
-    flex: none;
-  }
-}
 .threads-note {
   display: flex;
   align-items: center;
@@ -662,9 +567,6 @@
   }
 }
 @media (max-width: 760px) {
-  .threads-tools__search {
-    flex: 1 1 100%;
-  }
   .threads-selbar {
     left: 12px;
     right: 12px;

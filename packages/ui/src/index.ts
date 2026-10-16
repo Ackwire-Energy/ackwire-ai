@@ -152,6 +152,13 @@ export { type TabItem, TabPanel, Tabs } from "./components/Tabs";
 export { normalizeTime, TimeSelect, type TimeSelectProps, timeOptions } from "./components/TimeSelect";
 export { TimezoneSelect, type TimezoneSelectLabels, type TimezoneSelectProps } from "./components/TimezoneSelect";
 export { Token, TokenList } from "./components/Token";
+export {
+  FilterToggle,
+  type FilterToggleProps,
+  SearchField,
+  type SearchFieldProps,
+  Toolbar,
+} from "./components/Toolbar";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { cx } from "./cx";
 export {

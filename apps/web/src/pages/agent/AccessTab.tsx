@@ -1,4 +1,4 @@
-import { Button, Card, CheckboxPill, Chip, Icon, SearchInput, Segmented } from "@agenteschat/ui";
+import { Button, Card, CheckboxPill, Chip, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -80,14 +80,21 @@ export function AccessTab() {
   return (
     <>
       <ReadOnlyNote field="levels" />
-      <div className="agp-toolbar">
-        <SearchInput
-          className="agp-search"
-          aria-label={t("agentPage.access.search")}
-          placeholder={t("agentPage.access.search")}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+      <Toolbar
+        size="sm"
+        className="agp-toolbar"
+        search={
+          <SearchField
+            size="sm"
+            aria-label={t("agentPage.access.search")}
+            placeholder={t("agentPage.access.search")}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onClear={() => setQ("")}
+            clearLabel={t("filters.clearSearch")}
+          />
+        }
+      >
         <Segmented
           size="sm"
           label={t("agentPage.access.filter")}
@@ -95,11 +102,8 @@ export function AccessTab() {
           onValueChange={setFilter}
           options={(["all", "on", "ask"] as const).map((f) => ({
             value: f,
-            label: (
-              <>
-                {t(`agentPage.access.filters.${f}`)} <span className="agp-cnt">{count[f]}</span>
-              </>
-            ),
+            label: t(`agentPage.access.filters.${f}`),
+            count: count[f],
           }))}
         />
         {editable && resources.some((r) => r.kind === "connector") && (
@@ -113,7 +117,7 @@ export function AccessTab() {
             </Button>
           </span>
         )}
-      </div>
+      </Toolbar>
       <div className="agp-cols">
         <div className="agp-col">
           {accessState === "loading" ? (

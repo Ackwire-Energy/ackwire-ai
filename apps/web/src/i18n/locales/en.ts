@@ -2506,6 +2506,7 @@ export const en: Translations = {
     people_one: "{{count}} person or agent",
     people_other: "{{count}} people or agents",
     clearAll: "Clear filters",
+    clearSearch: "Clear search",
   },
   timezone: {
     search: "Search time zone",

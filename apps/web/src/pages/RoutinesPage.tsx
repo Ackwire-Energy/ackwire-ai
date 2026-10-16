@@ -22,11 +22,12 @@ import {
   RunKey,
   RunLane,
   RunStrip,
-  SearchInput,
+  SearchField,
   Segmented,
   Select,
   Switch,
   Textarea,
+  Toolbar,
   zonedInstant,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -279,26 +280,26 @@ export function RoutinesPage() {
         {list.length > 0 && (
           <>
             <RoutineHorizon routines={list} now={now} onOpen={toggleOpen} />
-            <div className="routines-tools">
-              <SearchInput
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t("routines.search")}
-                aria-label={t("routines.search")}
-                className="routines-tools__search"
-              />
+            <Toolbar
+              search={
+                <SearchField
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  onClear={() => setQ("")}
+                  clearLabel={copy.clearSearch}
+                  placeholder={t("routines.search")}
+                  aria-label={t("routines.search")}
+                />
+              }
+            >
               <Segmented
                 label={t("routines.statusLabel")}
                 value={status}
                 onValueChange={setStatus}
                 options={(["all", "active", "paused", "event"] as const).map((v) => ({
                   value: v,
-                  label: (
-                    <>
-                      {t(`routines.status.${v}`)}
-                      <span className="routines-tools__count">{counts[v]}</span>
-                    </>
-                  ),
+                  label: t(`routines.status.${v}`),
+                  count: counts[v],
                 }))}
               />
               <FilterBar
@@ -329,7 +330,7 @@ export function RoutinesPage() {
                   },
                 ]}
               />
-            </div>
+            </Toolbar>
             {group(status === "paused" ? t("routines.groupPaused") : t("routines.groupLive"), live)}
             {group(t("routines.groupPaused"), paused)}
             {live.length === 0 && paused.length === 0 && filtered && (

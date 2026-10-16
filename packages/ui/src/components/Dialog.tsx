@@ -2,7 +2,7 @@ import { Dialog as RDialog } from "radix-ui";
 import { type CSSProperties, type ReactNode, useRef } from "react";
 import { cx } from "../cx";
 import { Button } from "./Button";
-import { SearchInput } from "./Field";
+import { SearchField } from "./Toolbar";
 
 export interface DialogProps {
   open: boolean;
@@ -121,7 +121,8 @@ export function DialogSearchList({
   return (
     <>
       <div className="ac-dialog__tools">
-        <SearchInput
+        <SearchField
+          size="sm"
           aria-label={searchLabel}
           placeholder={searchPlaceholder}
           value={query}
