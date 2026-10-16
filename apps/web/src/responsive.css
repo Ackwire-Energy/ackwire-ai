@@ -323,3 +323,21 @@
     font-size: 16px;
   }
 }
+/* Onboarding: clear the notch and home bar (viewport-fit=cover); the e-mail chips field stays at 16px. */
+.onb {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+@media (max-width: 760px) {
+  .onb__rail {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+  }
+  .onb__body {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .onb__emails-input {
+    font-size: 16px;
+  }
+}
