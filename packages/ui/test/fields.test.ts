@@ -36,6 +36,6 @@ describe("fields are v2 (no black borders)", () => {
     // Radio cards: chosen = raised + a 2px ink ring (a faint tint at most), never a gray fill.
     const chosen = rules(css).find(([s]) => s.includes('.ac-option[data-state="checked"]') && !s.includes(":has"))?.[1];
     expect(chosen).toContain("0 0 0 2px var(--ink)");
-    expect(chosen).toContain("background: var(--raised)");
+    expect(chosen).toContain("background: color-mix(in srgb, var(--ink) 5%, var(--raised))");
   });
 });
