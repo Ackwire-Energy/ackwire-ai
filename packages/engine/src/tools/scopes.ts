@@ -11,40 +11,40 @@ const { agentScopes, agents } = schema;
  */
 export const BUILTIN_SCOPES: Record<string, { label: string; description: string; sensitive?: boolean }> = {
   "context:read": {
-    label: "Ler o contexto",
-    description: "Buscar mensagens, resumos e fatos nos canais do agente.",
+    label: "Read context",
+    description: "Search messages, summaries and facts in the agent's channels.",
   },
-  "memory:write": { label: "Lembrar", description: "Guardar e esquecer as próprias notas (memórias)." },
-  "drive:read": { label: "Ler arquivos", description: "Ler arquivos do Drive." },
+  "memory:write": { label: "Remember", description: "Save and forget its own notes (memories)." },
+  "drive:read": { label: "Read files", description: "Read files in the Drive." },
   "drive:write": {
-    label: "Escrever arquivos",
-    description: "Criar relatórios, tabelas, organogramas, diffs e páginas no Drive.",
+    label: "Write files",
+    description: "Create reports, tables, org charts, diffs and pages in the Drive.",
   },
-  "issues:read": { label: "Ler issues", description: "Listar e ler issues." },
-  "calendar:read": { label: "Ver agenda", description: "Ver eventos e horários livres." },
+  "issues:read": { label: "Read issues", description: "List and read issues." },
+  "calendar:read": { label: "View calendar", description: "View events and free time." },
   "calendar:write": {
-    label: "Propor eventos",
-    description: "Sugerir eventos; quem pediu confirma antes de qualquer convite.",
+    label: "Propose events",
+    description: "Suggest events; the person asking confirms before any invitation.",
   },
-  "issues:write": { label: "Issues", description: "Criar e atualizar issues." },
-  "skills:read": { label: "Usar skills", description: "Carregar as skills ligadas para o agente." },
-  "wiki:read": { label: "Ler a wiki", description: "Buscar e ler as páginas da wiki da organização." },
+  "issues:write": { label: "Issues", description: "Create and update issues." },
+  "skills:read": { label: "Use skills", description: "Load the skills enabled for the agent." },
+  "wiki:read": { label: "Read the wiki", description: "Search and read the organization's wiki pages." },
   "wiki:write": {
-    label: "Escrever na wiki",
-    description: "Criar e editar páginas da wiki, só quando uma pessoa pede.",
+    label: "Write to the wiki",
+    description: "Create and edit wiki pages, only when a person asks.",
   },
   "forum:write": {
-    label: "Fórum",
-    description: "Abrir tópicos no fórum, ler e postar fora da própria vez.",
+    label: "Forum",
+    description: "Open forum topics, read them and post outside its own turn.",
   },
   "schedule:write": {
-    label: "Agendar",
-    description: "Criar lembretes e rotinas pelo chat, para quem pediu, no fuso dessa pessoa.",
+    label: "Schedule",
+    description: "Create reminders and routines from the chat, for the person asking, in that person's time zone.",
   },
   "sandbox:run": {
-    label: "Rodar código",
+    label: "Run code",
     description:
-      "Rodar código e scripts de skills no computador do agente (isolado, sem segredos, arquivos guardados entre conversas); custa tempo de máquina. Nunca vem ligado por padrão.",
+      "Run code and skill scripts on the agent's computer (isolated, no secrets, files kept between conversations); costs machine time. Never on by default.",
   },
 };
 

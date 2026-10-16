@@ -30,7 +30,7 @@ test("period picker: phrase → rule → description, and a routine on a rule cr
     rule: { freq: "weekly", interval: 2, byWeekday: ["MO", "WE"], times: ["09:00"] },
     cron: null,
   });
-  expect(parsed.description).toStartWith("A cada 2 semanas, seg e qua, às 09:00 (horário de Brasília)");
+  expect(parsed.description).toStartWith("Every 2 weeks, Mon and Wed, at 09:00 (Brasília time)");
   expect(parsed.nextRuns).toHaveLength(5);
 
   const described = (await (
@@ -38,7 +38,7 @@ test("period picker: phrase → rule → description, and a routine on a rule cr
       json: { rule: { freq: "monthly", byWeekday: ["TU"], bySetPos: 2, times: ["10:00"], timezone: "UTC" } },
     })
   ).json()) as { ok: boolean; description: string };
-  expect(described).toMatchObject({ ok: true, description: "Todo mês, na 2ª terça, às 10:00 (UTC)" });
+  expect(described).toMatchObject({ ok: true, description: "Every month, on the 2nd Tuesday, at 10:00 (UTC)" });
 
   const created = await api("/routines", {
     json: {

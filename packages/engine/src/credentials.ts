@@ -119,7 +119,7 @@ async function setDefault(tx: Executor, orgId: string, provider: string, credent
     });
 }
 
-/** "Tornar padrão": a key becomes its provider's default for the workspace (admins). */
+/** "Make default": a key becomes its provider's default for the workspace (admins). */
 export async function makeDefaultCredential(db: Database, actorId: string, orgId: string, credentialId: string) {
   await requirePermission(db, actorId, orgId, "manage_credentials");
   const [row] = await db

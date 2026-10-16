@@ -5,7 +5,7 @@ import { organizations } from "./tenancy";
 
 /**
  * The org wiki (D34): markdown pages every member reads, linked with
- * `[[Título]]`, `[[slug|texto]]` or `[[Página#seção]]`. Agents write only when
+ * `[[Title]]`, `[[slug|text]]` or `[[Page#section]]`. Agents write only when
  * a person asks. Every save is a version; links are parsed on save into
  * `wiki_links` (backlinks and the graph).
  */
@@ -64,7 +64,7 @@ export const wikiPageVersions = pgTable(
     tags: text().array().notNull().default(sql`'{}'::text[]`),
     authorType: text().notNull(),
     authorId: text().notNull(),
-    /** The person an agent wrote it for ("por Theo, a pedido de Walter"). */
+    /** The person an agent wrote it for ("by Theo, at Walter's request"). */
     requestedByUserId: text().references(() => users.id, { onDelete: "set null" }),
     note: text().notNull().default(""),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

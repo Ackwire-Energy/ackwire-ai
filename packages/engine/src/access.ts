@@ -77,7 +77,7 @@ export interface AccessInput {
 
 export interface AccessTool {
   name: string;
-  /** Human name, pt-BR when we have one. */
+  /** Human name (English); the app translates built-ins by tool name. */
   label: string;
   description: string;
   connectionId: string | null;
@@ -88,67 +88,83 @@ export interface AccessTool {
   state: AccessState;
 }
 
-/** Labels and descriptions of the built-in tools (pt-BR). */
+/**
+ * Labels and descriptions of the built-in tools (English). The app translates
+ * them by tool name (`tools.{name}.label` / `.description`), with these as defaults.
+ */
 export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: string }> = {
-  ask_user: { label: "Perguntar à pessoa", description: "Faz uma pergunta curta e espera a resposta." },
-  search_context: { label: "Buscar no contexto", description: "Busca mensagens, resumos, fatos e lições." },
-  get_summary: { label: "Ler resumo", description: "Lê o resumo de um thread ou período." },
-  expand: { label: "Abrir item", description: "Abre uma memória ou mensagem por inteiro." },
-  remember: { label: "Lembrar", description: "Guarda uma nota quando alguém pede." },
-  update_memory: { label: "Atualizar memória", description: "Corrige uma nota guardada." },
-  forget: { label: "Esquecer", description: "Arquiva uma nota quando alguém pede." },
+  ask_user: { label: "Ask the person", description: "Asks a short question and waits for the answer." },
+  search_context: { label: "Search context", description: "Searches messages, summaries, facts and lessons." },
+  get_summary: { label: "Read summary", description: "Reads the summary of a thread or period." },
+  expand: { label: "Open item", description: "Opens a memory or message in full." },
+  remember: { label: "Remember", description: "Saves a note when someone asks." },
+  update_memory: { label: "Update memory", description: "Corrects a saved note." },
+  forget: { label: "Forget", description: "Archives a note when someone asks." },
   propose_instruction_change: {
-    label: "Propor mudança de instruções",
-    description: "Sugere mudar as próprias instruções ou o contexto da org; uma pessoa decide.",
+    label: "Propose an instruction change",
+    description: "Suggests changing its own instructions or the org context; a person decides.",
   },
-  read_artifact: { label: "Ler arquivo", description: "Lê um arquivo do Drive." },
-  list_artifacts: { label: "Listar arquivos", description: "Lista os arquivos do Drive que vê." },
+  read_artifact: { label: "Read file", description: "Reads a Drive file." },
+  list_artifacts: { label: "List files", description: "Lists the Drive files it can see." },
   share_artifact: {
-    label: "Compartilhar arquivo",
-    description: "Traz para a conversa um arquivo que fez em outra (como uma DM), se quem pediu tem acesso.",
+    label: "Share file",
+    description:
+      "Brings into the conversation a file it made in another one (such as a DM), if the person asking has access.",
   },
-  create_artifact: { label: "Criar arquivo", description: "Cria documento, tabela, diff, diagrama ou página." },
-  update_artifact: { label: "Atualizar arquivo", description: "Salva uma nova versão de um arquivo." },
-  list_issues: { label: "Ver issues", description: "Lista e abre issues." },
-  create_issue: { label: "Criar issue", description: "Cria uma issue com critérios de aceite." },
-  update_issue: { label: "Atualizar issue", description: "Muda status, prioridade ou liga um PR." },
-  comment_issue: { label: "Comentar issue", description: "Comenta o andamento numa issue." },
-  list_events: { label: "Ver agenda", description: "Lista eventos." },
-  find_free_time: { label: "Achar horário livre", description: "Procura horários livres em comum." },
-  propose_event: { label: "Propor evento", description: "Sugere um evento; quem pediu confirma." },
-  load_skill: { label: "Carregar skill", description: "Carrega as instruções de uma skill." },
-  read_skill_file: { label: "Ler arquivo de skill", description: "Lê um arquivo de referência de uma skill." },
-  schedule_reminder: { label: "Criar lembrete", description: "Agenda um lembrete nesta conversa, para quem pediu." },
-  create_routine: { label: "Criar rotina", description: "Cria uma rotina recorrente nesta conversa ou num canal." },
-  list_routines: { label: "Ver rotinas", description: "Lista as rotinas do agente." },
-  update_routine: { label: "Alterar rotina", description: "Muda instruções, horário ou canal de uma rotina." },
-  list_reminders: { label: "Ver lembretes", description: "Lista os lembretes pendentes de quem pediu." },
-  cancel_reminder: { label: "Cancelar lembrete", description: "Cancela um lembrete de quem pediu." },
-  open_forum_topic: { label: "Abrir tópico no fórum", description: "Leva um assunto para discussão entre agentes." },
-  post_in_forum: { label: "Postar no fórum", description: "Posta num tópico fora da própria vez." },
-  read_forum_topic: { label: "Ler tópico do fórum", description: "Lê o objetivo e as respostas de um tópico." },
-  search_wiki: { label: "Buscar na wiki", description: "Procura páginas da wiki da organização." },
-  read_wiki_page: { label: "Ler página da wiki", description: "Lê uma página da wiki inteira." },
-  create_wiki_page: { label: "Criar página na wiki", description: "Cria uma página quando alguém pede." },
+  create_artifact: { label: "Create file", description: "Creates a document, table, diff, diagram or page." },
+  update_artifact: { label: "Update file", description: "Saves a new version of a file." },
+  list_issues: { label: "View issues", description: "Lists and opens issues." },
+  create_issue: { label: "Create issue", description: "Creates an issue with acceptance criteria." },
+  update_issue: { label: "Update issue", description: "Changes status or priority, or links a PR." },
+  comment_issue: { label: "Comment on issue", description: "Comments on progress in an issue." },
+  list_events: { label: "View calendar", description: "Lists events." },
+  find_free_time: { label: "Find free time", description: "Looks for free slots in common." },
+  propose_event: { label: "Propose event", description: "Suggests an event; the person asking confirms." },
+  load_skill: { label: "Load skill", description: "Loads a skill's instructions." },
+  read_skill_file: { label: "Read skill file", description: "Reads a reference file of a skill." },
+  schedule_reminder: {
+    label: "Create reminder",
+    description: "Schedules a reminder in this conversation, for the person asking.",
+  },
+  create_routine: {
+    label: "Create routine",
+    description: "Creates a recurring routine in this conversation or in a channel.",
+  },
+  list_routines: { label: "View routines", description: "Lists the agent's routines." },
+  update_routine: { label: "Change routine", description: "Changes a routine's instructions, schedule or channel." },
+  list_reminders: { label: "View reminders", description: "Lists the pending reminders of the person asking." },
+  cancel_reminder: { label: "Cancel reminder", description: "Cancels a reminder of the person asking." },
+  open_forum_topic: { label: "Open forum topic", description: "Takes a subject to a discussion among agents." },
+  post_in_forum: { label: "Post in forum", description: "Posts in a topic outside its own turn." },
+  read_forum_topic: { label: "Read forum topic", description: "Reads a topic's goal and replies." },
+  search_wiki: { label: "Search wiki", description: "Searches the organization's wiki pages." },
+  read_wiki_page: { label: "Read wiki page", description: "Reads a whole wiki page." },
+  create_wiki_page: { label: "Create wiki page", description: "Creates a page when someone asks." },
   update_wiki_page: {
-    label: "Editar página da wiki",
-    description: "Acrescenta ou reescreve um trecho quando alguém pede.",
+    label: "Edit wiki page",
+    description: "Adds or rewrites a section when someone asks.",
   },
-  link_to_wiki: { label: "Ligar páginas da wiki", description: "Liga uma página a outras quando alguém pede." },
-  run_code: { label: "Rodar código", description: "Roda Python, Node ou bash no ambiente isolado da conversa." },
-  write_file: { label: "Escrever no ambiente", description: "Grava um arquivo no ambiente de código." },
-  read_file: { label: "Ler do ambiente", description: "Lê um arquivo do ambiente de código." },
-  list_files: { label: "Listar o ambiente", description: "Lista os arquivos do ambiente de código." },
-  export_file: { label: "Salvar no Drive", description: "Leva um arquivo do ambiente para o Drive." },
+  link_to_wiki: { label: "Link wiki pages", description: "Links a page to others when someone asks." },
+  run_code: { label: "Run code", description: "Runs Python, Node or bash in the conversation's isolated environment." },
+  write_file: { label: "Write to environment", description: "Writes a file in the code environment." },
+  read_file: { label: "Read from environment", description: "Reads a file from the code environment." },
+  list_files: { label: "List environment", description: "Lists the files in the code environment." },
+  export_file: { label: "Save to Drive", description: "Takes a file from the environment to the Drive." },
   upload_file: {
-    label: "Enviar para o Drive",
-    description: "Envia um arquivo ou pasta do computador para o Drive como está (PDF, imagens, zip…).",
+    label: "Upload to Drive",
+    description: "Uploads a file or folder from the computer to the Drive as is (PDF, images, zip…).",
   },
-  import_file: { label: "Trazer do Drive", description: "Copia um arquivo do Drive para o ambiente." },
-  run_skill_script: { label: "Rodar script de skill", description: "Roda um script de uma skill no ambiente." },
-  computer_start: { label: "Ligar o computador", description: "Liga o computador do agente (cria na primeira vez)." },
-  computer_stop: { label: "Desligar o computador", description: "Desliga o computador; os arquivos ficam." },
-  computer_status: { label: "Ver o computador", description: "Diz se está ligado, o disco usado e o custo do mês." },
+  import_file: { label: "Bring from Drive", description: "Copies a Drive file into the environment." },
+  run_skill_script: { label: "Run skill script", description: "Runs a skill's script in the environment." },
+  computer_start: {
+    label: "Turn on the computer",
+    description: "Turns on the agent's computer (creates it the first time).",
+  },
+  computer_stop: { label: "Turn off the computer", description: "Turns off the computer; the files stay." },
+  computer_status: {
+    label: "Check the computer",
+    description: "Says whether it is on, the disk used and this month's cost.",
+  },
 };
 
 const humanize = (name: string) => {
@@ -221,7 +237,7 @@ export async function orgToolCatalog(db: Database, orgId: string) {
         custom: true,
         scopes: [...byScope].map(([scope, list]) => ({
           scope,
-          label: scope.endsWith(":read") ? "Leitura" : "Escrita",
+          label: scope.endsWith(":read") ? "Read" : "Write",
           tools: list,
         })),
       });
@@ -288,7 +304,7 @@ function builtinInfo(name: string, scope: string): Omit<AccessTool, "state"> {
 function treeFor(granted: Set<string>, catalog: Awaited<ReturnType<typeof orgToolCatalog>>): AccessTree {
   const builtins: AccessScope[] = Object.entries(BUILTIN_TOOLS).map(([scope, names]) => ({
     scope,
-    label: scope === "" ? "Perguntar à pessoa" : (BUILTIN_SCOPES[scope]?.label ?? scope),
+    label: scope === "" ? "Ask the person" : (BUILTIN_SCOPES[scope]?.label ?? scope),
     state: scope === "" ? "inherited" : scopeState(granted, null, scope),
     tools: names.map((name) => ({
       ...builtinInfo(name, scope),
@@ -485,15 +501,13 @@ export async function pendingConnectors(
     if (tools.length === 0) {
       out.push({
         label: c.label,
-        reason: c.custom
-          ? "conectado, aguardando um admin classificar as ferramentas"
-          : "conectado, sem ferramentas disponíveis",
+        reason: c.custom ? "connected, waiting for an admin to classify the tools" : "connected, no tools available",
       });
     } else if (!tools.some((t) => offeredToolNames.has(t.name))) {
       out.push({
         label: c.label,
         reason:
-          "conectado, mas as ferramentas não foram liberadas para você; peça a um admin para liberar em Agentes e acesso ou na página do agente",
+          "connected, but the tools were not enabled for you; ask an admin to enable them in Agents and access or on the agent's page",
       });
     }
   }

@@ -227,7 +227,7 @@ describe("runtime", () => {
     await drainOutbox(f.db, f.handlers);
 
     const prompt = systemText(f.provider.calls[0]?.request.system ?? "");
-    expect(prompt).toContain("# Skills disponíveis");
+    expect(prompt).toContain("# Available skills");
     expect(prompt).toContain("- relatorio-semanal: Escreve o relatório semanal");
     expect(prompt).not.toContain("outra-skill");
     const results = (await f.db.select().from(schema.agentRunSteps))
@@ -236,7 +236,7 @@ describe("runtime", () => {
     expect(results[0]).toMatchObject({ name: "load_skill", isError: false });
     expect(results[0]?.content).toContain('Skill "relatorio-semanal" (v1) loaded.');
     expect(results[0]?.content).toContain("1. Junte as entregas da semana.");
-    expect(results[0]?.content).toContain("run.sh (script: roda com run_skill_script");
+    expect(results[0]?.content).toContain("run.sh (script: runs with run_skill_script");
     expect(results[0]?.content).not.toContain("echo");
     expect(results[1]).toMatchObject({ name: "read_skill_file", isError: false });
     expect(results[1]?.content).toContain("# Semana {{n}}");
@@ -263,7 +263,7 @@ describe("runtime", () => {
     await drainOutbox(f.db, f.handlers);
     const request = f.provider.calls[0]?.request;
     expect(request?.tools?.map((t) => t.name) ?? []).not.toContain("load_skill");
-    expect(systemText(request?.system ?? "")).not.toContain("# Skills disponíveis");
+    expect(systemText(request?.system ?? "")).not.toContain("# Available skills");
 
     const other = await addUser(f.db, "zed");
     const { organization } = await createOrganization(f.db, other.id, { name: "Outra" });

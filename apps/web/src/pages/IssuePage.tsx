@@ -167,8 +167,16 @@ function Activity({ issue }: { issue: Issue }) {
   const actors = useActors();
   const [text, setText] = useState("");
   const mentionSearch = useMentionSearch();
-  // The backend writes the event in words ("pediu a Ada para implementar").
-  const eventText = (a: IssueActivity) => a.text;
+  // The event in the person's language from its code (`issues.event.*`); the server's words as the fallback.
+  const eventText = (a: IssueActivity) => {
+    if (!a.textCode) return a.text;
+    const p = a.textParams ?? {};
+    const extra = {
+      ...(p.status ? { status: t(`issues.status.${p.status}`, { defaultValue: p.status }) } : {}),
+      ...(p.priority ? { priority: t(`issues.priority.${p.priority}`, { defaultValue: p.priority }) } : {}),
+    };
+    return t(`issues.event.${a.textCode}`, { ...p, ...extra, defaultValue: a.text });
+  };
   const list = activity.data ?? [];
   return (
     <section aria-labelledby="act" className="stack-4" style={{ gap: 4 }}>

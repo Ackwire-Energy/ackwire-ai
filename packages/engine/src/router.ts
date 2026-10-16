@@ -19,7 +19,7 @@ export interface RoutingCandidate {
   role: string;
   /** First part of the agent's instructions, so the strategy knows what it does. */
   about: string;
-  /** What its granted scopes let it do ("Arquivos (Drive), GitHub"), so "should it answer" weighs whether it can help. */
+  /** What its granted scopes let it do ("Files (Drive), GitHub"), so "should it answer" weighs whether it can help. */
   can?: string;
 }
 

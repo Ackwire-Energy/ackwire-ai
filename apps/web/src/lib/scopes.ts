@@ -21,6 +21,15 @@ export function scopeText(t: TFunction, scope: ScopeInfo) {
   };
 }
 
+/** A built-in tool's label and description in the app's language (keyed by tool name), or the server's English. */
+export function builtinToolText(t: TFunction, tool: { name: string; label: string; description: string }) {
+  const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
+  return {
+    label: tt(`builtinTools.${safe(tool.name)}.label`, { defaultValue: tool.label }),
+    description: tt(`builtinTools.${safe(tool.name)}.description`, { defaultValue: tool.description }),
+  };
+}
+
 /** The connector's name in the app's language: the brand, plus what a variant is ("Supabase (somente leitura)"). */
 export function connectorName(t: TFunction, def: Pick<ConnectorDef, "id" | "label">) {
   const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
@@ -110,13 +119,13 @@ function customScopes(t: TFunction, connectionId: string): ScopeRow[] {
       key: grantKey(grant),
       grant,
       label: tt(`scopes.custom_${access}.label`, {
-        defaultValue: access === "read" ? "Ferramentas de leitura" : "Ferramentas de escrita",
+        defaultValue: access === "read" ? "Read tools" : "Write tools",
       }),
       description: tt(`scopes.custom_${access}.description`, {
         defaultValue:
           access === "read"
-            ? "Consultar dados pelas ferramentas classificadas como leitura."
-            : "Usar as ferramentas de escrita. As marcadas como sensíveis sempre pedem aprovação.",
+            ? "Look up data with the tools classified as read."
+            : "Use the write tools. Those marked sensitive always ask for approval.",
       }),
       sensitive: access === "write",
     };

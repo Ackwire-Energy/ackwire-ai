@@ -96,10 +96,11 @@ import { errorText } from "@/lib/errors";
 import { fileIcon, fitsUpload, MAX_UPLOAD_MB } from "@/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
+import { serverBody } from "@/lib/message-body";
 import { reportPainted } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { localMeta, quoteExcerpt, replyOf } from "@/lib/reply";
-import { isReminderMessage, routineOfMessage } from "@/lib/routines";
+import { isReminderMessage, reminderBody, routineOfMessage } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
 import { splitCanceled } from "@/lib/work";
 import {
@@ -1522,8 +1523,9 @@ const TimelineMessage = memo(function TimelineMessage({
   // `agent.run.steered`: this message went into a running task.
   const steeredAgent = useLive((s) => s.steered[m.id]);
   // A stopped run's message (`meta.canceled`): the text so far, and "Interrompido por Walter" as a note.
-  const stopped = useMemo(() => splitCanceled(m.body, m.meta), [m.body, m.meta]);
-  const body = stopped.body;
+  // A text the server wrote (`meta.bodyCode`, a deploy's notice) is shown in the person's language.
+  const stopped = useMemo(() => splitCanceled(serverBody(t, m.body, m.meta), m.meta), [t, m.body, m.meta]);
+  const body = reminderBody(stopped.body, m.meta);
   const stopper = stopped.byUserId ? dir.memberById.get(stopped.byUserId)?.name : undefined;
   const canceledNote = !stopped.canceled
     ? null
@@ -1534,7 +1536,7 @@ const TimelineMessage = memo(function TimelineMessage({
         : // Older messages without a person in the meta: the server's line.
           stopped.note;
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
-  // A plain reminder: the agent's own message, with a small "Lembrete".
+  // A plain reminder: the agent's own message, with a small "Reminder" label.
   const reminder = isReminderMessage(m.meta);
   const renderMention = (handle: string, key: string) => {
     const a = dir.agentByHandle.get(handle.toLowerCase());

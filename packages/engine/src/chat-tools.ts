@@ -56,7 +56,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
         additionalProperties: false,
       },
       describe: (input) => ({
-        title: `Postar em #${str(input.channel).replace(/^#/, "")}`,
+        title: `Post in #${str(input.channel).replace(/^#/, "")}`,
         detail: str(input.text).slice(0, 500) || undefined,
       }),
       async execute(input, ctx) {

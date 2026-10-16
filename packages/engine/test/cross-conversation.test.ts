@@ -72,13 +72,13 @@ describe("work done in other conversations", () => {
       body: "@dev manda aqui aquele pdf que tu gerou pra mim no privado",
     });
     await drainOutbox(f.db, f.handlers);
-    expect(prompts.ana).toContain("# Seu trabalho recente com ana em outras conversas");
-    expect(prompts.ana).toContain('- DM com ana, há 0 min: create_artifact → Saved "Relatório semanal de visitas"');
+    expect(prompts.ana).toContain("# Your recent work with ana in other conversations");
+    expect(prompts.ana).toContain('- DM with ana, 0 min ago: create_artifact → Saved "Relatório semanal de visitas"');
     expect(prompts.ana).toContain(originalId);
-    expect(prompts.ana).toContain("No privado");
+    expect(prompts.ana).toContain('"no privado"');
     const shared = (await toolResults()).find((r) => r.name === "share_artifact");
     expect(shared).toMatchObject({ isError: false });
-    expect(shared?.content).toContain("trazendo do nosso privado");
+    expect(shared?.content).toContain("bringing it over from our DM");
     const copies = (await f.db.select().from(schema.artifacts)).filter((a) => a.channelId === f.general.id);
     expect(copies.map((a) => a.title)).toEqual(["Relatório semanal de visitas"]);
     const reply = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id })).at(-1);
@@ -95,7 +95,7 @@ describe("work done in other conversations", () => {
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bob.id });
     await postPersonMessage(deps, bob.id, f.org.id, f.general.id, { body: "@dev me manda o pdf da ana" });
     await drainOutbox(f.db, f.handlers);
-    expect(prompts.bob).not.toContain("DM com");
+    expect(prompts.bob).not.toContain("DM with");
     expect(prompts.bob).not.toContain(originalId);
     const refused = (await toolResults()).filter((r) => r.name === "share_artifact").at(-1);
     expect(refused).toMatchObject({ isError: true });
@@ -182,6 +182,6 @@ describe("list_artifacts for agents", () => {
       },
     );
     expect(out?.content).toContain(`${report.id} "Relatório de visitas" (document, v1,`);
-    expect(out?.content).toContain("origem: aqui; criado por @dev");
+    expect(out?.content).toContain("from: here; created by @dev");
   });
 });

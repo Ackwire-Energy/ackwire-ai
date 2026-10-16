@@ -123,9 +123,7 @@ describe("rules", () => {
       start: "2026-10-12",
       until: "2026-12-31",
     });
-    expect(describeRule(biweekly)).toMatch(
-      /^A cada 2 semanas, seg e qua, às 09:00 \(horário de Brasília\), até 31\/12/,
-    );
+    expect(describeRule(biweekly)).toMatch(/^Every 2 weeks, Mon and Wed, at 09:00 \(Brasília time\), until 12\/31/);
     expect(ruleToCron(biweekly)).toBeNull();
     expect(
       describeRule(
@@ -137,7 +135,7 @@ describe("rules", () => {
           timezone: SP,
         }),
       ),
-    ).toBe("Todo mês, no último dia útil, às 18:00 (horário de Brasília)");
+    ).toBe("Every month, on the last business day, at 18:00 (Brasília time)");
     const workdays = cronToRule("0 9 * * 1-5", SP) as ScheduleRule;
     expect(workdays).toMatchObject({ freq: "weekly", byWeekday: ["MO", "TU", "WE", "TH", "FR"], times: ["09:00"] });
     expect(ruleToCron(normalizeRule(workdays))).toBe("0 9 * * 1-5");

@@ -24,7 +24,7 @@ export interface ConnectorTool {
   onSuccess?: { kind: OutcomeKind; subject: string };
 }
 
-/** Catalog groups (the app translates them): Desenvolvimento, Produto, Docs, Pagamentos, Suporte, Marketing, Automação. */
+/** Catalog groups (the app translates them, `connectors.category.*`): development, product, docs, payments, support, marketing, automation. */
 export type ConnectorCategory = "dev" | "product" | "docs" | "payments" | "support" | "marketing" | "automation";
 
 export interface ConnectorDefinition {
@@ -47,7 +47,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
     id: "github",
     category: "dev",
     label: "GitHub",
-    description: "Repositórios, pull requests, issues e Actions.",
+    description: "Repositories, pull requests, issues and Actions.",
     serverUrl: "https://api.githubcopilot.com/mcp/",
     auth: ["oauth", "api_key"],
     oauth: {
@@ -57,25 +57,22 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       scopeSeparator: " ",
     },
     scopes: {
-      "repo.read": s("Ler código", "Ler arquivos e commits e buscar no código."),
-      "repo.write": s("Escrever código", "Criar branches e enviar commits (nunca na branch principal sem PR)."),
+      "repo.read": s("Read code", "Read files and commits and search the code."),
+      "repo.write": s("Write code", "Create branches and push commits (never to the default branch without a PR)."),
       "git.read": s(
-        "Clonar repositórios (git)",
-        "Clonar e atualizar repositórios no computador do agente com git, pelo nosso proxy; o token do GitHub nunca entra na máquina.",
+        "Clone repositories (git)",
+        "Clone and update repositories on the agent's computer with git, through our proxy; the GitHub token never enters the machine.",
       ),
       "git.write": s(
-        "Enviar branches (git push)",
-        "Enviar commits só para branches agentes/{agente}/…: nunca na branch principal, sem force push, sem tags.",
+        "Push branches (git push)",
+        "Push commits only to agentes/{agent}/… branches: never to the default branch, no force push, no tags.",
       ),
-      "pr.read": s("Ler pull requests", "Listar e ler pull requests e seus checks."),
-      "pr.write": s("Abrir pull requests", "Abrir pull requests e comentar neles."),
-      "pr.merge": s("Fazer merge", "Fazer merge de um pull request. Sempre pede aprovação."),
-      "issues.read": s("Ler issues", "Listar e ler issues do GitHub."),
-      "issues.write": s("Escrever issues", "Criar issues e comentar."),
-      "actions.run": s(
-        "Rodar workflows",
-        "Iniciar workflows do GitHub Actions (podem fazer deploy). Sempre pede aprovação.",
-      ),
+      "pr.read": s("Read pull requests", "List and read pull requests and their checks."),
+      "pr.write": s("Open pull requests", "Open pull requests and comment on them."),
+      "pr.merge": s("Merge pull requests", "Merge a pull request. Always asks for approval."),
+      "issues.read": s("Read issues", "List and read GitHub issues."),
+      "issues.write": s("Write issues", "Create issues and comment."),
+      "actions.run": s("Run workflows", "Start GitHub Actions workflows (they may deploy). Always asks for approval."),
     },
     tools: {
       git_clone: { scope: "git.read" },
@@ -95,7 +92,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       merge_pull_request: {
         scope: "pr.merge",
         sensitive: true,
-        title: "Fazer merge do PR #{pullNumber} em {owner}/{repo}",
+        title: "Merge PR #{pullNumber} in {owner}/{repo}",
         onSuccess: { kind: "pr_merged", subject: "{owner}/{repo}#{pullNumber}" },
       },
       get_issue: { scope: "issues.read" },
@@ -105,7 +102,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       run_workflow: {
         scope: "actions.run",
         sensitive: true,
-        title: "Rodar o workflow {workflow_id} em {owner}/{repo}",
+        title: "Run workflow {workflow_id} in {owner}/{repo}",
       },
       list_workflow_runs: { scope: "repo.read" },
     },
@@ -114,7 +111,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
     id: "sentry",
     category: "dev",
     label: "Sentry",
-    description: "Erros, issues e eventos.",
+    description: "Errors, issues and events.",
     serverUrl: "https://mcp.sentry.dev/mcp",
     auth: ["oauth", "api_key"],
     oauth: {
@@ -124,8 +121,8 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       scopeSeparator: " ",
     },
     scopes: {
-      "issues.read": s("Ler erros", "Buscar issues e eventos e ler os detalhes."),
-      "issues.write": s("Triar erros", "Resolver, atribuir ou ignorar issues do Sentry."),
+      "issues.read": s("Read errors", "Search issues and events and read their details."),
+      "issues.write": s("Triage errors", "Resolve, assign or ignore Sentry issues."),
     },
     tools: {
       find_projects: { scope: "issues.read" },
@@ -139,7 +136,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
     id: "linear",
     category: "product",
     label: "Linear",
-    description: "Issues, projetos e comentários.",
+    description: "Issues, projects and comments.",
     serverUrl: "https://mcp.linear.app/mcp",
     auth: ["oauth", "api_key"],
     oauth: {
@@ -149,8 +146,8 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       scopeSeparator: ",",
     },
     scopes: {
-      "issues.read": s("Ler issues", "Listar e ler issues e projetos do Linear."),
-      "issues.write": s("Escrever issues", "Criar e atualizar issues e comentários."),
+      "issues.read": s("Read issues", "List and read Linear issues and projects."),
+      "issues.write": s("Write issues", "Create and update issues and comments."),
     },
     tools: {
       list_issues: { scope: "issues.read" },
@@ -165,7 +162,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
     id: "drive",
     category: "docs",
     label: "Google Drive",
-    description: "Buscar, ler e escrever documentos (qualquer servidor MCP do tipo Drive).",
+    description: "Search, read and write documents (any Drive-like MCP server).",
     serverUrl: null,
     auth: ["oauth", "api_key"],
     oauth: {
@@ -175,16 +172,16 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       scopeSeparator: " ",
     },
     scopes: {
-      "files.read": s("Ler documentos", "Buscar e ler arquivos."),
-      "files.write": s("Escrever documentos", "Criar e editar arquivos."),
-      "files.share": s("Compartilhar documentos", "Mudar quem vê um arquivo. Sempre pede aprovação."),
+      "files.read": s("Read documents", "Search and read files."),
+      "files.write": s("Write documents", "Create and edit files."),
+      "files.share": s("Share documents", "Change who can see a file. Always asks for approval."),
     },
     tools: {
       search_files: { scope: "files.read" },
       read_file: { scope: "files.read" },
       create_file: { scope: "files.write" },
       update_file: { scope: "files.write" },
-      share_file: { scope: "files.share", sensitive: true, title: "Compartilhar {fileId} com {email}" },
+      share_file: { scope: "files.share", sensitive: true, title: "Share {fileId} with {email}" },
     },
   },
 };

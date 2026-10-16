@@ -104,7 +104,7 @@ export const agentRuns = pgTable(
     /**
      * People's messages for this run that arrived while it was active (one
      * active run per agent and conversation): delivered to the model at the
-     * next call ("Nova mensagem de …"), instead of starting a second run.
+     * next call ("New message from …"), instead of starting a second run.
      */
     pendingMessageIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** Bumped by the worker while it executes the run; a stale one means the worker died (recovered on boot). */

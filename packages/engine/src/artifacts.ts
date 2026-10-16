@@ -881,7 +881,7 @@ export async function requesterSharedChannels(db: Database, orgId: string, agent
   return rows.map((r) => r.id);
 }
 
-/** Where artifacts came from, for agents picking one ("DM com Walter", "#general", "Drive"). */
+/** Where artifacts came from, for agents picking one ("DM with Walter", "#general", "Drive"). */
 export async function artifactOrigins(
   db: Database,
   orgId: string,
@@ -921,7 +921,7 @@ export async function artifactOrigins(
     chans.map((c): [string, string] => {
       if (c.kind !== "dm") return [c.id, `#${c.name}`];
       const people = dmPeople.filter((p) => p.channelId === c.id).map((p) => p.name);
-      return [c.id, people.length ? `DM com ${people.join(", ")}` : "DM"];
+      return [c.id, people.length ? `DM with ${people.join(", ")}` : "DM"];
     }),
   );
   const creator = new Map<string, string>([
@@ -930,7 +930,7 @@ export async function artifactOrigins(
   ]);
   return {
     origin: (a: Pick<ArtifactView, "channelId">) =>
-      a.channelId ? (channelLabel.get(a.channelId) ?? "outra conversa") : "Drive (toda a organização)",
+      a.channelId ? (channelLabel.get(a.channelId) ?? "another conversation") : "Drive (the whole organization)",
     creator: (a: Pick<ArtifactView, "createdBy">) => creator.get(a.createdBy.id) ?? a.createdBy.type,
   };
 }
@@ -1146,7 +1146,7 @@ export async function restoreArtifact(deps: ArtifactDeps, userId: string, orgId:
 /**
  * Job: files deleted more than 30 days ago lose their contents (every
  * version's blob and row). The artifact row stays as a tombstone, so old
- * messages can still say "Arquivo removido" with its title.
+ * messages can still say "File removed" with its title.
  */
 export async function purgeDeletedArtifacts(deps: ArtifactDeps, now = new Date()) {
   const cutoff = new Date(now.getTime() - ARTIFACT_TRASH_DAYS * 86_400_000);
@@ -1207,7 +1207,7 @@ const fileName = (a: ArtifactRow, version: number, ext: string) => {
       .replace(/[̀-ͯ]/g, "")
       .replace(/[^a-zA-Z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
-      .slice(0, 60) || "arquivo";
+      .slice(0, 60) || "file";
   return `${slug}-v${version}.${ext}`;
 };
 

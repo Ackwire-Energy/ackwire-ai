@@ -10,7 +10,7 @@ import { type AgentRun, addRunStep, runErrorDetail, transitionRun } from "./runs
 
 const { agentRuns, agentRunSteps, outbox, channels } = schema;
 
-export const INTERRUPTED_BY_RESTART = "Interrompida por uma atualização do servidor";
+export const INTERRUPTED_BY_RESTART = "Interrupted by a server update";
 /** A run is resumed at most this many times after a dead worker; then it fails. */
 const MAX_RECOVERIES = 2;
 
@@ -25,8 +25,8 @@ type StoredTranscript = {
  * - Running, between steps (no tool call cut in half): resumed through the
  *   outbox from the saved transcript.
  * - Running with a tool call cut in half (it may have had effects), or
- *   recovered too often: failed with "Interrompida por uma atualização do
- *   servidor"; what the agent wrote so far is posted; the app hears it.
+ *   recovered too often: failed with "Interrupted by a server update";
+ *   what the agent wrote so far is posted; the app hears it.
  * - Queued with no job left: its job is enqueued again.
  */
 export async function recoverStaleRuns(
@@ -141,7 +141,7 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
     .map((m) => textOf(m.content).trim())
     .filter(Boolean)
     .join("\n\n");
-  const note = `_${INTERRUPTED_BY_RESTART}. Peça de novo para continuar._`;
+  const note = `_${INTERRUPTED_BY_RESTART}. Ask again to continue._`;
   const result = await db.transaction(async (tx) => {
     const failed = await transitionRun(tx, run.id, "running", "failed", { error: INTERRUPTED_BY_RESTART });
     if (!failed) return null;

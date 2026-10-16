@@ -21,7 +21,16 @@ const Memory = z
     agentId: z.uuid(),
     kind: z.enum(["fact", "decision", "lesson", "preference"]),
     text: z.string(),
-    source: z.string().openapi({ example: "Aprendido em #eng · 12 out" }),
+    source: z.string().openapi({ example: "Learned in #eng · Oct 12" }),
+    origin: z
+      .object({
+        by: z.enum(["person", "agent", "lesson", "recorded"]),
+        name: z.string().nullable().openapi({ description: "The person who wrote it (`by: person`)." }),
+        channel: z.string().nullable().openapi({ description: "Channel name, without `#`." }),
+        at: z.string(),
+      })
+      .optional()
+      .openapi({ description: "`source` in parts, for the app to say it in its language (`source` is English)." }),
     uses: z.number(),
     lastUsedAt: z.string().nullable(),
     pinned: z.boolean(),
@@ -46,7 +55,19 @@ const Proposal = z
     ]),
     title: z.string(),
     why: z.string(),
-    evidence: z.array(z.object({ where: z.string(), what: z.string(), channelId: z.string().nullable().optional() })),
+    evidence: z.array(
+      z.object({
+        where: z.string(),
+        what: z.string(),
+        channelId: z.string().nullable().optional(),
+        type: z
+          .enum(["outcome", "human", "agent", "self"])
+          .optional()
+          .openapi({
+            description: "Where the evidence came from; the app translates it (`where` is the English text).",
+          }),
+      }),
+    ),
     before: z.string(),
     after: z.string(),
     status: z.enum(["pending", "accepted", "refused"]),
@@ -62,8 +83,7 @@ const Proposal = z
   })
   .openapi("Proposal");
 
-const ptDate = (d: Date) =>
-  d.toLocaleDateString("pt-BR", { day: "numeric", month: "short", timeZone: "UTC" }).replace(".", "");
+const shortDate = (d: Date) => d.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: "UTC" });
 
 const KIND: Record<ContextItem["kind"], z.infer<typeof Memory>["kind"]> = {
   fact: "fact",
@@ -108,21 +128,30 @@ async function memoryViews(db: Database, items: ContextItem[]) {
     ).map((u) => [u.id, u.name]),
   );
   return items.map((i) => {
-    const where = i.channelIds[0] ? ` em #${channelName.get(i.channelIds[0]) ?? "canal"}` : "";
-    const how =
+    const channel = i.channelIds[0] ? (channelName.get(i.channelIds[0]) ?? null) : null;
+    const where = i.channelIds[0] ? ` in #${channel ?? "channel"}` : "";
+    const name = i.createdByKind === "person" ? (names.get(i.createdById ?? "") ?? null) : null;
+    const by =
       i.createdByKind === "person"
-        ? `Escrito por ${names.get(i.createdById ?? "") ?? "uma pessoa"}`
+        ? ("person" as const)
         : i.createdByKind === "agent"
-          ? "Anotado pelo agente"
+          ? ("agent" as const)
           : i.kind === "lesson"
-            ? "Aprendido"
-            : "Registrado";
+            ? ("lesson" as const)
+            : ("recorded" as const);
+    const how = {
+      person: `Written by ${name ?? "a person"}`,
+      agent: "Noted by the agent",
+      lesson: "Learned",
+      recorded: "Recorded",
+    }[by];
     return {
       id: i.id,
       agentId: i.agentId ?? "",
       kind: KIND[i.kind],
       text: i.content,
-      source: `${how}${where} · ${ptDate(i.createdAt)}`,
+      source: `${how}${where} · ${shortDate(i.createdAt)}`,
+      origin: { by, name, channel, at: i.createdAt.toISOString() },
       uses: i.useCount,
       lastUsedAt: i.lastUsedAt ? i.lastUsedAt.toISOString() : null,
       pinned: i.pinned,
@@ -171,10 +200,10 @@ async function proposalViews(db: Database, rows: (ProposalRow & { canDecide: boo
     : [];
   const itemById = new Map(items.map((i) => [i.id, i]));
   const evidenceLabel = {
-    outcome: "Resultado observado",
-    human: "Uma pessoa",
-    agent: "Outro agente",
-    self: "O próprio agente",
+    outcome: "Observed outcome",
+    human: "A person",
+    agent: "Another agent",
+    self: "The agent itself",
   };
   return rows.map((r) => {
     const agent = r.agentId ? agentById.get(r.agentId) : undefined;
@@ -189,11 +218,16 @@ async function proposalViews(db: Database, rows: (ProposalRow & { canDecide: boo
           : { type: "org_context" as const },
       title:
         r.target === "agent_instructions"
-          ? `Atualizar as instruções de ${agent?.name ?? "agente"}`
-          : "Atualizar o contexto da organização",
+          ? `Update ${agent?.name ?? "the agent"}'s instructions`
+          : "Update the organization context",
       why: sourceItems.map((i) => i.content).join(" ") || r.rationale,
       evidence: sourceItems.flatMap((i) =>
-        i.evidence.map((e) => ({ where: evidenceLabel[e.type], what: i.content, channelId: i.channelIds[0] ?? null })),
+        i.evidence.map((e) => ({
+          where: evidenceLabel[e.type],
+          what: i.content,
+          channelId: i.channelIds[0] ?? null,
+          type: e.type,
+        })),
       ),
       before: beforeOf(r.diff),
       after: r.proposedText,

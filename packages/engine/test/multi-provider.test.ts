@@ -52,7 +52,7 @@ describe("credentials per provider", () => {
     const [run] = await f.db.select().from(schema.agentRuns);
     expect(run).toMatchObject({
       status: "failed",
-      error: "Configure uma chave da API da OpenAI nas configurações do workspace",
+      error: "Add an API key for OpenAI in the workspace settings",
     });
   });
 

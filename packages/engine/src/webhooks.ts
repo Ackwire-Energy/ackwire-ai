@@ -89,7 +89,7 @@ export function webhookEvent(
       const url = String(get(payload, "pull_request", "html_url") ?? "");
       return {
         event: "github.pr_opened",
-        summary: `PR #${number} aberto em ${repo}: ${title}`,
+        summary: `PR #${number} opened in ${repo}: ${title}`,
         data: { repo, number, url },
       };
     }
@@ -97,7 +97,7 @@ export function webhookEvent(
       const environment = String(get(payload, "deployment", "environment") ?? "");
       return {
         event: "deploy.succeeded",
-        summary: `Deploy em ${environment} concluído (${repo})`,
+        summary: `Deploy to ${environment} finished (${repo})`,
         data: { repo, environment },
       };
     }
@@ -107,7 +107,7 @@ export function webhookEvent(
   if (resource === "issue" && payload.action === "created") {
     const title = String(get(payload, "data", "issue", "title") ?? "");
     const url = String(get(payload, "data", "issue", "web_url") ?? get(payload, "data", "issue", "permalink") ?? "");
-    return { event: "sentry.issue_created", summary: `Erro novo no Sentry: ${title}`, data: { title, url } };
+    return { event: "sentry.issue_created", summary: `New Sentry error: ${title}`, data: { title, url } };
   }
   return null;
 }

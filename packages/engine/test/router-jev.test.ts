@@ -67,8 +67,8 @@ function fakeJev(
     if (body.questions.best_agent) {
       answers.best_agent = {
         type: "choice",
-        choice: r.best ?? "nenhum",
-        probabilities: { [r.best ?? "nenhum"]: 0.9 },
+        choice: r.best ?? "none",
+        probabilities: { [r.best ?? "none"]: 0.9 },
         confidence: 0.8,
       };
     }

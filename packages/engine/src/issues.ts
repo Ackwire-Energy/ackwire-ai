@@ -52,6 +52,9 @@ export interface IssueActivityView {
   author: WorkActor;
   text: string;
   event?: string;
+  /** An event in the app's words (`issues.event.{textCode}`), with its params; `text` is the English fallback. */
+  textCode?: string;
+  textParams?: Record<string, string>;
   createdAt: string;
 }
 
@@ -83,11 +86,11 @@ type IssueRow = typeof issues.$inferSelect;
 const STATUSES: readonly IssueStatus[] = ["todo", "in_progress", "in_review", "done", "canceled"];
 const PRIORITIES: readonly IssuePriority[] = ["low", "normal", "high"];
 const STATUS_WORDS: Record<IssueStatus, string> = {
-  todo: "A fazer",
-  in_progress: "Em andamento",
-  in_review: "Em revisão",
-  done: "Concluída",
-  canceled: "Cancelada",
+  todo: "To do",
+  in_progress: "In progress",
+  in_review: "In review",
+  done: "Done",
+  canceled: "Canceled",
 };
 
 const actorOf = (a: IssueActor): WorkActor =>
@@ -202,8 +205,41 @@ const activityView = (a: typeof issueActivity.$inferSelect): IssueActivityView =
   author: { type: a.authorType as WorkActor["type"], id: a.authorId },
   text: a.text,
   ...(a.event ? { event: a.event } : {}),
+  ...(a.kind === "event" ? eventDetail(a.event, a.data as Record<string, unknown>) : {}),
   createdAt: a.createdAt.toISOString(),
 });
+
+/** The code and params of an activity event, from its `event` and `data` (older rows lacking a param keep `text`). */
+function eventDetail(event: string | null, data: Record<string, unknown>) {
+  const s = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : null);
+  const out = (textCode: string, textParams: Record<string, string> = {}) => ({ textCode, textParams });
+  switch (event) {
+    case "created":
+    case "renamed":
+    case "description_changed":
+    case "artifact_linked":
+      return out(event);
+    case "status_changed":
+      return s(data.to) ? out(event, { status: s(data.to) as string }) : {};
+    case "priority_changed":
+      return s(data.to) ? out(event, { priority: s(data.to) as string }) : {};
+    case "assigned":
+      return "assignee" in data ? out(data.assignee ? "assigned" : "unassigned") : {};
+    case "due_date":
+      if (!("dueDate" in data)) return {};
+      return s(data.dueDate) ? out("due_date_set", { date: s(data.dueDate) as string }) : out("due_date_removed");
+    case "pr_linked":
+      return s(data.number) ? out(event, { number: s(data.number) as string }) : {};
+    case "criterion_checked":
+      return s(data.text)
+        ? out(data.done ? "criterion_checked" : "criterion_unchecked", { text: s(data.text) as string })
+        : {};
+    case "agent_asked":
+      return s(data.agentName) ? out(event, { name: s(data.agentName) as string }) : {};
+    default:
+      return {};
+  }
+}
 
 /** Tells whoever can see the issue: its channel, or the whole org. */
 async function announce(
@@ -269,7 +305,7 @@ export async function createIssue(
       })
       .returning();
     if (!issue) throw new Error("issue insert returned nothing");
-    await addActivity(tx, issue, { kind: "event", author, text: "criou a issue", event: "created" });
+    await addActivity(tx, issue, { kind: "event", author, text: "created the issue", event: "created" });
     await enqueueIndex(tx, { orgId, kind: "issue", sourceId: issue.id });
     if (issue.description.includes("[[")) {
       await syncWikiLinks(tx, orgId, { type: "issue", id: issue.id, channelId: issue.channelId }, issue.description);
@@ -279,7 +315,7 @@ export async function createIssue(
   const view = await one(db, row);
   await announce(deps.pubsub, orgId, view, "issue.created");
   await fireRoutineEvent(deps, orgId, "issue.created", {
-    summary: `Nova issue #${view.number}: ${view.title}`,
+    summary: `New issue #${view.number}: ${view.title}`,
     issueId: view.id,
   }).catch(() => 0);
   return view;
@@ -340,7 +376,7 @@ export async function listIssues(
   return views(db, visible);
 }
 
-/** Changes fields; each change is an event in the activity ("mudou o status para Em revisão"). */
+/** Changes fields; each change is an event in the activity ("changed the status to In review"). */
 export async function updateIssue(
   deps: IssueDeps,
   actor: IssueActor,
@@ -358,29 +394,29 @@ export async function updateIssue(
   const events: { text: string; event: string; data?: Record<string, unknown> }[] = [];
   if (patch.title?.trim() && patch.title.trim() !== current.title) {
     set.title = patch.title.trim().slice(0, 300);
-    events.push({ text: "renomeou a issue", event: "renamed" });
+    events.push({ text: "renamed the issue", event: "renamed" });
   }
   if (patch.description !== undefined && patch.description !== current.description) {
     set.description = patch.description.slice(0, 50_000);
-    events.push({ text: "editou a descrição", event: "description_changed" });
+    events.push({ text: "edited the description", event: "description_changed" });
   }
   if (patch.status && patch.status !== current.status) {
     set.status = patch.status;
     events.push({
-      text: `mudou o status para ${STATUS_WORDS[patch.status]}`,
+      text: `changed the status to ${STATUS_WORDS[patch.status]}`,
       event: "status_changed",
       data: { from: current.status, to: patch.status },
     });
   }
   if (patch.priority && patch.priority !== current.priority) {
     set.priority = patch.priority;
-    events.push({ text: "mudou a prioridade", event: "priority_changed", data: { to: patch.priority } });
+    events.push({ text: "changed the priority", event: "priority_changed", data: { to: patch.priority } });
   }
   if (patch.assignee !== undefined) {
     set.assigneeType = patch.assignee?.type ?? null;
     set.assigneeId = patch.assignee?.id ?? null;
     events.push({
-      text: patch.assignee ? "atribuiu a issue" : "removeu o responsável",
+      text: patch.assignee ? "assigned the issue" : "removed the assignee",
       event: "assigned",
       data: { assignee: patch.assignee },
     });
@@ -388,8 +424,9 @@ export async function updateIssue(
   if (patch.dueDate !== undefined) {
     set.dueDate = checkDate(patch.dueDate) ?? null;
     events.push({
-      text: patch.dueDate ? `definiu o prazo para ${patch.dueDate}` : "removeu o prazo",
+      text: patch.dueDate ? `set the due date to ${patch.dueDate}` : "removed the due date",
       event: "due_date",
+      data: { dueDate: patch.dueDate || null },
     });
   }
   if (patch.labels !== undefined) set.labels = cleanLabels(patch.labels) ?? [];
@@ -399,11 +436,11 @@ export async function updateIssue(
     );
     const pr = { number: patch.addPullRequest.number, url: patch.addPullRequest.url, openedBy: author };
     set.pullRequests = [...prs, pr] as unknown as Record<string, unknown>[];
-    events.push({ text: `ligou o PR #${pr.number}`, event: "pr_linked", data: { url: pr.url } });
+    events.push({ text: `linked PR #${pr.number}`, event: "pr_linked", data: { url: pr.url, number: pr.number } });
   }
   if (patch.addArtifactId && !current.artifactIds.includes(patch.addArtifactId)) {
     set.artifactIds = [...current.artifactIds, patch.addArtifactId];
-    events.push({ text: "anexou um arquivo", event: "artifact_linked", data: { artifactId: patch.addArtifactId } });
+    events.push({ text: "attached a file", event: "artifact_linked", data: { artifactId: patch.addArtifactId } });
   }
   const row = await db.transaction(async (tx) => {
     const [updated] = await tx.update(issues).set(set).where(eq(issues.id, current.id)).returning();
@@ -443,9 +480,9 @@ export async function setCriterion(
     await addActivity(tx, updated, {
       kind: "event",
       author: actorOf(actor),
-      text: `${done ? "marcou" : "desmarcou"} o critério "${criterion.text.slice(0, 80)}"`,
+      text: `${done ? "checked" : "unchecked"} the criterion "${criterion.text.slice(0, 80)}"`,
       event: "criterion_checked",
-      data: { criterionId, done },
+      data: { criterionId, done, text: criterion.text.slice(0, 80) },
     });
     return updated;
   });
@@ -481,7 +518,7 @@ export async function commentIssue(deps: IssueDeps, actor: IssueActor, orgId: st
   return view;
 }
 
-/** "Transformar em issue": a message becomes an issue that keeps its channel's visibility. */
+/** "Turn into issue": a message becomes an issue that keeps its channel's visibility. */
 export async function issueFromMessage(
   deps: IssueDeps,
   userId: string,
@@ -500,7 +537,7 @@ export async function issueFromMessage(
   const open = channel?.visibility === "public" && channel.kind === "channel";
   const firstLine = message.body.split("\n")[0]?.trim() ?? "";
   return createIssue(deps, actor, orgId, {
-    title: input.title?.trim() || firstLine.slice(0, 120) || "Nova issue",
+    title: input.title?.trim() || firstLine.slice(0, 120) || "New issue",
     description: message.body,
     source: { type: "message", channelId: message.channelId, messageId: message.id },
     channelId: open ? null : message.channelId,
@@ -508,7 +545,7 @@ export async function issueFromMessage(
 }
 
 /**
- * "Pedir à Ada para implementar": assigns the agent and asks it in a channel
+ * "Ask Ada to implement": assigns the agent and asks it in a channel
  * it works in (the issue's channel, else #general, else its first channel).
  * The run reports progress as issue comments (`comment_issue`); its final
  * reply is mirrored as a comment. Sensitive actions still need approval.
@@ -550,10 +587,10 @@ export async function askAgentToImplement(
   const updated = await updateIssue(deps, actor, orgId, issue.id, { assignee: { type: "agent", id: agentId } });
   const criteria = issue.criteria.map((c) => `- [${c.done ? "x" : " "}] ${c.text}`).join("\n");
   const body = [
-    `@${agent.handle} implementa a issue #${issue.number}: ${issue.title}`,
+    `@${agent.handle} implement issue #${issue.number}: ${issue.title}`,
     issue.description.trim(),
-    criteria ? `Critérios de aceite:\n${criteria}` : "",
-    `Conte o andamento na issue com comment_issue (issue_id ${issue.id}) e ligue o PR com update_issue.`,
+    criteria ? `Acceptance criteria:\n${criteria}` : "",
+    `Report progress on the issue with comment_issue (issue_id ${issue.id}) and link the PR with update_issue.`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -566,9 +603,9 @@ export async function askAgentToImplement(
     await addActivity(tx, issue, {
       kind: "event",
       author: { type: "person", id: userId },
-      text: `pediu a ${agent.name} para implementar`,
+      text: `asked ${agent.name} to implement`,
       event: "agent_asked",
-      data: { agentId, channelId, messageId: message.id },
+      data: { agentId, agentName: agent.name, channelId, messageId: message.id },
     });
     await recordAudit(tx, {
       orgId,

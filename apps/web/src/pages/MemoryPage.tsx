@@ -27,6 +27,25 @@ import { agentGrammar } from "@/lib/grammar";
 
 export type MemoryTab = "known" | "lessons" | "archived";
 
+/** Where a memory came from, in the app's language ("Escrito por Walter em #eng · 12 out"); else the server's text. */
+export function memorySource(t: TFunction, language: string, m: Memory) {
+  const o = m.origin;
+  if (!o) return m.source;
+  const tt = t as unknown as (key: string, options: Record<string, string>) => string;
+  const how = tt(`memory.origin.${o.by}`, {
+    name: o.name ?? tt("memory.origin.someone", { defaultValue: "a person" }),
+    defaultValue: "",
+  });
+  if (!how) return m.source;
+  const where = o.channel
+    ? tt("memory.origin.inChannel", { channel: o.channel, defaultValue: ` in #${o.channel}` })
+    : "";
+  const date = new Date(o.at)
+    .toLocaleDateString(language, { day: "numeric", month: "short", timeZone: "UTC" })
+    .replace(".", "");
+  return `${how}${where} · ${date}`;
+}
+
 export function inMemoryTab(m: Memory, tab: MemoryTab) {
   if (tab === "archived") return m.archived;
   if (m.archived) return false;
@@ -167,7 +186,7 @@ function MemoryView({ agent }: { agent: Agent }) {
               <span className="memory-item__source small muted">
                 {m.editedByUserId === me.user.id
                   ? t("memory.editedByYou", { when: relativeTime(t, i18n.language, m.updatedAt) })
-                  : m.source}
+                  : memorySource(t, i18n.language, m)}
               </span>
               <div className="row" style={{ gap: 4 }}>
                 <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>
@@ -219,7 +238,7 @@ function EditMemoryDialog({
   onClose: () => void;
   onSave: (text: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [text, setText] = useState("");
   useEffect(() => setText(memory?.text ?? ""), [memory]);
   return (
@@ -234,7 +253,7 @@ function EditMemoryDialog({
         <Field
           label={t("memory.text")}
           id="edit-text"
-          help={t("memory.editHelp", { source: memory ? `${memory.source}.` : "" })}
+          help={t("memory.editHelp", { source: memory ? `${memorySource(t, i18n.language, memory)}.` : "" })}
         >
           <Textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} />
         </Field>

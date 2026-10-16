@@ -44,7 +44,7 @@ test("an env secret reaches the agent's commands, never their output; other agen
 
   const used = (await call({
     agent: dev,
-    ...exec('test "$AGENTES_DEMO_TOKEN" = "' + VALUE + '" && echo matches'),
+    ...exec(`test "$AGENTES_DEMO_TOKEN" = "${VALUE}" && echo matches`),
   })) as {
     stdout: string;
   };

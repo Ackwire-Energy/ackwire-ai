@@ -440,7 +440,8 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       update: (orgId, id, patch) =>
         request<Routine>(`${org(orgId)}/routines/${enc(id)}`, { method: "PATCH", json: patch }),
       remove: (orgId, id) => request<void>(`${org(orgId)}/routines/${enc(id)}`, { method: "DELETE" }),
-      duplicate: (orgId, id) => request<Routine>(`${org(orgId)}/routines/${enc(id)}/duplicate`, { json: {} }),
+      duplicate: (orgId, id, name) =>
+        request<Routine>(`${org(orgId)}/routines/${enc(id)}/duplicate`, { json: name ? { name } : {} }),
     },
     wiki: {
       tree: async (orgId) => (await request<{ pages: WikiPageSummary[] }>(`${org(orgId)}/wiki/pages`)).pages,

@@ -49,6 +49,7 @@ import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
 import { parseAmount } from "@/lib/text";
 import { useToast } from "@/lib/toast";
+import { memorySource } from "./MemoryPage";
 import { DEFAULT_KEY, keyOptions, modelOptions, NO_OWNER } from "./NewAgentPage";
 
 /** Validates the budget dialog: a positive number ("40", "40,5"). */
@@ -557,7 +558,7 @@ function OwnerDialog({ open, onClose, agent }: { open: boolean; onClose: () => v
 
 /** "Conhecimento": what the agent knows, with search; editing happens on the memory page. */
 function KnowledgeDialog({ open, onClose, agent }: { open: boolean; onClose: () => void; agent: Agent }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const memory = useMemory(org.id, agent.id);
   const proposals = useProposals(org.id);
@@ -586,7 +587,7 @@ function KnowledgeDialog({ open, onClose, agent }: { open: boolean; onClose: () 
             <span className="list-col">
               <span>{m.text}</span>
               <span className="small muted">
-                {t(`memory.kinds.${m.kind}`)} · {m.source}
+                {t(`memory.kinds.${m.kind}`)} · {memorySource(t, i18n.language, m)}
               </span>
             </span>
           </div>

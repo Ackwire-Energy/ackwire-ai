@@ -51,6 +51,8 @@ const Activity = z
     author: Actor,
     text: z.string(),
     event: z.string().optional(),
+    textCode: z.string().optional(),
+    textParams: z.record(z.string(), z.string()).optional(),
     createdAt: z.string(),
   })
   .openapi("IssueActivity");
@@ -247,7 +249,7 @@ export function issueRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/issues/{issueId}/ask-agent",
       tags,
       security,
-      summary: '"Pedir à Ada para implementar": assigns the agent and starts a run on the issue',
+      summary: '"Ask Ada to implement": assigns the agent and starts a run on the issue',
       request: { params: IssueParams, body: body(z.object({ agentId: z.uuid() })) },
       responses: { 200: json(Issue), ...errors },
     }),

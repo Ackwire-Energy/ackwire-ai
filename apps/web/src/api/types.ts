@@ -408,8 +408,14 @@ export interface Memory {
   agentId: string;
   kind: MemoryKind;
   text: string;
-  /** "Decidido por Walter em #eng · 12 out". */
+  /** "Written by Walter in #eng · Oct 12" (the server's English; `origin` has the parts). */
   source: string;
+  origin?: {
+    by: "person" | "agent" | "lesson" | "recorded";
+    name: string | null;
+    channel: string | null;
+    at: string;
+  };
   uses: number;
   lastUsedAt: string | null;
   pinned: boolean;
@@ -433,7 +439,13 @@ export interface Proposal {
   target: { type: "agent_instructions"; agentId: string } | { type: "org_context" };
   title: string;
   why: string;
-  evidence: { where: string; what: string; channelId?: string | null }[];
+  /** `type` names the source for translation; `where` is the server's English text. */
+  evidence: {
+    where: string;
+    what: string;
+    channelId?: string | null;
+    type?: "outcome" | "human" | "agent" | "self";
+  }[];
   before: string;
   after: string;
   status: ProposalStatus;
@@ -949,10 +961,13 @@ export interface IssueActivity {
   id: string;
   kind: "comment" | "event";
   author: Actor;
-  /** Comment body, or the event in words ("pediu à Ada para implementar"). */
+  /** Comment body, or the event in words ("asked Ada to implement"; English, the fallback). */
   text: string;
   /** Machine form of an event (`status_changed`, `assigned`, `agent_asked`, …). */
   event?: string;
+  /** The event in the app's words: `issues.event.{textCode}` with `textParams`. */
+  textCode?: string;
+  textParams?: Record<string, string>;
   createdAt: string;
 }
 
@@ -993,7 +1008,8 @@ export interface ApiRule {
 /** `POST …/routines/parse-rule` and `…/describe-rule`. */
 export type RuleInfo =
   | { ok: true; rule: ApiRule; description: string; cron: string; nextRuns: string[] }
-  | { ok: false; error: string };
+  /** `code`: stable, for the app to say it in the UI language (`error` is the English fallback). */
+  | { ok: false; error: string; code?: string };
 
 export type RoutineTrigger =
   | {
@@ -1502,6 +1518,9 @@ export interface WikiVersion {
   at: string;
   author: WikiAuthor;
   note: string | null;
+  /** A note the server wrote ("created the page"), translated as `wiki.note.{noteCode}`. */
+  noteCode?: string;
+  noteParams?: Record<string, string>;
 }
 
 export interface WikiPageInput {

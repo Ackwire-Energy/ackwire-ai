@@ -111,7 +111,7 @@ export interface Transcript {
 /** Errors that will not get better by retrying: the run fails right away with a readable reason. */
 const userFacing = (error: unknown): string | null => {
   if (error instanceof BudgetExceededError) return "budget_exceeded";
-  // The message says what to do ("Configure uma chave da API…"); the UI shows it as is.
+  // The message says what to do ("Add an API key…"); the UI shows it translated by its code (`runErrorDetail`).
   if (error instanceof MissingCredentialError) return error.message;
   if (error instanceof ValidationError || error instanceof NotFoundError) return error.message;
   if (error instanceof ProviderError && !error.retryable) return `provider_error: ${error.message}`;
@@ -326,8 +326,8 @@ async function executeRunInner(
       const keys = await grantedScopeKeys(db, run.orgId, run.agentId).catch(() => new Set<string>());
       if (keys.has(grantKey(null, SANDBOX_SCOPE))) {
         pending.push({
-          label: "Rodar código (sandbox)",
-          reason: "liberado para você, mas o ambiente de código está desligado nesta organização ou neste servidor",
+          label: "Run code (sandbox)",
+          reason: "granted to you, but the code environment is turned off in this organization or on this server",
         });
       }
     }
@@ -376,12 +376,12 @@ async function executeRunInner(
     }
     if (wikiPages.text) {
       system.push({
-        text: `# Wiki da organização (fonte confiável)\nPáginas escritas e revisadas pela equipe: são o conhecimento oficial da organização e valem mais que a memória. Cite a página com [[Título]] quando usar o que ela diz.\n${wikiPages.text}`,
+        text: `# Organization wiki (trusted source)\nPages written and reviewed by the team: they are the organization's official knowledge and outweigh memory. Cite the page with [[Title]] when you use what it says.\n${wikiPages.text}`,
       });
     }
     if (tools.some((t) => t.name === "create_wiki_page" || t.name === "update_wiki_page")) {
       system.push({
-        text: '# Escrever na wiki\nSó escreva na wiki (create_wiki_page, update_wiki_page, link_to_wiki) quando uma pessoa pedir na mensagem atual ("salva isso na wiki", "documenta…", "atualiza a página X"). Nunca por conta própria: se achar que vale documentar, ofereça e espere a pessoa pedir. Cada edição fica no histórico com o seu nome e o de quem pediu.',
+        text: '# Writing to the wiki\nOnly write to the wiki (create_wiki_page, update_wiki_page, link_to_wiki) when a person asks for it in the current message ("save this to the wiki", "document…", "update page X"; in Portuguese "salva isso na wiki", "documenta…", "atualiza a página X"). Never on your own: if you think something is worth documenting, offer and wait for the person to ask. Each edit stays in the history with your name and the name of whoever asked.',
       });
     }
     const stats = {
@@ -462,7 +462,7 @@ async function executeRunInner(
   };
   /**
    * The run was canceled (the row is already `canceled`): post what the agent
-   * wrote so far, nothing lost, with "Interrompido por …", and tell the channel.
+   * wrote so far, nothing lost, with "Stopped by …", and tell the channel.
    */
   const stopCanceled = async (partial: string) => {
     await deferred;
@@ -479,11 +479,11 @@ async function executeRunInner(
     ]
       .filter(Boolean)
       .join("\n\n");
-    const note = `_Interrompido${person ? ` por ${person.name}` : ""}._`;
+    const note = `_Stopped${person ? ` by ${person.name}` : ""}._`;
     const message = await db.transaction(async (tx) => {
       const m = await postAgentMessage(tx, run, replyThreadId, said ? `${said}\n\n${note}` : note, {
         ...(takeMemoryUpdates(t) ?? {}),
-        // `text`: what the agent wrote; the app adds "Interrompido por …" in the person's language.
+        // `text`: what the agent wrote; the app adds "Stopped by …" in the person's language.
         canceled: { byUserId: by, text: said },
       });
       t.postedUpTo = t.messages.length;
@@ -514,7 +514,7 @@ async function executeRunInner(
       await tx.update(agentRuns).set({ pendingMessageIds: [] }).where(eq(agentRuns.id, run.id));
       return ids;
     });
-  /** Appends them to the conversation as "Nova mensagem de …" (a step records it), so the model reads them next. */
+  /** Appends them to the conversation as "New message from …" (a step records it), so the model reads them next. */
   const deliverSteering = async () => {
     const ids = await takeSteering();
     if (ids.length === 0) return false;
@@ -534,7 +534,7 @@ async function executeRunInner(
     rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     if (rows.length === 0) return false;
     const text = rows
-      .map((m) => `[Nova mensagem de ${m.name ?? "alguém"}, enquanto você trabalhava]: ${m.body}`)
+      .map((m) => `[New message from ${m.name ?? "someone"}, while you were working]: ${m.body}`)
       .join("\n\n");
     const t = transcript as Transcript;
     const last = t.messages.at(-1);
@@ -759,7 +759,8 @@ async function executeRunInner(
               .where(eq(secretRequests.id, requestId))
               .returning();
             if (!request) continue;
-            const message = await postAgentMessage(tx, run, replyThreadId, `Pedido de segredo: ${request.name}`, {
+            const message = await postAgentMessage(tx, run, replyThreadId, `Secret request: ${request.name}`, {
+              ...bodyCode("secret_request", { name: request.name }),
               secretRequestId: request.id,
               secretRequest: secretRequestView(request),
             });
@@ -811,7 +812,8 @@ async function executeRunInner(
             }
           }
           for (const approval of waiting) {
-            const card = await postAgentMessage(tx, run, replyThreadId, `Pedido de aprovação: ${approval.title}`, {
+            const card = await postAgentMessage(tx, run, replyThreadId, `Approval request: ${approval.title}`, {
+              ...bodyCode("approval_request", { title: approval.title }),
               approvalId: approval.id,
             });
             out.push(card);
@@ -847,7 +849,7 @@ async function executeRunInner(
       // Final answer.
       if (result.stopReason === "refusal") return fail("model_refused");
       const updates = transcript.memoryUpdates ?? [];
-      const saved = (transcript.artifacts ?? []).length > 0 ? "Arquivo salvo." : "";
+      const saved = (transcript.artifacts ?? []).length > 0 ? "File saved." : "";
       const anythingPosted = transcript.postedCount > 0;
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
       const text =
@@ -855,6 +857,17 @@ async function executeRunInner(
         (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "") ||
         saved ||
         closingSummary(transcript, anythingPosted);
+      // A line the server wrote (not the model): its code, so the app shows it in the person's language.
+      const code =
+        turnText || text === ""
+          ? undefined
+          : updates.length > 0
+            ? bodyCode("memory")
+            : text === saved
+              ? bodyCode("file_saved")
+              : text === DONE_TEXT
+                ? bodyCode("done")
+                : undefined;
       if (!text && !anythingPosted) return fail("empty_reply");
       const t = transcript;
       // Someone wrote while it answered: post this answer, then read the new message(s) and go on.
@@ -865,7 +878,7 @@ async function executeRunInner(
       if ((still?.pending.length ?? 0) > 0) {
         const posted = text
           ? await db.transaction(async (tx) => {
-              const m = await postAgentMessage(tx, run, replyThreadId, text, takeMemoryUpdates(t));
+              const m = await postAgentMessage(tx, run, replyThreadId, text, withCode(takeMemoryUpdates(t), code));
               t.postedUpTo = t.messages.length;
               t.postedCount++;
               await addRunStep(tx, run, "message", { messageId: m.id });
@@ -880,7 +893,9 @@ async function executeRunInner(
         continue;
       }
       const reply = await db.transaction(async (tx) => {
-        const message = text ? await postAgentMessage(tx, run, replyThreadId, text, takeMemoryUpdates(t)) : null;
+        const message = text
+          ? await postAgentMessage(tx, run, replyThreadId, text, withCode(takeMemoryUpdates(t), code))
+          : null;
         t.postedUpTo = t.messages.length;
         if (message) t.postedCount++;
         if (message) {
@@ -929,7 +944,7 @@ async function executeRunInner(
 
 /**
  * When the final model call wrote nothing: the agent's last narration since
- * the last post ("Instalei o Go e compilei."), else a plain "Pronto." when it
+ * the last post ("Installed Go and built it."), else a plain "Done." when it
  * used tools, else nothing (an empty reply fails the run).
  */
 function closingSummary(t: Transcript, anythingPosted: boolean): string {
@@ -940,7 +955,7 @@ function closingSummary(t: Transcript, anythingPosted: boolean): string {
     .at(-1);
   if (last) return last;
   const usedTools = turns.some((m) => typeof m.content !== "string" && m.content.some((b) => b.type === "tool_use"));
-  return usedTools && !anythingPosted ? "Pronto." : "";
+  return usedTools && !anythingPosted ? DONE_TEXT : "";
 }
 
 function postAgentMessage(
@@ -1026,7 +1041,7 @@ function createDeltaPublisher(
 
 /**
  * Moves pending memory updates and artifacts onto the message being posted
- * (the "memória atualizada" and file preview cards).
+ * (the "memory updated" and file preview cards).
  */
 function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const updates = t.memoryUpdates ?? [];
@@ -1042,7 +1057,20 @@ function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
 
 const describeUpdate = (u: MemoryUpdate) =>
   u.action === "proposed"
-    ? `Proposta criada: ${u.text}`
+    ? `Proposal created: ${u.text}`
     : u.action === "forgot"
-      ? `Memória atualizada: esqueci "${u.text}".`
-      : `Memória atualizada: ${u.text}`;
+      ? `Memory updated: forgot "${u.text}".`
+      : `Memory updated: ${u.text}`;
+
+/** The closing line of a run that used tools and wrote nothing (the app shows it as `chat.body.done`). */
+const DONE_TEXT = "Done.";
+
+/**
+ * A body the server writes for an agent message (approval and secret cards,
+ * closing lines): its code and params, so the app shows it in the person's
+ * language (`chat.body.{code}`); the English body is the fallback.
+ */
+const bodyCode = (code: string, params: Record<string, string> = {}) => ({ bodyCode: code, bodyParams: params });
+
+const withCode = (meta: Record<string, unknown> | undefined, code: ReturnType<typeof bodyCode> | undefined) =>
+  code ? { ...(meta ?? {}), ...code } : meta;

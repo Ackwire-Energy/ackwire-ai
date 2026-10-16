@@ -126,7 +126,7 @@ const Routine = z
         type: z.literal("once"),
         at: z.string(),
         timezone: z.string(),
-        description: z.string().openapi({ description: '"amanhã, 16/10, às 09:00 (horário de Brasília)".' }),
+        description: z.string().openapi({ description: '"tomorrow, Oct 16, at 09:00 (Brasília time)".' }),
       }),
     ]),
     active: z.boolean().openapi({ description: "One-off routines are inactive once they fired." }),
@@ -154,7 +154,7 @@ const TriggerInput = z.union([
       rule: ScheduleRuleSchema.optional(),
       timezone: z.string().max(64).optional(),
     })
-    .openapi({ description: "A phrase (`dias úteis às 9h`) or a `rule` from the picker." }),
+    .openapi({ description: "A phrase (`weekdays at 9am`, or pt `dias úteis às 9h`) or a `rule` from the picker." }),
   z.object({ type: z.literal("event"), event: Event }),
   z.object({
     type: z.literal("once"),
@@ -221,11 +221,9 @@ export function routineRoutes(deps: AppDeps) {
               .max(64)
               .optional()
               .openapi({ description: "IANA zone; default: the person's own, then the organization's, then UTC." }),
-            locale: z
-              .string()
-              .max(10)
-              .optional()
-              .openapi({ description: '"pt-BR" (default) or "en": the description\'s language.' }),
+            locale: z.string().max(10).optional().openapi({
+              description: "Ignored (kept for older clients): descriptions are English; the app words the rule itself.",
+            }),
           }),
         ),
       },
@@ -249,13 +247,12 @@ export function routineRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      const { phrase, timezone, locale } = c.req.valid("json");
+      const { phrase, timezone } = c.req.valid("json");
       const parsed = await parseScheduleForOrg(routines, c.get("user").id, orgId, phrase, timezone);
       if (!parsed.ok) return c.json(parsed, 200);
       const asRule = cronToRule(parsed.cron, parsed.timezone);
       const rule = asRule ? normalizeRule(asRule) : null;
-      const description =
-        rule && locale && !locale.toLowerCase().startsWith("pt") ? describeRule(rule, locale) : parsed.description;
+      const description = rule ? describeRule(rule) : parsed.description;
       return c.json({ ...parsed, description, rule }, 200);
     },
   );
@@ -264,9 +261,7 @@ export function routineRoutes(deps: AppDeps) {
     z.object({
       ok: z.literal(true),
       rule: ScheduleRuleSchema,
-      description: z
-        .string()
-        .openapi({ description: '"A cada 2 semanas, seg e qua, às 09:00 (horário de Brasília)".' }),
+      description: z.string().openapi({ description: '"Every 2 weeks, Mon and Wed, at 09:00 (Brasília time)".' }),
       cron: z.string().nullable().openapi({ description: "When cron can say it." }),
       nextRuns: z.array(z.string()).openapi({ description: "The next 5 times." }),
     }),
@@ -277,12 +272,12 @@ export function routineRoutes(deps: AppDeps) {
       params: z.record(z.string(), z.unknown()).optional(),
     }),
   ]);
-  const answer = (rule: ScheduleRule, locale?: string) => {
+  const answer = (rule: ScheduleRule) => {
     const normal = normalizeRule(rule);
     return {
       ok: true as const,
       rule: normal,
-      description: describeRule(normal, locale),
+      description: describeRule(normal),
       cron: ruleToCron(normal),
       nextRuns: ruleOccurrences(normal, new Date(), new Date(Date.now() + 5 * 366 * 86_400_000), 5).map((d) =>
         d.toISOString(),
@@ -303,11 +298,9 @@ export function routineRoutes(deps: AppDeps) {
           z.object({
             phrase: z.string().min(1).max(300),
             timezone: z.string().max(64).optional(),
-            locale: z
-              .string()
-              .max(10)
-              .optional()
-              .openapi({ description: '"pt-BR" (default) or "en": the description\'s language.' }),
+            locale: z.string().max(10).optional().openapi({
+              description: "Ignored (kept for older clients): descriptions are English; the app words the rule itself.",
+            }),
           }),
         ),
       },
@@ -315,7 +308,7 @@ export function routineRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      const { phrase, timezone, locale } = c.req.valid("json");
+      const { phrase, timezone } = c.req.valid("json");
       const zone = await routineTimezone(db, c.get("user").id, orgId, timezone);
       const rule = phraseToRule(phrase, zone);
       if (!rule) {
@@ -329,7 +322,7 @@ export function routineRoutes(deps: AppDeps) {
         );
       }
       try {
-        return c.json(answer(rule, locale), 200);
+        return c.json(answer(rule), 200);
       } catch (error) {
         return c.json(
           {
@@ -358,7 +351,11 @@ export function routineRoutes(deps: AppDeps) {
         body: body(
           z.object({
             rule: ScheduleRuleSchema,
-            locale: z.string().max(10).optional().openapi({ description: '"pt-BR" (default) or "en".' }),
+            locale: z
+              .string()
+              .max(10)
+              .optional()
+              .openapi({ description: "Ignored (kept for older clients): descriptions are English." }),
           }),
         ),
       },
@@ -368,7 +365,7 @@ export function routineRoutes(deps: AppDeps) {
       await requirePermission(db, c.get("user").id, c.req.valid("param").orgId, "read");
       try {
         const input = c.req.valid("json");
-        return c.json(answer(input.rule as ScheduleRule, input.locale), 200);
+        return c.json(answer(input.rule as ScheduleRule), 200);
       } catch (error) {
         return c.json(
           {
@@ -485,13 +482,25 @@ export function routineRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "A paused copy of a routine",
-      request: { params: RoutineParams },
+      request: {
+        params: RoutineParams,
+        body: body(
+          z.object({
+            name: z
+              .string()
+              .max(120)
+              .optional()
+              .openapi({ description: "The copy's name, in the person's language (default \"{name} (copy)\")." }),
+          }),
+        ),
+      },
       responses: { 201: json(Routine, "Created"), ...errors },
     }),
     async (c) => {
       const { orgId, routineId } = c.req.valid("param");
       const actor = c.get("user").id;
-      const copy = await duplicateRoutine(routines, actor, orgId, routineId);
+      const { name } = c.req.valid("json");
+      const copy = await duplicateRoutine(routines, actor, orgId, routineId, { name });
       return c.json(forViewer(copy, await canViewCost(db, actor, orgId)), 201);
     },
   );

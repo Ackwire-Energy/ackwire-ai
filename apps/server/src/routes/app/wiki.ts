@@ -83,7 +83,15 @@ const Page = Summary.extend({
   deletedAt: z.string().nullable(),
 }).openapi("WikiPage");
 const Version = z
-  .object({ version: z.number(), at: z.string(), author: Author, note: z.string().nullable(), title: z.string() })
+  .object({
+    version: z.number(),
+    at: z.string(),
+    author: Author,
+    note: z.string().nullable(),
+    noteCode: z.string().optional(),
+    noteParams: z.record(z.string(), z.string()).optional(),
+    title: z.string(),
+  })
   .openapi("WikiVersion");
 const Source = z
   .union([
@@ -99,7 +107,7 @@ const conflict = errorResponse("`version_conflict`: someone saved first; `slug_t
 
 /**
  * The org wiki (D34): pages every member reads and edits (admins can lock
- * one), linked with `[[Título]]`, with history, backlinks and a graph.
+ * one), linked with `[[Title]]`, with history, backlinks and a graph.
  * `{slug}` also accepts the page id.
  */
 export function wikiRoutes(deps: AppDeps) {

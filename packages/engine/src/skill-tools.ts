@@ -18,7 +18,7 @@ export function createSkillToolSource(deps: SkillDeps): ToolSource {
     {
       name: "load_skill",
       description:
-        "Load one of your skills (from 'Skills disponíveis') before doing a task it covers: returns its instructions and the files you can read.",
+        "Load one of your skills (from 'Available skills') before doing a task it covers: returns its instructions and the files you can read.",
       scope: "skills:read",
       inputSchema: {
         type: "object",
@@ -36,9 +36,9 @@ export function createSkillToolSource(deps: SkillDeps): ToolSource {
                 .map((f) => {
                   if (f.status === "stored") return `- ${f.path} (${f.mime}, ${f.size} bytes)`;
                   if (f.status === "script") {
-                    return `- ${f.path} (script: roda com run_skill_script se você tiver o ambiente de código; o conteúdo não é mostrado)`;
+                    return `- ${f.path} (script: runs with run_skill_script if you have the code environment; its content is not shown)`;
                   }
-                  return `- ${f.path} (ignorado: arquivo binário)`;
+                  return `- ${f.path} (skipped: binary file)`;
                 })
                 .join("\n")
             : "(no files)";

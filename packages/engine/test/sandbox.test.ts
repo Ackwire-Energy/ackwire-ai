@@ -287,7 +287,7 @@ describe("what the agent is running", () => {
     expect(out.every((o) => o.toolUseId === start?.toolUseId && o.threadId !== null)).toBe(true);
     const streamed = out.map((o) => o.text).join("");
     expect(streamed.length).toBeLessThan(66 * 1024);
-    expect(streamed).toContain("mais saída");
+    expect(streamed).toContain("more output");
     expect(out.some((o) => o.stream === "stderr" && o.text.includes("warn"))).toBe(true);
     // After the fact: the call (with the code) and the result (exit code, output) are in the run's steps.
     const steps = await f.db.select().from(schema.agentRunSteps);
@@ -395,8 +395,8 @@ describe("network mode", () => {
     await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
     await updateSandboxSettings(f.db, f.owner.id, f.org.id, { network: "open" });
     const out = await call(await runCtx(), "run_code", { language: "bash", code: "curl https://nao-existe.example" });
-    expect(out.content).toContain("tem internet liberada");
-    expect(out.content).not.toContain("sem internet:");
+    expect(out.content).toContain("has open internet");
+    expect(out.content).not.toContain("no internet:");
   });
 });
 
@@ -411,8 +411,8 @@ describe("blocked network", () => {
     f = await setup({ sandbox: provider, reply: () => ({ chunks: ["ok"] }) });
     await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
     const out = await call(await runCtx(), "run_code", { language: "bash", code: "curl https://example.com" });
-    expect(out.content).toContain("sem internet");
-    expect(out.content).toContain("Configurações → Sandbox");
+    expect(out.content).toContain("no internet");
+    expect(out.content).toContain("Settings → Sandbox");
     expect(out.content).not.toMatch(/permiss(ão|ões) negada/i);
   });
 });
@@ -554,7 +554,7 @@ describe("the agent's computer API", () => {
     });
     await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
     await runCtx();
-    expect(prompt).toContain("Rodar código (sandbox): liberado para você, mas o ambiente de código está desligado");
+    expect(prompt).toContain("Run code (sandbox): granted to you, but the code environment is turned off");
   });
 });
 

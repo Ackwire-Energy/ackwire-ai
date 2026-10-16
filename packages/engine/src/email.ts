@@ -7,27 +7,53 @@ import { budgetPercent } from "./usage";
 
 const { users, organizations, agents, approvals } = schema;
 
+/** The languages emails are written in. */
+export type EmailLocale = "pt-BR" | "en";
+
+/** A stored or chosen language as an email locale: "en…" is English, anything else (or none) pt-BR. */
+export const emailLocale = (value: unknown): EmailLocale =>
+  typeof value === "string" && value.toLowerCase().startsWith("en") ? "en" : "pt-BR";
+
 /**
- * Transactional emails (pt-BR; the waiting list also in English), rendered
- * when the `email.send` job runs. Simple, accessible HTML (one column, real
- * text, high contrast, lang set) plus a plain-text version.
+ * Transactional emails in pt-BR or English (`locale`, the recipient's; jobs
+ * queued before it existed have none and stay pt-BR), rendered when the
+ * `email.send` job runs. Simple, accessible HTML (one column, real text, high
+ * contrast, lang set) plus a plain-text version.
  */
 export type EmailTemplate =
-  | { kind: "invitation"; orgName: string; inviterName: string; url: string; role: string }
-  | { kind: "password_reset"; url: string }
-  /** Someone invited you to an event (in-app too). `when` is already formatted in your time zone. */
-  | { kind: "calendar_invite"; orgName: string; inviterName: string; title: string; when: string; url: string }
+  | {
+      kind: "invitation";
+      locale?: EmailLocale;
+      orgName: string;
+      /** Empty: the email says "someone" in its language. */
+      inviterName: string;
+      url: string;
+      role: string;
+    }
+  | { kind: "password_reset"; locale?: EmailLocale; url: string }
+  /** Someone invited you to an event (in-app too). `when` is already formatted in your time zone and language. */
+  | {
+      kind: "calendar_invite";
+      locale?: EmailLocale;
+      orgName: string;
+      /** Empty: the email says "someone" in its language. */
+      inviterName: string;
+      title: string;
+      when: string;
+      url: string;
+    }
   /** Someone opened an expired invitation and asked for a new one. `email` is empty for an org link. */
-  | { kind: "invite_request"; orgName: string; email: string; url: string }
-  | { kind: "verify_email"; url: string }
+  | { kind: "invite_request"; locale?: EmailLocale; orgName: string; email: string; url: string }
+  | { kind: "verify_email"; locale?: EmailLocale; url: string }
   /**
    * Double opt-in for the landing page's waiting list, in the language they
    * joined in. `email` is the address being confirmed (absent in jobs queued
    * before it existed). Images come from the origin of `url`.
    */
-  | { kind: "waitlist_confirm"; locale: "pt-BR" | "en"; url: string; email?: string }
+  | { kind: "waitlist_confirm"; locale: EmailLocale; url: string; email?: string }
   | {
       kind: "budget";
+      locale?: EmailLocale;
       level: "warning" | "exhausted";
       agentName: string;
       orgName: string;
@@ -37,7 +63,9 @@ export type EmailTemplate =
     }
   | {
       kind: "approval_digest";
+      locale?: EmailLocale;
       orgName: string;
+      /** `agentName` empty: "an agent" in the email's language. */
       items: { agentName: string; title: string; ageHours: number }[];
       url: string;
     };
@@ -45,7 +73,6 @@ export type EmailTemplate =
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
 const percent = (n: number) => `${Math.round(n)}%`;
-const ROLE: Record<string, string> = { owner: "dono", admin: "admin", member: "membro" };
 
 const LAYOUT = {
   "pt-BR": {
@@ -62,7 +89,7 @@ function layout(
   title: string,
   paragraphs: string[],
   action?: { label: string; url: string },
-  options: { lang?: keyof typeof LAYOUT; footer?: string } = {},
+  options: { lang?: EmailLocale; footer?: string } = {},
 ) {
   const lang = options.lang ?? "pt-BR";
   const words = LAYOUT[lang];
@@ -211,112 +238,220 @@ ${t.email ? `<p class="mu" style="margin:0;font-size:14px;color:#6b6a66">${esc(t
   return { subject: w.subject, html, text };
 }
 
+/** The words of each email, per language (`html` parts are escaped by the caller's values). */
+const WORDS = {
+  "pt-BR": {
+    role: { owner: "dono", admin: "admin", member: "membro" } as Record<string, string>,
+    someone: "Alguém",
+    anAgent: "Um agente",
+    invitation: {
+      subject: (inviter: string, org: string) => `${inviter} convidou você para ${org} no agentes`,
+      title: (org: string) => `Convite para ${org}`,
+      body: (inviter: string, org: string, role: string) =>
+        `${inviter} convidou você para entrar em <strong>${org}</strong> como ${role}.`,
+      note: "O convite vale por 7 dias. Use este mesmo endereço de e-mail para aceitar.",
+      button: "Aceitar convite",
+    },
+    inviteRequest: {
+      title: (org: string) => `Pedido de novo convite para ${org}`,
+      someoneWithLink: "Alguém com o link de convite",
+      body: (who: string, org: string) =>
+        `${who} tentou entrar em <strong>${org}</strong>, mas o convite expirou e pediu um novo.`,
+      note: "Se fizer sentido, envie um convite novo na página de membros.",
+      button: "Abrir membros",
+    },
+    calendar: {
+      subject: (inviter: string, title: string) => `${inviter} convidou você: ${title}`,
+      body: (inviter: string, title: string, org: string) =>
+        `${inviter} convidou você para <strong>${title}</strong> em ${org}.`,
+      button: "Ver no calendário",
+    },
+    passwordReset: {
+      subject: "Redefinir sua senha do agentes",
+      title: "Redefinir sua senha",
+      body: "Recebemos um pedido para redefinir a sua senha. O link vale por pouco tempo.",
+      note: "Se não foi você, ignore este e-mail; nada muda.",
+      button: "Criar uma senha nova",
+    },
+    verify: {
+      subject: "Confirme seu e-mail no agentes",
+      title: "Confirme seu e-mail",
+      body: "Falta só confirmar que este endereço é seu.",
+      button: "Confirmar e-mail",
+    },
+    budget: {
+      subjectWarning: (agent: string) => `${agent} usou 80% do orçamento do mês`,
+      subjectExhausted: (agent: string) => `${agent} atingiu o orçamento do mês`,
+      titleWarning: (agent: string) => `${agent} chegou a 80% do orçamento`,
+      titleExhausted: (agent: string) => `${agent} parou: orçamento atingido`,
+      body: (agent: string, org: string, pct: string) => `${agent}, em ${org}, usou ${pct} do orçamento deste mês.`,
+      warning: "Quando chegar a 100%, o agente para e avisa no canal. Um admin do workspace pode ajustar o limite.",
+      exhausted: "O agente não responde mais até o mês virar ou até o limite subir.",
+      button: "Ver o agente",
+    },
+    digest: {
+      subject: (n: number, org: string) =>
+        n === 1 ? `1 pedido de aprovação esperando em ${org}` : `${n} pedidos de aprovação esperando em ${org}`,
+      title: (n: number) => (n === 1 ? "Um pedido espera sua decisão" : `${n} pedidos esperam sua decisão`),
+      age: (hours: number) => `há ${hours} h`,
+      note: "Pedidos sem decisão expiram em 24 horas e nada é executado.",
+      button: "Abrir aprovações",
+    },
+  },
+  en: {
+    role: { owner: "owner", admin: "admin", member: "member" } as Record<string, string>,
+    someone: "Someone",
+    anAgent: "An agent",
+    invitation: {
+      subject: (inviter: string, org: string) => `${inviter} invited you to ${org} on agentes`,
+      title: (org: string) => `Invitation to ${org}`,
+      body: (inviter: string, org: string, role: string) =>
+        `${inviter} invited you to join <strong>${org}</strong> as ${role}.`,
+      note: "The invitation works for 7 days. Use this same email address to accept it.",
+      button: "Accept invitation",
+    },
+    inviteRequest: {
+      title: (org: string) => `Request for a new invitation to ${org}`,
+      someoneWithLink: "Someone with the invite link",
+      body: (who: string, org: string) =>
+        `${who} tried to join <strong>${org}</strong>, but the invitation had expired, and asked for a new one.`,
+      note: "If it makes sense, send a new invitation from the members page.",
+      button: "Open members",
+    },
+    calendar: {
+      subject: (inviter: string, title: string) => `${inviter} invited you: ${title}`,
+      body: (inviter: string, title: string, org: string) =>
+        `${inviter} invited you to <strong>${title}</strong> in ${org}.`,
+      button: "View in the calendar",
+    },
+    passwordReset: {
+      subject: "Reset your agentes password",
+      title: "Reset your password",
+      body: "We got a request to reset your password. The link works for a short time only.",
+      note: "If it wasn't you, ignore this email; nothing changes.",
+      button: "Create a new password",
+    },
+    verify: {
+      subject: "Confirm your email on agentes",
+      title: "Confirm your email",
+      body: "All that's left is to confirm this address is yours.",
+      button: "Confirm email",
+    },
+    budget: {
+      subjectWarning: (agent: string) => `${agent} used 80% of this month's budget`,
+      subjectExhausted: (agent: string) => `${agent} reached this month's budget`,
+      titleWarning: (agent: string) => `${agent} reached 80% of the budget`,
+      titleExhausted: (agent: string) => `${agent} stopped: budget reached`,
+      body: (agent: string, org: string, pct: string) => `${agent}, in ${org}, used ${pct} of this month's budget.`,
+      warning: "At 100% the agent stops and says so in the channel. A workspace admin can change the limit.",
+      exhausted: "The agent won't answer until the month turns or the limit goes up.",
+      button: "View the agent",
+    },
+    digest: {
+      subject: (n: number, org: string) =>
+        n === 1 ? `1 approval request waiting in ${org}` : `${n} approval requests waiting in ${org}`,
+      title: (n: number) =>
+        n === 1 ? "A request is waiting for your decision" : `${n} requests are waiting for your decision`,
+      age: (hours: number) => `${hours} h ago`,
+      note: "Requests without a decision expire after 24 hours and nothing runs.",
+      button: "Open approvals",
+    },
+  },
+} satisfies Record<EmailLocale, unknown>;
+
 export function renderEmail(t: EmailTemplate): { subject: string; html: string; text: string } {
+  if (t.kind === "waitlist_confirm") return waitlistEmail(t);
+  const lang = emailLocale(t.locale);
+  const w = WORDS[lang];
+  const page = (title: string, paragraphs: string[], action: { label: string; url: string }) =>
+    layout(title, paragraphs, action, { lang });
   switch (t.kind) {
     case "invitation": {
-      const subject = `${t.inviterName} convidou você para ${t.orgName} no agentes`;
+      const inviter = t.inviterName || w.someone;
       return {
-        subject,
-        ...layout(
-          `Convite para ${t.orgName}`,
-          [
-            `${esc(t.inviterName)} convidou você para entrar em <strong>${esc(t.orgName)}</strong> como ${esc(ROLE[t.role] ?? t.role)}.`,
-            "O convite vale por 7 dias. Use este mesmo endereço de e-mail para aceitar.",
-          ],
-          { label: "Aceitar convite", url: t.url },
+        subject: w.invitation.subject(inviter, t.orgName),
+        ...page(
+          w.invitation.title(t.orgName),
+          [w.invitation.body(esc(inviter), esc(t.orgName), esc(w.role[t.role] ?? t.role)), w.invitation.note],
+          { label: w.invitation.button, url: t.url },
         ),
       };
     }
     case "invite_request": {
-      const who = t.email ? esc(t.email) : "Alguém com o link de convite";
+      const who = t.email ? esc(t.email) : w.inviteRequest.someoneWithLink;
       return {
-        subject: `Pedido de novo convite para ${t.orgName}`,
-        ...layout(
-          `Pedido de novo convite para ${t.orgName}`,
-          [
-            `${who} tentou entrar em <strong>${esc(t.orgName)}</strong>, mas o convite expirou e pediu um novo.`,
-            "Se fizer sentido, envie um convite novo na página de membros.",
-          ],
-          { label: "Abrir membros", url: t.url },
-        ),
-      };
-    }
-    case "calendar_invite":
-      return {
-        subject: `${t.inviterName} convidou você: ${t.title}`,
-        ...layout(
-          t.title,
-          [
-            `${esc(t.inviterName)} convidou você para <strong>${esc(t.title)}</strong> em ${esc(t.orgName)}.`,
-            esc(t.when),
-          ],
-          { label: "Ver no calendário", url: t.url },
-        ),
-      };
-    case "password_reset":
-      return {
-        subject: "Redefinir sua senha do agentes",
-        ...layout(
-          "Redefinir sua senha",
-          [
-            "Recebemos um pedido para redefinir a sua senha. O link vale por pouco tempo.",
-            "Se não foi você, ignore este e-mail; nada muda.",
-          ],
-          { label: "Criar uma senha nova", url: t.url },
-        ),
-      };
-    case "verify_email":
-      return {
-        subject: "Confirme seu e-mail no agentes",
-        ...layout("Confirme seu e-mail", ["Falta só confirmar que este endereço é seu."], {
-          label: "Confirmar e-mail",
+        subject: w.inviteRequest.title(t.orgName),
+        ...page(w.inviteRequest.title(t.orgName), [w.inviteRequest.body(who, esc(t.orgName)), w.inviteRequest.note], {
+          label: w.inviteRequest.button,
           url: t.url,
         }),
       };
-    case "waitlist_confirm":
-      return waitlistEmail(t);
-    case "budget": {
-      const pct = t.level === "warning" ? "80%" : "100%";
+    }
+    case "calendar_invite": {
+      const inviter = t.inviterName || w.someone;
       return {
-        subject:
-          t.level === "warning"
-            ? `${t.agentName} usou 80% do orçamento do mês`
-            : `${t.agentName} atingiu o orçamento do mês`,
-        ...layout(
-          t.level === "warning"
-            ? `${t.agentName} chegou a ${pct} do orçamento`
-            : `${t.agentName} parou: orçamento atingido`,
+        subject: w.calendar.subject(inviter, t.title),
+        ...page(t.title, [w.calendar.body(esc(inviter), esc(t.title), esc(t.orgName)), esc(t.when)], {
+          label: w.calendar.button,
+          url: t.url,
+        }),
+      };
+    }
+    case "password_reset":
+      return {
+        subject: w.passwordReset.subject,
+        ...page(w.passwordReset.title, [w.passwordReset.body, w.passwordReset.note], {
+          label: w.passwordReset.button,
+          url: t.url,
+        }),
+      };
+    case "verify_email":
+      return {
+        subject: w.verify.subject,
+        ...page(w.verify.title, [w.verify.body], { label: w.verify.button, url: t.url }),
+      };
+    case "budget": {
+      const warning = t.level === "warning";
+      return {
+        subject: warning ? w.budget.subjectWarning(t.agentName) : w.budget.subjectExhausted(t.agentName),
+        ...page(
+          warning ? w.budget.titleWarning(t.agentName) : w.budget.titleExhausted(t.agentName),
           [
-            `${esc(t.agentName)}, em ${esc(t.orgName)}, usou ${esc(percent(t.percent))} do orçamento deste mês.`,
-            t.level === "warning"
-              ? "Quando chegar a 100%, o agente para e avisa no canal. Um admin do workspace pode ajustar o limite."
-              : "O agente não responde mais até o mês virar ou até o limite subir.",
+            w.budget.body(esc(t.agentName), esc(t.orgName), esc(percent(t.percent))),
+            warning ? w.budget.warning : w.budget.exhausted,
           ],
-          { label: "Ver o agente", url: t.url },
+          { label: w.budget.button, url: t.url },
         ),
       };
     }
     case "approval_digest": {
       const n = t.items.length;
       return {
-        subject:
-          n === 1
-            ? `1 pedido de aprovação esperando em ${t.orgName}`
-            : `${n} pedidos de aprovação esperando em ${t.orgName}`,
-        ...layout(
-          n === 1 ? "Um pedido espera sua decisão" : `${n} pedidos esperam sua decisão`,
+        subject: w.digest.subject(n, t.orgName),
+        ...page(
+          w.digest.title(n),
           [
             ...t.items.map(
               (i) =>
-                `<strong>${esc(i.agentName)}</strong>: ${esc(i.title)} (há ${Math.max(1, Math.round(i.ageHours))} h)`,
+                `<strong>${esc(i.agentName || w.anAgent)}</strong>: ${esc(i.title)} (${w.digest.age(Math.max(1, Math.round(i.ageHours)))})`,
             ),
-            "Pedidos sem decisão expiram em 24 horas e nada é executado.",
+            w.digest.note,
           ],
-          { label: "Abrir aprovações", url: t.url },
+          { label: w.digest.button, url: t.url },
         ),
       };
     }
   }
+}
+
+/**
+ * Recipients grouped by language, one email per group. The pt-BR group keeps
+ * `key` as is (jobs queued before locales existed dedupe the same); others add ":en".
+ */
+export function emailsByLocale(recipients: { email: string; locale: EmailLocale }[], key: string) {
+  const groups = new Map<EmailLocale, string[]>();
+  for (const r of recipients) groups.set(r.locale, [...(groups.get(r.locale) ?? []), r.email]);
+  return [...groups].map(([locale, to]) => ({ locale, to, key: locale === "pt-BR" ? key : `${key}:${locale}` }));
 }
 
 /**
@@ -369,26 +504,36 @@ export async function queueBudgetEmail(
   // The owner, or the org's admins when the agent has none.
   const recipientIds = e.agent.ownerUserId ? [e.agent.ownerUserId] : await adminIds(db, e.agent.orgId);
   if (recipientIds.length === 0) return;
-  const recipients = await db.select({ email: users.email }).from(users).where(inArray(users.id, recipientIds));
+  const recipients = await db
+    .select({ email: users.email, locale: users.locale })
+    .from(users)
+    .where(inArray(users.id, recipientIds));
   const [org] = await db
     .select({ name: organizations.name })
     .from(organizations)
     .where(eq(organizations.id, e.agent.orgId));
   if (recipients.length === 0 || !org) return;
   const month = new Date().toISOString().slice(0, 7);
-  await queueEmail(db, {
-    orgId: e.agent.orgId,
-    key: `budget:${e.agent.id}:${month}:${e.level}`,
-    to: recipients.map((r) => r.email),
-    template: {
-      kind: "budget",
-      level: e.level,
-      agentName: e.agent.name,
-      orgName: org.name,
-      percent: budgetPercent(e.spentNanoUsd, e.budgetNanoUsd),
-      url: `${publicUrl.replace(/\/$/, "")}/org/${e.agent.orgId}/agents/${e.agent.id}`,
-    },
-  });
+  const groups = emailsByLocale(
+    recipients.map((r) => ({ email: r.email, locale: emailLocale(r.locale) })),
+    `budget:${e.agent.id}:${month}:${e.level}`,
+  );
+  for (const group of groups) {
+    await queueEmail(db, {
+      orgId: e.agent.orgId,
+      key: group.key,
+      to: group.to,
+      template: {
+        kind: "budget",
+        locale: group.locale,
+        level: e.level,
+        agentName: e.agent.name,
+        orgName: org.name,
+        percent: budgetPercent(e.spentNanoUsd, e.budgetNanoUsd),
+        url: `${publicUrl.replace(/\/$/, "")}/org/${e.agent.orgId}/agents/${e.agent.id}`,
+      },
+    });
+  }
 }
 
 /**
@@ -420,19 +565,19 @@ export async function queueApprovalDigests(db: Database, publicUrl: string, afte
     const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId));
     const byUser = new Map<string, typeof mine>();
     for (const a of mine) for (const u of await approverIds(db, a)) byUser.set(u, [...(byUser.get(u) ?? []), a]);
-    const emails = new Map(
+    const people = new Map(
       (byUser.size
         ? await db
-            .select({ id: users.id, email: users.email })
+            .select({ id: users.id, email: users.email, locale: users.locale })
             .from(users)
             .where(inArray(users.id, [...byUser.keys()]))
         : []
-      ).map((u) => [u.id, u.email]),
+      ).map((u) => [u.id, u]),
     );
     await db.transaction(async (tx) => {
       for (const [userId, items] of byUser) {
-        const email = emails.get(userId);
-        if (!email) continue;
+        const person = people.get(userId);
+        if (!person) continue;
         await queueEmail(tx, {
           orgId,
           key: `approval-digest:${userId}:${items
@@ -440,12 +585,13 @@ export async function queueApprovalDigests(db: Database, publicUrl: string, afte
             .sort()
             .join(",")
             .slice(0, 200)}`,
-          to: [email],
+          to: [person.email],
           template: {
             kind: "approval_digest",
+            locale: emailLocale(person.locale),
             orgName: org?.name ?? "",
             items: items.map((i) => ({
-              agentName: agentName.get(i.agentId) ?? "Agente",
+              agentName: agentName.get(i.agentId) ?? "",
               title: i.title,
               ageHours: (now.getTime() - i.createdAt.getTime()) / 3600_000,
             })),
@@ -468,12 +614,22 @@ export async function queueApprovalDigests(db: Database, publicUrl: string, afte
   return queued;
 }
 
-/** Invitation email (create, batch and resend). The key changes with each new link. */
+/**
+ * Invitation email (create, batch and resend). The key changes with each new link.
+ * In the invitee's language when they already have an account, else the inviter's.
+ */
 export async function queueInvitationEmail(
   db: Executor,
   input: { orgId: string; invitationId: string; email: string; role: string; url: string; inviterId: string },
 ) {
-  const [inviter] = await db.select({ name: users.name }).from(users).where(eq(users.id, input.inviterId));
+  const [inviter] = await db
+    .select({ name: users.name, locale: users.locale })
+    .from(users)
+    .where(eq(users.id, input.inviterId));
+  const [invitee] = await db
+    .select({ locale: users.locale })
+    .from(users)
+    .where(eq(users.email, input.email.trim().toLowerCase()));
   const [org] = await db
     .select({ name: organizations.name })
     .from(organizations)
@@ -484,8 +640,9 @@ export async function queueInvitationEmail(
     to: [input.email],
     template: {
       kind: "invitation",
+      locale: emailLocale(invitee?.locale ?? inviter?.locale),
       orgName: org?.name ?? "",
-      inviterName: inviter?.name ?? "Alguém",
+      inviterName: inviter?.name ?? "",
       url: input.url,
       role: input.role,
     },

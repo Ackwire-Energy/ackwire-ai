@@ -675,7 +675,11 @@ function HistoryDialog({ page, open, onClose }: { page: WikiPageData; open: bool
                 <span className="tabular">v{v.version}</span>
                 <span>{authorLabel(v.author)}</span>
                 <span className="small muted">{whenAt(t, i18n.language, v.at)}</span>
-                {v.note && <span className="small muted">{v.note}</span>}
+                {v.note && (
+                  <span className="small muted">
+                    {v.noteCode ? t(`wiki.note.${v.noteCode}`, { ...v.noteParams, defaultValue: v.note }) : v.note}
+                  </span>
+                )}
               </button>
             </li>
           ))}

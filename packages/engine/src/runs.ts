@@ -41,13 +41,22 @@ export function runErrorDetail(error: string | null | undefined): {
     return { errorCode: "run.provider_unavailable", errorParams: { detail: error.slice(8).trim() } };
   if (error.startsWith("canceled_by:"))
     return { errorCode: "run.canceled", errorParams: { byUserId: error.slice(12) } };
-  if (error === "Interrompida por uma atualização do servidor") {
+  // Older rows hold the Portuguese texts these errors used to have: still recognized.
+  if (error === "Interrupted by a server update" || error === "Interrompida por uma atualização do servidor") {
     return { errorCode: "run.interrupted", errorParams: { reason: "deploy" } };
   }
-  const none = /^Configure uma chave da API da (.+) nas configurações do workspace$/.exec(error);
+  const none =
+    /^Add an API key for (.+) in the workspace settings$/.exec(error) ??
+    /^Configure uma chave da API da (.+) nas configurações do workspace$/.exec(error);
   if (none) return { errorCode: "run.missing_credential", errorParams: { provider: none[1] as string } };
-  if (error.startsWith("A chave da API deste agente foi revogada")) return { errorCode: "run.credential_revoked" };
-  const wrong = /^O modelo deste agente é da (.+), mas a chave escolhida é da (.+)$/.exec(error);
+  if (
+    error.startsWith("This agent's API key was revoked") ||
+    error.startsWith("A chave da API deste agente foi revogada")
+  )
+    return { errorCode: "run.credential_revoked" };
+  const wrong =
+    /^This agent's model is from (.+), but the chosen key is from (.+)$/.exec(error) ??
+    /^O modelo deste agente é da (.+), mas a chave escolhida é da (.+)$/.exec(error);
   if (wrong) {
     return {
       errorCode: "run.credential_wrong_provider",

@@ -661,6 +661,12 @@ export const en: Translations = {
     expiresIn: "Expires in {{time}}",
     expired: "Expired",
     expiresDetail: "expires in {{time}}",
+    titles: {
+      run_code: "Run {{language}} code",
+      upload_file: "Send {{path}} to the Drive",
+      run_skill_script: "Run script {{path}} of the skill {{skill}}",
+      post_message: "Post in #{{channel}}",
+    },
   },
   approvals: {
     title: "Approvals",
@@ -799,6 +805,14 @@ export const en: Translations = {
     editTitle: "Edit {{kind}}",
     text: "Text",
     editHelp: "The previous version stays in the history. {{source}}",
+    origin: {
+      person: "Written by {{name}}",
+      agent: "Noted by the agent",
+      lesson: "Learned",
+      recorded: "Recorded",
+      someone: "a person",
+      inChannel: " in #{{channel}}",
+    },
   },
   proposals: {
     title: "Improvement proposals",
@@ -834,6 +848,14 @@ export const en: Translations = {
     added: "Added: ",
     removed: "Removed: ",
     empty: "No proposals yet. When a lesson repeats, the agent proposes a change here.",
+    titleInstructions: "Update {{name}}'s instructions",
+    titleContext: "Update the {{org}} context",
+    evidence: {
+      outcome: "Observed outcome",
+      human: "A person",
+      agent: "Another agent",
+      self: "The agent itself",
+    },
   },
   newAgent: {
     title: "Create agent",
@@ -1154,6 +1176,61 @@ export const en: Translations = {
       label: "Share documents",
       description: "Change who can see a file. Always asks for approval.",
     },
+    issues_read: {
+      label: "Read issues",
+      description: "List and read issues.",
+    },
+    calendar_read: {
+      label: "View calendar",
+      description: "View events and free time.",
+    },
+    calendar_write: {
+      label: "Propose events",
+      description: "Suggest events; the person asking confirms before any invitation.",
+    },
+    skills_read: {
+      label: "Use skills",
+      description: "Load the skills enabled for the agent.",
+    },
+    wiki_read: {
+      label: "Read the wiki",
+      description: "Search and read the organization's wiki pages.",
+    },
+    wiki_write: {
+      label: "Write to the wiki",
+      description: "Create and edit wiki pages, only when a person asks.",
+    },
+    forum_write: {
+      label: "Forum",
+      description: "Open forum topics, read them and post outside its own turn.",
+    },
+    schedule_write: {
+      label: "Schedule",
+      description: "Create reminders and routines from the chat, for the person asking, in that person's time zone.",
+    },
+    sandbox_run: {
+      label: "Run code",
+      description:
+        "Run code and skill scripts on the agent's computer (isolated, no secrets, files kept between conversations); costs machine time. Never on by default.",
+    },
+    github_git_read: {
+      label: "Clone repositories (git)",
+      description:
+        "Clone and update repositories on the agent's computer with git, through our proxy; the GitHub token never enters the machine.",
+    },
+    github_git_write: {
+      label: "Push branches (git push)",
+      description:
+        "Push commits only to agentes/{agent}/… branches: never to the default branch, no force push, no tags.",
+    },
+    custom_read: {
+      label: "Read tools",
+      description: "Look up data with the tools classified as read.",
+    },
+    custom_write: {
+      label: "Write tools",
+      description: "Use the write tools. Those marked sensitive always ask for approval.",
+    },
   },
   issues: {
     moreFilters: "Filter by assignee and priority",
@@ -1230,6 +1307,22 @@ export const en: Translations = {
     artifactBy: "{{title}} ({{name}})",
     noLinks: "Nothing linked yet.",
     labels: "Labels",
+    event: {
+      created: "created the issue",
+      renamed: "renamed the issue",
+      description_changed: "edited the description",
+      status_changed: "changed the status to {{status}}",
+      priority_changed: "changed the priority to {{priority}}",
+      assigned: "assigned the issue",
+      unassigned: "removed the assignee",
+      due_date_set: "set the due date to {{date}}",
+      due_date_removed: "removed the due date",
+      pr_linked: "linked PR #{{number}}",
+      artifact_linked: "attached a file",
+      criterion_checked: 'checked the criterion "{{text}}"',
+      criterion_unchecked: 'unchecked the criterion "{{text}}"',
+      agent_asked: "asked {{name}} to implement",
+    },
   },
   routines: {
     filters: "Filter routines",
@@ -1251,6 +1344,7 @@ export const en: Translations = {
       delivered_dm: "Sent in the DM",
       forum_opened: "Forum opened: {{title}}",
       failed: "Failed: {{reason}}",
+      audience: "Paused: the routine's creator can no longer talk to the agent",
     },
     resume: "Resume",
     edit: "Edit",
@@ -1346,7 +1440,15 @@ export const en: Translations = {
       created: "Routine created.",
       required: "Say what the agent should do.",
       noAgents: "Create an agent before creating a routine.",
+      defaultPhrase: "every Monday at 9am",
+      parseError: {
+        schedule_unreadable: "Couldn't read the period. Try “every 2 weeks on Monday at 9am”.",
+        schedule_never: "This schedule never happens.",
+        schedule_invalid: "This schedule isn't valid.",
+        routine_schedule_required: "Say when the routine should run.",
+      },
     },
+    copyName: "{{name}} (copy)",
   },
   filters: {
     clear: "Clear {{name}}",
@@ -1941,6 +2043,20 @@ export const en: Translations = {
     savedTo: "Saved to {{title}}.",
     fromMessage: "from a message in #{{channel}}",
     fromForum: "from the forum synthesis",
+    note: {
+      created: "created the page",
+      edited: "edited",
+      rewrote_section: 'rewrote the section "{{section}}"',
+      appended: "added a passage",
+      renamed: 'renamed from "{{from}}" to "{{to}}"',
+      link_updated: 'link updated: "{{from}}" → "{{to}}"',
+      moved: 'moved to "{{folder}}"',
+      moved_root: "moved to the root",
+      saved_message: "saved a message",
+      saved_synthesis: "saved the forum synthesis",
+      created_from_message: "created from a message",
+      created_from_synthesis: "created from the forum synthesis",
+    },
   },
   run: {
     steeredStep: "New message from {{name}}",
@@ -2736,6 +2852,22 @@ export const en: Translations = {
       general2: "Summarize what happened today",
       general3: "Help me plan the week?",
     },
+    body: {
+      approval_request: "Approval request: {{title}}",
+      secret_request: "Secret request: {{name}}",
+      file_saved: "File saved.",
+      done: "Done.",
+      memory: {
+        proposed: "Proposal created: {{text}}",
+        forgot: 'Memory updated: forgot "{{text}}".',
+        updated: "Memory updated: {{text}}",
+        remembered: "Memory updated: {{text}}",
+      },
+      interrupted: "Interrupted by a server update. Ask again to continue.",
+      forum_concluded: 'The forum "{{title}}" is over. The synthesis is in the file below.',
+      forum_concluded_issues:
+        'The forum "{{title}}" is over. The synthesis is in the file below, with {{count}} suggested issue(s) to approve.',
+    },
   },
   landing: {
     // biome-ignore lint/suspicious/noTemplateCurlyInString: i18next interpolation, not a template literal
@@ -3081,5 +3213,196 @@ export const en: Translations = {
     },
     footer: "© 2026 agentes.chat · People and AI agents working together.",
     footerBy: "Made by",
+  },
+  builtinTools: {
+    ask_user: {
+      label: "Ask the person",
+      description: "Asks a short question and waits for the answer.",
+    },
+    search_context: {
+      label: "Search context",
+      description: "Searches messages, summaries, facts and lessons.",
+    },
+    get_summary: {
+      label: "Read summary",
+      description: "Reads the summary of a thread or period.",
+    },
+    expand: {
+      label: "Open item",
+      description: "Opens a memory or message in full.",
+    },
+    remember: {
+      label: "Remember",
+      description: "Saves a note when someone asks.",
+    },
+    update_memory: {
+      label: "Update memory",
+      description: "Corrects a saved note.",
+    },
+    forget: {
+      label: "Forget",
+      description: "Archives a note when someone asks.",
+    },
+    propose_instruction_change: {
+      label: "Propose an instruction change",
+      description: "Suggests changing its own instructions or the org context; a person decides.",
+    },
+    read_artifact: {
+      label: "Read file",
+      description: "Reads a Drive file.",
+    },
+    list_artifacts: {
+      label: "List files",
+      description: "Lists the Drive files it can see.",
+    },
+    share_artifact: {
+      label: "Share file",
+      description:
+        "Brings into the conversation a file it made in another one (such as a DM), if the person asking has access.",
+    },
+    create_artifact: {
+      label: "Create file",
+      description: "Creates a document, table, diff, diagram or page.",
+    },
+    update_artifact: {
+      label: "Update file",
+      description: "Saves a new version of a file.",
+    },
+    list_issues: {
+      label: "View issues",
+      description: "Lists and opens issues.",
+    },
+    create_issue: {
+      label: "Create issue",
+      description: "Creates an issue with acceptance criteria.",
+    },
+    update_issue: {
+      label: "Update issue",
+      description: "Changes status or priority, or links a PR.",
+    },
+    comment_issue: {
+      label: "Comment on issue",
+      description: "Comments on progress in an issue.",
+    },
+    list_events: {
+      label: "View calendar",
+      description: "Lists events.",
+    },
+    find_free_time: {
+      label: "Find free time",
+      description: "Looks for free slots in common.",
+    },
+    propose_event: {
+      label: "Propose event",
+      description: "Suggests an event; the person asking confirms.",
+    },
+    load_skill: {
+      label: "Load skill",
+      description: "Loads a skill's instructions.",
+    },
+    read_skill_file: {
+      label: "Read skill file",
+      description: "Reads a reference file of a skill.",
+    },
+    schedule_reminder: {
+      label: "Create reminder",
+      description: "Schedules a reminder in this conversation, for the person asking.",
+    },
+    create_routine: {
+      label: "Create routine",
+      description: "Creates a recurring routine in this conversation or in a channel.",
+    },
+    list_routines: {
+      label: "View routines",
+      description: "Lists the agent's routines.",
+    },
+    update_routine: {
+      label: "Change routine",
+      description: "Changes a routine's instructions, schedule or channel.",
+    },
+    list_reminders: {
+      label: "View reminders",
+      description: "Lists the pending reminders of the person asking.",
+    },
+    cancel_reminder: {
+      label: "Cancel reminder",
+      description: "Cancels a reminder of the person asking.",
+    },
+    open_forum_topic: {
+      label: "Open forum topic",
+      description: "Takes a subject to a discussion among agents.",
+    },
+    post_in_forum: {
+      label: "Post in forum",
+      description: "Posts in a topic outside its own turn.",
+    },
+    read_forum_topic: {
+      label: "Read forum topic",
+      description: "Reads a topic's goal and replies.",
+    },
+    search_wiki: {
+      label: "Search wiki",
+      description: "Searches the organization's wiki pages.",
+    },
+    read_wiki_page: {
+      label: "Read wiki page",
+      description: "Reads a whole wiki page.",
+    },
+    create_wiki_page: {
+      label: "Create wiki page",
+      description: "Creates a page when someone asks.",
+    },
+    update_wiki_page: {
+      label: "Edit wiki page",
+      description: "Adds or rewrites a section when someone asks.",
+    },
+    link_to_wiki: {
+      label: "Link wiki pages",
+      description: "Links a page to others when someone asks.",
+    },
+    run_code: {
+      label: "Run code",
+      description: "Runs Python, Node or bash in the conversation's isolated environment.",
+    },
+    write_file: {
+      label: "Write to environment",
+      description: "Writes a file in the code environment.",
+    },
+    read_file: {
+      label: "Read from environment",
+      description: "Reads a file from the code environment.",
+    },
+    list_files: {
+      label: "List environment",
+      description: "Lists the files in the code environment.",
+    },
+    export_file: {
+      label: "Save to Drive",
+      description: "Takes a file from the environment to the Drive.",
+    },
+    upload_file: {
+      label: "Upload to Drive",
+      description: "Uploads a file or folder from the computer to the Drive as is (PDF, images, zip…).",
+    },
+    import_file: {
+      label: "Bring from Drive",
+      description: "Copies a Drive file into the environment.",
+    },
+    run_skill_script: {
+      label: "Run skill script",
+      description: "Runs a skill's script in the environment.",
+    },
+    computer_start: {
+      label: "Turn on the computer",
+      description: "Turns on the agent's computer (creates it the first time).",
+    },
+    computer_stop: {
+      label: "Turn off the computer",
+      description: "Turns off the computer; the files stay.",
+    },
+    computer_status: {
+      label: "Check the computer",
+      description: "Says whether it is on, the disk used and this month's cost.",
+    },
   },
 };

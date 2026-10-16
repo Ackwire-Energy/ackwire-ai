@@ -21,7 +21,7 @@ const { storageConfigs, storageMigrations, artifactVersions } = schema;
 type StorageConfigRow = typeof storageConfigs.$inferSelect;
 type MigrationRow = typeof storageMigrations.$inferSelect;
 
-/** What an admin types for "Seu próprio bucket". Keys empty = keep the stored ones. */
+/** What an admin types for "Your own bucket". Keys empty = keep the stored ones. */
 export interface S3Input {
   endpoint: string;
   region: string;
@@ -477,7 +477,7 @@ export async function runMigration(deps: StorageDeps, migrationId: string, optio
   const resolver = createBlobStoreResolver(deps);
   const target = await resolver.forOrg(m.orgId);
   if (target.storageConfigId !== m.toStorageConfigId) {
-    const error = "A configuração de armazenamento mudou durante a cópia.";
+    const error = "The storage settings changed during the copy.";
     await db
       .update(storageMigrations)
       .set({ status: "failed", error, updatedAt: new Date() })

@@ -26,6 +26,7 @@ import {
 import { type ConnectedItem, connectedItems, itemName } from "@/lib/connected";
 import { humanize } from "@/lib/custom-tools";
 import { can } from "@/lib/permissions";
+import { builtinToolText } from "@/lib/scopes";
 
 type TT = (key: string, options: { defaultValue: string }) => string;
 
@@ -87,9 +88,10 @@ export function ResourceIcon({
   );
 }
 
-/** "Get file contents" for `github_get_file_contents`; a server's own label for custom tools. */
-function toolLabel(r: AccessResource, tool: AccessTool) {
+/** "Get file contents" for `github_get_file_contents`; a server's own label for custom tools; built-ins translated. */
+function toolLabel(t: TFunction, r: AccessResource, tool: AccessTool) {
   if (r.custom) return tool.label;
+  if (r.kind === "builtin") return builtinToolText(t, tool).label;
   const prefix = r.connector ? `${r.connector}_` : "";
   return prefix && tool.name.startsWith(prefix) ? humanize(tool.name.slice(prefix.length)) : tool.label;
 }
@@ -104,7 +106,7 @@ export function levelText(t: TFunction, r: AccessResource, level: LevelState) {
   }
   const names = toolsAt(r, level)
     .filter((x) => !x.sensitive)
-    .map((x) => toolLabel(r, x));
+    .map((x) => toolLabel(t, r, x));
   if (names.length === 0) return t("access.noTools");
   return names.length > 6
     ? t("access.toolsMore", { tools: names.slice(0, 6).join(" · "), count: names.length - 6 })
@@ -237,7 +239,7 @@ export function AgentAccessPanel({ agent, editable }: { agent: Agent; editable: 
                     icon={<ResourceIcon resource={r} items={items} name={name} />}
                     name={name}
                     description={levelText(t, r, level)}
-                    asks={asksAt(r, level).map((x) => toolLabel(r, x))}
+                    asks={asksAt(r, level).map((x) => toolLabel(t, r, x))}
                     levels={r.levels}
                     value={level}
                     onChange={editable ? (l) => choose(r, l) : undefined}

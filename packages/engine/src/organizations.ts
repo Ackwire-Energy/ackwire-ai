@@ -234,7 +234,7 @@ export function handleBase(name: string, email: string) {
       .replace(/[^a-z0-9]+/g, "");
   const first = slug(name.trim().split(/\s+/)[0] ?? "");
   const local = slug(email.split("@")[0] ?? "");
-  const base = (first.length >= 2 ? first : local.length >= 2 ? local : "pessoa").slice(0, 24);
+  const base = (first.length >= 2 ? first : local.length >= 2 ? local : "person").slice(0, 24);
   return base;
 }
 

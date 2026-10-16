@@ -5,7 +5,7 @@ import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./h
 let t: TestServer;
 afterEach(() => t.close());
 
-test("computer API: settings, the agent's computer, and the access tree shows 'Rodar código'", async () => {
+test("computer API: settings, the agent's computer, and the access tree shows 'Run code'", async () => {
   t = await createTestServer({ sandbox: createFakeSandboxProvider() });
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
@@ -56,7 +56,7 @@ test("computer API: settings, the agent's computer, and the access tree shows 'R
     builtins: { scope: string; label: string; state: string; tools: { name: string }[] }[];
   };
   const sandbox = tree.builtins.find((b) => b.scope === "sandbox:run");
-  expect(sandbox).toMatchObject({ label: "Rodar código", state: "off" });
+  expect(sandbox).toMatchObject({ label: "Run code", state: "off" });
   expect(sandbox?.tools.map((x) => x.name)).toContain("run_code");
 });
 

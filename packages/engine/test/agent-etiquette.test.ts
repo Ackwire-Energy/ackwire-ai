@@ -156,8 +156,8 @@ test("an agent knows what the other agents here can do and points to them", asyn
   const ctx = await buildRunContext(f.db, run, f.agent, { maxMessages: 30 });
   const prompt = systemText(ctx.system);
   expect(prompt).toContain("Other agents here and what they can do: QA (@qa, Testes):");
-  expect(prompt).toContain("Arquivos (Drive)");
-  expect(prompt).toContain("pergunte a @qa");
+  expect(prompt).toContain("Files (Drive)");
+  expect(prompt).toContain("ask @qa");
   expect(prompt).not.toMatch(/Dev \(@dev, [^)]*\):/); // not itself
 });
 

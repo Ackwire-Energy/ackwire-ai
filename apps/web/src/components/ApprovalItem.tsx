@@ -21,6 +21,23 @@ export function approvalAction(approval: Pick<Approval, "tool" | "scope">): Appr
   return "other";
 }
 
+/** The app's own tools whose approval title it says in the person's language (`approval.titles.*`). */
+const OWN_TITLES = new Set(["run_code", "upload_file", "run_skill_script", "post_message"]);
+
+/** The approval's title: in the person's language for the app's own tools, else the server's (connector) title. */
+export function approvalTitle(t: TFunction, approval: Pick<Approval, "tool" | "title" | "params">): string {
+  if (!OWN_TITLES.has(approval.tool)) return approval.title;
+  const p = approval.params ?? {};
+  const s = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : "");
+  return t(`approval.titles.${approval.tool}`, {
+    language: s(p.language),
+    path: s(p.path),
+    skill: s(p.skill),
+    channel: s(p.channel).replace(/^#/, ""),
+    defaultValue: approval.title,
+  });
+}
+
 /** "Aprovado por você · agora" / "Recusado por João · ontem 18:02" / "Expirou · ontem". */
 export function decisionLabel(
   t: TFunction,
@@ -102,7 +119,7 @@ export function InlineApproval({
         who={
           <Trans
             i18nKey="approval.doneWho"
-            values={{ agent: name, title: lowerFirst(approval.title) }}
+            values={{ agent: name, title: lowerFirst(approvalTitle(t, approval)) }}
             components={{ b: <b /> }}
           />
         }
@@ -119,7 +136,7 @@ export function InlineApproval({
       sky={<CardSky color={colorOf(agent)} />}
       who={<Trans i18nKey="approval.asks" values={{ agent: name }} components={{ b: <b /> }} />}
       statusLabel={approval.canDecide ? t("approval.waitingYou") : waitingFor(t, agent, members)}
-      title={approval.title}
+      title={approvalTitle(t, approval)}
       detail={`${approval.detail}${left ? ` · ${t("approval.expiresDetail", { time: left })}` : ""}`}
       actions={approval.canDecide && <Actions approval={approval} />}
     />
@@ -150,7 +167,7 @@ export function ApprovalListItem({
     <ApprovalCard
       as="article"
       wide
-      aria-label={approval.title}
+      aria-label={approvalTitle(t, approval)}
       status={pending ? "waiting" : approval.status === "approved" ? "approved" : "refused"}
       avatar={
         agent ? (
@@ -182,7 +199,7 @@ export function ApprovalListItem({
             : waitingFor(t, agent, members)
           : decisionLabel(t, i18n.language, approval, me.user.id, members)
       }
-      title={approval.title}
+      title={approvalTitle(t, approval)}
       detail={
         approval.reason
           ? `${approval.detail} · ${t("approval.reasonLine", { reason: approval.reason })}`

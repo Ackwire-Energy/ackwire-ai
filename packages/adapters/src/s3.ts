@@ -27,7 +27,7 @@ export type StorageErrorCode =
   | "invalid_endpoint"
   | "other";
 
-/** A storage failure with a code the app can explain ("A chave não foi aceita"…). */
+/** A storage failure with a code the app can explain ("The key was not accepted"…). */
 export class StorageError extends Error {
   constructor(
     readonly code: StorageErrorCode,

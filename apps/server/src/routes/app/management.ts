@@ -467,7 +467,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/credentials/{credentialId}/make-default",
       tags: ["Agents"],
       security,
-      summary: 'Make this key its provider\'s default for the workspace ("Tornar padrão")',
+      summary: 'Make this key its provider\'s default for the workspace ("Make default")',
       request: { params: OrgParams.extend({ credentialId: z.uuid() }), body: body(z.object({})) },
       responses: { 200: json(Credential), ...errors },
     }),

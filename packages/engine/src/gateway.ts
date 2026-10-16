@@ -129,7 +129,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   };
   const label = (provider: string) => (PROVIDERS as Record<string, { label: string }>)[provider]?.label ?? provider;
   const noKey = (provider: string) =>
-    new MissingCredentialError(`Configure uma chave da API da ${label(provider)} nas configurações do workspace`);
+    new MissingCredentialError(`Add an API key for ${label(provider)} in the workspace settings`);
   const keyOf = (c: Awaited<ReturnType<typeof decryptCredential>>, credentialId: string | null): Key | null =>
     c
       ? {
@@ -151,13 +151,11 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     if (agentCredentialId) {
       const credential = await decryptCredential(db, deps.keyWrappers, orgId, agentCredentialId);
       if (!credential) {
-        throw new MissingCredentialError(
-          "A chave da API deste agente foi revogada; escolha outra nas configurações do agente",
-        );
+        throw new MissingCredentialError("This agent's API key was revoked; pick another one in the agent's settings");
       }
       if (credential.provider !== provider) {
         throw new MissingCredentialError(
-          `O modelo deste agente é da ${label(provider)}, mas a chave escolhida é da ${label(credential.provider)}`,
+          `This agent's model is from ${label(provider)}, but the chosen key is from ${label(credential.provider)}`,
         );
       }
       return keyOf(credential, agentCredentialId) as Key;

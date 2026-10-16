@@ -465,7 +465,7 @@ export async function postPersonMessage(
   }
   const answers = message.meta.answersQuestionId;
   if (typeof answers === "string") await afterReplyAnswered(deps, orgId, answers);
-  // Agents this person can't talk to (D31): no run; only they hear why ("O Theo só responde a …").
+  // Agents this person can't talk to (D31): no run; only they hear why ("Theo only replies to …").
   if (blocked.length > 0) {
     view.notices = await notifyBlocked(deps, orgId, userId, {
       agentIds: blocked,

@@ -4,8 +4,8 @@ import { ValidationError } from "./errors";
 /**
  * Recurrence rules (RRULE-like, as JSON) for routines and calendar events.
  * Evaluated on local dates and wall-clock times in the rule's time zone, so
- * "toda segunda às 9h" stays at 9:00 across DST. Cron can't say "a cada 2
- * semanas" or "último dia útil do mês"; these rules can.
+ * "every Monday at 9am" stays at 9:00 across DST. Cron can't say "every 2
+ * weeks" or "last business day of the month"; these rules can.
  */
 export type Weekday = "MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU";
 export type Freq = "hourly" | "daily" | "weekly" | "monthly" | "yearly";
@@ -20,7 +20,7 @@ export interface ScheduleRule {
   byMonthDay?: number[];
   /** Months, 1..12 (yearly). */
   byMonth?: number[];
-  /** Picks among the days a month rule matched: 1 = first, -1 = last ("último dia útil"). One or several. */
+  /** Picks among the days a month rule matched: 1 = first, -1 = last ("last business day"). One or several. */
   bySetPos?: number | number[];
   /** Wall-clock time(s), "HH:MM" (hourly: only the minutes count). */
   time?: string;
@@ -36,8 +36,6 @@ export interface ScheduleRule {
 }
 
 const WEEKDAYS: Weekday[] = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
-const DAY_NAMES = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-const DAY_LONG = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 const FREQS: Freq[] = ["hourly", "daily", "weekly", "monthly", "yearly"];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -284,7 +282,7 @@ export function nextOccurrence(rule: ScheduleRule, after: Date): Date | null {
   return null;
 }
 
-/** The same rule ending the day before `date` (for "este e os próximos"); null when nothing would be left. */
+/** The same rule ending the day before `date` (for "this and the following"); null when nothing would be left. */
 export function endRuleBefore(rule: ScheduleRule, date: string): ScheduleRule | null {
   const until = toDateString(parseDate(date) - 1);
   if (rule.start && until < rule.start) return null;
@@ -292,99 +290,22 @@ export function endRuleBefore(rule: ScheduleRule, date: string): ScheduleRule | 
   return { ...rest, until: rule.until && rule.until < until ? rule.until : until };
 }
 
-const ZONES: Record<string, string> = {
-  "America/Sao_Paulo": "horário de Brasília",
-  "America/Fortaleza": "horário de Brasília",
-  "America/Recife": "horário de Brasília",
-  "America/Bahia": "horário de Brasília",
-  UTC: "UTC",
-};
-const ORDINAL = (n: number) => (n === -1 ? "último" : n === -2 ? "penúltimo" : `${n}º`);
-const ORDINAL_F = (n: number) => (n === -1 ? "última" : n === -2 ? "penúltima" : `${n}ª`);
-const list = (items: string[]) =>
-  items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} e ${items.at(-1)}`;
-const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const WORKDAYS = ["MO", "TU", "WE", "TH", "FR"];
 
-/** "A cada 2 semanas, seg e qua, às 09:00 (horário de Brasília), até 31/12" */
-function describeRulePt(rule: ScheduleRule): string {
-  const n = rule.interval ?? 1;
-  const plain = (rule.byWeekday ?? []).every((w) => w.length === 2);
-  const weekdays = (rule.byWeekday ?? []).filter((w) => w.length === 2);
-  const isWorkdays = plain && weekdays.length === 5 && WORKDAYS.every((w) => weekdays.includes(w));
-  const dayList = () => list(weekdays.map((w) => DAY_NAMES[WEEKDAYS.indexOf(w as Weekday)] as string));
-  const parts: string[] = [];
-  const monthPart = () => {
-    if (rule.byWeekday && !plain) {
-      return rule.byWeekday
-        .map((w) => {
-          const [, pos, code] = DAY_SPEC.exec(w) as unknown as [string, string, Weekday];
-          return `na ${ORDINAL_F(Number(pos))} ${DAY_LONG[WEEKDAYS.indexOf(code)]}`;
-        })
-        .join(" e ");
-    }
-    if (isWorkdays && rule.bySetPos !== undefined) {
-      return setPos(rule)
-        .map((p) => `no ${ORDINAL(p)} dia útil`)
-        .join(" e ");
-    }
-    if (weekdays.length && rule.bySetPos !== undefined) {
-      const names = list(weekdays.map((w) => DAY_LONG[WEEKDAYS.indexOf(w as Weekday)] as string));
-      return setPos(rule)
-        .map((p) => `na ${ORDINAL_F(p)} ${names}`)
-        .join(" e ");
-    }
-    if (rule.byMonthDay) {
-      const days = rule.byMonthDay.map((d) => (d === -1 ? "último dia" : d < 0 ? `${ORDINAL(d)} dia` : `dia ${d}`));
-      return `no ${list(days)}`;
-    }
-    return rule.start ? `no dia ${Number(rule.start.slice(8, 10))}` : "";
-  };
-  switch (rule.freq) {
-    case "hourly":
-      parts.push(n === 1 ? "A cada hora" : `A cada ${n} horas`);
-      if (weekdays.length) parts.push(isWorkdays ? "em dias úteis" : dayList());
-      break;
-    case "daily":
-      if (isWorkdays && n === 1) parts.push("Dias úteis");
-      else {
-        parts.push(n === 1 ? "Todo dia" : `A cada ${n} dias`);
-        if (weekdays.length) parts.push(dayList());
-      }
-      break;
-    case "weekly":
-      parts.push(n === 1 ? "Toda semana" : `A cada ${n} semanas`);
-      if (isWorkdays) parts.push("em dias úteis");
-      else if (weekdays.length) parts.push(dayList());
-      else if (rule.start) parts.push(DAY_NAMES[fromDayNumber(parseDate(rule.start)).weekday] as string);
-      break;
-    case "monthly":
-      parts.push(n === 1 ? "Todo mês" : `A cada ${n} meses`);
-      parts.push(monthPart());
-      break;
-    case "yearly": {
-      parts.push(n === 1 ? "Todo ano" : `A cada ${n} anos`);
-      const months = rule.byMonth ?? (rule.start ? [Number(rule.start.slice(5, 7))] : []);
-      const where = monthPart();
-      parts.push(`${where}${months.length ? ` de ${list(months.map((m) => MONTHS[m - 1] as string))}` : ""}`);
-      break;
-    }
-  }
-  const times = rule.times ?? (rule.time ? [rule.time] : []);
-  if (rule.freq === "hourly") {
-    const minute = times[0]?.slice(3) ?? "00";
-    if (minute !== "00") parts.push(`aos ${minute} minutos`);
-  } else if (times.length) parts.push(`às ${list(times)}`);
-  let text = parts.filter(Boolean).join(", ");
-  text += ` (${ZONES[rule.timezone] ?? rule.timezone})`;
-  if (rule.until) {
-    const [y, m, d] = rule.until.split("-");
-    const thisYear = String(new Date().getUTCFullYear());
-    text += `, até ${d}/${m}${y === thisYear ? "" : `/${y}`}`;
-  }
-  if (rule.count) text += `, ${rule.count} ${rule.count === 1 ? "vez" : "vezes"}`;
-  return text;
-}
+/** English names of the zones people use most (the app shows its own, translated). */
+const ZONE_NAMES: Record<string, string> = {
+  "America/Sao_Paulo": "Brasília time",
+  "America/Manaus": "Amazonas time",
+  "America/Fortaleza": "Fortaleza time",
+  "America/Recife": "Recife time",
+  "America/Belem": "Belém time",
+  "America/Cuiaba": "Cuiabá time",
+  "America/Rio_Branco": "Acre time",
+  "America/Noronha": "Fernando de Noronha time",
+};
+
+/** "Brasília time", "UTC" or the IANA name. */
+export const timezoneName = (tz: string) => (tz === "UTC" || tz === "Etc/UTC" ? "UTC" : (ZONE_NAMES[tz] ?? tz));
 
 /** [1,2,3,4,5,0] → "0,1-5" (runs of 3 or more as ranges, like people write cron). */
 function cronList(values: number[]) {
@@ -491,8 +412,11 @@ const enOrdinal = (n: number) =>
 const enList = (items: string[]) =>
   items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 
-/** "Every 2 weeks, Mon and Wed, at 09:00 (America/Sao_Paulo), until 12/31" */
-function describeRuleEn(rule: ScheduleRule): string {
+/**
+ * A rule in words, in English: "Every 2 weeks, Mon and Wed, at 09:00 (Brasília time), until 12/31".
+ * For the model and as a fallback; the app writes its own sentence from the rule.
+ */
+export function describeRule(rule: ScheduleRule): string {
   const n = rule.interval ?? 1;
   const plain = (rule.byWeekday ?? []).every((w) => w.length === 2);
   const weekdays = (rule.byWeekday ?? []).filter((w) => w.length === 2);
@@ -561,16 +485,11 @@ function describeRuleEn(rule: ScheduleRule): string {
     const minute = times[0]?.slice(3) ?? "00";
     if (minute !== "00") parts.push(`at minute ${minute}`);
   } else if (times.length) parts.push(`at ${enList(times)}`);
-  let text = `${parts.filter(Boolean).join(", ")} (${rule.timezone})`;
+  let text = `${parts.filter(Boolean).join(", ")} (${timezoneName(rule.timezone)})`;
   if (rule.until) {
     const [y, m, d] = rule.until.split("-");
     text += `, until ${m}/${d}${y === String(new Date().getUTCFullYear()) ? "" : `/${y}`}`;
   }
   if (rule.count) text += `, ${rule.count} ${rule.count === 1 ? "time" : "times"}`;
   return text;
-}
-
-/** A rule in words: pt-BR (default) or English. */
-export function describeRule(rule: ScheduleRule, locale: "pt-BR" | "en" | string = "pt-BR"): string {
-  return locale.toLowerCase().startsWith("en") ? describeRuleEn(rule) : describeRulePt(rule);
 }

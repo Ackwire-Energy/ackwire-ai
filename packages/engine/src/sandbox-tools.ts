@@ -102,15 +102,15 @@ const NO_NETWORK =
   /temporary failure in name resolution|could not resolve host|name or service not known|getaddrinfo|enotfound|eai_again|connection refused|econnrefused|network is unreachable|enetunreach|failed to establish a new connection|newconnectionerror|no address associated with hostname/i;
 
 export const NO_NETWORK_NOTE =
-  "sem internet: este computador não acessa a internet, a não ser os domínios liberados em Configurações → Sandbox. Diga isso à pessoa (não é falta de permissão) e sugira liberar o domínio.";
+  "no internet: this computer can't reach the internet, except the domains allowed in Settings → Sandbox. Tell the person (it isn't a missing permission) and suggest allowing the domain.";
 
 /** With open internet a network failure is the site or the address, not our block. */
 export const OPEN_NETWORK_NOTE =
-  "falha de rede: este computador tem internet liberada, então o problema é o endereço ou o site (fora do ar, DNS, recusou a conexão). Diga isso à pessoa; não é bloqueio nem permissão.";
+  "network failure: this computer has open internet, so the problem is the address or the site (down, DNS, refused the connection). Tell the person; it isn't a block or a permission.";
 
 /** On a connected machine the network is that machine's own: we don't block anything there. */
 export const MACHINE_NETWORK_NOTE =
-  "falha de rede: este é um computador conectado, com a rede da própria máquina (não bloqueamos nada lá), então o problema é o endereço, o site ou a rede dessa máquina. Diga isso à pessoa.";
+  "network failure: this is a connected computer, on that machine's own network (we block nothing there), so the problem is the address, the site or that machine's network. Tell the person.";
 
 type Network = { mode: NetworkMode | "machine"; domains: string[] };
 
@@ -155,10 +155,10 @@ export function networkSentence(n: Network) {
       ? `Internet only for these domains: ${n.domains.slice(0, 20).join(", ")}.`
       : "Internet only for the domains the organization allowed.";
   }
-  return "No internet access (the organization can allow domains or open it in Configurações → Sandbox).";
+  return "No internet access (the organization can allow domains or open it in Settings → Sandbox).";
 }
 
-/** What the model sees from a command: exit code first (it is the line kept in "Ações recentes"). */
+/** What the model sees from a command: exit code first (it is the line kept in "Recent actions"). */
 function execOutput(label: string, r: ExecResult, seconds: number, timeout: number, network?: Network): ToolOutput {
   const head = r.canceled
     ? `${label}: canceled by a person after ${seconds} s (${r.canceled.killed ? "stopped" : "no longer waited for; it may still finish"})`
@@ -270,7 +270,7 @@ const slug = (s: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
-    .slice(0, 60) || "arquivo";
+    .slice(0, 60) || "file";
 
 /**
  * Sandbox tools through the Tool Gateway (scope `sandbox:run`, never on by
@@ -316,7 +316,7 @@ export function createSandboxToolSource(
         pending[stream] = "";
         if (!chunk || capped) continue;
         if (sent + chunk.length > LIVE_OUTPUT_CHARS) {
-          chunk = `${chunk.slice(0, Math.max(0, LIVE_OUTPUT_CHARS - sent))}\n[… mais saída: veja o resultado no fim …]`;
+          chunk = `${chunk.slice(0, Math.max(0, LIVE_OUTPUT_CHARS - sent))}\n[… more output: see the result at the end …]`;
           capped = true;
         }
         sent += chunk.length;
@@ -506,7 +506,7 @@ export function createSandboxToolSource(
         required: ["language", "code"],
         additionalProperties: false,
       },
-      describe: (input) => ({ title: `Rodar código ${str(input.language)}`, detail: str(input.code).slice(0, 500) }),
+      describe: (input) => ({ title: `Run ${str(input.language)} code`, detail: str(input.code).slice(0, 500) }),
       async execute(input, ctx) {
         try {
           const lang = str(input.language) as Language;
@@ -590,7 +590,7 @@ export function createSandboxToolSource(
         required: ["name", "purpose", "target"],
         additionalProperties: false,
       },
-      describe: (input) => ({ title: `Pedir o segredo ${str(input.name)}` }),
+      describe: (input) => ({ title: `Ask for the secret ${str(input.name)}` }),
       async execute(input, ctx) {
         try {
           const requester = await requesterOfRun(ctx);
@@ -835,7 +835,7 @@ export function createSandboxToolSource(
         required: ["path"],
         additionalProperties: false,
       },
-      describe: (input) => ({ title: `Enviar ${str(input.path)} para o Drive` }),
+      describe: (input) => ({ title: `Send ${str(input.path)} to the Drive` }),
       async execute(input, ctx) {
         try {
           const path = workspacePath(str(input.path));
@@ -923,7 +923,7 @@ export function createSandboxToolSource(
         additionalProperties: false,
       },
       describe: (input) => ({
-        title: `Rodar script ${str(input.path)} da skill ${str(input.skill)}`,
+        title: `Run script ${str(input.path)} of the skill ${str(input.skill)}`,
         detail: Array.isArray(input.args) ? input.args.map(String).join(" ").slice(0, 500) : undefined,
       }),
       async execute(input, ctx) {

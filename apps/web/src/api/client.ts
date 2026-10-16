@@ -389,7 +389,8 @@ export interface ApiClient {
     update(orgId: string, id: string, patch: RoutinePatch): Promise<Routine>;
     /** Soft delete: it stops running and leaves the list. */
     remove(orgId: string, id: string): Promise<void>;
-    duplicate(orgId: string, id: string): Promise<Routine>;
+    /** `name`: the copy's name in the UI language. */
+    duplicate(orgId: string, id: string, name?: string): Promise<Routine>;
   };
   /** The org wiki: pages in folders, `[[links]]`, backlinks, history and the graph. */
   wiki: {

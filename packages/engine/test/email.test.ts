@@ -79,6 +79,66 @@ describe("templates (pt-BR)", () => {
   });
 });
 
+describe("templates in English (the recipient's locale)", () => {
+  test("every kind has an English version with lang=en", () => {
+    const invitation = renderEmail({
+      kind: "invitation",
+      locale: "en",
+      orgName: "Acme",
+      inviterName: "",
+      url: "https://x/invite/t",
+      role: "member",
+    });
+    expect(invitation.subject).toBe("Someone invited you to Acme on agentes");
+    expect(invitation.html).toContain('<html lang="en">');
+    expect(invitation.text).toContain("as member");
+    expect(invitation.text).toContain("Accept invitation: https://x/invite/t");
+    const budget = renderEmail({
+      kind: "budget",
+      locale: "en",
+      level: "exhausted",
+      agentName: "Ada",
+      orgName: "Acme",
+      percent: 100,
+      url: "u",
+    });
+    expect(budget.subject).toBe("Ada reached this month's budget");
+    const digest = renderEmail({
+      kind: "approval_digest",
+      locale: "en",
+      orgName: "Acme",
+      items: [
+        { agentName: "Ada", title: "Merge PR #42", ageHours: 5 },
+        { agentName: "", title: "Deploy", ageHours: 0.2 },
+      ],
+      url: "u",
+    });
+    expect(digest.subject).toBe("2 approval requests waiting in Acme");
+    expect(digest.text).toContain("Ada: Merge PR #42 (5 h ago)");
+    expect(digest.text).toContain("An agent: Deploy (1 h ago)");
+    for (const t of [
+      { kind: "password_reset" as const, locale: "en" as const, url: "u" },
+      { kind: "verify_email" as const, locale: "en" as const, url: "u" },
+      { kind: "invite_request" as const, locale: "en" as const, orgName: "Acme", email: "", url: "u" },
+      {
+        kind: "calendar_invite" as const,
+        locale: "en" as const,
+        orgName: "Acme",
+        inviterName: "Ana",
+        title: "Retro",
+        when: "Oct 20, 2026, 9:00 AM",
+        url: "u",
+      },
+    ]) {
+      const e = renderEmail(t);
+      expect(e.html).toContain('<html lang="en">');
+      expect(e.text).not.toMatch(/você|convite|senha|e-mail/i);
+    }
+    // Jobs queued before locales existed stay pt-BR.
+    expect(renderEmail({ kind: "verify_email", url: "u" }).subject).toBe("Confirme seu e-mail no agentes");
+  });
+});
+
 describe("outbox delivery", () => {
   test("queued once per key, sent by the job with the key as idempotency key; permanent errors don't retry", async () => {
     f = await setup();

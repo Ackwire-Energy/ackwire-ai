@@ -73,7 +73,7 @@ export async function audienceError(db: Database, a: Agent) {
   return new ForbiddenError(d.english, d.code, d.params);
 }
 
-/** "O Theo só responde a Walter e Ana." (pt-BR text for agents' context and old clients; the app uses `audienceDetail`). */
+/** "Theo only replies to Walter and Ana." (English text for agents' context and old clients; the app uses `audienceDetail`). */
 export async function audienceNotice(db: Database, a: Agent): Promise<string> {
   const ids = [
     ...new Set([...(a.ownerUserId ? [a.ownerUserId] : []), ...(a.audienceMode === "people" ? a.audienceUserIds : [])]),
@@ -82,9 +82,9 @@ export async function audienceNotice(db: Database, a: Agent): Promise<string> {
     ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ids))
     : [];
   const names = ids.map((id) => rows.find((r) => r.id === id)?.name).filter((n): n is string => Boolean(n));
-  if (names.length === 0) return `O ${a.name} não está respondendo a ninguém agora.`;
-  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} e ${names.at(-1)}`;
-  return `O ${a.name} só responde a ${list}.`;
+  if (names.length === 0) return `${a.name} isn't replying to anyone right now.`;
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return `${a.name} only replies to ${list}.`;
 }
 
 /**

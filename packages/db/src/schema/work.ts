@@ -68,7 +68,7 @@ export const issues = pgTable(
   (t) => [unique().on(t.orgId, t.number), index().on(t.orgId, t.status), index().on(t.orgId, t.dueDate)],
 );
 
-/** Comments (people and agents) and events ("pediu à Ada para implementar") of an issue. */
+/** Comments (people and agents) and events ("asked Ada to implement") of an issue. */
 export const issueActivity = pgTable(
   "issue_activity",
   {
@@ -207,9 +207,9 @@ export const calendarEvents = pgTable(
     rrule: text(),
     /** The series rule (`ScheduleRule`, no times: the event's own); null = the legacy `recurrence`. */
     rule: jsonb().$type<Record<string, unknown>>(),
-    /** Original starts (ISO) of occurrences removed from the series ("só este"). */
+    /** Original starts (ISO) of occurrences removed from the series ("only this one"). */
     exdates: jsonb().$type<string[]>().notNull().default([]),
-    /** An edited occurrence ("só este"): the series it belongs to, and that occurrence's original start. */
+    /** An edited occurrence ("only this one"): the series it belongs to, and that occurrence's original start. */
     overrideOf: uuid(),
     originalStart: timestamp({ withTimezone: true }),
     channelId: uuid(),

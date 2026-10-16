@@ -667,6 +667,12 @@ export const ptBR = {
     expiresIn: "Expira em {{time}}",
     expired: "Expirou",
     expiresDetail: "expira em {{time}}",
+    titles: {
+      run_code: "Rodar código {{language}}",
+      upload_file: "Enviar {{path}} para o Drive",
+      run_skill_script: "Rodar o script {{path}} da skill {{skill}}",
+      post_message: "Postar em #{{channel}}",
+    },
   },
   approvals: {
     title: "Aprovações",
@@ -804,6 +810,14 @@ export const ptBR = {
     editTitle: "Editar {{kind}}",
     text: "Texto",
     editHelp: "A versão anterior fica no histórico. {{source}}",
+    origin: {
+      person: "Escrito por {{name}}",
+      agent: "Anotado pelo agente",
+      lesson: "Aprendido",
+      recorded: "Registrado",
+      someone: "uma pessoa",
+      inChannel: " em #{{channel}}",
+    },
   },
   proposals: {
     title: "Propostas de melhoria",
@@ -839,6 +853,14 @@ export const ptBR = {
     added: "Adicionado: ",
     removed: "Removido: ",
     empty: "Nenhuma proposta ainda. Quando uma lição se repetir, o agente propõe uma mudança aqui.",
+    titleInstructions: "Atualizar as instruções {{of}} {{name}}",
+    titleContext: "Atualizar o contexto da {{org}}",
+    evidence: {
+      outcome: "Resultado observado",
+      human: "Uma pessoa",
+      agent: "Outro agente",
+      self: "O próprio agente",
+    },
   },
   newAgent: {
     title: "Criar agente",
@@ -1165,6 +1187,61 @@ export const ptBR = {
       label: "Compartilhar documentos",
       description: "Mudar quem vê um arquivo. Sempre pede aprovação.",
     },
+    issues_read: {
+      label: "Ler issues",
+      description: "Listar e ler issues.",
+    },
+    calendar_read: {
+      label: "Ver agenda",
+      description: "Ver eventos e horários livres.",
+    },
+    calendar_write: {
+      label: "Propor eventos",
+      description: "Sugerir eventos; quem pediu confirma antes de qualquer convite.",
+    },
+    skills_read: {
+      label: "Usar skills",
+      description: "Carregar as skills ligadas para o agente.",
+    },
+    wiki_read: {
+      label: "Ler a wiki",
+      description: "Buscar e ler as páginas da wiki da organização.",
+    },
+    wiki_write: {
+      label: "Escrever na wiki",
+      description: "Criar e editar páginas da wiki, só quando uma pessoa pede.",
+    },
+    forum_write: {
+      label: "Fórum",
+      description: "Abrir tópicos no fórum, ler e postar fora da própria vez.",
+    },
+    schedule_write: {
+      label: "Agendar",
+      description: "Criar lembretes e rotinas pelo chat, para quem pediu, no fuso dessa pessoa.",
+    },
+    sandbox_run: {
+      label: "Rodar código",
+      description:
+        "Rodar código e scripts de skills no computador do agente (isolado, sem segredos, arquivos guardados entre conversas); custa tempo de máquina. Nunca vem ligado por padrão.",
+    },
+    github_git_read: {
+      label: "Clonar repositórios (git)",
+      description:
+        "Clonar e atualizar repositórios no computador do agente com git, pelo nosso proxy; o token do GitHub nunca entra na máquina.",
+    },
+    github_git_write: {
+      label: "Enviar branches (git push)",
+      description:
+        "Enviar commits só para branches agentes/{agente}/…: nunca na branch principal, sem force push, sem tags.",
+    },
+    custom_read: {
+      label: "Ferramentas de leitura",
+      description: "Consultar dados pelas ferramentas classificadas como leitura.",
+    },
+    custom_write: {
+      label: "Ferramentas de escrita",
+      description: "Usar as ferramentas de escrita. As marcadas como sensíveis sempre pedem aprovação.",
+    },
   },
   issues: {
     moreFilters: "Filtrar por responsável e prioridade",
@@ -1241,6 +1318,22 @@ export const ptBR = {
     artifactBy: "{{title}} ({{name}})",
     noLinks: "Nada ligado ainda.",
     labels: "Etiquetas",
+    event: {
+      created: "criou a issue",
+      renamed: "renomeou a issue",
+      description_changed: "editou a descrição",
+      status_changed: "mudou o status para {{status}}",
+      priority_changed: "mudou a prioridade para {{priority}}",
+      assigned: "atribuiu a issue",
+      unassigned: "removeu o responsável",
+      due_date_set: "definiu o prazo para {{date}}",
+      due_date_removed: "removeu o prazo",
+      pr_linked: "ligou o PR #{{number}}",
+      artifact_linked: "anexou um arquivo",
+      criterion_checked: 'marcou o critério "{{text}}"',
+      criterion_unchecked: 'desmarcou o critério "{{text}}"',
+      agent_asked: "pediu a {{name}} para implementar",
+    },
   },
   routines: {
     filters: "Filtrar rotinas",
@@ -1262,6 +1355,7 @@ export const ptBR = {
       delivered_dm: "Enviado na DM",
       forum_opened: "Fórum aberto: {{title}}",
       failed: "Falhou: {{reason}}",
+      audience: "Pausada: quem criou a rotina não pode mais falar com o agente",
     },
     resume: "Retomar",
     edit: "Editar",
@@ -1357,7 +1451,15 @@ export const ptBR = {
       created: "Rotina criada.",
       required: "Diga o que o agente deve fazer.",
       noAgents: "Crie um agente antes de criar uma rotina.",
+      defaultPhrase: "toda segunda às 9h",
+      parseError: {
+        schedule_unreadable: "Não entendi o período. Tente “a cada 2 semanas na segunda às 9h”.",
+        schedule_never: "Esse período nunca acontece.",
+        schedule_invalid: "Esse período não é válido.",
+        routine_schedule_required: "Diga quando a rotina deve rodar.",
+      },
     },
+    copyName: "{{name}} (cópia)",
   },
   filters: {
     clear: "Limpar {{name}}",
@@ -1948,6 +2050,20 @@ export const ptBR = {
     savedTo: "Salvo em {{title}}.",
     fromMessage: "de uma mensagem em #{{channel}}",
     fromForum: "da síntese do fórum",
+    note: {
+      created: "criou a página",
+      edited: "editou",
+      rewrote_section: 'reescreveu a seção "{{section}}"',
+      appended: "acrescentou um trecho",
+      renamed: 'renomeou de "{{from}}" para "{{to}}"',
+      link_updated: 'link atualizado: "{{from}}" → "{{to}}"',
+      moved: 'moveu para "{{folder}}"',
+      moved_root: "moveu para a raiz",
+      saved_message: "salvou uma mensagem",
+      saved_synthesis: "salvou a síntese do fórum",
+      created_from_message: "criou a partir de uma mensagem",
+      created_from_synthesis: "criou a partir da síntese do fórum",
+    },
   },
   run: {
     steeredStep: "Nova mensagem de {{name}}",
@@ -2748,6 +2864,22 @@ export const ptBR = {
       general2: "Resume o que rolou hoje",
       general3: "Me ajuda a organizar a semana?",
     },
+    body: {
+      approval_request: "Pedido de aprovação: {{title}}",
+      secret_request: "Pedido de segredo: {{name}}",
+      file_saved: "Arquivo salvo.",
+      done: "Pronto.",
+      memory: {
+        proposed: "Proposta criada: {{text}}",
+        forgot: 'Memória atualizada: esqueci "{{text}}".',
+        updated: "Memória atualizada: {{text}}",
+        remembered: "Memória atualizada: {{text}}",
+      },
+      interrupted: "Interrompida por uma atualização do servidor. Peça de novo para continuar.",
+      forum_concluded: 'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo.',
+      forum_concluded_issues:
+        'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo, com {{count}} issue(s) sugerida(s) para aprovar.',
+    },
   },
   landing: {
     money: "US$ {{value}}",
@@ -3093,6 +3225,196 @@ export const ptBR = {
     },
     footer: "© 2026 agentes.chat · Pessoas e agentes de IA trabalhando juntos.",
     footerBy: "Feito por",
+  },
+  builtinTools: {
+    ask_user: {
+      label: "Perguntar à pessoa",
+      description: "Faz uma pergunta curta e espera a resposta.",
+    },
+    search_context: {
+      label: "Buscar no contexto",
+      description: "Busca mensagens, resumos, fatos e lições.",
+    },
+    get_summary: {
+      label: "Ler resumo",
+      description: "Lê o resumo de um thread ou período.",
+    },
+    expand: {
+      label: "Abrir item",
+      description: "Abre uma memória ou mensagem por inteiro.",
+    },
+    remember: {
+      label: "Lembrar",
+      description: "Guarda uma nota quando alguém pede.",
+    },
+    update_memory: {
+      label: "Atualizar memória",
+      description: "Corrige uma nota guardada.",
+    },
+    forget: {
+      label: "Esquecer",
+      description: "Arquiva uma nota quando alguém pede.",
+    },
+    propose_instruction_change: {
+      label: "Propor mudança de instruções",
+      description: "Sugere mudar as próprias instruções ou o contexto da org; uma pessoa decide.",
+    },
+    read_artifact: {
+      label: "Ler arquivo",
+      description: "Lê um arquivo do Drive.",
+    },
+    list_artifacts: {
+      label: "Listar arquivos",
+      description: "Lista os arquivos do Drive que vê.",
+    },
+    share_artifact: {
+      label: "Compartilhar arquivo",
+      description: "Traz para a conversa um arquivo que fez em outra (como uma DM), se quem pediu tem acesso.",
+    },
+    create_artifact: {
+      label: "Criar arquivo",
+      description: "Cria documento, tabela, diff, diagrama ou página.",
+    },
+    update_artifact: {
+      label: "Atualizar arquivo",
+      description: "Salva uma nova versão de um arquivo.",
+    },
+    list_issues: {
+      label: "Ver issues",
+      description: "Lista e abre issues.",
+    },
+    create_issue: {
+      label: "Criar issue",
+      description: "Cria uma issue com critérios de aceite.",
+    },
+    update_issue: {
+      label: "Atualizar issue",
+      description: "Muda status, prioridade ou liga um PR.",
+    },
+    comment_issue: {
+      label: "Comentar issue",
+      description: "Comenta o andamento numa issue.",
+    },
+    list_events: {
+      label: "Ver agenda",
+      description: "Lista eventos.",
+    },
+    find_free_time: {
+      label: "Achar horário livre",
+      description: "Procura horários livres em comum.",
+    },
+    propose_event: {
+      label: "Propor evento",
+      description: "Sugere um evento; quem pediu confirma.",
+    },
+    load_skill: {
+      label: "Carregar skill",
+      description: "Carrega as instruções de uma skill.",
+    },
+    read_skill_file: {
+      label: "Ler arquivo de skill",
+      description: "Lê um arquivo de referência de uma skill.",
+    },
+    schedule_reminder: {
+      label: "Criar lembrete",
+      description: "Agenda um lembrete nesta conversa, para quem pediu.",
+    },
+    create_routine: {
+      label: "Criar rotina",
+      description: "Cria uma rotina recorrente nesta conversa ou num canal.",
+    },
+    list_routines: {
+      label: "Ver rotinas",
+      description: "Lista as rotinas do agente.",
+    },
+    update_routine: {
+      label: "Alterar rotina",
+      description: "Muda instruções, horário ou canal de uma rotina.",
+    },
+    list_reminders: {
+      label: "Ver lembretes",
+      description: "Lista os lembretes pendentes de quem pediu.",
+    },
+    cancel_reminder: {
+      label: "Cancelar lembrete",
+      description: "Cancela um lembrete de quem pediu.",
+    },
+    open_forum_topic: {
+      label: "Abrir tópico no fórum",
+      description: "Leva um assunto para discussão entre agentes.",
+    },
+    post_in_forum: {
+      label: "Postar no fórum",
+      description: "Posta num tópico fora da própria vez.",
+    },
+    read_forum_topic: {
+      label: "Ler tópico do fórum",
+      description: "Lê o objetivo e as respostas de um tópico.",
+    },
+    search_wiki: {
+      label: "Buscar na wiki",
+      description: "Procura páginas da wiki da organização.",
+    },
+    read_wiki_page: {
+      label: "Ler página da wiki",
+      description: "Lê uma página da wiki inteira.",
+    },
+    create_wiki_page: {
+      label: "Criar página na wiki",
+      description: "Cria uma página quando alguém pede.",
+    },
+    update_wiki_page: {
+      label: "Editar página da wiki",
+      description: "Acrescenta ou reescreve um trecho quando alguém pede.",
+    },
+    link_to_wiki: {
+      label: "Ligar páginas da wiki",
+      description: "Liga uma página a outras quando alguém pede.",
+    },
+    run_code: {
+      label: "Rodar código",
+      description: "Roda Python, Node ou bash no ambiente isolado da conversa.",
+    },
+    write_file: {
+      label: "Escrever no ambiente",
+      description: "Grava um arquivo no ambiente de código.",
+    },
+    read_file: {
+      label: "Ler do ambiente",
+      description: "Lê um arquivo do ambiente de código.",
+    },
+    list_files: {
+      label: "Listar o ambiente",
+      description: "Lista os arquivos do ambiente de código.",
+    },
+    export_file: {
+      label: "Salvar no Drive",
+      description: "Leva um arquivo do ambiente para o Drive.",
+    },
+    upload_file: {
+      label: "Enviar para o Drive",
+      description: "Envia um arquivo ou pasta do computador para o Drive como está (PDF, imagens, zip…).",
+    },
+    import_file: {
+      label: "Trazer do Drive",
+      description: "Copia um arquivo do Drive para o ambiente.",
+    },
+    run_skill_script: {
+      label: "Rodar script de skill",
+      description: "Roda um script de uma skill no ambiente.",
+    },
+    computer_start: {
+      label: "Ligar o computador",
+      description: "Liga o computador do agente (cria na primeira vez).",
+    },
+    computer_stop: {
+      label: "Desligar o computador",
+      description: "Desliga o computador; os arquivos ficam.",
+    },
+    computer_status: {
+      label: "Ver o computador",
+      description: "Diz se está ligado, o disco usado e o custo do mês.",
+    },
   },
 };
 

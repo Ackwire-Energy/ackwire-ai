@@ -4,7 +4,7 @@ import { requirePermission } from "./organizations";
 import { fetchGithub, type GithubFetchDeps, parseGithubUrl } from "./skills";
 
 /**
- * Bringing agents from another app (onboarding "Trazer seus agentes"): the
+ * Bringing agents from another app (onboarding "Bring your agents"): the
  * web app parses the files (an OpenMausBot team file, an OpenBot package);
  * the backend only reads them from GitHub for a link, because the browser
  * shouldn't call third parties. Only GitHub hosts, the SSRF guard on every

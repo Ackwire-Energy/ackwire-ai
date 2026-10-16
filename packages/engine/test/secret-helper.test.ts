@@ -69,7 +69,7 @@ test("keypair, deliver (env and file), run with redaction, remove: the helper do
   // Commands get it as an env variable; their output never shows it; exit codes pass through.
   const used = await exec("sb-1", {
     command: withSecretsCommand(
-      'test "$STRIPE_KEY" = "' + VALUE + '" && echo same; echo "k=$STRIPE_KEY"; echo "$STRIPE_KEY" >&2; exit 3',
+      `test "$STRIPE_KEY" = "${VALUE}" && echo same; echo "k=$STRIPE_KEY"; echo "$STRIPE_KEY" >&2; exit 3`,
     ),
     timeoutSeconds: 10,
   });

@@ -28,7 +28,7 @@ const {
 
 type PageRow = typeof wikiPages.$inferSelect;
 
-/** Who writes: a person, or an agent on a person's request ("por Theo, a pedido de Walter"). */
+/** Who writes: a person, or an agent on a person's request ("by Theo, at Walter's request"). */
 export type WikiActor =
   | { type: "person"; userId: string }
   | { type: "agent"; agentId: string; requestedByUserId: string | null };
@@ -38,7 +38,7 @@ export interface WikiDeps {
   pubsub?: PubSub;
   /** Search over the wiki (else a title/body match). */
   search?: SearchDeps;
-  /** For "Salvar na wiki" from a forum synthesis (a Drive document). */
+  /** For "Save to wiki" from a forum synthesis (a Drive document). */
   artifacts?: ArtifactDeps;
 }
 
@@ -85,6 +85,9 @@ export interface WikiVersionView {
   at: string;
   author: WikiAuthor;
   note: string | null;
+  /** A note the server wrote ("created the page"): its code and params, for the app's `wiki.note.*`. */
+  noteCode?: string;
+  noteParams?: Record<string, string>;
   title: string;
 }
 
@@ -94,7 +97,7 @@ export const WIKI_LIMITS = { body: 200_000, title: 200, folder: 200, tags: 20 };
 export class WikiVersionConflictError extends ConflictError {
   constructor(readonly currentVersion: number) {
     super(
-      `Alguém editou esta página enquanto você escrevia (agora está na versão ${currentVersion}).`,
+      `Someone edited this page while you were writing (it is now at version ${currentVersion}).`,
       "version_conflict",
     );
   }
@@ -516,7 +519,7 @@ export async function createWikiPage(
       })
       .returning();
     if (!page) throw new Error("wiki insert returned nothing");
-    await addVersion(tx, page, actor, input.note ?? (await defaultNote(tx, actor, "criou a página")));
+    await addVersion(tx, page, actor, input.note ?? (await defaultNote(tx, actor, "created the page")));
     await syncWikiLinks(tx, orgId, { type: "page", id: page.id }, body);
     await claimLinks(tx, page);
     await enqueueIndex(tx, { orgId, kind: "wiki", sourceId: page.id });
@@ -534,14 +537,40 @@ export async function createWikiPage(
   return view;
 }
 
-/** "por Theo, a pedido de Walter: …" for agent edits; the given text for people. */
+/** "by Theo, at Walter's request: …" for agent edits; the given text for people. */
 async function defaultNote(db: Executor, actor: WikiActor, what: string) {
   if (actor.type === "person") return what;
   const [agent] = await db.select({ name: agents.name }).from(agents).where(eq(agents.id, actor.agentId));
   const [person] = actor.requestedByUserId
     ? await db.select({ name: users.name }).from(users).where(eq(users.id, actor.requestedByUserId))
     : [];
-  return `por ${agent?.name ?? "agente"}${person ? `, a pedido de ${person.name}` : ""}: ${what}`;
+  return `by ${agent?.name ?? "agent"}${person ? `, at ${person.name}'s request` : ""}: ${what}`;
+}
+
+/** The notes `defaultNote` and the server write, by code (the author is shown apart, so only the action). */
+const NOTE_PATTERNS: [RegExp, string, string[]][] = [
+  [/^created the page$/, "created", []],
+  [/^edited$/, "edited", []],
+  [/^rewrote the section "(.*)"$/, "rewrote_section", ["section"]],
+  [/^added a passage$/, "appended", []],
+  [/^renamed from "(.*)" to "(.*)"$/, "renamed", ["from", "to"]],
+  [/^link updated: "(.*)" → "(.*)"$/, "link_updated", ["from", "to"]],
+  [/^moved to the root$/, "moved_root", []],
+  [/^moved to "(.*)"$/, "moved", ["folder"]],
+  [/^saved a message$/, "saved_message", []],
+  [/^saved the forum synthesis$/, "saved_synthesis", []],
+  [/^created from a message$/, "created_from_message", []],
+  [/^created from the forum synthesis$/, "created_from_synthesis", []],
+];
+
+/** `noteCode`/`noteParams` of a version note the server wrote; nothing for a person's own note. */
+export function wikiNoteDetail(note: string): { noteCode: string; noteParams: Record<string, string> } | null {
+  const action = note.replace(/^by [^:]+: /, "");
+  for (const [pattern, code, names] of NOTE_PATTERNS) {
+    const m = pattern.exec(action);
+    if (m) return { noteCode: code, noteParams: Object.fromEntries(names.map((n, i) => [n, m[i + 1] ?? ""])) };
+  }
+  return null;
 }
 
 export interface WikiPagePatch {
@@ -595,7 +624,7 @@ export async function updateWikiPage(
       const [now] = await tx.select({ version: wikiPages.version }).from(wikiPages).where(eq(wikiPages.id, current.id));
       throw new WikiVersionConflictError(now?.version ?? current.version);
     }
-    await addVersion(tx, page, actor, patch.note?.trim() || (await defaultNote(tx, actor, "editou")));
+    await addVersion(tx, page, actor, patch.note?.trim() || (await defaultNote(tx, actor, "edited")));
     if (next.body !== current.body) await syncWikiLinks(tx, orgId, { type: "page", id: page.id }, next.body);
     await enqueueIndex(tx, { orgId, kind: "wiki", sourceId: page.id });
     await recordAudit(tx, {
@@ -655,7 +684,7 @@ function findSection(body: string, section: string) {
   return start >= 0 ? { start, contentStart, end: body.length } : null;
 }
 
-/** Appends a block to a page (as a new version): agents, and "Salvar na wiki". */
+/** Appends a block to a page (as a new version): agents, and "Save to wiki". */
 export async function appendToWikiPage(
   deps: WikiDeps,
   actor: WikiActor,
@@ -676,7 +705,7 @@ export async function appendToWikiPage(
       (await defaultNote(
         deps.db,
         actor,
-        input.mode === "replace_section" ? `reescreveu a seção "${input.section}"` : "acrescentou um trecho",
+        input.mode === "replace_section" ? `rewrote the section "${input.section}"` : "added a passage",
       )),
   });
 }
@@ -728,7 +757,7 @@ export async function renameWikiPage(
       .where(eq(wikiPages.id, current.id))
       .returning();
     if (!page) throw new NotFoundError("Page not found", "wiki.page_not_found");
-    await addVersion(tx, page, actor, await defaultNote(tx, actor, `renomeou de "${current.title}" para "${title}"`));
+    await addVersion(tx, page, actor, await defaultNote(tx, actor, `renamed from "${current.title}" to "${title}"`));
     await claimLinks(tx, page);
     // Pages that link here: rewrite their `[[…]]` to the new title, as a new version each.
     const linking = await tx
@@ -750,7 +779,7 @@ export async function renameWikiPage(
         .where(eq(wikiPages.id, other.id))
         .returning();
       if (!saved) continue;
-      await addVersion(tx, saved, actor, `link atualizado: "${current.title}" → "${title}"`);
+      await addVersion(tx, saved, actor, `link updated: "${current.title}" → "${title}"`);
       await syncWikiLinks(tx, orgId, { type: "page", id: saved.id }, saved.body);
       await enqueueIndex(tx, { orgId, kind: "wiki", sourceId: saved.id });
       touched.push(saved.id);
@@ -776,7 +805,7 @@ export async function renameWikiPage(
   return view;
 }
 
-/** `[[Antigo#seção|texto]]` → `[[Novo#seção|texto]]` for links to any of `slugs` (code is left alone). */
+/** `[[Old#section|text]]` → `[[New#section|text]]` for links to any of `slugs` (code is left alone). */
 export function rewriteLinks(body: string, slugs: Set<string>, newTitle: string) {
   const parts = body.split(/(```[\s\S]*?```|`[^`\n]*`)/);
   return parts
@@ -804,7 +833,11 @@ export async function moveWikiPage(deps: WikiDeps, actor: WikiActor, orgId: stri
   const view = await updateWikiPage(deps, actor, orgId, page.id, {
     baseVersion: page.version,
     folder,
-    note: await defaultNote(deps.db, actor, `moveu para "${cleanFolder(folder) || "a raiz"}"`),
+    note: await defaultNote(
+      deps.db,
+      actor,
+      cleanFolder(folder) ? `moved to "${cleanFolder(folder)}"` : "moved to the root",
+    ),
   });
   await recordAudit(deps.db, {
     orgId,
@@ -1003,6 +1036,7 @@ export async function listWikiVersions(db: Database, actor: WikiActor, orgId: st
         onBehalfOf: v.authorType === "agent" ? v.requestedByUserId : null,
       },
       note: v.note || null,
+      ...(v.note ? wikiNoteDetail(v.note) : null),
       title: v.title,
     }),
   );
@@ -1029,6 +1063,7 @@ export async function getWikiVersion(db: Database, actor: WikiActor, orgId: stri
       onBehalfOf: v.authorType === "agent" ? v.requestedByUserId : null,
     },
     note: v.note || null,
+    ...(v.note ? wikiNoteDetail(v.note) : null),
   };
 }
 
@@ -1236,7 +1271,7 @@ async function searchPages(deps: WikiDeps, orgId: string, text: string, limit: n
     .limit(limit);
 }
 
-// ── "Salvar na wiki" ─────────────────────────────────────────────────────────
+// ── "Save to wiki" ─────────────────────────────────────────────────────────────
 
 export type WikiSaveSource =
   | { kind: "message"; channelId: string; messageId: string }
@@ -1260,17 +1295,17 @@ async function sourceBlock(deps: WikiDeps, userId: string, orgId: string, source
         : m.authorUserId
           ? await db.select({ name: users.name }).from(users).where(eq(users.id, m.authorUserId))
           : [];
-    const where = channel?.kind === "dm" ? "uma DM" : `#${channel?.name ?? "canal"}`;
+    const where = channel?.kind === "dm" ? "a DM" : `#${channel?.name ?? "channel"}`;
     const date = m.createdAt.toISOString().slice(0, 10);
     return {
-      text: `${m.body.trim()}\n\n_Salvo de uma mensagem de ${author?.name ?? "alguém"} em ${where} (${date})._`,
+      text: `${m.body.trim()}\n\n_Saved from a message by ${author?.name ?? "someone"} in ${where} (${date})._`,
       source: { type: "message", id: m.id, channelId: m.channelId },
       title:
         m.body
           .split("\n")[0]
           ?.replace(/[#*_`[\]|]/g, "")
           .trim()
-          .slice(0, 80) || "Nota",
+          .slice(0, 80) || "Note",
     };
   }
   const topic = await getForumTopic(db, userId, orgId, source.topicId);
@@ -1289,13 +1324,13 @@ async function sourceBlock(deps: WikiDeps, userId: string, orgId: string, source
   );
   const markdown = doc.content.kind === "document" ? doc.content.markdown : "";
   return {
-    text: `${markdown.trim()}\n\n_Síntese do fórum "${topic.title}" (${topic.lastActivityAt.slice(0, 10)})._`,
+    text: `${markdown.trim()}\n\n_Forum synthesis "${topic.title}" (${topic.lastActivityAt.slice(0, 10)})._`,
     source: { type: "forum_topic", id: topic.id, channelId: topic.channelId },
     title: topic.title.replace(/[#[\]|]/g, "").slice(0, 120),
   };
 }
 
-/** "Salvar na wiki": appends the message or synthesis to a page, with where it came from. */
+/** "Save to wiki": appends the message or synthesis to a page, with where it came from. */
 export async function appendSourceToWiki(
   deps: WikiDeps,
   userId: string,
@@ -1308,11 +1343,11 @@ export async function appendSourceToWiki(
   return appendToWikiPage(deps, { type: "person", userId }, orgId, ref, {
     text,
     section: input.section,
-    note: input.source.kind === "message" ? "salvou uma mensagem" : "salvou a síntese do fórum",
+    note: input.source.kind === "message" ? "saved a message" : "saved the forum synthesis",
   });
 }
 
-/** "Salvar na wiki" on a new page: the message or synthesis becomes the page, with its source. */
+/** "Save to wiki" on a new page: the message or synthesis becomes the page, with its source. */
 export async function createPageFromSource(
   deps: WikiDeps,
   userId: string,
@@ -1330,7 +1365,7 @@ export async function createPageFromSource(
       folder: input.folder,
       tags: input.tags,
       source: block.source,
-      note: input.source.kind === "message" ? "criou a partir de uma mensagem" : "criou a partir da síntese do fórum",
+      note: input.source.kind === "message" ? "created from a message" : "created from the forum synthesis",
     },
     { allowDuplicate: true },
   );
@@ -1385,7 +1420,7 @@ export async function retrieveWikiForRun(
     const room = Math.min(2500, budget - used);
     if (room < 300) break;
     const body = p.body.trim();
-    const text = `## [[${p.title}]] (${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version})\n${body.length > room ? `${body.slice(0, room)}\n[… continua: leia com read_wiki_page]` : body}`;
+    const text = `## [[${p.title}]] (${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version})\n${body.length > room ? `${body.slice(0, room)}\n[… continues: read it with read_wiki_page]` : body}`;
     lines.push(text);
     ids.push(p.id);
     used += text.length;

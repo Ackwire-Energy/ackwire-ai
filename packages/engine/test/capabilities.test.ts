@@ -20,15 +20,15 @@ test("capabilities come from the granted tools, grouped, with what needs approva
     { name: "github_merge_pr", description: "Merge a pull request.", scope: "github:pr.merge" },
     { name: "ask_user", description: "Ask the person.", scope: "" },
   ]);
-  expect(text).toContain("Você pode:");
-  expect(text).toContain("- Arquivos (Drive): `create_artifact` (Save a file people can open.); `read_artifact`");
+  expect(text).toContain("You can:");
+  expect(text).toContain("- Files (Drive): `create_artifact` (Save a file people can open.); `read_artifact`");
   expect(text).toContain("- GitHub: `github_merge_pr`");
-  expect(text).toContain("Baixar PDF");
-  expect(text).toContain("Precisam da aprovação de uma pessoa (você pede, alguém aprova no chat): `github_merge_pr`.");
-  expect(text).toContain("sugira quem pode");
+  expect(text).toContain("Download PDF");
+  expect(text).toContain("Need a person's approval (you ask, someone approves in the chat): `github_merge_pr`.");
+  expect(text).toContain("suggest who can");
   const none = describeCapabilities([]);
-  expect(none).toContain("Você só escreve mensagens neste chat");
-  expect(none).not.toContain("Baixar PDF");
+  expect(none).toContain("You only write messages in this chat");
+  expect(none).not.toContain("Download PDF");
 });
 
 const promptOf = (req: ModelRequest | undefined) => systemText(req?.system ?? "");
@@ -52,12 +52,12 @@ test("the run's prompt lists exactly what the agent was granted", async () => {
   await drainOutbox(f.db, f.handlers);
   prompt = promptOf(f.provider.calls.at(-1)?.request);
   expect(prompt).toContain("`github_merge_pr`");
-  expect(prompt).toMatch(/Precisam da aprovação[^\n]*`github_merge_pr`/);
+  expect(prompt).toMatch(/Need a person's approval[^\n]*`github_merge_pr`/);
 
   await setAgentScopes(f.db, f.owner.id, f.org.id, f.agent.id, []);
   await ask();
   await drainOutbox(f.db, f.handlers);
   prompt = promptOf(f.provider.calls.at(-1)?.request);
-  expect(prompt).toContain("Você só escreve mensagens neste chat");
+  expect(prompt).toContain("You only write messages in this chat");
   expect(prompt).not.toContain("`create_artifact`");
 });

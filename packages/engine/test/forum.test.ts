@@ -37,7 +37,7 @@ const SYNTHESIS = [
   "# Síntese",
   "Decisão: seguir com o plano B.",
   "",
-  "## Issues sugeridas",
+  "## Suggested issues",
   "- Medir a conversão — antes e depois da mudança",
   "- Atualizar a página de preços — com os novos valores",
 ].join("\n");
@@ -59,7 +59,7 @@ function forumReply(onTurn?: (handle: string, req: ModelRequest) => void) {
         ],
       };
     }
-    if (last.includes("escreva agora a síntese")) return { chunks: [SYNTHESIS] };
+    if (last.includes("now write the synthesis")) return { chunks: [SYNTHESIS] };
     onTurn?.(handle, req);
     return { chunks: [`${handle} acha que sim; @ops, o que você acha?`] };
   };
@@ -115,7 +115,7 @@ describe("rounds", () => {
       .select()
       .from(schema.artifacts)
       .where(eq(schema.artifacts.id, done.synthesis?.artifactId ?? ""));
-    expect(artifact).toMatchObject({ kind: "document", title: "Síntese: Plano de preços" });
+    expect(artifact).toMatchObject({ kind: "document", title: "Synthesis: Plano de preços" });
     // Issues only when a person approves them.
     const { numbers } = await createForumIssues(
       forum(),

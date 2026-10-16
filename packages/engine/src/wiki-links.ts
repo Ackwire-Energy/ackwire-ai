@@ -2,7 +2,7 @@ import { and, type Executor, eq, inArray, isNull, or, schema, sql } from "@agent
 
 const { wikiPages, wikiLinks } = schema;
 
-/** One `[[…]]` in a text: `[[Título]]`, `[[Pasta/Título|texto]]`, `[[Página#seção]]`. */
+/** One `[[…]]` in a text: `[[Title]]`, `[[Folder/Title|text]]`, `[[Page#section]]`. */
 export interface WikiLinkRef {
   /** What was written before `|`, e.g. `Processos/Deploy#Rollback`. */
   target: string;
@@ -86,7 +86,7 @@ export async function pagesBySlug(db: Executor, orgId: string, slugs: string[]) 
   return out;
 }
 
-/** Resolves written link targets (`Título`, `Pasta/Título#seção`) against the org's pages. */
+/** Resolves written link targets (`Title`, `Folder/Title#section`) against the org's pages. */
 export async function resolveWikiTargets(db: Executor, orgId: string, refs: WikiLinkRef[]) {
   const pages = await pagesBySlug(
     db,

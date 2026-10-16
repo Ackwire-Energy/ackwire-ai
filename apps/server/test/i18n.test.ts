@@ -7,7 +7,7 @@ beforeEach(async () => {
 });
 afterEach(() => t.close());
 
-test("errors carry a stable code and params (English message as fallback); rule descriptions in the asked language", async () => {
+test("errors carry a stable code and params (English message as fallback); rule descriptions in English", async () => {
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
   const { orgId } = await seedOrg(owner);
@@ -31,8 +31,9 @@ test("errors carry a stable code and params (English message as fallback); rule 
     description: string;
   };
   expect(en.description).toBe("Every 2 weeks, Mon and Wed, at 09:00 (UTC)");
-  const pt = (await (await api("/routines/describe-rule", { json: { rule } })).json()) as { description: string };
-  expect(pt.description).toBe("A cada 2 semanas, seg e qua, às 09:00 (UTC)");
+  // Without a locale: English too (the app words the rule itself from `rule`).
+  const plain = (await (await api("/routines/describe-rule", { json: { rule } })).json()) as { description: string };
+  expect(plain.description).toBe("Every 2 weeks, Mon and Wed, at 09:00 (UTC)");
   const bad = (await (
     await api("/routines/describe-rule", { json: { rule: { ...rule, byWeekday: ["2MO"] } } })
   ).json()) as { ok: boolean; code: string };
@@ -47,6 +48,19 @@ test("run failures, approvals and memory updates carry codes", async () => {
     errorParams: { detail: "rate limited" },
   });
   expect(runErrorDetail("canceled_by:u1")).toEqual({ errorCode: "run.canceled", errorParams: { byUserId: "u1" } });
+  expect(runErrorDetail("Add an API key for Anthropic in the workspace settings")).toEqual({
+    errorCode: "run.missing_credential",
+    errorParams: { provider: "Anthropic" },
+  });
+  expect(runErrorDetail("Interrupted by a server update")).toMatchObject({ errorCode: "run.interrupted" });
+  expect(runErrorDetail("This agent's API key was revoked; pick another one in the agent's settings")).toEqual({
+    errorCode: "run.credential_revoked",
+  });
+  expect(runErrorDetail("This agent's model is from OpenAI, but the chosen key is from Anthropic")).toEqual({
+    errorCode: "run.credential_wrong_provider",
+    errorParams: { modelProvider: "OpenAI", keyProvider: "Anthropic" },
+  });
+  // Rows written before the backend was in English still map to their codes.
   expect(runErrorDetail("Configure uma chave da API da Anthropic nas configurações do workspace")).toEqual({
     errorCode: "run.missing_credential",
     errorParams: { provider: "Anthropic" },

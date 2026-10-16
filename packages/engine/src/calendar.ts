@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gte, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { zonedParts, zonedTime } from "./cron";
-import { queueEmail } from "./email";
+import { type EmailLocale, emailLocale, queueEmail } from "./email";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { getOrgSettings } from "./management";
@@ -52,7 +52,7 @@ export interface CalendarEventView {
   rule: ScheduleRule | null;
   /** The series this occurrence belongs to (its own id, or the series of an edited occurrence). */
   seriesId: string;
-  /** For occurrences of a series: the occurrence's original start (use it for "só este" / "este e os próximos"). */
+  /** For occurrences of a series: the occurrence's original start (use it for "only this one" / "this and following"). */
   occurrenceStart: string | null;
   participants: CalendarActor[];
   /** RSVP of each person attending. */
@@ -77,7 +77,7 @@ export interface CalendarProposalView {
 
 /** A series rule for events: the `ScheduleRule` fields without times, zone or start (they come from the event). */
 export type EventRule = Omit<ScheduleRule, "time" | "times" | "timezone" | "start" | "freq"> & {
-  /** `once` = doesn't repeat (the picker's "Não repete"). */
+  /** `once` = doesn't repeat (the picker's "Doesn't repeat"). */
   freq: "once" | "daily" | "weekly" | "monthly" | "yearly";
   /** Accepted and ignored: an event's times, zone and first day are its own. */
   times?: string[];
@@ -277,9 +277,13 @@ async function checkParticipants(db: Database, orgId: string, participants: Cale
   }
 }
 
-/** "seg., 20 de out. de 2026, 09:00" in a time zone. */
-const formatWhen = (d: Date, timeZone: string) =>
-  new Intl.DateTimeFormat("pt-BR", { timeZone, dateStyle: "medium", timeStyle: "short" }).format(d);
+/** "Oct 20, 2026, 9:00 AM" / "20 de out. de 2026, 09:00": in a time zone and the email's language. */
+const formatWhen = (d: Date, timeZone: string, locale: EmailLocale) =>
+  new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", {
+    timeZone,
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(d);
 
 /** Tells invited people: in the app, and by email. */
 async function notifyInvited(deps: CalendarDeps, e: EventRow, inviterId: string, people: string[]) {
@@ -290,7 +294,7 @@ async function notifyInvited(deps: CalendarDeps, e: EventRow, inviterId: string,
     .from(organizations)
     .where(eq(organizations.id, e.orgId));
   const rows = await deps.db
-    .select({ id: users.id, email: users.email, tz: organizationMembers.timezone })
+    .select({ id: users.id, email: users.email, locale: users.locale, tz: organizationMembers.timezone })
     .from(users)
     .innerJoin(
       organizationMembers,
@@ -305,10 +309,11 @@ async function notifyInvited(deps: CalendarDeps, e: EventRow, inviterId: string,
       to: [r.email],
       template: {
         kind: "calendar_invite",
+        locale: emailLocale(r.locale),
         orgName: org?.name ?? "",
-        inviterName: inviter?.name ?? "Alguém",
+        inviterName: inviter?.name ?? "",
         title: e.title,
-        when: formatWhen(e.startAt, r.tz ?? e.timezone),
+        when: formatWhen(e.startAt, r.tz ?? e.timezone, emailLocale(r.locale)),
         url: `${(deps.publicUrl ?? "").replace(/\/$/, "")}/org/${e.orgId}/calendar`,
       },
     });
@@ -516,7 +521,7 @@ async function copyAttendees(tx: Executor, orgId: string, fromId: string, toId: 
     .onConflictDoNothing();
 }
 
-/** The occurrence a "só este / este e os próximos" refers to, checked against the series. */
+/** The occurrence an "only this one / this and following" refers to, checked against the series. */
 function occurrenceOf(series: EventRow, occurrenceStart: string | undefined) {
   if (!occurrenceStart) throw new ValidationError("occurrenceStart is required for this scope");
   const at = new Date(occurrenceStart);
@@ -687,7 +692,7 @@ export async function updateCalendarEvent(
           .where(and(eq(calendarEvents.overrideOf, row.id), gte(calendarEvents.originalStart, at)));
         return next;
       }
-      // "Este e os próximos" from the first one is the whole series.
+      // "This and following" from the first one is the whole series.
     }
     // The whole series: a time change moves every occurrence (and its removed/edited ones).
     const at = patch.occurrenceStart ? new Date(patch.occurrenceStart) : row.startAt;

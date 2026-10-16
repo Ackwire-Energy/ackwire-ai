@@ -63,7 +63,7 @@ test("knowledge API: search, context items (add, pin, edit), reactions, correcti
       archived: false,
     }),
   ]);
-  expect(memories.memories[0]?.source).toContain("Escrito por owner em #general");
+  expect(memories.memories[0]?.source).toContain("Written by owner in #general");
   const pinned = (await (
     await api(`/memories/${memories.memories[0]?.id}`, {
       method: "PATCH",
@@ -91,7 +91,7 @@ test("knowledge API: search, context items (add, pin, edit), reactions, correcti
   };
   expect(proposals.proposals).toHaveLength(1);
   expect(proposals.proposals[0]).toMatchObject({
-    title: "Atualizar as instruções de Dev",
+    title: "Update Dev's instructions",
     before: "",
     decider: { type: "user" },
     canDecide: true,

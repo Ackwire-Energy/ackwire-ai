@@ -6,7 +6,7 @@ const tags = ["Agents"];
 const State = z.enum(["granted", "inherited", "denied", "off"]);
 const Tool = z.object({
   name: z.string(),
-  label: z.string().openapi({ description: "Human name (pt-BR when we have one)." }),
+  label: z.string().openapi({ description: "Human name in English; the app translates built-ins by tool name." }),
   description: z.string(),
   connectionId: z.uuid().nullable(),
   scope: z.string(),

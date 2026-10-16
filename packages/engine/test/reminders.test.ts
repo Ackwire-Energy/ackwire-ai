@@ -33,7 +33,7 @@ describe("one-off times", () => {
       ok: true,
       at: new Date("2026-10-16T12:00:00Z"),
       timezone: sp,
-      description: "amanhã, 16/10, às 09:00 (horário de Brasília)",
+      description: "tomorrow, Oct 16, at 09:00 (Brasília time)",
     });
   });
 
@@ -51,9 +51,17 @@ describe("one-off times", () => {
     expect(at("às 8h")).toBe("2026-10-16T11:00:00.000Z"); // already past today: tomorrow
     expect(at("2026-10-16T09:00")).toBe("2026-10-16T12:00:00.000Z");
     expect(at("2026-10-16T09:00:00Z")).toBe("2026-10-16T09:00:00.000Z");
-    expect(at("hoje às 10h")).toBe("Esse horário já passou.");
-    expect(at("amanhã")).toBe("Falta o horário (por exemplo, às 9h).");
-    expect(at("quando der")).toContain("Não entendi quando");
+    expect(at("hoje às 10h")).toBe("That time has already passed.");
+    expect(at("amanhã")).toBe('The time of day is missing (for example, "at 9am").');
+    expect(at("quando der")).toContain("Couldn't tell when");
+    expect(parseWhen("quando der", sp, now)).toMatchObject({ ok: false, code: "when.unreadable" });
+    expect(parseWhen("hoje às 10h", sp, now)).toMatchObject({ ok: false, code: "when.past" });
+    // English input, English description; other days by weekday.
+    expect(parseWhen("monday at 10:30am", sp, now)).toMatchObject({
+      ok: true,
+      at: new Date("2026-10-19T13:30:00Z"),
+      description: "Monday, Oct 19, at 10:30 (Brasília time)",
+    });
   });
 });
 
@@ -97,11 +105,11 @@ describe("reminders from the chat", () => {
       body: "me lembra amanhã às 9h de pagar a conta de luz",
     });
     await drainOutbox(f.db, f.handlers);
-    expect(prompt).toContain("Você consegue agendar lembretes e rotinas");
+    expect(prompt).toContain("You can schedule reminders and routines");
     const [result] = await results();
     expect(result).toMatchObject({ name: "schedule_reminder", isError: false });
-    expect(result?.content).toContain("amanhã, ");
-    expect(result?.content).toContain("às 09:00 (horário de Brasília)");
+    expect(result?.content).toContain("tomorrow, ");
+    expect(result?.content).toContain("at 09:00 (Brasília time)");
 
     const [routine] = await listRoutines(f.db, f.owner.id, f.org.id);
     expect(routine).toMatchObject({ trigger: { type: "once", timezone: "America/Sao_Paulo" }, active: true });
@@ -115,7 +123,7 @@ describe("reminders from the chat", () => {
       threadId: null,
       authorType: "agent",
       authorAgentId: f.agent.id,
-      body: "@ana Lembrete: pagar a conta de luz",
+      body: "@ana Reminder: pagar a conta de luz",
     });
     expect(posted?.meta.routine).toMatchObject({ id: routine?.id });
     expect(posted?.mentionedUserIds).toEqual([f.owner.id]);

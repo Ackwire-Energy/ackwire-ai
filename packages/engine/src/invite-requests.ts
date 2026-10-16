@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { type Database, eq, schema } from "@agenteschat/db";
+import { type Database, eq, inArray, schema } from "@agenteschat/db";
 import { sha256 } from "./crypto";
-import { queueEmail } from "./email";
+import { emailLocale, emailsByLocale, queueEmail } from "./email";
 import { ConflictError, NotFoundError } from "./errors";
 import { publishUserEvent } from "./events";
 import { adminIds } from "./gateway";
@@ -53,20 +53,22 @@ export async function requestNewInvitation(
     .from(organizations)
     .where(eq(organizations.id, target.orgId));
   if (!org || recipientIds.length === 0) return;
-  const emails = (
-    await Promise.all(
-      recipientIds.map(
-        async (id) => (await db.select({ email: users.email }).from(users).where(eq(users.id, id)))[0]?.email,
-      ),
-    )
-  ).filter((e): e is string => Boolean(e));
-  if (emails.length > 0) {
+  const people = await db
+    .select({ email: users.email, locale: users.locale })
+    .from(users)
+    .where(inArray(users.id, recipientIds));
+  const groups = emailsByLocale(
+    people.map((p) => ({ email: p.email, locale: emailLocale(p.locale) })),
+    `invite-request:${target.id}`,
+  );
+  for (const { locale, to, key } of groups) {
     await queueEmail(db, {
       orgId: target.orgId,
-      key: `invite-request:${target.id}`,
-      to: emails,
+      key,
+      to,
       template: {
         kind: "invite_request",
+        locale,
         orgName: org.name,
         email: target.email,
         url: `${publicUrl.replace(/\/$/, "")}/org/${target.orgId}/members`,

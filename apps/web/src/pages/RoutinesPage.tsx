@@ -332,7 +332,7 @@ function RoutineCard({ routine: r, onRuns, onEdit }: { routine: Routine; onRuns:
                 icon="copy"
                 onSelect={() =>
                   action.mutate(
-                    { type: "duplicate", id: r.id },
+                    { type: "duplicate", id: r.id, name: t("routines.copyName", { name: r.name }) },
                     {
                       onSuccess: (copy) =>
                         toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
@@ -456,24 +456,42 @@ function targetChoice(target: RoutineTarget | undefined): string {
   return TARGET_KEEP;
 }
 
-/** The phrase the routine was set with ("toda segunda às 9h"; made with the picker: its rule's phrase). */
-function phraseOf(r: Routine | undefined): string {
-  if (!r) return "toda segunda às 9h";
-  if (r.trigger.type === "schedule") {
+/**
+ * The phrase the routine was set with (made with the picker: its rule's phrase);
+ * a new or event routine: the default one ("every Monday at 9am", in the UI language);
+ * a one-off: its moment in words.
+ */
+function phraseOf(r: Routine | undefined, t: TFunction, locale: string): string {
+  if (r?.trigger.type === "schedule") {
     if (r.trigger.phrase) return r.trigger.phrase;
     if (r.trigger.rule) return ruleToPhrase(fromApiRule(r.trigger.rule, toYmd(new Date())));
     return r.trigger.description;
   }
-  return r.trigger.type === "once" ? r.trigger.description : "toda segunda às 9h";
+  if (r?.trigger.type === "once") return ruleSentence(t, locale, onceRule(r.trigger.at, r.trigger.timezone || "UTC"));
+  return t("routines.form.defaultPhrase");
 }
 
-/** The rule a routine runs on, in `zone` (a phrase-only routine: its phrase read as a rule). */
+/** The rule a routine runs on, in `zone` (a phrase-only routine: its phrase read as a rule; new: Mondays at 09:00). */
 function ruleOf(r: Routine | undefined, zone: string): RecurrenceRule {
   const base = defaultRule(zone);
   if (r?.trigger.type === "once") return onceRule(r.trigger.at, zone);
   if (r?.trigger.type === "schedule" && r.trigger.rule)
     return { ...fromApiRule(r.trigger.rule, base.start), timezone: zone };
-  return phraseToRule(phraseOf(r), base) ?? base;
+  if (r?.trigger.type === "schedule") {
+    const phrase = r.trigger.phrase || r.trigger.description;
+    return phraseToRule(phrase, base) ?? base;
+  }
+  const { timezone, start } = base;
+  return {
+    freq: "weekly",
+    interval: 1,
+    byWeekday: ["MO"],
+    times: ["09:00"],
+    timezone,
+    start,
+    until: null,
+    count: null,
+  };
 }
 const zoneOf = (r: Routine | undefined) => (r && r.trigger.type !== "event" ? r.trigger.timezone || "UTC" : "");
 const isUtc = (z: string) => z === "UTC" || z === "Etc/UTC";
@@ -511,7 +529,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   const [kind, setKind] = useState<"schedule" | "event">(routine?.trigger.type === "event" ? "event" : "schedule");
   // The phrase field speaks Portuguese (the parser's language); in another UI language it starts empty.
   const phraseLang = i18n.language.startsWith("pt");
-  const [phrase, setPhrase] = useState(routine || phraseLang ? phraseOf(routine) : "");
+  const [phrase, setPhrase] = useState(routine || phraseLang ? phraseOf(routine, t, i18n.language) : "");
   const [event, setEvent] = useState<RoutineEvent>(
     routine?.trigger.type === "event" ? routine.trigger.event : "sentry.issue_created",
   );
@@ -616,10 +634,17 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
     return patch;
   };
   const help = () => {
-    if (phraseFailed && parsed.data && !parsed.data.ok) return parsed.data.error;
+    if (phraseFailed && parsed.data && !parsed.data.ok) {
+      const tt = t as unknown as (k: string, o: Record<string, unknown>) => string;
+      const code = parsed.data.code;
+      return code
+        ? tt(`routines.form.parseError.${code.replace(/\./g, "_")}`, { defaultValue: parsed.data.error })
+        : parsed.data.error;
+    }
     if (!info) return "";
     return t("routines.form.parsed", {
-      description: info.description,
+      // The sentence from the rule, in the UI language (the server's description is English).
+      description: ruleSentence(t, i18n.language, rule, new Date(), false),
       timezone: timezoneLabel(rule.timezone, undefined, i18n.language),
     });
   };

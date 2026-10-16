@@ -164,7 +164,7 @@ describe("links", () => {
       "Veja [[Publicação#Rollback|como voltar]] e [[Processos/Publicação]]. `[[Deploy]]` fica.",
     );
     expect(runbook.version).toBe(2);
-    expect((await listWikiVersions(f.db, me, f.org.id, "runbook"))[0]?.note).toContain("link atualizado");
+    expect((await listWikiVersions(f.db, me, f.org.id, "runbook"))[0]?.note).toContain("link updated");
     // The old slug finds the page; old `[[Deploy]]` in messages still resolve to it.
     expect((await getWikiPage(f.db, me, f.org.id, "deploy")).slug).toBe("publicacao");
     const [link] = await resolveWikiTargets(f.db, f.org.id, parseWikiLinks("[[Deploy]]"));
@@ -193,8 +193,10 @@ describe("pages", () => {
     const history = await listWikiVersions(f.db, me, f.org.id, "faq");
     expect(history.map((v) => [v.version, v.author.id, v.note])).toEqual([
       [2, bia.id, "acrescentei a 3"],
-      [1, f.owner.id, "criou a página"],
+      [1, f.owner.id, "created the page"],
     ]);
+    // A note the server wrote carries its code (the app translates it); a person's own note doesn't.
+    expect(history.map((v) => v.noteCode ?? null)).toEqual([null, "created"]);
     const diff = await diffWikiVersions(f.db, me, f.org.id, "faq", 1, 2);
     expect(diff).toMatchObject({ added: 1, removed: 0 });
     expect(diff.patch).toContain("+linha 3");
@@ -321,7 +323,7 @@ describe("pages", () => {
 });
 
 describe("agents", () => {
-  test("reads by default; writes only when a person asks, as 'por Dev, a pedido de ana'", async () => {
+  test("reads by default; writes only when a person asks, as 'by Dev, at ana's request'", async () => {
     let step = 0;
     f = await setup({
       wikiTools: true,
@@ -358,7 +360,8 @@ describe("agents", () => {
       createdBy: { type: "agent", id: f.agent.id, onBehalfOf: f.owner.id },
     });
     const [v1] = await listWikiVersions(f.db, person(f.owner.id), f.org.id, "deploy");
-    expect(v1?.note).toBe("por Dev, a pedido de ana: criou a página");
+    expect(v1?.note).toBe("by Dev, at ana's request: created the page");
+    expect(v1).toMatchObject({ noteCode: "created", noteParams: {} });
     expect(v1?.author).toEqual({ type: "agent", id: f.agent.id, onBehalfOf: f.owner.id });
 
     // A later question pulls the page into the prompt as a trusted source.
@@ -368,7 +371,7 @@ describe("agents", () => {
     });
     await drainOutbox(f.db, f.handlers);
     const later = systemText(f.provider.calls[before]?.request.system ?? "");
-    expect(later).toContain("Wiki da organização (fonte confiável)");
+    expect(later).toContain("Organization wiki (trusted source)");
     expect(later).toContain("Rode os testes");
   });
 

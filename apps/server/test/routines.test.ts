@@ -19,11 +19,11 @@ test("routines API: parse, create, run now, history, pause", async () => {
   expect(await (await api("/routines/parse-schedule", { json: { phrase: "dias úteis às 9h" } })).json()).toMatchObject({
     ok: true,
     cron: "0 9 * * 1-5",
-    description: "Dias úteis às 09:00",
+    description: "Every week, on weekdays, at 09:00 (UTC)",
     timezone: "UTC",
     rule: { freq: "weekly", byWeekday: ["MO", "TU", "WE", "TH", "FR"], times: ["09:00"] },
   });
-  // The same in English, for the app in English.
+  // A locale doesn't change it (descriptions are English).
   expect(
     await (await api("/routines/parse-schedule", { json: { phrase: "dias úteis às 9h", locale: "en" } })).json(),
   ).toMatchObject({ ok: true, description: "Every week, on weekdays, at 09:00 (UTC)" });
@@ -87,5 +87,5 @@ test("webhooks: signature checked; a GitHub PR opened fires the routine listenin
   expect(await ok.json()).toMatchObject({ event: "github.pr_opened", fired: 1 });
   await t.drain();
   const trigger = (await t.db.select().from(schema.messages)).find((m) => typeof m.meta.routineId === "string");
-  expect(trigger?.body).toContain("PR #7 aberto em acme/app: Fix login");
+  expect(trigger?.body).toContain("PR #7 opened in acme/app: Fix login");
 });

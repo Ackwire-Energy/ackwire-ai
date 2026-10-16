@@ -18,7 +18,7 @@ const failed = (error: unknown): ToolOutput => ({
 
 /** Shown when an agent tries to write without being asked. */
 export const WIKI_WRITE_REFUSAL =
-  'Not allowed: write to the wiki only when a person asks in the current message ("salva isso na wiki", "documenta…"). Offer to save it instead.';
+  'Not allowed: write to the wiki only when a person asks in the current message ("save this to the wiki", "document…"; in Portuguese "salva isso na wiki", "documenta…"). Offer to save it instead.';
 
 /**
  * Who asked: the person who wrote the trigger message. Forum turns, routines'
@@ -42,7 +42,7 @@ const reader = (ctx: ToolContext): WikiActor => ({ type: "agent", agentId: ctx.a
  * The org wiki for agents (D34): `search_wiki` and `read_wiki_page`
  * (`wiki:read`), `create_wiki_page`, `update_wiki_page` and `link_to_wiki`
  * (`wiki:write`). Writes need a person's request in the trigger message, and
- * every version records "por {agente}, a pedido de {pessoa}".
+ * every version records "by {agent}, at {person}'s request".
  */
 export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
   const wiki = (ctx: ToolContext): WikiDeps => ({ ...deps, db: ctx.db });
@@ -114,7 +114,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
     {
       name: "create_wiki_page",
       description:
-        "Create a wiki page. ONLY when a person asks you to save or document something in the wiki in the current message; never on your own. Use [[Título]] to link other pages.",
+        "Create a wiki page. ONLY when a person asks you to save or document something in the wiki in the current message; never on your own. Use [[Title]] to link other pages.",
       scope: "wiki:write",
       inputSchema: {
         type: "object",
@@ -205,7 +205,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
     {
       name: "link_to_wiki",
       description:
-        'Add links from one wiki page to others (in its "Veja também" section, or `section`). ONLY when a person asks.',
+        'Add links from one wiki page to others (in its "See also" section, or `section`: name it in the page\'s language, e.g. "Veja também"). ONLY when a person asks.',
       scope: "wiki:write",
       inputSchema: {
         type: "object",
@@ -224,7 +224,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
           const targets = (input.to as string[]).map((t) => t.replace(/[[\]]/g, "").trim()).filter(Boolean);
           const p = await appendToWikiPage(wiki(ctx), actor, ctx.orgId, str(input.page), {
             text: targets.map((t) => `- [[${t}]]`).join("\n"),
-            section: str(input.section) || "Veja também",
+            section: str(input.section) || "See also",
           });
           return { content: `Linked [[${p.title}]] to ${targets.map((t) => `[[${t}]]`).join(", ")}.` };
         } catch (error) {

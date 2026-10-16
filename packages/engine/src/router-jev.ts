@@ -5,7 +5,7 @@ import type { RouterStrategy, RoutingInput, RoutingResult } from "./router";
  * one request to `POST https://api.typesafe.ai/v1/systemone` with the
  * conversation as `state` and, in parallel, one Noul per candidate ("should
  * <agent> answer?"), a Noul for "does this need any agent?", and, with two or
- * more candidates, a Choice over the candidates plus "nenhum" to break ties.
+ * more candidates, a Choice over the candidates plus "none" to break ties.
  * It only scores; policy stays in `selectAgents`. Optional (needs
  * `TYPESAFE_API_KEY`); errors and timeouts fall back to another strategy.
  *
@@ -23,7 +23,7 @@ export interface JevUsage {
 export const JEV_NANO_USD_PER_INPUT_TOKEN = 0.042;
 export const jevCostNanoUsd = (inputTokens: number) => Math.round(inputTokens * JEV_NANO_USD_PER_INPUT_TOKEN);
 
-const NONE = "nenhum";
+const NONE = "none";
 
 interface JevAnswer {
   type: "noul" | "choice" | "score";

@@ -7,7 +7,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import type { Routine } from "@/api/types";
 import { createI18n } from "@/i18n";
 import { activityText, toolActivity } from "@/lib/activity";
-import { onceParts, routineOfMessage } from "@/lib/routines";
+import { onceParts, reminderBody, routineOfMessage } from "@/lib/routines";
 import { isDoneOnce } from "@/pages/RoutinesPage";
 import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -114,7 +114,7 @@ describe("reminder messages and activity", () => {
       channelId: ENG_ID,
       threadId: null,
       author: { type: "agent", id: ADA_ID },
-      body: "@walter Lembrete: ligar para o fornecedor",
+      body: "@walter Reminder: ligar para o fornecedor",
       mentionedAgentIds: [],
       agentRunId: null,
       meta: { reminder: true, routine: { id: "r-dm", name: "Lembrete: ligar", runId: "x" } },
@@ -127,6 +127,10 @@ describe("reminder messages and activity", () => {
       .find((a) => a.textContent?.includes("ligar para o fornecedor")) as HTMLElement;
     expect(row.textContent).toContain("Ada");
     expect(row.querySelector(".msg-reminder")?.textContent).toBe("Lembrete");
+    // The server's English prefix gives way to the translated label (older messages said "Lembrete: …").
+    expect(row.textContent).not.toContain("Reminder:");
+    expect(reminderBody("@ana Lembrete: pagar", { reminder: true })).toBe("@ana pagar");
+    expect(reminderBody("Reminder: x", {})).toBe("Reminder: x");
     expect(row.textContent).not.toContain("Rotina ·");
     expect(routineOfMessage({ reminder: true, routine: { id: "r", name: "x" } })).toBeNull();
     expect(routineOfMessage({ routine: { id: "r", name: "x" } })).toEqual({ id: "r", name: "x" });

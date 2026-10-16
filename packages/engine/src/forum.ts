@@ -165,7 +165,7 @@ async function views(db: Database, rows: TopicRow[]): Promise<ForumTopicView[]> 
             artifactId: r.synthesisArtifactId,
             version: r.synthesisVersion ?? 1,
             suggestedIssues: r.suggestedIssues,
-            /** The synthesis file was deleted (the app shows "Arquivo removido"). */
+            /** The synthesis file was deleted (the app shows "File removed"). */
             deleted: deletedFiles.has(r.synthesisArtifactId),
           }
         : null,
@@ -442,7 +442,7 @@ export async function postInForumAsPerson(
   const topic = await loadTopic(db, orgId, topicId);
   if (topic.status !== "open") throw new ValidationError("This topic has ended", "forum.topic_ended");
   const text = body.trim().slice(0, FORUM_LIMITS.postChars);
-  if (!text) throw new ValidationError("Escreva algo.");
+  if (!text) throw new ValidationError("Write something first", "forum.empty_post");
   // Reading the forum is open to the org; posting adds the person to the topic.
   await db.insert(channelMembers).values({ orgId, channelId: topic.channelId, userId }).onConflictDoNothing();
   await db.insert(forumParticipants).values({ orgId, topicId, userId }).onConflictDoNothing();
@@ -670,11 +670,11 @@ export async function advanceForumTopic(deps: ForumDeps, topicId: string, now = 
       .select({ handle: agents.handle })
       .from(agents)
       .where(and(eq(agents.id, next.agentId), eq(agents.orgId, topic.orgId)));
-    const handle = agent?.handle ?? "agente";
+    const handle = agent?.handle ?? "agent";
     const isSynthesis = next.kind === "synthesis";
     const body = isSynthesis
-      ? `@${handle}, escreva agora a síntese do fórum "${topic.title}" para quem pediu: a decisão ou recomendação, os prós e contras de cada participante, as perguntas em aberto e os próximos passos. No fim, uma seção "## Issues sugeridas" com uma linha por issue: "- Título — descrição". Seja fiel ao que foi dito.`
-      : `@${handle}, sua vez na rodada ${next.round} de ${topic.maxRounds} do fórum "${topic.title}". Objetivo: ${topic.goal}\nLeia o que já foi dito, traga sua visão e dados das suas ferramentas, discorde quando tiver motivo e fale com os outros pelo @. Uma resposta por rodada.`;
+      ? `@${handle}, now write the synthesis of the forum "${topic.title}" for whoever asked: the decision or recommendation, each participant's pros and cons, the open questions and the next steps. At the end, a "## Suggested issues" section (keep this heading in English) with one line per issue: "- Title — description". Be faithful to what was said.`
+      : `@${handle}, your turn in round ${next.round} of ${topic.maxRounds} of the forum "${topic.title}". Goal: ${topic.goal}\nRead what was already said, bring your view and data from your tools, disagree when you have a reason and talk to the others with @. One reply per round.`;
     // A turn message the worker writes on the person's behalf (hidden from posts), then the run.
     const { message } = await insertMessageWithRuns(
       tx,
@@ -721,9 +721,9 @@ export async function advanceForumTopic(deps: ForumDeps, topicId: string, now = 
   return outcome.kind;
 }
 
-/** "- Título — descrição" lines of the "Issues sugeridas" section. */
+/** "- Title — description" lines of the "Suggested issues" section (older syntheses: "Issues sugeridas"). */
 export function parseSuggestedIssues(markdown: string): ForumSuggestedIssue[] {
-  const section = /#+\s*issues sugeridas\s*\n([\s\S]*?)(?:\n#+\s|$)/i.exec(markdown)?.[1] ?? "";
+  const section = /#+\s*(?:suggested issues|issues sugeridas)\s*\n([\s\S]*?)(?:\n#+\s|$)/i.exec(markdown)?.[1] ?? "";
   return section
     .split("\n")
     .map((l) => /^\s*[-*]\s+(.+)$/.exec(l)?.[1]?.trim() ?? "")
@@ -751,7 +751,7 @@ async function finalizeSynthesis(deps: ForumDeps, topic: TopicRow, runId: string
       { type: "agent", agentId: run.agentId, channelId: topic.channelId, runId },
       topic.orgId,
       {
-        title: `Síntese: ${topic.title}`.slice(0, 200),
+        title: `Synthesis: ${topic.title}`.slice(0, 200),
         content: { kind: "document", markdown },
       },
     );
@@ -781,12 +781,14 @@ async function finalizeSynthesis(deps: ForumDeps, topic: TopicRow, runId: string
         channelId: topic.originChannelId,
         threadId: topic.originMessageId,
         author: { type: "agent", agentId: run.agentId, runId: null, hop: 0 },
-        body: `O fórum "${topic.title}" terminou. A síntese está no arquivo abaixo${suggested.length ? `, com ${suggested.length} issue(s) sugerida(s) para aprovar` : ""}.`,
+        body: `The forum "${topic.title}" is over. The synthesis is in the file below${suggested.length ? `, with ${suggested.length} suggested issue(s) to approve` : ""}.`,
         meta: {
           artifacts: [artifact],
           forumTopicId: topic.id,
           // For the app to say it in the person's language.
           forumConcluded: { topicId: topic.id, title: topic.title, suggestedIssues: suggested.length },
+          bodyCode: suggested.length ? "forum_concluded_issues" : "forum_concluded",
+          bodyParams: { title: topic.title, count: String(suggested.length) },
         },
       },
       { startRuns: false },
@@ -844,7 +846,7 @@ export async function postInForumAsAgent(
   );
   if (already) throw new ValidationError("You already posted this round; wait for the next", "forum.already_posted");
   const text = body.trim().slice(0, FORUM_LIMITS.postChars);
-  if (!text) throw new ValidationError("Escreva algo.");
+  if (!text) throw new ValidationError("Write something first", "forum.empty_post");
   const { message } = await insertMessageWithRuns(
     db,
     {

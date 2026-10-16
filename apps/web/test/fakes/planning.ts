@@ -498,13 +498,13 @@ export function createMockPlanning(
         const s = await store(orgId);
         s.routines = s.routines.filter((x) => x.id !== id);
       },
-      duplicate: async (orgId, id) => {
+      duplicate: async (orgId, id, name) => {
         record("routines.duplicate", id);
         const r = await findRoutine(orgId, id);
         const copy: Routine = {
           ...clone(r),
           id: mockId("rt"),
-          name: `${r.name} (cópia)`,
+          name: name ?? `${r.name} (copy)`,
           active: false,
           nextRunAt: null,
           running: false,

@@ -1,5 +1,5 @@
 import { isValidCron, nextCronTime, zonedParts, zonedTime } from "./cron";
-import { cronToRule, type ScheduleRule } from "./rrule";
+import { cronToRule, type ScheduleRule, timezoneName } from "./rrule";
 
 export type ScheduleParse =
   | { ok: true; cron: string; description: string; timezone: string }
@@ -15,7 +15,10 @@ const WEEKDAYS: [RegExp, number][] = [
   [/\bsextas?(-feira)?s?\b|\bfridays?\b/, 5],
   [/\bs[aá]bados?\b|\bsaturdays?\b/, 6],
 ];
-const WEEKDAY_NAMES = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const andList = (items: string[]) =>
+  items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 
 const plain = (s: string) => s.toLowerCase().normalize("NFC").replace(/\s+/g, " ").trim();
 
@@ -42,7 +45,7 @@ function timeOf(text: string): [number, number] | null {
 
 const hhmm = ([h, m]: [number, number]) => `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 
-/** Natural language (pt-BR or English) → cron, by code. Null when it can't tell. */
+/** Natural language (pt-BR or English) → cron, by code, with an English description. Null when it can't tell. */
 export function phraseToCron(phrase: string): { cron: string; description: string } | null {
   const text = plain(phrase);
   if (isValidCron(text) && text.split(" ").length === 5) return { cron: text, description: `cron ${text}` };
@@ -53,16 +56,16 @@ export function phraseToCron(phrase: string): { cron: string; description: strin
     const unit = every[2] ?? "";
     if (/^min/.test(unit)) {
       if (n < 1 || n > 59) return null;
-      return { cron: `*/${n} * * * *`, description: n === 1 ? "A cada minuto" : `A cada ${n} minutos` };
+      return { cron: `*/${n} * * * *`, description: n === 1 ? "Every minute" : `Every ${n} minutes` };
     }
     if (n < 1 || n > 23) return null;
     return {
       cron: n === 1 ? "0 * * * *" : `0 */${n} * * *`,
-      description: n === 1 ? "A cada hora" : `A cada ${n} horas`,
+      description: n === 1 ? "Every hour" : `Every ${n} hours`,
     };
   }
   if (/\b(de hora em hora|toda hora|every hour|hourly)\b/.test(text))
-    return { cron: "0 * * * *", description: "A cada hora" };
+    return { cron: "0 * * * *", description: "Every hour" };
 
   const time = timeOf(text) ?? (/(manh[ãa]|morning)/.test(text) ? ([9, 0] as [number, number]) : null);
   const at = time ?? ([9, 0] as [number, number]);
@@ -72,24 +75,24 @@ export function phraseToCron(phrase: string): { cron: string; description: strin
   if (monthDay && /(m[eê]s|month|todo dia \d)/.test(text)) {
     const day = Number(monthDay[1] ?? monthDay[2]);
     if (day < 1 || day > 31) return null;
-    return { cron: `${at[1]} ${at[0]} ${day} * *`, description: `Todo dia ${day} do mês às ${hhmm(at)}` };
+    return { cron: `${at[1]} ${at[0]} ${day} * *`, description: `Every month on day ${day} at ${hhmm(at)}` };
   }
 
   if (/(dias [úu]teis|de segunda a sexta|weekdays|every weekday|monday to friday|seg(unda)? a sex(ta)?)/.test(text)) {
-    return { cron: `${at[1]} ${at[0]} * * 1-5`, description: `Dias úteis às ${hhmm(at)}` };
+    return { cron: `${at[1]} ${at[0]} * * 1-5`, description: `Weekdays at ${hhmm(at)}` };
   }
   if (/(fins? de semana|weekends?)/.test(text)) {
-    return { cron: `${at[1]} ${at[0]} * * 0,6`, description: `Fins de semana às ${hhmm(at)}` };
+    return { cron: `${at[1]} ${at[0]} * * 0,6`, description: `Weekends at ${hhmm(at)}` };
   }
 
   const days = WEEKDAYS.filter(([re]) => re.test(text)).map(([, d]) => d);
   if (days.length > 0) {
-    const names = days.map((d) => WEEKDAY_NAMES[d] ?? "").join(", ");
-    return { cron: `${at[1]} ${at[0]} * * ${days.join(",")}`, description: `Toda ${names} às ${hhmm(at)}` };
+    const names = andList(days.map((d) => WEEKDAY_NAMES[d] ?? ""));
+    return { cron: `${at[1]} ${at[0]} * * ${days.join(",")}`, description: `Every ${names} at ${hhmm(at)}` };
   }
 
   if (/(todo dia|todos os dias|diariamente|every day|daily|cada dia)/.test(text) || time) {
-    return { cron: `${at[1]} ${at[0]} * * *`, description: `Todo dia às ${hhmm(at)}` };
+    return { cron: `${at[1]} ${at[0]} * * *`, description: `Every day at ${hhmm(at)}` };
   }
   return null;
 }
@@ -120,21 +123,10 @@ export async function parseSchedule(
 
 // ── One-off times ("amanhã às 9h") for reminders ─────────────────────────────
 
-export type WhenParse = { ok: true; at: Date; timezone: string; description: string } | { ok: false; error: string };
-
-const TZ_NAMES: Record<string, string> = {
-  "America/Sao_Paulo": "horário de Brasília",
-  "America/Manaus": "horário do Amazonas",
-  "America/Fortaleza": "horário de Fortaleza",
-  "America/Recife": "horário de Recife",
-  "America/Belem": "horário de Belém",
-  "America/Cuiaba": "horário de Cuiabá",
-  "America/Rio_Branco": "horário do Acre",
-  "America/Noronha": "horário de Fernando de Noronha",
-};
-
-/** "horário de Brasília", "UTC" or the IANA name. */
-export const timezoneName = (tz: string) => (tz === "UTC" || tz === "Etc/UTC" ? "UTC" : (TZ_NAMES[tz] ?? tz));
+/** `code` is stable (the app or the model can say it in the person's language); `error` is English. */
+export type WhenParse =
+  | { ok: true; at: Date; timezone: string; description: string }
+  | { ok: false; error: string; code: string };
 
 const addDays = (y: number, mo: number, d: number, n: number) => {
   const t = new Date(Date.UTC(y, mo - 1, d + n));
@@ -142,7 +134,7 @@ const addDays = (y: number, mo: number, d: number, n: number) => {
 };
 const weekdayOf = (y: number, mo: number, d: number) => new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
 
-/** "amanhã, 16/10, às 09:00 (horário de Brasília)". */
+/** "tomorrow, Oct 16, at 09:00 (Brasília time)"; other days by weekday ("Monday, Oct 19, …"). */
 export function describeWhen(at: Date, timezone: string, now = new Date()) {
   const p = zonedParts(at, timezone);
   const today = zonedParts(now, timezone);
@@ -150,12 +142,12 @@ export function describeWhen(at: Date, timezone: string, now = new Date()) {
   const same = (a: { year: number; month: number; day: number }) =>
     a.year === p.year && a.month === p.month && a.day === p.day;
   const day = same(today)
-    ? "hoje"
+    ? "today"
     : same(tomorrow)
-      ? "amanhã"
+      ? "tomorrow"
       : (WEEKDAY_NAMES[weekdayOf(p.year, p.month, p.day)] ?? "");
-  const date = `${String(p.day).padStart(2, "0")}/${String(p.month).padStart(2, "0")}${p.year !== today.year ? `/${p.year}` : ""}`;
-  return `${day}, ${date}, às ${hhmm([p.hour, p.minute])} (${timezoneName(timezone)})`;
+  const date = `${MONTH_NAMES[p.month - 1]} ${p.day}${p.year !== today.year ? `, ${p.year}` : ""}`;
+  return `${day}, ${date}, at ${hhmm([p.hour, p.minute])} (${timezoneName(timezone)})`;
 }
 
 /**
@@ -166,10 +158,12 @@ export function describeWhen(at: Date, timezone: string, now = new Date()) {
  */
 export function parseWhen(input: string, timezone: string, now = new Date()): WhenParse {
   const raw = input.trim();
-  if (!raw) return { ok: false, error: "Diga quando." };
+  if (!raw) return { ok: false, error: "Say when.", code: "when.required" };
   const done = (at: Date | null): WhenParse => {
-    if (!at || Number.isNaN(at.getTime())) return { ok: false, error: "Esse horário não existe nesse fuso." };
-    if (at.getTime() <= now.getTime()) return { ok: false, error: "Esse horário já passou." };
+    if (!at || Number.isNaN(at.getTime())) {
+      return { ok: false, error: "That time doesn't exist in this time zone.", code: "when.nonexistent" };
+    }
+    if (at.getTime() <= now.getTime()) return { ok: false, error: "That time has already passed.", code: "when.past" };
     return { ok: true, at, timezone, description: describeWhen(at, timezone, now) };
   };
   // ISO with an offset or Z: exact. Without: local wall time in the zone.
@@ -208,12 +202,13 @@ export function parseWhen(input: string, timezone: string, now = new Date()): Wh
     }
   }
   if (!time) {
-    return {
-      ok: false,
-      error: date
-        ? "Falta o horário (por exemplo, às 9h)."
-        : "Não entendi quando. Use algo como “amanhã às 9h”, “sexta às 15h” ou “em 2 horas”.",
-    };
+    return date
+      ? { ok: false, error: 'The time of day is missing (for example, "at 9am").', code: "when.time_missing" }
+      : {
+          ok: false,
+          error: 'Couldn\'t tell when. Try something like "tomorrow at 9am", "Friday at 3pm" or "in 2 hours".',
+          code: "when.unreadable",
+        };
   }
   if (!date) {
     // Only a time: today if it's still ahead, else tomorrow.

@@ -56,7 +56,7 @@ test("approvals API: list, approve (resumes the run), and decisions are final", 
   const thread = (await (
     await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages?threadId=${messages.messages[0]?.id}`)
   ).json()) as { messages: { body: string; meta: Record<string, unknown> }[] };
-  expect(thread.messages.at(-1)).toMatchObject({ body: "Pedido de aprovação: Merge PR #42", meta: { approvalId: id } });
+  expect(thread.messages.at(-1)).toMatchObject({ body: "Approval request: Merge PR #42", meta: { approvalId: id } });
 
   const approved = await owner(`/api/app/organizations/${orgId}/approvals/${id}/approve`, { json: {} });
   expect(approved.status).toBe(200);

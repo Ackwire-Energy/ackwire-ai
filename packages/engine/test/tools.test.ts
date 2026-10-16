@@ -228,9 +228,13 @@ describe("approval flow (end to end)", () => {
     expect(thread.map((m) => m.body)).toEqual([
       "@dev merge PR 42 if the tests pass",
       "Tests pass, merging.",
-      "Pedido de aprovação: Merge PR #42 in acme/app",
+      "Approval request: Merge PR #42 in acme/app",
     ]);
-    expect(thread[2]?.meta).toEqual({ approvalId: approval?.id });
+    expect(thread[2]?.meta).toEqual({
+      approvalId: approval?.id,
+      bodyCode: "approval_request",
+      bodyParams: { title: "Merge PR #42 in acme/app" },
+    });
     expect(events.map((e) => e.type)).toContain("approval.created");
     expect([...events].reverse().find((e) => e.type === "agent.run")).toMatchObject({ status: "waiting_approval" });
     expect(events.at(-1)).toMatchObject({ type: "message.handled", status: "waiting_approval" });

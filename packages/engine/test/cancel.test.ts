@@ -59,7 +59,7 @@ describe("canceling a run", () => {
     expect(run?.status).toBe("canceled");
     expect(f.provider.calls).toHaveLength(1);
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.at(-1)?.body).toBe("Começando a análise.\n\n_Interrompido por ana._");
+    expect(thread.at(-1)?.body).toBe("Começando a análise.\n\n_Stopped by ana._");
     expect(thread.at(-1)?.meta).toMatchObject({ canceled: { byUserId: f.owner.id } });
 
     const usage = await f.db
@@ -103,7 +103,7 @@ describe("canceling a run", () => {
     expect(sandbox.calls.some((c) => c.op === "kill")).toBe(true);
     expect(f.provider.calls).toHaveLength(1);
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
-    expect(thread.at(-1)?.body).toBe("Vou compilar.\n\n_Interrompido por ana._");
+    expect(thread.at(-1)?.body).toBe("Vou compilar.\n\n_Stopped by ana._");
   });
 
   test("while queued: it never starts and its job is dropped", async () => {
@@ -199,7 +199,7 @@ describe("one active run per agent and conversation", () => {
     const runs = await f.db.select().from(schema.agentRuns);
     expect(runs).toHaveLength(1);
     expect(runs[0]?.status).toBe("done");
-    expect(requests[1]).toContain("Nova mensagem de ana");
+    expect(requests[1]).toContain("New message from ana");
     expect(requests[1]).toContain("usa a branch dev, por favor");
     expect(requests[1]).toContain("build ok");
     expect(events.find((e) => e.type === "agent.run.steered")).toMatchObject({ runId: runs[0]?.id });

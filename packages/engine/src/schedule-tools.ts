@@ -12,7 +12,8 @@ import {
   routineTimezone,
   updateRoutine,
 } from "./routines";
-import { describeWhen, parseWhen, timezoneName } from "./schedule";
+import { timezoneName } from "./rrule";
+import { describeWhen, parseWhen } from "./schedule";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 export const SCHEDULE_SCOPE = "schedule:write";
@@ -121,7 +122,7 @@ const noRequester: ToolOutput = {
  * `schedule_reminder`, `create_routine`, `list_routines`, `update_routine`,
  * `list_reminders`, `cancel_reminder`.
  * Everything belongs to the person who asked, in their time zone, in this
- * conversation; reminders are one-off routines, so they show in Rotinas.
+ * conversation; reminders are one-off routines, so they show in Routines.
  */
 export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSource {
   const routineDeps = (ctx: ToolContext): RoutineDeps => ({ ...deps, db: ctx.db });
@@ -129,7 +130,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "schedule_reminder",
       description:
-        'Schedule a one-off reminder in this conversation: at that time you post "Lembrete: …" mentioning the person. `when` is natural language in the person\'s time zone ("amanhã às 9h", "sexta às 15h", "em 2 horas") or ISO. Set ask_agent when, at that time, you should do something (not just remind). If the time is ambiguous, ask with ask_user first.',
+        'Schedule a one-off reminder in this conversation: at that time you post "Reminder: …" mentioning the person (the app shows it as a reminder in their language). `when` is natural language in the person\'s time zone, Portuguese or English ("amanhã às 9h", "sexta às 15h", "em 2 horas", "tomorrow at 9am", "in 2 hours") or ISO. Write `message` in the person\'s language. Set ask_agent when, at that time, you should do something (not just remind). If the time is ambiguous, ask with ask_user first.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -175,7 +176,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             askAgent: input.ask_agent === true,
           });
           return {
-            content: `Scheduled reminder ${r.id} for ${when.description}. Confirm it to the person in those words ("Combinado: ${when.description}").`,
+            content: `Scheduled reminder ${r.id} for ${when.description}. Confirm it to the person with that day, date, time and time zone, in their language.`,
             data: { reminder: { id: r.id, at: r.at } },
           };
         } catch (error) {
@@ -186,7 +187,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "create_routine",
       description:
-        'Create a recurring routine ("toda segunda às 9h", "dias úteis às 18h"): at each time you get `prompt` as a request from the person, and your answer goes where the routine lives. By default that is this conversation; set `channel` (its name, with or without #) when the person wants the results posted in a channel ("manda no #general"), so nothing comes here. Only admins or your owner can create routines.',
+        'Create a recurring routine ("toda segunda às 9h", "dias úteis às 18h", "every Monday at 9am"): at each time you get `prompt` as a request from the person, and your answer goes where the routine lives. By default that is this conversation; set `channel` (its name, with or without #) when the person wants the results posted in a channel ("manda no #general", "post it in #general"), so nothing comes here. Only admins or your owner can create routines.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -212,7 +213,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           if (existing) {
             const next = existing.nextRunAt ? describeWhen(existing.nextRunAt, existing.timezone ?? "UTC") : "";
             return {
-              content: `Routine ${existing.id} "${existing.name}" already exists in this conversation with these instructions (next: ${next}). Don't create another: tell the person it's already set up. To change when it runs, they edit it in Rotinas.`,
+              content: `Routine ${existing.id} "${existing.name}" already exists in this conversation with these instructions (next: ${next}). Don't create another: tell the person it's already set up. To change when it runs, use update_routine or they edit it in Routines.`,
               data: { routine: { id: existing.id }, existing: true },
             };
           }
@@ -229,7 +230,13 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           const t = routine.trigger;
           const zone = t.type === "schedule" ? t.timezone : "UTC";
           const next = routine.nextRunAt ? describeWhen(new Date(routine.nextRunAt), zone) : "";
-          const when = t.type === "schedule" ? `${t.description} (${timezoneName(zone)})` : "";
+          const zoneName = timezoneName(zone);
+          const when =
+            t.type === "schedule"
+              ? t.description.includes(`(${zoneName})`)
+                ? t.description
+                : `${t.description} (${zoneName})`
+              : "";
           const where = await whereOf(ctx, routine);
           return {
             content: `Created routine ${routine.id} "${routine.name}": ${when}; next: ${next}; answers in ${where}. Confirm it to the person.`,
@@ -272,7 +279,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "update_routine",
       description:
-        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it answers ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h"), `active` pauses or resumes it. Only who created it, your owner or an admin can change it.',
+        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it answers ("manda no #general", "post it in #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am"), `active` pauses or resumes it. Only who created it, your owner or an admin can change it.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",

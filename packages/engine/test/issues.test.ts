@@ -72,7 +72,8 @@ describe("issues", () => {
       "criterion_checked",
       "comment",
     ]);
-    expect(activity[1]?.text).toBe("mudou o status para Em revisão");
+    expect(activity[1]?.text).toBe("changed the status to In review");
+    expect(activity[1]).toMatchObject({ textCode: "status_changed", textParams: { status: "in_review" } });
 
     expect((await listIssues(f.db, ana, f.org.id, { q: "safari" })).map((i) => i.number)).toEqual([1]);
     expect((await listIssues(f.db, ana, f.org.id, { q: "#2" })).map((i) => i.number)).toEqual([2]);
@@ -134,7 +135,7 @@ describe("issues", () => {
     const asked = await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
     expect(asked.assignee).toEqual({ type: "agent", id: f.agent.id });
     const [message] = (await f.db.select().from(schema.messages)).filter((m) => m.body.includes("#1"));
-    expect(message?.body).toContain("@dev implementa a issue #1: Login quebra");
+    expect(message?.body).toContain("@dev implement issue #1: Login quebra");
     expect(message?.body).toContain("- [ ] Funciona no Safari");
     expect(message?.meta).toMatchObject({ issueId: issue.id });
 

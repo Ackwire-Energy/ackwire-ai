@@ -223,7 +223,7 @@ describe("Rotinas", () => {
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
     await settle(4);
-    expect(dialog.textContent).toContain("Toda segunda-feira, às 09:00 · horário de Brasília (UTC−3)");
+    expect(dialog.textContent).toContain("Toda semana, seg, às 09:00 · horário de Brasília (UTC−3)");
     // The zone has its own select, so the person can change it.
     expect(within(dialog).getByRole("combobox", { name: "Fuso horário" }).textContent).toContain(
       "Horário de Brasília · UTC−3",

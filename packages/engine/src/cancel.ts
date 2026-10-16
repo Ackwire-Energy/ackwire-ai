@@ -83,7 +83,7 @@ export const canceledBy = (error: string | null | undefined) =>
  * - Waiting for an approval or an answer: it ends; the approval or question is canceled.
  * - Running: the worker aborts the model stream (usage so far is recorded),
  *   stops before the next tool, kills running code, and posts what the agent
- *   wrote so far with "Interrompido por …".
+ *   wrote so far with "Stopped by …".
  * The UI hears `run.canceled` at once. Audited.
  */
 export async function cancelRun(

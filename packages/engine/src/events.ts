@@ -5,7 +5,7 @@ import type { CalendarEventView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
 import type { MessageView, ReactionCount } from "./messages";
 
-/** What a memory tool changed, for the "memória atualizada" card (persisted in the reply's `meta.memoryUpdates`). */
+/** What a memory tool changed, for the "memory updated" card (persisted in the reply's `meta.memoryUpdates`). */
 export interface MemoryUpdate {
   action: "remembered" | "forgot" | "updated" | "proposed";
   itemId: string;
@@ -49,7 +49,7 @@ export type ChannelEvent =
     }
   /**
    * The text the agent streamed before calling tools was progress narration
-   * ("Go não está instalado; vou tentar…"), not the answer: show it as a step
+   * ("Go isn't installed; I'll try…"), not the answer: show it as a step
    * of the work and clear it from the live reply. The message holds only the
    * final answer.
    */

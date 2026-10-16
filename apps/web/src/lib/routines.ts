@@ -1,5 +1,14 @@
-/** A plain reminder the agent posted (`meta.reminder`): shown as the agent's message with a "Lembrete" label. */
+/** A plain reminder the agent posted (`meta.reminder`): shown as the agent's message with a "Reminder" label. */
 export const isReminderMessage = (meta: Record<string, unknown> | undefined) => meta?.reminder === true;
+
+/**
+ * A reminder's text without the server's own prefix ("@ana Reminder: …"; older
+ * messages say "Lembrete: …"), since the app shows its translated label.
+ */
+export function reminderBody(body: string, meta: Record<string, unknown> | undefined): string {
+  if (!isReminderMessage(meta)) return body;
+  return body.replace(/^((?:@[\w.-]+\s+)*)(?:Reminder|Lembrete): /, "$1");
+}
 
 /**
  * A message a routine posted (`meta.routine`): shown as the routine's, not as

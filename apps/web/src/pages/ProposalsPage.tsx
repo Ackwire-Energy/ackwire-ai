@@ -58,6 +58,14 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
     p.target.type === "org_context"
       ? t("proposals.targetContext", { org: org.name })
       : t("proposals.targetInstructions", agentGrammar(t, agentName(p.target.agentId)));
+  const tt = t as unknown as (key: string, options: Record<string, string>) => string;
+  /** The server's title is English; the app says it in its own language. */
+  const titleOf = (p: Proposal) =>
+    p.target.type === "org_context"
+      ? tt("proposals.titleContext", { org: org.name, defaultValue: p.title })
+      : tt("proposals.titleInstructions", { ...agentGrammar(t, agentName(p.target.agentId)), defaultValue: p.title });
+  const whereOf = (e: Proposal["evidence"][number]) =>
+    e.type ? tt(`proposals.evidence.${e.type}`, { defaultValue: e.where }) : e.where;
   const statusText = (p: Proposal) =>
     p.stale
       ? t("proposals.stale")
@@ -116,7 +124,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                     {relativeTime(t, i18n.language, p.createdAt)}
                   </span>
                 </span>
-                <span style={{ fontSize: 14, lineHeight: "20px" }}>{p.title}</span>
+                <span style={{ fontSize: 14, lineHeight: "20px" }}>{titleOf(p)}</span>
                 <span className="muted" style={{ fontSize: 12, lineHeight: "16px" }}>
                   {statusText(p)}
                 </span>
@@ -149,7 +157,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
               )}
             </div>
             <h2 id="prop-title" className="ac-card__title">
-              {current.title}
+              {titleOf(current)}
             </h2>
 
             <section aria-label={t("proposals.why")} className="section section--tight">
@@ -160,7 +168,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                   <li key={`${e.where}-${e.what}`}>
                     <Icon name="message" size={16} />
                     <span>
-                      {e.where} <span className="muted">· {e.what}</span>
+                      {whereOf(e)} <span className="muted">· {e.what}</span>
                     </span>
                   </li>
                 ))}

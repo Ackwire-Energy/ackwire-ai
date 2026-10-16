@@ -57,7 +57,7 @@ describe("what earlier runs did", () => {
     await post("@dev você criou mesmo?", root.id);
     await drainOutbox(f.db, f.handlers);
     const prompt = systemText(f.provider.calls.at(-1)?.request.system ?? "");
-    expect(prompt).toContain("# Ações recentes neste thread");
+    expect(prompt).toContain("# Recent actions in this thread");
     expect(prompt).toMatch(/@dev create_issue → Created #1 \[todo\] Integração com TikTok Ads.*\(ok\)/);
     expect(prompt).toContain("not with `search_context`");
     expect(prompt).toContain("Nunca diga que não fez");
@@ -88,10 +88,10 @@ describe("connectors the agent can't use yet", () => {
     await post("@dev consegue ver o himetrica?");
     await drainOutbox(f.db, handlers);
     const prompt = systemText(f.provider.calls.at(-1)?.request.system ?? "");
-    expect(prompt).toContain("Conectores da organização que você ainda não pode usar:");
-    expect(prompt).toContain("- himetrica: conectado, aguardando um admin classificar as ferramentas");
-    expect(prompt).toContain("- GitHub: conectado, mas as ferramentas não foram liberadas para você");
-    expect(prompt).toContain("Nunca diga que o conector não existe.");
+    expect(prompt).toContain("Organization connectors you can't use yet:");
+    expect(prompt).toContain("- himetrica: connected, waiting for an admin to classify the tools");
+    expect(prompt).toContain("- GitHub: connected, but the tools were not enabled for you");
+    expect(prompt).toContain("Never say the connector doesn't exist.");
   });
 
   test("suggested classification, accepted in one call, lists the agents without access", async () => {
@@ -143,6 +143,6 @@ test("in a DM, actions of earlier runs show up too (DMs are flat)", async () => 
   await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dm.id, { body: "e aí, criou?" });
   await drainOutbox(f.db, f.handlers);
   const prompt = systemText(f.provider.calls.at(-1)?.request.system ?? "");
-  expect(prompt).toContain("# Ações recentes nesta DM");
+  expect(prompt).toContain("# Recent actions in this DM");
   expect(prompt).toContain("create_issue → Created #1");
 });

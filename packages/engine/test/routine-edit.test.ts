@@ -120,7 +120,11 @@ describe("editing routines", () => {
     expect(await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id)).toHaveLength(1);
 
     const copy = await duplicateRoutine(deps(), f.owner.id, f.org.id, routine.id);
-    expect(copy).toMatchObject({ name: "Resumo (cópia)", active: false, nextRunAt: null, prompt: "Resuma o dia." });
+    expect(copy).toMatchObject({ name: "Resumo (copy)", active: false, nextRunAt: null, prompt: "Resuma o dia." });
+    // The app names the copy in the person's language.
+    const named = await duplicateRoutine(deps(), f.owner.id, f.org.id, routine.id, { name: "Resumo (cópia)" });
+    expect(named.name).toBe("Resumo (cópia)");
+    await deleteRoutine(deps(), f.owner.id, f.org.id, named.id);
     expect(copy.id).not.toBe(routine.id);
 
     await deleteRoutine(deps(), f.owner.id, f.org.id, routine.id);

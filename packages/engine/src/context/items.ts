@@ -248,7 +248,7 @@ export async function consolidateItem(db: Database, input: NewContextItem): Prom
   });
 }
 
-// ── Reading and editing (APIs: "O que a Ada sabe") ───────────────────────────
+// ── Reading and editing (APIs: "What Ada knows") ────────────────────────────
 
 /** Items a person may see: those whose every channel they can read (org-wide ones too). */
 export async function listContextItems(
@@ -399,7 +399,7 @@ export async function getContextItems(db: Database, orgId: string, ids: string[]
 
 /**
  * Undoes a memory change made in conversation (the "desfazer" of the
- * "memória atualizada" card): a forgotten item comes back, an updated one
+ * "memory updated" card): a forgotten item comes back, an updated one
  * goes back to its previous version, a newly remembered one is archived.
  * Anyone in the org who can read the item's channels may undo.
  */

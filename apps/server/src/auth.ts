@@ -1,6 +1,6 @@
 import type { Config } from "@agenteschat/config";
 import { type Database, schema } from "@agenteschat/db";
-import { deriveSecret, isSignupAllowed, onUserCreated, queueEmail, sha256 } from "@agenteschat/engine";
+import { deriveSecret, emailLocale, isSignupAllowed, onUserCreated, queueEmail, sha256 } from "@agenteschat/engine";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -77,7 +77,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
               url,
               token,
             }: {
-              user: { email: string };
+              user: { email: string; locale?: string | null };
               url: string;
               token: string;
             }) => {
@@ -85,7 +85,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
                 orgId: null,
                 key: `password-reset:${sha256(token)}`,
                 to: [user.email],
-                template: { kind: "password_reset", url },
+                template: { kind: "password_reset", locale: emailLocale(user.locale), url },
               });
             },
           }
@@ -101,7 +101,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
               url,
               token,
             }: {
-              user: { email: string };
+              user: { email: string; locale?: string | null };
               url: string;
               token: string;
             }) => {
@@ -109,7 +109,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
                 orgId: null,
                 key: `verify-email:${sha256(token)}`,
                 to: [user.email],
-                template: { kind: "verify_email", url },
+                template: { kind: "verify_email", locale: emailLocale(user.locale), url },
               });
             },
           },

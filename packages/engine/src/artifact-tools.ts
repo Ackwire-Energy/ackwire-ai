@@ -245,9 +245,9 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
           if (list.length === 0) return { content: "No files." };
           const names = await artifactOrigins(deps.db, ctx.orgId, list);
           const lines = list.map((a) => {
-            const here = a.channelId === ctx.channelId ? "aqui" : names.origin(a);
+            const here = a.channelId === ctx.channelId ? "here" : names.origin(a);
             const when = a.updatedAt.slice(0, 10);
-            return `${a.id} "${a.title}" (${a.kind}, v${a.version}, ${when}) — origem: ${here}; criado por ${names.creator(a)}`;
+            return `${a.id} "${a.title}" (${a.kind}, v${a.version}, ${when}) — from: ${here}; created by ${names.creator(a)}`;
           });
           return { content: lines.join("\n") };
         } catch (error) {
@@ -280,7 +280,7 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
           let from = "It was already visible here.";
           if (result.copied && result.from.kind === "dm") {
             from =
-              'It came from a DM: a copy was saved here. Say you are bringing it from the private conversation ("trazendo do nosso privado").';
+              'It came from a DM: a copy was saved here. Say you are bringing it from your private conversation (e.g. "bringing it over from our DM").';
           } else if (result.copied) from = "It came from another conversation: a copy was saved here.";
           return {
             content: `Shared "${a.title}" (${a.kind}) in this conversation as artifact ${a.id}; its card goes with your reply. ${from}`,
