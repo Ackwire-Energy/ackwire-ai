@@ -21,6 +21,7 @@ import type {
   CalendarRange,
   Channel,
   ChannelMember,
+  CommandApproval,
   ComputerTarget,
   Connection,
   ConnectorCatalog,
@@ -526,6 +527,11 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
           }),
         setExecutor: (orgId, missionId, executor) =>
           request<Mission>(`${one(orgId, missionId)}/executor`, { method: "PUT", json: { executor } }),
+        setCommandApproval: (orgId, missionId, commandApproval) =>
+          request<{ commandApproval: CommandApproval }>(`${one(orgId, missionId)}/command-approval`, {
+            method: "PUT",
+            json: { commandApproval },
+          }),
         decisions: async (orgId, missionId) =>
           (await request<{ decisions: MissionDecision[] }>(`${one(orgId, missionId)}/decisions`)).decisions,
         commands: (orgId, missionId) =>

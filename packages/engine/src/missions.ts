@@ -21,6 +21,7 @@ import { requireChannelAccess } from "./channels";
 import { eligibleChannelAgents } from "./dispatch";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
+import type { Judge } from "./judge";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import {
   formatDuration,
@@ -98,6 +99,18 @@ export const isMissionExecutor = (v: unknown): v is MissionExecutor =>
   typeof v === "string" && (MISSION_EXECUTORS as readonly string[]).includes(v);
 
 /**
+ * "Pedir aprovação de comandos" (ADR 0029): `always` (every command off the
+ * allow list gets a card), `low_risk_auto` (the judge allows the low-risk
+ * ones within what code allows; the default for new missions) or `never`
+ * (everything but the deny list). Stored as text; validated here.
+ */
+export type CommandApproval = "always" | "low_risk_auto" | "never";
+export const COMMAND_APPROVALS: readonly CommandApproval[] = ["always", "low_risk_auto", "never"];
+export const isCommandApproval = (v: unknown): v is CommandApproval =>
+  typeof v === "string" && (COMMAND_APPROVALS as readonly string[]).includes(v);
+export const commandApprovalOf = (v: unknown): CommandApproval => (isCommandApproval(v) ? v : "always");
+
+/**
  * Codex needs `exec --json`, `exec … resume <id>` and no `--full-auto` (ADR
  * 0029, "Codex"): 0.163.0 is the release verified on a real machine.
  */
@@ -173,6 +186,8 @@ export interface MissionDeps {
   search?: SearchDeps;
   /** Our public URL (the runner pushes uploads there). */
   publicUrl?: string;
+  /** Semantic judgments (judge.ts): low-risk commands in `low_risk_auto` missions. */
+  judge?: Judge;
 }
 
 // ── Prompts the executor gets (English, plain) ───────────────────────────────
@@ -408,6 +423,8 @@ export interface MissionView {
   status: MissionStatus;
   repoDir: string;
   resumeTasks: boolean;
+  /** "Pedir aprovação de comandos". */
+  commandApproval: CommandApproval;
   plan: {
     version: number;
     done: number;
@@ -554,6 +571,7 @@ export async function missionViews(
       status: r.status,
       repoDir: r.repoDir,
       resumeTasks: r.resumeTasks,
+      commandApproval: commandApprovalOf(r.commandApproval),
       plan: {
         version: r.planVersion,
         done: r.planDone,
@@ -787,6 +805,8 @@ export interface ProposeInput {
   repoDir?: string | null;
   /** Who programs: default Claude Code when the computer has it, else our agent. */
   executor?: MissionExecutor | null;
+  /** Default `low_risk_auto`. */
+  commandApproval?: CommandApproval | null;
   runId?: string | null;
 }
 
@@ -817,6 +837,9 @@ export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
   if (input.executor != null && !isMissionExecutor(input.executor)) {
     throw new ValidationError("Choose claude, codex or agent", "mission.invalid_executor");
   }
+  if (input.commandApproval != null && !isCommandApproval(input.commandApproval)) {
+    throw new ValidationError("Choose always, low_risk_auto or never", "mission.invalid_command_approval");
+  }
   const machine = await usableMachine(deps, input.orgId, agent.machineId ?? null, input.executor ?? null);
   const existing = await missionOfThread(db, input.orgId, input.threadRootId);
   if (existing) throw new ConflictError("This thread already has a mission", "mission.exists");
@@ -842,6 +865,7 @@ export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
         goal,
         mainSessionId: crypto.randomUUID(),
         repoDir,
+        ...(input.commandApproval ? { commandApproval: input.commandApproval } : {}),
         createdBy: input.ownerId,
       })
       .onConflictDoNothing()
@@ -923,6 +947,7 @@ export async function createMission(
     threadId?: string | null;
     repoDir?: string | null;
     executor?: MissionExecutor | null;
+    commandApproval?: CommandApproval | null;
   },
 ) {
   const { db } = deps;
@@ -984,6 +1009,7 @@ export async function createMission(
     goal,
     repoDir: input.repoDir,
     executor: input.executor ?? null,
+    commandApproval: input.commandApproval ?? null,
   });
   // A mission made in someone else's thread: whoever started that thread decides too (when the agent answers them).
   if (rootAuthor && (await agentAnswers(db, mission, rootAuthor))) {

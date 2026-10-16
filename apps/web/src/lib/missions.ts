@@ -4,6 +4,7 @@ import type {
   MachineTaskMeta,
   Message,
   Mission,
+  MissionAutoApprovedMeta,
   MissionCommandMeta,
   MissionLinkMeta,
   MissionPlanChangeMeta,
@@ -319,6 +320,19 @@ export function machineTaskOf(meta: Message["meta"]): MachineTaskMeta | null {
             .flatMap((d) => (d && str(d.command) ? [{ tool: str(d.tool) || "Bash", command: str(d.command) }] : [])),
         }
       : {}),
+  };
+}
+
+/** `meta.missionAutoApproved`: a command allowed without a card (the quiet line). */
+export function missionAutoApprovedOf(meta: Message["meta"]): MissionAutoApprovedMeta | null {
+  const p = obj(meta?.missionAutoApproved);
+  if (!p || !str(p.missionId) || !str(p.command)) return null;
+  return {
+    missionId: str(p.missionId),
+    taskId: str(p.taskId),
+    tool: str(p.tool) || "Bash",
+    command: str(p.command),
+    reason: str(p.reason) === "never" ? "never" : "low_risk",
   };
 }
 

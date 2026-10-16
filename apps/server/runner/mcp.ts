@@ -4,7 +4,12 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import { createConnection, createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
 import { createInterface } from "node:readline";
-import { type CommandScope, readOnlyCall } from "@agenteschat/adapters/command-policy";
+import {
+  type CommandScope,
+  deniedInMissions,
+  MISSION_DENY_RULES,
+  readOnlyCall,
+} from "@agenteschat/adapters/command-policy";
 import {
   isSafeRule,
   MCP_ARGS_MAX_CHARS,
@@ -15,7 +20,6 @@ import {
   PERMISSION_TOOL,
   PERMISSION_WAIT_MS,
   type RunnerFrame,
-  ruleMatches,
   type ServerFrame,
 } from "@agenteschat/adapters/machine-protocol";
 import { RUNNER_VERSION } from "./errors";
@@ -439,8 +443,7 @@ export async function permissionPrompt(
       ? (args.input as Record<string, unknown>)
       : {};
   if (!toolName) return { behavior: "deny", message: "Unknown tool." };
-  if (DENY_RULES.some((rule) => ruleMatches(rule, toolName, input)))
-    return { behavior: "deny", message: NEVER_MESSAGE };
+  if (deniedInMissions(toolName, input)) return { behavior: "deny", message: NEVER_MESSAGE };
   if (opts.scope && readOnlyCall(toolName, input, opts.scope)) return { behavior: "allow", updatedInput: input };
   const now = opts.now ?? Date.now;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
@@ -649,84 +652,8 @@ const readOnlyShell = () => READ_ONLY_COMMANDS.flatMap((c) => [`Bash(${c})`, `Ba
 const gitC = (rules: string[]) =>
   rules.flatMap((r) => (r.startsWith("Bash(git ") ? [r, r.replace("Bash(git ", "Bash(git -C * ")] : [r]));
 
-/**
- * Never without a person's approval (`request_approval`): merges, pushes
- * elsewhere, force pushes, deploys, cluster/infra changes and package
- * publishes. Never promptable: Claude Code checks deny before asking, and our
- * prompt tool refuses a match at once (`permissionPrompt`).
- */
-export const DENY_RULES = [
-  "Bash(git merge)",
-  "Bash(git merge *)",
-  "Bash(git -C * merge *)",
-  "Bash(git -C * push --force*)",
-  "Bash(git -C * push -f*)",
-  "Bash(git -C * push * --force*)",
-  "Bash(git -C * push * -f*)",
-  "Bash(git -C * push *+*)",
-  "Bash(git -C * push *:*)",
-  "Bash(git -C * push * main)",
-  "Bash(git -C * push * master)",
-  "Bash(git push * main *)",
-  "Bash(git push * master *)",
-  "Bash(git -C * push * main *)",
-  "Bash(git -C * push * master *)",
-  "Bash(git -C * push * --delete *)",
-  "Bash(git -C * push * -d *)",
-  "Bash(git -C * push * --all*)",
-  "Bash(git -C * push * --mirror*)",
-  "Bash(git push --force*)",
-  "Bash(git push -f*)",
-  "Bash(git push * --force*)",
-  "Bash(git push * -f*)",
-  "Bash(git push *+*)",
-  "Bash(git push *:*)",
-  "Bash(git push * main)",
-  "Bash(git push * master)",
-  "Bash(git push --delete *)",
-  "Bash(git push * --delete *)",
-  "Bash(git push * -d *)",
-  "Bash(git push --all*)",
-  "Bash(git push * --all*)",
-  "Bash(git push --mirror*)",
-  "Bash(git push * --mirror*)",
-  "Bash(gh pr merge *)",
-  "Bash(gh api *)",
-  "Bash(vercel deploy *)",
-  "Bash(vercel --prod*)",
-  "Bash(vercel * --prod*)",
-  "Bash(npx vercel *)",
-  "Bash(railway up*)",
-  "Bash(railway deploy*)",
-  "Bash(npx railway *)",
-  "Bash(fly deploy*)",
-  "Bash(flyctl deploy*)",
-  "Bash(netlify deploy *)",
-  "Bash(npx netlify *)",
-  "Bash(eas submit *)",
-  "Bash(eas update *)",
-  "Bash(npx eas *)",
-  "Bash(npx eas-cli *)",
-  "Bash(kubectl apply *)",
-  "Bash(kubectl rollout *)",
-  "Bash(kubectl delete *)",
-  "Bash(helm install *)",
-  "Bash(helm upgrade *)",
-  "Bash(helm uninstall *)",
-  "Bash(terraform apply *)",
-  "Bash(terraform destroy *)",
-  "Bash(docker push*)",
-  "Bash(gh release create*)",
-  // Publishing packages (`bun publish` and friends; `yarn npm publish` is Yarn 2+).
-  "Bash(npm publish*)",
-  "Bash(pnpm publish*)",
-  "Bash(yarn publish*)",
-  "Bash(yarn npm publish*)",
-  "Bash(bun publish*)",
-  "Bash(cargo publish*)",
-  "Bash(gem push*)",
-  "Bash(twine upload*)",
-];
+/** The deny list (`MISSION_DENY_RULES` in @agenteschat/adapters/command-policy, shared with the server). */
+export const DENY_RULES = MISSION_DENY_RULES;
 
 /**
  * The `--settings` file of a mission task's Claude Code (protocol 7): what
@@ -752,7 +679,7 @@ export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: st
           ...readOnlyShell(),
           ...gitC(GIT_READ.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`])),
         ],
-        deny: ["Edit", "Write", "NotebookEdit", ...DENY_RULES],
+        deny: ["Edit", "Write", "NotebookEdit", ...MISSION_DENY_RULES],
       },
     };
   }
@@ -777,7 +704,7 @@ export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: st
         // What a person allowed for the whole mission ("Aprovar sempre nesta missão").
         ...missionAllow.filter(isSafeRule).slice(0, 100),
       ],
-      deny: DENY_RULES,
+      deny: [...MISSION_DENY_RULES],
     },
   };
 }

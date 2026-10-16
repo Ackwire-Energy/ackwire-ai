@@ -1,8 +1,12 @@
 import {
   allowedBy,
+  type CommandScope,
   commandOf,
+  deniedInMissions,
+  forbiddenReason,
   PERMISSION_TIMEOUT_MESSAGE,
   PERMISSION_WAIT_MS,
+  readOnlyCall,
   rulesFor,
   TASK_LIMITS,
 } from "@agenteschat/adapters";
@@ -14,6 +18,10 @@ import type { MachineTaskRow } from "./machine-tasks";
 import { messageView } from "./messages";
 import { addMissionAllowRules, blockedOfTask, missionAllowRules } from "./mission-command-rules";
 import {
+  type CommandApproval,
+  commandApprovalOf,
+  isCommandApproval,
+  latestPlan,
   type MissionDeps,
   type MissionRow,
   noMentions,
@@ -36,8 +44,23 @@ const { missionEvents, machineTasks } = schema;
  * again every few seconds until the owner or someone who decides answers
  * (Aprovar / Recusar / Aprovar sempre), or `PERMISSION_WAIT_MS` passes.
  * Deny-list commands (merges, pushes to the default branch, deploys) never
- * get here: Claude Code and the runner refuse them first. Everything is in
- * the mission's feed: `command_prompt`, `command_decided`, `command_rule`.
+ * get here: Claude Code and the runner refuse them first (and so do we).
+ * Everything is in the mission's feed: `command_prompt`, `command_decided`,
+ * `command_rule`, `command_auto`, `command_approval`.
+ *
+ * The order for a new prompt: the deny list (refused, never judged) → plain
+ * reads (`readOnlyCall`, allowed silently) → the mission's rules → the
+ * mission's `commandApproval`: `never` allows the rest; `low_risk_auto`
+ * asks the judge whether it is low risk, and allows it at
+ * `LOW_RISK_THRESHOLD` or more only when code allows it too
+ * (`forbiddenReason`: no sudo, no deletes or writes outside the mission
+ * folder, no uploads, remote shells or global installs). A judge error or
+ * timeout means the card (fail closed). Every automatic approval posts one
+ * quiet line in the thread, with Revogar (back to `always`).
+ *
+ * This is the one place a judge's answer lets something run (ADR 0029): the
+ * owner chose the policy for the mission; the judge only classifies inside
+ * what code allows, and the deny list and code rules stay hard.
  */
 
 export type CommandDecision = "allow" | "deny" | "always";
@@ -45,6 +68,111 @@ export type CommandState = "pending" | "allowed" | "denied" | "expired";
 
 /** Prompts per task in 10 minutes: a loop can't flood the thread. */
 export const COMMAND_PROMPTS_PER_TASK = 10;
+/** `low_risk_auto`: the judge's probability that a command is low risk and needed, to allow it without a card. */
+export const LOW_RISK_THRESHOLD = 0.85;
+/** The judge answers within this, or it is the card. */
+export const COMMAND_JUDGE_TIMEOUT_MS = 8000;
+
+const NEVER_MESSAGE =
+  "This command is never allowed in a mission (merges, pushes to the default branch, deploys): ask with request_approval and wait.";
+
+/** Where the task runs, from the runner (absolute paths only); without it code allows no writes. */
+function scopeOf(value: unknown): CommandScope | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const abs = (p: unknown): p is string => typeof p === "string" && p.startsWith("/") && p.length < 1000;
+  if (!abs(v.cwd)) return null;
+  const folders = Array.isArray(v.folders) ? v.folders.filter(abs).slice(0, 4) : [];
+  return { cwd: v.cwd, folders: folders.length ? folders : [v.cwd], ...(abs(v.home) ? { home: v.home } : {}) };
+}
+const NO_SCOPE: CommandScope = { cwd: "/nonexistent", folders: [] };
+
+/**
+ * The judge's question for `low_risk_auto`: is this command low risk and
+ * needed for the work? A probability; null when the judge fails or is slow.
+ */
+export async function commandLowRisk(
+  deps: Pick<MissionDeps, "db" | "judge">,
+  mission: MissionRow,
+  call: { tool: string; command: string },
+): Promise<number | null> {
+  if (!deps.judge) return null;
+  const plan = await latestPlan(deps.db, mission.id).catch(() => null);
+  const items = Array.isArray(plan?.items) ? plan.items : [];
+  const current = items.find((i) => i.status === "doing") ?? items.find((i) => i.status === "todo");
+  const ask = deps.judge.ask({
+    orgId: mission.orgId,
+    kind: "mission_command_risk",
+    state: {
+      tool: call.tool,
+      command: call.command.slice(0, 2000),
+      mission_goal: mission.goal.slice(0, 2000),
+      current_plan_item: current?.title ?? null,
+    },
+    questions: {
+      low_risk: {
+        type: "noul",
+        instructions:
+          "An AI coding agent working on `mission_goal` (now on `current_plan_item`) wants to run `command` with `tool` on a person's computer, inside the mission folder. Is running it low risk (no data loss outside the mission folder, no publishing, deploying or sending anything, no credential exposure, no system changes) and needed for the work?",
+        criteria: {
+          true: "Low risk and plausibly needed for the mission's work.",
+          false:
+            "It could lose data, publish, deploy or send something, expose credentials, change the system, or isn't needed.",
+        },
+      },
+    },
+  });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), COMMAND_JUDGE_TIMEOUT_MS);
+  });
+  try {
+    const answers = await Promise.race([ask, timeout]);
+    const p = answers?.low_risk?.noul;
+    return typeof p === "number" && Number.isFinite(p) ? p : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** One quiet line in the thread for a command allowed without a card ("Aprovado automaticamente"). */
+async function autoApproved(
+  deps: MissionDeps,
+  mission: MissionRow,
+  task: MachineTaskRow,
+  call: { tool: string; command: string },
+  reason: "low_risk" | "never",
+  probability: number | null,
+) {
+  const shown = noMentions(call.command).slice(0, TASK_LIMITS.denial * 2);
+  const rules = rulesFor(call.tool, call.tool === "Bash" ? { command: call.command } : {});
+  await recordMissionEvent(deps.db, mission, "command_auto", {
+    taskId: task.id,
+    tool: call.tool,
+    command: shown,
+    reason,
+    ...(probability !== null ? { probability } : {}),
+  });
+  await recordAudit(deps.db, {
+    orgId: mission.orgId,
+    actor: { type: "agent", id: mission.agentId },
+    action: "mission.command_auto",
+    target: { type: "mission", id: mission.id },
+    details: { taskId: task.id, command: shown.slice(0, 300), reason, probability },
+  });
+  await postMissionMessage(
+    deps,
+    mission,
+    `Allowed automatically: \`${shown}\` (${reason === "never" ? "no approval asked" : "low risk"})`,
+    {
+      missionAutoApproved: { missionId: mission.id, taskId: task.id, tool: call.tool, command: shown, reason, rules },
+      bodyCode: "mission_auto_approved",
+      bodyParams: { command: shown, reason },
+    },
+  );
+}
 
 export interface MissionCommandView {
   id: string;
@@ -149,6 +277,11 @@ export async function handlePermissionPrompt(
       : {};
   const command = commandOf(tool, input);
   if (!tool || !command) return deny("Unknown tool.");
+  // The deny list: refused, never shown, never judged.
+  if (deniedInMissions(tool, input)) return deny(NEVER_MESSAGE);
+  const scope = scopeOf(args.scope);
+  // Plain reads (`ls` of any folder, read-only git, a GET): allowed, nothing posted.
+  if (scope && readOnlyCall(tool, input, scope)) return allow();
   if (mission.status !== "active") return deny("The plan isn't approved yet: only read for now.");
   // "Aprovar sempre nesta missão" covers it.
   if (allowedBy(await missionAllowRules(deps.db, mission.id), tool, input)) return allow();
@@ -156,6 +289,18 @@ export async function handlePermissionPrompt(
   // Asked again while the card is open (Claude Code retries): the same card.
   const open = recent.find((p) => p.state === "pending" && p.command === command && p.tool === tool);
   if (open) return JSON.stringify({ status: "pending", request_id: open.id });
+  const mode = commandApprovalOf(mission.commandApproval);
+  if (mode === "never") {
+    await autoApproved(deps, mission, task, { tool, command }, "never", null);
+    return allow();
+  }
+  if (mode === "low_risk_auto" && forbiddenReason(tool, input, scope ?? NO_SCOPE) === null) {
+    const p = await commandLowRisk(deps, mission, { tool, command });
+    if (p !== null && p >= LOW_RISK_THRESHOLD) {
+      await autoApproved(deps, mission, task, { tool, command }, "low_risk", p);
+      return allow();
+    }
+  }
   const lately = recent.filter((p) => Date.now() - Date.parse(p.createdAt) < 10 * 60_000);
   if (lately.length >= COMMAND_PROMPTS_PER_TASK) {
     return deny(
@@ -283,4 +428,41 @@ export async function retryBlockedCommand(
   );
   await publishMissionEvent(deps, mission, "command", { taskId: input.taskId });
   return { rules: added.length ? added : rules, delivered: sent.delivered };
+}
+
+/**
+ * "Pedir aprovação de comandos": the owner or someone who decides changes
+ * it (Revogar on an automatic approval sets `always`). Audited.
+ */
+export async function setCommandApproval(
+  deps: MissionDeps,
+  userId: string,
+  orgId: string,
+  missionId: string,
+  value: unknown,
+): Promise<{ commandApproval: CommandApproval }> {
+  if (!isCommandApproval(value)) {
+    throw new ValidationError("Choose always, low_risk_auto or never", "mission.invalid_command_approval");
+  }
+  const { mission, role } = await requireMission(deps, userId, orgId, missionId);
+  requireAct(role, "change how commands are approved");
+  requireOpen(mission);
+  const from = commandApprovalOf(mission.commandApproval);
+  if (from === value) return { commandApproval: value };
+  await deps.db.transaction(async (tx) => {
+    await tx
+      .update(schema.missions)
+      .set({ commandApproval: value, updatedAt: new Date() })
+      .where(sql`${schema.missions.id} = ${mission.id}::uuid`);
+    await recordMissionEvent(tx, mission, "command_approval", { by: userId, from, to: value });
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "mission.command_approval",
+      target: { type: "mission", id: mission.id },
+      details: { from, to: value },
+    });
+  });
+  await publishMissionEvent(deps, mission, "settings", { commandApproval: value });
+  return { commandApproval: value };
 }

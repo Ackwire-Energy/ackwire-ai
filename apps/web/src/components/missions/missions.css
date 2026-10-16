@@ -695,6 +695,22 @@ a.mi-pr:hover {
   color: var(--faint);
   animation: mi-fade 0.35s var(--out) both;
 }
+/* A command allowed without a card: quiet, the command in mono. */
+.mi-evt--auto code,
+.mi-evt__list code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+.mi-evt__list {
+  flex-basis: 100%;
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
 .mi-evt b {
   font-weight: 600;
   color: var(--ink2);

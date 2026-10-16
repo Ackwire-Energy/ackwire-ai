@@ -1,4 +1,5 @@
 import path from "node:path";
+import { ruleMatches } from "./machine-protocol";
 
 /**
  * Deterministic command policy for mission work turns (ADR 0029). No model:
@@ -565,6 +566,89 @@ export function readOnlyCall(toolName: string, input: Record<string, unknown> | 
   const cmds = simpleCommands(command);
   return Boolean(cmds && cmds.length > 0 && cmds.every((s) => readOnlySimple(s, scope)));
 }
+
+/**
+ * Never without a person's approval (`request_approval`): merges, pushes
+ * elsewhere, force pushes, deploys, cluster/infra changes and package
+ * publishes. Never promptable and never judged: Claude Code checks deny
+ * before asking, the runner's prompt tool and the server refuse a match at once.
+ */
+export const MISSION_DENY_RULES: readonly string[] = [
+  "Bash(git merge)",
+  "Bash(git merge *)",
+  "Bash(git -C * merge *)",
+  "Bash(git -C * push --force*)",
+  "Bash(git -C * push -f*)",
+  "Bash(git -C * push * --force*)",
+  "Bash(git -C * push * -f*)",
+  "Bash(git -C * push *+*)",
+  "Bash(git -C * push *:*)",
+  "Bash(git -C * push * main)",
+  "Bash(git -C * push * master)",
+  "Bash(git push * main *)",
+  "Bash(git push * master *)",
+  "Bash(git -C * push * main *)",
+  "Bash(git -C * push * master *)",
+  "Bash(git -C * push * --delete *)",
+  "Bash(git -C * push * -d *)",
+  "Bash(git -C * push * --all*)",
+  "Bash(git -C * push * --mirror*)",
+  "Bash(git push --force*)",
+  "Bash(git push -f*)",
+  "Bash(git push * --force*)",
+  "Bash(git push * -f*)",
+  "Bash(git push *+*)",
+  "Bash(git push *:*)",
+  "Bash(git push * main)",
+  "Bash(git push * master)",
+  "Bash(git push --delete *)",
+  "Bash(git push * --delete *)",
+  "Bash(git push * -d *)",
+  "Bash(git push --all*)",
+  "Bash(git push * --all*)",
+  "Bash(git push --mirror*)",
+  "Bash(git push * --mirror*)",
+  "Bash(gh pr merge *)",
+  "Bash(gh api *)",
+  "Bash(vercel deploy *)",
+  "Bash(vercel --prod*)",
+  "Bash(vercel * --prod*)",
+  "Bash(npx vercel *)",
+  "Bash(railway up*)",
+  "Bash(railway deploy*)",
+  "Bash(npx railway *)",
+  "Bash(fly deploy*)",
+  "Bash(flyctl deploy*)",
+  "Bash(netlify deploy *)",
+  "Bash(npx netlify *)",
+  "Bash(eas submit *)",
+  "Bash(eas update *)",
+  "Bash(npx eas *)",
+  "Bash(npx eas-cli *)",
+  "Bash(kubectl apply *)",
+  "Bash(kubectl rollout *)",
+  "Bash(kubectl delete *)",
+  "Bash(helm install *)",
+  "Bash(helm upgrade *)",
+  "Bash(helm uninstall *)",
+  "Bash(terraform apply *)",
+  "Bash(terraform destroy *)",
+  "Bash(docker push*)",
+  "Bash(gh release create*)",
+  // Publishing packages (`bun publish` and friends; `yarn npm publish` is Yarn 2+).
+  "Bash(npm publish*)",
+  "Bash(pnpm publish*)",
+  "Bash(yarn publish*)",
+  "Bash(yarn npm publish*)",
+  "Bash(bun publish*)",
+  "Bash(cargo publish*)",
+  "Bash(gem push*)",
+  "Bash(twine upload*)",
+];
+
+/** On the deny list: refused at once, never shown to anyone, never judged. */
+export const deniedInMissions = (toolName: string, input: Record<string, unknown> | null | undefined) =>
+  MISSION_DENY_RULES.some((rule) => ruleMatches(rule, toolName, input));
 
 // ── What the judge may never approve ──────────────────────────────────────────
 

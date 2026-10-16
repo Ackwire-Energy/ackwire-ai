@@ -12,6 +12,7 @@ import {
   useMissionDecisions,
   useMissionPlan,
   useMissionReviews,
+  useSetCommandApproval,
   useSetMissionExecutor,
   useThreadTasks,
 } from "@/api/missions";
@@ -36,6 +37,7 @@ import {
   executorName,
   formatSpan,
   machineTaskOf,
+  missionAutoApprovedOf,
   missionCardRef,
   missionPlanChangeOf,
   planChangeParts,
@@ -45,7 +47,7 @@ import {
   viaText,
 } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
-import { executorOptions, MissionHead, MissionStatusChip, useMissionPanel } from "./MissionBits";
+import { CommandApprovalSelect, executorOptions, MissionHead, MissionStatusChip, useMissionPanel } from "./MissionBits";
 import { BlockedCommands } from "./MissionCommandCard";
 import { SessionRows } from "./MissionSessions";
 
@@ -211,6 +213,13 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
             />
           </div>
         )}
+        {m?.canAct && (
+          <div className="mi-plan__meta">
+            <Icon name="shield" size={14} />
+            <span>{t("missions.commandApproval.label")}</span>
+            <PlanApprovalSelect mission={m} />
+          </div>
+        )}
       </div>
       <div className="mi-plan__foot">
         {m?.role === "owner" && (
@@ -234,6 +243,123 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
       {stamp.node}
     </div>
   );
+}
+
+/** "Pedir aprovação de comandos" on the plan card (and the same choice in Nova missão and ⋯). */
+function PlanApprovalSelect({ mission }: { mission: Mission }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const set = useSetCommandApproval(org.id, mission.id);
+  return (
+    <span className="mi-plan__who">
+      <CommandApprovalSelect
+        size="sm"
+        value={mission.commandApproval}
+        disabled={set.isPending}
+        onChange={(v) =>
+          set.mutate(v, {
+            onSuccess: () =>
+              toast.show(t("missions.commandApproval.changed", { value: t(`missions.commandApproval.${v}`) })),
+            onError: (error) => toast.show(errorText(t, error), "error"),
+          })
+        }
+      />
+    </span>
+  );
+}
+
+/**
+ * Commands allowed without a card (`meta.missionAutoApproved`): one quiet
+ * line, or one line for several within a minute ("3 comandos", Ver
+ * comandos), with Revogar for whoever decides (back to asking for every one).
+ */
+export function AutoApprovedLine({ messages }: { messages: Message[] }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [revoked, setRevoked] = useState(false);
+  const items = messages.flatMap((m) => {
+    const a = missionAutoApprovedOf(m.meta);
+    return a ? [{ id: m.id, at: m.createdAt, ...a }] : [];
+  });
+  const first = items[0];
+  const missionId = first?.missionId ?? "";
+  const mission = useMission(org.id, missionId || undefined);
+  const set = useSetCommandApproval(org.id, missionId);
+  if (!first) return null;
+  const m = mission.data;
+  const reason = t(`missions.auto.${first.reason}` as const);
+  const canRevoke = Boolean(m?.canAct && m.commandApproval !== "always" && !revoked);
+  const revoke = () =>
+    set.mutate("always", {
+      onSuccess: () => {
+        setRevoked(true);
+        toast.show(t("missions.auto.revoked"));
+      },
+      onError: (error) => toast.show(errorText(t, error), "error"),
+    });
+  return (
+    <div className="mi-evt mi-evt--auto" data-message-id={first.id}>
+      <Icon name="check" size={14} />
+      <span>
+        {t("missions.auto.label")}:{" "}
+        {items.length === 1 ? <code>{first.command}</code> : t("missions.auto.many", { count: items.length })} ·{" "}
+        {reason} · {formatTime(i18n.language, first.at)}
+      </span>
+      {items.length > 1 && (
+        <button type="button" className="mi-lnk" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          {open ? t("missions.auto.hide") : t("missions.auto.show")}
+        </button>
+      )}
+      {canRevoke && (
+        <button
+          type="button"
+          className="mi-lnk"
+          title={t("missions.auto.revokeHint")}
+          disabled={set.isPending}
+          onClick={revoke}
+        >
+          {t("missions.auto.revoke")}
+        </button>
+      )}
+      {open && items.length > 1 && (
+        <ul className="mi-evt__list">
+          {items.map((i) => (
+            <li key={i.id}>
+              <code>{i.command}</code>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Auto approvals in a row, a minute apart at most from the first: one line (first id → the group; the rest hidden). */
+export function groupAutoApproved(list: Message[]) {
+  const groups = new Map<string, Message[]>();
+  const hidden = new Set<string>();
+  let current: Message[] | null = null;
+  for (const m of list) {
+    const a = missionAutoApprovedOf(m.meta);
+    const head = current?.[0];
+    if (
+      a &&
+      current &&
+      head &&
+      missionAutoApprovedOf(head.meta)?.missionId === a.missionId &&
+      Date.parse(m.createdAt) - Date.parse(head.createdAt) <= 60_000
+    ) {
+      current.push(m);
+      hidden.add(m.id);
+      continue;
+    }
+    current = a ? [m] : null;
+    if (current) groups.set(m.id, current);
+  }
+  return { groups, hidden };
 }
 
 // ── Decision card ─────────────────────────────────────────────────────────────

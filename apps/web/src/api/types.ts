@@ -1820,6 +1820,8 @@ export interface Mission {
   status: MissionStatus;
   repoDir: string;
   resumeTasks: boolean;
+  /** "Pedir aprovação de comandos". */
+  commandApproval: CommandApproval;
   plan: {
     version: number;
     done: number;
@@ -1941,6 +1943,18 @@ export interface TaskOutput {
   truncated: boolean;
 }
 
+/** "Pedir aprovação de comandos": every command, only the risky ones (Jev allows the low-risk ones), or never (but the blocked ones). */
+export type CommandApproval = "always" | "low_risk_auto" | "never";
+
+/** `meta.missionAutoApproved`: a command allowed without a card (one quiet line, Revogar). */
+export interface MissionAutoApprovedMeta {
+  missionId: string;
+  taskId: string;
+  tool: string;
+  command: string;
+  reason: "low_risk" | "never";
+}
+
 export interface MissionCreateInput {
   agentId: string;
   goal: string;
@@ -1953,6 +1967,8 @@ export interface MissionCreateInput {
   folder?: string;
   /** Default: Claude Code when the computer has it, else the agent itself. */
   executor?: MissionExecutor;
+  /** Default: low_risk_auto. */
+  commandApproval?: CommandApproval;
 }
 
 export interface MissionDecision {

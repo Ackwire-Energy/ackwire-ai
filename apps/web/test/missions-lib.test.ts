@@ -56,6 +56,7 @@ const mission = (over: Partial<Mission> = {}): Mission => ({
   status: "active",
   repoDir: "",
   resumeTasks: true,
+  commandApproval: "low_risk_auto",
   plan: { version: 1, done: 4, total: 12, waiting: 1, doing: 2, items: [] },
   pending: { decisions: 2, provisional: 0, reviews: 1, suggestions: 0, joinRequests: 0, commands: 0 },
   joinRequested: false,

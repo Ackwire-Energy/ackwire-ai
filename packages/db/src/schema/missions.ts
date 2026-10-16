@@ -81,6 +81,12 @@ export const missions = pgTable(
     /** Interrupted mission tasks resume by themselves when the machine comes back. */
     resumeTasks: boolean().notNull().default(true),
     /**
+     * Command cards (ADR 0029): `always` (every command off the allow list
+     * asks), `low_risk_auto` (the judge allows low-risk ones within what code
+     * allows) or `never` (everything but the deny list); validated in code.
+     */
+    commandApproval: text().notNull().default("low_risk_auto"),
+    /**
      * Agent mode: the agent's wake-ups in a row with no plan item changing
      * state (the stuck-loop guard pauses the mission at 5).
      */

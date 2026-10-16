@@ -1,8 +1,8 @@
-import { Chip, Icon, type IconName, PlanStrip } from "@agenteschat/ui";
+import { Chip, Icon, type IconName, PlanStrip, Select } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Mission, MissionExecutor, MissionFileName, ThreadMissionSummary } from "@/api/types";
+import type { CommandApproval, Mission, MissionExecutor, MissionFileName, ThreadMissionSummary } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
@@ -27,6 +27,42 @@ export function executorOptions(t: TFunction, executors: MissionExecutor[], agen
     label: t(`missions.executor.${e}` as const, { name: agentName }),
     description: t(`missions.executor.${e}Text` as const, { name: agentName }),
   }));
+}
+
+/** "Pedir aprovação de comandos", in the order people read them (the default first). */
+export const COMMAND_APPROVALS: readonly CommandApproval[] = ["low_risk_auto", "always", "never"];
+
+export function commandApprovalOptions(t: TFunction) {
+  return COMMAND_APPROVALS.map((v) => ({
+    value: v,
+    label: t(`missions.commandApproval.${v}` as const),
+    description: t(`missions.commandApproval.${v}Text` as const),
+  }));
+}
+
+/** The same choice everywhere (Nova missão, the plan card): a select with one line on each option. */
+export function CommandApprovalSelect({
+  value,
+  onChange,
+  disabled,
+  size,
+}: {
+  value: CommandApproval;
+  onChange: (value: CommandApproval) => void;
+  disabled?: boolean;
+  size?: "sm";
+}) {
+  const { t } = useTranslation();
+  return (
+    <Select
+      {...(size ? { size } : {})}
+      aria-label={t("missions.commandApproval.label")}
+      value={value}
+      disabled={disabled}
+      onValueChange={(v) => onChange(v as CommandApproval)}
+      options={commandApprovalOptions(t)}
+    />
+  );
 }
 
 /** Re-renders every `ms` while `active` (live durations). */

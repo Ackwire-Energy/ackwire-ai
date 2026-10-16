@@ -1,4 +1,4 @@
-import { AvatarStack, Button, Icon, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
+import { AvatarStack, Button, Icon, Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,10 +10,11 @@ import {
   useMissionParticipants,
   useMissionPlan,
   useRequestJoin,
+  useSetCommandApproval,
   useThreadTasks,
 } from "@/api/missions";
 import { useMachines } from "@/api/queries";
-import type { Mission, MissionControl } from "@/api/types";
+import type { CommandApproval, Mission, MissionControl } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -28,7 +29,14 @@ import {
   planCellTitles,
 } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
-import { MachineChip, MissionStatusChip, MissionStrip, useElapsedNow, useMissionPanel } from "./MissionBits";
+import {
+  COMMAND_APPROVALS,
+  MachineChip,
+  MissionStatusChip,
+  MissionStrip,
+  useElapsedNow,
+  useMissionPanel,
+} from "./MissionBits";
 import { CloseMissionDialog, ShareMissionDialog } from "./MissionDialogs";
 import { SessionRows } from "./MissionSessions";
 
@@ -49,6 +57,7 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
   const tasks = useThreadTasks(org.id, m.threadId);
   const people = useMissionParticipants(org.id, m.id);
   const control = useMissionControl(org.id);
+  const setApproval = useSetCommandApproval(org.id, m.id);
   const api = useApi();
   const approveAll = useMissionAct(org.id, m.id, () => api.missions.approveProvisional(org.id, m.id));
   const [dialog, setDialog] = useState<"share" | "close" | null>(null);
@@ -139,6 +148,26 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
               </MenuItem>
             )}
             {m.canAct && <MenuSeparator />}
+            {m.canAct && (
+              <>
+                <MenuRadioGroup
+                  label={t("missions.commandApproval.label")}
+                  value={m.commandApproval}
+                  onValueChange={(raw) => {
+                    const v = raw as CommandApproval;
+                    setApproval.mutate(v, {
+                      onSuccess: () =>
+                        toast.show(
+                          t("missions.commandApproval.changed", { value: t(`missions.commandApproval.${v}` as const) }),
+                        ),
+                      onError: (error) => toast.show(errorText(t, error), "error"),
+                    });
+                  }}
+                  options={COMMAND_APPROVALS.map((v) => ({ value: v, label: t(`missions.commandApproval.${v}`) }))}
+                />
+                <MenuSeparator />
+              </>
+            )}
             <MenuItem icon="members" onSelect={() => setDialog("share")}>
               {t("missions.actions.share")}
             </MenuItem>

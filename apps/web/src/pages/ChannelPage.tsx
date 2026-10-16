@@ -87,6 +87,8 @@ import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
 import { MissionPanelProvider } from "@/components/missions/MissionBits";
 import {
+  AutoApprovedLine,
+  groupAutoApproved,
   MissionDecisionCard,
   MissionEphemeral,
   MissionLinkCard,
@@ -1460,12 +1462,20 @@ const Timeline = memo(function Timeline({
       ),
     [items],
   );
+  // Commands allowed without a card, a minute apart: one line for the run of them.
+  const autoApproved = useMemo(
+    () => groupAutoApproved(items.flatMap((i) => (i.kind === "message" ? [i.message] : []))),
+    [items],
+  );
   let afterLive = false;
   /** A closed thread is one line; the root of a thread made from a range is its marker (or stub). */
   const threadRow = (key: string, m: MessageType) => {
     // A mission's automatic lines (the plan changed, the computer went offline, a task ended): not a voice.
     if (missionPlanChangeOf(m.meta)) return <MissionPlanChangeLine key={key} message={m} />;
     if (taskNoticeOf(m.meta)) return <TaskNoticeLine key={key} message={m} />;
+    if (autoApproved.hidden.has(m.id)) return <Fragment key={key} />;
+    const autoGroup = autoApproved.groups.get(m.id);
+    if (autoGroup) return <AutoApprovedLine key={key} messages={autoGroup} />;
     if (!threadsView) return null;
     const info = threadsView.byId.get(m.id);
     if (info?.state === "closed") return <ClosedThreadLine key={key} thread={info} />;

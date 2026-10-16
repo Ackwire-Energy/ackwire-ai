@@ -172,6 +172,7 @@ export function buildEngine(o: EngineOptions) {
     artifacts,
     search: context,
     publicUrl: config.PUBLIC_URL,
+    judge: context.judge,
   };
   machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps }));
   const githubApp =
