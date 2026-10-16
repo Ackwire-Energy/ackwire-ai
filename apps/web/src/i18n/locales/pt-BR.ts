@@ -341,6 +341,8 @@ export const ptBR = {
     nav: "Navegação do workspace",
     openNav: "Abrir menu",
     closeNav: "Fechar menu",
+    collapseNav: "Minimizar barra lateral",
+    expandNav: "Expandir barra lateral",
     searchWorkspace: "Buscar no workspace",
     summary_one: "{{people}} membro · {{agents}} agentes",
     summary_other: "{{people}} membros · {{agents}} agentes",

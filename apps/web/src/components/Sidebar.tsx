@@ -36,6 +36,7 @@ import { formatPercent } from "@/lib/format";
 import { markOpen } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { browserTimezone } from "@/lib/routines";
+import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/SettingsPage";
@@ -44,7 +45,7 @@ import { agentStateIn, runningAgents } from "@/realtime/streams";
 import { AudienceChip } from "./AgentAudience";
 import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
-import { useNavDrawer } from "./NavDrawer";
+import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
@@ -64,6 +65,9 @@ function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boo
     </SkeletonGroup>
   );
 }
+
+/** Tablet widths: the sidebar is always an icon rail (NavDrawer.tsx has the other breakpoints). */
+const TABLET_QUERY = "(min-width: 761px) and (max-width: 1199px)";
 
 /** The workspace sidebar (telas/Sidebar.dc.html). */
 export function Sidebar() {
@@ -98,9 +102,21 @@ export function Sidebar() {
   const orgRef = useRef<HTMLDivElement>(null);
   // Narrow screens: the sidebar is a drawer (id, open state, close on link / swipe).
   const drawer = useNavDrawer();
+  // Desktop: the person can shrink the sidebar to an icon rail (remembered). Tablets always get the rail.
+  const compact = useMediaQuery(COMPACT_QUERY);
+  const tablet = useMediaQuery(TABLET_QUERY);
+  const [collapsed, setCollapsed] = useState(() => storage.get(STORAGE_KEYS.sidebarCollapsed) === "1");
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      storage.set(STORAGE_KEYS.sidebarCollapsed, c ? "0" : "1");
+      return !c;
+    });
+  };
+  const rail = !compact && (tablet || collapsed);
 
-  // The active item's soft pill slides between items (one indicator, measured).
-  const navRef = useRef<HTMLElement>(null);
+  // The active item's soft pill slides between items (one indicator, measured). Only the middle
+  // scrolls: the workspace card on top and the foot stay put.
+  const navRef = useRef<HTMLDivElement>(null);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [indicator, setIndicator] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
   // Measure from the active item itself, and again whenever anything in the sidebar changes size
@@ -138,164 +154,183 @@ export function Sidebar() {
       ro?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [pathname, channels.data, dir.agents.length, people.length]);
+  }, [pathname, channels.data, dir.agents.length, people.length, rail]);
 
   return (
-    <nav className="sidebar" aria-label={t("shell.nav")} ref={navRef} {...drawer?.navProps}>
-      {indicator && (
-        <span
-          className="sidebar__indicator"
-          aria-hidden="true"
-          style={{
-            transform: `translate(${indicator.left}px, ${indicator.top}px)`,
-            width: indicator.width,
-            height: indicator.height,
-          }}
-        />
-      )}
-      <div className="sidebar__org" ref={orgRef}>
-        <SidebarOrgSky calm={() => [orgRef.current?.querySelector(".sidebar__org-text") ?? null]} />
-        <WorkspaceMenu
-          summary={
-            overview.data
-              ? t("shell.summary", {
-                  count: overview.data.people,
-                  people: overview.data.people,
-                  agents: overview.data.agents,
-                })
-              : null
-          }
-        />
-        <Button asChild variant="ghost" iconOnly style={{ width: 32, height: 32 }}>
-          <Link to="/org/$orgId/search" params={{ orgId }} aria-label={t("shell.searchWorkspace")}>
-            <Icon name="search" />
-          </Link>
-        </Button>
-      </div>
-
-      <button type="button" className="sidebar__jump" onClick={openPalette} title={t("palette.jump")}>
-        <Icon name="search" />
-        <span className="sidebar__item-label">{t("palette.jump")}</span>
-        <Kbd>{modKey()}</Kbd>
-        <Kbd>K</Kbd>
-      </button>
-
-      <div className="sidebar__group">
-        <Link to="/org/$orgId/approvals" params={{ orgId }} className="sidebar__item" title={t("shell.approvals")}>
-          <Icon name="waiting" />
-          <span className="sidebar__item-label">{t("shell.approvals")}</span>
-          {pending > 0 && (
-            <CountBadge aria-label={t("shell.pendingApprovals", { count: pending })}>{pending}</CountBadge>
-          )}
-        </Link>
-        <Link to="/org/$orgId/issues" params={{ orgId }} className="sidebar__item" title={t("shell.issues")}>
-          <Icon name="issues" />
-          <span className="sidebar__item-label">{t("shell.issues")}</span>
-        </Link>
-        <Link to="/org/$orgId/routines" params={{ orgId }} className="sidebar__item" title={t("shell.routines")}>
-          <Icon name="routines" />
-          <span className="sidebar__item-label">{t("shell.routines")}</span>
-        </Link>
-        <Link to="/org/$orgId/calendar" params={{ orgId }} className="sidebar__item" title={t("shell.calendar")}>
-          <Icon name="calendar" />
-          <span className="sidebar__item-label">{t("shell.calendar")}</span>
-        </Link>
-        <Link to="/org/$orgId/forum" params={{ orgId }} className="sidebar__item" title={t("shell.forum")}>
-          <Icon name="message" />
-          <span className="sidebar__item-label">{t("shell.forum")}</span>
-        </Link>
-        <Link to="/org/$orgId/wiki" params={{ orgId }} className="sidebar__item" title={t("shell.wiki")}>
-          <Icon name="book" />
-          <span className="sidebar__item-label">{t("shell.wiki")}</span>
-        </Link>
-        <Link to="/org/$orgId/drive" params={{ orgId }} className="sidebar__item" title={t("shell.drive")}>
-          <Icon name="drive" />
-          <span className="sidebar__item-label">{t("shell.drive")}</span>
-        </Link>
-        <Link to="/org/$orgId/members" params={{ orgId }} className="sidebar__item" title={t("shell.members")}>
-          <Icon name="members" />
-          <span className="sidebar__item-label">{t("shell.members")}</span>
-        </Link>
-      </div>
-
-      <div className="sidebar__group">
-        <div className="sidebar__label-row">
-          <span className="sidebar__label">{t("shell.channels")}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            icon="plus"
-            aria-label={t("newChannel.open")}
-            onClick={() => setCreatingChannel(true)}
+    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
+      <div className="sidebar__top">
+        <div className="sidebar__org" ref={orgRef}>
+          <SidebarOrgSky calm={() => [orgRef.current?.querySelector(".sidebar__org-text") ?? null]} />
+          <WorkspaceMenu
+            summary={
+              overview.data
+                ? t("shell.summary", {
+                    count: overview.data.people,
+                    people: overview.data.people,
+                    agents: overview.data.agents,
+                  })
+                : null
+            }
           />
-        </div>
-        {channels.isLoading && <SidebarSkeleton count={3} label={t("common.loadingList")} />}
-        {(channels.data ?? [])
-          .filter((c) => !dmChannels.has(c.id))
-          .map((c) => (
-            <Link
-              key={c.id}
-              to="/org/$orgId/c/$channelId"
-              params={{ orgId, channelId: c.id }}
-              className="sidebar__item"
-              title={`#${c.name}`}
-              onMouseEnter={() => prefetch(c.id)}
-              onFocus={() => prefetch(c.id)}
-              onClick={() => markOpen(c.id)}
-            >
-              <Icon name="channel" className="sidebar__channel-icon" />
-              <span className="sidebar__item-label">{c.name}</span>
+          <Button asChild variant="ghost" iconOnly style={{ width: 32, height: 32 }}>
+            <Link to="/org/$orgId/search" params={{ orgId }} aria-label={t("shell.searchWorkspace")}>
+              <Icon name="search" />
             </Link>
-          ))}
+          </Button>
+        </div>
+
+        <div className="sidebar__jump-row">
+          <button type="button" className="sidebar__jump" onClick={openPalette} title={t("palette.jump")}>
+            <Icon name="search" />
+            <span className="sidebar__item-label">{t("palette.jump")}</span>
+            <Kbd>{modKey()}</Kbd>
+            <Kbd>K</Kbd>
+          </button>
+          {!compact && !tablet && (
+            <Button
+              variant="ghost"
+              iconOnly
+              icon="sidebar"
+              className="sidebar__collapse"
+              aria-label={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
+              title={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
+              aria-expanded={!collapsed}
+              onClick={toggleCollapsed}
+            />
+          )}
+        </div>
       </div>
 
-      {dir.loading && dir.agents.length === 0 && (
-        <div className="sidebar__group">
-          <span className="sidebar__label">{t("shell.agents")}</span>
-          <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />
-        </div>
-      )}
-      {dir.agents.length > 0 && (
-        <div className="sidebar__group">
-          <span className="sidebar__label">{t("shell.agents")}</span>
-          {dir.agents.map((a) => (
-            <AgentRow
-              key={a.id}
-              agent={a}
-              unread={unreadWith.get(a.id) ?? 0}
-              onPrefetch={() => prefetchDm(a.id)}
-              onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
-            />
-          ))}
-        </div>
-      )}
+      <div className="sidebar__scroll" ref={navRef}>
+        {indicator && (
+          <span
+            className="sidebar__indicator"
+            aria-hidden="true"
+            style={{
+              transform: `translate(${indicator.left}px, ${indicator.top}px)`,
+              width: indicator.width,
+              height: indicator.height,
+            }}
+          />
+        )}
 
-      {people.length > 0 && (
         <div className="sidebar__group">
-          <span className="sidebar__label">{t("shell.directMessages")}</span>
-          {people.map((m) => {
-            const unread = unreadWith.get(m.userId) ?? 0;
-            return (
-              <Link
-                key={m.userId}
-                to="/org/$orgId/dm/person/$userId"
-                params={{ orgId, userId: m.userId }}
-                className="sidebar__item"
-                title={m.name}
-                data-unread={unread > 0}
-                onMouseEnter={() => prefetchDm(m.userId)}
-                onFocus={() => prefetchDm(m.userId)}
-                onClick={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
-              >
-                <Avatar name={m.name} size="sm" imageUrl={m.image} />
-                <span className="sidebar__item-label">{m.name}</span>
-                {unread > 0 && <UnreadCount count={unread} />}
-              </Link>
-            );
-          })}
+          <Link to="/org/$orgId/approvals" params={{ orgId }} className="sidebar__item" title={t("shell.approvals")}>
+            <Icon name="waiting" />
+            <span className="sidebar__item-label">{t("shell.approvals")}</span>
+            {pending > 0 && (
+              <CountBadge aria-label={t("shell.pendingApprovals", { count: pending })}>{pending}</CountBadge>
+            )}
+          </Link>
+          <Link to="/org/$orgId/issues" params={{ orgId }} className="sidebar__item" title={t("shell.issues")}>
+            <Icon name="issues" />
+            <span className="sidebar__item-label">{t("shell.issues")}</span>
+          </Link>
+          <Link to="/org/$orgId/routines" params={{ orgId }} className="sidebar__item" title={t("shell.routines")}>
+            <Icon name="routines" />
+            <span className="sidebar__item-label">{t("shell.routines")}</span>
+          </Link>
+          <Link to="/org/$orgId/calendar" params={{ orgId }} className="sidebar__item" title={t("shell.calendar")}>
+            <Icon name="calendar" />
+            <span className="sidebar__item-label">{t("shell.calendar")}</span>
+          </Link>
+          <Link to="/org/$orgId/forum" params={{ orgId }} className="sidebar__item" title={t("shell.forum")}>
+            <Icon name="message" />
+            <span className="sidebar__item-label">{t("shell.forum")}</span>
+          </Link>
+          <Link to="/org/$orgId/wiki" params={{ orgId }} className="sidebar__item" title={t("shell.wiki")}>
+            <Icon name="book" />
+            <span className="sidebar__item-label">{t("shell.wiki")}</span>
+          </Link>
+          <Link to="/org/$orgId/drive" params={{ orgId }} className="sidebar__item" title={t("shell.drive")}>
+            <Icon name="drive" />
+            <span className="sidebar__item-label">{t("shell.drive")}</span>
+          </Link>
+          <Link to="/org/$orgId/members" params={{ orgId }} className="sidebar__item" title={t("shell.members")}>
+            <Icon name="members" />
+            <span className="sidebar__item-label">{t("shell.members")}</span>
+          </Link>
         </div>
-      )}
+
+        <div className="sidebar__group">
+          <div className="sidebar__label-row">
+            <span className="sidebar__label">{t("shell.channels")}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              icon="plus"
+              aria-label={t("newChannel.open")}
+              onClick={() => setCreatingChannel(true)}
+            />
+          </div>
+          {channels.isLoading && <SidebarSkeleton count={3} label={t("common.loadingList")} />}
+          {(channels.data ?? [])
+            .filter((c) => !dmChannels.has(c.id))
+            .map((c) => (
+              <Link
+                key={c.id}
+                to="/org/$orgId/c/$channelId"
+                params={{ orgId, channelId: c.id }}
+                className="sidebar__item"
+                title={`#${c.name}`}
+                onMouseEnter={() => prefetch(c.id)}
+                onFocus={() => prefetch(c.id)}
+                onClick={() => markOpen(c.id)}
+              >
+                <Icon name="channel" className="sidebar__channel-icon" />
+                <span className="sidebar__item-label">{c.name}</span>
+              </Link>
+            ))}
+        </div>
+
+        {dir.loading && dir.agents.length === 0 && (
+          <div className="sidebar__group">
+            <span className="sidebar__label">{t("shell.agents")}</span>
+            <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />
+          </div>
+        )}
+        {dir.agents.length > 0 && (
+          <div className="sidebar__group">
+            <span className="sidebar__label">{t("shell.agents")}</span>
+            {dir.agents.map((a) => (
+              <AgentRow
+                key={a.id}
+                agent={a}
+                unread={unreadWith.get(a.id) ?? 0}
+                onPrefetch={() => prefetchDm(a.id)}
+                onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        {people.length > 0 && (
+          <div className="sidebar__group">
+            <span className="sidebar__label">{t("shell.directMessages")}</span>
+            {people.map((m) => {
+              const unread = unreadWith.get(m.userId) ?? 0;
+              return (
+                <Link
+                  key={m.userId}
+                  to="/org/$orgId/dm/person/$userId"
+                  params={{ orgId, userId: m.userId }}
+                  className="sidebar__item"
+                  title={m.name}
+                  data-unread={unread > 0}
+                  onMouseEnter={() => prefetchDm(m.userId)}
+                  onFocus={() => prefetchDm(m.userId)}
+                  onClick={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
+                >
+                  <Avatar name={m.name} size="sm" imageUrl={m.image} />
+                  <span className="sidebar__item-label">{m.name}</span>
+                  {unread > 0 && <UnreadCount count={unread} />}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <NewChannelDialog open={creatingChannel} onOpenChange={setCreatingChannel} />
 

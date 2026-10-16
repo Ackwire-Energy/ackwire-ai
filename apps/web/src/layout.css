@@ -276,7 +276,27 @@ p {
   padding: 16px 12px;
   background: var(--surface-sunken);
   color: var(--ink);
+  overflow: hidden;
+}
+/* Only the middle scrolls: the workspace card (and ⌘K) on top and the foot stay put. */
+.sidebar__top {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.sidebar__scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  /* Bleed to the sidebar's edges: the scrollbar sits at the edge and focus rings aren't clipped. */
+  margin: -4px -12px;
+  padding: 4px 12px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .sidebar__org {
   display: flex;
@@ -3028,10 +3048,7 @@ button.drive-where:focus-visible {
   flex: none;
 }
 .sidebar__foot {
-  position: sticky;
-  bottom: 0;
-  padding-top: var(--space-2);
-  background: var(--surface-sunken);
+  flex: none;
 }
 .sidebar__me {
   display: flex;
@@ -3712,7 +3729,8 @@ button.drive-where:focus-visible {
   position: relative;
   background: var(--sunken);
 }
-.sidebar > *:not(.sidebar__indicator) {
+.sidebar > *,
+.sidebar__scroll > *:not(.sidebar__indicator) {
   position: relative;
   z-index: 1;
 }
@@ -3778,8 +3796,9 @@ button.drive-where:focus-visible {
   align-items: center;
   gap: 8px;
   height: 34px;
+  flex: 1;
+  min-width: 0;
   padding: 0 8px 0 10px;
-  margin: -8px 0 0;
   border: 0;
   border-radius: var(--radius-item);
   background: transparent;
@@ -3796,6 +3815,27 @@ button.drive-where:focus-visible {
 .sidebar__jump:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+/* ⌘K and, beside it, the button that shrinks the sidebar to its icon rail (desktop). */
+.sidebar__jump-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: -8px;
+}
+.sidebar__collapse.ac-btn {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar {
+    transition:
+      flex-basis 0.2s var(--out),
+      width 0.2s var(--out),
+      min-width 0.2s var(--out);
+  }
 }
 
 /* Composer area: the floating card sits on the page with breathing room. */
@@ -5547,90 +5587,105 @@ button.live-call__head:hover {
   }
 }
 
-/* The sidebar never gets crushed by a wide page: full width, or (1024–1199px) an icon rail. */
+/* The sidebar never gets crushed by a wide page: full width, or an icon rail (`data-rail`: tablets, or the person shrank it). */
 .sidebar {
   min-width: 272px;
 }
-@media (min-width: 761px) and (max-width: 1199px) {
-  .sidebar {
-    flex: 0 0 68px;
-    width: 68px;
-    min-width: 68px;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 10px;
-  }
-  .sidebar__org {
-    flex-direction: column;
-    padding: 0;
-  }
-  .sidebar__org > a,
-  .sidebar__org-text,
-  .sidebar__org-button > .ac-icon,
-  .sidebar__jump .ac-kbd,
-  .sidebar__item-meta,
-  .sidebar__user-text,
-  .sidebar__label-row .ac-btn {
-    display: none;
-  }
-  /* Names stay for screen readers; the title shows them on hover. */
-  .sidebar__item-label,
-  .sidebar__label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-  .sidebar__group {
-    align-items: center;
-    width: 100%;
-    gap: 2px;
-    padding-top: 10px;
-    border-top: 1px solid var(--line);
-  }
-  .sidebar__label-row {
-    display: contents;
-  }
-  .sidebar__item,
-  .sidebar__jump {
-    position: relative;
-    justify-content: center;
-    width: 44px;
-    min-height: 40px;
-    padding: 0;
-    gap: 0;
-  }
-  .sidebar__unread,
-  .sidebar__item .ac-count {
-    position: absolute;
-    top: 2px;
-    right: 0;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    font-size: 10px;
-    line-height: 16px;
-  }
-  .sidebar__foot {
-    align-items: center;
-    width: 100%;
-  }
-  .sidebar__create.ac-btn {
-    width: 44px;
-    padding: 0;
-    justify-content: center;
-  }
-  .sidebar__me {
-    flex-direction: column;
-    gap: 6px;
-    padding: 0;
-  }
-  .sidebar__user {
-    justify-content: center;
-    padding: 4px;
-  }
+.sidebar[data-rail="true"] {
+  flex: 0 0 68px;
+  width: 68px;
+  min-width: 68px;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 10px;
+}
+.sidebar[data-rail="true"] .sidebar__org {
+  flex-direction: column;
+  padding: 0;
+}
+.sidebar[data-rail="true"] .sidebar__org > a,
+.sidebar[data-rail="true"] .sidebar__org-text,
+.sidebar[data-rail="true"] .sidebar__org-button > .ac-icon,
+.sidebar[data-rail="true"] .sidebar__jump .ac-kbd,
+.sidebar[data-rail="true"] .sidebar__item-meta,
+.sidebar[data-rail="true"] .sidebar__user-text,
+.sidebar[data-rail="true"] .sidebar__label-row .ac-btn {
+  display: none;
+}
+/* Names stay for screen readers; the title shows them on hover. */
+.sidebar[data-rail="true"] .sidebar__item-label,
+.sidebar[data-rail="true"] .sidebar__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.sidebar[data-rail="true"] .sidebar__group {
+  align-items: center;
+  width: 100%;
+  gap: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.sidebar[data-rail="true"] .sidebar__label-row {
+  display: contents;
+}
+.sidebar[data-rail="true"] .sidebar__item,
+.sidebar[data-rail="true"] .sidebar__jump {
+  position: relative;
+  justify-content: center;
+  width: 44px;
+  min-height: 40px;
+  padding: 0;
+  gap: 0;
+}
+.sidebar[data-rail="true"] .sidebar__unread,
+.sidebar[data-rail="true"] .sidebar__item .ac-count {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 16px;
+}
+.sidebar[data-rail="true"] .sidebar__top,
+.sidebar[data-rail="true"] .sidebar__scroll,
+.sidebar[data-rail="true"] .sidebar__foot {
+  align-items: center;
+  width: 100%;
+}
+.sidebar[data-rail="true"] .sidebar__top,
+.sidebar[data-rail="true"] .sidebar__scroll {
+  gap: 14px;
+}
+.sidebar[data-rail="true"] .sidebar__scroll {
+  margin: -4px -10px;
+  padding: 4px 10px;
+}
+.sidebar[data-rail="true"] .sidebar__jump-row {
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar[data-rail="true"] .sidebar__jump {
+  flex: none;
+}
+.sidebar[data-rail="true"] .sidebar__create.ac-btn {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.sidebar[data-rail="true"] .sidebar__me {
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+}
+.sidebar[data-rail="true"] .sidebar__user {
+  justify-content: center;
+  padding: 4px;
 }
 /* A routine's "when": the sentence, "Ajustar dias e horários" and the next runs; the picker on demand. */
 .routine-when {
@@ -6074,21 +6129,19 @@ button.live-call__head:hover {
     backdrop-filter: blur(10px);
   }
 }
-@media (min-width: 761px) and (max-width: 1199px) {
-  .sidebar__org {
-    min-height: 0;
-    padding: 6px;
-  }
-  .sidebar__trail {
-    display: none;
-  }
-  .sidebar__glow {
-    display: block;
-  }
-  .sidebar__me {
-    background: transparent;
-    box-shadow: none;
-  }
+.sidebar[data-rail="true"] .sidebar__org {
+  min-height: 0;
+  padding: 6px;
+}
+.sidebar[data-rail="true"] .sidebar__trail {
+  display: none;
+}
+.sidebar[data-rail="true"] .sidebar__glow {
+  display: block;
+}
+.sidebar[data-rail="true"] .sidebar__me {
+  background: transparent;
+  box-shadow: none;
 }
 
 /* Uploaded files in the Drive (ADR 0025): name + size, preview, read-only text. */

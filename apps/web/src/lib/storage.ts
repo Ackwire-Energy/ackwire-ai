@@ -32,4 +32,6 @@ export const STORAGE_KEYS = {
   waitlistConfirmed: "agentes.waitlist.confirmed",
   /** The Drive's view: "grid" (default) or "list". */
   driveView: "agentes.drive.view",
+  /** "1" when the person shrank the sidebar to its icon rail (desktop). */
+  sidebarCollapsed: "agentes.sidebar.collapsed",
 } as const;

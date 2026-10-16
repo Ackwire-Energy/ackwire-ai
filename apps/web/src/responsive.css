@@ -4,7 +4,7 @@
  * (components/NavDrawer.tsx):
  *   phone   ≤ 640px    single columns, dialogs are bottom sheets
  *   compact ≤ 760px    the sidebar is a drawer behind a menu button; side panels go full screen
- *   tablet  761–1199px the sidebar is an icon rail (layout.css)
+ *   tablet  761–1199px the sidebar is an icon rail (layout.css `data-rail`; on desktop, when collapsed)
  *   desktop ≥ 1200px
  * Touch is about the pointer, not the width: `(pointer: coarse)` grows hit
  * areas to 40px. Nothing scrolls the page sideways: wide things (tables, the

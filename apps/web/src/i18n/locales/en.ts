@@ -335,6 +335,8 @@ export const en: Translations = {
     nav: "Workspace navigation",
     openNav: "Open menu",
     closeNav: "Close menu",
+    collapseNav: "Collapse sidebar",
+    expandNav: "Expand sidebar",
     searchWorkspace: "Search the workspace",
     summary_one: "{{people}} member · {{agents}} agents",
     summary_other: "{{people}} members · {{agents}} agents",
