@@ -19,14 +19,14 @@ export interface RunPixel {
   at?: string | Date;
 }
 
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
-const CELL = 2;
+export const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+export const CELL = 2;
 
-const reduced = () =>
+export const reduced = () =>
   typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches === true;
 
 /** A color token as "#rrggbb" (the mixer reads six digits: "#fff" would come out blue). */
-function token(el: Element, name: string, fallback: string) {
+export function token(el: Element, name: string, fallback: string) {
   const v = getComputedStyle(el).getPropertyValue(name).trim();
   if (/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v)) return v.slice(0, 7);
   if (/^#[0-9a-f]{3,4}$/i.test(v)) return `#${[...v.slice(1, 4)].map((c) => c + c).join("")}`;
@@ -34,7 +34,7 @@ function token(el: Element, name: string, fallback: string) {
 }
 
 /** Bayer between a column's tones: deep at the base, light at the top. */
-function column(ctx: CanvasRenderingContext2D, x0: number, w: number, h: number, base: number, pal: string[]) {
+export function column(ctx: CanvasRenderingContext2D, x0: number, w: number, h: number, base: number, pal: string[]) {
   const last = pal.length - 1;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
@@ -101,7 +101,7 @@ function drawWorking(ctx: CanvasRenderingContext2D, x0: number, w: number, rows:
 }
 
 /** Runs a draw function: once (reduced motion, nothing moving) or about 12 times a second while mounted. */
-function useCanvas(
+export function useCanvas(
   draw: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, t: number) => void,
   moving: boolean,
 ) {
@@ -169,7 +169,7 @@ export function RunStrip({
 }
 
 const SPRITES = new Map<string, string[]>();
-const spriteOf = (eyes: string) => {
+export const spriteOf = (eyes: string) => {
   let g = SPRITES.get(eyes);
   if (!g) {
     g = spriteGrid(9, eyes);
