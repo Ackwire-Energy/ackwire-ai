@@ -506,9 +506,10 @@ describe("Drive", () => {
 
   test("a click shows the details: preview, Abrir, Baixar, Copiar link, versions, where", async () => {
     await goDrive();
+    // The card says it opens a dialog (checked before: the open modal hides the page behind it).
+    expect(card("Organograma do time").getAttribute("aria-haspopup")).toBe("dialog");
     await click(card("Organograma do time"));
     await settle(4);
-    expect(card("Organograma do time").getAttribute("aria-haspopup")).toBe("dialog");
     const panel = screen().getByRole("dialog", { name: "Organograma do time" });
     expect(within(panel).getByRole("heading", { level: 2, name: "Organograma do time" })).toBeTruthy();
     expect(panel.querySelector(".drive-pv--lg")).not.toBeNull();

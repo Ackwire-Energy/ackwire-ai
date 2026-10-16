@@ -58,7 +58,7 @@ export function RunIcon({ run }: { run: Pick<Run, "status"> }) {
 }
 
 /** The run's state as a chip (icon and word). */
-export function RunChip({ run }: { run: Pick<Run, "status"> & Partial<Pick<Run, "agentId">> }) {
+export function RunChip({ run }: { run: Pick<Run, "status"> & { agentId?: Run["agentId"] } }) {
   const { t } = useTranslation();
   if (run.status === "failed") return <Chip icon="alert">{t("agentPage.activity.failed")}</Chip>;
   if (run.status === "waiting_approval" || run.status === "waiting_input")

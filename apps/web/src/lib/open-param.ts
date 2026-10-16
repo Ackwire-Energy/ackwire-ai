@@ -32,8 +32,14 @@ export function useOpenParam(name = "open"): [string | null, (value: string | nu
   return [value, set];
 }
 
-/** `validateSearch` for a page with an open item: keeps `open` (a string or a number such as an issue's). */
-export function openSearch(search: Record<string, unknown>): { open?: string } {
+/**
+ * `validateSearch` for a page with an open item. A number (an issue's) stays a
+ * number: the router JSON-quotes a string that reads as one (`?open=%22131%22`),
+ * so a digits-only string becomes a number too. Anything else stays a string.
+ */
+export function openSearch(search: Record<string, unknown>): { open?: string | number } {
   const v = search.open;
-  return typeof v === "string" && v ? { open: v } : typeof v === "number" ? { open: String(v) } : {};
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? { open: v } : {};
+  if (typeof v !== "string" || !v) return {};
+  return /^\d{1,15}$/.test(v) ? { open: Number(v) } : { open: v };
 }

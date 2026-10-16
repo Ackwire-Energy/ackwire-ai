@@ -5,7 +5,9 @@ import { THREAD_TABS, ThreadsPage, type ThreadsTab } from "@/pages/ThreadsPage";
 
 /** Threads (telas/Threads.html): `?tab=`, `?channel=` (from a channel's "Threads (N)") and `?open=` (a thread's details). */
 export const Route = createFileRoute("/org/$orgId/threads/")({
-  validateSearch: (search: Record<string, unknown>): { tab?: ThreadsTab; channel?: string; open?: string } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tab?: ThreadsTab; channel?: string; open?: string | number } => ({
     ...openSearch(search),
     ...(THREAD_TABS.includes(search.tab as ThreadsTab) ? { tab: search.tab as ThreadsTab } : {}),
     ...(typeof search.channel === "string" && search.channel ? { channel: search.channel } : {}),

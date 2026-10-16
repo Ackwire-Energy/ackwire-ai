@@ -5,7 +5,7 @@ import { DrivePage } from "@/pages/DrivePage";
 
 /** Drive: every artifact the viewer can see. `?artifact=…&v=…` opens one (shared links); `?open=…` its details. */
 export const Route = createFileRoute("/org/$orgId/drive")({
-  validateSearch: (search: Record<string, unknown>): { artifact?: string; v?: number; open?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { artifact?: string; v?: number; open?: string | number } => ({
     ...openSearch(search),
     artifact: typeof search.artifact === "string" ? search.artifact : undefined,
     v: typeof search.v === "number" && search.v > 0 ? search.v : undefined,

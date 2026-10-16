@@ -397,7 +397,8 @@ test("an item away from the mission folder may use it (--add-dir, Read/Edit/Writ
     },
     "darwin",
   );
-  expect(args.join(" ")).toContain(`--add-dir ${folder}`);
+  // Shell-quoted like every other path argument.
+  expect(args.join(" ")).toContain(`--add-dir '${folder}'`);
   expect(
     missionExecutorArgs(
       "claude",
