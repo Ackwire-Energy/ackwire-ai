@@ -1,7 +1,8 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { requireChannelAccess } from "../channels";
 import { NotFoundError, ValidationError } from "../errors";
+import { publishChannelEvent } from "../events";
 import { getMessage } from "../messages";
 import { enqueue } from "../outbox";
 import type { Approval } from "../tools/gateway";
@@ -99,7 +100,14 @@ export async function correctAgentMessage(
 }
 
 /** Adds a reaction. 👍/👎 on an agent's reply adjust the relevance of the context it used, via a job. */
-export async function addReaction(db: Database, userId: string, orgId: string, messageId: string, reaction: string) {
+export async function addReaction(
+  db: Database,
+  userId: string,
+  orgId: string,
+  messageId: string,
+  reaction: string,
+  pubsub?: PubSub,
+) {
   const message = await getMessage(db, orgId, messageId);
   if (!message || message.deletedAt) throw new NotFoundError("Message not found");
   await requireChannelAccess(db, userId, orgId, message.channelId);
@@ -116,10 +124,21 @@ export async function addReaction(db: Database, userId: string, orgId: string, m
       await enqueue(tx, { orgId, kind: "context.feedback", payload: { messageId, reaction } });
     }
   });
-  return listReactions(db, orgId, messageId);
+  const reactions = await listReactions(db, orgId, messageId);
+  await publishChannelEvent(pubsub, { type: "message.reactions", channelId: message.channelId, messageId, reactions });
+  return reactions;
 }
 
-export async function removeReaction(db: Database, userId: string, orgId: string, messageId: string, reaction: string) {
+export async function removeReaction(
+  db: Database,
+  userId: string,
+  orgId: string,
+  messageId: string,
+  reaction: string,
+  pubsub?: PubSub,
+) {
+  const message = await getMessage(db, orgId, messageId);
+  if (!message) throw new NotFoundError("Message not found");
   await db
     .delete(messageReactions)
     .where(
@@ -130,14 +149,18 @@ export async function removeReaction(db: Database, userId: string, orgId: string
         eq(messageReactions.reaction, reaction),
       ),
     );
-  return listReactions(db, orgId, messageId);
+  const reactions = await listReactions(db, orgId, messageId);
+  await publishChannelEvent(pubsub, { type: "message.reactions", channelId: message.channelId, messageId, reactions });
+  return reactions;
 }
 
+/** Reactions on a message, in the order they were first given, with who reacted. */
 export async function listReactions(db: Database, orgId: string, messageId: string) {
   const rows = await db
     .select({ reaction: messageReactions.reaction, userId: messageReactions.userId })
     .from(messageReactions)
-    .where(and(eq(messageReactions.orgId, orgId), eq(messageReactions.messageId, messageId)));
+    .where(and(eq(messageReactions.orgId, orgId), eq(messageReactions.messageId, messageId)))
+    .orderBy(asc(messageReactions.createdAt));
   const byReaction = new Map<string, string[]>();
   for (const r of rows) byReaction.set(r.reaction, [...(byReaction.get(r.reaction) ?? []), r.userId]);
   return [...byReaction].map(([reaction, userIds]) => ({ reaction, count: userIds.length, userIds }));

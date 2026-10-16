@@ -1,5 +1,6 @@
 import { Popover as RPopover } from "radix-ui";
 import {
+  type DragEvent,
   type KeyboardEvent,
   type ReactNode,
   useId,
@@ -9,8 +10,42 @@ import {
   useState,
 } from "react";
 import { cx } from "../cx";
+import {
+  applyFormat,
+  FORMAT_KINDS,
+  type FormatKind,
+  formatShortcut,
+  formatShortcutHint,
+  insertText,
+  type TextEdit,
+} from "../format";
+import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
-import { Kbd } from "./Kbd";
+import { type EmojiPickerLabels, EmojiPickerPopover } from "./EmojiPicker";
+import { Kbd, modKey } from "./Kbd";
+import { Spinner } from "./Skeleton";
+
+/** Names of the formatting buttons (also their tooltips, with the shortcut). */
+export type ComposerFormatLabels = Record<FormatKind, string> & {
+  /** Accessible name of the toolbar ("Formatação"). */
+  toolbar: string;
+  /** Put in `[…](https://)` when making a link with nothing selected ("texto"). */
+  linkText?: string;
+};
+
+const FORMAT_ICON: Record<FormatKind, IconName> = {
+  bold: "bold",
+  italic: "italic",
+  strike: "strike",
+  code: "code",
+  codeBlock: "codeBlock",
+  link: "link",
+  bulletList: "bulletList",
+  numberedList: "numberedList",
+  quote: "quote",
+};
+/** A hairline after these (inline styles | code | link | blocks). */
+const FORMAT_GROUP_ENDS: FormatKind[] = ["strike", "codeBlock", "link"];
 
 /** One "@" suggestion. `insert` is what goes after the "@" (the handle). */
 export interface ComposerSuggestion {
@@ -81,6 +116,103 @@ export interface ComposerProps {
   pills?: ReactNode;
   /** Shown in the send button once there is text ("Enviar"); the key hint follows. */
   sendText?: string;
+  /** Formatting toolbar (bold, italic, lists…) and its ⌘/Ctrl shortcuts, writing Markdown. */
+  format?: ComposerFormatLabels;
+  /** The emoji button: the picker inserts at the caret. `button` names it ("Emoji"). */
+  emoji?: EmojiPickerLabels & { button: string };
+  /** Files picked with the attach button (when there is no `onAttach`), dropped on the box or pasted. */
+  onFiles?: (files: File[]) => void;
+  /** Inside the card, above the text (e.g. "Respondendo a Ana" with the quoted line). */
+  header?: ReactNode;
+  /** Inside the card, under the text (e.g. files being uploaded, as `ComposerFile`). */
+  attachments?: ReactNode;
+  /** Something is attached: the message may go without text. */
+  canSendEmpty?: boolean;
+  /** Not yet (e.g. uploads still running): Enter and the send button wait. */
+  sendBlocked?: boolean;
+}
+
+/** A file in the composer: name, a spinner while it uploads, remove. */
+export function ComposerFile({
+  name,
+  icon = "file",
+  status,
+  statusLabel,
+  removeLabel,
+  onRemove,
+}: {
+  name: string;
+  icon?: IconName;
+  status: "uploading" | "done" | "failed";
+  /** Read with the name ("enviando…", "não enviado"). */
+  statusLabel?: string;
+  /** "Remover relatorio.pdf". */
+  removeLabel: string;
+  onRemove: () => void;
+}) {
+  return (
+    <span className="ac-composer__file" data-status={status} aria-busy={status === "uploading" || undefined}>
+      {status === "uploading" ? <Spinner size={14} /> : <Icon name={status === "failed" ? "alert" : icon} size={14} />}
+      <span className="ac-composer__file-name">{name}</span>
+      {statusLabel && <span className="ac-visually-hidden">{statusLabel}</span>}
+      <button type="button" className="ac-composer__file-remove" aria-label={removeLabel} onClick={onRemove}>
+        <Icon name="close" size={14} />
+      </button>
+    </span>
+  );
+}
+
+/** The formatting buttons: one tab stop, arrows move between them (toolbar pattern). */
+function FormatBar({ labels, onFormat }: { labels: ComposerFormatLabels; onFormat: (kind: FormatKind) => void }) {
+  const [focus, setFocus] = useState(0);
+  const bar = useRef<HTMLDivElement>(null);
+  const mod = modKey();
+  const move = (i: number) => {
+    const next = (i + FORMAT_KINDS.length) % FORMAT_KINDS.length;
+    setFocus(next);
+    bar.current?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
+  };
+  return (
+    <div
+      ref={bar}
+      className="ac-composer__format"
+      role="toolbar"
+      aria-label={labels.toolbar}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowRight") move(focus + 1);
+        else if (e.key === "ArrowLeft") move(focus - 1);
+        else if (e.key === "Home") move(0);
+        else if (e.key === "End") move(FORMAT_KINDS.length - 1);
+        else return;
+        e.preventDefault();
+      }}
+    >
+      {FORMAT_KINDS.map((kind, i) => {
+        const hint = formatShortcutHint(kind, mod);
+        return (
+          <span
+            key={kind}
+            className="ac-composer__format-item"
+            data-group-end={FORMAT_GROUP_ENDS.includes(kind) || undefined}
+          >
+            <button
+              type="button"
+              className="ac-composer__format-btn"
+              aria-label={labels[kind]}
+              title={hint ? `${labels[kind]} (${hint})` : labels[kind]}
+              tabIndex={i === focus ? 0 : -1}
+              // Keep the text box's focus and selection.
+              onMouseDown={(e) => e.preventDefault()}
+              onFocus={() => setFocus(i)}
+              onClick={() => onFormat(kind)}
+            >
+              <Icon name={FORMAT_ICON[kind]} size={16} />
+            </button>
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 /** "[[que" right before the caret (no "]]" or line break yet). */
@@ -120,9 +252,17 @@ export function Composer({
   links,
   pills,
   sendText,
+  format,
+  emoji,
+  onFiles,
+  header,
+  attachments,
+  canSendEmpty,
+  sendBlocked,
 }: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const box = useRef<HTMLDivElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const listId = useId();
   useImperativeHandle(textareaRef, () => ref.current as HTMLTextAreaElement, []);
   // The "@…" being typed, and the one the person closed with Esc.
@@ -131,7 +271,10 @@ export function Composer({
   const [linkToken, setLinkToken] = useState<{ start: number; query: string } | null>(null);
   const [dismissed, setDismissed] = useState<number | null>(null);
   const [active, setActive] = useState(0);
+  const [dragging, setDragging] = useState(false);
   const caretAfter = useRef<number | null>(null);
+  // A selection to restore after the text changes (formatting, an emoji).
+  const selectAfter = useRef<[number, number] | null>(null);
 
   // Grow with the text, up to the CSS max-height; put the caret after an inserted mention.
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure whenever the text changes
@@ -144,7 +287,38 @@ export function Composer({
       el.setSelectionRange(caretAfter.current, caretAfter.current);
       caretAfter.current = null;
     }
+    if (selectAfter.current) {
+      el.focus();
+      el.setSelectionRange(...selectAfter.current);
+      selectAfter.current = null;
+    }
   }, [value]);
+
+  /** Replaces the text and selection (formatting, emoji), keeping the focus in the box. */
+  const edit = (next: TextEdit) => {
+    const el = ref.current;
+    if (next.value === value) {
+      el?.focus();
+      el?.setSelectionRange(next.start, next.end);
+      return;
+    }
+    selectAfter.current = [next.start, next.end];
+    onChange(next.value);
+  };
+  const selection = () => {
+    const el = ref.current;
+    return { start: el?.selectionStart ?? value.length, end: el?.selectionEnd ?? value.length };
+  };
+  const applyKind = (kind: FormatKind) => {
+    const { start, end } = selection();
+    edit(applyFormat(value, start, end, kind, { link: format?.linkText }));
+  };
+  const insertEmoji = (e: string) => {
+    const { start, end } = selection();
+    edit(insertText(value, start, end, e));
+  };
+  const files = (list: FileList | null | undefined) => Array.from(list ?? []);
+  const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
 
   // "/" commands: only while the box is just "/word" (no space yet).
   const slash = commands ? /^\/(\S*)$/.exec(value) : null;
@@ -213,15 +387,23 @@ export function Composer({
     mentions?.onPick?.(item);
   };
 
+  const ready = Boolean(value.trim() || canSendEmpty) && !disabled && !sendBlocked;
   const send = () => {
-    const text = value.trim();
-    if (!text || disabled) return;
-    onSend(text);
+    if (!ready) return;
+    onSend(value.trim());
     // Keep typing: focus stays in the box (also after clicking the send button).
     ref.current?.focus();
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    const kind = format ? formatShortcut(e) : null;
+    if (kind) {
+      // Also keeps ⌘K (link) from reaching the command palette.
+      e.preventDefault();
+      e.stopPropagation();
+      applyKind(kind);
+      return;
+    }
     if (open) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
@@ -267,6 +449,12 @@ export function Composer({
       }}
       onSelect={(e) => track(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
       onKeyDown={onKeyDown}
+      onPaste={(e) => {
+        const pasted = files(e.clipboardData?.files);
+        if (!onFiles || pasted.length === 0) return;
+        e.preventDefault();
+        onFiles(pasted);
+      }}
       {...(mentions || commands || links
         ? {
             role: "combobox",
@@ -287,10 +475,60 @@ export function Composer({
       }}
     >
       <RPopover.Anchor asChild>
-        <div ref={box} className={cx("ac-composer", className)} data-disabled={disabled || undefined}>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: files dropped anywhere on the card (the attach button is the accessible way) */}
+        <div
+          ref={box}
+          className={cx("ac-composer", className)}
+          data-disabled={disabled || undefined}
+          data-dragging={dragging || undefined}
+          onDragOver={
+            onFiles
+              ? (e) => {
+                  if (!hasFiles(e) || disabled) return;
+                  e.preventDefault();
+                  setDragging(true);
+                }
+              : undefined
+          }
+          onDragLeave={
+            onFiles
+              ? (e) => {
+                  if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)))
+                    setDragging(false);
+                }
+              : undefined
+          }
+          onDrop={
+            onFiles
+              ? (e) => {
+                  setDragging(false);
+                  const dropped = files(e.dataTransfer?.files);
+                  if (dropped.length === 0 || disabled) return;
+                  e.preventDefault();
+                  onFiles(dropped);
+                }
+              : undefined
+          }
+        >
+          {header && <div className="ac-composer__header">{header}</div>}
           {textarea}
-          <div className="ac-composer__tools">
+          {attachments && <div className="ac-composer__attachments">{attachments}</div>}
+          <div className={cx("ac-composer__tools", format && "ac-composer__tools--format")}>
             {pills && <div className="ac-composer__pills">{pills}</div>}
+            {format && !disabled && <FormatBar labels={format} onFormat={applyKind} />}
+            {emoji && !disabled && (
+              <EmojiPickerPopover
+                labels={emoji}
+                onPick={insertEmoji}
+                align="start"
+                // Back to the text box (the caret after the emoji), not to the button.
+                onCloseAutoFocus={(e) => {
+                  e.preventDefault();
+                  ref.current?.focus();
+                }}
+                trigger={<Button variant="ghost" iconOnly size="sm" icon="smile" aria-label={emoji.button} />}
+              />
+            )}
             {attachLabel && (
               <Button
                 variant="ghost"
@@ -298,20 +536,35 @@ export function Composer({
                 size="sm"
                 icon="attach"
                 aria-label={attachLabel}
-                onClick={onAttach}
-                disabled={!onAttach}
+                onClick={onAttach ?? (onFiles ? () => fileInput.current?.click() : undefined)}
+                disabled={(!onAttach && !onFiles) || disabled}
+              />
+            )}
+            {onFiles && !onAttach && (
+              <input
+                ref={fileInput}
+                type="file"
+                multiple
+                hidden
+                tabIndex={-1}
+                aria-label={attachLabel}
+                onChange={(e) => {
+                  const picked = files(e.target.files);
+                  e.target.value = "";
+                  if (picked.length > 0) onFiles(picked);
+                }}
               />
             )}
             {/* Grows from a dim square into "Enviar ↵" once there is text. */}
             <button
               type="button"
               className="ac-composer__send"
-              data-ready={value.trim() && !disabled ? "" : undefined}
+              data-ready={ready ? "" : undefined}
               aria-label={sendLabel}
               onClick={send}
-              disabled={disabled || !value.trim()}
+              disabled={!ready}
             >
-              {sendText && value.trim() && !disabled && (
+              {sendText && ready && (
                 <span className="ac-composer__send-text" aria-hidden="true">
                   {sendText}
                   <Kbd>↵</Kbd>

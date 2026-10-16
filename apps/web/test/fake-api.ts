@@ -1009,6 +1009,26 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("chat.post", orgId, channelId, input);
         if (state.holdPosts) await state.holdPosts;
         if (state.failPosts) throw new ApiError(503, "unavailable", "Try again");
+        // Like the server: the quoted message must be in this channel; the meta is built here.
+        const meta: Record<string, unknown> = {};
+        if (input.replyTo) {
+          const quoted = state.messages.find((m) => m.id === input.replyTo);
+          if (!quoted || quoted.channelId !== channelId) {
+            throw new ApiError(400, "message.reply_not_found", "replyTo must be a message of this channel");
+          }
+          const who =
+            quoted.author.type === "agent"
+              ? state.agents.find((a) => a.id === quoted.author.id)?.name
+              : state.members.find((m) => m.userId === quoted.author.id)?.name;
+          meta.replyTo = {
+            messageId: quoted.id,
+            threadId: quoted.threadId,
+            author: quoted.author,
+            authorName: who ?? "",
+            excerpt: quoted.body.replace(/\s+/g, " ").trim().slice(0, 200),
+          };
+        }
+        if (input.attachments?.length) meta.artifacts = input.attachments.map((a) => ({ id: a, version: 1 }));
         const message: Message = {
           id: input.clientId ? `srv-${input.clientId}` : id("msg"),
           channelId,
@@ -1018,6 +1038,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           mentionedAgentIds: [],
           agentRunId: null,
           clientId: input.clientId ?? null,
+          ...(Object.keys(meta).length > 0 ? { meta } : {}),
           createdAt: new Date().toISOString(),
         };
         message.mentionedAgentIds = state.agents

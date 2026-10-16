@@ -222,7 +222,7 @@ describe("Canal", () => {
     expect(document.body.textContent).toContain("Correção enviada. A Ada vai aprender com ela.");
   });
 
-  test("people's messages have no feedback buttons, only the '…' bar", async () => {
+  test("people's messages have no feedback buttons: Reagir, Responder and '…'", async () => {
     await open();
     const ask = screen()
       .getAllByRole("article")
@@ -233,7 +233,7 @@ describe("Canal", () => {
       within(bar)
         .getAllByRole("button")
         .map((b) => b.getAttribute("aria-label")),
-    ).toEqual(["Mais ações da mensagem"]);
+    ).toEqual(["Reagir", "Responder", "Mais ações da mensagem"]);
   });
 
   test("admins edit the channel topic from the details", async () => {

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 /**
  * A small, safe Markdown renderer for chat messages and artifact documents:
  * headings, paragraphs, lists, quotes, rules, GFM tables, fenced code (mono),
- * inline code, bold, italic, links and bare URLs. It builds React elements
+ * inline code, bold, italic, ~~strikethrough~~, links and bare URLs. It builds React elements
  * only: raw HTML in the source is shown as text, never interpreted. Links
  * allow http(s) and mailto. In messages, line breaks are kept and @mentions
  * become our mention chips.
@@ -71,7 +71,7 @@ export function parseMarkdown(source: string, options: { breaks?: boolean } = {}
       const body: string[] = [];
       while (i < lines.length && /^\s*>/.test(lines[i] as string))
         body.push((lines[i++] as string).replace(/^\s*>\s?/, ""));
-      out.push({ type: "quote", text: body.join(" ") });
+      out.push({ type: "quote", text: body.join(join) });
       continue;
     }
     const item = line.match(LIST);
@@ -102,9 +102,10 @@ export function parseMarkdown(source: string, options: { breaks?: boolean } = {}
   return out;
 }
 
-// Code, bold, italic (not inside words, so `snake_case` and URLs stay as typed), links, bare URLs.
+// Code, bold, italic (not inside words, so `snake_case` and URLs stay as typed), links, bare URLs,
+// wiki links, ~~strikethrough~~.
 const INLINE =
-  /(`[^`]+`)|(\*\*[^*]+?\*\*|__[^_]+?__)|((?<![\w*])\*[^*\s][^*]*?\*(?![\w*])|(?<![\w_])_[^_\s][^_]*?_(?![\w_]))|(\[[^\]]+\]\([^)\s]+\))|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])|(\[\[[^[\]\n]+\]\])/;
+  /(`[^`]+`)|(\*\*[^*]+?\*\*|__[^_]+?__)|((?<![\w*])\*[^*\s][^*]*?\*(?![\w*])|(?<![\w_])_[^_\s][^_]*?_(?![\w_]))|(\[[^\]]+\]\([^)\s]+\))|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])|(\[\[[^[\]\n]+\]\])|(~~[^~\s](?:[^~]*?[^~\s])?~~)/;
 const SAFE_URL = /^(https?:|mailto:)/i;
 /** Same rule as the backend (`parseMentionHandles`): emails are not mentions. */
 const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
@@ -178,6 +179,7 @@ export function renderInline(text: string, key = "i", mention?: MentionRenderer,
     if (m[1]) out.push(<code key={k}>{tok.slice(1, -1)}</code>);
     else if (m[2]) out.push(<strong key={k}>{renderInline(tok.slice(2, -2), k, mention, wiki)}</strong>);
     else if (m[3]) out.push(<em key={k}>{renderInline(tok.slice(1, -1), k, mention, wiki)}</em>);
+    else if (m[7]) out.push(<del key={k}>{renderInline(tok.slice(2, -2), k, mention, wiki)}</del>);
     else if (m[4]) {
       const parts = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
       const href = parts?.[2] ?? "";

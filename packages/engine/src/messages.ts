@@ -9,6 +9,7 @@ import {
   inArray,
   isNull,
   lt,
+  or,
   rowsOf,
   schema,
   sql,
@@ -55,8 +56,40 @@ export interface MessageView {
   notices?: { agentId: string; text: string; code?: string; params?: Record<string, unknown> }[];
   /** Top-level messages with `include=replies`: thread summary and the latest replies. */
   replies?: { count: number; lastAt: string | null; latest: MessageView[] };
+  /** In message lists: reactions (`+1`/`-1` or an emoji) and who reacted. */
+  reactions?: ReactionCount[];
   createdAt: string;
 }
+
+export interface ReactionCount {
+  reaction: string;
+  count: number;
+  userIds: string[];
+}
+
+/** `meta.replyTo` of a quote reply: the message it answers, as it was when quoted. */
+export interface ReplyRef {
+  messageId: string;
+  /** The quoted message's thread (null = main timeline). */
+  threadId: string | null;
+  author: { type: "person" | "agent"; id: string | null };
+  authorName: string;
+  excerpt: string;
+}
+
+export const REPLY_EXCERPT_LENGTH = 200;
+
+/** One line of a message for a quote: whitespace collapsed, code fences dropped, ~200 chars. */
+export function replyExcerpt(body: string, max = REPLY_EXCERPT_LENGTH): string {
+  const line = body
+    .replace(/```[\w+-]*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
+}
+
+/** Files a person may attach to one message. */
+export const MAX_MESSAGE_ATTACHMENTS = 10;
 
 export interface MessageUsage {
   model: string;
@@ -207,7 +240,10 @@ export async function insertMessageWithRuns(
   steered: { id: string; agentId: string }[];
 }> {
   const body = input.body.trim();
-  if (body === "") throw new ValidationError("Message is empty");
+  // Files alone are a message (`meta.artifacts`): the text may be empty then.
+  const attached = input.meta?.artifacts;
+  const files = Array.isArray(attached) && attached.length > 0;
+  if (body === "" && !files) throw new ValidationError("Message is empty");
   if (body.length > MAX_MESSAGE_LENGTH)
     throw new ValidationError(`Message is longer than ${MAX_MESSAGE_LENGTH} characters`);
   const handles = `{${parseMentionHandles(body).join(",")}}`; // handles match [a-z0-9_-]: safe as an array literal
@@ -379,6 +415,10 @@ export async function postPersonMessage(
     clientId?: string | null;
     /** Server-side attachments (e.g. `{ issueId }` when asking an agent to implement an issue). */
     meta?: Record<string, unknown>;
+    /** Quote reply: the message this one answers (same channel). Stored as `meta.replyTo`. */
+    replyTo?: string | null;
+    /** Files (artifact ids) uploaded for this message, or files of this channel. Stored as `meta.artifacts`. */
+    attachments?: string[];
   },
 ): Promise<MessageView> {
   // One access check (membership + channel) instead of two round trips.
@@ -388,6 +428,15 @@ export async function postPersonMessage(
   if (channel.kind === "forum")
     throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
   const clientId = input.clientId?.trim().slice(0, 64) || null;
+  // Quote and files: checked and resolved here, so the run's context reads them from the meta (no query there).
+  const [replyTo, files] = await Promise.all([
+    input.replyTo ? replyRefFor(deps.db, orgId, channelId, input.replyTo) : null,
+    input.attachments?.length ? attachmentRefsFor(deps.db, userId, orgId, channelId, input.attachments) : null,
+  ]);
+  const meta =
+    replyTo || files
+      ? { ...(input.meta ?? {}), ...(replyTo ? { replyTo } : {}), ...(files ? { artifacts: files } : {}) }
+      : input.meta;
   // One statement: the message, its jobs, and the runs of agents that will surely answer.
   const { message, runs, blocked, steered } = await insertMessageWithRuns(
     deps.db,
@@ -397,7 +446,7 @@ export async function postPersonMessage(
       threadId: input.threadId,
       author: { type: "person", userId },
       body: input.body,
-      meta: clientId || input.meta ? { ...(input.meta ?? {}), ...(clientId ? { clientId } : {}) } : undefined,
+      meta: clientId || meta ? { ...(meta ?? {}), ...(clientId ? { clientId } : {}) } : undefined,
     },
     { startRuns: true },
   );
@@ -468,6 +517,90 @@ export async function postPersonMessage(
     }
   }
   return view;
+}
+
+/** The quoted message (one statement, with its author's name): it must be a live message of this channel. */
+async function replyRefFor(db: Database, orgId: string, channelId: string, messageId: string): Promise<ReplyRef> {
+  const [row] = await db
+    .select({
+      id: messages.id,
+      channelId: messages.channelId,
+      threadId: messages.threadId,
+      authorType: messages.authorType,
+      authorUserId: messages.authorUserId,
+      authorAgentId: messages.authorAgentId,
+      body: messages.body,
+      deletedAt: messages.deletedAt,
+      userName: schema.users.name,
+      agentName: agents.name,
+    })
+    .from(messages)
+    .leftJoin(schema.users, eq(schema.users.id, messages.authorUserId))
+    .leftJoin(agents, eq(agents.id, messages.authorAgentId))
+    .where(and(eq(messages.id, messageId), eq(messages.orgId, orgId)));
+  if (!row || row.deletedAt || row.channelId !== channelId) {
+    throw new ValidationError("replyTo must be a message of this channel", "message.reply_not_found");
+  }
+  const person = row.authorType === "person";
+  return {
+    messageId: row.id,
+    threadId: row.threadId,
+    author: { type: row.authorType, id: person ? row.authorUserId : row.authorAgentId },
+    authorName: (person ? row.userName : row.agentName) ?? "",
+    excerpt: replyExcerpt(row.body),
+  };
+}
+
+/** Files for a message: the person's own uploads or files of this channel, not deleted. */
+async function attachmentRefsFor(db: Database, userId: string, orgId: string, channelId: string, ids: string[]) {
+  const wanted = [...new Set(ids)];
+  if (wanted.length > MAX_MESSAGE_ATTACHMENTS) {
+    throw new ValidationError(`At most ${MAX_MESSAGE_ATTACHMENTS} files per message`, "message.too_many_attachments", {
+      max: MAX_MESSAGE_ATTACHMENTS,
+    });
+  }
+  const a = schema.artifacts;
+  const rows = await db
+    .select({ id: a.id, title: a.title, version: a.currentVersion })
+    .from(a)
+    .where(
+      and(
+        eq(a.orgId, orgId),
+        inArray(a.id, wanted),
+        isNull(a.deletedAt),
+        or(eq(a.channelId, channelId), and(eq(a.createdByType, "person"), eq(a.createdById, userId))),
+      ),
+    );
+  if (rows.length !== wanted.length) {
+    throw new ValidationError("Attach files you uploaded or files of this channel", "message.attachment_not_found");
+  }
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return wanted.map((id) => {
+    const r = byId.get(id) as (typeof rows)[number];
+    return { id: r.id, version: r.version, title: r.title };
+  });
+}
+
+/** Reactions on these messages, grouped like `listReactions`. */
+async function reactionsFor(db: Database, orgId: string, ids: string[]): Promise<Map<string, ReactionCount[]>> {
+  const out = new Map<string, ReactionCount[]>();
+  if (ids.length === 0) return out;
+  const r = schema.messageReactions;
+  const rows = await db
+    .select({ messageId: r.messageId, reaction: r.reaction, userId: r.userId })
+    .from(r)
+    .where(and(eq(r.orgId, orgId), inArray(r.messageId, ids)))
+    .orderBy(asc(r.createdAt));
+  for (const row of rows) {
+    const list = out.get(row.messageId) ?? [];
+    const found = list.find((x) => x.reaction === row.reaction);
+    if (found) {
+      found.count += 1;
+      found.userIds.push(row.userId);
+    } else list.push({ reaction: row.reaction, count: 1, userIds: [row.userId] });
+    out.set(row.messageId, list);
+  }
+  return out;
 }
 
 export async function getMessage(db: Executor, orgId: string, messageId: string): Promise<Message | null> {
@@ -584,20 +717,27 @@ async function usageFor(db: Database, orgId: string, list: Message[]) {
 }
 
 async function withReceipts(db: Database, orgId: string, list: Message[]): Promise<MessageView[]> {
-  const [receipts, usage] = await Promise.all([
+  const [receipts, usage, reactions] = await Promise.all([
     receiptsFor(
       db,
       orgId,
       list.filter((m) => m.authorType === "person"),
     ),
     usageFor(db, orgId, list),
+    reactionsFor(
+      db,
+      orgId,
+      list.map((m) => m.id),
+    ),
   ]);
   const views = list.map((m) => {
     const runUsage = m.agentRunId ? usage.get(m.agentRunId) : undefined;
+    const reacted = reactions.get(m.id);
     return {
       ...messageView(m),
       ...(receipts.has(m.id) ? { receipts: receipts.get(m.id) } : {}),
       ...(runUsage ? { usage: runUsage } : {}),
+      ...(reacted ? { reactions: reacted } : {}),
     };
   });
   return withDeletedArtifacts(db, orgId, await withWikiLinks(db, orgId, views));

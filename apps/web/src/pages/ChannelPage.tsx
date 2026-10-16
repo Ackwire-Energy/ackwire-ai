@@ -3,13 +3,18 @@ import {
   Button,
   Composer,
   type ComposerCommand,
+  ComposerFile,
+  type ComposerFormatLabels,
   DayDivider,
   Dialog,
   DialogFooter,
   DialogSearchList,
   EmptyState,
   Field,
+  FORMAT_KINDS,
+  type FormatKind,
   Icon,
+  type IconName,
   Input,
   Mention,
   Message,
@@ -47,10 +52,12 @@ import type {
   Agent,
   AgentQuestion,
   Approval,
+  ArtifactRef,
   Channel,
   Member,
   MemoryUpdate,
   Message as MessageType,
+  ReplyRef,
 } from "@/api/types";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
@@ -65,12 +72,13 @@ import { ForumMessageCard, forumTopicOfMessage } from "@/components/Forum";
 import { LiveCodeToggle, LiveWorkList } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
-import { MessageFeedback, ReactionPills } from "@/components/MessageFeedback";
-import { MessageMoreMenu, PersonMessageActions } from "@/components/MessageMore";
+import { MessageFeedback } from "@/components/MessageFeedback";
+import { MessageMoreMenu, PersonMessageActions, QuoteReplyButton } from "@/components/MessageMore";
 import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
+import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { askToStop, isStoppable, StopButton, useStopRun } from "@/components/StopRun";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
@@ -82,10 +90,13 @@ import { artifactRefs } from "@/lib/artifacts";
 import { audienceNotice, canTalk } from "@/lib/audience";
 import { entersWithMotion, greetingSuggestions, messageUsage, nearBottom, usageLine } from "@/lib/chat";
 import { clearDraft, peekDraft } from "@/lib/drafts";
+import { errorText } from "@/lib/errors";
+import { fileIcon, fitsUpload, MAX_UPLOAD_MB } from "@/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { reportPainted } from "@/lib/perf";
 import { can } from "@/lib/permissions";
+import { localMeta, quoteExcerpt, replyOf } from "@/lib/reply";
 import { isReminderMessage, routineOfMessage } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
 import { splitCanceled } from "@/lib/work";
@@ -131,6 +142,74 @@ const OLDER_PAGE = 50;
 const olderPages = new Map<string, MessageType[]>();
 const olderDone = new Set<string>();
 const scrollPositions = new Map<string, number>();
+/** Same limit as the server (`MAX_MESSAGE_ATTACHMENTS`). */
+const MAX_ATTACHMENTS = 10;
+
+/** A file picked for the next message: uploading, uploaded (with its Drive ref) or failed. */
+interface PendingFile {
+  key: string;
+  name: string;
+  icon: IconName;
+  status: "uploading" | "done" | "failed";
+  ref?: ArtifactRef;
+}
+
+/** Scrolls to a message on screen and gives it the soft highlight; false when it isn't there. */
+function highlightMessage(scroller: HTMLElement | null, messageId: string) {
+  const el = scroller?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
+  if (!el) return false;
+  el.scrollIntoView?.({ block: "center" });
+  // A soft plate that fades (CSS; static with reduced motion).
+  el.classList.add("ac-msg--focus");
+  setTimeout(() => el.classList.remove("ac-msg--focus"), HIGHLIGHT_MS);
+  return true;
+}
+
+/** "Respondendo a Ana" above the text: the quoted line and a cancel (Esc does it too). */
+function QuoteBar({ name, excerpt, onCancel }: { name: string; excerpt: string; onCancel: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="composer-quote">
+      <Icon name="reply" size={16} />
+      <span className="composer-quote__text">
+        <span className="composer-quote__who">{t("channel.replyingTo", { name })}</span>
+        <span className="composer-quote__excerpt">{excerpt}</span>
+      </span>
+      <button type="button" className="composer-reply__close" aria-label={t("channel.cancelQuote")} onClick={onCancel}>
+        <Icon name="close" size={14} />
+      </button>
+    </div>
+  );
+}
+
+/** The quote above a reply: who and one line; opens the original. */
+function QuotedMessage({ reply }: { reply: ReplyRef }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const actions = useChannelActions();
+  // The directory's current name; the one saved with the quote when they are gone.
+  const known =
+    reply.author.type === "agent"
+      ? dir.agentById.get(reply.author.id ?? "")?.name
+      : dir.memberById.get(reply.author.id ?? "")?.name;
+  const name = known || reply.authorName || dir.authorName(reply.author);
+  return (
+    <button
+      type="button"
+      className="msg-quote"
+      aria-label={t("channel.quoteOf", { name, excerpt: reply.excerpt })}
+      onClick={() => actions?.jumpTo?.(reply.messageId)}
+    >
+      <span className="msg-quote__who" aria-hidden="true">
+        {name}
+      </span>
+      <span className="msg-quote__excerpt" aria-hidden="true">
+        {reply.excerpt}
+      </span>
+    </button>
+  );
+}
 
 /** telas/Main.dc.html — a channel with real-time messages, streaming agent replies and inline approvals. */
 export function ChannelPage({
@@ -247,6 +326,8 @@ function ChannelView({
   const workingRun = useStreams((s) => runsInChannel(s, channel.id).find((r) => isStoppable(r) && !r.stopping));
   // "Responder em thread": the next message goes to that thread.
   const [replyTo, setReplyTo] = useState<MessageType | null>(null);
+  // "Responder": the next message quotes this one (`meta.replyTo`), in the same conversation.
+  const [quote, setQuote] = useState<MessageType | null>(null);
   draftRef.current = draft;
   useEffect(() => {
     if (draftKey) clearDraft(draftKey);
@@ -256,6 +337,16 @@ function ChannelView({
   const [offer, setOffer] = useState<string | null>(null);
   const mentionSearch = useMentionSearch(members.data);
   const composer = useRef<HTMLTextAreaElement>(null);
+  const emojiPicker = useEmojiLabels();
+  const emojiLabels = useMemo(() => ({ ...emojiPicker, button: t("channel.emoji") }), [emojiPicker, t]);
+  const formatLabels: ComposerFormatLabels = useMemo(
+    () => ({
+      ...(Object.fromEntries(FORMAT_KINDS.map((k) => [k, t(`composer.format.${k}`)])) as Record<FormatKind, string>),
+      toolbar: t("composer.format.toolbar"),
+      linkText: t("composer.format.linkText"),
+    }),
+    [t],
+  );
   useChannelRealtime(org.id, channel.id, isMember);
 
   const channelAgents = useMemo(
@@ -488,7 +579,7 @@ function ChannelView({
         {replyTo && (
           <span className="ac-composer__pill composer-reply">
             <Icon name="message" size={14} />
-            {t("channel.replyingTo", { name: dir.authorName(replyTo.author) })}
+            {t("channel.inThreadOf", { name: dir.authorName(replyTo.author) })}
             <button
               type="button"
               className="composer-reply__close"
@@ -549,21 +640,19 @@ function ChannelView({
     }
   }, [messages.dataUpdatedAt, timeline.length]);
 
-  // `?m=`: find the message (paging back up to FOCUS_MAX_PAGES), scroll to it, highlight it once.
+  // `?m=` (or a quote clicked): find the message (paging back up to FOCUS_MAX_PAGES), scroll to it,
+  // highlight it once.
+  const [focusTarget, setFocusTarget] = useState(focusMessageId);
   const [focusDone, setFocusDone] = useState(!focusMessageId);
   const focusPages = useRef(0);
-  const found = focusMessageId ? timeline.some((i) => i.kind === "message" && i.message.id === focusMessageId) : false;
+  const found = focusTarget ? timeline.some((i) => i.kind === "message" && i.message.id === focusTarget) : false;
   // biome-ignore lint/correctness/useExhaustiveDependencies: steps while the timeline grows
   useEffect(() => {
-    if (focusDone || !focusMessageId || !messages.isSuccess) return;
+    if (focusDone || !focusTarget || !messages.isSuccess) return;
     if (found) {
       setFocusDone(true);
       stick.current = false;
-      const el = scroller.current?.querySelector<HTMLElement>(`[data-message-id="${focusMessageId}"]`);
-      el?.scrollIntoView?.({ block: "center" });
-      // A soft plate that fades (CSS; static with reduced motion).
-      el?.classList.add("ac-msg--focus");
-      setTimeout(() => el?.classList.remove("ac-msg--focus"), HIGHLIGHT_MS);
+      highlightMessage(scroller.current, focusTarget);
       return;
     }
     if (olderState === "done" || focusPages.current >= FOCUS_MAX_PAGES) {
@@ -577,12 +666,58 @@ function ChannelView({
       focusPages.current += 1;
       loadOlder();
     }
-  }, [found, focusDone, focusMessageId, messages.isSuccess, olderState, older.length]);
+  }, [found, focusDone, focusTarget, messages.isSuccess, olderState, older.length]);
+  /** A quote was clicked: the original on screen, or paged in like `?m=`. */
+  const jumpTo = (messageId: string) => {
+    if (highlightMessage(scroller.current, messageId)) {
+      stick.current = false;
+      return;
+    }
+    focusPages.current = 0;
+    setFocusTarget(messageId);
+    setFocusDone(false);
+  };
+
+  // Files for the next message: uploaded to the Drive (this channel) right away; sending waits for them.
+  const toast = useToast();
+  const [files, setFiles] = useState<PendingFile[]>([]);
+  const addFiles = (list: File[]) => {
+    const room = MAX_ATTACHMENTS - files.length;
+    if (list.length > room) toast.show(t("channel.tooManyFiles", { max: MAX_ATTACHMENTS }), "error");
+    for (const file of list.slice(0, Math.max(0, room))) {
+      if (!fitsUpload(file)) {
+        toast.show(t("files.tooLarge", { name: file.name, max: MAX_UPLOAD_MB }), "error");
+        continue;
+      }
+      const key = `${file.name}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const update = (patch: Partial<PendingFile>) =>
+        setFiles((prev) => prev.map((f) => (f.key === key ? { ...f, ...patch } : f)));
+      setFiles((prev) => [
+        ...prev,
+        { key, name: file.name, icon: fileIcon(file.name, file.type), status: "uploading" },
+      ]);
+      api.artifacts
+        .upload(org.id, file, { channelId: channel.id })
+        .then((saved) => update({ status: "done", ref: { id: saved.id, version: saved.version, title: saved.title } }))
+        .catch((error) => {
+          update({ status: "failed" });
+          toast.show(errorText(t, error), "error");
+        });
+    }
+    composer.current?.focus();
+  };
+  const attached = files.flatMap((f) => (f.status === "done" && f.ref ? [f.ref] : []));
+  const uploading = files.some((f) => f.status === "uploading");
+
   const onSend = (text: string) => {
+    if (uploading || (!text && attached.length === 0)) return;
     toBottom(true);
     setDraft("");
-    send(text, replyTo ? (replyTo.threadId ?? replyTo.id) : null);
+    const meta = localMeta(quote, quote ? dir.authorName(quote.author) : "", attached);
+    send(text, replyTo ? (replyTo.threadId ?? replyTo.id) : null, meta);
     setReplyTo(null);
+    setQuote(null);
+    setFiles([]);
   };
   // Live rows sit by time: right after the message that started them (never at the bottom glued
   // to a later reply). `liveKey` only changes when runs start or end.
@@ -619,6 +754,11 @@ function ChannelView({
       setReplyTo(message);
       composer.current?.focus();
     },
+    quoteReply: (message) => {
+      setQuote(message);
+      composer.current?.focus();
+    },
+    jumpTo,
   };
 
   const agentNames = joinNames(
@@ -762,9 +902,56 @@ function ChannelView({
                 {t("channel.reconnecting")}
               </p>
             )}
-            <div className="channel__composer">
+            {/* Esc in the box (nothing else open) drops the quote first. */}
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: Esc from the composer's controls bubbles here */}
+            <div
+              className="channel__composer"
+              onKeyDown={(e) => {
+                if (e.key !== "Escape" || !quote || e.defaultPrevented) return;
+                e.preventDefault();
+                setQuote(null);
+              }}
+            >
               <ActivityBar channelId={channel.id} />
               <Composer
+                header={
+                  quote ? (
+                    <QuoteBar
+                      name={dir.authorName(quote.author)}
+                      excerpt={quoteExcerpt(quote.body)}
+                      onCancel={() => {
+                        setQuote(null);
+                        composer.current?.focus();
+                      }}
+                    />
+                  ) : undefined
+                }
+                attachments={
+                  files.length > 0
+                    ? files.map((f) => (
+                        <ComposerFile
+                          key={f.key}
+                          name={f.name}
+                          icon={f.icon}
+                          status={f.status}
+                          statusLabel={
+                            f.status === "uploading"
+                              ? t("channel.uploading")
+                              : f.status === "failed"
+                                ? t("channel.uploadFailed")
+                                : undefined
+                          }
+                          removeLabel={t("channel.removeFile", { name: f.name })}
+                          onRemove={() => setFiles((prev) => prev.filter((x) => x.key !== f.key))}
+                        />
+                      ))
+                    : undefined
+                }
+                onFiles={chrome?.locked ? undefined : addFiles}
+                canSendEmpty={attached.length > 0}
+                sendBlocked={uploading}
+                format={formatLabels}
+                emoji={emojiLabels}
                 id={`composer-${channel.id}`}
                 textareaRef={composer}
                 value={draft}
@@ -1371,7 +1558,10 @@ const TimelineMessage = memo(function TimelineMessage({
     ? (meta.memoryUpdates as MemoryUpdate[]).filter(isMemoryUpdate)
     : [];
   const question = isQuestion(meta.question) ? meta.question : null;
-  const artifacts = m.author.type === "agent" ? artifactRefs(meta) : [];
+  // Files an agent made, or a person attached.
+  const artifacts = artifactRefs(meta);
+  // "Responder": the message this one quotes.
+  const quoted = useMemo(() => replyOf(m.meta), [m.meta]);
   // An agent opened a forum topic from here: the topic card with "Ver discussão".
   const forumTopicId = m.author.type === "agent" ? forumTopicOfMessage(meta) : null;
   const card = approvalId || proposalId || memoryUpdates.length > 0 || question;
@@ -1468,7 +1658,8 @@ const TimelineMessage = memo(function TimelineMessage({
           </button>
         </p>
       )}
-      {(!routine || routineOpen) && (body.trim() || (!card && !canceledNote)) && (
+      {quoted && <QuotedMessage reply={quoted} />}
+      {(!routine || routineOpen) && (body.trim() || (!card && !canceledNote && artifacts.length === 0)) && (
         <MessageText>
           <MessageBody body={body} resolveMention={dir.mentionName} renderMention={renderMention} wikiLink={wikiLink} />
         </MessageText>
@@ -1499,12 +1690,15 @@ const TimelineMessage = memo(function TimelineMessage({
           ))}
         </div>
       )}
-      {feedback && <ReactionPills messageId={m.id} initial={m.reactions} />}
+      {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
+      {!m.local && <MessageReactions messageId={m.id} initial={m.reactions} feedback={feedback} />}
       {feedback && (
         <MessageFeedback
           messageId={m.id}
           agentName={agent?.name ?? t("channel.unknownAgent")}
           active={active}
+          initial={m.reactions}
+          quick={<QuoteReplyButton message={m} />}
           more={<MessageMoreMenu message={m} channelName={channelName ?? ""} />}
         />
       )}

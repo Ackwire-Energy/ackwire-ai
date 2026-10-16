@@ -15,6 +15,10 @@ export interface ChannelActions {
   channelAgents: Agent[];
   /** "Responder em thread": the composer replies in that message's thread. */
   replyInThread?: (message: MessageType) => void;
+  /** "Responder": the next message quotes this one (same conversation, `meta.replyTo`). */
+  quoteReply?: (message: MessageType) => void;
+  /** A quote was clicked: scroll to the original and highlight it (paging back if needed). */
+  jumpTo?: (messageId: string) => void;
 }
 export const ChannelActionsContext = createContext<ChannelActions | null>(null);
 export const useChannelActions = () => useContext(ChannelActionsContext);

@@ -218,7 +218,15 @@ export interface ApiClient {
     post(
       orgId: string,
       channelId: string,
-      input: { body: string; threadId?: string | null; clientId?: string },
+      input: {
+        body: string;
+        threadId?: string | null;
+        clientId?: string;
+        /** Quote reply: the message this one answers (the server stores `meta.replyTo`). */
+        replyTo?: string;
+        /** Uploaded files (artifact ids): the server stores `meta.artifacts`. */
+        attachments?: string[];
+      },
     ): Promise<Message>;
     reactions(orgId: string, messageId: string): Promise<ReactionCount[]>;
     react(orgId: string, messageId: string, reaction: string): Promise<ReactionCount[]>;

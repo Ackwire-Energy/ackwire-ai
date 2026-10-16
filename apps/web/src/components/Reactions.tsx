@@ -1,0 +1,156 @@
+import {
+  Button,
+  EMOJI_CATEGORIES,
+  type EmojiCategoryId,
+  type EmojiPickerLabels,
+  EmojiPickerPopover,
+  Icon,
+  Reaction,
+  Reactions,
+} from "@agenteschat/ui";
+import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { useReactions, useToggleReaction } from "@/api/queries";
+import type { ReactionCount } from "@/api/types";
+import { useDirectory } from "@/hooks/useDirectory";
+import { joinNames } from "@/lib/format";
+import { useOrg } from "./org-context";
+
+/** 👍/👎 are stored as `+1`/`-1`: on an agent's reply they are feedback that teaches it. */
+export const UP = "+1";
+export const DOWN = "-1";
+const THUMBS_UP = "👍";
+const THUMBS_DOWN = "👎";
+
+/** How a stored reaction shows ("+1" → 👍). */
+export const reactionEmoji = (reaction: string) =>
+  reaction === UP ? THUMBS_UP : reaction === DOWN ? THUMBS_DOWN : reaction;
+/** What a picked emoji is stored as (👍 → "+1"), so the picker's thumbs are the feedback ones. */
+export const reactionOf = (emoji: string) => (emoji === THUMBS_UP ? UP : emoji === THUMBS_DOWN ? DOWN : emoji);
+
+/** Whether I reacted with `reaction`, and how many did. */
+export function reactionState(list: ReactionCount[] | undefined, reaction: string, userId: string) {
+  const r = list?.find((x) => x.reaction === reaction);
+  return { mine: Boolean(r?.userIds.includes(userId)), count: r?.count ?? 0 };
+}
+
+/** The picker's words, translated. */
+export function useEmojiLabels(): EmojiPickerLabels {
+  const { t } = useTranslation();
+  return useMemo(
+    () => ({
+      dialog: t("emoji.dialog"),
+      search: t("emoji.search"),
+      noResults: t("emoji.noResults"),
+      recent: t("emoji.recent"),
+      results: t("emoji.results"),
+      categories: Object.fromEntries(EMOJI_CATEGORIES.map((c) => [c, t(`emoji.categories.${c}`)])) as Record<
+        EmojiCategoryId,
+        string
+      >,
+    }),
+    [t],
+  );
+}
+
+/**
+ * A message's reactions: the list from the message (server) until this
+ * client loaded or heard newer ones (`message.reactions`), and `toggle`.
+ * On an agent's reply (`feedback`), 👍 and 👎 are one opinion: one replaces the other.
+ */
+export function useMessageReactions(
+  messageId: string,
+  initial: ReactionCount[] | undefined,
+  options: { feedback?: boolean; load?: boolean } = {},
+) {
+  const { org, me } = useOrg();
+  const loaded = useReactions(org.id, messageId, Boolean(options.load));
+  const mutation = useToggleReaction(org.id, messageId);
+  const list = loaded.data ?? initial ?? [];
+  const toggle = (reaction: string) => {
+    const mine = reactionState(list, reaction, me.user.id).mine;
+    if (options.feedback && !mine && (reaction === UP || reaction === DOWN)) {
+      const other = reaction === UP ? DOWN : UP;
+      if (reactionState(list, other, me.user.id).mine) mutation.mutate({ reaction: other, on: false });
+    }
+    mutation.mutate({ reaction, on: !mine });
+  };
+  return { list, toggle, pending: mutation.isPending, userId: me.user.id };
+}
+
+/** "Reagir" on the hover bar: the picker; picking an emoji I already gave takes it back. */
+export function ReactButton({ onPick }: { onPick: (emoji: string) => void }) {
+  const { t } = useTranslation();
+  const labels = useEmojiLabels();
+  return (
+    <EmojiPickerPopover
+      labels={labels}
+      onPick={onPick}
+      align="end"
+      trigger={<Button variant="ghost" size="sm" iconOnly icon="smile" aria-label={t("reactions.react")} />}
+    />
+  );
+}
+
+/**
+ * Pills under a message (people's and agents'): emoji + count, pressed when
+ * mine, who reacted in the tooltip and the accessible name; "+" adds another.
+ */
+export function MessageReactions({
+  messageId,
+  initial,
+  feedback,
+}: {
+  messageId: string;
+  initial?: ReactionCount[];
+  /** An agent's reply: 👍/👎 replace each other (they teach the agent). */
+  feedback?: boolean;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const labels = useEmojiLabels();
+  const { list, toggle, userId } = useMessageReactions(messageId, initial, { feedback });
+  const shown = list.filter((r) => r.count > 0);
+  if (shown.length === 0) return null;
+  const nameOf = (id: string) =>
+    id === userId ? t("reactions.you") : (dir.memberById.get(id)?.name ?? t("reactions.someone"));
+  return (
+    <Reactions label={t("channel.reactions")}>
+      {shown.map((r) => {
+        const emoji = reactionEmoji(r.reaction);
+        const who = t("reactions.who", {
+          count: r.count,
+          names: joinNames(r.userIds.map(nameOf), t("newAgent.and")),
+          emoji,
+        });
+        return (
+          <Reaction
+            key={r.reaction}
+            pressed={r.userIds.includes(userId)}
+            count={r.count}
+            label={who}
+            title={who}
+            onClick={() => toggle(r.reaction)}
+          >
+            <span className="ac-react__emoji" aria-hidden="true">
+              {emoji}
+            </span>
+          </Reaction>
+        );
+      })}
+      <EmojiPickerPopover
+        labels={labels}
+        onPick={(emoji) => toggle(reactionOf(emoji))}
+        side="top"
+        align="start"
+        trigger={
+          <button type="button" className="ac-react ac-react--add" aria-label={t("reactions.add")}>
+            <Icon name="smile" size={14} />
+            <Icon name="plus" size={14} />
+          </button>
+        }
+      />
+    </Reactions>
+  );
+}

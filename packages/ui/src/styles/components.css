@@ -3242,6 +3242,276 @@ a.ac-list__row:focus-visible {
   min-height: 40px;
 }
 
+/* Composer: header (reply), files, formatting toolbar, drop target */
+.ac-composer__header {
+  padding: 10px 12px 0;
+}
+.ac-composer__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 14px 4px;
+}
+.ac-composer[data-dragging] {
+  box-shadow:
+    var(--e3),
+    var(--top),
+    inset 0 0 0 2px var(--line-strong);
+}
+.ac-composer__tools--format {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+/* With the toolbar, context pills get their own line above it, and send stays on the right. */
+.ac-composer__tools--format .ac-composer__pills {
+  flex-basis: 100%;
+}
+.ac-composer__tools--format .ac-composer__send,
+.ac-composer__tools--format .ac-btn + .ac-composer__send {
+  margin-left: auto;
+}
+.ac-composer__format {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ac-composer__format::-webkit-scrollbar {
+  display: none;
+}
+.ac-composer__format-item {
+  display: inline-flex;
+  flex: none;
+}
+.ac-composer__format-item[data-group-end]::after {
+  content: "";
+  width: 1px;
+  height: 16px;
+  margin: auto 4px;
+  background: var(--line);
+}
+.ac-composer__format-btn {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--radius-item);
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    transform 0.18s var(--spring);
+}
+.ac-composer__format-btn:hover {
+  background: var(--sunken);
+  color: var(--ink);
+}
+.ac-composer__format-btn:active {
+  transform: scale(0.94);
+}
+.ac-composer__format-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-composer__file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  max-width: 260px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--radius-full);
+  background: var(--sunken);
+  color: var(--ink2);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.ac-composer__file[data-status="uploading"] {
+  color: var(--muted);
+}
+.ac-composer__file[data-status="failed"] {
+  color: var(--danger);
+}
+.ac-composer__file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-composer__file-remove {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.ac-composer__file-remove:hover {
+  background: var(--raised);
+}
+.ac-composer__file-remove:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-composer__format-btn {
+    transition: none;
+  }
+}
+
+/* Emoji picker: glass popover, search, category tabs, grids */
+.ac-emoji-popover {
+  width: 332px;
+  max-width: calc(100vw - 32px);
+  padding: 8px;
+}
+.ac-emoji {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ac-emoji__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-item);
+  background: var(--sunken);
+  color: var(--faint);
+}
+.ac-emoji__search:focus-within {
+  box-shadow: var(--focus-ring);
+}
+.ac-emoji__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+}
+.ac-emoji__search input::placeholder {
+  color: var(--faint);
+}
+.ac-emoji__tabs {
+  display: flex;
+  justify-content: space-between;
+}
+.ac-emoji__tab {
+  width: 32px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--radius-item);
+  background: transparent;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  filter: grayscale(0.6);
+  opacity: 0.8;
+  transition:
+    background-color 0.15s,
+    filter 0.15s,
+    opacity 0.15s;
+}
+.ac-emoji__tab:hover {
+  background: rgba(127, 127, 127, 0.12);
+  filter: none;
+  opacity: 1;
+}
+.ac-emoji__scroll {
+  height: 248px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ac-emoji__heading {
+  padding: 6px 4px 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+/* Eight emoji per row (`EMOJI_COLUMNS`); a short last row keeps the same cell width. */
+.ac-emoji__grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.ac-emoji__grid td {
+  width: 12.5%;
+  padding: 0;
+}
+.ac-emoji__cell {
+  width: 100%;
+  aspect-ratio: 1;
+  max-height: 38px;
+  border: 0;
+  border-radius: var(--radius-item);
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.18s var(--spring);
+}
+.ac-emoji__cell:hover,
+.ac-emoji__cell:focus-visible {
+  background: rgba(127, 127, 127, 0.14);
+}
+.ac-emoji__cell:hover {
+  transform: scale(1.12);
+}
+.ac-emoji__cell:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-emoji__empty {
+  margin: 0;
+  padding: 24px 8px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-emoji__cell,
+  .ac-emoji__tab {
+    transition: none;
+  }
+  .ac-emoji__cell:hover {
+    transform: none;
+  }
+}
+
+/* Reaction pills: the emoji, and "+" to add another */
+.ac-react__emoji {
+  font-size: 15px;
+  line-height: 1;
+}
+.ac-react--add {
+  padding: 0 7px;
+  color: var(--faint);
+}
+.ac-react--add:hover {
+  color: var(--ink);
+}
+.ac-react[disabled] {
+  cursor: default;
+  opacity: 0.6;
+}
+
 /* ⌘K palette */
 .ac-palette__scrim {
   position: fixed;

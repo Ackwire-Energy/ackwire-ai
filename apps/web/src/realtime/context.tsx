@@ -297,6 +297,8 @@ export function RealtimeProvider({
     const conn = new RealtimeConnection({ url: realtimeUrl(window.location, orgId), createSocket });
     // Catch up over HTTP after a reconnect: events sent while offline are gone.
     const offReconnect = conn.onReconnect(() => {
+      // Reactions heard live may be stale now: the refetched message lists carry them again.
+      qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
     });
     // Approvals I can decide arrive here even when I'm not in that channel (sidebar badge, Aprovações).
@@ -445,6 +447,10 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         void qc.invalidateQueries({ queryKey: keys.artifacts(orgId) });
         if ((event.type as string) === "artifact.deleted")
           void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
+      }
+      // Someone reacted: the pills under that message change for everyone.
+      if (event.type === "message.reactions") {
+        qc.setQueryData(keys.reactions(orgId, event.messageId), event.reactions);
       }
       if (event.type === "message.created") {
         if (event.message) cacheMessage(qc, orgId, event.message);

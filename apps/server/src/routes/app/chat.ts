@@ -260,8 +260,19 @@ export function chatRoutes(deps: AppDeps) {
         params: ChannelParams,
         body: body(
           z.object({
-            body: z.string().min(1).max(40_000),
+            body: z
+              .string()
+              .max(40_000)
+              .openapi({ description: "Markdown. May be empty only when `attachments` has files." }),
             threadId: z.uuid().nullable().optional(),
+            replyTo: z.uuid().nullable().optional().openapi({
+              description:
+                "Quote reply: a message of this channel. Stored as `meta.replyTo` ({ messageId, threadId, author, authorName, excerpt }).",
+            }),
+            attachments: z.array(z.uuid()).max(10).optional().openapi({
+              description:
+                "Files (artifact ids) you uploaded or files of this channel. Stored as `meta.artifacts` ({ id, version, title }).",
+            }),
             clientId: z
               .string()
               .max(64)

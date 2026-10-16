@@ -11,7 +11,8 @@
 - **Events** (`ChannelEvent` in `@agenteschat/engine`), forwarded as `{"type":"event","channelId","event"}`:
   - `message.created` — committed message (inline when small; otherwise only `messageId`, fetch it over HTTP);
   - `agent.run` — `running` (typing indicator), `done`, `failed` with a reason;
-  - `agent.delta` — ordered (`seq`) fragments of an agent reply while it streams; not persisted, the final `message.created` replaces them.
+  - `agent.delta` — ordered (`seq`) fragments of an agent reply while it streams; not persisted, the final `message.created` replaces them;
+  - `message.reactions` — someone reacted (emoji, or `+1`/`-1`) or took it back: the message's full reaction list, which replaces the client's.
 - **Fan-out** goes through the `PubSub` adapter, topic `channel:<id>`. Core: Postgres LISTEN/NOTIFY on one channel (payload limit enforced below 8 KB; deltas are coalesced every 50 ms into ≤ 2000-character chunks). Cloud can register Redis. Postgres is the source of truth; real-time is best effort and clients catch up over HTTP on reconnect.
 - **Presence** is tracked per connection through the `Presence` adapter (in-memory in core).
 

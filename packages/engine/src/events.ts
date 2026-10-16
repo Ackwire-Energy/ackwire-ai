@@ -3,7 +3,7 @@ import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
 import type { CalendarEventView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
-import type { MessageView } from "./messages";
+import type { MessageView, ReactionCount } from "./messages";
 
 /** What a memory tool changed, for the "memória atualizada" card (persisted in the reply's `meta.memoryUpdates`). */
 export interface MemoryUpdate {
@@ -206,7 +206,9 @@ export type ChannelEvent =
       member: { type: "person" | "agent"; id: string; autoReply?: boolean };
     }
   /** A sensitive action waits for a person (`approval.created`) or was decided/expired (`approval.decided`). */
-  | { type: "approval.created" | "approval.decided"; channelId: string; approval: ApprovalView };
+  | { type: "approval.created" | "approval.decided"; channelId: string; approval: ApprovalView }
+  /** Someone reacted or took a reaction back: the message's reactions now (replace, don't merge). */
+  | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] };
 
 const INLINE_LIMIT = 6000;
 

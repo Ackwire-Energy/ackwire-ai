@@ -3929,6 +3929,78 @@ a.forum-card__title::after {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* "Respondendo a Ana" (quote reply) at the top of the composer card: who and the quoted line. */
+.composer-quote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 10px;
+  border-radius: var(--radius-item);
+  background: var(--sunken);
+  color: var(--muted);
+}
+.composer-quote > .ac-icon {
+  flex: none;
+}
+.composer-quote__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  font-size: 12.5px;
+  line-height: 17px;
+}
+.composer-quote__who {
+  font-weight: 600;
+  color: var(--ink2);
+}
+.composer-quote__excerpt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The quote above a reply: a neutral strip with a hairline; opens the original. */
+.msg-quote {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  margin: 4px 0 2px;
+  padding: 3px 10px;
+  border: 0;
+  border-left: 2px solid var(--line-strong);
+  border-radius: 0 var(--radius-item) var(--radius-item) 0;
+  background: var(--sunken);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+.msg-quote:hover {
+  color: var(--ink2);
+}
+.msg-quote:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.msg-quote__who {
+  flex: none;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.msg-quote__excerpt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A picker or menu open from the hover bar keeps the bar on screen. */
+.ac-msg__actions:has([aria-expanded="true"]) {
+  opacity: 1;
+  pointer-events: auto;
+}
 /* `?m=`: the linked message gets a soft plate that fades. */
 .channel__messages .ac-msg--focus {
   background: var(--plate);

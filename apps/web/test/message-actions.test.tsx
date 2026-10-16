@@ -22,7 +22,7 @@ const openMenu = async (trigger: HTMLElement) => {
 };
 
 describe("message action bars", () => {
-  test("people's messages get the glass bar with '…': Salvar na wiki, Copiar link, Responder em thread", async () => {
+  test("people's messages get the glass bar with '…': Salvar na wiki, Copiar link, Responder, Responder em thread", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
     await settle(8);
     const bar = screen().getByRole("toolbar", { name: "Ações da mensagem de João" });
@@ -32,18 +32,20 @@ describe("message action bars", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((i) => i.textContent),
-    ).toEqual(["Salvar na wiki", "Copiar link", "Responder em thread"]);
+    ).toEqual(["Salvar na wiki", "Copiar link", "Responder", "Responder em thread"]);
   });
 
-  test("agents keep 👍 👎 ✏️ and get the same '…'", async () => {
+  test("agents keep 👍 👎 ✏️, get Reagir and Responder, and the same '…'", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
     await settle(8);
     const bar = screen().getByRole("toolbar", { name: "Ações da mensagem de Ada" });
     expect(within(bar).getByRole("button", { name: "Útil" })).toBeTruthy();
     expect(within(bar).getByRole("button", { name: "Não ajudou" })).toBeTruthy();
     expect(within(bar).getByRole("button", { name: "Corrigir resposta" })).toBeTruthy();
+    expect(within(bar).getByRole("button", { name: "Reagir" })).toBeTruthy();
+    expect(within(bar).getByRole("button", { name: "Responder" })).toBeTruthy();
     const menu = await openMenu(within(bar).getByRole("button", { name: "Mais ações da mensagem" }));
-    expect(within(menu).getAllByRole("menuitem")).toHaveLength(3);
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(4);
   });
 
   test("Copiar link copies the message's address", async () => {
@@ -69,7 +71,7 @@ describe("message action bars", () => {
     const bar = screen().getByRole("toolbar", { name: "Ações da mensagem de João" });
     const menu = await openMenu(within(bar).getByRole("button", { name: "Mais ações da mensagem" }));
     await click(within(menu).getByRole("menuitem", { name: "Responder em thread" }));
-    expect(document.querySelector(".composer-reply")?.textContent).toContain("Respondendo a João");
+    expect(document.querySelector(".composer-reply")?.textContent).toContain("Na thread de João");
     const box = screen().getByRole("combobox", { name: /Mensagem para/ });
     await act(async () => fireEvent.change(box, { target: { value: "vou olhar" } }));
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));

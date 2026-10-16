@@ -384,7 +384,14 @@ export function knowledgeRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, messageId } = c.req.valid("param");
-      const reactions = await addReaction(db, c.get("user").id, orgId, messageId, c.req.valid("json").reaction);
+      const reactions = await addReaction(
+        db,
+        c.get("user").id,
+        orgId,
+        messageId,
+        c.req.valid("json").reaction,
+        adapters.pubsub,
+      );
       deps.wakeWorkers?.();
       return c.json({ reactions }, 200);
     },
@@ -396,14 +403,15 @@ export function knowledgeRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/messages/{messageId}/reactions",
       tags,
       security,
-      summary: "Remove your reaction",
+      summary: "Remove your reaction (everyone in the channel gets `message.reactions`)",
       request: { params: MessageParams, query: z.object({ reaction: z.string().min(1).max(32) }) },
       responses: { 200: json(z.object({ reactions: Reactions })), ...errors },
     }),
     async (c) => {
       const { orgId, messageId } = c.req.valid("param");
+      const { reaction } = c.req.valid("query");
       return c.json(
-        { reactions: await removeReaction(db, c.get("user").id, orgId, messageId, c.req.valid("query").reaction) },
+        { reactions: await removeReaction(db, c.get("user").id, orgId, messageId, reaction, adapters.pubsub) },
         200,
       );
     },

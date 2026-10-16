@@ -368,6 +368,24 @@ export function getChannelCached(db: Database, orgId: string, channelId: string)
   }) as Promise<typeof channels.$inferSelect | null>;
 }
 
+/** `meta.replyTo` (a quote reply) as a line before the text: who and what it answers. */
+export function quotedLine(meta: Record<string, unknown> | null | undefined): string {
+  const r = meta?.replyTo as { authorName?: unknown; excerpt?: unknown } | undefined;
+  if (!r || typeof r.excerpt !== "string" || !r.excerpt) return "";
+  const who = typeof r.authorName === "string" && r.authorName ? r.authorName : "someone";
+  return `(replying to ${who}: "${r.excerpt}")\n`;
+}
+
+/** Files a person attached (`meta.artifacts`): titles and ids, so the agent can open them with its file tools. */
+export function attachedLine(m: Pick<Message, "authorUserId" | "meta">): string {
+  const files = m.authorUserId ? m.meta?.artifacts : undefined;
+  if (!Array.isArray(files) || files.length === 0) return "";
+  const list = files
+    .filter((f): f is { id: string; title?: unknown } => Boolean(f) && typeof f.id === "string")
+    .map((f) => `"${typeof f.title === "string" ? f.title : "file"}" (artifact ${f.id})`);
+  return list.length > 0 ? `\n(attached files: ${list.join(", ")})` : "";
+}
+
 /**
  * Turns channel history into alternating user/assistant turns. The agent's
  * own messages are `assistant`; everything else is `user`, prefixed with the
@@ -396,7 +414,9 @@ export function toTurns(
       : routine && typeof routine.name === "string"
         ? `Rotina "${routine.name}", criada por ${who}`
         : who;
-    const text = own ? m.body : `[${label}]: ${m.body}`;
+    // Quote reply and files: from the meta written at post time (no query here).
+    const body = `${quotedLine(m.meta)}${m.body}${attachedLine(m)}`;
+    const text = own ? body : `[${label}]: ${body}`;
     const last = turns.at(-1);
     if (last && last.role === role) last.parts.push({ id: m.id, text });
     else turns.push({ role, parts: [{ id: m.id, text }] });

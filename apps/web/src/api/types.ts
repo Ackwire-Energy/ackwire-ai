@@ -211,6 +211,8 @@ export interface ActiveRun {
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
 export type ChannelEvent =
   | { type: "message.created"; channelId: string; messageId: string; message?: Message }
+  /** Someone reacted or took it back: the message's reactions now (replace). */
+  | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   | ArtifactEvent
   | {
       type: "agent.delta";
@@ -634,6 +636,16 @@ export interface SearchHit {
   snippet: string;
   score: number;
   createdAt: string;
+}
+
+/** `message.meta.replyTo`: the message a quote reply answers, as it was when quoted (server-made). */
+export interface ReplyRef {
+  messageId: string;
+  /** Its thread (null = the main timeline). */
+  threadId: string | null;
+  author: { type: AuthorType; id: string | null };
+  authorName: string;
+  excerpt: string;
 }
 
 export interface ReactionCount {

@@ -89,23 +89,36 @@ export function WorkSummary({
   );
 }
 
-/** One reaction pill: icon (or emoji-free symbol) + count; pressed when it's mine. */
+/** One reaction pill: an emoji (or icon) + count; pressed when it's mine. */
 export function Reaction({
   pressed,
   count,
   label,
+  title,
   children,
   onClick,
+  disabled,
 }: {
   pressed?: boolean;
   count?: number;
   /** Accessible name: "Útil, 2". */
   label: string;
+  /** Tooltip, e.g. who reacted. */
+  title?: string;
   children?: ReactNode;
   onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
-    <button type="button" className="ac-react" aria-pressed={pressed} aria-label={label} onClick={onClick}>
+    <button
+      type="button"
+      className="ac-react"
+      aria-pressed={pressed}
+      aria-label={label}
+      title={title}
+      onClick={onClick}
+      disabled={disabled}
+    >
       {children}
       {count !== undefined && <span className="tabular">{count}</span>}
     </button>

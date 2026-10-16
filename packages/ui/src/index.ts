@@ -65,6 +65,8 @@ export {
   Composer,
   type ComposerCommand,
   type ComposerCommands,
+  ComposerFile,
+  type ComposerFormatLabels,
   type ComposerMentions,
   type ComposerProps,
   type ComposerSuggestion,
@@ -74,6 +76,14 @@ export {
 export { DatePicker, type DatePickerProps, monthGrid, parseYmd, ymd } from "./components/DatePicker";
 export { Dialog, DialogBody, DialogFooter, type DialogProps, DialogSearchList } from "./components/Dialog";
 export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";
+export {
+  EMOJI_COLUMNS,
+  EmojiPicker,
+  type EmojiPickerLabels,
+  EmojiPickerPopover,
+  readRecentEmoji,
+  rememberEmoji,
+} from "./components/EmojiPicker";
 export { AffixInput, Field, type FieldProps, Input, SearchInput, Textarea, useFieldControl } from "./components/Field";
 export {
   FILTER_SEARCH_AFTER,
@@ -131,6 +141,27 @@ export { TimezoneSelect, type TimezoneSelectLabels, type TimezoneSelectProps } f
 export { Token, TokenList } from "./components/Token";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { cx } from "./cx";
+export {
+  EMOJI_CATEGORIES,
+  EMOJIS,
+  type EmojiCategoryId,
+  type EmojiEntry,
+  emojiEntry,
+  searchEmoji,
+} from "./emoji-data";
+export {
+  applyFormat,
+  codeBlock,
+  FORMAT_KINDS,
+  type FormatKind,
+  formatShortcut,
+  formatShortcutHint,
+  insertText,
+  linkSelection,
+  prefixLines,
+  type TextEdit,
+  wrapSelection,
+} from "./format";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
 export {
   BUSINESS_DAYS,

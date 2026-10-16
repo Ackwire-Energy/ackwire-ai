@@ -198,4 +198,40 @@ export const extraIcons = {
   ],
   /** The cloud computer. */
   cloud: [["path", { d: "M6 15.5a3.5 3.5 0 0 1-.4-7 4.5 4.5 0 0 1 8.7-.9A3.5 3.5 0 0 1 14 15.5z" }]],
+  /** "Reagir" and the composer's emoji button (our face, never an emoji glyph). */
+  smile: [
+    ["circle", { cx: "10", cy: "10", r: "7" }],
+    ["path", { d: "M7.2 11.8c.7.9 1.7 1.4 2.8 1.4s2.1-.5 2.8-1.4M7.6 8.2v.01M12.4 8.2v.01" }],
+  ],
+  /** "Responder" (quote reply). */
+  reply: [["path", { d: "M8 5 4 9l4 4M4 9h7a5 5 0 0 1 5 5v1.5" }]],
+  /** Composer formatting: bold. */
+  bold: [["path", { d: "M6 4h4.8a3 3 0 0 1 0 6H6zM6 10h5.6a3 3 0 0 1 0 6H6z" }]],
+  /** Composer formatting: italic. */
+  italic: [["path", { d: "M9 4h6M5 16h6M12 4 8 16" }]],
+  /** Composer formatting: strikethrough. */
+  strike: [
+    [
+      "path",
+      {
+        d: "M4 10h12M13.4 6.3C12.9 5 11.6 4 9.9 4 8 4 6.6 5.1 6.6 6.7c0 .7.3 1.3.9 1.8M6.6 13.5c.5 1.5 1.8 2.5 3.6 2.5 2 0 3.4-1.1 3.4-2.7 0-.5-.1-.9-.4-1.3",
+      },
+    ],
+  ],
+  /** Composer formatting: code block. */
+  codeBlock: [
+    ["rect", { x: "3", y: "4", width: "14", height: "12", rx: "3" }],
+    ["path", { d: "M8.2 8.2 6.4 10l1.8 1.8M11.8 8.2l1.8 1.8-1.8 1.8" }],
+  ],
+  /** Composer formatting: bulleted list. */
+  bulletList: [["path", { d: "M8.5 6H16M8.5 10H16M8.5 14H16M4.5 6v.01M4.5 10v.01M4.5 14v.01" }]],
+  /** Composer formatting: numbered list. */
+  numberedList: [
+    [
+      "path",
+      { d: "M9 6h7M9 10h7M9 14h7M4 4.8l1-.6v3.6M3.8 12.2c.2-.4.6-.7 1.1-.7.6 0 1 .4 1 .9 0 .8-2.1 1.3-2.1 2.4h2.1" },
+    ],
+  ],
+  /** Composer formatting: quote. */
+  quote: [["path", { d: "M4.5 4.5v11M8.5 6.5H16M8.5 10H16M8.5 13.5h5" }]],
 } satisfies Record<string, IconShape[]>;

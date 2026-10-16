@@ -1,6 +1,8 @@
 import { queryOptions, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { upsertMessage } from "@/chat/timeline";
+import { artifactRefs } from "@/lib/artifacts";
+import { replyOf } from "@/lib/reply";
 import type { ApiClient } from "./client";
 import { useApi } from "./context";
 import { keys } from "./keys";
@@ -298,9 +300,19 @@ export function usePostMessage(
   const key = keys.messages(orgId, channelId);
   return useMutation({
     meta: { silent: true },
-    mutationFn: ({ body, clientId, threadId }: { body: string; clientId: string; threadId?: string | null }) =>
-      api.chat.post(orgId, channelId, { body, clientId, ...(threadId ? { threadId } : {}) }),
-    onMutate: ({ body, clientId, threadId }) => {
+    mutationFn: ({ body, clientId, threadId, meta }: PostInput) => {
+      // The server builds the real meta from these (it checks the quoted message and the files).
+      const replyTo = replyOf(meta)?.messageId;
+      const attachments = artifactRefs(meta).map((r) => r.id);
+      return api.chat.post(orgId, channelId, {
+        body,
+        clientId,
+        ...(threadId ? { threadId } : {}),
+        ...(replyTo ? { replyTo } : {}),
+        ...(attachments.length > 0 ? { attachments } : {}),
+      });
+    },
+    onMutate: ({ body, clientId, threadId, meta }) => {
       const local: Message = {
         id: `local-${clientId}`,
         channelId,
@@ -309,7 +321,7 @@ export function usePostMessage(
         body,
         mentionedAgentIds: options.mentioned?.(body) ?? [],
         agentRunId: null,
-        meta: {},
+        meta: meta ?? {},
         clientId,
         local: "pending",
         createdAt: new Date().toISOString(),
@@ -336,12 +348,29 @@ export function usePostMessage(
   });
 }
 
-/** `send(body)` for a new message; `retry(local)` for one that failed. */
+/**
+ * A message to post. `meta` is the optimistic copy's (`replyTo`, `artifacts`): only the quoted
+ * message id and the file ids go to the server, which writes the real meta.
+ */
+interface PostInput {
+  body: string;
+  clientId: string;
+  threadId?: string | null;
+  meta?: Record<string, unknown>;
+}
+
+/** `send(body)` for a new message; `retry(local)` for one that failed (same quote and files). */
 export function sendHelpers(mutation: ReturnType<typeof usePostMessage>) {
   return {
-    send: (body: string, threadId?: string | null) => mutation.mutate({ body, clientId: newClientId(), threadId }),
+    send: (body: string, threadId?: string | null, meta?: Record<string, unknown>) =>
+      mutation.mutate({ body, clientId: newClientId(), threadId, meta }),
     retry: (local: Message) =>
-      mutation.mutate({ body: local.body, clientId: local.clientId ?? newClientId(), threadId: local.threadId }),
+      mutation.mutate({
+        body: local.body,
+        clientId: local.clientId ?? newClientId(),
+        threadId: local.threadId,
+        meta: local.meta,
+      }),
   };
 }
 

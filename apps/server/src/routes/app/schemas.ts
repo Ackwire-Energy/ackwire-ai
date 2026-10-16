@@ -146,6 +146,12 @@ const MessageBase = z.object({
     .record(z.string(), z.unknown())
     .openapi({ description: "Attachments, e.g. `{ approvalId }` on an approval card (see /approvals)." }),
   usage: MessageUsage.optional(),
+  reactions: z
+    .array(z.object({ reaction: z.string(), count: z.number(), userIds: z.array(z.string()) }))
+    .optional()
+    .openapi({
+      description: "In lists: reactions (`+1`/`-1` or an emoji) and who reacted; live via `message.reactions`.",
+    }),
   createdAt: z.string(),
 });
 
