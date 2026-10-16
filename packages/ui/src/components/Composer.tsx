@@ -132,10 +132,16 @@ export interface ComposerProps {
   sendBlocked?: boolean;
 }
 
-/** A file in the composer: name, a spinner while it uploads, remove. */
+/**
+ * A file in the composer, as a tile beside the others: an image shows its
+ * thumbnail (`preview`, a local object URL); the rest show the type, name and
+ * `detail` (the size). A spinner while it uploads, remove.
+ */
 export function ComposerFile({
   name,
   icon = "file",
+  preview,
+  detail,
   status,
   statusLabel,
   removeLabel,
@@ -143,6 +149,10 @@ export function ComposerFile({
 }: {
   name: string;
   icon?: IconName;
+  /** An image's thumbnail URL. */
+  preview?: string;
+  /** Under the name ("1,2 MB"). */
+  detail?: string;
   status: "uploading" | "done" | "failed";
   /** Read with the name ("enviando…", "não enviado"). */
   statusLabel?: string;
@@ -150,14 +160,47 @@ export function ComposerFile({
   removeLabel: string;
   onRemove: () => void;
 }) {
+  const remove = (
+    <button type="button" className="ac-composer__file-remove" aria-label={removeLabel} onClick={onRemove}>
+      <Icon name="close" size={14} />
+    </button>
+  );
+  if (preview) {
+    return (
+      <span
+        className="ac-composer__file ac-composer__file--image"
+        data-status={status}
+        aria-busy={status === "uploading" || undefined}
+        title={name}
+      >
+        <img src={preview} alt="" />
+        <span className="ac-visually-hidden">{name}</span>
+        {status !== "done" && (
+          <span className="ac-composer__file-state" aria-hidden="true">
+            {status === "uploading" ? <Spinner size={16} /> : <Icon name="alert" size={16} />}
+          </span>
+        )}
+        {statusLabel && <span className="ac-visually-hidden">{statusLabel}</span>}
+        {remove}
+      </span>
+    );
+  }
   return (
     <span className="ac-composer__file" data-status={status} aria-busy={status === "uploading" || undefined}>
-      {status === "uploading" ? <Spinner size={14} /> : <Icon name={status === "failed" ? "alert" : icon} size={14} />}
-      <span className="ac-composer__file-name">{name}</span>
-      {statusLabel && <span className="ac-visually-hidden">{statusLabel}</span>}
-      <button type="button" className="ac-composer__file-remove" aria-label={removeLabel} onClick={onRemove}>
-        <Icon name="close" size={14} />
-      </button>
+      <span className="ac-composer__file-icon">
+        {status === "uploading" ? (
+          <Spinner size={16} />
+        ) : (
+          <Icon name={status === "failed" ? "alert" : icon} size={18} />
+        )}
+      </span>
+      <span className="ac-composer__file-text">
+        <span className="ac-composer__file-name" title={name}>
+          {name}
+        </span>
+        {(statusLabel || detail) && <span className="ac-composer__file-detail">{statusLabel ?? detail}</span>}
+      </span>
+      {remove}
     </span>
   );
 }

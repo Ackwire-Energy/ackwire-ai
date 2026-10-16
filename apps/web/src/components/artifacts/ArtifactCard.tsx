@@ -4,7 +4,6 @@ import { useArtifact } from "@/api/queries";
 import type { ArtifactContent, ArtifactRef } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { documentPreview, KIND_ICON, patchCounts } from "@/lib/artifacts";
-import { fileIcon } from "@/lib/files";
 import { useArtifactViewer, useAuthorName } from "./ArtifactViewer";
 import { FileCardPreview } from "./FileView";
 import { MermaidDiagram } from "./Mermaid";
@@ -37,13 +36,22 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
     );
   }
   if (!a) return <div className="artifact-card artifact-card--loading" aria-busy="true" />;
+  const open = () => viewer.open(a.id, a.shownVersion < a.version ? a.shownVersion : undefined);
+  // Files are tiles that sit side by side (images as their thumbnail).
+  if (a.content.kind === "file") {
+    return (
+      <div className="artifact-tile" data-kind="file">
+        <FileCardPreview content={a.content} artifactId={a.id} version={a.shownVersion} title={a.title} onOpen={open} />
+      </div>
+    );
+  }
   return (
     <div className="artifact-card" data-kind={a.kind}>
       <button
         type="button"
         className="artifact-card__open"
         aria-label={t("artifacts.open", { title: a.title })}
-        onClick={() => viewer.open(a.id, a.shownVersion < a.version ? a.shownVersion : undefined)}
+        onClick={open}
       >
         {/* A tiny page for documents; the kind's icon for the rest. */}
         {a.kind === "document" ? (
@@ -55,9 +63,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
           </span>
         ) : (
           <span className="artifact-card__icon">
-            <Icon
-              name={a.content.kind === "file" ? fileIcon(a.content.name, a.content.contentType) : KIND_ICON[a.kind]}
-            />
+            <Icon name={KIND_ICON[a.kind]} />
           </span>
         )}
         <span className="artifact-card__meta">
@@ -71,31 +77,13 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
         {t("artifacts.version", { version: a.shownVersion })}
       </span>
       <div className="artifact-card__preview">
-        <Preview
-          content={a.content}
-          title={a.title}
-          artifactId={a.id}
-          version={a.shownVersion}
-          onOpen={() => viewer.open(a.id, a.shownVersion < a.version ? a.shownVersion : undefined)}
-        />
+        <Preview content={a.content} title={a.title} />
       </div>
     </div>
   );
 }
 
-function Preview({
-  content,
-  title,
-  artifactId,
-  version,
-  onOpen,
-}: {
-  content: ArtifactContent;
-  title: string;
-  artifactId: string;
-  version: number;
-  onOpen: () => void;
-}) {
+function Preview({ content, title }: { content: ArtifactContent; title: string }) {
   const { t } = useTranslation();
   switch (content.kind) {
     case "document":
@@ -170,8 +158,7 @@ function Preview({
         </div>
       );
     case "file":
-      return (
-        <FileCardPreview content={content} artifactId={artifactId} version={version} title={title} onOpen={onOpen} />
-      );
+      // Files render as tiles (`ArtifactCard`), never inside a card.
+      return null;
   }
 }

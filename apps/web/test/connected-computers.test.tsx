@@ -106,6 +106,8 @@ describe("uploaded files in the Drive", () => {
     });
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(10);
+    // Both are tiles side by side in the message, not full cards.
+    expect(document.querySelectorAll(".artifact-cards > .artifact-tile")).toHaveLength(2);
     const thumb = document.querySelector(".file-thumb") as HTMLElement;
     expect(thumb).not.toBeNull();
     expect(within(thumb).getByRole("img").getAttribute("src")).toMatch(/^blob:preview-/);

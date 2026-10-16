@@ -808,12 +808,26 @@ p {
 }
 
 /* ── Artifacts: chat card, viewer, Drive ─────────────────────────────────── */
+/* Cards take the full row; file tiles (images, files) sit side by side and wrap. */
 .artifact-cards {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
-  max-width: 560px;
+  max-width: 640px;
   margin-top: 10px;
+}
+.artifact-cards > * {
+  flex: 1 1 100%;
+}
+.artifact-cards > .artifact-tile,
+.artifact-cards > .artifact-card--removed {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.artifact-cards > .artifact-card--loading {
+  flex: 0 1 240px;
 }
 .artifact-card {
   position: relative;
@@ -5420,28 +5434,40 @@ button.live-call__head:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A file in a chat card: an image thumbnail (opens the viewer), or the type, name, size and Baixar. */
+/* A file on a chat message, as a tile: an image thumbnail (opens the viewer), or the type, name, size and Baixar. */
 .file-thumb {
   position: relative;
   display: block;
-  width: 100%;
-  max-width: 420px;
-  min-height: 120px;
+  height: 200px;
+  max-width: min(100%, 360px);
   padding: 0;
   overflow: hidden;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--surface-sunken);
+  box-shadow: var(--e1), var(--top);
   cursor: zoom-in;
 }
 .file-thumb img {
   display: block;
-  width: 100%;
-  max-height: 320px;
+  height: 100%;
+  width: auto;
+  min-width: 140px;
+  max-width: 100%;
   object-fit: cover;
 }
+/* Alone on the message: the image at its own proportions, a bit taller. */
+.artifact-tile:only-child .file-thumb {
+  height: auto;
+  max-width: min(100%, 420px);
+}
+.artifact-tile:only-child .file-thumb img {
+  height: auto;
+  max-height: 320px;
+}
 .file-thumb[data-loading] {
-  aspect-ratio: 4 / 3;
+  width: 240px;
+  height: 180px;
 }
 .file-thumb__caption {
   position: absolute;
@@ -5458,6 +5484,9 @@ button.live-call__head:hover {
   color: var(--ink);
   box-shadow: var(--e1);
 }
+.file-thumb__caption > .tabular {
+  flex: none;
+}
 .file-thumb__name {
   min-width: 0;
   overflow: hidden;
@@ -5470,8 +5499,17 @@ button.live-call__head:hover {
   box-shadow: var(--focus-ring);
 }
 @media (prefers-reduced-motion: no-preference) {
+  .file-thumb {
+    transition:
+      box-shadow 0.2s var(--out),
+      transform 0.2s var(--spring);
+  }
   .file-thumb img {
     transition: transform 0.3s var(--out);
+  }
+  .file-thumb:hover {
+    box-shadow: var(--e2), var(--top);
+    transform: translateY(-1px);
   }
   .file-thumb:hover img {
     transform: scale(1.02);
@@ -5480,18 +5518,47 @@ button.live-call__head:hover {
 .file-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 10px 10px 12px;
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
+  gap: 4px;
+  width: 260px;
+  max-width: 100%;
+  padding: 8px 6px 8px 8px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--e1), var(--top);
+}
+.file-row:hover {
+  box-shadow: var(--e2), var(--top);
+}
+.file-row:has(.file-row__open:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+.file-row__open {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.file-row__open:focus-visible {
+  outline: none;
 }
 .file-row .file-summary__icon {
   width: 40px;
   height: 40px;
-  background: var(--raised);
-  box-shadow: var(--e1);
+  background: var(--sunken);
   color: var(--ink2);
+}
+@media (max-width: 640px) {
+  .file-thumb {
+    height: 160px;
+  }
+  .file-thumb img {
+    min-width: 110px;
+  }
 }
 .file-view {
   display: flex;

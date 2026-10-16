@@ -3238,8 +3238,8 @@ a.ac-list__row:focus-visible {
 .ac-composer__attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 2px 14px 4px;
+  gap: 8px;
+  padding: 6px 14px;
 }
 .ac-composer[data-dragging] {
   box-shadow:
@@ -3309,30 +3309,97 @@ a.ac-list__row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* A picked file: a small card (type, name, size) or an image thumbnail, side by side. */
 .ac-composer__file {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 30px;
-  max-width: 260px;
-  padding: 0 4px 0 10px;
-  border-radius: var(--radius-full);
-  background: var(--sunken);
+  gap: 8px;
+  height: 52px;
+  width: 200px;
+  max-width: 100%;
+  padding: 0 4px 0 6px;
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  box-shadow:
+    0 0 0 1px var(--line),
+    var(--e1);
   color: var(--ink2);
   font-size: 12.5px;
-  font-weight: 600;
 }
-.ac-composer__file[data-status="uploading"] {
+.ac-composer__file-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--sunken);
+}
+.ac-composer__file-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ac-composer__file-detail {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ac-composer__file[data-status="uploading"] .ac-composer__file-icon {
   color: var(--muted);
 }
-.ac-composer__file[data-status="failed"] {
+.ac-composer__file[data-status="failed"] .ac-composer__file-icon,
+.ac-composer__file[data-status="failed"] .ac-composer__file-detail {
   color: var(--danger);
 }
 .ac-composer__file-name {
   min-width: 0;
   overflow: hidden;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ac-composer__file--image {
+  width: 52px;
+  padding: 0;
+  overflow: hidden;
+  background: var(--sunken);
+}
+.ac-composer__file--image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ac-composer__file--image[data-status="uploading"] img {
+  opacity: 0.5;
+}
+.ac-composer__file-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+}
+.ac-composer__file--image[data-status="failed"] {
+  box-shadow: 0 0 0 2px var(--danger);
+}
+.ac-composer__file--image[data-status="failed"] .ac-composer__file-state {
+  background: color-mix(in srgb, var(--raised) 70%, transparent);
+  color: var(--danger);
+}
+.ac-composer__file--image .ac-composer__file-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  background: var(--glass-solid);
+  color: var(--ink);
+  box-shadow: var(--e1);
 }
 .ac-composer__file-remove {
   flex: none;

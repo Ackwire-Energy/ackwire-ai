@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { objectUrls } from "@/components/artifacts/FileView";
 import { localMeta, quoteExcerpt, replyOf } from "@/lib/reply";
 import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -204,5 +205,36 @@ describe("attachments", () => {
     const post = state.calls.find((c) => c.method === "chat.post")?.args[2] as { attachments?: string[] };
     expect(post.attachments).toHaveLength(1);
     expect(screen().queryByRole("button", { name: "Remover notas.txt" })).toBeNull();
+  });
+
+  test("files sit side by side: an image shows its thumbnail, others their size; the thumbnail is freed on remove", async () => {
+    const realCreate = objectUrls.create;
+    const realRevoke = objectUrls.revoke;
+    const revoked: string[] = [];
+    objectUrls.create = () => "blob:local-1";
+    objectUrls.revoke = (url) => {
+      revoked.push(url);
+    };
+    try {
+      await open();
+      const input = document.querySelector('.channel__composer input[type="file"]') as HTMLInputElement;
+      const files = [
+        new File([new Uint8Array([137, 80, 78, 71])], "foto.png", { type: "image/png" }),
+        new File(["oi"], "notas.txt", { type: "text/plain" }),
+      ];
+      Object.defineProperty(input, "files", { configurable: true, value: files });
+      await act(async () => fireEvent.change(input));
+      await settle(4);
+      const tiles = document.querySelectorAll(".ac-composer__attachments > .ac-composer__file");
+      expect(tiles).toHaveLength(2);
+      expect(tiles[0]?.querySelector("img")?.getAttribute("src")).toBe("blob:local-1");
+      expect(tiles[1]?.querySelector("img")).toBeNull();
+      expect(tiles[1]?.textContent).toMatch(/notas\.txt2\s?(byte|B)/);
+      await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover foto.png" })));
+      expect(revoked).toEqual(["blob:local-1"]);
+    } finally {
+      objectUrls.create = realCreate;
+      objectUrls.revoke = realRevoke;
+    }
   });
 });

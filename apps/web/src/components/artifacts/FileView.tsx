@@ -58,8 +58,9 @@ function usePreviewUrl(artifactId: string, version: number, contentType: string,
 }
 
 /**
- * A file in a chat card: images show a thumbnail (a click opens the viewer);
- * the rest show the type, name, size and Baixar.
+ * A file on a chat message, as a tile that sits beside the others: images show
+ * their thumbnail (a click opens the viewer); the rest show the type, name and
+ * size (a click opens the viewer) with Baixar.
  */
 export function FileCardPreview({
   content,
@@ -99,10 +100,24 @@ export function FileCardPreview({
   }
   return (
     <div className="file-row">
-      <FileSummary content={content} />
-      <Button size="sm" variant="ghost" icon="download" onClick={download}>
-        {t("artifacts.download")}
-      </Button>
+      <button
+        type="button"
+        className="file-row__open"
+        onClick={onOpen}
+        aria-label={t("artifacts.open", { title })}
+        title={content.name}
+      >
+        <FileSummary content={content} />
+      </button>
+      <Button
+        size="sm"
+        variant="ghost"
+        icon="download"
+        iconOnly
+        aria-label={t("artifacts.download")}
+        title={t("artifacts.download")}
+        onClick={download}
+      />
     </div>
   );
 }

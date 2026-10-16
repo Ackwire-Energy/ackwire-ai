@@ -66,6 +66,7 @@ import { buildTimeline, mergeTimeline, threadRootsToLoad } from "@/chat/timeline
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
+import { objectUrls } from "@/components/artifacts/FileView";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
@@ -93,7 +94,7 @@ import { audienceNotice, canTalk } from "@/lib/audience";
 import { entersWithMotion, greetingSuggestions, messageUsage, nearBottom, usageLine } from "@/lib/chat";
 import { clearDraft, peekDraft } from "@/lib/drafts";
 import { errorText } from "@/lib/errors";
-import { fileIcon, fitsUpload, MAX_UPLOAD_MB } from "@/lib/files";
+import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { serverBody } from "@/lib/message-body";
@@ -153,6 +154,9 @@ interface PendingFile {
   key: string;
   name: string;
   icon: IconName;
+  size: number;
+  /** An image's local thumbnail (an object URL, revoked when the file leaves the composer). */
+  preview?: string;
   status: "uploading" | "done" | "failed";
   ref?: ArtifactRef;
 }
@@ -293,7 +297,7 @@ function ChannelView({
   chrome?: ChannelChrome;
   focusMessageId?: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const isMember = channel.isMember;
@@ -685,6 +689,23 @@ function ChannelView({
   // Files for the next message: uploaded to the Drive (this channel) right away; sending waits for them.
   const toast = useToast();
   const [files, setFiles] = useState<PendingFile[]>([]);
+  // Thumbnails are object URLs: freed when a file leaves the composer and when the page goes.
+  const previews = useRef(new Set<string>());
+  const dropFiles = (keep: (f: PendingFile) => boolean) => {
+    for (const f of files) {
+      if (keep(f) || !f.preview) continue;
+      objectUrls.revoke(f.preview);
+      previews.current.delete(f.preview);
+    }
+    setFiles((prev) => prev.filter(keep));
+  };
+  useEffect(() => {
+    const urls = previews.current;
+    return () => {
+      for (const url of urls) objectUrls.revoke(url);
+      urls.clear();
+    };
+  }, []);
   const addFiles = (list: File[]) => {
     const room = MAX_ATTACHMENTS - files.length;
     if (list.length > room) toast.show(t("channel.tooManyFiles", { max: MAX_ATTACHMENTS }), "error");
@@ -696,9 +717,11 @@ function ChannelView({
       const key = `${file.name}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const update = (patch: Partial<PendingFile>) =>
         setFiles((prev) => prev.map((f) => (f.key === key ? { ...f, ...patch } : f)));
+      const preview = previewKind(file.type) === "image" ? (objectUrls.create(file) ?? undefined) : undefined;
+      if (preview) previews.current.add(preview);
       setFiles((prev) => [
         ...prev,
-        { key, name: file.name, icon: fileIcon(file.name, file.type), status: "uploading" },
+        { key, name: file.name, icon: fileIcon(file.name, file.type), size: file.size, preview, status: "uploading" },
       ]);
       api.artifacts
         .upload(org.id, file, { channelId: channel.id })
@@ -721,7 +744,7 @@ function ChannelView({
     send(text, replyTo ? (replyTo.threadId ?? replyTo.id) : null, meta);
     setReplyTo(null);
     setQuote(null);
-    setFiles([]);
+    dropFiles(() => false);
   };
   // Live rows sit by time: right after the message that started them (never at the bottom glued
   // to a later reply). `liveKey` only changes when runs start or end.
@@ -938,6 +961,8 @@ function ChannelView({
                           key={f.key}
                           name={f.name}
                           icon={f.icon}
+                          preview={f.preview}
+                          detail={formatBytes(i18n.language, f.size)}
                           status={f.status}
                           statusLabel={
                             f.status === "uploading"
@@ -947,7 +972,7 @@ function ChannelView({
                                 : undefined
                           }
                           removeLabel={t("channel.removeFile", { name: f.name })}
-                          onRemove={() => setFiles((prev) => prev.filter((x) => x.key !== f.key))}
+                          onRemove={() => dropFiles((x) => x.key !== f.key)}
                         />
                       ))
                     : undefined
