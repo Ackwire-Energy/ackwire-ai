@@ -730,11 +730,11 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   if (!notice) return null;
   const p = notice.params;
   const seconds = Number(p.seconds ?? 0);
-  // Commands it was refused (Liberar e repetir).
+  // Commands it was refused: one line, the list in a dialog.
   const task = machineTaskOf(message.meta);
   const blocked = task?.blocked ?? [];
   return (
-    <div className={blocked.length > 0 ? "mi-evt mi-evt--blocked" : "mi-evt"} data-message-id={message.id}>
+    <div className="mi-evt" data-message-id={message.id}>
       <Icon name={NOTICE_ICON[notice.code] ?? "computer"} size={14} />
       <span>
         {t(`missions.notice.${notice.code}`, {

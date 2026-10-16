@@ -1398,33 +1398,70 @@ a.mi-pr:hover {
 .mi-cmd > .mi-hint {
   margin-top: 10px;
 }
-/* A task's end notice: the commands it was refused, each with Liberar e repetir. */
-.mi-evt--blocked {
-  align-items: flex-start;
-}
+/* A task's end notice: its refused commands as one line ("4 comandos bloqueados · Ver"). */
 .mi-cmd-blocked {
-  display: grid;
-  gap: 6px;
-  width: 100%;
-  margin: 2px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.mi-cmd-blocked li {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
+  color: var(--ink2);
 }
-.mi-cmd-blocked li > .ac-icon {
+.mi-cmd-blocked > .ac-icon {
   flex: none;
   color: var(--faint);
 }
-.mi-cmd-blocked__t {
+/* In the dialog: one row per command, the checkbox on the command's first line. */
+.mi-cmd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mi-cmd-item {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+/* The 18px checkbox centered on the command's first line (6px padding + 18px line). */
+.mi-cmd-item > .ac-check {
+  margin-top: 6px;
+}
+.mi-cmd-item__t {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   min-width: 0;
+}
+.mi-cmd-item__code {
+  display: -webkit-box;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--sunken);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 18px;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
-  color: var(--ink2);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.mi-cmd-item__code[data-all] {
+  display: block;
+}
+.mi-cmd-why {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
 }
 
 /* Who programs: Claude Code's / Codex's mark or the agent's small avatar, then "… no mac". */
