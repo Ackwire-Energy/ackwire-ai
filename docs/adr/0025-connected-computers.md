@@ -61,7 +61,7 @@ A new artifact kind `file` (migration adds the enum value): any bytes, with the 
 
 **Connection.** Outbound WebSocket to `/api/machines/connect`: no public IP, port or tunnel on the machine. The first frame is `hello` with the token (not a header: Node's WebSocket client can't set one); no valid `hello` in 10 s closes the socket. Then the server sends `welcome`, pings every 25 s, and marks the machine offline when the socket closes. `machine.status { machineId, online }` goes to the organization.
 
-**Protocol.** `packages/adapters/src/machine-protocol.ts` (shared by server and runner): `request { id, op }` with `exec`, `read`, `write`, `list`, `push` (protocol 3 adds `secret`, ADR 0027; protocol 4 adds `task.*`, section 5a); `output` frames while a command runs; `result { id, ok, data | error }`; `cancel { id }`. Files travel base64 inside JSON for `read`/`write` (5 MB); uploads always use `push`.
+**Protocol.** `packages/adapters/src/machine-protocol.ts` (shared by server and runner): `request { id, op }` with `exec`, `read`, `write`, `list`, `push` (protocol 3 adds `secret`, ADR 0027; protocol 4 adds `task.*`, section 5a; protocol 5 adds `mcp.call`/`mcp.result` for missions, section 5b); `output` frames while a command runs; `result { id, ok, data | error }`; `cancel { id }`. Files travel base64 inside JSON for `read`/`write` (5 MB); uploads always use `push`.
 
 **On the machine.**
 - Every path is relative to the workspace folder chosen at pairing (default `~/agentes`); `..` and absolute paths are refused, and symlinks that leave the workspace are refused for reads, writes and uploads.
@@ -83,6 +83,15 @@ Runner protocol 4 (`TASKS_PROTOCOL`, runner 0.4.0) adds work that outlives a req
 - **Worktrees.** With `branch`, the folder must be a git repository: `git worktree add -b <branch> <agent folder>/.worktrees/<taskId>`, with `.worktrees/` added to the repository's `info/exclude`.
 - **Slots and sleep.** At most `maxConcurrentTasks` (config, default 3) running per machine: beyond that `no_slot` (the tool says `task.no_slot`). On macOS a `caffeinate -i -w <runner pid>` child holds off idle sleep while at least one task runs.
 - **Services.** The systemd unit has `KillMode=process` and the launchd agent `AbandonProcessGroup`, so `agentes-runner update` (a service restart) doesn't kill running tasks.
+
+### 5b. Protocol 5: the `agentes` MCP server of mission tasks
+
+Runner protocol 5 (`MISSION_PROTOCOL`, runner 0.5.0) lets a task work for a mission (ADR 0029):
+
+- **`task.start { …, mission: { id, rules } }`.** For an executor task the runner makes a random per-task token (in the journal and `tasks/<taskId>/mcp-token`, mode 600) and gives the executor our MCP server. Claude Code: `--mcp-config tasks/<taskId>/mcp.json` (one stdio server `agentes`: this runtime running `agentes-runner mcp --task <taskId>`, with `AGENTES_MCP_TOKEN` and `AGENTES_MCP_SOCKET` in its env), `--allowedTools mcp__agentes` (`-p` can't ask for permission) and `--append-system-prompt <rules>`. No `--strict-mcp-config`: the person's own MCP servers stay. Codex (untested, best effort): `-c mcp_servers.agentes.command/args/env`, the rules prepended to the prompt, the token read from the task's folder. The rules and paths are single shell arguments (plain characters only for the rules).
+- **`agentes-runner mcp --task <id>`**: a small stdio MCP server (JSON-RPC lines; `initialize`, `tools/list`, `tools/call`, `ping`; no SDK). Each call goes over a local endpoint of the running daemon: `<runner home>/mcp.sock` (a named pipe `\\.\pipe\agentes-runner-<hash>` on Windows), one JSON line per request with `{ taskId, token, tool, args }`. The daemon checks the token against the task (constant-time), that the task still runs, and the tool name, then relays.
+- **Frames.** Runner → server `mcp.call { callId, taskId, tool, args }` (args ≤ 64 KB); server → runner `mcp.result { callId, ok, text | error }`. Calls in flight fail when the connection drops (the executor may retry); a call waits at most 6 minutes (uploads).
+- **Server.** The replica holding the socket runs the call without blocking other frames: the task must be this machine's and belong to an open mission on this machine; the input is validated against the tool's JSON Schema (`MISSION_MCP_TOOLS` in `machine-protocol.ts`, shared). Older runners get no mission features ("run agentes-runner update").
 
 ### 6. Which computer an agent uses
 
