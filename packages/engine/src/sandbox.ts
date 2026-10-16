@@ -602,7 +602,16 @@ export async function agentComputerInfo(
   agentId: string,
 ): Promise<
   | { kind: "cloud"; available: boolean }
-  | { kind: "machine"; machineId: string; name: string; online: boolean; execAllowed: boolean; os: string }
+  | {
+      kind: "machine";
+      machineId: string;
+      name: string;
+      online: boolean;
+      execAllowed: boolean;
+      os: string;
+      /** The runner's protocol (4+: background tasks). */
+      protocol: number;
+    }
   | { kind: "removed" }
 > {
   const agent = await getAgentCached(deps.db, orgId, agentId);
@@ -616,6 +625,7 @@ export async function agentComputerInfo(
     online: status.online,
     execAllowed: status.execAllowed,
     os: status.os,
+    protocol: status.protocol,
   };
 }
 
