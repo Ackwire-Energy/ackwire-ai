@@ -87,7 +87,7 @@ describe("Criar agente: steps", () => {
     expect(preview.textContent).toContain("@iris");
 
     await proceed();
-    expect(title()).toBe("O que a Iris faz");
+    expect(title()).toBe("O que o Iris faz");
     expect((screen().getByLabelText("Instruções") as HTMLTextAreaElement).value).toStartWith(
       "Reproduz cada bug relatado antes de abrir issue.",
     );
@@ -121,7 +121,7 @@ describe("Criar agente: steps", () => {
     expect(gpt.getAttribute("aria-pressed")).toBe("false");
 
     await proceed();
-    expect(title()).toBe("Tudo certo com a Iris?");
+    expect(title()).toBe("Tudo certo com o Iris?");
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
     expect(createdWith(state)).toMatchObject({
@@ -280,7 +280,7 @@ describe("Criar agente: what gets created", () => {
     expect(title()).toBe("Onde trabalha e com quem");
     await click(screen().getByRole("checkbox", { name: "#general" }));
     await pick(screen().getByRole("combobox", { name: "Responsável" }), /^João/);
-    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com a Iris" });
+    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com o Iris" });
     expect(within(audience).getByRole("radio", { name: "Todos do workspace" }).getAttribute("aria-checked")).toBe(
       "true",
     );
@@ -303,7 +303,7 @@ describe("Criar agente: what gets created", () => {
     await startAs("QA");
     await proceed(3);
     await pick(screen().getByRole("combobox", { name: "Responsável" }), /Sem responsável/);
-    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com a Iris" });
+    const audience = screen().getByRole("radiogroup", { name: "Quem pode falar com o Iris" });
     await click(within(audience).getByRole("radio", { name: "Só o responsável" }));
     await click(continueButton());
     expect(title()).toBe("Onde trabalha e com quem");
