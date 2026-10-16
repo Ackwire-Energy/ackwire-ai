@@ -125,7 +125,13 @@ export function Sidebar() {
   useLayoutEffect(() => {
     const nav = navRef.current;
     if (!nav) return;
+    // The list fades out at an edge only while there is more to scroll past it (no hard cut).
+    const edges = () => {
+      nav.dataset.fadeTop = String(nav.scrollTop > 1);
+      nav.dataset.fadeBottom = String(nav.scrollTop + nav.clientHeight < nav.scrollHeight - 1);
+    };
     const measure = () => {
+      edges();
       const active = nav.querySelector<HTMLElement>('.sidebar__item[data-status="active"]');
       if (!active) {
         setIndicator(null);
@@ -150,9 +156,11 @@ export function Sidebar() {
     for (const child of Array.from(nav.children)) ro?.observe(child);
     document.fonts?.ready.then(measure).catch(() => {});
     window.addEventListener("resize", measure);
+    nav.addEventListener("scroll", edges, { passive: true });
     return () => {
       ro?.disconnect();
       window.removeEventListener("resize", measure);
+      nav.removeEventListener("scroll", edges);
     };
   }, [pathname, channels.data, dir.agents.length, people.length, rail]);
 

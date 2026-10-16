@@ -297,6 +297,46 @@ p {
   padding: 4px 12px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Soft edges where the list runs under the top card or the foot (Sidebar.tsx sets the flags). */
+  --sidebar-fade-top: 0px;
+  --sidebar-fade-bottom: 0px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--sidebar-fade-top),
+    #000 calc(100% - var(--sidebar-fade-bottom)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--sidebar-fade-top),
+    #000 calc(100% - var(--sidebar-fade-bottom)),
+    transparent 100%
+  );
+}
+.sidebar__scroll[data-fade-top="true"] {
+  --sidebar-fade-top: 24px;
+}
+.sidebar__scroll[data-fade-bottom="true"] {
+  --sidebar-fade-bottom: 40px;
+}
+@property --sidebar-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --sidebar-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar__scroll {
+    transition:
+      --sidebar-fade-top 0.2s var(--out),
+      --sidebar-fade-bottom 0.2s var(--out);
+  }
 }
 .sidebar__org {
   display: flex;
