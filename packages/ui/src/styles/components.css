@@ -1115,11 +1115,17 @@ textarea.ac-input {
   border-radius: var(--radius-lg);
   border: 0;
   background: var(--raised);
-  box-shadow: var(--e1), var(--top);
+  /* A visible outline in both themes (the e1 hairline alone disappears on dark surfaces). */
+  box-shadow:
+    0 0 0 1px var(--line2),
+    var(--e1),
+    var(--top);
   box-sizing: border-box;
   min-width: 0;
+  position: relative;
   transition:
     box-shadow 0.18s var(--out),
+    background-color 0.18s var(--out),
     transform 0.18s var(--spring);
 }
 .ac-option:hover {
@@ -1132,14 +1138,38 @@ textarea.ac-input {
 .ac-option--agent {
   border-bottom-left-radius: var(--radius-cut);
 }
-/* Chosen: the raised card with a 1.5px ink ring (no fill change, no heavy border). */
+/* Chosen: a 2px ink ring, a faint ink tint and a check in the corner (never just a border shade). */
 .ac-option[aria-pressed="true"],
 .ac-option[data-state="checked"] {
-  background: var(--raised);
+  background: color-mix(in srgb, var(--ink) 5%, var(--raised));
   box-shadow:
     var(--e1),
     var(--top),
-    0 0 0 1.5px var(--ink);
+    0 0 0 2px var(--ink);
+}
+.ac-option[aria-pressed="true"]::after,
+.ac-option[data-state="checked"]::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background:
+    var(--ink)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4L18 8.5'/%3E%3C/svg%3E")
+    center / 12px no-repeat;
+}
+/* The title never runs under the check. */
+.ac-option[aria-pressed="true"] .ac-option__title,
+.ac-option[data-state="checked"] .ac-option__title {
+  padding-right: 22px;
+}
+/* Dark: the check's mark takes the page color (ink is light there). */
+[data-theme="dark"] .ac-option[aria-pressed="true"]::after,
+[data-theme="dark"] .ac-option[data-state="checked"]::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111110' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4L18 8.5'/%3E%3C/svg%3E");
 }
 .ac-option:focus-visible,
 .ac-option:has(:focus-visible) {
@@ -1151,7 +1181,7 @@ textarea.ac-input {
 .ac-option[aria-pressed="true"]:focus-visible {
   box-shadow:
     var(--e1),
-    0 0 0 1.5px var(--ink),
+    0 0 0 2px var(--ink),
     var(--field-ring);
 }
 .ac-option__text {
