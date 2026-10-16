@@ -1246,14 +1246,14 @@ describe("missions (ADR 0029)", () => {
       await expect(decideCommand(md(), f.owner.id, f.org.id, view.id, b, "allow")).rejects.toMatchObject({
         code: "mission.command_expired",
       });
-      // At most 10 in 10 minutes per task (a is one of them).
+      // At most COMMAND_PROMPTS_PER_TASK (30) in 10 minutes per task (a is one of them; b is older).
       const answers = [];
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 30; i++) {
         answers.push(await prompt(main.taskId, { tool_name: "Bash", input: { command: `tool${i} --run` } }));
       }
-      expect(answers.slice(0, 9).every((x) => x.status === "pending")).toBe(true);
-      expect(answers[9]).toMatchObject({ behavior: "deny" });
-      expect(answers[9]?.message).toContain("Too many");
+      expect(answers.slice(0, 29).every((x) => x.status === "pending")).toBe(true);
+      expect(answers[29]).toMatchObject({ behavior: "deny" });
+      expect(answers[29]?.message).toContain("Too many");
     });
 
     test("refused commands reach the task's end notice; Liberar e repetir adds the rule and resumes the session", async () => {
@@ -1280,6 +1280,31 @@ describe("missions (ADR 0029)", () => {
       expect(resumed.resume).toBe(true);
       expect(resumed.prompt).toContain("The command was allowed; retry it");
       expect(resumed.mission?.allow).toEqual(["Bash(python3 *)"]);
+    });
+
+    test("Liberar e repetir for several blocked commands at once: one resume; refused while paused", async () => {
+      const { view, runner, main } = await working();
+      ok(await runner.mcp(main.taskId, "start_task", { title: "Photos", prompt: "Resize them", branch: "photos" }));
+      const item = runner.started.at(-1) as TaskStartRequest;
+      const blocked = ["python3 -c 'import PIL'", "swift build"];
+      await runner.done(item.taskId, { denials: blocked.map((command) => ({ tool: "Bash", command })) });
+      await drainOutbox(f.db, f.handlers);
+      await pauseMission(md(), f.owner.id, f.org.id, view.id);
+      await expect(
+        retryBlockedCommand(md(), f.owner.id, f.org.id, view.id, { taskId: item.taskId, commands: blocked }),
+      ).rejects.toMatchObject({ code: "mission.paused" });
+      await f.db.update(schema.missions).set({ status: "active" }).where(eq(schema.missions.id, view.id));
+      const before = runner.started.length;
+      const out = await retryBlockedCommand(md(), f.owner.id, f.org.id, view.id, {
+        taskId: item.taskId,
+        commands: blocked,
+      });
+      expect(out.rules.sort()).toEqual(["Bash(python3 *)", "Bash(swift build *)"].sort());
+      expect(runner.started.length).toBe(before + 1);
+      const resumed = runner.started.at(-1) as TaskStartRequest;
+      expect(resumed.session).toBe(item.session);
+      expect(resumed.prompt).toContain("These commands were allowed; retry them:");
+      expect(resumed.prompt).toContain("- swift build");
     });
   });
 });

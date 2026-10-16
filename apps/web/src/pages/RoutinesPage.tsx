@@ -3,6 +3,8 @@ import {
   Checkbox,
   Chip,
   cx,
+  DetailsDialog,
+  DetailsSection,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -52,6 +54,7 @@ import type {
   RoutineTarget,
   RoutineTargetInput,
 } from "@/api/types";
+import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
@@ -60,6 +63,7 @@ import { ZoneSelect } from "@/components/ZoneSelect";
 import { formatPercent, relativeTime, toYmd, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { lookOf } from "@/lib/look";
+import { useOpenParam } from "@/lib/open-param";
 import { can } from "@/lib/permissions";
 import { defaultRule, fromApiRule, recurrenceLabels, ruleSentence, toApiRule, upcomingLabels } from "@/lib/recurrence";
 import { browserTimezone, onceParts, timezoneLabel, timezoneName } from "@/lib/routines";
@@ -179,7 +183,8 @@ export function RoutinesPage() {
   const now = useNow();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Routine | null>(null);
-  const [openId, setOpenId] = useState<string | null>(null);
+  // The routine whose details are open, in the URL (`?open=…`).
+  const [openId, setOpenId] = useOpenParam();
   const [showDone, setShowDone] = useState(false);
   const [status, setStatus] = useState<"all" | "active" | "paused" | "event">("all");
   const [q, setQ] = useState("");
@@ -209,7 +214,7 @@ export function RoutinesPage() {
   const live = current.filter((r) => byStatus(r) && !isPaused(r));
   const paused = current.filter((r) => byStatus(r) && isPaused(r));
   const open = list.find((r) => r.id === openId) ?? null;
-  const toggleOpen = (id: string) => setOpenId((o) => (o === id ? null : id));
+  const toggleOpen = (id: string) => setOpenId(openId === id ? null : id);
   const filtered = agents.length > 0 || query.length > 0 || status !== "all";
   // "N" opens "Nova rotina" (not while typing).
   useEffect(() => {
@@ -245,7 +250,7 @@ export function RoutinesPage() {
       </section>
     );
   return (
-    <div className={cx("page routines", open && "routines--panel")}>
+    <div className="page routines">
       <div className="routines__main">
         <header className="routines-head">
           <div>
@@ -808,14 +813,6 @@ function RoutineDetails({
     r.active && r.trigger.type === "schedule" && r.trigger.rule ? r.trigger.rule : null,
   );
   const nexts = described.data?.ok ? described.data.nextRuns.slice(0, 4) : r.nextRunAt ? [r.nextRunAt] : [];
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !(e.target instanceof Element && e.target.closest("[role=dialog], [role=menu]")))
-        onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
   const state = r.running ? "running" : done ? "done" : paused ? "paused" : "live";
   const whereHint =
     r.target.type === "conversation"
@@ -826,29 +823,28 @@ function RoutineDetails({
         ? "dm"
         : r.target.type;
   return (
-    <aside className="routine-details" aria-label={t("routines.panel.label", { name: title })}>
-      <div className="routine-details__head">
-        {actors.avatar(agent, "sm")}
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          icon="close"
-          aria-label={t("routines.panel.close")}
-          onClick={onClose}
-        />
-      </div>
-      <div>
-        <h2 className="routine-details__title">{title}</h2>
-        <p className="routine-details__facts">
+    <DetailsDialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      closeLabel={t("routines.panel.close")}
+      className="routine-details"
+      eyebrow={t("routines.panel.eyebrow")}
+      icon={<AgentAvatar agentId={r.agentId} name={name} size="md" running={r.running} />}
+      title={title}
+      subtitle={
+        <>
           <span>{name}</span>
           <Chip
-            icon={state === "running" ? "play" : state === "paused" ? "pause" : state === "done" ? "check" : "repeat"}
+            icon={
+              state === "running" ? "spinner" : state === "paused" ? "pause" : state === "done" ? "check" : "repeat"
+            }
+            lead={state === "running" ? <AgentSpinner agentId={r.agentId} /> : undefined}
           >
             {t(`routines.panel.state.${state}`)}
           </Chip>
-        </p>
-      </div>
+        </>
+      }
+    >
       <div className="routine-details__actions">
         <Button size="sm" icon="edit" onClick={onEdit}>
           {t("routines.edit")}
@@ -878,12 +874,10 @@ function RoutineDetails({
           </Button>
         )}
       </div>
-      <section className="routine-details__section">
-        <h3 className="ac-eyebrow">{t("routines.panel.what", agentGrammar(t, name))}</h3>
+      <DetailsSection title={t("routines.panel.what", agentGrammar(t, name))}>
         <p className="routine-details__prompt">{r.prompt}</p>
-      </section>
-      <section className="routine-details__section">
-        <h3 className="ac-eyebrow">{t("routines.panel.when")}</h3>
+      </DetailsSection>
+      <DetailsSection title={t("routines.panel.when")}>
         <p className="routine-details__sentence">{when(r)}</p>
         {r.trigger.type === "event" ? (
           <p className="small muted">{t("routines.panel.eventEvery")}</p>
@@ -898,9 +892,8 @@ function RoutineDetails({
           )
         )}
         {!done && <p className="small muted">{nextText(r, now)}</p>}
-      </section>
-      <section className="routine-details__section">
-        <h3 className="ac-eyebrow">{t("routines.panel.where")}</h3>
+      </DetailsSection>
+      <DetailsSection title={t("routines.panel.where")}>
         <div className="routine-details__where">
           <span className="routine-details__where-icon">
             <Icon name={targetIcon(r.target)} size={16} />
@@ -910,20 +903,18 @@ function RoutineDetails({
             <small>{t(`routines.panel.whereHint.${whereHint}`)}</small>
           </span>
         </div>
-      </section>
+      </DetailsSection>
       {r.budgetUsedPercent != null && (
-        <section className="routine-details__section">
-          <h3 className="ac-eyebrow">{t("routines.panel.budget")}</h3>
+        <DetailsSection title={t("routines.panel.budget")}>
           <p className="routine-details__meter-row">
             <span>{t("routines.budgetUsed", { percent: formatPercent(i18n.language, r.budgetUsedPercent) })}</span>
           </p>
           <span className="routine-details__meter" aria-hidden="true">
             <i style={{ width: `${Math.min(100, r.budgetUsedPercent * 100)}%` }} />
           </span>
-        </section>
+        </DetailsSection>
       )}
-      <section className="routine-details__section">
-        <h3 className="ac-eyebrow">{t("routines.panel.runs")}</h3>
+      <DetailsSection title={t("routines.panel.runs")}>
         {runs.isLoading && <LoadingList count={3} avatar={false} />}
         {(r.running || (runs.data?.length ?? 0) > 0) && (
           <ol className="routine-runs">
@@ -970,8 +961,8 @@ function RoutineDetails({
             {nexts[0] && !done && ` ${t("routines.panel.firstRun", { when: nextLabel(i18n.language, nexts[0]) })}`}
           </p>
         )}
-      </section>
-    </aside>
+      </DetailsSection>
+    </DetailsDialog>
   );
 }
 

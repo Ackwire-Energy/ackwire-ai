@@ -1255,10 +1255,6 @@ p {
   gap: 0 20px;
   padding-bottom: 96px;
 }
-.drive--panel {
-  max-width: 1500px;
-  grid-template-columns: minmax(0, 1fr) 380px;
-}
 .drive__main {
   min-width: 0;
   display: flex;
@@ -1882,41 +1878,7 @@ p {
   z-index: var(--z-lifted);
 }
 
-/* Details panel. */
-.drive-details {
-  position: sticky;
-  top: 16px;
-  max-height: calc(100vh - 32px);
-  /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
-  max-height: calc(100dvh - 32px);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 14px;
-  border-radius: var(--radius-section);
-  background: var(--raised);
-  box-shadow: var(--e2), var(--top);
-}
-.drive-details__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.drive-details__title {
-  margin: 2px 0 0;
-  font-size: 19px;
-  font-weight: 650;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-  overflow-wrap: anywhere;
-}
-.drive-details__facts {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--muted);
-}
+/* Details (in the shared details dialog). */
 .drive-details__actions {
   display: flex;
   flex-wrap: wrap;
@@ -1924,19 +1886,6 @@ p {
 }
 .drive-details__actions > .ac-btn--primary {
   flex: 1 1 auto;
-}
-.drive-details__section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-}
-.drive-details__section h3 {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 .drive-author {
   display: flex;
@@ -2069,9 +2018,6 @@ button.drive-where:focus-visible {
   display: block;
   font-size: 12px;
   color: var(--faint);
-}
-.drive-scrim {
-  display: none;
 }
 
 /* Selection: a glass bar that floats at the bottom of the page. */
@@ -2307,9 +2253,6 @@ button.drive-where:focus-visible {
   .drive-group {
     animation: drive-in 0.3s var(--out) both;
   }
-  .drive-details {
-    animation: drive-slide 0.32s var(--spring) both;
-  }
   .drive-selbar {
     animation: drive-in 0.3s var(--spring) both;
   }
@@ -2327,16 +2270,6 @@ button.drive-where:focus-visible {
   from {
     opacity: 0;
     transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@keyframes drive-slide {
-  from {
-    opacity: 0;
-    transform: translateX(14px);
   }
   to {
     opacity: 1;
@@ -2367,35 +2300,7 @@ button.drive-where:focus-visible {
   }
 }
 
-/* Narrower: the panel floats over the page; phones: a sheet from the bottom. */
-@media (max-width: 1180px) {
-  .drive--panel {
-    grid-template-columns: minmax(0, 1fr) 340px;
-  }
-}
 @media (max-width: 980px) {
-  .drive--panel {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .drive-details {
-    position: fixed;
-    top: 12px;
-    right: 12px;
-    bottom: 12px;
-    z-index: var(--z-dialog);
-    width: min(400px, calc(100vw - 24px));
-    max-height: none;
-    box-shadow: var(--e3);
-  }
-  .drive-scrim {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-scrim);
-    border: 0;
-    padding: 0;
-    background: var(--scrim);
-  }
   .drive-table__head,
   .drive-row {
     grid-template-columns: 40px minmax(0, 2.4fr) minmax(0, 1.2fr) 96px 40px;
@@ -2455,18 +2360,6 @@ button.drive-where:focus-visible {
   .drive-row__mobile {
     display: inline;
   }
-  .drive-details {
-    top: auto;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: auto;
-    max-height: 88vh;
-    /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
-    max-height: 88dvh;
-    border-radius: 22px 22px 0 0;
-    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  }
   .drive-selbar {
     align-self: stretch;
     bottom: 12px;
@@ -2494,21 +2387,6 @@ button.drive-where:focus-visible {
   }
   .drive-trash__row .ac-chip {
     display: none;
-  }
-}
-@media (max-width: 720px) and (prefers-reduced-motion: no-preference) {
-  .drive-details {
-    animation: drive-sheet 0.34s var(--spring) both;
-  }
-}
-@keyframes drive-sheet {
-  from {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
   }
 }
 
@@ -5459,30 +5337,9 @@ button.live-call__head:hover {
   padding-top: 4px;
   border-top: 1px solid var(--line);
 }
-/* Artifact viewer header: one-line title with its meta; Baixar ▾, Editar, … and × compact on the right. */
-.artifact-sheet .ac-sheet__heading {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-.artifact-sheet .ac-sheet__title {
-  min-width: 0;
-}
+/* Artifact viewer header: the title (wraps at the dialog's width) with its meta; Baixar ▾, Editar, … and × on the bar. */
 .artifact-sheet__title {
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.artifact-sheet .ac-sheet__subtitle {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.artifact-sheet .ac-sheet__actions {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 2px;
 }
 @media (max-width: 720px) {
   .artifact-edit__label {

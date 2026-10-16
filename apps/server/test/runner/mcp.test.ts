@@ -6,18 +6,21 @@ import {
   MISSION_MCP_TOOLS,
   MISSION_PROTOCOL,
   MISSION_RULES_NO_GIT,
+  PERMISSION_PROMPT_TOOL,
   parseRunnerFrame,
   parseServerFrame,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
 import {
   claudeMcpConfig,
+  claudePermissionSettings,
   cleanRules,
   handleMcpMessage,
   ipcCall,
   McpBridge,
   type McpTaskInfo,
   missionExecutorArgs,
+  missionFolderRules,
   runMcpServer,
 } from "../../runner/mcp";
 import { agentWorkspace } from "../../runner/paths";
@@ -117,7 +120,6 @@ test("the bridge checks the task's token, needs a connection, relays the call an
   });
   expect(await b.handle({ ...req, taskId: "0193aaaa-0000-7000-8000-000000000099" })).toMatchObject({ ok: false });
   expect(await b.handle({ ...req, tool: "rm_rf" })).toMatchObject({ ok: false, error: "Unknown tool rm_rf" });
-  expect(await b.handle(req)).toMatchObject({ ok: false, error: expect.stringContaining("not connected") });
   b.attach((f) => frames.push(f));
   const pending = b.handle(req);
   await waitFor(() => frames.length === 1);
@@ -130,6 +132,43 @@ test("the bridge checks the task's token, needs a connection, relays the call an
   await waitFor(() => frames.length === 2);
   b.detach();
   expect(await second).toMatchObject({ ok: false });
+});
+
+test("while the connection is down (a runner restart, a reconnect) a call waits and is relayed after it comes back", async () => {
+  const { b, frames } = bridge({ token: "secret-token-1", missionId: "m1", running: true });
+  const req = { taskId: TASK, token: "secret-token-1", tool: "report", args: { summary: "hi" } };
+  const early = b.handle(req);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(frames).toHaveLength(0);
+  b.attach((f) => frames.push(f));
+  await waitFor(() => frames.length === 1);
+  const sent = frames[0] as Extract<RunnerFrame, { type: "mcp.call" }>;
+  b.result({ type: "mcp.result", callId: sent.callId, ok: true, text: "Reported in the thread." });
+  expect(await early).toEqual({ ok: true, text: "Reported in the thread." });
+  // A permission prompt in flight when the link drops is sent again on the next connection (never denied for it).
+  const prompt = b.handle({ ...req, tool: "permission_prompt", args: { tool_name: "Bash", input: { command: "ls" } } });
+  await waitFor(() => frames.length === 2);
+  b.detach();
+  const resent: RunnerFrame[] = [];
+  b.attach((f) => resent.push(f));
+  await waitFor(() => resent.length === 1);
+  const again = resent[0] as Extract<RunnerFrame, { type: "mcp.call" }>;
+  expect(again.tool).toBe("permission_prompt");
+  b.result({ type: "mcp.result", callId: again.callId, ok: true, text: '{"behavior":"allow"}' });
+  expect(await prompt).toEqual({ ok: true, text: '{"behavior":"allow"}' });
+});
+
+test("a call that waited out its timeout without a connection says so (transient)", async () => {
+  const frames: RunnerFrame[] = [];
+  const b = new McpBridge({
+    socketPath: "unused",
+    task: (id) => (id === TASK ? { token: "secret-token-1", missionId: "m1", running: true } : null),
+    callTimeoutMs: 30,
+  });
+  closers.push(() => b.close());
+  const out = await b.handle({ taskId: TASK, token: "secret-token-1", tool: "report", args: {} });
+  expect(out).toMatchObject({ ok: false, transient: true, error: expect.stringContaining("not connected") });
+  expect(frames).toHaveLength(0);
 });
 
 test("an ended task has no tools any more", async () => {
@@ -280,3 +319,91 @@ test.skipIf(!posix)(
     expect(tasks.mcpTask(plain)).toBeNull();
   },
 );
+
+test("the permission prompt tool Claude Code is told to use is one our server advertises (work turns), under the server name of the MCP config", async () => {
+  const list = (await handleMcpMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" }, async () => ({
+    ok: true as const,
+    text: "",
+  }))) as { result: { tools: { name: string; inputSchema: { properties?: Record<string, unknown> } }[] } };
+  const names = list.result.tools.map((t) => t.name);
+  expect(names).toContain("permission_prompt");
+  expect(names).toContain("complete_mission");
+  const prompt = list.result.tools.find((t) => t.name === "permission_prompt");
+  expect(Object.keys(prompt?.inputSchema.properties ?? {})).toEqual(
+    expect.arrayContaining(["tool_name", "input", "tool_use_id"]),
+  );
+  const args = missionExecutorArgs(
+    "claude",
+    {
+      configFile: "/c/mcp.json",
+      command: ["node", "r.mjs"],
+      taskId: TASK,
+      socketPath: "/s",
+      rules: "",
+      promptTool: true,
+    },
+    "darwin",
+  );
+  const given = args[args.indexOf("--permission-prompt-tool") + 1] ?? "";
+  expect(given).toBe(PERMISSION_PROMPT_TOOL);
+  const config = claudeMcpConfig({ command: ["node", "r.mjs"], taskId: TASK, socketPath: "/s", token: "t" }) as {
+    mcpServers: Record<string, unknown>;
+  };
+  const [server] = Object.keys(config.mcpServers);
+  expect(given).toBe(`mcp__${server}__permission_prompt`);
+  expect(names.map((n) => `mcp__${server}__${n}`)).toContain(given);
+  // Plan turns don't get the prompt tool (only reads there).
+  const plan = missionExecutorArgs(
+    "claude",
+    { configFile: "/c/mcp.json", command: ["node", "r.mjs"], taskId: TASK, socketPath: "/s", rules: "" },
+    "darwin",
+  );
+  expect(plan).not.toContain("--permission-prompt-tool");
+});
+
+test("an item away from the mission folder may use it (--add-dir, Read/Edit/Write there only); the main session needs nothing", () => {
+  const folder = "/Users/ana/agentes/app";
+  expect(missionFolderRules(folder, ["Read", "Edit", "Write"])).toEqual([
+    "Read(//Users/ana/agentes/app/**)",
+    "Edit(//Users/ana/agentes/app/**)",
+    "Write(//Users/ana/agentes/app/**)",
+  ]);
+  // Never a relative, wildcard or parent path.
+  expect(missionFolderRules("app", ["Read"])).toEqual([]);
+  expect(missionFolderRules("/Users/*", ["Read"])).toEqual([]);
+  expect(missionFolderRules("/Users/ana/../bob", ["Read"])).toEqual([]);
+  const work = claudePermissionSettings("work", "agentes/abcd1234/", [], folder);
+  expect(work.permissions.allow).toContain("Edit(//Users/ana/agentes/app/**)");
+  // Nothing broader: no bare Edit/Write, and the deny list stays.
+  expect(work.permissions.allow).not.toContain("Edit");
+  expect(work.permissions.allow).not.toContain("Write");
+  expect(work.permissions.deny.length).toBeGreaterThan(0);
+  const plan = claudePermissionSettings("plan", "agentes/abcd1234/", [], folder);
+  expect(plan.permissions.allow).toContain("Read(//Users/ana/agentes/app/**)");
+  expect(plan.permissions.allow.some((r) => r.startsWith("Edit("))).toBe(false);
+  expect(claudePermissionSettings("work", "agentes/abcd1234/").permissions.allow.some((r) => r.includes("//"))).toBe(
+    false,
+  );
+  const args = missionExecutorArgs(
+    "claude",
+    {
+      configFile: "/tmp/mcp.json",
+      command: ["agentes-runner"],
+      taskId: TASK,
+      socketPath: "/tmp/mcp.sock",
+      rules: "",
+      promptTool: true,
+      addDirs: [folder],
+    },
+    "darwin",
+  );
+  // Shell-quoted like every other path argument.
+  expect(args.join(" ")).toContain(`--add-dir '${folder}'`);
+  expect(
+    missionExecutorArgs(
+      "claude",
+      { configFile: "/tmp/mcp.json", command: ["x"], taskId: TASK, socketPath: "/tmp/s", rules: "" },
+      "darwin",
+    ),
+  ).not.toContain("--add-dir");
+});

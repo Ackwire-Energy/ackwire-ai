@@ -45,6 +45,7 @@ import {
   rangeOf,
   sortArtifacts,
 } from "@/lib/drive";
+import { useOpenParam } from "@/lib/open-param";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 
@@ -88,7 +89,10 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   const [authors, setAuthors] = useState<string[]>([]);
   const [group, setGroup] = useState<DriveGroup>("date");
   const [sort, setSort] = useState<DriveSort>("recent");
-  const [openId, setOpenId] = useState<string | null>(null);
+  // The item whose details are open, in the URL (`?open=…`).
+  const [openId, setOpenParam] = useOpenParam();
+  const setOpenId = (next: string | null | ((o: string | null) => string | null)) =>
+    setOpenParam(typeof next === "function" ? next(openId) : next);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const anchor = useRef<string | null>(null);
   const [uploadsHidden, setUploadsHidden] = useState(false);
@@ -198,7 +202,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   };
   const openViewer = (a: Artifact) => viewer.open(a.id);
 
-  // "/" searches, ⌘A selects what's shown, Esc clears the selection, then closes the details.
+  // "/" searches, ⌘A selects what's shown, Esc clears the selection.
   const keys = useRef({ shown, selected, openId, trashOpen });
   keys.current = { shown, selected, openId, trashOpen };
   useEffect(() => {
@@ -208,8 +212,8 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
       const active = document.activeElement;
       if (e.key === "Escape") {
         if (typing(active)) return;
+        // The details dialog closes itself on Esc; here Esc clears the selection.
         if (s.selected.size > 0) setSelected(new Set());
-        else if (s.openId) setOpenId(null);
         return;
       }
       if (typing(active) || e.altKey) return;
@@ -300,10 +304,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   const kindChips = ARTIFACT_KINDS.filter((k) => (counts.get(k) ?? 0) > 0 || kinds.includes(k));
 
   return (
-    <div
-      className={cx("page drive drive-drop", drop.over && "drive-drop--over", openItem && !trashOpen && "drive--panel")}
-      {...drop.props}
-    >
+    <div className={cx("page drive drive-drop", drop.over && "drive-drop--over")} {...drop.props}>
       {drop.over && <DropOverlay />}
       <div className="drive__main">
         <header className="drive-head">

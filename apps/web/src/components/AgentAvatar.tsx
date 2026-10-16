@@ -1,5 +1,13 @@
-import { type AgentAppearance, type AgentState, Avatar, type AvatarProps } from "@agenteschat/ui";
+import {
+  type AgentAppearance,
+  type AgentState,
+  Avatar,
+  type AvatarProps,
+  PixelSpinner,
+  type PixelSpinnerSize,
+} from "@agenteschat/ui";
 import { useOrg } from "@/components/org-context";
+import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 import { useStreams } from "@/realtime/context";
@@ -60,6 +68,25 @@ function LiveAgentAvatar({
       {...rest}
     />
   );
+}
+
+/**
+ * The working indicator for an agent's work (the pixel orbit in its own
+ * tones); the neutral one is `Icon name="spinner"` / `PixelSpinner` alone.
+ */
+export function AgentSpinner({
+  agentId,
+  size = 14,
+  label,
+}: {
+  agentId: string | null | undefined;
+  size?: PixelSpinnerSize;
+  label?: string;
+}) {
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const agent = agentId ? dir.agentById.get(agentId) : undefined;
+  return <PixelSpinner size={size} color={agent ? colorOf(agent) : undefined} label={label} />;
 }
 
 /**

@@ -73,27 +73,77 @@ describe("command approvals", () => {
     expect(within(card).queryByRole("button", { name: "Recusar" })).toBeNull();
   });
 
-  test("a task's blocked commands: Liberar e repetir for whoever decides (active missions)", async () => {
-    const { api, mission, state } = await withCommand();
+  const blockedList = [
+    { tool: "Bash", command: "zsh /Users/w/work/t-conteudo/search2.sh" },
+    { tool: "Bash", command: "python3 -P -E geo.py > geo.out" },
+    { tool: "Bash", command: `python3 - <<'EOF'\nimport PIL\nprint(PIL.__version__)\nEOF` },
+    { tool: "Read", command: "/Users/w/app/.agentes/notes.md" },
+  ];
+
+  test("a task's blocked commands: one line, the list in the details dialog grouped by first word", async () => {
+    const { api, mission } = await withCommand();
     await api.missions.control(ORG_ID, mission.id, "start");
     await renderPage(
-      <BlockedCommands
-        missionId={mission.id}
-        taskId="00000000-0000-4000-8000-00000000aa01"
-        blocked={[{ tool: "Bash", command: "python3 -c 'import PIL'" }]}
-      />,
+      <BlockedCommands missionId={mission.id} taskId="00000000-0000-4000-8000-00000000aa01" blocked={blockedList} />,
       { api, org: true },
     );
     await settle(6);
-    const list = screen().getByRole("list", { name: "Comandos bloqueados" });
-    expect(list.textContent).toContain("Bloqueado:");
-    expect(list.textContent).toContain("python3 -c 'import PIL'");
-    await act(async () => fireEvent.click(within(list).getByRole("button", { name: "Liberar e repetir" })));
+    // Never the raw commands inline in the thread.
+    expect(document.body.textContent).toContain("4 comandos bloqueados");
+    expect(document.body.textContent).not.toContain("geo.py");
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver" })));
+    const dialog = screen().getByRole("dialog", { name: "4 comandos bloqueados" });
+    const python = within(dialog).getByRole("region", { name: "python3" });
+    expect(python.querySelector(".ac-countchip")?.textContent).toBe("2");
+    expect(within(dialog).getByRole("region", { name: "zsh" })).toBeTruthy();
+    expect(within(dialog).getByRole("region", { name: "Read" }).textContent).toContain(
+      "Read /Users/w/app/.agentes/notes.md",
+    );
+    // Long and multi-line commands are cut to two lines with "Mostrar tudo".
+    expect(within(python).getAllByRole("button", { name: "Mostrar tudo" })).toHaveLength(1);
+    expect(within(dialog).getAllByRole("checkbox")).toHaveLength(4);
+  });
+
+  test("Liberar selecionados e continuar: the picked commands in one call, then the line says it resumes", async () => {
+    const { api, mission, state } = await withCommand();
+    await api.missions.control(ORG_ID, mission.id, "start");
+    await renderPage(
+      <BlockedCommands missionId={mission.id} taskId="00000000-0000-4000-8000-00000000aa02" blocked={blockedList} />,
+      { api, org: true },
+    );
+    await settle(6);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver" })));
+    const dialog = screen().getByRole("dialog", { name: "4 comandos bloqueados" });
+    await act(async () => fireEvent.click(within(dialog).getByRole("checkbox", { name: /^Liberar zsh/ })));
+    await act(async () =>
+      fireEvent.click(within(dialog).getByRole("button", { name: "Liberar selecionados e continuar" })),
+    );
     await settle(4);
     expect(state.calls.find((c) => c.method === "missions.retryCommand")?.args[2]).toEqual({
-      taskId: "00000000-0000-4000-8000-00000000aa01",
-      command: "python3 -c 'import PIL'",
+      taskId: "00000000-0000-4000-8000-00000000aa02",
+      commands: [blockedList[1]?.command, blockedList[2]?.command, blockedList[3]?.command],
     });
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(document.querySelector(".mi-cmd-blocked")?.textContent).toContain(
+      "3 comandos liberados · retomando a sessão",
+    );
+  });
+
+  test("a paused mission says why it can't continue, before anyone clicks", async () => {
+    const { api, mission } = await withCommand();
+    await api.missions.control(ORG_ID, mission.id, "start");
+    await api.missions.control(ORG_ID, mission.id, "pause");
+    await renderPage(
+      <BlockedCommands missionId={mission.id} taskId="00000000-0000-4000-8000-00000000aa03" blocked={blockedList} />,
+      { api, org: true },
+    );
+    await settle(6);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver" })));
+    const dialog = screen().getByRole("dialog", { name: "4 comandos bloqueados" });
+    expect(dialog.textContent).toContain("A missão está pausada");
+    expect(
+      within(dialog).getByRole("button", { name: "Liberar selecionados e continuar" }).hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   test("meta readers and rule text", () => {

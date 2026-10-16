@@ -516,6 +516,8 @@ export function applyMissionEvent(
     suggestion: [],
     task: [],
     command: ["commands"],
+    delivery: ["deliveries"],
+    status: ["deliveries"],
   };
   refreshMission(qc, orgId, event.missionId, parts[event.change] ?? undefined);
   void qc.invalidateQueries({ queryKey: keys.threadMission(orgId, event.threadId) });

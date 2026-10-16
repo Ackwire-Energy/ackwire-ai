@@ -11,6 +11,7 @@ import type {
   Mission,
   MissionCommand,
   MissionDecision,
+  MissionDelivery,
   MissionJoinRequest,
   MissionParticipants,
   MissionPlanVersion,
@@ -31,6 +32,7 @@ interface Store {
   outputs: Map<string, string[]>;
   commands: MissionCommand[];
   rules: Map<string, string[]>;
+  deliveries: MissionDelivery[];
 }
 
 export function createFakeMissions(
@@ -50,6 +52,7 @@ export function createFakeMissions(
       outputs: new Map(),
       commands: [],
       rules: new Map(),
+      deliveries: [],
     }),
   );
   const find = async (orgId: string, missionId: string) => {
@@ -67,7 +70,7 @@ export function createFakeMissions(
   };
   return {
     list: async (orgId, query = {}) => {
-      const open = (m: Mission) => ["proposed", "active", "paused"].includes(m.status);
+      const open = (m: Mission) => ["proposed", "active", "paused", "awaiting_close"].includes(m.status);
       const waiting = (m: Mission) =>
         m.canAct &&
         m.plan.waiting +
@@ -341,11 +344,57 @@ export function createFakeMissions(
     },
     retryCommand: async (orgId, missionId, input) => {
       log("missions.retryCommand", orgId, missionId, input);
-      const word = input.command.split(" ")[0] ?? "";
-      const rules = [`Bash(${word} *)`];
+      const m = await find(orgId, missionId);
+      if (m.status === "paused") throw new ApiError(409, "mission.paused", "The mission is paused");
+      if (m.status === "done" || m.status === "canceled") throw new ApiError(409, "mission.closed", "Closed");
+      const list = input.commands ?? (input.command ? [input.command] : []);
+      const rules = [...new Set(list.map((c) => `Bash(${c.split(" ")[0] ?? ""} *)`))];
       const s = await store(orgId);
       s.rules.set(missionId, [...(s.rules.get(missionId) ?? []), ...rules]);
       return { rules, delivered: true };
+    },
+    deliveries: async (orgId, missionId) =>
+      clone((await store(orgId)).deliveries.filter((d) => d.missionId === missionId).reverse()),
+    checkDelivery: async (orgId, missionId, deliveryId, itemId, checked) => {
+      log("missions.checkDelivery", orgId, missionId, deliveryId, itemId, checked);
+      const d = (await store(orgId)).deliveries.find((x) => x.id === deliveryId && x.missionId === missionId);
+      const item = d?.checklist.find((c) => c.id === itemId);
+      if (!d || !item) throw new ApiError(404, "mission.delivery_item_not_found", "Not found");
+      const me = (await ctx.lookup.me())?.user.id ?? "";
+      item.checkedBy = checked ? [...new Set([...item.checkedBy, me])] : item.checkedBy.filter((u) => u !== me);
+      return clone(d);
+    },
+    acceptDelivery: async (orgId, missionId, deliveryId, input) => {
+      log("missions.acceptDelivery", orgId, missionId, deliveryId, input);
+      const m = await find(orgId, missionId);
+      const d = (await store(orgId)).deliveries.find((x) => x.id === deliveryId);
+      if (!d) throw new ApiError(404, "mission.delivery_not_found", "Not found");
+      if (d.status !== "pending") throw new ApiError(409, "mission.delivery_decided", "Already answered");
+      const me = await ctx.lookup.me();
+      Object.assign(d, {
+        status: "accepted",
+        saveToWiki: Boolean(input.saveToWiki),
+        decidedBy: me?.user.id ?? null,
+        decidedAt: ctx.now().toISOString(),
+      });
+      touch(m, { status: "done", pending: { ...m.pending, deliveries: 0 } });
+      return clone(m);
+    },
+    requestDeliveryChanges: async (orgId, missionId, deliveryId, note) => {
+      log("missions.requestDeliveryChanges", orgId, missionId, deliveryId, note);
+      const m = await find(orgId, missionId);
+      const d = (await store(orgId)).deliveries.find((x) => x.id === deliveryId);
+      if (!d) throw new ApiError(404, "mission.delivery_not_found", "Not found");
+      if (!note.trim()) throw new ApiError(400, "mission.delivery_note_required", "A note is required");
+      const me = await ctx.lookup.me();
+      Object.assign(d, {
+        status: "changes_requested",
+        note,
+        decidedBy: me?.user.id ?? null,
+        decidedAt: ctx.now().toISOString(),
+      });
+      touch(m, { status: "active", pending: { ...m.pending, deliveries: 0 } });
+      return clone(m);
     },
     choose: async (orgId, missionId, decisionId, option) => {
       log("missions.choose", orgId, missionId, decisionId, option);

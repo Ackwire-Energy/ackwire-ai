@@ -3,7 +3,7 @@ import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CommandApproval, Mission, MissionExecutor, MissionFileName, ThreadMissionSummary } from "@/api/types";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -153,12 +153,23 @@ export function MissionStrip({
   return <PlanStrip cells={cells} color={colorOf(dir.agentById.get(agentId))} label={label} titles={hints} />;
 }
 
-export type MissionStatusKey = "needsYou" | "proposed" | "working" | "active" | "paused" | "done" | "canceled";
+export type MissionStatusKey =
+  | "needsYou"
+  | "proposed"
+  | "working"
+  | "active"
+  | "paused"
+  | "awaitingClose"
+  | "readyToClose"
+  | "done"
+  | "canceled";
 
 export function missionStatusKey(m: Pick<Mission, "status" | "runningTasks" | "pending" | "canAct">): MissionStatusKey {
   if (m.status === "done" || m.status === "canceled" || m.status === "proposed" || m.status === "paused") {
     return m.status;
   }
+  // Everything done, nothing runs: on whoever concludes it (the others read "Pronta para concluir").
+  if (m.status === "awaiting_close") return m.canAct ? "awaitingClose" : "readyToClose";
   const waiting = m.canAct && m.pending.decisions + m.pending.reviews + m.pending.provisional + m.pending.commands > 0;
   if (waiting) return "needsYou";
   return m.runningTasks > 0 ? "working" : "active";
@@ -169,6 +180,7 @@ export function missionSummaryStatusKey(m: Pick<ThreadMissionSummary, "status" |
   if (m.status === "done" || m.status === "canceled" || m.status === "proposed" || m.status === "paused") {
     return m.status;
   }
+  if (m.status === "awaiting_close") return m.waitingYou > 0 ? "awaitingClose" : "readyToClose";
   if (m.waitingYou > 0) return "needsYou";
   return working ? "working" : "active";
 }
@@ -179,6 +191,8 @@ const STATUS_ICON: Record<MissionStatusKey, IconName> = {
   working: "spinner",
   active: "play",
   paused: "pause",
+  awaitingClose: "flag",
+  readyToClose: "flag",
   done: "check",
   canceled: "close",
 };
@@ -186,15 +200,23 @@ const STATUS_ICON: Record<MissionStatusKey, IconName> = {
 export function MissionStatusChip({
   mission,
   status,
+  agentId,
 }: {
-  mission?: Pick<Mission, "status" | "runningTasks" | "pending" | "canAct">;
+  mission?: Pick<Mission, "status" | "runningTasks" | "pending" | "canAct" | "agentId">;
   /** A state already known (a thread row's summary). */
   status?: MissionStatusKey;
+  /** Whose work it is ("Trabalhando" in that agent's tones); the mission's agent by default. */
+  agentId?: string;
 }) {
   const { t } = useTranslation();
   const key = status ?? (mission ? missionStatusKey(mission) : "active");
+  const who = agentId ?? mission?.agentId;
   return (
-    <Chip icon={STATUS_ICON[key]} tone={key === "needsYou" ? "waiting" : "neutral"}>
+    <Chip
+      icon={STATUS_ICON[key]}
+      lead={key === "working" && who ? <AgentSpinner agentId={who} /> : undefined}
+      tone={key === "needsYou" || key === "awaitingClose" ? "waiting" : "neutral"}
+    >
       {t(`missions.status.${key}`)}
     </Chip>
   );

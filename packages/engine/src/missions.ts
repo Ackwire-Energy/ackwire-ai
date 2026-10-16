@@ -51,6 +51,7 @@ const {
   missionFiles,
   missionEvents,
   missionJoinRequests,
+  missionDeliveries,
   machineTasks,
   machines,
   messages,
@@ -173,7 +174,9 @@ export const MISSION_LIMITS = {
   /** `GET …/tasks/{id}/output`: at most this many lines. */
   outputLines: 200,
 } as const;
-const OPEN: MissionStatus[] = ["proposed", "active", "paused"];
+/** Open: work may still happen (`awaiting_close` waits for its owner to conclude it). */
+export const OPEN_MISSION_STATUSES: MissionStatus[] = ["proposed", "active", "paused", "awaiting_close"];
+const OPEN = OPEN_MISSION_STATUSES;
 
 export interface MissionDeps {
   db: Database;
@@ -320,6 +323,7 @@ export const MISSION_TOOL_RATES: Record<string, number> = {
   request_approval: 5,
   upload_artifact: 30,
   start_task: 30,
+  complete_mission: 5,
 };
 
 /** Counts this call (a `tool_call` event) and refuses past the hourly limit. */
@@ -373,6 +377,55 @@ export async function publishMissionEvent(
     ...extra,
   });
 }
+
+/**
+ * New work for a mission waiting to be concluded (`awaiting_close`): a
+ * person's message, "Pedir ajustes", a plan item reopened, a task started.
+ * It goes back to `active`; any other status is left alone. Returns the
+ * fresh row.
+ */
+export async function reactivateMission(
+  deps: Pick<MissionDeps, "db" | "pubsub">,
+  mission: MissionRow,
+  reason: string,
+): Promise<MissionRow> {
+  if (mission.status !== "awaiting_close") return mission;
+  const [row] = await deps.db
+    .update(missions)
+    .set({ status: "active", updatedAt: new Date() })
+    .where(and(eq(missions.id, mission.id), eq(missions.status, "awaiting_close")))
+    .returning();
+  if (!row) return (await getMissionRow(deps.db, mission.id)) ?? mission;
+  await recordMissionEvent(deps.db, row, "reactivated", { reason });
+  await requestFilesSync(deps.db, row);
+  await publishMissionEvent(deps, row, "status", { reason });
+  return row;
+}
+
+/**
+ * Schedules the "is everything done?" check (`mission.check_done`, see
+ * mission-delivery.ts). Delayed so an agent finishing its plan has time to
+ * call `complete_mission` itself before an automatic card shows.
+ */
+export async function scheduleDoneCheck(
+  db: Executor,
+  mission: Pick<MissionRow, "id" | "orgId">,
+  delayMs = DONE_CHECK_DELAY_MS,
+  attempt = 0,
+) {
+  const at = Date.now() + delayMs;
+  await enqueue(db, {
+    orgId: mission.orgId,
+    kind: "mission.check_done",
+    payload: { missionId: mission.id, attempt },
+    dedupeKey: `mission.check_done:${mission.id}:${Math.floor(at / 5000)}`,
+    runAt: new Date(at),
+    maxAttempts: 3,
+  });
+}
+
+/** How long after the last plan change the done check runs. */
+export const DONE_CHECK_DELAY_MS = 30_000;
 
 /** A line written in the mission's thread by its agent (no run, no routing). */
 export async function postMissionMessage(
@@ -444,6 +497,8 @@ export interface MissionView {
     joinRequests: number;
     /** Command cards waiting for an answer (0 for whoever can't answer them). */
     commands: number;
+    /** Delivery cards waiting to be concluded (0 for whoever can't answer them). */
+    deliveries: number;
   };
   /** The caller asked to join and nobody answered yet. */
   joinRequested: boolean;
@@ -484,7 +539,7 @@ export async function missionViews(
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const machineIds = [...new Set(rows.flatMap((r) => (r.machineId ? [r.machineId] : [])))];
-  const [roles, counts, machineRows, running, plans, joins, commands] = await Promise.all([
+  const [roles, counts, machineRows, running, plans, joins, commands, deliveries] = await Promise.all([
     db
       .select({ missionId: missionParticipants.missionId, role: missionParticipants.role })
       .from(missionParticipants)
@@ -545,7 +600,13 @@ export async function missionViews(
       .where(and(inArray(missionJoinRequests.missionId, ids), eq(missionJoinRequests.status, "pending")))
       .groupBy(missionJoinRequests.missionId),
     pendingCommandCounts(db, ids),
+    db
+      .select({ missionId: missionDeliveries.missionId, n: sql<number>`count(*)::int` })
+      .from(missionDeliveries)
+      .where(and(inArray(missionDeliveries.missionId, ids), eq(missionDeliveries.status, "pending")))
+      .groupBy(missionDeliveries.missionId),
   ]);
+  const deliveriesOf = new Map(deliveries.map((d) => [d.missionId, Number(d.n)]));
   const planOf = new Map(plans.map((p) => [p.missionId, Array.isArray(p.items) ? p.items : []]));
   const joinOf = new Map(joins.map((j) => [j.missionId, j]));
   const roleOf = new Map(roles.map((r) => [r.missionId, r.role]));
@@ -587,6 +648,7 @@ export async function missionViews(
         suggestions: 0,
         joinRequests: mayAct(role) ? Number(join?.n ?? 0) : 0,
         commands: mayAct(role) ? (commands.get(r.id) ?? 0) : 0,
+        deliveries: mayAct(role) ? (deliveriesOf.get(r.id) ?? 0) : 0,
       },
       joinRequested: role === "none" && join?.mine === true,
       runningTasks: runningOf.get(r.id) ?? 0,
@@ -662,6 +724,8 @@ export interface ListMissionsInput {
 const waitingYouSql = (userId: string) => sql`(m.owner_id = ${userId} or exists (select 1 from ${missionParticipants} mp
     where mp.mission_id = m.id and mp.user_id = ${userId} and mp.role = 'decide'))
   and (m.plan_waiting > 0
+    or m.status = 'awaiting_close'
+    or exists (select 1 from ${missionDeliveries} mdl where mdl.mission_id = m.id and mdl.status = 'pending')
     or exists (select 1 from ${missionDecisions} md where md.mission_id = m.id and md.status in ('pending', 'provisional'))
     or exists (select 1 from ${missionReviews} mr where mr.mission_id = m.id and mr.status = 'pending')
     or exists (select 1 from ${missionJoinRequests} mj where mj.mission_id = m.id and mj.status = 'pending')
@@ -669,7 +733,7 @@ const waitingYouSql = (userId: string) => sql`(m.owner_id = ${userId} or exists 
       and sm.meta->'missionSuggestion'->>'status' = 'pending')
     or ${pendingCommandsSql(sql`m.id`)} > 0)`;
 
-const OPEN_SQL = sql`m.status in ('proposed', 'active', 'paused')`;
+const OPEN_SQL = sql`m.status in ('proposed', 'active', 'paused', 'awaiting_close')`;
 
 /** The missions (alias `m`) the person sees, with the filters but the status. */
 function missionScope(userId: string, orgId: string, input: ListMissionsInput) {
@@ -1141,6 +1205,11 @@ export async function tellSession(
   options: { title?: string; requestedBy?: string | null; from?: string; kind?: WakeKind } = {},
 ): Promise<{ delivered: boolean; taskId?: string; runId?: string }> {
   if (!OPEN.includes(mission.status)) return { delivered: false };
+  // A person's word is new work: a mission waiting to be concluded goes back to active. (The
+  // mission's own notices, like an item's end, still reach the session without reopening it.)
+  if (mission.status === "awaiting_close" && (options.requestedBy || options.kind === "person")) {
+    mission = await reactivateMission(deps, mission, "message");
+  }
   // Work on someone's computer only for people the agent answers (D31).
   if (options.requestedBy && !(await agentAnswers(deps.db, mission, options.requestedBy))) {
     throw new ForbiddenError("The mission's agent doesn't answer this person", "mission.agent_unavailable");
@@ -1163,7 +1232,9 @@ export async function tellSession(
   };
   // The main session may talk while the plan is only proposed; everything else waits for an active mission.
   const canTalk =
-    mission.status === "active" || (mission.status === "proposed" && target.sessionId === mission.mainSessionId);
+    mission.status === "active" ||
+    mission.status === "awaiting_close" ||
+    (mission.status === "proposed" && target.sessionId === mission.mainSessionId);
   if (!canTalk || isLive(last)) {
     await queueForSession(deps.db, mission, entry);
     return { delivered: false };
@@ -1201,7 +1272,8 @@ export type WakeKind = "person" | "task" | "system";
 
 /** Agent mode: whether the agent may be woken now (an active mission, or a proposed one being planned). */
 const agentCanWork = (mission: Pick<MissionRow, "status" | "machineId">) =>
-  Boolean(mission.machineId) && (mission.status === "active" || mission.status === "proposed");
+  Boolean(mission.machineId) &&
+  (mission.status === "active" || mission.status === "awaiting_close" || mission.status === "proposed");
 
 /**
  * Agent mode (ADR 0029, "Executor agent"): the mission's "main session" is
@@ -1227,8 +1299,11 @@ export async function wakeMissionAgent(
   } = {},
 ): Promise<{ delivered: boolean; runId?: string }> {
   const body = text.slice(0, MISSION_LIMITS.sendText);
-  const fresh = (await getMissionRow(deps.db, mission.id)) ?? mission;
+  let fresh = (await getMissionRow(deps.db, mission.id)) ?? mission;
   if (!OPEN.includes(fresh.status)) return { delivered: false };
+  if (fresh.status === "awaiting_close" && (options.requestedBy || options.kind === "person")) {
+    fresh = await reactivateMission(deps, fresh, "message");
+  }
   const entry = { sessionId: fresh.mainSessionId, cwd: fresh.repoDir, text: body, at: new Date().toISOString() };
   if (!agentCanWork(fresh)) {
     await queueForSession(deps.db, fresh, entry);
@@ -1351,7 +1426,9 @@ export async function deliverInbox(deps: MissionDeps, missionId: string) {
   let sent = 0;
   for (const [sessionId, entries] of bySession) {
     const canTalk =
-      mission.status === "active" || (mission.status === "proposed" && sessionId === mission.mainSessionId);
+      mission.status === "active" ||
+      mission.status === "awaiting_close" ||
+      (mission.status === "proposed" && sessionId === mission.mainSessionId);
     if (!canTalk) continue;
     if (isLive(await sessionTask(deps.db, mission.id, sessionId))) continue;
     // Claim these entries first (another delivery may run at the same time).
@@ -1387,7 +1464,7 @@ export async function deliverInbox(deps: MissionDeps, missionId: string) {
 
 /** Agent mode: everything waiting goes to the agent at once (one notice, one run or steer). */
 async function deliverAgentInbox(deps: MissionDeps, mission: MissionRow) {
-  if (!agentCanWork(mission) || mission.status !== "active") return 0;
+  if (!agentCanWork(mission) || (mission.status !== "active" && mission.status !== "awaiting_close")) return 0;
   const [claimed] = await deps.db
     .update(missions)
     .set({ inbox: [] })
@@ -1508,7 +1585,7 @@ export async function pauseMission(deps: MissionDeps, userId: string, orgId: str
     deps,
     mission,
     userId,
-    ["active"],
+    ["active", "awaiting_close"],
     { status: "paused", pausedAt: new Date() },
     "mission.paused",
   );
@@ -1536,6 +1613,7 @@ export async function resumeMission(deps: MissionDeps, userId: string, orgId: st
   );
   await deliverInbox(deps, row.id);
   await requestFilesSync(deps.db, row);
+  await scheduleDoneCheck(deps.db, row);
   await publishMissionEvent(deps, row, "resumed");
   return viewFor(deps, (await getMissionRow(deps.db, row.id)) ?? row, userId, isAdmin);
 }
@@ -1592,12 +1670,12 @@ export async function stopMission(deps: MissionDeps, userId: string, orgId: stri
   requireOpen(mission);
   const canceled = await cancelMissionTasks(deps, mission, userId);
   const row =
-    mission.status === "active"
+    mission.status === "active" || mission.status === "awaiting_close"
       ? await setStatus(
           deps,
           mission,
           userId,
-          ["active"],
+          ["active", "awaiting_close"],
           { status: "paused", pausedAt: new Date() },
           "mission.stopped",
         )
@@ -1633,6 +1711,22 @@ export async function closeMission(
     throw new ForbiddenError("Only the mission's owner or an admin can close it", "mission.not_owner");
   }
   requireOpen(mission);
+  return concludeMission(deps, mission, userId, isAdmin, input);
+}
+
+/**
+ * Closing itself, once the caller may (the owner or an admin on "Fechar
+ * missão"; also a decider concluding a delivery): tasks canceled, the status,
+ * the optional wiki page, the files and the event.
+ */
+export async function concludeMission(
+  deps: MissionDeps,
+  mission: MissionRow,
+  userId: string,
+  isAdmin: boolean,
+  input: { outcome: "done" | "canceled"; saveToWiki?: boolean; note?: string | null },
+) {
+  const orgId = mission.orgId;
   await cancelMissionTasks(deps, mission, userId);
   const note = clean(input.note, 500);
   let row = await setStatus(
@@ -2229,6 +2323,65 @@ export async function latestPlan(db: Executor, missionId: string) {
   return row ?? null;
 }
 
+/**
+ * Tool names people should never read in a plan (the executor's MCP tools
+ * and the agent's mission tools). Names with an underscore are removed
+ * anywhere; one-word names (`report`) only when written as code.
+ */
+export const MISSION_TOOL_NAMES = [
+  "report",
+  "update_plan",
+  "ask_decision",
+  "request_review",
+  "request_approval",
+  "upload_artifact",
+  "get_context",
+  "start_task",
+  "complete_mission",
+  "permission_prompt",
+  "send_to_mission",
+  "propose_mission",
+  "run_code",
+  "upload_file",
+  "read_file",
+  "write_file",
+  "list_files",
+  "list_tasks",
+  "task_status",
+  "cancel_task",
+] as const;
+
+const TOOL_WORDS = "(?:via|with|using|through|use|call|calling|calls|com|usando|chamar|chamando|pelo|pela|por)";
+const snakeNames = MISSION_TOOL_NAMES.filter((n) => n.includes("_")).join("|");
+const allNames = MISSION_TOOL_NAMES.join("|");
+/** One tool name: `report` / `update_plan()` as code, or a bare snake_case name, optionally followed by "tool". */
+const TOOL_CORE = `(?:\`(?:${allNames})(?:\\(\\))?\`|\\b(?:${snakeNames})\\b(?:\\(\\))?)(?:\\s+tool)?`;
+/** "(via upload_artifact)" as a whole, or "via upload_artifact" / "upload_artifact" in the text. */
+const TOOL_NAME_RE = new RegExp(
+  `\\s*(?:\\(\\s*(?:${TOOL_WORDS}\\s+)?${TOOL_CORE}\\s*\\)|(?:\\b${TOOL_WORDS}\\s+)?${TOOL_CORE})`,
+  "gi",
+);
+
+/**
+ * A plan item's title without tool names (`Enviar capturas via upload_artifact`
+ * → `Enviar capturas`): whitespace collapsed, dangling punctuation and a
+ * trailing "e"/"and" trimmed. When nothing would be left, the original text
+ * without backticks.
+ */
+export function stripToolNames(title: string) {
+  const out = title
+    .replace(TOOL_NAME_RE, " ")
+    .replace(/\(\s*\)/g, " ")
+    .replace(/\s+\)/g, ")")
+    .replace(/([,;])(?:\s*[,;])+/g, "$1")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s,.;:\-–—]+|[\s,;:\-–—]+$/g, "")
+    .replace(/\s+(?:e|and|ou|or)$/i, "")
+    .trim();
+  return out || title.replace(/`/g, "").replace(/\s+/g, " ").trim();
+}
+
 /** Items as the executor sent them, cleaned; ids kept, or matched by title, or made up. */
 export function normalizePlan(input: unknown, previous: PlanItem[] = []): PlanItem[] {
   if (!Array.isArray(input) || input.length === 0)
@@ -2238,7 +2391,7 @@ export function normalizePlan(input: unknown, previous: PlanItem[] = []): PlanIt
   let n = 0;
   for (const raw of input.slice(0, MISSION_LIMITS.planItems)) {
     const r = (raw ?? {}) as Record<string, unknown>;
-    const title = oneLine(clean(r.title, MISSION_LIMITS.itemTitle), MISSION_LIMITS.itemTitle);
+    const title = stripToolNames(oneLine(clean(r.title, MISSION_LIMITS.itemTitle), MISSION_LIMITS.itemTitle));
     if (!title) continue;
     const status = (PLAN_STATUSES as string[]).includes(String(r.status)) ? (r.status as PlanStatus) : "todo";
     let id = typeof r.id === "string" ? r.id.trim().slice(0, 40) : "";
@@ -2351,6 +2504,10 @@ export async function updatePlan(
   if (result && deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(result));
   await requestFilesSync(deps.db, mission);
   await publishMissionEvent(deps, mission, "plan", { planVersion: version });
+  // A plan with something left to do is new work; a finished one gets the done check.
+  const finished = items.length > 0 && items.every((i) => i.status === "done" || i.status === "dropped");
+  if (!finished) await reactivateMission(deps, (await getMissionRow(deps.db, mission.id)) ?? mission, "plan");
+  else await scheduleDoneCheck(deps.db, mission);
   return { version, change, items };
 }
 
@@ -3146,3 +3303,10 @@ export async function getTaskOutput(
     truncated: lines.length > tail || kept.length >= RECENT_LINES,
   };
 }
+
+export {
+  answerers as missionAnswerers,
+  clean as cleanMissionText,
+  nameOf as missionPersonName,
+  oneLine as oneLineText,
+};

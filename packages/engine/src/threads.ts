@@ -108,10 +108,13 @@ export interface ThreadMissionSummary {
   id: string;
   /** The mission's agent (the row's avatar). */
   agentId: string;
-  status: "proposed" | "active" | "paused" | "done" | "canceled";
+  status: "proposed" | "active" | "paused" | "done" | "canceled" | "awaiting_close";
   planDone: number;
   planTotal: number;
-  /** Plan items waiting for people, pending decisions and pending reviews; command cards for whoever answers them. */
+  /**
+   * Plan items waiting for people, pending decisions and pending reviews; command cards and a
+   * mission waiting to be concluded (`awaiting_close`, counted once) for whoever answers them.
+   */
   waitingYou: number;
 }
 
@@ -179,7 +182,7 @@ async function requireManageThread(
       and(
         eq(schema.missions.orgId, root.orgId),
         eq(schema.missions.threadRootId, root.id),
-        inArray(schema.missions.status, ["proposed", "active", "paused"]),
+        inArray(schema.missions.status, ["proposed", "active", "paused", "awaiting_close"]),
       ),
     );
   if (mission) {
@@ -1022,7 +1025,7 @@ async function queryThreads(
             + (select count(*)::int from ${schema.missionReviews} mr where mr.mission_id = mi.id and mr.status = 'pending')
             + case when mi.owner_id = ${userId} or exists (select 1 from ${schema.missionParticipants} mpc
                 where mpc.mission_id = mi.id and mpc.user_id = ${userId} and mpc.role = 'decide')
-              then ${pendingCommandsSql(sql`mi.id`)} else 0 end
+              then ${pendingCommandsSql(sql`mi.id`)} + case when mi.status = 'awaiting_close' then 1 else 0 end else 0 end
           end as mission_waiting
         from candidates c
         join ${messages} root on root.id = c.root_id and root.org_id = ${orgId}::uuid

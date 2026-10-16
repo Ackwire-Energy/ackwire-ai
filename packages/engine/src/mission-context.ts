@@ -33,7 +33,7 @@ export async function missionOfRun(
       and(
         eq(missions.orgId, ctx.orgId),
         eq(missions.threadRootId, ctx.threadRootId),
-        inArray(missions.status, ["proposed", "active", "paused"]),
+        inArray(missions.status, ["proposed", "active", "paused", "awaiting_close"]),
       ),
     );
   return row && row.agentId === ctx.agentId ? row : null;

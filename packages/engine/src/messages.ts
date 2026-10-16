@@ -279,7 +279,7 @@ export async function insertMessageWithRuns(
             where mo.mission_id = mi.id and mo.user_id = ${userId}) as outsider
         from ${schema.missions} mi
         where ${person}::boolean and ${threadId}::uuid is not null and mi.org_id = ${input.orgId}::uuid
-          and mi.thread_root_id = ${threadId}::uuid and mi.status in ('proposed', 'active', 'paused')
+          and mi.thread_root_id = ${threadId}::uuid and mi.status in ('proposed', 'active', 'paused', 'awaiting_close')
           and mi.owner_id is distinct from ${userId}
           and not exists (select 1 from ${schema.missionParticipants} mp
             where mp.mission_id = mi.id and mp.user_id = ${userId} and mp.role = 'decide')

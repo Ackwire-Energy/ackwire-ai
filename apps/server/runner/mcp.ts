@@ -93,7 +93,11 @@ export function resolveTaskPath(given: string, info: Pick<McpTaskInfo, "cwd" | "
   return null;
 }
 
-const PATH_ARGS: Record<string, "path" | "paths"> = { upload_artifact: "path", request_review: "paths" };
+const PATH_ARGS: Record<string, "path" | "paths"> = {
+  upload_artifact: "path",
+  request_review: "paths",
+  complete_mission: "paths",
+};
 
 export interface IpcRequest {
   taskId: string;
@@ -102,7 +106,8 @@ export interface IpcRequest {
   args: Record<string, unknown>;
 }
 
-export type IpcReply = { ok: true; text: string } | { ok: false; error: string };
+/** `transient`: the link to the runner or to agentes.chat was down; asking again later may work. */
+export type IpcReply = { ok: true; text: string } | { ok: false; error: string; transient?: boolean };
 
 /** Where the daemon listens: `<runner home>/mcp.sock`, or a named pipe on Windows. */
 export function mcpSocketPath(home: string, platform: NodeJS.Platform = process.platform) {
@@ -123,6 +128,9 @@ const sameToken = (a: string, b: string) => {
   return x.length === y.length && timingSafeEqual(x, y);
 };
 
+/** Calls the bridge may send again after a reconnect (the server answers them the same way twice). */
+const RESEND_SAFE = new Set<string>([PERMISSION_TOOL, "get_context"]);
+
 /** How long a relayed call may take (an upload of a large file takes minutes). */
 export const MCP_CALL_TIMEOUT_MS = 6 * 60_000;
 
@@ -135,8 +143,10 @@ export class McpBridge {
   private send: ((frame: RunnerFrame) => void) | null = null;
   private readonly pending = new Map<
     string,
-    { resolve: (r: IpcReply) => void; timer: ReturnType<typeof setTimeout> }
+    { resolve: (r: IpcReply) => void; timer: ReturnType<typeof setTimeout>; frame: RunnerFrame; tool: string }
   >();
+  /** Calls made while the connection is down (a restart, a reconnect): relayed once it is back. */
+  private readonly waiting = new Map<string, { frame: RunnerFrame; tool: string }>();
 
   constructor(
     private readonly opts: {
@@ -169,18 +179,51 @@ export class McpBridge {
     this.server = server;
   }
 
-  /** A connection to the server is up: calls go there. */
+  /** A connection to the server is up: calls go there, the ones that waited first. */
   attach(send: (frame: RunnerFrame) => void) {
     this.send = send;
+    for (const [callId, w] of this.waiting) {
+      this.waiting.delete(callId);
+      this.relay(callId, w.frame);
+    }
   }
 
-  /** The connection went away: calls in flight fail (the executor may try again). */
+  /**
+   * The connection went away. Calls not answered yet: the ones safe to send
+   * twice (the permission prompt, which the server keys by its request, and
+   * reads) wait for the connection and go again; the others fail as
+   * transient (the server may already have done them).
+   */
   detach() {
     this.send = null;
     for (const [callId, p] of this.pending) {
+      if (RESEND_SAFE.has(p.tool)) {
+        this.waiting.set(callId, { frame: p.frame, tool: p.tool });
+        continue;
+      }
       clearTimeout(p.timer);
-      p.resolve({ ok: false, error: "The computer lost its connection to agentes.chat; try again in a minute." });
+      p.resolve({
+        ok: false,
+        error: "The computer lost its connection to agentes.chat; try again in a minute.",
+        transient: true,
+      });
       this.pending.delete(callId);
+    }
+  }
+
+  private relay(callId: string, frame: RunnerFrame) {
+    const p = this.pending.get(callId);
+    const send = this.send;
+    if (!p) return;
+    if (!send) {
+      this.waiting.set(callId, { frame, tool: p.tool });
+      return;
+    }
+    try {
+      send(frame);
+    } catch {
+      // The socket broke while sending: wait for the next connection.
+      this.waiting.set(callId, { frame, tool: p.tool });
     }
   }
 
@@ -223,25 +266,28 @@ export class McpBridge {
       }
       args.paths = out;
     }
-    const send = this.send;
-    if (!send) {
-      return { ok: false, error: "The computer is not connected to agentes.chat right now; try again in a minute." };
-    }
+    // Not connected right now (the runner restarting, a reconnect): the call waits for the
+    // connection, bounded by its own timeout, instead of being refused.
     const callId = randomBytes(12).toString("hex");
+    const frame: RunnerFrame = { type: "mcp.call", callId, taskId, tool, args };
     return new Promise<IpcReply>((resolve) => {
       const timer = setTimeout(() => {
+        const waited = this.waiting.has(callId);
         this.pending.delete(callId);
-        resolve({ ok: false, error: "agentes.chat did not answer in time." });
+        this.waiting.delete(callId);
+        resolve(
+          waited
+            ? {
+                ok: false,
+                error: "The computer is not connected to agentes.chat right now; try again in a minute.",
+                transient: true,
+              }
+            : { ok: false, error: "agentes.chat did not answer in time." },
+        );
       }, this.opts.callTimeoutMs ?? MCP_CALL_TIMEOUT_MS);
       timer.unref?.();
-      this.pending.set(callId, { resolve, timer });
-      try {
-        send({ type: "mcp.call", callId, taskId, tool, args });
-      } catch {
-        clearTimeout(timer);
-        this.pending.delete(callId);
-        resolve({ ok: false, error: "The computer lost its connection to agentes.chat; try again in a minute." });
-      }
+      this.pending.set(callId, { resolve, timer, frame, tool });
+      this.relay(callId, frame);
     });
   }
 
@@ -275,6 +321,12 @@ export class McpBridge {
 
   async close() {
     this.detach();
+    for (const [callId, p] of this.pending) {
+      clearTimeout(p.timer);
+      p.resolve({ ok: false, error: "The runner is stopping; try again in a minute.", transient: true });
+      this.pending.delete(callId);
+    }
+    this.waiting.clear();
     const server = this.server;
     this.server = null;
     if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -312,9 +364,10 @@ export function ipcCall(socketPath: string, req: IpcRequest, timeoutMs = MCP_CAL
       finish({
         ok: false,
         error: "The agentes runner is not running on this computer (start it: agentes-runner start).",
+        transient: true,
       }),
     );
-    socket.on("close", () => finish({ ok: false, error: "The runner closed the connection." }));
+    socket.on("close", () => finish({ ok: false, error: "The runner closed the connection.", transient: true }));
   });
 }
 
@@ -449,7 +502,12 @@ export async function permissionPrompt(
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const deadline = now() + (opts.waitMs ?? PERMISSION_WAIT_MS);
   const ask = async (a: Record<string, unknown>) => {
-    const reply = await call(PERMISSION_TOOL, a);
+    let reply = await call(PERMISSION_TOOL, a);
+    // The runner restarting or reconnecting: keep asking (within the wait), never a silent deny.
+    while (!reply.ok && reply.transient && now() < deadline) {
+      await sleep(opts.pollMs ?? PERMISSION_POLL_MS);
+      reply = await call(PERMISSION_TOOL, a);
+    }
     if (!reply.ok) return { error: reply.error };
     try {
       return JSON.parse(reply.text) as { behavior?: string; message?: string; status?: string; request_id?: string };
@@ -666,7 +724,25 @@ export const DENY_RULES = MISSION_DENY_RULES;
  * merges, other pushes and deploys are denied (they go through
  * `request_approval`). Deny rules win over allow rules.
  */
-export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: string, missionAllow: string[] = []) {
+/**
+ * File rules for the mission folder (absolute; `//` is Claude Code's prefix
+ * for an absolute path): an item in its own worktree or subfolder reads and
+ * writes the mission's `.agentes/` and its shared inputs there, and nothing
+ * outside it (other paths still ask through the prompt tool).
+ */
+export function missionFolderRules(missionFolder: string | undefined, tools: readonly string[]) {
+  const dir = (missionFolder ?? "").replace(/\\/g, "/").replace(/\/+$/, "");
+  if (!dir.startsWith("/") || dir.includes("*") || /\.\.(\/|$)/.test(dir)) return [];
+  return tools.map((tool) => `${tool}(/${dir}/**)`);
+}
+
+export function claudePermissionSettings(
+  mode: "plan" | "work",
+  branchPrefix: string,
+  missionAllow: string[] = [],
+  /** An item's mission folder when it runs elsewhere (its worktree or subfolder). */
+  missionFolder?: string,
+) {
   if (mode === "plan") {
     return {
       permissions: {
@@ -678,6 +754,7 @@ export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: st
           "LS",
           ...readOnlyShell(),
           ...gitC(GIT_READ.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`])),
+          ...missionFolderRules(missionFolder, ["Read"]),
         ],
         deny: ["Edit", "Write", "NotebookEdit", ...MISSION_DENY_RULES],
       },
@@ -701,6 +778,8 @@ export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: st
         "Bash(gh pr diff *)",
         "Bash(gh pr status *)",
         ...BUILD_RULES,
+        // The mission folder, for an item working in its own worktree or subfolder.
+        ...missionFolderRules(missionFolder, ["Read", "Edit", "Write"]),
         // What a person allowed for the whole mission ("Aprovar sempre nesta missão").
         ...missionAllow.filter(isSafeRule).slice(0, 100),
       ],
@@ -764,6 +843,8 @@ export function missionExecutorArgs(
     resumed?: boolean;
     /** Claude Code work turns: commands off the allow list ask a person through our tool. */
     promptTool?: boolean;
+    /** Claude Code: folders it may use besides its own (an item's mission folder). */
+    addDirs?: string[];
   },
   platform: NodeJS.Platform = process.platform,
 ): string[] {
@@ -777,6 +858,7 @@ export function missionExecutorArgs(
       "--allowedTools",
       "mcp__agentes",
       ...(input.promptTool ? ["--permission-prompt-tool", PERMISSION_PROMPT_TOOL] : []),
+      ...(input.addDirs ?? []).flatMap((d) => ["--add-dir", q(d)]),
       ...(rules ? ["--append-system-prompt", q(rules)] : []),
     ];
   }

@@ -29,6 +29,13 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { approvalAction, approvalRisk, approvalTitle, approvalTraits, decisionLabel } from "@/components/ApprovalItem";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { ErrorState, LoadingCards } from "@/components/Loading";
+import {
+  MissionCommandsPending,
+  MissionsWaitingList,
+  missionsWaiting,
+  pendingCommandCount,
+  useMissionsWaitingYou,
+} from "@/components/missions/MissionWaiting";
 import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -106,7 +113,11 @@ const TRAIT_ICON: Record<ReturnType<typeof approvalTraits>[number], IconName> = 
   external: "send",
 };
 
-/** Aprovações (telas/Aprovacoes.html): who waits on you, each request with its exact action, then the history. */
+/**
+ * Aprovações (telas/Aprovacoes.html): who waits on you, each request with its
+ * exact action, then the history. Under the requests, the missions' command
+ * cards and the decisions and reviews waiting on you in missions (ADR 0029).
+ */
 export function ApprovalsPage() {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -145,6 +156,11 @@ export function ApprovalsPage() {
     (a) => matches(a) && (filter === "all" || filter === "pending" || bucketOf(approvalPhase(a)) === filter),
   );
   const toggle = (id: string) => setOpenId((o) => (o === id ? null : id));
+  // Missions you own or decide in: the executor's commands and what waits on you (decisions, reviews).
+  const { missions } = useMissionsWaitingYou();
+  const commands = pendingCommandCount(missions);
+  const missionWaiting = missionsWaiting(missions).length > 0;
+  const waitingYou = mine.length + commands;
 
   // J/K walk the requests, A approves (high risk: focuses the hold), R refuses, / searches, Escape closes.
   useEffect(() => {
@@ -187,7 +203,9 @@ export function ApprovalsPage() {
     <button key={f} type="button" className="ap-pill" aria-pressed={filter === f} onClick={() => setFilter(f)}>
       {t(`approvals.filter.${f}`)}
       <span className="ap-pill__count" aria-hidden="true">
-        {f === "all" ? all.length : all.filter((a) => bucketOf(approvalPhase(a)) === f).length}
+        {f === "all"
+          ? all.length
+          : all.filter((a) => bucketOf(approvalPhase(a)) === f).length + (f === "pending" ? commands : 0)}
       </span>
     </button>
   );
@@ -199,9 +217,9 @@ export function ApprovalsPage() {
         <header className="ap-head">
           <h1>{t("approvals.title")}</h1>
           <p className="ap-head__sub">
-            {mine.length > 0 ? (
+            {waitingYou > 0 ? (
               <>
-                {t("approvals.summary", { count: mine.length })}
+                {t("approvals.summary", { count: waitingYou })}
                 {urgentLeft && urgentLeft <= 2 * URGENT_MS
                   ? ` · ${t("approvals.urgent", { time: timeLeft(t, urgent.expiresAt) ?? "" })}`
                   : ""}
@@ -258,11 +276,16 @@ export function ApprovalsPage() {
         {approvals.isError && !approvals.data && (
           <ErrorState error={approvals.error} onRetry={() => void approvals.refetch()} />
         )}
-        {approvals.isSuccess && filter === "pending" && shownOpen.length === 0 && !query && (
-          <EmptyState sky title={t("approvals.emptyTitle")}>
-            {t("approvals.empty")}
-          </EmptyState>
-        )}
+        {approvals.isSuccess &&
+          filter === "pending" &&
+          shownOpen.length === 0 &&
+          !query &&
+          commands === 0 &&
+          !missionWaiting && (
+            <EmptyState sky title={t("approvals.emptyTitle")}>
+              {t("approvals.empty")}
+            </EmptyState>
+          )}
         {approvals.isSuccess && query && shownOpen.length === 0 && shownDecided.length === 0 && (
           <EmptyState icon="search">{t("approvals.noResults")}</EmptyState>
         )}
@@ -284,6 +307,13 @@ export function ApprovalsPage() {
               />
             ))}
           </section>
+        )}
+
+        {filter === "pending" && (
+          <>
+            <MissionCommandsPending missions={missions} query={query} />
+            <MissionsWaitingList missions={missions} query={query} />
+          </>
         )}
 
         {filter === "pending"

@@ -61,20 +61,27 @@ describe("Issues (board and list)", () => {
     expect(within(timeout).getByRole("img", { name: "1 de 2 critérios de aceite" })).toBeTruthy();
   });
 
-  test("a click opens the details beside the board; Escape closes them", async () => {
-    await go("issues");
+  test("a click opens the details dialog (kept in the URL); Escape closes it", async () => {
+    const { router } = await go("issues");
     await click(screen().getByRole("link", { name: "#131 Confirmação do agendamento por WhatsApp" }));
     await settle(4);
-    const panel = screen().getByRole("region", { name: "Issue #131" });
-    expect(
-      within(panel).getByRole("heading", { level: 2, name: "Confirmação do agendamento por WhatsApp" }),
-    ).toBeTruthy();
-    expect(within(panel).getByRole("region", { name: "Pedir a um agente" })).toBeTruthy();
-    expect(within(panel).getByRole("link", { name: "Abrir página da issue" }).getAttribute("href")).toBe(
+    const dialog = screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" });
+    expect(dialog.textContent).toContain("#131");
+    expect(within(dialog).getByRole("region", { name: "Pedir a um agente" })).toBeTruthy();
+    expect(within(dialog).getByRole("complementary", { name: "Detalhes da issue" })).toBeTruthy();
+    expect(within(dialog).getByRole("link", { name: "Abrir página da issue" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/issues/131`,
     );
-    await act(async () => fireEvent.keyDown(window, { key: "Escape" }));
-    expect(screen().queryByRole("region", { name: "Issue #131" })).toBeNull();
+    expect(router.state.location.href).toContain("?open=131");
+    await act(async () => fireEvent.keyDown(document.body, { key: "Escape" }));
+    await settle(2);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(router.state.location.href).not.toContain("open=");
+  });
+
+  test("an issue's link with ?open= reopens its details", async () => {
+    await go("issues?open=131");
+    expect(screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" })).toBeTruthy();
   });
 
   test("filters, search and the list view", async () => {
@@ -228,13 +235,13 @@ describe("Rotinas", () => {
     // The title opens the details: what it does, when, where, and the run history.
     await click(within(weekly()).getByRole("button", { name: "Resumo da semana" }));
     await settle(4);
-    const details = screen().getByRole("complementary", { name: "Detalhes: Resumo da semana" });
+    const details = screen().getByRole("dialog", { name: "Resumo da semana" });
     expect(details.textContent).toContain("Resuma o que");
     expect(details.textContent).toContain("Orçamento do mês esgotado");
     expect(details.textContent).toContain("não rodou");
     expect(details.textContent).toContain("Resumo postado no canal");
     await click(within(details).getByRole("button", { name: "Fechar detalhes" }));
-    expect(screen().queryByRole("complementary", { name: "Detalhes: Resumo da semana" })).toBeNull();
+    expect(screen().queryByRole("dialog", { name: "Resumo da semana" })).toBeNull();
   });
 
   test("Nova rotina: natural-language schedule is parsed before creating", async () => {

@@ -537,6 +537,49 @@
   gap: 8px;
 }
 
+/* ── Missions: the executor's commands and what waits on you (ADR 0029) ─── */
+.ap-mi {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.ap-mi__mission {
+  font-weight: 600;
+  color: var(--ink2);
+  text-decoration: none;
+}
+.ap-mi__mission:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+}
+.ap-mi__mission:focus-visible {
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
+}
+/* The command card sits in the request card's body, without its own surface. */
+.ap-mi-cmd .mi-card {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  animation: none;
+}
+.ap-mi__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ap-mi__row {
+  cursor: default;
+}
+.ap-mi__row:hover {
+  background: none;
+}
+
 /* ── Details panel ──────────────────────────────────────────────────────── */
 .ap-panel {
   position: sticky;

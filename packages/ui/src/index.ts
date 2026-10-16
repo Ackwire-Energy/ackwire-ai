@@ -74,6 +74,12 @@ export {
   mentionQuery,
 } from "./components/Composer";
 export { DatePicker, type DatePickerProps, monthGrid, parseYmd, ymd } from "./components/DatePicker";
+export {
+  DetailsDialog,
+  type DetailsDialogPageLink,
+  type DetailsDialogProps,
+  DetailsSection,
+} from "./components/DetailsDialog";
 export { Dialog, DialogBody, DialogFooter, type DialogProps, DialogSearchList } from "./components/Dialog";
 export { Diff, type DiffKind, type DiffLine, diffLines } from "./components/Diff";
 export {
@@ -112,6 +118,14 @@ export { Mention } from "./components/Mention";
 export { Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "./components/Menu";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
 export { glowOptions, PixelSky, SkyGlow } from "./components/PixelSky";
+export {
+  ORBIT_RING,
+  ORBIT_STEP_MS,
+  orbitShades,
+  PixelSpinner,
+  type PixelSpinnerProps,
+  type PixelSpinnerSize,
+} from "./components/PixelSpinner";
 export { Popover } from "./components/Popover";
 export {
   modeOf,
@@ -137,7 +151,6 @@ export {
 } from "./components/RunPixels";
 export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";
 export { Select, type SelectOption, type SelectProps } from "./components/Select";
-export { Sheet, type SheetProps } from "./components/Sheet";
 export {
   SKELETON_DELAY_MS,
   Skeleton,

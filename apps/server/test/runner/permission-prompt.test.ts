@@ -186,6 +186,28 @@ test("the prompt tool: a person says no; nobody answers in time; the server is u
   expect((await permissionPrompt(bash("brew install z"), down.call, instant)).behavior).toBe("deny");
 });
 
+test("the prompt tool: the runner restarting or reconnecting is waited out, not a silent deny", async () => {
+  const replies: IpcReply[] = [
+    { ok: false, error: "The runner closed the connection.", transient: true },
+    { ok: false, error: "The computer is not connected to agentes.chat right now", transient: true },
+    { ok: true, text: JSON.stringify({ status: "pending", request_id: "r9" }) },
+    { ok: false, error: "The runner closed the connection.", transient: true },
+    { ok: true, text: JSON.stringify({ behavior: "allow" }) },
+  ];
+  const calls: Record<string, unknown>[] = [];
+  const call = async (_tool: string, args: Record<string, unknown>) => {
+    calls.push(args);
+    return replies.shift() as IpcReply;
+  };
+  expect(await permissionPrompt(bash("swift build"), call, instant)).toEqual({
+    behavior: "allow",
+    updatedInput: { command: "swift build" },
+  });
+  // The first question went again after the link came back; then the poll by its request id.
+  expect(calls.filter((c) => c.tool_name === "Bash")).toHaveLength(3);
+  expect(calls.filter((c) => c.request_id === "r9")).toHaveLength(2);
+});
+
 test("over MCP: permission_prompt always answers JSON text Claude Code understands", async () => {
   const s = server([{ behavior: "allow" }]);
   const res = (await handleMcpMessage(

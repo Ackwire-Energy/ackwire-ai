@@ -64,6 +64,7 @@ import type {
   MissionControl,
   MissionCreateInput,
   MissionDecision,
+  MissionDelivery,
   MissionEligibleAgent,
   MissionExecutor,
   MissionFiles,
@@ -491,12 +492,31 @@ export interface ApiClient {
       commandId: string,
       decision: "allow" | "deny" | "always",
     ): Promise<MissionCommand>;
-    /** "Liberar e repetir": allow a command a task was refused, and resume it. */
+    /** "Liberar e continuar": allow the commands a task was refused (one or several) and resume it once. */
     retryCommand(
       orgId: string,
       missionId: string,
-      input: { taskId: string; command: string },
+      input: { taskId: string; command?: string; commands?: string[] },
     ): Promise<{ rules: string[]; delivered: boolean }>;
+    /** Delivery cards, newest first. */
+    deliveries(orgId: string, missionId: string): Promise<MissionDelivery[]>;
+    /** "O que conferir": my own check of one item. */
+    checkDelivery(
+      orgId: string,
+      missionId: string,
+      deliveryId: string,
+      itemId: string,
+      checked: boolean,
+    ): Promise<MissionDelivery>;
+    /** "Concluir missão" (closes it as done; optionally the wiki page of decisions and lessons). */
+    acceptDelivery(
+      orgId: string,
+      missionId: string,
+      deliveryId: string,
+      input: { saveToWiki?: boolean },
+    ): Promise<Mission>;
+    /** "Pedir ajustes": the note goes to the mission's main session; the mission is active again. */
+    requestDeliveryChanges(orgId: string, missionId: string, deliveryId: string, note: string): Promise<Mission>;
     choose(orgId: string, missionId: string, decisionId: string, option: string): Promise<MissionDecision>;
     opinion(orgId: string, missionId: string, decisionId: string, option: string): Promise<MissionDecision>;
     approveProvisional(orgId: string, missionId: string): Promise<MissionDecision[]>;

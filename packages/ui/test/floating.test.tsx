@@ -31,7 +31,7 @@ describe("floating layers", () => {
     const rule = (selector: string) => components.split(`${selector} {`)[1]?.split("}")[0] ?? "";
     expect(rule(".ac-menu")).toContain("z-index: var(--z-floating)");
     expect(rule(".ac-dialog")).toContain("z-index: var(--z-dialog)");
-    expect(rule(".ac-sheet")).toContain("z-index: var(--z-dialog)");
+    expect(rule(".ac-details")).toContain("z-index: var(--z-dialog)");
     expect(await css("index.css")).toContain('@import "./layers.css"');
   });
 

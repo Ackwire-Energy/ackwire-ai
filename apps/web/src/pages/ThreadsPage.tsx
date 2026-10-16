@@ -3,6 +3,8 @@ import {
   Button,
   Checkbox,
   cx,
+  DetailsDialog,
+  DetailsSection,
   EmptyState,
   FilterBar,
   FilterChip,
@@ -31,6 +33,7 @@ import { MissionsTab } from "@/components/missions/MissionList";
 import { useOrg } from "@/components/org-context";
 import { ThreadStatusChip, useThreadControls } from "@/components/threads/ThreadBits";
 import { formatFullDate, relativeTime } from "@/lib/format";
+import { useOpenParam } from "@/lib/open-param";
 import { threadMessageCount, threadTitle } from "@/lib/threads";
 import "./threads.css";
 
@@ -63,7 +66,8 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
   const [agent, setAgent] = useState<string[]>([]);
   const [needsYou, setNeedsYou] = useState(false);
   const [mine, setMine] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
+  // The thread whose details are open, in the URL (`?open=…`).
+  const [openId, setOpenId] = useOpenParam();
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [newMission, setNewMission] = useState(false);
   const missions = tab === "missions";
@@ -93,12 +97,11 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
   // A new tab or filter starts a new selection.
   // biome-ignore lint/correctness/useExhaustiveDependencies: resets when the list's filters change
   useEffect(() => setPicked(new Set()), [tab, channel, agent, needsYou, mine, query]);
-  // Esc: the details panel first, then the selection.
+  // Esc clears the selection (the details dialog closes itself first).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || (e.target instanceof Element && e.target.closest("[role=dialog], [role=menu]"))) return;
-      if (openId) setOpenId(null);
-      else setPicked(new Set());
+      if (!openId) setPicked(new Set());
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -122,7 +125,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
   };
 
   return (
-    <div className={cx("page threads", open && "threads--panel")}>
+    <div className="page threads">
       <div className="threads__main">
         <header className="threads-head">
           <div>
@@ -276,7 +279,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
                 thread={thread}
                 open={thread.id === openId}
                 picked={picked.has(thread.id)}
-                onOpen={() => setOpenId((o) => (o === thread.id ? null : thread.id))}
+                onOpen={() => setOpenId(openId === thread.id ? null : thread.id)}
                 onGo={() => go(thread)}
                 onPick={() => toggle(thread.id)}
                 onAction={(action) => controls.request([thread], action)}
@@ -407,7 +410,7 @@ function ThreadRow({
         </span>
       )}
       <div className="thread-row__title">
-        <button type="button" className="thread-row__name" aria-expanded={open} onClick={onOpen}>
+        <button type="button" className="thread-row__name" aria-haspopup="dialog" onClick={onOpen}>
           {title}
         </button>
         <small>
@@ -448,7 +451,10 @@ function ThreadRow({
         </span>
         <span className="thread-row__state">
           {thread.mission && thread.state === "open" ? (
-            <MissionStatusChip status={missionSummaryStatusKey(thread.mission, thread.working)} />
+            <MissionStatusChip
+              status={missionSummaryStatusKey(thread.mission, thread.working)}
+              agentId={thread.mission.agentId}
+            />
           ) : (
             <ThreadStatusChip thread={thread} />
           )}
@@ -505,7 +511,7 @@ function ThreadRow({
 
 const lastActor = (a: ThreadActor) => ({ type: a.type, id: a.id ?? "" });
 
-/** The details panel (bottom sheet on a phone): state, actions, origin, participants, facts. */
+/** The details (the shared details dialog; full screen on a phone): state, actions, origin, participants, facts. */
 function ThreadDetails({
   thread,
   onClose,
@@ -535,28 +541,33 @@ function ThreadDetails({
       search: { m: ctx && !ctx.moved ? ctx.firstMessageId : thread.id },
     });
   return (
-    <aside className="thread-details" aria-label={t("threads.panel.label", { title })}>
-      <div className="thread-details__head">
-        <ThreadStatusChip thread={thread} />
-        <Button
-          size="sm"
-          variant="ghost"
-          iconOnly
-          icon="close"
-          aria-label={t("threads.panel.close")}
-          onClick={onClose}
-        />
-      </div>
-      <div>
-        <h2 className="thread-details__title">{title}</h2>
-        <p className="thread-details__facts">
+    <DetailsDialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      closeLabel={t("threads.panel.close")}
+      className="thread-details"
+      eyebrow={
+        thread.mission && thread.state === "open" ? (
+          <MissionStatusChip
+            status={missionSummaryStatusKey(thread.mission, thread.working)}
+            agentId={thread.mission.agentId}
+          />
+        ) : (
+          <ThreadStatusChip thread={thread} />
+        )
+      }
+      title={title}
+      subtitle={
+        <>
           <span>{where}</span>
           <span aria-hidden="true">·</span>
           <span>{t("threads.messages", { count: threadMessageCount(thread) })}</span>
           <span aria-hidden="true">·</span>
           <span>{relativeTime(t, i18n.language, thread.lastActivityAt)}</span>
-        </p>
-      </div>
+        </>
+      }
+      page={{ label: thread.state === "archived" ? t("threads.read") : t("threads.open"), onOpen: onGo }}
+    >
       {thread.state === "archived" && (
         <div className="thread-banner">
           <Icon name="lock" size={16} />
@@ -587,8 +598,7 @@ function ThreadDetails({
             </Button>
           ))}
       </div>
-      <section className="thread-details__section">
-        <h3>{t("threads.panel.origin")}</h3>
+      <DetailsSection title={t("threads.panel.origin")}>
         <button type="button" className="thread-where" onClick={toChannel}>
           <span className="thread-where__icon" aria-hidden="true">
             <Icon name={ctx ? "layers" : "message"} size={14} />
@@ -603,9 +613,8 @@ function ThreadDetails({
           </span>
           <Icon name="chevronRight" size={16} />
         </button>
-      </section>
-      <section className="thread-details__section">
-        <h3>{t("threads.panel.people", { count: people.length })}</h3>
+      </DetailsSection>
+      <DetailsSection title={t("threads.panel.peopleTitle")} count={people.length}>
         <ul className="thread-people">
           {people.map((p) => (
             <li key={`${p.type}:${p.id}`}>
@@ -617,8 +626,8 @@ function ThreadDetails({
             </li>
           ))}
         </ul>
-      </section>
-      <section className="thread-details__section">
+      </DetailsSection>
+      <DetailsSection>
         <dl className="thread-facts">
           <dt>{t("threads.panel.created")}</dt>
           <dd>
@@ -627,8 +636,8 @@ function ThreadDetails({
           <dt>{t("threads.panel.lives")}</dt>
           <dd>{where}</dd>
         </dl>
-      </section>
-    </aside>
+      </DetailsSection>
+    </DetailsDialog>
   );
 }
 

@@ -2050,7 +2050,8 @@ export interface ThreadStartMeta {
 
 // ── Missions (ADR 0029; apps/server/src/routes/app/missions.ts) ────────────────
 
-export type MissionStatus = "proposed" | "active" | "paused" | "done" | "canceled";
+/** `awaiting_close`: every plan item is done and nothing runs; the owner (or a decider) concludes it. */
+export type MissionStatus = "proposed" | "active" | "paused" | "awaiting_close" | "done" | "canceled";
 export type MissionRole = "owner" | "decide" | "comment" | "none";
 export type PlanItemStatus = "todo" | "doing" | "waiting_you" | "done" | "dropped";
 
@@ -2099,6 +2100,8 @@ export interface Mission {
     joinRequests: number;
     /** Command cards waiting for an answer (0 unless you can answer them). */
     commands: number;
+    /** Delivery cards waiting for you to conclude (0 unless you can answer them). */
+    deliveries?: number;
   };
   /** You asked to join and nobody answered yet. */
   joinRequested: boolean;
@@ -2421,6 +2424,35 @@ export interface MachineTaskMeta {
 }
 
 /** `meta.missionCommand`: the executor asks to run a command off its allow list (the command card). */
+/**
+ * The end of a mission (`complete_mission`, or `auto` when every plan item
+ * is done and nothing runs): what was delivered, what to check (per-person
+ * checks), Concluir missão / Pedir ajustes.
+ */
+export interface MissionDelivery {
+  id: string;
+  missionId: string;
+  taskId: string | null;
+  messageId: string | null;
+  auto: boolean;
+  summary: string;
+  artifactIds: string[];
+  paths: string[];
+  checklist: { id: string; text: string; checkedBy: string[] }[];
+  status: "pending" | "accepted" | "changes_requested" | "superseded";
+  note: string | null;
+  saveToWiki: boolean;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+/** `meta.missionDelivery` on the delivery card's message. */
+export interface MissionDeliveryMeta {
+  missionId: string;
+  id: string;
+}
+
 export interface MissionCommandMeta {
   id: string;
   missionId: string;

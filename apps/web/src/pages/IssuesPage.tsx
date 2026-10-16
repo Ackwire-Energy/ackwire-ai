@@ -44,8 +44,9 @@ import {
   useAssigneeColor,
   useStepText,
 } from "@/lib/issues";
+import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
-import { IssueDetails } from "./IssuePage";
+import { IssueDialog } from "./IssuePage";
 import "./issues.css";
 
 export { BOARD, PRIORITIES, STATUSES, splitCriteria } from "@/lib/issues";
@@ -67,7 +68,9 @@ export function IssuesPage() {
   const [q, setQ] = useState("");
   const [assignees, setAssignees] = useState<string[]>([]);
   const [priority, setPriority] = useState<string[]>([]);
-  const [openNumber, setOpenNumber] = useState<number | null>(null);
+  // The open issue lives in the URL (`?open=131`): a reload or a shared link reopens it.
+  const [openParam, setOpenParam] = useOpenParam();
+  const openNumber = openParam && /^\d+$/.test(openParam) ? Number(openParam) : null;
   const actorOptions = useActorFilterOptions();
   const copy = useFilterCopy();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -89,15 +92,14 @@ export function IssuesPage() {
   );
   const open = all.filter(isOpen);
   const opened = all.find((i) => i.number === openNumber) ?? null;
-  const toggle = (n: number) => setOpenNumber((o) => (o === n ? null : n));
-  // "N" opens "Nova issue", "/" the search, Escape closes the panel (not while typing or in a dialog).
+  const toggle = (n: number) => setOpenParam(openNumber === n ? null : n);
+  // "N" opens "Nova issue", "/" the search (not while typing or in a dialog; the details dialog closes itself on Esc).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target instanceof Element ? e.target : null;
       if (el?.closest("input, textarea, [contenteditable], [role=dialog], [role=menu], [role=listbox]")) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === "Escape") setOpenNumber(null);
-      else if (e.key.toLowerCase() === "n") {
+      if (e.key.toLowerCase() === "n") {
         e.preventDefault();
         setCreating(true);
       } else if (e.key === "/") {
@@ -109,7 +111,7 @@ export function IssuesPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   return (
-    <div className={cx("page issues", opened && "issues--panel")}>
+    <div className="page issues">
       <div className="issues__main">
         <header className="issues-head">
           <div>
@@ -269,11 +271,7 @@ export function IssuesPage() {
           <IssueList issues={visible} openNumber={openNumber} onOpen={toggle} />
         )}
       </div>
-      {opened && (
-        <section className="issues-panel" aria-label={t("issues.panelLabel", { number: opened.number })}>
-          <IssueDetails issue={opened} variant="panel" onClose={() => setOpenNumber(null)} />
-        </section>
-      )}
+      {opened && <IssueDialog issue={opened} onClose={() => setOpenParam(null)} />}
       <NewIssueDialog open={creating} onClose={() => setCreating(false)} />
     </div>
   );

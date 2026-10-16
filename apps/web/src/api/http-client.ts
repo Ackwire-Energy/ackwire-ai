@@ -49,6 +49,7 @@ import type {
   Mission,
   MissionCommand,
   MissionDecision,
+  MissionDelivery,
   MissionEligibleAgent,
   MissionFiles,
   MissionJoinRequest,
@@ -545,6 +546,16 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
           request<{ rules: string[]; delivered: boolean }>(`${one(orgId, missionId)}/commands/retry`, {
             json: input,
           }),
+        deliveries: (orgId, missionId) => request<MissionDelivery[]>(`${one(orgId, missionId)}/deliveries`),
+        checkDelivery: (orgId, missionId, deliveryId, itemId, checked) =>
+          request<MissionDelivery>(`${one(orgId, missionId)}/deliveries/${enc(deliveryId)}/checks/${enc(itemId)}`, {
+            method: "PUT",
+            json: { checked },
+          }),
+        acceptDelivery: (orgId, missionId, deliveryId, input) =>
+          request<Mission>(`${one(orgId, missionId)}/deliveries/${enc(deliveryId)}/accept`, { json: input }),
+        requestDeliveryChanges: (orgId, missionId, deliveryId, note) =>
+          request<Mission>(`${one(orgId, missionId)}/deliveries/${enc(deliveryId)}/changes`, { json: { note } }),
         choose: (orgId, missionId, decisionId, option) =>
           request<MissionDecision>(`${one(orgId, missionId)}/decisions/${enc(decisionId)}/choose`, {
             json: { option },

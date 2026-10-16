@@ -5,6 +5,7 @@ import {
   Composer,
   Convergence,
   cx,
+  DetailsDialog,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -16,7 +17,6 @@ import {
   MenuItem,
   MenuSeparator,
   roundLabelBoxes,
-  Sheet,
   StanceLane,
   Switch,
   Textarea,
@@ -371,7 +371,7 @@ function TopicView({ topic }: { topic: ForumTopicDetail }) {
       <aside className="forum-topic__side" aria-label={t(ended ? "forum.side.titleDone" : "forum.side.title")}>
         <Standing topic={topic} active={active} next={next} />
       </aside>
-      <Sheet
+      <DetailsDialog
         open={sheet}
         onOpenChange={setSheet}
         title={t(ended ? "forum.side.titleDone" : "forum.side.title")}
@@ -379,7 +379,7 @@ function TopicView({ topic }: { topic: ForumTopicDetail }) {
         className="forum-sheet"
       >
         <Standing topic={topic} active={active} next={next} bare />
-      </Sheet>
+      </DetailsDialog>
 
       <ConcludeDialog topic={topic} open={concluding} onClose={() => setConcluding(false)} active={active} />
       <Dialog

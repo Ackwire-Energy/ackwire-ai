@@ -7,6 +7,8 @@ import {
   type ComposerFormatLabels,
   CriteriaPixels,
   cx,
+  DetailsDialog,
+  DetailsSection,
   Field,
   FORMAT_KINDS,
   type FormatKind,
@@ -57,85 +59,100 @@ export function IssuePage({ number }: { number: number }) {
   );
 }
 
+/** Where an issue came from: "a partir de uma mensagem no #eng" (a link), the forum, an agent, a webhook. */
+function useIssueSource(i: Issue) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const channels = useChannels(org.id);
+  switch (i.source.type) {
+    case "message": {
+      const { channelId } = i.source;
+      const channel = channels.data?.find((c) => c.id === channelId);
+      return (
+        <Trans
+          i18nKey="issues.fromMessage"
+          values={{ channel: channel?.name ?? "" }}
+          components={[
+            <Link key="l" to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId }} className="ac-link" />,
+          ]}
+        />
+      );
+    }
+    case "forum":
+      return t("issues.fromForum");
+    case "agent":
+      return t("issues.fromAgent");
+    case "webhook":
+      return t("issues.fromWebhook", { provider: i.source.provider });
+    default:
+      return null;
+  }
+}
+
+/**
+ * An issue opened from the board or the list: the shared details dialog
+ * ("#131", the title, who made it and from where; "abrir em página própria").
+ */
+export function IssueDialog({ issue: i, onClose }: { issue: Issue; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const actors = useActors();
+  const from = useIssueSource(i);
+  return (
+    <DetailsDialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      closeLabel={t("issues.close")}
+      eyebrow={<span className="tabular">#{i.number}</span>}
+      title={i.title}
+      subtitle={
+        <span>
+          {t("issues.createdByShort", { name: actors.name(i.createdBy) })}
+          {from && <> {from}</>}
+        </span>
+      }
+      page={{
+        label: t("issues.openPage"),
+        render: (props) => (
+          <Link to="/org/$orgId/issues/$number" params={{ orgId: org.id, number: String(i.number) }} {...props} />
+        ),
+      }}
+    >
+      <IssueDetails issue={i} variant="dialog" />
+    </DetailsDialog>
+  );
+}
+
 /**
  * An issue's details (telas/Issues.html): source, status and who, the agent's
  * work (live steps, or "stalled" with "Pedir para continuar"), "Pedir a um
  * agente", description, criteria (who checked them), links and activity.
+ * The page has its own header and aside; the dialog shows the fields on top.
  */
-export function IssueDetails({
-  issue: i,
-  variant,
-  onClose,
-}: {
-  issue: Issue;
-  variant: "page" | "panel";
-  onClose?: () => void;
-}) {
+export function IssueDetails({ issue: i, variant }: { issue: Issue; variant: "page" | "dialog" }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
   const wikiLink = useWikiLinkRenderer();
   const action = useIssueAction(org.id);
-  const channels = useChannels(org.id);
   const color = useAssigneeColor();
   const done = i.criteria.filter((c) => c.done).length;
-  const source = () => {
-    switch (i.source.type) {
-      case "message": {
-        const { channelId } = i.source;
-        const channel = channels.data?.find((c) => c.id === channelId);
-        return (
-          <Trans
-            i18nKey="issues.fromMessage"
-            values={{ channel: channel?.name ?? "" }}
-            components={[
-              <Link key="l" to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId }} className="ac-link" />,
-            ]}
-          />
-        );
-      }
-      case "forum":
-        return t("issues.fromForum");
-      case "agent":
-        return t("issues.fromAgent");
-      case "webhook":
-        return t("issues.fromWebhook", { provider: i.source.provider });
-      default:
-        return null;
-    }
-  };
-  const from = source();
-  const Title = variant === "page" ? "h1" : "h2";
+  const from = useIssueSource(i);
   const main = (
     <>
-      <header className="issue-details__head">
-        {variant === "panel" && (
-          <div className="issue-details__bar">
-            <span className="tabular muted">#{i.number}</span>
-            <span className="issue-details__grow" />
-            <Link
-              to="/org/$orgId/issues/$number"
-              params={{ orgId: org.id, number: String(i.number) }}
-              className="ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon"
-              aria-label={t("issues.openPage")}
-              title={t("issues.openPage")}
-            >
-              <Icon name="external" size={16} />
-            </Link>
-            <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t("issues.close")} onClick={onClose} />
-          </div>
-        )}
-        <span className="small muted tabular">
-          {t("issues.createdBy", { number: i.number, name: actors.name(i.createdBy) })}
-          {from && <> {from}</>}
-        </span>
-        <Title className="issue-details__title">{i.title}</Title>
-      </header>
-      {variant === "panel" && <Details issue={i} />}
+      {variant === "page" && (
+        <header className="issue-details__head">
+          <span className="small muted tabular">
+            {t("issues.createdBy", { number: i.number, name: actors.name(i.createdBy) })}
+            {from && <> {from}</>}
+          </span>
+          <h1 className="issue-details__title">{i.title}</h1>
+        </header>
+      )}
+      {variant === "dialog" && <Details issue={i} />}
       <WorkBox issue={i} />
       {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
-      <section aria-label={t("issues.description")} className="issue-details__section">
-        <h3 className="ac-eyebrow">{t("issues.description")}</h3>
+      <DetailsSection title={t("issues.description")}>
         {i.description ? (
           <div className="issue-description">
             <Markdown source={i.description} variant="message" wikiLink={wikiLink} />
@@ -143,16 +160,17 @@ export function IssueDetails({
         ) : (
           <p className="small muted">{t("issues.noDescription")}</p>
         )}
-      </section>
-      <section aria-label={t("issues.criteria")} className="issue-details__section">
-        <h3 className="ac-eyebrow issue-details__row">
-          {t("issues.criteria")}
-          {i.criteria.length > 0 && (
+      </DetailsSection>
+      <DetailsSection
+        title={t("issues.criteria")}
+        actions={
+          i.criteria.length > 0 ? (
             <span className="issue-details__count tabular">
               {t("issues.criteriaCount", { done, total: i.criteria.length })}
             </span>
-          )}
-        </h3>
+          ) : undefined
+        }
+      >
         {i.criteria.length === 0 && <p className="small muted">{t("issues.noCriteria")}</p>}
         {i.criteria.length > 0 && <CriteriaPixels done={i.criteria.map((c) => c.done)} color={color(i)} />}
         {i.criteria.map((c) => (
@@ -171,13 +189,17 @@ export function IssueDetails({
             )}
           </div>
         ))}
-      </section>
+      </DetailsSection>
       <IssueForum issue={i} />
-      {variant === "panel" && <Links issue={i} />}
+      {variant === "dialog" && (
+        <DetailsSection title={t("issues.links")}>
+          <Links issue={i} bare />
+        </DetailsSection>
+      )}
       <Activity issue={i} />
     </>
   );
-  if (variant === "panel") return <div className="issue-details issue-details--panel">{main}</div>;
+  if (variant === "dialog") return main;
   return (
     <div className="issue-layout">
       <div className="issue-details issue-layout__main">{main}</div>
@@ -210,10 +232,9 @@ function IssueForum({ issue: i }: { issue: Issue }) {
   const going = topics.some((x) => x.status === "open" || x.status === "stalled");
   if (subs.length === 0 && topics.length === 0 && !isOpen(i)) return null;
   return (
-    <section aria-label={t("forum.issue.section")} className="issue-details__section">
+    <>
       {subs.length > 0 && (
-        <>
-          <h3 className="ac-eyebrow">{t("forum.issue.subIssues", { count: subs.length })}</h3>
+        <DetailsSection title={t("forum.issue.subIssues", { count: subs.length })}>
           <ul className="forum-subl">
             {subs.map((s) => (
               <li key={s.id}>
@@ -231,24 +252,28 @@ function IssueForum({ issue: i }: { issue: Issue }) {
               </li>
             ))}
           </ul>
-        </>
+        </DetailsSection>
       )}
-      {topics.map((x) => (
-        <IssueForumCard key={x.id} topicId={x.id} />
-      ))}
-      {isOpen(i) && !going && (
-        <div className="forum-evaluate">
-          <span className="forum-evaluate__t">
-            <b>
-              <Icon name="message" size={16} />
-              {t("forum.issue.evaluateTitle")}
-            </b>
-            <small>{t("forum.issue.evaluateText")}</small>
-          </span>
-          <Button size="sm" variant="primary" icon="message" onClick={() => setEvaluating(true)}>
-            {t("forum.issue.evaluate")}
-          </Button>
-        </div>
+      {(topics.length > 0 || (isOpen(i) && !going)) && (
+        <DetailsSection title={t("forum.issue.section")}>
+          {topics.map((x) => (
+            <IssueForumCard key={x.id} topicId={x.id} />
+          ))}
+          {isOpen(i) && !going && (
+            <div className="forum-evaluate">
+              <span className="forum-evaluate__t">
+                <b>
+                  <Icon name="message" size={16} />
+                  {t("forum.issue.evaluateTitle")}
+                </b>
+                <small>{t("forum.issue.evaluateText")}</small>
+              </span>
+              <Button size="sm" variant="primary" icon="message" onClick={() => setEvaluating(true)}>
+                {t("forum.issue.evaluate")}
+              </Button>
+            </div>
+          )}
+        </DetailsSection>
       )}
       <NewTopicDialog
         open={evaluating}
@@ -265,7 +290,7 @@ function IssueForum({ issue: i }: { issue: Issue }) {
           heading: "fromIssue",
         }}
       />
-    </section>
+    </>
   );
 }
 
@@ -459,8 +484,7 @@ function Activity({ issue }: { issue: Issue }) {
   };
   const list = activity.data ?? [];
   return (
-    <section aria-label={t("issues.activity")} className="issue-details__section">
-      <h3 className="ac-eyebrow">{t("issues.activity")}</h3>
+    <DetailsSection title={t("issues.activity")}>
       {activity.isSuccess && list.length === 0 && <p className="small muted">{t("issues.noActivity")}</p>}
       {list.map((a) =>
         a.kind === "event" ? (
@@ -549,7 +573,7 @@ function Activity({ issue }: { issue: Issue }) {
           );
         }}
       />
-    </section>
+    </DetailsSection>
   );
 }
 
@@ -613,14 +637,15 @@ function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
   );
 }
 
-function Links({ issue: i }: { issue: Issue }) {
+/** Pull requests, files and labels. `bare`: inside a section that already says "Links". */
+function Links({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
   const { t } = useTranslation();
   const actors = useActors();
   const viewer = useArtifactViewer();
   return (
     <>
       <div className="issue-aside__item">
-        <span className="ac-field__label">{t("issues.links")}</span>
+        {!bare && <span className="ac-field__label">{t("issues.links")}</span>}
         {i.pullRequests.length + i.artifacts.length === 0 && <span className="small muted">{t("issues.noLinks")}</span>}
         {i.pullRequests.map((pr) => (
           <a key={pr.number} href={pr.url} target="_blank" rel="noopener noreferrer" className="issue-link">

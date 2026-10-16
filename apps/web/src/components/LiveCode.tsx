@@ -228,12 +228,12 @@ function LiveCallBlock({ call }: { call: Extract<LiveWork, { kind: "call" }> }) 
     <div className="live-call" data-running={call.running || undefined}>
       {hasDetail ? (
         <button type="button" className="live-call__head" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {call.running ? <Spinner size={12} /> : <Icon name="code" size={14} />}
+          {call.running ? <Spinner size={14} /> : <Icon name="code" size={14} />}
           <span>{label}</span>
         </button>
       ) : (
         <p className="live-call__head live-call__head--static">
-          {call.running ? <Spinner size={12} /> : <Icon name="check" size={14} />}
+          {call.running ? <Spinner size={14} /> : <Icon name="check" size={14} />}
           <span>{label}</span>
         </p>
       )}

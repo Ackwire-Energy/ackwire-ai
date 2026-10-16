@@ -1,8 +1,11 @@
-import { Button, Chip, Icon, Skeleton } from "@agenteschat/ui";
+import { Button, Checkbox, Chip, DetailsDialog, DetailsSection, Icon, Skeleton } from "@agenteschat/ui";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { ApiError } from "@/api/http";
 import { useMission, useMissionAct, useMissionCommands } from "@/api/missions";
 import type { MissionCommandMeta } from "@/api/types";
+import { AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { errorText } from "@/lib/errors";
@@ -104,10 +107,26 @@ export const ruleText = (rule: string) => {
   return d ? (d[1] ?? rule) : rule;
 };
 
+/** What a refused command reads as: the shell line, or the tool and its target ("Read …/notes.md"). */
+const blockedText = (d: { tool: string; command: string }) =>
+  d.tool === "Bash" || !d.tool ? d.command : `${d.tool} ${d.command}`;
+
+/** "python3", "zsh", "cd", "Read": the group a refused command goes in. */
+export function blockedGroup(d: { tool: string; command: string }) {
+  if (d.tool && d.tool !== "Bash") return d.tool;
+  return d.command.trim().split(/\s+/)[0]?.split("/").pop() || d.command.slice(0, 16);
+}
+
+/** Released here, per task: the line keeps saying so while the session resumes (no stale "Ver"). */
+const releasedTasks = new Map<string, { count: number; delivered: boolean }>();
+
 /**
- * Under a task's end notice: the commands it was refused with nobody to ask
- * ("Bloqueado: `swift build`"); "Liberar e repetir" allows it for the
- * mission and resumes the session to try again (owner or deciders).
+ * Under a task's end notice: the commands it was refused with nobody to ask,
+ * as ONE line ("4 comandos bloqueados · Ver"); the shared details dialog
+ * lists them grouped by their first word ("python3 (2)", "zsh", "Read"),
+ * each cut to two lines and checkable, with one action: "Liberar
+ * selecionados e continuar" (the owner or deciders; the rules are added and
+ * the session resumes once). Never a raw multi-line command in the thread.
  */
 export function BlockedCommands({
   missionId,
@@ -123,40 +142,168 @@ export function BlockedCommands({
   const api = useApi();
   const toast = useToast();
   const mission = useMission(org.id, missionId);
-  const retry = useMissionAct(org.id, missionId, (command: string) =>
-    api.missions.retryCommand(org.id, missionId, { taskId, command }),
+  const [open, setOpen] = useState(false);
+  const [released, setReleased] = useState(() => releasedTasks.get(taskId) ?? null);
+  const [picked, setPicked] = useState<Set<number>>(() => new Set(blocked.map((_, i) => i)));
+  const [error, setError] = useState<string | null>(null);
+  const retry = useMissionAct(org.id, missionId, (commands: string[]) =>
+    api.missions.retryCommand(org.id, missionId, { taskId, commands }),
   );
-  const canAct = Boolean(mission.data?.canAct && mission.data.status === "active");
+  const m = mission.data;
+  const status = m?.status;
+  const closed = status === "done" || status === "canceled";
+  // Why it can't continue now, said before anyone clicks.
+  const why = !m
+    ? null
+    : !m.canAct
+      ? t("missions.command.onlyDeciders")
+      : status === "paused"
+        ? t("missions.command.releasePaused")
+        : closed
+          ? t("missions.command.releaseClosed")
+          : null;
+  const groups = new Map<string, number[]>();
+  blocked.forEach((d, i) => {
+    const key = blockedGroup(d);
+    groups.set(key, [...(groups.get(key) ?? []), i]);
+  });
+  const release = () => {
+    const commands = [...picked].sort((a, b) => a - b).flatMap((i) => (blocked[i] ? [blocked[i].command] : []));
+    if (commands.length === 0) return;
+    setError(null);
+    retry.mutate(commands, {
+      onSuccess: (out) => {
+        const done = { count: commands.length, delivered: out.delivered };
+        releasedTasks.set(taskId, done);
+        setReleased(done);
+        setOpen(false);
+      },
+      onError: (e) => {
+        const code = e instanceof ApiError ? e.code : "";
+        const text =
+          code === "mission.paused"
+            ? t("missions.command.releasePaused")
+            : code === "mission.closed"
+              ? t("missions.command.releaseClosed")
+              : errorText(t, e);
+        setError(text);
+        toast.show(text, "error");
+      },
+    });
+  };
+  if (released) {
+    return (
+      <span className="mi-cmd-blocked" role="status">
+        {released.delivered ? <AgentSpinner agentId={m?.agentId} /> : <Icon name="check" size={14} />}
+        <span>
+          {released.delivered
+            ? t("missions.command.releasedResuming", { count: released.count })
+            : t("missions.command.releasedQueued", { count: released.count })}
+        </span>
+      </span>
+    );
+  }
   return (
-    <ul className="mi-cmd-blocked" aria-label={t("missions.command.blockedLabel")}>
-      {blocked.map((d) => (
-        <li key={`${d.tool}:${d.command}`}>
-          <Icon name="lock" size={14} />
-          <span className="mi-cmd-blocked__t">
-            {t("missions.command.blocked")} <code className="mi-mono">{d.command}</code>
-          </span>
-          {canAct && (
-            <Button
-              size="sm"
-              icon="refresh"
-              loading={retry.isPending && retry.variables === d.command}
-              disabled={retry.isPending}
-              onClick={() =>
-                retry.mutate(d.command, {
-                  onSuccess: (out) =>
-                    toast.show(
-                      out.delivered ? t("missions.command.retried") : t("missions.command.retryQueued"),
-                      "info",
-                    ),
-                  onError: (e) => toast.show(errorText(t, e), "error"),
-                })
-              }
+    <span className="mi-cmd-blocked">
+      <Icon name="lock" size={14} />
+      <span>{t("missions.command.blockedCount", { count: blocked.length })}</span>
+      <span aria-hidden="true">·</span>
+      <button type="button" className="mi-link" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        {t("missions.command.see")}
+      </button>
+      {open && (
+        <DetailsDialog
+          open
+          onOpenChange={setOpen}
+          closeLabel={t("common.close")}
+          eyebrow={m?.title}
+          title={t("missions.command.blockedTitle", { count: blocked.length })}
+          subtitle={<span>{t("missions.command.blockedText")}</span>}
+          footer={
+            <>
+              {(why || error) && <span className="mi-cmd-why">{error ?? why}</span>}
+              <Button
+                variant="primary"
+                icon="refresh"
+                loading={retry.isPending}
+                disabled={Boolean(why) || picked.size === 0 || retry.isPending}
+                onClick={release}
+              >
+                {retry.isPending ? t("missions.command.releasing") : t("missions.command.release")}
+              </Button>
+            </>
+          }
+        >
+          {[...groups.entries()].map(([key, indexes]) => (
+            <DetailsSection
+              key={key}
+              title={<code className="mi-mono">{key}</code>}
+              label={key}
+              count={indexes.length > 1 ? indexes.length : undefined}
             >
-              {t("missions.command.retry")}
-            </Button>
-          )}
-        </li>
-      ))}
-    </ul>
+              <ul className="mi-cmd-list" aria-label={key}>
+                {indexes.map((i) => {
+                  const d = blocked[i];
+                  if (!d) return null;
+                  return (
+                    <BlockedRow
+                      key={i}
+                      text={blockedText(d)}
+                      checked={picked.has(i)}
+                      disabled={Boolean(why)}
+                      onChange={(on) =>
+                        setPicked((prev) => {
+                          const next = new Set(prev);
+                          if (on) next.add(i);
+                          else next.delete(i);
+                          return next;
+                        })
+                      }
+                    />
+                  );
+                })}
+              </ul>
+            </DetailsSection>
+          ))}
+        </DetailsDialog>
+      )}
+    </span>
+  );
+}
+
+/** One refused command: a checkbox and the command cut to two lines ("Mostrar tudo" opens it). */
+function BlockedRow({
+  text,
+  checked,
+  disabled,
+  onChange,
+}: {
+  text: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const [all, setAll] = useState(false);
+  const long = text.length > 140 || text.includes("\n");
+  return (
+    <li className="mi-cmd-item">
+      <Checkbox
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={(v) => onChange(v === true)}
+        aria-label={t("missions.command.pick", { command: text.slice(0, 80) })}
+      />
+      <span className="mi-cmd-item__t">
+        <code className="mi-cmd-item__code" data-all={all || undefined}>
+          {text}
+        </code>
+        {long && (
+          <button type="button" className="mi-link" aria-expanded={all} onClick={() => setAll((v) => !v)}>
+            {all ? t("missions.sessions.less") : t("missions.command.showAll")}
+          </button>
+        )}
+      </span>
+    </li>
   );
 }

@@ -11,10 +11,6 @@
   gap: 0 20px;
   padding-bottom: 96px;
 }
-.routines--panel {
-  max-width: 1540px;
-  grid-template-columns: minmax(0, 1fr) 400px;
-}
 .routines__main {
   min-width: 0;
   display: flex;
@@ -400,54 +396,7 @@
   opacity: 0.5;
 }
 
-/* ── Details panel ──────────────────────────────────────────────────────── */
-.routine-details {
-  position: sticky;
-  top: 16px;
-  max-height: calc(100vh - 32px);
-  /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
-  max-height: calc(100dvh - 32px);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 16px;
-  border-radius: var(--radius-section);
-  background: var(--raised);
-  box-shadow: var(--e2), var(--top);
-  animation: routine-slide 0.32s var(--spring) both;
-}
-@keyframes routine-slide {
-  from {
-    opacity: 0;
-    transform: translateX(14px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.routine-details__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.routine-details__title {
-  margin: 0;
-  font-size: 19px;
-  font-weight: 650;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-  overflow-wrap: anywhere;
-}
-.routine-details__facts {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--muted);
-}
+/* ── Details (in the shared details dialog) ─────────────────────────────── */
 .routine-details__actions {
   display: flex;
   flex-wrap: wrap;
@@ -456,17 +405,7 @@
 .routine-details__actions > .ac-btn {
   flex: 1 1 auto;
 }
-.routine-details__section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-}
-.routine-details__section h3 {
-  margin: 0;
-}
-.routine-details__section p {
+.routine-details .ac-details__section p {
   margin: 0;
 }
 .routine-details__prompt {
@@ -697,21 +636,6 @@
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 1280px) {
-  .routines--panel {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .routine-details {
-    position: fixed;
-    z-index: 30;
-    top: 12px;
-    right: 12px;
-    bottom: 12px;
-    width: min(420px, calc(100vw - 24px));
-    max-height: none;
-    box-shadow: var(--e3);
-  }
-}
 @media (max-width: 980px) {
   .routine-row {
     grid-template-columns: 36px minmax(0, 1fr) minmax(0, 200px) auto;
@@ -753,14 +677,5 @@
   }
   .routine-presets__list {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .routine-details {
-    top: auto;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: auto;
-    max-height: 88vh;
-    border-radius: 22px 22px 0 0;
   }
 }
