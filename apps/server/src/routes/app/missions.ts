@@ -27,6 +27,7 @@ import {
   requestToJoin,
   resumeMission,
   sendMissionMessage,
+  setMissionExecutor,
   setMissionMachine,
   setParticipant,
   startMission,
@@ -48,6 +49,9 @@ import {
 
 const tags = ["Missions"];
 const Status = z.enum(["proposed", "active", "paused", "done", "canceled"]);
+const Executor = z
+  .enum(["claude", "codex", "agent"])
+  .openapi({ description: "Who programs: Claude Code, Codex (experimental) or the agent itself with its own tools." });
 const Role = z.enum(["owner", "decide", "comment", "none"]);
 const PlanItem = z.object({
   id: z.string(),
@@ -89,7 +93,14 @@ const Mission = z
     joinRequested: z.boolean().openapi({ description: "You asked to join and nobody answered yet." }),
     runningTasks: z.number(),
     machine: z
-      .object({ id: z.uuid(), name: z.string(), online: z.boolean(), lentBy: z.string().nullable() })
+      .object({
+        id: z.uuid(),
+        name: z.string(),
+        online: z.boolean(),
+        lentBy: z.string().nullable(),
+        executors: z.array(Executor).openapi({ description: "Who can program on that computer." }),
+        codexTooOld: z.boolean(),
+      })
       .nullable(),
     needsComputer: z.boolean().openapi({ description: "Handed over without a computer: the owner sets one." }),
     role: Role.openapi({ description: "Your role in it." }),
@@ -204,6 +215,9 @@ const EligibleAgent = z
     name: z.string(),
     machine: z.object({ id: z.uuid(), name: z.string(), online: z.boolean() }),
     ready: z.boolean(),
+    executors: z.array(Executor).openapi({ description: 'Who can program on its computer ("Quem programa").' }),
+    defaultExecutor: Executor,
+    codexTooOld: z.boolean().openapi({ description: "Codex is installed but too old for missions." }),
   })
   .openapi("MissionEligibleAgent");
 
@@ -301,6 +315,9 @@ export function missionRoutes(deps: AppDeps) {
             threadId: z.uuid().optional().openapi({ description: "Or the thread that becomes its home." }),
             folder: z.string().max(300).optional().openapi({
               description: "The repository on the computer, relative to the agent's folder.",
+            }),
+            executor: Executor.optional().openapi({
+              description: "Default: Claude Code when the computer has it, else the agent itself.",
             }),
           }),
         ),
@@ -663,6 +680,29 @@ export function missionRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, missionId } = c.req.valid("param");
       return c.json(await setMissionMachine(missions(), c.get("user").id, orgId, missionId, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/missions/{missionId}/executor",
+      tags,
+      security,
+      summary: "Before Start, its owner switches who programs (the planning starts again with it)",
+      request: { params: MissionParams, body: body(z.object({ executor: Executor })) },
+      responses: { 200: json(Mission), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      const view = await setMissionExecutor(
+        missions(),
+        c.get("user").id,
+        orgId,
+        missionId,
+        c.req.valid("json").executor,
+      );
+      return c.json(after(view), 200);
     },
   );
 

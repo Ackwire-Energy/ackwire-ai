@@ -15,7 +15,7 @@ const RUNNER = {
 };
 
 /** A connected runner on the test server's hub that starts and cancels tasks. */
-function fakeRunner() {
+function fakeRunner(extra: Record<string, unknown> = {}) {
   const hub = t.engine.machineHub;
   const started: Extract<ServerFrame, { type: "request"; op: "task.start" }>[] = [];
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
@@ -45,7 +45,8 @@ function fakeRunner() {
   });
   return {
     started,
-    hello: (token: string) => hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true })),
+    hello: (token: string) =>
+      hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true, ...extra })),
   };
 }
 
@@ -193,4 +194,59 @@ test("missions API: session and same origin; create, read, start (owner only), l
   expect(closed.status).toBe(200);
   expect(((await closed.json()) as Mission).status).toBe("canceled");
   expect((await api(`/missions/${mission.id}/resume`, { json: {} })).status).toBe(409);
+});
+
+test("missions API: who programs: eligible agents list it, POST takes it, the owner switches it before Start", async () => {
+  t = await createTestServer({ reply: () => ({ chunks: ["ok"] }) });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const pairing = (await (await api("/machines/pairings", { json: { name: "MacBook" } })).json()) as { code: string };
+  const paired = (await (
+    await t.app.request("/api/machines/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
+      body: JSON.stringify({ code: pairing.code, ...RUNNER, exec: true }),
+    })
+  ).json()) as { machineId: string; token: string };
+  await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: paired.machineId } });
+  // The runner found Claude Code on the machine.
+  const runner = fakeRunner({ executors: { claude: { version: "2.1.300 (Claude Code)" } } });
+  await runner.hello(paired.token);
+
+  const eligible = (await (await api("/missions/eligible-agents")).json()) as {
+    agents: { executors: string[]; defaultExecutor: string; codexTooOld: boolean }[];
+  };
+  expect(eligible.agents[0]).toMatchObject({
+    executors: ["claude", "agent"],
+    defaultExecutor: "claude",
+    codexTooOld: false,
+  });
+
+  const bad = await api("/missions", { json: { agentId, channelId, goal: "Build it", executor: "codex" } });
+  expect(bad.status).toBe(409);
+  expect(((await bad.json()) as { error: { code: string } }).error.code).toBe("mission.executor_unavailable");
+
+  const created = await api("/missions", { json: { agentId, channelId, goal: "Build it", executor: "agent" } });
+  expect(created.status).toBe(201);
+  const mission = (await created.json()) as Mission & {
+    executor: string;
+    machine: { executors: string[] };
+  };
+  expect(mission.executor).toBe("agent");
+  expect(mission.machine.executors).toEqual(["claude", "agent"]);
+  // The agent plans it itself: no executor session on the machine.
+  expect(runner.started).toHaveLength(0);
+
+  const switched = await api(`/missions/${mission.id}/executor`, { method: "PUT", json: { executor: "claude" } });
+  expect(switched.status).toBe(200);
+  expect(((await switched.json()) as { executor: string }).executor).toBe("claude");
+  expect(runner.started).toHaveLength(1);
+  expect(runner.started[0]?.mission).toMatchObject({ id: mission.id, mode: "plan" });
+
+  await api(`/missions/${mission.id}/start`, { json: {} });
+  const late = await api(`/missions/${mission.id}/executor`, { method: "PUT", json: { executor: "agent" } });
+  expect(late.status).toBe(409);
 });
