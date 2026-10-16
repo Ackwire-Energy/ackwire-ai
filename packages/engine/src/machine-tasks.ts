@@ -202,7 +202,7 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
     .returning();
   if (!row) throw new Error("machine_tasks insert returned nothing");
   try {
-    const started = await deps.call(input.machineId, {
+    const started = await deps.call<"task.start">(input.machineId, {
       agent: input.agent,
       op: "task.start",
       taskId: row.id,

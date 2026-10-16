@@ -1179,7 +1179,7 @@ export function createSandboxToolSource(
           const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
           let reply: { canceled: boolean } | null = null;
           try {
-            reply = await hubOf().call(row.machineId, {
+            reply = await hubOf().call<"task.cancel">(row.machineId, {
               agent: { id: ctx.agentId, handle: agent?.handle ?? "agent" },
               op: "task.cancel",
               taskId: row.id,
