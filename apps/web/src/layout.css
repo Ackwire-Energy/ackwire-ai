@@ -392,14 +392,8 @@ p {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.sidebar__user-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
 .sidebar__user-name {
+  flex: 1;
   font-size: 14px;
   font-weight: 600;
   min-width: 0;
@@ -407,48 +401,10 @@ p {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The workspace's budget use: a thin bar and the percentage (never money). */
-.sidebar__usage {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.sidebar__usage-track {
-  flex: 1;
-  height: 4px;
-  border-radius: var(--radius-full);
-  background: var(--surface-sunken);
-  overflow: hidden;
-}
-.sidebar__usage-bar {
-  display: block;
-  height: 100%;
-  min-width: 2px;
-  border-radius: var(--radius-full);
-  background: var(--ink-muted);
-  transition: width 0.4s ease;
-}
-.sidebar__usage[data-level="high"] .sidebar__usage-bar {
-  background: var(--warn);
-}
-.sidebar__usage[data-level="full"] .sidebar__usage-bar {
-  background: var(--danger);
-}
-.sidebar__usage-value {
-  font-size: 11px;
+.sidebar__user-spend {
+  font-size: 12px;
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
-}
-.sidebar__usage[data-level="high"] .sidebar__usage-value {
-  color: var(--warn);
-}
-.sidebar__usage[data-level="full"] .sidebar__usage-value {
-  color: var(--danger);
-}
-@media (prefers-reduced-motion: reduce) {
-  .sidebar__usage-bar {
-    transition: none;
-  }
 }
 
 /* Page container (telas/Aprovacoes, Agente, Membros, NovoAgente) */
@@ -5034,7 +4990,8 @@ button.live-call__head:hover {
   .sidebar__org-button > .ac-icon,
   .sidebar__jump .ac-kbd,
   .sidebar__item-meta,
-  .sidebar__user-text,
+  .sidebar__user-name,
+  .sidebar__user-spend,
   .sidebar__label-row .ac-btn {
     display: none;
   }
@@ -6270,22 +6227,5 @@ button.live-call__head:hover {
   }
   .onb__body {
     padding-top: 24px;
-  }
-}
-
-/* Settings → Usage: one agent's spend against its budget (admins only). */
-.usage-agent__meter {
-  flex: 0 0 160px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.usage-agent__meter .ac-meter {
-  flex: 1;
-  height: 6px;
-}
-@media (max-width: 640px) {
-  .usage-agent__meter {
-    flex-basis: 96px;
   }
 }
