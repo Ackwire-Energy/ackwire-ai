@@ -2941,8 +2941,9 @@ a.ac-list__row:focus-visible {
 .ac-msg:hover {
   background: var(--plate-soft);
 }
+/* Solid, and lifted above the author line: it may cover the tail of the message above, never this one's text. */
 .ac-msg__actions {
-  top: -14px;
+  top: -28px;
   right: 12px;
   z-index: var(--z-sticky);
   border: 0;
@@ -2950,13 +2951,6 @@ a.ac-list__row:focus-visible {
   background: var(--glass-solid);
   box-shadow: var(--e2), var(--top);
   transition: opacity 0.15s var(--out);
-}
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .ac-msg__actions {
-    background: var(--glass);
-    -webkit-backdrop-filter: blur(18px) saturate(1.6);
-    backdrop-filter: blur(18px) saturate(1.6);
-  }
 }
 /* The row being hovered stays above its neighbours, so its bar is never under the next row. */
 .ac-msg:hover,
@@ -4071,7 +4065,7 @@ a.ac-list__row:focus-visible {
     outline: none;
   }
   .ac-msg__actions {
-    top: -20px;
+    top: -36px;
     right: 8px;
   }
   /* The time's details: on a tap of the time, not only on hover. */

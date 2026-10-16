@@ -552,7 +552,8 @@ p {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 16px 8px 8px;
+  /* Room between the last message and the composer. */
+  padding: 16px 8px 28px;
 }
 .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
   margin-top: var(--space-2);

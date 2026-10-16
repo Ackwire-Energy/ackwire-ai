@@ -147,7 +147,7 @@
     white-space: nowrap;
   }
   .channel__messages {
-    padding: 12px 0 8px;
+    padding: 12px 0 20px;
   }
   .channel__messages .ac-msg {
     gap: 10px;
