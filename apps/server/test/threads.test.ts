@@ -3,7 +3,7 @@ import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./h
 
 let t: TestServer;
 beforeEach(async () => {
-  t = await createTestServer({ reply: () => ({ chunks: ["ok"] }) });
+  t = await createTestServer({ env: { ALLOW_SIGNUP: "true" }, reply: () => ({ chunks: ["ok"] }) });
 });
 afterEach(() => t.close());
 

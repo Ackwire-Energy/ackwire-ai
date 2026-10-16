@@ -1,17 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import {
-  and,
-  type Database,
-  desc,
-  type Executor,
-  eq,
-  inArray,
-  isNull,
-  ne,
-  rowsOf,
-  schema,
-  sql,
-} from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, isNull, ne, rowsOf, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { type Channel, requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -242,10 +230,7 @@ async function resolveRange(
           .from(messages)
           .where(and(inRange, inArray(messages.id, wanted)))
       : Promise.resolve([] as { id: string }[]),
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(messages)
-      .where(inRange),
+    db.select({ n: sql<number>`count(*)::int` }).from(messages).where(inRange),
   ]);
   const excluded = excludedRows.map((r) => r.id);
   const count = Number(total?.n ?? 0) - excluded.length;
@@ -564,10 +549,7 @@ export async function moveContextIntoThread(
   }
   if (row.state === "archived") throw new ConflictError("This thread is archived", "thread.archived");
   if (row.contextChannelId !== root.channelId) {
-    throw new ValidationError(
-      "Only messages of this thread's channel can move into it",
-      "thread.move_other_channel",
-    );
+    throw new ValidationError("Only messages of this thread's channel can move into it", "thread.move_other_channel");
   }
   if (row.contextMoved) return getThread(db, actorId, orgId, rootId);
   const nested = rowsOf<{ id: string }>(

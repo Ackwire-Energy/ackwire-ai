@@ -136,9 +136,7 @@ export const messages = pgTable(
     index().on(t.channelId, t.createdAt),
     index().on(t.threadId, t.createdAt),
     // The Threads page: replies grouped by thread within the channels a person sees.
-    index()
-      .on(t.channelId, t.threadId, t.createdAt)
-      .where(sql`${t.threadId} is not null`),
+    index().on(t.channelId, t.threadId, t.createdAt).where(sql`${t.threadId} is not null`),
     check(
       "messages_author",
       sql`(${t.authorType} = 'person' and ${t.authorAgentId} is null) or (${t.authorType} = 'agent' and ${t.authorUserId} is null)`,

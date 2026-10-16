@@ -115,7 +115,7 @@ export function threadRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/channels/{channelId}/threads",
       tags,
       security,
-      summary: "A channel's threads (its \"Threads (N)\")",
+      summary: 'A channel\'s threads (its "Threads (N)")',
       request: { params: ChannelParams, query: ListQuery },
       responses: { 200: json(ThreadList), ...errors },
     }),
@@ -182,7 +182,7 @@ export function threadRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/threads/{threadId}",
       tags,
       security,
-      summary: "Rename a thread or change its range (\"Ajustar trecho\")",
+      summary: 'Rename a thread or change its range ("Ajustar trecho")',
       request: {
         params: ThreadParams,
         body: body(
