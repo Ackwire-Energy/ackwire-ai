@@ -1425,6 +1425,58 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--focus-ring);
 }
 
+/* A neutral clickable row for side lists (ListRow): lead, title, meta. */
+.ac-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-item);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ac-row:hover {
+  background: var(--plate-soft);
+}
+.ac-row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-row__lead {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  color: var(--muted);
+}
+.ac-row__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 1px;
+}
+.ac-row__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ac-row__meta {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* Empty state (from telas/Aprovacoes) */
 .ac-empty {
   padding: 40px 24px;
@@ -4653,6 +4705,7 @@ a.ac-list__row:focus-visible {
 
 /* Routine runs in pixels (RunPixels.tsx): 2px cells, never smoothed. */
 .ac-run-strip,
+.ac-run-mark,
 .ac-run-key {
   display: block;
   image-rendering: pixelated;

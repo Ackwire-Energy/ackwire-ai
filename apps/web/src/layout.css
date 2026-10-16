@@ -4685,19 +4685,73 @@ button.live-call__head:hover {
   height: 6px;
   cursor: ns-resize;
 }
-/* A routine run is a moment: one compact line at its time. */
-.cal-chip--block[data-kind="routine"] {
+/* Single routine runs: pixel marks at their time (RunMarks), on the column's right edge */
+.cal-marks {
+  position: absolute;
+  right: 3px;
+  z-index: 2;
+  display: inline-flex;
   align-items: center;
-  padding: 0 6px 0 9px;
+  gap: 2px;
+  height: 12px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
 }
-.cal-chip--block[data-kind="routine"] .cal-chip__text {
-  flex-direction: row;
-  align-items: baseline;
-  gap: 6px;
+.cal-marks:hover,
+.cal-marks[aria-pressed="true"] {
+  background: var(--plate-soft);
 }
-.cal-chip--block[data-kind="routine"] .cal-chip__avatar,
-.cal-chip--block[data-kind="routine"] .cal-chip__repeat {
-  margin-top: 0;
+.cal-marks:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.cal-marks__more {
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+}
+.cal-runs {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cal-runs__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.cal-runs__avatar {
+  flex: none;
+  margin-top: 1px;
+}
+.cal-runs__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.cal-runs__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.cal-runs__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 2px;
 }
 
 /* Routines that run often: one lane each, as on the Rotinas horizon */
@@ -4751,9 +4805,9 @@ button.live-call__head:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
 }
 .cal-band:hover .cal-band__label b {
   color: var(--ink);
@@ -5044,35 +5098,6 @@ button.live-call__head:hover {
   flex-direction: column;
   gap: 2px;
 }
-.cal-upcoming__item {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  width: 100%;
-  padding: 6px 8px 6px 11px;
-  border: 0;
-  border-radius: var(--radius-item);
-  background: transparent;
-  box-shadow: inset 3px 0 0 var(--line2);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.cal-upcoming__item[data-source="agent"] {
-  box-shadow: inset 3px 0 0 var(--agent);
-}
-.cal-upcoming__item:hover {
-  background: var(--plate-soft);
-}
-.cal-upcoming__title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Series prompt and the event form */
 .cal-series {
   display: flex;

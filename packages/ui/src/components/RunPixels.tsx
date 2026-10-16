@@ -260,6 +260,51 @@ export function RunLane({
   return <canvas ref={ref} className={cx("ac-run-lane", className)} />;
 }
 
+/**
+ * One routine run as a single pixel mark (4×4 cells, 8px): dithered in the
+ * agent's own tones when it went fine, the danger tone when it failed, a
+ * pale square when it said nothing new or is still to come. Decorative: the
+ * caller gives the words (a button's `aria-label`).
+ */
+export function RunMark({
+  color = "sky",
+  status = "next",
+  className,
+}: {
+  color?: AgentColor;
+  status?: RunPixelStatus | "next";
+  className?: string;
+}) {
+  const N = 4;
+  const ref = useCanvas((ctx, canvas) => {
+    const p = paletteFor(canvas, color);
+    const tones = bodyTones(color);
+    const next = [p.future, tones[4] ?? p.future];
+    const pal =
+      status === "ok"
+        ? p.ok
+        : status === "failed"
+          ? p.failed
+          : status === "skipped"
+            ? p.skipped
+            : status === "silent"
+              ? p.silent
+              : next;
+    ctx.clearRect(0, 0, N, N);
+    column(ctx, 0, N, N, N - 1, pal);
+  }, false);
+  return (
+    <canvas
+      ref={ref}
+      className={cx("ac-run-mark", className)}
+      data-status={status}
+      width={N}
+      height={N}
+      style={{ width: N * CELL, height: N * CELL }}
+    />
+  );
+}
+
 /** A legend key (3×5 cells) in neutral tones, for the horizon's legend. */
 export function RunKey({ status }: { status: RunPixelStatus | "next" }) {
   const ref = useCanvas((ctx, canvas) => {

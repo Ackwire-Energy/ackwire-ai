@@ -303,18 +303,26 @@ describe("Calendário", () => {
     expect(screen().getByRole("heading", { level: 1, name: "Calendário" })).toBeTruthy();
     expect(document.querySelectorAll(".cal-week__col")).toHaveLength(7);
     expect(screen().getByRole("button", { name: "Daily de produto, 10:00–11:00" })).toBeTruthy();
-    expect(screen().getByRole("button", { name: "Resumo da semana, 09:00" })).toBeTruthy();
-    expect(screen().getAllByRole("button", { name: /^Erros do Sentry do dia, 18:00/ })).toHaveLength(5);
+    expect(screen().getAllByRole("button", { name: "Rotina Erros do Sentry do dia, 18:00" })).toHaveLength(5);
     expect(screen().getByRole("button", { name: "#133 Fechar a release, dia todo" })).toBeTruthy();
-    // Routines are recurring and muted.
-    const routine = screen().getByRole("button", { name: "Resumo da semana, 09:00" });
-    expect(routine.getAttribute("data-source")).toBe("routine");
-    expect(routine.querySelector(".cal-chip__repeat")).not.toBeNull();
+    // A routine run is a quiet pixel mark, not a chip; a click lists the slot's runs.
+    const routine = screen().getByRole("button", { name: "Rotina Resumo da semana, 09:00" });
+    expect(routine.classList.contains("cal-marks")).toBe(true);
+    expect(routine.querySelectorAll(".ac-run-mark")).toHaveLength(1);
+    expect(routine.querySelector(".cal-chip__title")).toBeNull();
+    await click(routine);
+    await settle(2);
+    const runs = screen().getByRole("region", { name: "Rotinas às 09:00" });
+    expect(runs.textContent).toContain("Resumo da semana");
+    expect(runs.textContent).toContain("última: respondeu");
+    expect(within(runs).getByRole("link", { name: "Abrir rotina" }).getAttribute("href")).toContain("?open=");
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await settle(2);
 
     await openPanel();
     const filters = screen().getByRole("group", { name: "Filtros" });
     await click(within(filters).getByRole("button", { name: /^Rotinas/ }));
-    expect(screen().queryByRole("button", { name: /^Resumo da semana/ })).toBeNull();
+    expect(screen().queryByRole("button", { name: /Resumo da semana/ })).toBeNull();
     await click(within(filters).getByRole("button", { name: /^Prazos de issues/ }));
     expect(screen().queryByRole("button", { name: /Fechar a release/ })).toBeNull();
     expect(screen().getByRole("button", { name: "Daily de produto, 10:00–11:00" })).toBeTruthy();

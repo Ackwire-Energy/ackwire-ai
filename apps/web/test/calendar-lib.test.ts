@@ -8,6 +8,7 @@ import {
   layoutBars,
   layoutDay,
   rangeLabel,
+  runSlots,
   upcomingItems,
   viewDays,
 } from "@/lib/calendar";
@@ -27,6 +28,33 @@ const item = (key: string, start: Date, end: Date, allDay = false): CalItem => (
 });
 
 describe("calendar layout", () => {
+  test("single routine runs group into one slot per hour (earliest first); events and bands stay out", () => {
+    const run = (key: string, start: Date): CalItem => ({
+      ...item(key, start, new Date(start.getTime() + 15 * 60_000)),
+      kind: "routine",
+      source: "routine",
+      routineId: key,
+    });
+    const band: CalItem = { ...run("band", at(0)), allDay: true, end: at(0, 0, new Date(2026, 9, 15)), runs: [at(1)] };
+    const slots = runSlots(
+      [
+        run("b", at(9, 30)),
+        run("a", at(9, 10)),
+        run("c", at(9, 45)),
+        run("d", at(9, 50)),
+        run("e", at(18)),
+        run("other-day", at(9, 0, new Date(2026, 9, 15))),
+        item("event", at(9), at(10)),
+        band,
+      ],
+      day,
+    );
+    expect(slots.map((s) => [s.top, s.runs.map((r) => r.key)])).toEqual([
+      [9 * 60 + 10, ["a", "b", "c", "d"]],
+      [18 * 60, ["e"]],
+    ]);
+  });
+
   test("overlapping events sit side by side; a later one gets the full width again", () => {
     const placed = layoutDay(
       [

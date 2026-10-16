@@ -16,9 +16,11 @@ import {
   HOUR_PX,
   hourLabel,
   initialScrollMinutes,
+  isRunMark,
   layoutBars,
   layoutDay,
   minutesOfDay,
+  runSlots,
   SNAP_MIN,
   sameDay,
   shiftDays,
@@ -28,6 +30,7 @@ import {
 import { toYmd } from "@/lib/format";
 import { EventChip } from "./EventChip";
 import { RoutineBand } from "./RoutineBand";
+import { RunMarks } from "./RunMarks";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 /** Movement before a press on a chip becomes a drag (px). */
@@ -51,7 +54,8 @@ interface Gesture {
 /**
  * The day/week grid: hours 00:00–24:00 in a scroll area (opens around 07:00
  * or the first event), all-day and multi-day items as bars on top,
- * routines that run often as one band each (their runs as ticks),
+ * routines that run often as one band each (their runs as ticks), single
+ * routine runs as small pixel marks at their time (a click lists them),
  * overlapping items side by side, today's column tinted with a filled day
  * pill, and the current-time line. Drag on empty space to create; drag a
  * chip to move it, its bottom edge to resize.
@@ -296,7 +300,11 @@ export function TimeGrid({
             ))}
           </div>
           {days.map((d, i) => {
-            const placed = layoutDay(items, d);
+            const placed = layoutDay(
+              items.filter((it) => !isRunMark(it)),
+              d,
+            );
+            const slots = runSlots(items, d);
             const isToday = sameDay(d, today);
             const ghost =
               gesture?.kind === "create" && gesture.dayIndex === i
@@ -358,6 +366,15 @@ export function TimeGrid({
                     />
                   );
                 })}
+                {slots.map((slot) => (
+                  <RunMarks
+                    key={slot.key}
+                    slot={slot}
+                    style={{ top: (slot.top / 60) * HOUR_PX + 2 }}
+                    open={openKey === slot.key && !gesture}
+                    onOpenChange={(o) => onOpenKey(o ? slot.key : null)}
+                  />
+                ))}
                 {ghost && (
                   <div
                     className="cal-week__ghost"

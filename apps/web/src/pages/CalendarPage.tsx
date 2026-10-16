@@ -2,8 +2,10 @@ import {
   ApprovalCard,
   Button,
   FilterToggle,
+  Icon,
   type IconName,
   Kbd,
+  ListRow,
   offsetMinutes,
   Popover,
   Segmented,
@@ -14,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useCalendar, useCalendarAction, useRoutines } from "@/api/queries";
 import type { CalendarEvent, CalendarRange, SeriesScope } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import { AgendaView } from "@/components/calendar/AgendaView";
 import { dayLabel, ItemDetails } from "@/components/calendar/EventChip";
@@ -121,8 +124,14 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
     all.filter((it) => filters[it.source]),
     days,
   ).map((it) => {
-    const r = it.runs && it.routineId ? routineById.get(it.routineId) : undefined;
+    const r = it.routineId ? routineById.get(it.routineId) : undefined;
     if (!r) return it;
+    if (!it.runs) {
+      // A single run: how it went when it already ran (a run within 5 minutes of it), and the routine's last result.
+      const recent = r.recentRuns ?? [];
+      const own = recent.find((x) => Math.abs(toView(new Date(x.at)).getTime() - it.start.getTime()) < 5 * 60_000);
+      return { ...it, result: own?.status, lastResult: recent[0]?.status ?? r.lastRun?.status };
+    }
     const pastRuns = (r.recentRuns ?? []).map((x) => ({
       at: toView(new Date(x.at)),
       status: x.status,
@@ -389,25 +398,35 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
                 <p className="small muted">{t("calendar.upcomingEmpty")}</p>
               ) : (
                 <ol className="cal-upcoming">
-                  {upcoming.map((it) => (
-                    <li key={it.key}>
-                      <button
-                        type="button"
-                        className="cal-upcoming__item"
-                        data-source={it.source}
-                        onClick={() => {
-                          setFocus(startOfDay(it.start));
-                          if (view === "agenda" || view === "month") setView("week");
-                        }}
-                      >
-                        <span className="cal-upcoming__title">{it.title}</span>
-                        <span className="small muted tabular">
-                          {sameDay(it.start, now) ? t("calendar.today") : dayLabel(i18n.language, it.start)}
-                          {it.allDay || isBarItem(it) ? "" : ` · ${formatTime(i18n.language, it.start.toISOString())}`}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
+                  {upcoming.map((it) => {
+                    const day = sameDay(it.start, now) ? t("calendar.today") : dayLabel(i18n.language, it.start);
+                    return (
+                      <li key={it.key}>
+                        <ListRow
+                          lead={
+                            it.agentId ? (
+                              <AgentAvatar agentId={it.agentId} size="xs" name="" />
+                            ) : (
+                              <Icon name="calendar" size={16} aria-hidden="true" />
+                            )
+                          }
+                          title={it.title}
+                          meta={
+                            it.allDay || isBarItem(it)
+                              ? day
+                              : t("calendar.upcomingMeta", {
+                                  day,
+                                  time: formatTime(i18n.language, it.start.toISOString()),
+                                })
+                          }
+                          onClick={() => {
+                            setFocus(startOfDay(it.start));
+                            if (view === "agenda" || view === "month") setView("week");
+                          }}
+                        />
+                      </li>
+                    );
+                  })}
                 </ol>
               )}
             </section>

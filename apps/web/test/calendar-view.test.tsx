@@ -96,6 +96,22 @@ describe("Calendário: views, moves and series", () => {
     expect(document.querySelector(".cal-agenda, .cal-agenda__empty")).not.toBeNull();
   });
 
+  test("Próximos: neutral rows (avatar or event icon, title, day · time), no source bar", async () => {
+    await go();
+    const show = screen().queryByRole("button", { name: "Mostrar painel" });
+    if (show) await click(show);
+    const side = screen().getByRole("region", { name: "Próximos" });
+    const rows = [...side.querySelectorAll<HTMLElement>(".ac-row")];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(side.querySelector(".cal-upcoming__item, [data-source]")).toBeNull();
+    for (const row of rows) {
+      expect(row.querySelector(".ac-row__lead")).not.toBeNull();
+      const title = row.querySelector(".ac-row__title");
+      expect(title?.getAttribute("title")).toBe(title?.textContent ?? "");
+    }
+    expect(rows.some((r) => / · \d{2}:\d{2}$/.test(r.querySelector(".ac-row__meta")?.textContent ?? ""))).toBe(true);
+  });
+
   test("an empty week keeps the grid with a quiet hint", async () => {
     await go();
     const show = screen().queryByRole("button", { name: "Mostrar painel" });

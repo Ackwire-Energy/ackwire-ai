@@ -210,7 +210,12 @@ export function ItemDetails({ item, onEdit, onDelete }: { item: CalItem; onEdit?
           </Link>
         )}
         {item.kind === "routine" && (
-          <Link to="/org/$orgId/routines" params={{ orgId: org.id }} className="ac-link small">
+          <Link
+            to="/org/$orgId/routines"
+            params={{ orgId: org.id }}
+            search={item.routineId ? { open: item.routineId } : {}}
+            className="ac-link small"
+          >
             {t("calendar.openRoutines")}
           </Link>
         )}

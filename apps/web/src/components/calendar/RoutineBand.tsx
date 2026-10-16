@@ -1,7 +1,6 @@
 import { Popover, RunLane } from "@agenteschat/ui";
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { AgentAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import type { CalItem } from "@/lib/calendar";
 import { lookOf } from "@/lib/look";
@@ -9,7 +8,7 @@ import { useCadence } from "./EventChip";
 
 /**
  * A routine that runs often, as its lane on the Rotinas horizon: the name
- * and cadence on top, then the dotted line over its days, past runs as
+ * and cadence on top in a quiet line (the agent is the sprite on the lane), then the dotted line over its days, past runs as
  * pixel columns, future runs as pixels and the next one as the agent's
  * sprite. A click opens its details.
  */
@@ -55,7 +54,6 @@ export function RoutineBand({
           aria-pressed={open}
         >
           <span className="cal-band__label">
-            {item.agentId && <AgentAvatar agentId={item.agentId} size="xs" name="" />}
             <b>{item.title}</b>
             <span className="cal-band__cadence">{cadence}</span>
           </span>

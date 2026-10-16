@@ -14,12 +14,14 @@ import {
   Icon,
   iconNames,
   initialsOf,
+  ListRow,
   Logo,
   Menu,
   MenuItem,
   Message,
   MessageText,
   Meter,
+  RunMark,
 } from "../src";
 
 const body = () => within(document.body);
@@ -409,5 +411,34 @@ describe("Message aside", () => {
     const [first, second] = Array.from(container.querySelectorAll("article"));
     expect(first?.querySelector(".ac-msg__head .ac-msg__aside")?.textContent).toBe("✓");
     expect(second?.querySelector(".ac-msg__aside--floating")?.textContent).toBe("✓✓");
+  });
+});
+
+describe("ListRow and RunMark", () => {
+  test("a list row is a neutral button: lead, the whole title on hover, meta", () => {
+    let clicked = 0;
+    const { container } = render(
+      <ListRow
+        lead={<Icon name="calendar" />}
+        title="Revisão do roadmap"
+        meta="Hoje · 21:00"
+        onClick={() => clicked++}
+      />,
+    );
+    const row = within(container).getByRole("button", { name: /Revisão do roadmap/ });
+    expect(row.getAttribute("type")).toBe("button");
+    expect(row.className).toBe("ac-row");
+    expect(row.querySelector(".ac-row__title")?.getAttribute("title")).toBe("Revisão do roadmap");
+    expect(row.querySelector(".ac-row__meta")?.textContent).toBe("Hoje · 21:00");
+    fireEvent.click(row);
+    expect(clicked).toBe(1);
+  });
+
+  test("a run mark is a decorative 8px canvas carrying its status", () => {
+    const { container } = render(<RunMark color="sky" status="failed" />);
+    const mark = container.querySelector("canvas.ac-run-mark") as HTMLCanvasElement;
+    expect(mark.getAttribute("role")).toBeNull();
+    expect(mark.dataset.status).toBe("failed");
+    expect(mark.style.width).toBe("8px");
   });
 });

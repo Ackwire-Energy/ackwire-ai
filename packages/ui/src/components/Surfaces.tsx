@@ -1,4 +1,4 @@
-import { type HTMLAttributes, type ReactNode, useEffect, useState } from "react";
+import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode, useEffect, useState } from "react";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 import { SkyGlow } from "./PixelSky";
@@ -24,6 +24,35 @@ export function List({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
     return () => clearTimeout(timer);
   }, []);
   return <div className={cx("ac-list", entering && "ac-list--stagger", className)} {...rest} />;
+}
+
+export interface ListRowProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "title"> {
+  /** A small avatar or an icon. */
+  lead?: ReactNode;
+  /** One line, cut with an ellipsis (the whole of it on hover). */
+  title: string;
+  /** A quiet second line ("Hoje · 21:00"). */
+  meta?: ReactNode;
+  trailing?: ReactNode;
+}
+
+/**
+ * A neutral clickable row for short side lists (Próximos, recent items):
+ * lead, title and meta. No border bar, no tint: it only lifts on hover.
+ */
+export function ListRow({ lead, title, meta, trailing, className, type = "button", ...rest }: ListRowProps) {
+  return (
+    <button type={type} className={cx("ac-row", className)} {...rest}>
+      {lead && <span className="ac-row__lead">{lead}</span>}
+      <span className="ac-row__text">
+        <span className="ac-row__title" title={title}>
+          {title}
+        </span>
+        {meta && <span className="ac-row__meta">{meta}</span>}
+      </span>
+      {trailing}
+    </button>
+  );
 }
 
 export interface EmptyStateProps {

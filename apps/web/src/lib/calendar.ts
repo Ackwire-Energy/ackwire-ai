@@ -34,9 +34,14 @@ export interface CalItem {
   runs?: Date[];
   every?: number | null;
   /** A band's recent runs as they went (from the routine), and whether one is running now. */
-  pastRuns?: { at: Date; status: "ok" | "silent" | "failed" | "skipped"; weight?: number }[];
+  pastRuns?: { at: Date; status: RunStatus; weight?: number }[];
   running?: boolean;
+  /** A single run: how it went (when it already ran), else how the routine's last run went. */
+  result?: RunStatus;
+  lastResult?: RunStatus;
 }
+
+export type RunStatus = "ok" | "silent" | "failed" | "skipped";
 
 // ── Dates (local days) ──────────────────────────────────────────────────────
 
@@ -305,6 +310,36 @@ export function layoutDay(items: CalItem[], day: Date): Placed[] {
   }
   if (cluster.length > 0) flush();
   return out;
+}
+
+/** A single routine run (not a band): drawn as a pixel mark in the grid, not a chip. */
+export const isRunMark = (it: CalItem) => it.kind === "routine" && !it.runs && !isBarItem(it);
+
+export interface RunSlot {
+  key: string;
+  /** Minutes from midnight of the slot's first run. */
+  top: number;
+  runs: CalItem[];
+}
+
+/** One day's single routine runs grouped by the hour they start in (a slot per hour), earliest first. */
+export function runSlots(items: CalItem[], day: Date): RunSlot[] {
+  const byHour = new Map<number, CalItem[]>();
+  for (const it of items) {
+    if (!isRunMark(it) || !sameDay(it.start, day)) continue;
+    const h = it.start.getHours();
+    byHour.set(h, [...(byHour.get(h) ?? []), it]);
+  }
+  return [...byHour.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([h, list]) => {
+      const runs = [...list].sort((a, b) => a.start.getTime() - b.start.getTime() || a.title.localeCompare(b.title));
+      return {
+        key: `${startOfDay(day).getTime()}-${h}`,
+        top: minutesOfDay((runs[0] as CalItem).start),
+        runs,
+      };
+    });
 }
 
 export interface Bar {
