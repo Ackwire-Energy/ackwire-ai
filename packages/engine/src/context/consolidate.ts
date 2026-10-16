@@ -1,9 +1,17 @@
 import { and, asc, eq, inArray, isNull, lt, or, schema, sql } from "@agenteschat/db";
 import { enqueue } from "../outbox";
-import { isVerified, mergeEvidence, SAME_ITEM_SIMILARITY, similarity } from "./items";
+import {
+  type ContextItem,
+  isVerified,
+  mergeEvidence,
+  type NewContextItem,
+  SAME_ITEM_SIMILARITY,
+  similarity,
+} from "./items";
+import { decide, findCandidates, judgeRelations, memoryJudgeEnabled } from "./judgments";
 import { proposeFromItem } from "./proposals";
 import { REFLECT_DEFAULTS } from "./reflect";
-import { type ContextDeps, ensurePeriodSummary } from "./summaries";
+import { type ContextDeps, ensurePeriodSummary, judgeOf } from "./summaries";
 
 const { contextItems, messages, threadReflections, channels } = schema;
 
@@ -14,6 +22,10 @@ export const DECAY = { factor: 0.95, unusedDays: 7, archiveBelow: 0.1, archiveAf
  * Periodic job `context.consolidate` per organization:
  * 1. dedupe near-identical active items in the same scope (the older keeps
  *    the evidence of both; the newer is archived, pointing at it);
+ * 1b. by meaning (ADR 0028, Jev only): items written or changed since the
+ *    last runs are compared with their neighbours, as on write, so what the
+ *    write missed (an item written before its twin, a judge that was down)
+ *    is settled here;
  * 2. decay the relevance of unused items and archive stale ones (pinned items
  *    never decay; archived ones stay reachable through `expand`);
  * 3. refresh last week's period summaries of busy channels;
@@ -70,6 +82,9 @@ export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new
       }
     }
   }
+
+  const judged = await consolidateByMeaning(deps, orgId, now).catch(() => ({ moved: 0, linked: 0 }));
+  merged += judged.moved;
 
   const unusedSince = new Date(now.getTime() - DECAY.unusedDays * 86_400_000);
   await db
@@ -135,7 +150,136 @@ export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new
       ),
     );
   for (const item of candidates) if (await proposeFromItem(deps, item)) proposals++;
-  return { merged, archived: stale.length, proposals };
+  return { merged, archived: stale.length, proposals, linked: judged.linked };
+}
+
+/** Items re-judged per org and run, and how far back "recent" goes (a missed day is caught up). */
+export const DAILY_JUDGING = { maxItems: 100, sinceDays: 2 };
+
+const SUMMARY_KINDS = new Set(["thread_summary", "period_summary", "entity_profile"]);
+
+/** An existing item as if it were being written now (the newer side of each comparison). */
+const asNew = (item: ContextItem): NewContextItem => ({
+  orgId: item.orgId,
+  kind: item.kind,
+  scopeType: item.scopeType as NewContextItem["scopeType"],
+  scopeId: item.scopeId,
+  agentId: item.agentId,
+  subject: item.subjectKey,
+  title: item.title ?? undefined,
+  content: item.content,
+  channelIds: item.channelIds,
+  evidence: item.evidence,
+  trust: item.trust as NewContextItem["trust"],
+  confidence: item.confidence,
+});
+
+/**
+ * The daily pass by meaning: each recent item against its older neighbours
+ * (pairs already linked are skipped), with the write's policy (`decide`).
+ * One move per item; the loser is archived pointing at the winner, so
+ * history stays and a person can bring it back. Needs Jev (calibrated
+ * requests): without it nothing happens here.
+ */
+export async function consolidateByMeaning(deps: ContextDeps, orgId: string, now = new Date()) {
+  const out = { moved: 0, linked: 0 };
+  if (!memoryJudgeEnabled(deps.memoryJudgeOrgs, orgId)) return out;
+  const { db } = deps;
+  const judge = judgeOf(deps);
+  const since = new Date(now.getTime() - DAILY_JUDGING.sinceDays * 86_400_000);
+  const recent = await db
+    .select()
+    .from(contextItems)
+    .where(
+      and(
+        eq(contextItems.orgId, orgId),
+        eq(contextItems.status, "active"),
+        isNull(contextItems.supersededBy),
+        sql`${contextItems.updatedAt} >= ${since.toISOString()}::timestamptz`,
+      ),
+    )
+    .orderBy(asc(contextItems.updatedAt))
+    .limit(DAILY_JUDGING.maxItems);
+  const gone = new Set<string>();
+  for (const item of recent) {
+    if (SUMMARY_KINDS.has(item.kind) || gone.has(item.id)) continue;
+    const input = asNew(item);
+    const candidates = (await findCandidates(db, input)).filter(
+      (c) =>
+        c.id !== item.id &&
+        !gone.has(c.id) &&
+        !item.relatedIds.includes(c.id) &&
+        // Each pair once, from its newer side (ties by id).
+        (c.createdAt.getTime() < item.createdAt.getTime() ||
+          (c.createdAt.getTime() === item.createdAt.getTime() && c.id < item.id)),
+    );
+    if (candidates.length === 0) continue;
+    let plan: ReturnType<typeof decide>;
+    try {
+      plan = decide(input, await judgeRelations(judge, input, candidates));
+    } catch {
+      return out; // no Jev (or it's down): try again on the next run
+    }
+    const touched = await db.transaction(async (tx) => {
+      if (plan.action === "create") {
+        if (plan.related.length === 0) return [];
+        await tx
+          .update(contextItems)
+          .set({ relatedIds: [...new Set([...item.relatedIds, ...plan.related])] })
+          .where(eq(contextItems.id, item.id));
+        await tx
+          .update(contextItems)
+          .set({
+            relatedIds: sql`array_append(array_remove(${contextItems.relatedIds}, ${item.id}::uuid), ${item.id}::uuid)`,
+          })
+          .where(inArray(contextItems.id, plan.related));
+        out.linked += plan.related.length;
+        return [];
+      }
+      const target = plan.target;
+      // merge: the older keeps both; supersede, or a resolve the newer wins: the newer stays.
+      const [winner, loser] =
+        plan.action === "merge" || (plan.action === "resolve" && plan.winner === "old")
+          ? [target, item]
+          : [item, target];
+      if (plan.action === "merge") {
+        const evidence = mergeEvidence(winner.evidence, loser.evidence);
+        await tx
+          .update(contextItems)
+          .set({
+            evidence,
+            verified: evidence.length === 0 ? winner.verified : isVerified(evidence),
+            recurrence: winner.recurrence + loser.recurrence,
+            confidence: Math.max(winner.confidence, loser.confidence),
+            relevance: Math.max(winner.relevance, loser.relevance),
+            trust: winner.trust === "low" || loser.trust === "low" ? "low" : "high",
+            sourceIds: [...new Set([...winner.sourceIds, ...loser.sourceIds])],
+            updatedAt: now,
+          })
+          .where(eq(contextItems.id, winner.id));
+      } else {
+        await tx
+          .update(contextItems)
+          .set({ relatedIds: [...new Set([...winner.relatedIds, loser.id])], updatedAt: now })
+          .where(eq(contextItems.id, winner.id));
+      }
+      await tx
+        .update(contextItems)
+        .set({
+          status: "archived",
+          supersededBy: winner.id,
+          relatedIds: [...new Set([...loser.relatedIds, winner.id])],
+          updatedAt: now,
+        })
+        .where(and(eq(contextItems.id, loser.id), eq(contextItems.status, "active")));
+      for (const id of [winner.id, loser.id])
+        await enqueue(tx, { orgId, kind: "search.index", payload: { kind: "context_item", sourceId: id } });
+      return [loser.id];
+    });
+    for (const id of touched) gone.add(id);
+    out.moved += touched.length;
+  }
+  return out;
 }
 
 /**

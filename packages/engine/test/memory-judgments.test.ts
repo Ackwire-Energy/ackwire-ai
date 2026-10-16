@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
+  consolidateByMeaning,
   consolidateItem,
   createFakeJudge,
   createLlmJudge,
@@ -260,4 +261,75 @@ test("memory never takes the LLM fallback's word: without Jev, words decide", as
     const res = await consolidateItem(f.db, fact(f, "We host the app on Railway."), { judge, semantic: true });
     expect(res).toMatchObject({ action: "merged", item: { id: old.item.id } }); // by words, as today
   }
+});
+
+describe("memory judgments: the daily pass", () => {
+  const relation = (answer: string) => createFakeJudge((kind) => (kind === "memory_relation" ? answer : undefined));
+  /** Makes `id` the older item (writes in one test can share a timestamp). */
+  const ageOf = (id: string, days = 1) =>
+    f.db
+      .update(schema.contextItems)
+      .set({ createdAt: new Date(Date.now() - days * 86_400_000) })
+      .where(eq(schema.contextItems.id, id));
+
+  test("settles what writes missed: a twin merges into the older item, which keeps both", async () => {
+    f = await setup();
+    const older = await insertContextItem(f.db, fact(f, "We host the app on Railway.", { evidence: [human("m1")] }));
+    const twin = await insertContextItem(
+      f.db,
+      fact(f, "Hospedamos a aplicação no Railway.", { evidence: [human("m2")] }),
+    );
+    await ageOf(older.id);
+    const deps = { ...f.context, judge: relation("same"), memoryJudgeOrgs: "*" };
+    expect(await consolidateByMeaning(deps, f.org.id)).toEqual({ moved: 1, linked: 0 });
+    const rows = await f.db.select().from(schema.contextItems);
+    expect(rows.find((r) => r.id === twin.id)).toMatchObject({ status: "archived", supersededBy: older.id });
+    expect(rows.find((r) => r.id === older.id)?.evidence).toHaveLength(2);
+    // Nothing left to settle on the next run.
+    expect(await consolidateByMeaning(deps, f.org.id)).toEqual({ moved: 0, linked: 0 });
+  });
+
+  test("a contradiction resolves by evidence; related items are linked once", async () => {
+    f = await setup();
+    const personSaid = await insertContextItem(f.db, fact(f, "Deploys are on Fridays.", { evidence: [human("m1")] }));
+    const claim = await insertContextItem(
+      f.db,
+      fact(f, "Fridays are bad for deploys.", { evidence: [agentClaim("m2")] }),
+    );
+    await ageOf(personSaid.id, 2);
+    await consolidateByMeaning({ ...f.context, judge: relation("contradicts"), memoryJudgeOrgs: "*" }, f.org.id);
+    const [lost] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, claim.id));
+    expect(lost).toMatchObject({ status: "archived", supersededBy: personSaid.id });
+
+    const a = await insertContextItem(f.db, fact(f, "Railway bills us monthly."));
+    await insertContextItem(f.db, fact(f, "We pay Railway with the company card."));
+    await ageOf(a.id);
+    const linking = { ...f.context, judge: relation("related"), memoryJudgeOrgs: "*" };
+    expect((await consolidateByMeaning(linking, f.org.id)).linked).toBeGreaterThan(0);
+    const [linked] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, a.id));
+    expect(linked?.relatedIds.length).toBeGreaterThan(0);
+    expect(await consolidateByMeaning(linking, f.org.id)).toEqual({ moved: 0, linked: 0 });
+  });
+
+  test("off for the org, or without Jev: nothing moves", async () => {
+    f = await setup();
+    await insertContextItem(f.db, fact(f, "We host the app on Railway."));
+    const twin = await insertContextItem(f.db, fact(f, "Hospedamos a aplicação no Railway."));
+    expect(
+      await consolidateByMeaning({ ...f.context, judge: relation("same"), memoryJudgeOrgs: "" }, f.org.id),
+    ).toEqual({
+      moved: 0,
+      linked: 0,
+    });
+    const llmOnly = createLlmJudge({
+      gateway: { complete: async () => Promise.reject(new Error("must not be called")) },
+      resolveModel: async () => "claude-haiku-5-5",
+    });
+    expect(await consolidateByMeaning({ ...f.context, judge: llmOnly, memoryJudgeOrgs: "*" }, f.org.id)).toEqual({
+      moved: 0,
+      linked: 0,
+    });
+    const [still] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, twin.id));
+    expect(still?.status).toBe("active");
+  });
 });
