@@ -355,6 +355,12 @@ button.mi-pill--need:hover {
 .mh__exec {
   flex: none;
 }
+/* Beside the title the executor chip has the state chip's height (22px), not a pill's. */
+.mh__exec .mi-pill {
+  height: 22px;
+  padding: 0 8px 0 6px;
+  font-size: 12px;
+}
 .mh__mini {
   grid-column: 3;
   display: none;
