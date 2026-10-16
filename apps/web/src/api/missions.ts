@@ -40,14 +40,15 @@ export function useMissionList(orgId: string, query: MissionListQuery = { status
   });
 }
 
-/** "Nova missão": the agents that can run one for me (a connected computer they may use). */
+/** "Nova missão": every agent, each saying whether it can run one for me and why not. */
 export function useEligibleAgents(orgId: string, enabled = true) {
   const api = useApi();
   return useQuery({
     queryKey: [...keys.missions(orgId), "eligible"],
     queryFn: () => api.missions.eligibleAgents(orgId),
     enabled,
-    staleTime: 30_000,
+    // Fresh each time the dialog opens: a computer just chosen for an agent shows at once.
+    staleTime: 0,
   });
 }
 
