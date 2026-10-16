@@ -6,6 +6,7 @@ import {
   MISSION_MCP_TOOLS,
   MISSION_PROTOCOL,
   MISSION_RULES_NO_GIT,
+  PERMISSION_PROMPT_TOOL,
   parseRunnerFrame,
   parseServerFrame,
   type RunnerFrame,
@@ -280,3 +281,44 @@ test.skipIf(!posix)(
     expect(tasks.mcpTask(plain)).toBeNull();
   },
 );
+
+test("the permission prompt tool Claude Code is told to use is one our server advertises (work turns), under the server name of the MCP config", async () => {
+  const list = (await handleMcpMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" }, async () => ({
+    ok: true as const,
+    text: "",
+  }))) as { result: { tools: { name: string; inputSchema: { properties?: Record<string, unknown> } }[] } };
+  const names = list.result.tools.map((t) => t.name);
+  expect(names).toContain("permission_prompt");
+  expect(names).toContain("complete_mission");
+  const prompt = list.result.tools.find((t) => t.name === "permission_prompt");
+  expect(Object.keys(prompt?.inputSchema.properties ?? {})).toEqual(
+    expect.arrayContaining(["tool_name", "input", "tool_use_id"]),
+  );
+  const args = missionExecutorArgs(
+    "claude",
+    {
+      configFile: "/c/mcp.json",
+      command: ["node", "r.mjs"],
+      taskId: TASK,
+      socketPath: "/s",
+      rules: "",
+      promptTool: true,
+    },
+    "darwin",
+  );
+  const given = args[args.indexOf("--permission-prompt-tool") + 1] ?? "";
+  expect(given).toBe(PERMISSION_PROMPT_TOOL);
+  const config = claudeMcpConfig({ command: ["node", "r.mjs"], taskId: TASK, socketPath: "/s", token: "t" }) as {
+    mcpServers: Record<string, unknown>;
+  };
+  const [server] = Object.keys(config.mcpServers);
+  expect(given).toBe(`mcp__${server}__permission_prompt`);
+  expect(names.map((n) => `mcp__${server}__${n}`)).toContain(given);
+  // Plan turns don't get the prompt tool (only reads there).
+  const plan = missionExecutorArgs(
+    "claude",
+    { configFile: "/c/mcp.json", command: ["node", "r.mjs"], taskId: TASK, socketPath: "/s", rules: "" },
+    "darwin",
+  );
+  expect(plan).not.toContain("--permission-prompt-tool");
+});
