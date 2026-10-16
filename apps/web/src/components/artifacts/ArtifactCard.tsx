@@ -6,7 +6,7 @@ import { useOrg } from "@/components/org-context";
 import { documentPreview, KIND_ICON, patchCounts } from "@/lib/artifacts";
 import { fileIcon } from "@/lib/files";
 import { useArtifactViewer, useAuthorName } from "./ArtifactViewer";
-import { FileSummary } from "./FileView";
+import { FileCardPreview } from "./FileView";
 import { MermaidDiagram } from "./Mermaid";
 
 const PREVIEW_ROWS = 3;
@@ -71,13 +71,31 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
         {t("artifacts.version", { version: a.shownVersion })}
       </span>
       <div className="artifact-card__preview">
-        <Preview content={a.content} title={a.title} />
+        <Preview
+          content={a.content}
+          title={a.title}
+          artifactId={a.id}
+          version={a.shownVersion}
+          onOpen={() => viewer.open(a.id, a.shownVersion < a.version ? a.shownVersion : undefined)}
+        />
       </div>
     </div>
   );
 }
 
-function Preview({ content, title }: { content: ArtifactContent; title: string }) {
+function Preview({
+  content,
+  title,
+  artifactId,
+  version,
+  onOpen,
+}: {
+  content: ArtifactContent;
+  title: string;
+  artifactId: string;
+  version: number;
+  onOpen: () => void;
+}) {
   const { t } = useTranslation();
   switch (content.kind) {
     case "document":
@@ -153,9 +171,7 @@ function Preview({ content, title }: { content: ArtifactContent; title: string }
       );
     case "file":
       return (
-        <div className="artifact-card__thumb">
-          <FileSummary content={content} />
-        </div>
+        <FileCardPreview content={content} artifactId={artifactId} version={version} title={title} onOpen={onOpen} />
       );
   }
 }

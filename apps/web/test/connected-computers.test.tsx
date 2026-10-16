@@ -15,7 +15,7 @@ import { createI18n } from "@/i18n";
 import { errorText } from "@/lib/errors";
 import { fileIcon, formatBytes, MAX_UPLOAD_BYTES, previewKind } from "@/lib/files";
 import { applyComputerEvent, applyMachineEvent } from "@/realtime/machines";
-import { ADA_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 const saved: { url: string; name: string }[] = [];
@@ -79,6 +79,47 @@ describe("uploaded files in the Drive", () => {
       url: `/api/app/organizations/${ORG_ID}/artifacts/${file.id}/file?version=1`,
       name: "grafico.png",
     });
+  });
+
+  test("in a chat card: an image shows its thumbnail (opens the viewer); other files show name, size and Baixar", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const image = await api.artifacts.upload(ORG_ID, png("contato.jpg"));
+    const zip = await api.artifacts.upload(
+      ORG_ID,
+      new File([new Uint8Array([80, 75, 3, 4])], "carrossel.zip", { type: "application/zip" }),
+    );
+    const base = state.messages[0] as (typeof state.messages)[number];
+    state.messages.push({
+      ...base,
+      id: "m-files",
+      threadId: null,
+      body: "Aqui estão os arquivos.",
+      mentionedAgentIds: [],
+      meta: {
+        artifacts: [
+          { id: image.id, version: 1 },
+          { id: zip.id, version: 1 },
+        ],
+      },
+      createdAt: new Date().toISOString(),
+    });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    const thumb = document.querySelector(".file-thumb") as HTMLElement;
+    expect(thumb).not.toBeNull();
+    expect(within(thumb).getByRole("img").getAttribute("src")).toMatch(/^blob:preview-/);
+    expect(thumb.textContent).toContain("contato.jpg");
+    const row = document.querySelector(".file-row") as HTMLElement;
+    expect(row.textContent).toContain("carrossel.zip");
+    await click(within(row).getByRole("button", { name: "Baixar" }));
+    expect(saved.at(-1)).toEqual({
+      url: `/api/app/organizations/${ORG_ID}/artifacts/${zip.id}/file?version=1`,
+      name: "carrossel.zip",
+    });
+    await click(thumb);
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "contato.jpg" })).toBeTruthy();
   });
 
   test("SVG and other types are download-only; small text files show their text, read-only", async () => {

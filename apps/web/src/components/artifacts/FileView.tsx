@@ -36,6 +36,77 @@ export function FileSummary({ content }: { content: ArtifactFileContent }) {
   );
 }
 
+/** Images up to this size get a thumbnail in the chat card (bigger ones only in the viewer). */
+const MAX_THUMB_BYTES = 8 * 1024 * 1024;
+
+/** The blob of a previewable file as an object URL of exactly the allowed type (null until loaded). */
+function usePreviewUrl(artifactId: string, version: number, contentType: string, enabled: boolean) {
+  const { org } = useOrg();
+  const blob = useArtifactBlob(org.id, artifactId, version, enabled);
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!blob.data) return;
+    // Exactly the allowed type, whatever the server or the bytes say.
+    const typed = new Blob([blob.data], { type: previewType(contentType) });
+    const next = objectUrls.create(typed);
+    setUrl(next);
+    return () => {
+      if (next) objectUrls.revoke(next);
+    };
+  }, [blob.data, contentType]);
+  return { url, failed: blob.isError };
+}
+
+/**
+ * A file in a chat card: images show a thumbnail (a click opens the viewer);
+ * the rest show the type, name, size and Baixar.
+ */
+export function FileCardPreview({
+  content,
+  artifactId,
+  version,
+  title,
+  onOpen,
+}: {
+  content: ArtifactFileContent;
+  artifactId: string;
+  version: number;
+  title: string;
+  onOpen: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const api = useApi();
+  const image = previewKind(content.contentType) === "image" && content.size <= MAX_THUMB_BYTES;
+  const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, image);
+  const download = () => fileSaver.save(api.artifacts.fileUrl(org.id, artifactId, { version }), content.name);
+  if (image && !failed) {
+    return (
+      <button
+        type="button"
+        className="file-thumb"
+        data-loading={url ? undefined : "true"}
+        onClick={onOpen}
+        aria-label={t("artifacts.open", { title })}
+      >
+        {url && <img src={url} alt={t("files.imageAlt", { title })} />}
+        <span className="file-thumb__caption small">
+          <span className="file-thumb__name">{content.name}</span>
+          <span className="tabular">{formatBytes(i18n.language, content.size)}</span>
+        </span>
+      </button>
+    );
+  }
+  return (
+    <div className="file-row">
+      <FileSummary content={content} />
+      <Button size="sm" variant="ghost" icon="download" onClick={download}>
+        {t("artifacts.download")}
+      </Button>
+    </div>
+  );
+}
+
 /**
  * An uploaded file in the viewer: name, size and Baixar; an inline preview
  * only for raster images and PDF (a blob of exactly that type, never the
@@ -57,18 +128,7 @@ export function FileView({
   const api = useApi();
   const kind = previewKind(content.contentType);
   const canPreview = kind !== null && content.size <= MAX_PREVIEW_BYTES;
-  const blob = useArtifactBlob(org.id, artifactId, version, canPreview);
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!blob.data) return;
-    // Exactly the allowed type, whatever the server or the bytes say.
-    const typed = new Blob([blob.data], { type: previewType(content.contentType) });
-    const next = objectUrls.create(typed);
-    setUrl(next);
-    return () => {
-      if (next) objectUrls.revoke(next);
-    };
-  }, [blob.data, content.contentType]);
+  const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, canPreview);
   const download = () => fileSaver.save(api.artifacts.fileUrl(org.id, artifactId, { version }), content.name);
 
   return (
@@ -81,7 +141,7 @@ export function FileView({
       </div>
       {canPreview && (
         <div className="file-view__preview">
-          {blob.isError ? (
+          {failed ? (
             <p className="small muted">{t("files.previewFailed")}</p>
           ) : !url ? (
             <span className="row small muted" style={{ gap: 8 }} role="status">
