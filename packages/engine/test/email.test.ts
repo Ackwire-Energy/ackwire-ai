@@ -35,6 +35,26 @@ describe("templates (pt-BR)", () => {
     expect(e.text).toContain("como membro");
   });
 
+  test("waitlist confirmation: the agent's request, in their language, art from the link's origin", () => {
+    const pt = renderEmail({
+      kind: "waitlist_confirm",
+      locale: "pt-BR",
+      email: "ana@acme.com",
+      url: "https://agentes.chat/?confirm=abc&x=<1>",
+    });
+    expect(pt.subject).toBe("Confirme seu lugar na lista do agentes.chat");
+    expect(pt.html).toContain('<html lang="pt-BR">');
+    expect(pt.html).toContain('src="https://agentes.chat/email/avatar.png"');
+    expect(pt.html).toContain('href="https://agentes.chat/?confirm=abc&amp;x=&lt;1&gt;"');
+    expect(pt.html).toContain("ana@acme.com");
+    expect(pt.text).toContain("Confirmar meu e-mail: https://agentes.chat/?confirm=abc&x=<1>");
+    expect(pt.text).toContain("Entrar na lista de espera (ana@acme.com)");
+    const en = renderEmail({ kind: "waitlist_confirm", locale: "en", url: "https://agentes.chat/?confirm=abc" });
+    expect(en.html).toContain('<html lang="en">');
+    expect(en.text).toContain("Confirm my email: https://agentes.chat/?confirm=abc");
+    expect(en.text).toContain("Join the waiting list\n");
+  });
+
   test("budget and approval digest", () => {
     const b = renderEmail({
       kind: "budget",

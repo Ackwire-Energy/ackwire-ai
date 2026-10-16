@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Email art</title>
+<!--
+  The images of the waiting list email (direction C in Email.html), drawn by the
+  agent engine at 2x. Regenerate apps/web/public/email/*.png from the repo root:
+    python3 -m http.server 8765 --bind 127.0.0.1
+    for a in mark:104x104 avatar:176x176 shield:32x32 sky:1040x56; do n=${a%%:*}; s=${a#*:}; \
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
+        --default-background-color=00000000 --window-size=${s/x/,} --virtual-time-budget=3000 \
+        --screenshot=apps/web/public/email/$n.png "http://127.0.0.1:8765/docs/design/telas/EmailArt.html?art=$n"; done
+-->
+<style>
+html, body { margin: 0; background: transparent; overflow: hidden; }
+canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import { drawAgent, spriteGrid, spriteBody } from "../../../packages/ui/src/agent/engine.js";
+
+const art = new URLSearchParams(location.search).get("art") || "mark";
+const c = document.getElementById("c");
+const g = () => c.getContext("2d");
+
+if (art === "mark") {
+  c.width = c.height = 104;
+  drawAgent(g(), 0, 0, 104, { color: "sky", cells: 12 });
+} else if (art === "avatar") {
+  c.width = c.height = 176;
+  drawAgent(g(), 0, 0, 176, { color: "sky", cells: 14, pose: { expression: "happy" } });
+} else if (art === "shield") {
+  // The request card's icon (Email.html's shield SVG), mid gray so it reads on light and dark.
+  c.width = c.height = 32;
+  const x = g(); x.scale(2, 2);
+  x.strokeStyle = "#807f7a"; x.lineWidth = 1.5; x.lineCap = "round"; x.lineJoin = "round";
+  x.stroke(new Path2D("M8 1.5l5 2v4c0 3.2-2.2 5.6-5 7-2.8-1.4-5-3.8-5-7v-4l5-2z"));
+  x.stroke(new Path2D("M5.6 8.1l1.7 1.7 3.2-3.4"));
+} else {
+  // The sky strip under the message: light on the left, deep on the right, two pixel agents.
+  c.width = 1040; c.height = 56;
+  const P = 8, W = c.width / P, H = c.height / P;
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+  const SKY = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"];
+  const rgb = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const cols = SKY.map(rgb), n = cols.length - 1;
+  const off = document.createElement("canvas"); off.width = W; off.height = H;
+  const ctx = off.getContext("2d"), img = ctx.createImageData(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const f = Math.max(0, Math.min(1, 0.85 - 0.6 * (x / W)));
+    const k = f * n, lo = Math.floor(k);
+    const col = cols[Math.min(n, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))];
+    const i = (y * W + x) * 4; img.data.set([...col, 255], i);
+  }
+  const grid = spriteGrid(9), body = rgb(spriteBody("sky"));
+  for (const [sx, sy] of [[0.3, 0.05], [0.72, 0.05]]) for (let j = 0; j < 9; j++) for (let i = 0; i < 9; i++) {
+    const ch = grid[j][i]; if (ch === ".") continue;
+    const X = Math.round(sx * W) + i, Y = Math.round(sy * H) + j;
+    if (X >= W || Y >= H) continue;
+    img.data.set(ch === "o" ? [255, 255, 255] : body, (Y * W + X) * 4);
+  }
+  ctx.putImageData(img, 0, 0);
+  const out = g(); out.imageSmoothingEnabled = false; out.drawImage(off, 0, 0, W * P, H * P);
+}
+</script>
+</body>
+</html>

@@ -77,6 +77,7 @@ export async function joinWaitlist(
       template: {
         kind: "waitlist_confirm",
         locale: entry.locale === "en" ? "en" : "pt-BR",
+        email,
         url: `${input.publicUrl.replace(/\/$/, "")}/?confirm=${token}`,
       },
     });

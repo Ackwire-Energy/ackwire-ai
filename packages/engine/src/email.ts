@@ -20,8 +20,12 @@ export type EmailTemplate =
   /** Someone opened an expired invitation and asked for a new one. `email` is empty for an org link. */
   | { kind: "invite_request"; orgName: string; email: string; url: string }
   | { kind: "verify_email"; url: string }
-  /** Double opt-in for the landing page's waiting list, in the language they joined in. */
-  | { kind: "waitlist_confirm"; locale: "pt-BR" | "en"; url: string }
+  /**
+   * Double opt-in for the landing page's waiting list, in the language they
+   * joined in. `email` is the address being confirmed (absent in jobs queued
+   * before it existed). Images come from the origin of `url`.
+   */
+  | { kind: "waitlist_confirm"; locale: "pt-BR" | "en"; url: string; email?: string }
   | {
       kind: "budget";
       level: "warning" | "exhausted";
@@ -91,6 +95,122 @@ ${
   return { html, text };
 }
 
+const WAITLIST = {
+  "pt-BR": {
+    subject: "Confirme seu lugar na lista do agentes.chat",
+    preheader: "Um clique e seu lugar está guardado.",
+    sender: "Agente da lista",
+    when: "agora",
+    title: "Oi! Só falta você aprovar.",
+    lead: "Recebi um pedido para colocar este e-mail na lista de espera do agentes.chat. Aqui, nada importante acontece sem uma pessoa aprovar, e isso vale para mim também.",
+    request: "Pedido de confirmação",
+    what: "Entrar na lista de espera",
+    button: "Confirmar meu e-mail",
+    deny: "Não fui eu? Ignore este e-mail.",
+    expires: "O link vale por 48 horas.",
+    footer:
+      "Alguém colocou este endereço no agentes.chat. Se não foi você, é só ignorar: sem confirmação, ele não entra na lista.",
+  },
+  en: {
+    subject: "Confirm your spot on the agentes.chat waiting list",
+    preheader: "One click and your spot is saved.",
+    sender: "Waiting list agent",
+    when: "now",
+    title: "Hi! It just needs your approval.",
+    lead: "I got a request to put this email on the agentes.chat waiting list. Here nothing important happens without a person approving it, and that goes for me too.",
+    request: "Confirmation request",
+    what: "Join the waiting list",
+    button: "Confirm my email",
+    deny: "Wasn't you? Ignore this email.",
+    expires: "The link works for 48 hours.",
+    footer:
+      "Someone entered this address on agentes.chat. If it wasn't you, just ignore this: without confirmation it never joins the list.",
+  },
+};
+
+/**
+ * The waiting list confirmation, written as a message in the product: the
+ * list's agent asks the person to approve (docs/design/telas/Email.html,
+ * direction C). Tables and inline styles for Gmail/Outlook; the art is PNGs
+ * from apps/web/public/email (EmailArt.html); a dark palette where the client
+ * supports `prefers-color-scheme`.
+ */
+function waitlistEmail(t: Extract<EmailTemplate, { kind: "waitlist_confirm" }>) {
+  const lang = t.locale === "en" ? "en" : "pt-BR";
+  const w = WAITLIST[lang];
+  const words = LAYOUT[lang];
+  const origin = URL.canParse(t.url) ? new URL(t.url).origin : "";
+  const img = (name: string) => esc(`${origin}/email/${name}`);
+  const url = esc(t.url);
+  const ui = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  const display = `'Funnel Display',${ui}`;
+  const doto = "'Doto',ui-monospace,Menlo,monospace";
+  const html = `<!doctype html>
+<html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">
+<title>${esc(w.subject)}</title>
+<style>
+@font-face{font-family:'Funnel Display';font-weight:300 800;src:url('${img("funnel-display-latin.woff2")}') format('woff2')}
+@font-face{font-family:'Doto';font-weight:100 900;src:url('${img("doto-latin.woff2")}') format('woff2')}
+@media (prefers-color-scheme:dark){
+.bg{background:#141413!important}.tx{color:#ecebe7!important}.mu{color:#9a9993!important}
+.card{background:#1c1c1a!important;border-color:#2c2c29!important}
+.btn{background:#ecebe7!important;color:#141413!important}
+}
+@media (max-width:480px){.pad{padding-left:22px!important;padding-right:22px!important}.h1{font-size:28px!important}}
+</style></head>
+<body class="bg" style="margin:0;padding:0;background:#ffffff">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(w.preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bg" style="background:#ffffff"><tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px">
+<tr><td class="pad" style="padding:36px 40px 30px">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+<td style="padding-right:9px;vertical-align:middle"><img src="${img("mark.png")}" width="26" height="26" alt="" style="display:block;border:0"></td>
+<td class="tx" style="vertical-align:middle;font-family:${display};font-weight:300;font-size:22px;letter-spacing:-0.02em;color:#161614">agentes<span style="font-family:${doto};font-weight:600;font-size:14px;opacity:0.7">.chat</span></td>
+</tr></table>
+</td></tr>
+<tr><td class="pad" style="padding:0 40px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td width="58" style="width:58px;vertical-align:top"><img src="${img("avatar.png")}" width="44" height="44" alt="" style="display:block;border:0"></td>
+<td class="tx" style="vertical-align:top;font-family:${ui};font-size:16px;line-height:1.55;color:#161614">
+<p style="margin:0;font-weight:600;font-size:15px">${esc(w.sender)}<span class="mu" style="font-weight:400;font-size:13px;color:#6b6a66;margin-left:6px">${esc(w.when)}</span></p>
+<h1 class="h1" style="margin:6px 0 12px;font-family:${display};font-weight:300;font-size:34px;line-height:1.05;letter-spacing:-0.03em">${esc(w.title)}</h1>
+<p style="margin:0 0 18px">${esc(w.lead)}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td class="card" style="background:#fafaf8;border:1px solid #e4e2dd;border-radius:16px;padding:18px 20px">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+<td style="padding-right:8px;vertical-align:middle"><img src="${img("shield.png")}" width="16" height="16" alt="" style="display:block;border:0"></td>
+<td class="mu" style="vertical-align:middle;font-size:13px;color:#6b6a66">${esc(w.request)}</td>
+</tr></table>
+<p style="margin:8px 0 2px;font-weight:600">${esc(w.what)}</p>
+${t.email ? `<p class="mu" style="margin:0;font-size:14px;color:#6b6a66">${esc(t.email)}</p>` : ""}
+<p style="margin:16px 0 0"><a class="btn" href="${url}" style="display:inline-block;background:#161614;color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;padding:14px 24px;border-radius:12px">${esc(w.button)}</a></p>
+<p class="mu" style="margin:12px 0 0;font-size:14px;color:#6b6a66">${esc(w.deny)}</p>
+</td></tr></table>
+<p class="mu" style="margin:14px 0 0;font-size:13px;color:#6b6a66">${esc(w.expires)} ${esc(words.fallback)} <a href="${url}" class="mu" style="color:#6b6a66;word-break:break-all">${url}</a></p>
+</td></tr></table>
+</td></tr>
+<tr><td class="pad" style="padding:30px 40px 0"><img src="${img("sky.png")}" width="520" height="28" alt="" style="display:block;border:0;width:100%;max-width:520px;height:auto;border-radius:6px"></td></tr>
+<tr><td class="pad mu" style="padding:18px 40px 36px;font-family:${ui};font-size:13px;line-height:1.5;color:#6b6a66">${esc(w.footer)}</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+  const text = [
+    w.title,
+    "",
+    w.lead,
+    "",
+    `${w.what}${t.email ? ` (${t.email})` : ""}`,
+    `${w.button}: ${t.url}`,
+    "",
+    w.expires,
+    w.deny,
+    "",
+    w.footer,
+  ].join("\n");
+  return { subject: w.subject, html, text };
+}
+
 export function renderEmail(t: EmailTemplate): { subject: string; html: string; text: string } {
   switch (t.kind) {
     case "invitation": {
@@ -154,38 +274,7 @@ export function renderEmail(t: EmailTemplate): { subject: string; html: string; 
         }),
       };
     case "waitlist_confirm":
-      return t.locale === "en"
-        ? {
-            subject: "Confirm your spot on the agentes.chat waiting list",
-            ...layout(
-              "Confirm your email",
-              [
-                "You asked to join the agentes.chat waiting list. Confirm that this address is yours and you're in.",
-                "The link works for 48 hours.",
-              ],
-              { label: "Confirm my email", url: t.url },
-              {
-                lang: "en",
-                footer:
-                  "Someone entered this address on agentes.chat. If it wasn't you, ignore this email and nothing happens.",
-              },
-            ),
-          }
-        : {
-            subject: "Confirme seu lugar na lista do agentes.chat",
-            ...layout(
-              "Confirme seu e-mail",
-              [
-                "Você pediu para entrar na lista de espera do agentes.chat. Confirme que este endereço é seu e pronto, você está na lista.",
-                "O link vale por 48 horas.",
-              ],
-              { label: "Confirmar meu e-mail", url: t.url },
-              {
-                footer:
-                  "Alguém colocou este endereço no agentes.chat. Se não foi você, ignore este e-mail e nada acontece.",
-              },
-            ),
-          };
+      return waitlistEmail(t);
     case "budget": {
       const pct = t.level === "warning" ? "80%" : "100%";
       return {
