@@ -14,7 +14,7 @@ afterEach(async () => {
  * SQL statements; transaction BEGIN/COMMIT are not counted. Raise these only
  * on purpose.
  */
-test("claim → model request stays within 10 statements; a whole mention run within 20", async () => {
+test("claim → model request stays within 11 statements; a whole mention run within 20", async () => {
   let beforeModel = -1;
   f = await setup({
     reply: () => {
@@ -37,7 +37,8 @@ test("claim → model request stays within 10 statements; a whole mention run wi
   await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev hi" });
   await drainOutbox(f.db, handlers);
   expect(beforeModel).toBeGreaterThan(0);
-  expect(beforeModel).toBeLessThanOrEqual(10);
+  // 11 since every agent has a budget (ADR 0026): the call always reserves (one statement on the fast path).
+  expect(beforeModel).toBeLessThanOrEqual(11);
   expect(profile).not.toBeNull();
   const p = profile as unknown as { stages: StageTiming[]; total: { queries: number } };
   expect(p.total.queries).toBeLessThanOrEqual(20);

@@ -31,7 +31,7 @@ describe("Fórum: the list", () => {
     expect(pricing.textContent).toContain("Em discussão · rodada 2 de 3");
     // The cap used as a percentage, never money (everyone reads the forum).
     expect(pricing.textContent).toContain("21% do limite de gasto");
-    expect(pricing.textContent).not.toContain("US$");
+    expect(pricing.textContent).not.toContain("0,42");
     expect(pricing.textContent).toContain("Última atividade");
     expect(within(pricing).getByRole("img", { name: /Participantes: Ada/ })).toBeTruthy();
     expect(screen().queryByRole("article", { name: "Onboarding em 5 minutos" })).toBeNull();

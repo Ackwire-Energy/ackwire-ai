@@ -17,8 +17,11 @@ import {
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
-let f: Fixture;
-afterEach(() => f?.close());
+let f: Fixture | undefined;
+afterEach(async () => {
+  await f?.close();
+  f = undefined;
+});
 
 const usage = { inputTokens: 1000, outputTokens: 100 };
 const call = (fx: Fixture, agentId = fx.agent.id) =>

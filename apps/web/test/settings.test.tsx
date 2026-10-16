@@ -163,7 +163,9 @@ describe("Configurações da organização", () => {
     await act(async () => fireEvent.change(field, { target: { value: "80" } }));
     await click(within(fallback).getByRole("button", { name: "Salvar" }));
     await settle(4);
-    expect(state.calls.find((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({ defaultAgentBudgetUsd: 80 });
+    expect(state.calls.findLast((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({
+      defaultAgentBudgetUsd: 80,
+    });
     // Jev / the router's own key is internal: never in the UI.
     expect(document.body.textContent).not.toMatch(/jev|typesafe/i);
   });
