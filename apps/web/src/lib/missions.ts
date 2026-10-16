@@ -4,6 +4,7 @@ import type {
   MachineTaskMeta,
   Message,
   Mission,
+  MissionLinkMeta,
   MissionPlanChangeMeta,
   MissionPlanMeta,
   MissionReportMeta,
@@ -120,6 +121,13 @@ export function waitingText(t: TFunction, m: Pick<Mission, "pending" | "canAct">
 }
 
 /** "1 h 25", "14 min", "40 s": a span in the person's language. */
+/** How often an elapsed label must tick: 1 s under a minute, 15 s under an hour, then a minute. */
+export function tickFor(ageSeconds: number): number {
+  if (ageSeconds < 60) return 1000;
+  if (ageSeconds < 3600) return 15_000;
+  return 60_000;
+}
+
 export function formatSpan(t: TFunction, seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
   if (s < 60) return t("missions.span.s", { s });
@@ -219,6 +227,13 @@ export function parseMissionCommand(text: string): { command: MissionCommand; ar
 const obj = (v: unknown): Record<string, unknown> | null =>
   v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+/** `meta.missionLink`: a mission proposed here whose thread lives elsewhere (the link card). */
+export function missionLinkOf(meta: Message["meta"]): MissionLinkMeta | null {
+  const p = obj(meta?.missionLink);
+  if (!p || !str(p.missionId) || !str(p.threadId)) return null;
+  return { missionId: str(p.missionId), threadId: str(p.threadId) };
+}
 
 export function missionPlanOf(meta: Message["meta"]): MissionPlanMeta | null {
   const p = obj(meta?.missionPlan);

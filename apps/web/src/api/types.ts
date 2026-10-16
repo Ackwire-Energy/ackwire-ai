@@ -2083,6 +2083,12 @@ export interface MissionPlan {
 export type MissionControl = "start" | "pause" | "resume" | "stop";
 
 /** `meta.missionPlan`: the plan card (Começar / Mudar algo). */
+/** `meta.missionLink` on an agent's reply: the mission it proposed, whose thread lives elsewhere. */
+export interface MissionLinkMeta {
+  missionId: string;
+  threadId: string;
+}
+
 export interface MissionPlanMeta {
   missionId: string;
   title: string;

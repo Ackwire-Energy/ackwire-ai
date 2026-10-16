@@ -89,6 +89,7 @@ import { MissionPanelProvider } from "@/components/missions/MissionBits";
 import {
   MissionDecisionCard,
   MissionEphemeral,
+  MissionLinkCard,
   MissionPlanCard,
   MissionPlanChangeLine,
   MissionReportExtras,
@@ -131,6 +132,7 @@ import { agentGrammar } from "@/lib/grammar";
 import { serverBody } from "@/lib/message-body";
 import {
   isOpenMission,
+  missionLinkOf,
   missionPlanChangeOf,
   missionPlanOf,
   missionReportOf,
@@ -1465,6 +1467,17 @@ const Timeline = memo(function Timeline({
   if (ready && initialKeys.current === null) initialKeys.current = new Set(items.map((i) => i.key));
   const initial = initialKeys.current;
   const threadsView = useChannelThreadsView();
+  // Threads a mission link card already points to (the agent's reply): their start marker stays out.
+  const linked = useMemo(
+    () =>
+      new Set(
+        items.flatMap((i) => {
+          const link = i.kind === "message" ? missionLinkOf(i.message.meta) : null;
+          return link ? [link.threadId] : [];
+        }),
+      ),
+    [items],
+  );
   let afterLive = false;
   /** A closed thread is one line; the root of a thread made from a range is its marker (or stub). */
   const threadRow = (key: string, m: MessageType) => {
@@ -1475,6 +1488,7 @@ const Timeline = memo(function Timeline({
     const info = threadsView.byId.get(m.id);
     if (info?.state === "closed") return <ClosedThreadLine key={key} thread={info} />;
     const start = threadStartOf(m.meta);
+    if (start && !start.moved && linked.has(m.id)) return <Fragment key={key} />;
     return start ? <ThreadStartLine key={key} message={m} start={start} thread={info} /> : null;
   };
   return (
@@ -2011,6 +2025,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   const missionReview = m.author.type === "agent" && meta.missionReview ? m : null;
   const missionReport = m.author.type === "agent" ? missionReportOf(meta) : null;
   const missionSuggestion = m.author.type === "person" ? missionSuggestionOf(meta) : null;
+  // A mission proposed from here whose thread lives elsewhere: its link card under the reply.
+  const missionLink = m.author.type === "agent" ? missionLinkOf(meta) : null;
   const missionCard = Boolean(missionPlan || missionDecision || missionReview);
   // The root of a mission in the channel: its work lives in its thread.
   const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.replyInThread !== undefined;
@@ -2152,6 +2168,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       {missionReport && <MissionReportExtras report={missionReport} message={m} />}
       {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
       {missionStart && <MissionStartLink message={m} />}
+      {missionLink && <MissionLinkCard link={missionLink} />}
       {artifacts.length > 0 && (
         <div className="artifact-cards">
           {artifacts.map((r) => (

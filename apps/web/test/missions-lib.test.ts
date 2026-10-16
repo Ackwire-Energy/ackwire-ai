@@ -16,6 +16,7 @@ import {
   mdLines,
   missionCardRef,
   missionCells,
+  missionLinkOf,
   missionPlanChangeOf,
   missionPlanOf,
   missionReportOf,
@@ -32,6 +33,7 @@ import {
   taskNoticeOf,
   taskPr,
   taskSeconds,
+  tickFor,
   viaText,
   waitingParts,
   waitingText,
@@ -451,5 +453,26 @@ describe("who programs (ADR 0029, executor agent)", () => {
     const options = executorOptions(t, ["codex", "agent"], "Dev");
     expect(options.map((o) => o.label)).toEqual(["Codex (experimental)", "Dev (o próprio agente)"]);
     expect(executorOptions(te, ["claude"], "Dev")[0]?.description).toContain("Claude Code plans and codes");
+  });
+});
+
+describe("the elapsed clock", () => {
+  test("ticks every second under a minute, then every 15 s, then every minute", () => {
+    expect(tickFor(0)).toBe(1000);
+    expect(tickFor(58)).toBe(1000);
+    expect(tickFor(60)).toBe(15_000);
+    expect(tickFor(3599)).toBe(15_000);
+    expect(tickFor(7200)).toBe(60_000);
+  });
+});
+
+describe("the mission link card", () => {
+  test("reads meta.missionLink; anything else is no card", () => {
+    expect(missionLinkOf({ missionLink: { missionId: "m1", threadId: "t1" } })).toEqual({
+      missionId: "m1",
+      threadId: "t1",
+    });
+    expect(missionLinkOf({ missionLink: { missionId: "m1" } })).toBeNull();
+    expect(missionLinkOf({})).toBeNull();
   });
 });

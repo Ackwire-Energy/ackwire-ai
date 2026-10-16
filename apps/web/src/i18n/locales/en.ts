@@ -2050,7 +2050,7 @@ export const en: Translations = {
     planChange: {
       title: "Plan updated",
       done: "✓ {{title}}",
-      renamed: "{{from}} → {{to}}",
+      renamed: "{{to}} (edited)",
     },
     notice: {
       machine_offline_one: "{{computer}} went offline: “{{title}}” stopped until it's back. Nothing is lost.",
@@ -2123,6 +2123,14 @@ export const en: Translations = {
       stopped: "stopped with the computer",
       dropped: "out of the plan",
     },
+    link: {
+      label: "Mission {{title}}",
+      status: {
+        planning: "Planning",
+        ready: "Waiting for you to start",
+        readyOther: "Plan ready",
+      },
+    },
     list: {
       noItems: "No items yet",
       waitingYouCount_one: "{{count}} waiting for you",
@@ -2131,8 +2139,7 @@ export const en: Translations = {
       ended: "Ended",
       card: "Mission {{title}}",
       more: "More actions for {{title}}",
-      threadIn: "Thread in #{{channel}}",
-      threadInDm: "Thread in a DM",
+      dmWith: "DM with {{name}}",
       started: "started {{date}}",
       waiting: "Waiting for you: {{what}}",
       running_one: "{{count}} task running",

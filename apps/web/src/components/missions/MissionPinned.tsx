@@ -18,9 +18,17 @@ import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { errorText } from "@/lib/errors";
-import { formatSpan, isOpenMission, missionCells, missionTasks, planCells } from "@/lib/missions";
+import {
+  formatSpan,
+  isOpenMission,
+  missionCells,
+  missionCellTitles,
+  missionTasks,
+  planCells,
+  planCellTitles,
+} from "@/lib/missions";
 import { useToast } from "@/lib/toast";
-import { MachineChip, MissionStatusChip, MissionStrip, useMissionPanel, useNow } from "./MissionBits";
+import { MachineChip, MissionStatusChip, MissionStrip, useElapsedNow, useMissionPanel } from "./MissionBits";
 import { CloseMissionDialog, ShareMissionDialog } from "./MissionDialogs";
 import { SessionRows } from "./MissionSessions";
 
@@ -46,13 +54,15 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
   const [dialog, setDialog] = useState<"share" | "close" | null>(null);
   const open = isOpenMission(m);
   const offline = Boolean(m.machine && !m.machine.online);
-  const now = useNow(open, 30_000);
+  const since = m.startedAt ?? m.createdAt;
+  const now = useElapsedNow(since, open);
   const items = plan.data?.current?.items;
   const cells = items ? planCells(items, { offline }) : missionCells(m, { offline });
   const sessions = missionTasks(tasks.data ?? [], m.id);
   const interrupted = sessions.filter((x) => x.status === "interrupted" && !x.endedAt).length;
   const waiting = m.pending.decisions + m.pending.reviews + m.pending.provisional;
-  const since = m.startedAt ?? m.createdAt;
+  // Running: the live session rows when loaded (`machine.task` updates them at once), else the mission's count.
+  const running = tasks.data ? sessions.filter((x) => x.status === "running").length : m.runningTasks;
   const agentName = dir.agentById.get(m.agentId)?.name ?? "";
   const act = (action: MissionControl) =>
     control.mutate(
@@ -74,7 +84,7 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
   return (
     <section className="mi-pinned" aria-label={t("missions.pinned.label", { title: m.title })}>
       <div className="mi-pinned__head">
-        <AgentAvatar agentId={m.agentId} name={agentName} size="sm" running={m.runningTasks > 0 && !offline} />
+        <AgentAvatar agentId={m.agentId} name={agentName} size="sm" running={running > 0 && !offline} />
         <span className="mi-pinned__title">
           <span className="mi-pinned__lab">{t("missions.pinned.lab")}</span>
           <b>{m.title}</b>
@@ -144,6 +154,7 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
         <b>{t("missions.items", { done: m.plan.done, count: m.plan.total })}</b>
         <MissionStrip
           cells={cells}
+          titles={items ? planCellTitles(items) : missionCellTitles(m)}
           agentId={m.agentId}
           label={t("missions.itemsLabel", { done: m.plan.done, count: m.plan.total })}
         />
@@ -156,14 +167,14 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
           </span>
         ) : (
           <span className="mi-pill">
-            {m.runningTasks > 0 ? (
+            {running > 0 ? (
               <span className="mi-run">
                 <Icon name="spinner" size={14} />
               </span>
             ) : (
               <Icon name="pause" size={14} />
             )}
-            {m.runningTasks > 0 ? t("missions.pinned.running", { count: m.runningTasks }) : t("missions.pinned.idle")}
+            {running > 0 ? t("missions.pinned.running", { count: running }) : t("missions.pinned.idle")}
           </span>
         )}
         <span className={waiting > 0 && m.canAct ? "mi-pill mi-pill--need" : "mi-pill"}>

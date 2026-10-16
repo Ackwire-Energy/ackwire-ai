@@ -2061,7 +2061,7 @@ export const ptBR = {
     planChange: {
       title: "Plano atualizado",
       done: "✓ {{title}}",
-      renamed: "{{from}} → {{to}}",
+      renamed: "{{to}} (editado)",
     },
     notice: {
       machine_offline_one: "{{computer}} ficou offline: “{{title}}” parou até ele voltar. Nada se perde.",
@@ -2134,6 +2134,14 @@ export const ptBR = {
       stopped: "parado com o computador",
       dropped: "fora do plano",
     },
+    link: {
+      label: "Missão {{title}}",
+      status: {
+        planning: "Montando o plano",
+        ready: "Esperando você começar",
+        readyOther: "Plano pronto",
+      },
+    },
     list: {
       noItems: "Sem itens ainda",
       waitingYouCount_one: "{{count}} esperando você",
@@ -2142,8 +2150,7 @@ export const ptBR = {
       ended: "Encerradas",
       card: "Missão {{title}}",
       more: "Mais ações de {{title}}",
-      threadIn: "Thread em #{{channel}}",
-      threadInDm: "Thread numa DM",
+      dmWith: "DM com {{name}}",
       started: "começou em {{date}}",
       waiting: "Esperando você: {{what}}",
       running_one: "{{count}} tarefa rodando",
