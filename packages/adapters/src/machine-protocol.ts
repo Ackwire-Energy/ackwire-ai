@@ -556,7 +556,7 @@ export interface MissionMcpTool {
 const RULES_START =
   "You work on an agentes.chat mission. Read the files in .agentes/ first (mission.md, decisions.md, notes.md). Use the agentes tools: keep the plan with update_plan, report milestones with report, ask decisions only with ask_decision, and ask for a review with request_review when you have something to show. Write plan items, reports, decisions and reviews in the language the people use in the thread (the language of the mission goal), short and plain.";
 const RULES_END =
-  "Write what you learn and the next steps in .agentes/notes.md. When a tool tells you to stop and wait, end your turn.";
+  "Plan items are short outcomes in the people's language; never put tool names (request_review, upload_artifact and the like) in them. When every plan item is done, call complete_mission with what you delivered and what the person should check; don't keep working. Write what you learn and the next steps in .agentes/notes.md. When a tool tells you to stop and wait, end your turn.";
 
 /**
  * What a mission's executor is told on every task (ADR 0029) when its folder
@@ -711,6 +711,21 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
         branch: { type: "string", minLength: 1, maxLength: 120 },
       },
       required: ["title", "prompt", "branch"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "complete_mission",
+    description:
+      "When every plan item is done: hand the mission over to the people as a delivery card. summary: what you delivered, in the language the people use in the thread. checklist: what the person should check (short items). paths: files in your folder to attach (uploaded to the Drive). Then stop and wait: the person concludes the mission or asks for changes (you are resumed with them). Don't keep working.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        summary: { type: "string", minLength: 1, maxLength: 4000 },
+        checklist: { type: "array", maxItems: 12, items: { type: "string", minLength: 1, maxLength: 200 } },
+        paths: { type: "array", maxItems: 10, items: { type: "string", minLength: 1, maxLength: 300 } },
+      },
+      required: ["summary"],
       additionalProperties: false,
     },
   },

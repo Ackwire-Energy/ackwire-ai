@@ -252,7 +252,7 @@ export type ChannelEvent =
       channelId: string;
       threadId: string;
       missionId: string;
-      status: "proposed" | "active" | "paused" | "done" | "canceled";
+      status: "proposed" | "active" | "paused" | "done" | "canceled" | "awaiting_close";
       change: string;
       [key: string]: unknown;
     };

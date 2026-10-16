@@ -6,6 +6,7 @@ import { ValidationError } from "./errors";
 import type { MachineMissionHooks } from "./machine-hub";
 import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./machine-tasks";
 import { handlePermissionPrompt } from "./mission-commands";
+import { completeMission } from "./mission-delivery";
 import { createMissionApproval, onMachineOnline } from "./mission-sync";
 import {
   askDecision,
@@ -18,6 +19,7 @@ import {
   noMentions,
   postMissionMessage,
   publishMissionEvent,
+  reactivateMission,
   recordMissionEvent,
   requestReview,
   startSessionTask,
@@ -128,7 +130,7 @@ export async function handleMissionMcpCall(
   if (!mission || mission.id !== task.missionId || mission.machineId !== machineId) {
     return refuse("mission.not_allowed", "This task's mission is not on this computer.");
   }
-  if (!["proposed", "active", "paused"].includes(mission.status)) {
+  if (!["proposed", "active", "paused", "awaiting_close"].includes(mission.status)) {
     return refuse("mission.closed", "The mission is closed: stop here.");
   }
   if (task.endedAt) return refuse("mission.task_ended", "This task already ended.");
@@ -240,6 +242,28 @@ async function run(
         failed.length ? `; not uploaded: ${failed.join(", ")}` : ""
       }. Stop now and wait; you'll be resumed with the people's answer.`;
     }
+    case "complete_mission": {
+      if (!main) return "Only the mission's main session hands the mission over. Report what you did instead.";
+      const paths = Array.isArray(args.paths) ? args.paths.map(String).slice(0, 10) : [];
+      const artifactIds: string[] = [];
+      const failed: string[] = [];
+      for (const p of paths) {
+        try {
+          artifactIds.push((await uploadFromTask(deps, mission, task, p, null)).id);
+        } catch (error) {
+          failed.push(`${p} (${error instanceof Error ? error.message : String(error)})`);
+        }
+      }
+      await completeMission(deps, mission, task, {
+        summary: args.summary,
+        checklist: args.checklist,
+        artifactIds,
+        paths,
+      });
+      return `Delivered${artifactIds.length ? ` with ${artifactIds.length} file(s)` : ""}${
+        failed.length ? `; not uploaded: ${failed.join(", ")}` : ""
+      }. Stop now and wait for the person to check it.`;
+    }
     case "request_approval": {
       const action = str(args.action) as "merge" | "deploy" | "rollback";
       const approval = await createMissionApproval(deps, mission, task, {
@@ -275,6 +299,8 @@ async function run(
       return handlePermissionPrompt(deps, mission, task, args);
     case "start_task": {
       if (!main) return "Only the mission's main session can start tasks. Report what you need instead.";
+      // A new task is new work: a mission waiting to be concluded is active again.
+      if (mission.status === "awaiting_close") mission = await reactivateMission(deps, mission, "task");
       if (mission.status === "paused") {
         throw Object.assign(new Error("The mission is paused: don't start new work now."), { code: "mission.paused" });
       }

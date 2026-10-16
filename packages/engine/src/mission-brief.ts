@@ -95,12 +95,15 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
       : []),
     ...(provisional.length ? [`Provisional decisions to review: ${provisional.length}.`] : []),
     ...(reviews.length ? [`Waiting for a review: ${reviews.map((r) => `"${r.title}"`).join("; ")}.`] : []),
+    ...(mission.status === "awaiting_close"
+      ? ["Every plan item is done: the mission waits for the people to conclude it or ask for changes."]
+      : []),
   ]
     .join("\n")
     .replace(/<\/?mission-data>/gi, "");
   const guidance = agentMode
     ? [
-        `You do this mission's work yourself on ${computer} (no Claude Code or Codex here). Use start_task for anything long (it runs in the background and wakes you here when it ends; don't wait or poll) and run_code for short commands; files with read_file and write_file. Keep the plan with update_plan (mark items doing, done or waiting_you as they move), report milestones with report, ask decisions only with ask_decision (blocking when you can't go on), request_review when there is something to show, and request_approval before any merge, deploy or rollback, then wait. Before the people press Start, only read and plan.`,
+        `You do this mission's work yourself on ${computer} (no Claude Code or Codex here). Use start_task for anything long (it runs in the background and wakes you here when it ends; don't wait or poll) and run_code for short commands; files with read_file and write_file. Keep the plan with update_plan (mark items doing, done or waiting_you as they move), report milestones with report, ask decisions only with ask_decision (blocking when you can't go on), request_review when there is something to show, and request_approval before any merge, deploy or rollback, then wait. When every plan item is done, call complete_mission with what you delivered and what the person should check (files with upload_file first), then stop. Before the people press Start, only read and plan.`,
         `Mission rules: ${MISSION_RULES} When the mission folder is not a git repository (images, documents, files), skip branches, commits and pushes: work in plain folders and deliver results with the Drive or request_review.`,
         "Commands people have: /stop, /pause, /summary, /plan.",
       ]

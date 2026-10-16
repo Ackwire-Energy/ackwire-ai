@@ -7,6 +7,7 @@ import { publishUserEvent } from "./events";
 import { taskRequester } from "./machine-tasks";
 import { getMessage } from "./messages";
 import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
+import { completeMission } from "./mission-delivery";
 import {
   askDecision,
   checkMissionToolRate,
@@ -216,7 +217,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
       async execute(input, ctx) {
         try {
           const mission = await getMissionRow(ctx.db, run.id);
-          if (!mission || !["proposed", "active", "paused"].includes(mission.status)) {
+          if (!mission || !["proposed", "active", "paused", "awaiting_close"].includes(mission.status)) {
             return { content: "The mission is closed: stop here.", isError: true, data: { code: "mission.closed" } };
           }
           if (mission.status === "proposed" && !whileProposed) {
@@ -339,6 +340,42 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
       },
     }),
     bound(run, {
+      name: "complete_mission",
+      description:
+        "When every plan item is done: hand the mission over to the people as a delivery card. summary: what you delivered. checklist: what the person should check (short items). Send files to the Drive first with upload_file and pass their artifact ids. Then end your turn: the person concludes the mission or asks for changes (you are woken with them). Don't keep working. Write it in the language the people use in the thread.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          summary: { type: "string", minLength: 1, maxLength: 4000 },
+          checklist: { type: "array", maxItems: 12, items: { type: "string", minLength: 1, maxLength: 200 } },
+          artifact_ids: { type: "array", maxItems: 10, items: { type: "string", minLength: 36, maxLength: 36 } },
+        },
+        required: ["summary"],
+        additionalProperties: false,
+      },
+      async run(input, ctx, mission) {
+        const asked = (Array.isArray(input.artifact_ids) ? input.artifact_ids.map(String) : []).filter((id) =>
+          /^[0-9a-f-]{36}$/i.test(id),
+        );
+        const found = asked.length
+          ? await ctx.db
+              .select({ id: schema.artifacts.id })
+              .from(schema.artifacts)
+              .where(and(eq(schema.artifacts.orgId, mission.orgId), inArray(schema.artifacts.id, asked)))
+          : [];
+        const delivery = await completeMission(missionDeps(ctx), mission, null, {
+          summary: input.summary,
+          checklist: input.checklist,
+          artifactIds: found.map((a) => a.id),
+        });
+        return {
+          content: `Delivered${found.length ? ` with ${found.length} file(s)` : ""}${
+            found.length < asked.length ? `; ${asked.length - found.length} id(s) not found in the Drive` : ""
+          } (${delivery.id}). Stop now and wait for the person to check it: end your turn.`,
+        };
+      },
+    }),
+    bound(run, {
       name: "request_approval",
       description:
         "Ask a person to approve a merge, a deploy or a rollback before you do it. Never merge, deploy or roll back without an approval. Your run waits for the decision; once approved, do it.",
@@ -366,7 +403,15 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
     name: "missions",
     async tools(ctx) {
       const keys = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-      const names = ["propose_mission", "send_to_mission", "update_plan", "report", "ask_decision", "request_review"];
+      const names = [
+        "propose_mission",
+        "send_to_mission",
+        "update_plan",
+        "report",
+        "ask_decision",
+        "request_review",
+        "complete_mission",
+      ];
       const granted =
         keys.has(grantKey(null, SANDBOX_SCOPE)) || names.some((n) => keys.has(grantKey(null, toolAllowScope(n))));
       if (!granted || !deps.hub) return [];

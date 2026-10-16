@@ -13,7 +13,7 @@ import {
 import { type Executor, rowsOf, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
-import { publishMessageCreated } from "./events";
+import { publishMessageCreated, publishUserEvent } from "./events";
 import type { MachineTaskRow } from "./machine-tasks";
 import { messageView } from "./messages";
 import { addMissionAllowRules, blockedOfTask, missionAllowRules } from "./mission-command-rules";
@@ -24,6 +24,7 @@ import {
   latestPlan,
   type MissionDeps,
   type MissionRow,
+  missionAnswerers,
   noMentions,
   postMissionMessage,
   publishMissionEvent,
@@ -246,6 +247,23 @@ async function readPrompts(db: Executor, missionId: string, promptId?: string): 
   return [...byId.values()].reverse();
 }
 
+/**
+ * The owner and the deciders hear a command card opened or was answered
+ * (`mission.needs_you { kind: command }`): their Aprovações page refreshes
+ * even outside the mission's conversation.
+ */
+async function notifyCommand(deps: Pick<MissionDeps, "db" | "pubsub">, mission: MissionRow, promptId: string) {
+  for (const userId of await missionAnswerers(deps.db, mission)) {
+    await publishUserEvent(deps.pubsub, mission.orgId, userId, {
+      type: "mission.needs_you",
+      kind: "command",
+      missionId: mission.id,
+      threadId: mission.threadRootId,
+      promptId,
+    });
+  }
+}
+
 const allow = () => JSON.stringify({ behavior: "allow" });
 const deny = (message: string) => JSON.stringify({ behavior: "deny", message });
 
@@ -334,6 +352,7 @@ export async function handlePermissionPrompt(
   });
   if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
   await publishMissionEvent(deps, mission, "command", { promptId });
+  await notifyCommand(deps, mission, promptId);
   return JSON.stringify({ status: "pending", request_id: promptId });
 }
 
@@ -381,6 +400,7 @@ export async function decideCommand(
     details: { promptId, command: p.command.slice(0, 300), ...(decision === "always" ? { rules: p.rules } : {}) },
   });
   await publishMissionEvent(deps, mission, "command", { promptId });
+  await notifyCommand(deps, mission, promptId);
   const [after] = await readPrompts(deps.db, mission.id, promptId);
   return after as MissionCommandView;
 }

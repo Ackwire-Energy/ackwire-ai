@@ -7,6 +7,7 @@ import { publishMessageCreated, publishUserEvent } from "./events";
 import { formatDuration, getTask, type MachineTaskRow, taskEndNotice, taskSeconds } from "./machine-tasks";
 import { getMachineById } from "./machines";
 import { messageView } from "./messages";
+import { checkMissionDone } from "./mission-delivery";
 import {
   deliverInbox,
   getMissionRow,
@@ -20,6 +21,7 @@ import {
   postMissionMessage,
   publishMissionEvent,
   recordMissionEvent,
+  scheduleDoneCheck,
   tellSession,
   wakeMissionAgent,
 } from "./missions";
@@ -311,7 +313,7 @@ export async function onMissionTaskEnded(deps: MissionDeps, taskId: string) {
   const mission = await getMissionRow(deps.db, task.missionId);
   if (!mission) return;
   await readNotesBack(deps, mission, task).catch(() => null);
-  const open = ["proposed", "active", "paused"].includes(mission.status);
+  const open = ["proposed", "active", "paused", "awaiting_close"].includes(mission.status);
   if (mission.executor === "agent") {
     if (open) await wakeAgentForTask(deps, mission, task);
   } else {
@@ -332,6 +334,10 @@ export async function onMissionTaskEnded(deps: MissionDeps, taskId: string) {
   }
   await deliverInbox(deps, mission.id).catch(() => 0);
   await publishMissionEvent(deps, mission, "task", { taskId: task.id });
+  // The last task ended with every item done: the mission waits to be concluded (agent mode: a bit later,
+  // its run may still deliver by itself).
+  if (mission.executor === "agent") await scheduleDoneCheck(deps.db, mission);
+  else await checkMissionDone(deps, mission.id).catch(() => null);
 }
 
 /**

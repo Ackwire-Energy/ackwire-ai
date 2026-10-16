@@ -14,8 +14,9 @@ import { advanceForumTopic } from "./forum";
 import { mentionHandoffs } from "./judge";
 import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
 import { getMessage } from "./messages";
+import { checkMissionDone } from "./mission-delivery";
 import { onMissionApprovalDecided, onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
-import { type MissionDeps, missionOfThread, missionRole } from "./missions";
+import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import {
   createLlmRouterStrategy,
@@ -231,6 +232,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (where?.kind === "forum") return;
       // Addressed a mission's agent without the right to act there (ADR 0029): a suggestion, no run.
       if (message.meta.missionSuggestion) return routed("none", message.mentionedAgentIds, [], "mission_suggestion");
+      // Someone who acts in a mission waiting to be concluded wrote in its thread: new work, active again.
+      if (message.authorType === "person" && message.threadId && message.authorUserId) {
+        const waiting = await missionOfThread(deps.db, message.orgId, message.threadId);
+        if (waiting?.status === "awaiting_close") {
+          const role = await missionRole(deps.db, waiting, message.authorUserId);
+          if (role === "owner" || role === "decide") await reactivateMission(missions, waiting, "message");
+        }
+      }
       if (message.authorType !== "person") {
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
@@ -245,7 +254,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
             if (
               mission &&
               allowed.includes(mission.agentId) &&
-              ["proposed", "active", "paused"].includes(mission.status)
+              ["proposed", "active", "paused", "awaiting_close"].includes(mission.status)
             ) {
               const person = await requesterOf(deps.db, message);
               const role = person ? await missionRole(deps.db, mission, person) : "none";
@@ -276,7 +285,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       // In a mission's thread only its owner and deciders make the agent work (the router included).
       if (message.threadId && message.authorUserId) {
         const mission = await missionOfThread(deps.db, message.orgId, message.threadId);
-        if (mission && ["proposed", "active", "paused"].includes(mission.status)) {
+        if (mission && ["proposed", "active", "paused", "awaiting_close"].includes(mission.status)) {
           const role = await missionRole(deps.db, mission, message.authorUserId);
           if (role !== "owner" && role !== "decide") return routed("none", [], [], "mission_read_only");
         }
@@ -362,6 +371,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // The `.agentes/` files of a mission changed (debounced): written to its machine.
     "mission.sync_files": async (job) => {
       await syncMissionFiles(missions, String(job.payload.missionId));
+    },
+    // A mission's plan finished or its work stopped: is everything done (then it waits to be concluded)?
+    "mission.check_done": async (job) => {
+      await checkMissionDone(missions, String(job.payload.missionId), Number(job.payload.attempt ?? 0) || 0);
     },
     // An approval asked by a mission's executor was decided or expired: its session is resumed.
     "mission.approval_decided": async (job) => {
