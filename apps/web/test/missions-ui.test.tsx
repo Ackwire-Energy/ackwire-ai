@@ -96,10 +96,14 @@ describe("Missões (Threads.html)", () => {
     const atlas = screen().getByRole("option", { name: /^Atlas/ });
     expect(atlas.getAttribute("aria-disabled")).toBe("true");
     expect(atlas.textContent).toContain("missões lá chegam depois");
-    const blocked = within(dialog).getByRole("list", { name: "Agentes que ainda não podem rodar uma missão" });
-    expect(within(blocked).getByRole("link", { name: "Conectar computador" }).getAttribute("href")).toContain(
-      `/agents/${ATLAS_ID}`,
-    );
+    // The open agent list hides the rest of the dialog from the accessibility tree (a modal popover).
+    const blocked = within(dialog).getByRole("list", {
+      name: "Agentes que ainda não podem rodar uma missão",
+      hidden: true,
+    });
+    expect(
+      within(blocked).getByRole("link", { name: "Conectar computador", hidden: true }).getAttribute("href"),
+    ).toContain(`/agents/${ATLAS_ID}`);
     // Somebody can: no empty state.
     expect(within(dialog).queryByText("Nenhum agente pode rodar uma missão para você ainda")).toBeNull();
   });

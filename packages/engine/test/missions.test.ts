@@ -1059,8 +1059,9 @@ describe("missions (ADR 0029)", () => {
       expect(
         (await prompt(main.taskId, { tool_name: "Bash", input: { command: "swift build -c release" } })).request_id,
       ).toBe(id);
-      // Only the owner or a decider answers.
+      // Only the owner or a decider answers (bia reads the conversation, but doesn't decide).
       const bia = await addMember(f.db, f.org.id, "member", "bia");
+      await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
       await expect(decideCommand(md(), bia.id, f.org.id, view.id, id, "allow")).rejects.toMatchObject({
         code: "mission.not_allowed",
       });

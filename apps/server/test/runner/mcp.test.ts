@@ -5,6 +5,7 @@ import { PassThrough } from "node:stream";
 import {
   MISSION_MCP_TOOLS,
   MISSION_PROTOCOL,
+  MISSION_RULES_NO_GIT,
   parseRunnerFrame,
   parseServerFrame,
   type RunnerFrame,
@@ -258,7 +259,9 @@ test.skipIf(!posix)(
     });
     expect(started.command).toContain("--mcp-config");
     expect(started.command).toContain("--allowedTools mcp__agentes");
-    expect(started.command).toContain("--append-system-prompt 'Read .agentes/ first.'");
+    // The workspace isn't a git repository: the rules for a folder without git replace the given ones.
+    expect(started.command).toContain(`--append-system-prompt '${cleanRules(MISSION_RULES_NO_GIT)}'`);
+    expect(started.command).not.toContain("Read .agentes/ first.");
     const info = tasks.mcpTask(TASK);
     expect(info).toMatchObject({ missionId: "0193aaaa-0000-7000-8000-0000000000bb", running: true });
     const config = JSON.parse(readFileSync(path.join(home, "tasks", TASK, "mcp.json"), "utf8"));
