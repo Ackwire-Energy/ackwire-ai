@@ -93,7 +93,11 @@ export function resolveTaskPath(given: string, info: Pick<McpTaskInfo, "cwd" | "
   return null;
 }
 
-const PATH_ARGS: Record<string, "path" | "paths"> = { upload_artifact: "path", request_review: "paths" };
+const PATH_ARGS: Record<string, "path" | "paths"> = {
+  upload_artifact: "path",
+  request_review: "paths",
+  complete_mission: "paths",
+};
 
 export interface IpcRequest {
   taskId: string;

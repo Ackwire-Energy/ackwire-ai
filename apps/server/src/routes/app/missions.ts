@@ -1,5 +1,7 @@
 import {
+  acceptDelivery,
   approveProvisionalDecisions,
+  checkDeliveryItem,
   chooseDecision,
   closeMission,
   createMission,
@@ -14,6 +16,7 @@ import {
   getMissionPlan,
   getTaskOutput,
   listDecisions,
+  listDeliveries,
   listJoinRequests,
   listMissionCommands,
   listMissions,
@@ -26,6 +29,7 @@ import {
   opineDecision,
   pauseMission,
   removeParticipant,
+  requestDeliveryChanges,
   requestToJoin,
   resumeMission,
   retryBlockedCommand,
@@ -52,7 +56,9 @@ import {
 } from "./context";
 
 const tags = ["Missions"];
-const Status = z.enum(["proposed", "active", "paused", "done", "canceled"]);
+const Status = z.enum(["proposed", "active", "paused", "done", "canceled", "awaiting_close"]).openapi({
+  description: "awaiting_close: every plan item is done and nothing runs; it waits for its owner to conclude it.",
+});
 const Executor = z
   .enum(["claude", "codex", "agent"])
   .openapi({ description: "Who programs: Claude Code, Codex (experimental) or the agent itself with its own tools." });
@@ -102,6 +108,9 @@ const Mission = z
       commands: z
         .number()
         .openapi({ description: "Command cards waiting for an answer (0 unless you can answer them)." }),
+      deliveries: z
+        .number()
+        .openapi({ description: "Delivery cards waiting to be concluded (0 unless you can answer them)." }),
     }),
     joinRequested: z.boolean().openapi({ description: "You asked to join and nobody answered yet." }),
     runningTasks: z.number(),
@@ -166,6 +175,28 @@ const Review = z
     createdAt: z.string(),
   })
   .openapi("MissionReview");
+
+const Delivery = z
+  .object({
+    id: z.uuid(),
+    missionId: z.uuid(),
+    taskId: z.string().nullable(),
+    messageId: z.string().nullable(),
+    auto: z.boolean().openapi({ description: "Made by us: every plan item done and no complete_mission call." }),
+    summary: z.string(),
+    artifactIds: z.array(z.string()),
+    paths: z.array(z.string()),
+    checklist: z.array(z.object({ id: z.string(), text: z.string(), checkedBy: z.array(z.string()) })).openapi({
+      description: '"O que conferir": each item with the people who checked it (each person checks alone).',
+    }),
+    status: z.enum(["pending", "accepted", "changes_requested", "superseded"]),
+    note: z.string().nullable(),
+    saveToWiki: z.boolean(),
+    decidedBy: z.string().nullable(),
+    decidedAt: z.string().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi("MissionDelivery");
 
 const Participants = z.object({
   owner: z.object({ userId: z.string(), name: z.string() }).nullable(),
@@ -287,7 +318,17 @@ export function missionRoutes(deps: AppDeps) {
         params: OrgParams,
         query: z.object({
           status: z
-            .enum(["open", "closed", "waiting_you", "proposed", "active", "paused", "done", "canceled"])
+            .enum([
+              "open",
+              "closed",
+              "waiting_you",
+              "proposed",
+              "active",
+              "paused",
+              "done",
+              "canceled",
+              "awaiting_close",
+            ])
             .optional(),
           channelId: z.uuid().optional(),
           agentId: z.uuid().optional(),
@@ -845,10 +886,23 @@ export function missionRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        '"Liberar e repetir": a command a task was refused becomes allowed for the mission and its session is resumed to retry it',
+        '"Liberar e repetir": commands a task was refused become allowed for the mission and its session is resumed once to retry them (mission.paused while paused, mission.closed once closed)',
       request: {
         params: MissionParams,
-        body: body(z.object({ taskId: z.uuid(), command: z.string().min(1).max(1000) })),
+        body: body(
+          z
+            .object({
+              taskId: z.uuid(),
+              command: z.string().min(1).max(1000).optional(),
+              commands: z
+                .array(z.string().min(1).max(1000))
+                .min(1)
+                .max(20)
+                .optional()
+                .openapi({ description: "Several blocked commands of the task at once (one resume)." }),
+            })
+            .refine((v) => Boolean(v.command || v.commands?.length), { message: "command or commands" }),
+        ),
       },
       responses: {
         200: json(z.object({ rules: z.array(z.string()), delivered: z.boolean() })),
@@ -980,6 +1034,92 @@ export function missionRoutes(deps: AppDeps) {
       },
     );
   }
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/missions/{missionId}/deliveries",
+      tags,
+      security,
+      summary: "Its delivery cards (complete_mission, or the automatic one when every item is done), newest first",
+      request: { params: MissionParams },
+      responses: { 200: json(z.array(Delivery)), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      return c.json(await listDeliveries(missions(), c.get("user").id, orgId, missionId), 200);
+    },
+  );
+
+  const DeliveryParams = MissionParams.extend({ deliveryId: z.uuid() });
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/missions/{missionId}/deliveries/{deliveryId}/checks/{itemId}",
+      tags,
+      security,
+      summary: '"O que conferir": check or uncheck one item for yourself (owner or deciders)',
+      request: {
+        params: DeliveryParams.extend({ itemId: z.string().min(1).max(40) }),
+        body: body(z.object({ checked: z.boolean() })),
+      },
+      responses: { 200: json(Delivery), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId, deliveryId, itemId } = c.req.valid("param");
+      const out = await checkDeliveryItem(
+        missions(),
+        c.get("user").id,
+        orgId,
+        missionId,
+        deliveryId,
+        itemId,
+        c.req.valid("json").checked,
+      );
+      return c.json(out, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/missions/{missionId}/deliveries/{deliveryId}/accept",
+      tags,
+      security,
+      summary: '"Concluir missão" (owner or deciders): the mission closes as done, optionally its lessons in the wiki',
+      request: { params: DeliveryParams, body: body(z.object({ saveToWiki: z.boolean().optional() })) },
+      responses: { 200: json(Mission), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId, deliveryId } = c.req.valid("param");
+      const out = await acceptDelivery(missions(), c.get("user").id, orgId, missionId, deliveryId, c.req.valid("json"));
+      return c.json(after(out), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/missions/{missionId}/deliveries/{deliveryId}/changes",
+      tags,
+      security,
+      summary: '"Pedir ajustes" (owner or deciders): the mission is active again and the note goes to its main session',
+      request: { params: DeliveryParams, body: body(z.object({ note: z.string().min(1).max(4000) })) },
+      responses: { 200: json(Mission), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId, deliveryId } = c.req.valid("param");
+      const out = await requestDeliveryChanges(
+        missions(),
+        c.get("user").id,
+        orgId,
+        missionId,
+        deliveryId,
+        c.req.valid("json"),
+      );
+      return c.json(after(out), 200);
+    },
+  );
 
   const SuggestionParams = MissionParams.extend({ messageId: z.uuid() });
   for (const [action, outcome] of [

@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
+import { completeMission, getMissionRow } from "@agenteschat/engine";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -249,4 +250,81 @@ test("missions API: who programs: eligible agents list it, POST takes it, the ow
   await api(`/missions/${mission.id}/start`, { json: {} });
   const late = await api(`/missions/${mission.id}/executor`, { method: "PUT", json: { executor: "agent" } });
   expect(late.status).toBe(409);
+});
+
+test("missions API: deliveries — list, check per person, Pedir ajustes (active again), Concluir (done)", async () => {
+  t = await createTestServer({ env: { ALLOW_SIGNUP: "true" }, reply: () => ({ chunks: ["ok"] }) });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const pairing = (await (await api("/machines/pairings", { json: { name: "MacBook" } })).json()) as { code: string };
+  const paired = (await (
+    await t.app.request("/api/machines/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
+      body: JSON.stringify({ code: pairing.code, ...RUNNER, exec: true }),
+    })
+  ).json()) as { machineId: string; token: string };
+  await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: paired.machineId } });
+  const runner = fakeRunner();
+  await runner.hello(paired.token);
+  const mission = (await (
+    await api("/missions", { json: { agentId, channelId, goal: "Build our mobile app", title: "Mobile app" } })
+  ).json()) as Mission;
+  expect((await api(`/missions/${mission.id}/start`, { json: {} })).status).toBe(200);
+
+  const deliver = async (summary: string) =>
+    completeMission(
+      { db: t.db },
+      (await getMissionRow(t.db, mission.id)) as NonNullable<Awaited<ReturnType<typeof getMissionRow>>>,
+      null,
+      {
+        summary,
+        checklist: ["Open it on the phone"],
+      },
+    );
+  const first = await deliver("The app builds");
+  const view = (await (await api(`/missions/${mission.id}`)).json()) as Mission & { pending: { deliveries: number } };
+  expect(view.status).toBe("awaiting_close");
+  expect(view.pending.deliveries).toBe(1);
+
+  const listed = await api(`/missions/${mission.id}/deliveries`);
+  expect(listed.status).toBe(200);
+  expect(await listed.json()).toEqual([
+    expect.objectContaining({ id: first.id, status: "pending", auto: false, summary: "The app builds" }),
+  ]);
+  const checked = await api(`/missions/${mission.id}/deliveries/${first.id}/checks/c1`, {
+    method: "PUT",
+    json: { checked: true },
+  });
+  expect(checked.status).toBe(200);
+  const body = (await checked.json()) as { checklist: { id: string; checkedBy: string[] }[] };
+  expect(body.checklist[0]?.checkedBy).toHaveLength(1);
+  expect(
+    (await api(`/missions/${mission.id}/deliveries/${first.id}/checks/zz`, { method: "PUT", json: { checked: true } }))
+      .status,
+  ).toBe(404);
+  const anon = browser(t);
+  expect((await anon(`/api/app/organizations/${orgId}/missions/${mission.id}/deliveries`)).status).toBe(401);
+
+  expect((await api(`/missions/${mission.id}/deliveries/${first.id}/changes`, { json: { note: "" } })).status).toBe(
+    400,
+  );
+  const changed = await api(`/missions/${mission.id}/deliveries/${first.id}/changes`, {
+    json: { note: "Bigger buttons" },
+  });
+  expect(changed.status).toBe(200);
+  expect(((await changed.json()) as Mission).status).toBe("active");
+  const again = await api(`/missions/${mission.id}/deliveries/${first.id}/accept`, { json: {} });
+  expect(again.status).toBe(409);
+  expect(((await again.json()) as { error: { code: string } }).error.code).toBe("mission.delivery_decided");
+
+  const second = await deliver("Now with bigger buttons");
+  const done = await api(`/missions/${mission.id}/deliveries/${second.id}/accept`, { json: { saveToWiki: false } });
+  expect(done.status).toBe(200);
+  expect(((await done.json()) as Mission).status).toBe("done");
+  const all = (await (await api(`/missions/${mission.id}/deliveries`)).json()) as { status: string }[];
+  expect(all.map((d) => d.status)).toEqual(["accepted", "changes_requested"]);
 });
