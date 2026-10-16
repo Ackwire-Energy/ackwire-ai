@@ -87,6 +87,7 @@ What it means: the agent does whatever the owner's session can do, with their lo
 - **Two modes, chosen by the owner:** *watched* (runs only while someone with access has the live view open) and *alone* (runs unattended within the caps). Default: watched.
 - **Session approval:** starting a desktop session is an approval card in the chat (who, what for, how long), approved by the machine owner. Agent browser and virtual desktop sessions don't need it.
 - **Approvals are not binding here.** With the owner's logins, the agent could click "Merge" in a browser where the owner is signed in. Same limit as ADR 0030 states for credentials; the docs say it plainly and recommend the virtual desktop or the agent browser for anything that matters.
+- **A rented Mac is one option, not the recommendation.** A Mac rented in the cloud (MacinCloud and similar) is just another connected machine: the runner needs Node 22+ or Bun, outbound HTTPS/WebSocket and a user-level launchd agent (no admin). For the owner's desktop it also needs a logged-in graphical session (automatic login) and the two permissions granted once over remote access. Plans without admin rights or that end background processes at logout may not work; the docs list these checks. Whatever logins are left open on that Mac still apply to the agent.
 
 ### 5. Watching and stopping
 
@@ -122,6 +123,8 @@ New ops: `screen.info` (monitors, scale), `screen.capture { monitor, maxEdge, fo
 3. Virtual desktop in the Daytona image; documented VM/container image for level 3.
 4. Owner's desktop: macOS helper first (signing, permissions flow), then Windows, then Linux X11; per-agent choice that turns protected mode off; session approval card.
 5. `type_secret`.
+
+Test case: a rented Mac (MacinCloud) paired as a connected machine runs the whole path end to end (pairing, `--desktop`, permissions, automatic login, an agent with `owner_desktop`, live view, Stop, local input pausing the agent, reconnection after the provider restarts the Mac).
 
 ## Consequences
 
