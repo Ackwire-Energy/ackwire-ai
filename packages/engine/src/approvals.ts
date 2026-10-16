@@ -80,7 +80,8 @@ const resultOf = (a: Approval): ApprovalView["result"] => {
 async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<string, ApprovalContext>> {
   const out = new Map<string, ApprovalContext>();
   if (rows.length === 0) return out;
-  const runIds = [...new Set(rows.map((r) => r.runId))];
+  // Mission approvals (ADR 0029) have no run.
+  const runIds = [...new Set(rows.map((r) => r.runId).filter((id): id is string => !!id))];
   const connectionIds = [...new Set(rows.map((r) => r.connectionId).filter((id): id is string => !!id))];
   const [connections, steps, runs] = await Promise.all([
     connectionIds.length
@@ -93,18 +94,22 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
           .from(connectorConnections)
           .where(inArray(connectorConnections.id, connectionIds))
       : Promise.resolve([]),
-    db
-      .select({
-        runId: agentRunSteps.runId,
-        kind: agentRunSteps.kind,
-        narration: sql<string | null>`${agentRunSteps.data}->>'narration'`,
-        approvalId: sql<string | null>`${agentRunSteps.data}->>'approvalId'`,
-        createdAt: agentRunSteps.createdAt,
-      })
-      .from(agentRunSteps)
-      .where(and(inArray(agentRunSteps.runId, runIds), inArray(agentRunSteps.kind, ["model_call", "approval"])))
-      .orderBy(agentRunSteps.runId, agentRunSteps.seq),
-    db.select({ id: agentRuns.id, issueId: agentRuns.issueId }).from(agentRuns).where(inArray(agentRuns.id, runIds)),
+    runIds.length
+      ? db
+          .select({
+            runId: agentRunSteps.runId,
+            kind: agentRunSteps.kind,
+            narration: sql<string | null>`${agentRunSteps.data}->>'narration'`,
+            approvalId: sql<string | null>`${agentRunSteps.data}->>'approvalId'`,
+            createdAt: agentRunSteps.createdAt,
+          })
+          .from(agentRunSteps)
+          .where(and(inArray(agentRunSteps.runId, runIds), inArray(agentRunSteps.kind, ["model_call", "approval"])))
+          .orderBy(agentRunSteps.runId, agentRunSteps.seq)
+      : Promise.resolve([]),
+    runIds.length
+      ? db.select({ id: agentRuns.id, issueId: agentRuns.issueId }).from(agentRuns).where(inArray(agentRuns.id, runIds))
+      : Promise.resolve([]),
   ]);
   const issueIds = [...new Set(runs.map((r) => r.issueId).filter((id): id is string => !!id))];
   const issueRows = issueIds.length
@@ -128,7 +133,7 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
       connector: connection?.connector ?? null,
       connectorAccount: connection?.account ?? null,
       why: trail.at(-1)?.text.slice(0, 1000) ?? null,
-      issue: issueOfRun.get(row.runId) ?? null,
+      issue: row.runId ? (issueOfRun.get(row.runId) ?? null) : null,
       trail: trail.slice(-12),
     });
   }
