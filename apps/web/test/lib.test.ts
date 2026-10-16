@@ -130,7 +130,7 @@ describe("grammar", () => {
     expect(isFeminineName("Ada")).toBe(true);
     expect(isFeminineName("Theo")).toBe(false);
     expect(t("agent.howWorks", agentGrammar(t, "Ada"))).toBe("Como a Ada trabalha");
-    expect(t("agent.permissionsTitle", agentGrammar(t, "Atlas"))).toBe("O que o Atlas pode fazer");
+    expect(t("agentPage.overview.does", agentGrammar(t, "Atlas"))).toBe("O que o Atlas faz");
     expect(t("memory.subtitle", agentGrammar(t, "Ada"))).toContain("entra no contexto dela");
   });
 });

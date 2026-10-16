@@ -54,29 +54,20 @@ describe("the agent's look", () => {
     expect(a.querySelector("canvas.ac-avatar__canvas")).not.toBeNull();
   });
 
-  test("Aparência: pick color, eyes and accessory with a live preview; saves; the sidebar shows it", async () => {
+  test("Configurações: pick color, eyes and accessory in place; the cover shows it; Salvar; the sidebar shows it", async () => {
     const state = seedState();
-    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api: createFakeApi(state) });
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, { api: createFakeApi(state) });
     await settle(8);
-    await click(screen().getByRole("button", { name: "Aparência" }));
-    const dialog = screen().getByRole("dialog", { name: "Aparência da Ada" });
-    const preview = within(dialog).getByRole("img", { name: "Ada" });
-    await click(within(within(dialog).getByRole("radiogroup", { name: "Cor" })).getByRole("radio", { name: "Rosa" }));
-    await click(
-      within(within(dialog).getByRole("radiogroup", { name: "Olhos" })).getByRole("radio", { name: "Felizes" }),
-    );
-    await click(
-      within(within(dialog).getByRole("radiogroup", { name: "Acessório" })).getByRole("radio", { name: "Coroa" }),
-    );
-    expect(preview.getAttribute("data-eyes")).toBe("happy");
-    expect(preview.getAttribute("data-accessory")).toBe("crown");
-    await click(
-      within(within(dialog).getByRole("radiogroup", { name: "Ver como fica" })).getByRole("radio", {
-        name: "Pensando",
-      }),
-    );
-    expect(preview.className).toContain("ac-avatar--thinking");
-    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await click(within(screen().getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
+    await click(within(screen().getByRole("group", { name: "Olhos" })).getByRole("button", { name: /Felizes/ }));
+    await click(within(screen().getByRole("group", { name: "Acessório" })).getByRole("button", { name: /Coroa/ }));
+    // The agent on the cover is the draft.
+    const cover = document.querySelector(".agp-cover .ac-avatar") as HTMLElement;
+    expect(cover.getAttribute("data-eyes")).toBe("happy");
+    expect(cover.getAttribute("data-accessory")).toBe("crown");
+    expect(document.body.textContent).toContain("Antes: Céu · Redondos");
+    const bar = screen().getByRole("region", { name: "Alterações não salvas" });
+    await click(within(bar).getByRole("button", { name: /^Salvar/ }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
       appearance: { color: "rose", eyes: "happy", accessory: "crown" },
@@ -85,14 +76,12 @@ describe("the agent's look", () => {
     expect(nav.querySelector('[data-accessory="crown"]')).not.toBeNull();
   });
 
-  test("Aleatório changes the look (Salvar turns on)", async () => {
-    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api: createFakeApi(seedState()) });
+  test("Sortear changes the look (the save bar shows up)", async () => {
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, { api: createFakeApi(seedState()) });
     await settle(8);
-    await click(screen().getByRole("button", { name: "Aparência" }));
-    const dialog = screen().getByRole("dialog", { name: "Aparência da Ada" });
-    expect((within(dialog).getByRole("button", { name: "Salvar" }) as HTMLButtonElement).disabled).toBe(true);
-    await click(within(dialog).getByRole("button", { name: "Aleatório" }));
-    expect((within(dialog).getByRole("button", { name: "Salvar" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen().queryByRole("region", { name: "Alterações não salvas" })).toBeNull();
+    await click(screen().getByRole("button", { name: "Sortear" }));
+    expect(screen().getByRole("region", { name: "Alterações não salvas" }).textContent).toContain("Jeito");
   });
 });
 
@@ -105,7 +94,7 @@ describe("the agent's name and role", () => {
     await act(() => new Promise((r) => setTimeout(r, 0)));
   };
 
-  test("Mais ações → Editar nome e cargo: saves both; the @handle stays", async () => {
+  test("Mais ações → Editar nome e cargo: edited in Configurações, saved together; the @handle stays", async () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api: createFakeApi(state) });
     await settle(8);
@@ -113,13 +102,17 @@ describe("the agent's name and role", () => {
     trigger.focus();
     await key(trigger, "Enter");
     await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Editar nome e cargo" }));
-    const dialog = screen().getByRole("dialog", { name: "Nome e cargo" });
-    expect(dialog.textContent).toContain("@ada");
-    const name = within(dialog).getByLabelText("Nome") as HTMLInputElement;
-    const role = within(dialog).getByLabelText("Cargo") as HTMLInputElement;
+    await settle(4);
+    expect(document.body.textContent).toContain("As menções continuam por @ada.");
+    const name = screen().getByLabelText("Nome") as HTMLInputElement;
+    const role = screen().getByLabelText("Cargo") as HTMLInputElement;
     await act(async () => fireEvent.change(name, { target: { value: "Ada Lovelace" } }));
     await act(async () => fireEvent.change(role, { target: { value: "Tech lead" } }));
-    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    // The page title follows the draft.
+    expect(screen().getByRole("heading", { level: 1 }).textContent).toBe("Ada Lovelace");
+    await click(
+      within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
+    );
     await settle(6);
     const call = state.calls.find((c) => c.method === "agents.update");
     expect(call?.args[2]).toEqual({ name: "Ada Lovelace", role: "Tech lead" });

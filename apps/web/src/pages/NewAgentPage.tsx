@@ -1,12 +1,7 @@
 import {
   AffixInput,
-  AGENT_ACCESSORIES,
-  AGENT_COLORS,
-  AGENT_EYES,
   type AgentAppearance,
   type AgentColor,
-  Avatar,
-  agentGradient,
   Button,
   Card,
   CheckboxPill,
@@ -21,13 +16,11 @@ import {
   modKey,
   prefersReducedMotion,
   randomAppearance,
-  Select,
-  type SelectOption,
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import type { TFunction } from "i18next";
-import { type CSSProperties, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+
+import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import {
@@ -42,10 +35,22 @@ import {
   useSettings,
   useSkills,
 } from "@/api/queries";
-import type { Agent, AgentAudience, Credential, Model } from "@/api/types";
+import type { Agent, AgentAudience } from "@/api/types";
 import { LevelRow, useConnectedById } from "@/components/AccessLevels";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import {
+  BudgetField,
+  DEFAULT_KEY,
+  InstructionTips,
+  KeySelect,
+  keyOptions,
+  LookPicker,
+  ModelCards,
+  NO_OWNER,
+  OwnerSelect,
+  usd,
+} from "@/components/AgentFields";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { useMediaQuery } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
@@ -69,7 +74,6 @@ import {
   presetChannels,
   presetLevels,
   presetModel,
-  QUICK_BUDGETS,
   ROLE_IDS,
   ROLE_PRESETS,
   type RoleId,
@@ -77,70 +81,8 @@ import {
   stepErrors,
 } from "@/lib/new-agent";
 import { can } from "@/lib/permissions";
-import { modelChoices, providerLabel } from "@/lib/providers";
+import { modelChoices } from "@/lib/providers";
 import { scopeText } from "@/lib/scopes";
-
-/** Select value for "Sem responsável" (the API takes `ownerUserId: null`). */
-export const NO_OWNER = "__none__";
-
-/** Model descriptions of the approved screen, by model family. */
-export function modelDescription(t: TFunction, locale: string, model: Model) {
-  const id = model.id.toLowerCase();
-  if (id.includes("sonnet")) return t("newAgent.modelDesc.sonnet");
-  if (id.includes("opus")) return t("newAgent.modelDesc.opus");
-  if (id.includes("haiku")) return t("newAgent.modelDesc.haiku");
-  const fmt = (n: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n);
-  return t("newAgent.modelDesc.other", { input: fmt(model.inputUsdPerMTok), output: fmt(model.outputUsdPerMTok) });
-}
-
-/** Value of the "Chave padrão do workspace" option (the API takes `credentialId: null`). */
-export const DEFAULT_KEY = "__default__";
-
-/**
- * Key choices: the workspace default first (with its masked hint), then the
- * other stored keys.
- */
-export function keyOptions(t: TFunction, credentials: Credential[], defaultId: string | null): SelectOption[] {
-  const live = credentials.filter((c) => !c.revokedAt);
-  const def = live.find((c) => c.id === defaultId);
-  return [
-    {
-      value: DEFAULT_KEY,
-      label: t("newAgent.defaultKey"),
-      description: def
-        ? t("newAgent.defaultKeyDesc", { provider: providerLabel(def.provider), hint: def.keyHint })
-        : undefined,
-    },
-    ...live
-      .filter((c) => c.id !== defaultId)
-      .map((c) => ({
-        value: c.id,
-        label: c.label,
-        description: t("newAgent.otherKeyDesc", { provider: providerLabel(c.provider), hint: c.keyHint }),
-      })),
-  ];
-}
-
-/** Models grouped by provider; those without a key are disabled and say why. */
-export function modelOptions(
-  t: TFunction,
-  locale: string,
-  models: Model[],
-  credentials: Credential[],
-  platform: boolean,
-): SelectOption[] {
-  return modelChoices(models, credentials, platform).flatMap(([provider, choices]) =>
-    choices.map(({ model, available }) => ({
-      value: model.id,
-      label: model.label,
-      group: providerLabel(provider),
-      disabled: !available,
-      description: available
-        ? modelDescription(t, locale, model)
-        : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) }),
-    })),
-  );
-}
 
 /** How long the preview keeps writing after a keystroke. */
 const TYPING_MS = 700;
@@ -174,17 +116,6 @@ function useDraftMood() {
       timers.current.face = setTimeout(() => setFace(undefined), ms);
     },
   };
-}
-
-/** "US$ 10", "US$ 12,50": whole amounts without cents. */
-const usd = (t: TFunction, locale: string, n: number) =>
-  t("format.usd", { value: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n) });
-
-/** 1–3 bars by price among the catalog's models (cheapest third = 1). */
-function priceTier(model: Model, models: Model[]) {
-  const prices = [...new Set(models.map((m) => m.outputUsdPerMTok))].sort((a, b) => a - b);
-  const rank = prices.indexOf(model.outputUsdPerMTok);
-  return prices.length <= 1 ? 2 : Math.min(3, 1 + Math.floor((3 * rank) / prices.length));
 }
 
 interface Created {
@@ -704,83 +635,15 @@ function NewAgentFlow() {
           </Button>
         </div>
         <Card as="div" className="newag__card newag__look">
-          <div className="newag__look-row">
-            <span className="newag__label">
-              {t("look.color")} <span className="newag__opt-label">{t(`look.colors.${look.color}`)}</span>
-            </span>
-            {/* biome-ignore lint/a11y/useSemanticElements: pressable swatches, not a native fieldset */}
-            <div className="newag__swatches" role="group" aria-label={t("look.color")}>
-              {AGENT_COLORS.map((c) => {
-                const [top, bottom] = agentGradient(c);
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    className="newag__swatch"
-                    aria-label={t(`look.colors.${c}`)}
-                    aria-pressed={look.color === c}
-                    style={{ "--a": top, "--b": bottom } as CSSProperties}
-                    onClick={() => {
-                      setLook((l) => ({ ...l, color: c }));
-                      mood.react("happy", 1100);
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-          <div className="newag__look-row">
-            <span className="newag__label">{t("look.eyes")}</span>
-            {/* biome-ignore lint/a11y/useSemanticElements: pressable options, not a native fieldset */}
-            <div className="newag__opts" role="group" aria-label={t("look.eyes")}>
-              {AGENT_EYES.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  className="newag__opt"
-                  aria-pressed={look.eyes === e}
-                  onClick={() => {
-                    setLook((l) => ({ ...l, eyes: e }));
-                    mood.react("wink", 700);
-                  }}
-                >
-                  <span className="newag__stage">
-                    <AgentAvatar name={t(`look.eyesNames.${e}`)} appearance={{ ...look, eyes: e, accessory: "none" }} />
-                  </span>
-                  {t(`look.eyesNames.${e}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="newag__look-row">
-            <span className="newag__label">
-              {t("look.accessory")} <span className="newag__opt-label">{t("newAgent.optional")}</span>
-            </span>
-            {/* biome-ignore lint/a11y/useSemanticElements: pressable options, not a native fieldset */}
-            <div className="newag__opts newag__opts--acc" role="group" aria-label={t("look.accessory")}>
-              {AGENT_ACCESSORIES.map((a) => (
-                <button
-                  key={a}
-                  type="button"
-                  className="newag__opt"
-                  aria-pressed={look.accessory === a}
-                  onClick={() => {
-                    setLook((l) => ({ ...l, accessory: a }));
-                    if (a !== "none") mood.react("happy", 900);
-                  }}
-                >
-                  <span className="newag__stage">
-                    {a === "none" ? (
-                      <Icon name="block" />
-                    ) : (
-                      <AgentAvatar size="sm" name={t(`look.accessories.${a}`)} appearance={{ ...look, accessory: a }} />
-                    )}
-                  </span>
-                  {t(`look.accessories.${a}`)}
-                </button>
-              ))}
-            </div>
-          </div>
+          <LookPicker
+            look={look}
+            onPick={(patch) => {
+              setLook((l) => ({ ...l, ...patch }));
+              if (patch.color) mood.react("happy", 1100);
+              else if (patch.eyes) mood.react("wink", 700);
+              else if (patch.accessory && patch.accessory !== "none") mood.react("happy", 900);
+            }}
+          />
         </Card>
       </>
     ),
@@ -825,30 +688,17 @@ function NewAgentFlow() {
               <span className="ac-visually-hidden">{t("newAgent.characters", { count: instructions.length })}</span>
             </span>
           </div>
-          <div className="newag__tips">
-            {(["do", "avoid", "help"] as const).map((tip) => (
-              <button
-                key={tip}
-                type="button"
-                className="newag__tip"
-                onClick={() => {
-                  const add = t(`newAgent.tips.${tip}.text`, { name: me.user.name.split(/\s+/)[0] });
-                  setInstructions((v) => (v.trim() ? `${v.replace(/\s+$/, "")}\n` : "") + add);
-                  setTimeout(() => {
-                    const ta = root.current?.querySelector<HTMLTextAreaElement>("textarea");
-                    ta?.focus();
-                    ta?.setSelectionRange?.(ta.value.length, ta.value.length);
-                  });
-                }}
-              >
-                <b>
-                  <Icon name="plus" size={14} />
-                  {t(`newAgent.tips.${tip}.title`)}
-                </b>
-                <span>{t(`newAgent.tips.${tip}.desc`)}</span>
-              </button>
-            ))}
-          </div>
+          <InstructionTips
+            helper={me.user.name.split(/\s+/)[0] ?? me.user.name}
+            onAdd={(add) => {
+              setInstructions((v) => (v.trim() ? `${v.replace(/\s+$/, "")}\n` : "") + add);
+              setTimeout(() => {
+                const ta = root.current?.querySelector<HTMLTextAreaElement>("textarea");
+                ta?.focus();
+                ta?.setSelectionRange?.(ta.value.length, ta.value.length);
+              });
+            }}
+          />
           <p className="newag__note">
             <Icon name="info" size={16} />
             <span>{t("newAgent.contextNote", { ...g, org: org.name })}</span>
@@ -979,41 +829,14 @@ function NewAgentFlow() {
           </h2>
         </div>
         <Card as="div" className="newag__card">
-          <Select
-            className="newag__sel"
-            aria-label={t("newAgent.owner")}
+          <OwnerSelect
             value={owner}
-            onValueChange={(v) => {
+            members={members.data ?? []}
+            meId={me.user.id}
+            onChange={(v) => {
               setOwner(v);
               if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
             }}
-            options={[
-              ...(members.data ?? []).map((m) => ({
-                value: m.userId,
-                label: m.userId === me.user.id ? t("newAgent.you", { name: m.name }) : m.name,
-                description: t(`roles.${m.role}`),
-                leading: <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />,
-              })),
-              {
-                value: NO_OWNER,
-                label: t("newAgent.noOwnerOption"),
-                description: t("newAgent.noOwnerShort"),
-                leading: (
-                  <span className="newag__ib">
-                    <Icon name="members" size={16} />
-                  </span>
-                ),
-              },
-            ]}
-            renderValue={(o) => (
-              <span className="newag__sel-value">
-                {o.leading}
-                <span className="newag__sel-text">
-                  <b>{o.label}</b>
-                  <span>{o.description}</span>
-                </span>
-              </span>
-            )}
           />
           <span className="small muted">{ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
         </Card>
@@ -1037,57 +860,18 @@ function NewAgentFlow() {
       </>
     ),
     model: () => {
-      const all = models.data?.models ?? [];
       return (
         <>
           {head(t("newAgent.steps.model.title"), t("newAgent.steps.model.lead"))}
-          {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
-          <div className="newag__models" role="group" aria-label={t("newAgent.model")}>
-            {choices.flatMap(([provider, list]) =>
-              list.map(({ model: m, available }) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  className="newag__model"
-                  aria-pressed={model === m.id}
-                  aria-disabled={!available || undefined}
-                  onClick={() => {
-                    if (!available) return;
-                    setModel(m.id);
-                    mood.react(m.id.toLowerCase().includes("opus") ? "star" : "happy", 800);
-                  }}
-                >
-                  <span className="newag__model-head">
-                    <b>{m.label}</b>
-                    <span className="newag__model-prov">{providerLabel(provider)}</span>
-                  </span>
-                  <span className="newag__model-desc">
-                    {available
-                      ? modelDescription(t, locale, m)
-                      : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) })}
-                  </span>
-                  {available ? (
-                    <span className="newag__cost">
-                      <span className="newag__meter" aria-hidden="true">
-                        {[1, 2, 3].map((n) => (
-                          <i key={n} data-on={n <= priceTier(m, all) || undefined} />
-                        ))}
-                      </span>
-                      {t("newAgent.price", {
-                        input: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(m.inputUsdPerMTok),
-                        output: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(m.outputUsdPerMTok),
-                      })}
-                    </span>
-                  ) : (
-                    <span className="newag__cost">
-                      <Icon name="key" size={14} />
-                      {t("newAgent.noKeyFor", { provider: providerLabel(provider) })}
-                    </span>
-                  )}
-                </button>
-              )),
-            )}
-          </div>
+          <ModelCards
+            choices={choices}
+            value={model}
+            money
+            onChange={(id) => {
+              setModel(id);
+              mood.react(id.toLowerCase().includes("opus") ? "star" : "happy", 800);
+            }}
+          />
           {errorLine(errorOf("model"))}
           <div className="newag__sect">
             <h2>
@@ -1095,30 +879,7 @@ function NewAgentFlow() {
               {t("newAgent.key")}
             </h2>
           </div>
-          <Select
-            className="newag__sel"
-            aria-label={t("newAgent.key")}
-            value={key}
-            onValueChange={setKey}
-            placeholder={t("newAgent.noKeys")}
-            options={keys.map((k) => ({
-              ...k,
-              leading: (
-                <span className="newag__ib">
-                  <Icon name="key" size={16} />
-                </span>
-              ),
-            }))}
-            renderValue={(o) => (
-              <span className="newag__sel-value">
-                {o.leading}
-                <span className="newag__sel-text">
-                  <b>{o.label}</b>
-                  {o.description && <span>{o.description}</span>}
-                </span>
-              </span>
-            )}
-          />
+          <KeySelect value={key} onChange={setKey} options={keys} />
           <div className="newag__sect">
             <h2>
               <Icon name="wallet" />
@@ -1127,35 +888,13 @@ function NewAgentFlow() {
             <span className="small muted">{t("newAgent.budgetHelp", g)}</span>
           </div>
           <Card as="div" className="newag__card">
-            <div className="newag__money">
-              <Field
-                label={<span className="ac-visually-hidden">{t("newAgent.budget")}</span>}
-                id="ag-budget"
-                error={errorOf("budget") ? errorText(errorOf("budget") as DraftError) : undefined}
-                className="newag__money-field"
-              >
-                <AffixInput
-                  prefix="US$"
-                  inputMode="decimal"
-                  value={budget}
-                  onChange={(e) => setBudget(e.target.value)}
-                  placeholder={
-                    defaultBudget === undefined ? undefined : new Intl.NumberFormat(locale).format(defaultBudget)
-                  }
-                />
-              </Field>
-              {QUICK_BUDGETS.map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  className="newag__tog"
-                  aria-pressed={amount === v}
-                  onClick={() => setBudget(String(v))}
-                >
-                  {usd(t, locale, v)}
-                </button>
-              ))}
-            </div>
+            <BudgetField
+              id="ag-budget"
+              value={budget}
+              onChange={setBudget}
+              defaultBudget={defaultBudget}
+              error={errorOf("budget") ? errorText(errorOf("budget") as DraftError) : undefined}
+            />
             {!errorOf("budget") && (
               <span className="small muted">
                 {defaultBudget === undefined

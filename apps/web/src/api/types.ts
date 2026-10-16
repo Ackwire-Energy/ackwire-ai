@@ -553,6 +553,9 @@ export interface Run {
   trigger: string;
   status: string;
   error: string | null;
+  /** The error as a code (`run.budget_exceeded`…) and its values, to say it in the person's language. */
+  errorCode?: string;
+  errorParams?: Record<string, string>;
   /** Start of the message that started the run. */
   what: string;
   turns: number;

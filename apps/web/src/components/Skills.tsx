@@ -2,7 +2,6 @@ import {
   Alert,
   Button,
   Card,
-  Checkbox,
   Chip,
   Dialog,
   DialogBody,
@@ -13,7 +12,6 @@ import {
   type IconName,
   Input,
   List,
-  SearchInput,
   Sheet,
   Switch,
   TabPanel,
@@ -22,9 +20,8 @@ import {
 } from "@agenteschat/ui";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useAgentSkills, useSkill, useSkillAction, useSkills, useSkillUsage } from "@/api/queries";
+import { useSkill, useSkillAction, useSkills, useSkillUsage } from "@/api/queries";
 import type { Skill, SkillDetail, SkillFile } from "@/api/types";
-import { EditDialog } from "@/components/EditDialog";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { joinNames, relativeTime } from "@/lib/format";
@@ -508,112 +505,5 @@ function EditSkill({ skill, onDone }: { skill: SkillDetail; onDone: () => void }
         </Button>
       </div>
     </form>
-  );
-}
-
-/** Our checkboxes over the library, with search (the agent profile's dialog). */
-export function SkillPicker({
-  skills,
-  selected,
-  onChange,
-}: {
-  skills: Skill[];
-  selected: Set<string>;
-  onChange: (next: Set<string>) => void;
-}) {
-  const { t } = useTranslation();
-  const [q, setQ] = useState("");
-  const shown = searchSkills(skills, q);
-  return (
-    <div className="stack-4" style={{ gap: 8 }}>
-      <SearchInput
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder={t("skills.search")}
-        aria-label={t("skills.search")}
-      />
-      <span className="small muted tabular" role="status">
-        {t("skills.selected", { count: selected.size, total: skills.length })}
-      </span>
-      {shown.length === 0 && <p className="small muted">{t("skills.noResults", { q })}</p>}
-      <div className="skill-picker">
-        {shown.map((s) => {
-          const id = `skill-pick-${s.id}`;
-          return (
-            <label key={s.id} htmlFor={id} className="scope-row">
-              <Checkbox
-                id={id}
-                checked={selected.has(s.id)}
-                onCheckedChange={(on) => {
-                  const next = new Set(selected);
-                  if (on) next.add(s.id);
-                  else next.delete(s.id);
-                  onChange(next);
-                }}
-              />
-              <span className="scope-row__text">
-                <span>{s.name}</span>
-                <span className="small muted">{s.description}</span>
-              </span>
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/** Agent profile → Skills → "Gerenciar skills": our checkboxes over the library, saved explicitly. */
-export function ManageSkillsDialog({
-  agentId,
-  agentName,
-  open,
-  onClose,
-}: {
-  agentId: string;
-  agentName: string;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const toast = useToast();
-  const skills = useAgentSkills(org.id, agentId);
-  const action = useSkillAction(org.id);
-  const list = skills.data ?? [];
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [initial, setInitial] = useState("");
-  useEffect(() => {
-    if (!open || !skills.data) return;
-    const on = skills.data.filter((s) => s.enabled).map((s) => s.id);
-    setPicked(new Set(on));
-    setInitial([...on].sort().join(","));
-  }, [open, skills.data]);
-  const dirty = [...picked].sort().join(",") !== initial;
-  return (
-    <EditDialog
-      open={open}
-      onClose={onClose}
-      title={t("skills.manageTitle", { name: agentName })}
-      dirty={dirty}
-      saving={action.isPending}
-      onSave={() =>
-        action.mutate(
-          { type: "assign", agentId, skills: list.map((s) => ({ skillId: s.id, enabled: picked.has(s.id) })) },
-          {
-            onSuccess: () => {
-              toast.show(t("skills.assigned", { name: agentName }));
-              onClose();
-            },
-          },
-        )
-      }
-    >
-      {list.length === 0 ? (
-        <p className="small muted">{t("skills.empty")}</p>
-      ) : (
-        <SkillPicker skills={list} selected={picked} onChange={setPicked} />
-      )}
-    </EditDialog>
   );
 }

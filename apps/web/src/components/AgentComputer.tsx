@@ -21,7 +21,7 @@ import {
   TokenList,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   useAgents,
@@ -30,7 +30,6 @@ import {
   useMachines,
   useSandboxSettings,
   useSaveSandboxSettings,
-  useSetComputerTarget,
 } from "@/api/queries";
 import type { Agent, AgentComputer, ComputerTarget, SandboxNetwork, SandboxSettings } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -290,24 +289,39 @@ function MachineTargetView({ target }: { target: Extract<ComputerTarget, { kind:
   );
 }
 
-const CLOUD = "cloud";
+export const CLOUD = "cloud";
+
+/** The computer an agent uses, as a picker value: `"cloud"` or the machine's id. */
+export const machineOf = (pc: AgentComputer | undefined) => {
+  const target = targetOf(pc);
+  return target.kind === "machine" ? target.machineId : CLOUD;
+};
 
 /**
  * "Computador: Nuvem | <máquina>". Admins pick any machine; the agent's
  * owner, the ones they paired (the server checks again). Offline machines
- * stay selectable, marked.
+ * stay selectable, marked. The choice is a draft: the page saves it.
  */
-function ComputerTargetSelect({ agent, target, admin }: { agent: Agent; target: ComputerTarget; admin: boolean }) {
+function ComputerTargetSelect({
+  target,
+  value,
+  onChange,
+  admin,
+}: {
+  target: ComputerTarget;
+  value: string;
+  onChange: (value: string) => void;
+  admin: boolean;
+}) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
-  const toast = useToast();
   const machines = useMachines(org.id);
-  const set = useSetComputerTarget(org.id);
-  const [error, setError] = useState<string | null>(null);
   const current = target.kind === "machine" ? target.machineId : CLOUD;
-  const list = (machines.data ?? []).filter((m) => admin || m.pairedBy?.id === me.user.id || m.id === current);
+  const list = (machines.data ?? []).filter(
+    (m) => admin || m.pairedBy?.id === me.user.id || m.id === current || m.id === value,
+  );
   if (machines.isLoading) return <LoadingLine width={200} />;
-  if (list.length === 0 && target.kind === "cloud") {
+  if (list.length === 0 && target.kind === "cloud" && value === CLOUD) {
     return (
       <Link
         to="/org/$orgId/settings/$section"
@@ -331,125 +345,111 @@ function ComputerTargetSelect({ agent, target, admin }: { agent: Agent; target: 
     options.push({ value: target.machineId, label: target.name });
   }
   return (
-    <span className="stack-4" style={{ gap: 4 }}>
-      <span className="row computer-target" style={{ gap: 8, alignItems: "center" }}>
-        <span className="small muted">{t("computer.target.label")}</span>
-        <Select
-          size="sm"
-          aria-label={t("computer.target.label")}
-          value={current}
-          options={options}
-          disabled={set.isPending}
-          onValueChange={(value) => {
-            if (value === current) return;
-            setError(null);
-            const machine = list.find((m) => m.id === value);
-            set.mutate(
-              { agentId: agent.id, machineId: value === CLOUD ? null : value },
-              {
-                onSuccess: () =>
-                  toast.show(
-                    machine
-                      ? t("computer.target.switchedMachine", { name: agent.name, machine: machine.name })
-                      : t("computer.target.switchedCloud", { name: agent.name }),
-                  ),
-                onError: (e) => setError(errorText(t, e)),
-              },
-            );
-          }}
-        />
-      </span>
-      {error && (
-        <p className="computer-error small" role="alert">
-          <Icon name="alert" size={16} />
-          <span>{error}</span>
-        </p>
+    <Select
+      className="newag__sel"
+      aria-label={t("computer.target.label")}
+      value={value}
+      options={options.map((o) => ({
+        ...o,
+        leading: (
+          <span className="newag__ib">
+            <Icon name={o.value === CLOUD ? "cloud" : "computer"} size={16} />
+          </span>
+        ),
+      }))}
+      onValueChange={onChange}
+      renderValue={(o) => (
+        <span className="newag__sel-value">
+          {o.leading}
+          <span className="newag__sel-text">
+            <b>{o.label}</b>
+            {o.description && <span>{o.description}</span>}
+          </span>
+        </span>
       )}
-    </span>
+    />
   );
 }
 
-/** Agent profile: "PC do Theo" with status, disk, cost and last use. Hidden when the server has no sandbox. */
-export function AgentComputerRow({ agent, editable }: { agent: Agent; editable: boolean }) {
+/**
+ * Configurações › Computador: the agent's PC (status, disk, last use; start,
+ * stop and delete for admins) and where it runs. `onMachine` = can choose.
+ */
+export function AgentComputerPanel({
+  agent,
+  admin,
+  machine,
+  onMachine,
+  machineNote,
+}: {
+  agent: Agent;
+  admin: boolean;
+  /** The chosen computer (a draft): `"cloud"` or a machine id. */
+  machine: string;
+  onMachine?: (value: string) => void;
+  /** Under the picker ("Antes: …"). */
+  machineNote?: ReactNode;
+}) {
   const { t } = useTranslation();
-  const { me } = useOrg();
   const life = useComputerLifecycle(agent);
   const { pc } = life;
   const g = agentGrammar(t, agent.name);
-  // Choosing the computer: admins, or the agent's owner (with machines they paired).
-  const canTarget = editable || (agent.ownerUserId != null && agent.ownerUserId === me.user.id);
-  if (pc.isLoading) {
-    return (
-      <section aria-labelledby="sec-pc" className="summary-row">
-        <div className="summary-row__text">
-          <h2 id="sec-pc" className="summary-row__title">
-            {t("computer.title", g)}
-          </h2>
-          <div className="summary-row__body">
-            <LoadingLine width={240} />
-          </div>
-        </div>
-      </section>
-    );
-  }
-  if (pc.isError || !pc.data) return null;
+  if (pc.isLoading) return <LoadingLine width={240} />;
+  if (pc.isError || !pc.data) return <p className="small muted">{t("agentPage.computer.unavailable")}</p>;
   const target = targetOf(pc.data);
-  const selector = canTarget ? <ComputerTargetSelect agent={agent} target={target} admin={editable} /> : null;
-  // A connected machine: no start/stop/delete, network or cost; its owner turns it on.
-  if (target.kind === "machine") {
-    return (
-      <section aria-labelledby="sec-pc" className="summary-row">
-        <div className="summary-row__text">
-          <h2 id="sec-pc" className="summary-row__title">
-            {t("computer.title", g)}
-          </h2>
-          <div className="summary-row__body stack-4" style={{ gap: 8 }}>
-            <MachineTargetView target={target} />
-            <ComputerError life={life} />
-            {selector}
-          </div>
-        </div>
-      </section>
-    );
-  }
-  if (!life.display) return null;
-  // No PC yet (and nothing running): explain it and offer to create it.
   const empty = pc.data.status === "none" && !life.busy;
   return (
-    <section aria-labelledby="sec-pc" className="summary-row">
-      <div className="summary-row__text">
-        <h2 id="sec-pc" className="summary-row__title">
-          {t("computer.title", g)}
-        </h2>
-        <div className="summary-row__body">
-          {empty ? (
+    <div className="agp-pc">
+      <div className="agp-pc__now">
+        <span className="agp-pc__logo" aria-hidden="true">
+          <Icon name={target.kind === "machine" ? "computer" : "cloud"} />
+        </span>
+        <span className="agp-pc__text">
+          {target.kind === "machine" ? (
+            <MachineTargetView target={target} />
+          ) : empty ? (
             <span className="muted">{t("computer.emptyText", g)}</span>
           ) : (
-            <span className="row" style={{ gap: 8, alignItems: "center" }}>
-              <ComputerChip status={life.display} />
-              {life.busy ? <ComputerProgress life={life} /> : <ComputerFacts pc={pc.data} />}
-              {!life.busy && life.ready && <ComputerProgress life={life} />}
-            </span>
+            life.display && (
+              <span className="row" style={{ gap: 8, alignItems: "center" }}>
+                <ComputerChip status={life.display} />
+                {life.busy ? <ComputerProgress life={life} /> : <ComputerFacts pc={pc.data} />}
+                {!life.busy && life.ready && <ComputerProgress life={life} />}
+              </span>
+            )
           )}
-          <ComputerError life={life} />
-          {pc.data.network === "provider-default" && (
+          {target.kind === "cloud" && pc.data.network === "provider-default" && (
             <span className="small muted">{t("sandbox.providerDefault")}</span>
           )}
-          {selector}
-        </div>
+        </span>
+        {admin && target.kind === "cloud" && (
+          <span className="agp-pc__act">
+            {empty ? (
+              <Button size="sm" variant="primary" onClick={() => life.run("start")}>
+                {t("computer.create", g)}
+              </Button>
+            ) : (
+              <ComputerMenu agent={agent} life={life} />
+            )}
+          </span>
+        )}
       </div>
-      {editable && (
-        <div className="summary-row__action">
-          {empty ? (
-            <Button size="sm" variant="primary" onClick={() => life.run("start")}>
-              {t("computer.create", g)}
-            </Button>
-          ) : (
-            <ComputerMenu agent={agent} life={life} />
-          )}
-        </div>
-      )}
-    </section>
+      <ComputerError life={life} />
+      <div className="stack-4" style={{ gap: 6 }}>
+        <span className="newag__label">{t("computer.target.label")}</span>
+        {onMachine ? (
+          <ComputerTargetSelect target={target} value={machine} onChange={onMachine} admin={admin} />
+        ) : (
+          <span className="agp-ro">{target.kind === "machine" ? target.name : t("computer.target.cloud")}</span>
+        )}
+        {machineNote}
+        {onMachine && (
+          <span className="small muted">
+            {admin ? t("agentPage.computer.adminsPick") : t("agentPage.computer.ownerPicks")}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 

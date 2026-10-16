@@ -183,16 +183,16 @@ describe("agent owner is optional", () => {
     expect(state.calls.find((c) => c.method === "agents.create")?.args[1]).toMatchObject({ ownerUserId: null });
   });
 
-  test("profile: Responsável is edited in a dialog; the header says 'Sem responsável'", async () => {
+  test("profile: Responsável is chosen in Configurações and saved with the bar; the header says 'Sem responsável'", async () => {
     const state = seedState();
-    const { state: s } = await go(`agents/${ADA_ID}`, state);
-    await click(screen().getByRole("button", { name: "Editar Responsável" }));
-    const dialog = screen().getByRole("dialog", { name: "Responsável" });
-    await pick(within(dialog).getByRole("combobox", { name: "Responsável" }), /Sem responsável/);
-    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    const { state: s } = await go(`agents/${ADA_ID}?tab=settings&sec=owner`, state);
+    await pick(screen().getByRole("combobox", { name: "Responsável" }), /Sem responsável/);
+    await click(
+      within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
+    );
     await settle(4);
     expect(s.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({ ownerUserId: null });
-    expect(document.querySelector(".agent-head")?.textContent).toContain("Sem responsável");
+    expect(document.querySelector(".agp-meta")?.textContent).toContain("Sem responsável");
   });
 });
 

@@ -32,18 +32,18 @@ const onlyOwner = () => {
 };
 
 describe("Quem pode falar com a Ada", () => {
-  test("profile row: everyone by default; Editar → Só algumas pessoas → pick → Salvar sends the audience", async () => {
-    const state = await go(`agents/${ADA_ID}`);
-    const row = screen().getByRole("region", { name: "Quem pode falar com a Ada" });
-    expect(row.textContent).toContain("Todos do workspace");
-    await click(within(row).getByRole("button", { name: "Editar Quem pode falar" }));
-    const dialog = screen().getByRole("dialog", { name: "Quem pode falar com a Ada" });
-    expect(within(dialog).getByRole("button", { name: "Salvar" }).hasAttribute("disabled")).toBe(true);
-    await click(within(dialog).getAllByLabelText(/Só algumas pessoas/)[0] as HTMLElement);
+  test("Configurações: everyone by default; Só algumas pessoas → pick → Salvar sends the audience", async () => {
+    const state = await go(`agents/${ADA_ID}?tab=settings&sec=audience`);
+    const section = screen().getByRole("region", { name: "Quem pode falar com a Ada" });
+    const group = within(section).getByRole("radiogroup", { name: "Quem pode falar com a Ada" });
+    expect(within(group).getByRole("radio", { name: "Todos do workspace" }).getAttribute("aria-checked")).toBe("true");
+    await click(within(group).getByRole("radio", { name: "Só algumas pessoas" }));
     // The owner (João) always can; he isn't in the list.
-    expect(dialog.textContent).toContain("João sempre pode, como responsável.");
-    await click(within(dialog).getAllByLabelText(/Walter/)[0] as HTMLElement);
-    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(section.textContent).toContain("João sempre pode, como responsável.");
+    await click(within(section).getAllByLabelText(/Walter/)[0] as HTMLElement);
+    await click(
+      within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
+    );
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
       audience: { mode: "people", userIds: ["u-walter"] },

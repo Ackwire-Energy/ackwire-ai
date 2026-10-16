@@ -5,11 +5,11 @@ import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
-import { useAgentAccess, useAgents, useCatalog, useConnections, useCustomServers } from "@/api/queries";
+import { useAgents, useCatalog, useConnections, useCustomServers } from "@/api/queries";
 import type { AccessTool, Agent } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
-import { LoadingLine, LoadingList } from "@/components/Loading";
+import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
 import {
@@ -89,7 +89,7 @@ export function ResourceIcon({
 }
 
 /** "Get file contents" for `github_get_file_contents`; a server's own label for custom tools; built-ins translated. */
-function toolLabel(t: TFunction, r: AccessResource, tool: AccessTool) {
+export function toolLabel(t: TFunction, r: AccessResource, tool: AccessTool) {
   if (r.custom) return tool.label;
   if (r.kind === "builtin") return builtinToolText(t, tool).label;
   const prefix = r.connector ? `${r.connector}_` : "";
@@ -141,6 +141,9 @@ export function LevelRow({
   levels,
   value,
   onChange,
+  tag,
+  extra,
+  changed,
 }: {
   icon: ReactNode;
   name: string;
@@ -149,6 +152,12 @@ export function LevelRow({
   levels: Level[];
   value: LevelState;
   onChange?: (level: Level) => void;
+  /** Next to the name ("Alterado" on the agent page). */
+  tag?: ReactNode;
+  /** Under the description (what it was before). */
+  extra?: ReactNode;
+  /** Marked as changed and not saved yet. */
+  changed?: boolean;
 }) {
   const { t } = useTranslation();
   const options = [
@@ -156,10 +165,13 @@ export function LevelRow({
     ...(value === "custom" ? [{ value: "custom" as LevelState, label: t("access.level.custom") }] : []),
   ];
   return (
-    <li className="level-row">
+    <li className="level-row" data-changed={changed || undefined}>
       {icon}
       <span className="level-row__text">
-        <span className="level-row__name">{name}</span>
+        <span className="level-row__name">
+          {name}
+          {tag}
+        </span>
         {description && <span className="small muted">{description}</span>}
         {asks.length > 0 && (
           <span className="level-row__asks">
@@ -171,6 +183,7 @@ export function LevelRow({
             {asks.length > 3 && <span className="small muted">{t("access.asksMore", { count: asks.length - 3 })}</span>}
           </span>
         )}
+        {extra}
       </span>
       {onChange ? (
         <Segmented
@@ -187,70 +200,6 @@ export function LevelRow({
         </Chip>
       )}
     </li>
-  );
-}
-
-/** The agent page: what this agent can use, one level per connector and built-in area. */
-export function AgentAccessPanel({ agent, editable }: { agent: Agent; editable: boolean }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const access = useAgentAccess(org.id, agent.id);
-  const items = useConnectedById();
-  const set = useSetLevels();
-  const [pending, setPending] = useState<Record<string, Level>>({});
-  const resources = useMemo(() => (access.data ? resourcesOf(access.data) : []), [access.data]);
-  if (access.isLoading) return <LoadingLine width={220} />;
-  if (!access.data) return <span className="muted">{t("access.unavailable")}</span>;
-  const busy = set.isPending;
-  const choose = (r: AccessResource, level: Level) => {
-    if (busy) return;
-    setPending((p) => ({ ...p, [r.id]: level }));
-    set.mutate(
-      { agentId: agent.id, changes: { [r.id]: level } },
-      {
-        onSettled: () =>
-          setPending((p) => {
-            const next = { ...p };
-            delete next[r.id];
-            return next;
-          }),
-      },
-    );
-  };
-  const groups: { id: string; title: string; list: AccessResource[] }[] = [
-    { id: "connectors", title: t("access.kind.connectors"), list: resources.filter((r) => r.kind === "connector") },
-    { id: "builtin", title: t("access.kind.builtin"), list: resources.filter((r) => r.kind === "builtin") },
-  ];
-  return (
-    <div className="level-panel">
-      {groups.map((g) => (
-        <section key={g.id} className="level-panel__group" aria-label={g.title}>
-          <h3 className="ac-eyebrow">{g.title}</h3>
-          {g.list.length === 0 ? (
-            <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>
-          ) : (
-            <ul className="level-list">
-              {g.list.map((r) => {
-                const name = resourceName(t, r, items);
-                const level = pending[r.id] ?? levelOf(r);
-                return (
-                  <LevelRow
-                    key={r.id}
-                    icon={<ResourceIcon resource={r} items={items} name={name} />}
-                    name={name}
-                    description={levelText(t, r, level)}
-                    asks={asksAt(r, level).map((x) => toolLabel(t, r, x))}
-                    levels={r.levels}
-                    value={level}
-                    onChange={editable ? (l) => choose(r, l) : undefined}
-                  />
-                );
-              })}
-            </ul>
-          )}
-        </section>
-      ))}
-    </div>
   );
 }
 

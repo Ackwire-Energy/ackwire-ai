@@ -300,12 +300,12 @@ describe("Configurações → Computadores", () => {
 });
 
 describe("agent page: which computer", () => {
-  test("Computador: Nuvem | machine; on a machine the cloud controls go away", async () => {
+  test("Computador: Nuvem | machine, saved with the save bar; on a machine the cloud controls go away", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     const m = fakeMachinesOf.get(api)?.pair({ name: "Escritório" }) as Machine;
     fakeMachinesOf.get(api)?.pair({ name: "Laptop", online: false });
-    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api });
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings&sec=computer`, { api });
     await settle(8);
     const pc = screen().getByRole("region", { name: "PC da Ada" });
     expect(within(pc).getByRole("button", { name: "Ações do PC da Ada" })).toBeTruthy();
@@ -316,9 +316,16 @@ describe("agent page: which computer", () => {
     // Offline machines stay selectable, marked.
     expect(screen().getByRole("option", { name: /^Laptop \(offline\)/ })).toBeTruthy();
     await act(async () => fireEvent.click(screen().getByRole("option", { name: /^Escritório/ })));
+    await settle(4);
+    // A draft until Salvar.
+    expect(state.calls.find((c) => c.method === "sandbox.setTarget")).toBeUndefined();
+    expect(pc.textContent).toContain("Antes: Nuvem");
+    await click(
+      within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
+    );
     await settle(6);
     expect(state.calls.find((c) => c.method === "sandbox.setTarget")?.args).toEqual([ORG_ID, ADA_ID, m.id]);
-    expect(document.body.textContent).toContain("Ada agora trabalha em Escritório.");
+    expect(document.body.textContent).toContain("Alterações da Ada salvas.");
     const after = screen().getByRole("region", { name: "PC da Ada" });
     expect(after.textContent).toContain("Escritório");
     expect(after.textContent).toContain("Online");
@@ -332,7 +339,7 @@ describe("agent page: which computer", () => {
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     const api = createFakeApi(state);
     fakeMachinesOf.get(api)?.pair({ name: "Escritório" });
-    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api });
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, { api });
     await settle(8);
     expect(screen().queryByRole("combobox", { name: "Computador" })).toBeNull();
   });

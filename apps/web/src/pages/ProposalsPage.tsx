@@ -1,5 +1,6 @@
 import { Alert, Button, Card, Chip, Diff, diffLines, EmptyState, Field, Icon, Textarea } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { ApiError } from "@/api/http";
@@ -59,11 +60,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
       ? t("proposals.targetContext", { org: org.name })
       : t("proposals.targetInstructions", agentGrammar(t, agentName(p.target.agentId)));
   const tt = t as unknown as (key: string, options: Record<string, string>) => string;
-  /** The server's title is English; the app says it in its own language. */
-  const titleOf = (p: Proposal) =>
-    p.target.type === "org_context"
-      ? tt("proposals.titleContext", { org: org.name, defaultValue: p.title })
-      : tt("proposals.titleInstructions", { ...agentGrammar(t, agentName(p.target.agentId)), defaultValue: p.title });
+  const titleOf = (p: Proposal) => proposalTitle(t, p, org.name, agentName);
   const whereOf = (e: Proposal["evidence"][number]) =>
     e.type ? tt(`proposals.evidence.${e.type}`, { defaultValue: e.where }) : e.where;
   const statusText = (p: Proposal) =>
@@ -245,4 +242,11 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
       )}
     </div>
   );
+}
+
+/** The server's title is English; the app says it in its own language. */
+export function proposalTitle(t: TFunction, p: Proposal, orgName: string, agentName: (id: string) => string) {
+  const tt = t as unknown as (key: string, options: Record<string, string>) => string;
+  if (p.target.type === "org_context") return tt("proposals.titleContext", { org: orgName, defaultValue: p.title });
+  return tt("proposals.titleInstructions", { ...agentGrammar(t, agentName(p.target.agentId)), defaultValue: p.title });
 }

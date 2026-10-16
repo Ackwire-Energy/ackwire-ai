@@ -117,7 +117,7 @@ describe("internet mode", () => {
 
 describe("agent profile: PC da Ada", () => {
   test("status, disk, cost and last use", async () => {
-    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api: createFakeApi(seedState()) });
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, { api: createFakeApi(seedState()) });
     await settle(8);
     const pc = screen().getByRole("region", { name: "PC da Ada" });
     expect(pc.textContent).toContain("Ligado");
@@ -218,7 +218,7 @@ describe("creating the PC feels alive", () => {
     const api = createFakeApi(seedState());
     const start = deferred<typeof running>();
     api.sandbox.start = () => start.promise;
-    await renderApp(`/org/${ORG_ID}/agents/${ATLAS_ID}`, { api });
+    await renderApp(`/org/${ORG_ID}/agents/${ATLAS_ID}?tab=settings`, { api });
     await settle(8);
     const pc = screen().getByRole("region", { name: "PC do Atlas" });
     expect(pc.textContent).toContain("Um computador só do Atlas para rodar código e guardar arquivos.");
@@ -241,7 +241,7 @@ describe("creating the PC feels alive", () => {
       calls += 1;
       throw new Error("sem cota no provedor");
     };
-    await renderApp(`/org/${ORG_ID}/agents/${ATLAS_ID}`, { api });
+    await renderApp(`/org/${ORG_ID}/agents/${ATLAS_ID}?tab=settings`, { api });
     await settle(8);
     const pc = screen().getByRole("region", { name: "PC do Atlas" });
     await click(within(pc).getByRole("button", { name: "Criar PC do Atlas" }));

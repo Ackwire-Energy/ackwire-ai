@@ -59,7 +59,7 @@ export function filterMemories(list: Memory[], tab: MemoryTab, query: string) {
   return list.filter((m) => inMemoryTab(m, tab) && (!q || `${m.text} ${m.source}`.toLowerCase().includes(q)));
 }
 
-const KIND_ICON: Record<MemoryKind, IconName> = {
+export const KIND_ICON: Record<MemoryKind, IconName> = {
   decision: "check",
   fact: "info",
   preference: "preference",

@@ -14,7 +14,7 @@ import { useOrg } from "./org-context";
  * went, who gave them and Remover. Values never leave the computer. Shown to
  * the agent's owner and admins, like the computer itself.
  */
-export function AgentSecretsRow({ agent, editable }: { agent: Agent; editable: boolean }) {
+export function AgentSecretsList({ agent, editable }: { agent: Agent; editable: boolean }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const api = useApi();
@@ -41,42 +41,40 @@ export function AgentSecretsRow({ agent, editable }: { agent: Agent; editable: b
   if (!canManage || !list.data || list.data.length === 0) return null;
   const secrets = list.data;
   return (
-    <section aria-labelledby="sec-secrets" className="summary-row">
-      <div className="summary-row__text">
-        <h2 id="sec-secrets" className="summary-row__title">
-          {t("agentSecrets.title")}
-        </h2>
-        <div className="summary-row__body stack-4" style={{ gap: 8 }}>
-          <span className="small muted">{t("agentSecrets.help")}</span>
-          <ul className="agent-secrets">
-            {secrets.map((s) => (
-              <li key={`${s.machineId ?? "cloud"}:${s.name}`} className="agent-secrets__row">
-                <span className="agent-secrets__name">
-                  <code>{s.name}</code>
-                  <span className="small muted">
-                    {s.target.kind === "file" ? t("agentSecrets.file", { path: s.target.path }) : t("agentSecrets.env")}
-                    {" · "}
-                    {t("agentSecrets.by", {
-                      person: dir.memberById.get(s.deliveredByUserId)?.name ?? t("channel.unknownPerson"),
-                      time: formatTime(i18n.language, s.deliveredAt),
-                    })}
-                  </span>
+    <section aria-labelledby="sec-secrets" className="agp-secrets">
+      <h3 id="sec-secrets" className="newag__label">
+        {t("agentSecrets.title")}
+      </h3>
+      <div className="stack-4" style={{ gap: 8 }}>
+        <span className="small muted">{t("agentSecrets.help")}</span>
+        <ul className="agent-secrets">
+          {secrets.map((s) => (
+            <li key={`${s.machineId ?? "cloud"}:${s.name}`} className="agent-secrets__row">
+              <span className="agent-secrets__name">
+                <code>{s.name}</code>
+                <span className="small muted">
+                  {s.target.kind === "file" ? t("agentSecrets.file", { path: s.target.path }) : t("agentSecrets.env")}
+                  {" · "}
+                  {t("agentSecrets.by", {
+                    person: dir.memberById.get(s.deliveredByUserId)?.name ?? t("channel.unknownPerson"),
+                    time: formatTime(i18n.language, s.deliveredAt),
+                  })}
                 </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon="trash"
-                  aria-label={t("agentSecrets.removeLabel", { name: s.name })}
-                  loading={remove.isPending && remove.variables?.name === s.name}
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate({ name: s.name, machineId: s.machineId })}
-                >
-                  {t("agentSecrets.remove")}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </div>
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="trash"
+                aria-label={t("agentSecrets.removeLabel", { name: s.name })}
+                loading={remove.isPending && remove.variables?.name === s.name}
+                disabled={remove.isPending}
+                onClick={() => remove.mutate({ name: s.name, machineId: s.machineId })}
+              >
+                {t("agentSecrets.remove")}
+              </Button>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

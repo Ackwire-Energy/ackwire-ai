@@ -152,27 +152,38 @@ describe("Configurações → Skills", () => {
 });
 
 describe("agent skills", () => {
-  test("profile: enabled skills and 'Gerenciar skills' with search and our checkboxes", async () => {
+  test("Ferramentas e acesso: the library as checkboxes; a change waits for Salvar and sends every skill", async () => {
     const state = seedState();
-    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api: createFakeApi(state) });
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api: createFakeApi(state) });
     await settle(8);
     const section = screen().getByRole("region", { name: "Skills" });
-    expect(section.textContent).toContain("Revisão de PR");
-    expect(section.textContent).not.toContain("Atendimento");
-    // One "Editar" per profile section opens "Gerenciar skills".
-    await click(within(section).getByRole("button", { name: "Editar Skills" }));
-    const dialog = screen().getByRole("dialog", { name: "Skills de Ada" });
-    expect(dialog.textContent).toContain("1 de 3 escolhidas");
-    await type(within(dialog).getByRole("searchbox", { name: "Buscar skill" }), "atend");
-    await click(within(dialog).getByRole("checkbox", { name: /Atendimento/ }));
-    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(
+      within(section)
+        .getByRole("checkbox", { name: /Revisão de PR/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
+      within(section)
+        .getByRole("checkbox", { name: /Atendimento/ })
+        .getAttribute("aria-checked"),
+    ).toBe("false");
+    await click(within(section).getByRole("checkbox", { name: /Atendimento/ }));
+    expect(state.calls.find((c) => c.method === "skills.setForAgent")).toBeUndefined();
+    expect(section.textContent).toContain("Antes: 1 ligada");
+    await click(
+      within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
+    );
     await settle(6);
     const set = state.calls.find((c) => c.method === "skills.setForAgent")?.args;
     expect(set?.[1]).toBe(ADA_ID);
     const sent = set?.[2] as { skillId: string; enabled: boolean }[];
     expect(sent).toHaveLength(3);
     expect(sent.filter((x) => x.enabled)).toHaveLength(2);
-    expect(screen().getByRole("region", { name: "Skills" }).textContent).toContain("Atendimento");
+    expect(
+      within(screen().getByRole("region", { name: "Skills" }))
+        .getByRole("checkbox", { name: /Atendimento/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
   });
 
   test("Criar agente: optional Skills under the tools, the ones on for new agents already checked", async () => {

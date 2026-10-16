@@ -23,8 +23,6 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { joinNames, whenAt } from "@/lib/format";
 import { lookOf } from "@/lib/look";
 import { agentActivitySince, dayPart, isNewDay, lastVisit, markVisit } from "@/lib/welcome";
-import { useStreams } from "@/realtime/context";
-import { agentStateIn } from "@/realtime/streams";
 
 /*
  * The pixel sky inside the app (prototype: docs/design/telas/CeuNoApp.html). The sky is the
@@ -38,11 +36,6 @@ const C = Math.cos;
 /** An agent's color for drawing (its look, or the default sky). */
 export const colorOf = (agent: { appearance?: unknown } | undefined | null): AgentColor =>
   lookOf(agent)?.color ?? "sky";
-
-/** Whether the agent has a live run anywhere we listen to. */
-export function useAgentBusy(agentId: string) {
-  return useStreams((s) => agentStateIn(s, agentId)) !== "idle";
-}
 
 /* ---------- Channel: the greeting of a new day ---------- */
 
@@ -140,26 +133,30 @@ export function ChannelWelcome({
 
 /* ---------- Agent page: the cover in the agent's color ---------- */
 
-/** The agent page's cover: a sky in the agent's own color that runs faster while it works. */
-export function AgentCover({ agent }: { agent: Agent }) {
-  const color = colorOf(agent);
-  const busy = useAgentBusy(agent.id);
+/**
+ * The agent page's cover (docs/design/telas/AgentePerfil.html): a sky in the
+ * agent's own color, lighter behind the agent (at `at`, 0..1 across) so its
+ * body reads; faster and busier while it works.
+ */
+export function AgentCover({ color, busy, at = 0.1 }: { color: AgentColor; busy: boolean; at?: number }) {
   return (
-    <div className="agent-cover" data-busy={busy}>
+    <div className="agp-cover__sky" data-busy={busy || undefined} aria-hidden="true">
       <PixelSky
         options={{
           pixel: 4,
           palette: agentTones(color),
           body: spriteTone(color),
-          speed: busy ? 3.2 : 1,
+          speed: busy ? 2.6 : 1,
           rise: busy ? 2.4 : 1,
-          sprites: busy ? { area: 420, max: 60 } : { area: 900, max: 34 },
-          base: (u, v) => 0.82 - 0.3 * u - 0.55 * v,
-          blobs: (tt) => [
-            [0.2 + 0.1 * S(tt * 0.3), 0.3 + 0.1 * C(tt * 0.25), 0.1, 0.16],
-            [0.7 + 0.12 * C(tt * 0.2), 0.55 + 0.1 * S(tt * 0.33), 0.12, -0.18],
-            [0.5 + 0.2 * S(tt * 0.12), 0.1, 0.06, 0.12],
-          ],
+          sprites: busy ? { area: 520, max: 40 } : { area: 1100, max: 20 },
+          light: 0,
+          base: (u, v, tt) => {
+            const dx = (u - at) * 2.2;
+            const dy = (v - 0.84) * 1.3;
+            return (
+              0.86 - 0.22 * u - 0.46 * v + 0.42 * Math.exp(-(dx * dx + dy * dy) / 0.14) + 0.06 * S(u * 5 + tt * 0.6)
+            );
+          },
         }}
       />
     </div>
