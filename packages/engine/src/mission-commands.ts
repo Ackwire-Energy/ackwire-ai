@@ -282,7 +282,8 @@ export async function handlePermissionPrompt(
   const scope = scopeOf(args.scope);
   // Plain reads (`ls` of any folder, read-only git, a GET): allowed, nothing posted.
   if (scope && readOnlyCall(tool, input, scope)) return allow();
-  if (mission.status !== "active") return deny("The plan isn't approved yet: only read for now.");
+  if (mission.status !== "active" && mission.status !== "awaiting_close")
+    return deny("The plan isn't approved yet: only read for now.");
   // "Aprovar sempre nesta missão" covers it.
   if (allowedBy(await missionAllowRules(deps.db, mission.id), tool, input)) return allow();
   const recent = (await readPrompts(deps.db, mission.id)).filter((p) => p.taskId === task.id);
@@ -393,41 +394,53 @@ export async function retryBlockedCommand(
   userId: string,
   orgId: string,
   missionId: string,
-  input: { taskId: string; command: string },
+  input: { taskId: string; command?: string; commands?: string[] },
 ) {
   const { mission, role } = await requireMission(deps, userId, orgId, missionId);
   requireAct(role, "allow the executor's commands");
   requireOpen(mission);
+  if (mission.status === "paused") {
+    throw new ConflictError("The mission is paused: resume it first", "mission.paused");
+  }
   if (!/^[0-9a-f-]{36}$/i.test(input.taskId)) throw new NotFoundError("Task not found", "task.not_found");
+  const wanted = [...new Set([...(input.command ? [input.command] : []), ...(input.commands ?? [])])].slice(0, 20);
+  if (wanted.length === 0) throw new ValidationError("Say which command", "mission.invalid");
   const blocked = await blockedOfTask(deps.db, mission.id, input.taskId);
-  const denial = blocked.find((d) => d.command === input.command);
-  if (!denial) throw new NotFoundError("That command wasn't blocked", "mission.command_not_found");
+  const denials = wanted.map((c) => blocked.find((d) => d.command === c));
+  if (denials.some((d) => !d)) throw new NotFoundError("That command wasn't blocked", "mission.command_not_found");
   const rows = rowsOf<{ session_id: string | null; cwd: string | null }>(
     await deps.db.execute(sql`select session_id, cwd from ${machineTasks}
       where id = ${input.taskId}::uuid and mission_id = ${mission.id}::uuid`),
   );
   const task = rows[0];
   if (!task?.session_id) throw new NotFoundError("Task not found", "task.not_found");
-  // A non-shell tool's line is "<Tool> <what>" (`WebFetch https://…`).
-  const what = denial.command.slice(denial.tool.length).trim();
-  const rules = rulesFor(denial.tool, denial.tool === "Bash" ? { command: denial.command } : { url: what });
-  const added = await addMissionAllowRules(deps.db, mission, rules, { userId });
-  await recordAudit(deps.db, {
-    orgId,
-    actor: { type: "person", id: userId },
-    action: "mission.command_retry",
-    target: { type: "mission", id: mission.id },
-    details: { taskId: input.taskId, command: denial.command.slice(0, 300), rules },
-  });
+  const all: string[] = [];
+  for (const denial of denials as NonNullable<(typeof denials)[number]>[]) {
+    // A non-shell tool's line is "<Tool> <what>" (`WebFetch https://…`).
+    const what = denial.command.slice(denial.tool.length).trim();
+    const rules = rulesFor(denial.tool, denial.tool === "Bash" ? { command: denial.command } : { url: what });
+    const added = await addMissionAllowRules(deps.db, mission, rules, { userId });
+    all.push(...(added.length ? added : rules));
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "mission.command_retry",
+      target: { type: "mission", id: mission.id },
+      details: { taskId: input.taskId, command: denial.command.slice(0, 300), rules },
+    });
+  }
+  const list = (denials as { command: string }[]).map((d) => d.command);
   const sent = await tellSession(
     deps,
     mission,
     { sessionId: task.session_id, cwd: task.cwd },
-    `The command was allowed; retry it: ${denial.command}`,
+    list.length === 1
+      ? `The command was allowed; retry it: ${list[0]}`
+      : `These commands were allowed; retry them:\n${list.map((c) => `- ${c}`).join("\n")}`,
     { requestedBy: userId, from: "a person", kind: "person" },
   );
   await publishMissionEvent(deps, mission, "command", { taskId: input.taskId });
-  return { rules: added.length ? added : rules, delivered: sent.delivered };
+  return { rules: [...new Set(all)], delivered: sent.delivered };
 }
 
 /**
