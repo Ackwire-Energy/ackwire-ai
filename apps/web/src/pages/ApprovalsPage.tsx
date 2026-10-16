@@ -3,6 +3,8 @@ import {
   Chip,
   CriteriaPixels,
   cx,
+  DetailsDialog,
+  DetailsSection,
   EmptyState,
   ExpiryFuse,
   Icon,
@@ -41,6 +43,7 @@ import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { daysBetween, joinNames, relativeTime, timeLeft } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
+import { useOpenParam } from "@/lib/open-param";
 import { connectorName } from "@/lib/scopes";
 import { useToast } from "@/lib/toast";
 import "./approvals.css";
@@ -86,7 +89,7 @@ export function sortOpen(list: Approval[]) {
 
 const decidedAt = (a: Approval) => a.decidedAt ?? (a.status === "expired" ? a.expiresAt : a.createdAt);
 
-/** The top-level scalar values of the action (what the card shows; the panel shows them all). */
+/** The top-level scalar values of the action (what the card shows; the details show them all). */
 function scalars(params: Record<string, unknown>) {
   return Object.entries(params ?? {}).filter(
     (e): e is [string, string | number | boolean] =>
@@ -117,6 +120,7 @@ const TRAIT_ICON: Record<ReturnType<typeof approvalTraits>[number], IconName> = 
  * Aprovações (telas/Aprovacoes.html): who waits on you, each request with its
  * exact action, then the history. Under the requests, the missions' command
  * cards and the decisions and reviews waiting on you in missions (ADR 0029).
+ * A request's details open in the centered details dialog (`?open=<id>`).
  */
 export function ApprovalsPage() {
   const { t } = useTranslation();
@@ -126,7 +130,7 @@ export function ApprovalsPage() {
   const channels = useChannels(org.id);
   const [filter, setFilter] = useState<Filter>("pending");
   const [q, setQ] = useState("");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useOpenParam();
   const [refusing, setRefusing] = useState<string | null>(null);
   const all = approvals.data ?? [];
   const channelName = (id: string) => channels.data?.find((c) => c.id === id)?.name ?? "";
@@ -155,7 +159,12 @@ export function ApprovalsPage() {
   const shownDecided = decided.filter(
     (a) => matches(a) && (filter === "all" || filter === "pending" || bucketOf(approvalPhase(a)) === filter),
   );
-  const toggle = (id: string) => setOpenId((o) => (o === id ? null : id));
+  // What J/K walk through while the details are open: the requests in the order shown.
+  const order = [...shownOpen, ...(filter === "pending" ? shownDecided.slice(0, 3) : shownDecided)].map((a) => a.id);
+  const closeDetails = () => {
+    setOpenId(null);
+    setRefusing(null);
+  };
   // Missions you own or decide in: the executor's commands and what waits on you (decisions, reviews).
   const { missions } = useMissionsWaitingYou();
   const commands = pendingCommandCount(missions);
@@ -163,15 +172,36 @@ export function ApprovalsPage() {
   const waitingYou = mine.length + commands;
 
   // J/K walk the requests, A approves (high risk: focuses the hold), R refuses, / searches, Escape closes.
+  // In the details dialog: J/K move to the next request, A and R act on the open one (Esc is the dialog's).
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       const el = e.target instanceof Element ? e.target : null;
-      if (el?.closest("input, textarea, [contenteditable], [role=dialog], [role=menu], [role=listbox]")) return;
+      if (el?.closest("input, textarea, [contenteditable], [role=menu], [role=listbox]")) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const key = e.key.toLowerCase();
+      const dialog = el?.closest("[role=dialog]");
+      if (dialog) {
+        if (!dialog.classList.contains("ap-dialog") || !openId) return;
+        if (key === "j" || key === "k") {
+          e.preventDefault();
+          const i = order.indexOf(openId);
+          const next = order[Math.max(0, Math.min(order.length - 1, i + (key === "j" ? 1 : -1)))];
+          if (next && next !== openId) {
+            setRefusing(null);
+            setOpenId(next);
+          }
+        } else if (key === "a" || key === "r") {
+          const a = all.find((x) => x.id === openId);
+          if (a?.status !== "pending" || !a.canDecide) return;
+          e.preventDefault();
+          if (key === "r") setRefusing(a.id);
+          else dialog.querySelector<HTMLElement>(`[data-approve="${a.id}"]`)?.focus();
+        }
+        return;
+      }
       const cards = [...document.querySelectorAll<HTMLElement>(".ap-card")];
       const current = el?.closest<HTMLElement>(".ap-card") ?? null;
       const id = current?.dataset.id ?? openId;
-      const key = e.key.toLowerCase();
       if (e.key === "Escape") {
         if (refusing) setRefusing(null);
         else setOpenId(null);
@@ -183,7 +213,6 @@ export function ApprovalsPage() {
         const i = current ? cards.indexOf(current) : -1;
         const next = cards[Math.max(0, Math.min(cards.length - 1, i + (key === "j" ? 1 : -1)))];
         next?.focus();
-        if (openId && next?.dataset.id) setOpenId(next.dataset.id);
       } else if (e.key === "Enter" && current?.dataset.id && el === current) {
         e.preventDefault();
         setOpenId(current.dataset.id);
@@ -197,7 +226,7 @@ export function ApprovalsPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [all, openId, refusing]);
+  }, [all, openId, refusing, order, setOpenId]);
 
   const pill = (f: Filter) => (
     <button key={f} type="button" className="ap-pill" aria-pressed={filter === f} onClick={() => setFilter(f)}>
@@ -212,7 +241,7 @@ export function ApprovalsPage() {
   const waiters = [...new Set(mine.map((a) => a.agentId))];
 
   return (
-    <div className={cx("page ap", opened && "ap--panel")}>
+    <div className="page ap">
       <div className="ap__main">
         <header className="ap-head">
           <h1>{t("approvals.title")}</h1>
@@ -301,7 +330,7 @@ export function ApprovalsPage() {
                 channel={channelName(a.channelId)}
                 selected={openId === a.id}
                 refusing={refusing === a.id && openId !== a.id}
-                onOpen={() => toggle(a.id)}
+                onOpen={() => setOpenId(a.id)}
                 onRefuse={() => setRefusing(a.id)}
                 onCancelRefuse={() => setRefusing(null)}
               />
@@ -328,7 +357,7 @@ export function ApprovalsPage() {
                 </div>
                 <div className="ap-list">
                   {shownDecided.slice(0, 3).map((a) => (
-                    <HistoryRow key={a.id} approval={a} selected={openId === a.id} onOpen={() => toggle(a.id)} />
+                    <HistoryRow key={a.id} approval={a} selected={openId === a.id} onOpen={() => setOpenId(a.id)} />
                   ))}
                 </div>
               </section>
@@ -341,7 +370,7 @@ export function ApprovalsPage() {
                 </div>
                 <div className="ap-list">
                   {list.map((a) => (
-                    <HistoryRow key={a.id} approval={a} selected={openId === a.id} onOpen={() => toggle(a.id)} />
+                    <HistoryRow key={a.id} approval={a} selected={openId === a.id} onOpen={() => setOpenId(a.id)} />
                   ))}
                 </div>
               </section>
@@ -351,20 +380,16 @@ export function ApprovalsPage() {
         )}
       </div>
       {opened && (
-        <section className="ap-panel" aria-label={t("approvals.panel.label")}>
-          <ApprovalDetails
-            approval={opened}
-            all={all}
-            channel={channelName(opened.channelId)}
-            refusing={refusing === opened.id}
-            onRefuse={() => setRefusing(opened.id)}
-            onCancelRefuse={() => setRefusing(null)}
-            onClose={() => {
-              setOpenId(null);
-              setRefusing(null);
-            }}
-          />
-        </section>
+        <ApprovalDetails
+          key={opened.id}
+          approval={opened}
+          all={all}
+          channel={channelName(opened.channelId)}
+          refusing={refusing === opened.id}
+          onRefuse={() => setRefusing(opened.id)}
+          onCancelRefuse={() => setRefusing(null)}
+          onClose={closeDetails}
+        />
       )}
     </div>
   );
@@ -672,7 +697,7 @@ function RequestCard({
         )}
       </div>
       <h3 className="ap-card__title">
-        <button type="button" className="ap-card__open" aria-expanded={selected} onClick={onOpen}>
+        <button type="button" className="ap-card__open" aria-haspopup="dialog" onClick={onOpen}>
           {title}
         </button>
       </h3>
@@ -690,7 +715,7 @@ function RequestCard({
             </Button>
             <span className="ap-grow" />
             {approvalRisk(a) === "high" && <span className="ap-card__hint">{t("approvals.highRisk")}</span>}
-            <Button variant="ghost" size="sm" onClick={onOpen}>
+            <Button variant="ghost" size="sm" aria-haspopup="dialog" onClick={onOpen}>
               {t("approvals.details")}
             </Button>
           </div>
@@ -812,7 +837,10 @@ function AskAgain({ approval, agent }: { approval: Approval; agent: Agent | unde
   );
 }
 
-/** The panel: the exact action, why, how it got here, the agent's record, who decides, and the decision bar. */
+/**
+ * A request's details, in the centered details dialog: the exact action, why,
+ * how it got here, the agent's record, who decides, and the decision bar.
+ */
 function ApprovalDetails({
   approval: listed,
   all,
@@ -858,179 +886,179 @@ function ApprovalDetails({
     ...dir.members.filter((m) => m.userId !== ownerId && (m.role === "owner" || m.role === "admin")),
   ].slice(0, 6);
   const pr = prLink(a);
+  const decides = p === "waiting" && a.canDecide;
   return (
-    <div className="ap-details" data-burst="">
-      <div className="ap-details__scroll">
-        <div className="ap-details__head">
-          <AgentAvatar
-            agentId={a.agentId}
-            name={name}
-            size="md"
-            state={p === "running" ? "writing" : p === "waiting" ? "waiting" : "idle"}
-            running={p === "running"}
-            expression={p === "done" ? "happy" : undefined}
-          />
-          <div className="ap-details__who">
-            <b>
-              {name} {t(`approvals.verb.${kind}`)}
-            </b>
-            <small>
-              {agent?.role ? `${agent.role} · ` : ""}
-              {channel ? `#${channel} · ` : ""}
-              {relativeTime(t, i18n.language, a.createdAt)}
-            </small>
-          </div>
-          <span className="ap-grow" />
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            icon="close"
-            aria-label={t("approvals.panel.close")}
-            onClick={onClose}
-          />
-        </div>
-        <div>
-          <h2 className="ap-details__title">{approvalTitle(t, a)}</h2>
-          {p === "waiting" && (
-            <div className="ap-traits ap-details__chips">
-              <Chip icon="clock">{expiryText(t, a)}</Chip>
-              {approvalTraits(a).map((k) => (
-                <Chip key={k} icon={TRAIT_ICON[k]}>
-                  {t(`approvals.trait.${k}`)}
-                </Chip>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {p !== "waiting" && <Outcome approval={a} agent={agent} />}
-
-        <section className="ap-sec">
-          <h3>{t("approvals.panel.exact")}</h3>
-          <ExactAction approval={a} />
-          {Object.keys(a.params ?? {}).length > scalars(a.params).length && (
-            <pre className="ap-code">
-              <code>{JSON.stringify(a.params, null, 2)}</code>
-            </pre>
-          )}
-          <p className="ap-bound">{t("approvals.panel.bound", { the: g.article, name })}</p>
-          {pr && (
-            <a className="ap-link" href={pr} target="_blank" rel="noreferrer">
-              {t("approvals.panel.openPr")}
-            </a>
-          )}
-        </section>
-
-        {a.why && (
-          <section className="ap-sec">
-            <h3>{t("approvals.panel.why")}</h3>
-            <p className="ap-bubble">{a.why}</p>
-            {a.issue && (
-              <Link
-                className="ap-link"
-                to="/org/$orgId/issues/$number"
-                params={{ orgId: org.id, number: String(a.issue.number) }}
-              >
-                #{a.issue.number} {a.issue.title}
-              </Link>
+    <DetailsDialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      // Esc while a reason is being typed backs out of refusing first.
+      onEscapeKeyDown={(e) => {
+        if (refusing) {
+          e.preventDefault();
+          onCancelRefuse();
+        }
+      }}
+      closeLabel={t("approvals.panel.close")}
+      className="ap-dialog"
+      eyebrow={t("approvals.panel.eyebrow")}
+      icon={
+        <AgentAvatar
+          agentId={a.agentId}
+          name={name}
+          size="md"
+          state={p === "running" ? "writing" : p === "waiting" ? "waiting" : "idle"}
+          running={p === "running"}
+          expression={p === "done" ? "happy" : undefined}
+        />
+      }
+      title={approvalTitle(t, a)}
+      subtitle={
+        <>
+          <span>
+            <b className="ap-dialog__who">{name}</b> {t(`approvals.verb.${kind}`)}
+          </span>
+          <span>
+            {agent?.role ? `${agent.role} · ` : ""}
+            {channel ? `#${channel} · ` : ""}
+            {relativeTime(t, i18n.language, a.createdAt)}
+          </span>
+        </>
+      }
+      footer={
+        decides && (
+          <div className="ap-decide">
+            {refusing ? (
+              <RefuseBox approval={a} agent={agent} onCancel={onCancelRefuse} />
+            ) : (
+              <>
+                <div className="ap-decide__buttons">
+                  <Button onClick={onRefuse}>
+                    {t("approval.refuse")}
+                    <Kbd>R</Kbd>
+                  </Button>
+                  <ApproveButton approval={a} block />
+                </div>
+                <p className="ap-muted ap-center">
+                  {approvalRisk(a) === "high" ? t("approvals.holdNote") : t("approvals.clickNote")}
+                </p>
+              </>
             )}
-          </section>
-        )}
-
-        {(a.trail?.length ?? 0) > 1 && (
-          <section className="ap-sec">
-            <h3>{t("approvals.panel.trail")}</h3>
-            <ol className="ap-trail">
-              {a.trail?.map((s) => (
-                <li key={s.at + s.text.slice(0, 12)}>
-                  <span className="ap-trail__dot" aria-hidden="true" />
-                  <span className="ap-trail__text">{s.text}</span>
-                  <time dateTime={s.at}>{relativeTime(t, i18n.language, s.at)}</time>
-                </li>
-              ))}
-              <li className="is-current">
-                <span className="ap-trail__dot" aria-hidden="true" />
-                <span className="ap-trail__text">{t("approvals.panel.asked")}</span>
-                <time dateTime={a.createdAt}>{relativeTime(t, i18n.language, a.createdAt)}</time>
-              </li>
-            </ol>
-          </section>
-        )}
-        {channel && (
-          <Link
-            className="ap-link"
-            to="/org/$orgId/c/$channelId"
-            params={{ orgId: org.id, channelId: a.channelId }}
-            search={{ m: a.messageId ?? a.threadId }}
-          >
-            {t("approvals.panel.viewChannel", { channel })}
-          </Link>
-        )}
-
-        <section className="ap-sec">
-          <h3>{t("approvals.panel.history", { of: g.of, name })}</h3>
-          {record.length > 0 ? (
-            <div className="ap-record">
-              <span role="img" aria-label={t("approvals.panel.historyCount", { ok, count: record.length })}>
-                <CriteriaPixels done={record.map((x) => x.status === "approved")} color={colorOf(agent)} />
-              </span>
-              <span>{t("approvals.panel.historyCount", { ok, count: record.length })}</span>
-            </div>
-          ) : (
-            <p className="ap-muted">{t("approvals.panel.noHistory")}</p>
-          )}
-        </section>
-
-        {p === "waiting" && (
-          <section className="ap-sec">
-            <h3>{t("approvals.panel.deciders")}</h3>
-            <ul className="ap-deciders">
-              {deciders.map((m) => (
-                <li key={m.userId}>
-                  <span className="ap-person" aria-hidden="true">
-                    {(m.name.trim()[0] ?? "?").toUpperCase()}
-                  </span>
-                  <span>
-                    {m.userId === me.user.id ? t("approvals.panel.you") : m.name}
-                    <small>
-                      {" · "}
-                      {[
-                        m.userId === ownerId ? t("approvals.panel.owner") : "",
-                        m.role === "owner" || m.role === "admin" ? t("approvals.panel.admin") : "",
-                      ]
-                        .filter(Boolean)
-                        .join(", ")}
-                    </small>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {channel && <p className="ap-muted">{t("approvals.panel.firstWins", { channel })}</p>}
-          </section>
-        )}
-      </div>
-      {p === "waiting" && a.canDecide && (
-        <div className="ap-details__bar">
-          {refusing ? (
-            <RefuseBox approval={a} agent={agent} onCancel={onCancelRefuse} />
-          ) : (
-            <>
-              <div className="ap-details__buttons">
-                <Button onClick={onRefuse}>
-                  {t("approval.refuse")}
-                  <Kbd>R</Kbd>
-                </Button>
-                <ApproveButton approval={a} block />
-              </div>
-              <p className="ap-muted ap-center">
-                {approvalRisk(a) === "high" ? t("approvals.holdNote") : t("approvals.clickNote")}
-              </p>
-            </>
-          )}
+          </div>
+        )
+      }
+    >
+      {p === "waiting" && (
+        <div className="ap-traits">
+          <Chip icon="clock">{expiryText(t, a)}</Chip>
+          {approvalTraits(a).map((k) => (
+            <Chip key={k} icon={TRAIT_ICON[k]}>
+              {t(`approvals.trait.${k}`)}
+            </Chip>
+          ))}
         </div>
       )}
-    </div>
+
+      {p !== "waiting" && <Outcome approval={a} agent={agent} />}
+
+      <DetailsSection title={t("approvals.panel.exact")}>
+        <ExactAction approval={a} />
+        {Object.keys(a.params ?? {}).length > scalars(a.params).length && (
+          <pre className="ap-code">
+            <code>{JSON.stringify(a.params, null, 2)}</code>
+          </pre>
+        )}
+        <p className="ap-bound">{t("approvals.panel.bound", { the: g.article, name })}</p>
+        {pr && (
+          <a className="ap-link" href={pr} target="_blank" rel="noreferrer">
+            {t("approvals.panel.openPr")}
+          </a>
+        )}
+      </DetailsSection>
+
+      {a.why && (
+        <DetailsSection title={t("approvals.panel.why")}>
+          <p className="ap-bubble">{a.why}</p>
+          {a.issue && (
+            <Link
+              className="ap-link"
+              to="/org/$orgId/issues/$number"
+              params={{ orgId: org.id, number: String(a.issue.number) }}
+            >
+              #{a.issue.number} {a.issue.title}
+            </Link>
+          )}
+        </DetailsSection>
+      )}
+
+      {(a.trail?.length ?? 0) > 1 && (
+        <DetailsSection title={t("approvals.panel.trail")}>
+          <ol className="ap-trail">
+            {a.trail?.map((s) => (
+              <li key={s.at + s.text.slice(0, 12)}>
+                <span className="ap-trail__dot" aria-hidden="true" />
+                <span className="ap-trail__text">{s.text}</span>
+                <time dateTime={s.at}>{relativeTime(t, i18n.language, s.at)}</time>
+              </li>
+            ))}
+            <li className="is-current">
+              <span className="ap-trail__dot" aria-hidden="true" />
+              <span className="ap-trail__text">{t("approvals.panel.asked")}</span>
+              <time dateTime={a.createdAt}>{relativeTime(t, i18n.language, a.createdAt)}</time>
+            </li>
+          </ol>
+        </DetailsSection>
+      )}
+      {channel && (
+        <Link
+          className="ap-link"
+          to="/org/$orgId/c/$channelId"
+          params={{ orgId: org.id, channelId: a.channelId }}
+          search={{ m: a.messageId ?? a.threadId }}
+        >
+          {t("approvals.panel.viewChannel", { channel })}
+        </Link>
+      )}
+
+      <DetailsSection title={t("approvals.panel.history", { of: g.of, name })}>
+        {record.length > 0 ? (
+          <div className="ap-record">
+            <span role="img" aria-label={t("approvals.panel.historyCount", { ok, count: record.length })}>
+              <CriteriaPixels done={record.map((x) => x.status === "approved")} color={colorOf(agent)} />
+            </span>
+            <span>{t("approvals.panel.historyCount", { ok, count: record.length })}</span>
+          </div>
+        ) : (
+          <p className="ap-muted">{t("approvals.panel.noHistory")}</p>
+        )}
+      </DetailsSection>
+
+      {p === "waiting" && (
+        <DetailsSection title={t("approvals.panel.deciders")}>
+          <ul className="ap-deciders">
+            {deciders.map((m) => (
+              <li key={m.userId}>
+                <span className="ap-person" aria-hidden="true">
+                  {(m.name.trim()[0] ?? "?").toUpperCase()}
+                </span>
+                <span>
+                  {m.userId === me.user.id ? t("approvals.panel.you") : m.name}
+                  <small>
+                    {" · "}
+                    {[
+                      m.userId === ownerId ? t("approvals.panel.owner") : "",
+                      m.role === "owner" || m.role === "admin" ? t("approvals.panel.admin") : "",
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </small>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {channel && <p className="ap-muted">{t("approvals.panel.firstWins", { channel })}</p>}
+        </DetailsSection>
+      )}
+    </DetailsDialog>
   );
 }
 

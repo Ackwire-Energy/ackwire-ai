@@ -767,7 +767,7 @@ export const en: Translations = {
     empty:
       "When an agent wants to merge, deploy, roll back, send something outside or delete data, the request shows up here and in the channel, with the exact action and the why.",
     panel: {
-      label: "Request details",
+      eyebrow: "Approval request",
       close: "Close",
       exact: "The exact action",
       builtIn: "agentes.chat tool",

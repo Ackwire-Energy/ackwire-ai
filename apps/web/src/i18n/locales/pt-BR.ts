@@ -773,7 +773,7 @@ export const ptBR = {
     empty:
       "Quando um agente quiser fazer merge, deploy, rollback, mandar algo para fora ou apagar dados, o pedido aparece aqui e no canal, com a ação exata e o porquê.",
     panel: {
-      label: "Detalhes do pedido",
+      eyebrow: "Pedido de aprovação",
       close: "Fechar",
       exact: "A ação exata",
       builtIn: "Ferramenta do agentes.chat",

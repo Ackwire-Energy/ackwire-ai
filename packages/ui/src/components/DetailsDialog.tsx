@@ -38,6 +38,11 @@ export interface DetailsDialogProps {
   footer?: ReactNode;
   children: ReactNode;
   className?: string;
+  /**
+   * Escape, before the dialog closes: `preventDefault()` keeps it open (an
+   * inner step to back out of first, like a reason being typed).
+   */
+  onEscapeKeyDown?: (event: KeyboardEvent) => void;
 }
 
 /**
@@ -62,6 +67,7 @@ export function DetailsDialog({
   footer,
   children,
   className,
+  onEscapeKeyDown,
 }: DetailsDialogProps) {
   // Controlled: no Radix Trigger to return focus to, so remember it.
   const wasOpen = useRef(false);
@@ -79,6 +85,7 @@ export function DetailsDialog({
         <RDialog.Content
           className={cx("ac-details", size === "lg" && "ac-details--lg", className)}
           aria-describedby={undefined}
+          onEscapeKeyDown={onEscapeKeyDown}
           onCloseAutoFocus={(e) => {
             const target = returnTo.current;
             if (target?.isConnected) {

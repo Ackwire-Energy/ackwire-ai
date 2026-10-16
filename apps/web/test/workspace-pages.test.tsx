@@ -54,15 +54,31 @@ describe("Aprovações", () => {
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args[1]).toBe("ap-merge");
   });
 
-  test("the panel shows the exact action and who may decide", async () => {
-    await go("approvals");
+  test("the details dialog shows the exact action and who may decide, kept in ?open=", async () => {
+    const { router } = await go("approvals");
     const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
     await click(within(merge).getByRole("button", { name: "Detalhes" }));
     await settle(2);
-    const panel = screen().getByRole("region", { name: "Detalhes do pedido" });
-    expect(panel.textContent).toContain("A ação exata");
-    expect(panel.textContent).toContain("Quem pode decidir");
-    expect(within(panel).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
+    const dialog = screen().getByRole("dialog", { name: "Merge PR #42 into main" });
+    expect(dialog.textContent).toContain("Pedido de aprovação");
+    expect(within(dialog).getByRole("region", { name: "A ação exata" })).toBeTruthy();
+    expect(within(dialog).getByRole("region", { name: "Quem pode decidir" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
+    expect(router.state.location.search).toMatchObject({ open: "ap-merge" });
+    await click(within(dialog).getByRole("button", { name: "Fechar" }));
+    await settle(2);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(router.state.location.search).toEqual({});
+  });
+
+  test("a link with ?open= reopens the request's details; refusing works from the dialog", async () => {
+    const { state } = await go("approvals?open=ap-merge");
+    const dialog = screen().getByRole("dialog", { name: "Merge PR #42 into main" });
+    await click(within(dialog).getByRole("button", { name: /^Recusar/ }));
+    await click(within(dialog).getByRole("button", { name: "Falta teste" }));
+    await click(within(dialog).getByRole("button", { name: /Recusar e avisar/ }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "approvals.refuse")?.args).toEqual([ORG_ID, "ap-merge", "Falta teste"]);
   });
 
   test("approvals you can't decide show who they wait for, without buttons", async () => {
