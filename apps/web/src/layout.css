@@ -552,7 +552,7 @@ p {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 16px 8px 12px;
+  padding: 16px 8px 24px;
 }
 .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
   margin-top: var(--space-2);
@@ -566,17 +566,11 @@ p {
   min-height: 0;
   margin: 0;
 }
-/* Messages fade out into the page just above the composer (no hard cut, no empty band). */
-.channel__composer::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% - 16px);
-  height: 52px;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 0%, transparent), var(--bg) 85%);
-  pointer-events: none;
-  z-index: var(--z-raised);
+/* Messages fade out at the list's bottom edge, above the composer: a mask on the list itself, so a hovered
+   (lifted) row, its reactions and any background fade too. The padding keeps the newest line clear of it. */
+.channel__messages {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
 }
 .channel__status {
   margin: 0 24px;
@@ -2909,9 +2903,9 @@ p {
 }
 
 /* Composer area: the floating card sits on the page with breathing room. */
-/* Same gap above the composer as on its sides (24px); the fade above it softens the cut. */
+/* The 24px above the composer (same as its sides) is the list's own bottom padding, where messages fade out. */
 .channel__composer {
-  padding-top: 24px;
+  padding-top: 0;
 }
 /* Page titles: tighter, more editorial. */
 .page-title {

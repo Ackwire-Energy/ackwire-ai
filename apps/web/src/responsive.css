@@ -147,7 +147,9 @@
     white-space: nowrap;
   }
   .channel__messages {
-    padding: 12px 0 8px;
+    padding: 12px 0 10px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent);
   }
   .channel__messages .ac-msg {
     gap: 10px;
@@ -155,7 +157,7 @@
     padding-left: 12px;
   }
   .channel__composer {
-    padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
+    padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
   }
   .channel__status,
   .channel__notice {

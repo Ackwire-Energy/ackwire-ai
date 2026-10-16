@@ -1003,27 +1003,25 @@ function ChannelView({
                 }}
               />
               {offer && <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />}
-              <p className="ac-composer__hint">
-                {workingRun && !chrome?.locked ? (
-                  <span className="composer-working">
-                    {t("run.working", {
-                      name: dir.agentById.get(workingRun.agentId)?.name ?? t("channel.unknownAgent"),
-                    })}
-                    {mayStop(workingRun) && (
-                      <>
-                        {" · "}
-                        <StopButton run={workingRun} onStop={stopRun} place="composer" />
-                      </>
-                    )}
-                  </span>
-                ) : chrome?.locked ? (
-                  chrome.locked
-                ) : channelAgents.length > 0 ? (
-                  t("channel.footerAgents", { count: channelAgents.length, names: agentNames })
-                ) : (
-                  t("channel.footerNoAgents")
-                )}
-              </p>
+              {(workingRun || chrome?.locked) && (
+                <p className="ac-composer__hint">
+                  {workingRun && !chrome?.locked ? (
+                    <span className="composer-working">
+                      {t("run.working", {
+                        name: dir.agentById.get(workingRun.agentId)?.name ?? t("channel.unknownAgent"),
+                      })}
+                      {mayStop(workingRun) && (
+                        <>
+                          {" · "}
+                          <StopButton run={workingRun} onStop={stopRun} place="composer" />
+                        </>
+                      )}
+                    </span>
+                  ) : (
+                    chrome?.locked
+                  )}
+                </p>
+              )}
             </div>
           </>
         )}

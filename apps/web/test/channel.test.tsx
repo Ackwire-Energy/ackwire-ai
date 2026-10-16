@@ -31,9 +31,8 @@ describe("Canal", () => {
     const reply = articles.find((a) => a.textContent?.includes("Achei a causa"));
     expect(reply?.querySelector(".ac-avatar--agent")).not.toBeNull();
     expect(reply?.querySelector("code")?.textContent).toBe("expires_at");
-    expect(
-      screen().getByText("Ada e Atlas leem este canal. Merge, deploy e rollback sempre pedem sua aprovação."),
-    ).toBeTruthy();
+    // No standing footer under the composer: the hint only shows while an agent works (or the channel is locked).
+    expect(document.querySelector(".ac-composer__hint")).toBeNull();
   });
 
   test("subscribes to the channel over the WebSocket", async () => {
