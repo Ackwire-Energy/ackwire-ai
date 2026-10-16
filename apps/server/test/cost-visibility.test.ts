@@ -87,14 +87,14 @@ test("admins see and set the budgets: the workspace default and each agent's", a
   expect(detail).not.toHaveProperty("defaultBudgetUsd");
 });
 
-test("a member's forum topic gets the default cap, whatever budget they send", async () => {
+test("a forum topic has no spend cap of its own and shows no money (D45)", async () => {
   const w = await workspace();
   const res = await w.member("/forum/topics", {
-    json: { title: "Pricing", goal: "Pick a plan", agentIds: [w.agentId], budgetUsd: null },
+    json: { title: "Pricing", goal: "Pick a plan", agentIds: [w.agentId], budgetUsd: 5 },
   });
   expect(res.status).toBe(201);
   const topic = (await res.json()) as Record<string, unknown>;
-  // `budgetUsd: null` (no cap) was ignored: the default US$ 0.50 cap applies, shown as a percentage.
-  expect(typeof topic.budgetUsedPercent).toBe("number");
+  // Each agent runs on its own budget: no cap and no percentage on the topic.
+  expect(topic).not.toHaveProperty("budgetUsedPercent");
   expect(JSON.stringify(topic)).not.toMatch(money);
 });

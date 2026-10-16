@@ -2,7 +2,7 @@ import {
   askAgentToImplement,
   commentIssue,
   createIssue,
-  getIssue,
+  getIssueDetail,
   type IssueDeps,
   issueFromMessage,
   listIssueActivity,
@@ -39,6 +39,10 @@ const Issue = z
     createdBy: Actor,
     source: z.record(z.string(), z.unknown()),
     channelId: z.uuid().nullable(),
+    parentIssueId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: "The issue this one is a sub-issue of (a plan step from the forum, D45)." }),
     pullRequests: z.array(z.object({ number: z.number(), url: z.string(), openedBy: Actor.nullable() })),
     artifacts: z.array(z.object({ id: z.uuid(), title: z.string(), createdBy: Actor })),
     work: z
@@ -59,6 +63,15 @@ const Issue = z
     updatedAt: z.string(),
   })
   .openapi("Issue");
+
+const IssueDetail = Issue.extend({
+  subIssues: z.array(
+    z.object({ id: z.uuid(), number: z.number(), title: z.string(), status: Status, assignee: Actor.nullable() }),
+  ),
+  forumTopics: z
+    .array(z.object({ id: z.uuid(), title: z.string(), status: z.string(), format: z.string() }))
+    .openapi({ description: 'Forum topics opened from this issue ("Avaliar no fórum"), oldest first.' }),
+}).openapi("IssueDetail");
 
 const Activity = z
   .object({
@@ -94,14 +107,22 @@ export function issueRoutes(deps: AppDeps) {
       summary: "Issues you can see, open ones first",
       request: {
         params: OrgParams,
-        query: z.object({ q: z.string().max(200).optional(), status: Status.optional() }),
+        query: z.object({
+          q: z.string().max(200).optional(),
+          status: Status.optional(),
+          parentIssueId: z.uuid().optional(),
+        }),
       },
       responses: { 200: json(z.object({ issues: z.array(Issue) })), ...errors },
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
       const query = c.req.valid("query");
-      const list = await listIssues(db, person(c.get("user").id), orgId, { q: query.q, status: query.status });
+      const list = await listIssues(db, person(c.get("user").id), orgId, {
+        q: query.q,
+        status: query.status,
+        parentIssueId: query.parentIssueId,
+      });
       return c.json({ issues: list }, 200);
     },
   );
@@ -114,11 +135,11 @@ export function issueRoutes(deps: AppDeps) {
       security,
       summary: "An issue by its number (#131)",
       request: { params: OrgParams.extend({ number: z.coerce.number().int().min(1) }) },
-      responses: { 200: json(Issue), ...errors },
+      responses: { 200: json(IssueDetail), ...errors },
     }),
     async (c) => {
       const { orgId, number } = c.req.valid("param");
-      return c.json(await getIssue(db, person(c.get("user").id), orgId, { number }), 200);
+      return c.json(await getIssueDetail(db, person(c.get("user").id), orgId, { number }), 200);
     },
   );
 
@@ -128,13 +149,13 @@ export function issueRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/issues/{issueId}",
       tags,
       security,
-      summary: "An issue",
+      summary: "An issue, with its sub-issues and the forum topics that evaluate it",
       request: { params: IssueParams },
-      responses: { 200: json(Issue), ...errors },
+      responses: { 200: json(IssueDetail), ...errors },
     }),
     async (c) => {
       const { orgId, issueId } = c.req.valid("param");
-      return c.json(await getIssue(db, person(c.get("user").id), orgId, { id: issueId }), 200);
+      return c.json(await getIssueDetail(db, person(c.get("user").id), orgId, { id: issueId }), 200);
     },
   );
 
@@ -156,6 +177,7 @@ export function issueRoutes(deps: AppDeps) {
             priority: Priority.optional(),
             dueDate: DueDate.optional(),
             labels: z.array(z.string().max(40)).max(20).optional(),
+            parentIssueId: z.uuid().nullable().optional(),
           }),
         ),
       },
