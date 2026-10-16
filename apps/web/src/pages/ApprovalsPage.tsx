@@ -4,6 +4,12 @@ import { useTranslation } from "react-i18next";
 import { useApprovals, useChannels } from "@/api/queries";
 import type { Approval } from "@/api/types";
 import { ApprovalListItem } from "@/components/ApprovalItem";
+import {
+  MissionCommandsPending,
+  MissionsWaitingList,
+  pendingCommandCount,
+  useMissionsWaitingYou,
+} from "@/components/missions/MissionWaiting";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
@@ -16,7 +22,7 @@ export function splitApprovals(list: Approval[]) {
   return { pending, decided };
 }
 
-/** telas/Aprovacoes.dc.html */
+/** telas/Aprovacoes.dc.html; plus the missions' command cards and what waits on you in them (ADR 0029). */
 export function ApprovalsPage() {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -26,6 +32,10 @@ export function ApprovalsPage() {
   const [tab, setTab] = useState<"pending" | "done">("pending");
   const { pending, decided } = splitApprovals(approvals.data ?? []);
   const visible = tab === "pending" ? pending : decided;
+  // Missions: the executor's commands and what waits on you (decisions, reviews) in missions you own or decide.
+  const { missions } = useMissionsWaitingYou();
+  const commands = pendingCommandCount(missions);
+  const missionWaiting = missions.some((m) => m.pending.decisions + m.pending.provisional + m.pending.reviews > 0);
 
   return (
     <div className="page page--mid">
@@ -38,12 +48,12 @@ export function ApprovalsPage() {
         onValueChange={setTab}
         label={t("approvals.filter")}
         items={[
-          { value: "pending", label: t("approvals.pending"), count: pending.length },
+          { value: "pending", label: t("approvals.pending"), count: pending.length + commands },
           { value: "done", label: t("approvals.decided"), count: decided.length },
         ]}
       >
         <TabPanel value={tab}>
-          {approvals.isSuccess && visible.length === 0 && (
+          {approvals.isSuccess && visible.length === 0 && (tab === "done" || (commands === 0 && !missionWaiting)) && (
             <EmptyState>{tab === "pending" ? t("approvals.emptyPending") : t("approvals.emptyDecided")}</EmptyState>
           )}
           {visible.map((a) => (
@@ -56,6 +66,12 @@ export function ApprovalsPage() {
               initials={dir.agentInitials(a.agentId)}
             />
           ))}
+          {tab === "pending" && (
+            <>
+              <MissionCommandsPending missions={missions} />
+              <MissionsWaitingList missions={missions} />
+            </>
+          )}
         </TabPanel>
       </Tabs>
       <p className="page__note">{t("approvals.footer")}</p>

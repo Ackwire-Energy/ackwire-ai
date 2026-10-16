@@ -18,7 +18,16 @@ import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
  * live runs and composer (ChannelPage in thread mode). Archived: read only.
  * A mission's thread has the mission pinned on top (ThreadContexto.html, "App mobile").
  */
-export function ThreadPage({ threadId, reply }: { threadId: string; reply?: boolean }) {
+export function ThreadPage({
+  threadId,
+  reply,
+  focusMessageId,
+}: {
+  threadId: string;
+  reply?: boolean;
+  /** Open at this message (a card someone was sent to). */
+  focusMessageId?: string;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const info = useThreadInfo(org.id, threadId);
@@ -56,6 +65,7 @@ export function ThreadPage({ threadId, reply }: { threadId: string; reply?: bool
     <ChannelPage
       channelId={thread.channelId}
       thread={thread}
+      focusMessageId={focusMessageId}
       // A DM isn't in the channel list: the thread's own view of where it lives is enough here.
       fallback={{
         id: thread.channelId,

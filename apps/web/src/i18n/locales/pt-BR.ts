@@ -702,6 +702,15 @@ export const ptBR = {
     whoNoChannel: "<b>{{agent}}</b> · {{when}}",
     emptyPending: "Nenhuma aprovação pendente. Quando um agente pedir algo sensível, aparece aqui e no canal.",
     emptyDecided: "Nenhuma decisão ainda.",
+    missions: {
+      commands: "Comandos para aprovar",
+      waiting: "Esperando você em missões",
+      decision: "Decisão",
+      provisional: "Decisão provisória",
+      review: "Revisão",
+      delivery: "Entrega",
+      open: "Abrir",
+    },
     footer:
       "Quem pode aprovar: o responsável pelo agente e os admins da organização. Pedidos expiram em 24 h sem decisão.",
   },

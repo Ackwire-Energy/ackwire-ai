@@ -697,6 +697,15 @@ export const en: Translations = {
     emptyPending:
       "No pending approvals. When an agent asks for something sensitive, it shows up here and in the channel.",
     emptyDecided: "No decisions yet.",
+    missions: {
+      commands: "Commands to approve",
+      waiting: "Waiting for you in missions",
+      decision: "Decision",
+      provisional: "Provisional decision",
+      review: "Review",
+      delivery: "Delivery",
+      open: "Open",
+    },
     footer:
       "Who can approve: the agent's owner and the organization admins. Requests expire after 24 h without a decision.",
   },
