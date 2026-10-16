@@ -111,11 +111,13 @@ export {
   CriteriaPixels,
   PlanStrip,
   type PlanStripCell,
+  planCellPixel,
   RunKey,
   RunLane,
   type RunPixel,
   type RunPixelStatus,
   RunStrip,
+  STRIP_CELL,
   WorkSweep,
 } from "./components/RunPixels";
 export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";

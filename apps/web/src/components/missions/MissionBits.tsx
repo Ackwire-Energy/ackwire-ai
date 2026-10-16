@@ -40,12 +40,28 @@ export function useNow(active: boolean, ms = 1000) {
   return now;
 }
 
-/** "4 de 12 itens" as pixels, in the mission agent's own tones. */
-export function MissionStrip({ cells, agentId, label }: { cells: PlanCell[]; agentId: string; label: string }) {
+/** "4 de 12 itens" as pixels, in the mission agent's own tones; `titles` (the items') give each cell a tooltip. */
+export function MissionStrip({
+  cells,
+  agentId,
+  label,
+  titles,
+}: {
+  cells: PlanCell[];
+  agentId: string;
+  label: string;
+  titles?: string[];
+}) {
+  const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   if (cells.length === 0) return null;
-  return <PlanStrip cells={cells} color={colorOf(dir.agentById.get(agentId))} label={label} />;
+  const hints = cells.map((cell, i) => {
+    const status = t(`missions.strip.${cell}` as const);
+    const title = titles?.[i];
+    return title ? t("missions.strip.cell", { title, status }) : status;
+  });
+  return <PlanStrip cells={cells} color={colorOf(dir.agentById.get(agentId))} label={label} titles={hints} />;
 }
 
 export type MissionStatusKey = "needsYou" | "proposed" | "working" | "active" | "paused" | "done" | "canceled";

@@ -18,18 +18,29 @@ import type {
  * living checklist (no phases, no gates), drawn as one pixel cell per item.
  */
 
-/** One cell of the plan strip: done (filled), doing (moving), waiting for you (outlined), stopped with the computer (dotted outline), dropped (dotted line), to do (a faint base). */
+/** One cell of the plan strip: done (filled), doing (moving), waiting for you (outlined), stopped with the computer (dim outline), dropped (faint diagonal), to do (faint solid). */
 export type PlanCell = "done" | "doing" | "waiting" | "stopped" | "dropped" | "todo";
 
-/** The strip from the plan's items, in order. `offline`: what was being done stopped with the computer. */
+/** The cell of one plan item. `offline`: what was being done stopped with the computer. */
+export function planCell(status: PlanItem["status"], options: { offline?: boolean } = {}): PlanCell {
+  if (status === "done") return "done";
+  if (status === "doing") return options.offline ? "stopped" : "doing";
+  if (status === "waiting_you") return "waiting";
+  if (status === "dropped") return "dropped";
+  return "todo";
+}
+
+/**
+ * The strip from the plan's items, in order. Dropped items are left out, as
+ * in "N de M itens" (`planCounts`), so the strip and the count agree.
+ */
 export function planCells(items: Pick<PlanItem, "status">[], options: { offline?: boolean } = {}): PlanCell[] {
-  return items.map((i) => {
-    if (i.status === "done") return "done";
-    if (i.status === "doing") return options.offline ? "stopped" : "doing";
-    if (i.status === "waiting_you") return "waiting";
-    if (i.status === "dropped") return "dropped";
-    return "todo";
-  });
+  return items.filter((i) => i.status !== "dropped").map((i) => planCell(i.status, options));
+}
+
+/** The item titles in the strip's order (dropped left out), for each cell's tooltip. */
+export function planCellTitles(items: Pick<PlanItem, "status" | "title">[]): string[] {
+  return items.filter((i) => i.status !== "dropped").map((i) => i.title);
 }
 
 /**
@@ -54,6 +65,11 @@ export function cellsFromCounts(
   ];
 }
 
+/** The item titles of a mission view's strip (empty when only the counts are known). */
+export function missionCellTitles(m: Pick<Mission, "plan">): string[] {
+  return planCellTitles(m.plan.items ?? []);
+}
+
 /**
  * The strip of a mission view: its plan items when the server sent them
  * (`plan.items`), else the counts (an older server), with what is in
@@ -64,7 +80,7 @@ export function missionCells(
   options: { offline?: boolean } = {},
 ): PlanCell[] {
   const items = m.plan.items ?? [];
-  if (items.length > 0) return planCells(items, options);
+  if (items.some((i) => i.status !== "dropped")) return planCells(items, options);
   return cellsFromCounts(m.plan, m.plan.doing ?? m.runningTasks, options);
 }
 

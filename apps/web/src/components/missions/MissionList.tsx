@@ -10,7 +10,7 @@ import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { formatShortDate, relativeTime } from "@/lib/format";
-import { isOpenMission, missionCells, waitingText } from "@/lib/missions";
+import { isOpenMission, missionCells, missionCellTitles, waitingText } from "@/lib/missions";
 import { MachineChip, MissionStatusChip, MissionStrip } from "./MissionBits";
 import { CloseMissionDialog } from "./MissionDialogs";
 
@@ -160,6 +160,7 @@ function MissionCard({ mission: m }: { mission: Mission }) {
         </b>
         <MissionStrip
           cells={missionCells(m, { offline })}
+          titles={missionCellTitles(m)}
           agentId={m.agentId}
           label={t("missions.itemsLabel", { done: m.plan.done, count: m.plan.total })}
         />

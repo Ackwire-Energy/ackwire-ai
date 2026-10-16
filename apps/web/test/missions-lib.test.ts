@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { bodyTones, type PlanStripCell, planCellPixel, STRIP_CELL } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import type { MachineTask, Message, Mission } from "@/api/types";
 import { threadRootsToLoad } from "@/chat/timeline";
@@ -23,6 +24,7 @@ import {
   newLineIndexes,
   parseMissionCommand,
   planCells,
+  planCellTitles,
   planChangeParts,
   planCounts,
   prOf,
@@ -111,8 +113,46 @@ describe("the plan strip", () => {
       { status: "dropped" as const },
       { status: "todo" as const },
     ];
-    expect(planCells(items)).toEqual(["done", "doing", "waiting", "dropped", "todo"]);
+    // Dropped items are left out, like "N de M itens".
+    expect(planCells(items)).toEqual(["done", "doing", "waiting", "todo"]);
     expect(planCells(items, { offline: true })[1]).toBe("stopped");
+    expect(planCounts(items).total).toBe(4);
+  });
+
+  test("tooltips: the item titles in the strip's order, dropped left out", () => {
+    expect(
+      planCellTitles([
+        { status: "done", title: "Ler o app" },
+        { status: "dropped", title: "Velho" },
+        { status: "waiting_you", title: "Push" },
+      ]),
+    ).toEqual(["Ler o app", "Push"]);
+  });
+
+  test("cell kinds: all the same square, in the agent's tones; only dropped is broken up", () => {
+    const tones = bodyTones("sky");
+    const pixels = (kind: PlanStripCell) =>
+      Array.from({ length: STRIP_CELL * STRIP_CELL }, (_, k) =>
+        planCellPixel(kind, "sky", k % STRIP_CELL, Math.floor(k / STRIP_CELL)),
+      );
+    // Every kind but dropped fills the whole square (no size change for waiting).
+    for (const kind of ["todo", "doing", "done", "waiting", "stopped"] as const) {
+      expect(pixels(kind).every(Boolean)).toBe(true);
+    }
+    expect(pixels("dropped").some((p) => p === null)).toBe(true);
+    // To do: a faint solid cell, one tone, low opacity (never dotted).
+    const todo = pixels("todo");
+    expect(new Set(todo.map((p) => p?.color)).size).toBe(1);
+    expect(todo.every((p) => (p?.alpha ?? 1) < 0.5)).toBe(true);
+    // Done: full opacity, dithered across the agent's tones.
+    const done = pixels("done");
+    expect(done.every((p) => p?.alpha === 1 && tones.includes(p.color))).toBe(true);
+    expect(new Set(done.map((p) => p?.color)).size).toBeGreaterThan(1);
+    // Waiting for you: the outline in the agent's mid tone (never black), the inside faint.
+    const corner = planCellPixel("waiting", "sky", 0, 0);
+    expect(corner?.color).toBe(tones[2]);
+    expect(corner?.color).not.toBe("#000000");
+    expect(planCellPixel("waiting", "sky", 3, 3)?.alpha).toBeLessThan(0.5);
   });
 
   test("from counts: done, waiting, running, then the rest; never more cells than items", () => {
@@ -167,8 +207,8 @@ describe("what waits for you", () => {
         ],
       },
     });
-    expect(missionCells(withItems)).toEqual(["done", "doing", "waiting", "dropped"]);
-    expect(missionCells(withItems, { offline: true })).toEqual(["done", "stopped", "waiting", "dropped"]);
+    expect(missionCells(withItems)).toEqual(["done", "doing", "waiting"]);
+    expect(missionCells(withItems, { offline: true })).toEqual(["done", "stopped", "waiting"]);
     // No items (an older server): the counts, with `doing` as the moving cells.
     expect(missionCells(mission({ plan: { version: 1, done: 1, total: 4, waiting: 0, doing: 2, items: [] } }))).toEqual(
       ["done", "doing", "doing", "todo"],

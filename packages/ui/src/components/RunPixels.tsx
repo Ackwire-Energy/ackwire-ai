@@ -364,72 +364,117 @@ export function WorkSweep({
   return <canvas ref={ref} className={cx("ac-work-sweep", className)} />;
 }
 
-/**
- * A mission's plan as a pixel strip (telas/ThreadContexto.html): one cell
- * per checklist item, in the agent's own tones. Done is a filled dithered
- * cell, doing an animated one, waiting for a person an ink outline, stopped
- * with the computer a dotted outline, dropped a dotted base, to do a faint
- * base. The caller gives the words (`aria-label` on `role="img"`).
- */
-export type PlanStripCell = "done" | "doing" | "waiting" | "stopped" | "dropped" | "todo";
+/** A plan cell's side in canvas pixels (square), and the gap between cells. */
+export const STRIP_CELL = 7;
+export const STRIP_GAP = 2;
 
+/**
+ * One pixel of a plan cell (`null`: left empty), in the agent's tones
+ * (`bodyTones`: 0 deep … 4 lightest). `t` in seconds, or null when still.
+ * Every kind but dropped fills the whole square, so cells never change size.
+ */
+export function planCellPixel(
+  kind: PlanStripCell,
+  color: AgentColor,
+  x: number,
+  y: number,
+  index = 0,
+  t: number | null = null,
+): { color: string; alpha: number } | null {
+  const tones = bodyTones(color);
+  const tone = (i: number) => tones[i] ?? "#888888";
+  const last = STRIP_CELL - 1;
+  const edge = x === 0 || y === 0 || x === last || y === last;
+  const b = BAYER[((y & 3) << 2) | (x & 3)] ?? 0.5;
+  const faint = { color: tone(3), alpha: 0.28 };
+  switch (kind) {
+    case "done": {
+      const f = 1 - y / last;
+      return { color: tone(1 + Math.min(2, Math.floor(f * 2 + b))), alpha: 1 };
+    }
+    case "doing": {
+      const w = t == null ? 0.6 : (Math.sin(t * 4 - x * 0.7 + index) + 1) / 2;
+      if (w + b * 0.8 > 0.7) return { color: tone(2 + Math.min(2, Math.floor((w + b) * 1.5))), alpha: 1 };
+      return faint;
+    }
+    case "waiting":
+      if (edge) return { color: tone(2), alpha: t == null ? 1 : 0.7 + 0.3 * ((Math.sin(t * 3) + 1) / 2) };
+      return faint;
+    case "stopped":
+      if (edge) return { color: tone(2), alpha: 0.5 };
+      return faint;
+    case "dropped":
+      return (x + y) % 3 === 0 ? { color: tone(3), alpha: 0.3 } : null;
+    default:
+      return faint;
+  }
+}
+
+/**
+ * A mission's plan as a pixel strip (telas/ThreadContexto.html): one square
+ * cell per checklist item, all the same size, in the agent's own tones. To do
+ * is a faint solid cell, doing an animated dithered one, done a full dithered
+ * one, waiting for a person a faint cell outlined in the agent's mid tone
+ * (a slow pulse), stopped with the computer the same outline, still and dim,
+ * and dropped a faint diagonal (the only broken-up look; callers usually
+ * leave dropped items out). The caller gives the words: `label` on
+ * `role="img"`, and `titles` (one per cell) for each cell's tooltip.
+ */
 export function PlanStrip({
   cells,
   color = "sky",
   label,
+  titles,
   className,
 }: {
   cells: PlanStripCell[];
   color?: AgentColor;
   /** "4 de 12 itens prontos". */
   label: string;
+  /** Each cell's tooltip ("Push · esperando você"), in order. */
+  titles?: (string | null | undefined)[];
   className?: string;
 }) {
-  const W = 9;
-  const H = 7;
-  const GAP = 2;
   const n = Math.max(1, cells.length);
-  const width = n * W + (n - 1) * GAP;
-  const moving = cells.includes("doing");
-  const ref = useCanvas((ctx, canvas, t) => {
-    const tones = bodyTones(color);
-    const tone = (i: number) => tones[i] ?? "#888888";
-    const line = token(canvas, "--line-strong", "#cfcfc9");
-    const ink = token(canvas, "--ink2", "#2a2a28");
+  const width = n * STRIP_CELL + (n - 1) * STRIP_GAP;
+  const moving = cells.includes("doing") || cells.includes("waiting");
+  const ref = useCanvas((ctx, _canvas, t) => {
     const still = reduced();
-    ctx.clearRect(0, 0, width, H);
-    cells.forEach((st, i) => {
-      const x0 = i * (W + GAP);
-      for (let y = 0; y < H; y++)
-        for (let x = 0; x < W; x++) {
-          const edge = x === 0 || y === 0 || x === W - 1 || y === H - 1;
-          const b = BAYER[((y & 3) << 2) | (x & 3)] ?? 0.5;
-          let c: string | null = null;
-          if (st === "done") {
-            const f = 1 - y / (H - 1);
-            c = tone(1 + Math.min(2, Math.floor(f * 2 + b)));
-          } else if (st === "doing") {
-            const w = still ? 0.6 : (Math.sin(t * 4 - x * 0.7 + i) + 1) / 2;
-            if (w + b * 0.8 > 0.7) c = tone(2 + Math.min(2, Math.floor((w + b) * 1.5)));
-            else if (edge) c = tone(3);
-          } else if (st === "waiting") {
-            if (edge) c = ink;
-          } else if (st === "stopped") {
-            if (edge && (x + y) % 2 === 0) c = ink;
-          } else if (st === "dropped") {
-            if (y === Math.floor(H / 2) && x % 2 === 0) c = line;
-          } else if (y === H - 1 && x % 2 === 0) c = line;
-          if (c) {
-            ctx.fillStyle = c;
-            ctx.fillRect(x0 + x, y, 1, 1);
-          }
+    ctx.clearRect(0, 0, width, STRIP_CELL);
+    cells.forEach((kind, i) => {
+      const x0 = i * (STRIP_CELL + STRIP_GAP);
+      for (let y = 0; y < STRIP_CELL; y++)
+        for (let x = 0; x < STRIP_CELL; x++) {
+          const px = planCellPixel(kind, color, x, y, i, still ? null : t);
+          if (!px) continue;
+          ctx.globalAlpha = px.alpha;
+          ctx.fillStyle = px.color;
+          ctx.fillRect(x0 + x, y, 1, 1);
         }
     });
+    ctx.globalAlpha = 1;
   }, moving);
+  const hints = titles?.some(Boolean) ? titles : null;
   return (
     <span className={cx("ac-plan-strip", className)} role="img" aria-label={label}>
       {/* Height follows the width (the canvas's own ratio), so a long plan scales down whole. */}
-      <canvas ref={ref} width={width} height={H} style={{ width: width * CELL }} />
+      <canvas ref={ref} width={width} height={STRIP_CELL} style={{ width: width * CELL }} />
+      {hints && (
+        <span className="ac-plan-strip__hits" aria-hidden="true">
+          {cells.map((kind, i) => (
+            <span
+              // biome-ignore lint/suspicious/noArrayIndexKey: cells are positional
+              key={i}
+              data-cell={kind}
+              title={hints[i] ?? undefined}
+              style={{
+                left: `${((i * (STRIP_CELL + STRIP_GAP)) / width) * 100}%`,
+                width: `${(STRIP_CELL / width) * 100}%`,
+              }}
+            />
+          ))}
+        </span>
+      )}
     </span>
   );
 }
