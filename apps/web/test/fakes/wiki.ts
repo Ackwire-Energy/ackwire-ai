@@ -6,7 +6,7 @@
  */
 import type { ApiClient } from "@/api/client";
 import { ApiError } from "@/api/http";
-import type { WikiAuthor, WikiBacklink, WikiPage, WikiVersion } from "@/api/types";
+import type { WikiAuthor, WikiBacklink, WikiPage, WikiPageSummary, WikiVersion } from "@/api/types";
 import { resolveWikiLink, wikiLinksIn, wikiSlug } from "@/lib/wiki";
 import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg } from "./context";
 
@@ -109,7 +109,11 @@ export function createFakeWiki(ctx: MockContext, log: (method: string, ...args: 
     const fromPages: WikiBacklink[] = all
       .filter((x) => x !== s && wikiLinksIn(x.page.body).some((t) => resolveWikiLink(pages, t)?.slug === s.page.slug))
       .map((x) => ({ kind: "page", slug: x.page.slug, title: x.page.title }));
-    return clone({ ...s.page, backlinks: [...fromPages, ...s.outside] });
+    return clone({
+      ...s.page,
+      backlinks: [...fromPages, ...s.outside],
+      reads: s.page.reads ?? { total: 0, agents: [], last: null },
+    });
   };
   const me = async (): Promise<WikiAuthor> => ({ type: "person", id: (await ctx.lookup.me())?.user.id ?? "me" });
   return {
@@ -209,6 +213,84 @@ export function createFakeWiki(ctx: MockContext, log: (method: string, ...args: 
             .map((p) => ({ from: x.page.slug, to: p.slug })),
         ),
       };
+    },
+    move: async (orgId, slug, folder) => {
+      log("wiki.move", orgId, slug, folder);
+      const s = await find(orgId, slug);
+      s.page = { ...s.page, folder };
+      return withBacklinks(orgId, s);
+    },
+    lock: async (orgId, slug, locked) => {
+      log("wiki.lock", orgId, slug, locked);
+      const s = await find(orgId, slug);
+      s.page = { ...s.page, locked };
+      return withBacklinks(orgId, s);
+    },
+    pin: async (orgId, slug, pinned) => {
+      log("wiki.pin", orgId, slug, pinned);
+      const s = await find(orgId, slug);
+      s.page = { ...s.page, pinned };
+      return withBacklinks(orgId, s);
+    },
+    remove: async (orgId, slug) => {
+      log("wiki.remove", orgId, slug);
+      const list = await store(orgId);
+      const at = list.findIndex((x) => x.page.slug === slug);
+      if (at >= 0) list.splice(at, 1);
+    },
+    reads: async (orgId) => {
+      const agents = await ctx.lookup.agents(orgId);
+      const all = await store(orgId);
+      const [first] = all;
+      return ctx.seed && first && agents[0]
+        ? [
+            {
+              slug: first.page.slug,
+              title: first.page.title,
+              total: 12,
+              agents: [{ agentId: agents[0].id, count: 12 }],
+            },
+          ]
+        : [];
+    },
+    import: async (orgId, input) => {
+      log("wiki.import", orgId, input);
+      const list = await store(orgId);
+      const by = await me();
+      const at = ctx.now().toISOString();
+      const created: WikiPageSummary[] = [];
+      const skipped: string[] = [];
+      for (const n of input.notes) {
+        const taken = list.some((s) => s.page.slug === wikiSlug(n.title));
+        if (taken && input.onConflict === "skip") {
+          skipped.push(n.title);
+          continue;
+        }
+        const title = taken ? `${n.title} (${input.source.name})` : n.title;
+        const s: Stored = {
+          page: {
+            id: mockId("wiki"),
+            slug: wikiSlug(title),
+            title,
+            folder: [input.folder, n.folder].filter(Boolean).join("/"),
+            tags: n.tags ?? [],
+            body: n.body,
+            version: 1,
+            createdAt: at,
+            createdBy: by,
+            updatedAt: at,
+            updatedBy: by,
+            authors: [by],
+            sourceType: "obsidian",
+            source: { type: "obsidian", id: input.source.name, attachments: n.attachments },
+          },
+          versions: [{ version: 1, at, author: by, note: null, body: n.body }],
+          outside: [],
+        };
+        list.push(s);
+        created.push(summary(s));
+      }
+      return { created, skipped, failed: [] };
     },
     append: async (orgId, slug, input) => {
       log("wiki.append", orgId, slug, input);

@@ -6,6 +6,7 @@ import {
   diffWikiVersions,
   getWikiPage,
   getWikiVersion,
+  importWikiPages,
   listWikiPages,
   listWikiVersions,
   moveWikiPage,
@@ -15,8 +16,11 @@ import {
   resolveWikiTargets,
   restoreWikiPage,
   setWikiPageLock,
+  setWikiPagePinned,
   suggestWikiPages,
+  topWikiReads,
   updateWikiPage,
+  WIKI_IMPORT_MAX_NOTES,
   type WikiActor,
   type WikiDeps,
   wikiGraph,
@@ -53,13 +57,16 @@ const Summary = z
     tags: z.array(z.string()),
     version: z.number(),
     locked: z.boolean().openapi({ description: "Only admins edit it." }),
+    pinned: z.boolean().openapi({ description: "At the top of the wiki for everyone." }),
+    excerpt: z.string().openapi({ description: "The start of the text, plain." }),
+    sourceType: z.string().nullable().openapi({ description: '"obsidian" for an imported page.' }),
     updatedAt: z.string(),
     updatedBy: Author,
   })
   .openapi("WikiPageSummary");
 const Backlink = z
   .union([
-    z.object({ kind: z.literal("page"), slug: z.string(), title: z.string() }),
+    z.object({ kind: z.literal("page"), slug: z.string(), title: z.string(), excerpt: z.string() }),
     z.object({
       kind: z.literal("message"),
       channelId: z.uuid(),
@@ -72,6 +79,10 @@ const Backlink = z
     z.object({ kind: z.literal("issue"), number: z.number(), title: z.string() }),
   ])
   .openapi("WikiBacklink");
+const AgentReads = z.object({
+  total: z.number(),
+  agents: z.array(z.object({ agentId: z.string(), count: z.number() })),
+});
 const Page = Summary.extend({
   body: z.string(),
   createdAt: z.string(),
@@ -79,7 +90,27 @@ const Page = Summary.extend({
   authors: z.array(Author).openapi({ description: "Everyone who wrote it, most recent first." }),
   backlinks: z.array(Backlink),
   links: z.array(z.object({ target: z.string(), slug: z.string(), title: z.string().nullable(), exists: z.boolean() })),
-  source: z.object({ type: z.string(), id: z.string(), channelId: z.string().optional() }).nullable(),
+  source: z
+    .object({
+      type: z.string(),
+      id: z.string(),
+      channelId: z.string().optional(),
+      attachments: z
+        .record(z.string(), z.string())
+        .optional()
+        .openapi({ description: "Imported attachments: file name → Drive artifact id (for `![[file]]`)." }),
+    })
+    .nullable(),
+  reads: AgentReads.extend({
+    last: z
+      .object({
+        agentId: z.string(),
+        channelId: z.string().nullable(),
+        channelName: z.string().nullable().openapi({ description: "Only for public channels." }),
+        at: z.string(),
+      })
+      .nullable(),
+  }).openapi({ description: "Agents that used the page in the last 7 days." }),
   deletedAt: z.string().nullable(),
 }).openapi("WikiPage");
 const Version = z
@@ -248,6 +279,7 @@ export function wikiRoutes(deps: AppDeps) {
                 folder: z.string(),
                 tags: z.array(z.string()),
                 agentId: z.uuid().nullable(),
+                sourceType: z.string().nullable().openapi({ description: '"obsidian" for an imported page.' }),
               }),
             ),
             edges: z.array(z.object({ from: z.string(), to: z.string() })),
@@ -406,6 +438,88 @@ export function wikiRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, slug } = c.req.valid("param");
       return c.json(await moveWikiPage(wiki(), person(c.get("user").id), orgId, slug, c.req.valid("json").folder), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/pages/{slug}/pin",
+      tags,
+      security,
+      summary: "Pin a page to the top of the wiki (or unpin it)",
+      request: { params: PageParams, body: body(z.object({ pinned: z.boolean() })) },
+      responses: { 200: json(Page), ...errors },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      return c.json(await setWikiPagePinned(wiki(), c.get("user").id, orgId, slug, c.req.valid("json").pinned), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/wiki/reads",
+      tags,
+      security,
+      summary: "What the agents read most in the last 7 days",
+      request: { params: OrgParams },
+      responses: {
+        200: json(z.array(AgentReads.extend({ slug: z.string(), title: z.string() })).openapi("WikiTopReads")),
+        ...errors,
+      },
+    }),
+    async (c) => c.json(await topWikiReads(db, person(c.get("user").id), c.req.valid("param").orgId), 200),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/wiki/import",
+      tags,
+      security,
+      summary: "Import notes (an Obsidian vault read by the app) as pages",
+      description: `Up to ${WIKI_IMPORT_MAX_NOTES} notes per call; the app sends a big vault in batches. Attachments go to the Drive first (upload), and each note says which ones it embeds.`,
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            source: z.object({ type: z.literal("obsidian"), name: z.string().max(200) }),
+            notes: z
+              .array(
+                z.object({
+                  title: z.string().min(1).max(300),
+                  folder: z.string().max(500).optional(),
+                  body: z.string().max(400_000),
+                  tags: z.array(z.string().max(80)).max(100).optional(),
+                  aliases: z.array(z.string().max(300)).max(50).optional(),
+                  attachments: z.record(z.string().max(300), z.uuid()).optional(),
+                }),
+              )
+              .max(WIKI_IMPORT_MAX_NOTES),
+            folder: Folder.optional().openapi({ description: "Put everything under this folder." }),
+            onConflict: z.enum(["keep_both", "skip"]).default("keep_both"),
+          }),
+        ),
+      },
+      responses: {
+        200: json(
+          z
+            .object({
+              created: z.array(Summary),
+              skipped: z.array(z.string()).openapi({ description: "Titles left out (a page already had the name)." }),
+              failed: z.array(z.object({ title: z.string(), reason: z.enum(["title", "too_long"]) })),
+            })
+            .openapi("WikiImportResult"),
+          "Imported",
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await importWikiPages(wiki(), c.get("user").id, orgId, c.req.valid("json")), 200);
     },
   );
 

@@ -1,39 +1,26 @@
-import {
-  Avatar,
-  Button,
-  Chip,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  Diff,
-  diffLines,
-  EmptyState,
-  Field,
-  Icon,
-  Input,
-  SearchInput,
-} from "@agenteschat/ui";
+import { Button, EmptyState, Icon, Kbd, SearchInput } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
-import { useWikiAction, useWikiHistory, useWikiPage, useWikiTree } from "@/api/queries";
-import type { WikiAuthor, WikiPage as WikiPageData, WikiPageSummary } from "@/api/types";
+import { useWikiReads, useWikiTree } from "@/api/queries";
+import type { WikiPageSummary } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { ErrorState, LoadingList, LoadingPage } from "@/components/Loading";
+import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { WikiEditor } from "@/components/WikiEditor";
 import { WikiGraphView } from "@/components/WikiGraph";
-import { useWikiLinkRenderer } from "@/components/WikiLinks";
+import { ObsidianMark } from "@/components/wiki/ObsidianMark";
+import { useVaultDrop, VaultDropOverlay, WikiImportDialog } from "@/components/wiki/WikiImport";
+import { AuthorAvatar, typingIn, WikiReader } from "@/components/wiki/WikiReader";
 import { useDirectory } from "@/hooks/useDirectory";
-import { relativeTime, whenAt } from "@/lib/format";
-import { Markdown } from "@/lib/markdown";
+import { relativeTime } from "@/lib/format";
+import type { VaultFile } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
-import { leafTitle, outlineOf, type WikiFolder, wikiSlug, wikiTree } from "@/lib/wiki";
+import { type WikiFolder, wikiSlug, wikiTree } from "@/lib/wiki";
+import "./wiki.css";
 
 /** The suggested start (Visão geral, Processos/Como trabalhamos, Glossário), in the UI language. */
 export function starterPages(t: TFunction) {
@@ -55,124 +42,308 @@ export function starterPages(t: TFunction) {
   ];
 }
 
-type Center = "page" | "graph";
+/** Imported in the last day and not edited since: marked "novo" in the tree. */
+const isFresh = (p: WikiPageSummary) =>
+  p.sourceType === "obsidian" && (p.version ?? 1) === 1 && Date.now() - Date.parse(p.updatedAt) < 86_400_000;
 
-/** The org wiki: tree, search, tags and recents on the left; the page; outline, backlinks, info and history on the right. */
+type View = "home" | "graph";
+
+/**
+ * The org wiki (prototype: docs/design/telas/Wiki.html): pages on the left
+ * (pinned, folders, tags, Obsidian import); the home, a page or the graph in
+ * the middle. A vault dropped anywhere opens the import.
+ */
 export function WikiPage({ slug, newTitle }: { slug?: string; newTitle?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const tree = useWikiTree(org.id);
-  const [center, setCenter] = useState<Center>("page");
-  const [creating, setCreating] = useState<string | null>(newTitle ?? null);
-  useEffect(() => {
-    if (newTitle !== undefined) setCreating(newTitle);
-  }, [newTitle]);
   const pages = tree.data ?? [];
+  const [view, setView] = useState<View>("home");
+  const [writing, setWriting] = useState<{ title: string; folder: string } | null>(null);
+  const [importing, setImporting] = useState<{ files?: Promise<VaultFile[]> } | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
+  const [tag, setTag] = useState<string | null>(null);
+  const current = pages.find((p) => p.slug === slug);
+
+  useEffect(() => {
+    if (newTitle === undefined) return;
+    const parts = newTitle.split("/");
+    setWriting({ title: parts.pop()?.trim() ?? "", folder: parts.join("/") });
+  }, [newTitle]);
+  useEffect(() => {
+    setNavOpen(false);
+    if (slug) {
+      setView("home");
+      setWriting(null);
+    }
+  }, [slug]);
+
+  const startNew = (title = "", folder = current?.folder ?? "") => {
+    setWriting({ title, folder });
+    setNavOpen(false);
+  };
+  // N: a new page (when not typing).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "n" || e.metaKey || e.ctrlKey || e.altKey || typingIn(document.activeElement)) return;
+      if (writing || importing) return;
+      e.preventDefault();
+      startNew();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+  const drop = useVaultDrop((files) => setImporting({ files }), importing === null && writing === null);
+
+  let center: ReactNode;
+  if (tree.isError && !tree.data) center = <ErrorState error={tree.error} onRetry={() => void tree.refetch()} />;
+  else if (writing)
+    center = (
+      <WikiReader
+        key={`new:${writing.title}`}
+        initial={writing}
+        pages={pages}
+        onCreate={startNew}
+        onDiscard={() => setWriting(null)}
+        onTag={setTag}
+      />
+    );
+  else if (view === "graph") center = <WikiGraphView onOpen={() => setView("home")} />;
+  else if (slug) center = <WikiReader key={slug} slug={slug} pages={pages} onCreate={startNew} onTag={setTag} />;
+  else if (tree.isLoading) center = <LoadingCards count={4} />;
+  else if (pages.length === 0)
+    center = <WikiEmpty onNew={() => startNew()} onImport={() => setImporting({})} onNav={() => setNavOpen(true)} />;
+  else
+    center = (
+      <WikiHome
+        pages={pages}
+        onNew={() => startNew()}
+        onImport={() => setImporting({})}
+        onGraph={() => setView("graph")}
+        onNav={() => setNavOpen(true)}
+      />
+    );
 
   return (
-    <div className="wiki">
-      <aside className="wiki__left" aria-label={t("wiki.nav")}>
-        <div className="row" style={{ gap: 6 }}>
-          <Button size="sm" variant="primary" icon="plus" onClick={() => setCreating("")}>
-            {t("wiki.new")}
+    <div className="wiki" {...drop.props}>
+      <WikiNav
+        pages={pages}
+        loading={tree.isLoading}
+        current={writing ? undefined : slug}
+        view={writing ? null : view}
+        open={navOpen}
+        tag={tag}
+        onTag={setTag}
+        onHome={() => {
+          setView("home");
+          setWriting(null);
+        }}
+        onGraph={() => {
+          setView("graph");
+          setWriting(null);
+          setNavOpen(false);
+        }}
+        onNew={() => startNew()}
+        onImport={() => setImporting({})}
+        onClose={() => setNavOpen(false)}
+      />
+      {navOpen && (
+        <button
+          type="button"
+          className="wiki__scrim"
+          aria-hidden="true"
+          tabIndex={-1}
+          onClick={() => setNavOpen(false)}
+        />
+      )}
+      <div className="wiki__center">
+        {(slug || writing || view === "graph") && (
+          <Button size="sm" variant="ghost" icon="menu" className="wiki__navbtn" onClick={() => setNavOpen(true)}>
+            {t("wiki.tree")}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-pressed={center === "graph"}
-            onClick={() => setCenter(center === "graph" ? "page" : "graph")}
-          >
-            {t("wiki.graph")}
-          </Button>
-        </div>
-        {tree.isLoading ? <LoadingList count={5} avatar={false} /> : <WikiNav pages={pages} current={slug} />}
-      </aside>
-      <main className="wiki__center">
-        {tree.isError && !tree.data ? (
-          <ErrorState error={tree.error} onRetry={() => void tree.refetch()} />
-        ) : center === "graph" ? (
-          <WikiGraphView onOpen={() => setCenter("page")} />
-        ) : slug ? (
-          <PageView key={slug} slug={slug} pages={pages} onCreate={setCreating} />
-        ) : tree.isSuccess && pages.length === 0 ? (
-          <WikiEmpty onCreate={() => setCreating("")} />
-        ) : tree.isSuccess ? (
-          <WikiHome pages={pages} />
-        ) : null}
-      </main>
-      <NewPageDialog initialTitle={creating} pages={pages} onClose={() => setCreating(null)} />
+        )}
+        {center}
+      </div>
+      {drop.over && <VaultDropOverlay />}
+      {importing && <WikiImportDialog files={importing.files} onClose={() => setImporting(null)} />}
     </div>
   );
 }
 
-/** Left pane: search, the folder tree, tags and recent pages. */
-function WikiNav({ pages, current }: { pages: WikiPageSummary[]; current?: string }) {
-  const { t, i18n } = useTranslation();
+/** Left pane: search, home and graph, pinned pages, the folder tree, tags, Obsidian import. */
+function WikiNav({
+  pages,
+  loading,
+  current,
+  view,
+  open,
+  tag,
+  onTag,
+  onHome,
+  onGraph,
+  onNew,
+  onImport,
+  onClose,
+}: {
+  pages: WikiPageSummary[];
+  loading: boolean;
+  current?: string;
+  view: View | null;
+  open: boolean;
+  tag: string | null;
+  onTag: (tag: string | null) => void;
+  onHome: () => void;
+  onGraph: () => void;
+  onNew: () => void;
+  onImport: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
   const { org } = useOrg();
   const [q, setQ] = useState("");
-  const [tag, setTag] = useState<string | null>(null);
+  const [closed, setClosed] = useState<Set<string>>(new Set());
   const query = q.trim().toLowerCase();
-  const shown = pages.filter(
-    (p) => (!query || `${p.title} ${p.folder}`.toLowerCase().includes(query)) && (!tag || p.tags.includes(tag)),
+  const filtering = Boolean(query || tag);
+  const shown = useMemo(
+    () =>
+      pages.filter(
+        (p) =>
+          (!query || `${p.title} ${p.folder} ${p.excerpt ?? ""}`.toLowerCase().includes(query)) &&
+          (!tag || p.tags.includes(tag)),
+      ),
+    [pages, query, tag],
   );
   const root = useMemo(() => wikiTree(shown), [shown]);
-  const tags = [...new Set(pages.flatMap((p) => p.tags))].sort();
-  const recent = [...pages].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5);
-  const PageLink = ({ p }: { p: WikiPageSummary }) => (
+  const tags = useMemo(() => [...new Set(pages.flatMap((p) => p.tags))].sort(), [pages]);
+  const pinned = pages.filter((p) => p.pinned);
+  const count = (f: WikiFolder<WikiPageSummary>): number =>
+    f.pages.length + f.folders.reduce((n, sub) => n + count(sub), 0);
+
+  const PageRow = ({ p }: { p: WikiPageSummary }) => (
     <Link
       to="/org/$orgId/wiki/$slug"
       params={{ orgId: org.id, slug: p.slug }}
-      className="wiki-nav__page"
+      className="wiki-row"
       aria-current={p.slug === current ? "page" : undefined}
+      onClick={onClose}
     >
-      <Icon name="document" size={14} />
-      <span>{p.title}</span>
+      <Icon name={p.locked ? "lock" : "document"} size={14} />
+      <span className="wiki-row__t">{p.title}</span>
+      {isFresh(p) && <span className="wiki-row__new">{t("wiki.fresh")}</span>}
     </Link>
   );
-  const Folder = ({ f }: { f: WikiFolder<WikiPageSummary> }) => (
-    <details className="wiki-nav__folder" open>
-      <summary>
-        <Icon name="drive" size={14} />
-        {f.name}
-      </summary>
-      <div className="wiki-nav__children">
-        {f.folders.map((sub) => (
-          <Folder key={sub.path} f={sub} />
-        ))}
-        {f.pages.map((p) => (
-          <PageLink key={p.slug} p={p} />
-        ))}
-      </div>
-    </details>
-  );
+  const Folder = ({ f }: { f: WikiFolder<WikiPageSummary> }) => {
+    const isOpen = filtering || !closed.has(f.path);
+    return (
+      <>
+        <button
+          type="button"
+          className="wiki-row wiki-row--folder"
+          aria-expanded={isOpen}
+          onClick={() => {
+            const next = new Set(closed);
+            if (next.has(f.path)) next.delete(f.path);
+            else next.add(f.path);
+            setClosed(next);
+          }}
+        >
+          <Icon name="chevronDown" size={14} className="wiki-row__car" />
+          <Icon name="drive" size={14} />
+          <span className="wiki-row__t">{f.name}</span>
+          <span className="wiki-row__n">{count(f)}</span>
+        </button>
+        {isOpen && (
+          <div className="wiki-sub">
+            {f.folders.map((sub) => (
+              <Folder key={sub.path} f={sub} />
+            ))}
+            {f.pages.map((p) => (
+              <PageRow key={p.slug} p={p} />
+            ))}
+          </div>
+        )}
+      </>
+    );
+  };
+
   return (
-    <>
+    <aside className="wiki-nav" data-open={open || undefined} aria-label={t("wiki.nav")}>
+      <div className="wiki-nav__head">
+        <b>{t("wiki.title")}</b>
+        <Button
+          size="sm"
+          variant="ghost"
+          iconOnly
+          icon="plus"
+          aria-label={t("wiki.new")}
+          title={`${t("wiki.new")} (N)`}
+          onClick={onNew}
+        />
+      </div>
       <SearchInput
         aria-label={t("wiki.search")}
-        placeholder={t("wiki.search")}
+        placeholder={t("wiki.searchPlaceholder")}
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
-      <nav className="wiki-nav" aria-label={t("wiki.tree")}>
-        {root.folders.map((f) => (
-          <Folder key={f.path} f={f} />
-        ))}
-        {root.pages.map((p) => (
-          <PageLink key={p.slug} p={p} />
-        ))}
-        {shown.length === 0 && <p className="small muted">{t("wiki.noMatch")}</p>}
+      <div className="wiki-nav__list">
+        <button
+          type="button"
+          className="wiki-row"
+          aria-current={view === "home" && !current ? "page" : undefined}
+          onClick={onHome}
+        >
+          <Icon name="book" size={14} />
+          <span className="wiki-row__t">{t("wiki.home")}</span>
+        </button>
+        <button
+          type="button"
+          className="wiki-row"
+          aria-current={view === "graph" ? "page" : undefined}
+          onClick={onGraph}
+        >
+          <Icon name="diagram" size={14} />
+          <span className="wiki-row__t">{t("wiki.graph")}</span>
+          <span className="wiki-row__n">{pages.length}</span>
+        </button>
+      </div>
+      {!filtering && pinned.length > 0 && (
+        <section className="wiki-nav__section" aria-label={t("wiki.pinnedPages")}>
+          <span className="wiki-label">{t("wiki.pinnedPages")}</span>
+          <div className="wiki-nav__list">
+            {pinned.map((p) => (
+              <PageRow key={p.slug} p={p} />
+            ))}
+          </div>
+        </section>
+      )}
+      <nav className="wiki-nav__section" aria-label={t("wiki.tree")}>
+        <span className="wiki-label">{filtering ? t("wiki.results", { count: shown.length }) : t("wiki.tree")}</span>
+        {loading ? (
+          <LoadingList count={5} avatar={false} />
+        ) : (
+          <div className="wiki-nav__list">
+            {root.folders.map((f) => (
+              <Folder key={f.path} f={f} />
+            ))}
+            {root.pages.map((p) => (
+              <PageRow key={p.slug} p={p} />
+            ))}
+            {shown.length === 0 && <p className="small muted wiki-nav__empty">{t("wiki.noMatch")}</p>}
+          </div>
+        )}
       </nav>
       {tags.length > 0 && (
-        <section aria-label={t("wiki.tags")} className="wiki-nav__section">
-          <span className="wiki-nav__label">{t("wiki.tags")}</span>
+        <section className="wiki-nav__section" aria-label={t("wiki.tags")}>
+          <span className="wiki-label">{t("wiki.tags")}</span>
           <div className="wiki-tags">
             {tags.map((tg) => (
               <button
                 key={tg}
                 type="button"
-                className="pill"
+                className="wiki-tag"
                 aria-pressed={tag === tg}
-                onClick={() => setTag(tag === tg ? null : tg)}
+                onClick={() => onTag(tag === tg ? null : tg)}
               >
                 #{tg}
               </button>
@@ -180,53 +351,194 @@ function WikiNav({ pages, current }: { pages: WikiPageSummary[]; current?: strin
           </div>
         </section>
       )}
-      {recent.length > 0 && (
-        <section aria-label={t("wiki.recent")} className="wiki-nav__section">
-          <span className="wiki-nav__label">{t("wiki.recent")}</span>
+      <button type="button" className="wiki-import-card" onClick={onImport}>
+        <ObsidianMark size={20} />
+        <span>
+          <b>{t("wiki.import.cta")}</b>
+          <small>{t("wiki.import.ctaText")}</small>
+        </span>
+      </button>
+    </aside>
+  );
+}
+
+function HomeHead({ onNew, onImport, onNav }: { onNew: () => void; onImport: () => void; onNav: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  return (
+    <header className="wiki-home__head">
+      <div>
+        <h1 className="wiki-home__title">{t("wiki.homeTitle", { org: org.name })}</h1>
+        <p className="muted">{t("wiki.subtitle")}</p>
+      </div>
+      <div className="wiki-home__acts">
+        <Button size="sm" variant="ghost" icon="menu" className="wiki__navbtn" onClick={onNav}>
+          {t("wiki.tree")}
+        </Button>
+        <Button size="sm" onClick={onImport}>
+          <ObsidianMark size={16} />
+          {t("wiki.import.short")}
+        </Button>
+        <Button size="sm" variant="primary" icon="plus" onClick={onNew}>
+          {t("wiki.new")}
+          <Kbd>N</Kbd>
+        </Button>
+      </div>
+    </header>
+  );
+}
+
+/** The home: recently edited pages, what the agents read most, folders and the graph. */
+function WikiHome({
+  pages,
+  onNew,
+  onImport,
+  onGraph,
+  onNav,
+}: {
+  pages: WikiPageSummary[];
+  onNew: () => void;
+  onImport: () => void;
+  onGraph: () => void;
+  onNav: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const reads = useWikiReads(org.id);
+  const recent = [...pages].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6);
+  const top = (reads.data ?? []).slice(0, 5);
+  const max = top[0]?.total ?? 1;
+  const tops = wikiTree(pages).folders;
+  const count = (f: WikiFolder<WikiPageSummary>): number =>
+    f.pages.length + f.folders.reduce((n, sub) => n + count(sub), 0);
+  const name = (a: WikiPageSummary["updatedBy"]) =>
+    a.type === "agent" ? (dir.agentById.get(a.id)?.name ?? "") : (dir.memberById.get(a.id)?.name ?? "");
+  return (
+    <div className="wiki-home">
+      <HomeHead onNew={onNew} onImport={onImport} onNav={onNav} />
+      <section className="wiki-home__sec" aria-label={t("wiki.recent")}>
+        <h2 className="wiki-home__h">{t("wiki.recent")}</h2>
+        <div className="wiki-cards">
           {recent.map((p) => (
             <Link
               key={p.slug}
               to="/org/$orgId/wiki/$slug"
               params={{ orgId: org.id, slug: p.slug }}
-              className="wiki-nav__recent"
+              className="wiki-card"
             >
-              <span className="wiki-nav__recent-title">{p.title}</span>
-              <span className="wiki-nav__recent-time">{relativeTime(t, i18n.language, p.updatedAt)}</span>
+              <span className="wiki-card__where">
+                <Icon name={p.locked ? "lock" : "drive"} size={14} />
+                {p.folder || t("wiki.root")}
+              </span>
+              {p.sourceType === "obsidian" && (
+                <span className="wiki-card__src">
+                  <ObsidianMark size={14} />
+                  Obsidian
+                </span>
+              )}
+              <b className="wiki-card__title">{p.title}</b>
+              {p.excerpt && <span className="wiki-card__text">{p.excerpt}</span>}
+              <span className="wiki-card__by">
+                <AuthorAvatar a={p.updatedBy} />
+                <span>
+                  <b>{name(p.updatedBy)}</b>
+                  {p.updatedBy.onBehalfOf
+                    ? ` ${t("wiki.atRequestOf")} ${dir.memberById.get(p.updatedBy.onBehalfOf)?.name ?? ""}`
+                    : ""}
+                  {" · "}
+                  {relativeTime(t, i18n.language, p.updatedAt)}
+                </span>
+              </span>
             </Link>
           ))}
+        </div>
+      </section>
+      <div className="wiki-home__two">
+        <section className="wiki-home__sec" aria-label={t("wiki.topReads")}>
+          <h2 className="wiki-home__h">
+            {t("wiki.topReads")} <span className="wiki-label__n">{t("wiki.last7Days")}</span>
+          </h2>
+          <div className="wiki-panel">
+            {reads.isLoading ? (
+              <LoadingList count={3} />
+            ) : top.length === 0 ? (
+              <p className="wiki-panel__empty small muted">{t("wiki.topReadsEmpty")}</p>
+            ) : (
+              top.map((r) => (
+                <Link
+                  key={r.slug}
+                  to="/org/$orgId/wiki/$slug"
+                  params={{ orgId: org.id, slug: r.slug }}
+                  className="wiki-read"
+                >
+                  <span className="wiki-read__crew">
+                    {r.agents.slice(0, 3).map((a) => (
+                      <AgentAvatar
+                        key={a.agentId}
+                        agentId={a.agentId}
+                        name={dir.agentById.get(a.agentId)?.name ?? ""}
+                        size="sm"
+                      />
+                    ))}
+                  </span>
+                  <span className="wiki-read__t">
+                    <b>{r.title}</b>
+                    <small>
+                      {r.agents
+                        .slice(0, 3)
+                        .map((a) => dir.agentById.get(a.agentId)?.name)
+                        .filter(Boolean)
+                        .join(", ")}
+                    </small>
+                  </span>
+                  <span className="wiki-read__bar" aria-hidden="true">
+                    <i style={{ width: `${Math.round((r.total / max) * 100)}%` }} />
+                  </span>
+                  <span className="dot-num wiki-read__n" title={t("wiki.uses.count", { count: r.total })}>
+                    {r.total}
+                  </span>
+                </Link>
+              ))
+            )}
+          </div>
         </section>
-      )}
-    </>
-  );
-}
-
-/** "Wiki" with no page: a short index of the root pages. */
-function WikiHome({ pages }: { pages: WikiPageSummary[] }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  return (
-    <div className="wiki-page">
-      <h1 className="page-title">{t("wiki.title")}</h1>
-      <p className="muted">{t("wiki.subtitle")}</p>
-      <div className="wiki-home">
-        {pages.slice(0, 12).map((p) => (
-          <Link
-            key={p.slug}
-            to="/org/$orgId/wiki/$slug"
-            params={{ orgId: org.id, slug: p.slug }}
-            className="ac-card ac-card--interactive wiki-home__card"
-          >
-            <span className="wiki-home__title">{p.title}</span>
-            {p.folder && <span className="small muted">{p.folder}</span>}
-          </Link>
-        ))}
+        <section className="wiki-home__sec" aria-label={t("wiki.folders")}>
+          <h2 className="wiki-home__h">
+            {t("wiki.folders")} <span className="wiki-label__n">{t("wiki.pageCount", { count: pages.length })}</span>
+          </h2>
+          <div className="wiki-panel">
+            {tops.length > 0 && (
+              <div className="wiki-folders">
+                {tops.map((f) => (
+                  <div key={f.path} className="wiki-folder">
+                    <span className="wiki-folder__icon">
+                      <Icon name="drive" size={16} />
+                    </span>
+                    <span>
+                      <b>{f.name}</b>
+                      <small>{t("wiki.pageCount", { count: count(f) })}</small>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button type="button" className="wiki-minigraph" onClick={onGraph} aria-label={t("wiki.openGraph")}>
+              <WikiGraphView mini />
+              <span className="wiki-minigraph__label">
+                <Icon name="diagram" size={14} />
+                {t("wiki.openGraph")}
+              </span>
+            </button>
+          </div>
+        </section>
       </div>
     </div>
   );
 }
 
-/** No pages yet: a friendly start with the suggested structure. */
-function WikiEmpty({ onCreate }: { onCreate: () => void }) {
+/** No pages yet: import a vault, the suggested start, or a blank page. */
+function WikiEmpty({ onNew, onImport, onNav }: { onNew: () => void; onImport: () => void; onNav: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -235,14 +547,17 @@ function WikiEmpty({ onCreate }: { onCreate: () => void }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   return (
-    <div className="wiki-page">
+    <div className="wiki-home">
+      <HomeHead onNew={onNew} onImport={onImport} onNav={onNav} />
       <EmptyState
+        sky
         icon="book"
         title={t("wiki.emptyTitle")}
         actions={
-          <div className="row" style={{ gap: 8, justifyContent: "center" }}>
-            <Button variant="primary" icon="plus" onClick={onCreate}>
-              {t("wiki.createFirst")}
+          <div className="wiki-empty__acts">
+            <Button variant="primary" onClick={onImport}>
+              <ObsidianMark size={16} />
+              {t("wiki.import.cta")}
             </Button>
             <Button
               loading={busy}
@@ -267,6 +582,9 @@ function WikiEmpty({ onCreate }: { onCreate: () => void }) {
             >
               {t("wiki.useStarter")}
             </Button>
+            <Button variant="ghost" icon="plus" onClick={onNew}>
+              {t("wiki.blankPage")}
+            </Button>
           </div>
         }
       >
@@ -281,507 +599,5 @@ function WikiEmpty({ onCreate }: { onCreate: () => void }) {
         ))}
       </ul>
     </div>
-  );
-}
-
-/** "Por Theo, a pedido de Walter" / "Por Walter". */
-function useAuthorLabel() {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
-  return (a: WikiAuthor) => {
-    const name = a.type === "agent" ? (dir.agentById.get(a.id)?.name ?? "") : (dir.memberById.get(a.id)?.name ?? "");
-    const behalf = a.onBehalfOf ? dir.memberById.get(a.onBehalfOf)?.name : undefined;
-    return behalf ? t("wiki.byFor", { name, person: behalf }) : t("wiki.by", { name });
-  };
-}
-
-function AuthorAvatar({ a }: { a: WikiAuthor }) {
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
-  if (a.type === "agent") return <AgentAvatar agentId={a.id} name={dir.agentById.get(a.id)?.name ?? ""} size="xs" />;
-  const m = dir.memberById.get(a.id);
-  return <Avatar size="xs" name={m?.name ?? "?"} imageUrl={m?.image} />;
-}
-
-/** One page: reading or editing in the center, outline/backlinks/info/history on the right. */
-function PageView({
-  slug,
-  pages,
-  onCreate,
-}: {
-  slug: string;
-  pages: WikiPageSummary[];
-  onCreate: (title: string) => void;
-}) {
-  const { t, i18n } = useTranslation();
-  const { org } = useOrg();
-  const api = useApi();
-  const qc = useQueryClient();
-  const toast = useToast();
-  const page = useWikiPage(org.id, slug);
-  const action = useWikiAction(org.id);
-  const wikiLink = useWikiLinkRenderer();
-  const authorLabel = useAuthorLabel();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [conflict, setConflict] = useState<WikiPageData | null>(null);
-  const [renaming, setRenaming] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-
-  if (page.isLoading) return <LoadingPage rows={4} />;
-  if (!page.data) {
-    const missing = (page.error as { status?: number } | null)?.status === 404;
-    const title = leafTitle(slug.split("/").pop()?.replace(/-/g, " ") ?? slug);
-    return missing ? (
-      <div className="wiki-page">
-        <EmptyState
-          icon="book"
-          title={t("wiki.missingTitle")}
-          actions={
-            <Button
-              variant="primary"
-              icon="plus"
-              onClick={() => onCreate(title.charAt(0).toUpperCase() + title.slice(1))}
-            >
-              {t("wiki.createPage")}
-            </Button>
-          }
-        >
-          {t("wiki.missingText")}
-        </EmptyState>
-      </div>
-    ) : (
-      <ErrorState error={page.error} onRetry={() => void page.refetch()} />
-    );
-  }
-  const p = page.data;
-  const outline = outlineOf(p.body);
-  const save = (body: string, baseVersion: number) =>
-    action.mutate(
-      { type: "update", slug: p.slug, input: { body, baseVersion } },
-      {
-        onSuccess: () => {
-          setEditing(false);
-          setConflict(null);
-          toast.show(t("wiki.saved"));
-        },
-        onError: async (e) => {
-          if (e instanceof ApiError && e.code === "version_conflict") {
-            const latest = await api.wiki.get(org.id, p.slug);
-            qc.setQueryData(keys.wikiPage(org.id, p.slug), latest);
-            setConflict(latest);
-          } else toast.show(e.message, "error");
-        },
-      },
-    );
-
-  return (
-    <div className="wiki-body">
-      <article className="wiki-page" aria-labelledby="wiki-title">
-        <header className="wiki-page__head">
-          <div className="stack-4" style={{ gap: 4, flex: 1, minWidth: 0 }}>
-            {p.folder && <span className="small muted">{p.folder}</span>}
-            <h1 id="wiki-title" className="page-title">
-              {p.title}
-            </h1>
-            {p.tags.length > 0 && (
-              <div className="wiki-tags">
-                {p.tags.map((tg) => (
-                  <Chip key={tg} icon="dash">
-                    #{tg}
-                  </Chip>
-                ))}
-              </div>
-            )}
-          </div>
-          {!editing && (
-            <div className="row" style={{ gap: 6 }}>
-              <Button size="sm" variant="ghost" onClick={() => setRenaming(true)}>
-                {t("wiki.rename")}
-              </Button>
-              <Button
-                size="sm"
-                icon="edit"
-                onClick={() => {
-                  setDraft(p.body);
-                  setEditing(true);
-                }}
-              >
-                {t("wiki.edit")}
-              </Button>
-            </div>
-          )}
-        </header>
-        {editing ? (
-          <>
-            <WikiEditor
-              value={draft}
-              onChange={setDraft}
-              onSave={() => save(draft, p.version)}
-              pages={pages}
-              label={t("wiki.editorLabel", { title: p.title })}
-            />
-            <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
-              <Button onClick={() => setEditing(false)}>{t("common.cancel")}</Button>
-              <Button
-                variant="primary"
-                loading={action.isPending}
-                disabled={action.isPending || draft === p.body}
-                onClick={() => save(draft, p.version)}
-              >
-                {t("common.save")}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className="wiki-page__body">
-            <Markdown source={p.body} wikiLink={wikiLink} />
-          </div>
-        )}
-      </article>
-      <aside className="wiki__right" aria-label={t("wiki.aside")}>
-        {outline.length > 0 && (
-          <nav className="wiki-aside__section" aria-label={t("wiki.outline")}>
-            <span className="wiki-nav__label">{t("wiki.outline")}</span>
-            {outline.map((h) => (
-              <a key={h.id} href={`#${h.id}`} className="wiki-outline__item" data-level={h.level}>
-                {h.text}
-              </a>
-            ))}
-          </nav>
-        )}
-        <section className="wiki-aside__section" aria-label={t("wiki.backlinks")}>
-          <span className="wiki-nav__label">{t("wiki.backlinks")}</span>
-          {p.backlinks.length === 0 ? (
-            <span className="small muted">{t("wiki.noBacklinks")}</span>
-          ) : (
-            p.backlinks.map((b) =>
-              b.kind === "page" ? (
-                <Link
-                  key={`p:${b.slug}`}
-                  to="/org/$orgId/wiki/$slug"
-                  params={{ orgId: org.id, slug: b.slug }}
-                  className="wiki-backlink"
-                >
-                  <Icon name="document" size={14} />
-                  {b.title}
-                </Link>
-              ) : b.kind === "message" ? (
-                <Link
-                  key={`m:${b.messageId}`}
-                  to="/org/$orgId/c/$channelId"
-                  params={{ orgId: org.id, channelId: b.channelId }}
-                  className="wiki-backlink"
-                >
-                  <Icon name="channel" size={14} />
-                  <span className="list-col">
-                    <span>#{b.channelName}</span>
-                    <span className="small muted">{b.excerpt}</span>
-                  </span>
-                </Link>
-              ) : b.kind === "forum" ? (
-                <Link
-                  key={`f:${b.topicId}`}
-                  to="/org/$orgId/forum/$topicId"
-                  params={{ orgId: org.id, topicId: b.topicId }}
-                  className="wiki-backlink"
-                >
-                  <Icon name="message" size={14} />
-                  {b.title}
-                </Link>
-              ) : (
-                <Link
-                  key={`i:${b.number}`}
-                  to="/org/$orgId/issues/$number"
-                  params={{ orgId: org.id, number: String(b.number) }}
-                  className="wiki-backlink"
-                >
-                  <Icon name="issues" size={14} />
-                  {`#${b.number} ${b.title}`}
-                </Link>
-              ),
-            )
-          )}
-        </section>
-        <section className="wiki-aside__section" aria-label={t("wiki.info")}>
-          <span className="wiki-nav__label">{t("wiki.info")}</span>
-          {p.authors.map((a) => (
-            <span key={`${a.type}:${a.id}`} className="wiki-author">
-              <AuthorAvatar a={a} />
-              <span className="small">{authorLabel(a)}</span>
-            </span>
-          ))}
-          <span className="small muted">
-            {t("wiki.updated", { when: whenAt(t, i18n.language, p.updatedAt), version: p.version })}
-          </span>
-          <Button size="sm" variant="ghost" onClick={() => setHistoryOpen(true)}>
-            {t("wiki.history")}
-          </Button>
-        </section>
-      </aside>
-      {conflict && (
-        <ConflictDialog
-          mine={draft}
-          theirs={conflict}
-          onKeepMine={() => save(draft, conflict.version)}
-          onKeepTheirs={() => {
-            setConflict(null);
-            setEditing(false);
-          }}
-          onClose={() => setConflict(null)}
-          saving={action.isPending}
-        />
-      )}
-      <RenameDialog page={p} open={renaming} onClose={() => setRenaming(false)} />
-      <HistoryDialog page={p} open={historyOpen} onClose={() => setHistoryOpen(false)} />
-    </div>
-  );
-}
-
-/** "Alguém editou enquanto você escrevia": the difference and which version stays. */
-function ConflictDialog({
-  mine,
-  theirs,
-  onKeepMine,
-  onKeepTheirs,
-  onClose,
-  saving,
-}: {
-  mine: string;
-  theirs: WikiPageData;
-  onKeepMine: () => void;
-  onKeepTheirs: () => void;
-  onClose: () => void;
-  saving: boolean;
-}) {
-  const { t } = useTranslation();
-  const authorLabel = useAuthorLabel();
-  return (
-    <Dialog
-      open
-      onOpenChange={(o) => !o && onClose()}
-      title={t("wiki.conflictTitle")}
-      description={t("wiki.conflictText", { who: authorLabel(theirs.updatedBy) })}
-      closeLabel={t("common.close")}
-      width={760}
-    >
-      <DialogBody>
-        <Diff
-          lines={diffLines(theirs.body.split("\n"), mine.split("\n"))}
-          addedLabel={t("wiki.yours")}
-          removedLabel={t("wiki.theirs")}
-          aria-label={t("wiki.conflictDiff")}
-        />
-      </DialogBody>
-      <DialogFooter>
-        <Button onClick={onKeepTheirs}>{t("wiki.keepTheirs")}</Button>
-        <Button variant="primary" onClick={onKeepMine} loading={saving} disabled={saving}>
-          {t("wiki.keepMine")}
-        </Button>
-      </DialogFooter>
-    </Dialog>
-  );
-}
-
-function RenameDialog({ page, open, onClose }: { page: WikiPageData; open: boolean; onClose: () => void }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const navigate = useNavigate();
-  const toast = useToast();
-  const action = useWikiAction(org.id);
-  const [title, setTitle] = useState(page.title);
-  useEffect(() => {
-    if (open) setTitle(page.title);
-  }, [open, page.title]);
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => !o && onClose()}
-      title={t("wiki.rename")}
-      closeLabel={t("common.close")}
-      width={440}
-    >
-      <form
-        style={{ display: "contents" }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!title.trim() || title.trim() === page.title) return;
-          action.mutate(
-            { type: "rename", slug: page.slug, title: title.trim() },
-            {
-              onSuccess: (renamed) => {
-                toast.show(t("wiki.renamed"));
-                onClose();
-                void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId: org.id, slug: renamed.slug } });
-              },
-            },
-          );
-        }}
-      >
-        <DialogBody>
-          <Field label={t("wiki.form.title")} id="wiki-rename" help={t("wiki.renameHelp")}>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-          </Field>
-        </DialogBody>
-        <DialogFooter>
-          <Button type="button" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button type="submit" variant="primary" loading={action.isPending} disabled={action.isPending}>
-            {t("wiki.rename")}
-          </Button>
-        </DialogFooter>
-      </form>
-    </Dialog>
-  );
-}
-
-/** History: every version; picking one shows what changed from the one before. */
-function HistoryDialog({ page, open, onClose }: { page: WikiPageData; open: boolean; onClose: () => void }) {
-  const { t, i18n } = useTranslation();
-  const { org } = useOrg();
-  const api = useApi();
-  const history = useWikiHistory(org.id, page.slug, open);
-  const authorLabel = useAuthorLabel();
-  const [diff, setDiff] = useState<{ version: number; before: string; after: string } | null>(null);
-  useEffect(() => {
-    if (!open) setDiff(null);
-  }, [open]);
-  const show = async (version: number) => {
-    const after = await api.wiki.version(org.id, page.slug, version);
-    const before = version > 1 ? await api.wiki.version(org.id, page.slug, version - 1) : { body: "" };
-    setDiff({ version, before: before.body, after: after.body });
-  };
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => !o && onClose()}
-      title={t("wiki.historyTitle", { title: page.title })}
-      closeLabel={t("common.close")}
-      width={760}
-    >
-      <DialogBody>
-        {history.isLoading && <LoadingList count={3} />}
-        <ol className="wiki-history">
-          {(history.data ?? []).map((v) => (
-            <li key={v.version}>
-              <button
-                type="button"
-                className="wiki-history__item"
-                aria-pressed={diff?.version === v.version}
-                onClick={() => void show(v.version)}
-              >
-                <span className="tabular">v{v.version}</span>
-                <span>{authorLabel(v.author)}</span>
-                <span className="small muted">{whenAt(t, i18n.language, v.at)}</span>
-                {v.note && (
-                  <span className="small muted">
-                    {v.noteCode ? t(`wiki.note.${v.noteCode}`, { ...v.noteParams, defaultValue: v.note }) : v.note}
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ol>
-        {diff && (
-          <Diff
-            lines={diffLines(diff.before.split("\n"), diff.after.split("\n"))}
-            addedLabel={t("wiki.added")}
-            removedLabel={t("wiki.removed")}
-            aria-label={t("wiki.versionDiff", { version: diff.version })}
-          />
-        )}
-      </DialogBody>
-      <DialogFooter>
-        <Button onClick={onClose}>{t("common.close")}</Button>
-      </DialogFooter>
-    </Dialog>
-  );
-}
-
-/** "Nova página": title and folder (a `Pasta/Título` title also works). */
-function NewPageDialog({
-  initialTitle,
-  pages,
-  onClose,
-}: {
-  initialTitle: string | null;
-  pages: WikiPageSummary[];
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const navigate = useNavigate();
-  const toast = useToast();
-  const action = useWikiAction(org.id);
-  const [title, setTitle] = useState("");
-  const [folder, setFolder] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (initialTitle === null) return;
-    const parts = initialTitle.split("/");
-    setTitle(parts.pop()?.trim() ?? "");
-    setFolder(parts.join("/"));
-    setError(null);
-  }, [initialTitle]);
-  const folders = [...new Set(pages.map((p) => p.folder).filter(Boolean))].sort();
-  return (
-    <Dialog
-      open={initialTitle !== null}
-      onOpenChange={(o) => !o && onClose()}
-      title={t("wiki.new")}
-      closeLabel={t("common.close")}
-      width={480}
-    >
-      <form
-        style={{ display: "contents" }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!title.trim()) return setError(t("wiki.form.required"));
-          action.mutate(
-            { type: "create", input: { title: title.trim(), folder: folder.trim(), body: `# ${title.trim()}\n\n` } },
-            {
-              onSuccess: (page) => {
-                toast.show(t("wiki.created"));
-                onClose();
-                void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId: org.id, slug: page.slug } });
-              },
-              onError: (err) => setError(err.message),
-            },
-          );
-        }}
-      >
-        <DialogBody>
-          <Field label={t("wiki.form.title")} id="wiki-new-title" error={error ?? undefined}>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
-          </Field>
-          <Field label={t("wiki.form.folder")} id="wiki-new-folder" help={t("wiki.form.folderHelp")}>
-            <Input
-              value={folder}
-              onChange={(e) => setFolder(e.target.value)}
-              placeholder={t("wiki.form.folderPlaceholder")}
-            />
-          </Field>
-          {folders.length > 0 && (
-            <div className="wiki-tags">
-              {folders.map((f) => (
-                <button key={f} type="button" className="pill" aria-pressed={folder === f} onClick={() => setFolder(f)}>
-                  {f}
-                </button>
-              ))}
-            </div>
-          )}
-        </DialogBody>
-        <DialogFooter>
-          <Button type="button" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button type="submit" variant="primary" loading={action.isPending} disabled={action.isPending}>
-            {t("wiki.createPage")}
-          </Button>
-        </DialogFooter>
-      </form>
-    </Dialog>
   );
 }

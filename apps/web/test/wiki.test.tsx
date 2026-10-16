@@ -8,7 +8,9 @@ import type { WikiGraph } from "@/api/types";
 import { prefixLines, wikiQuery, wrapSelection } from "@/components/WikiEditor";
 import { layoutGraph, neighborsOf } from "@/components/WikiGraph";
 import { headingId, Markdown, parseWikiToken, wikiLinksIn } from "@/lib/markdown";
+import { filesFromList, homeOf, parseNote, readVault, type VaultFile } from "@/lib/obsidian";
 import { outlineOf, resolveWikiLink, splitSection, wikiSlug, wikiTree } from "@/lib/wiki";
+import { readZip } from "@/lib/zip";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -114,26 +116,30 @@ describe("the wiki", () => {
       within(outline)
         .getAllByRole("link")
         .map((a) => a.textContent),
-    ).toEqual(["Onboarding", "Acessos", "Primeira tarefa"]);
+    ).toEqual(["Acessos", "Primeira tarefa"]);
     const backlinks = screen().getByRole("region", { name: "Mencionada em" });
     expect(backlinks.textContent).toContain("Visão geral");
     expect(backlinks.textContent).toContain("Deploy");
     expect(backlinks.textContent).toContain("Leiam o [[Onboarding]] antes de segunda.");
     expect(backlinks.textContent).toContain("#131");
-    expect(screen().getByRole("region", { name: "Autores" }).textContent).toContain("por Ada, a pedido de Walter");
+    const aside = screen().getByRole("complementary", { name: "Sobre a página" });
+    expect(aside.textContent).toContain("por Ada, a pedido de Walter");
+    expect(within(aside).getByRole("region", { name: "Agentes que usam esta página" }).textContent).toContain(
+      "Nenhum agente consultou ainda",
+    );
     // Search filters the tree.
     await type(screen().getByRole("searchbox", { name: "Buscar páginas" }), "glos");
     expect(within(tree).queryByRole("link", { name: "Onboarding" })).toBeNull();
     expect(within(tree).getByRole("link", { name: "Glossário" })).toBeTruthy();
   });
 
-  test("a missing [[link]] → Criar página with the title → the new page", async () => {
+  test("a missing [[link]] → a new page written in place, with the title → the new page", async () => {
     const { router, state } = await go("wiki/onboarding");
     await click(screen().getByRole("button", { name: "Plano de férias" }));
     await settle(4);
-    const dialog = screen().getByRole("dialog", { name: "Nova página" });
-    expect((within(dialog).getByLabelText("Título") as HTMLInputElement).value).toBe("Plano de férias");
-    await click(within(dialog).getByRole("button", { name: "Criar página" }));
+    expect((screen().getByLabelText("Título") as HTMLInputElement).value).toBe("Plano de férias");
+    await type(screen().getByRole("combobox", { name: "Texto de Plano de férias" }), "Quem cobre quem.");
+    await click(screen().getByRole("button", { name: /^Salvar/ }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "wiki.create")?.args[1]).toMatchObject({ title: "Plano de férias" });
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/wiki/plano-de-ferias`);
@@ -141,7 +147,7 @@ describe("the wiki", () => {
 
   test("editing: [[ autocomplete in glass, ⌘S saves with the version", async () => {
     const { state } = await go("wiki/deploy");
-    await click(screen().getByRole("button", { name: "Editar" }));
+    await click(screen().getByRole("button", { name: /^Editar/ }));
     const box = screen().getByRole("combobox", { name: "Texto de Deploy" }) as HTMLTextAreaElement;
     await type(box, `${box.value}\n\nVeja [[Glos`);
     const list = screen().getByRole("listbox", { name: "Páginas" });
@@ -158,14 +164,14 @@ describe("the wiki", () => {
 
   test("version conflict: shows the difference and keeps mine on purpose", async () => {
     const { state, api } = await go("wiki/deploy");
-    await click(screen().getByRole("button", { name: "Editar" }));
+    await click(screen().getByRole("button", { name: /^Editar/ }));
     const box = screen().getByRole("combobox", { name: "Texto de Deploy" }) as HTMLTextAreaElement;
     await type(box, "# Deploy\n\nMinha versão.");
     // Someone else saves first.
     await act(async () => {
       await api.wiki.update(ORG_ID, "deploy", { body: "# Deploy\n\nA versão do João.", baseVersion: 1 });
     });
-    await click(screen().getByRole("button", { name: "Salvar" }));
+    await click(screen().getByRole("button", { name: /^Salvar/ }));
     await settle(8);
     const dialog = screen().getByRole("dialog", { name: "Alguém editou enquanto você escrevia" });
     expect(dialog.textContent).toContain("A versão do João.");
@@ -181,10 +187,10 @@ describe("the wiki", () => {
     await act(async () => {
       await api.wiki.update(ORG_ID, "deploy", { body: "# Deploy\n\nSó de segunda a quarta.", baseVersion: 1 });
     });
-    await click(screen().getByRole("button", { name: "Histórico" }));
+    await click(screen().getByRole("button", { name: /^v1$/ }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Histórico de Deploy" });
-    await click(within(dialog).getByRole("button", { name: /^v2/ }));
+    await click(within(dialog).getByRole("button", { name: /v2/ }));
     await settle(4);
     const diff = within(dialog).getByRole("group", { name: "O que mudou na v2" });
     expect(diff.querySelector(".ac-diff__line--add")?.textContent).toContain("Só de segunda a quarta.");
@@ -204,7 +210,7 @@ describe("the wiki", () => {
 
   test("Grafo: nodes are links; hover lights the neighbors", async () => {
     await go("wiki");
-    await click(screen().getByRole("button", { name: "Grafo" }));
+    await click(screen().getByRole("button", { name: /^Grafo/ }));
     await settle(4);
     const graph = screen().getByRole("region", { name: "Grafo" });
     const node = within(graph).getByRole("link", { name: "Onboarding" });
@@ -271,5 +277,212 @@ describe("links everywhere", () => {
     await type(screen().getByRole("combobox", { name: "Ir para, ou pedir a um agente" }), "glossário");
     const list = screen().getByRole("listbox", { name: "Resultados" });
     expect(within(list).getAllByRole("option")[0]?.textContent).toContain("Glossário");
+  });
+});
+
+/** A tiny .zip with stored (uncompressed) entries: enough for the reader (it doesn't check CRCs). */
+function storedZip(files: Record<string, string>) {
+  const enc = new TextEncoder();
+  const parts: Uint8Array[] = [];
+  const central: Uint8Array[] = [];
+  let offset = 0;
+  const u16 = (v: number) => [v & 255, (v >> 8) & 255];
+  const u32 = (v: number) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+  for (const [name, text] of Object.entries(files)) {
+    const n = enc.encode(name);
+    const d = enc.encode(text);
+    const local = new Uint8Array([
+      ...u32(0x04034b50),
+      ...u16(20),
+      ...u16(0x800),
+      ...u16(0),
+      ...u16(0),
+      ...u16(0),
+      ...u32(0),
+      ...u32(d.length),
+      ...u32(d.length),
+      ...u16(n.length),
+      ...u16(0),
+    ]);
+    parts.push(local, n, d);
+    central.push(
+      new Uint8Array([
+        ...u32(0x02014b50),
+        ...u16(20),
+        ...u16(20),
+        ...u16(0x800),
+        ...u16(0),
+        ...u16(0),
+        ...u16(0),
+        ...u32(0),
+        ...u32(d.length),
+        ...u32(d.length),
+        ...u16(n.length),
+        ...u16(0),
+        ...u16(0),
+        ...u16(0),
+        ...u16(0),
+        ...u32(0),
+        ...u32(offset),
+      ]),
+      n,
+    );
+    offset += local.length + n.length + d.length;
+  }
+  const size = central.reduce((s, c) => s + c.length, 0);
+  const count = Object.keys(files).length;
+  const end = new Uint8Array([
+    ...u32(0x06054b50),
+    ...u16(0),
+    ...u16(0),
+    ...u16(count),
+    ...u16(count),
+    ...u32(size),
+    ...u32(offset),
+    ...u16(0),
+  ]);
+  return new Blob([...parts, ...central, end] as BlobPart[]);
+}
+
+const vaultFiles = (files: Record<string, string>): VaultFile[] =>
+  Object.entries(files).map(([path, text]) => ({
+    path,
+    size: text.length,
+    text: async () => text,
+    blob: async () => new Blob([text]),
+  }));
+
+describe("Obsidian vaults", () => {
+  test("zip: names and contents of stored entries", async () => {
+    const entries = await readZip(storedZip({ "Vault/Início.md": "# Oi", "Vault/sub/": "" }));
+    expect(entries.map((e) => e.name)).toEqual(["Vault/Início.md"]);
+    expect(new TextDecoder().decode(await entries[0]?.read())).toBe("# Oi");
+    await expect(readZip(new Blob(["não é zip"]))).rejects.toThrow();
+  });
+
+  test("a note: frontmatter tags and aliases, inline tags, links and embeds (code skipped)", () => {
+    const n = parseNote(
+      "Clientes/Mercado Bom.md",
+      "---\ntags: [cliente, Varejo]\naliases:\n  - MB\n---\nVer [[Início]] e [[Clientes/Casa Verde|a Casa]] #vip\n![[foto.png]]\n`[[não]]`",
+    );
+    expect(n).toMatchObject({
+      title: "Mercado Bom",
+      folder: "Clientes",
+      tags: ["cliente", "varejo", "vip"],
+      aliases: ["MB"],
+      links: ["Início", "Clientes/Casa Verde"],
+      embeds: ["foto.png"],
+    });
+    expect(n.body.startsWith("Ver")).toBe(true);
+  });
+
+  test("reading a vault: the vault's folder is dropped, .obsidian left out, broken links and conflicts found", async () => {
+    const report = await readVault(
+      vaultFiles({
+        "Acme/Início.md": "Veja [[Glossário]], [[Nada]] e ![[foto.png]].\n> [!tip] Dica\n> ok",
+        "Acme/Glossário.md": "# Glossário",
+        "Acme/Clientes/Bom.md": "```dataview\nLIST\n```",
+        "Acme/anexos/foto.png": "png",
+        "Acme/.obsidian/app.json": "{}",
+        "Acme/Mapa.canvas": "{}",
+      }),
+      { existing: [{ title: "Glossário" }] },
+    );
+    expect(report).toMatchObject({
+      name: "Acme",
+      folders: [
+        { name: "Clientes", count: 1 },
+        { name: "", count: 2 },
+      ],
+      broken: ["Nada"],
+      conflicts: ["Glossário"],
+      embeddedCount: 1,
+      dataview: 1,
+      callouts: 1,
+      canvases: ["Mapa.canvas"],
+      skipped: { config: 1, trash: 0, other: 0 },
+    });
+    await expect(readVault(vaultFiles({ "a.txt": "x" }))).rejects.toThrow();
+  });
+
+  test("loose .md files and a .zip both read", async () => {
+    const md = await filesFromList([new File(["# A"], "A.md")]);
+    expect(md.map((f) => f.path)).toEqual(["A.md"]);
+    const zipped = await filesFromList([new File([storedZip({ "V/A.md": "x" })], "vault.zip")]);
+    expect(zipped.map((f) => f.path)).toEqual(["V/A.md"]);
+    expect(await zipped[0]?.text()).toBe("x");
+  });
+
+  test("homeOf: the vault's home note, else the first", () => {
+    const p = (title: string) => ({
+      id: title,
+      slug: title,
+      title,
+      folder: "",
+      tags: [],
+      updatedAt: "",
+      updatedBy: { type: "person" as const, id: "u" },
+    });
+    expect(homeOf([p("Glossário"), p("Início")])?.title).toBe("Início");
+    expect(homeOf([p("Glossário")])?.title).toBe("Glossário");
+  });
+
+  test("markdown: callout title and body; embeds go to the renderer", () => {
+    const { container } = render(
+      <Markdown
+        source={"> [!warning] Atenção\n> Só às terças.\n\n![[foto.png]]\n\nTexto com ![[doc.pdf]] no meio."}
+        embed={(target, key, block) => (
+          <span key={key} className="emb" data-block={block || undefined}>
+            {target}
+          </span>
+        )}
+      />,
+    );
+    const callout = container.querySelector(".md__callout[data-kind='warning']");
+    expect(callout?.querySelector(".md__callout-title")?.textContent).toBe("Atenção");
+    expect(callout?.querySelector(".md__callout-body")?.textContent).toBe("Só às terças.");
+    expect([...container.querySelectorAll(".emb")].map((e) => [e.textContent, e.hasAttribute("data-block")])).toEqual([
+      ["foto.png", true],
+      ["doc.pdf", false],
+    ]);
+    expect(container.textContent).not.toContain("!");
+  });
+
+  test("import: pick .md files → review → import sends the notes; done opens the home note", async () => {
+    const { state, router } = await go("wiki");
+    await click(screen().getByRole("button", { name: /^Importar$/ }));
+    const dialog = screen().getByRole("dialog", { name: "Importar do Obsidian" });
+    const input = within(dialog).getByLabelText("Escolher .zip ou .md") as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(input, {
+        target: {
+          files: [
+            new File(["Veja [[Notas]].\n#mapa"], "Início.md"),
+            new File(["---\naliases: [N]\n---\nVolta ao [[Início]]"], "Notas.md"),
+          ],
+        },
+      });
+    });
+    await settle(10);
+    await act(() => new Promise((r) => setTimeout(r, 700)));
+    await settle(4);
+    const review = screen().getByRole("dialog");
+    expect(review.textContent).toContain("2 de 2");
+    expect(review.textContent).toContain("1 tag do frontmatter e do texto");
+    await click(within(review).getByRole("button", { name: "Importar 2 notas" }));
+    await settle(10);
+    const call = state.calls.find((c) => c.method === "wiki.import");
+    expect(call?.args[1]).toMatchObject({
+      source: { type: "obsidian" },
+      onConflict: "keep_both",
+      notes: [
+        { title: "Início", tags: ["mapa"] },
+        { title: "Notas", aliases: ["N"] },
+      ],
+    });
+    expect(document.body.textContent).toContain("2 páginas na wiki");
+    await click(screen().getByRole("button", { name: "Abrir Início" }));
+    await settle(6);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/wiki/inicio`);
   });
 });

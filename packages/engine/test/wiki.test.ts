@@ -169,7 +169,7 @@ describe("links", () => {
     expect((await getWikiPage(f.db, me, f.org.id, "deploy")).slug).toBe("publicacao");
     const [link] = await resolveWikiTargets(f.db, f.org.id, parseWikiLinks("[[Deploy]]"));
     expect(link).toMatchObject({ slug: "publicacao", title: "Publicação", exists: true });
-    expect(renamed.backlinks).toEqual([{ kind: "page", slug: "runbook", title: "Runbook" }]);
+    expect(renamed.backlinks).toMatchObject([{ kind: "page", slug: "runbook", title: "Runbook" }]);
   });
 });
 
@@ -236,7 +236,7 @@ describe("pages", () => {
     await expect(getWikiPage(f.db, me, f.org.id, "politica")).rejects.toBeInstanceOf(NotFoundError);
     expect((await getWikiPage(f.db, me, f.org.id, "indice")).links[0]).toMatchObject({ exists: false });
     const restored = await restoreWikiPage(deps, me, f.org.id, "politica");
-    expect(restored.backlinks).toEqual([{ kind: "page", slug: "indice", title: "Índice" }]);
+    expect(restored.backlinks).toMatchObject([{ kind: "page", slug: "indice", title: "Índice" }]);
 
     const actions = (await f.db.select().from(schema.auditLog))
       .map((a) => a.action)

@@ -28,6 +28,8 @@ import { type ImportChoice, OnboardingImport } from "@/components/OnboardingImpo
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { OnboardingHorizon, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
+import { VaultCard } from "@/components/wiki/VaultCard";
+import { useVaultReader } from "@/components/wiki/WikiImport";
 import { ZonePicker } from "@/components/ZoneSelect";
 import {
   IMPORT_MAX_BYTES,
@@ -39,6 +41,7 @@ import {
 } from "@/lib/agent-import";
 import { errorText } from "@/lib/errors";
 import { joinNames } from "@/lib/format";
+import { importVault } from "@/lib/obsidian";
 import { addInvites, type InviteDraft, ONBOARDING_STEPS, type OnboardingStepId, validInvites } from "@/lib/onboarding";
 import { keyLooksValid, PROVIDERS, type ProviderId, providerLabel, suggestModel } from "@/lib/providers";
 import { browserTimezone } from "@/lib/routines";
@@ -131,6 +134,9 @@ export function OnboardingPage() {
   // Context
   const [context, setContext] = useState("");
   const [savedContext, setSavedContext] = useState("");
+  // An Obsidian vault for the wiki: read in step 2, imported when it continues.
+  const vault = useVaultReader([]);
+  const [vaultPages, setVaultPages] = useState<number | null>(null);
   // Import (OpenMausBot / OpenBot): the parsed file, the agents to bring, the ones created.
   const [importFrom, setImportFrom] = useState<ImportChoice>(null);
   const [imported, setImported] = useState<ImportResult | null>(null);
@@ -217,6 +223,19 @@ export function OnboardingPage() {
       await api.orgs.updateSettings(created.orgId, { context });
       setSavedContext(context);
     },
+  });
+
+  const importWiki = useMutation({
+    mutationFn: async () => {
+      if (!created || !vault.report) return;
+      const result = await importVault(api, created.orgId, vault.report, {
+        folders: new Set(vault.report.folders.map((f) => f.name)),
+        into: "",
+        onConflict: "keep_both",
+      });
+      setVaultPages(result.created.length);
+    },
+    onError: (e) => toast.show(errorText(t, e), "error"),
   });
 
   const readImport = useMutation({
@@ -388,7 +407,11 @@ export function OnboardingPage() {
     }
     if (!skip) {
       if (step.id === "workspace") await saveWorkspace.mutateAsync();
-      if (step.id === "context") await saveContext.mutateAsync();
+      if (step.id === "context") {
+        await saveContext.mutateAsync();
+        // The vault goes in the background: the next steps don't wait for the attachments.
+        if (vault.report && vaultPages === null && !importWiki.isPending) importWiki.mutate();
+      }
       if (step.id === "agents") await saveAgents.mutateAsync();
       if (step.id === "computer") await saveComputer.mutateAsync();
       if (step.id === "team") await sendInvites.mutateAsync();
@@ -573,6 +596,7 @@ export function OnboardingPage() {
               </Field>
             </Card>
           )}
+          {step.id === "context" && <VaultCard reader={vault} />}
 
           {step.id === "import" && (
             <OnboardingImport
@@ -787,6 +811,7 @@ export function OnboardingPage() {
               agents={crew}
               computer={computer === "cloud" ? "cloud" : computer === "machine" ? (machine?.name ?? null) : undefined}
               invites={sent.size}
+              wiki={vault.report ? (importWiki.isPending ? null : vaultPages) : undefined}
             />
           )}
         </div>
@@ -1190,9 +1215,12 @@ function DoneStep({
   agents,
   computer,
   invites,
+  wiki,
 }: {
   orgName: string;
   agents: CrewMember[];
+  /** Pages imported from Obsidian; null while importing, undefined when none was brought. */
+  wiki?: number | null;
   /** "cloud", a machine's name, null while it waits to connect, undefined when skipped. */
   computer: string | null | undefined;
   invites: number;
@@ -1249,6 +1277,14 @@ function DoneStep({
           <dt className="small muted">{t("onboarding.done.invites")}</dt>
           <dd className="onb__stat">{invites}</dd>
         </Card>
+        {wiki !== undefined && (
+          <Card as="div">
+            <dt className="small muted">{t("onboarding.done.wiki")}</dt>
+            <dd className="onb__stat">
+              {wiki === null ? t("onboarding.done.wikiImporting") : t("onboarding.done.wikiPages", { count: wiki })}
+            </dd>
+          </Card>
+        )}
       </dl>
     </>
   );

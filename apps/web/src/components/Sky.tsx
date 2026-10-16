@@ -490,3 +490,38 @@ export function WelcomeSky({ calm }: { calm: () => (Element | null)[] }) {
     />
   );
 }
+
+/** Wiki: the top of "agents that use this page" (a slow drift) or the glow behind a finished import. */
+export function WikiSky({ variant }: { variant: "strip" | "glow" }) {
+  return (
+    <span className={`wiki-sky wiki-sky--${variant}`} aria-hidden="true">
+      <PixelSky
+        options={
+          variant === "strip"
+            ? {
+                pixel: 2,
+                surface: "--raised",
+                palette: (bg) => softTones("sky", bg),
+                light: 0,
+                base: (u, v, tt) => {
+                  const c = ((tt * 0.22) % 1.6) - 0.3;
+                  const d = u - c;
+                  return 0.08 + 0.45 * Math.exp(-(d * d) / 0.05) + 0.3 * (1 - v);
+                },
+              }
+            : {
+                pixel: 4,
+                surface: "--raised",
+                palette: (bg) => softTones("sky", bg),
+                light: 0,
+                base: (u, v, tt) => {
+                  const dx = (u - 0.5) * 2.2;
+                  const dy = (v - 0.6) * 1.3;
+                  return 0.75 * Math.exp(-(dx * dx + dy * dy) / 0.22) + 0.05 * S(tt * 0.8 + u * 3);
+                },
+              }
+        }
+      />
+    </span>
+  );
+}

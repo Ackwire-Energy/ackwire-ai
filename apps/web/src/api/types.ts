@@ -1500,13 +1500,59 @@ export interface WikiPageSummary {
   /** "Processos/Vendas" ("" = the root). */
   folder: string;
   tags: string[];
+  /** Bumped on every save. */
+  version?: number;
+  /** Only admins edit it. */
+  locked?: boolean;
+  /** "Fixadas": at the top of the wiki for everyone. */
+  pinned?: boolean;
+  /** The start of the text, plain, for cards. */
+  excerpt?: string;
+  /** `obsidian` for an imported page. */
+  sourceType?: string | null;
   updatedAt: string;
   updatedBy: WikiAuthor;
 }
 
+/** Agents that used pages (in their context or reading them), last 7 days. */
+export interface WikiAgentReads {
+  total: number;
+  agents: { agentId: string; count: number }[];
+}
+
+/** "What the agents read most" on the wiki's home. */
+export interface WikiTopRead extends WikiAgentReads {
+  slug: string;
+  title: string;
+}
+
+/** A note of an Obsidian vault, read by the app, sent to `POST …/wiki/import`. */
+export interface WikiImportNote {
+  title: string;
+  folder?: string;
+  body: string;
+  tags?: string[];
+  aliases?: string[];
+  /** Embedded attachments already in the Drive: name as written in `![[…]]` → artifact id. */
+  attachments?: Record<string, string>;
+}
+
+export interface WikiImportInput {
+  source: { type: "obsidian"; name: string };
+  notes: WikiImportNote[];
+  folder?: string;
+  onConflict: "keep_both" | "skip";
+}
+
+export interface WikiImportResult {
+  created: WikiPageSummary[];
+  skipped: string[];
+  failed: { title: string; reason: "title" | "too_long" }[];
+}
+
 /** Where a page is mentioned: other pages, messages, forum topics, issues. */
 export type WikiBacklink =
-  | { kind: "page"; slug: string; title: string }
+  | { kind: "page"; slug: string; title: string; excerpt?: string }
   | { kind: "message"; channelId: string; messageId: string; channelName: string; excerpt: string; at: string }
   | { kind: "forum"; topicId: string; title: string }
   | { kind: "issue"; number: number; title: string };
@@ -1519,6 +1565,12 @@ export interface WikiPage extends WikiPageSummary {
   /** Everyone who wrote it, most recent first. */
   authors: WikiAuthor[];
   backlinks: WikiBacklink[];
+  /** Where it came from; an import keeps its attachments (name → Drive artifact id). */
+  source?: { type: string; id: string; channelId?: string; attachments?: Record<string, string> } | null;
+  /** Agents that used it in the last 7 days; the channel only when public. */
+  reads?: WikiAgentReads & {
+    last: { agentId: string; channelId: string | null; channelName: string | null; at: string } | null;
+  };
 }
 
 export interface WikiVersion {
@@ -1549,6 +1601,13 @@ export interface WikiUpdateInput {
 }
 
 export interface WikiGraph {
-  nodes: { slug: string; title: string; folder: string; tags: string[]; agentId?: string | null }[];
+  nodes: {
+    slug: string;
+    title: string;
+    folder: string;
+    tags: string[];
+    agentId?: string | null;
+    sourceType?: string | null;
+  }[];
   edges: { from: string; to: string }[];
 }

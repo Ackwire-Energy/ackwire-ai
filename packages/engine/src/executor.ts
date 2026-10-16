@@ -50,7 +50,7 @@ import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
 import type { Approval, ToolGateway } from "./tools/gateway";
 import { grantedScopeKeys, grantKey } from "./tools/scopes";
 import type { ToolContext } from "./tools/types";
-import { retrieveWikiForRun } from "./wiki";
+import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
 
 const { agentRuns, approvals, agentQuestions, secretRequests, users } = schema;
@@ -389,6 +389,16 @@ async function executeRunInner(
       later(() => recordContextUse(db, run.orgId, run.id, ids));
     }
     if (wikiPages.text) {
+      const pageIds = wikiPages.pageIds;
+      later(() =>
+        recordWikiReads(db, {
+          orgId: run.orgId,
+          agentId: agent.id,
+          runId: run.id,
+          channelId: run.channelId,
+          pageIds,
+        }),
+      );
       system.push({
         text: `# Organization wiki (trusted source)\nPages written and reviewed by the team: they are the organization's official knowledge and outweigh memory. Cite the page with [[Title]] when you use what it says.\n${wikiPages.text}`,
       });

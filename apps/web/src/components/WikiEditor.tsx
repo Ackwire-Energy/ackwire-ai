@@ -47,21 +47,29 @@ export function WikiEditor({
   onSave,
   pages,
   label,
+  autoFocus = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   onSave: () => void;
   pages: WikiPageSummary[];
   label: string;
+  /** Put the caret in the text when it opens. */
+  autoFocus?: boolean;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLTextAreaElement>(null);
   const listId = useId();
-  const [mode, setMode] = useState<Mode>("split");
+  const [mode, setMode] = useState<Mode>("write");
   const [token, setToken] = useState<{ start: number; query: string } | null>(null);
   const [active, setActive] = useState(0);
   const selectAfter = useRef<[number, number] | null>(null);
   const wikiLink = useWikiLinkRenderer();
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the editor opens
+  useLayoutEffect(() => {
+    if (autoFocus) ref.current?.focus();
+  }, []);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -184,7 +192,7 @@ export function WikiEditor({
 
   return (
     <div className="wiki-editor" data-mode={mode}>
-      <div className="wiki-editor__bar">
+      <div className="wiki-editor__bar ac-glass">
         <div className="wiki-editor__tools" role="toolbar" aria-label={t("wiki.editor.toolbar")}>
           {toolbar.map((b) => (
             <Button

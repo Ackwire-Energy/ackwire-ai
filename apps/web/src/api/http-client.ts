@@ -69,8 +69,10 @@ import type {
   TrashedArtifact,
   UsageReport,
   WikiGraph,
+  WikiImportResult,
   WikiPage,
   WikiPageSummary,
+  WikiTopRead,
   WikiVersion,
 } from "./types";
 
@@ -459,6 +461,17 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       version: (orgId, slug, version) =>
         request<{ version: number; body: string }>(`${org(orgId)}/wiki/pages/${enc(slug)}/versions/${version}`),
       graph: (orgId) => request<WikiGraph>(`${org(orgId)}/wiki/graph`),
+      move: (orgId, slug, folder) =>
+        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/move`, { json: { folder } }),
+      lock: (orgId, slug, locked) =>
+        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/lock`, { json: { locked } }),
+      pin: (orgId, slug, pinned) =>
+        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/pin`, { json: { pinned } }),
+      remove: async (orgId, slug) => {
+        await request<void>(`${org(orgId)}/wiki/pages/${enc(slug)}`, { method: "DELETE" });
+      },
+      reads: (orgId) => request<WikiTopRead[]>(`${org(orgId)}/wiki/reads`),
+      import: (orgId, input) => request<WikiImportResult>(`${org(orgId)}/wiki/import`, { json: input }),
       append: (orgId, slug, input) =>
         request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/append`, { json: input }),
     },

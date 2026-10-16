@@ -13,7 +13,8 @@ export type MdBlock =
   | { type: "paragraph"; text: string }
   | { type: "code"; lang: string; text: string }
   | { type: "list"; ordered: boolean; items: string[] }
-  | { type: "quote"; text: string }
+  | { type: "quote"; text: string; lines: string[] }
+  | { type: "embed"; target: string }
   | { type: "rule" }
   | { type: "table"; header: string[]; rows: string[][] };
 
@@ -71,7 +72,14 @@ export function parseMarkdown(source: string, options: { breaks?: boolean } = {}
       const body: string[] = [];
       while (i < lines.length && /^\s*>/.test(lines[i] as string))
         body.push((lines[i++] as string).replace(/^\s*>\s?/, ""));
-      out.push({ type: "quote", text: body.join(join) });
+      out.push({ type: "quote", text: body.join(join), lines: body });
+      continue;
+    }
+    // `![[foto.png]]` alone on its line: an Obsidian embed (an attachment or another note).
+    const embed = line.match(/^\s*!\[\[([^[\]\n|]+)(?:\|[^\]\n]*)?\]\]\s*$/);
+    if (embed) {
+      out.push({ type: "embed", target: (embed[1] ?? "").trim() });
+      i++;
       continue;
     }
     const item = line.match(LIST);
@@ -113,6 +121,8 @@ const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
 export type MentionRenderer = (handle: string, key: string) => ReactNode;
 /** `[[Título]]` or `[[Título|texto]]`: how a wiki link shows (a chip, a dashed missing link…). */
 export type WikiLinkRenderer = (title: string, label: string, key: string) => ReactNode;
+/** `![[foto.png]]`: how an embed shows (`block` alone on its line, else inside a sentence). */
+export type EmbedRenderer = (target: string, key: string, block: boolean) => ReactNode;
 
 /** `[[Processos/Onboarding|o onboarding]]` → { title: "Processos/Onboarding", label: "o onboarding" }. */
 export function parseWikiToken(token: string) {
@@ -126,7 +136,7 @@ export function parseWikiToken(token: string) {
 /** Every `[[link]]` title in a text, in order, without repeats. */
 export function wikiLinksIn(text: string): string[] {
   const out: string[] = [];
-  for (const m of text.matchAll(/\[\[([^[\]\n]+)\]\]/g)) {
+  for (const m of text.matchAll(/(?<!!)\[\[([^[\]\n]+)\]\]/g)) {
     const { title } = parseWikiToken(m[0]);
     if (title && !out.includes(title)) out.push(title);
   }
@@ -163,7 +173,13 @@ const link = (href: string, key: string, children: ReactNode) => (
   </a>
 );
 
-export function renderInline(text: string, key = "i", mention?: MentionRenderer, wiki?: WikiLinkRenderer): ReactNode[] {
+export function renderInline(
+  text: string,
+  key = "i",
+  mention?: MentionRenderer,
+  wiki?: WikiLinkRenderer,
+  embed?: EmbedRenderer,
+): ReactNode[] {
   const out: ReactNode[] = [];
   let rest = text;
   let n = 0;
@@ -173,13 +189,21 @@ export function renderInline(text: string, key = "i", mention?: MentionRenderer,
       out.push(...withMentions(rest, `${key}-t${n}`, mention));
       break;
     }
-    if (m.index > 0) out.push(...withMentions(rest.slice(0, m.index), `${key}-t${n}`, mention));
     const tok = m[0];
     const k = `${key}-${n++}`;
+    // `![[…]]` inside a sentence: the "!" belongs to the embed.
+    const isEmbed = Boolean(m[6] && embed && m.index > 0 && rest[m.index - 1] === "!");
+    const before = rest.slice(0, isEmbed ? m.index - 1 : m.index);
+    if (before) out.push(...withMentions(before, `${key}-t${n}`, mention));
+    if (isEmbed && embed) {
+      out.push(embed(parseWikiToken(tok).title, k, false));
+      rest = rest.slice(m.index + tok.length);
+      continue;
+    }
     if (m[1]) out.push(<code key={k}>{tok.slice(1, -1)}</code>);
-    else if (m[2]) out.push(<strong key={k}>{renderInline(tok.slice(2, -2), k, mention, wiki)}</strong>);
-    else if (m[3]) out.push(<em key={k}>{renderInline(tok.slice(1, -1), k, mention, wiki)}</em>);
-    else if (m[7]) out.push(<del key={k}>{renderInline(tok.slice(2, -2), k, mention, wiki)}</del>);
+    else if (m[2]) out.push(<strong key={k}>{renderInline(tok.slice(2, -2), k, mention, wiki, embed)}</strong>);
+    else if (m[3]) out.push(<em key={k}>{renderInline(tok.slice(1, -1), k, mention, wiki, embed)}</em>);
+    else if (m[7]) out.push(<del key={k}>{renderInline(tok.slice(2, -2), k, mention, wiki, embed)}</del>);
     else if (m[4]) {
       const parts = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
       const href = parts?.[2] ?? "";
@@ -210,15 +234,29 @@ export interface MarkdownProps {
   variant?: "document" | "message";
   mention?: MentionRenderer;
   wikiLink?: WikiLinkRenderer;
+  /** Obsidian embeds (`![[file]]`); without it they show as a plain link. */
+  embed?: EmbedRenderer;
+  /** Skip a leading `# Title` equal to this (the page shows the title itself). */
+  title?: string;
 }
 
 const TASK = /^\[( |x|X)\]\s+(.*)$/;
-const CALLOUT = /^\[!(note|tip|warning|important)\]\s*(.*)$/i;
+const CALLOUT = /^\[!([\w-]+)\][+-]?\s*(.*)$/i;
+/** Obsidian's callout kinds, in our three looks. */
+const calloutKind = (kind: string) =>
+  /^(warning|caution|attention|danger|error|bug|failure|fail|missing|important)$/.test(kind)
+    ? "warning"
+    : /^(tip|hint|success|check|done)$/.test(kind)
+      ? "tip"
+      : "note";
 
-export function Markdown({ source, variant = "document", mention, wikiLink }: MarkdownProps) {
+export function Markdown({ source, variant = "document", mention, wikiLink, embed, title }: MarkdownProps) {
   const message = variant === "message";
-  const inline = (text: string, k: string) => renderInline(text, k, mention, wikiLink);
-  const blocks = parseMarkdown(source, { breaks: message }).map((b, i) => {
+  const inline = (text: string, k: string) => renderInline(text, k, mention, wikiLink, embed);
+  const parsed = parseMarkdown(source, { breaks: message });
+  const [first] = parsed;
+  if (title && first?.type === "heading" && first.level === 1 && first.text.trim() === title.trim()) parsed.shift();
+  const blocks = parsed.map((b, i) => {
     const k = `b${i}`;
     switch (b.type) {
       case "heading": {
@@ -268,18 +306,22 @@ export function Markdown({ source, variant = "document", mention, wikiLink }: Ma
         );
       }
       case "quote": {
-        // "> [!note] Título" → a callout (neutral card with an icon), as in Obsidian.
-        const callout = b.text.match(CALLOUT);
+        // "> [!note] Título" + lines → a callout (neutral card with an icon), as in Obsidian.
+        const callout = (b.lines[0] ?? "").match(CALLOUT);
         if (callout && !message) {
-          const kind = (callout[1] ?? "note").toLowerCase();
+          const kind = calloutKind((callout[1] ?? "note").toLowerCase());
+          const rest = b.lines.slice(1).join(" ").trim();
           return (
             <aside key={k} className="md__callout" data-kind={kind}>
-              {inline(callout[2] ?? "", k)}
+              {callout[2] ? <b className="md__callout-title">{inline(callout[2], `${k}t`)}</b> : null}
+              {rest ? <span className="md__callout-body">{inline(rest, `${k}b`)}</span> : null}
             </aside>
           );
         }
         return <blockquote key={k}>{inline(b.text, k)}</blockquote>;
       }
+      case "embed":
+        return embed ? embed(b.target, k, true) : <p key={k}>{inline(`[[${b.target}]]`, k)}</p>;
       case "rule":
         return <hr key={k} />;
       case "table":

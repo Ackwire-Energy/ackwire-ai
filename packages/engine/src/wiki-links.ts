@@ -39,7 +39,8 @@ export function wikiSlug(title: string) {
     .replace(/-$/, "");
 }
 
-const LINK = /\[\[([^[\]\n]+)\]\]/g;
+/** `[[…]]`, but not an Obsidian embed `![[file.png]]` (an attachment, not a link). */
+const LINK = /(?<!!)\[\[([^[\]\n]+)\]\]/g;
 
 /** The `[[…]]` links of a markdown text (code blocks and inline code are skipped), first occurrence of each. */
 export function parseWikiLinks(text: string): WikiLinkRef[] {

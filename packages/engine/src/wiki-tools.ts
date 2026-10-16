@@ -4,6 +4,7 @@ import {
   appendToWikiPage,
   createWikiPage,
   getWikiPage,
+  recordWikiReads,
   searchWiki,
   updateWikiPage,
   type WikiActor,
@@ -95,6 +96,13 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
       async execute(input, ctx) {
         try {
           const p = await getWikiPage(ctx.db, reader(ctx), ctx.orgId, str(input.page));
+          await recordWikiReads(ctx.db, {
+            orgId: ctx.orgId,
+            agentId: ctx.agentId,
+            runId: ctx.runId,
+            channelId: ctx.channelId,
+            pageIds: [p.id],
+          });
           const backlinks = p.backlinks.filter((b) => b.kind === "page").map((b) => `[[${b.title}]]`);
           return {
             content: [

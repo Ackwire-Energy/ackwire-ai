@@ -194,9 +194,6 @@
   .proposals__list {
     max-width: none;
   }
-  .wiki__center > .wiki-page {
-    padding: 20px 16px;
-  }
 }
 
 /* Issues: the board scrolls sideways inside itself, one column at a time. */
@@ -246,25 +243,6 @@
   }
 }
 
-/* Wiki: one scrolling column; with a page open, the tree comes after it. */
-@media (max-width: 760px) {
-  .shell__main--wiki {
-    overflow-y: auto;
-  }
-  .wiki {
-    min-height: 100%;
-  }
-  .wiki__left,
-  .wiki__center {
-    overflow: visible;
-  }
-  .wiki:has(.wiki-body) .wiki__left {
-    order: 1;
-    border-top: 1px solid var(--line);
-    border-bottom: 0;
-  }
-}
-
 /* Sign in / sign up: on a phone the sky is a band with the logo; the form comes right after. */
 @media (max-width: 640px) {
   .auth {
@@ -300,9 +278,6 @@
   .sidebar__item,
   .sidebar__jump,
   .settings__link,
-  .wiki-nav__page {
-    min-height: 40px;
-  }
   .pill,
   .cal-toggle,
   .cal-filter {

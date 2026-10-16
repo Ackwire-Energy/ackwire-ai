@@ -74,4 +74,5 @@ export const keys = {
   wikiPage: (orgId: string, slug: string) => ["org", orgId, "wiki", "page", slug] as const,
   wikiHistory: (orgId: string, slug: string) => ["org", orgId, "wiki", "history", slug] as const,
   wikiGraph: (orgId: string) => ["org", orgId, "wiki", "graph"] as const,
+  wikiReads: (orgId: string) => ["org", orgId, "wiki", "reads"] as const,
 };

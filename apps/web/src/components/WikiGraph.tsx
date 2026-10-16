@@ -90,22 +90,34 @@ export function layoutGraph(graph: WikiGraph, width = 720, height = 460, steps =
 export const neighborsOf = (graph: WikiGraph, slug: string) =>
   new Set(graph.edges.flatMap((e) => (e.from === slug ? [e.to] : e.to === slug ? [e.from] : [])));
 
-/** "Grafo": pages and their links; hover lights the neighbors, click opens; filter by tag or folder. */
-export function WikiGraphView({ onOpen }: { onOpen?: () => void }) {
+type Filter = "all" | "agent" | "obsidian" | `folder:${string}`;
+
+/**
+ * "Grafo": pages and their links; hover lights the neighbors, click opens;
+ * filter by who wrote them (agents), where they came from (Obsidian) or the
+ * top folder. `mini`: the home's preview (no filters, no labels, not interactive).
+ */
+export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; mini?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const graph = useWikiGraph(org.id, true);
   const [hover, setHover] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
   const data = graph.data;
   const filtered = useMemo<WikiGraph | null>(() => {
     if (!data) return null;
-    if (!filter) return data;
+    if (filter === "all") return data;
     const keep = new Set(
       data.nodes
-        .filter((n) => (filter.startsWith("#") ? n.tags.includes(filter.slice(1)) : n.folder === filter))
+        .filter((n) =>
+          filter === "agent"
+            ? Boolean(n.agentId)
+            : filter === "obsidian"
+              ? n.sourceType === "obsidian"
+              : (n.folder.split("/")[0] || "") === filter.slice("folder:".length),
+        )
         .map((n) => n.slug),
     );
     return {
@@ -113,103 +125,144 @@ export function WikiGraphView({ onOpen }: { onOpen?: () => void }) {
       edges: data.edges.filter((e) => keep.has(e.from) && keep.has(e.to)),
     };
   }, [data, filter]);
-  const placed = useMemo(() => (filtered ? layoutGraph(filtered) : []), [filtered]);
-  if (graph.isLoading) return <LoadingCards count={2} />;
-  if (!data || !filtered) return <ErrorState error={graph.error} onRetry={() => void graph.refetch()} />;
+  const W = mini ? 520 : 960;
+  const H = mini ? 200 : 560;
+  const placed = useMemo(() => (filtered ? layoutGraph(filtered, W, H) : []), [filtered, W, H]);
+  if (graph.isLoading) return mini ? null : <LoadingCards count={2} />;
+  if (!data || !filtered) return mini ? null : <ErrorState error={graph.error} onRetry={() => void graph.refetch()} />;
   const at = new Map(placed.map((p) => [p.slug, p]));
   const near = hover ? neighborsOf(filtered, hover) : null;
-  const folders = [...new Set(data.nodes.map((n) => n.folder).filter(Boolean))].sort();
-  const tags = [...new Set(data.nodes.flatMap((n) => n.tags))].sort();
-  return (
-    <section className="wiki-graph" aria-label={t("wiki.graph")}>
-      <fieldset className="wiki-tags wiki-graph__filter">
-        <legend className="ac-visually-hidden">{t("wiki.graphFilter")}</legend>
-        <button type="button" className="pill" aria-pressed={filter === null} onClick={() => setFilter(null)}>
-          {t("wiki.allPages")}
-        </button>
-        {folders.map((f) => (
-          <button key={f} type="button" className="pill" aria-pressed={filter === f} onClick={() => setFilter(f)}>
-            {f}
-          </button>
-        ))}
-        {tags.map((tg) => (
-          <button
-            key={tg}
-            type="button"
-            className="pill"
-            aria-pressed={filter === `#${tg}`}
-            onClick={() => setFilter(`#${tg}`)}
-          >
-            #{tg}
-          </button>
-        ))}
-      </fieldset>
-      <svg
-        className="wiki-graph__svg"
-        viewBox="0 0 720 460"
-        role="img"
-        aria-label={t("wiki.graphLabel", { count: filtered.nodes.length })}
-      >
-        <g className="wiki-graph__edges">
-          {filtered.edges.map((e) => {
-            const a = at.get(e.from);
-            const b = at.get(e.to);
-            if (!a || !b) return null;
-            const lit = hover !== null && (e.from === hover || e.to === hover);
-            return (
-              <line
-                key={`${e.from}>${e.to}`}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                data-lit={lit || undefined}
-                data-dim={(hover !== null && !lit) || undefined}
-              />
-            );
-          })}
-        </g>
-        {filtered.nodes.map((node) => {
-          const p = at.get(node.slug);
-          if (!p) return null;
-          const lit = hover === node.slug || near?.has(node.slug);
-          const agent = node.agentId ? dir.agentById.get(node.agentId) : undefined;
+  const degree = new Map<string, number>();
+  for (const e of filtered.edges) {
+    degree.set(e.from, (degree.get(e.from) ?? 0) + 1);
+    degree.set(e.to, (degree.get(e.to) ?? 0) + 1);
+  }
+  const folders = [...new Set(data.nodes.map((n) => n.folder.split("/")[0] || ""))].filter(Boolean).sort();
+  const hasObsidian = data.nodes.some((n) => n.sourceType === "obsidian");
+  const hasAgents = data.nodes.some((n) => n.agentId);
+  const open = (slug: string) => {
+    onOpen?.();
+    void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId: org.id, slug } });
+  };
+  const svg = (
+    <svg
+      className="wiki-graph__svg"
+      viewBox={`0 0 ${W} ${H}`}
+      role={mini ? "presentation" : "img"}
+      aria-label={mini ? undefined : t("wiki.graphLabel", { count: filtered.nodes.length })}
+      aria-hidden={mini || undefined}
+    >
+      <g className="wiki-graph__edges">
+        {filtered.edges.map((e) => {
+          const a = at.get(e.from);
+          const b = at.get(e.to);
+          if (!a || !b) return null;
+          const lit = hover !== null && (e.from === hover || e.to === hover);
           return (
-            // biome-ignore lint/a11y/useSemanticElements: an SVG node acting as a link
-            <g
-              key={node.slug}
-              className="wiki-graph__node"
+            <line
+              key={`${e.from}>${e.to}`}
+              x1={a.x}
+              y1={a.y}
+              x2={b.x}
+              y2={b.y}
               data-lit={lit || undefined}
               data-dim={(hover !== null && !lit) || undefined}
-              data-agent={agent ? "" : undefined}
-              style={agent ? appearanceStyle(lookOf(agent)) : undefined}
-              transform={`translate(${p.x} ${p.y})`}
-              role="link"
-              tabIndex={0}
-              aria-label={node.title}
-              onPointerEnter={() => setHover(node.slug)}
-              onPointerLeave={() => setHover(null)}
-              onFocus={() => setHover(node.slug)}
-              onBlur={() => setHover(null)}
-              onClick={() => {
-                onOpen?.();
-                void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId: org.id, slug: node.slug } });
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  onOpen?.();
-                  void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId: org.id, slug: node.slug } });
-                }
-              }}
-            >
-              <circle r={agent ? 9 : 7} />
-              <text y={22} textAnchor="middle">
-                {node.title}
-              </text>
-            </g>
+            />
           );
         })}
-      </svg>
+      </g>
+      {filtered.nodes.map((node) => {
+        const p = at.get(node.slug);
+        if (!p) return null;
+        const lit = hover === node.slug || near?.has(node.slug);
+        const agent = node.agentId ? dir.agentById.get(node.agentId) : undefined;
+        const r = 5 + Math.sqrt(degree.get(node.slug) ?? 0) * 2.4;
+        const kind = node.sourceType === "obsidian" ? "obsidian" : agent ? "agent" : "person";
+        const showLabel = !mini && ((degree.get(node.slug) ?? 0) >= 2 || lit || filtered.nodes.length <= 16);
+        if (mini) {
+          return (
+            <circle
+              key={node.slug}
+              className="wiki-graph__dot"
+              data-kind={kind}
+              cx={p.x}
+              cy={p.y}
+              r={r * 0.8}
+              style={agent ? appearanceStyle(lookOf(agent)) : undefined}
+            />
+          );
+        }
+        return (
+          // biome-ignore lint/a11y/useSemanticElements: an SVG node acting as a link
+          <g
+            key={node.slug}
+            className="wiki-graph__node"
+            data-kind={kind}
+            data-lit={lit || undefined}
+            data-dim={(hover !== null && !lit) || undefined}
+            data-agent={agent ? "" : undefined}
+            style={agent ? appearanceStyle(lookOf(agent)) : undefined}
+            transform={`translate(${p.x} ${p.y})`}
+            role="link"
+            tabIndex={0}
+            aria-label={node.title}
+            onPointerEnter={() => setHover(node.slug)}
+            onPointerLeave={() => setHover(null)}
+            onFocus={() => setHover(node.slug)}
+            onBlur={() => setHover(null)}
+            onClick={() => open(node.slug)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") open(node.slug);
+            }}
+          >
+            <circle r={r} />
+            {showLabel && (
+              <text y={r + 14} textAnchor="middle">
+                {node.title}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+  if (mini) return svg;
+  const chips: [Filter, string][] = [
+    ["all", t("wiki.allPages")],
+    ...(hasAgents ? ([["agent", t("wiki.graphAgents")]] as [Filter, string][]) : []),
+    ...(hasObsidian ? ([["obsidian", t("wiki.fromObsidian")]] as [Filter, string][]) : []),
+    ...folders.map((f) => [`folder:${f}`, f] as [Filter, string]),
+  ];
+  return (
+    <section className="wiki-graph" aria-label={t("wiki.graph")}>
+      <header className="wiki-home__head">
+        <div>
+          <h1 className="wiki-home__title">{t("wiki.graph")}</h1>
+          <p className="muted">{t("wiki.graphText")}</p>
+        </div>
+      </header>
+      <div className="wiki-graph__box">
+        <fieldset className="wiki-graph__filter">
+          <legend className="ac-visually-hidden">{t("wiki.graphFilter")}</legend>
+          {chips.map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className="wiki-graph__chip"
+              aria-pressed={filter === value}
+              onClick={() => setFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </fieldset>
+        {svg}
+        <p className="wiki-graph__legend" aria-hidden="true">
+          <span data-kind="person">{t("wiki.legend.people")}</span>
+          {hasAgents && <span data-kind="agent">{t("wiki.legend.agents")}</span>}
+          {hasObsidian && <span data-kind="obsidian">{t("wiki.legend.obsidian")}</span>}
+        </p>
+      </div>
     </section>
   );
 }

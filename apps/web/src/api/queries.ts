@@ -1362,6 +1362,17 @@ export const useWikiGraph = (orgId: string, enabled: boolean) => {
   return useQuery({ queryKey: keys.wikiGraph(orgId), queryFn: () => api.wiki.graph(orgId), enabled });
 };
 
+/** What the agents read most in the last 7 days (the wiki's home). */
+export const useWikiReads = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.wikiReads(orgId),
+    queryFn: () => api.wiki.reads(orgId),
+    enabled,
+    staleTime: 60_000,
+  });
+};
+
 export function useWikiAction(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -1372,6 +1383,9 @@ export function useWikiAction(orgId: string) {
         | { type: "create"; input: WikiPageInput }
         | { type: "update"; slug: string; input: WikiUpdateInput }
         | { type: "rename"; slug: string; title: string }
+        | { type: "move"; slug: string; folder: string }
+        | { type: "lock"; slug: string; locked: boolean }
+        | { type: "pin"; slug: string; pinned: boolean }
         | {
             type: "append";
             slug: string;
@@ -1386,6 +1400,12 @@ export function useWikiAction(orgId: string) {
           return api.wiki.update(orgId, action.slug, action.input);
         case "rename":
           return api.wiki.rename(orgId, action.slug, action.title);
+        case "move":
+          return api.wiki.move(orgId, action.slug, action.folder);
+        case "lock":
+          return api.wiki.lock(orgId, action.slug, action.locked);
+        case "pin":
+          return api.wiki.pin(orgId, action.slug, action.pinned);
         case "append":
           return api.wiki.append(orgId, action.slug, { text: action.text, source: action.source });
       }

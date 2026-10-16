@@ -17,6 +17,7 @@ const {
   wikiPages,
   wikiPageVersions,
   wikiLinks,
+  wikiPageReads,
   users,
   agents,
   messages,
@@ -57,12 +58,18 @@ export interface WikiPageSummary {
   tags: string[];
   version: number;
   locked: boolean;
+  /** "Fixadas": at the top of the wiki for everyone. */
+  pinned: boolean;
+  /** The start of the text, plain (no markdown), for cards. */
+  excerpt: string;
+  /** Where it came from: `obsidian` for an imported page, `message`/`forum_topic` for "Save to wiki". */
+  sourceType: string | null;
   updatedAt: string;
   updatedBy: WikiAuthor;
 }
 
 export type WikiBacklink =
-  | { kind: "page"; slug: string; title: string }
+  | { kind: "page"; slug: string; title: string; excerpt: string }
   | { kind: "message"; channelId: string; messageId: string; channelName: string; excerpt: string; at: string }
   | { kind: "forum"; topicId: string; title: string }
   | { kind: "issue"; number: number; title: string };
@@ -76,8 +83,20 @@ export interface WikiPageView extends WikiPageSummary {
   backlinks: WikiBacklink[];
   /** Its own `[[…]]` links, resolved. */
   links: { target: string; slug: string; title: string | null; exists: boolean }[];
-  source: { type: string; id: string; channelId?: string } | null;
+  source: WikiSource | null;
+  /** Agents that used the page in the last 7 days. */
+  reads: WikiPageReads;
   deletedAt: string | null;
+}
+
+/** Where a page came from. An import keeps its attachments: file name → Drive artifact id. */
+export type WikiSource = { type: string; id: string; channelId?: string; attachments?: Record<string, string> };
+
+export interface WikiPageReads {
+  total: number;
+  agents: { agentId: string; count: number }[];
+  /** The latest use; the channel only when it is a public channel. */
+  last: { agentId: string; channelId: string | null; channelName: string | null; at: string } | null;
 }
 
 export interface WikiVersionView {
@@ -228,6 +247,9 @@ async function summaries(db: Executor, rows: PageRow[]): Promise<WikiPageSummary
     tags: r.tags,
     version: r.version,
     locked: r.locked,
+    pinned: r.pinned,
+    excerpt: plainExcerpt(r.body, r.title),
+    sourceType: r.source?.type ?? null,
     updatedAt: r.updatedAt.toISOString(),
     updatedBy: {
       type: r.updatedByType as WikiAuthor["type"],
@@ -235,6 +257,24 @@ async function summaries(db: Executor, rows: PageRow[]): Promise<WikiPageSummary
       onBehalfOf: r.updatedByType === "agent" ? (behalf.get(r.id) ?? null) : null,
     },
   }));
+}
+
+/** About 220 characters of plain text from the start of a page (a leading `# Title` is skipped). */
+export function plainExcerpt(body: string, title = "", max = 220) {
+  const text = body
+    .replace(/^---\n[\s\S]*?\n---\n?/, "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(new RegExp(`^#\\s+${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "m"), "")
+    .replace(/!\[\[[^\]\n]*\]\]/g, " ")
+    .replace(/\[\[([^\]|\n]+)\|([^\]\n]+)\]\]/g, "$2")
+    .replace(/\[\[([^\]\n]+)\]\]/g, (_, t: string) => t.split("#")[0]?.split("/").pop() ?? t)
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^\s*>\s*\[![\w-]+\][+-]?\s*/gm, "")
+    .replace(/^\s*(#{1,6}|>|[-*+]\s+\[[ xX]\]|[-*+]|\d+[.)])\s*/gm, "")
+    .replace(/[*_`~|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > max ? `${text.slice(0, max).replace(/\s+\S*$/, "")}…` : text;
 }
 
 async function summaryOf(db: Executor, row: PageRow) {
@@ -254,11 +294,11 @@ async function backlinksOf(db: Database, actor: WikiActor, page: PageRow): Promi
   const pageIds = rows.filter((r) => r.fromType === "page" && r.fromId !== page.id).map((r) => r.fromId);
   if (pageIds.length) {
     const from = await db
-      .select({ slug: wikiPages.slug, title: wikiPages.title })
+      .select({ slug: wikiPages.slug, title: wikiPages.title, body: wikiPages.body })
       .from(wikiPages)
       .where(and(inArray(wikiPages.id, pageIds), isNull(wikiPages.deletedAt)))
       .orderBy(asc(wikiPages.title));
-    for (const p of from) out.push({ kind: "page", slug: p.slug, title: p.title });
+    for (const p of from) out.push({ kind: "page", slug: p.slug, title: p.title, excerpt: excerpt(p.body, page) });
   }
   // Messages and issues only where the reader can see them (people: their channels and public ones).
   const viewer = actor.type === "person" ? actor.userId : null;
@@ -343,7 +383,7 @@ function excerpt(body: string, page: Pick<PageRow, "slug" | "aliases">) {
 }
 
 async function detail(db: Database, actor: WikiActor, row: PageRow): Promise<WikiPageView> {
-  const [summary, versions, backlinks, links] = await Promise.all([
+  const [summary, versions, backlinks, links, reads] = await Promise.all([
     summaryOf(db, row),
     db
       .select({
@@ -358,6 +398,7 @@ async function detail(db: Database, actor: WikiActor, row: PageRow): Promise<Wik
       .limit(500),
     backlinksOf(db, actor, row),
     resolveOwnLinks(db, row),
+    pageReads(db, row),
   ]);
   const authors: WikiAuthor[] = [];
   const seen = new Set<string>();
@@ -385,8 +426,123 @@ async function detail(db: Database, actor: WikiActor, row: PageRow): Promise<Wik
     backlinks,
     links,
     source: row.source ?? null,
+    reads,
     deletedAt: row.deletedAt?.toISOString() ?? null,
   };
+}
+
+const READ_WINDOW_DAYS = 7;
+const since = (days: number) => new Date(Date.now() - days * 86_400_000);
+
+async function pageReads(db: Executor, row: PageRow): Promise<WikiPageReads> {
+  const from = since(READ_WINDOW_DAYS);
+  const [byAgent, [last]] = await Promise.all([
+    db
+      .select({ agentId: wikiPageReads.agentId, count: sql<number>`count(*)::int` })
+      .from(wikiPageReads)
+      .innerJoin(agents, eq(agents.id, wikiPageReads.agentId))
+      .where(
+        and(eq(wikiPageReads.pageId, row.id), sql`${wikiPageReads.createdAt} >= ${from}`, isNull(agents.archivedAt)),
+      )
+      .groupBy(wikiPageReads.agentId)
+      .orderBy(desc(sql`count(*)`)),
+    db
+      .select({
+        agentId: wikiPageReads.agentId,
+        channelId: wikiPageReads.channelId,
+        at: wikiPageReads.createdAt,
+        channelName: channels.name,
+        kind: channels.kind,
+        visibility: channels.visibility,
+      })
+      .from(wikiPageReads)
+      .leftJoin(channels, eq(channels.id, wikiPageReads.channelId))
+      .where(and(eq(wikiPageReads.pageId, row.id), sql`${wikiPageReads.createdAt} >= ${from}`))
+      .orderBy(desc(wikiPageReads.createdAt))
+      .limit(1),
+  ]);
+  const open = last?.kind === "channel" && last.visibility === "public";
+  return {
+    total: byAgent.reduce((n, r) => n + r.count, 0),
+    agents: byAgent.map((r) => ({ agentId: r.agentId, count: r.count })),
+    last: last
+      ? {
+          agentId: last.agentId,
+          channelId: open ? last.channelId : null,
+          channelName: open ? (last.channelName ?? null) : null,
+          at: last.at.toISOString(),
+        }
+      : null,
+  };
+}
+
+/**
+ * Agents used these pages (in the run's context or with `read_wiki_page`).
+ * Best effort: never fails the run. Now and then drops reads older than 30 days.
+ */
+export async function recordWikiReads(
+  db: Executor,
+  input: { orgId: string; agentId: string; runId?: string | null; channelId?: string | null; pageIds: string[] },
+) {
+  const ids = [...new Set(input.pageIds)];
+  if (ids.length === 0) return;
+  try {
+    await db.insert(wikiPageReads).values(
+      ids.map((pageId) => ({
+        orgId: input.orgId,
+        pageId,
+        agentId: input.agentId,
+        runId: input.runId ?? null,
+        channelId: input.channelId ?? null,
+      })),
+    );
+    if (Math.random() < 0.02) {
+      await db
+        .delete(wikiPageReads)
+        .where(and(eq(wikiPageReads.orgId, input.orgId), sql`${wikiPageReads.createdAt} < ${since(30)}`));
+    }
+  } catch {
+    // Counting reads must never break an answer.
+  }
+}
+
+/** "What the agents read most": pages by uses in the last 7 days, with the agents that used each. */
+export async function topWikiReads(db: Database, actor: WikiActor, orgId: string, limit = 8) {
+  await requireReader(db, actor, orgId);
+  const rows = await db
+    .select({
+      pageId: wikiPageReads.pageId,
+      agentId: wikiPageReads.agentId,
+      count: sql<number>`count(*)::int`,
+      slug: wikiPages.slug,
+      title: wikiPages.title,
+    })
+    .from(wikiPageReads)
+    .innerJoin(wikiPages, eq(wikiPages.id, wikiPageReads.pageId))
+    .innerJoin(agents, eq(agents.id, wikiPageReads.agentId))
+    .where(
+      and(
+        eq(wikiPageReads.orgId, orgId),
+        sql`${wikiPageReads.createdAt} >= ${since(READ_WINDOW_DAYS)}`,
+        isNull(wikiPages.deletedAt),
+        isNull(agents.archivedAt),
+      ),
+    )
+    .groupBy(wikiPageReads.pageId, wikiPageReads.agentId, wikiPages.slug, wikiPages.title);
+  const pages = new Map<
+    string,
+    { slug: string; title: string; total: number; agents: { agentId: string; count: number }[] }
+  >();
+  for (const r of rows) {
+    const p = pages.get(r.pageId) ?? { slug: r.slug, title: r.title, total: 0, agents: [] };
+    p.total += r.count;
+    p.agents.push({ agentId: r.agentId, count: r.count });
+    pages.set(r.pageId, p);
+  }
+  return [...pages.values()]
+    .map((p) => ({ ...p, agents: p.agents.sort((a, b) => b.count - a.count) }))
+    .sort((a, b) => b.total - a.total || a.title.localeCompare(b.title))
+    .slice(0, limit);
 }
 
 async function resolveOwnLinks(db: Executor, row: PageRow) {
@@ -439,7 +595,18 @@ async function announce(
   deps: WikiDeps,
   orgId: string,
   page: WikiPageSummary,
-  action: "created" | "updated" | "renamed" | "moved" | "deleted" | "restored" | "locked" | "unlocked",
+  action:
+    | "created"
+    | "updated"
+    | "renamed"
+    | "moved"
+    | "deleted"
+    | "restored"
+    | "locked"
+    | "unlocked"
+    | "pinned"
+    | "unpinned"
+    | "imported",
   extra: Record<string, unknown> = {},
 ) {
   caches.contextPresence.delete(`${orgId}:wiki`);
@@ -537,6 +704,152 @@ export async function createWikiPage(
   return view;
 }
 
+export interface WikiImportNote {
+  /** The note's name (the file name without `.md`). */
+  title: string;
+  /** Its folder in the vault (`Clientes/Varejo`). */
+  folder?: string;
+  body: string;
+  tags?: string[];
+  /** Frontmatter aliases: `[[Alias]]` links reach the page. */
+  aliases?: string[];
+  /** Attachments it embeds (`![[file.png]]`), already in the Drive: file name → artifact id. */
+  attachments?: Record<string, string>;
+}
+
+export interface WikiImportInput {
+  source: { type: "obsidian"; name: string };
+  notes: WikiImportNote[];
+  /** Put everything under this folder (empty = merge with the wiki's own folders). */
+  folder?: string;
+  /** A note named like a live page: a second page "Title (vault)", or leave it out. */
+  onConflict: "keep_both" | "skip";
+}
+
+export const WIKI_IMPORT_MAX_NOTES = 500;
+
+/** Obsidian allows `#`, `[`, `]` and `|` in some file names; our titles don't. */
+const importTitle = (name: string) =>
+  name
+    .replace(/[[\]|#^]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, WIKI_LIMITS.title);
+
+/**
+ * Imports notes (an Obsidian vault, read by the app) as pages: one version
+ * each ("imported from …"), folders, tags and aliases kept, `[[links]]`
+ * resolved among the new pages and the existing ones. Notes that can't be
+ * pages (no usable title, too long) come back in `failed`.
+ */
+export async function importWikiPages(
+  deps: WikiDeps,
+  userId: string,
+  orgId: string,
+  input: WikiImportInput,
+): Promise<{
+  created: WikiPageSummary[];
+  skipped: string[];
+  failed: { title: string; reason: "title" | "too_long" }[];
+}> {
+  const { db } = deps;
+  const actor: WikiActor = { type: "person", userId };
+  await requireWriter(db, actor, orgId);
+  if (input.notes.length > WIKI_IMPORT_MAX_NOTES) {
+    throw new ValidationError(`At most ${WIKI_IMPORT_MAX_NOTES} notes per request`, "wiki.import_too_many", {
+      max: WIKI_IMPORT_MAX_NOTES,
+    });
+  }
+  const sourceName = input.source.name.replace(/\s+/g, " ").trim().slice(0, 80) || "Obsidian";
+  const base = cleanFolder(input.folder);
+  const skipped: string[] = [];
+  const failed: { title: string; reason: "title" | "too_long" }[] = [];
+  const note = `imported from "${sourceName}"`;
+  const rows = await db.transaction(async (tx) => {
+    const made: PageRow[] = [];
+    for (const n of input.notes) {
+      const raw = importTitle(n.title);
+      const wanted = wikiSlug(raw);
+      if (!raw || !wanted) {
+        failed.push({ title: n.title, reason: "title" });
+        continue;
+      }
+      if (n.body.length > WIKI_LIMITS.body) {
+        failed.push({ title: raw, reason: "too_long" });
+        continue;
+      }
+      let folder: string;
+      try {
+        folder = cleanFolder([base, n.folder ?? ""].filter(Boolean).join("/"));
+      } catch {
+        folder = base;
+      }
+      const taken = (await pagesBySlug(tx, orgId, [wanted])).get(wanted);
+      const before = taken && !made.some((m) => m.id === taken.id);
+      if (before && input.onConflict === "skip") {
+        skipped.push(raw);
+        continue;
+      }
+      // A clash with a page that was there before: "Glossário (Acme Vault)". Within the vault, `-2`.
+      const title = before ? importTitle(`${raw} (${sourceName})`) : raw;
+      const slugWanted = wikiSlug(title);
+      const slug = (await pagesBySlug(tx, orgId, [slugWanted])).has(slugWanted)
+        ? await freeSlug(tx, orgId, slugWanted)
+        : slugWanted;
+      const aliases = [...new Set((n.aliases ?? []).map((a) => wikiSlug(a)).filter((a) => a && a !== slug))].slice(
+        0,
+        20,
+      );
+      const attachments = Object.fromEntries(Object.entries(n.attachments ?? {}).slice(0, 200));
+      const [page] = await tx
+        .insert(wikiPages)
+        .values({
+          orgId,
+          slug,
+          aliases,
+          title,
+          body: n.body,
+          folder,
+          tags: cleanTags(n.tags) ?? [],
+          source: {
+            type: input.source.type,
+            id: sourceName,
+            ...(Object.keys(attachments).length ? { attachments } : {}),
+          },
+          createdByType: "person",
+          createdById: userId,
+          updatedByType: "person",
+          updatedById: userId,
+        })
+        .returning();
+      if (!page) throw new Error("wiki insert returned nothing");
+      await addVersion(tx, page, actor, note);
+      await syncWikiLinks(tx, orgId, { type: "page", id: page.id }, page.body);
+      await claimLinks(tx, page);
+      await enqueueIndex(tx, { orgId, kind: "wiki", sourceId: page.id });
+      made.push(page);
+    }
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "wiki.imported",
+      target: { type: "wiki", id: orgId },
+      details: {
+        source: input.source.type,
+        name: sourceName,
+        created: made.length,
+        skipped: skipped.length,
+        failed: failed.length,
+      },
+    });
+    return made;
+  });
+  const created = await summaries(db, rows);
+  const first = created[0];
+  if (first) await announce(deps, orgId, first, "imported", { count: created.length });
+  return { created, skipped, failed };
+}
+
 /** "by Theo, at Walter's request: …" for agent edits; the given text for people. */
 async function defaultNote(db: Executor, actor: WikiActor, what: string) {
   if (actor.type === "person") return what;
@@ -561,6 +874,7 @@ const NOTE_PATTERNS: [RegExp, string, string[]][] = [
   [/^saved the forum synthesis$/, "saved_synthesis", []],
   [/^created from a message$/, "created_from_message", []],
   [/^created from the forum synthesis$/, "created_from_synthesis", []],
+  [/^imported from "(.*)"$/, "imported", ["source"]],
 ];
 
 /** `noteCode`/`noteParams` of a version note the server wrote; nothing for a person's own note. */
@@ -933,6 +1247,26 @@ export async function setWikiPageLock(deps: WikiDeps, userId: string, orgId: str
   return view;
 }
 
+/** Pins a page to the top of the wiki (or unpins it). Members who write can do it. */
+export async function setWikiPagePinned(deps: WikiDeps, userId: string, orgId: string, ref: string, pinned: boolean) {
+  const { db } = deps;
+  const actor: WikiActor = { type: "person", userId };
+  await requireWriter(db, actor, orgId);
+  const page = await findPage(db, orgId, ref);
+  const [row] = await db.update(wikiPages).set({ pinned }).where(eq(wikiPages.id, page.id)).returning();
+  if (!row) throw new NotFoundError("Page not found", "wiki.page_not_found");
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: userId },
+    action: pinned ? "wiki.page_pinned" : "wiki.page_unpinned",
+    target: { type: "wiki_page", id: page.id },
+    details: { slug: page.slug },
+  });
+  const view = await detail(db, actor, row);
+  await announce(deps, orgId, view, pinned ? "pinned" : "unpinned");
+  return view;
+}
+
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export async function getWikiPage(db: Database, actor: WikiActor, orgId: string, ref: string) {
@@ -1185,6 +1519,7 @@ export async function wikiGraph(db: Database, actor: WikiActor, orgId: string) {
       tags: wikiPages.tags,
       createdByType: wikiPages.createdByType,
       createdById: wikiPages.createdById,
+      source: wikiPages.source,
     })
     .from(wikiPages)
     .where(and(eq(wikiPages.orgId, orgId), isNull(wikiPages.deletedAt)))
@@ -1213,6 +1548,7 @@ export async function wikiGraph(db: Database, actor: WikiActor, orgId: string) {
       folder: p.folder,
       tags: p.tags,
       agentId: p.createdByType === "agent" ? p.createdById : null,
+      sourceType: p.source?.type ?? null,
     })),
     edges,
     unresolved,

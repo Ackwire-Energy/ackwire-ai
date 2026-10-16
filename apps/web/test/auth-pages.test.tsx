@@ -5,7 +5,7 @@ setupDom();
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { act, cleanup, fireEvent } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
 import { renderApp, screen, settle } from "./render";
@@ -182,6 +182,33 @@ describe("Onboarding", () => {
       ),
     ).toBe(true);
   };
+
+  test("context: an Obsidian vault is read in the step and imported into the wiki on continue", async () => {
+    const { state } = await start();
+    await type("Nome", "Acme Saúde");
+    await next();
+    const card = screen().getByRole("region", { name: "Já tem documentação no Obsidian?" });
+    const input = within(card).getByLabelText("Escolher .zip ou .md") as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(input, {
+        target: { files: [new File(["Veja [[Clientes]]."], "Início.md"), new File(["Lista."], "Clientes.md")] },
+      });
+    });
+    await settle(8);
+    await act(() => new Promise((r) => setTimeout(r, 700)));
+    await settle(4);
+    expect(card.textContent).toContain("Pronta");
+    expect(card.textContent).toContain("2notas");
+    await next();
+    await settle(8);
+    const call = calls(state, "wiki.import")[0];
+    // Into the workspace made in step 1.
+    expect(typeof call?.args[0]).toBe("string");
+    expect(call?.args[1]).toMatchObject({
+      source: { type: "obsidian" },
+      notes: [{ title: "Início" }, { title: "Clientes" }],
+    });
+  });
 
   test("every chosen preset is created with its own look and joins #general", async () => {
     const { state } = await start();

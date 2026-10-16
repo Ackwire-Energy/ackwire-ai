@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { agents } from "./agents";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
@@ -31,8 +32,10 @@ export const wikiPages = pgTable(
     version: integer().notNull().default(1),
     /** Admins lock a page: only admins edit it. */
     locked: boolean().notNull().default(false),
-    /** Where it came from ("Salvar na wiki"): `{ type: "message" | "forum_topic", id }`. */
-    source: jsonb().$type<{ type: string; id: string; channelId?: string }>(),
+    /** "Fixadas": shown at the top of the wiki for everyone. */
+    pinned: boolean().notNull().default(false),
+    /** Where it came from: "Salvar na wiki" (`message`, `forum_topic`) or an import (`obsidian`, id = the vault's name). */
+    source: jsonb().$type<{ type: string; id: string; channelId?: string; attachments?: Record<string, string> }>(),
     /** `person` or `agent`. */
     createdByType: text().notNull(),
     createdById: text().notNull(),
@@ -99,4 +102,28 @@ export const wikiLinks = pgTable(
     index().on(t.toPageId),
     index().on(t.fromPageId),
   ],
+);
+
+/**
+ * An agent used a page: it went into the run's context or the agent read it
+ * with `read_wiki_page`. Feeds "what the agents read most" and "agents that
+ * use this page". Kept for 30 days.
+ */
+export const wikiPageReads = pgTable(
+  "wiki_page_reads",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid().notNull(),
+    pageId: uuid()
+      .notNull()
+      .references(() => wikiPages.id, { onDelete: "cascade" }),
+    agentId: uuid()
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    runId: uuid(),
+    /** Where the agent was answering. */
+    channelId: uuid(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.orgId, t.createdAt), index().on(t.pageId, t.createdAt)],
 );

@@ -90,3 +90,47 @@ test("wiki API: create, edit with version check, rename, history, graph, links i
   const stranger = await outsider(owner, orgId, "stranger@example.com");
   expect((await stranger(`/api/app/organizations/${orgId}/wiki/pages`)).status).toBe(403);
 });
+
+test("wiki API: Obsidian import in batches, pin, what the agents read", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+
+  const imported = await api("/wiki/import", {
+    json: {
+      source: { type: "obsidian", name: "Acme Vault" },
+      onConflict: "keep_both",
+      folder: "Obsidian",
+      notes: [
+        { title: "Início", body: "Veja [[Mercado Bom]].", tags: ["mapa"], aliases: ["Home"] },
+        { title: "Mercado Bom", folder: "Clientes", body: "Volta ao [[Home]]." },
+      ],
+    },
+  });
+  expect(imported.status).toBe(200);
+  const result = (await imported.json()) as { created: { slug: string; folder: string; sourceType: string }[] };
+  expect(result.created).toMatchObject([
+    { slug: "inicio", folder: "Obsidian", sourceType: "obsidian" },
+    { slug: "mercado-bom", folder: "Obsidian/Clientes", sourceType: "obsidian" },
+  ]);
+  const home = (await (await api("/wiki/pages/home")).json()) as Page & { reads: unknown };
+  expect(home.slug).toBe("inicio");
+  expect(home.backlinks).toMatchObject([{ kind: "page", slug: "mercado-bom" }]);
+  expect(home.reads).toEqual({ total: 0, agents: [], last: null });
+  const graph = (await (await api("/wiki/graph")).json()) as { nodes: { sourceType: string | null }[] };
+  expect(graph.nodes.every((n) => n.sourceType === "obsidian")).toBe(true);
+
+  const pinned = await api("/wiki/pages/inicio/pin", { json: { pinned: true } });
+  expect(((await pinned.json()) as { pinned: boolean }).pinned).toBe(true);
+  expect(await (await api("/wiki/reads")).json()).toEqual([]);
+
+  const tooMany = await api("/wiki/import", {
+    json: {
+      source: { type: "obsidian", name: "x" },
+      notes: Array.from({ length: 501 }, (_, i) => ({ title: `N${i}`, body: "" })),
+    },
+  });
+  expect(tooMany.status).toBe(400);
+});

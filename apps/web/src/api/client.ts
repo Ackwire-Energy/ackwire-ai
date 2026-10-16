@@ -91,9 +91,12 @@ import type {
   TrashedArtifact,
   UsageReport,
   WikiGraph,
+  WikiImportInput,
+  WikiImportResult,
   WikiPage,
   WikiPageInput,
   WikiPageSummary,
+  WikiTopRead,
   WikiUpdateInput,
   WikiVersion,
 } from "./types";
@@ -406,6 +409,18 @@ export interface ApiClient {
     history(orgId: string, slug: string): Promise<WikiVersion[]>;
     version(orgId: string, slug: string, version: number): Promise<{ version: number; body: string }>;
     graph(orgId: string): Promise<WikiGraph>;
+    /** Moves a page to another folder ("" = the root). */
+    move(orgId: string, slug: string, folder: string): Promise<WikiPage>;
+    /** Admins: only admins edit a locked page. */
+    lock(orgId: string, slug: string, locked: boolean): Promise<WikiPage>;
+    /** "Fixadas": at the top of the wiki for everyone. */
+    pin(orgId: string, slug: string, pinned: boolean): Promise<WikiPage>;
+    /** To the trash (the server can restore it). */
+    remove(orgId: string, slug: string): Promise<void>;
+    /** What the agents read most in the last 7 days. */
+    reads(orgId: string): Promise<WikiTopRead[]>;
+    /** Notes of an Obsidian vault (≤ 500 per call; the app batches). */
+    import(orgId: string, input: WikiImportInput): Promise<WikiImportResult>;
     /** Appends a block (e.g. a chat message) with a link back to where it came from. */
     append(
       orgId: string,
