@@ -99,6 +99,8 @@ export interface ConnectionOptions {
   tasks?: Pick<NonNullable<HandlerContext["tasks"]>, "list" | "attach" | "detach" | "ack">;
   /** Protocol 5: the local MCP endpoint of mission tasks; its calls go out while connected. */
   mcp?: Pick<McpBridge, "attach" | "detach" | "result">;
+  /** Protocol 7: the coding CLIs on the machine, looked up for each `hello` (cached by the caller). */
+  executors?: () => RunnerInfo["executors"];
   /** Called after each `welcome`. */
   onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number }) => void;
 }
@@ -248,7 +250,13 @@ export class RunnerConnection {
         socket = (opts.dial ?? webSocketDial)(opts.url, {
           onOpen: () => {
             queueMicrotask(() =>
-              send({ type: "hello", token: opts.token, ...opts.info, ...(tasks ? { tasks: tasks.list() } : {}) }),
+              send({
+                type: "hello",
+                token: opts.token,
+                ...opts.info,
+                ...(opts.executors ? { executors: opts.executors() ?? {} } : {}),
+                ...(tasks ? { tasks: tasks.list() } : {}),
+              }),
             );
           },
           onMessage: (raw) => {

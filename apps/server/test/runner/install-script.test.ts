@@ -37,6 +37,10 @@ test("service files: systemd unit, launchd plist and the Windows task command", 
   // Restarting the runner (an update) leaves background tasks running.
   expect(unit).toContain("KillMode=process");
   expect(unit).toContain('Environment="AGENTES_RUNNER_HOME=/home/me/.agentes-runner"');
+  // The install-time PATH, like the plist: tasks find claude, git, node.
+  expect(systemdUnit({ ...launch, path: "/home/me/.local/bin:/usr/bin" })).toContain(
+    'Environment="PATH=/home/me/.local/bin:/usr/bin"',
+  );
 
   const plist = launchdPlist({ ...launch, script: "/Users/me/a&b/agentes-runner.mjs" });
   expect(plist).toContain("<string>chat.agentes.runner</string>");

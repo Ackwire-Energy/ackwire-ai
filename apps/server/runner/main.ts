@@ -10,6 +10,7 @@ import { MACHINE_PROTOCOL_VERSION, type MachineOs, type RunnerInfo } from "@agen
 import { configPath, connectUrl, expandHome, normalizeServerUrl, readConfig, runnerHome, writeConfig } from "./config";
 import { RunnerConnection } from "./connection";
 import { RUNNER_VERSION } from "./errors";
+import { cachedExecutors } from "./executors";
 import { MCP_TOKEN_FILE, McpBridge, mcpSocketPath, runMcpServer } from "./mcp";
 import { agentWorkspace } from "./paths";
 import { agentSecrets } from "./secrets";
@@ -206,7 +207,10 @@ async function start(): Promise<number> {
   await mcp
     .listen()
     .catch((err: unknown) => log(`mission tools unavailable: ${err instanceof Error ? err.message : String(err)}`));
+  // Which coding CLIs this machine has (protocol 7), sent with every hello.
+  const executors = cachedExecutors();
   const connection = new RunnerConnection({
+    executors: () => (config.exec ? executors() : {}),
     mcp,
     url: connectUrl(config.server),
     token: config.token,

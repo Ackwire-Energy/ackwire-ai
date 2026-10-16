@@ -35,7 +35,53 @@ export interface McpTaskInfo {
   token: string;
   missionId: string;
   running: boolean;
+  /** Where the task runs (absolute) and its agent's folder (absolute): paths the executor gives are resolved here. */
+  cwd?: string;
+  folder?: string;
+  /** The agent's secrets masked (ADR 0027): nothing the executor sends leaves the machine with them. */
+  redact?: (text: string) => string;
 }
+
+/** Every string inside `value` through `redact` (keys kept). */
+export function redactDeep(value: unknown, redact: (text: string) => string): unknown {
+  if (typeof value === "string") return redact(value);
+  if (Array.isArray(value)) return value.map((v) => redactDeep(v, redact));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, redactDeep(v, redact)]),
+    );
+  }
+  return value;
+}
+
+/** Paths in the agent's folder but outside the task's own folder travel with this prefix (the server resolves it). */
+export const FOLDER_PATH_PREFIX = "@folder/";
+
+/**
+ * A path the executor gave (`upload_artifact`, `request_review`), as the
+ * server expects it: relative to the task's folder; an absolute one inside
+ * the task's folder becomes relative, one elsewhere in the agent's folder
+ * gets `@folder/`, anything outside is refused (null).
+ */
+export function resolveTaskPath(given: string, info: Pick<McpTaskInfo, "cwd" | "folder">): string | null {
+  const p = given.trim();
+  if (!p) return p;
+  const absolute = path.isAbsolute(p) || /^[a-zA-Z]:[\\/]/.test(p);
+  if (!absolute) return p;
+  const abs = path.resolve(p);
+  const inside = (root: string | undefined) => {
+    if (!root) return null;
+    const rel = path.relative(root, abs);
+    return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel)) ? rel.split(path.sep).join("/") : null;
+  };
+  const inCwd = inside(info.cwd);
+  if (inCwd !== null) return inCwd || ".";
+  const inFolder = inside(info.folder);
+  if (inFolder !== null) return `${FOLDER_PATH_PREFIX}${inFolder}`;
+  return null;
+}
+
+const PATH_ARGS: Record<string, "path" | "paths"> = { upload_artifact: "path", request_review: "paths" };
 
 export interface IpcRequest {
   taskId: string;
@@ -145,8 +191,26 @@ export class McpBridge {
     if (!info.running) return { ok: false, error: "This task has ended." };
     const tool = typeof req.tool === "string" ? req.tool.slice(0, 64) : "";
     if (!MISSION_MCP_TOOLS.some((t) => t.name === tool)) return { ok: false, error: `Unknown tool ${tool}` };
-    const args = req.args && typeof req.args === "object" && !Array.isArray(req.args) ? req.args : {};
-    if (JSON.stringify(args).length > MCP_ARGS_MAX_CHARS) return { ok: false, error: "The arguments are too large." };
+    const given = req.args && typeof req.args === "object" && !Array.isArray(req.args) ? req.args : {};
+    if (JSON.stringify(given).length > MCP_ARGS_MAX_CHARS) return { ok: false, error: "The arguments are too large." };
+    // Secrets never leave the machine through our tools (the server masks again).
+    const args = (info.redact ? redactDeep(given, info.redact) : given) as Record<string, unknown>;
+    const pathArg = PATH_ARGS[tool];
+    if (pathArg === "path" && typeof args.path === "string") {
+      const resolved = resolveTaskPath(args.path, info);
+      if (resolved === null)
+        return { ok: false, error: `${args.path} is outside your folder: copy it into your folder first.` };
+      args.path = resolved;
+    } else if (pathArg === "paths" && Array.isArray(args.paths)) {
+      const out: string[] = [];
+      for (const p of args.paths) {
+        const resolved = typeof p === "string" ? resolveTaskPath(p, info) : null;
+        if (resolved === null)
+          return { ok: false, error: `${String(p)} is outside your folder: copy it into your folder first.` };
+        out.push(resolved);
+      }
+      args.paths = out;
+    }
     const send = this.send;
     if (!send) {
       return { ok: false, error: "The computer is not connected to agentes.chat right now; try again in a minute." };
@@ -393,17 +457,164 @@ export function claudeMcpConfig(input: { command: string[]; taskId: string; sock
   };
 }
 
+/** Mission branches: `agentes/<last 8 hex of the mission id>/` unless the server sends its own prefix. */
+export function missionBranchPrefix(missionId: string, given?: string) {
+  const clean = (given ?? "").replace(/[^A-Za-z0-9/_.-]/g, "").replace(/^\/+/, "");
+  if (clean.endsWith("/") && !clean.includes("..") && clean.length <= 80) return clean;
+  return `agentes/${missionId.replace(/[^a-zA-Z0-9]/g, "").slice(-8)}/`;
+}
+
+/** Package managers and build tools a mission task may run for tests, lint, builds and installs. */
+const BUILD_RULES = [
+  ...["npm", "pnpm", "yarn", "bun"].flatMap((pm) => [
+    `Bash(${pm} install *)`,
+    `Bash(${pm} add *)`,
+    `Bash(${pm} test *)`,
+    `Bash(${pm} run *)`,
+  ]),
+  "Bash(npm ci *)",
+  "Bash(bun x *)",
+  "Bash(bunx *)",
+  "Bash(npx *)",
+  "Bash(node *)",
+  "Bash(python *)",
+  "Bash(python3 *)",
+  "Bash(pip install *)",
+  "Bash(pip3 install *)",
+  "Bash(uv *)",
+  "Bash(cargo build *)",
+  "Bash(cargo test *)",
+  "Bash(cargo check *)",
+  "Bash(cargo run *)",
+  "Bash(cargo fmt *)",
+  "Bash(cargo clippy *)",
+  "Bash(go build *)",
+  "Bash(go test *)",
+  "Bash(go run *)",
+  "Bash(go vet *)",
+  "Bash(go mod *)",
+  "Bash(make *)",
+  "Bash(expo *)",
+  "Bash(eas build --local *)",
+];
+
+const GIT_WORK = [
+  "add",
+  "commit",
+  "status",
+  "diff",
+  "log",
+  "show",
+  "branch",
+  "checkout",
+  "switch",
+  "stash",
+  "restore",
+  "rev-parse",
+  "fetch",
+  "pull",
+];
+const GIT_READ = ["status", "diff", "log", "show", "rev-parse", "branch --list", "ls-files"];
+
+/** Never without a person's approval (`request_approval`): merges, pushes elsewhere, force pushes, deploys. */
+const DENY_RULES = [
+  "Bash(git merge *)",
+  "Bash(git push --force*)",
+  "Bash(git push -f*)",
+  "Bash(git push * --force*)",
+  "Bash(git push * -f*)",
+  "Bash(git push *+*)",
+  "Bash(git push *:*)",
+  "Bash(git push * main)",
+  "Bash(git push * master)",
+  "Bash(git push --delete *)",
+  "Bash(git push * --delete *)",
+  "Bash(git push * -d *)",
+  "Bash(git push --all*)",
+  "Bash(git push * --all*)",
+  "Bash(git push --mirror*)",
+  "Bash(git push * --mirror*)",
+  "Bash(gh pr merge *)",
+  "Bash(gh api *)",
+  "Bash(vercel deploy *)",
+  "Bash(vercel --prod*)",
+  "Bash(vercel * --prod*)",
+  "Bash(npx vercel *)",
+  "Bash(railway up *)",
+  "Bash(railway deploy *)",
+  "Bash(npx railway *)",
+  "Bash(fly deploy *)",
+  "Bash(flyctl deploy *)",
+  "Bash(netlify deploy *)",
+  "Bash(npx netlify *)",
+  "Bash(eas submit *)",
+  "Bash(eas update *)",
+  "Bash(npx eas *)",
+  "Bash(npx eas-cli *)",
+  "Bash(kubectl apply *)",
+  "Bash(terraform apply *)",
+  "Bash(npm publish *)",
+];
+
+/**
+ * The `--settings` file of a mission task's Claude Code (protocol 7): what
+ * it may run without asking (`-p` can't ask: anything else is denied).
+ * `plan`: read only and our tools. `work`: edits (`acceptEdits`), git on its
+ * own branches, pushes only to branches under the mission's prefix, pull
+ * requests, tests and builds; merges, other pushes and deploys are denied
+ * (they go through `request_approval`). Deny rules win over allow rules.
+ */
+export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: string) {
+  if (mode === "plan") {
+    return {
+      permissions: {
+        allow: ["mcp__agentes", "Read", "Glob", "Grep", "LS", ...GIT_READ.map((c) => `Bash(git ${c} *)`)],
+        deny: ["Edit", "Write", "NotebookEdit", ...DENY_RULES],
+      },
+    };
+  }
+  const prefix = branchPrefix;
+  return {
+    permissions: {
+      allow: [
+        "mcp__agentes",
+        ...GIT_WORK.map((c) => `Bash(git ${c} *)`),
+        `Bash(git push origin ${prefix}*)`,
+        `Bash(git push -u origin ${prefix}*)`,
+        `Bash(git push --set-upstream origin ${prefix}*)`,
+        "Bash(gh pr create *)",
+        "Bash(gh pr view *)",
+        "Bash(gh pr list *)",
+        "Bash(gh pr checks *)",
+        "Bash(gh pr diff *)",
+        "Bash(gh pr status *)",
+        ...BUILD_RULES,
+      ],
+      deny: DENY_RULES,
+    },
+  };
+}
+
 /**
  * Extra arguments for a mission task's executor. Claude Code: our MCP
  * config (added to the person's own MCP servers: no `--strict-mcp-config`),
- * our tools allowed without a prompt (`-p` can't ask), and the rules appended
+ * the permission profile (`--settings`, see `claudePermissionSettings`), our
+ * tools allowed without a prompt (`-p` can't ask), and the rules appended
  * to its system prompt. Codex (best effort, untested): the same server
  * through `-c mcp_servers.agentes.*` (the MCP process reads its token from
  * the task's folder), and the rules arrive with the prompt.
  */
 export function missionExecutorArgs(
   executor: "claude" | "codex",
-  input: { configFile: string; command: string[]; taskId: string; socketPath: string; rules: string },
+  input: {
+    configFile: string;
+    command: string[];
+    taskId: string;
+    socketPath: string;
+    rules: string;
+    /** Claude Code: the generated permission settings file. */
+    settingsFile?: string;
+  },
   platform: NodeJS.Platform = process.platform,
 ): string[] {
   const q = (v: string) => shellArg(v, platform);
@@ -412,6 +623,7 @@ export function missionExecutorArgs(
     return [
       "--mcp-config",
       q(input.configFile),
+      ...(input.settingsFile ? ["--settings", q(input.settingsFile)] : []),
       "--allowedTools",
       "mcp__agentes",
       ...(rules ? ["--append-system-prompt", q(rules)] : []),

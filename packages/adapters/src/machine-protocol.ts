@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 6;
+export const MACHINE_PROTOCOL_VERSION = 7;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -27,6 +27,13 @@ export const MISSION_PROTOCOL = 5;
  * the server only asks runners at this protocol or later.
  */
 export const TASK_OUTPUT_PROTOCOL = 6;
+/**
+ * From this protocol on, `hello` says which coding CLIs the machine has
+ * (`executors`), and a mission task carries its permission profile
+ * (`mission.mode`, `mission.branchPrefix`): Claude Code gets a generated
+ * `--settings` file with what it may run without asking (ADR 0029).
+ */
+export const EXECUTORS_PROTOCOL = 7;
 
 /** No valid `hello` within this time closes the socket. */
 export const HELLO_TIMEOUT_MS = 10_000;
@@ -94,7 +101,24 @@ export interface TaskStart {
    * Protocol 5: the task works for a mission. The runner gives the executor
    * the local `agentes` MCP server (bound to this task) and the mission's rules.
    */
-  mission?: { id: string; rules?: string };
+  mission?: {
+    id: string;
+    rules?: string;
+    /**
+     * Protocol 7: `plan` (read only, before the people press Start) or `work`
+     * (edits, git on the mission's branches, tests and builds; merges, pushes
+     * to other branches and deploys denied: they go through `request_approval`).
+     */
+    mode?: "plan" | "work";
+    /** Protocol 7: the mission's branches start with this (`agentes/<id>/`); only these may be pushed. */
+    branchPrefix?: string;
+  };
+}
+
+/** A coding CLI on the machine, as `hello` reports it (protocol 7). */
+export interface RunnerExecutorInfo {
+  /** The first line of `<cli> --version`. */
+  version: string;
 }
 
 /** A task as the runner's journal has it (in `hello` and `task.status`). */
@@ -159,6 +183,8 @@ export interface RunnerInfo {
   workspace: string;
   /** `false` when started with `--no-exec`: files and uploads only. */
   exec: boolean;
+  /** Protocol 7: the coding CLIs found on the machine's PATH (best effort, cached by the runner). */
+  executors?: { claude?: RunnerExecutorInfo; codex?: RunnerExecutorInfo };
 }
 
 export interface FileEntry {
@@ -311,6 +337,16 @@ const fileList = (v: unknown) =>
     : undefined;
 const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 
+/** `hello.executors`: only `claude` and `codex`, each with a short version line. */
+export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerInfo["executors"]> {
+  const out: NonNullable<RunnerInfo["executors"]> = {};
+  for (const name of ["claude", "codex"] as const) {
+    const e = v[name];
+    if (isObject(e) && isString(e.version)) out[name] = { version: e.version.replace(/\s+/g, " ").trim().slice(0, 80) };
+  }
+  return out;
+}
+
 /** A journal entry from `hello` or `task.status`; null when malformed. */
 export function parseRunnerTask(v: unknown): RunnerTask | null {
   if (!isObject(v) || !isString(v.taskId) || !isString(v.agentId) || !isString(v.startedAt)) return null;
@@ -355,6 +391,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         hostname: isString(f.hostname) ? f.hostname.slice(0, 200) : "",
         workspace: isString(f.workspace) ? f.workspace.slice(0, 500) : "",
         exec: f.exec !== false,
+        ...(isObject(f.executors) ? { executors: parseExecutors(f.executors) } : {}),
         ...(Array.isArray(f.tasks)
           ? {
               tasks: f.tasks

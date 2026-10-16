@@ -13,6 +13,8 @@ export interface Launch {
   runtime: string;
   script: string;
   home: string;
+  /** The PATH services get (default: the installing shell's). */
+  path?: string;
 }
 
 export function currentLaunch(): Launch {
@@ -65,6 +67,8 @@ export function systemdUnit(launch: Launch): string {
     `ExecStart=${systemdQuote(launch.runtime)} ${systemdQuote(launch.script)} start`,
     `Environment=${systemdEnv("AGENTES_RUNNER_HOME", launch.home)}`,
     "Environment=AGENTES_RUNNER_SERVICE=systemd",
+    // The install-time PATH (like the launchd plist): tasks find claude, codex, git, node, gh.
+    `Environment=${systemdEnv("PATH", launch.path ?? process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin")}`,
     "Restart=always",
     "RestartSec=5",
     "RestartPreventExitStatus=0 2 3",

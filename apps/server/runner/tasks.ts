@@ -2,14 +2,17 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import {
   closeSync,
+  cpSync,
   existsSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   readSync,
   renameSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -27,7 +30,15 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
 import { shellCommand } from "./exec";
-import { claudeMcpConfig, MCP_TOKEN_FILE, type McpTaskInfo, missionExecutorArgs, newMcpToken } from "./mcp";
+import {
+  claudeMcpConfig,
+  claudePermissionSettings,
+  MCP_TOKEN_FILE,
+  type McpTaskInfo,
+  missionBranchPrefix,
+  missionExecutorArgs,
+  newMcpToken,
+} from "./mcp";
 import { isInside, resolveInWorkspace } from "./paths";
 
 /**
@@ -94,6 +105,12 @@ interface Entry {
   cwd: string;
   /** Relative to the agent's folder. */
   cwdRel: string;
+  /** The agent's folder (absolute). */
+  folder?: string;
+  /** Claude Code: started with `--resume` (else `--session-id`); flipped once when that was wrong. */
+  resumed?: boolean;
+  /** The start was retried once with the other session flag. */
+  retried?: boolean;
   branch?: string;
   session?: string;
   status: RunnerTask["status"];
@@ -248,12 +265,50 @@ export function claudeSessionFile(claudeHome: string, cwd: string, session: stri
 }
 
 /**
+ * Whether Claude Code has this session: in this folder first, then in any
+ * project folder (a worktree, a moved repository). Null when there is no
+ * `projects` folder to look in (another home, an older Claude Code).
+ */
+export function claudeSessionExists(claudeHome: string, cwd: string, session: string): boolean | null {
+  const projects = path.join(claudeHome, "projects");
+  if (!existsSync(projects)) return null;
+  if (existsSync(claudeSessionFile(claudeHome, cwd, session))) return true;
+  try {
+    for (const dir of readdirSync(projects)) {
+      if (existsSync(path.join(projects, dir, `${session}.jsonl`))) return true;
+    }
+  } catch {
+    return null;
+  }
+  return false;
+}
+
+/** Claude Code's answer when the session flag was the wrong one (exits at once). */
+export const WRONG_SESSION_FLAG = /already in use|no conversation found|session .* not found/i;
+/** A start that ends within this long with that answer is retried once with the other flag. */
+export const FAST_FAIL_SECONDS = 30;
+
+/** The same command with the other session flag (`--resume` ↔ `--session-id`). */
+export function flipSessionFlag(command: string, session: string, resumed: boolean) {
+  return resumed
+    ? command.replace(`--resume ${session}`, `--session-id ${session}`)
+    : command.replace(`--session-id ${session}`, `--resume ${session}`);
+}
+
+/**
  * The command line for an executor. Prompts never go on it (no quoting
  * across shells): the wrapper feeds them through stdin.
  */
 export function executorCommand(
   executor: TaskExecutor,
-  options: { command?: string; session?: string; resume?: boolean; extra?: string[] },
+  options: {
+    command?: string;
+    session?: string;
+    resume?: boolean;
+    extra?: string[];
+    /** Claude Code's permission mode (default `acceptEdits`; a mission's plan turn runs `dontAsk`). */
+    permissionMode?: "acceptEdits" | "dontAsk";
+  },
 ): string {
   if (executor === "shell") {
     const command = (options.command ?? "").trim();
@@ -262,7 +317,15 @@ export function executorCommand(
   }
   // `extra`: a mission task's MCP server and rules (already quoted for the shell).
   if (executor === "codex") return ["codex", "exec", "--json", "--full-auto", ...(options.extra ?? []), "-"].join(" ");
-  const parts = ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits"];
+  const parts = [
+    "claude",
+    "-p",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    options.permissionMode ?? "acceptEdits",
+  ];
   parts.push(...(options.extra ?? []));
   if (options.session) parts.push(options.resume ? "--resume" : "--session-id", options.session);
   return parts.join(" ");
@@ -595,16 +658,23 @@ export class TaskManager {
       if (!statSync(resolved.abs).isDirectory()) throw new RunnerError("bad_request", `${req.cwd} is not a folder`);
       cwd = resolved.abs;
     }
+    const missionTask = typeof req.mission?.id === "string" && TASK_ID.test(req.mission.id);
     let branch: string | undefined;
     if (typeof req.branch === "string" && req.branch.trim() !== "") {
       branch = req.branch.trim();
+      const repo = cwd;
       cwd = createWorktree(cwd, folder, taskId, branch);
+      // A mission item in its own worktree still reads the mission's files (ADR 0029).
+      if (missionTask) linkMissionFiles(repo, cwd);
+    } else if (missionTask) {
+      excludeLocally(cwd, ".agentes/");
     }
-    // Claude Code resumes a session that exists in this folder, else starts it with that id.
+    // Claude Code resumes a session it has (this folder, or any project folder), else starts it with that id.
     let resume = req.resume === true;
     if (executor === "claude" && session) {
       const home = this.opts.claudeHome ?? process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
-      if (existsSync(path.join(home, "projects"))) resume = existsSync(claudeSessionFile(home, cwd, session));
+      const found = claudeSessionExists(home, cwd, session);
+      if (found !== null) resume = found;
     }
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     // A mission task (protocol 5): our MCP server for its executor, bound to this task by a token.
@@ -615,10 +685,12 @@ export class TaskManager {
     let extra: string[] = [];
     let mcpToken: string | undefined;
     let input = prompt;
+    const mode = req.mission?.mode === "plan" ? "plan" : "work";
     if (missionId && this.opts.mcp) {
       mcpToken = newMcpToken();
       writeFileSync(path.join(dir, MCP_TOKEN_FILE), mcpToken, { mode: 0o600 });
       const configFile = path.join(dir, "mcp.json");
+      const settingsFile = path.join(dir, "settings.json");
       const rules = typeof req.mission?.rules === "string" ? req.mission.rules : "";
       if (executor === "claude") {
         const config = claudeMcpConfig({
@@ -628,6 +700,9 @@ export class TaskManager {
           token: mcpToken,
         });
         writeFileSync(configFile, JSON.stringify(config), { mode: 0o600 });
+        // What it may run without asking (protocol 7; older servers send no mode: work).
+        const prefix = missionBranchPrefix(missionId, req.mission?.branchPrefix);
+        writeFileSync(settingsFile, JSON.stringify(claudePermissionSettings(mode, prefix)), { mode: 0o600 });
       } else if (rules) {
         input = `${rules}\n\n${prompt}`;
       }
@@ -637,11 +712,18 @@ export class TaskManager {
         taskId,
         socketPath: this.opts.mcp.socketPath,
         rules,
+        ...(executor === "claude" ? { settingsFile } : {}),
       });
     } else if (missionId) {
       this.log(`task ${taskId} works for a mission, but this runner has no MCP endpoint`);
     }
-    const command = executorCommand(executor, { command: req.command, session, resume, extra });
+    const command = executorCommand(executor, {
+      command: req.command,
+      session,
+      resume,
+      extra,
+      ...(missionId && executor === "claude" && mode === "plan" ? { permissionMode: "dontAsk" as const } : {}),
+    });
     const maxSeconds = clampInt(
       req.maxSeconds,
       1,
@@ -686,6 +768,8 @@ export class TaskManager {
       command,
       cwd,
       cwdRel: rel,
+      folder,
+      ...(executor === "claude" && session ? { resumed: resume } : {}),
       ...(branch ? { branch } : {}),
       ...(session ? { session } : {}),
       ...(missionId ? { missionId } : {}),
@@ -708,7 +792,14 @@ export class TaskManager {
   mcpTask(taskId: string): McpTaskInfo | null {
     const t = this.journal.tasks.find((x) => x.taskId === taskId);
     if (!t?.missionId || !t.mcpToken) return null;
-    return { token: t.mcpToken, missionId: t.missionId, running: t.status === "running" };
+    return {
+      token: t.mcpToken,
+      missionId: t.missionId,
+      running: t.status === "running",
+      cwd: t.cwd,
+      ...(t.folder ? { folder: t.folder } : {}),
+      ...(this.watches.get(t.taskId)?.redact ? { redact: this.watches.get(t.taskId)?.redact } : {}),
+    };
   }
 
   status(agent: AgentScope | undefined, taskId?: string): MachineReplies["task.status"] {
@@ -925,6 +1016,64 @@ export class TaskManager {
     }
     this.flushEvents(t, w, true);
     this.watches.delete(t.taskId);
+    // Claude Code refused the session flag at once ("already in use", "No conversation found"): try the other one, once.
+    if (exit && this.wrongSessionFlag(t, w, exit)) {
+      void this.retryOtherFlag(t, w, exit);
+      return;
+    }
+    this.settle(t, w, exit);
+  }
+
+  private wrongSessionFlag(t: Entry, w: Watch, exit: ExitFile) {
+    if (t.retried || t.executor !== "claude" || !t.session || t.resumed === undefined) return false;
+    if (exit.exitCode === 0 || exit.reason) return false;
+    const seconds = (Date.parse(exit.endedAt) - Date.parse(t.startedAt)) / 1000;
+    return seconds <= FAST_FAIL_SECONDS && WRONG_SESSION_FLAG.test(`${w.tail.join("\n")}\n${w.result ?? ""}`);
+  }
+
+  /** Starts the same task again with the other session flag; when that can't start, the first end stands. */
+  private async retryOtherFlag(t: Entry, w: Watch, exit: ExitFile) {
+    const session = t.session as string;
+    const command = flipSessionFlag(t.command, session, t.resumed === true);
+    if (command === t.command) return this.settle(t, w, exit);
+    const dir = this.dirOf(t.taskId);
+    try {
+      const shell = shellCommand(command);
+      writeJson(path.join(dir, "spec.json"), {
+        file: shell.file,
+        args: shell.args,
+        verbatim: shell.verbatim,
+        cwd: t.cwd,
+        maxSeconds: t.maxSeconds,
+      });
+      for (const f of ["exit.json", "alive", "child.pid", "cancel"]) rmSync(path.join(dir, f), { force: true });
+      for (const f of ["stdout.log", "stderr.log"]) writeFileSync(path.join(dir, f), "", { mode: 0o600 });
+      const secrets = (await this.opts.secrets?.({ id: t.agentId, handle: t.agentHandle }).catch(() => null)) ?? null;
+      const child = spawn(this.opts.runtime ?? process.execPath, [path.join(this.opts.root, "wrap.mjs"), dir], {
+        cwd: dir,
+        env: secrets ? { ...process.env, ...secrets.env } : process.env,
+        stdio: "ignore",
+        detached: true,
+        windowsHide: true,
+      });
+      (child as unknown as EventEmitter).on("error", () => {});
+      child.unref();
+      if (!child.pid) throw new Error("no pid");
+      t.command = command;
+      t.resumed = !t.resumed;
+      t.retried = true;
+      t.pid = child.pid;
+      t.startedAt = new Date(this.now()).toISOString();
+      t.lastLine = undefined;
+      this.save();
+      this.log(`[${t.agentHandle}] task ${t.taskId}: retrying with ${t.resumed ? "--resume" : "--session-id"}`);
+      await this.watch(t, false, secrets?.redact ?? w.redact);
+    } catch {
+      this.settle(t, w, exit);
+    }
+  }
+
+  private settle(t: Entry, w: Watch, exit: ExitFile | null) {
     const endedAt = exit?.endedAt ?? new Date(this.now()).toISOString();
     const seconds = Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(t.startedAt)) / 1000));
     const canceled = exit ? exit.reason === "canceled" : t.canceling === true;
@@ -1028,18 +1177,46 @@ export function createWorktree(cwd: string, folder: string, taskId: string, bran
   if (add.status !== 0) {
     throw new RunnerError("bad_request", `git worktree add failed: ${(add.stderr || add.stdout).trim().slice(0, 500)}`);
   }
+  excludeLocally(cwd, ".worktrees/");
+  return target;
+}
+
+/** Adds a pattern to the repository's `info/exclude` (never committed, never shown as untracked). Best effort. */
+export function excludeLocally(cwd: string, pattern: string) {
   const gitDir = spawnSync("git", ["rev-parse", "--git-common-dir"], { cwd, encoding: "utf8", windowsHide: true });
-  if (gitDir.status === 0) {
-    const exclude = path.join(path.resolve(cwd, gitDir.stdout.trim()), "info", "exclude");
+  if (gitDir.error || gitDir.status !== 0) return;
+  const exclude = path.join(path.resolve(cwd, gitDir.stdout.trim()), "info", "exclude");
+  try {
+    const current = existsSync(exclude) ? readFileSync(exclude, "utf8") : "";
+    if (!current.split("\n").includes(pattern)) {
+      mkdirSync(path.dirname(exclude), { recursive: true });
+      writeFileSync(exclude, `${current}${current && !current.endsWith("\n") ? "\n" : ""}${pattern}\n`);
+    }
+  } catch {
+    // only cosmetic
+  }
+}
+
+/**
+ * A mission item's worktree sees the mission's files: `<worktree>/.agentes`
+ * is a link to the repository's `.agentes/` (a copy where links can't be
+ * made, e.g. Windows without the right), and `.agentes/` stays out of git
+ * (`info/exclude`). A worktree whose branch already tracks `.agentes/` keeps
+ * its own.
+ */
+export function linkMissionFiles(repo: string, worktree: string) {
+  excludeLocally(repo, ".agentes/");
+  const source = path.join(repo, ".agentes");
+  const target = path.join(worktree, ".agentes");
+  try {
+    mkdirSync(source, { recursive: true });
+    if (existsSync(target)) return;
+    symlinkSync(source, target, "dir");
+  } catch {
     try {
-      const current = existsSync(exclude) ? readFileSync(exclude, "utf8") : "";
-      if (!current.split("\n").includes(".worktrees/")) {
-        mkdirSync(path.dirname(exclude), { recursive: true });
-        writeFileSync(exclude, `${current}${current && !current.endsWith("\n") ? "\n" : ""}.worktrees/\n`);
-      }
+      cpSync(source, target, { recursive: true });
     } catch {
-      // only cosmetic
+      // the executor is told where the files are anyway
     }
   }
-  return target;
 }
