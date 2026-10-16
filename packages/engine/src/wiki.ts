@@ -1,5 +1,19 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { type ArtifactDeps, getArtifact } from "./artifacts";
 import { recordAudit } from "./audit";
@@ -441,9 +455,7 @@ async function pageReads(db: Executor, row: PageRow): Promise<WikiPageReads> {
       .select({ agentId: wikiPageReads.agentId, count: sql<number>`count(*)::int` })
       .from(wikiPageReads)
       .innerJoin(agents, eq(agents.id, wikiPageReads.agentId))
-      .where(
-        and(eq(wikiPageReads.pageId, row.id), sql`${wikiPageReads.createdAt} >= ${from}`, isNull(agents.archivedAt)),
-      )
+      .where(and(eq(wikiPageReads.pageId, row.id), gte(wikiPageReads.createdAt, from), isNull(agents.archivedAt)))
       .groupBy(wikiPageReads.agentId)
       .orderBy(desc(sql`count(*)`)),
     db
@@ -457,7 +469,7 @@ async function pageReads(db: Executor, row: PageRow): Promise<WikiPageReads> {
       })
       .from(wikiPageReads)
       .leftJoin(channels, eq(channels.id, wikiPageReads.channelId))
-      .where(and(eq(wikiPageReads.pageId, row.id), sql`${wikiPageReads.createdAt} >= ${from}`))
+      .where(and(eq(wikiPageReads.pageId, row.id), gte(wikiPageReads.createdAt, from)))
       .orderBy(desc(wikiPageReads.createdAt))
       .limit(1),
   ]);
@@ -499,7 +511,7 @@ export async function recordWikiReads(
     if (Math.random() < 0.02) {
       await db
         .delete(wikiPageReads)
-        .where(and(eq(wikiPageReads.orgId, input.orgId), sql`${wikiPageReads.createdAt} < ${since(30)}`));
+        .where(and(eq(wikiPageReads.orgId, input.orgId), lt(wikiPageReads.createdAt, since(30))));
     }
   } catch {
     // Counting reads must never break an answer.
@@ -523,7 +535,7 @@ export async function topWikiReads(db: Database, actor: WikiActor, orgId: string
     .where(
       and(
         eq(wikiPageReads.orgId, orgId),
-        sql`${wikiPageReads.createdAt} >= ${since(READ_WINDOW_DAYS)}`,
+        gte(wikiPageReads.createdAt, since(READ_WINDOW_DAYS)),
         isNull(wikiPages.deletedAt),
         isNull(agents.archivedAt),
       ),
