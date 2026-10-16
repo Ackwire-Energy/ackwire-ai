@@ -340,7 +340,7 @@ export type UserEvent =
 
 // ── Approvals, connectors, scopes ─────────────────────────────────────────────
 
-export type ApprovalStatus = "pending" | "approved" | "refused" | "expired";
+export type ApprovalStatus = "pending" | "approved" | "refused" | "expired" | "canceled";
 
 /** A sensitive action waiting for a person (apps/server/src/routes/app/approvals.ts). */
 export interface Approval {
@@ -369,6 +369,20 @@ export interface Approval {
   reason: string | null;
   /** You are the agent's owner or an admin, and it is pending. */
   canDecide: boolean;
+  /** The agent's owner (they and admins may decide). */
+  ownerUserId?: string | null;
+  /** When the approved action ran; null while it runs (or if it never did). */
+  executedAt?: string | null;
+  /** What the action returned once it ran (raw tool output, short). */
+  result?: { ok: boolean; text: string } | null;
+  /** The connector it goes through ("github") and its account. */
+  connector?: string | null;
+  connectorAccount?: string | null;
+  /** What the agent said right before asking. */
+  why?: string | null;
+  issue?: { id: string; number: number; title: string } | null;
+  /** One approval only: what the agent said at each turn before asking. */
+  trail?: { text: string; at: string }[];
 }
 
 export interface ScopeInfo {

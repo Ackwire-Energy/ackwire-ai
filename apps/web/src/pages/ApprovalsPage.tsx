@@ -1,64 +1,1059 @@
-import { EmptyState, TabPanel, Tabs } from "@agenteschat/ui";
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useApprovals, useChannels } from "@/api/queries";
-import type { Approval } from "@/api/types";
-import { ApprovalListItem } from "@/components/ApprovalItem";
+import {
+  Button,
+  Chip,
+  CriteriaPixels,
+  cx,
+  EmptyState,
+  ExpiryFuse,
+  Icon,
+  type IconName,
+  Kbd,
+  SearchInput,
+  WorkSweep,
+} from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
+import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
+import {
+  sendHelpers,
+  useApproval,
+  useApprovals,
+  useCatalog,
+  useChannels,
+  useDecideApproval,
+  usePostMessage,
+} from "@/api/queries";
+import type { Agent, Approval, Member } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
+import { approvalAction, approvalRisk, approvalTitle, approvalTraits, decisionLabel } from "@/components/ApprovalItem";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { daysBetween, joinNames, relativeTime, timeLeft } from "@/lib/format";
+import { agentGrammar } from "@/lib/grammar";
+import { connectorName } from "@/lib/scopes";
+import { useToast } from "@/lib/toast";
+import "./approvals.css";
 
-/** Pending first (oldest request first, it expires sooner); decided newest first. */
-export function splitApprovals(list: Approval[]) {
-  const pending = list.filter((a) => a.status === "pending").sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  const decided = list
-    .filter((a) => a.status !== "pending")
-    .sort((a, b) => ((a.decidedAt ?? a.createdAt) < (b.decidedAt ?? b.createdAt) ? 1 : -1));
-  return { pending, decided };
+type Filter = "pending" | "approved" | "refused" | "expired" | "all";
+const FILTERS: Filter[] = ["pending", "approved", "refused", "expired", "all"];
+const TTL_MS = 24 * 3_600_000;
+const URGENT_MS = 3_600_000;
+/** Approved without a result for this long: it ran before results were kept (or the run died); stop showing "running". */
+const RUNNING_FOR_MS = 15 * 60_000;
+
+/** Where an approval goes on this screen. */
+export type ApprovalPhase = "waiting" | "running" | "done" | "failed" | "refused" | "expired" | "canceled";
+
+export function approvalPhase(a: Approval, now = Date.now()): ApprovalPhase {
+  if (a.status === "pending") return "waiting";
+  if (a.status === "approved") {
+    if (a.result) return a.result.ok ? "done" : "failed";
+    if (a.executedAt) return "done";
+    const decided = a.decidedAt ? new Date(a.decidedAt).getTime() : 0;
+    return now - decided < RUNNING_FOR_MS ? "running" : "done";
+  }
+  return a.status;
 }
 
-/** telas/Aprovacoes.dc.html */
+const bucketOf = (p: ApprovalPhase): Exclude<Filter, "all"> =>
+  p === "waiting" || p === "running"
+    ? "pending"
+    : p === "done" || p === "failed"
+      ? "approved"
+      : p === "refused"
+        ? "refused"
+        : "expired";
+
+/** Waiting first, the one closest to expiring on top; running after them. */
+export function sortOpen(list: Approval[]) {
+  return [...list].sort((a, b) => {
+    const ra = approvalPhase(a) === "running" ? 1 : 0;
+    const rb = approvalPhase(b) === "running" ? 1 : 0;
+    return ra - rb || a.expiresAt.localeCompare(b.expiresAt);
+  });
+}
+
+const decidedAt = (a: Approval) => a.decidedAt ?? (a.status === "expired" ? a.expiresAt : a.createdAt);
+
+/** The top-level scalar values of the action (what the card shows; the panel shows them all). */
+function scalars(params: Record<string, unknown>) {
+  return Object.entries(params ?? {}).filter(
+    (e): e is [string, string | number | boolean] =>
+      typeof e[1] === "string" || typeof e[1] === "number" || typeof e[1] === "boolean",
+  );
+}
+
+/** A GitHub PR the action points at, when its values say so. */
+function prLink(a: Approval) {
+  if (a.connector !== "github") return null;
+  const p = a.params ?? {};
+  const pr = p.pullNumber ?? p.pull_number ?? p.pr ?? p.number;
+  const owner = typeof p.owner === "string" ? p.owner : null;
+  const repo = typeof p.repo === "string" ? p.repo : null;
+  if (!repo || (typeof pr !== "number" && typeof pr !== "string")) return null;
+  const full = owner && !repo.includes("/") ? `${owner}/${repo}` : repo;
+  return /^[\w.-]+\/[\w.-]+$/.test(full) && /^\d+$/.test(String(pr)) ? `https://github.com/${full}/pull/${pr}` : null;
+}
+
+const TRAIT_ICON: Record<ReturnType<typeof approvalTraits>[number], IconName> = {
+  production: "cloud",
+  irreversible: "alert",
+  reversible: "undo",
+  external: "send",
+};
+
+/** Aprovações (telas/Aprovacoes.html): who waits on you, each request with its exact action, then the history. */
 export function ApprovalsPage() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const approvals = useApprovals(org.id);
-  const channels = useChannels(org.id);
   const dir = useDirectory(org.id);
-  const [tab, setTab] = useState<"pending" | "done">("pending");
-  const { pending, decided } = splitApprovals(approvals.data ?? []);
-  const visible = tab === "pending" ? pending : decided;
+  const channels = useChannels(org.id);
+  const [filter, setFilter] = useState<Filter>("pending");
+  const [q, setQ] = useState("");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [refusing, setRefusing] = useState<string | null>(null);
+  const all = approvals.data ?? [];
+  const channelName = (id: string) => channels.data?.find((c) => c.id === id)?.name ?? "";
+  const query = q.trim().toLowerCase();
+  const matches = (a: Approval) =>
+    !query ||
+    [
+      approvalTitle(t, a),
+      dir.agentById.get(a.agentId)?.name ?? "",
+      channelName(a.channelId),
+      ...scalars(a.params).map(([, v]) => String(v)),
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  const open = sortOpen(all.filter((a) => bucketOf(approvalPhase(a)) === "pending"));
+  const decided = all
+    .filter((a) => bucketOf(approvalPhase(a)) !== "pending")
+    .sort((a, b) => decidedAt(b).localeCompare(decidedAt(a)));
+  const waiting = open.filter((a) => a.status === "pending");
+  const mine = waiting.filter((a) => a.canDecide);
+  const urgent = mine[0];
+  const urgentLeft = urgent && new Date(urgent.expiresAt).getTime() - Date.now();
+  const opened = all.find((a) => a.id === openId) ?? null;
+  const shownOpen = filter === "pending" || filter === "all" ? open.filter(matches) : [];
+  const shownDecided = decided.filter(
+    (a) => matches(a) && (filter === "all" || filter === "pending" || bucketOf(approvalPhase(a)) === filter),
+  );
+  const toggle = (id: string) => setOpenId((o) => (o === id ? null : id));
+
+  // J/K walk the requests, A approves (high risk: focuses the hold), R refuses, / searches, Escape closes.
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (el?.closest("input, textarea, [contenteditable], [role=dialog], [role=menu], [role=listbox]")) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const cards = [...document.querySelectorAll<HTMLElement>(".ap-card")];
+      const current = el?.closest<HTMLElement>(".ap-card") ?? null;
+      const id = current?.dataset.id ?? openId;
+      const key = e.key.toLowerCase();
+      if (e.key === "Escape") {
+        if (refusing) setRefusing(null);
+        else setOpenId(null);
+      } else if (e.key === "/") {
+        e.preventDefault();
+        document.querySelector<HTMLInputElement>(".ap-tools__search input")?.focus();
+      } else if (key === "j" || key === "k") {
+        e.preventDefault();
+        const i = current ? cards.indexOf(current) : -1;
+        const next = cards[Math.max(0, Math.min(cards.length - 1, i + (key === "j" ? 1 : -1)))];
+        next?.focus();
+        if (openId && next?.dataset.id) setOpenId(next.dataset.id);
+      } else if (e.key === "Enter" && current?.dataset.id && el === current) {
+        e.preventDefault();
+        setOpenId(current.dataset.id);
+      } else if ((key === "a" || key === "r") && id) {
+        const a = all.find((x) => x.id === id);
+        if (a?.status !== "pending" || !a.canDecide) return;
+        e.preventDefault();
+        if (key === "r") setRefusing(a.id);
+        else document.querySelector<HTMLElement>(`[data-approve="${a.id}"]`)?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [all, openId, refusing]);
+
+  const pill = (f: Filter) => (
+    <button key={f} type="button" className="ap-pill" aria-pressed={filter === f} onClick={() => setFilter(f)}>
+      {t(`approvals.filter.${f}`)}
+      <span className="ap-pill__count" aria-hidden="true">
+        {f === "all" ? all.length : all.filter((a) => bucketOf(approvalPhase(a)) === f).length}
+      </span>
+    </button>
+  );
+  const waiters = [...new Set(mine.map((a) => a.agentId))];
 
   return (
-    <div className="page page--mid">
-      <header className="page__header">
-        <h1 className="page-title">{t("approvals.title")}</h1>
-        <p className="page-sub">{t("approvals.subtitle")}</p>
-      </header>
-      <Tabs
-        value={tab}
-        onValueChange={setTab}
-        label={t("approvals.filter")}
-        items={[
-          { value: "pending", label: t("approvals.pending"), count: pending.length },
-          { value: "done", label: t("approvals.decided"), count: decided.length },
-        ]}
-      >
-        <TabPanel value={tab}>
-          {approvals.isSuccess && visible.length === 0 && (
-            <EmptyState>{tab === "pending" ? t("approvals.emptyPending") : t("approvals.emptyDecided")}</EmptyState>
-          )}
-          {visible.map((a) => (
-            <ApprovalListItem
-              key={a.id}
-              approval={a}
-              agent={dir.agentById.get(a.agentId)}
-              channel={channels.data?.find((c) => c.id === a.channelId)}
-              members={dir.memberById}
-              initials={dir.agentInitials(a.agentId)}
-            />
+    <div className={cx("page ap", opened && "ap--panel")}>
+      <div className="ap__main">
+        <header className="ap-head">
+          <h1>{t("approvals.title")}</h1>
+          <p className="ap-head__sub">
+            {mine.length > 0 ? (
+              <>
+                {t("approvals.summary", { count: mine.length })}
+                {urgentLeft && urgentLeft <= 2 * URGENT_MS
+                  ? ` · ${t("approvals.urgent", { time: timeLeft(t, urgent.expiresAt) ?? "" })}`
+                  : ""}
+              </>
+            ) : (
+              t("approvals.nothing")
+            )}
+          </p>
+          <p className="ap-head__guard">
+            <span aria-hidden="true" className="ap-head__guard-icon">
+              <Icon name="shield" size={14} />
+            </span>
+            {t("approvals.guard")}
+          </p>
+        </header>
+        <div className="ap-tools">
+          <SearchInput
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t("approvals.search")}
+            aria-label={t("approvals.search")}
+            className="ap-tools__search"
+          />
+          {/* biome-ignore lint/a11y/useSemanticElements: filter pills */}
+          <div className="ap-pills" role="group" aria-label={t("approvals.filters")}>
+            {FILTERS.map(pill)}
+          </div>
+        </div>
+
+        {filter === "pending" && waiters.length > 1 && (
+          <div className="ap-waiters">
+            <span className="ap-waiters__faces">
+              {waiters.map((id) => (
+                <AgentAvatar key={id} agentId={id} name={dir.agentById.get(id)?.name ?? ""} size="sm" state="waiting" />
+              ))}
+            </span>
+            <span className="ap-waiters__text">
+              <Trans
+                i18nKey="approvals.waiters"
+                count={waiters.length}
+                values={{
+                  names: joinNames(
+                    waiters.map((id) => dir.agentById.get(id)?.name ?? ""),
+                    t("approvals.and"),
+                  ),
+                }}
+                components={{ b: <b /> }}
+              />
+            </span>
+          </div>
+        )}
+
+        {approvals.isLoading && <LoadingCards count={2} />}
+        {approvals.isError && !approvals.data && (
+          <ErrorState error={approvals.error} onRetry={() => void approvals.refetch()} />
+        )}
+        {approvals.isSuccess && filter === "pending" && shownOpen.length === 0 && !query && (
+          <EmptyState sky title={t("approvals.emptyTitle")}>
+            {t("approvals.empty")}
+          </EmptyState>
+        )}
+        {approvals.isSuccess && query && shownOpen.length === 0 && shownDecided.length === 0 && (
+          <EmptyState icon="search">{t("approvals.noResults")}</EmptyState>
+        )}
+
+        {shownOpen.length > 0 && (
+          <section className="ap-cards" aria-label={t("approvals.filter.pending")}>
+            {shownOpen.map((a) => (
+              <RequestCard
+                key={a.id}
+                approval={a}
+                agent={dir.agentById.get(a.agentId)}
+                members={dir.memberById}
+                channel={channelName(a.channelId)}
+                selected={openId === a.id}
+                refusing={refusing === a.id && openId !== a.id}
+                onOpen={() => toggle(a.id)}
+                onRefuse={() => setRefusing(a.id)}
+                onCancelRefuse={() => setRefusing(null)}
+              />
+            ))}
+          </section>
+        )}
+
+        {filter === "pending"
+          ? shownDecided.length > 0 && (
+              <section className="ap-history">
+                <div className="ap-section-head">
+                  <h2>{t("approvals.recent")}</h2>
+                  <span className="ap-grow" />
+                  <Button variant="ghost" size="sm" onClick={() => setFilter("all")}>
+                    {t("approvals.seeHistory")}
+                  </Button>
+                </div>
+                <div className="ap-list">
+                  {shownDecided.slice(0, 3).map((a) => (
+                    <HistoryRow key={a.id} approval={a} selected={openId === a.id} onOpen={() => toggle(a.id)} />
+                  ))}
+                </div>
+              </section>
+            )
+          : groups(shownDecided).map(([key, list]) => (
+              <section key={key} className="ap-history">
+                <div className="ap-section-head">
+                  <h2>{t(`approvals.groups.${key}`)}</h2>
+                  <span className="ap-section-head__count">{list.length}</span>
+                </div>
+                <div className="ap-list">
+                  {list.map((a) => (
+                    <HistoryRow key={a.id} approval={a} selected={openId === a.id} onOpen={() => toggle(a.id)} />
+                  ))}
+                </div>
+              </section>
+            ))}
+        {approvals.isSuccess && filter !== "pending" && !query && shownOpen.length + shownDecided.length === 0 && (
+          <EmptyState icon="approve">{t("approvals.noResults")}</EmptyState>
+        )}
+      </div>
+      {opened && (
+        <section className="ap-panel" aria-label={t("approvals.panel.label")}>
+          <ApprovalDetails
+            approval={opened}
+            all={all}
+            channel={channelName(opened.channelId)}
+            refusing={refusing === opened.id}
+            onRefuse={() => setRefusing(opened.id)}
+            onCancelRefuse={() => setRefusing(null)}
+            onClose={() => {
+              setOpenId(null);
+              setRefusing(null);
+            }}
+          />
+        </section>
+      )}
+    </div>
+  );
+}
+
+function groups(list: Approval[]): ["today" | "yesterday" | "earlier", Approval[]][] {
+  const out: ["today" | "yesterday" | "earlier", Approval[]][] = [
+    ["today", []],
+    ["yesterday", []],
+    ["earlier", []],
+  ];
+  for (const a of list) {
+    const d = daysBetween(decidedAt(a), new Date());
+    out[d <= 0 ? 0 : d === 1 ? 1 : 2]?.[1].push(a);
+  }
+  return out.filter(([, l]) => l.length > 0);
+}
+
+/** "github · acme" with the brand icon, or the app's own tool. */
+function ConnectorLine({ approval }: { approval: Approval }) {
+  const { t } = useTranslation();
+  const catalog = useCatalog();
+  const def = approval.connector ? catalog.data?.connectors.find((c) => c.id === approval.connector) : undefined;
+  const name = approval.connector
+    ? connectorName(t, def ?? { id: approval.connector, label: approval.connector })
+    : t("approvals.panel.builtIn");
+  return (
+    <span className="ap-conn">
+      {approval.connector ? (
+        <ConnectorIcon def={def ?? null} label={name} />
+      ) : (
+        <span className="ap-conn__own" aria-hidden="true">
+          <Icon name="shield" size={14} />
+        </span>
+      )}
+      <b>{name}</b>
+      {approval.connectorAccount && <span className="ap-conn__account">· {approval.connectorAccount}</span>}
+    </span>
+  );
+}
+
+/** The exact action: connector, then its values (names are the tool's own identifiers, shown as code). */
+function ExactAction({ approval, max }: { approval: Approval; max?: number }) {
+  const values = scalars(approval.params);
+  const shown = max ? values.slice(0, max) : values;
+  return (
+    <div className="ap-exact">
+      <ConnectorLine approval={approval} />
+      {shown.length > 0 && (
+        <dl className="ap-exact__values">
+          {shown.map(([k, v]) => (
+            <div key={k}>
+              <dt>
+                <code>{k}</code>
+              </dt>
+              <dd>{String(v)}</dd>
+            </div>
           ))}
-        </TabPanel>
-      </Tabs>
-      <p className="page__note">{t("approvals.footer")}</p>
+        </dl>
+      )}
+    </div>
+  );
+}
+
+function Traits({ approval }: { approval: Approval }) {
+  const { t } = useTranslation();
+  const traits = approvalTraits(approval);
+  if (traits.length === 0 && !approval.issue) return null;
+  return (
+    <div className="ap-traits">
+      {traits.map((k) => (
+        <Chip key={k} icon={TRAIT_ICON[k]}>
+          {t(`approvals.trait.${k}`)}
+        </Chip>
+      ))}
+      {approval.issue && (
+        <Chip icon="issues">
+          #{approval.issue.number} {approval.issue.title}
+        </Chip>
+      )}
+    </div>
+  );
+}
+
+function expiryText(t: TFunction, a: Approval) {
+  const left = timeLeft(t, a.expiresAt);
+  if (!left) return t("approval.expired");
+  return new Date(a.expiresAt).getTime() - Date.now() <= URGENT_MS
+    ? t("approvals.leftUrgent", { time: left })
+    : t("approvals.left", { time: left });
+}
+
+/** Approve: one click, or a hold for high risk (let go early and nothing happens). */
+function ApproveButton({ approval, block }: { approval: Approval; block?: boolean }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const decide = useDecideApproval(org.id);
+  const [holding, setHolding] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const label = t(`approval.approve.${approvalAction(approval)}`);
+  const high = approvalRisk(approval) === "high";
+  const go = (el: HTMLElement) => {
+    // Approved: a burst of the agent's pixels from its avatar.
+    const burst = prepareBurst(el);
+    decide.mutate({ id: approval.id, decision: "approve" }, { onSuccess: burst });
+  };
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+  if (!high)
+    return (
+      <Button
+        variant="primary"
+        size="sm"
+        block={block}
+        icon="check"
+        data-approve={approval.id}
+        disabled={decide.isPending}
+        loading={decide.isPending}
+        onClick={(e) => go(e.currentTarget)}
+      >
+        {label}
+      </Button>
+    );
+  const start = (el: HTMLElement) => {
+    if (timer.current || decide.isPending) return;
+    setHolding(true);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      setHolding(false);
+      go(el);
+    }, 1100);
+  };
+  const stop = () => {
+    if (!timer.current) return;
+    clearTimeout(timer.current);
+    timer.current = null;
+    setHolding(false);
+  };
+  return (
+    <Button
+      variant="primary"
+      size="sm"
+      block={block}
+      icon="check"
+      className={cx("ap-hold", holding && "is-holding")}
+      data-approve={approval.id}
+      aria-label={t("approvals.holdLabel", { action: label })}
+      disabled={decide.isPending}
+      loading={decide.isPending}
+      onPointerDown={(e: PointerEvent<HTMLButtonElement>) => {
+        if (e.button > 0) return;
+        start(e.currentTarget);
+      }}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onPointerCancel={stop}
+      onKeyDown={(e: KeyboardEvent<HTMLButtonElement>) => {
+        if ((e.key === " " || e.key === "Enter") && !e.repeat) {
+          e.preventDefault();
+          start(e.currentTarget);
+        }
+      }}
+      onKeyUp={(e: KeyboardEvent<HTMLButtonElement>) => {
+        if (e.key === " " || e.key === "Enter") stop();
+      }}
+      onClick={(e) => {
+        // A plain click (no hold) only explains.
+        if (e.detail > 0 && !timer.current && !decide.isPending) toast.show(t("approvals.holdHint"), "info");
+      }}
+    >
+      {holding ? t("approvals.holding") : t("approvals.hold")}
+    </Button>
+  );
+}
+
+const SUGGESTIONS = ["later", "review", "tests", "smaller"] as const;
+
+/** Refuse with a reason the agent reads (and keeps as a lesson). */
+function RefuseBox({ approval, agent, onCancel }: { approval: Approval; agent?: Agent; onCancel: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const decide = useDecideApproval(org.id);
+  const [reason, setReason] = useState("");
+  const g = agentGrammar(t, agent?.name ?? "");
+  const id = `ap-reason-${approval.id}`;
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  const send = () =>
+    decide.mutate(
+      { id: approval.id, decision: "refuse", reason: reason.trim() || undefined },
+      { onSuccess: () => toast.show(t("approvals.refused", { name: g.name }), "info") },
+    );
+  return (
+    <div className="ap-refuse">
+      <label htmlFor={id}>{t("approvals.refuseLabel", { The: g.The, name: g.name })}</label>
+      <textarea
+        id={id}
+        ref={ref}
+        rows={2}
+        value={reason}
+        placeholder={t("approvals.refusePlaceholder")}
+        onChange={(e) => setReason(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send();
+          if (e.key === "Escape") onCancel();
+        }}
+      />
+      <div className="ap-refuse__suggest">
+        {SUGGESTIONS.map((s) => (
+          <button key={s} type="button" onClick={() => setReason(t(`approvals.suggest.${s}`))}>
+            {t(`approvals.suggest.${s}`)}
+          </button>
+        ))}
+      </div>
+      <div className="ap-refuse__row">
+        <span className="ap-refuse__learn">{t("approvals.refuseLearn", { of: g.of, name: g.name })}</span>
+        <span className="ap-grow" />
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          {t("approvals.back")}
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          kbd={["⌘", "↵"]}
+          loading={decide.isPending}
+          disabled={decide.isPending}
+          onClick={send}
+        >
+          {t("approvals.refuseConfirm")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** A request waiting on a person (or running right after approval). */
+function RequestCard({
+  approval: a,
+  agent,
+  members,
+  channel,
+  selected,
+  refusing,
+  onOpen,
+  onRefuse,
+  onCancelRefuse,
+}: {
+  approval: Approval;
+  agent: Agent | undefined;
+  members: Map<string, Member>;
+  channel: string;
+  selected: boolean;
+  refusing: boolean;
+  onOpen: () => void;
+  onRefuse: () => void;
+  onCancelRefuse: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const name = agent?.name ?? t("channel.unknownAgent");
+  const g = agentGrammar(t, name);
+  const phase = approvalPhase(a);
+  const running = phase === "running";
+  const leftMs = new Date(a.expiresAt).getTime() - Date.now();
+  const owner = a.ownerUserId ?? agent?.ownerUserId;
+  const title = approvalTitle(t, a);
+  return (
+    <article
+      className={cx("ap-card", selected && "is-selected", running && "is-running")}
+      data-id={a.id}
+      data-burst=""
+      tabIndex={-1}
+      aria-label={title}
+    >
+      <span className="ap-card__face">
+        <AgentAvatar
+          agentId={a.agentId}
+          name={name}
+          size="md"
+          state={running ? "writing" : "waiting"}
+          running={running}
+        />
+      </span>
+      <div className="ap-card__meta">
+        <b>{name}</b>
+        <span>{t(`approvals.verb.${approvalAction(a)}`)}</span>
+        <span>
+          · {channel ? `#${channel} · ` : ""}
+          {relativeTime(t, i18n.language, a.createdAt)}
+        </span>
+        <span className="ap-grow" />
+        {!running && (
+          <Chip icon="clock" tone={leftMs <= URGENT_MS ? "waiting" : "neutral"}>
+            {a.canDecide
+              ? expiryText(t, a)
+              : members.get(owner ?? "")
+                ? t("approval.waitingFor", { name: members.get(owner ?? "")?.name })
+                : t("approval.waitingAdmin")}
+          </Chip>
+        )}
+      </div>
+      <h3 className="ap-card__title">
+        <button type="button" className="ap-card__open" aria-expanded={selected} onClick={onOpen}>
+          {title}
+        </button>
+      </h3>
+      <div className="ap-card__body">
+        <ExactAction approval={a} max={4} />
+        {a.why && <p className="ap-why">{a.why}</p>}
+        <Traits approval={a} />
+        {running && <p className="ap-card__running">{t("approvals.running", { The: g.The, name })}</p>}
+        {refusing && a.canDecide && <RefuseBox approval={a} agent={agent} onCancel={onCancelRefuse} />}
+        {!running && !refusing && a.canDecide && (
+          <div className="ap-card__actions">
+            <ApproveButton approval={a} />
+            <Button size="sm" onClick={onRefuse}>
+              {t("approval.refuse")}
+            </Button>
+            <span className="ap-grow" />
+            {approvalRisk(a) === "high" && <span className="ap-card__hint">{t("approvals.highRisk")}</span>}
+            <Button variant="ghost" size="sm" onClick={onOpen}>
+              {t("approvals.details")}
+            </Button>
+          </div>
+        )}
+      </div>
+      {running ? (
+        <WorkSweep color={colorOf(agent)} />
+      ) : (
+        <ExpiryFuse left={Math.max(0, leftMs) / TTL_MS} color={colorOf(agent)} />
+      )}
+    </article>
+  );
+}
+
+function PhaseChip({ approval }: { approval: Approval }) {
+  const { t } = useTranslation();
+  const p = approvalPhase(approval);
+  const [icon, key]: [IconName, "approved" | "failed" | "refused" | "expired" | "running" | "canceled"] =
+    p === "done"
+      ? ["check", "approved"]
+      : p === "failed"
+        ? ["alert", "failed"]
+        : p === "refused"
+          ? ["close", "refused"]
+          : p === "expired"
+            ? ["clock", "expired"]
+            : p === "running"
+              ? ["play", "running"]
+              : ["block", "canceled"];
+  return (
+    <Chip icon={icon} className={`ap-phase ap-phase--${p}`}>
+      {t(`approvals.status.${key}`)}
+    </Chip>
+  );
+}
+
+function HistoryRow({ approval: a, selected, onOpen }: { approval: Approval; selected: boolean; onOpen: () => void }) {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const agent = dir.agentById.get(a.agentId);
+  const name = agent?.name ?? t("channel.unknownAgent");
+  const p = approvalPhase(a);
+  const fresh = a.decidedAt && Date.now() - new Date(a.decidedAt).getTime() < 8000;
+  const sub =
+    p === "expired"
+      ? t("approvals.expiredLine")
+      : p === "canceled"
+        ? t("approvals.canceledLine")
+        : [
+            decisionLabel(t, i18n.language, a, me.user.id, dir.memberById),
+            p === "refused" && a.reason ? `“${a.reason}”` : "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a row that opens the details
+    <div
+      className={cx("ap-row", selected && "is-selected", fresh && "is-fresh")}
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+    >
+      <AgentAvatar
+        agentId={a.agentId}
+        name={name}
+        size="sm"
+        state="idle"
+        expression={p === "done" ? "happy" : p === "refused" || p === "expired" ? "closed" : undefined}
+      />
+      <div className="ap-row__text">
+        <b>{approvalTitle(t, a)}</b>
+        <small>{sub}</small>
+        {p === "refused" && a.reason && (
+          <span className="ap-row__lesson">{t("approvals.lesson", { name, reason: a.reason })}</span>
+        )}
+      </div>
+      <div className="ap-row__end">
+        {p === "expired" && <AskAgain approval={a} agent={agent} />}
+        <PhaseChip approval={a} />
+      </div>
+    </div>
+  );
+}
+
+/** Expired: ask the agent, in the same conversation, to ask again if it still makes sense. */
+function AskAgain({ approval, agent }: { approval: Approval; agent: Agent | undefined }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const toast = useToast();
+  const post = usePostMessage(org.id, approval.channelId, {
+    me: { id: me.user.id },
+    mentioned: () => [approval.agentId],
+    onSent: () => toast.show(t("approvals.againSent"), "info"),
+  });
+  if (!agent) return null;
+  return (
+    <Button
+      size="sm"
+      icon="repeat"
+      loading={post.isPending}
+      disabled={post.isPending || post.isSuccess}
+      onClick={(e) => {
+        e.stopPropagation();
+        sendHelpers(post).send(
+          t("approvals.againBody", { handle: agent.handle, title: approvalTitle(t, approval) }),
+          approval.threadId,
+        );
+      }}
+    >
+      {t("approvals.again")}
+    </Button>
+  );
+}
+
+/** The panel: the exact action, why, how it got here, the agent's record, who decides, and the decision bar. */
+function ApprovalDetails({
+  approval: listed,
+  all,
+  channel,
+  refusing,
+  onRefuse,
+  onCancelRefuse,
+  onClose,
+}: {
+  approval: Approval;
+  all: Approval[];
+  channel: string;
+  refusing: boolean;
+  onRefuse: () => void;
+  onCancelRefuse: () => void;
+  onClose: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const detail = useApproval(org.id, listed.id);
+  // The list (kept fresh by events) wins for the state; the detail adds the trail.
+  const a: Approval = { ...listed, trail: detail.data?.trail ?? listed.trail };
+  const agent = dir.agentById.get(a.agentId);
+  const name = agent?.name ?? t("channel.unknownAgent");
+  const g = agentGrammar(t, name);
+  const p = approvalPhase(a);
+  const kind = approvalAction(a);
+  const record = all
+    .filter(
+      (x) =>
+        x.agentId === a.agentId &&
+        x.id !== a.id &&
+        approvalAction(x) === kind &&
+        (x.status === "approved" || x.status === "refused"),
+    )
+    .sort((x, y) => decidedAt(x).localeCompare(decidedAt(y)))
+    .slice(-12);
+  const ok = record.filter((x) => x.status === "approved").length;
+  const ownerId = a.ownerUserId ?? agent?.ownerUserId ?? null;
+  const deciders = [
+    ...dir.members.filter((m) => m.userId === ownerId),
+    ...dir.members.filter((m) => m.userId !== ownerId && (m.role === "owner" || m.role === "admin")),
+  ].slice(0, 6);
+  const pr = prLink(a);
+  return (
+    <div className="ap-details" data-burst="">
+      <div className="ap-details__scroll">
+        <div className="ap-details__head">
+          <AgentAvatar
+            agentId={a.agentId}
+            name={name}
+            size="md"
+            state={p === "running" ? "writing" : p === "waiting" ? "waiting" : "idle"}
+            running={p === "running"}
+            expression={p === "done" ? "happy" : undefined}
+          />
+          <div className="ap-details__who">
+            <b>
+              {name} {t(`approvals.verb.${kind}`)}
+            </b>
+            <small>
+              {agent?.role ? `${agent.role} · ` : ""}
+              {channel ? `#${channel} · ` : ""}
+              {relativeTime(t, i18n.language, a.createdAt)}
+            </small>
+          </div>
+          <span className="ap-grow" />
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="close"
+            aria-label={t("approvals.panel.close")}
+            onClick={onClose}
+          />
+        </div>
+        <div>
+          <h2 className="ap-details__title">{approvalTitle(t, a)}</h2>
+          {p === "waiting" && (
+            <div className="ap-traits ap-details__chips">
+              <Chip icon="clock">{expiryText(t, a)}</Chip>
+              {approvalTraits(a).map((k) => (
+                <Chip key={k} icon={TRAIT_ICON[k]}>
+                  {t(`approvals.trait.${k}`)}
+                </Chip>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {p !== "waiting" && <Outcome approval={a} agent={agent} />}
+
+        <section className="ap-sec">
+          <h3>{t("approvals.panel.exact")}</h3>
+          <ExactAction approval={a} />
+          {Object.keys(a.params ?? {}).length > scalars(a.params).length && (
+            <pre className="ap-code">
+              <code>{JSON.stringify(a.params, null, 2)}</code>
+            </pre>
+          )}
+          <p className="ap-bound">{t("approvals.panel.bound", { the: g.article, name })}</p>
+          {pr && (
+            <a className="ap-link" href={pr} target="_blank" rel="noreferrer">
+              {t("approvals.panel.openPr")}
+            </a>
+          )}
+        </section>
+
+        {a.why && (
+          <section className="ap-sec">
+            <h3>{t("approvals.panel.why")}</h3>
+            <p className="ap-bubble">{a.why}</p>
+            {a.issue && (
+              <Link
+                className="ap-link"
+                to="/org/$orgId/issues/$number"
+                params={{ orgId: org.id, number: String(a.issue.number) }}
+              >
+                #{a.issue.number} {a.issue.title}
+              </Link>
+            )}
+          </section>
+        )}
+
+        {(a.trail?.length ?? 0) > 1 && (
+          <section className="ap-sec">
+            <h3>{t("approvals.panel.trail")}</h3>
+            <ol className="ap-trail">
+              {a.trail?.map((s) => (
+                <li key={s.at + s.text.slice(0, 12)}>
+                  <span className="ap-trail__dot" aria-hidden="true" />
+                  <span className="ap-trail__text">{s.text}</span>
+                  <time dateTime={s.at}>{relativeTime(t, i18n.language, s.at)}</time>
+                </li>
+              ))}
+              <li className="is-current">
+                <span className="ap-trail__dot" aria-hidden="true" />
+                <span className="ap-trail__text">{t("approvals.panel.asked")}</span>
+                <time dateTime={a.createdAt}>{relativeTime(t, i18n.language, a.createdAt)}</time>
+              </li>
+            </ol>
+          </section>
+        )}
+        {channel && (
+          <Link
+            className="ap-link"
+            to="/org/$orgId/c/$channelId"
+            params={{ orgId: org.id, channelId: a.channelId }}
+            search={{ m: a.messageId ?? a.threadId }}
+          >
+            {t("approvals.panel.viewChannel", { channel })}
+          </Link>
+        )}
+
+        <section className="ap-sec">
+          <h3>{t("approvals.panel.history", { of: g.of, name })}</h3>
+          {record.length > 0 ? (
+            <div className="ap-record">
+              <span role="img" aria-label={t("approvals.panel.historyCount", { ok, count: record.length })}>
+                <CriteriaPixels done={record.map((x) => x.status === "approved")} color={colorOf(agent)} />
+              </span>
+              <span>{t("approvals.panel.historyCount", { ok, count: record.length })}</span>
+            </div>
+          ) : (
+            <p className="ap-muted">{t("approvals.panel.noHistory")}</p>
+          )}
+        </section>
+
+        {p === "waiting" && (
+          <section className="ap-sec">
+            <h3>{t("approvals.panel.deciders")}</h3>
+            <ul className="ap-deciders">
+              {deciders.map((m) => (
+                <li key={m.userId}>
+                  <span className="ap-person" aria-hidden="true">
+                    {(m.name.trim()[0] ?? "?").toUpperCase()}
+                  </span>
+                  <span>
+                    {m.userId === me.user.id ? t("approvals.panel.you") : m.name}
+                    <small>
+                      {" · "}
+                      {[
+                        m.userId === ownerId ? t("approvals.panel.owner") : "",
+                        m.role === "owner" || m.role === "admin" ? t("approvals.panel.admin") : "",
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </small>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {channel && <p className="ap-muted">{t("approvals.panel.firstWins", { channel })}</p>}
+          </section>
+        )}
+      </div>
+      {p === "waiting" && a.canDecide && (
+        <div className="ap-details__bar">
+          {refusing ? (
+            <RefuseBox approval={a} agent={agent} onCancel={onCancelRefuse} />
+          ) : (
+            <>
+              <div className="ap-details__buttons">
+                <Button onClick={onRefuse}>
+                  {t("approval.refuse")}
+                  <Kbd>R</Kbd>
+                </Button>
+                <ApproveButton approval={a} block />
+              </div>
+              <p className="ap-muted ap-center">
+                {approvalRisk(a) === "high" ? t("approvals.holdNote") : t("approvals.clickNote")}
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Outcome({ approval: a, agent }: { approval: Approval; agent: Agent | undefined }) {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const name = agent?.name ?? t("channel.unknownAgent");
+  const g = agentGrammar(t, name);
+  const p = approvalPhase(a);
+  const who =
+    a.decidedByUserId === me.user.id
+      ? t("approvals.panel.you").toLowerCase()
+      : (dir.memberById.get(a.decidedByUserId ?? "")?.name ?? "");
+  const when = a.decidedAt ? relativeTime(t, i18n.language, a.decidedAt) : "";
+  return (
+    <div className={cx("ap-outcome", `ap-outcome--${p}`)}>
+      <PhaseChip approval={a} />
+      <div className="ap-outcome__text">
+        {p === "running" && <b>{t("approvals.panel.runningLine", { The: g.The, name })}</b>}
+        {(p === "done" || p === "failed") && (
+          <>
+            <b>{p === "done" ? t("approvals.panel.done") : t("approvals.panel.failed")}</b>
+            <small>{t("approvals.panel.approvedBy", { name: who, when })}</small>
+          </>
+        )}
+        {p === "refused" && (
+          <>
+            <b>{t("approvals.panel.refusedBy", { name: who, when })}</b>
+            <small>{a.reason ? `“${a.reason}”` : t("approvals.panel.noReason")}</small>
+            {a.reason && <small className="ap-row__lesson">{t("approvals.lesson", { name, reason: a.reason })}</small>}
+          </>
+        )}
+        {p === "expired" && (
+          <>
+            <b>{t("approvals.status.expired")}</b>
+            <small>{t("approvals.expiredLine")}</small>
+            <span>
+              <AskAgain approval={a} agent={agent} />
+            </span>
+          </>
+        )}
+        {p === "canceled" && <small>{t("approvals.canceledLine")}</small>}
+      </div>
+      {a.result?.text && (
+        <details className="ap-result">
+          <summary>{t("approvals.panel.returned")}</summary>
+          <pre className="ap-code">
+            <code>{a.result.text}</code>
+          </pre>
+        </details>
+      )}
+      {p === "running" && <WorkSweep color={colorOf(agent)} />}
     </div>
   );
 }

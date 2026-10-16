@@ -1,15 +1,13 @@
 import { ApprovalCard, Button } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import { useDecideApproval } from "@/api/queries";
-import type { Agent, Approval, Channel, Member } from "@/api/types";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import type { Agent, Approval, Member } from "@/api/types";
 import { CardSky, colorOf, prepareBurst } from "@/components/Sky";
-import { relativeTime, timeLeft, whenAt } from "@/lib/format";
+import { timeLeft, whenAt } from "@/lib/format";
 import { useOrg } from "./org-context";
 
-export type ApprovalAction = "merge" | "deploy" | "rollback" | "publish" | "other";
+export type ApprovalAction = "merge" | "deploy" | "rollback" | "publish" | "delete" | "send" | "other";
 
 /** The verb of the primary button ("Aprovar merge"), from the tool and scope the agent asked for. */
 export function approvalAction(approval: Pick<Approval, "tool" | "scope">): ApprovalAction {
@@ -17,8 +15,34 @@ export function approvalAction(approval: Pick<Approval, "tool" | "scope">): Appr
   if (text.includes("merge")) return "merge";
   if (text.includes("rollback")) return "rollback";
   if (text.includes("deploy") || text.includes("workflow") || text.includes("actions.run")) return "deploy";
+  if (/delete|remove|destroy|drop|purge/.test(text)) return "delete";
+  if (/send|email|mail\b|sms/.test(text) && !text.includes("post_message")) return "send";
   if (text.includes("share") || text.includes("publish")) return "publish";
   return "other";
+}
+
+/**
+ * High risk (production, can't be undone, leaves the company): approving
+ * takes a hold, not a click (telas/Aprovacoes.html).
+ */
+export function approvalRisk(approval: Pick<Approval, "tool" | "scope">): "high" | "normal" {
+  const action = approvalAction(approval);
+  return action === "deploy" || action === "rollback" || action === "delete" || action === "send" ? "high" : "normal";
+}
+
+/** What the action touches, said as neutral chips (icon + word): production, can't be undone, can be undone. */
+export function approvalTraits(approval: Pick<Approval, "tool" | "scope" | "params">) {
+  const action = approvalAction(approval);
+  const values = Object.values(approval.params ?? {})
+    .filter((v) => typeof v === "string")
+    .join(" ")
+    .toLowerCase();
+  const traits: ("production" | "irreversible" | "reversible" | "external")[] = [];
+  if (action === "deploy" || action === "rollback" || /\bprod(uction)?\b/.test(values)) traits.push("production");
+  if (action === "delete" || action === "send") traits.push("irreversible");
+  else if (action === "merge" || action === "deploy") traits.push("reversible");
+  if (action === "send" || action === "publish") traits.push("external");
+  return traits;
 }
 
 /** The app's own tools whose approval title it says in the person's language (`approval.titles.*`). */
@@ -139,97 +163,6 @@ export function InlineApproval({
       title={approvalTitle(t, approval)}
       detail={`${approval.detail}${left ? ` · ${t("approval.expiresDetail", { time: left })}` : ""}`}
       actions={approval.canDecide && <Actions approval={approval} />}
-    />
-  );
-}
-
-/** The card on the Aprovações page (telas/Aprovacoes): avatar, channel link and time in the head. */
-export function ApprovalListItem({
-  approval,
-  agent,
-  channel,
-  members,
-  initials,
-}: {
-  approval: Approval;
-  agent: Agent | undefined;
-  channel: Channel | undefined;
-  members: Map<string, Member>;
-  initials?: string;
-}) {
-  const { t, i18n } = useTranslation();
-  const { org, me } = useOrg();
-  const name = agent?.name ?? t("channel.unknownAgent");
-  const when = relativeTime(t, i18n.language, approval.createdAt);
-  const left = timeLeft(t, approval.expiresAt);
-  const pending = approval.status === "pending";
-  return (
-    <ApprovalCard
-      as="article"
-      wide
-      aria-label={approvalTitle(t, approval)}
-      status={pending ? "waiting" : approval.status === "approved" ? "approved" : "refused"}
-      avatar={
-        agent ? (
-          <AgentAvatar agentId={agent.id} size="sm" name={name} />
-        ) : (
-          <AgentAvatar size="sm" name={name} initials={initials} />
-        )
-      }
-      who={
-        channel ? (
-          <Trans
-            i18nKey="approvals.who"
-            values={{ agent: name, channel: channel.name, when }}
-            components={{
-              b: <b />,
-              link: <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: channel.id }} />,
-            }}
-          />
-        ) : (
-          <Trans i18nKey="approvals.whoNoChannel" values={{ agent: name, when }} components={{ b: <b /> }} />
-        )
-      }
-      statusLabel={
-        pending
-          ? approval.canDecide
-            ? left
-              ? t("approval.expiresIn", { time: left })
-              : t("approval.expired")
-            : waitingFor(t, agent, members)
-          : decisionLabel(t, i18n.language, approval, me.user.id, members)
-      }
-      title={approvalTitle(t, approval)}
-      detail={
-        approval.reason
-          ? `${approval.detail} · ${t("approval.reasonLine", { reason: approval.reason })}`
-          : approval.detail
-      }
-      actions={
-        pending &&
-        (approval.canDecide ? (
-          <Actions
-            approval={approval}
-            secondary={
-              channel && (
-                <Button asChild variant="ghost" size="sm">
-                  <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: channel.id }}>
-                    {t("approval.viewInChannel")}
-                  </Link>
-                </Button>
-              )
-            }
-          />
-        ) : (
-          channel && (
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: channel.id }}>
-                {t("approval.viewInChannel")}
-              </Link>
-            </Button>
-          )
-        ))
-      }
     />
   );
 }

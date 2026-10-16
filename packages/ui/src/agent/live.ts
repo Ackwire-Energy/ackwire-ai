@@ -16,7 +16,7 @@ export interface LiveAgent {
     color?: DrawAgentOptions["color"];
     eyes?: DrawAgentOptions["eyes"];
     accessory?: string;
-    state: "idle" | "thinking" | "writing";
+    state: "idle" | "thinking" | "writing" | "waiting";
     expression?: Pose["expression"];
     seed: number;
   };
@@ -50,6 +50,15 @@ export function setGaze(point: { x: number; y: number } | null) {
 /** In the app expressions are rare (one every ~18 s per agent); thinking speeds the head up. */
 function poseFor(a: ReturnType<LiveAgent["look"]>, t: number, box: HTMLElement, gazing: boolean): Pose {
   if (a.state === "writing") return { writing: true, turn: [Math.sin(t * 1.3 + a.seed) * 0.15, 0.1] };
+  // Waiting on you: looking up out of its card, blinking, now and then a glance aside (telas/Aprovacoes.html).
+  if (a.state === "waiting") {
+    const pose: Pose = idlePose(t, a.seed, { every: 99, expressions: [] });
+    const g = Math.sin(t * 0.35 + a.seed * 2);
+    pose.expression = undefined;
+    pose.turn = [g > 0.85 ? 0.45 : g < -0.9 ? -0.4 : 0.05, -0.32];
+    pose.look = [0, -0.12];
+    return pose;
+  }
   const pose: Pose = idlePose(t, a.seed, { active: a.state === "thinking", every: 18 });
   if (a.state === "thinking") pose.expression = undefined;
   if (a.expression) pose.expression = a.expression;

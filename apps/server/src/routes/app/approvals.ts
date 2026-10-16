@@ -25,6 +25,20 @@ export const Approval = z
     decidedAt: z.string().nullable(),
     reason: z.string().nullable(),
     canDecide: z.boolean().openapi({ description: "You are the agent's owner or an admin, and it is pending." }),
+    ownerUserId: z.string().nullable().openapi({ description: "The agent's owner (they and admins may decide)." }),
+    executedAt: z.string().nullable().openapi({ description: "When the approved action ran." }),
+    result: z
+      .object({ ok: z.boolean(), text: z.string() })
+      .nullable()
+      .openapi({ description: "What the action returned once it ran (raw, short)." }),
+    connector: z.string().nullable().openapi({ example: "github" }),
+    connectorAccount: z.string().nullable().openapi({ example: "acme" }),
+    why: z.string().nullable().openapi({ description: "What the agent said right before asking." }),
+    issue: z.object({ id: z.uuid(), number: z.number().int(), title: z.string() }).nullable(),
+    trail: z
+      .array(z.object({ text: z.string(), at: z.string() }))
+      .optional()
+      .openapi({ description: "One approval only: what the agent said at each turn before asking." }),
   })
   .openapi("Approval");
 

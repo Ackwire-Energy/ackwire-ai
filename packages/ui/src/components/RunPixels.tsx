@@ -481,3 +481,54 @@ export function PlanStrip({
     </span>
   );
 }
+
+/**
+ * A request's fuse (telas/Aprovacoes.html): a pixel line along the bottom of
+ * its holder (`position: relative`) that burns down to the deadline. What is
+ * left (`left`, 0–1) is in the agent's tones with a flickering edge; the
+ * spent part is a sparse dotted trail.
+ */
+export function ExpiryFuse({
+  left,
+  color = "sky",
+  className,
+}: {
+  left: number;
+  color?: AgentColor;
+  className?: string;
+}) {
+  const rem = Math.max(0, Math.min(1, left));
+  const ref = useCanvas((ctx, canvas, t) => {
+    const w = Math.max(8, Math.round(canvas.clientWidth / CELL) || 120);
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== 2) canvas.height = 2;
+    const surface = token(canvas, "--raised", "#ffffff");
+    const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+    const pal = [
+      surface,
+      mixHex(surface, top, 0.14),
+      mixHex(surface, top, 0.3),
+      mixHex(surface, top, 0.5),
+      mixHex(surface, bottom, 0.55),
+      mixHex(top, bottom, 0.5),
+      mixHex(top, "#ffffff", 0.5),
+    ];
+    const last = pal.length - 1;
+    for (let y = 0; y < 2; y++)
+      for (let x = 0; x < w; x++) {
+        const u = x / w;
+        let f: number;
+        if (u > rem) f = x % 3 === 0 ? 0.12 : 0;
+        else {
+          const d = rem - u;
+          const edge = Math.exp(-(d * d) / 0.0006) * (0.75 + 0.25 * Math.sin(t * 9 + u * 40));
+          f = Math.min(1, 0.38 + 0.1 * Math.sin(t * 1.4 - u * 18) + edge);
+        }
+        const s = Math.max(0, Math.min(1, f)) * last;
+        const b = Math.floor(s);
+        ctx.fillStyle = pal[Math.min(last, s - b > (BAYER[((y & 3) << 2) | (x & 3)] ?? 0.5) ? b + 1 : b)] ?? surface;
+        ctx.fillRect(x, y, 1, 1);
+      }
+  }, rem > 0);
+  return <canvas ref={ref} className={cx("ac-work-sweep", "ac-expiry-fuse", className)} />;
+}

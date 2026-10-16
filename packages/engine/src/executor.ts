@@ -487,6 +487,9 @@ async function executeRunInner(
         if (approval?.status === "approved" && deps.tools) {
           const output = await deps.tools.executeApproved(ctx, approval);
           result = { content: output.content, isError: output.isError === true };
+          // The approvals screen shows it ran (and what came back).
+          const [ran] = await db.select().from(approvals).where(eq(approvals.id, approval.id));
+          if (ran) await publishApproval({ db, pubsub: deps.pubsub }, ran, "approval.decided").catch(() => {});
         } else result = toolResultFor(approval);
       }
       blocks.push({

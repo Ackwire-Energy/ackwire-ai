@@ -109,6 +109,7 @@ export {
 } from "./components/RecurrencePicker";
 export {
   CriteriaPixels,
+  ExpiryFuse,
   PlanStrip,
   type PlanStripCell,
   planCellPixel,

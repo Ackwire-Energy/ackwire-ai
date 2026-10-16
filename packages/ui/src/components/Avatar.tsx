@@ -8,9 +8,10 @@ export type AvatarKind = "person" | "agent";
 
 /**
  * The agent symbol's state: `idle` blinks now and then, `thinking` looks
- * around (with a halo), `writing` has dash eyes (with a halo).
+ * around (with a halo), `writing` has dash eyes (with a halo), `waiting`
+ * looks up at you (waiting on a person's decision, no halo).
  */
-export type AgentState = "idle" | "thinking" | "writing";
+export type AgentState = "idle" | "thinking" | "writing" | "waiting";
 
 export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   kind?: AvatarKind;
@@ -127,7 +128,7 @@ export function Avatar({
         "ac-avatar",
         kind === "agent" && "ac-avatar--agent",
         size !== "md" && `ac-avatar--${size}`,
-        agent && mood !== "idle" && "ac-avatar--running",
+        agent && mood !== "idle" && mood !== "waiting" && "ac-avatar--running",
         agent && mood !== "idle" && `ac-avatar--${mood}`,
         className,
       )}
