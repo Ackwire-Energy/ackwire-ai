@@ -2710,14 +2710,13 @@ a.ac-list__row:focus-visible {
   place-items: center;
   border-radius: var(--radius-full);
   background: var(--sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--muted);
+  color: var(--faint);
   font-size: 11.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .ac-seg__item[data-on] .ac-seg__count {
-  color: var(--ink2);
+  color: var(--muted);
 }
 .ac-seg--sm .ac-seg__count {
   min-width: 16px;

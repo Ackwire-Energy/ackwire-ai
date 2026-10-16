@@ -74,11 +74,19 @@ export function ThreadStartLine({
       </div>
     );
   }
+  // In context: one quiet line, its link as text (the range above stays the conversation).
   return (
     <div className="thread-marker" data-message-id={message.id}>
       <Icon name="link" size={14} />
       <span>{t("threads.line.context", { title })}</span>
-      {open}
+      <span aria-hidden="true">·</span>
+      <Link
+        className="thread-marker__open"
+        to="/org/$orgId/threads/$threadId"
+        params={{ orgId: org.id, threadId: message.id }}
+      >
+        {t("threads.line.open")}
+      </Link>
     </div>
   );
 }

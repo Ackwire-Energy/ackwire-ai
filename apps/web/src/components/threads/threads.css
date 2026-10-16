@@ -29,6 +29,27 @@
   font-size: 12.5px;
   color: var(--faint);
 }
+.thread-marker > .ac-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.thread-marker__open {
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+}
+.thread-marker__open:hover {
+  color: var(--ink2);
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+}
+.thread-marker__open:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 .thread-marker b,
 .thread-stub b,
 .thread-closed b {
