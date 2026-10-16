@@ -265,7 +265,7 @@ export function missionReportOf(meta: Message["meta"]): MissionReportMeta | null
   };
 }
 
-export function missionCardRef(meta: Message["meta"], key: "missionDecision" | "missionReview") {
+export function missionCardRef(meta: Message["meta"], key: "missionDecision" | "missionReview" | "missionDelivery") {
   const p = obj(meta?.[key]);
   return p && str(p.id) && str(p.missionId) ? { id: str(p.id), missionId: str(p.missionId) } : null;
 }

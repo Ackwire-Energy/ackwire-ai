@@ -1,4 +1,16 @@
-import { Button, Chip, Icon, type IconName, RadioCard, RadioGroup, Select, Skeleton, Textarea } from "@agenteschat/ui";
+import {
+  Button,
+  Checkbox,
+  Chip,
+  Icon,
+  type IconName,
+  RadioCard,
+  RadioGroup,
+  Select,
+  Skeleton,
+  Switch,
+  Textarea,
+} from "@agenteschat/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -10,6 +22,7 @@ import {
   useMissionAct,
   useMissionControl,
   useMissionDecisions,
+  useMissionDeliveries,
   useMissionPlan,
   useMissionReviews,
   useSetCommandApproval,
@@ -26,7 +39,7 @@ import type {
   MissionReportMeta,
   MissionSuggestionMeta,
 } from "@/api/types";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
@@ -674,6 +687,213 @@ export function MissionReviewCard({ message }: { message: Message }) {
       ) : (
         <div className="mi-foot">
           <span className="mi-hint">{t("missions.review.readOnly")}</span>
+        </div>
+      )}
+      {stamp.node}
+    </div>
+  );
+}
+
+// ── Delivery card (the end of a mission) ──────────────────────────────────────
+
+/**
+ * The mission's end, like an approval (ADR 0029): what was delivered (the
+ * summary, the files as thumbnails that open in the Drive), "O que conferir"
+ * as items each person checks for themselves, and for the owner or deciders
+ * "Concluir missão" (with "Salvar decisões e lições na wiki") or "Pedir
+ * ajustes" (a note that resumes the work). Every plan item done and nothing
+ * running without a call to complete_mission: the smaller "Tudo pronto" card.
+ */
+export function MissionDeliveryCard({ message }: { message: Message }) {
+  const ref = missionCardRef(message.meta, "missionDelivery");
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const api = useApi();
+  const dir = useDirectory(org.id);
+  const toast = useToast();
+  const deliveries = useMissionDeliveries(org.id, ref?.missionId);
+  const mission = useMission(org.id, ref?.missionId);
+  const stamp = useStamp();
+  const [asking, setAsking] = useState(false);
+  const [note, setNote] = useState("");
+  const [wiki, setWiki] = useState(true);
+  const missionId = ref?.missionId ?? "";
+  const deliveryId = ref?.id ?? "";
+  const accept = useMissionAct(org.id, missionId, (saveToWiki: boolean) =>
+    api.missions.acceptDelivery(org.id, missionId, deliveryId, { saveToWiki }),
+  );
+  const changes = useMissionAct(org.id, missionId, (text: string) =>
+    api.missions.requestDeliveryChanges(org.id, missionId, deliveryId, text),
+  );
+  const check = useMissionAct(org.id, missionId, ({ itemId, checked }: { itemId: string; checked: boolean }) =>
+    api.missions.checkDelivery(org.id, missionId, deliveryId, itemId, checked),
+  );
+  const d = deliveries.data?.find((x) => x.id === ref?.id);
+  const m = mission.data;
+  if (!ref) return null;
+  if (!d || !m) {
+    return deliveries.isPending ? (
+      <div className="mi-card" aria-hidden="true">
+        <Skeleton width="55%" height={18} />
+      </div>
+    ) : null;
+  }
+  // A newer delivery replaced this one: it says so in one quiet line.
+  if (d.status === "superseded") {
+    return (
+      <p className="mi-evt">
+        <Icon name="refresh" size={14} />
+        <span>{t("missions.delivery.superseded")}</span>
+      </p>
+    );
+  }
+  const who = d.decidedBy ? (dir.memberById.get(d.decidedBy)?.name ?? t("missions.someone")) : "";
+  const time = d.decidedAt ? formatTime(i18n.language, d.decidedAt) : "";
+  if (d.status !== "pending") {
+    return (
+      <div className="mi-card" role="group" aria-label={t("missions.delivery.label")}>
+        <div className="mi-decided">
+          <span className="mi-ok">
+            <Icon name={d.status === "accepted" ? "check" : "edit"} size={16} />
+          </span>
+          <span className="mi-decided__t">
+            <b>{d.status === "accepted" ? t("missions.delivery.accepted") : t("missions.delivery.changesAsked")}</b>
+            <small>
+              {t("missions.review.by", { name: who, time })}
+              {d.note ? ` · ${d.note}` : ""}
+            </small>
+          </span>
+        </div>
+      </div>
+    );
+  }
+  const decide = m.canAct && m.status !== "done" && m.status !== "canceled";
+  const finish = () =>
+    accept.mutate(wiki, {
+      onSuccess: () => stamp.show(t("missions.delivery.acceptedStamp")),
+      onError: (error) => toast.show(errorText(t, error), "error"),
+    });
+  const ask = () =>
+    changes.mutate(note.trim(), {
+      onSuccess: () => {
+        stamp.show(t("missions.delivery.sentStamp"));
+        setAsking(false);
+        setNote("");
+      },
+      onError: (error) => toast.show(errorText(t, error), "error"),
+    });
+  const checked = d.checklist.filter((c) => c.checkedBy.includes(me.user.id)).length;
+  return (
+    <div
+      className={d.auto ? "mi-card mi-delivery mi-delivery--auto" : "mi-card mi-delivery"}
+      role="group"
+      aria-label={t("missions.delivery.label")}
+    >
+      <div className="mi-tags">
+        <Chip icon="flag" tone={decide ? "waiting" : "neutral"}>
+          {decide ? t("missions.status.awaitingClose") : t("missions.status.readyToClose")}
+        </Chip>
+      </div>
+      <div className="mi-q">
+        <h3>{d.auto ? t("missions.delivery.allDone") : t("missions.delivery.title", { title: m.title })}</h3>
+        {d.auto ? (
+          <p>{t("missions.delivery.allDoneText")}</p>
+        ) : (
+          d.summary && <p className="mi-delivery__summary">{d.summary}</p>
+        )}
+      </div>
+      {d.artifactIds.length > 0 && (
+        <div className="artifact-cards">
+          {d.artifactIds.map((id) => (
+            <ArtifactCard key={id} artifact={{ id }} />
+          ))}
+        </div>
+      )}
+      {d.checklist.length > 0 && (
+        <section className="mi-delivery__check" aria-label={t("missions.delivery.check")}>
+          <h4>
+            {t("missions.delivery.check")}
+            <span>{t("missions.delivery.checked", { done: checked, total: d.checklist.length })}</span>
+          </h4>
+          <ul>
+            {d.checklist.map((c) => {
+              const mine = c.checkedBy.includes(me.user.id);
+              const others = c.checkedBy.filter((u) => u !== me.user.id);
+              return (
+                <li key={c.id} data-done={mine || undefined}>
+                  <Checkbox
+                    id={`dl-${d.id}-${c.id}`}
+                    checked={mine}
+                    disabled={!m.canAct}
+                    onCheckedChange={(v) => check.mutate({ itemId: c.id, checked: v })}
+                  />
+                  <label htmlFor={`dl-${d.id}-${c.id}`}>{c.text}</label>
+                  {others.length > 0 && (
+                    <span className="mi-delivery__by" title={others.map((u) => dir.memberById.get(u)?.name).join(", ")}>
+                      {others.slice(0, 3).map((u) => (
+                        <ActorAvatar
+                          key={u}
+                          actor={{ type: "person", id: u }}
+                          name={dir.memberById.get(u)?.name ?? ""}
+                          size="xs"
+                        />
+                      ))}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+      {asking && (
+        <div className="mi-note">
+          <Textarea
+            value={note}
+            rows={3}
+            autoFocus
+            aria-label={t("missions.delivery.noteLabel")}
+            placeholder={t("missions.delivery.notePlaceholder")}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+      )}
+      {decide ? (
+        <div className="mi-foot">
+          {asking ? (
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                icon="send"
+                disabled={!note.trim()}
+                loading={changes.isPending}
+                onClick={ask}
+              >
+                {t("missions.delivery.sendChanges")}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setAsking(false)}>
+                {t("common.cancel")}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="primary" size="sm" icon="check" loading={accept.isPending} onClick={finish}>
+                {t("missions.delivery.accept")}
+              </Button>
+              <Button size="sm" icon="edit" disabled={accept.isPending} onClick={() => setAsking(true)}>
+                {t("missions.delivery.askChanges")}
+              </Button>
+              <label className="mi-delivery__wiki">
+                <Switch checked={wiki} onCheckedChange={setWiki} aria-label={t("missions.delivery.saveToWiki")} />
+                <span>{t("missions.delivery.saveToWiki")}</span>
+              </label>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="mi-foot">
+          <span className="mi-hint">{t("missions.delivery.readOnly")}</span>
         </div>
       )}
       {stamp.node}

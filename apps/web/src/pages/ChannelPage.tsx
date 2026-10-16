@@ -90,6 +90,7 @@ import {
   AutoApprovedLine,
   groupAutoApproved,
   MissionDecisionCard,
+  MissionDeliveryCard,
   MissionEphemeral,
   MissionLinkCard,
   MissionPlanCard,
@@ -2023,13 +2024,15 @@ export const TimelineMessage = memo(function TimelineMessage({
   const missionPlan = m.author.type === "agent" ? missionPlanOf(meta) : null;
   const missionDecision = m.author.type === "agent" && meta.missionDecision ? m : null;
   const missionReview = m.author.type === "agent" && meta.missionReview ? m : null;
+  // The mission's end: what was delivered, what to check, Concluir missão / Pedir ajustes.
+  const missionDelivery = m.author.type === "agent" && meta.missionDelivery ? m : null;
   // The executor asks to run a command off its allow list: the command card (Aprovar / Recusar / Aprovar sempre).
   const missionCommand = m.author.type === "agent" ? missionCommandOf(meta) : null;
   const missionReport = m.author.type === "agent" ? missionReportOf(meta) : null;
   const missionSuggestion = m.author.type === "person" ? missionSuggestionOf(meta) : null;
   // A mission proposed from here whose thread lives elsewhere: its link card under the reply.
   const missionLink = m.author.type === "agent" ? missionLinkOf(meta) : null;
-  const missionCard = Boolean(missionPlan || missionDecision || missionReview || missionCommand);
+  const missionCard = Boolean(missionPlan || missionDecision || missionReview || missionDelivery || missionCommand);
   // The root of a mission in the channel: its work lives in its thread.
   const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.replyInThread !== undefined;
   const card = approvalId || proposalId || memoryUpdates.length > 0 || question || secretRequest || missionCard;
@@ -2167,6 +2170,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       {missionPlan && <MissionPlanCard plan={missionPlan} />}
       {missionDecision && <MissionDecisionCard message={missionDecision} />}
       {missionReview && <MissionReviewCard message={missionReview} />}
+      {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
       {missionCommand && <MissionCommandCard command={missionCommand} />}
       {missionReport && <MissionReportExtras report={missionReport} message={m} />}
       {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
