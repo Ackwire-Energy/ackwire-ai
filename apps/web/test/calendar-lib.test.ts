@@ -1,12 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import {
   type CalItem,
+  collapseRoutines,
   dragRange,
   HOUR_PX,
   initialScrollMinutes,
   layoutBars,
   layoutDay,
   rangeLabel,
+  runOffset,
+  upcomingItems,
   viewDays,
 } from "@/lib/calendar";
 
@@ -91,5 +94,51 @@ describe("hour labels", () => {
     expect(uses12h("pt-BR")).toBe(false);
     expect([1, 12, 13].map((h) => hourLabel("en", h).replace(/\s/g, " "))).toEqual(["1 AM", "12 PM", "1 PM"]);
     expect([1, 13, 23].map((h) => hourLabel("pt-BR", h))).toEqual(["01:00", "13:00", "23:00"]);
+  });
+});
+
+describe("routines on the calendar", () => {
+  const run = (routineId: string, start: Date): CalItem => ({
+    ...item(`${routineId}@${start.getTime()}`, start, new Date(start.getTime() + 15 * 60_000)),
+    kind: "routine",
+    source: "routine",
+    recurring: true,
+    routineId,
+    agentId: "a1",
+  });
+  const week = viewDays("week", day);
+  const hourly = week.flatMap((d) => Array.from({ length: 24 }, (_, h) => run("hourly", at(h, 0, d))));
+
+  test("a routine that runs often is one band over the week, with its runs and cadence", () => {
+    const sparse = run("daily", at(9));
+    const out = collapseRoutines([...hourly, sparse, item("meet", at(10), at(11))], week);
+    const bands = out.filter((it) => it.runs);
+    expect(bands).toHaveLength(1);
+    const band = bands[0] as CalItem;
+    expect(band.allDay).toBe(true);
+    expect(band.runs).toHaveLength(24 * 7);
+    expect(band.every).toBe(60);
+    expect(layoutBars(bands, week)[0]).toMatchObject({ from: 0, span: 7 });
+    // Sparse runs and events stay as they are.
+    expect(out.map((it) => it.key)).toContain(sparse.key);
+    expect(out.map((it) => it.key)).toContain("meet");
+    // A run lines up with its day column.
+    expect(runOffset(band, at(12, 0, week[3] as Date))).toBeCloseTo((3 + 0.5) / 7);
+  });
+
+  test("a band only spans days that follow each other; a light day breaks it", () => {
+    const light = new Date((week[2] as Date).getTime());
+    const runs = hourly.filter((r) => !(r.start.toDateString() === light.toDateString() && r.start.getHours() > 1));
+    const bands = collapseRoutines(runs, week).filter((it) => it.runs);
+    expect(bands.map((b) => b.runs?.length)).toEqual([48, 96]);
+    const businessWeek = viewDays("week", day, true);
+    expect(collapseRoutines(hourly, businessWeek).filter((it) => it.runs)).toHaveLength(1);
+  });
+
+  test("Próximos shows a routine only by its next run", () => {
+    const now = at(8, 30);
+    const next = upcomingItems([...hourly, item("meet", at(10), at(11))], now);
+    expect(next.filter((it) => it.routineId)).toHaveLength(1);
+    expect(next.map((it) => it.key)).toContain("meet");
   });
 });

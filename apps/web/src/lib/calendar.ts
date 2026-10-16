@@ -30,6 +30,9 @@ export interface CalItem {
   description?: string;
   location?: string | null;
   target?: RoutineTarget;
+  /** A routine band: every run it stands for, and their spacing in minutes when regular. */
+  runs?: Date[];
+  every?: number | null;
 }
 
 // ── Dates (local days) ──────────────────────────────────────────────────────
@@ -140,8 +143,9 @@ export function toItems(range: CalendarRange | undefined): CalItem[] {
         kind: "routine",
         source: "routine",
         title: r.name,
+        // A run is a moment, not a meeting: drawn small at its time.
         start: new Date(r.at),
-        end: addMinutes(new Date(r.at), 30),
+        end: addMinutes(new Date(r.at), 15),
         allDay: false,
         recurring: true,
         agentId: r.agentId,
@@ -176,6 +180,80 @@ export const isBarItem = (it: CalItem) =>
 
 /** Whether an item touches a day. */
 export const onDay = (it: CalItem, d: Date) => it.start < addDays(startOfDay(d), 1) && it.end > startOfDay(d);
+
+/** From this many runs on a day, a routine is one band with its runs as ticks, not a chip per run. */
+export const DENSE_RUNS = 4;
+
+/**
+ * Routines that run often (≥ DENSE_RUNS on a day) become one band per routine
+ * over consecutive days, carrying the runs; sparser runs stay as they are.
+ */
+export function collapseRoutines(items: CalItem[], days: Date[]): CalItem[] {
+  const out: CalItem[] = [];
+  const byRoutine = new Map<string, Map<number, CalItem[]>>();
+  for (const it of items) {
+    const i = it.kind === "routine" && it.routineId && !it.runs ? days.findIndex((d) => sameDay(d, it.start)) : -1;
+    if (i < 0 || !it.routineId) {
+      out.push(it);
+      continue;
+    }
+    const perDay = byRoutine.get(it.routineId) ?? new Map<number, CalItem[]>();
+    byRoutine.set(it.routineId, perDay);
+    perDay.set(i, [...(perDay.get(i) ?? []), it]);
+  }
+  for (const perDay of byRoutine.values()) {
+    let segment: number[] = [];
+    const flush = () => {
+      const first = segment[0];
+      const last = segment[segment.length - 1];
+      segment = [];
+      if (first === undefined || last === undefined) return;
+      const runs = Array.from({ length: last - first + 1 }, (_, k) => perDay.get(first + k) ?? [])
+        .flat()
+        .sort((a, b) => a.start.getTime() - b.start.getTime());
+      const head = runs[0] as CalItem;
+      const start = startOfDay(days[first] as Date);
+      out.push({
+        ...head,
+        key: `${head.routineId}~${start.getTime()}`,
+        start,
+        end: addDays(days[last] as Date, 1),
+        allDay: true,
+        runs: runs.map((r) => r.start),
+        every: spacing((perDay.get(first) ?? []).map((r) => r.start)),
+      });
+    };
+    for (const i of [...perDay.keys()].sort((a, b) => a - b)) {
+      const list = perDay.get(i) ?? [];
+      if (list.length < DENSE_RUNS) {
+        flush();
+        out.push(...list);
+        continue;
+      }
+      const prev = segment[segment.length - 1];
+      // One band only over days that sit side by side and follow each other.
+      if (prev !== undefined && (prev !== i - 1 || !sameDay(addDays(days[prev] as Date, 1), days[i] as Date))) flush();
+      segment.push(i);
+    }
+    flush();
+  }
+  return out;
+}
+
+/** The gap between runs in minutes when it never changes, else null. */
+function spacing(runs: Date[]): number | null {
+  const sorted = [...runs].sort((a, b) => a.getTime() - b.getTime());
+  const gaps = sorted.slice(1).map((d, i) => Math.round((d.getTime() - (sorted[i] as Date).getTime()) / 60_000));
+  const g = gaps[0];
+  return g !== undefined && g > 0 && gaps.every((x) => x === g) ? g : null;
+}
+
+/** Where a run sits along a band, 0–1 (by day and time of day, so it lines up with the columns). */
+export function runOffset(band: CalItem, run: Date) {
+  const spanDays = Math.max(1, Math.round((band.end.getTime() - band.start.getTime()) / 86_400_000));
+  const day = Math.round((startOfDay(run).getTime() - band.start.getTime()) / 86_400_000);
+  return (day + minutesOfDay(run) / 1440) / spanDays;
+}
 
 // ── Layout ──────────────────────────────────────────────────────────────────
 
@@ -288,11 +366,18 @@ export function initialScrollMinutes(items: CalItem[], days: Date[]) {
   return Math.max(0, Math.min(7 * 60, Math.min(...firsts) - 30));
 }
 
-/** The next `n` items from `now` (for "Próximos"). */
+/** The next `n` items from `now` (for "Próximos"); a routine only by its next run. */
 export function upcomingItems(items: CalItem[], now: Date, n = 5) {
+  const seen = new Set<string>();
   return items
     .filter((it) => it.kind !== "deadline" && it.end > now)
     .sort((a, b) => a.start.getTime() - b.start.getTime())
+    .filter((it) => {
+      if (!it.routineId) return true;
+      if (seen.has(it.routineId)) return false;
+      seen.add(it.routineId);
+      return true;
+    })
     .slice(0, n);
 }
 

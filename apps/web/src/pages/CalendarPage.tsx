@@ -29,6 +29,7 @@ import {
   addMinutes,
   type CalendarView,
   type CalItem,
+  collapseRoutines,
   type ItemSource,
   isBarItem,
   onDay,
@@ -112,7 +113,11 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
     list.map((it) => (it.allDay ? it : { ...it, start: toView(it.start), end: toView(it.end) }));
   // biome-ignore lint/correctness/useExhaustiveDependencies: toView only depends on the zone
   const all = useMemo(() => shiftItems(toItems(range.data)), [range.data, viewZone]);
-  const items = all.filter((it) => filters[it.source]);
+  // A routine that runs often is one band, not a chip per run.
+  const items = collapseRoutines(
+    all.filter((it) => filters[it.source]),
+    days,
+  );
   const counts = Object.fromEntries(
     SOURCES.map(({ source }) => [source, all.filter((it) => it.source === source).length]),
   );

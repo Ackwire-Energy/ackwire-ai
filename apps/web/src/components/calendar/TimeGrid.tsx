@@ -1,4 +1,4 @@
-import { Skeleton } from "@agenteschat/ui";
+import { Icon, Skeleton } from "@agenteschat/ui";
 import {
   type CSSProperties,
   type ReactNode,
@@ -50,6 +50,7 @@ interface Gesture {
 /**
  * The day/week grid: hours 00:00–24:00 in a scroll area (opens around 07:00
  * or the first event), all-day and multi-day items as bars on top,
+ * routines that run often as one band each (their runs as ticks),
  * overlapping items side by side, today's column tinted with a filled day
  * pill, and the current-time line. Drag on empty space to create; drag a
  * chip to move it, its bottom edge to resize.
@@ -89,8 +90,17 @@ export function TimeGrid({
   const gestureRef = useRef<Gesture | null>(null);
   gestureRef.current = gesture;
   const suppressClick = useRef(false);
-  const bars = layoutBars(items, days);
+  // Routines that run often get their own band under the all-day bars.
+  const bars = layoutBars(
+    items.filter((it) => !it.runs),
+    days,
+  );
+  const bands = layoutBars(
+    items.filter((it) => it.runs),
+    days,
+  );
   const lanes = Math.max(0, ...bars.map((b) => b.lane + 1));
+  const bandLanes = Math.max(0, ...bands.map((b) => b.lane + 1));
   const cols = days.length;
 
   // Opens scrolled to ~07:00 or a little before the first event (once per set of days).
@@ -239,6 +249,30 @@ export function TimeGrid({
                 key={b.item.key}
                 item={b.item}
                 variant="bar"
+                style={{
+                  gridColumn: `${b.from + 1} / span ${b.span}`,
+                  gridRow: b.lane + 1,
+                }}
+                open={openKey === b.item.key}
+                onOpenChange={(o) => onOpenKey(o ? b.item.key : null)}
+                details={details(b.item)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      {bandLanes > 0 && (
+        <div className="cal-week__bars cal-week__bars--routines">
+          <div className="cal-week__gutter muted" title={t("calendar.filter.routine")}>
+            <Icon name="routines" size={14} label={t("calendar.filter.routine")} />
+          </div>
+          <div className="cal-week__barlane">
+            {bands.map((b) => (
+              <EventChip
+                key={b.item.key}
+                item={b.item}
+                variant="bar"
+                now={now}
                 style={{
                   gridColumn: `${b.from + 1} / span ${b.span}`,
                   gridRow: b.lane + 1,

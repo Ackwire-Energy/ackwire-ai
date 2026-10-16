@@ -7,7 +7,7 @@ import type { RoutineTarget } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import { useOrg } from "@/components/org-context";
-import type { CalItem } from "@/lib/calendar";
+import { type CalItem, runOffset } from "@/lib/calendar";
 import { formatTime } from "@/lib/format";
 import { lookOf } from "@/lib/look";
 
@@ -22,8 +22,24 @@ export function useAccent(item: CalItem): CSSProperties {
   return {};
 }
 
+/** "09:00–10:00"; a routine run is a moment: "09:00". */
 export const timeRange = (locale: string, it: CalItem) =>
-  `${formatTime(locale, it.start.toISOString())}–${formatTime(locale, it.end.toISOString())}`;
+  it.kind === "routine"
+    ? formatTime(locale, it.start.toISOString())
+    : `${formatTime(locale, it.start.toISOString())}–${formatTime(locale, it.end.toISOString())}`;
+
+/** How often a routine band runs: "a cada hora", "a cada 15 min", "6× por dia". */
+export function useCadence() {
+  const { t } = useTranslation();
+  return (it: CalItem) => {
+    const every = it.every;
+    if (every && every % 60 === 0)
+      return every === 60 ? t("calendar.every.hour") : t("calendar.every.hours", { count: every / 60 });
+    if (every) return t("calendar.every.minutes", { count: every });
+    const spanDays = Math.max(1, Math.round((it.end.getTime() - it.start.getTime()) / 86_400_000));
+    return t("calendar.perDay", { count: Math.round((it.runs?.length ?? 0) / spanDays) });
+  };
+}
 
 /** "seg, 12 out". */
 export const dayLabel = (locale: string, d: Date) =>
@@ -34,8 +50,9 @@ export const dayLabel = (locale: string, d: Date) =>
 
 /**
  * One item on the calendar: a neutral card with a left color by source, the
- * recurrence icon and the agent's avatar. A click opens its details in a
- * popover anchored to it.
+ * recurrence icon and the agent's avatar. A routine that runs often is one
+ * band: its cadence, and each run as a pixel in the agent's color (past runs
+ * faded, the next one larger). A click opens its details in a popover.
  */
 export function EventChip({
   item,
@@ -46,6 +63,7 @@ export function EventChip({
   details,
   onPointerDown,
   resizeHandle,
+  now,
 }: {
   item: CalItem;
   /** `block` in the hour grid, `bar` for all-day/multi-day, `line` in the month and lists. */
@@ -56,16 +74,21 @@ export function EventChip({
   details: ReactNode;
   onPointerDown?: (e: ReactPointerEvent<HTMLButtonElement>) => void;
   resizeHandle?: ReactNode;
+  /** Splits a band's runs into past and next (the view's wall clock). */
+  now?: Date;
 }) {
   const { t, i18n } = useTranslation();
   const accent = useAccent(item);
-  const time = item.allDay ? t("calendar.allDay") : timeRange(i18n.language, item);
+  const cadence = useCadence();
+  const band = Boolean(item.runs);
+  const time = band ? cadence(item) : item.allDay ? t("calendar.allDay") : timeRange(i18n.language, item);
   const title =
     item.kind === "deadline" ? t("calendar.deadline", { number: item.issueNumber, title: item.title }) : item.title;
   const label =
-    item.allDay || item.kind === "deadline"
+    !band && (item.allDay || item.kind === "deadline")
       ? t("calendar.allDayAria", { title })
       : t("calendar.eventAria", { title: item.title, time });
+  const next = now ? item.runs?.find((r) => r > now) : undefined;
   return (
     <Popover
       open={open}
@@ -81,6 +104,7 @@ export function EventChip({
           data-source={item.source}
           data-kind={item.kind}
           data-recurring={item.recurring || undefined}
+          data-band={band || undefined}
           style={{ ...accent, ...style }}
           aria-label={label}
           aria-pressed={open}
@@ -91,12 +115,28 @@ export function EventChip({
           )}
           <span className="cal-chip__text">
             <span className="cal-chip__title">{title}</span>
-            {variant === "block" && <span className="cal-chip__time tabular">{time}</span>}
-            {variant === "line" && !item.allDay && (
-              <span className="cal-chip__time tabular">{formatTime(i18n.language, item.start.toISOString())}</span>
+            {(variant === "block" || (band && variant === "bar")) && (
+              <span className="cal-chip__time tabular">{time}</span>
+            )}
+            {variant === "line" && (band || !item.allDay) && (
+              <span className="cal-chip__time tabular">
+                {band ? time : formatTime(i18n.language, item.start.toISOString())}
+              </span>
             )}
           </span>
-          {item.recurring && <Icon name="repeat" size={14} className="cal-chip__repeat" aria-hidden="true" />}
+          {item.recurring && !band && <Icon name="repeat" size={14} className="cal-chip__repeat" aria-hidden="true" />}
+          {band && variant === "bar" && (
+            <span className="cal-chip__ticks" aria-hidden="true">
+              {item.runs?.map((r) => (
+                <i
+                  key={r.getTime()}
+                  style={{ left: `${runOffset(item, r) * 100}%` }}
+                  data-past={(now && r <= now) || undefined}
+                  data-next={r === next || undefined}
+                />
+              ))}
+            </span>
+          )}
           {resizeHandle}
         </button>
       }
@@ -111,6 +151,7 @@ export function ItemDetails({ item, onEdit, onDelete }: { item: CalItem; onEdit?
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
+  const cadence = useCadence();
   const channels = useChannels(org.id);
   const target = (tg: RoutineTarget) => {
     if (tg.type === "channel") return `#${channels.data?.find((c) => c.id === tg.channelId)?.name ?? ""}`;
@@ -139,8 +180,13 @@ export function ItemDetails({ item, onEdit, onDelete }: { item: CalItem; onEdit?
       </span>
       <span className="small muted">
         {dayLabel(i18n.language, item.start)}
-        {item.allDay ? ` · ${t("calendar.allDay")}` : ` · ${timeRange(i18n.language, item)}`}
+        {item.runs
+          ? `${item.end.getTime() - item.start.getTime() > 86_400_000 ? ` – ${dayLabel(i18n.language, new Date(item.end.getTime() - 1))}` : ""} · ${cadence(item)}`
+          : item.allDay
+            ? ` · ${t("calendar.allDay")}`
+            : ` · ${timeRange(i18n.language, item)}`}
       </span>
+      {item.runs && <span className="small">{t("calendar.runs", { count: item.runs.length })}</span>}
       {item.location && (
         <span className="small cal-details__row">
           <Icon name="link" size={14} aria-hidden="true" />

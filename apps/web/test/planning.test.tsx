@@ -273,11 +273,11 @@ describe("Calendário", () => {
     expect(screen().getByRole("heading", { level: 1, name: "Calendário" })).toBeTruthy();
     expect(document.querySelectorAll(".cal-week__col")).toHaveLength(7);
     expect(screen().getByRole("button", { name: "Daily de produto, 10:00–11:00" })).toBeTruthy();
-    expect(screen().getByRole("button", { name: "Resumo da semana, 09:00–09:30" })).toBeTruthy();
+    expect(screen().getByRole("button", { name: "Resumo da semana, 09:00" })).toBeTruthy();
     expect(screen().getAllByRole("button", { name: /^Erros do Sentry do dia, 18:00/ })).toHaveLength(5);
     expect(screen().getByRole("button", { name: "#133 Fechar a release, dia todo" })).toBeTruthy();
     // Routines are recurring and muted.
-    const routine = screen().getByRole("button", { name: "Resumo da semana, 09:00–09:30" });
+    const routine = screen().getByRole("button", { name: "Resumo da semana, 09:00" });
     expect(routine.getAttribute("data-source")).toBe("routine");
     expect(routine.querySelector(".cal-chip__repeat")).not.toBeNull();
 

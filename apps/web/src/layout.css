@@ -5734,6 +5734,87 @@ button.live-call__head:hover {
   height: 6px;
   cursor: ns-resize;
 }
+/* A routine run is a moment: one compact line at its time. */
+.cal-chip--block[data-kind="routine"] {
+  align-items: center;
+  padding: 0 6px 0 9px;
+}
+.cal-chip--block[data-kind="routine"] .cal-chip__text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+}
+.cal-chip--block[data-kind="routine"] .cal-chip__avatar,
+.cal-chip--block[data-kind="routine"] .cal-chip__repeat {
+  margin-top: 0;
+}
+
+/* Routines that run often: one band each, their runs as pixels in the agent's color */
+.cal-week__bars--routines .cal-week__barlane {
+  grid-auto-rows: 30px;
+}
+.cal-week__bars--routines .cal-week__gutter {
+  align-items: flex-start;
+  padding-top: 8px;
+}
+.cal-chip--bar[data-band] {
+  position: relative;
+  height: 28px;
+  padding: 0 8px 6px 9px;
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow:
+    inset 3px 0 0 var(--cal-accent),
+    var(--e1);
+}
+.cal-chip--bar[data-band]:hover {
+  box-shadow:
+    inset 3px 0 0 var(--cal-accent),
+    var(--e2);
+}
+.cal-chip--bar[data-band] .cal-chip__text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+.cal-chip--bar[data-band] .cal-chip__title {
+  flex: 0 1 auto;
+}
+.cal-chip__ticks {
+  position: absolute;
+  left: 3px;
+  right: 0;
+  bottom: 4px;
+  height: 3px;
+  pointer-events: none;
+}
+.cal-chip__ticks i {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 3px;
+  background: var(--cal-accent);
+  transform: translateX(-50%);
+}
+.cal-chip__ticks i[data-past] {
+  opacity: 0.3;
+}
+.cal-chip__ticks i[data-next] {
+  top: -1px;
+  width: 5px;
+  height: 5px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cal-accent) 25%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cal-chip__ticks i[data-next] {
+    animation: cal-next-run 2.4s ease-in-out infinite;
+  }
+}
+@keyframes cal-next-run {
+  50% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--cal-accent) 10%, transparent);
+  }
+}
 
 /* Details popover */
 .cal-pop.ac-popover {
