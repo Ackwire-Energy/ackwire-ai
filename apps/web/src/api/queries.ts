@@ -1441,9 +1441,10 @@ export function useWikiAction(orgId: string) {
 // ── Threads (ADR 0029) ──────────────────────────────────────────────────────
 
 /** The Threads page: one page per cursor, most recent activity first. */
-export function useThreadList(orgId: string, filters: ThreadFilters) {
+export function useThreadList(orgId: string, filters: ThreadFilters, enabled = true) {
   const api = useApi();
   return useInfiniteQuery({
+    enabled,
     queryKey: keys.threadList(orgId, filters),
     queryFn: ({ pageParam }) => api.threads.list(orgId, { ...filters, ...(pageParam ? { cursor: pageParam } : {}) }),
     initialPageParam: "",

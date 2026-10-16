@@ -50,10 +50,22 @@ import type {
   IssuePatch,
   Machine,
   MachinePairing,
+  MachineTask,
   Me,
   Member,
   Memory,
   Message,
+  Mission,
+  MissionControl,
+  MissionCreateInput,
+  MissionDecision,
+  MissionFiles,
+  MissionListStatus,
+  MissionParticipantRole,
+  MissionParticipants,
+  MissionPlan,
+  MissionReview,
+  MissionSummary,
   Model,
   Organization,
   OrgOverview,
@@ -397,6 +409,65 @@ export interface ApiClient {
     remove(orgId: string, threadId: string): Promise<void>;
     /** Tirar do canal / Devolver ao canal / Fechar / Reabrir / Arquivar / Desarquivar. */
     act(orgId: string, threadId: string, action: ThreadAction): Promise<ThreadInfo>;
+  };
+  /** Missions (ADR 0029): long work by the agent's executor on a connected computer, in one thread. */
+  missions: {
+    /** Missions you can see (the Missões tab), most recently changed first. */
+    list(orgId: string, status?: MissionListStatus): Promise<Mission[]>;
+    /** `/mission <goal>` and "Nova missão": the executor plans it; a plan card follows. */
+    create(orgId: string, input: MissionCreateInput): Promise<Mission>;
+    get(orgId: string, missionId: string): Promise<Mission>;
+    /** The mission of a thread (`mission.not_found` when it has none). */
+    ofThread(orgId: string, threadId: string): Promise<Mission>;
+    /** The background tasks of a thread, newest first (`machine.task` keeps them live). */
+    threadTasks(orgId: string, threadId: string): Promise<MachineTask[]>;
+    /** Começar (owner only), `/pause`, resume, `/stop` (cancels its running tasks and pauses). */
+    control(orgId: string, missionId: string, action: MissionControl): Promise<Mission & { canceledTasks?: number }>;
+    close(
+      orgId: string,
+      missionId: string,
+      input: { outcome: "done" | "canceled"; saveToWiki?: boolean; note?: string },
+    ): Promise<Mission>;
+    /** "Mudar algo": to the executor's main session (queued when it can't hear now). */
+    message(orgId: string, missionId: string, text: string): Promise<{ delivered: boolean; taskId?: string }>;
+    participants(orgId: string, missionId: string): Promise<MissionParticipants>;
+    setParticipant(
+      orgId: string,
+      missionId: string,
+      userId: string,
+      role: MissionParticipantRole,
+      existing?: boolean,
+    ): Promise<MissionParticipants>;
+    removeParticipant(orgId: string, missionId: string, userId: string): Promise<void>;
+    /** Hand it over; the computer doesn't move (`code: mission.needs_computer` when it pauses). */
+    transfer(
+      orgId: string,
+      missionId: string,
+      input: { userId: string; lendMachine?: boolean },
+    ): Promise<Mission & { code?: string }>;
+    /** Its owner points it at a computer they paired (new sessions start from the mission files). */
+    setMachine(orgId: string, missionId: string, machineId: string, repoDir?: string): Promise<Mission>;
+    decisions(orgId: string, missionId: string): Promise<MissionDecision[]>;
+    choose(orgId: string, missionId: string, decisionId: string, option: string): Promise<MissionDecision>;
+    opinion(orgId: string, missionId: string, decisionId: string, option: string): Promise<MissionDecision>;
+    approveProvisional(orgId: string, missionId: string): Promise<MissionDecision[]>;
+    reviews(orgId: string, missionId: string): Promise<MissionReview[]>;
+    review(
+      orgId: string,
+      missionId: string,
+      reviewId: string,
+      outcome: "approve" | "changes",
+      note?: string,
+    ): Promise<MissionReview>;
+    suggestion(
+      orgId: string,
+      missionId: string,
+      messageId: string,
+      outcome: "accept" | "decline",
+    ): Promise<{ messageId: string; status: "accepted" | "declined" }>;
+    files(orgId: string, missionId: string): Promise<MissionFiles>;
+    summary(orgId: string, missionId: string): Promise<MissionSummary>;
+    plan(orgId: string, missionId: string): Promise<MissionPlan>;
   };
   routines: {
     list(orgId: string): Promise<Routine[]>;

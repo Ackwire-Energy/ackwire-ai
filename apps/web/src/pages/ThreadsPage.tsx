@@ -22,6 +22,8 @@ import { ActorAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { NewMissionDialog } from "@/components/missions/MissionDialogs";
+import { MissionsTab } from "@/components/missions/MissionList";
 import { useOrg } from "@/components/org-context";
 import { ThreadStatusChip, useThreadControls } from "@/components/threads/ThreadBits";
 import { formatFullDate, relativeTime } from "@/lib/format";
@@ -36,9 +38,8 @@ import "./threads.css";
  * channel) and no counts on the tabs (the API doesn't give them).
  */
 
-// TODO(missions): a "Missões" tab goes between "Com trabalho" and "Fechadas" (ADR 0029 §11), with the
-// mission cards of Threads.html, once missions exist on the server.
-export const THREAD_TABS = ["all", "working", "closed", "archived"] as const satisfies readonly ThreadTab[];
+/** "Missões" sits between "Com trabalho" and "Fechadas" (ADR 0029 §11); the sidebar's "Missões" opens it. */
+export const THREAD_TABS = ["all", "working", "missions", "closed", "archived"] as const satisfies readonly ThreadTab[];
 export type ThreadsTab = (typeof THREAD_TABS)[number];
 
 const actorsOf = (t: ThreadInfo): { type: ThreadActor["type"]; id: string }[] =>
@@ -60,6 +61,8 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
   const [mine, setMine] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const [newMission, setNewMission] = useState(false);
+  const missions = tab === "missions";
   const filters = {
     tab,
     ...(channel[0] ? { channelId: channel[0] } : {}),
@@ -68,7 +71,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
     ...(mine ? { mine: true } : {}),
     ...(query ? { q: query } : {}),
   };
-  const list = useThreadList(org.id, filters);
+  const list = useThreadList(org.id, filters, !missions);
   const threads = useMemo(() => list.data?.pages.flatMap((p) => p.threads) ?? [], [list.data]);
   const controls = useThreadControls();
   const open = threads.find((x) => x.id === openId) ?? null;
@@ -117,9 +120,17 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
       <div className="threads__main">
         <header className="threads-head">
           <div>
-            <h1>{t("threads.title")}</h1>
-            <p className="threads-head__sub">{t("threads.subtitle")}</p>
+            <h1>{missions ? t("missions.title") : t("threads.title")}</h1>
+            <p className="threads-head__sub">{missions ? t("missions.subtitle") : t("threads.subtitle")}</p>
           </div>
+          <Button
+            size="sm"
+            variant={missions ? "primary" : "default"}
+            icon={missions ? "plus" : "flag"}
+            onClick={() => setNewMission(true)}
+          >
+            {t("missions.new.open")}
+          </Button>
         </header>
         <div className="threads-tabs">
           <Segmented
@@ -136,7 +147,9 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
           <SearchInput
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={tab === "archived" ? t("threads.searchArchived") : t("threads.search")}
+            placeholder={
+              tab === "archived" ? t("threads.searchArchived") : missions ? t("missions.search") : t("threads.search")
+            }
             aria-label={t("threads.search")}
             className="threads-tools__search"
           />
@@ -181,36 +194,40 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
                   />
                 ),
               },
-              {
-                key: "needsYou",
-                active: needsYou,
-                node: (
-                  <button
-                    type="button"
-                    className="threads-toggle"
-                    aria-pressed={needsYou}
-                    onClick={() => setNeedsYou((v) => !v)}
-                  >
-                    <Icon name="waiting" size={14} />
-                    {t("threads.needsYou")}
-                  </button>
-                ),
-              },
-              {
-                key: "mine",
-                active: mine,
-                node: (
-                  <button
-                    type="button"
-                    className="threads-toggle"
-                    aria-pressed={mine}
-                    onClick={() => setMine((v) => !v)}
-                  >
-                    <Icon name="person" size={14} />
-                    {t("threads.mine")}
-                  </button>
-                ),
-              },
+              ...(missions
+                ? []
+                : [
+                    {
+                      key: "needsYou",
+                      active: needsYou,
+                      node: (
+                        <button
+                          type="button"
+                          className="threads-toggle"
+                          aria-pressed={needsYou}
+                          onClick={() => setNeedsYou((v) => !v)}
+                        >
+                          <Icon name="waiting" size={14} />
+                          {t("threads.needsYou")}
+                        </button>
+                      ),
+                    },
+                    {
+                      key: "mine",
+                      active: mine,
+                      node: (
+                        <button
+                          type="button"
+                          className="threads-toggle"
+                          aria-pressed={mine}
+                          onClick={() => setMine((v) => !v)}
+                        >
+                          <Icon name="person" size={14} />
+                          {t("threads.mine")}
+                        </button>
+                      ),
+                    },
+                  ]),
             ]}
           />
         </div>
@@ -228,12 +245,24 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
             <span>{t("threads.notes.closed")}</span>
           </p>
         )}
-        {list.isPending && <LoadingList count={5} />}
-        {list.isError && !list.data && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
-        {list.isSuccess && threads.length === 0 && (
+        {missions && (
+          <MissionsTab
+            filters={{
+              q: query,
+              ...(agent[0] ? { agentId: agent[0].slice("agent:".length) } : {}),
+              ...(channel[0] ? { channelId: channel[0] } : {}),
+            }}
+            onNew={() => setNewMission(true)}
+          />
+        )}
+        {!missions && list.isPending && <LoadingList count={5} />}
+        {!missions && list.isError && !list.data && (
+          <ErrorState error={list.error} onRetry={() => void list.refetch()} />
+        )}
+        {!missions && list.isSuccess && threads.length === 0 && (
           <ThreadsEmpty tab={tab} filtered={filtered} onClear={clearFilters} onAll={() => setTab("all")} />
         )}
-        {threads.length > 0 && (
+        {!missions && threads.length > 0 && (
           <section
             className="threads-list"
             aria-label={t("threads.listLabel")}
@@ -253,7 +282,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
             ))}
           </section>
         )}
-        {list.hasNextPage && (
+        {!missions && list.hasNextPage && (
           <Button className="threads-more" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
             {t("threads.loadMore")}
           </Button>
@@ -299,6 +328,14 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
         />
       )}
       {controls.dialog}
+      {newMission && (
+        <NewMissionDialog
+          open={newMission}
+          onOpenChange={setNewMission}
+          initialChannelId={channel[0]}
+          initialAgentId={agent[0]?.slice("agent:".length)}
+        />
+      )}
     </div>
   );
 }

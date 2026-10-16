@@ -1,0 +1,344 @@
+import { describe, expect, test } from "bun:test";
+import type { TFunction } from "i18next";
+import type { MachineTask, Message, Mission } from "@/api/types";
+import { threadRootsToLoad } from "@/chat/timeline";
+import { createI18n } from "@/i18n";
+import {
+  cellsFromCounts,
+  editDiff,
+  formatSpan,
+  isOpenMission,
+  machineTaskOf,
+  mdLines,
+  missionCardRef,
+  missionPlanChangeOf,
+  missionPlanOf,
+  missionReportOf,
+  missionSuggestionOf,
+  missionTasks,
+  newLineIndexes,
+  parseMissionCommand,
+  planCells,
+  planChangeParts,
+  planCounts,
+  prOf,
+  summaryParts,
+  taskNoticeOf,
+  taskSeconds,
+  waitingParts,
+  waitingText,
+} from "@/lib/missions";
+
+const pt = createI18n("pt-BR");
+const t = pt.t.bind(pt) as TFunction;
+const enI18n = createI18n("en");
+const te = enI18n.t.bind(enI18n) as TFunction;
+
+const mission = (over: Partial<Mission> = {}): Mission => ({
+  id: "m1",
+  threadId: "root",
+  channelId: "c",
+  agentId: "a",
+  ownerId: "u1",
+  executor: "claude",
+  title: "App mobile",
+  goal: "Build the app.",
+  status: "active",
+  repoDir: "",
+  resumeTasks: true,
+  plan: { version: 1, done: 4, total: 12, waiting: 1 },
+  pending: { decisions: 2, provisional: 0, reviews: 1, suggestions: 0 },
+  runningTasks: 2,
+  machine: { id: "mac", name: "MacBook do Walter", online: true, lentBy: null },
+  needsComputer: false,
+  role: "owner",
+  canAct: true,
+  canManage: true,
+  createdAt: "2026-10-16T10:00:00.000Z",
+  startedAt: "2026-10-16T10:41:00.000Z",
+  pausedAt: null,
+  closedAt: null,
+  closeReason: null,
+  wikiPageId: null,
+  ...over,
+});
+
+const task = (over: Partial<MachineTask> = {}): MachineTask => ({
+  id: "t1",
+  agentId: "a",
+  machineId: "mac",
+  channelId: "c",
+  threadId: "root",
+  missionId: "m1",
+  title: "Tela de chat",
+  executor: "claude",
+  status: "running",
+  exitCode: null,
+  seconds: null,
+  lastLine: null,
+  files: [],
+  branch: "mission/app-mobile/chat",
+  cwd: null,
+  resumedFromId: null,
+  resumedTaskId: null,
+  startedAt: "2026-10-16T11:00:00.000Z",
+  endedAt: null,
+  lastEventAt: null,
+  createdAt: "2026-10-16T11:00:00.000Z",
+  ...over,
+});
+
+describe("the plan strip", () => {
+  test("one cell per item, in order; doing stops with the computer", () => {
+    const items = [
+      { status: "done" as const },
+      { status: "doing" as const },
+      { status: "waiting_you" as const },
+      { status: "dropped" as const },
+      { status: "todo" as const },
+    ];
+    expect(planCells(items)).toEqual(["done", "doing", "waiting", "dropped", "todo"]);
+    expect(planCells(items, { offline: true })[1]).toBe("stopped");
+  });
+
+  test("from counts: done, waiting, running, then the rest; never more cells than items", () => {
+    expect(cellsFromCounts({ done: 2, total: 6, waiting: 1 }, 2)).toEqual([
+      "done",
+      "done",
+      "waiting",
+      "doing",
+      "doing",
+      "todo",
+    ]);
+    expect(cellsFromCounts({ done: 1, total: 2, waiting: 3 }, 5)).toEqual(["done", "waiting"]);
+    expect(cellsFromCounts({ done: 0, total: 3, waiting: 0 }, 1, { offline: true })).toEqual([
+      "stopped",
+      "todo",
+      "todo",
+    ]);
+    expect(cellsFromCounts({ done: 0, total: 0, waiting: 0 })).toEqual([]);
+  });
+
+  test("counts leave dropped items out", () => {
+    expect(
+      planCounts([{ status: "done" }, { status: "dropped" }, { status: "doing" }, { status: "waiting_you" }]),
+    ).toEqual({ total: 3, done: 1, doing: 1, waiting: 1 });
+  });
+});
+
+describe("what waits for you", () => {
+  test("only for whoever can act, in the card's order", () => {
+    expect(waitingParts(mission())).toEqual([
+      { key: "decisions", count: 2 },
+      { key: "reviews", count: 1 },
+    ]);
+    expect(waitingText(t, mission())).toBe("2 decisões, 1 revisão");
+    expect(waitingText(te, mission())).toBe("2 decisions, 1 review");
+    expect(waitingParts(mission({ canAct: false }))).toEqual([]);
+  });
+
+  test("open missions", () => {
+    expect(isOpenMission(mission())).toBe(true);
+    expect(isOpenMission(mission({ status: "proposed" }))).toBe(true);
+    expect(isOpenMission(mission({ status: "done" }))).toBe(false);
+  });
+});
+
+describe("time and sessions", () => {
+  test("spans read like the prototype", () => {
+    expect(formatSpan(t, 40)).toBe("40 s");
+    expect(formatSpan(t, 14 * 60)).toBe("14 min");
+    expect(formatSpan(t, 85 * 60)).toBe("1 h 25");
+    expect(formatSpan(t, 2 * 3600)).toBe("2 h");
+    expect(formatSpan(t, 50 * 3600)).toBe("2 dias");
+  });
+
+  test("a running task's time comes from its start; an ended one from its seconds", () => {
+    const now = Date.parse("2026-10-16T11:09:05.000Z");
+    expect(taskSeconds(task(), now)).toBe(545);
+    expect(taskSeconds(task({ status: "done", seconds: 840 }), now)).toBe(840);
+  });
+
+  test("a mission's sessions: running first, newest next; resumed ones show as their next task", () => {
+    const list = missionTasks(
+      [
+        task({ id: "old", status: "done", createdAt: "2026-10-16T10:00:00.000Z" }),
+        task({ id: "new", status: "done", createdAt: "2026-10-16T10:30:00.000Z" }),
+        task({ id: "run", status: "running", createdAt: "2026-10-16T09:00:00.000Z" }),
+        task({ id: "gone", status: "interrupted", resumedTaskId: "run" }),
+        task({ id: "other", missionId: "m2" }),
+      ],
+      "m1",
+    ).map((x) => x.id);
+    expect(list).toEqual(["run", "new", "old"]);
+  });
+
+  test("a PR named in a line", () => {
+    expect(prOf("✓ gh pr create --draft · PR #431")).toEqual({ number: "431", url: null });
+    expect(prOf("Opened https://github.com/acme/app/pull/12 as a draft")).toEqual({
+      number: "12",
+      url: "https://github.com/acme/app/pull/12",
+    });
+    expect(prOf("Writing apps/mobile/app.json")).toBeNull();
+    expect(prOf(null)).toBeNull();
+  });
+});
+
+describe("plan changes and the summary", () => {
+  test("the plan-change line's parts", () => {
+    expect(
+      planChangeParts({
+        added: [{ id: "1", title: "Build de desenvolvimento" }],
+        removed: [{ id: "2", title: "Drawer lateral" }],
+        changed: [
+          { id: "3", title: "Login", from: "doing", to: "done" },
+          { id: "4", title: "Tabs embaixo", from: "todo", to: "todo", renamedFrom: "Navegação" },
+        ],
+      }),
+    ).toEqual({
+      added: ["Build de desenvolvimento"],
+      removed: ["Drawer lateral"],
+      done: ["Login"],
+      renamed: [{ from: "Navegação", to: "Tabs embaixo" }],
+    });
+  });
+
+  test("the summary in the person's language: the plan always, the rest when there is some", () => {
+    const parts = summaryParts({
+      missionId: "m1",
+      text: "English text from the server",
+      plan: { done: 4, total: 12, doing: 2, waiting: 0 },
+      running: 2,
+      pendingDecisions: 1,
+      provisionalDecisions: 0,
+      pendingReviews: 0,
+    });
+    expect(parts.map((p) => p.key)).toEqual(["plan", "doing", "running", "decisions"]);
+    expect(parts.map((p) => t(`missions.summary.${p.key}`, { count: p.count, total: p.total ?? 0 }))).toEqual([
+      "4 de 12 itens prontos",
+      "2 itens em andamento",
+      "2 sessões rodando no computador",
+      "1 decisão esperando",
+    ]);
+  });
+});
+
+describe("composer commands", () => {
+  test("/mission needs a goal; the others take none", () => {
+    expect(parseMissionCommand("/mission construir o app mobile")).toEqual({
+      command: "mission",
+      arg: "construir o app mobile",
+    });
+    expect(parseMissionCommand("/mission")).toBeNull();
+    expect(parseMissionCommand("/stop")).toEqual({ command: "stop", arg: "" });
+    expect(parseMissionCommand(" /Summary ")).toEqual({ command: "summary", arg: "" });
+    expect(parseMissionCommand("/stop now please")).toBeNull();
+    expect(parseMissionCommand("please /stop")).toBeNull();
+    expect(parseMissionCommand("/relatório")).toBeNull();
+  });
+});
+
+describe("message meta", () => {
+  test("cards and lines read their meta (and ignore broken ones)", () => {
+    expect(
+      missionPlanOf({ missionPlan: { missionId: "m1", title: "App", goal: "G", computer: "Mac", executor: "claude" } }),
+    ).toEqual({ missionId: "m1", title: "App", goal: "G", computer: "Mac", executor: "claude" });
+    expect(missionPlanOf({ missionPlan: { title: "no id" } })).toBeNull();
+    expect(missionCardRef({ missionDecision: { id: "d1", missionId: "m1" } }, "missionDecision")).toEqual({
+      id: "d1",
+      missionId: "m1",
+    });
+    expect(missionCardRef({ missionReview: { id: "r1" } }, "missionReview")).toBeNull();
+    expect(
+      missionReportOf({
+        missionReport: { missionId: "m1", taskId: "t1", status: "working", executor: "claude", computer: "Mac" },
+      }),
+    ).toMatchObject({ missionId: "m1", taskId: "t1", main: false, computer: "Mac" });
+    expect(missionSuggestionOf({ missionSuggestion: { status: "pending", missionId: "m1" } })).toEqual({
+      status: "pending",
+      missionId: "m1",
+    });
+    expect(missionSuggestionOf({ missionSuggestion: { status: "weird", missionId: "m1" } })).toBeNull();
+    expect(
+      missionPlanChangeOf({
+        missionPlanChange: { missionId: "m1", version: 2, added: [{ id: "x", title: "A" }], removed: [], changed: [] },
+      })?.added,
+    ).toEqual([{ id: "x", title: "A" }]);
+    expect(
+      machineTaskOf({ machineTask: { id: "t1", title: "T", status: "done", seconds: 9, computer: "Mac" } }),
+    ).toMatchObject({ id: "t1", status: "done", seconds: 9 });
+  });
+
+  test("the computer's notices become lines; other codes don't", () => {
+    expect(taskNoticeOf({ bodyCode: "machine_offline", bodyParams: { computer: "Mac", count: 2 } })).toEqual({
+      code: "machine_offline",
+      params: { computer: "Mac", count: "2" },
+    });
+    expect(taskNoticeOf({ bodyCode: "machine_task_done", bodyParams: {} })?.code).toBe("machine_task_done");
+    expect(taskNoticeOf({ bodyCode: "mission_plan" })).toBeNull();
+    expect(taskNoticeOf(undefined)).toBeNull();
+  });
+
+  test("the channel doesn't load a mission's thread (its work lives in the thread view)", () => {
+    const base = {
+      channelId: "c",
+      threadId: null,
+      author: { type: "person" as const, id: "u1" },
+      mentionedAgentIds: [],
+      agentRunId: null,
+      createdAt: "2026-10-16T10:00:00.000Z",
+    };
+    const list = [
+      { ...base, id: "plain", body: "oi" },
+      { ...base, id: "mission", body: "goal", meta: { missionStart: { title: "App" } } },
+    ] as Message[];
+    expect(threadRootsToLoad(list)).toEqual(["plain"]);
+  });
+});
+
+describe("the .agentes/ files", () => {
+  test("headings, the server's checklist marks, bullets, quotes and paragraphs", () => {
+    const lines = mdLines(
+      [
+        "# App mobile",
+        "## Plano",
+        "- [x] Protótipos",
+        "- [~] Tela de chat",
+        "- [!] Navegação (tabs ou drawer)",
+        "- [-] Drawer lateral",
+        "- [ ] Notificações",
+        "- Até 3 tarefas em paralelo",
+        "> Resumo da conversa",
+        "",
+        "Texto",
+      ].join("\n"),
+    );
+    expect(lines).toEqual([
+      { kind: "h1", text: "App mobile" },
+      { kind: "h2", text: "Plano" },
+      { kind: "check", state: "done", text: "Protótipos" },
+      { kind: "check", state: "doing", text: "Tela de chat" },
+      { kind: "check", state: "waiting", text: "Navegação", note: "tabs ou drawer" },
+      { kind: "check", state: "dropped", text: "Drawer lateral" },
+      { kind: "check", state: "todo", text: "Notificações" },
+      { kind: "li", text: "Até 3 tarefas em paralelo" },
+      { kind: "quote", text: "Resumo da conversa" },
+      { kind: "blank" },
+      { kind: "p", text: "Texto" },
+    ]);
+  });
+
+  test("new lines since the last look (none the first time)", () => {
+    expect([...newLineIndexes(undefined, "a\nb")]).toEqual([]);
+    expect([...newLineIndexes("# Notas\n- a", "# Notas\n- a\n- b\n\n- c")]).toEqual([2, 4]);
+    expect([...newLineIndexes("- a\n- a", "- a\n- a\n- a")]).toEqual([2]);
+  });
+
+  test("the edit found on the computer as a small diff", () => {
+    expect(editDiff("- ## Jotai para o estado local\n+ ## Zustand para o estado local\nnoise")).toEqual([
+      { kind: "del", text: "## Jotai para o estado local" },
+      { kind: "add", text: "## Zustand para o estado local" },
+    ]);
+    expect(editDiff(undefined)).toEqual([]);
+  });
+});

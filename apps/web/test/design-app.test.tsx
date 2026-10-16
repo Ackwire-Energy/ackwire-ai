@@ -157,6 +157,7 @@ describe("composer in a DM", () => {
       expect.stringContaining("/relatório"),
       expect.stringContaining("/rotina"),
       expect.stringContaining("/pc"),
+      expect.stringContaining("/mission"),
     ]);
     await act(async () => fireEvent.keyDown(composer, { key: "Enter" }));
     expect(composer.value).toBe("monte um relatório sobre ");

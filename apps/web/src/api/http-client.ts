@@ -39,10 +39,18 @@ import type {
   IssueActivity,
   Machine,
   MachinePairing,
+  MachineTask,
   Me,
   Member,
   Memory,
   Message,
+  Mission,
+  MissionDecision,
+  MissionFiles,
+  MissionParticipants,
+  MissionPlan,
+  MissionReview,
+  MissionSummary,
   Model,
   Organization,
   OrgOverview,
@@ -457,6 +465,70 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       act: (orgId, threadId, action) =>
         request<ThreadInfo>(`${org(orgId)}/threads/${enc(threadId)}/${action}`, { json: {} }),
     },
+    missions: ((): HttpApi["missions"] => {
+      const one = (orgId: string, missionId: string) => `${org(orgId)}/missions/${enc(missionId)}`;
+      return {
+        list: async (orgId, status) =>
+          (await request<{ missions: Mission[] }>(`${org(orgId)}/missions`, { query: { status } })).missions,
+        create: (orgId, input) => request<Mission>(`${org(orgId)}/missions`, { json: input }),
+        get: (orgId, missionId) => request<Mission>(one(orgId, missionId)),
+        ofThread: (orgId, threadId) => request<Mission>(`${org(orgId)}/threads/${enc(threadId)}/mission`),
+        threadTasks: async (orgId, threadId) =>
+          (await request<{ tasks: MachineTask[] }>(`${org(orgId)}/threads/${enc(threadId)}/tasks`)).tasks,
+        control: (orgId, missionId, action) =>
+          request<Mission & { canceledTasks?: number }>(`${one(orgId, missionId)}/${action}`, { json: {} }),
+        close: (orgId, missionId, input) => request<Mission>(`${one(orgId, missionId)}/close`, { json: input }),
+        message: (orgId, missionId, text) =>
+          request<{ delivered: boolean; taskId?: string }>(`${one(orgId, missionId)}/messages`, { json: { text } }),
+        participants: (orgId, missionId) => request<MissionParticipants>(`${one(orgId, missionId)}/participants`),
+        setParticipant: (orgId, missionId, userId, role, existing) =>
+          existing
+            ? request<MissionParticipants>(`${one(orgId, missionId)}/participants/${enc(userId)}`, {
+                method: "PATCH",
+                json: { role },
+              })
+            : request<MissionParticipants>(`${one(orgId, missionId)}/participants`, { json: { userId, role } }),
+        removeParticipant: (orgId, missionId, userId) =>
+          request<void>(`${one(orgId, missionId)}/participants/${enc(userId)}`, { method: "DELETE" }),
+        transfer: (orgId, missionId, input) =>
+          request<Mission & { code?: string }>(`${one(orgId, missionId)}/transfer`, { json: input }),
+        setMachine: (orgId, missionId, machineId, repoDir) =>
+          request<Mission>(`${one(orgId, missionId)}/machine`, {
+            method: "PUT",
+            json: { machineId, ...(repoDir ? { repoDir } : {}) },
+          }),
+        decisions: async (orgId, missionId) =>
+          (await request<{ decisions: MissionDecision[] }>(`${one(orgId, missionId)}/decisions`)).decisions,
+        choose: (orgId, missionId, decisionId, option) =>
+          request<MissionDecision>(`${one(orgId, missionId)}/decisions/${enc(decisionId)}/choose`, {
+            json: { option },
+          }),
+        opinion: (orgId, missionId, decisionId, option) =>
+          request<MissionDecision>(`${one(orgId, missionId)}/decisions/${enc(decisionId)}/opinion`, {
+            json: { option },
+          }),
+        approveProvisional: async (orgId, missionId) =>
+          (
+            await request<{ decisions: MissionDecision[] }>(`${one(orgId, missionId)}/decisions/approve-provisional`, {
+              json: {},
+            })
+          ).decisions,
+        reviews: async (orgId, missionId) =>
+          (await request<{ reviews: MissionReview[] }>(`${one(orgId, missionId)}/reviews`)).reviews,
+        review: (orgId, missionId, reviewId, outcome, note) =>
+          request<MissionReview>(`${one(orgId, missionId)}/reviews/${enc(reviewId)}/${outcome}`, {
+            json: note ? { note } : {},
+          }),
+        suggestion: (orgId, missionId, messageId, outcome) =>
+          request<{ messageId: string; status: "accepted" | "declined" }>(
+            `${one(orgId, missionId)}/suggestions/${enc(messageId)}/${outcome}`,
+            { json: {} },
+          ),
+        files: (orgId, missionId) => request<MissionFiles>(`${one(orgId, missionId)}/files`),
+        summary: (orgId, missionId) => request<MissionSummary>(`${one(orgId, missionId)}/summary`),
+        plan: (orgId, missionId) => request<MissionPlan>(`${one(orgId, missionId)}/plan`),
+      };
+    })(),
     routines: {
       list: async (orgId) => (await request<{ routines: Routine[] }>(`${org(orgId)}/routines`)).routines,
       parseSchedule: (orgId, phrase, timezone) =>

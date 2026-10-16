@@ -314,6 +314,22 @@ export type ChannelEvent =
       agentId: string;
       runId: string;
       update: MemoryUpdate;
+    }
+  /** A background task on a connected computer changed (`task` is its whole view: replace). */
+  | { type: "machine.task"; channelId: string; threadId: string | null; task: MachineTask }
+  /** A mission changed (ADR 0029): `change` says what; refetch the mission for the rest. */
+  | {
+      type: "mission.updated";
+      channelId: string;
+      threadId: string;
+      missionId: string;
+      status: MissionStatus;
+      change: string;
+      decision?: MissionDecision;
+      review?: MissionReview;
+      messageId?: string;
+      planVersion?: number;
+      file?: string;
     };
 
 /** Events for one person (`{ type: "event", scope: "user" }` frames), e.g. approvals they can decide. */
@@ -329,7 +345,10 @@ export type ApprovalStatus = "pending" | "approved" | "refused" | "expired";
 /** A sensitive action waiting for a person (apps/server/src/routes/app/approvals.ts). */
 export interface Approval {
   id: string;
-  runId: string;
+  /** Null when a mission's executor asked (`missionId`). */
+  runId: string | null;
+  /** A mission's executor asked (ADR 0029). */
+  missionId?: string | null;
   agentId: string;
   channelId: string;
   threadId: string;
@@ -1650,7 +1669,7 @@ export interface WikiGraph {
 // ── Threads (ADR 0029; apps/server/src/routes/app/threads.ts) ──────────────────
 
 export type ThreadState = "open" | "closed" | "archived";
-export type ThreadTab = "all" | "working" | "closed" | "archived";
+export type ThreadTab = "all" | "working" | "missions" | "closed" | "archived";
 export type ThreadChange =
   | "created"
   | "title"
@@ -1707,7 +1726,18 @@ export interface ThreadInfo {
   needsYou: boolean;
   /** You may close, archive, rename or change the context. */
   canManage: boolean;
+  /** The thread's mission, in short (details: `GET …/threads/{id}/mission`). */
+  mission?: ThreadMissionSummary | null;
   createdAt: string;
+}
+
+export interface ThreadMissionSummary {
+  id: string;
+  status: MissionStatus;
+  planDone: number;
+  planTotal: number;
+  /** Plan items waiting for people, pending decisions and reviews. */
+  waitingYou: number;
 }
 
 export interface ThreadPage {
@@ -1756,4 +1786,246 @@ export interface ThreadStartMeta {
   count: number;
   moved: boolean;
   movedCount: number;
+}
+
+// ── Missions (ADR 0029; apps/server/src/routes/app/missions.ts) ────────────────
+
+export type MissionStatus = "proposed" | "active" | "paused" | "done" | "canceled";
+export type MissionRole = "owner" | "decide" | "comment" | "none";
+export type PlanItemStatus = "todo" | "doing" | "waiting_you" | "done" | "dropped";
+
+export interface PlanItem {
+  id: string;
+  title: string;
+  status: PlanItemStatus;
+  note?: string;
+}
+
+export interface Mission {
+  id: string;
+  /** The home thread (root message id). */
+  threadId: string;
+  channelId: string;
+  agentId: string;
+  ownerId: string | null;
+  /** "claude" | "codex". */
+  executor: string;
+  title: string;
+  goal: string;
+  status: MissionStatus;
+  repoDir: string;
+  resumeTasks: boolean;
+  plan: { version: number; done: number; total: number; waiting: number };
+  pending: { decisions: number; provisional: number; reviews: number; suggestions: number };
+  runningTasks: number;
+  machine: { id: string; name: string; online: boolean; lentBy: string | null } | null;
+  /** Handed over without a computer: the owner sets one. */
+  needsComputer: boolean;
+  /** Your role in it. */
+  role: MissionRole;
+  /** You may start work, decide, review, pause and stop. */
+  canAct: boolean;
+  /** You may close it and change who takes part. */
+  canManage: boolean;
+  createdAt: string;
+  startedAt: string | null;
+  pausedAt: string | null;
+  closedAt: string | null;
+  closeReason: string | null;
+  wikiPageId: string | null;
+}
+
+export type MissionListStatus = "open" | "closed" | MissionStatus;
+
+export interface MissionCreateInput {
+  agentId: string;
+  goal: string;
+  title?: string;
+  /** Where it starts (a new thread there). */
+  channelId?: string;
+  /** Or the thread that becomes its home. */
+  threadId?: string;
+  /** The repository on the computer, relative to the agent's folder. */
+  folder?: string;
+}
+
+export interface MissionDecision {
+  id: string;
+  missionId: string;
+  taskId: string | null;
+  messageId: string | null;
+  question: string;
+  options: string[];
+  recommendation: string | null;
+  why: string | null;
+  impact: string | null;
+  blocking: boolean;
+  status: "pending" | "provisional" | "taken";
+  chosen: string | null;
+  chosenBy: string | null;
+  chosenAt: string | null;
+  opinions: { userId: string; option: string; at: string }[];
+  createdAt: string;
+}
+
+export interface MissionReview {
+  id: string;
+  missionId: string;
+  taskId: string | null;
+  messageId: string | null;
+  title: string;
+  summary: string;
+  prUrl: string | null;
+  artifactIds: string[];
+  status: "pending" | "approved" | "changes_requested";
+  note: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+export type MissionParticipantRole = "decide" | "comment";
+
+export interface MissionParticipants {
+  owner: { userId: string; name: string } | null;
+  participants: {
+    userId: string;
+    name: string;
+    role: MissionParticipantRole;
+    addedBy: string | null;
+    createdAt: string;
+  }[];
+}
+
+export type MachineTaskStatus = "queued" | "running" | "interrupted" | "done" | "failed" | "canceled";
+
+/** A background task on a connected computer (one session of a mission's executor). */
+export interface MachineTask {
+  id: string;
+  agentId: string;
+  machineId: string;
+  channelId: string;
+  threadId: string | null;
+  missionId: string | null;
+  title: string;
+  executor: string;
+  status: MachineTaskStatus;
+  exitCode: number | null;
+  seconds: number | null;
+  lastLine: string | null;
+  files: string[];
+  branch: string | null;
+  cwd: string | null;
+  resumedFromId: string | null;
+  resumedTaskId: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  lastEventAt: string | null;
+  createdAt: string;
+}
+
+export type MissionFileName = "mission.md" | "decisions.md" | "notes.md";
+
+export interface MissionFile {
+  name: MissionFileName | string;
+  content: string | null;
+  source: string | null;
+  writtenAt: string | null;
+  updatedAt: string | null;
+}
+
+/** A `.agentes/` file edited on the machine: we kept the approved version. */
+export interface MissionFileEdit {
+  id?: string;
+  name?: string;
+  approved?: string;
+  edited?: string;
+  diff?: string;
+  at?: string;
+  [key: string]: unknown;
+}
+
+export interface MissionFiles {
+  files: MissionFile[];
+  editedOnMachine: MissionFileEdit[];
+}
+
+/** `/summary`: where it stands, from the database. */
+export interface MissionSummary {
+  missionId: string;
+  text: string;
+  plan: { done: number; total: number; doing: number; waiting: number };
+  running: number;
+  pendingDecisions: number;
+  provisionalDecisions: number;
+  pendingReviews: number;
+}
+
+export interface MissionPlanVersion {
+  version: number;
+  items: PlanItem[];
+  source: string;
+  taskId: string | null;
+  createdAt: string;
+}
+
+/** `/plan`: the latest version and the history. */
+export interface MissionPlan {
+  missionId: string;
+  current: MissionPlanVersion | null;
+  history: MissionPlanVersion[];
+}
+
+export type MissionControl = "start" | "pause" | "resume" | "stop";
+
+/** `meta.missionPlan`: the plan card (Começar / Mudar algo). */
+export interface MissionPlanMeta {
+  missionId: string;
+  title: string;
+  goal: string;
+  computer: string;
+  executor: string;
+}
+
+/** `meta.missionReport`: a report the executor wrote in the thread. */
+export interface MissionReportMeta {
+  missionId: string;
+  taskId: string;
+  status: string;
+  executor: string;
+  computer: string | null;
+  main: boolean;
+}
+
+/** `meta.missionPlanChange`: one line per plan change. */
+export interface MissionPlanChangeMeta {
+  missionId: string;
+  version: number;
+  added: { id: string; title: string }[];
+  removed: { id: string; title: string }[];
+  changed: { id: string; title: string; from: PlanItemStatus; to: PlanItemStatus; renamedFrom?: string }[];
+}
+
+/** `meta.missionSuggestion`: a person without the right to ask for work addressed the agent. */
+export interface MissionSuggestionMeta {
+  status: "pending" | "accepted" | "declined";
+  missionId: string;
+  by?: string;
+  at?: string;
+}
+
+/** `meta.machineTask`: the notice when a background task ended. */
+export interface MachineTaskMeta {
+  id: string;
+  title: string;
+  status: MachineTaskStatus;
+  exitCode: number | null;
+  seconds: number;
+  computer: string;
+  executor: string;
+  branch?: string;
+  lastLine?: string;
+  files?: string[];
+  result?: string;
+  missionId?: string;
 }

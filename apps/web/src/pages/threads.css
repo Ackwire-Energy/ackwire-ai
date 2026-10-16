@@ -24,6 +24,13 @@
   container: threads / inline-size;
 }
 
+.threads-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
 .threads-head h1 {
   margin: 0;
   font-family: var(--font-display);

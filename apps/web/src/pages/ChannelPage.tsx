@@ -32,6 +32,7 @@ import { Fragment, memo, type ReactNode, useEffect, useLayoutEffect, useMemo, us
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
+import { useCreateMission, useMissionControl, useThreadMission } from "@/api/missions";
 import {
   MESSAGES_PAGE,
   sendHelpers,
@@ -84,6 +85,19 @@ import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageMoreMenu, PersonMessageActions, QuoteReplyButton } from "@/components/MessageMore";
 import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
+import { MissionPanelProvider } from "@/components/missions/MissionBits";
+import {
+  MissionDecisionCard,
+  MissionEphemeral,
+  MissionPlanCard,
+  MissionPlanChangeLine,
+  MissionReportExtras,
+  MissionReviewCard,
+  MissionStartLink,
+  MissionSuggestionBar,
+  TaskNoticeLine,
+} from "@/components/missions/MissionCards";
+import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
@@ -115,6 +129,15 @@ import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { serverBody } from "@/lib/message-body";
+import {
+  isOpenMission,
+  missionPlanChangeOf,
+  missionPlanOf,
+  missionReportOf,
+  missionSuggestionOf,
+  parseMissionCommand,
+  taskNoticeOf,
+} from "@/lib/missions";
 import { reportPainted } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { localMeta, quoteExcerpt, replyOf } from "@/lib/reply";
@@ -162,6 +185,8 @@ export interface ChannelChrome {
   composerLabel?: string;
   /** In place of the composer (an archived thread's read-only note). */
   composerReplacement?: ReactNode;
+  /** Under the composer (a mission someone only reads: "para pedir algo, peça para participar"). */
+  composerNote?: ReactNode;
 }
 
 const sameRuns = (a: LiveRun[], b: LiveRun[]) => a.length === b.length && a.every((r, i) => r === b[i]);
@@ -285,14 +310,17 @@ export function ChannelPage({
     );
   }
   return (
-    <ChannelView
-      key={`${channel.id}:${thread?.id ?? ""}:${adjustThreadId ?? ""}`}
-      channel={channel}
-      chrome={chrome}
-      focusMessageId={focusMessageId}
-      adjustThreadId={adjustThreadId}
-      thread={thread}
-    />
+    // "Arquivos", "Ver plano", "Ver no arquivo": any mission card here opens the same files panel.
+    <MissionPanelProvider>
+      <ChannelView
+        key={`${channel.id}:${thread?.id ?? ""}:${adjustThreadId ?? ""}`}
+        channel={channel}
+        chrome={chrome}
+        focusMessageId={focusMessageId}
+        adjustThreadId={adjustThreadId}
+        thread={thread}
+      />
+    </MissionPanelProvider>
   );
 }
 
@@ -372,7 +400,7 @@ function ChannelView({
     () =>
       new Set([
         ...threadList.filter((x) => x.state !== "open").map((x) => x.id),
-        ...(channelMessages.data ?? []).filter((m) => threadStartOf(m.meta)).map((m) => m.id),
+        ...(channelMessages.data ?? []).filter((m) => threadStartOf(m.meta) || m.meta?.missionStart).map((m) => m.id),
       ]),
     [threadList, channelMessages.data],
   );
@@ -410,6 +438,12 @@ function ChannelView({
   const [replyTo, setReplyTo] = useState<MessageType | null>(null);
   // "Responder": the next message quotes this one (`meta.replyTo`), in the same conversation.
   const [quote, setQuote] = useState<MessageType | null>(null);
+  // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
+  const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
+  // `/summary` and `/plan`: a card only I see, under the conversation.
+  const [ephemeral, setEphemeral] = useState<{ kind: "summary" | "plan"; missionId: string } | null>(null);
+  // `/mission` with several agents and none named: "Nova missão" with the goal filled in.
+  const [missionDraft, setMissionDraft] = useState<string | null>(null);
   draftRef.current = draft;
   useEffect(() => {
     if (draftKey) clearDraft(draftKey);
@@ -683,8 +717,22 @@ function ChannelView({
   );
   const pillAgents = dmAgent ? [dmAgent] : draftAgents;
   const composerPills =
-    pillAgents.length > 0 || replyTo ? (
+    pillAgents.length > 0 || replyTo || missionReply ? (
       <>
+        {missionReply && (
+          <span className="ac-composer__pill composer-reply">
+            <Icon name="message" size={14} />
+            {t("missions.reply.pill", { label: missionReply.label })}
+            <button
+              type="button"
+              className="composer-reply__close"
+              aria-label={t("missions.reply.cancel")}
+              onClick={() => setMissionReply(null)}
+            >
+              <Icon name="close" size={14} />
+            </button>
+          </span>
+        )}
         {replyTo && (
           <span className="ac-composer__pill composer-reply">
             <Icon name="message" size={14} />
@@ -738,6 +786,94 @@ function ChannelView({
         },
       ]
     : [];
+  // Mission commands (English, like the server's): `/mission` anywhere with an agent; the rest in a mission's thread.
+  const threadMission = useThreadMission(org.id, thread?.id);
+  const homeMission = threadMission.data && isOpenMission(threadMission.data) ? threadMission.data : null;
+  if (commandAgent && !homeMission) {
+    commands.push({
+      key: "mission",
+      label: "/mission",
+      description: t("missions.commands.mission"),
+      leading: <Icon name="flag" size={16} />,
+      insert: "/mission ",
+    });
+  }
+  if (homeMission) {
+    const run = (text: string) => () => void runCommand(text);
+    const can = homeMission.canAct;
+    commands.push(
+      ...[
+        { key: "summary" as const, icon: "layers" as const, show: true },
+        { key: "plan" as const, icon: "document" as const, show: true },
+        { key: "pause" as const, icon: "pause" as const, show: can && homeMission.status === "active" },
+        { key: "resume" as const, icon: "play" as const, show: can && homeMission.status === "paused" },
+        { key: "stop" as const, icon: "stop" as const, show: can && homeMission.status !== "proposed" },
+      ]
+        .filter((c) => c.show)
+        .map((c) => ({
+          key: c.key,
+          label: `/${c.key}`,
+          description: t(`missions.commands.${c.key}`),
+          leading: <Icon name={c.icon} size={16} />,
+          ...(c.key === "stop" ? { insert: "/stop" } : { insert: "", onPick: run(`/${c.key}`) }),
+        })),
+    );
+  }
+  const createMission = useCreateMission(org.id);
+  const missionControl = useMissionControl(org.id);
+  /** `/mission`, `/stop`, `/pause`, `/resume`, `/summary`, `/plan`: nothing is posted. True when handled. */
+  async function runCommand(text: string): Promise<boolean> {
+    const cmd = parseMissionCommand(text);
+    if (!cmd) return false;
+    setDraft("");
+    if (cmd.command === "mission") {
+      const named = mentioned(cmd.arg)[0];
+      const agentId = named ?? dmAgent?.id ?? (channelAgents.length === 1 ? channelAgents[0]?.id : undefined);
+      if (!agentId) {
+        setMissionDraft(cmd.arg);
+        return true;
+      }
+      createMission.mutate(
+        { agentId, goal: cmd.arg, ...(thread ? { threadId: thread.id } : { channelId: channel.id }) },
+        {
+          onSuccess: (mission) => {
+            toast.show(t("missions.new.created", { name: dir.agentById.get(agentId)?.name ?? "" }));
+            if (mission.threadId !== thread?.id) {
+              void navigateTo({
+                to: "/org/$orgId/threads/$threadId",
+                params: { orgId: org.id, threadId: mission.threadId },
+              });
+            }
+          },
+          onError: (error) => toast.show(errorText(t, error), "error"),
+        },
+      );
+      return true;
+    }
+    const mission = threadMission.data;
+    if (!mission) {
+      toast.show(t("missions.commands.noMission"), "error");
+      return true;
+    }
+    if (cmd.command === "summary" || cmd.command === "plan") {
+      setEphemeral({ kind: cmd.command, missionId: mission.id });
+      return true;
+    }
+    const action = cmd.command;
+    missionControl.mutate(
+      { missionId: mission.id, action },
+      {
+        onSuccess: (out) =>
+          toast.show(
+            action === "stop"
+              ? t("missions.toast.stopped", { count: out.canceledTasks ?? 0 })
+              : t(`missions.toast.${action}`),
+          ),
+        onError: (error) => toast.show(errorText(t, error), "error"),
+      },
+    );
+    return true;
+  }
 
   // Any new page of data (first load, refetch, cache → server) re-pins while at the bottom,
   // without waiting for observers (some environments have none).
@@ -838,6 +974,23 @@ function ChannelView({
 
   const onSend = (text: string) => {
     if (uploading || (!text && attached.length === 0)) return;
+    if (attached.length === 0 && parseMissionCommand(text)) {
+      void runCommand(text);
+      return;
+    }
+    if (missionReply && text) {
+      const target = missionReply;
+      setDraft("");
+      setMissionReply(null);
+      api.missions
+        .message(org.id, target.missionId, text)
+        .then((out) => toast.show(out.delivered ? t("missions.reply.sent") : t("missions.reply.queued")))
+        .catch((error) => {
+          setDraft(text);
+          toast.show(errorText(t, error), "error");
+        });
+      return;
+    }
     toBottom(true);
     setDraft("");
     const meta = localMeta(quote, quote ? dir.authorName(quote.author) : "", attached);
@@ -946,6 +1099,11 @@ function ChannelView({
     jumpTo,
     // "Criar thread a partir daqui": the suggested range becomes a thread's context (not in a thread view).
     createThreadFrom: thread || adjustThreadId ? undefined : createThreadFrom,
+    replyToMission: (missionId, label) => {
+      setMissionReply({ missionId, label });
+      setReplyTo(null);
+      composer.current?.focus();
+    },
   };
 
   const agentNames = joinNames(
@@ -1089,6 +1247,13 @@ function ChannelView({
                     )}
                   </>
                 )}
+                {ephemeral && (
+                  <MissionEphemeral
+                    kind={ephemeral.kind}
+                    missionId={ephemeral.missionId}
+                    onClose={() => setEphemeral(null)}
+                  />
+                )}
                 <LiveMemoryCards channelId={channel.id} />
                 <LiveNotices channelId={channel.id} />
                 {unanchored.map((runId) => (
@@ -1206,7 +1371,7 @@ function ChannelView({
                               leading: <Icon name="book" size={16} />,
                             })),
                       }}
-                      commands={commandAgent ? { listLabel: t("composer.commands"), list: commands } : undefined}
+                      commands={commands.length > 0 ? { listLabel: t("composer.commands"), list: commands } : undefined}
                       mentions={{
                         search: mentionSearch,
                         listLabel: t("mentions.list"),
@@ -1217,6 +1382,9 @@ function ChannelView({
                     />
                     {offer && (
                       <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />
+                    )}
+                    {chrome?.composerNote && !workingRun && !chrome.locked && (
+                      <p className="ac-composer__hint">{chrome.composerNote}</p>
                     )}
                     {(workingRun || chrome?.locked) && (
                       <p className="ac-composer__hint">
@@ -1244,6 +1412,15 @@ function ChannelView({
           )}
 
           {!chrome?.header && <ChannelDetails open={detailsOpen} onOpenChange={setDetailsOpen} channel={channel} />}
+          {missionDraft !== null && (
+            <NewMissionDialog
+              open
+              onOpenChange={(o) => !o && setMissionDraft(null)}
+              initialGoal={missionDraft}
+              initialChannelId={chrome?.dmAgentId ? undefined : channel.id}
+              initialAgentId={channelAgents[0]?.id}
+            />
+          )}
         </main>
       </ChannelThreadsContext.Provider>
     </ChannelActionsContext.Provider>
@@ -1291,6 +1468,9 @@ const Timeline = memo(function Timeline({
   let afterLive = false;
   /** A closed thread is one line; the root of a thread made from a range is its marker (or stub). */
   const threadRow = (key: string, m: MessageType) => {
+    // A mission's automatic lines (the plan changed, the computer went offline, a task ended): not a voice.
+    if (missionPlanChangeOf(m.meta)) return <MissionPlanChangeLine key={key} message={m} />;
+    if (taskNoticeOf(m.meta)) return <TaskNoticeLine key={key} message={m} />;
     if (!threadsView) return null;
     const info = threadsView.byId.get(m.id);
     if (info?.state === "closed") return <ClosedThreadLine key={key} thread={info} />;
@@ -1825,7 +2005,16 @@ export const TimelineMessage = memo(function TimelineMessage({
   const quoted = useMemo(() => replyOf(m.meta), [m.meta]);
   // An agent opened a forum topic from here: the topic card with "Ver discussão".
   const forumTopicId = m.author.type === "agent" ? forumTopicOfMessage(meta) : null;
-  const card = approvalId || proposalId || memoryUpdates.length > 0 || question || secretRequest;
+  // A mission's cards (ADR 0029): the plan, a decision, a review; a report says where it ran.
+  const missionPlan = m.author.type === "agent" ? missionPlanOf(meta) : null;
+  const missionDecision = m.author.type === "agent" && meta.missionDecision ? m : null;
+  const missionReview = m.author.type === "agent" && meta.missionReview ? m : null;
+  const missionReport = m.author.type === "agent" ? missionReportOf(meta) : null;
+  const missionSuggestion = m.author.type === "person" ? missionSuggestionOf(meta) : null;
+  const missionCard = Boolean(missionPlan || missionDecision || missionReview);
+  // The root of a mission in the channel: its work lives in its thread.
+  const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.replyInThread !== undefined;
+  const card = approvalId || proposalId || memoryUpdates.length > 0 || question || secretRequest || missionCard;
   const feedback = m.author.type === "agent" && !card && !m.local;
   // People see name, time and text; the date, model and tokens wait behind the time.
   const usage = m.author.type === "agent" ? messageUsage(m) : null;
@@ -1925,11 +2114,18 @@ export const TimelineMessage = memo(function TimelineMessage({
         </p>
       )}
       {quoted && <QuotedMessage reply={quoted} />}
-      {(!routine || routineOpen) && (body.trim() || (!card && !canceledNote && artifacts.length === 0)) && (
-        <MessageText>
-          <MessageBody body={body} resolveMention={dir.mentionName} renderMention={renderMention} wikiLink={wikiLink} />
-        </MessageText>
-      )}
+      {(!routine || routineOpen) &&
+        !missionCard &&
+        (body.trim() || (!card && !canceledNote && artifacts.length === 0)) && (
+          <MessageText>
+            <MessageBody
+              body={body}
+              resolveMention={dir.mentionName}
+              renderMention={renderMention}
+              wikiLink={wikiLink}
+            />
+          </MessageText>
+        )}
       {canceledNote && <p className="ac-msg__activity run-canceled">{canceledNote}</p>}
       {m.local === "failed" && (
         <p className="ac-msg__error" role="alert">
@@ -1950,6 +2146,12 @@ export const TimelineMessage = memo(function TimelineMessage({
         <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} />
       )}
       {forumTopicId && <ForumMessageCard topicId={forumTopicId} />}
+      {missionPlan && <MissionPlanCard plan={missionPlan} />}
+      {missionDecision && <MissionDecisionCard message={missionDecision} />}
+      {missionReview && <MissionReviewCard message={missionReview} />}
+      {missionReport && <MissionReportExtras report={missionReport} message={m} />}
+      {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
+      {missionStart && <MissionStartLink message={m} />}
       {artifacts.length > 0 && (
         <div className="artifact-cards">
           {artifacts.map((r) => (

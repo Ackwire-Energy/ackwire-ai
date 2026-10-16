@@ -21,6 +21,8 @@ export interface ChannelActions {
   jumpTo?: (messageId: string) => void;
   /** "Criar thread a partir daqui": a thread whose context is the conversation from this message on. */
   createThreadFrom?: (message: MessageType) => void;
+  /** "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano"). */
+  replyToMission?: (missionId: string, label: string) => void;
 }
 export const ChannelActionsContext = createContext<ChannelActions | null>(null);
 export const useChannelActions = () => useContext(ChannelActionsContext);

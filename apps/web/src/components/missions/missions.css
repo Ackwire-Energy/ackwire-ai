@@ -1,0 +1,1149 @@
+/*
+ * Missions in the thread (telas/ThreadContexto.html, "App mobile") and on
+ * the Missões tab (telas/Threads.html): the plan card, the pinned card with
+ * the plan strip, one row per session, the decision and review cards, the
+ * plan-change and computer lines, the files panel and the mission cards.
+ * Neutral surfaces (ink and gray); blue only for the agent (avatar, the
+ * running icon, the streaming cursor). Mono only for paths and branches.
+ */
+
+/* ── Shared ─────────────────────────────────────────────────────────────── */
+.mi-card {
+  position: relative;
+  max-width: 680px;
+  margin-top: 10px;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  animation: mi-pop 0.3s var(--spring) both;
+}
+@keyframes mi-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mi-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.mi-cap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.mi-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.mi-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.mi-foot__grow {
+  flex: 1;
+}
+.mi-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.mi-hint code,
+.mi-mono {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink2);
+}
+.mi-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sunken);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink2);
+  white-space: nowrap;
+}
+button.mi-pill {
+  cursor: pointer;
+}
+button.mi-pill:hover {
+  background: color-mix(in srgb, var(--ink) 10%, var(--sunken));
+}
+button.mi-pill:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.mi-pill small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--faint);
+}
+.mi-pill--need {
+  background: var(--ink);
+  color: var(--bg);
+}
+button.mi-pill--need:hover {
+  background: var(--ink);
+  filter: brightness(1.12);
+}
+.mi-pill--need .ac-icon {
+  color: var(--bg);
+}
+.mi-run {
+  display: inline-flex;
+  color: var(--agent);
+}
+.mi-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.mi-stamp {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--raised) 86%, transparent);
+  font-size: 15px;
+  font-weight: 650;
+  animation: mi-fade 0.2s var(--out) both;
+}
+.mi-ok {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--bg);
+}
+.mi-decided {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.mi-decided__t {
+  flex: 1;
+  min-width: 0;
+}
+.mi-decided__t b {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.mi-decided__t small {
+  display: block;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.mi-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink2);
+  cursor: pointer;
+}
+.mi-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.mi-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 11px;
+  flex: none;
+  border-radius: 1px;
+  background: var(--agent);
+  animation: mi-blink 1s steps(2, start) infinite;
+}
+@keyframes mi-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* ── Plan card ("Plano do Claude Code") ───────────────────────────────────── */
+.mi-plan {
+  max-width: 640px;
+  padding: 0;
+  overflow: hidden;
+}
+.mi-plan__head {
+  padding: 16px 16px 4px;
+}
+.mi-plan__head h3 {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.mi-plan__head p {
+  margin-top: 4px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.mi-plan__list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 10px 16px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+  color: var(--ink2);
+}
+.mi-plan__list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mi-box {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+}
+.mi-box--on {
+  background: var(--ink);
+  box-shadow: none;
+  color: var(--bg);
+}
+.mi-plan__note {
+  margin: 8px 16px 0 40px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.mi-plan__meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 16px 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.mi-plan__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 16px;
+}
+.mi-created {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-width: 640px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+}
+.mi-created .mi-ok {
+  width: 32px;
+  height: 32px;
+}
+
+/* ── Pinned card ─────────────────────────────────────────────────────────── */
+.mi-pinned {
+  position: sticky;
+  top: -8px;
+  z-index: 6;
+  margin: 0 12px 8px;
+  padding: 12px 14px 0;
+  border-radius: 18px;
+  background: var(--raised);
+  box-shadow: var(--e2), var(--top);
+  animation: mi-pop 0.32s var(--spring) both;
+}
+.mi-pinned__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.mi-pinned__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mi-pinned__title b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.mi-pinned__lab {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.mi-pinned__strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.mi-pinned__strip b {
+  font-weight: 650;
+  white-space: nowrap;
+}
+.mi-pinned__pills {
+  padding: 8px 0 12px;
+}
+.mi-pinned__sessions {
+  margin: 0 -14px;
+  border-top: 1px solid var(--line);
+}
+.mi-pinned__sessions .mi-sessions {
+  margin: 0;
+  max-width: none;
+  border-radius: 0 0 18px 18px;
+  box-shadow: none;
+}
+
+/* ── Sessions: one row per session (status, title, one human line, time, PR) ─ */
+.mi-sessions {
+  max-width: 640px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.mi-sessions__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+.mi-sessions__head:hover {
+  background: rgba(127, 127, 127, 0.06);
+}
+.mi-sessions__head b {
+  font-weight: 600;
+  color: var(--ink2);
+}
+.mi-sessions__head .ac-icon {
+  flex: none;
+  transition: transform 0.2s var(--out);
+}
+.mi-sessions__head[aria-expanded="true"] > .ac-icon {
+  transform: rotate(90deg);
+}
+.mi-session {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink2);
+}
+.mi-session:hover {
+  background: rgba(127, 127, 127, 0.05);
+}
+.mi-session__icon {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--sunken);
+  color: var(--ink2);
+}
+.mi-session__icon[data-state="done"] {
+  background: var(--ink);
+  color: var(--bg);
+}
+.mi-session__icon[data-state="running"] {
+  background: transparent;
+  color: var(--agent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--agent) 30%, transparent);
+}
+.mi-session__icon[data-state="failed"] {
+  color: var(--danger);
+}
+.mi-session__title {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mi-session__title b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 600;
+}
+.mi-session__title b > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mi-session__title b > .ac-icon {
+  flex: none;
+  color: var(--faint);
+  transition: transform 0.2s var(--out);
+}
+.mi-session__title[aria-expanded="true"] b > .ac-icon {
+  transform: rotate(90deg);
+}
+.mi-session__line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.mi-session__line > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: mi-fade 0.35s var(--out);
+}
+.mi-session__branch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--faint);
+}
+.mi-session__branch code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--faint);
+}
+.mi-session__end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 1px;
+}
+.mi-session__time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--faint);
+}
+.mi-session__time[data-live] {
+  font-weight: 600;
+  color: var(--ink2);
+}
+.mi-pr {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sunken);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink2);
+  white-space: nowrap;
+  text-decoration: none;
+}
+a.mi-pr:hover {
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.mi-session__more {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 0 14px 10px 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sunken);
+  animation: mi-fade 0.25s var(--out) both;
+}
+.mi-session__more h4 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ink2);
+}
+.mi-session__more h4 span {
+  font-weight: 500;
+  color: var(--faint);
+}
+.mi-session__files {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mi-session__files code {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink2);
+}
+.mi-session__none {
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.mi-log {
+  margin: 0;
+  padding: 8px 10px;
+  overflow-x: auto;
+  border-radius: 10px;
+  background: var(--raised);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink2);
+}
+
+/* ── Decision and review cards ───────────────────────────────────────────── */
+.mi-q h3 {
+  font-size: 16.5px;
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+.mi-q p {
+  max-width: 70ch;
+  margin-top: 4px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.mi-opts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+.mi-why {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--sunken);
+  font-size: 13.5px;
+  color: var(--ink2);
+}
+.mi-why__k {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding-top: 1px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  color: var(--faint);
+}
+.mi-opinions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.mi-opinions b {
+  font-weight: 600;
+  color: var(--ink2);
+}
+.mi-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ── Lines in the thread (automatic, not a voice) ────────────────────────── */
+.mi-evt {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 4px 12px 4px var(--thread-indent, 56px);
+  font-size: 12.5px;
+  color: var(--faint);
+  animation: mi-fade 0.35s var(--out) both;
+}
+.mi-evt b {
+  font-weight: 600;
+  color: var(--ink2);
+}
+.mi-evt code {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink2);
+}
+.mi-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--faint);
+}
+.mi-suggest {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ── Ephemeral cards (`/summary`, `/plan`): only you see them ─────────────── */
+.mi-ephemeral {
+  margin: 8px 12px 4px var(--thread-indent, 56px);
+  max-width: 640px;
+}
+.mi-ephemeral__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mi-ephemeral__head b {
+  flex: 1;
+  font-size: 14.5px;
+  font-weight: 650;
+}
+.mi-ephemeral ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+  color: var(--ink2);
+}
+.mi-ephemeral li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mi-ephemeral li small {
+  font-size: 12px;
+  color: var(--faint);
+}
+.mi-ephemeral__foot {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* ── Files panel (side panel on desktop, bottom sheet on a phone) ─────────── */
+.mi-files.ac-sheet {
+  top: 64px;
+  right: 12px;
+  bottom: 12px;
+  width: min(460px, calc(100vw - 24px));
+  overflow: hidden;
+  border-radius: 22px;
+}
+.mi-files .ac-sheet__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+}
+.mi-files__tabs {
+  padding: 0 16px 10px;
+}
+.mi-files__tabs button {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.mi-files__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--faint);
+}
+.mi-files__meta > b {
+  font-weight: 600;
+  color: var(--ink2);
+}
+.mi-files__edited {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mi-files__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 18px 20px;
+}
+.mi-files__diff {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 16px;
+  animation: mi-fade 0.3s var(--out) both;
+}
+.mi-files__diff small {
+  font-size: 12px;
+  color: var(--faint);
+}
+.mi-files__foot {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--faint);
+}
+.mi-md {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink2);
+}
+.mi-md__l {
+  margin: 0 -8px;
+  padding: 1px 8px;
+  border-radius: 6px;
+}
+.mi-md__l[data-fresh] {
+  animation: mi-fade 0.35s var(--out) both;
+}
+.mi-md__h1 {
+  margin: 2px -8px 6px;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.mi-md__h2 {
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.mi-md__li {
+  position: relative;
+  padding-left: 22px;
+}
+.mi-md__li::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 0.72em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.mi-md__check {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-left: 8px;
+}
+.mi-md__check .mi-box {
+  width: 13px;
+  height: 13px;
+  transform: translateY(2px);
+}
+.mi-md__check[data-state="done"] {
+  color: var(--muted);
+}
+.mi-md__check[data-state="dropped"] > span:last-child {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+.mi-md__check small,
+.mi-md__at {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  color: var(--faint);
+}
+.mi-md__quote {
+  margin-top: 6px;
+  color: var(--muted);
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.mi-md__p {
+  margin-top: 4px;
+}
+.mi-md code {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--ink);
+}
+.mi-md__empty {
+  color: var(--faint);
+}
+
+/* ── Share and close dialogs ─────────────────────────────────────────────── */
+.mi-people {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mi-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 0;
+}
+.mi-person__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.mi-person__name small {
+  font-weight: 500;
+  color: var(--faint);
+}
+.mi-section-title {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--faint);
+}
+.mi-optrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 14px;
+}
+.mi-optrow > div {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.mi-optrow small {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--faint);
+}
+.mi-notes {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--sunken);
+  font-size: 13px;
+  color: var(--ink2);
+}
+.mi-notes .ac-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--faint);
+}
+.mi-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.mi-field__label {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--faint);
+}
+.mi-grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* ── Missões tab: mission cards ──────────────────────────────────────────── */
+.mi-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.mi-tab .mi-section-title {
+  margin-top: 0;
+}
+.mi-mcs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mi-mc {
+  position: relative;
+  padding: 16px 16px 12px;
+  border-radius: 20px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  transition: box-shadow 0.2s var(--out);
+  animation: mi-fade 0.3s var(--out) both;
+}
+.mi-mc:hover {
+  box-shadow: var(--e2), var(--top);
+}
+.mi-mc__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.mi-mc__t {
+  flex: 1;
+  min-width: 0;
+}
+.mi-mc__t h3 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+.mi-mc__t h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+.mi-mc__t h3 a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+}
+.mi-mc__t small {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.mi-mc__r {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mi-lnk {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink2);
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.mi-lnk:hover {
+  text-decoration-color: var(--ink);
+}
+.mi-mc__strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.mi-mc__strip b {
+  font-weight: 650;
+  white-space: nowrap;
+}
+.mi-mc__pills {
+  padding-top: 12px;
+}
+.mi-mc__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 760px) {
+  .mi-pinned {
+    position: relative;
+    top: 0;
+    margin: 0 4px 8px;
+  }
+  .mi-plan__head,
+  .mi-plan__list {
+    padding-left: 0;
+  }
+  .mi-card {
+    padding: 14px;
+  }
+  .mi-opts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mi-why {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .mi-session__more {
+    margin-left: 14px;
+  }
+  .mi-session__branch {
+    display: none;
+  }
+  .mi-evt,
+  .mi-ephemeral {
+    margin-left: 12px;
+  }
+  .mi-grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mi-files.ac-sheet {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: 84dvh;
+    border-radius: 22px 22px 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mi-card,
+  .mi-pinned,
+  .mi-evt,
+  .mi-mc,
+  .mi-md__l[data-fresh],
+  .mi-session__line > span:first-child,
+  .mi-session__more,
+  .mi-stamp {
+    animation: none;
+  }
+  .mi-cursor {
+    animation: none;
+  }
+}
