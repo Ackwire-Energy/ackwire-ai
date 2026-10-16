@@ -2332,6 +2332,13 @@ a.ac-list__row:focus-visible {
     transform: rotate(360deg);
   }
 }
+/* The spinner icon turns everywhere it is used (Icon adds the class). */
+@media (prefers-reduced-motion: no-preference) {
+  .ac-icon--spin {
+    transform-origin: 50% 50%;
+    animation: ac-spin 0.9s linear infinite;
+  }
+}
 /* Loading button: the label keeps its width under the spinner. */
 .ac-btn--loading {
   position: relative;

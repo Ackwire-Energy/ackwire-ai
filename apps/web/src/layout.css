@@ -3197,9 +3197,6 @@ button.drive-where:focus-visible {
   .computer-chip {
     animation: computer-chip-in 200ms ease-out;
   }
-  .computer-chip--busy .ac-icon {
-    animation: computer-spin 900ms linear infinite;
-  }
 }
 @keyframes computer-chip-in {
   from {
@@ -3207,11 +3204,6 @@ button.drive-where:focus-visible {
   }
   to {
     opacity: 1;
-  }
-}
-@keyframes computer-spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 
