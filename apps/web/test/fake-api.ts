@@ -34,6 +34,7 @@ import { createMockPlanning } from "./fakes/planning";
 import { createFakeSandbox } from "./fakes/sandbox";
 import { createFakeSkills } from "./fakes/skills";
 import { createMockStorage } from "./fakes/storage";
+import { createFakeThreads } from "./fakes/threads";
 import { createFakeWiki } from "./fakes/wiki";
 
 export const NOW = new Date("2026-10-14T13:44:00.000Z");
@@ -574,6 +575,7 @@ type FakedParts =
   | "artifacts"
   | "issues"
   | "routines"
+  | "threads"
   | "calendar"
   | "customConnectors";
 
@@ -1372,6 +1374,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     machines: machines.client,
     forum: createFakeForum(ctx, (method, ...args) => state.calls.push({ method, args })),
     wiki: createFakeWiki(ctx, (method, ...args) => state.calls.push({ method, args })),
+    threads: createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args })),
     skills: createFakeSkills(ctx, (method, ...args) => state.calls.push({ method, args })),
     access: createFakeAccess(
       (orgId) => http.connectors.list(orgId),

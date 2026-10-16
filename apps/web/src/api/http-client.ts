@@ -66,6 +66,9 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
+  ThreadFilters,
+  ThreadInfo,
+  ThreadPage,
   TrashedArtifact,
   UsageReport,
   WikiGraph,
@@ -77,6 +80,18 @@ import type {
 } from "./types";
 
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
+
+/** The list's query string (booleans as "true"; nothing for what isn't set). */
+const threadQuery = (f: Partial<ThreadFilters>) => ({
+  tab: f.tab,
+  channelId: f.channelId,
+  agentId: f.agentId,
+  needsYou: f.needsYou ? "true" : undefined,
+  mine: f.mine ? "true" : undefined,
+  q: f.q?.trim() || undefined,
+  cursor: f.cursor,
+  limit: f.limit,
+});
 
 /** The real backend: `/api/health` and `/api/app/*` (apps/server/src/routes/app). */
 export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
@@ -429,6 +444,18 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         }),
       askAgent: (orgId, id, agentId) =>
         request<Issue>(`${org(orgId)}/issues/${enc(id)}/ask-agent`, { json: { agentId } }),
+    },
+    threads: {
+      list: (orgId, filters = {}) => request<ThreadPage>(`${org(orgId)}/threads`, { query: threadQuery(filters) }),
+      inChannel: (orgId, channelId, filters = {}) =>
+        request<ThreadPage>(`${org(orgId)}/channels/${enc(channelId)}/threads`, { query: threadQuery(filters) }),
+      get: (orgId, threadId) => request<ThreadInfo>(`${org(orgId)}/threads/${enc(threadId)}`),
+      create: (orgId, input) => request<ThreadInfo>(`${org(orgId)}/threads`, { json: input }),
+      update: (orgId, threadId, patch) =>
+        request<ThreadInfo>(`${org(orgId)}/threads/${enc(threadId)}`, { method: "PATCH", json: patch }),
+      remove: (orgId, threadId) => request<void>(`${org(orgId)}/threads/${enc(threadId)}`, { method: "DELETE" }),
+      act: (orgId, threadId, action) =>
+        request<ThreadInfo>(`${org(orgId)}/threads/${enc(threadId)}/${action}`, { json: {} }),
     },
     routines: {
       list: async (orgId) => (await request<{ routines: Routine[] }>(`${org(orgId)}/routines`)).routines,

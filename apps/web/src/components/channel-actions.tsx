@@ -19,6 +19,8 @@ export interface ChannelActions {
   quoteReply?: (message: MessageType) => void;
   /** A quote was clicked: scroll to the original and highlight it (paging back if needed). */
   jumpTo?: (messageId: string) => void;
+  /** "Criar thread a partir daqui": a thread whose context is the conversation from this message on. */
+  createThreadFrom?: (message: MessageType) => void;
 }
 export const ChannelActionsContext = createContext<ChannelActions | null>(null);
 export const useChannelActions = () => useContext(ChannelActionsContext);

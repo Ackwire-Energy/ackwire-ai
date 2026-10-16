@@ -1,5 +1,6 @@
 import type { Approval, Message } from "@/api/types";
 import { isRoutineCall, routineOfMessage } from "@/lib/routines";
+import { threadStartOf } from "@/lib/threads";
 import type { LiveRun } from "@/realtime/streams";
 
 const byTime = (a: { createdAt: string; id: string }, b: { createdAt: string; id: string }) =>
@@ -25,10 +26,13 @@ export function mergeTimeline(topLevel: Message[], threads: (Message[] | undefin
   return [...seen.values()].sort(byTime);
 }
 
-/** Top-level messages whose threads we load: the latest ones written by people (agents answer those). */
+/**
+ * Top-level messages whose threads we load: the latest ones written by people (agents answer those).
+ * Not the root of a thread made from a range: its conversation lives in the thread view.
+ */
 export function threadRootsToLoad(topLevel: Message[], max = 20): string[] {
   return topLevel
-    .filter((m) => m.author.type === "person")
+    .filter((m) => m.author.type === "person" && !threadStartOf(m.meta))
     .slice(-max)
     .map((m) => m.id);
 }

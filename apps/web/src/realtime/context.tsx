@@ -16,6 +16,7 @@ import type {
   MemoryUpdate,
   Message,
   SecretRequest,
+  ThreadInfo,
 } from "@/api/types";
 import { formatPercent } from "@/lib/format";
 import { useToast } from "@/lib/toast";
@@ -433,6 +434,29 @@ const quietStore = () => {
   return quiet;
 };
 
+/**
+ * `thread.updated` (ADR 0029): the thread's view (keeping my own `canManage`,
+ * which the event never carries), every thread list, and the conversation
+ * when messages left it or came back (moved, returned, a new marker, undo).
+ */
+export function applyThreadEvent(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  event: Extract<ChannelEvent, { type: "thread.updated" }>,
+) {
+  const one = keys.threadInfo(orgId, event.threadId);
+  if (event.change === "deleted") qc.removeQueries({ queryKey: one });
+  else if (event.thread) {
+    const fresh = event.thread;
+    qc.setQueryData<ThreadInfo>(one, (old) => (old ? { ...fresh, canManage: old.canManage } : undefined));
+    if (!qc.getQueryData(one)) void qc.invalidateQueries({ queryKey: one });
+  } else void qc.invalidateQueries({ queryKey: one });
+  void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
+  if (["created", "context", "moved", "returned", "deleted"].includes(event.change)) {
+    void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", event.channelId] });
+  }
+}
+
 /** Subscribes to a channel while mounted: live runs + message cache updates. */
 export function useChannelRealtime(orgId: string, channelId: string, enabled: boolean) {
   const { connection, streams } = useRealtime();
@@ -466,6 +490,7 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if ((event.type as string) === "artifact.deleted")
           void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       }
+      if (event.type === "thread.updated") applyThreadEvent(qc, orgId, event);
       // Someone reacted: the pills under that message change for everyone.
       if (event.type === "message.reactions") {
         qc.setQueryData(keys.reactions(orgId, event.messageId), event.reactions);

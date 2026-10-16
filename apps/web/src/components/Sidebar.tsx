@@ -230,6 +230,11 @@ export function Sidebar() {
               <CountBadge aria-label={t("shell.pendingApprovals", { count: pending })}>{pending}</CountBadge>
             )}
           </Link>
+          {/* No count: "precisa de você" across every thread is a heavy query; Aprovações already counts. */}
+          <Link to="/org/$orgId/threads" params={{ orgId }} className="sidebar__item" title={t("shell.threads")}>
+            <Icon name="thread" />
+            <span className="sidebar__item-label">{t("shell.threads")}</span>
+          </Link>
           <Link to="/org/$orgId/issues" params={{ orgId }} className="sidebar__item" title={t("shell.issues")}>
             <Icon name="issues" />
             <span className="sidebar__item-label">{t("shell.issues")}</span>

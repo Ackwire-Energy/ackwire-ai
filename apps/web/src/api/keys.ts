@@ -56,6 +56,14 @@ export const keys = {
   issueList: (orgId: string, q: string) => ["org", orgId, "issues", "list", q] as const,
   issue: (orgId: string, number: number) => ["org", orgId, "issues", "one", number] as const,
   issueActivity: (orgId: string, id: string) => ["org", orgId, "issues", "activity", id] as const,
+  /** Every thread view and list (prefix): a `thread.updated` refreshes them all. */
+  threads: (orgId: string) => ["org", orgId, "threads"] as const,
+  threadList: (orgId: string, filters: object) => ["org", orgId, "threads", "list", filters] as const,
+  threadInfo: (orgId: string, threadId: string) => ["org", orgId, "threads", "one", threadId] as const,
+  channelThreads: (orgId: string, channelId: string, tab: string) =>
+    ["org", orgId, "threads", "channel", channelId, tab] as const,
+  /** The messages of a thread's context range (another channel's, or this one's). */
+  threadRange: (orgId: string, threadId: string) => ["org", orgId, "threads", "range", threadId] as const,
   routines: (orgId: string) => ["org", orgId, "routines"] as const,
   routineRuns: (orgId: string, id: string) => ["org", orgId, "routines", "runs", id] as const,
   calendar: (orgId: string) => ["org", orgId, "calendar"] as const,

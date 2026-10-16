@@ -216,6 +216,20 @@ export type ChannelEvent =
   | { type: "message.created"; channelId: string; messageId: string; message?: Message }
   /** Someone reacted or took it back: the message's reactions now (replace). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
+  /**
+   * A thread's state, title or context changed (ADR 0029). `thread` is the fresh view when the
+   * server had it (its `canManage` is always false: read yours from the API). `messageIds`: messages
+   * that left the channel (`moved`) or came back (`returned`).
+   */
+  | {
+      type: "thread.updated";
+      channelId: string;
+      threadId: string;
+      change: ThreadChange;
+      state?: ThreadState;
+      thread?: ThreadInfo;
+      messageIds?: string[];
+    }
   | ArtifactEvent
   | {
       type: "agent.delta";
@@ -1631,4 +1645,115 @@ export interface WikiGraph {
     sourceType?: string | null;
   }[];
   edges: { from: string; to: string }[];
+}
+
+// ── Threads (ADR 0029; apps/server/src/routes/app/threads.ts) ──────────────────
+
+export type ThreadState = "open" | "closed" | "archived";
+export type ThreadTab = "all" | "working" | "closed" | "archived";
+export type ThreadChange =
+  | "created"
+  | "title"
+  | "context"
+  | "moved"
+  | "returned"
+  | "closed"
+  | "reopened"
+  | "archived"
+  | "unarchived"
+  | "deleted";
+
+/** A person or an agent in a thread (`id` null: someone who left). */
+export interface ThreadActor {
+  type: AuthorType;
+  id: string | null;
+}
+
+/** The range of a conversation a thread was made from. */
+export interface ThreadContext {
+  channelId: string;
+  firstMessageId: string;
+  lastMessageId: string;
+  excludedMessageIds: string[];
+  /** The range left the channel (a stub stays there). */
+  moved: boolean;
+  /** Messages in the range now (deleted and excluded ones don't count). */
+  count: number;
+}
+
+export interface ThreadInfo {
+  /** The root message id (what replies carry as `threadId`). */
+  id: string;
+  channelId: string;
+  channelName: string;
+  channelKind: "channel" | "dm" | "forum";
+  /** Null: show `rootText`. */
+  title: string | null;
+  rootText: string;
+  rootAuthor: ThreadActor;
+  state: ThreadState;
+  createdBy: string | null;
+  closedBy: string | null;
+  closedAt: string | null;
+  archivedBy: string | null;
+  archivedAt: string | null;
+  context: ThreadContext | null;
+  replyCount: number;
+  lastActivityAt: string;
+  lastMessage: { author: ThreadActor; excerpt: string; createdAt: string } | null;
+  participants: ThreadActor[];
+  /** An agent run is in progress (or waiting) in this thread. */
+  working: boolean;
+  needsYou: boolean;
+  /** You may close, archive, rename or change the context. */
+  canManage: boolean;
+  createdAt: string;
+}
+
+export interface ThreadPage {
+  threads: ThreadInfo[];
+  nextCursor: string | null;
+}
+
+export interface ThreadFilters {
+  tab?: ThreadTab;
+  channelId?: string;
+  agentId?: string;
+  needsYou?: boolean;
+  mine?: boolean;
+  q?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ThreadCreateInput {
+  /** Where the thread lives. */
+  channelId: string;
+  /** Where the range comes from (default: `channelId`). */
+  contextChannelId?: string;
+  firstMessageId: string;
+  lastMessageId: string;
+  excludedMessageIds?: string[];
+  title?: string | null;
+}
+
+export interface ThreadPatch {
+  /** Empty or null: no title of its own. */
+  title?: string | null;
+  firstMessageId?: string;
+  lastMessageId?: string;
+  excludedMessageIds?: string[];
+}
+
+export type ThreadAction = "move" | "return" | "close" | "reopen" | "archive" | "unarchive";
+
+/** `meta.threadStart` on the root of a thread made from a range: the channel shows it as a marker. */
+export interface ThreadStartMeta {
+  title: string;
+  contextChannelId: string;
+  firstMessageId: string;
+  lastMessageId: string;
+  count: number;
+  moved: boolean;
+  movedCount: number;
 }

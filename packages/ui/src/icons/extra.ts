@@ -283,4 +283,32 @@ export const extraIcons = {
   external: [
     ["path", { d: "M11.5 3.5h5v5M16.5 3.5 9.5 10.5M15 11.5v4a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" }],
   ],
+  /** ThreadContexto.html / Threads.html: a thread (a speech box with a line). */
+  thread: [
+    ["path", { d: "M3.5 4h13v7.5H9l-3.5 3v-3h-2z" }],
+    ["path", { d: "M7.5 7.75h5" }],
+  ],
+  /** ThreadContexto.html: "Tirar do canal" (out of the conversation, into the thread). */
+  move: [["path", { d: "M3.5 10h9M9 6l4 4-4 4M16.5 4v12" }]],
+  /** ThreadContexto.html: the drag handle on a range's start and end caps. */
+  grip: [
+    ["circle", { cx: "7.5", cy: "5", r: "0.6" }],
+    ["circle", { cx: "12.5", cy: "5", r: "0.6" }],
+    ["circle", { cx: "7.5", cy: "10", r: "0.6" }],
+    ["circle", { cx: "12.5", cy: "10", r: "0.6" }],
+    ["circle", { cx: "7.5", cy: "15", r: "0.6" }],
+    ["circle", { cx: "12.5", cy: "15", r: "0.6" }],
+  ],
+  /** Threads.html: "Reabrir". */
+  refresh: [["path", { d: "M16.5 10a6.5 6.5 0 1 1-1.9-4.6M16.5 3.5v3.8h-3.8" }]],
+  /** Threads.html: "Arquivar" a thread (a box; `archive` is a zip file). */
+  archiveBox: [
+    ["rect", { x: "3", y: "3.75", width: "14", height: "3.3", rx: "1" }],
+    ["path", { d: "M4.2 7v8.2a.8.8 0 0 0 .8.8h10a.8.8 0 0 0 .8-.8V7M8.3 10.4h3.4" }],
+  ],
+  /** Threads.html: "Desarquivar". */
+  unarchive: [
+    ["rect", { x: "3", y: "3.75", width: "14", height: "3.3", rx: "1" }],
+    ["path", { d: "M4.2 7v8.2a.8.8 0 0 0 .8.8h10a.8.8 0 0 0 .8-.8V7M10 14v-4.2M7.9 11.9 10 9.8l2.1 2.1" }],
+  ],
 } satisfies Record<string, IconShape[]>;

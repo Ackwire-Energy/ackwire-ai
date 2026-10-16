@@ -10,12 +10,17 @@ export interface Toast {
   id: number;
   tone: "error" | "info";
   text: string;
-  /** One quick action ("Desfazer"). */
-  action?: { label: string; run: () => void };
+  /** Quick actions ("Ajustar", "Desfazer"); usually one. */
+  actions?: ToastAction[];
+}
+
+export interface ToastAction {
+  label: string;
+  run: () => void;
 }
 
 interface ToastApi {
-  show: (text: string, tone?: Toast["tone"], action?: Toast["action"]) => void;
+  show: (text: string, tone?: Toast["tone"], action?: ToastAction | ToastAction[]) => void;
 }
 
 const ToastContext = createContext<ToastApi>({ show: () => {} });
@@ -30,8 +35,9 @@ export function createToastStore() {
     for (const l of listeners) l();
   };
   return {
-    show(text: string, tone: Toast["tone"] = "info", action?: Toast["action"]) {
-      const toast = { id: nextId++, tone, text, ...(action ? { action } : {}) };
+    show(text: string, tone: Toast["tone"] = "info", action?: ToastAction | ToastAction[]) {
+      const actions = action ? (Array.isArray(action) ? action : [action]) : [];
+      const toast = { id: nextId++, tone, text, ...(actions.length > 0 ? { actions } : {}) };
       toasts = [...toasts.filter((t) => t.text !== text), toast].slice(-3);
       emit();
       setTimeout(() => {
@@ -65,7 +71,7 @@ export function ToastProvider({
 }) {
   const toasts = useSyncExternalStore(store.subscribe, store.get, store.get);
   const show = useCallback(
-    (text: string, tone?: Toast["tone"], action?: Toast["action"]) => store.show(text, tone, action),
+    (text: string, tone?: Toast["tone"], action?: ToastAction | ToastAction[]) => store.show(text, tone, action),
     [store],
   );
   return (
@@ -80,18 +86,19 @@ export function ToastProvider({
           >
             <Icon name={toast.tone === "error" ? "alert" : "check"} />
             <span className="ac-toast__text">{toast.text}</span>
-            {toast.action && (
+            {toast.actions?.map((action) => (
               <button
+                key={action.label}
                 type="button"
                 className="ac-btn ac-btn--ghost ac-btn--sm"
                 onClick={() => {
-                  toast.action?.run();
+                  action.run();
                   store.dismiss(toast.id);
                 }}
               >
-                {toast.action.label}
+                {action.label}
               </button>
-            )}
+            ))}
             <button
               type="button"
               className="ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon"

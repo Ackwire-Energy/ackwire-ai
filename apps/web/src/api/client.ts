@@ -87,6 +87,12 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
+  ThreadAction,
+  ThreadCreateInput,
+  ThreadFilters,
+  ThreadInfo,
+  ThreadPage,
+  ThreadPatch,
   ToolDecision,
   TrashedArtifact,
   UsageReport,
@@ -375,6 +381,22 @@ export interface ApiClient {
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
     /** "Pedir à Ada para implementar": assigns the agent and starts a run on the issue. */
     askAgent(orgId: string, id: string, agentId: string): Promise<Issue>;
+  };
+  /** Threads (ADR 0029): the Threads page, a thread from a range, moving it, closing and archiving. */
+  threads: {
+    /** Threads you can see, most recent activity first (archived only with `tab: "archived"`). */
+    list(orgId: string, filters?: ThreadFilters): Promise<ThreadPage>;
+    /** A channel's threads (its "Threads (N)"). */
+    inChannel(orgId: string, channelId: string, filters?: Omit<ThreadFilters, "channelId">): Promise<ThreadPage>;
+    get(orgId: string, threadId: string): Promise<ThreadInfo>;
+    /** "Criar thread a partir daqui": the range is its context; nothing moves. */
+    create(orgId: string, input: ThreadCreateInput): Promise<ThreadInfo>;
+    /** Rename, or change the range ("Ajustar trecho"). */
+    update(orgId: string, threadId: string, patch: ThreadPatch): Promise<ThreadInfo>;
+    /** Undo a thread made from a range, while nobody replied (`thread.has_replies`). */
+    remove(orgId: string, threadId: string): Promise<void>;
+    /** Tirar do canal / Devolver ao canal / Fechar / Reabrir / Arquivar / Desarquivar. */
+    act(orgId: string, threadId: string, action: ThreadAction): Promise<ThreadInfo>;
   };
   routines: {
     list(orgId: string): Promise<Routine[]>;

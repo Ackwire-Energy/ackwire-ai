@@ -16,6 +16,19 @@ const KNOWN = {
   "machine.not_found": "errors.machine.notFound",
   "machine.name_required": "errors.machine.nameRequired",
   "machine.pairing_invalid": "errors.machine.pairingInvalid",
+  "thread.context_not_visible": "errors.thread.contextNotVisible",
+  "thread.archived": "errors.thread.archived",
+  "thread.has_replies": "errors.thread.hasReplies",
+  "thread.range_has_replies": "errors.thread.rangeHasReplies",
+  "thread.move_other_channel": "errors.thread.moveOtherChannel",
+  "thread.not_allowed": "errors.thread.notAllowed",
+  "thread.range_invalid": "errors.thread.rangeInvalid",
+  "thread.range_empty": "errors.thread.rangeEmpty",
+  "thread.range_too_long": "errors.thread.rangeTooLong",
+  "thread.title_too_long": "errors.thread.titleTooLong",
+  "thread.no_context": "errors.thread.noContext",
+  "thread.not_undoable": "errors.thread.notUndoable",
+  "thread.forum": "errors.thread.forum",
 } as const;
 
 export const errorCode = (error: unknown) => (error instanceof ApiError ? error.code : undefined);
@@ -24,7 +37,7 @@ export const errorCode = (error: unknown) => (error instanceof ApiError ? error.
 export function errorText(t: TFunction, error: unknown): string {
   if (error instanceof ApiError) {
     const key = KNOWN[error.code as keyof typeof KNOWN];
-    if (key) return t(key, { max: MAX_UPLOAD_MB });
+    if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
     if (error.status === 413) return t("errors.artifact.fileTooLarge", { max: MAX_UPLOAD_MB });
     if (error.status === 403) return t("common.notAllowed");
   }

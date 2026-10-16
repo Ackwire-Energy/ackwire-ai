@@ -1,16 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
-import { EmptyPage } from "@/components/EmptyPage";
-import { Main } from "@/components/Main";
+import { ThreadPage } from "@/pages/ThreadPage";
 
-/** Thread view. The channel shows agent replies inline; a dedicated thread view comes later. */
+/** A thread: its context, its conversation and its controls (ADR 0029). `?reply=true` focuses the composer. */
 export const Route = createFileRoute("/org/$orgId/threads/$threadId")({
+  validateSearch: (search: Record<string, unknown>): { reply?: boolean } =>
+    search.reply === true || search.reply === "true" ? { reply: true } : {},
   component: function Thread() {
-    const { t } = useTranslation();
-    return (
-      <Main>
-        <EmptyPage icon="message" title={t("empty.thread.title")} text={t("empty.thread.text")} />
-      </Main>
-    );
+    const { reply } = Route.useSearch();
+    return <ThreadPage threadId={Route.useParams().threadId} reply={reply} />;
   },
 });
