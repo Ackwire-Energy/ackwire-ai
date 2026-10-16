@@ -16,6 +16,7 @@ import { useCadence } from "./EventChip";
 export function RoutineBand({
   item,
   now,
+  track,
   style,
   open,
   onOpenChange,
@@ -24,6 +25,8 @@ export function RoutineBand({
   item: CalItem;
   /** The view's wall clock. */
   now: Date;
+  /** Where its line sits in the row: first day column, days covered, columns in the view. */
+  track: { from: number; span: number; cols: number };
   style?: CSSProperties;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -56,7 +59,14 @@ export function RoutineBand({
             <b>{item.title}</b>
             <span className="cal-band__cadence">{cadence}</span>
           </span>
-          <span className="cal-band__track" aria-hidden="true">
+          <span
+            className="cal-band__track"
+            aria-hidden="true"
+            style={{
+              marginLeft: `${(track.from / track.cols) * 100}%`,
+              width: `${(track.span / track.cols) * 100}%`,
+            }}
+          >
             <RunLane
               from={item.start}
               to={item.end}

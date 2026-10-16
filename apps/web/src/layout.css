@@ -5382,21 +5382,25 @@ button.live-call__head:hover {
 
 /* Routines that run often: one lane each, as on the Rotinas horizon */
 .cal-week__bars--routines {
-  padding: 6px 0;
+  padding: 0;
 }
+/* The day columns run through the routines too, so each line sits under its days. */
 .cal-week__bars--routines .cal-week__barlane {
   grid-auto-rows: auto;
-  row-gap: 2px;
+  row-gap: 0;
+  padding: 6px 0;
+  background-image: linear-gradient(to right, var(--line) 1px, transparent 1px);
+  background-size: calc(100% / var(--cols)) 100%;
 }
 .cal-week__gutter--top {
   align-items: flex-start;
-  padding-top: 5px;
+  padding-top: 12px;
 }
 .cal-band {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  margin: 0 2px;
+  margin: 0;
   padding: 3px 0 0;
   border: 0;
   border-radius: var(--radius-sm);
@@ -5420,7 +5424,7 @@ button.live-call__head:hover {
   gap: 6px;
   min-width: 0;
   height: 20px;
-  padding: 0 6px;
+  padding: 0 10px;
 }
 .cal-band__label b {
   min-width: 0;

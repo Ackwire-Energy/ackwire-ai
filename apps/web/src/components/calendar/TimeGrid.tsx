@@ -268,20 +268,21 @@ export function TimeGrid({
             <Icon name="routines" size={14} label={t("calendar.filter.routine")} />
           </div>
           <div className="cal-week__barlane">
-            {bands.map((b) => (
-              <RoutineBand
-                key={b.item.key}
-                item={b.item}
-                now={now}
-                style={{
-                  gridColumn: `${b.from + 1} / span ${b.span}`,
-                  gridRow: b.lane + 1,
-                }}
-                open={openKey === b.item.key}
-                onOpenChange={(o) => onOpenKey(o ? b.item.key : null)}
-                details={details(b.item)}
-              />
-            ))}
+            {[...bands]
+              .sort((a, b) => a.from - b.from || a.item.title.localeCompare(b.item.title))
+              .map((b, row) => (
+                <RoutineBand
+                  key={b.item.key}
+                  item={b.item}
+                  now={now}
+                  // One row per routine across the week (names line up on the left); the line covers its days.
+                  track={{ from: b.from, span: b.span, cols }}
+                  style={{ gridColumn: "1 / -1", gridRow: row + 1 }}
+                  open={openKey === b.item.key}
+                  onOpenChange={(o) => onOpenKey(o ? b.item.key : null)}
+                  details={details(b.item)}
+                />
+              ))}
           </div>
         </div>
       )}
