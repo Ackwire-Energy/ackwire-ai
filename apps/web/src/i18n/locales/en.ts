@@ -1846,6 +1846,7 @@ export const en: Translations = {
     openThread: "Mission · open the thread",
     via: "via {{executor}} on {{computer}}",
     viaNoComputer: "via {{executor}}",
+    executorOn: "{{executor}} on {{computer}}",
     byAgent: "{{agent}} on {{computer}}",
     executor: {
       claude: "Claude Code",

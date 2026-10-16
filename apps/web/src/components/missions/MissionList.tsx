@@ -10,7 +10,7 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { formatShortDate, relativeTime } from "@/lib/format";
 import { isOpenMission, missionCells, missionCellTitles, waitingText } from "@/lib/missions";
-import { MachineChip, MissionHead, MissionStatusChip, MissionStrip } from "./MissionBits";
+import { ExecutorChip, MachineChip, MissionHead, MissionStatusChip, MissionStrip } from "./MissionBits";
 import { CloseMissionDialog } from "./MissionDialogs";
 
 /**
@@ -178,7 +178,7 @@ function MissionCard({ mission: m }: { mission: Mission }) {
               {t("missions.list.running", { count: m.runningTasks })}
             </span>
           )}
-          <MachineChip machine={m.machine} />
+          {m.machine ? <ExecutorChip mission={m} agentName={agent?.name ?? ""} /> : <MachineChip machine={m.machine} />}
           {m.status === "paused" && m.pausedAt && (
             <span className="mi-pill">
               <Icon name="clock" size={14} />

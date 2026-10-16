@@ -1410,3 +1410,20 @@ a.mi-pr:hover {
   overflow-wrap: anywhere;
   color: var(--ink2);
 }
+
+/* Who programs: Claude Code's / Codex's mark or the agent's small avatar, then "… no mac". */
+.mi-exec {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.mi-exec > .ac-avatar {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.mi-exec__icon {
+  flex: none;
+  color: var(--ink2);
+}

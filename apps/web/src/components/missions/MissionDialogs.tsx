@@ -257,7 +257,7 @@ export function NewMissionDialog({
               aria-label={t("missions.new.who")}
               value={executor}
               onValueChange={(v) => setPicked(v as MissionExecutor)}
-              options={executorOptions(t, agent.executors, agent.name)}
+              options={executorOptions(t, agent.executors, agent.name, agent.id)}
             />
             {agent.codexTooOld && (
               <span className="mi-hint">

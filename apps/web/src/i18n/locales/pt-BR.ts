@@ -1857,6 +1857,7 @@ export const ptBR = {
     openThread: "Missão · abrir a thread",
     via: "via {{executor}} no {{computer}}",
     viaNoComputer: "via {{executor}}",
+    executorOn: "{{executor}} no {{computer}}",
     byAgent: "{{agent}} no {{computer}}",
     executor: {
       claude: "Claude Code",

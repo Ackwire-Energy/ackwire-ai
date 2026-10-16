@@ -47,7 +47,14 @@ import {
   viaText,
 } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
-import { CommandApprovalSelect, executorOptions, MissionHead, MissionStatusChip, useMissionPanel } from "./MissionBits";
+import {
+  CommandApprovalSelect,
+  ExecutorMark,
+  executorOptions,
+  MissionHead,
+  MissionStatusChip,
+  useMissionPanel,
+} from "./MissionBits";
 import { BlockedCommands } from "./MissionCommandCard";
 import { SessionRows } from "./MissionSessions";
 
@@ -146,7 +153,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
     <div className="mi-card mi-plan">
       <div className="mi-plan__head">
         <span className="mi-cap">
-          <Icon name="code" size={14} />
+          <ExecutorMark executor={current} agentId={m?.agentId} agentName={agentName} />
           {t("missions.plan.cap", { executor })}
         </span>
         <h3>{meta.title}</h3>
@@ -209,7 +216,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
                   },
                 )
               }
-              options={executorOptions(t, choices, agentName)}
+              options={executorOptions(t, choices, agentName, m.agentId)}
             />
           </div>
         )}
@@ -455,7 +462,10 @@ function DecisionBody({ decision: d, mission: m }: { decision: MissionDecision; 
         ) : (
           <Chip icon="clock">{t("missions.decision.provisional", { option: d.chosen ?? "" })}</Chip>
         )}
-        <Chip icon="code">{viaText(t, m.executor, agentName, m.machine?.name)}</Chip>
+        <span className="mi-pill mi-exec">
+          <ExecutorMark executor={m.executor} agentId={m.agentId} agentName={agentName} />
+          {viaText(t, m.executor, agentName, m.machine?.name)}
+        </span>
       </div>
       <div className="mi-q">
         <h3>{d.question}</h3>
@@ -753,8 +763,8 @@ export function MissionReportExtras({ report, message }: { report: MissionReport
     message.author.type === "agent" && message.author.id ? (dir.agentById.get(message.author.id)?.name ?? "") : "";
   return (
     <>
-      <span className="mi-tag">
-        <Icon name="code" size={14} />
+      <span className="mi-tag mi-exec">
+        <ExecutorMark executor={report.executor} agentId={message.author.id ?? undefined} agentName={agentName} />
         {viaText(t, report.executor, agentName, report.computer)}
       </span>
       {task && <SessionRows tasks={[task]} defaultOpen />}
@@ -861,7 +871,12 @@ export function MissionLinkCard({ link }: { link: MissionLinkMeta }) {
         agentName={agentName}
         running={m.runningTasks > 0 && !offline}
         title={<Link {...threadLink}>{m.title}</Link>}
-        meta={[viaText(t, m.executor, agentName, m.machine?.name)]}
+        meta={[
+          <span key="via" className="mi-exec">
+            <ExecutorMark executor={m.executor} agentId={m.agentId} agentName={agentName} />
+            {viaText(t, m.executor, agentName, m.machine?.name)}
+          </span>,
+        ]}
         right={
           proposed ? (
             <Chip

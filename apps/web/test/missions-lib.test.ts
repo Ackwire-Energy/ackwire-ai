@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { bodyTones, type PlanStripCell, planCellPixel, STRIP_CELL } from "@agenteschat/ui";
+import { bodyTones, iconNames, type PlanStripCell, planCellPixel, STRIP_CELL } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import type { MachineTask, Message, Mission } from "@/api/types";
 import { threadRootsToLoad } from "@/chat/timeline";
@@ -9,7 +9,9 @@ import {
   appendOutputLine,
   cellsFromCounts,
   editDiff,
+  executorIcon,
   executorName,
+  executorOnText,
   formatSpan,
   isOpenMission,
   machineTaskOf,
@@ -488,5 +490,25 @@ describe("the mission link card", () => {
     });
     expect(missionLinkOf({ missionLink: { missionId: "m1" } })).toBeNull();
     expect(missionLinkOf({})).toBeNull();
+  });
+});
+
+describe("who programs, as a mark", () => {
+  test("Claude Code and Codex have their own icons; the agent uses its avatar (no icon)", () => {
+    expect(executorIcon("claude")).toBe("executorClaude");
+    expect(executorIcon("codex")).toBe("executorCodex");
+    expect(executorIcon("agent")).toBeNull();
+    expect(iconNames).toContain("executorClaude");
+    expect(iconNames).toContain("executorCodex");
+  });
+
+  test("'Claude Code no mac' (no 'via'), the agent's name when it works itself; options carry the mark", () => {
+    expect(executorOnText(t, "claude", "Ada", "mac")).toBe("Claude Code no mac");
+    expect(executorOnText(te, "codex", "Ada", "mac")).toBe("Codex on mac");
+    expect(executorOnText(t, "agent", "Ada", "mac")).toBe("Ada no mac");
+    expect(executorOnText(t, "claude", "Ada", null)).toBe("Claude Code");
+    const options = executorOptions(t, ["claude", "codex", "agent"], "Ada", "a1");
+    expect(options.map((o) => o.label)).toEqual(["Claude Code", "Codex (experimental)", "Ada (o próprio agente)"]);
+    expect(options.every((o) => o.leading)).toBe(true);
   });
 });

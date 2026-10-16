@@ -7,7 +7,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
-import { type PlanCell, tickFor } from "@/lib/missions";
+import { executorIcon, executorOnText, type PlanCell, tickFor } from "@/lib/missions";
 import { MissionFilesPanel } from "./MissionFiles";
 import "./missions.css";
 
@@ -18,14 +18,52 @@ import "./missions.css";
  */
 
 /**
- * "Quem programa": Claude Code, Codex (experimental) or the agent itself,
- * only those its computer can run, each with one line on what it means.
+ * Who programs, as a mark: Claude Code's and Codex's own icons, or the
+ * agent's small pixel avatar when it does the work itself.
  */
-export function executorOptions(t: TFunction, executors: MissionExecutor[], agentName: string) {
+export function ExecutorMark({
+  executor,
+  agentId,
+  agentName,
+}: {
+  executor: string;
+  agentId?: string;
+  agentName?: string;
+}) {
+  const icon = executorIcon(executor);
+  if (icon) return <Icon name={icon} size={14} className="mi-exec__icon" />;
+  return <AgentAvatar agentId={agentId} name={agentName ?? ""} size="xs" />;
+}
+
+/** "[mark] Claude Code no mac": who programs and where, one quiet chip (offline says so). */
+export function ExecutorChip({
+  mission,
+  agentName,
+}: {
+  mission: Pick<Mission, "executor" | "agentId" | "machine">;
+  agentName: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <span className="mi-pill mi-exec">
+      <ExecutorMark executor={mission.executor} agentId={mission.agentId} agentName={agentName} />
+      {executorOnText(t, mission.executor, agentName, mission.machine?.name)}
+      {mission.machine && !mission.machine.online && <small>{t("missions.offline")}</small>}
+    </span>
+  );
+}
+
+/**
+ * "Quem programa": Claude Code, Codex (experimental) or the agent itself,
+ * only those its computer can run, each with one line on what it means and
+ * its mark (`leading`).
+ */
+export function executorOptions(t: TFunction, executors: MissionExecutor[], agentName: string, agentId?: string) {
   return executors.map((e) => ({
     value: e,
     label: t(`missions.executor.${e}` as const, { name: agentName }),
     description: t(`missions.executor.${e}Text` as const, { name: agentName }),
+    leading: <ExecutorMark executor={e} agentId={agentId} agentName={agentName} />,
   }));
 }
 
