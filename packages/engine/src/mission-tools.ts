@@ -63,7 +63,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
       executors.includes("claude")
         ? "By default Claude Code there explores the repository and plans it;"
         : "You explore the repository there and plan it yourself;"
-    } the people get a plan card with Start. Nothing changes until the person who asked presses Start. For one task, use start_task instead.`,
+    } the people get a plan card to start it. Nothing changes until the person who asked starts it. For one task, use start_task instead.`,
     scope: SANDBOX_SCOPE,
     inputSchema: {
       type: "object",
@@ -125,12 +125,24 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           runId: ctx.runId,
         });
         const who = EXECUTOR_NAMES[mission.executor as MissionExecutor] ?? "Claude Code";
+        // Its home is a new thread (a flat DM): the reply here gets a link card to it.
+        const elsewhere = home !== ctx.threadRootId;
+        const shown = elsewhere
+          ? "The app shows a link card to the mission's thread under your reply, and the plan card there has the button to start."
+          : "The app shows the plan card in this thread, with the button to start.";
+        const reply =
+          "Reply briefly (one or two lines) in the person's language; don't name buttons or other parts of the app.";
         return {
           content:
             mission.executor === "agent"
-              ? `Mission ${mission.id} proposed: you program it yourself on ${computer}. Plan it now in its thread (read only: read_file, list_files, read-only commands), then update_plan with the first items and report the goal; the people press Start when the plan looks right.`
-              : `Mission ${mission.id} proposed: ${who} on ${computer} is planning it now (read only). The people see a plan card with Start; nothing changes until the person who asked presses it. Tell them in one or two lines, and end your turn.`,
-          data: { missionId: mission.id, threadId: home, executor: mission.executor },
+              ? `Mission ${mission.id} proposed: you program it yourself on ${computer}. Plan it now in its thread (read only: read_file, list_files, read-only commands), then update_plan with the first items and report the goal, in the person's language; the person who asked starts it when the plan looks right. ${shown}`
+              : `Mission ${mission.id} proposed: ${who} on ${computer} is planning it now (read only); nothing changes until the person who asked starts it. ${shown} ${reply} Then end your turn.`,
+          data: {
+            missionId: mission.id,
+            threadId: home,
+            executor: mission.executor,
+            ...(elsewhere ? { missionLink: { missionId: mission.id, threadId: home } } : {}),
+          },
         };
       } catch (error) {
         return failed(error);
@@ -239,7 +251,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
     bound(run, {
       name: "update_plan",
       description:
-        "Replace this mission's plan: the whole checklist, every time (keep each item's id stable). Statuses: todo, doing, waiting_you (needs a person), done, dropped. People see each change as one line in the thread.",
+        "Replace this mission's plan: the whole checklist, every time (keep each item's id stable). Statuses: todo, doing, waiting_you (needs a person), done, dropped. Keep an item's title unless what it means changed. People see each change as one line in the thread. Write it in the language the people use in the thread.",
       inputSchema: mcpSchema("update_plan"),
       whileProposed: true,
       async run(input, ctx, mission) {
@@ -253,7 +265,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
     bound(run, {
       name: "report",
       description:
-        "Tell the people in this mission's thread where things stand: a milestone, what you found, what is next, as a status card. One short paragraph; at milestones, not for every step. pr_url: a pull request you opened.",
+        "Tell the people in this mission's thread where things stand: a milestone, what you found, what is next, as a status card. One short paragraph; at milestones, not for every step. pr_url: a pull request you opened. Write it in the language the people use in the thread.",
       inputSchema: mcpSchema("report"),
       whileProposed: true,
       async run(input, ctx, mission) {
@@ -269,7 +281,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
     bound(run, {
       name: "ask_decision",
       description:
-        "Ask the people a product or technical decision as a card with 2 to 4 options. blocking: true when you can't go on without it (then end your turn; you are woken with the answer). blocking: false to go on with your recommendation as a provisional decision they review later.",
+        "Ask the people a product or technical decision as a card with 2 to 4 options. blocking: true when you can't go on without it (then end your turn; you are woken with the answer). blocking: false to go on with your recommendation as a provisional decision they review later. Write it in the language the people use in the thread.",
       inputSchema: mcpSchema("ask_decision"),
       async run(input, ctx, mission) {
         const blocking = input.blocking === true;
@@ -291,7 +303,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
     bound(run, {
       name: "request_review",
       description:
-        "Ask the people to look at something you can show (screens, a prototype, a PR). Send files to the Drive first with upload_file and pass their artifact ids. Then end your turn: you are woken with their answer (approved, or the changes they want).",
+        "Ask the people to look at something you can show (screens, a prototype, a PR). Send files to the Drive first with upload_file and pass their artifact ids. Then end your turn: you are woken with their answer (approved, or the changes they want). Write it in the language the people use in the thread.",
       inputSchema: {
         type: "object",
         properties: {

@@ -28,6 +28,7 @@ import {
   missionBranchPrefix,
   missionSummary,
   onMissionApprovalDecided,
+  openDm,
   opineDecision,
   pauseMission,
   postPersonMessage,
@@ -183,6 +184,42 @@ async function proposed(options: { reply?: NonNullable<Parameters<typeof setup>[
 }
 
 describe("missions (ADR 0029)", () => {
+  test("proposed from a flat DM: its home is a new thread and the agent's reply in the DM carries the link card", async () => {
+    f = await setup({
+      machines: true,
+      missionTools: true,
+      reply: (_req, n) =>
+        n === 1
+          ? {
+              chunks: ["Planning it."],
+              toolUses: [{ name: "propose_mission", input: { title: "Photos", goal: "Make a contact sheet" } }],
+            }
+          : { chunks: ["Proposed the mission; the plan is coming."] },
+    });
+    const paired = await pairedMachine();
+    const runner = missionRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const ask = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dm.id, {
+      body: "make a contact sheet of my photos",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const mission = await missionRow();
+    expect(mission.threadRootId).not.toBe(ask.id);
+    const replies = await f.db
+      .select()
+      .from(schema.messages)
+      .where(and(eq(schema.messages.channelId, dm.id), eq(schema.messages.authorAgentId, f.agent.id)));
+    const linked = replies.filter((m) => m.meta.missionLink);
+    expect(linked).toHaveLength(1);
+    expect(linked[0]?.threadId).toBeNull();
+    expect(linked[0]?.meta.missionLink).toEqual({ missionId: mission.id, threadId: mission.threadRootId });
+    // The tool told the model not to name the app's buttons.
+    const toolResult = JSON.stringify(f.provider.calls.at(-1)?.request.messages ?? []);
+    expect(toolResult).toContain("don't name buttons");
+    expect(toolResult).not.toContain("press Start");
+  });
+
   test("the agent proposes (plan mode on the machine, plan card); only the owner starts; the start waits for the plan turn", async () => {
     f = await setup({
       machines: true,

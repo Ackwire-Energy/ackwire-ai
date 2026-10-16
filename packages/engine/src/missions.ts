@@ -181,9 +181,10 @@ export function planPrompt(mission: Pick<MissionRow, "title" | "goal">) {
     `Mission: ${mission.title}`,
     `Goal: ${mission.goal}`,
     "",
-    "PLAN MODE. Explore the repository read-only: don't change any file and don't run anything that writes.",
+    "PLAN MODE. Explore the mission folder (a code repository or plain files) read-only: don't change any file and don't run anything that writes.",
     "Then call the agentes tool update_plan with the first items of the plan (a checklist; short, stable ids),",
     "and call report with the goal in one sentence for the people. Then end your turn: the people review the plan and press Start.",
+    "Write the plan items, reports, decisions and reviews in the language of the goal (the people's language).",
   ].join("\n");
 }
 
@@ -191,8 +192,9 @@ export function planPrompt(mission: Pick<MissionRow, "title" | "goal">) {
 export function agentPlanPrompt(mission: Pick<MissionRow, "title" | "goal">) {
   return [
     `Mission proposed: ${mission.title}. Goal: ${mission.goal}`,
-    "PLAN MODE: explore the repository on the computer read-only (read_file, list_files, run_code with read-only commands); don't change anything yet.",
+    "PLAN MODE: explore the mission folder on the computer read-only (read_file, list_files, run_code with read-only commands); don't change anything yet.",
     "Then call update_plan with the first items (a checklist; short, stable ids) and report the goal in one sentence. Then end your turn: the people review the plan and press Start.",
+    "Write the plan items, reports, decisions and reviews in the language of the goal (the people's language).",
   ].join("\n");
 }
 
@@ -201,7 +203,7 @@ export const AGENT_START_PROMPT =
   "The person approved the plan. Do the work now on the computer: start_task for anything long (it wakes you when it ends), run_code for short commands; keep the plan with update_plan, report milestones, ask decisions with ask_decision, request_review when there is something to show, and request_approval before any merge, deploy or rollback.";
 
 export const START_PROMPT =
-  "The person approved the plan. Proceed: split the work into tasks (each in its own branch) using the agentes tools; keep the plan updated; ask for a review when you have something to show.";
+  "The person approved the plan. Proceed: split the work into tasks with start_task (each gets its own branch in a git repository, its own subfolder otherwise; small work you can do yourself) using the agentes tools; keep the plan updated; ask for a review when you have something to show.";
 
 // ── Small helpers ────────────────────────────────────────────────────────────
 
