@@ -1113,7 +1113,8 @@ export function createSandboxToolSource(
             if (!computer.machineId) throw new Error("Background tasks run only on a connected computer.");
             const status = await hub.status(computer.machineId);
             const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
-            const session = executor === "claude" ? ctx.threadRootId : null;
+            // One session per conversation for Claude Code and Codex (the runner maps Codex's own thread id).
+            const session = executor === "claude" || executor === "codex" ? ctx.threadRootId : null;
             const [before] = session
               ? await ctx.db
                   .select({ id: schema.machineTasks.id })

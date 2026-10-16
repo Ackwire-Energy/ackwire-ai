@@ -214,7 +214,9 @@ test("executor arguments: Claude Code gets our MCP config, our tools allowed and
     { configFile: "", command: ["/usr/bin/node", "/opt/runner.mjs"], taskId: TASK, socketPath: "/s", rules: "" },
     "linux",
   );
-  expect(codex.join(" ")).toContain(`mcp_servers.agentes.args=["/opt/runner.mjs","mcp","--task","${TASK}"]`);
+  expect(codex.join(" ")).toContain(
+    `mcp_servers.agenteschat_agentes.args=["/opt/runner.mjs","mcp","--task","${TASK}"]`,
+  );
   expect(
     claudeMcpConfig({ command: ["/usr/bin/node", "/opt/r.mjs"], taskId: TASK, socketPath: "/s", token: "t" }),
   ).toEqual({

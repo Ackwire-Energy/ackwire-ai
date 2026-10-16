@@ -31,6 +31,7 @@ import {
 import { RunnerError } from "./errors";
 import { shellCommand } from "./exec";
 import {
+  CODEX_MCP_ENV,
   claudeMcpConfig,
   claudePermissionSettings,
   MCP_TOKEN_FILE,
@@ -38,6 +39,7 @@ import {
   missionBranchPrefix,
   missionExecutorArgs,
   newMcpToken,
+  shellArg,
 } from "./mcp";
 import { isInside, resolveInWorkspace } from "./paths";
 
@@ -134,6 +136,11 @@ interface Entry {
 
 interface Journal {
   tasks: Entry[];
+  /**
+   * Codex picks its own thread id (`thread.started`): our session id → that
+   * thread, so the next turn resumes it by id (`exec … resume <id> -`).
+   */
+  codexThreads?: Record<string, string>;
 }
 
 interface ExitFile {
@@ -308,6 +315,9 @@ export function executorCommand(
     extra?: string[];
     /** Claude Code's permission mode (default `acceptEdits`; a mission's plan turn runs `dontAsk`). */
     permissionMode?: "acceptEdits" | "dontAsk";
+    /** Codex: where it works (`-C`), its sandbox, the file for its last message, the thread to resume. */
+    codex?: { cwd: string; sandbox: "read-only" | "workspace-write"; lastFile: string; thread?: string };
+    platform?: NodeJS.Platform;
   },
 ): string {
   if (executor === "shell") {
@@ -316,7 +326,25 @@ export function executorCommand(
     return command;
   }
   // `extra`: a mission task's MCP server and rules (already quoted for the shell).
-  if (executor === "codex") return ["codex", "exec", "--json", "--full-auto", ...(options.extra ?? []), "-"].join(" ");
+  if (executor === "codex") {
+    // `codex exec` (JSONL events) runs unattended with approval_policy=never: the sandbox is the limit, so
+    // workspace-write with network (git push, installs) for work, read-only for a plan. No `--full-auto` (removed).
+    // Global options go before `resume`; the prompt comes on stdin (`-`). Always resumed by id, never `--last`.
+    const q = (v: string) => shellArg(v, options.platform);
+    const c = options.codex;
+    return [
+      "codex",
+      "exec",
+      "--json",
+      "--skip-git-repo-check",
+      ...(c ? ["-C", q(c.cwd), "--sandbox", c.sandbox] : []),
+      ...(c?.sandbox === "workspace-write" ? ["-c", q("sandbox_workspace_write.network_access=true")] : []),
+      ...(options.extra ?? []),
+      ...(c ? ["-o", q(c.lastFile)] : []),
+      ...(c?.thread ? ["resume", c.thread] : []),
+      "-",
+    ].join(" ");
+  }
   const parts = [
     "claude",
     "-p",
@@ -369,6 +397,10 @@ export interface ParsedLine {
   session?: string;
   /** A pull request URL in the output (a tool result, the answer, a plain line). */
   prUrl?: string;
+  /** Codex: the thread it opened (`thread.started`), to resume next time. */
+  thread?: string;
+  /** Codex: the turn failed (`turn.failed`, `error`). */
+  error?: string;
 }
 
 /** The text of a Claude Code tool result (a string, or text blocks). */
@@ -438,24 +470,88 @@ export function parseOutputLine(raw: string, executor: TaskExecutor, cwd: string
       }
       return session ? { session } : {};
     }
-    // Codex: messages and file changes, whatever the exact event shape.
-    const item = (ev.item ?? ev.msg ?? ev) as Record<string, unknown>;
-    const message = typeof item.text === "string" ? item.text : typeof item.message === "string" ? item.message : "";
-    const changes = Array.isArray(item.changes)
-      ? (item.changes as { path?: unknown }[]).flatMap((c) => (typeof c.path === "string" ? [rel(c.path)] : []))
-      : [];
-    const command = typeof item.command === "string" ? `Running: ${item.command}` : "";
-    const out: ParsedLine = {};
-    if (message) out.line = first(message);
-    else if (command) out.line = command;
-    if (changes.length) out.files = changes;
-    if (item.type === "agent_message" && message) out.result = message;
-    const prUrl = findPullRequestUrl(message || (typeof item.output === "string" ? item.output : ""));
-    if (prUrl) out.prUrl = prUrl;
-    return out;
+    return parseCodexEvent(ev, rel, first);
   }
   const prUrl = findPullRequestUrl(text);
   return { line: text, ...(prUrl ? { prUrl } : {}) };
+}
+
+/**
+ * One `codex exec --json` event (JSONL): `thread.started` (its thread id),
+ * `item.started|updated|completed` with `agent_message` (the human line and,
+ * last one wins, the result; only when completed), `command_execution`
+ * ("Running: …", a failure, a pull request in its output), `file_change`
+ * (files), `mcp_tool_call`, `todo_list`; `turn.failed` and `error` (the
+ * error, as the line and the result). Reasoning and usage are skipped.
+ * Stderr is never a failure by itself (the person's own MCP servers log there).
+ */
+export function parseCodexEvent(
+  ev: Record<string, unknown>,
+  rel: (p: string) => string,
+  first: (s: string) => string,
+): ParsedLine {
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  switch (ev.type) {
+    case "thread.started":
+      return str(ev.thread_id) ? { thread: str(ev.thread_id) } : {};
+    case "turn.failed": {
+      const message = str((ev.error as { message?: unknown } | undefined)?.message) || "the turn failed";
+      return { line: `Error: ${first(message)}`, error: message, result: message };
+    }
+    case "error": {
+      const message = str(ev.message) || "error";
+      return { line: `Error: ${first(message)}`, error: message };
+    }
+    case "item.started":
+    case "item.updated":
+    case "item.completed": {
+      const item = (ev.item ?? {}) as Record<string, unknown>;
+      const done = ev.type === "item.completed";
+      switch (item.type) {
+        case "agent_message": {
+          if (!done) return {};
+          const text = str(item.text);
+          const prUrl = findPullRequestUrl(text);
+          return text ? { line: first(text), result: text, ...(prUrl ? { prUrl } : {}) } : {};
+        }
+        case "command_execution": {
+          const command = unwrapShell(str(item.command));
+          const output = str(item.aggregated_output);
+          const prUrl = findPullRequestUrl(output);
+          const code = typeof item.exit_code === "number" ? item.exit_code : null;
+          if (!done) return command ? { line: `Running: ${command}` } : {};
+          return {
+            ...(code !== null && code !== 0 ? { line: `Command failed (exit ${code}): ${command}` } : {}),
+            ...(prUrl ? { prUrl } : {}),
+          };
+        }
+        case "file_change": {
+          const files = (Array.isArray(item.changes) ? (item.changes as { path?: unknown }[]) : []).flatMap((c) =>
+            typeof c?.path === "string" && c.path ? [rel(c.path)] : [],
+          );
+          return files.length ? { files, line: `Editing ${files[0]}` } : {};
+        }
+        case "mcp_tool_call":
+          return done ? {} : { line: `Using ${str(item.tool) || "a tool"}` };
+        case "todo_list":
+          return { line: "Updating its plan" };
+        case "error": {
+          const message = str(item.message);
+          return message ? { line: `Error: ${first(message)}` } : {};
+        }
+        default:
+          return {};
+      }
+    }
+    default:
+      return {};
+  }
+}
+
+/** `/bin/zsh -lc "npm test"` → `npm test` (Codex wraps every command in the login shell). */
+function unwrapShell(command: string) {
+  const m = /^\S*(?:sh|bash|zsh)\s+-l?c\s+(["'])([\s\S]*)\1$/.exec(command.trim());
+  return (m ? (m[2] ?? "") : command).replace(/\s+/g, " ").trim();
 }
 
 /** The end of a log (at most `max` bytes) and whether there was more before it. */
@@ -676,6 +772,9 @@ export class TaskManager {
       const found = claudeSessionExists(home, cwd, session);
       if (found !== null) resume = found;
     }
+    // Codex resumes the thread it opened for this session before (by id), else starts a new one.
+    const codexThread = executor === "codex" && session ? this.journal.codexThreads?.[session] : undefined;
+    if (executor === "codex") resume = Boolean(codexThread);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     // A mission task (protocol 5): our MCP server for its executor, bound to this task by a token.
     const missionId =
@@ -684,7 +783,7 @@ export class TaskManager {
         : undefined;
     let extra: string[] = [];
     let mcpToken: string | undefined;
-    let input = prompt;
+    const input = prompt;
     const mode = req.mission?.mode === "plan" ? "plan" : "work";
     if (missionId && this.opts.mcp) {
       mcpToken = newMcpToken();
@@ -703,8 +802,6 @@ export class TaskManager {
         // What it may run without asking (protocol 7; older servers send no mode: work).
         const prefix = missionBranchPrefix(missionId, req.mission?.branchPrefix);
         writeFileSync(settingsFile, JSON.stringify(claudePermissionSettings(mode, prefix)), { mode: 0o600 });
-      } else if (rules) {
-        input = `${rules}\n\n${prompt}`;
       }
       extra = missionExecutorArgs(executor === "codex" ? "codex" : "claude", {
         configFile,
@@ -712,7 +809,7 @@ export class TaskManager {
         taskId,
         socketPath: this.opts.mcp.socketPath,
         rules,
-        ...(executor === "claude" ? { settingsFile } : {}),
+        ...(executor === "claude" ? { settingsFile } : { resumed: Boolean(codexThread) }),
       });
     } else if (missionId) {
       this.log(`task ${taskId} works for a mission, but this runner has no MCP endpoint`);
@@ -723,6 +820,16 @@ export class TaskManager {
       resume,
       extra,
       ...(missionId && executor === "claude" && mode === "plan" ? { permissionMode: "dontAsk" as const } : {}),
+      ...(executor === "codex"
+        ? {
+            codex: {
+              cwd,
+              sandbox: missionId && mode === "plan" ? ("read-only" as const) : ("workspace-write" as const),
+              lastFile: path.join(dir, "last.txt"),
+              ...(codexThread ? { thread: codexThread } : {}),
+            },
+          }
+        : {}),
     });
     const maxSeconds = clampInt(
       req.maxSeconds,
@@ -744,10 +851,19 @@ export class TaskManager {
     const secrets = (await this.opts.secrets?.(agent)) ?? null;
     let child: ChildProcess;
     try {
+      // Codex hands our MCP process these by name (`env_vars`): the token never goes on a command line.
+      const mcpEnv: Record<string, string> =
+        executor === "codex" && mcpToken && this.opts.mcp
+          ? {
+              [CODEX_MCP_ENV[0]]: mcpToken,
+              [CODEX_MCP_ENV[1]]: this.opts.mcp.socketPath,
+              [CODEX_MCP_ENV[2]]: path.dirname(this.opts.root),
+            }
+          : {};
       child = spawn(this.opts.runtime ?? process.execPath, [wrapper, dir], {
         cwd: dir,
         // The agent's secrets (ADR 0027) through the environment only, never on disk here.
-        env: secrets ? { ...process.env, ...secrets.env } : process.env,
+        env: { ...process.env, ...(secrets?.env ?? {}), ...mcpEnv },
         stdio: "ignore",
         detached: true,
         windowsHide: true,
@@ -958,6 +1074,10 @@ export class TaskManager {
   private onLine(t: Entry, w: Watch, raw: string, stream: "stdout" | "stderr") {
     // Claude Code's events are on stdout; its stderr (and every other executor's output) is plain text.
     const parsed = parseOutputLine(raw, stream === "stdout" ? t.executor : "shell", t.cwd);
+    if (parsed.thread && t.session && t.executor === "codex") {
+      this.journal.codexThreads = { ...(this.journal.codexThreads ?? {}), [t.session]: parsed.thread };
+      this.save();
+    }
     if (parsed.session && !t.session) t.session = parsed.session;
     if (parsed.result !== undefined) w.result = parsed.result;
     if (parsed.line) {
@@ -1080,7 +1200,18 @@ export class TaskManager {
     const interrupted = !exit && !t.canceling;
     // Canceled and the wrapper gone without an exit: make sure nothing of the command is left.
     if (!exit && t.canceling) this.hardKill(t, this.dirOf(t.taskId));
-    const result = w.redact(w.result ?? w.tail.join("\n")).slice(0, TASK_LIMITS.result);
+    // Codex writes its final message to `last.txt` (`-o`): the result when the stream had none.
+    const codexLast =
+      t.executor === "codex" && !w.result
+        ? (() => {
+            try {
+              return readFileSync(path.join(this.dirOf(t.taskId), "last.txt"), "utf8").trim() || undefined;
+            } catch {
+              return undefined;
+            }
+          })()
+        : undefined;
+    const result = w.redact(w.result ?? codexLast ?? w.tail.join("\n")).slice(0, TASK_LIMITS.result);
     t.status = interrupted ? "interrupted" : "done";
     t.endedAt = endedAt;
     t.done = {

@@ -310,6 +310,9 @@ export function ipcCall(socketPath: string, req: IpcRequest, timeoutMs = MCP_CAL
 
 export const MCP_PROTOCOL_VERSION = "2025-06-18";
 
+/** Our tools that only read (MCP `readOnlyHint`). */
+const READ_ONLY_TOOLS = new Set(["get_context"]);
+
 type JsonRpcId = string | number | null;
 export type ToolCaller = (tool: string, args: Record<string, unknown>) => Promise<IpcReply>;
 
@@ -351,7 +354,16 @@ export async function handleMcpMessage(message: unknown, call: ToolCaller): Prom
     case "ping":
       return { jsonrpc: "2.0", id, result: {} };
     case "tools/list":
-      return { jsonrpc: "2.0", id, result: { tools: MISSION_MCP_TOOLS } };
+      return {
+        jsonrpc: "2.0",
+        id,
+        result: {
+          // Read-only tools say so (Codex runs them without an approval even when told to ask).
+          tools: MISSION_MCP_TOOLS.map((tool) =>
+            READ_ONLY_TOOLS.has(tool.name) ? { ...tool, annotations: { readOnlyHint: true } } : tool,
+          ),
+        },
+      };
     case "tools/call": {
       const name = typeof params.name === "string" ? params.name : "";
       if (!MISSION_MCP_TOOLS.some((t) => t.name === name)) return rpcError(id, -32602, `Unknown tool: ${name}`);
@@ -596,13 +608,43 @@ export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: st
 }
 
 /**
+ * Our MCP server's name in Codex's config: unique, so a server of the same
+ * name in the person's `~/.codex/config.toml` is never merged into it.
+ */
+export const CODEX_MCP_SERVER = "agenteschat_agentes";
+
+/** The env names Codex passes to our MCP process (values come from the task's env, never argv). */
+export const CODEX_MCP_ENV = ["AGENTES_MCP_TOKEN", "AGENTES_MCP_SOCKET", "AGENTES_RUNNER_HOME"] as const;
+
+/**
+ * Codex's `-c key=value` overrides for our MCP server (values are TOML;
+ * JSON strings and arrays are valid TOML). `default_tools_approval_mode =
+ * "approve"` is essential: `codex exec` runs with approval_policy=never and
+ * would deny every tool without `readOnlyHint` as "requires approval".
+ */
+export function codexMcpOverrides(input: { command: string[]; taskId: string }) {
+  const [command, ...args] = input.command;
+  const key = `mcp_servers.${CODEX_MCP_SERVER}`;
+  const toml = (v: unknown) => JSON.stringify(v);
+  return [
+    `${key}.command=${toml(command ?? "node")}`,
+    `${key}.args=${toml([...args, "mcp", "--task", input.taskId])}`,
+    `${key}.env_vars=${toml(CODEX_MCP_ENV)}`,
+    `${key}.default_tools_approval_mode="approve"`,
+    `${key}.startup_timeout_sec=60`,
+    `${key}.tool_timeout_sec=300`,
+    `${key}.required=true`,
+  ];
+}
+
+/**
  * Extra arguments for a mission task's executor. Claude Code: our MCP
  * config (added to the person's own MCP servers: no `--strict-mcp-config`),
  * the permission profile (`--settings`, see `claudePermissionSettings`), our
  * tools allowed without a prompt (`-p` can't ask), and the rules appended
- * to its system prompt. Codex (best effort, untested): the same server
- * through `-c mcp_servers.agentes.*` (the MCP process reads its token from
- * the task's folder), and the rules arrive with the prompt.
+ * to its system prompt. Codex: our server through repeatable `-c` overrides
+ * (token and socket through the env), and on the first turn the rules as
+ * `developer_instructions` (a resumed thread keeps them).
  */
 export function missionExecutorArgs(
   executor: "claude" | "codex",
@@ -614,12 +656,14 @@ export function missionExecutorArgs(
     rules: string;
     /** Claude Code: the generated permission settings file. */
     settingsFile?: string;
+    /** Codex: a resumed thread already has the rules. */
+    resumed?: boolean;
   },
   platform: NodeJS.Platform = process.platform,
 ): string[] {
   const q = (v: string) => shellArg(v, platform);
+  const rules = cleanRules(input.rules);
   if (executor === "claude") {
-    const rules = cleanRules(input.rules);
     return [
       "--mcp-config",
       q(input.configFile),
@@ -629,14 +673,8 @@ export function missionExecutorArgs(
       ...(rules ? ["--append-system-prompt", q(rules)] : []),
     ];
   }
-  const [command, ...args] = input.command;
-  const toml = (v: string) => JSON.stringify(v);
   return [
-    "-c",
-    q(`mcp_servers.agentes.command=${toml(command ?? "node")}`),
-    "-c",
-    q(`mcp_servers.agentes.args=[${[...args, "mcp", "--task", input.taskId].map(toml).join(",")}]`),
-    "-c",
-    q(`mcp_servers.agentes.env={AGENTES_MCP_SOCKET=${toml(input.socketPath)}}`),
+    ...codexMcpOverrides(input).flatMap((o) => ["-c", q(o)]),
+    ...(rules && !input.resumed ? ["-c", q(`developer_instructions=${JSON.stringify(rules)}`)] : []),
   ];
 }
