@@ -34,12 +34,15 @@ test("service files: systemd unit, launchd plist and the Windows task command", 
   expect(unit).toContain("Restart=always");
   expect(unit).toContain("RestartSec=5");
   expect(unit).toContain("RestartPreventExitStatus=0 2 3");
+  // Restarting the runner (an update) leaves background tasks running.
+  expect(unit).toContain("KillMode=process");
   expect(unit).toContain('Environment="AGENTES_RUNNER_HOME=/home/me/.agentes-runner"');
 
   const plist = launchdPlist({ ...launch, script: "/Users/me/a&b/agentes-runner.mjs" });
   expect(plist).toContain("<string>chat.agentes.runner</string>");
   expect(plist).toContain("<string>/Users/me/a&amp;b/agentes-runner.mjs</string>");
   expect(plist).toContain("<key>RunAtLoad</key>");
+  expect(plist).toContain("<key>AbandonProcessGroup</key>\n  <true/>");
   expect(plist).toContain("<string>/home/me/.agentes-runner/runner.log</string>");
 
   const win = windowsTaskCommand({

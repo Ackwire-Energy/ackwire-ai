@@ -13,6 +13,10 @@ export interface RunnerConfig {
   /** Absolute path of the workspace folder. */
   workspace: string;
   exec: boolean;
+  /** Background tasks at once on this computer (default 3). */
+  maxConcurrentTasks?: number;
+  /** A background task is stopped after this many seconds (default 4 h). */
+  taskMaxSeconds?: number;
 }
 
 /** `AGENTES_RUNNER_HOME`, or `~/.agentes-runner`. */
@@ -73,8 +77,12 @@ export function readConfig(home = runnerHome()): RunnerConfig | null {
     token: raw.token,
     workspace: raw.workspace,
     exec: raw.exec !== false,
+    ...(positive(raw.maxConcurrentTasks) ? { maxConcurrentTasks: positive(raw.maxConcurrentTasks) } : {}),
+    ...(positive(raw.taskMaxSeconds) ? { taskMaxSeconds: positive(raw.taskMaxSeconds) } : {}),
   };
 }
+
+const positive = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 1 ? Math.floor(v) : undefined);
 
 /** Writes the config with mode 600 (folder 700), atomically. */
 export function writeConfig(config: RunnerConfig, home = runnerHome()) {

@@ -10,7 +10,10 @@ import { MACHINE_PROTOCOL_VERSION, type MachineOs, type RunnerInfo } from "@agen
 import { configPath, connectUrl, expandHome, normalizeServerUrl, readConfig, runnerHome, writeConfig } from "./config";
 import { RunnerConnection } from "./connection";
 import { RUNNER_VERSION } from "./errors";
+import { agentWorkspace } from "./paths";
+import { agentSecrets } from "./secrets";
 import { installService, serviceStatus, uninstallService } from "./service";
+import { TaskManager } from "./tasks";
 
 const HELP = `agentes-runner ${RUNNER_VERSION}: connects this computer to agentes.chat
 
@@ -28,7 +31,9 @@ Usage:
   agentes-runner status
   agentes-runner --help | --version
 
-Config: $AGENTES_RUNNER_HOME or ~/.agentes-runner (config.json, mode 600).
+Config: $AGENTES_RUNNER_HOME or ~/.agentes-runner (config.json, mode 600; optional
+"maxConcurrentTasks" (default 3) and "taskMaxSeconds" (default 14400) for background tasks).
+Background tasks keep running when the runner restarts; their logs are in tasks/.
 Commands run as the user that runs the runner; consider a dedicated OS user.`;
 
 const log = (line: string) => console.log(`${new Date().toISOString()} ${line}`);
@@ -177,14 +182,29 @@ async function start(): Promise<number> {
     workspace: workspaceReal,
     exec: config.exec,
   };
+  const secretsDir = path.join(runnerHome(), "secrets");
+  // Background tasks outlive this process: their journal is picked up again here.
+  const tasks = new TaskManager({
+    root: path.join(runnerHome(), "tasks"),
+    workspaceReal,
+    maxConcurrent: config.maxConcurrentTasks,
+    defaultMaxSeconds: config.taskMaxSeconds,
+    log,
+    agentFolder: (agent) => agentWorkspace(workspaceReal, agent),
+    secrets: (agent) => agentSecrets(secretsDir, agent),
+  });
+  await tasks.init();
   const connection = new RunnerConnection({
     url: connectUrl(config.server),
     token: config.token,
     info,
-    context: { workspaceReal, exec: config.exec, token: config.token, secretsDir: path.join(runnerHome(), "secrets") },
+    context: { workspaceReal, exec: config.exec, token: config.token, secretsDir, tasks },
     log,
   });
-  const stop = () => connection.stop();
+  const stop = () => {
+    tasks.close();
+    connection.stop();
+  };
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
   log(

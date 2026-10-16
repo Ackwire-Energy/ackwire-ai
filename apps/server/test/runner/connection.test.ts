@@ -129,6 +129,40 @@ test("hello first, ping → pong, request → result, refused → stops with exi
   expect(sockets.length).toBe(1);
 });
 
+test("tasks: hello carries the journal, each welcome re-sends unacknowledged task.done, task.ack marks it", async () => {
+  const done = { taskId: "t1", exitCode: 0, seconds: 3 };
+  let delivered = false;
+  const acks: string[] = [];
+  const attached: ((f: unknown) => void)[] = [];
+  const { sockets, connection } = setup({
+    tasks: {
+      list: () => [{ taskId: "t1", agentId: "a1", status: "done", startedAt: "2026-10-16T10:00:00.000Z" }],
+      attach: (send) => {
+        attached.push(send as (f: unknown) => void);
+        if (!delivered) send({ type: "task.done", ...done });
+      },
+      detach: () => {},
+      ack: (taskId) => {
+        acks.push(taskId);
+        delivered = true;
+      },
+    },
+  });
+  const run = connection.run();
+  await waitFor(() => sockets.length === 1);
+  const s = sock(sockets, 0);
+  s.handlers.onOpen();
+  await waitFor(() => s.sent.length === 1);
+  expect(s.sent[0]).toMatchObject({ type: "hello", tasks: [{ taskId: "t1", status: "done" }] });
+  s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
+  expect(s.sent[1]).toEqual({ type: "task.done", taskId: "t1", exitCode: 0, seconds: 3 });
+  s.frame({ type: "task.ack", taskId: "t1" });
+  expect(acks).toEqual(["t1"]);
+  expect(attached).toHaveLength(1);
+  connection.stop();
+  await run;
+});
+
 test("refused: outdated exits 3, replaced exits 0", async () => {
   for (const [reason, exitCode] of [
     ["outdated", 3],

@@ -6,12 +6,14 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 3;
+export const MACHINE_PROTOCOL_VERSION = 4;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
 /** From this protocol on, the runner keeps secrets for each agent (`op: "secret"`, ADR 0027). */
 export const SECRETS_PROTOCOL = 3;
+/** From this protocol on, the runner runs background tasks that outlive a request (`task.*`, ADR 0029). */
+export const TASKS_PROTOCOL = 4;
 
 /** No valid `hello` within this time closes the socket. */
 export const HELLO_TIMEOUT_MS = 10_000;
@@ -46,7 +48,80 @@ export type SecretRequest =
 
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
+/** What runs a background task: Claude Code, Codex, or a plain shell command. */
+export type TaskExecutor = "claude" | "codex" | "shell";
+export const TASK_EXECUTORS: readonly TaskExecutor[] = ["claude", "codex", "shell"];
+
+/**
+ * A background task (protocol 4): started detached on the machine, so it
+ * survives the runner restarting and the socket dropping; its output goes to
+ * files in `<runner home>/tasks/<taskId>/` and its state to the runner's
+ * journal. The runner streams `task.event` frames and sends `task.done` once,
+ * until the server acknowledges it (`task.ack`).
+ */
+export interface TaskStart {
+  /** Chosen by the server (a UUID). */
+  taskId: string;
+  executor: TaskExecutor;
+  /** `shell`: the command line. */
+  command?: string;
+  /** `claude` / `codex`: what to do. */
+  prompt?: string;
+  /** `claude`: the session to continue (one per conversation); the runner resumes it when it exists. */
+  session?: string;
+  /** `claude`: the server knows this session ran before (a hint; the runner checks on disk). */
+  resume?: boolean;
+  /** Relative to the agent's folder (default: the folder itself). */
+  cwd?: string;
+  /** Work in a new git worktree on this new branch (`<agent folder>/.worktrees/<taskId>`), when `cwd` is a git repository. */
+  branch?: string;
+  /** Killed (the whole process group) after this long; default and cap are the runner's. */
+  maxSeconds?: number;
+}
+
+/** A task as the runner's journal has it (in `hello` and `task.status`). */
+export interface RunnerTask {
+  taskId: string;
+  agentId: string;
+  /** `interrupted`: the process is gone without an exit (the machine slept, rebooted or killed it). */
+  status: "running" | "done" | "interrupted";
+  pid?: number;
+  startedAt: string;
+  endedAt?: string;
+  exitCode?: number | null;
+  signal?: string | null;
+  seconds?: number;
+  lastLine?: string;
+  files?: string[];
+}
+
+/** `task.done`: how a task ended. Sent once per task, again after a reconnect until acknowledged. */
+export interface TaskDone {
+  taskId: string;
+  /** Null when there is no exit code (killed by a signal, or interrupted). */
+  exitCode: number | null;
+  signal?: string | null;
+  seconds: number;
+  /** The executor's final answer (Claude Code's `result`), or the last lines of output; capped. */
+  result?: string;
+  lastLine?: string;
+  files?: string[];
+  /** Ended by `task.cancel`. */
+  canceled?: boolean;
+  /** Killed after `maxSeconds`. */
+  timedOut?: boolean;
+  /** The process vanished without an exit (the machine went down): it may be resumed. */
+  interrupted?: boolean;
+  /** Claude Code's session id, when it reported one. */
+  session?: string;
+}
+
+/** Largest pieces of task frames (characters / entries); the runner cuts, the server cuts again. */
+export const TASK_LIMITS = { line: 500, files: 50, filePath: 300, result: 8000, tasks: 200 } as const;
+
 export interface RunnerInfo {
+  /** Protocol 4: the tasks in the runner's journal (running, and finished ones not yet acknowledged). */
+  tasks?: RunnerTask[];
   /** The runner's own version (`0.1.0`). */
   version: string;
   protocol: number;
@@ -91,6 +166,10 @@ export type MachineRequest = (
   | { op: "write"; path: string; base64: string }
   | { op: "list"; path: string; depth: number }
   | ({ op: "secret" } & SecretRequest)
+  | ({ op: "task.start" } & TaskStart)
+  /** One task, or all of this agent's when `taskId` is omitted. */
+  | { op: "task.status"; taskId?: string }
+  | { op: "task.cancel"; taskId: string }
   | {
       op: "push";
       path: string;
@@ -103,6 +182,18 @@ export type MachineRequest = (
 
 export type MachineOp = MachineRequest["op"];
 
+export const MACHINE_OPS: readonly MachineOp[] = [
+  "exec",
+  "read",
+  "write",
+  "list",
+  "push",
+  "secret",
+  "task.start",
+  "task.status",
+  "task.cancel",
+];
+
 /** What each op answers with `ok: true`. */
 export interface MachineReplies {
   exec: { exitCode: number; stdout: string; stderr: string; timedOut: boolean; canceled?: { killed: boolean } };
@@ -114,6 +205,11 @@ export interface MachineReplies {
   push: { name: string; size: number; sha256: string; contentType: string };
   /** `keypair`: the public key (raw P-256, base64); `deliver`: the value's size in bytes. */
   secret: { publicKey?: string; size?: number };
+  /** `cwd`: where it runs, relative to the agent's folder (`.worktrees/<taskId>` with a branch). */
+  "task.start": { taskId: string; pid: number; startedAt: string; cwd: string; branch?: string; command: string };
+  "task.status": { tasks: RunnerTask[] };
+  /** `false`: it had already ended. */
+  "task.cancel": { canceled: boolean };
 }
 
 /** Error codes the runner reports; the message is for people. */
@@ -123,6 +219,8 @@ export type MachineErrorCode =
   | "exec_disabled"
   | "too_large"
   | "upload_failed"
+  /** `task.start` beyond the runner's concurrent tasks (`maxConcurrentTasks`). */
+  | "no_slot"
   | "bad_request"
   | "internal";
 
@@ -132,6 +230,8 @@ export type ServerFrame =
   | ({ type: "request"; id: string } & MachineRequest)
   | { type: "cancel"; id: string }
   | { type: "ping"; at: number }
+  /** The server stored this task's `task.done`: the runner stops re-sending it. */
+  | { type: "task.ack"; taskId: string }
   /** The server closes after sending this (bad token, revoked, outdated runner). */
   | { type: "refused"; reason: "invalid_token" | "revoked" | "outdated" | "replaced"; message: string };
 
@@ -141,10 +241,50 @@ export type RunnerFrame =
   | { type: "output"; id: string; stream: "stdout" | "stderr"; chunk: string }
   | { type: "result"; id: string; ok: true; data: unknown }
   | { type: "result"; id: string; ok: false; error: { code: MachineErrorCode; message: string } }
-  | { type: "pong"; at: number };
+  | { type: "pong"; at: number }
+  /** A task's progress: a human last line, files it touched, or elapsed time (throttled). */
+  | {
+      type: "task.event";
+      taskId: string;
+      kind: "line" | "files" | "progress";
+      line?: string;
+      files?: string[];
+      seconds?: number;
+    }
+  | ({ type: "task.done" } & TaskDone);
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const isString = (v: unknown): v is string => typeof v === "string";
+const cut = (v: unknown, max: number) => (isString(v) ? v.slice(0, max) : undefined);
+const fileList = (v: unknown) =>
+  Array.isArray(v)
+    ? v
+        .filter(isString)
+        .slice(0, TASK_LIMITS.files)
+        .map((p) => p.slice(0, TASK_LIMITS.filePath))
+    : undefined;
+const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+
+/** A journal entry from `hello` or `task.status`; null when malformed. */
+export function parseRunnerTask(v: unknown): RunnerTask | null {
+  if (!isObject(v) || !isString(v.taskId) || !isString(v.agentId) || !isString(v.startedAt)) return null;
+  const status = (["running", "done", "interrupted"] as const).find((s) => s === v.status);
+  if (!status) return null;
+  const exitCode = v.exitCode === null ? null : finite(v.exitCode);
+  return {
+    taskId: v.taskId.slice(0, 64),
+    agentId: v.agentId.slice(0, 64),
+    status,
+    ...(finite(v.pid) !== undefined ? { pid: finite(v.pid) } : {}),
+    startedAt: v.startedAt.slice(0, 40),
+    ...(isString(v.endedAt) ? { endedAt: v.endedAt.slice(0, 40) } : {}),
+    ...(exitCode !== undefined ? { exitCode } : {}),
+    ...(v.signal === null || isString(v.signal) ? { signal: v.signal === null ? null : v.signal.slice(0, 20) } : {}),
+    ...(finite(v.seconds) !== undefined ? { seconds: finite(v.seconds) } : {}),
+    ...(isString(v.lastLine) ? { lastLine: v.lastLine.slice(0, TASK_LIMITS.line) } : {}),
+    ...(fileList(v.files) ? { files: fileList(v.files) } : {}),
+  };
+}
 
 /** Parses a runner frame (server side); null when it isn't one. */
 export function parseRunnerFrame(raw: string): RunnerFrame | null {
@@ -169,6 +309,14 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         hostname: isString(f.hostname) ? f.hostname.slice(0, 200) : "",
         workspace: isString(f.workspace) ? f.workspace.slice(0, 500) : "",
         exec: f.exec !== false,
+        ...(Array.isArray(f.tasks)
+          ? {
+              tasks: f.tasks
+                .slice(0, TASK_LIMITS.tasks)
+                .map(parseRunnerTask)
+                .filter((t): t is RunnerTask => t !== null),
+            }
+          : {}),
       };
     case "output":
       if (!isString(f.id) || !isString(f.chunk) || (f.stream !== "stdout" && f.stream !== "stderr")) return null;
@@ -187,6 +335,42 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       return null;
     case "pong":
       return typeof f.at === "number" ? { type: "pong", at: f.at } : null;
+    case "task.event": {
+      if (!isString(f.taskId) || (f.kind !== "line" && f.kind !== "files" && f.kind !== "progress")) return null;
+      const line = cut(f.line, TASK_LIMITS.line);
+      const files = fileList(f.files);
+      const seconds = finite(f.seconds);
+      return {
+        type: "task.event",
+        taskId: f.taskId.slice(0, 64),
+        kind: f.kind,
+        ...(line !== undefined ? { line } : {}),
+        ...(files ? { files } : {}),
+        ...(seconds !== undefined ? { seconds } : {}),
+      };
+    }
+    case "task.done": {
+      if (!isString(f.taskId)) return null;
+      const exitCode = finite(f.exitCode) ?? null;
+      const result = cut(f.result, TASK_LIMITS.result);
+      const lastLine = cut(f.lastLine, TASK_LIMITS.line);
+      const files = fileList(f.files);
+      const session = cut(f.session, 64);
+      return {
+        type: "task.done",
+        taskId: f.taskId.slice(0, 64),
+        exitCode,
+        signal: isString(f.signal) ? f.signal.slice(0, 20) : null,
+        seconds: Math.max(0, Math.round(finite(f.seconds) ?? 0)),
+        ...(result !== undefined ? { result } : {}),
+        ...(lastLine !== undefined ? { lastLine } : {}),
+        ...(files ? { files } : {}),
+        ...(f.canceled === true ? { canceled: true } : {}),
+        ...(f.timedOut === true ? { timedOut: true } : {}),
+        ...(f.interrupted === true ? { interrupted: true } : {}),
+        ...(session !== undefined ? { session } : {}),
+      };
+    }
     default:
       return null;
   }
@@ -204,10 +388,11 @@ export function parseServerFrame(raw: string): ServerFrame | null {
   if (!isObject(f) || !isString(f.type)) return null;
   if (f.type === "request") {
     if (!isString(f.id) || !isString(f.op)) return null;
-    if (!["exec", "read", "write", "list", "push", "secret"].includes(f.op)) return null;
+    if (!MACHINE_OPS.includes(f.op as MachineOp)) return null;
   }
   if ((f.type === "cancel" || f.type === "request") && !isString(f.id)) return null;
-  if (!["welcome", "request", "cancel", "ping", "refused"].includes(f.type)) return null;
+  if (f.type === "task.ack" && !isString(f.taskId)) return null;
+  if (!["welcome", "request", "cancel", "ping", "refused", "task.ack"].includes(f.type)) return null;
   return f as ServerFrame;
 }
 

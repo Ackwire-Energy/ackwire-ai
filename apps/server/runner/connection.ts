@@ -90,6 +90,12 @@ export interface ConnectionOptions {
   random?: () => number;
   /** Tests: run requests with a fake. */
   handler?: typeof handleRequest;
+  /**
+   * Background tasks (protocol 4): `hello` carries their journal, each
+   * `welcome` re-sends every `task.done` not yet acknowledged, `task.ack`
+   * marks one delivered. Defaults to `context.tasks`.
+   */
+  tasks?: Pick<NonNullable<HandlerContext["tasks"]>, "list" | "attach" | "detach" | "ack">;
   /** Called after each `welcome`. */
   onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number }) => void;
 }
@@ -169,12 +175,14 @@ export class RunnerConnection {
         }
       };
       const runner = new RequestRunner(opts.context, send, log, opts.handler ?? handleRequest);
+      const tasks = opts.tasks ?? opts.context.tasks;
 
       const end = () => {
         if (finished) return;
         finished = true;
         if (watchdog) clearTimeout(watchdog);
         runner.close();
+        tasks?.detach();
         socket?.close();
         this.endSession = undefined;
         resolve({ welcomed, outcome });
@@ -200,8 +208,12 @@ export class RunnerConnection {
             log(`connected as ${frame.name}`);
             arm();
             opts.onWelcome?.({ machineId: frame.machineId, name: frame.name, heartbeatMs });
+            tasks?.attach(send);
             return;
           }
+          case "task.ack":
+            tasks?.ack(frame.taskId);
+            return;
           case "ping":
             send({ type: "pong", at: frame.at });
             arm();
@@ -227,7 +239,9 @@ export class RunnerConnection {
       try {
         socket = (opts.dial ?? webSocketDial)(opts.url, {
           onOpen: () => {
-            queueMicrotask(() => send({ type: "hello", token: opts.token, ...opts.info }));
+            queueMicrotask(() =>
+              send({ type: "hello", token: opts.token, ...opts.info, ...(tasks ? { tasks: tasks.list() } : {}) }),
+            );
           },
           onMessage: (raw) => {
             if (!finished) onFrame(raw);

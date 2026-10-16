@@ -14,6 +14,7 @@ import { runCommand } from "./exec";
 import { agentWorkspace, isInside, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
 import { agentSecrets, handleSecret } from "./secrets";
+import type { TaskManager } from "./tasks";
 
 export const MAX_CONCURRENT_REQUESTS = 8;
 export const MAX_LIST_ENTRIES = 5000;
@@ -28,6 +29,8 @@ export interface HandlerContext {
   fetch?: FetchLike;
   /** Where each agent's secrets live (ADR 0027); without it the machine keeps none. */
   secretsDir?: string;
+  /** Background tasks (protocol 4); without it the runner refuses `task.*`. */
+  tasks?: TaskManager;
 }
 
 export interface RequestScope {
@@ -182,6 +185,7 @@ async function doList(
 
 /** Runs one request; throws RunnerError (or fs errors) on failure. */
 export async function handleRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
+  if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel") return handleTask(ctx, req);
   // Each agent works in its own folder: that folder is its workspace.
   if (req.agent) ctx = { ...ctx, workspaceReal: await agentWorkspace(ctx.workspaceReal, req.agent) };
   if (req.op === "secret") {
@@ -216,6 +220,30 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   }
 }
 
+/** Background tasks: the manager finds each agent's folder itself (and keeps it for the task's life). */
+function handleTask(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "task.start" | "task.status" | "task.cancel" }>,
+) {
+  const tasks = ctx.tasks;
+  if (!tasks) throw new RunnerError("bad_request", "This runner runs no background tasks");
+  switch (req.op) {
+    case "task.start":
+      if (!ctx.exec) {
+        throw new RunnerError(
+          "exec_disabled",
+          "Commands are turned off on this computer (the runner was paired with --no-exec)",
+        );
+      }
+      if (!req.agent) throw new RunnerError("bad_request", "A task belongs to an agent");
+      return tasks.start(req.agent, req);
+    case "task.status":
+      return tasks.status(req.agent, typeof req.taskId === "string" ? req.taskId : undefined);
+    case "task.cancel":
+      return tasks.cancel(req.agent, requireString(req.taskId, "taskId"));
+  }
+}
+
 /** One log line per request: the op and the path or the head of the command, never file contents. */
 export function describeRequest(req: MachineRequest): string {
   const who = req.agent ? `[${String(req.agent.handle ?? "")}] ` : "";
@@ -238,6 +266,12 @@ function describeOp(req: MachineRequest): string {
     case "secret":
       // Never the value: the action and the name or request.
       return `secret ${req.action} ${"name" in req ? req.name : req.requestId}`;
+    case "task.start":
+      return `task.start ${String(req.taskId ?? "")} (${String(req.executor ?? "")})`;
+    case "task.status":
+      return `task.status ${String(req.taskId ?? "all")}`;
+    case "task.cancel":
+      return `task.cancel ${String(req.taskId ?? "")}`;
     default:
       return String((req as { op: unknown }).op);
   }
