@@ -76,7 +76,7 @@ export function describeCapabilities(
     }
     if (names.has("schedule_reminder")) {
       lines.push(
-        "- Você consegue agendar lembretes e rotinas: `schedule_reminder` (uma vez, no fuso de quem pediu) e `create_routine` (recorrente). Confirme o horário com as palavras que a ferramenta devolve; se o horário estiver ambíguo, pergunte antes com `ask_user`.",
+        "- Você consegue agendar lembretes e rotinas: `schedule_reminder` (uma vez, no fuso de quem pediu) e `create_routine` (recorrente; com `channel` ela posta direto naquele canal, não nesta conversa). Para mudar uma rotina que já existe (instruções, horário, onde ela responde), use `list_routines` e `update_routine`; nunca diga que não dá para mudar. Confirme o horário com as palavras que a ferramenta devolve; se o horário estiver ambíguo, pergunte antes com `ask_user`.",
       );
     }
     if (names.has("share_artifact")) {

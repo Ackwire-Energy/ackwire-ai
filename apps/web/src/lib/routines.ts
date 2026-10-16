@@ -11,6 +11,16 @@ export function routineOfMessage(meta: Record<string, unknown> | undefined): { i
   return r && typeof r.id === "string" && typeof r.name === "string" ? { id: r.id, name: r.name } : null;
 }
 
+/**
+ * The message a routine posts on its creator's behalf to call its agent
+ * (top level): hidden from the timeline, only the agent's answer shows.
+ */
+export const isRoutineCall = (m: {
+  threadId: string | null;
+  author: { type: string };
+  meta?: Record<string, unknown>;
+}) => m.threadId === null && m.author.type === "person" && routineOfMessage(m.meta) !== null;
+
 /** Zones people pick most often; the select also keeps whatever zone a routine already has. */
 export const COMMON_TIMEZONES = [
   "America/Sao_Paulo",

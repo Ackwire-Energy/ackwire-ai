@@ -206,11 +206,16 @@ async function executeRunInner(
   prof.mark("claim");
   const claimedAt = Date.now();
   // DMs are flat: a reply to a top-level DM message goes in the main timeline, not a thread.
+  // So is a routine's answer in a channel: the routine's own message isn't shown, so its
+  // result can't hang in a thread under it.
   const channelRow = await getChannelCached(db, run.orgId, run.channelId);
-  const replyThreadId: string | null =
-    (channelRow?.kind === "dm" || channelRow?.kind === "forum") && run.threadRootId === run.triggerMessageId
-      ? null
-      : run.threadRootId;
+  const topLevel = run.threadRootId === run.triggerMessageId;
+  const flat =
+    topLevel &&
+    (channelRow?.kind === "dm" ||
+      channelRow?.kind === "forum" ||
+      Boolean((await getMessage(db, run.orgId, run.triggerMessageId))?.meta.routine));
+  const replyThreadId: string | null = flat ? null : run.threadRootId;
   const where = { channelId: run.channelId, threadId: replyThreadId, agentId: run.agentId, runId: run.id };
   await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where });
   await publishChannelEvent(deps.pubsub, {

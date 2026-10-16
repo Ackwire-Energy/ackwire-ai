@@ -158,6 +158,85 @@ describe("reminders from the chat", () => {
     expect(await listRoutines(f.db, f.owner.id, f.org.id)).toHaveLength(1);
   });
 
+  test("a routine asked in a DM moves to #general (update_routine): it answers there, flat, and nothing comes to the DM", async () => {
+    let routineId = "";
+    await world((req) => {
+      const last = JSON.stringify(req.messages.at(-1)?.content);
+      if (last.includes("tool_result")) return { chunks: ["Feito."] };
+      if (last.includes("cria a rotina"))
+        return {
+          chunks: [],
+          toolUses: [
+            {
+              name: "create_routine",
+              input: { schedule: "toda segunda às 10h", prompt: "Veja erros novos no Sentry." },
+            },
+          ],
+        };
+      if (last.includes("manda no general"))
+        return { chunks: [], toolUses: [{ name: "update_routine", input: { id: routineId, channel: "#General" } }] };
+      return { chunks: ["Nenhum erro novo."] };
+    });
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const say = async (body: string) => {
+      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dm.id, { body });
+      await drainOutbox(f.db, f.handlers);
+    };
+    await say("cria a rotina de erros");
+    const [created] = await listRoutines(f.db, f.owner.id, f.org.id);
+    expect(created?.target).toMatchObject({ type: "conversation", channelId: dm.id });
+    routineId = created?.id ?? "";
+    await say("manda no general, não no privado");
+    const updated = (await results()).find((r) => r.name === "update_routine");
+    expect(updated).toMatchObject({ isError: false });
+    expect(updated?.content).toContain("answers in #general");
+    const [moved] = await listRoutines(f.db, f.owner.id, f.org.id);
+    expect(moved?.target).toEqual({ type: "channel", channelId: f.general.id });
+
+    const before = (await f.db.select().from(schema.messages)).filter((m) => m.channelId === dm.id).length;
+    await fireNow();
+    const all = await f.db.select().from(schema.messages);
+    expect(all.filter((m) => m.channelId === dm.id)).toHaveLength(before);
+    const answer = all.find((m) => m.channelId === f.general.id && m.authorType === "agent");
+    expect(answer).toMatchObject({ body: "Nenhum erro novo.", threadId: null });
+  });
+
+  test("create_routine with a channel posts there; a channel the person isn't in is not found", async () => {
+    await world((req) => {
+      const last = JSON.stringify(req.messages.at(-1)?.content);
+      if (last.includes("tool_result")) return { chunks: ["Feito."] };
+      if (last.includes("no secreto"))
+        return {
+          chunks: [],
+          toolUses: [
+            { name: "create_routine", input: { schedule: "toda segunda às 10h", prompt: "x", channel: "secreto" } },
+          ],
+        };
+      if (last.includes("rotina"))
+        return {
+          chunks: [],
+          toolUses: [
+            {
+              name: "create_routine",
+              input: { schedule: "toda segunda às 10h", prompt: "Erros?", channel: "general" },
+            },
+          ],
+        };
+      return { chunks: ["ok"] };
+    });
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    for (const body of ["rotina de erros", "outra no secreto"]) {
+      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dm.id, { body });
+      await drainOutbox(f.db, f.handlers);
+    }
+    const created = (await results()).filter((r) => r.name === "create_routine");
+    expect(created[0]?.content).toContain("answers in #general");
+    expect(created[1]).toMatchObject({ isError: true });
+    expect(created[1]?.content).toContain("No channel #secreto");
+    const routines = await listRoutines(f.db, f.owner.id, f.org.id);
+    expect(routines.map((r) => r.target)).toEqual([{ type: "channel", channelId: f.general.id }]);
+  });
+
   test("in a channel thread it lands in that thread; ask_agent makes the agent do it then", async () => {
     await world((req) => {
       const last = JSON.stringify(req.messages.at(-1)?.content);
@@ -220,7 +299,14 @@ describe("reminders from the chat", () => {
       scopes: [],
       tools: {
         allow: [],
-        deny: ["schedule_reminder", "create_routine", "list_reminders", "cancel_reminder"].map((name) => ({
+        deny: [
+          "schedule_reminder",
+          "create_routine",
+          "list_routines",
+          "update_routine",
+          "list_reminders",
+          "cancel_reminder",
+        ].map((name) => ({
           connectionId: null,
           name,
         })),

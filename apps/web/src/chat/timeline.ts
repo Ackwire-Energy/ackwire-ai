@@ -1,5 +1,5 @@
 import type { Approval, Message } from "@/api/types";
-import { routineOfMessage } from "@/lib/routines";
+import { isRoutineCall, routineOfMessage } from "@/lib/routines";
 import type { LiveRun } from "@/realtime/streams";
 
 const byTime = (a: { createdAt: string; id: string }, b: { createdAt: string; id: string }) =>
@@ -94,6 +94,8 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
     }
     if (entry.item.kind === "message") {
       const m = entry.item.message;
+      // The message a routine posts to call its agent isn't shown: only the agent's answer is.
+      if (isRoutineCall(m)) continue;
       // A routine's message always shows its own header, and nothing groups under it.
       const routine = Boolean(routineOfMessage(m.meta));
       const prevRoutine = Boolean(prev && routineOfMessage(prev.meta));

@@ -32,6 +32,7 @@ export type ActivityKind =
   | "fetchingFile"
   | "schedulingReminder"
   | "creatingRoutine"
+  | "updatingRoutine"
   | "openingForumTopic"
   | "postingInForum"
   | "usingTool";
@@ -76,6 +77,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   // Scheduling from the chat.
   schedule_reminder: "schedulingReminder",
   create_routine: "creatingRoutine",
+  update_routine: "updatingRoutine",
   // The forum.
   open_forum_topic: "openingForumTopic",
   post_in_forum: "postingInForum",

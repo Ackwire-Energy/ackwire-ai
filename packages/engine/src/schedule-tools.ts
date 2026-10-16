@@ -5,8 +5,12 @@ import {
   createReminder,
   createRoutine,
   listReminders,
+  listRoutines,
   type RoutineDeps,
+  type RoutineTarget,
+  type RoutineView,
   routineTimezone,
+  updateRoutine,
 } from "./routines";
 import { describeWhen, parseWhen, timezoneName } from "./schedule";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -32,6 +36,42 @@ async function requesterOf(ctx: ToolContext): Promise<string | null> {
 async function conversationOf(ctx: ToolContext) {
   const channel = await getChannelCached(ctx.db, ctx.orgId, ctx.channelId);
   return { channelId: ctx.channelId, threadId: channel?.kind === "dm" ? null : ctx.threadRootId };
+}
+
+/**
+ * A channel by name for a routine to post in: one the person who asked is in
+ * (not in it = not found, so private channels stay hidden). Being in it is the
+ * agent's part, checked when the routine is saved.
+ */
+async function channelTarget(ctx: ToolContext, requester: string, raw: string) {
+  const name = raw.trim().replace(/^#/, "").toLowerCase();
+  const { channels, channelMembers } = schema;
+  const [channel] = await ctx.db
+    .select({ id: channels.id, name: channels.name })
+    .from(channels)
+    .innerJoin(channelMembers, eq(channelMembers.channelId, channels.id))
+    .where(
+      and(
+        eq(channels.orgId, ctx.orgId),
+        eq(channels.name, name),
+        eq(channels.kind, "channel"),
+        isNull(channels.archivedAt),
+        eq(channelMembers.userId, requester),
+      ),
+    );
+  if (!channel) throw new Error(`No channel #${name} that the person who asked is in.`);
+  return { target: { type: "channel", channelId: channel.id } satisfies RoutineTarget, name: channel.name };
+}
+
+/** Where a routine answers, for the agent to tell the person. */
+async function whereOf(ctx: ToolContext, r: RoutineView) {
+  const t = r.target;
+  if (t.type === "channel" || t.type === "conversation") {
+    if (t.channelId === ctx.channelId) return "this conversation";
+    const channel = await getChannelCached(ctx.db, ctx.orgId, t.channelId);
+    return channel?.kind === "channel" ? `#${channel.name}` : "a direct message";
+  }
+  return t.type === "forum" ? "a forum topic" : t.type === "artifact" ? "a file in the Drive" : "a direct message";
 }
 
 const sameText = (a: string, b: string) =>
@@ -78,7 +118,8 @@ const noRequester: ToolOutput = {
 
 /**
  * Scheduling from the chat (scope `schedule:write`, on by default):
- * `schedule_reminder`, `create_routine`, `list_reminders`, `cancel_reminder`.
+ * `schedule_reminder`, `create_routine`, `list_routines`, `update_routine`,
+ * `list_reminders`, `cancel_reminder`.
  * Everything belongs to the person who asked, in their time zone, in this
  * conversation; reminders are one-off routines, so they show in Rotinas.
  */
@@ -145,7 +186,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "create_routine",
       description:
-        'Create a recurring routine in this conversation ("toda segunda às 9h", "dias úteis às 18h"): at each time you get `prompt` as a request from the person. Only admins or your owner can create routines.',
+        'Create a recurring routine ("toda segunda às 9h", "dias úteis às 18h"): at each time you get `prompt` as a request from the person, and your answer goes where the routine lives. By default that is this conversation; set `channel` (its name, with or without #) when the person wants the results posted in a channel ("manda no #general"), so nothing comes here. Only admins or your owner can create routines.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -153,6 +194,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           schedule: { type: "string", minLength: 1, maxLength: 300 },
           prompt: { type: "string", minLength: 1, maxLength: 10_000 },
           title: { type: "string", maxLength: 120 },
+          channel: { type: "string", maxLength: 100, description: "Post in this channel instead of here" },
         },
         required: ["schedule", "prompt"],
         additionalProperties: false,
@@ -161,7 +203,11 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
         try {
           const requester = await requesterOf(ctx);
           if (!requester) return noRequester;
-          const conv = await conversationOf(ctx);
+          const channel = str(input.channel).trim() ? await channelTarget(ctx, requester, str(input.channel)) : null;
+          const conv =
+            channel && channel.target.channelId !== ctx.channelId
+              ? { channelId: channel.target.channelId, threadId: null }
+              : await conversationOf(ctx);
           const existing = await sameRoutine(ctx, conv, str(input.prompt));
           if (existing) {
             const next = existing.nextRunAt ? describeWhen(existing.nextRunAt, existing.timezone ?? "UTC") : "";
@@ -174,15 +220,95 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             name: str(input.title) || undefined,
             agentId: ctx.agentId,
             prompt: str(input.prompt),
-            target: { type: "conversation", ...conv, reminder: false },
+            target:
+              channel && channel.target.channelId !== ctx.channelId
+                ? channel.target
+                : { type: "conversation", ...conv, reminder: false },
             trigger: { type: "schedule", phrase: str(input.schedule) },
           });
           const t = routine.trigger;
           const zone = t.type === "schedule" ? t.timezone : "UTC";
           const next = routine.nextRunAt ? describeWhen(new Date(routine.nextRunAt), zone) : "";
           const when = t.type === "schedule" ? `${t.description} (${timezoneName(zone)})` : "";
+          const where = await whereOf(ctx, routine);
           return {
-            content: `Created routine ${routine.id} "${routine.name}": ${when}; next: ${next}. Confirm it to the person.`,
+            content: `Created routine ${routine.id} "${routine.name}": ${when}; next: ${next}; answers in ${where}. Confirm it to the person.`,
+            data: { routine: { id: routine.id } },
+          };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: "list_routines",
+      description:
+        "List your routines in this organization (recurring, not reminders): id, name, when, where they answer and their instructions. Use it before update_routine.",
+      scope: SCHEDULE_SCOPE,
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      async execute(_input, ctx) {
+        try {
+          const requester = await requesterOf(ctx);
+          if (!requester) return noRequester;
+          const mine = (await listRoutines(ctx.db, requester, ctx.orgId)).filter(
+            (r) =>
+              r.agentId === ctx.agentId &&
+              r.trigger.type !== "once" &&
+              !(r.target.type === "conversation" && r.target.reminder),
+          );
+          if (mine.length === 0) return { content: "You have no routines." };
+          const lines = await Promise.all(
+            mine.map(async (r) => {
+              const when = r.trigger.type === "schedule" ? r.trigger.description : `on ${r.trigger.type}`;
+              return `${r.id} — "${r.name}" (${r.active ? "active" : "paused"}): ${when}; answers in ${await whereOf(ctx, r)}\n  ${r.prompt.replace(/\s+/g, " ").slice(0, 300)}`;
+            }),
+          );
+          return { content: lines.join("\n") };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: "update_routine",
+      description:
+        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it answers ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h"), `active` pauses or resumes it. Only who created it, your owner or an admin can change it.',
+      scope: SCHEDULE_SCOPE,
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string", minLength: 36, maxLength: 36 },
+          channel: { type: "string", maxLength: 100 },
+          prompt: { type: "string", minLength: 1, maxLength: 10_000 },
+          schedule: { type: "string", minLength: 1, maxLength: 300 },
+          title: { type: "string", minLength: 1, maxLength: 120 },
+          active: { type: "boolean" },
+        },
+        required: ["id"],
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
+        try {
+          const requester = await requesterOf(ctx);
+          if (!requester) return noRequester;
+          const id = str(input.id);
+          const current = (await listRoutines(ctx.db, requester, ctx.orgId)).find(
+            (r) => r.id === id && r.agentId === ctx.agentId,
+          );
+          if (!current) return { content: `You have no routine ${id}. Use list_routines.`, isError: true };
+          const channel = str(input.channel).trim() ? await channelTarget(ctx, requester, str(input.channel)) : null;
+          const routine = await updateRoutine(routineDeps(ctx), requester, ctx.orgId, id, {
+            ...(channel ? { target: channel.target } : {}),
+            ...(str(input.prompt) ? { prompt: str(input.prompt) } : {}),
+            ...(str(input.title) ? { name: str(input.title) } : {}),
+            ...(str(input.schedule) ? { trigger: { type: "schedule" as const, phrase: str(input.schedule) } } : {}),
+            ...(typeof input.active === "boolean" ? { active: input.active } : {}),
+          });
+          const when = routine.trigger.type === "schedule" ? routine.trigger.description : "";
+          const zone = routine.trigger.type === "schedule" ? routine.trigger.timezone : "UTC";
+          const next = routine.nextRunAt ? describeWhen(new Date(routine.nextRunAt), zone) : "none";
+          return {
+            content: `Updated routine ${routine.id} "${routine.name}" (${routine.active ? "active" : "paused"}): ${when}; next: ${next}; answers in ${await whereOf(ctx, routine)}. Tell the person what changed.`,
             data: { routine: { id: routine.id } },
           };
         } catch (error) {

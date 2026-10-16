@@ -17,18 +17,16 @@ const msg = (id: string, minute: number, meta?: Record<string, unknown>): Messag
 });
 
 describe("routine messages", () => {
-  test("recognized by meta.routine; never grouped with the creator's own messages", () => {
+  test("recognized by meta.routine; the call to the agent is hidden, the agent's answer shows", () => {
     const routine = { routine: { id: "r1", name: "Relatório semanal", runId: "x" } };
     expect(routineOfMessage(routine)).toEqual({ id: "r1", name: "Relatório semanal" });
     expect(routineOfMessage({ routineId: "r1" })).toBeNull();
     expect(routineOfMessage(undefined)).toBeNull();
-    const rows = buildTimeline([msg("typed", 1), msg("by-routine", 2, routine), msg("typed-again", 3)], [], []);
-    const grouped = rows.flatMap((r) => (r.kind === "message" ? [[r.message.id, r.grouped]] : []));
-    expect(grouped).toEqual([
-      ["typed", false],
-      ["by-routine", false],
-      ["typed-again", false],
-    ]);
+    const answer = { ...msg("answer", 3, routine), author: { type: "agent" as const, id: "atlas" } };
+    const inThread = { ...msg("in-thread", 4, routine), threadId: "root" };
+    const rows = buildTimeline([msg("typed", 1), msg("by-routine", 2, routine), answer, inThread], [], []);
+    const shown = rows.flatMap((r) => (r.kind === "message" ? [r.message.id] : []));
+    expect(shown).toEqual(["typed", "answer", "in-thread"]);
   });
 });
 
