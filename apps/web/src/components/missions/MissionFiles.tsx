@@ -1,4 +1,4 @@
-import { Diff, Icon, Segmented, Sheet, Skeleton } from "@agenteschat/ui";
+import { DetailsDialog, Diff, Icon, Segmented, Skeleton } from "@agenteschat/ui";
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMission, useMissionFiles } from "@/api/missions";
@@ -65,17 +65,24 @@ export function MissionFilesPanel({
   };
   const synced = file?.writtenAt ?? file?.updatedAt;
   return (
-    <Sheet
+    <DetailsDialog
       open
       onOpenChange={(o) => !o && onClose()}
       className="mi-files"
+      eyebrow={mission.data?.title}
       title={t("missions.files.title")}
       subtitle={
-        <>
+        <span>
           {t("missions.files.folder")} <code className="mi-mono">{FOLDER}</code>
-        </>
+        </span>
       }
       closeLabel={t("common.close")}
+      footer={
+        <div className="mi-files__foot">
+          <Icon name="info" size={14} />
+          <span>{tab === "notes.md" ? t("missions.files.notesFoot", { executor }) : t("missions.files.foot")}</span>
+        </div>
+      }
     >
       <div className="mi-files__tabs">
         <Segmented
@@ -131,11 +138,7 @@ export function MissionFilesPanel({
             <p className="mi-md mi-md__empty">{t("missions.files.empty")}</p>
           ))}
       </div>
-      <div className="mi-files__foot">
-        <Icon name="info" size={14} />
-        <span>{tab === "notes.md" ? t("missions.files.notesFoot", { executor }) : t("missions.files.foot")}</span>
-      </div>
-    </Sheet>
+    </DetailsDialog>
   );
 }
 

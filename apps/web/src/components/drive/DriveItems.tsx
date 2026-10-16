@@ -11,7 +11,6 @@ import { relativeTime } from "@/lib/format";
 import { DrivePreview } from "./DrivePreview";
 
 /** The details panel's id (cards and rows control it). */
-export const DETAILS_ID = "drive-details";
 
 /** The kind's icon; uploaded files by their name (the list has no content type). */
 export const itemIcon = (a: Pick<Artifact, "kind" | "title">): IconName =>
@@ -56,8 +55,7 @@ export function DriveCard({ artifact: a, open, selected, channelName, onPick, on
         <button
           type="button"
           className="drive-card__title drive-hit"
-          aria-expanded={open}
-          aria-controls={open ? DETAILS_ID : undefined}
+          aria-haspopup="dialog"
           onClick={(e) => onPick(a, e)}
           onDoubleClick={() => onOpen(a)}
         >
@@ -111,8 +109,7 @@ export function DriveRow({
           <button
             type="button"
             className="drive-row__title drive-hit"
-            aria-expanded={open}
-            aria-controls={open ? DETAILS_ID : undefined}
+            aria-haspopup="dialog"
             onClick={(e) => onPick(a, e)}
             onDoubleClick={() => onOpen(a)}
           >

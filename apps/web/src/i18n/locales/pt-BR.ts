@@ -1563,6 +1563,7 @@ export const ptBR = {
     back: "Issues",
     notFound: "Esta issue não existe ou você não tem acesso.",
     createdBy: "#{{number}} · criada por {{name}}",
+    createdByShort: "Criada por {{name}}",
     fromMessage: "a partir de <0>uma mensagem no #{{channel}}</0>",
     fromForum: "a partir de um tópico no fórum",
     fromAgent: "a partir de um pedido a um agente",
@@ -1728,6 +1729,7 @@ export const ptBR = {
     },
     panel: {
       label: "Detalhes: {{name}}",
+      eyebrow: "Rotina",
       close: "Fechar detalhes",
       pause: "Pausar",
       what: "O que {{article}} {{name}} faz",
@@ -2500,6 +2502,7 @@ export const ptBR = {
       fromMessage: "Mensagem de {{name}} em {{where}}",
       seeInChannel: "Ver no canal",
       movedHint: "Tiradas do canal; lá ficou um aviso",
+      peopleTitle: "Participantes",
       people_one: "Participantes · {{count}}",
       people_other: "Participantes · {{count}}",
       agent: "agente",

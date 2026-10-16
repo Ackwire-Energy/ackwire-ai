@@ -1551,6 +1551,7 @@ export const en: Translations = {
     back: "Issues",
     notFound: "This issue doesn't exist or you don't have access.",
     createdBy: "#{{number}} · created by {{name}}",
+    createdByShort: "Created by {{name}}",
     fromMessage: "from <0>a message in #{{channel}}</0>",
     fromForum: "from a forum topic",
     fromAgent: "from a request to an agent",
@@ -1716,6 +1717,7 @@ export const en: Translations = {
     },
     panel: {
       label: "Details: {{name}}",
+      eyebrow: "Routine",
       close: "Close details",
       pause: "Pause",
       what: "What {{name}} does",
@@ -2487,6 +2489,7 @@ export const en: Translations = {
       fromMessage: "Message from {{name}} in {{where}}",
       seeInChannel: "See in the channel",
       movedHint: "Taken out of the channel; a notice stayed there",
+      peopleTitle: "Participants",
       people_one: "Participants · {{count}}",
       people_other: "Participants · {{count}}",
       agent: "agent",

@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Chip,
+  DetailsDialog,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -12,7 +13,6 @@ import {
   type IconName,
   Input,
   List,
-  Sheet,
   Switch,
   TabPanel,
   Tabs,
@@ -317,8 +317,9 @@ export function SkillSheet({
   const [removing, setRemoving] = useState(false);
   const s = skill.data;
   return (
-    <Sheet
+    <DetailsDialog
       open
+      size="lg"
       onOpenChange={(o) => !o && onClose()}
       closeLabel={t("common.close")}
       title={s?.name ?? t("common.loading")}
@@ -425,7 +426,7 @@ export function SkillSheet({
           </DialogFooter>
         </Dialog>
       )}
-    </Sheet>
+    </DetailsDialog>
   );
 }
 

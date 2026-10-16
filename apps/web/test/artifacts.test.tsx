@@ -508,8 +508,8 @@ describe("Drive", () => {
     await goDrive();
     await click(card("Organograma do time"));
     await settle(4);
-    expect(card("Organograma do time").getAttribute("aria-expanded")).toBe("true");
-    const panel = screen().getByRole("complementary", { name: "Detalhes de Organograma do time" });
+    expect(card("Organograma do time").getAttribute("aria-haspopup")).toBe("dialog");
+    const panel = screen().getByRole("dialog", { name: "Organograma do time" });
     expect(within(panel).getByRole("heading", { level: 2, name: "Organograma do time" })).toBeTruthy();
     expect(panel.querySelector(".drive-pv--lg")).not.toBeNull();
     expect(panel.textContent).toContain("Feito por");
@@ -526,14 +526,12 @@ describe("Drive", () => {
 
     // Esc closes it.
     await keyDown("Escape");
-    expect(screen().queryByRole("complementary", { name: /^Detalhes de/ })).toBeNull();
+    expect(document.querySelector(".drive-details")).toBeNull();
 
     // Abrir: the same viewer as everywhere.
     await click(card("Organograma do time"));
     await settle(4);
-    await click(
-      within(screen().getByRole("complementary", { name: /^Detalhes de/ })).getByRole("button", { name: "Abrir" }),
-    );
+    await click(within(document.querySelector(".drive-details") as HTMLElement).getByRole("button", { name: "Abrir" }));
     await settle(4);
     expect(screen().getByRole("dialog", { name: "Organograma do time" })).toBeTruthy();
   });
@@ -542,7 +540,7 @@ describe("Drive", () => {
     await goDrive();
     await click(card("Relatório de incidente: checkout"));
     await settle(6);
-    const panel = screen().getByRole("complementary", { name: "Detalhes de Relatório de incidente: checkout" });
+    const panel = screen().getByRole("dialog", { name: "Relatório de incidente: checkout" });
     expect(panel.querySelectorAll(".drive-versions li")).toHaveLength(2);
     expect(panel.textContent).toContain("Acrescentei quem foi afetado.");
     await click(within(panel).getByRole("button", { name: "Ver a v1" }));
@@ -567,7 +565,7 @@ describe("Drive", () => {
     // While selecting, a click selects (no details).
     await act(async () => fireEvent.click(card("Pedidos mais comuns nos reviews"), { metaKey: true }));
     expect(bar().textContent).toContain("2 selecionados");
-    expect(screen().queryByRole("complementary", { name: /^Detalhes de/ })).toBeNull();
+    expect(document.querySelector(".drive-details")).toBeNull();
 
     await click(within(bar()).getByRole("button", { name: "Copiar links" }));
     await settle(2);
@@ -691,7 +689,7 @@ describe("deleting a file", () => {
     // From the details panel's "…".
     await click(screen().getByRole("button", { name: "Organograma do time" }));
     await settle(4);
-    const panel = screen().getByRole("complementary", { name: "Detalhes de Organograma do time" });
+    const panel = screen().getByRole("dialog", { name: "Organograma do time" });
     await pick(panel, /^Mais ações: /, "Apagar arquivo");
     const confirm = screen().getByRole("dialog", { name: "Apagar “Organograma do time”?" });
     expect(confirm.textContent).toContain("lixeira por 30 dias");
@@ -699,7 +697,7 @@ describe("deleting a file", () => {
     await settle(5);
     expect(state.calls.some((c) => c.method === "artifacts.remove")).toBe(true);
     expect(screen().queryByRole("button", { name: "Organograma do time" })).toBeNull();
-    expect(screen().queryByRole("complementary", { name: /^Detalhes de/ })).toBeNull();
+    expect(document.querySelector(".drive-details")).toBeNull();
     expect(screen().getByText("Arquivo apagado")).toBeTruthy();
     await click(screen().getByRole("button", { name: "Desfazer" }));
     await settle(5);

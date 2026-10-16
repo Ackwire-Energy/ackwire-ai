@@ -1,4 +1,4 @@
-import { Alert, Button, Chip, Field, Icon, Input, Menu, MenuItem, Sheet, Textarea } from "@agenteschat/ui";
+import { Alert, Button, Chip, DetailsDialog, Field, Icon, Input, Menu, MenuItem, Textarea } from "@agenteschat/ui";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useArtifact, useArtifactVersions, useChannels, useSaveArtifact } from "@/api/queries";
@@ -146,8 +146,9 @@ export function ArtifactViewer({
     </>
   );
   return (
-    <Sheet
+    <DetailsDialog
       open
+      size="lg"
       onOpenChange={(o) => !o && onClose()}
       closeLabel={t("artifacts.close")}
       className="artifact-sheet"
@@ -207,7 +208,7 @@ export function ArtifactViewer({
         </div>
       )}
       {remover.dialog}
-    </Sheet>
+    </DetailsDialog>
   );
 }
 

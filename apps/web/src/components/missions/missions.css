@@ -773,24 +773,13 @@ a.mi-pr:hover {
   color: var(--faint);
 }
 
-/* ── Files panel (side panel on desktop, bottom sheet on a phone) ─────────── */
-.mi-files.ac-sheet {
-  top: 64px;
-  right: 12px;
-  bottom: 12px;
-  width: min(460px, calc(100vw - 24px));
-  overflow: hidden;
-  border-radius: 22px;
+/* ── Files (the details dialog; a full-screen sheet on a phone) ───────────── */
+.mi-files .ac-details__body {
+  gap: 12px;
 }
-.mi-files .ac-sheet__body {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 0;
-}
-/* The tabs and the file's line make one block: room above and below, one divider under it. */
+/* The tabs and the file's line make one block, one divider under it. */
 .mi-files__tabs {
-  padding: 12px 20px 0;
+  overflow-x: auto;
 }
 /* File names in mono, at the weight of any other segmented control (mono at 600 reads heavier). */
 .mi-files__tabs .ac-seg__item {
@@ -805,8 +794,8 @@ a.mi-pr:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 8px;
-  padding: 10px 20px 12px;
+  gap: 4px 8px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--line);
   font-size: 12px;
   color: var(--faint);
@@ -825,10 +814,7 @@ a.mi-pr:hover {
   color: var(--muted);
 }
 .mi-files__body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 14px 20px 20px;
+  padding-top: 4px;
 }
 .mi-files__diff {
   display: flex;
@@ -842,13 +828,16 @@ a.mi-pr:hover {
   color: var(--faint);
 }
 .mi-files__foot {
+  flex: 1;
   display: flex;
   align-items: flex-start;
-  gap: 7px;
-  padding: 10px 20px 14px;
-  border-top: 1px solid var(--line);
+  gap: 8px;
   font-size: 12px;
+  line-height: 18px;
   color: var(--faint);
+}
+.mi-files__foot .ac-icon {
+  margin-top: 2px;
 }
 .mi-md {
   font-size: 13.5px;
@@ -1238,28 +1227,6 @@ a.mi-pr:hover {
   }
   .mi-grid2 {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .mi-files__tabs {
-    padding: 12px 16px 0;
-    overflow-x: auto;
-  }
-  .mi-files__meta {
-    padding: 10px 16px 12px;
-  }
-  .mi-files__body {
-    padding: 12px 16px 16px;
-  }
-  .mi-files__foot {
-    padding: 10px 16px 12px;
-  }
-  .mi-files.ac-sheet {
-    top: auto;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: auto;
-    height: 84dvh;
-    border-radius: 22px 22px 0 0;
   }
 }
 
