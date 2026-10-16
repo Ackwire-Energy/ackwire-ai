@@ -17,14 +17,6 @@ import {
 } from "@agenteschat/adapters";
 import { and, type Database, eq, lt, schema } from "@agenteschat/db";
 import {
-  authenticateMachine,
-  getMachineById,
-  MACHINE_CONTROL_TOPIC,
-  MachineOfflineError,
-  machineOnline,
-  publishMachineStatus,
-} from "./machines";
-import {
   applyTaskDone,
   applyTaskEvent,
   getTask,
@@ -35,6 +27,14 @@ import {
   TASK_OFFLINE_GRACE_MS,
   type TaskCall,
 } from "./machine-tasks";
+import {
+  authenticateMachine,
+  getMachineById,
+  MACHINE_CONTROL_TOPIC,
+  MachineOfflineError,
+  machineOnline,
+  publishMachineStatus,
+} from "./machines";
 import { enqueue } from "./outbox";
 
 const { machines, machineRpc } = schema;

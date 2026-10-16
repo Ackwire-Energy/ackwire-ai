@@ -203,7 +203,8 @@ process.on("SIGHUP", () => {});
 if (spec.maxSeconds > 0) setTimeout(() => stop("timeout"), spec.maxSeconds * 1000).unref();
 const poll = setInterval(() => { if (existsSync(file("cancel"))) stop("canceled"); }, 1000);
 child.on("error", (e) => { clearInterval(beat); clearInterval(poll); finish({ exitCode: 127, signal: null, error: String(e && e.message || e) }); });
-child.on("exit", (code, signal) => { clearInterval(beat); clearInterval(poll); finish({ exitCode: code, signal: signal ?? null }); });
+// A command stopped by us ends by our signal even when its shell reports none (or exits with 143).
+child.on("exit", (code, signal) => { clearInterval(beat); clearInterval(poll); finish(reason && (signal || code === null || code === 143) ? { exitCode: null, signal: signal ?? "SIGTERM" } : { exitCode: code, signal: signal ?? null }); });
 `;
 
 const clampInt = (n: unknown, min: number, max: number, fallback: number) => {
@@ -608,14 +609,12 @@ export class TaskManager {
     t.canceling = true;
     this.save();
     const dir = this.dirOf(t.taskId);
+    // The wrapper polls this file every second. No SIGTERM to it right away: a wrapper that is still
+    // starting has no handler yet and would die without stopping the command or writing `exit.json`.
+    // One that ignores the file is killed after the grace (`hardKill`).
     try {
       writeFileSync(path.join(dir, "cancel"), "");
     } catch {}
-    if (process.platform !== "win32" && t.pid) {
-      try {
-        process.kill(t.pid, "SIGTERM");
-      } catch {}
-    }
     const w = this.watches.get(t.taskId);
     if (w) w.cancelAt = this.now();
     return { canceled: true };
@@ -779,13 +778,15 @@ export class TaskManager {
     const seconds = Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(t.startedAt)) / 1000));
     const canceled = exit ? exit.reason === "canceled" : t.canceling === true;
     const interrupted = !exit && !t.canceling;
+    // Canceled and the wrapper gone without an exit: make sure nothing of the command is left.
+    if (!exit && t.canceling) this.hardKill(t, this.dirOf(t.taskId));
     const result = w.redact(w.result ?? w.tail.join("\n")).slice(0, TASK_LIMITS.result);
     t.status = interrupted ? "interrupted" : "done";
     t.endedAt = endedAt;
     t.done = {
       taskId: t.taskId,
       exitCode: exit ? exit.exitCode : null,
-      signal: exit?.signal ?? null,
+      signal: exit?.signal ?? (canceled && !exit ? "SIGTERM" : null),
       seconds,
       ...(result ? { result } : {}),
       ...(t.lastLine ? { lastLine: t.lastLine } : {}),

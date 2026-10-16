@@ -14,8 +14,8 @@ import {
   claudeSessionFile,
   executorCommand,
   parseOutputLine,
-  type TaskManagerOptions,
   TaskManager,
+  type TaskManagerOptions,
 } from "../../runner/tasks";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 

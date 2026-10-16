@@ -13,8 +13,8 @@ import { recordAudit } from "./audit";
 import { getChannelCached } from "./context";
 import { createAgentRuns, eligibleChannelAgents, requesterOf } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
-import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { getMachineById, machineOnline } from "./machines";
+import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { enqueue } from "./outbox";
 import type { ToolContext } from "./tools/types";
 
