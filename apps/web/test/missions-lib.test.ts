@@ -57,7 +57,7 @@ const mission = (over: Partial<Mission> = {}): Mission => ({
   repoDir: "",
   resumeTasks: true,
   plan: { version: 1, done: 4, total: 12, waiting: 1, doing: 2, items: [] },
-  pending: { decisions: 2, provisional: 0, reviews: 1, suggestions: 0, joinRequests: 0 },
+  pending: { decisions: 2, provisional: 0, reviews: 1, suggestions: 0, joinRequests: 0, commands: 0 },
   joinRequested: false,
   runningTasks: 2,
   machine: {
@@ -191,6 +191,19 @@ describe("what waits for you", () => {
     expect(waitingText(t, mission())).toBe("2 decisões, 1 revisão");
     expect(waitingText(te, mission())).toBe("2 decisions, 1 review");
     expect(waitingParts(mission({ canAct: false }))).toEqual([]);
+  });
+
+  test("command cards count too ('Esperando você: 2 decisões, 1 revisão, 3 comandos')", () => {
+    const m = mission({
+      pending: { decisions: 2, provisional: 0, reviews: 1, suggestions: 0, joinRequests: 0, commands: 3 },
+    });
+    expect(waitingParts(m).at(-1)).toEqual({ key: "commands", count: 3 });
+    expect(waitingText(t, m)).toBe("2 decisões, 1 revisão, 3 comandos");
+    expect(waitingText(te, m)).toBe("2 decisions, 1 review, 3 commands");
+    const one = mission({
+      pending: { decisions: 0, provisional: 0, reviews: 0, suggestions: 0, joinRequests: 0, commands: 1 },
+    });
+    expect(waitingText(t, one)).toBe("1 comando");
   });
 
   test("the strip of a view: its plan items when sent, else the counts with what is in progress", () => {

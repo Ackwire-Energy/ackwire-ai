@@ -1,7 +1,7 @@
-import { isSafeRule, TASK_LIMITS, type TaskDenial } from "@agenteschat/adapters";
-import { type Executor, rowsOf, schema, sql } from "@agenteschat/db";
+import { isSafeRule, PERMISSION_WAIT_MS, TASK_LIMITS, type TaskDenial } from "@agenteschat/adapters";
+import { type Executor, rowsOf, type SQL, schema, sql } from "@agenteschat/db";
 
-const { missionEvents } = schema;
+const { missionEvents, missions } = schema;
 
 /**
  * The stored side of command approvals (ADR 0029): kept in the mission's
@@ -10,6 +10,31 @@ const { missionEvents } = schema;
  * `command_blocked`: commands a task was refused with nobody to ask (its end
  * notice lists them). The prompts themselves live in `mission-commands.ts`.
  */
+
+/**
+ * How many command cards (`command_prompt`, see `mission-commands.ts`) of
+ * the mission `missionId` (an SQL expression: `m.id`) wait for an answer:
+ * nobody decided and its `PERMISSION_WAIT_MS` hasn't passed (the runner
+ * stopped asking then). A scalar subquery (`int`).
+ */
+export const pendingCommandsSql = (missionId: SQL) => sql`(select count(*)::int from ${missionEvents} ce
+    where ce.mission_id = ${missionId} and ce.kind = 'command_prompt'
+      and ce.created_at > now() - ${sql.raw(`interval '${Math.round(PERMISSION_WAIT_MS / 1000)} seconds'`)}
+      and not exists (select 1 from ${missionEvents} cd where cd.mission_id = ce.mission_id
+        and cd.kind = 'command_decided' and cd.data->>'promptId' = ce.data->>'promptId'))`;
+
+/** Open command cards per mission (missions without one are left out). */
+export async function pendingCommandCounts(db: Executor, missionIds: string[]): Promise<Map<string, number>> {
+  if (missionIds.length === 0) return new Map();
+  const rows = rowsOf<{ id: string; n: number | string }>(
+    await db.execute(sql`select m.id, ${pendingCommandsSql(sql`m.id`)} as n from ${missions} m
+      where m.id in (${sql.join(
+        missionIds.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )})`),
+  );
+  return new Map(rows.filter((r) => Number(r.n) > 0).map((r) => [r.id, Number(r.n)]));
+}
 
 /** Every rule a person allowed for the whole mission, oldest first (sent with each work turn). */
 export async function missionAllowRules(db: Executor, missionId: string): Promise<string[]> {

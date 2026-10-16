@@ -32,7 +32,7 @@ import {
 } from "./machine-tasks";
 import { MachineOfflineError, machineOnline } from "./machines";
 import { insertMessage, type Message, messageView } from "./messages";
-import { missionAllowRules } from "./mission-command-rules";
+import { missionAllowRules, pendingCommandCounts, pendingCommandsSql } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
 import { enqueueRunJob } from "./mission-runs";
 import { can, requirePermission } from "./organizations";
@@ -425,6 +425,8 @@ export interface MissionView {
     suggestions: number;
     /** Requests to join waiting for an answer (0 for whoever can't answer them). */
     joinRequests: number;
+    /** Command cards waiting for an answer (0 for whoever can't answer them). */
+    commands: number;
   };
   /** The caller asked to join and nobody answered yet. */
   joinRequested: boolean;
@@ -465,7 +467,7 @@ export async function missionViews(
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const machineIds = [...new Set(rows.flatMap((r) => (r.machineId ? [r.machineId] : [])))];
-  const [roles, counts, machineRows, running, plans, joins] = await Promise.all([
+  const [roles, counts, machineRows, running, plans, joins, commands] = await Promise.all([
     db
       .select({ missionId: missionParticipants.missionId, role: missionParticipants.role })
       .from(missionParticipants)
@@ -525,6 +527,7 @@ export async function missionViews(
       .from(missionJoinRequests)
       .where(and(inArray(missionJoinRequests.missionId, ids), eq(missionJoinRequests.status, "pending")))
       .groupBy(missionJoinRequests.missionId),
+    pendingCommandCounts(db, ids),
   ]);
   const planOf = new Map(plans.map((p) => [p.missionId, Array.isArray(p.items) ? p.items : []]));
   const joinOf = new Map(joins.map((j) => [j.missionId, j]));
@@ -565,6 +568,7 @@ export async function missionViews(
         reviews: count(r.id, "review"),
         suggestions: 0,
         joinRequests: mayAct(role) ? Number(join?.n ?? 0) : 0,
+        commands: mayAct(role) ? (commands.get(r.id) ?? 0) : 0,
       },
       joinRequested: role === "none" && join?.mine === true,
       runningTasks: runningOf.get(r.id) ?? 0,
@@ -634,7 +638,8 @@ export interface ListMissionsInput {
 
 /**
  * Something waits for this person in the mission (`m`): they can act and a
- * decision, a review, a plan item, a suggestion or a request to join waits.
+ * decision, a review, a plan item, a suggestion, a request to join or a
+ * command card waits.
  */
 const waitingYouSql = (userId: string) => sql`(m.owner_id = ${userId} or exists (select 1 from ${missionParticipants} mp
     where mp.mission_id = m.id and mp.user_id = ${userId} and mp.role = 'decide'))
@@ -643,7 +648,8 @@ const waitingYouSql = (userId: string) => sql`(m.owner_id = ${userId} or exists 
     or exists (select 1 from ${missionReviews} mr where mr.mission_id = m.id and mr.status = 'pending')
     or exists (select 1 from ${missionJoinRequests} mj where mj.mission_id = m.id and mj.status = 'pending')
     or exists (select 1 from ${messages} sm where sm.org_id = m.org_id and sm.thread_id = m.thread_root_id
-      and sm.meta->'missionSuggestion'->>'status' = 'pending'))`;
+      and sm.meta->'missionSuggestion'->>'status' = 'pending')
+    or ${pendingCommandsSql(sql`m.id`)} > 0)`;
 
 const OPEN_SQL = sql`m.status in ('proposed', 'active', 'paused')`;
 

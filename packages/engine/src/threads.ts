@@ -6,6 +6,7 @@ import { type Channel, requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { type Message, messageView, replyExcerpt } from "./messages";
+import { pendingCommandsSql } from "./mission-command-rules";
 import { can, type Membership, requirePermission } from "./organizations";
 
 const { threads, messages, channels, channelMembers } = schema;
@@ -108,7 +109,7 @@ export interface ThreadMissionSummary {
   status: "proposed" | "active" | "paused" | "done" | "canceled";
   planDone: number;
   planTotal: number;
-  /** Plan items waiting for people, pending decisions and pending reviews. */
+  /** Plan items waiting for people, pending decisions and pending reviews; command cards for whoever answers them. */
   waitingYou: number;
 }
 
@@ -1016,6 +1017,9 @@ async function queryThreads(
           case when mi.id is null then null else mi.plan_waiting
             + (select count(*)::int from ${schema.missionDecisions} md where md.mission_id = mi.id and md.status = 'pending')
             + (select count(*)::int from ${schema.missionReviews} mr where mr.mission_id = mi.id and mr.status = 'pending')
+            + case when mi.owner_id = ${userId} or exists (select 1 from ${schema.missionParticipants} mpc
+                where mpc.mission_id = mi.id and mpc.user_id = ${userId} and mpc.role = 'decide')
+              then ${pendingCommandsSql(sql`mi.id`)} else 0 end
           end as mission_waiting
         from candidates c
         join ${messages} root on root.id = c.root_id and root.org_id = ${orgId}::uuid

@@ -24,6 +24,7 @@ import {
   listJoinRequests,
   listMissionCommands,
   listMissions,
+  listThreads,
   type MachineHub,
   MISSION_RULES,
   machineExecutors,
@@ -1065,7 +1066,20 @@ describe("missions (ADR 0029)", () => {
       await expect(decideCommand(md(), bia.id, f.org.id, view.id, id, "allow")).rejects.toMatchObject({
         code: "mission.not_allowed",
       });
+      // The open card waits for the owner ("Esperando você", the thread row, the sidebar), not for bia.
+      const threadWaiting = async (userId: string) =>
+        (await listThreads(f.db, userId, { orgId: f.org.id, tab: "missions" })).threads.find(
+          (x) => x.mission?.id === view.id,
+        )?.mission?.waitingYou ?? -1;
+      expect((await getMission(md(), f.owner.id, f.org.id, view.id)).pending.commands).toBe(1);
+      expect((await getMission(md(), bia.id, f.org.id, view.id)).pending.commands).toBe(0);
+      expect((await listMissions(md(), f.owner.id, f.org.id, {})).missions[0]?.pending.commands).toBe(1);
+      expect((await listMissions(md(), f.owner.id, f.org.id, {})).counts.waitingYou).toBe(1);
+      const ownerWaiting = await threadWaiting(f.owner.id);
+      expect(await threadWaiting(bia.id)).toBe(ownerWaiting - 1);
       const decided = await decideCommand(md(), f.owner.id, f.org.id, view.id, id, "always");
+      expect((await getMission(md(), f.owner.id, f.org.id, view.id)).pending.commands).toBe(0);
+      expect(await threadWaiting(f.owner.id)).toBe(ownerWaiting - 1);
       expect(decided).toMatchObject({ state: "allowed", always: true, rules: ["Bash(swift build *)"] });
       expect(await prompt(main.taskId, { request_id: id })).toEqual({ behavior: "allow" });
       await expect(decideCommand(md(), f.owner.id, f.org.id, view.id, id, "deny")).rejects.toMatchObject({

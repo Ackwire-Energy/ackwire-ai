@@ -75,7 +75,8 @@ export function createFakeMissions(
           m.pending.provisional +
           m.pending.reviews +
           m.pending.suggestions +
-          m.pending.joinRequests >
+          m.pending.joinRequests +
+          m.pending.commands >
           0;
       const q = query.q?.trim().toLowerCase();
       const scope = (await store(orgId)).missions.filter(
@@ -193,7 +194,7 @@ export function createFakeMissions(
         repoDir: input.folder ?? "",
         resumeTasks: true,
         plan: { version: 0, done: 0, total: 0, waiting: 0, doing: 0, items: [] },
-        pending: { decisions: 0, provisional: 0, reviews: 0, suggestions: 0, joinRequests: 0 },
+        pending: { decisions: 0, provisional: 0, reviews: 0, suggestions: 0, joinRequests: 0, commands: 0 },
         joinRequested: false,
         runningTasks: 1,
         machine: {

@@ -102,7 +102,7 @@ export const isOpenMission = (m: Pick<Mission, "status">) =>
   m.status === "proposed" || m.status === "active" || m.status === "paused";
 
 /** What waits for people, in the order the cards show it ("2 decisões, 1 revisão"). */
-export type WaitingKey = "decisions" | "provisional" | "reviews" | "suggestions";
+export type WaitingKey = "decisions" | "provisional" | "reviews" | "suggestions" | "commands";
 export function waitingParts(m: Pick<Mission, "pending" | "canAct">): { key: WaitingKey; count: number }[] {
   if (!m.canAct) return [];
   const parts: { key: WaitingKey; count: number }[] = [
@@ -110,6 +110,7 @@ export function waitingParts(m: Pick<Mission, "pending" | "canAct">): { key: Wai
     { key: "provisional", count: m.pending.provisional },
     { key: "reviews", count: m.pending.reviews },
     { key: "suggestions", count: m.pending.suggestions },
+    { key: "commands", count: m.pending.commands },
   ];
   return parts.filter((p) => p.count > 0);
 }

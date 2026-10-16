@@ -1898,6 +1898,8 @@ export const ptBR = {
       reviews_other: "{{count}} revisões",
       suggestions_one: "{{count}} sugestão",
       suggestions_other: "{{count}} sugestões",
+      commands_one: "{{count}} comando",
+      commands_other: "{{count}} comandos",
     },
     actions: {
       pause: "Pausar",

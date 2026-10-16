@@ -92,6 +92,9 @@ const Mission = z
       reviews: z.number(),
       suggestions: z.number(),
       joinRequests: z.number().openapi({ description: "Requests to join (0 unless you can answer them)." }),
+      commands: z
+        .number()
+        .openapi({ description: "Command cards waiting for an answer (0 unless you can answer them)." }),
     }),
     joinRequested: z.boolean().openapi({ description: "You asked to join and nobody answered yet." }),
     runningTasks: z.number(),

@@ -1835,6 +1835,8 @@ export interface Mission {
     suggestions: number;
     /** Requests to join (0 unless you can answer them). */
     joinRequests: number;
+    /** Command cards waiting for an answer (0 unless you can answer them). */
+    commands: number;
   };
   /** You asked to join and nobody answered yet. */
   joinRequested: boolean;

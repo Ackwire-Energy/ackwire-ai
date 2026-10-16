@@ -1887,6 +1887,8 @@ export const en: Translations = {
       reviews_other: "{{count}} reviews",
       suggestions_one: "{{count}} suggestion",
       suggestions_other: "{{count}} suggestions",
+      commands_one: "{{count}} command",
+      commands_other: "{{count}} commands",
     },
     actions: {
       pause: "Pause",

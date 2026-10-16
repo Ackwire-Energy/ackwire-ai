@@ -60,7 +60,7 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
   const cells = items ? planCells(items, { offline }) : missionCells(m, { offline });
   const sessions = missionTasks(tasks.data ?? [], m.id);
   const interrupted = sessions.filter((x) => x.status === "interrupted" && !x.endedAt).length;
-  const waiting = m.pending.decisions + m.pending.reviews + m.pending.provisional;
+  const waiting = m.pending.decisions + m.pending.reviews + m.pending.provisional + m.pending.commands;
   // Running: the live session rows when loaded (`machine.task` updates them at once), else the mission's count.
   const running = tasks.data ? sessions.filter((x) => x.status === "running").length : m.runningTasks;
   const agentName = dir.agentById.get(m.agentId)?.name ?? "";
