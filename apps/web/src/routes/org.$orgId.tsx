@@ -6,6 +6,7 @@ import { requireUserIn } from "@/app/guards";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
 import { CommandMenu } from "@/components/CommandMenu";
 import { RefetchBar } from "@/components/Loading";
+import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
@@ -55,12 +56,16 @@ function OrgLayout() {
     <OrgProvider org={membership} me={me}>
       <RealtimeProvider orgId={membership.id}>
         <ArtifactViewerProvider>
-          <div className="shell">
-            <RefetchBar />
-            <CommandMenu />
-            <Sidebar />
-            <Outlet />
-          </div>
+          <NavDrawerProvider>
+            <div className="shell">
+              <RefetchBar />
+              <CommandMenu />
+              <NavScrim />
+              <Sidebar />
+              <ShellBar />
+              <Outlet />
+            </div>
+          </NavDrawerProvider>
         </ArtifactViewerProvider>
       </RealtimeProvider>
     </OrgProvider>

@@ -30,6 +30,23 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
   aside?: ReactNode;
 }
 
+/** Taps on these keep doing their own thing (the bar stays as it is). */
+const INTERACTIVE = "a[href], button, input, textarea, select, label, summary, [role='button'], [tabindex='0']";
+
+/**
+ * Touch screens have no hover: tapping a message (not a link or button in it)
+ * focuses the row, which reveals its action bar (Reagir, Responder, …) the
+ * same way keyboard focus does. Tapping another message moves it there.
+ */
+function revealActionsOnTap(row: HTMLElement, target: EventTarget) {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+  if (!(navigator.maxTouchPoints > 0) || !window.matchMedia("(hover: none)").matches) return;
+  if (target instanceof Element && target !== row && target.closest(INTERACTIVE)) return;
+  if (!row.querySelector(".ac-msg__actions")) return;
+  if (!row.hasAttribute("tabindex")) row.tabIndex = -1;
+  row.focus({ preventScroll: true });
+}
+
 /** A chat line: avatar, author, time and text. Agents are told apart by the avatar only. */
 export function Message({
   avatar,
@@ -45,6 +62,7 @@ export function Message({
   stacked,
   aside,
   className,
+  onClick,
   ...rest
 }: MessageProps) {
   const tipId = useId();
@@ -54,6 +72,7 @@ export function Message({
     </span>
   ) : null;
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the tap only reveals the action bar, which keyboard focus already reveals
     <article
       className={cx(
         "ac-msg",
@@ -64,6 +83,10 @@ export function Message({
         className,
       )}
       aria-busy={streaming || undefined}
+      onClick={(e) => {
+        onClick?.(e);
+        revealActionsOnTap(e.currentTarget, e.target);
+      }}
       {...rest}
     >
       {grouped ? (

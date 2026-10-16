@@ -164,6 +164,8 @@ export const extraIcons = {
   ],
   /** "Filtros". */
   filter: [["path", { d: "M3.5 5h13M6 10h8M8.5 15h3" }]],
+  /** Opens the workspace navigation on narrow screens (the last line is shorter). */
+  menu: [["path", { d: "M3.5 5.5h13M3.5 10h13M3.5 14.5h8" }]],
   /** Side panel toggle. */
   sidebar: [
     ["rect", { x: "3", y: "4", width: "14", height: "12", rx: "2.5" }],

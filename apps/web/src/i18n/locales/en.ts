@@ -321,6 +321,8 @@ export const en: Translations = {
     useOrgZone: "Use the workspace time zone",
     profileSaved: "Profile saved.",
     nav: "Workspace navigation",
+    openNav: "Open menu",
+    closeNav: "Close menu",
     searchWorkspace: "Search the workspace",
     summary_one: "{{people}} member · {{agents}} agents",
     summary_other: "{{people}} members · {{agents}} agents",

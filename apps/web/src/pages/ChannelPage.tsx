@@ -76,6 +76,7 @@ import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageMoreMenu, PersonMessageActions, QuoteReplyButton } from "@/components/MessageMore";
 import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
+import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
@@ -253,6 +254,7 @@ export function ChannelSkeleton() {
     <main className="shell__main shell__main--chat">
       <SkeletonGroup label={t("common.loadingMessages")} className="channel__skeleton">
         <header className="channel__header">
+          <NavToggle />
           <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0, flex: 1 }}>
             <Skeleton width={160} height={16} />
             <Skeleton width={260} height={10} />
@@ -777,6 +779,7 @@ function ChannelView({
       <main className="shell__main shell__main--chat">
         {chrome?.header ?? (
           <header className="channel__header">
+            <NavToggle />
             <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
               <h1 className="channel__title"># {channel.name}</h1>
               {subtitle && <span className="channel__topic">{subtitle}</span>}

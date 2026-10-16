@@ -233,6 +233,13 @@ export function mentionQuery(text: string, caret: number): { start: number; quer
   return { start: caret - query.length - 1, query };
 }
 
+/** A phone or tablet typing on its on-screen keyboard (touch first, no mouse). */
+const onScreenKeyboard = () =>
+  typeof navigator !== "undefined" &&
+  navigator.maxTouchPoints > 0 &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(pointer: coarse)").matches;
+
 /** The chat message box: attach on the left, send (primary, icon only) on the right, focus on the whole box. */
 export function Composer({
   value,
@@ -426,7 +433,8 @@ export function Composer({
         return;
       }
     }
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+    // On-screen keyboards: Enter is a new line; the send button sends.
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !onScreenKeyboard()) {
       e.preventDefault();
       send();
     }

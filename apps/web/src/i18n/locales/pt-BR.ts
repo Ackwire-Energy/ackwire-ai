@@ -327,6 +327,8 @@ export const ptBR = {
     useOrgZone: "Usar o fuso do workspace",
     profileSaved: "Perfil salvo.",
     nav: "Navegação do workspace",
+    openNav: "Abrir menu",
+    closeNav: "Fechar menu",
     searchWorkspace: "Buscar no workspace",
     summary_one: "{{people}} membro · {{agents}} agentes",
     summary_other: "{{people}} membros · {{agents}} agentes",

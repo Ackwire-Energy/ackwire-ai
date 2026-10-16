@@ -44,6 +44,7 @@ import { agentStateIn, runningAgents } from "@/realtime/streams";
 import { AudienceChip } from "./AgentAudience";
 import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
+import { useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { useOrg } from "./org-context";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
@@ -95,6 +96,8 @@ export function Sidebar() {
     return agentIds ? agentIds.split(",").filter((id) => busy.has(id)).length : 0;
   });
   const orgRef = useRef<HTMLDivElement>(null);
+  // Narrow screens: the sidebar is a drawer (id, open state, close on link / swipe).
+  const drawer = useNavDrawer();
 
   // The active item's soft pill slides between items (one indicator, measured).
   const navRef = useRef<HTMLElement>(null);
@@ -138,7 +141,7 @@ export function Sidebar() {
   }, [pathname, channels.data, dir.agents.length, people.length]);
 
   return (
-    <nav className="sidebar" aria-label={t("shell.nav")} ref={navRef}>
+    <nav className="sidebar" aria-label={t("shell.nav")} ref={navRef} {...drawer?.navProps}>
       {indicator && (
         <span
           className="sidebar__indicator"

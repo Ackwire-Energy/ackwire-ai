@@ -1,0 +1,325 @@
+/*
+ * Responsive app layout (2026-10). Loaded after layout.css. Breakpoints, the
+ * same numbers in @agenteschat/ui components.css and in COMPACT_QUERY
+ * (components/NavDrawer.tsx):
+ *   phone   ≤ 640px    single columns, dialogs are bottom sheets
+ *   compact ≤ 760px    the sidebar is a drawer behind a menu button; side panels go full screen
+ *   tablet  761–1199px the sidebar is an icon rail (layout.css)
+ *   desktop ≥ 1200px
+ * Touch is about the pointer, not the width: `(pointer: coarse)` grows hit
+ * areas to 40px. Nothing scrolls the page sideways: wide things (tables, the
+ * issue board, code) scroll inside their own box.
+ */
+
+/* ── Shell: bar + page; the sidebar slides in over it ── */
+@media (max-width: 760px) {
+  .shell {
+    flex-direction: column;
+    overflow: hidden;
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .shell__main {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    overflow-x: hidden;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .shell__main--chat {
+    padding-bottom: 0;
+  }
+
+  /* Menu, the workspace, search. Chat pages put the menu in their own header instead. */
+  .shell__bar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    min-height: 52px;
+    padding: calc(env(safe-area-inset-top, 0px) + 6px) 8px 6px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .shell:has(.channel__header) .shell__bar {
+    display: none;
+  }
+  .shell__bar-org {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px;
+    font-size: 15px;
+    font-weight: 650;
+  }
+  .shell__bar-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nav-toggle {
+    flex: none;
+  }
+
+  /* The drawer: same sidebar, off-canvas. Hidden (and out of the tab order) while closed. */
+  .shell .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--z-scrim);
+    flex: none;
+    width: min(304px, calc(100vw - 48px));
+    min-width: 0;
+    height: auto;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 12px calc(env(safe-area-inset-bottom, 0px) + 14px)
+      calc(env(safe-area-inset-left, 0px) + 12px);
+    box-shadow: var(--e3);
+    overscroll-behavior: contain;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform 0.24s var(--out),
+      visibility 0s linear 0.24s;
+  }
+  .shell .sidebar[data-open="true"] {
+    transform: none;
+    visibility: visible;
+    transition: transform 0.24s var(--out);
+  }
+  .shell__scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-scrim);
+    padding: 0;
+    border: 0;
+    background: var(--scrim);
+    cursor: default;
+  }
+}
+.sidebar:focus {
+  outline: none;
+}
+@media (min-width: 761px) {
+  .nav-toggle {
+    display: none;
+  }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: no-preference) {
+  .shell__scrim {
+    animation: ac-fade-in 160ms ease-out;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell .sidebar,
+  .shell .sidebar[data-open="true"] {
+    transition: none;
+  }
+}
+
+/* ── Conversation: one-line header, edge-to-edge messages, composer above the home bar ── */
+@media (max-width: 760px) {
+  .channel__header {
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-height: 56px;
+    padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px 8px;
+  }
+  .channel__header > .ac-btn,
+  .channel__header > .members-stack {
+    flex: none;
+  }
+  .channel__title {
+    display: block;
+    min-width: 0;
+    font-size: 17px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .channel__topic {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .channel__messages {
+    padding: 12px 0 8px;
+  }
+  .channel__messages .ac-msg {
+    gap: 10px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+  .channel__composer {
+    padding: 6px 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  }
+  .channel__status,
+  .channel__notice {
+    margin-right: 12px;
+    margin-left: 12px;
+  }
+}
+@media (max-width: 420px) {
+  .channel__header .members-stack {
+    display: none;
+  }
+}
+
+/* ── Pages ── */
+@media (max-width: 640px) {
+  .page {
+    gap: 20px;
+    padding: 20px 16px 28px;
+  }
+  .page-title {
+    font-size: 24px;
+    line-height: 30px;
+  }
+  .page__header-text {
+    min-width: min(220px, 100%);
+  }
+  .settings {
+    gap: 20px;
+    padding: 20px 16px 28px;
+  }
+  .tabs-bar .ac-search {
+    flex: 1 1 100%;
+  }
+  .proposals__list {
+    max-width: none;
+  }
+  .wiki__center > .wiki-page {
+    padding: 20px 16px;
+  }
+}
+
+/* Issues: the board scrolls sideways inside itself, one column at a time. */
+@media (max-width: 640px) {
+  .issues-page__header {
+    padding: 14px 16px 10px;
+  }
+  .issues-page__search {
+    flex: 1 1 100%;
+  }
+  .issues-page__pad {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+  .issue-board {
+    grid-template-columns: repeat(4, minmax(min(280px, 82vw), 1fr));
+    padding-right: 16px;
+    padding-left: 16px;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 16px;
+  }
+  .issue-board__col {
+    scroll-snap-align: start;
+  }
+  .issue-list__row {
+    padding: 10px 12px;
+  }
+  .issue-list__who {
+    flex-basis: auto;
+  }
+}
+
+/* Calendar: the side panel goes under the grid when there's no room beside it. */
+@media (max-width: 900px) {
+  .cal-page[data-panel] .cal-page__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(360px, 1fr) auto;
+    overflow-y: auto;
+  }
+  .cal-page[data-panel] .cal-side {
+    overflow: visible;
+  }
+}
+@media (max-width: 640px) {
+  .cal-page__header {
+    padding-top: 12px;
+  }
+}
+
+/* Wiki: one scrolling column; with a page open, the tree comes after it. */
+@media (max-width: 760px) {
+  .shell__main--wiki {
+    overflow-y: auto;
+  }
+  .wiki {
+    min-height: 100%;
+  }
+  .wiki__left,
+  .wiki__center {
+    overflow: visible;
+  }
+  .wiki:has(.wiki-body) .wiki__left {
+    order: 1;
+    border-top: 1px solid var(--line);
+    border-bottom: 0;
+  }
+}
+
+/* Sign in / sign up: on a phone the sky is a band with the logo; the form comes right after. */
+@media (max-width: 640px) {
+  .auth {
+    align-content: flex-start;
+  }
+  .auth__aside {
+    flex-basis: 100%;
+    min-height: 0;
+    gap: 12px;
+    padding: calc(env(safe-area-inset-top, 0px) + 20px) 16px 24px;
+  }
+  .auth__aside .auth__demo .ac-msg,
+  .auth__aside .auth__steps {
+    display: none;
+  }
+  .auth__giant {
+    right: -12px;
+    bottom: -24px;
+    width: 88px;
+    height: 88px;
+  }
+  .auth__main {
+    align-items: flex-start;
+    padding: 28px 16px calc(env(safe-area-inset-bottom, 0px) + 32px);
+  }
+  .center {
+    padding: calc(env(safe-area-inset-top, 0px) + 24px) 16px calc(env(safe-area-inset-bottom, 0px) + 32px);
+  }
+}
+
+/* ── Touch: 40px targets, 16px fields ── */
+@media (pointer: coarse) {
+  .sidebar__item,
+  .sidebar__jump,
+  .settings__link,
+  .wiki-nav__page {
+    min-height: 40px;
+  }
+  .pill,
+  .cal-toggle,
+  .cal-filter {
+    height: auto;
+    min-height: 40px;
+  }
+  /* Keyboard shortcuts mean nothing on a touch screen. */
+  .sidebar__jump .ac-kbd,
+  .cal-page__new .ac-kbd {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .forum-composer {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .wiki-editor__text {
+    font-size: 16px;
+  }
+}

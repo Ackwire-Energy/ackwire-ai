@@ -22,6 +22,8 @@ p {
   display: flex;
   flex-wrap: wrap;
   min-height: 100vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
+  min-height: 100dvh;
   background: var(--surface);
 }
 .auth__aside {
@@ -129,6 +131,8 @@ p {
 /* Centered single card (telas/Convite, Onboarding) */
 .center {
   min-height: 100vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -240,6 +244,8 @@ p {
   position: relative;
   display: flex;
   height: 100vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
+  height: 100dvh;
   background: var(--surface);
   color: var(--ink);
 }
@@ -254,24 +260,10 @@ p {
   flex-direction: column;
   overflow: hidden;
 }
-@media (max-width: 760px) {
-  .shell {
-    flex-direction: column;
-    height: auto;
-    min-height: 100vh;
-  }
-  .shell .sidebar {
-    width: 100%;
-    height: auto;
-    max-height: none;
-  }
-  .shell__main {
-    height: auto;
-    overflow: visible;
-  }
-  .shell__main--chat {
-    height: 100vh;
-  }
+/* Narrow screens: the bar (menu, workspace, search) and the drawer; see "Responsive" at the end. */
+.shell__bar,
+.shell__scrim {
+  display: none;
 }
 
 .sidebar {
