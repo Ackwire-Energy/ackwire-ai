@@ -1691,7 +1691,6 @@ export const en: Translations = {
         name: "Review new PRs",
         text: "When a PR opens, the agent reads it and comments.",
         prompt: "Read the new PR's diff, point out risks and say what to test by hand.",
-        phrase: "",
       },
       week: {
         name: "Week wrap-up",

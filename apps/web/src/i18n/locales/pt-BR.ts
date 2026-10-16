@@ -1702,7 +1702,6 @@ export const ptBR = {
         name: "Revisar PRs novos",
         text: "Quando abrir um PR, o agente lê e comenta.",
         prompt: "Leia o diff do PR novo, aponte riscos e diga o que testar à mão.",
-        phrase: "",
       },
       week: {
         name: "Fechamento da semana",
