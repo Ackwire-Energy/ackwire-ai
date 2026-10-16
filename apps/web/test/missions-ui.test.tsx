@@ -63,6 +63,47 @@ describe("Missões (Threads.html)", () => {
     expect(plain.querySelector(".thread-kind--agent")).toBeNull();
   });
 
+  test("an old proposal's thread-start marker (no link card in the reply) shows the mission card instead", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const mission = await api.missions.create(ORG_ID, {
+      agentId: ADA_ID,
+      goal: "Fotos",
+      title: "Fotos",
+      channelId: ENG_ID,
+    });
+    const start = {
+      title: "Fotos",
+      contextChannelId: ENG_ID,
+      firstMessageId: "m-old",
+      lastMessageId: "m-old",
+      count: 1,
+    };
+    state.messages.push({
+      id: "root-old",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "person", id: "u-walter" },
+      body: "Fotos",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      meta: { threadStart: { ...start, moved: false, movedCount: 0 } },
+      createdAt: new Date().toISOString(),
+    });
+    await api.threads.create(ORG_ID, {
+      id: "root-old",
+      channelId: ENG_ID,
+      firstMessageId: "m-old",
+      lastMessageId: "m-old",
+      title: "Fotos",
+      mission: { id: mission.id, agentId: ADA_ID, status: "proposed", planDone: 0, planTotal: 0, waitingYou: 0 },
+    } as Parameters<typeof api.threads.create>[1]);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    expect(screen().getByRole("region", { name: "Missão Fotos" })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("Este trecho virou contexto da thread");
+  });
+
   const pick = (agentId: string, name: string, extra: Partial<MissionEligibleAgent> = {}): MissionEligibleAgent => ({
     agentId,
     handle: name.toLowerCase(),

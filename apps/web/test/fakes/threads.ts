@@ -47,7 +47,8 @@ export function createFakeThreads(
       const channel = (await ctx.lookup.channels(orgId)).find((c) => c.id === input.channelId);
       const now = ctx.now().toISOString();
       const thread: ThreadInfo = {
-        id: mockId("thread"),
+        // Tests may give the root's id (a thread made from a range is its root message).
+        id: (input as { id?: string }).id ?? mockId("thread"),
         channelId: input.channelId,
         channelName: channel?.name ?? "",
         channelKind: "channel",

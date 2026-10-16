@@ -1481,6 +1481,14 @@ const Timeline = memo(function Timeline({
     if (info?.state === "closed") return <ClosedThreadLine key={key} thread={info} />;
     const start = threadStartOf(m.meta);
     if (start && !start.moved && linked.has(m.id)) return <Fragment key={key} />;
+    // A thread that has a mission (also ones proposed before the link card existed): the same mission card.
+    if (start && info?.mission) {
+      return (
+        <div key={key} className="mi-linkrow" data-message-id={m.id}>
+          <MissionLinkCard link={{ missionId: info.mission.id, threadId: m.id }} />
+        </div>
+      );
+    }
     return start ? <ThreadStartLine key={key} message={m} start={start} thread={info} /> : null;
   };
   return (

@@ -1427,3 +1427,8 @@ a.mi-pr:hover {
   flex: none;
   color: var(--ink2);
 }
+
+/* A mission's card in place of its thread's start marker (threads proposed before the link card). */
+.mi-linkrow {
+  margin: 6px 12px 6px var(--thread-indent, 56px);
+}
