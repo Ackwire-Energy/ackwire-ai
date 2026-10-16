@@ -3,13 +3,17 @@ import {
   chooseDecision,
   closeMission,
   createMission,
+  decideJoinRequest,
   decideReview,
   decideSuggestion,
+  eligibleMissionAgents,
   getMission,
   getMissionByThread,
   getMissionFiles,
   getMissionPlan,
+  getTaskOutput,
   listDecisions,
+  listJoinRequests,
   listMissions,
   listParticipants,
   listReviews,
@@ -20,6 +24,7 @@ import {
   opineDecision,
   pauseMission,
   removeParticipant,
+  requestToJoin,
   resumeMission,
   sendMissionMessage,
   setMissionMachine,
@@ -64,13 +69,24 @@ const Mission = z
     status: Status,
     repoDir: z.string(),
     resumeTasks: z.boolean(),
-    plan: z.object({ version: z.number(), done: z.number(), total: z.number(), waiting: z.number() }),
+    plan: z.object({
+      version: z.number(),
+      done: z.number(),
+      total: z.number(),
+      waiting: z.number(),
+      doing: z.number(),
+      items: z
+        .array(PlanItem.omit({ note: true }))
+        .openapi({ description: "The latest plan in order (at most 40), for the strip." }),
+    }),
     pending: z.object({
       decisions: z.number(),
       provisional: z.number(),
       reviews: z.number(),
       suggestions: z.number(),
+      joinRequests: z.number().openapi({ description: "Requests to join (0 unless you can answer them)." }),
     }),
+    joinRequested: z.boolean().openapi({ description: "You asked to join and nobody answered yet." }),
     runningTasks: z.number(),
     machine: z
       .object({ id: z.uuid(), name: z.string(), online: z.boolean(), lentBy: z.string().nullable() })
@@ -155,6 +171,7 @@ const Task = z
     seconds: z.number().nullable(),
     lastLine: z.string().nullable(),
     files: z.array(z.string()),
+    prUrl: z.string().nullable().openapi({ description: "A pull request it opened." }),
     branch: z.string().nullable(),
     cwd: z.string().nullable(),
     resumedFromId: z.string().nullable(),
@@ -165,6 +182,32 @@ const Task = z
     createdAt: z.string(),
   })
   .openapi("MachineTask");
+
+const JoinRequest = z
+  .object({
+    id: z.uuid(),
+    missionId: z.uuid(),
+    userId: z.string(),
+    name: z.string(),
+    status: z.enum(["pending", "accepted", "declined"]),
+    role: z.enum(["decide", "comment"]).nullable(),
+    decidedBy: z.string().nullable(),
+    decidedAt: z.string().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi("MissionJoinRequest");
+
+const EligibleAgent = z
+  .object({
+    agentId: z.uuid(),
+    handle: z.string(),
+    name: z.string(),
+    machine: z.object({ id: z.uuid(), name: z.string(), online: z.boolean() }),
+    ready: z.boolean(),
+  })
+  .openapi("MissionEligibleAgent");
+
+const Counts = z.object({ active: z.number(), waitingYou: z.number(), closed: z.number() });
 
 const MissionParams = OrgParams.extend({ missionId: z.uuid() });
 const ThreadParams = OrgParams.extend({ threadId: z.uuid() });
@@ -201,20 +244,42 @@ export function missionRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/missions",
       tags,
       security,
-      summary: "Missions you can see (the Threads page's Missions tab), most recently changed first",
+      summary:
+        "Missions you can see (the Threads page's Missions tab), most recently changed first; `counts` (same filters, any status) for the tabs and the sidebar",
       request: {
         params: OrgParams,
         query: z.object({
-          status: z.enum(["open", "closed", "proposed", "active", "paused", "done", "canceled"]).optional(),
+          status: z
+            .enum(["open", "closed", "waiting_you", "proposed", "active", "paused", "done", "canceled"])
+            .optional(),
+          channelId: z.uuid().optional(),
+          agentId: z.uuid().optional(),
+          q: z.string().max(200).optional().openapi({ description: "Words of the title or the goal." }),
           limit: z.coerce.number().int().min(1).max(200).optional(),
         }),
       },
-      responses: { 200: json(z.object({ missions: z.array(Mission) })), ...errors },
+      responses: { 200: json(z.object({ missions: z.array(Mission), counts: Counts })), ...errors },
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      const list = await listMissions(missions(), c.get("user").id, orgId, c.req.valid("query"));
-      return c.json({ missions: list }, 200);
+      return c.json(await listMissions(missions(), c.get("user").id, orgId, c.req.valid("query")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/missions/eligible-agents",
+      tags,
+      security,
+      summary:
+        '"Nova missão": agents that can run a mission for you (a connected computer with commands on and a recent runner; you can talk to them)',
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ agents: z.array(EligibleAgent) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ agents: await eligibleMissionAgents(missions(), c.get("user").id, orgId) }, 200);
     },
   );
 
@@ -296,6 +361,37 @@ export function missionRoutes(deps: AppDeps) {
       const { orgId, threadId } = c.req.valid("param");
       const rows = await listThreadMachineTasks(missions(), c.get("user").id, orgId, threadId);
       return c.json({ tasks: rows.map(machineTaskView) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/tasks/{taskId}/output",
+      tags,
+      security,
+      summary:
+        '"Ver saída": the last lines of a background task (from the computer when it is online, else the lines we kept); anyone who reads its conversation',
+      request: {
+        params: OrgParams.extend({ taskId: z.uuid() }),
+        query: z.object({ tail: z.coerce.number().int().min(1).max(200).optional() }),
+      },
+      responses: {
+        200: json(
+          z.object({
+            taskId: z.uuid(),
+            status: Task.shape.status,
+            source: z.enum(["computer", "saved"]),
+            lines: z.array(z.string()),
+            truncated: z.boolean(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, taskId } = c.req.valid("param");
+      return c.json(await getTaskOutput(missions(), c.get("user").id, orgId, taskId, c.req.valid("query")), 200);
     },
   );
 
@@ -455,6 +551,79 @@ export function missionRoutes(deps: AppDeps) {
       const { orgId, missionId, userId } = c.req.valid("param");
       await removeParticipant(missions(), c.get("user").id, orgId, missionId, userId);
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/missions/{missionId}/join-requests",
+      tags,
+      security,
+      summary: "Requests to join waiting for an answer (the owner and deciders see all; others their own)",
+      request: { params: MissionParams },
+      responses: { 200: json(z.object({ requests: z.array(JoinRequest) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      return c.json({ requests: await listJoinRequests(missions(), c.get("user").id, orgId, missionId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/missions/{missionId}/join-requests",
+      tags,
+      security,
+      summary:
+        '"Pedir para participar": someone who sees it and takes no part asks to join (the owner and deciders are told; nothing is posted)',
+      request: { params: MissionParams, body: Empty },
+      responses: { 200: json(JoinRequest), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      return c.json(await requestToJoin(missions(), c.get("user").id, orgId, missionId), 200);
+    },
+  );
+
+  const JoinParams = MissionParams.extend({ userId: z.string().min(1).max(200) });
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/missions/{missionId}/join-requests/{userId}/accept",
+      tags,
+      security,
+      summary: "Accept a request to join with a role (owner or deciders)",
+      request: { params: JoinParams, body: body(z.object({ role: z.enum(["decide", "comment"]) })) },
+      responses: { 200: json(JoinRequest), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId, userId } = c.req.valid("param");
+      const out = await decideJoinRequest(missions(), c.get("user").id, orgId, missionId, userId, {
+        outcome: "accepted",
+        role: c.req.valid("json").role,
+      });
+      return c.json(out, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/missions/{missionId}/join-requests/{userId}/decline",
+      tags,
+      security,
+      summary: "Decline a request to join (owner or deciders)",
+      request: { params: JoinParams, body: Empty },
+      responses: { 200: json(JoinRequest), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId, userId } = c.req.valid("param");
+      const out = await decideJoinRequest(missions(), c.get("user").id, orgId, missionId, userId, {
+        outcome: "declined",
+      });
+      return c.json(out, 200);
     },
   );
 

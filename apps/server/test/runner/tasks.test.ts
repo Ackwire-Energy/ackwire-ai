@@ -399,3 +399,54 @@ test.skipIf(process.platform !== "darwin")(
   },
   15_000,
 );
+
+test("protocol 6: pull request URLs in Claude Code tool results, answers and plain lines", () => {
+  const cwd = "/w/dev";
+  const toolResult = JSON.stringify({
+    type: "user",
+    message: {
+      content: [{ type: "tool_result", content: [{ type: "text", text: "https://github.com/acme/app/pull/431\n" }] }],
+    },
+  });
+  expect(parseOutputLine(toolResult, "claude", cwd)).toEqual({ prUrl: "https://github.com/acme/app/pull/431" });
+  expect(parseOutputLine(JSON.stringify({ type: "user", message: { content: [] } }), "claude", cwd)).toEqual({});
+  expect(
+    parseOutputLine(JSON.stringify({ type: "result", result: "Opened https://github.com/a/b/pull/7." }), "claude", cwd)
+      .prUrl,
+  ).toBe("https://github.com/a/b/pull/7");
+  expect(parseOutputLine("Created https://gitlab.com/acme/app/-/merge_requests/3", "shell", cwd).prUrl).toBe(
+    "https://gitlab.com/acme/app/-/merge_requests/3",
+  );
+  const parsed = parseServerFrame(
+    JSON.stringify({ type: "request", id: "r", op: "task.output", taskId: id(1), tail: 5 }),
+  );
+  expect(parsed).toMatchObject({ op: "task.output", tail: 5 });
+  expect(
+    parseRunnerFrame(
+      JSON.stringify({ type: "task.event", taskId: id(1), kind: "progress", prUrl: "https://github.com/a/b/pull/1" }),
+    ),
+  ).toMatchObject({ prUrl: "https://github.com/a/b/pull/1" });
+  expect(
+    parseRunnerFrame(JSON.stringify({ type: "task.event", taskId: id(1), kind: "progress", prUrl: "javascript:x" })),
+  ).not.toHaveProperty("prUrl");
+});
+
+test.skipIf(!posix)(
+  "task.output: the last human lines of a task's log, secrets redacted; another agent's task is not found",
+  async () => {
+    const { tasks, send, done } = setup({
+      secrets: async () => ({ env: {}, redact: (s: string) => s.replaceAll("hunter2", "[redacted]") }),
+    });
+    await tasks.init();
+    tasks.attach(send);
+    await tasks.start(AGENT, { taskId: id(61), executor: "shell", command: "echo one; echo pass hunter2; echo three" });
+    await waitFor(() => Boolean(done(id(61))), 8000);
+    expect(await tasks.output(AGENT, id(61), 2)).toEqual({ lines: ["pass [redacted]", "three"], truncated: true });
+    expect(await tasks.output(AGENT, id(61), 50)).toEqual({
+      lines: ["one", "pass [redacted]", "three"],
+      truncated: false,
+    });
+    await expect(tasks.output({ id: "other", handle: "x" }, id(61), 10)).rejects.toMatchObject({ code: "not_found" });
+  },
+  15_000,
+);

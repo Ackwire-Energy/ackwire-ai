@@ -16,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   type AgentScope,
+  findPullRequestUrl,
   type MachineReplies,
   type RunnerFrame,
   type RunnerTask,
@@ -47,6 +48,10 @@ import { isInside, resolveInWorkspace } from "./paths";
  * - A watcher tails the logs: Claude Code's `stream-json` lines become a
  *   human last line and the files it edits; other executors send their last
  *   plain lines. Events are throttled and secrets redacted (ADR 0027).
+ *   A pull request URL seen in the output (`gh pr create`, a tool result)
+ *   goes once as `task.event` `prUrl` (protocol 6).
+ * - `task.output` (protocol 6) re-reads the end of a task's log and answers
+ *   the same human lines the watcher derives ("Ver saída"), redacted.
  * - `task.done` goes once per task and again after each reconnect until the
  *   server acknowledges it (`task.ack`).
  */
@@ -67,6 +72,8 @@ export const EVENT_EVERY_MS = 2000;
 export const PROGRESS_EVERY_MS = 30_000;
 /** What `task.done` keeps of a plain command's output. */
 const TAIL_LINES = 20;
+/** `task.output` reads at most this much of the end of each log. */
+const OUTPUT_READ_BYTES = 512 * 1024;
 const MAX_LINE_BUFFER = 1024 * 1024;
 const CANCEL_GRACE_MS = 10_000;
 const TASK_ID = /^[a-zA-Z0-9-]{8,64}$/;
@@ -96,6 +103,8 @@ interface Entry {
   maxSeconds: number;
   lastLine?: string;
   files: string[];
+  /** Protocol 6: the first pull request URL seen in its output. */
+  prUrl?: string;
   /** Protocol 5: the mission this task works for, and its token for the local `agentes` MCP server. */
   missionId?: string;
   mcpToken?: string;
@@ -295,6 +304,17 @@ export interface ParsedLine {
   files?: string[];
   result?: string;
   session?: string;
+  /** A pull request URL in the output (a tool result, the answer, a plain line). */
+  prUrl?: string;
+}
+
+/** The text of a Claude Code tool result (a string, or text blocks). */
+function toolResultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return (content as Record<string, unknown>[])
+    .map((b) => (b && b.type === "text" && typeof b.text === "string" ? b.text : ""))
+    .join("\n");
 }
 
 /** Claude Code `stream-json` (and Codex `--json`, best effort); plain text otherwise. */
@@ -318,7 +338,19 @@ export function parseOutputLine(raw: string, executor: TaskExecutor, cwd: string
       const session = typeof ev.session_id === "string" ? ev.session_id : undefined;
       if (ev.type === "result") {
         const result = typeof ev.result === "string" ? ev.result : "";
-        return { result, session, ...(result ? { line: first(result) } : {}) };
+        const prUrl = findPullRequestUrl(result);
+        return { result, session, ...(result ? { line: first(result) } : {}), ...(prUrl ? { prUrl } : {}) };
+      }
+      if (ev.type === "user") {
+        // Tool results: only a pull request URL matters here (`gh pr create` prints it).
+        const content = (ev.message as { content?: unknown } | undefined)?.content;
+        const blocks = Array.isArray(content) ? (content as Record<string, unknown>[]) : [];
+        for (const block of blocks) {
+          if (block?.type !== "tool_result") continue;
+          const prUrl = findPullRequestUrl(toolResultText(block.content));
+          if (prUrl) return { session, prUrl };
+        }
+        return session ? { session } : {};
       }
       if (ev.type === "assistant") {
         const content = (ev.message as { content?: unknown } | undefined)?.content;
@@ -328,6 +360,8 @@ export function parseOutputLine(raw: string, executor: TaskExecutor, cwd: string
           for (const block of content as Record<string, unknown>[]) {
             if (block.type === "text" && typeof block.text === "string" && block.text.trim()) {
               out.line = first(block.text);
+              const prUrl = findPullRequestUrl(block.text);
+              if (prUrl) out.prUrl = prUrl;
             } else if (block.type === "tool_use" && typeof block.name === "string") {
               const input = (block.input ?? {}) as Record<string, unknown>;
               out.line = toolLine(block.name, input, rel);
@@ -353,9 +387,32 @@ export function parseOutputLine(raw: string, executor: TaskExecutor, cwd: string
     else if (command) out.line = command;
     if (changes.length) out.files = changes;
     if (item.type === "agent_message" && message) out.result = message;
+    const prUrl = findPullRequestUrl(message || (typeof item.output === "string" ? item.output : ""));
+    if (prUrl) out.prUrl = prUrl;
     return out;
   }
-  return { line: text };
+  const prUrl = findPullRequestUrl(text);
+  return { line: text, ...(prUrl ? { prUrl } : {}) };
+}
+
+/** The end of a log (at most `max` bytes) and whether there was more before it. */
+function readTail(file: string, max: number): { text: string; truncated: boolean } {
+  let fd: number | undefined;
+  try {
+    const size = statSync(file).size;
+    const start = Math.max(0, size - max);
+    const buf = Buffer.alloc(size - start);
+    fd = openSync(file, "r");
+    const n = readSync(fd, buf, 0, buf.length, start);
+    let text = buf.subarray(0, n).toString("utf8");
+    // Cut where a line was split by the window.
+    if (start > 0) text = text.slice(text.indexOf("\n") + 1);
+    return { text, truncated: start > 0 };
+  } catch {
+    return { text: "", truncated: false };
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
 }
 
 /** Reads what a log grew since `offset` (at most 1 MB per call). */
@@ -400,6 +457,8 @@ interface Watch {
   lastSentLine?: string;
   lastSentAt: number;
   pendingLine?: string;
+  /** A pull request URL not yet sent. */
+  pendingPr?: string;
   newFiles: string[];
   redact: (text: string) => string;
   missingSince?: number;
@@ -657,6 +716,34 @@ export class TaskManager {
     return { tasks: (taskId ? mine.filter((t) => t.taskId === taskId) : mine).map((t) => this.info(t)) };
   }
 
+  /**
+   * `task.output` (protocol 6): the last `tail` human lines of a task, from
+   * its logs (stdout first, then what it wrote to stderr), redacted with the
+   * agent's secrets. Claude Code's `stream-json` becomes the same lines the
+   * watcher sends, never raw JSON.
+   */
+  async output(agent: AgentScope | undefined, taskId: string, tail: number): Promise<MachineReplies["task.output"]> {
+    const t = this.journal.tasks.find((x) => x.taskId === taskId && (!agent || x.agentId === agent.id));
+    if (!t) throw new RunnerError("not_found", "No such task on this computer");
+    const n = clampInt(tail, 1, TASK_LIMITS.outputLines, 50);
+    const dir = this.dirOf(t.taskId);
+    const redact =
+      this.watches.get(t.taskId)?.redact ??
+      (await this.opts.secrets?.({ id: t.agentId, handle: t.agentHandle }).catch(() => null))?.redact ??
+      ((x: string) => x);
+    const lines: string[] = [];
+    let truncated = false;
+    for (const stream of ["stdout", "stderr"] as const) {
+      const read = readTail(path.join(dir, `${stream}.log`), OUTPUT_READ_BYTES);
+      truncated ||= read.truncated;
+      for (const raw of read.text.split("\n")) {
+        const parsed = parseOutputLine(raw, stream === "stdout" ? t.executor : "shell", t.cwd);
+        if (parsed.line) lines.push(redact(parsed.line).slice(0, TASK_LIMITS.line));
+      }
+    }
+    return { lines: lines.slice(-n), truncated: truncated || lines.length > n };
+  }
+
   cancel(agent: AgentScope | undefined, taskId: string): MachineReplies["task.cancel"] {
     const t = this.journal.tasks.find((x) => x.taskId === taskId && (!agent || x.agentId === agent.id));
     if (!t) throw new RunnerError("not_found", "No such task on this computer");
@@ -789,6 +876,10 @@ export class TaskManager {
       w.tail.push(line);
       if (w.tail.length > TAIL_LINES) w.tail.shift();
     }
+    if (parsed.prUrl && !t.prUrl) {
+      t.prUrl = w.redact(parsed.prUrl).slice(0, TASK_LIMITS.prUrl);
+      w.pendingPr = t.prUrl;
+    }
     for (const f of parsed.files ?? []) {
       if (!f || t.files.includes(f) || t.files.length >= TASK_LIMITS.files) continue;
       t.files.push(f);
@@ -802,6 +893,11 @@ export class TaskManager {
     if (w.newFiles.length > 0) {
       this.emit({ type: "task.event", taskId: t.taskId, kind: "files", files: [...t.files] });
       w.newFiles = [];
+      this.save();
+    }
+    if (w.pendingPr) {
+      this.emit({ type: "task.event", taskId: t.taskId, kind: "progress", seconds, prUrl: w.pendingPr });
+      w.pendingPr = undefined;
       this.save();
     }
     if (final) return;

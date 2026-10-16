@@ -61,7 +61,7 @@ A new artifact kind `file` (migration adds the enum value): any bytes, with the 
 
 **Connection.** Outbound WebSocket to `/api/machines/connect`: no public IP, port or tunnel on the machine. The first frame is `hello` with the token (not a header: Node's WebSocket client can't set one); no valid `hello` in 10 s closes the socket. Then the server sends `welcome`, pings every 25 s, and marks the machine offline when the socket closes. `machine.status { machineId, online }` goes to the organization.
 
-**Protocol.** `packages/adapters/src/machine-protocol.ts` (shared by server and runner): `request { id, op }` with `exec`, `read`, `write`, `list`, `push` (protocol 3 adds `secret`, ADR 0027; protocol 4 adds `task.*`, section 5a; protocol 5 adds `mcp.call`/`mcp.result` for missions, section 5b); `output` frames while a command runs; `result { id, ok, data | error }`; `cancel { id }`. Files travel base64 inside JSON for `read`/`write` (5 MB); uploads always use `push`.
+**Protocol.** `packages/adapters/src/machine-protocol.ts` (shared by server and runner): `request { id, op }` with `exec`, `read`, `write`, `list`, `push` (protocol 3 adds `secret`, ADR 0027; protocol 4 adds `task.*`, section 5a; protocol 5 adds `mcp.call`/`mcp.result` for missions, section 5b; protocol 6 adds `task.output`, section 5c); `output` frames while a command runs; `result { id, ok, data | error }`; `cancel { id }`. Files travel base64 inside JSON for `read`/`write` (5 MB); uploads always use `push`.
 
 **On the machine.**
 - Every path is relative to the workspace folder chosen at pairing (default `~/agentes`); `..` and absolute paths are refused, and symlinks that leave the workspace are refused for reads, writes and uploads.
@@ -92,6 +92,14 @@ Runner protocol 5 (`MISSION_PROTOCOL`, runner 0.5.0) lets a task work for a miss
 - **`agentes-runner mcp --task <id>`**: a small stdio MCP server (JSON-RPC lines; `initialize`, `tools/list`, `tools/call`, `ping`; no SDK). Each call goes over a local endpoint of the running daemon: `<runner home>/mcp.sock` (a named pipe `\\.\pipe\agentes-runner-<hash>` on Windows), one JSON line per request with `{ taskId, token, tool, args }`. The daemon checks the token against the task (constant-time), that the task still runs, and the tool name, then relays.
 - **Frames.** Runner → server `mcp.call { callId, taskId, tool, args }` (args ≤ 64 KB); server → runner `mcp.result { callId, ok, text | error }`. Calls in flight fail when the connection drops (the executor may retry); a call waits at most 6 minutes (uploads).
 - **Server.** The replica holding the socket runs the call without blocking other frames: the task must be this machine's and belong to an open mission on this machine; the input is validated against the tool's JSON Schema (`MISSION_MCP_TOOLS` in `machine-protocol.ts`, shared). Older runners get no mission features ("run agentes-runner update").
+
+### 5c. Protocol 6: a task's output
+
+Runner protocol 6 (`TASK_OUTPUT_PROTOCOL`, runner 0.6.0) adds what "Ver saída" needs (ADR 0029):
+
+- **`task.output { taskId, tail }`** → `{ lines, truncated }`: the last `tail` (≤ 200) human lines of the task, read from the end of `stdout.log` (512 KB) and then `stderr.log`, parsed like the watcher does (Claude Code's `stream-json` becomes "Editing src/app.ts", never raw JSON) and redacted with the agent's secrets. Only the request's agent's tasks.
+- **`task.event { …, prUrl? }`**: the first pull (or merge) request URL the task's output shows (a Claude Code tool result such as `gh pr create`, its answer, a plain line), sent once.
+- **Compatibility.** A runner ignores a request whose op it doesn't know (no reply), so the server asks `task.output` only of runners at protocol 6 or later; older ones get the lines the server kept (`machine_tasks.recent_lines`).
 
 ### 6. Which computer an agent uses
 

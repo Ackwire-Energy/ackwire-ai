@@ -1,10 +1,10 @@
-import { MISSION_MCP_TOOLS, type RunnerFrame, workspacePath } from "@agenteschat/adapters";
+import { findPullRequestUrl, MISSION_MCP_TOOLS, type RunnerFrame, workspacePath } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { ValidationError } from "./errors";
 import type { MachineMissionHooks } from "./machine-hub";
-import { getTask, type MachineTaskRow, publishTaskEvent } from "./machine-tasks";
+import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./machine-tasks";
 import { createMissionApproval, onMachineOnline } from "./mission-sync";
 import {
   askDecision,
@@ -156,12 +156,14 @@ async function run(
           main,
         },
       });
+      const pr = str(args.pr_url).trim() || findPullRequestUrl(summary);
       const [row] = await deps.db
         .update(machineTasks)
         .set({ lastLine: noMentions(summary.split("\n")[0] ?? "").slice(0, 500), updatedAt: new Date() })
         .where(eq(machineTasks.id, task.id))
         .returning();
       if (row) await publishTaskEvent(deps.pubsub, row);
+      if (pr) await setTaskPrUrl(deps, task.id, pr);
       await recordMissionEvent(deps.db, mission, "report", { taskId: task.id, status });
       return "Reported in the mission's thread.";
     }
@@ -201,6 +203,8 @@ async function run(
         prUrl: args.pr_url,
         artifactIds,
       });
+      const pr = str(args.pr_url).trim() || findPullRequestUrl(str(args.summary));
+      if (pr) await setTaskPrUrl(deps, task.id, pr);
       return `Review requested${artifactIds.length ? ` with ${artifactIds.length} file(s)` : ""}${
         failed.length ? `; not uploaded: ${failed.join(", ")}` : ""
       }. Stop now and wait; you'll be resumed with the people's answer.`;

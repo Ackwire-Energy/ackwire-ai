@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { agents } from "./agents";
@@ -31,6 +32,7 @@ export const missionStatusEnum = pgEnum("mission_status", ["proposed", "active",
 export const missionRoleEnum = pgEnum("mission_role", ["decide", "comment"]);
 export const missionDecisionStatusEnum = pgEnum("mission_decision_status", ["pending", "provisional", "taken"]);
 export const missionReviewStatusEnum = pgEnum("mission_review_status", ["pending", "approved", "changes_requested"]);
+export const missionJoinStatusEnum = pgEnum("mission_join_status", ["pending", "accepted", "declined"]);
 
 /** A plan item as the executor keeps it (`update_plan`). */
 export interface MissionPlanItem {
@@ -251,4 +253,34 @@ export const missionEvents = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.missionId, t.createdAt)],
+);
+
+/**
+ * "Pedir para participar": someone who sees a mission but takes no part asks
+ * its owner and deciders to join. At most one pending request per person.
+ */
+export const missionJoinRequests = pgTable(
+  "mission_join_requests",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    missionId: uuid()
+      .notNull()
+      .references(() => missions.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: missionJoinStatusEnum().notNull().default("pending"),
+    /** The role given on accept. */
+    role: missionRoleEnum(),
+    decidedBy: text().references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("mission_join_requests_one_pending").on(t.missionId, t.userId).where(sql`${t.status} = 'pending'`),
+    index().on(t.missionId, t.status),
+  ],
 );

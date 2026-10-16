@@ -1,4 +1,5 @@
 import {
+  findPullRequestUrl,
   type MachineReplies,
   type MachineRequest,
   MISSION_PROTOCOL,
@@ -45,6 +46,8 @@ export const RESUME_PROMPT =
 export const TASK_TEXT_LIMITS = { title: 120, command: 2000, prompt: 20_000, wakeResult: 4000 } as const;
 
 const ACTIVE: MachineTaskStatus[] = ["queued", "running", "interrupted"];
+/** `machine_tasks.recent_lines` keeps this many human lines ("Ver saída" while the computer is offline). */
+export const RECENT_LINES = 50;
 
 /** A task as the app and the agent's tools see it. */
 export interface MachineTaskView {
@@ -62,6 +65,8 @@ export interface MachineTaskView {
   seconds: number | null;
   lastLine: string | null;
   files: string[];
+  /** A pull request it opened (from the executor's tools or its output), or null. */
+  prUrl: string | null;
   branch: string | null;
   cwd: string | null;
   resumedFromId: string | null;
@@ -87,6 +92,7 @@ export function machineTaskView(row: MachineTaskRow): MachineTaskView {
     seconds: row.seconds,
     lastLine: row.lastLine,
     files: Array.isArray(row.files) ? row.files : [],
+    prUrl: row.prUrl ?? null,
     branch: row.branch,
     cwd: row.cwd,
     resumedFromId: row.resumedFromId,
@@ -308,18 +314,49 @@ export async function listThreadTasks(db: Executor, orgId: string, channelId: st
     .limit(50);
 }
 
-/** `task.event`: the last line, files and elapsed time; an event proves the task runs. */
+/** One line more in `recent_lines` (oldest dropped past `RECENT_LINES`; the same line twice in a row is kept once). */
+const pushRecentLine = (line: string) => {
+  const col = machineTasks.recentLines;
+  return sql`case when ${col}->> -1 = ${line}::text then ${col}
+    else (case when jsonb_array_length(${col}) >= ${sql.raw(String(RECENT_LINES))} then ${col} - 0 else ${col} end)
+      || jsonb_build_array(${line}::text) end`;
+};
+
+/** Keeps the first pull request URL a task showed. */
+const keepPrUrl = (url: string) => sql`coalesce(${machineTasks.prUrl}, ${url}::text)`;
+
+/** A pull request a task opened, from its frames or the executor's tools: kept once, published. */
+export async function setTaskPrUrl(deps: TaskDeps, taskId: string, url: string | null | undefined) {
+  const pr = findPullRequestUrl(url) ?? (url && /^https?:\/\/\S+$/i.test(url) ? url.slice(0, TASK_LIMITS.prUrl) : null);
+  if (!pr) return null;
+  const [row] = await deps.db
+    .update(machineTasks)
+    .set({ prUrl: pr, updatedAt: new Date() })
+    .where(and(eq(machineTasks.id, taskId), isNull(machineTasks.prUrl)))
+    .returning();
+  if (row) await publishTaskEvent(deps.pubsub, row);
+  return row ?? null;
+}
+
+/**
+ * `task.event`: the last line, files and elapsed time; an event proves the
+ * task runs. A line also goes into `recent_lines`; a pull request URL (the
+ * runner's `prUrl`, or one in the line) is kept as `pr_url`.
+ */
 export async function applyTaskEvent(
   deps: TaskDeps,
   machineId: string,
   frame: Extract<RunnerFrame, { type: "task.event" }>,
 ) {
   const now = new Date();
+  const pr = frame.prUrl ?? findPullRequestUrl(frame.line);
   const [row] = await deps.db
     .update(machineTasks)
     .set({
       status: "running",
       ...(frame.line !== undefined ? { lastLine: frame.line } : {}),
+      ...(frame.line ? { recentLines: pushRecentLine(frame.line) } : {}),
+      ...(pr ? { prUrl: keepPrUrl(pr) } : {}),
       ...(frame.files ? { files: frame.files.slice(0, TASK_LIMITS.files) } : {}),
       ...(frame.seconds !== undefined ? { seconds: Math.round(frame.seconds) } : {}),
       lastEventAt: now,
@@ -352,6 +389,7 @@ export async function applyTaskDone(
   frame: Extract<RunnerFrame, { type: "task.done" }>,
 ) {
   const now = new Date();
+  const pr = findPullRequestUrl(frame.result) ?? findPullRequestUrl(frame.lastLine);
   const row = await deps.db.transaction(async (tx) => {
     const [ended] = await tx
       .update(machineTasks)
@@ -361,6 +399,8 @@ export async function applyTaskDone(
         signal: frame.signal ?? null,
         seconds: frame.seconds,
         ...(frame.lastLine !== undefined ? { lastLine: frame.lastLine } : {}),
+        ...(frame.lastLine ? { recentLines: pushRecentLine(frame.lastLine) } : {}),
+        ...(pr ? { prUrl: keepPrUrl(pr) } : {}),
         ...(frame.files ? { files: frame.files.slice(0, TASK_LIMITS.files) } : {}),
         result: frame.result ? frame.result.slice(0, TASK_LIMITS.result) : null,
         ...(frame.session ? { sessionId: frame.session } : {}),

@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 5;
+export const MACHINE_PROTOCOL_VERSION = 6;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -20,6 +20,13 @@ export const TASKS_PROTOCOL = 4;
  * `mcp.result`, ADR 0029).
  */
 export const MISSION_PROTOCOL = 5;
+/**
+ * From this protocol on, the runner answers `task.output` (the last human
+ * lines of a task's log, ADR 0029) and reports pull requests it sees in a
+ * task's output (`task.event` `prUrl`). Older runners ignore unknown ops, so
+ * the server only asks runners at this protocol or later.
+ */
+export const TASK_OUTPUT_PROTOCOL = 6;
 
 /** No valid `hello` within this time closes the socket. */
 export const HELLO_TIMEOUT_MS = 10_000;
@@ -128,7 +135,16 @@ export interface TaskDone {
 }
 
 /** Largest pieces of task frames (characters / entries); the runner cuts, the server cuts again. */
-export const TASK_LIMITS = { line: 500, files: 50, filePath: 300, result: 8000, tasks: 200 } as const;
+export const TASK_LIMITS = {
+  line: 500,
+  files: 50,
+  filePath: 300,
+  result: 8000,
+  tasks: 200,
+  /** `task.output`: at most this many lines. */
+  outputLines: 200,
+  prUrl: 500,
+} as const;
 
 export interface RunnerInfo {
   /** Protocol 4: the tasks in the runner's journal (running, and finished ones not yet acknowledged). */
@@ -181,6 +197,8 @@ export type MachineRequest = (
   /** One task, or all of this agent's when `taskId` is omitted. */
   | { op: "task.status"; taskId?: string }
   | { op: "task.cancel"; taskId: string }
+  /** Protocol 6: the last `tail` human lines of a task's output (redacted), as the watcher derives them. */
+  | { op: "task.output"; taskId: string; tail: number }
   | {
       op: "push";
       path: string;
@@ -203,6 +221,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "task.start",
   "task.status",
   "task.cancel",
+  "task.output",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -221,6 +240,8 @@ export interface MachineReplies {
   "task.status": { tasks: RunnerTask[] };
   /** `false`: it had already ended. */
   "task.cancel": { canceled: boolean };
+  /** Oldest first; `truncated`: the log had more than was read. */
+  "task.output": { lines: string[]; truncated: boolean };
 }
 
 /** Error codes the runner reports; the message is for people. */
@@ -264,6 +285,8 @@ export type RunnerFrame =
       line?: string;
       files?: string[];
       seconds?: number;
+      /** Protocol 6: a pull request URL seen in the task's output (`gh pr create`, a tool result). */
+      prUrl?: string;
     }
   | ({ type: "task.done" } & TaskDone)
   /**
@@ -363,6 +386,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const line = cut(f.line, TASK_LIMITS.line);
       const files = fileList(f.files);
       const seconds = finite(f.seconds);
+      const prUrl = cut(f.prUrl, TASK_LIMITS.prUrl);
       return {
         type: "task.event",
         taskId: f.taskId.slice(0, 64),
@@ -370,6 +394,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(line !== undefined ? { line } : {}),
         ...(files ? { files } : {}),
         ...(seconds !== undefined ? { seconds } : {}),
+        ...(prUrl && /^https?:\/\/\S+$/i.test(prUrl) ? { prUrl } : {}),
       };
     }
     case "task.done": {
@@ -454,12 +479,13 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "report",
     description:
-      "Tell the people in the mission's thread where things stand: a milestone, what you found, what is next. One short paragraph in their language; no internal details (tool names, logs). Use it at milestones, not for every step.",
+      "Tell the people in the mission's thread where things stand: a milestone, what you found, what is next. One short paragraph in their language; no internal details (tool names, logs). Use it at milestones, not for every step. pr_url: a pull request you opened.",
     inputSchema: {
       type: "object",
       properties: {
         summary: { type: "string", minLength: 1, maxLength: 4000 },
         status: { enum: ["working", "blocked", "done"] },
+        pr_url: { type: "string", maxLength: 500 },
       },
       required: ["summary"],
       additionalProperties: false,
@@ -588,3 +614,16 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
     },
   },
 ];
+
+/**
+ * The first pull (or merge) request URL in a text: GitHub `…/pull/N`,
+ * GitLab `…/-/merge_requests/N`. Shared by the runner (task output) and the
+ * server (lines, results, the executor's reports).
+ */
+export function findPullRequestUrl(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const m = /https:\/\/(?:github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+|[\w.-]+\/(?:[\w.-]+\/)+-\/merge_requests\/\d+)/.exec(
+    text,
+  );
+  return m ? m[0].slice(0, TASK_LIMITS.prUrl) : null;
+}

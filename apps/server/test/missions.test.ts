@@ -36,6 +36,7 @@ function fakeRunner() {
           });
         }
         if (frame.op === "task.cancel") return ok({ canceled: true });
+        if (frame.op === "task.output") return ok({ lines: ["Reading app/package.json"], truncated: false });
         if (frame.op === "read") return ok({ base64: null, size: 0 });
         return ok({ size: 0 });
       }, 1);
@@ -143,6 +144,44 @@ test("missions API: session and same origin; create, read, start (owner only), l
   expect((await api(`/missions/${mission.id}/files`)).status).toBe(200);
   expect((await api(`/missions/${mission.id}/participants`)).status).toBe(200);
   expect((await api(`/missions/${mission.id}/decisions`)).status).toBe(200);
+
+  // The list's counts and filters, the agents that can run a mission.
+  const counted = (await (await api(`/missions?status=open&agentId=${agentId}&q=mobile`)).json()) as {
+    missions: Mission[];
+    counts: { active: number; waitingYou: number; closed: number };
+  };
+  expect(counted.counts).toEqual({ active: 1, waitingYou: 0, closed: 0 });
+  expect(counted.missions).toHaveLength(1);
+  expect(((await (await api("/missions?q=nothing-like-it")).json()) as { missions: Mission[] }).missions).toEqual([]);
+  const eligible = (await (await api("/missions/eligible-agents")).json()) as {
+    agents: { agentId: string; machine: { online: boolean } }[];
+  };
+  expect(eligible.agents).toEqual([
+    expect.objectContaining({ agentId, machine: expect.objectContaining({ online: true }) }),
+  ]);
+
+  // "Ver saída": anyone who reads the thread.
+  const taskId = runner.started[0]?.taskId as string;
+  const output = await asBia(`/tasks/${taskId}/output?tail=20`);
+  expect(output.status).toBe(200);
+  expect(await output.json()).toMatchObject({ source: "computer", lines: ["Reading app/package.json"] });
+
+  // Bia asks to join; the owner sees it and accepts her as someone who decides.
+  const asked = await asBia(`/missions/${mission.id}/join-requests`, { json: {} });
+  expect(asked.status).toBe(200);
+  expect(((await (await asBia(`/missions/${mission.id}`)).json()) as { joinRequested: boolean }).joinRequested).toBe(
+    true,
+  );
+  const pending = (await (await api(`/missions/${mission.id}/join-requests`)).json()) as {
+    requests: { userId: string; name: string }[];
+  };
+  expect(pending.requests).toHaveLength(1);
+  const biaId = pending.requests[0]?.userId as string;
+  expect((await asBia(`/missions/${mission.id}/join-requests/${biaId}/decline`, { json: {} })).status).toBe(403);
+  const accepted = await api(`/missions/${mission.id}/join-requests/${biaId}/accept`, { json: { role: "decide" } });
+  expect(accepted.status).toBe(200);
+  expect(((await (await asBia(`/missions/${mission.id}`)).json()) as Mission).role).toBe("decide");
+  expect((await asBia(`/missions/${mission.id}/join-requests`, { json: {} })).status).toBe(409);
 
   const stopped = await api(`/missions/${mission.id}/stop`, { json: {} });
   expect(stopped.status).toBe(200);

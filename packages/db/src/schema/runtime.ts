@@ -534,6 +534,13 @@ export const machineTasks = pgTable(
     signal: text(),
     seconds: integer(),
     lastLine: text(),
+    /**
+     * The latest human lines (at most 50, oldest first), from `task.event`:
+     * "Ver saída" when the computer is offline. Throttled like the events.
+     */
+    recentLines: jsonb().$type<string[]>().notNull().default([]),
+    /** A pull request the task opened (from the executor's tools or its output). */
+    prUrl: text(),
     /** Files it touched (relative paths, at most 50). */
     files: jsonb().$type<string[]>().notNull().default([]),
     /** The executor's final answer or the last lines of output (capped). */

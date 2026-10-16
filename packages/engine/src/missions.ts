@@ -1,4 +1,4 @@
-import { MISSION_PROTOCOL, type PubSub } from "@agenteschat/adapters";
+import { MISSION_PROTOCOL, type PubSub, TASK_OUTPUT_PROTOCOL } from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -15,13 +15,21 @@ import {
 } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import type { ArtifactDeps } from "./artifacts";
+import { audienceSql } from "./audience";
 import { recordAudit } from "./audit";
 import { requireChannelAccess } from "./channels";
 import { eligibleChannelAgents } from "./dispatch";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
-import { formatDuration, type MachineTaskRow, publishTaskEvent, startMachineTask, taskSeconds } from "./machine-tasks";
+import {
+  formatDuration,
+  type MachineTaskRow,
+  publishTaskEvent,
+  RECENT_LINES,
+  startMachineTask,
+  taskSeconds,
+} from "./machine-tasks";
 import { MachineOfflineError, machineOnline } from "./machines";
 import { insertMessage, type Message, messageView } from "./messages";
 import { MISSION_RULES } from "./mission-rules";
@@ -39,6 +47,7 @@ const {
   missionReviews,
   missionFiles,
   missionEvents,
+  missionJoinRequests,
   machineTasks,
   machines,
   messages,
@@ -83,6 +92,10 @@ export const MISSION_LIMITS = {
   sendText: 8000,
   inbox: 50,
   repoDir: 300,
+  /** Plan items in a mission view (the strip); the full plan is `GET …/plan`. */
+  viewItems: 40,
+  /** `GET …/tasks/{id}/output`: at most this many lines. */
+  outputLines: 200,
 } as const;
 const OPEN: MissionStatus[] = ["proposed", "active", "paused"];
 
@@ -266,8 +279,26 @@ export interface MissionView {
   status: MissionStatus;
   repoDir: string;
   resumeTasks: boolean;
-  plan: { version: number; done: number; total: number; waiting: number };
-  pending: { decisions: number; provisional: number; reviews: number; suggestions: number };
+  plan: {
+    version: number;
+    done: number;
+    total: number;
+    waiting: number;
+    /** Items in progress now. */
+    doing: number;
+    /** The latest plan in order, for the strip (at most `MISSION_LIMITS.viewItems`; dropped ones included). */
+    items: { id: string; title: string; status: PlanStatus }[];
+  };
+  pending: {
+    decisions: number;
+    provisional: number;
+    reviews: number;
+    suggestions: number;
+    /** Requests to join waiting for an answer (0 for whoever can't answer them). */
+    joinRequests: number;
+  };
+  /** The caller asked to join and nobody answered yet. */
+  joinRequested: boolean;
   runningTasks: number;
   machine: { id: string; name: string; online: boolean; lentBy: string | null } | null;
   /** The owner has no computer for it (handed over without one): work can't start until they set one. */
@@ -286,7 +317,7 @@ export interface MissionView {
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
-/** Views of several missions for one person (four queries for the whole list). */
+/** Views of several missions for one person (six queries for the whole list). */
 export async function missionViews(
   db: Database,
   rows: MissionRow[],
@@ -296,7 +327,7 @@ export async function missionViews(
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const machineIds = [...new Set(rows.flatMap((r) => (r.machineId ? [r.machineId] : [])))];
-  const [roles, counts, machineRows, running] = await Promise.all([
+  const [roles, counts, machineRows, running, plans, joins] = await Promise.all([
     db
       .select({ missionId: missionParticipants.missionId, role: missionParticipants.role })
       .from(missionParticipants)
@@ -336,7 +367,26 @@ export async function missionViews(
         ),
       )
       .groupBy(machineTasks.missionId),
+    db
+      .selectDistinctOn([missionPlanVersions.missionId], {
+        missionId: missionPlanVersions.missionId,
+        items: missionPlanVersions.items,
+      })
+      .from(missionPlanVersions)
+      .where(inArray(missionPlanVersions.missionId, ids))
+      .orderBy(missionPlanVersions.missionId, desc(missionPlanVersions.version)),
+    db
+      .select({
+        missionId: missionJoinRequests.missionId,
+        n: sql<number>`count(*)::int`,
+        mine: sql<boolean>`bool_or(${missionJoinRequests.userId} = ${userId})`,
+      })
+      .from(missionJoinRequests)
+      .where(and(inArray(missionJoinRequests.missionId, ids), eq(missionJoinRequests.status, "pending")))
+      .groupBy(missionJoinRequests.missionId),
   ]);
+  const planOf = new Map(plans.map((p) => [p.missionId, Array.isArray(p.items) ? p.items : []]));
+  const joinOf = new Map(joins.map((j) => [j.missionId, j]));
   const roleOf = new Map(roles.map((r) => [r.missionId, r.role]));
   const countRows = rowsOf<{ mission_id: string; k: string; n: number | string }>(counts);
   const count = (id: string, k: string) => Number(countRows.find((c) => c.mission_id === id && c.k === k)?.n ?? 0);
@@ -346,6 +396,8 @@ export async function missionViews(
     const role: MissionRole = r.ownerId === userId ? "owner" : ((roleOf.get(r.id) as MissionRole) ?? "none");
     const m = r.machineId ? machineOf.get(r.machineId) : undefined;
     const needsComputer = !m || Boolean(m.deletedAt) || (m.pairedBy !== r.ownerId && !r.machineLentBy);
+    const items = planOf.get(r.id) ?? [];
+    const join = joinOf.get(r.id);
     return {
       id: r.id,
       threadId: r.threadRootId,
@@ -358,13 +410,22 @@ export async function missionViews(
       status: r.status,
       repoDir: r.repoDir,
       resumeTasks: r.resumeTasks,
-      plan: { version: r.planVersion, done: r.planDone, total: r.planTotal, waiting: r.planWaiting },
+      plan: {
+        version: r.planVersion,
+        done: r.planDone,
+        total: r.planTotal,
+        waiting: r.planWaiting,
+        doing: items.filter((i) => i.status === "doing").length,
+        items: items.slice(0, MISSION_LIMITS.viewItems).map((i) => ({ id: i.id, title: i.title, status: i.status })),
+      },
       pending: {
         decisions: count(r.id, "decision:pending"),
         provisional: count(r.id, "decision:provisional"),
         reviews: count(r.id, "review"),
         suggestions: 0,
+        joinRequests: mayAct(role) ? Number(join?.n ?? 0) : 0,
       },
+      joinRequested: role === "none" && join?.mine === true,
       runningTasks: runningOf.get(r.id) ?? 0,
       machine: m ? { id: m.id, name: m.name, online: machineOnline(m), lentBy: r.machineLentBy } : null,
       needsComputer,
@@ -411,35 +472,94 @@ export async function getMissionByThread(deps: MissionDeps, userId: string, orgI
   return getMission(deps, userId, orgId, row.id);
 }
 
-/** Missions the person can see (their home channels), most recently changed first. */
-export async function listMissions(
-  deps: MissionDeps,
-  userId: string,
-  orgId: string,
-  input: { status?: MissionStatus | "open" | "closed"; limit?: number } = {},
-) {
+export interface ListMissionsInput {
+  status?: MissionStatus | "open" | "closed" | "waiting_you";
+  /** Its home conversation. */
+  channelId?: string;
+  agentId?: string;
+  /** Words of the title or the goal. */
+  q?: string;
+  limit?: number;
+}
+
+/**
+ * Something waits for this person in the mission (`m`): they can act and a
+ * decision, a review, a plan item, a suggestion or a request to join waits.
+ */
+const waitingYouSql = (userId: string) => sql`(m.owner_id = ${userId} or exists (select 1 from ${missionParticipants} mp
+    where mp.mission_id = m.id and mp.user_id = ${userId} and mp.role = 'decide'))
+  and (m.plan_waiting > 0
+    or exists (select 1 from ${missionDecisions} md where md.mission_id = m.id and md.status in ('pending', 'provisional'))
+    or exists (select 1 from ${missionReviews} mr where mr.mission_id = m.id and mr.status = 'pending')
+    or exists (select 1 from ${missionJoinRequests} mj where mj.mission_id = m.id and mj.status = 'pending')
+    or exists (select 1 from ${messages} sm where sm.org_id = m.org_id and sm.thread_id = m.thread_root_id
+      and sm.meta->'missionSuggestion'->>'status' = 'pending'))`;
+
+const OPEN_SQL = sql`m.status in ('proposed', 'active', 'paused')`;
+
+/** The missions (alias `m`) the person sees, with the filters but the status. */
+function missionScope(userId: string, orgId: string, input: ListMissionsInput) {
+  const q = input.q?.trim().slice(0, 200);
+  const like = q ? `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
+  const uuid = (v: string | undefined) => (v && /^[0-9a-f-]{36}$/i.test(v) ? v : null);
+  const channelId = uuid(input.channelId);
+  const agentId = uuid(input.agentId);
+  if ((input.channelId && !channelId) || (input.agentId && !agentId)) return sql`false`;
+  return sql`m.org_id = ${orgId}::uuid
+    and m.channel_id in (select cm.channel_id from ${schema.channelMembers} cm
+      where cm.org_id = ${orgId}::uuid and cm.user_id = ${userId})
+    ${channelId ? sql`and m.channel_id = ${channelId}::uuid` : sql``}
+    ${agentId ? sql`and m.agent_id = ${agentId}::uuid` : sql``}
+    ${like ? sql`and (m.title ilike ${like} or m.goal ilike ${like})` : sql``}`;
+}
+
+/**
+ * Missions the person can see (their home channels), most recently changed
+ * first, filtered by status (`open`, `closed`, `waiting_you` or one status),
+ * conversation, agent and words; `counts` (same filters, any status) feed
+ * the tabs and the sidebar.
+ */
+export async function listMissions(deps: MissionDeps, userId: string, orgId: string, input: ListMissionsInput = {}) {
   const membership = await requirePermission(deps.db, userId, orgId, "read");
   const status = input.status;
-  const rows = await deps.db
-    .select()
-    .from(missions)
-    .where(
-      and(
-        eq(missions.orgId, orgId),
-        sql`${missions.channelId} in (select cm.channel_id from ${schema.channelMembers} cm
-          where cm.org_id = ${orgId}::uuid and cm.user_id = ${userId})`,
-        status === "open"
-          ? inArray(missions.status, OPEN)
-          : status === "closed"
-            ? inArray(missions.status, ["done", "canceled"])
-            : status
-              ? eq(missions.status, status)
-              : undefined,
-      ),
-    )
-    .orderBy(desc(missions.updatedAt))
-    .limit(Math.min(Math.max(input.limit ?? 50, 1), 200));
-  return missionViews(deps.db, rows, userId, can(membership.role, "manage_members"));
+  const scope = missionScope(userId, orgId, input);
+  const statusSql =
+    status === "open"
+      ? OPEN_SQL
+      : status === "closed"
+        ? sql`m.status in ('done', 'canceled')`
+        : status === "waiting_you"
+          ? sql`${OPEN_SQL} and ${waitingYouSql(userId)}`
+          : status
+            ? sql`m.status = ${status}`
+            : sql`true`;
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 200);
+  const [rows, counts] = await Promise.all([
+    deps.db
+      .select()
+      .from(missions)
+      .where(sql`${missions.id} in (select m.id from ${missions} m where ${scope} and ${statusSql})`)
+      .orderBy(desc(missions.updatedAt))
+      .limit(limit),
+    missionCounts(deps.db, userId, orgId, input),
+  ]);
+  return {
+    missions: await missionViews(deps.db, rows, userId, can(membership.role, "manage_members")),
+    counts,
+  };
+}
+
+/** `{ active, waitingYou, closed }` over the missions the person sees (one query; the sidebar's count). */
+export async function missionCounts(db: Executor, userId: string, orgId: string, input: ListMissionsInput = {}) {
+  const rows = rowsOf<{ active: number | string; waiting_you: number | string; closed: number | string }>(
+    await db.execute(sql`select
+        count(*) filter (where ${OPEN_SQL})::int as active,
+        count(*) filter (where ${OPEN_SQL} and ${waitingYouSql(userId)})::int as waiting_you,
+        count(*) filter (where m.status in ('done', 'canceled'))::int as closed
+      from ${missions} m where ${missionScope(userId, orgId, input)}`),
+  );
+  const r = rows[0];
+  return { active: Number(r?.active ?? 0), waitingYou: Number(r?.waiting_you ?? 0), closed: Number(r?.closed ?? 0) };
 }
 
 // ── Starting a mission ───────────────────────────────────────────────────────
@@ -1219,6 +1339,17 @@ export async function setParticipant(
       target: [missionParticipants.missionId, missionParticipants.userId],
       set: { role: input.role },
     });
+  // Added by hand: a request to join from them is answered by that.
+  await deps.db
+    .update(missionJoinRequests)
+    .set({ status: "accepted", role: input.role, decidedBy: actorId, decidedAt: new Date() })
+    .where(
+      and(
+        eq(missionJoinRequests.missionId, mission.id),
+        eq(missionJoinRequests.userId, input.userId),
+        eq(missionJoinRequests.status, "pending"),
+      ),
+    );
   const action = before === "none" ? "mission.participant_added" : "mission.participant_role_changed";
   await recordMissionEvent(deps.db, mission, action.replace("mission.", ""), {
     by: actorId,
@@ -1264,6 +1395,170 @@ export async function removeParticipant(
   });
   await requestFilesSync(deps.db, found.mission);
   await publishMissionEvent(deps, found.mission, "participants");
+}
+
+// ── Requests to join ─────────────────────────────────────────────────────────
+
+export interface JoinRequestView {
+  id: string;
+  missionId: string;
+  userId: string;
+  name: string;
+  status: "pending" | "accepted" | "declined";
+  role: "decide" | "comment" | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+/** Who answers requests to join: the owner and the deciders. */
+async function answerers(db: Executor, mission: MissionRow) {
+  const rows = await db
+    .select({ userId: missionParticipants.userId })
+    .from(missionParticipants)
+    .where(and(eq(missionParticipants.missionId, mission.id), eq(missionParticipants.role, "decide")));
+  return [...new Set([...(mission.ownerId ? [mission.ownerId] : []), ...rows.map((r) => r.userId)])];
+}
+
+/**
+ * "Pedir para participar": someone who sees the mission and takes no part
+ * asks to join. Nothing is posted in the thread; the owner and the deciders
+ * get `mission.needs_you` (`kind: join_request`). Asking again while a
+ * request waits returns that request.
+ */
+export async function requestToJoin(deps: MissionDeps, userId: string, orgId: string, missionId: string) {
+  const { mission, role } = await requireMission(deps, userId, orgId, missionId);
+  requireOpen(mission);
+  if (role !== "none") throw new ConflictError("You already take part in this mission", "mission.already_participant");
+  const [inserted] = await deps.db
+    .insert(missionJoinRequests)
+    .values({ orgId, missionId: mission.id, userId })
+    .onConflictDoNothing()
+    .returning();
+  if (inserted) {
+    await recordMissionEvent(deps.db, mission, "join_requested", { userId });
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "mission.join_requested",
+      target: { type: "mission", id: mission.id },
+      details: {},
+    });
+    for (const to of await answerers(deps.db, mission)) {
+      await publishUserEvent(deps.pubsub, orgId, to, {
+        type: "mission.needs_you",
+        kind: "join_request",
+        missionId: mission.id,
+        threadId: mission.threadRootId,
+        userId,
+      });
+    }
+    await publishMissionEvent(deps, mission, "join_requests");
+  }
+  const [row] = await deps.db
+    .select()
+    .from(missionJoinRequests)
+    .where(
+      and(
+        eq(missionJoinRequests.missionId, mission.id),
+        eq(missionJoinRequests.userId, userId),
+        eq(missionJoinRequests.status, "pending"),
+      ),
+    );
+  if (!row) throw new ConflictError("The request was answered already", "mission.join_decided");
+  return joinView(row, await nameOf(deps.db, userId));
+}
+
+const joinView = (r: typeof missionJoinRequests.$inferSelect, name: string): JoinRequestView => ({
+  id: r.id,
+  missionId: r.missionId,
+  userId: r.userId,
+  name,
+  status: r.status,
+  role: r.role,
+  decidedBy: r.decidedBy,
+  decidedAt: iso(r.decidedAt),
+  createdAt: r.createdAt.toISOString(),
+});
+
+/** Pending requests (the owner and deciders see all; anyone else only their own). */
+export async function listJoinRequests(deps: MissionDeps, userId: string, orgId: string, missionId: string) {
+  const { mission, role } = await requireMission(deps, userId, orgId, missionId);
+  const rows = await deps.db
+    .select()
+    .from(missionJoinRequests)
+    .where(
+      and(
+        eq(missionJoinRequests.missionId, mission.id),
+        eq(missionJoinRequests.status, "pending"),
+        mayAct(role) ? undefined : eq(missionJoinRequests.userId, userId),
+      ),
+    )
+    .orderBy(asc(missionJoinRequests.createdAt))
+    .limit(100);
+  const names = await namesOf(
+    deps.db,
+    rows.map((r) => r.userId),
+  );
+  return rows.map((r) => joinView(r, names.get(r.userId) ?? ""));
+}
+
+/** Accept (with a role: the person becomes a participant) or decline; the owner's and deciders'. */
+export async function decideJoinRequest(
+  deps: MissionDeps,
+  actorId: string,
+  orgId: string,
+  missionId: string,
+  userId: string,
+  input: { outcome: "accepted" | "declined"; role?: "decide" | "comment" },
+) {
+  const { mission, role } = await requireMission(deps, actorId, orgId, missionId);
+  requireAct(role, "answer requests to join");
+  requireOpen(mission);
+  const given = input.outcome === "accepted" ? (input.role ?? "comment") : null;
+  if (given) await requireSeesHome(deps.db, orgId, mission, userId);
+  const row = await deps.db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(missionJoinRequests)
+      .set({ status: input.outcome, role: given, decidedBy: actorId, decidedAt: new Date() })
+      .where(
+        and(
+          eq(missionJoinRequests.missionId, mission.id),
+          eq(missionJoinRequests.userId, userId),
+          eq(missionJoinRequests.status, "pending"),
+        ),
+      )
+      .returning();
+    if (!updated) throw new NotFoundError("No request to join from this person", "mission.join_not_found");
+    if (given && userId !== mission.ownerId) {
+      await tx
+        .insert(missionParticipants)
+        .values({ orgId, missionId: mission.id, userId, role: given, addedBy: actorId })
+        .onConflictDoUpdate({
+          target: [missionParticipants.missionId, missionParticipants.userId],
+          set: { role: given },
+        });
+    }
+    await recordMissionEvent(tx, mission, `join_${input.outcome}`, { by: actorId, userId, role: given });
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: `mission.join_${input.outcome}`,
+      target: { type: "mission", id: mission.id },
+      details: { userId, role: given },
+    });
+    return updated;
+  });
+  if (given) await requestFilesSync(deps.db, mission);
+  await publishUserEvent(deps.pubsub, orgId, userId, {
+    type: "mission.join_answered",
+    missionId: mission.id,
+    threadId: mission.threadRootId,
+    status: input.outcome,
+    role: given,
+  });
+  await publishMissionEvent(deps, mission, given ? "participants" : "join_requests");
+  return joinView(row, await nameOf(deps.db, userId));
 }
 
 /**
@@ -2156,4 +2451,113 @@ export async function missionsOnMachine(db: Executor, machineId: string) {
         or(inArray(missions.status, OPEN), sql`${missions.filesDirtyAt} is not null`),
       ),
     );
+}
+
+// ── Who can run a mission for the caller ─────────────────────────────────────
+
+export interface EligibleAgent {
+  agentId: string;
+  handle: string;
+  name: string;
+  machine: { id: string; name: string; online: boolean };
+  /** Online: a mission can start now. Offline agents are listed (their computer comes back). */
+  ready: boolean;
+}
+
+/**
+ * "Nova missão": the agents that can run a mission for the caller: a
+ * connected computer that allows commands with a runner on protocol 5 or
+ * later, and the caller in the agent's audience (D31). One query.
+ */
+export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userId: string, orgId: string) {
+  await requirePermission(deps.db, userId, orgId, "read");
+  const rows = rowsOf<{
+    id: string;
+    handle: string;
+    name: string;
+    machine_id: string;
+    machine_name: string;
+    online: boolean;
+    last_seen_at: Date | string | null;
+  }>(
+    await deps.db.execute(sql`select agents.id, agents.handle, agents.name, mc.id as machine_id, mc.name as machine_name,
+        mc.online, mc.last_seen_at
+      from ${schema.agents} agents
+      join ${machines} mc on mc.id = agents.machine_id and mc.org_id = agents.org_id
+      where agents.org_id = ${orgId}::uuid and agents.archived_at is null
+        and mc.deleted_at is null and mc.exec_allowed and mc.protocol >= ${MISSION_PROTOCOL}
+        and ${audienceSql("agents", sql`${userId}::text`)}
+      order by agents.name`),
+  );
+  return rows.map((r): EligibleAgent => {
+    const online = machineOnline({
+      online: r.online,
+      lastSeenAt: r.last_seen_at ? new Date(r.last_seen_at) : null,
+      deletedAt: null,
+    });
+    return {
+      agentId: r.id,
+      handle: r.handle,
+      name: r.name,
+      machine: { id: r.machine_id, name: r.machine_name, online },
+      ready: online,
+    };
+  });
+}
+
+// ── A task's output ("Ver saída") ────────────────────────────────────────────
+
+/**
+ * The last lines of a task, for whoever reads its conversation. Online (a
+ * runner on protocol 6+): asked to the computer, which reads its log and
+ * answers the human lines it derives (redacted). Otherwise, or when that
+ * fails: the lines we kept from its events (`recent_lines`).
+ */
+export async function getTaskOutput(
+  deps: MissionDeps,
+  userId: string,
+  orgId: string,
+  taskId: string,
+  input: { tail?: number } = {},
+) {
+  if (!/^[0-9a-f-]{36}$/i.test(taskId)) throw new NotFoundError("Task not found", "task.not_found");
+  const [row] = await deps.db
+    .select()
+    .from(machineTasks)
+    .where(and(eq(machineTasks.id, taskId), eq(machineTasks.orgId, orgId)));
+  if (!row) throw new NotFoundError("Task not found", "task.not_found");
+  await requireChannelAccess(deps.db, userId, orgId, row.channelId).catch(() => {
+    throw new NotFoundError("Task not found", "task.not_found");
+  });
+  const tail = Math.min(Math.max(Math.floor(input.tail ?? RECENT_LINES), 1), MISSION_LIMITS.outputLines);
+  const status = deps.hub ? await deps.hub.status(row.machineId).catch(() => null) : null;
+  if (deps.hub && status?.online && status.protocol >= TASK_OUTPUT_PROTOCOL) {
+    try {
+      const agent = await getAgentCached(deps.db, orgId, row.agentId);
+      const out = await deps.hub.call<"task.output">(
+        row.machineId,
+        { op: "task.output", taskId: row.id, tail, agent: { id: row.agentId, handle: agent?.handle ?? "agent" } },
+        { timeoutMs: 15_000 },
+      );
+      const lines = (Array.isArray(out?.lines) ? out.lines : []).map((l) => String(l).slice(0, 500)).slice(-tail);
+      return {
+        taskId: row.id,
+        status: row.status,
+        source: "computer" as const,
+        lines,
+        truncated: out?.truncated === true,
+      };
+    } catch {
+      // Fall back to what we kept.
+    }
+  }
+  const kept = Array.isArray(row.recentLines) ? row.recentLines : [];
+  const lines = kept.length ? kept : row.lastLine ? [row.lastLine] : [];
+  return {
+    taskId: row.id,
+    status: row.status,
+    source: "saved" as const,
+    lines: lines.slice(-tail),
+    truncated: lines.length > tail || kept.length >= RECENT_LINES,
+  };
 }

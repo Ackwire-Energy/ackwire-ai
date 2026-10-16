@@ -10,12 +10,17 @@ import {
   createMachinePairing,
   createMission,
   decideApproval,
+  decideJoinRequest,
   decideReview,
   decideSuggestion,
   drainOutbox,
+  eligibleMissionAgents,
   getMission,
   getMissionFiles,
+  getTaskOutput,
   grantScopes,
+  listJoinRequests,
+  listMissions,
   type MachineHub,
   MISSION_RULES,
   missionSummary,
@@ -24,7 +29,9 @@ import {
   postPersonMessage,
   redeemMachinePairing,
   requestFilesSync,
+  requestToJoin,
   START_PROMPT,
+  setAgentAudience,
   setAgentComputerTarget,
   setParticipant,
   startMachineTask,
@@ -64,6 +71,8 @@ function missionRunner(hub: MachineHub) {
   const started: TaskStartRequest[] = [];
   const files = new Map<string, string>();
   const canceled: string[] = [];
+  /** What `task.output` answers, per task. */
+  const outputs = new Map<string, string[]>();
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
   const socket = {
     send(text: string) {
@@ -86,6 +95,10 @@ function missionRunner(hub: MachineHub) {
         if (frame.op === "task.cancel") {
           canceled.push(frame.taskId);
           return ok({ canceled: true });
+        }
+        if (frame.op === "task.output") {
+          const lines = outputs.get(frame.taskId) ?? [];
+          return ok({ lines: lines.slice(-frame.tail), truncated: lines.length > frame.tail });
         }
         if (frame.op === "read") {
           const text = files.get(frame.path);
@@ -113,6 +126,8 @@ function missionRunner(hub: MachineHub) {
     started,
     files,
     canceled,
+    outputs,
+    close: () => hub.close(conn),
     frame: (frame: Record<string, unknown>) => reply(frame),
     hello: (token: string) => hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true })),
     /** The executor of `taskId` calls one of our MCP tools; resolves with the server's answer. */
@@ -552,5 +567,219 @@ describe("missions (ADR 0029)", () => {
       },
     );
     expect(ctx.system.map((b) => b.text).join("\n")).not.toContain("# Mission in this thread");
+  });
+
+  test("a task's output: the computer's lines when online; the kept ring when offline; only for who reads the thread", async () => {
+    const { view, runner, plan } = await proposed();
+    runner.outputs.set(plan.taskId, ["Reading app/package.json", "Editing app/src/nav.tsx", "Running: bun test"]);
+    const online = await getTaskOutput(md(), f.owner.id, f.org.id, plan.taskId, { tail: 2 });
+    expect(online).toMatchObject({ source: "computer", lines: ["Editing app/src/nav.tsx", "Running: bun test"] });
+    expect(runner.sent.some((s) => s.type === "request" && s.op === "task.output")).toBe(true);
+
+    // Lines from events are kept (the same line twice in a row once), at most 50.
+    for (const line of ["Reading a", "Reading a", "Editing b", ...Array.from({ length: 55 }, (_, i) => `step ${i}`)]) {
+      await runner.frame({ type: "task.event", taskId: plan.taskId, kind: "line", line });
+    }
+    const [row] = await f.db.select().from(schema.machineTasks).where(eq(schema.machineTasks.id, plan.taskId));
+    expect(row?.recentLines).toHaveLength(50);
+    expect(row?.recentLines.at(-1)).toBe("step 54");
+
+    await runner.close();
+    const offline = await getTaskOutput(md(), f.owner.id, f.org.id, plan.taskId, { tail: 3 });
+    expect(offline).toMatchObject({ source: "saved", lines: ["step 52", "step 53", "step 54"], truncated: true });
+
+    const outsider = await addMember(f.db, f.org.id, "member", "zed");
+    await expect(getTaskOutput(md(), outsider.id, f.org.id, plan.taskId)).rejects.toMatchObject({
+      code: "task.not_found",
+    });
+    expect(view.id).toBeTruthy();
+  });
+
+  test("pull requests: from a task's output line, the runner's prUrl, report and request_review", async () => {
+    const { view, runner, plan } = await proposed();
+    await startMission(md(), f.owner.id, f.org.id, view.id);
+    const prOf = async (id: string) =>
+      (await f.db.select().from(schema.machineTasks).where(eq(schema.machineTasks.id, id)))[0]?.prUrl ?? null;
+    await runner.frame({
+      type: "task.event",
+      taskId: plan.taskId,
+      kind: "line",
+      line: "Opened https://github.com/acme/app/pull/431 for review",
+    });
+    expect(await prOf(plan.taskId)).toBe("https://github.com/acme/app/pull/431");
+    // The first one stays.
+    await runner.frame({
+      type: "task.event",
+      taskId: plan.taskId,
+      kind: "progress",
+      prUrl: "https://github.com/acme/app/pull/9",
+    });
+    expect(await prOf(plan.taskId)).toBe("https://github.com/acme/app/pull/431");
+
+    ok(await runner.mcp(plan.taskId, "start_task", { title: "Navigation", prompt: "Build the tabs", branch: "nav" }));
+    const item = runner.started.at(-1) as TaskStartRequest;
+    await runner.frame({
+      type: "task.event",
+      taskId: item.taskId,
+      kind: "progress",
+      prUrl: "https://github.com/acme/app/pull/12",
+    });
+    expect(await prOf(item.taskId)).toBe("https://github.com/acme/app/pull/12");
+
+    ok(await runner.mcp(plan.taskId, "start_task", { title: "Auth", prompt: "Sign-in", branch: "auth" }));
+    const auth = runner.started.at(-1) as TaskStartRequest;
+    ok(
+      await runner.mcp(auth.taskId, "report", {
+        summary: "Sign-in is up",
+        pr_url: "https://github.com/acme/app/pull/13",
+      }),
+    );
+    expect(await prOf(auth.taskId)).toBe("https://github.com/acme/app/pull/13");
+
+    ok(await runner.mcp(plan.taskId, "start_task", { title: "Build", prompt: "Dev build", branch: "build" }));
+    const build = runner.started.at(-1) as TaskStartRequest;
+    ok(
+      await runner.mcp(build.taskId, "request_review", {
+        title: "Dev build",
+        pr_url: "https://github.com/acme/app/pull/14",
+      }),
+    );
+    expect(await prOf(build.taskId)).toBe("https://github.com/acme/app/pull/14");
+  });
+
+  test("the view carries plan items and what is in progress", async () => {
+    const { view, runner, plan } = await proposed();
+    ok(
+      await runner.mcp(plan.taskId, "update_plan", {
+        items: [
+          { id: "nav", title: "Navigation", status: "doing" },
+          { id: "auth", title: "Sign-in", status: "doing" },
+          { id: "push", title: "Push", status: "waiting_you" },
+          { id: "old", title: "Drawer", status: "dropped" },
+          { id: "done", title: "Repo", status: "done" },
+        ],
+      }),
+    );
+    const m = await getMission(md(), f.owner.id, f.org.id, view.id);
+    expect(m.plan).toMatchObject({ done: 1, total: 4, waiting: 1, doing: 2 });
+    expect(m.plan.items.map((i) => [i.id, i.status])).toEqual([
+      ["nav", "doing"],
+      ["auth", "doing"],
+      ["push", "waiting_you"],
+      ["old", "dropped"],
+      ["done", "done"],
+    ]);
+    const { missions } = await listMissions(md(), f.owner.id, f.org.id, {});
+    expect(missions[0]?.plan.doing).toBe(2);
+  });
+
+  test("requests to join: only who takes no part asks; the owner and deciders answer; accept adds with the role", async () => {
+    const { view } = await proposed();
+    const [bia, caio, duda] = await Promise.all(
+      ["bia", "caio", "duda"].map((n) => addMember(f.db, f.org.id, "member", n)),
+    );
+    for (const u of [bia, caio, duda]) {
+      await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: u?.id as string });
+    }
+    const b = bia as { id: string };
+    const c = caio as { id: string };
+    const d = duda as { id: string };
+    await setParticipant(md(), f.owner.id, f.org.id, view.id, { userId: c.id, role: "comment" });
+    await expect(requestToJoin(md(), c.id, f.org.id, view.id)).rejects.toMatchObject({
+      code: "mission.already_participant",
+    });
+    const asked = await requestToJoin(md(), b.id, f.org.id, view.id);
+    expect(asked).toMatchObject({ status: "pending", userId: b.id, name: "bia" });
+    // Asking again returns the same request; nothing is posted in the thread.
+    expect((await requestToJoin(md(), b.id, f.org.id, view.id)).id).toBe(asked.id);
+    const posted = await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, view.threadId));
+    expect(posted.some((m) => m.authorUserId === b.id)).toBe(false);
+    expect((await getMission(md(), b.id, f.org.id, view.id)).joinRequested).toBe(true);
+    expect((await getMission(md(), f.owner.id, f.org.id, view.id)).pending.joinRequests).toBe(1);
+    expect((await getMission(md(), c.id, f.org.id, view.id)).pending.joinRequests).toBe(0);
+    expect(await listJoinRequests(md(), c.id, f.org.id, view.id)).toHaveLength(0);
+    expect(await listJoinRequests(md(), f.owner.id, f.org.id, view.id)).toHaveLength(1);
+
+    // A commenter can't answer; the owner accepts as a decider.
+    await expect(
+      decideJoinRequest(md(), c.id, f.org.id, view.id, b.id, { outcome: "accepted", role: "decide" }),
+    ).rejects.toMatchObject({ code: "mission.not_allowed" });
+    const accepted = await decideJoinRequest(md(), f.owner.id, f.org.id, view.id, b.id, {
+      outcome: "accepted",
+      role: "decide",
+    });
+    expect(accepted).toMatchObject({ status: "accepted", role: "decide", decidedBy: f.owner.id });
+    expect((await getMission(md(), b.id, f.org.id, view.id)).role).toBe("decide");
+
+    // The new decider declines duda's request.
+    await requestToJoin(md(), d.id, f.org.id, view.id);
+    const declined = await decideJoinRequest(md(), b.id, f.org.id, view.id, d.id, { outcome: "declined" });
+    expect(declined.status).toBe("declined");
+    expect((await getMission(md(), d.id, f.org.id, view.id)).role).toBe("none");
+    await expect(
+      decideJoinRequest(md(), f.owner.id, f.org.id, view.id, d.id, { outcome: "declined" }),
+    ).rejects.toMatchObject({ code: "mission.join_not_found" });
+    // Someone who doesn't read the conversation doesn't see the mission at all.
+    const zed = await addMember(f.db, f.org.id, "member", "zed");
+    await expect(requestToJoin(md(), zed.id, f.org.id, view.id)).rejects.toMatchObject({ code: "mission.not_found" });
+  });
+
+  test("eligible agents: a computer with commands and protocol 5+, and the caller in the audience; offline still listed", async () => {
+    f = await setup({ machines: true, missionTools: true });
+    expect(await eligibleMissionAgents(md(), f.owner.id, f.org.id)).toEqual([]);
+    const paired = await pairedMachine();
+    const runner = missionRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    const list = await eligibleMissionAgents(md(), f.owner.id, f.org.id);
+    expect(list).toEqual([
+      {
+        agentId: f.agent.id,
+        handle: f.agent.handle,
+        name: f.agent.name,
+        machine: { id: paired.machineId, name: "MacBook", online: true },
+        ready: true,
+      },
+    ]);
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    expect(await eligibleMissionAgents(md(), bia.id, f.org.id)).toHaveLength(1);
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "owner", userIds: [] });
+    expect(await eligibleMissionAgents(md(), bia.id, f.org.id)).toHaveLength(0);
+    await runner.close();
+    expect((await eligibleMissionAgents(md(), f.owner.id, f.org.id))[0]?.machine.online).toBe(false);
+    await f.db.update(schema.machines).set({ protocol: 4 }).where(eq(schema.machines.id, paired.machineId));
+    expect(await eligibleMissionAgents(md(), f.owner.id, f.org.id)).toHaveLength(0);
+    await f.db
+      .update(schema.machines)
+      .set({ protocol: 5, execAllowed: false })
+      .where(eq(schema.machines.id, paired.machineId));
+    expect(await eligibleMissionAgents(md(), f.owner.id, f.org.id)).toHaveLength(0);
+  });
+
+  test("list filters (status, conversation, agent, words) and counts (active, waiting for you, closed)", async () => {
+    const { view, runner, plan } = await proposed();
+    const counts = (await listMissions(md(), f.owner.id, f.org.id, { status: "open" })).counts;
+    expect(counts).toEqual({ active: 1, waitingYou: 0, closed: 0 });
+    ok(await runner.mcp(plan.taskId, "update_plan", { items: [{ id: "push", title: "Push", status: "waiting_you" }] }));
+    const after = await listMissions(md(), f.owner.id, f.org.id, { status: "waiting_you" });
+    expect(after.counts.waitingYou).toBe(1);
+    expect(after.missions.map((m) => m.id)).toEqual([view.id]);
+    // Someone who can't act sees it, but nothing waits for them.
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+    expect((await listMissions(md(), bia.id, f.org.id, {})).counts).toEqual({ active: 1, waitingYou: 0, closed: 0 });
+    const ids = async (input: Parameters<typeof listMissions>[3]) =>
+      (await listMissions(md(), f.owner.id, f.org.id, input)).missions.map((m) => m.id);
+    expect(await ids({ q: "mobile" })).toEqual([view.id]);
+    expect(await ids({ q: "mobile app build" })).toEqual([]);
+    expect(await ids({ q: "Build our" })).toEqual([view.id]);
+    expect(await ids({ channelId: f.general.id })).toEqual([view.id]);
+    expect(await ids({ channelId: crypto.randomUUID() })).toEqual([]);
+    expect(await ids({ agentId: f.agent.id })).toEqual([view.id]);
+    expect(await ids({ agentId: crypto.randomUUID() })).toEqual([]);
+    expect(await ids({ status: "closed" })).toEqual([]);
+    await closeMission(md(), f.owner.id, f.org.id, view.id, { outcome: "done" });
+    const closed = await listMissions(md(), f.owner.id, f.org.id, { status: "closed" });
+    expect(closed.counts).toEqual({ active: 0, waitingYou: 0, closed: 1 });
+    expect(closed.missions.map((m) => m.id)).toEqual([view.id]);
   });
 });

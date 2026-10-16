@@ -185,7 +185,9 @@ async function doList(
 
 /** Runs one request; throws RunnerError (or fs errors) on failure. */
 export async function handleRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
-  if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel") return handleTask(ctx, req);
+  if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel" || req.op === "task.output") {
+    return handleTask(ctx, req);
+  }
   // Each agent works in its own folder: that folder is its workspace.
   if (req.agent) ctx = { ...ctx, workspaceReal: await agentWorkspace(ctx.workspaceReal, req.agent) };
   if (req.op === "secret") {
@@ -223,7 +225,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
 /** Background tasks: the manager finds each agent's folder itself (and keeps it for the task's life). */
 function handleTask(
   ctx: HandlerContext,
-  req: Extract<MachineRequest, { op: "task.start" | "task.status" | "task.cancel" }>,
+  req: Extract<MachineRequest, { op: "task.start" | "task.status" | "task.cancel" | "task.output" }>,
 ) {
   const tasks = ctx.tasks;
   if (!tasks) throw new RunnerError("bad_request", "This runner runs no background tasks");
@@ -241,6 +243,8 @@ function handleTask(
       return tasks.status(req.agent, typeof req.taskId === "string" ? req.taskId : undefined);
     case "task.cancel":
       return tasks.cancel(req.agent, requireString(req.taskId, "taskId"));
+    case "task.output":
+      return tasks.output(req.agent, requireString(req.taskId, "taskId"), Number(req.tail));
   }
 }
 
@@ -272,6 +276,8 @@ function describeOp(req: MachineRequest): string {
       return `task.status ${String(req.taskId ?? "all")}`;
     case "task.cancel":
       return `task.cancel ${String(req.taskId ?? "")}`;
+    case "task.output":
+      return `task.output ${String(req.taskId ?? "")}`;
     default:
       return String((req as { op: unknown }).op);
   }
