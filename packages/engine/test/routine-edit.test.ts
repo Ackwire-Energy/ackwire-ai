@@ -24,7 +24,7 @@ afterEach(async () => {
   await current?.close();
 });
 
-const deps = () => ({ db: f.db, pubsub: f.pubsub });
+const deps = () => ({ db: f.db, pubsub: f.pubsub, context: f.context });
 const daily = () =>
   createRoutine(deps(), f.owner.id, f.org.id, {
     name: "Resumo",

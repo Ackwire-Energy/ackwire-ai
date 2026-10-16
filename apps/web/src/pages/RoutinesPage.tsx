@@ -53,16 +53,7 @@ import { ZoneSelect } from "@/components/ZoneSelect";
 import { formatPercent, toYmd, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
-import {
-  defaultRule,
-  fromApiRule,
-  phraseToRule,
-  recurrenceLabels,
-  ruleSentence,
-  ruleToPhrase,
-  toApiRule,
-  upcomingLabels,
-} from "@/lib/recurrence";
+import { defaultRule, fromApiRule, recurrenceLabels, ruleSentence, toApiRule, upcomingLabels } from "@/lib/recurrence";
 import { browserTimezone, onceParts, timezoneLabel, timezoneName } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
 
@@ -456,31 +447,16 @@ function targetChoice(target: RoutineTarget | undefined): string {
   return TARGET_KEEP;
 }
 
-/**
- * The phrase the routine was set with (made with the picker: its rule's phrase);
- * a new or event routine: the default one ("every Monday at 9am", in the UI language);
- * a one-off: its moment in words.
- */
-function phraseOf(r: Routine | undefined, t: TFunction, locale: string): string {
-  if (r?.trigger.type === "schedule") {
-    if (r.trigger.phrase) return r.trigger.phrase;
-    if (r.trigger.rule) return ruleToPhrase(fromApiRule(r.trigger.rule, toYmd(new Date())));
-    return r.trigger.description;
-  }
-  if (r?.trigger.type === "once") return ruleSentence(t, locale, onceRule(r.trigger.at, r.trigger.timezone || "UTC"));
-  return t("routines.form.defaultPhrase");
-}
+/** The phrase the routine was written with, as the person wrote it (made with the picker, or new: none). */
+const phraseOf = (r: Routine | undefined) => (r?.trigger.type === "schedule" ? (r.trigger.phrase ?? "") : "");
 
-/** The rule a routine runs on, in `zone` (a phrase-only routine: its phrase read as a rule; new: Mondays at 09:00). */
+/** The rule a routine runs on, in `zone` (new, or an old cron-only routine: Mondays at 09:00). */
 function ruleOf(r: Routine | undefined, zone: string): RecurrenceRule {
   const base = defaultRule(zone);
   if (r?.trigger.type === "once") return onceRule(r.trigger.at, zone);
   if (r?.trigger.type === "schedule" && r.trigger.rule)
     return { ...fromApiRule(r.trigger.rule, base.start), timezone: zone };
-  if (r?.trigger.type === "schedule") {
-    const phrase = r.trigger.phrase || r.trigger.description;
-    return phraseToRule(phrase, base) ?? base;
-  }
+  if (r?.trigger.type === "schedule") return base;
   const { timezone, start } = base;
   return {
     freq: "weekly",
@@ -527,9 +503,8 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   const [prompt, setPrompt] = useState(routine?.prompt ?? "");
   const [name, setName] = useState(routine?.name ?? "");
   const [kind, setKind] = useState<"schedule" | "event">(routine?.trigger.type === "event" ? "event" : "schedule");
-  // The phrase field speaks Portuguese (the parser's language); in another UI language it starts empty.
-  const phraseLang = i18n.language.startsWith("pt");
-  const [phrase, setPhrase] = useState(routine || phraseLang ? phraseOf(routine, t, i18n.language) : "");
+  // What the person typed, in any language: the server reads it (never the browser) and fills the picker.
+  const [phrase, setPhrase] = useState(phraseOf(routine));
   const [event, setEvent] = useState<RoutineEvent>(
     routine?.trigger.type === "event" ? routine.trigger.event : "sentry.issue_created",
   );
@@ -551,11 +526,11 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   useEffect(() => {
     if (followsMyZone && !zoneTouched) setRule((r) => (r.timezone === myZone ? r : { ...r, timezone: myZone }));
   }, [myZone, followsMyZone, zoneTouched]);
-  // The phrase was typed (its parse fills the picker) or follows the picker.
+  // The phrase was typed (its parse fills the picker); picking in the picker clears it.
   const [phraseTyped, setPhraseTyped] = useState(false);
   const pickRule = (next: RecurrenceRule) => {
     setRule(next);
-    setPhrase(phraseLang ? ruleToPhrase(next) : "");
+    setPhrase("");
     setPhraseTyped(false);
   };
   const typePhrase = (text: string) => {

@@ -2,14 +2,14 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { asc, eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
-  addressesSeveral,
   buildRunContext,
   createAgent,
-  createJevMentionClassifier,
-  createJobHandlers,
+  createFakeJudge,
+  createJevJudge,
   drainOutbox,
   isShortFollowUp,
-  mentionIntent,
+  type JudgeQuestion,
+  mentionHandoffs,
   postPersonMessage,
   type RouterStrategy,
   routeMessage,
@@ -22,6 +22,11 @@ afterEach(async () => {
   f = undefined as unknown as Fixture;
   await current?.close();
 });
+
+/** The handle a `mention_handoff` question is about ("@qa"). */
+const askedHandle = (q: JudgeQuestion) =>
+  String((q.instructions as { agent?: { handle?: string } }).agent?.handle ?? "");
+const messageText = (state: Record<string, unknown>) => String((state.message as { text?: string })?.text ?? "");
 
 const post = (body: string, threadId?: string) =>
   postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body, threadId });
@@ -39,21 +44,36 @@ async function addQa() {
 }
 
 describe("an agent's @mention of another agent", () => {
-  test("requests and questions hand off; references don't", () => {
-    expect(mentionIntent("@jorge pode revisar o PR?", "jorge")).toBe("request");
-    expect(mentionIntent("@Jorge, dá uma olhada nos testes.", "jorge")).toBe("request");
-    expect(mentionIntent("Feito. @jorge consegue confirmar em staging", "jorge")).toBe("request");
-    expect(mentionIntent("Como o @jorge disse, está tudo certo.", "jorge")).toBe("reference");
-    expect(mentionIntent("O @jorge já fez o deploy.", "jorge")).toBe("reference");
-    expect(mentionIntent("Não sei as permissões dele, pergunte a @jorge.", "jorge")).toBe("reference");
-    expect(mentionIntent("Fale com o @theo ou o @jorge.", "theo")).toBe("reference");
-    expect(mentionIntent("Fale com o @theo ou o @jorge.", "jorge")).toBe("reference");
-    expect(mentionIntent("Vou alinhar isso com @jorge depois.", "jorge")).toBe("unclear");
+  test("the judge gets one yes/no per mentioned agent, about that agent, with the message as written", async () => {
+    const judge = createFakeJudge((kind, _id, _state, q) =>
+      kind === "mention_handoff" && askedHandle(q) === "@jorge" ? 0.9 : 0.1,
+    );
+    const scores = await mentionHandoffs(judge, {
+      orgId: "o",
+      body: "@jorge pode revisar o PR? O @theo já aprovou.",
+      author: "@dev",
+      targets: [
+        { agentId: "a-jorge", handle: "jorge", name: "Jorge", role: null },
+        { agentId: "a-theo", handle: "theo", name: "Theo", role: "QA" },
+      ],
+    });
+    expect(scores).toEqual(
+      new Map([
+        ["a-jorge", 0.9],
+        ["a-theo", 0.1],
+      ]),
+    );
+    const [call] = judge.calls;
+    expect(Object.keys(call?.questions ?? {})).toEqual(["asks_0", "asks_1"]);
+    expect(messageText(call?.state ?? {})).toBe("@jorge pode revisar o PR? O @theo já aprovou.");
   });
 
   test("a reference doesn't start the other agent; a request does, once, and the reply can't hand back", async () => {
     let turn = 0;
     f = await setup({
+      // The judge hears "pode revisar?" as a hand-off and "como o @qa disse" as a reference.
+      judge: (kind, _id, state) =>
+        kind === "mention_handoff" && messageText(state).includes("pode revisar") ? 0.9 : 0.1,
       reply: (req) => {
         const mine = systemText(req.system).includes("You are Dev (@dev)");
         if (!mine) return { chunks: ["@dev revisei, pode seguir?"] }; // QA tries to hand back
@@ -73,11 +93,17 @@ describe("an agent's @mention of another agent", () => {
     expect(runs.map((r) => r.hop)).toEqual([1, 1, 2]);
   });
 
-  test("Jev judges each mentioned agent in one request", async () => {
+  test("with Jev: one request for every mentioned agent, usage recorded", async () => {
     const seen: string[] = [];
-    const classify = createJevMentionClassifier({
+    const usage: unknown[] = [];
+    const judge = createJevJudge({
       apiKey: "tk",
-      recordUsage: async () => {},
+      gateway: {
+        recordExternalUsage: async (u) => {
+          usage.push(u);
+          return null;
+        },
+      },
       fetch: (async (_url: string, init?: RequestInit) => {
         seen.push(String(init?.body));
         return Response.json({
@@ -87,23 +113,30 @@ describe("an agent's @mention of another agent", () => {
         });
       }) as unknown as typeof fetch,
     });
-    const scores = await classify({
+    const scores = await mentionHandoffs(judge, {
       orgId: "o",
       body: "Vou alinhar isso com @jorge depois.",
       author: "@dev",
       targets: [{ agentId: "a1", handle: "jorge", name: "Jorge", role: null }],
     });
     expect(scores.get("a1")).toBeCloseTo(0.83);
+    expect(seen).toHaveLength(1);
     expect(seen[0]).toContain("@jorge");
+    expect(usage).toMatchObject([{ orgId: "o", provider: "typesafe", inputTokens: 50 }]);
   });
 });
 
 describe("short follow-ups without a mention", () => {
+  /** A router that hears "vocês" as for every agent, and anything else as for Dev only. */
   const scoreAll: RouterStrategy = {
     name: "fixed",
     async decide(input) {
+      const everyone = input.message.body.includes("vocês");
       return {
-        agents: input.candidates.map((c) => ({ agentId: c.agentId, score: 0.9 })),
+        agents: input.candidates.map((c) => ({
+          agentId: c.agentId,
+          score: everyone || c.handle === "dev" ? 0.9 : 0.2,
+        })),
         needsAgent: 0.9,
         reason: "t",
       };
@@ -111,7 +144,7 @@ describe("short follow-ups without a mention", () => {
   };
   const policy = { minScore: 0.5, maxAgents: 2, maxHops: 3 };
 
-  test("go only to the agent the person last talked to, unless they address several", async () => {
+  test("go only to the agent the person last talked to, unless the router hears several", async () => {
     f = await setup({ reply: () => ({ chunks: ["Deploy feito."] }) });
     const qa = await addQa();
     await post("@dev status do deploy?");
@@ -131,19 +164,13 @@ describe("short follow-ups without a mention", () => {
     expect(several.runs.map((r) => r.agentId).sort()).toEqual([f.agent.id, qa.id].sort());
   });
 
-  test("helpers", () => {
+  test("a short follow-up is judged by length and mentions, not by words", () => {
     expect(isShortFollowUp("e aí?")).toBe(true);
+    expect(isShortFollowUp("and now?")).toBe(true);
     expect(isShortFollowUp("@qa e agora?")).toBe(false);
     expect(isShortFollowUp("preciso que alguém revise todo o fluxo de pagamento antes da release de sexta")).toBe(
       false,
     );
-    const agents = [
-      { name: "Theo", handle: "theo" },
-      { name: "Jorge", handle: "jorge" },
-    ];
-    expect(addressesSeveral("theo e jorge, e agora?", agents)).toBe(true);
-    expect(addressesSeveral("e agora, theo?", agents)).toBe(false);
-    expect(addressesSeveral("e agora, pessoal, todos prontos?", agents)).toBe(true);
   });
 });
 
@@ -161,27 +188,13 @@ test("an agent knows what the other agents here can do and points to them", asyn
   expect(prompt).not.toMatch(/Dev \(@dev, [^)]*\):/); // not itself
 });
 
-describe("Jev judges every agent-to-agent mention (the 20:35 loop)", () => {
-  /** Fake TypeSafe: mention judgements by the mentioned agent's handle; routing questions answered low. */
-  function fakeJev(asks: Record<string, number>) {
-    const requests: Record<string, unknown>[] = [];
-    const fetcher = (async (_url: string, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body)) as {
-        questions: Record<string, { instructions: { agent?: { handle: string } } }>;
-      };
-      requests.push(body);
-      const answers: Record<string, unknown> = {};
-      for (const [key, q] of Object.entries(body.questions)) {
-        const noul = key.startsWith("asks_") ? (asks[q.instructions.agent?.handle ?? ""] ?? 0) : 0.1;
-        answers[key] = { type: "noul", noul };
-      }
-      return Response.json({ model: "jev-1", answers, usage: { input_tokens: 100, output_tokens: 5 } });
-    }) as unknown as typeof fetch;
-    return { fetcher, requests };
-  }
-
+describe("the judge decides every agent-to-agent mention (the 20:35 loop)", () => {
   test("a question to three agents gets one answer each and at most one hand-off; decisions are recorded", async () => {
+    // "fale com o @qa ou o @ops" names them; QA's "@ops você consegue…?" hands off to Ops.
+    const asks: Record<string, number> = { "@ops": 0.9, "@qa": 0.2, "@dev": 0.2 };
     f = await setup({
+      judge: (kind, _id, state, q) =>
+        kind !== "mention_handoff" || messageText(state).includes("fale com") ? 0.1 : (asks[askedHandle(q)] ?? 0),
       reply: (req) => {
         const system = systemText(req.system);
         const last = JSON.stringify(req.messages.at(-1)?.content);
@@ -204,16 +217,7 @@ describe("Jev judges every agent-to-agent mention (the 20:35 loop)", () => {
       { model: "claude-sonnet-5-5" },
     );
     await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ops.id });
-    const jev = fakeJev({ "@ops": 0.9, "@qa": 0.2, "@dev": 0.2 });
-    const handlers = createJobHandlers({
-      ...f.jobDeps,
-      router: {
-        enabled: true,
-        model: "claude-haiku-5-5",
-        jev: { apiKey: "tk", fetch: jev.fetcher },
-        mentionThreshold: 0.6,
-      },
-    });
+    const handlers = f.handlers;
 
     // A person's @mentions always start the mentioned agents.
     await post("@dev @qa @ops quem consegue ver os logs de produção?");
@@ -225,15 +229,12 @@ describe("Jev judges every agent-to-agent mention (the 20:35 loop)", () => {
     expect(runs.filter((r) => r.hop >= 3)).toEqual([]);
 
     const decisions = await f.db.select().from(schema.routingDecisions);
-    const strategies = decisions.map((d) => d.strategy).sort();
-    expect(strategies).toContain("mention-rules"); // Dev's "fale com o @qa ou o @ops": references, no Jev call
-    expect(strategies.filter((s) => s === "jev-mention").length).toBeGreaterThanOrEqual(2);
-    expect(
-      decisions.find((d) => d.strategy === "jev-mention" && d.selectedAgentIds.length === 1)?.selectedAgentIds,
-    ).toEqual([ops.id]);
+    const judged = decisions.filter((d) => d.strategy === "mention-fake");
+    expect(judged.length).toBeGreaterThanOrEqual(2);
+    expect(judged.find((d) => d.selectedAgentIds.length === 1)?.selectedAgentIds).toEqual([ops.id]);
   });
 
-  test("without Jev only explicit requests hand off", async () => {
+  test("when the judge doesn't hear a hand-off, a mention alone starts nobody", async () => {
     f = await setup({
       reply: (req) =>
         systemText(req.system).includes("You are Dev (@dev)")
@@ -245,6 +246,6 @@ describe("Jev judges every agent-to-agent mention (the 20:35 loop)", () => {
     await drainOutbox(f.db, f.handlers);
     expect((await f.db.select().from(schema.agentRuns)).map((r) => r.hop)).toEqual([1]);
     const [decision] = await f.db.select().from(schema.routingDecisions);
-    expect(decision).toMatchObject({ strategy: "mention-rules", selectedAgentIds: [] });
+    expect(decision).toMatchObject({ strategy: "mention-fake", selectedAgentIds: [] });
   });
 });

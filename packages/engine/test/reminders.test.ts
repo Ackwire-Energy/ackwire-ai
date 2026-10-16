@@ -4,11 +4,15 @@ import { systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
   cancelReminder,
+  createFakeScheduleReader,
+  createLlmScheduleReader,
   drainOutbox,
   fireDueRoutines,
   listReminders,
   listRoutines,
+  momentFromFields,
   NotFoundError,
+  type OrgCall,
   openDm,
   parseWhen,
   postPersonMessage,
@@ -27,40 +31,99 @@ describe("one-off times", () => {
   // Thursday 2026-10-15, 12:00 in São Paulo.
   const now = new Date("2026-10-15T15:00:00Z");
   const sp = "America/Sao_Paulo";
+  // What the model would answer: a local date-time in the zone (or why there is none).
+  const reader = createFakeScheduleReader({
+    "amanhã às 9h": { at: "2026-10-16T09:00" },
+    "sexta às 15h": { at: "2026-10-16T15:00" },
+    "monday at 10:30am": { at: "2026-10-19T10:30" },
+    "lundi à 10h30": { at: "2026-10-19T10:30" },
+    "hoje às 10h": { at: "2026-10-15T10:00" },
+    "dia 31 de fevereiro às 9h": { at: "2027-02-31T09:00" },
+    "14/03 às 2h30": { at: "2027-03-14T02:30" },
+    amanhã: { error: "time_missing" },
+  });
+  const read = (text: string, timezone = sp) => parseWhen(reader, { orgId: "org", text, timezone, now });
+  const at = async (text: string, timezone = sp) => {
+    const r = await read(text, timezone);
+    return r.ok ? r.at.toISOString() : r.code;
+  };
 
-  test("amanhã às 9h in São Paulo is 12:00 UTC the next day, described in human terms", () => {
-    expect(parseWhen("amanhã às 9h", sp, now)).toEqual({
+  test("the reader's local time becomes the UTC moment, described in human terms", async () => {
+    expect(await read("amanhã às 9h")).toEqual({
       ok: true,
       at: new Date("2026-10-16T12:00:00Z"),
       timezone: sp,
       description: "tomorrow, Oct 16, at 09:00 (Brasília time)",
     });
+    // Any language: the model reads it, the code only converts it. Other days by weekday.
+    for (const text of ["monday at 10:30am", "lundi à 10h30"]) {
+      expect(await read(text)).toMatchObject({
+        ok: true,
+        at: new Date("2026-10-19T13:30:00Z"),
+        description: "Monday, Oct 19, at 10:30 (Brasília time)",
+      });
+    }
+    expect(await at("sexta às 15h")).toBe("2026-10-16T18:00:00.000Z");
+    // The same local time in another zone is another moment.
+    expect(await at("amanhã às 9h", "UTC")).toBe("2026-10-16T09:00:00.000Z");
   });
 
-  test("relative, weekdays, dates, ISO; the past and missing times are refused", () => {
-    const at = (text: string) => {
-      const r = parseWhen(text, sp, now);
-      return r.ok ? r.at.toISOString() : r.error;
-    };
-    expect(at("em 2 horas")).toBe("2026-10-15T17:00:00.000Z");
-    expect(at("daqui a 30 minutos")).toBe("2026-10-15T15:30:00.000Z");
-    expect(at("sexta às 15h")).toBe("2026-10-16T18:00:00.000Z");
-    expect(at("segunda às 10h30")).toBe("2026-10-19T13:30:00.000Z");
-    expect(at("20/10 às 9h")).toBe("2026-10-20T12:00:00.000Z");
-    expect(at("hoje às 18h")).toBe("2026-10-15T21:00:00.000Z");
-    expect(at("às 8h")).toBe("2026-10-16T11:00:00.000Z"); // already past today: tomorrow
-    expect(at("2026-10-16T09:00")).toBe("2026-10-16T12:00:00.000Z");
-    expect(at("2026-10-16T09:00:00Z")).toBe("2026-10-16T09:00:00.000Z");
-    expect(at("hoje às 10h")).toBe("That time has already passed.");
-    expect(at("amanhã")).toBe('The time of day is missing (for example, "at 9am").');
-    expect(at("quando der")).toContain("Couldn't tell when");
-    expect(parseWhen("quando der", sp, now)).toMatchObject({ ok: false, code: "when.unreadable" });
-    expect(parseWhen("hoje às 10h", sp, now)).toMatchObject({ ok: false, code: "when.past" });
-    // English input, English description; other days by weekday.
-    expect(parseWhen("monday at 10:30am", sp, now)).toMatchObject({
-      ok: true,
-      at: new Date("2026-10-19T13:30:00Z"),
-      description: "Monday, Oct 19, at 10:30 (Brasília time)",
+  test("ISO is read by code; the past, impossible dates, DST gaps and unreadable text are refused", async () => {
+    expect(await at("2026-10-16T09:00")).toBe("2026-10-16T12:00:00.000Z");
+    expect(await at("2026-10-16T09:00:00Z")).toBe("2026-10-16T09:00:00.000Z");
+    expect(await at("2026-10-15T09:00:00Z")).toBe("when.past");
+    expect(reader.calls.map((c) => c.text)).not.toContain("2026-10-16T09:00");
+    expect(await at("hoje às 10h")).toBe("when.past");
+    expect(await at("dia 31 de fevereiro às 9h")).toBe("when.unreadable");
+    // New York springs forward on 2027-03-14: 02:30 doesn't exist that day.
+    expect(await at("14/03 às 2h30", "America/New_York")).toBe("when.nonexistent");
+    expect(await read("amanhã")).toMatchObject({ ok: false, code: "when.time_missing" });
+    expect(await read("quando der")).toMatchObject({ ok: false, code: "when.unreadable" });
+    expect(await read("  ")).toMatchObject({ ok: false, code: "when.required" });
+    // Without a reader only ISO is read.
+    expect(await parseWhen(null, { orgId: "org", text: "amanhã às 9h", timezone: sp, now })).toMatchObject({
+      code: "when.unreadable",
+    });
+  });
+
+  test("the model's fields: relative minutes count from now, absolute ones are checked", () => {
+    expect(momentFromFields({ status: "ok", in_minutes: 120, local_date_time: "" }, sp, now)).toEqual({
+      localDateTime: "2026-10-15T14:00",
+    });
+    expect(momentFromFields({ status: "ok", in_minutes: 0, local_date_time: "2026-10-16T09:00" }, sp, now)).toEqual({
+      localDateTime: "2026-10-16T09:00",
+    });
+    expect(momentFromFields({ status: "ok", in_minutes: 0, local_date_time: "2026-10-16T25:00" }, sp, now)).toEqual({
+      error: "unreadable",
+    });
+    expect(momentFromFields({ status: "time_missing", in_minutes: 0, local_date_time: "" }, sp, now)).toEqual({
+      error: "time_missing",
+    });
+  });
+
+  test("the model reader asks the org's cheap model with today's date, weekday and time in the zone", async () => {
+    const requests: OrgCall[] = [];
+    const reader = createLlmScheduleReader({
+      gateway: {
+        complete: async (call) => {
+          requests.push(call);
+          return {
+            text: JSON.stringify({ status: "ok", in_minutes: 0, local_date_time: "2026-10-16T09:00" }),
+          } as never;
+        },
+      },
+      resolveModel: async () => "cheap-model",
+    });
+    expect(await reader.readMoment({ orgId: "org", text: "amanhã às 9h", timezone: sp, now })).toEqual({
+      localDateTime: "2026-10-16T09:00",
+    });
+    const [call] = requests;
+    expect(call).toMatchObject({ orgId: "org", model: "cheap-model", kind: "summary" });
+    expect(call?.outputSchema).toMatchObject({ type: "object", required: ["status", "in_minutes", "local_date_time"] });
+    const sent = JSON.parse(String(call?.messages[0]?.content));
+    expect(sent).toEqual({
+      now: { date: "2026-10-15", weekday: "Thursday", time: "12:00", timezone: sp },
+      when: "amanhã às 9h",
     });
   });
 });

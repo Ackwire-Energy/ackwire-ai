@@ -5,7 +5,8 @@ import {
   endRuleBefore,
   nextOccurrence,
   normalizeRule,
-  phraseToRule,
+  type RecurrenceFields,
+  recurrenceFromFields,
   ruleOccurrences,
   ruleToCron,
   type ScheduleRule,
@@ -147,30 +148,72 @@ describe("rules", () => {
     expect(() => normalizeRule({ freq: "weekly", byWeekday: ["2TU"], timezone: "UTC" })).toThrow();
   });
 
-  test("phrases become rules (what cron can't say, too)", () => {
-    const now = at("2026-10-15T12:00:00Z");
-    expect(phraseToRule("a cada 2 semanas na segunda e quarta às 9h", SP, now)).toMatchObject({
+  test("the model's fields become rules (what cron can't say, too); bad fields make none", () => {
+    const none: RecurrenceFields = {
+      kind: "recurring",
+      freq: "none",
+      interval: 1,
+      every_minutes: 0,
+      weekdays: [],
+      weekday_position: 0,
+      month_days: [],
+      months: [],
+      set_position: 0,
+      times: [],
+      until: "",
+      count: 0,
+      local_date_time: "",
+    };
+    const read = (fields: Partial<RecurrenceFields>) => {
+      const r = recurrenceFromFields({ ...none, ...fields }, SP);
+      return r?.type === "rule" ? r.rule : r;
+    };
+    // "a cada 2 semanas na segunda e quarta às 9h", in any language.
+    expect(read({ freq: "weekly", interval: 2, weekdays: ["MO", "WE"], times: [{ hour: 9, minute: 0 }] })).toEqual({
       freq: "weekly",
       interval: 2,
       byWeekday: ["MO", "WE"],
       times: ["09:00"],
+      timezone: SP,
     });
-    expect(phraseToRule("último dia útil do mês às 18h", SP, now)).toMatchObject({
+    // "último dia útil do mês às 18h".
+    const lastBusiness = read({
       freq: "monthly",
-      bySetPos: [-1],
-      byWeekday: ["MO", "TU", "WE", "TH", "FR"],
-      times: ["18:00"],
-    });
-    expect(phraseToRule("2ª terça do mês às 10h", SP, now)).toMatchObject({ freq: "monthly", byWeekday: ["2TU"] });
-    expect(phraseToRule("todo dia às 8h até 31/12", SP, now)).toMatchObject({
+      weekdays: ["MO", "TU", "WE", "TH", "FR"],
+      set_position: -1,
+      times: [{ hour: 18, minute: 0 }],
+    }) as ScheduleRule;
+    expect(lastBusiness).toMatchObject({ freq: "monthly", bySetPos: [-1], times: ["18:00"] });
+    expect(describeRule(normalizeRule(lastBusiness))).toBe(
+      "Every month, on the last business day, at 18:00 (Brasília time)",
+    );
+    // "2ª terça do mês às 10h": the position goes on the weekday; weekly rules don't take one.
+    expect(
+      read({ freq: "monthly", weekdays: ["TU"], weekday_position: 2, times: [{ hour: 10, minute: 0 }] }),
+    ).toMatchObject({ freq: "monthly", byWeekday: ["2TU"] });
+    expect(read({ freq: "weekly", weekdays: ["TU"], weekday_position: 2 })).toMatchObject({ byWeekday: ["TU"] });
+    // "todo dia às 8h até 31/12", "10 vezes"; hourly keeps only the minute.
+    expect(read({ freq: "daily", times: [{ hour: 8, minute: 0 }], until: "2026-12-31", count: 10 })).toMatchObject({
       freq: "daily",
       times: ["08:00"],
       until: "2026-12-31",
+      count: 10,
     });
-    expect(phraseToRule("dias úteis às 9h", SP, now)).toMatchObject({
-      freq: "weekly",
-      byWeekday: ["MO", "TU", "WE", "TH", "FR"],
+    expect(read({ freq: "hourly", times: [{ hour: 14, minute: 30 }] })).toMatchObject({ times: ["00:30"] });
+    expect(recurrenceFromFields({ ...none, every_minutes: 15 }, SP)).toEqual({ type: "minutes", every: 15 });
+    expect(recurrenceFromFields({ ...none, kind: "once", local_date_time: "2026-10-16T09:00" }, SP)).toEqual({
+      type: "once",
+      localDateTime: "2026-10-16T09:00",
     });
-    expect(phraseToRule("quando der vontade", SP, now)).toBeNull();
+    // Out of range or not a schedule: no rule.
+    expect(read({ freq: "daily", times: [{ hour: 24, minute: 0 }] })).toBeNull();
+    expect(read({ freq: "monthly", month_days: [32] })).toBeNull();
+    expect(read({ freq: "daily", interval: 0 })).toMatchObject({ interval: 1 });
+    expect(read({ freq: "daily", interval: 5000 })).toBeNull();
+    expect(read({ freq: "daily", until: "31/12" })).toBeNull();
+    expect(read({ freq: "none" })).toBeNull();
+    expect(read({ every_minutes: 90 })).toBeNull();
+    expect(read({ kind: "once", local_date_time: "amanhã" })).toBeNull();
+    expect(read({ kind: "unreadable" })).toBeNull();
   });
 });

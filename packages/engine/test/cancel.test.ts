@@ -231,15 +231,22 @@ describe("one active run per agent and conversation", () => {
     expect((await runOf())?.pendingMessageIds).toEqual([]);
   });
 
-  test('"para" while it works cancels the task instead of starting another', async () => {
+  test('a stop ("para", as the judge hears it) while it works cancels the task instead of starting another', async () => {
     let threadId = "";
     f = await setup({
+      judge: (kind, _id, state) => (kind === "stop_request" && state.message === "para" ? 0.95 : 0),
       toolSources: [
         slowTool(() =>
-          postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
-            body: "para",
-            threadId,
-          }),
+          postPersonMessage(
+            { db: f.db, pubsub: f.pubsub, judge: f.context.judge },
+            f.owner.id,
+            f.org.id,
+            f.general.id,
+            {
+              body: "para",
+              threadId,
+            },
+          ),
         ),
       ],
       reply: (_req: ModelRequest, call: number) =>

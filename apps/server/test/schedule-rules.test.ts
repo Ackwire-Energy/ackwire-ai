@@ -3,7 +3,11 @@ import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./h
 
 let t: TestServer;
 beforeEach(async () => {
-  t = await createTestServer({ reply: () => ({ chunks: ["ok"] }) });
+  t = await createTestServer({
+    reply: () => ({ chunks: ["ok"] }),
+    // What the model would answer for a one-off (a local date-time in the zone).
+    schedules: { "30 de dezembro de 2099 às 9h": { at: "2099-12-30T09:00" } },
+  });
 });
 afterEach(() => t.close());
 
@@ -32,6 +36,23 @@ test("period picker: phrase → rule → description, and a routine on a rule cr
   });
   expect(parsed.description).toStartWith("Every 2 weeks, Mon and Wed, at 09:00 (Brasília time)");
   expect(parsed.nextRuns).toHaveLength(5);
+
+  // A one-off fills the picker's "once"; a phrase the reader can't read is refused with a code.
+  const once = await (
+    await api("/routines/parse-rule", {
+      json: { phrase: "30 de dezembro de 2099 às 9h", timezone: "America/Sao_Paulo" },
+    })
+  ).json();
+  expect(once).toMatchObject({
+    ok: true,
+    rule: { freq: "once", start: "2099-12-30", times: ["09:00"], timezone: "America/Sao_Paulo" },
+    cron: null,
+    nextRuns: ["2099-12-30T12:00:00.000Z"],
+  });
+  expect(await (await api("/routines/parse-rule", { json: { phrase: "quando der vontade" } })).json()).toMatchObject({
+    ok: false,
+    code: "schedule.unreadable",
+  });
 
   const described = (await (
     await api("/routines/describe-rule", {

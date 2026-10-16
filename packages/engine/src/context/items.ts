@@ -14,6 +14,7 @@ import {
 import { getAgent } from "../agents";
 import { caches } from "../cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
+import { type Judge, triesToChangePermissions } from "../judge";
 import { can, requirePermission } from "../organizations";
 import { enqueueIndex, userVisibleChannels } from "../search";
 
@@ -39,26 +40,33 @@ const SECRET_PATTERNS = [
 /** Memories and context never carry credentials (docs/adr/0017). */
 export const looksLikeSecret = (text: string) => SECRET_PATTERNS.some((p) => p.test(text));
 
-const PERMISSION_PATTERNS = [
-  /\b(skip|bypass|ignore|without|no need for|don'?t (need|ask for))\b.{0,40}\b(approv\w*|permission\w*|review\w*|scope\w*)/i,
-  /\b(sem|dispens\w*|ignor\w*|pul\w*|n[ãa]o precis\w*( de)?)\b.{0,40}\b(aprova\w*|permiss\w*|revis\w*|escopo\w*)/i,
-  /\b(you are|agent is|está|esta) (allowed|authorized|autorizad\w*|liberad\w*) to\b/i,
-  /\b(grant|give|conced\w*|d[êe])\b.{0,30}\b(scope|escopo|permission|permiss[ãa]o|admin)/i,
-  /\b(always|sempre)\b.{0,30}\b(merge|deploy|rollback)\b.{0,30}\b(directly|direto|sem|without)/i,
-];
-
-/**
- * Text that tries to change what an agent may do. Permissions come only from
- * scopes and approvals in the database; such text is never stored as context.
- */
-export const touchesPermissions = (text: string) => PERMISSION_PATTERNS.some((p) => p.test(text));
-
-/** Refuses content that must never become context. */
+/** Refuses content that must never become context: credentials (by their format). */
 export function checkContent(text: string) {
   if (looksLikeSecret(text)) throw new ValidationError("This looks like a credential; it can't be stored as context");
-  if (touchesPermissions(text)) {
-    throw new ValidationError("Context can't change permissions or approvals; ask an admin to change scopes instead");
+}
+
+/**
+ * Refuses text that tries to change what agents may do (skip approvals, grant
+ * scopes, "you are authorized to…"), in any language: the judge decides.
+ * Permissions only ever come from scopes and approvals in the database, so
+ * this only keeps such text out of memory; if the judge is unavailable, the
+ * text is stored (it can't grant anything anyway).
+ */
+export async function checkPermissionText(judge: Judge | undefined, orgId: string, text: string) {
+  if (!judge || !text.trim()) return;
+  const changes = await triesToChangePermissions(judge, { orgId, text }).catch(() => false);
+  if (changes) {
+    throw new ValidationError(
+      "Context can't change permissions or approvals; ask an admin to change scopes instead",
+      "context.changes_permissions",
+    );
   }
+}
+
+/** Like `checkPermissionText`, as a yes/no (jobs skip such text instead of failing). */
+export async function changesPermissions(judge: Judge | undefined, orgId: string, text: string) {
+  if (!judge || !text.trim()) return false;
+  return triesToChangePermissions(judge, { orgId, text }).catch(() => false);
 }
 
 // ── Evidence ─────────────────────────────────────────────────────────────────
@@ -198,7 +206,9 @@ export type ConsolidateResult = {
  *   (a contradiction keeps history; nothing is deleted silently);
  * - otherwise → created.
  */
-export async function consolidateItem(db: Database, input: NewContextItem): Promise<ConsolidateResult> {
+/** `judge`: keeps text that tries to change permissions out (see `checkPermissionText`). */
+export async function consolidateItem(db: Database, input: NewContextItem, judge?: Judge): Promise<ConsolidateResult> {
+  await checkPermissionText(judge, input.orgId, `${input.title ?? ""}\n${input.content}`);
   const subjectKey = normalizeSubject(input.subject ?? input.title ?? input.content.slice(0, 120));
   return db.transaction(async (tx) => {
     const existing = await tx
@@ -305,9 +315,13 @@ export async function editContextItem(
   orgId: string,
   itemId: string,
   input: { content?: string; title?: string; pinned?: boolean; archived?: boolean },
+  judge?: Judge,
 ): Promise<ContextItem> {
   const item = await loadItem(db, orgId, itemId);
   await requireEdit(db, actorId, item);
+  if (input.content !== undefined && input.content !== item.content) {
+    await checkPermissionText(judge, orgId, `${input.title ?? item.title ?? ""}\n${input.content}`);
+  }
   let current = item;
   if (input.content !== undefined && input.content !== item.content) {
     current = await db.transaction((tx) =>
@@ -365,9 +379,11 @@ export async function addContextItemByPerson(
   actorId: string,
   orgId: string,
   input: { kind: ContextKind; content: string; title?: string; agentId?: string | null; pinned?: boolean },
+  judge?: Judge,
 ) {
   const fake = { orgId, agentId: input.agentId ?? null } as ContextItem;
   await requireEdit(db, actorId, fake);
+  await checkPermissionText(judge, orgId, `${input.title ?? ""}\n${input.content}`);
   if (input.agentId && !(await getAgent(db, orgId, input.agentId))) throw new NotFoundError("Agent not found");
   return db.transaction((tx) =>
     insertContextItem(tx, {

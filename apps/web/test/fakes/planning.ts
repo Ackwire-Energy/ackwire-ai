@@ -4,8 +4,9 @@
  * - Issues: `GET …/issues?q`, `GET …/issues/{number}`, `POST …/issues`, `PATCH …/issues/{id}`,
  *   `PUT …/issues/{id}/criteria/{criterionId} { done }`, `GET|POST …/issues/{id}/activity`,
  *   `POST …/issues/{id}/ask-agent { agentId }` (assigns, moves to "Em andamento", starts the run).
- * - Routines: `GET|POST …/routines`, `POST …/routines/parse-schedule { phrase }` → cron + description in the
- *   workspace time zone, `PATCH …/routines/{id} { active }`, `POST …/routines/{id}/run`, `GET …/routines/{id}/runs`.
+ * - Routines: `GET|POST …/routines`, `POST …/routines/parse-schedule|parse-rule { phrase }` → cron, rule and
+ *   description in the workspace time zone (phrases looked up in a table, standing in for the model),
+ *   `PATCH …/routines/{id} { active }`, `POST …/routines/{id}/run`, `GET …/routines/{id}/runs`.
  * - Calendar: `GET …/calendar?from&to` → events, routine runs, issue deadlines and agent proposals;
  *   `POST …/calendar/events`, `POST …/calendar/proposals/{id}/confirm|dismiss`.
  * Nothing runs: "Rodar agora" and "Pedir à Ada" only change local state. Seeded in development only.
@@ -24,10 +25,9 @@ import type {
   RuleInfo,
   ScheduleParse,
 } from "@/api/types";
-import { defaultRule, fromApiRule, phraseToRule, ruleToPhrase, toApiRule } from "@/lib/recurrence";
+import { fromApiRule } from "@/lib/recurrence";
 import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg } from "./context";
 
-const DAYS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 const DAY_LABEL = [
   "Todo domingo",
   "Toda segunda-feira",
@@ -37,37 +37,49 @@ const DAY_LABEL = [
   "Toda sexta-feira",
   "Todo sábado",
 ];
+const WEEKDAY_CODES = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+const WORKDAYS = ["MO", "TU", "WE", "TH", "FR"];
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** The mock's stand-in for the backend parser: a few Portuguese phrasings. */
+/**
+ * What the mock server's schedule reader answers for the phrases tests type:
+ * a lookup table standing in for the model (the browser never reads phrases).
+ */
+const PHRASES: Record<string, Omit<ApiRule, "timezone">> = {
+  "toda segunda às 9h": { freq: "weekly", byWeekday: ["MO"], times: ["09:00"] },
+  "dias úteis às 18h": { freq: "daily", byWeekday: WORKDAYS, times: ["18:00"] },
+  "dias úteis às 8h30": { freq: "daily", byWeekday: WORKDAYS, times: ["08:30"] },
+  "dia 1 às 8h": { freq: "monthly", byMonthDay: [1], times: ["08:00"] },
+};
+const UNREADABLE = "Não entendi. Tente “toda segunda às 9h” ou “dias úteis às 18h”.";
+
+const isWorkdays = (days: string[] | undefined) => days?.length === 5 && WORKDAYS.every((d) => days.includes(d));
+
+/** A rule's `m h dom * dow` (the mock's own cron, from the structure). */
+function cronOf(rule: Pick<ApiRule, "freq" | "byWeekday" | "byMonthDay" | "times">) {
+  const [h, m] = (rule.times?.[0] ?? "09:00").split(":").map(Number);
+  const days = rule.byWeekday ?? [];
+  const dow = isWorkdays(days) ? "1-5" : days.length ? days.map((d) => WEEKDAY_CODES.indexOf(d)).join(",") : "*";
+  const dom = rule.freq === "monthly" && rule.byMonthDay?.length ? String(rule.byMonthDay[0]) : "*";
+  return `${m} ${h} ${dom} * ${dow}`;
+}
+
+/** A rule's description, in Portuguese (the mock's own wording, from the structure). */
+function describeOf(rule: Pick<ApiRule, "freq" | "byWeekday" | "byMonthDay" | "times">) {
+  const at = `às ${rule.times?.[0] ?? "09:00"}`;
+  const days = rule.byWeekday ?? [];
+  if (isWorkdays(days)) return `De segunda a sexta, ${at}`;
+  if (days.length === 1) return `${DAY_LABEL[WEEKDAY_CODES.indexOf(days[0] as string)]}, ${at}`;
+  if (rule.freq === "monthly" && rule.byMonthDay?.length) return `Todo dia ${rule.byMonthDay[0]}, ${at}`;
+  return `Todos os dias, ${at}`;
+}
+
+/** The mock's `parse-schedule`: a phrase looked up in the table. */
 export function parseSchedulePhrase(phrase: string, timezone = "America/Sao_Paulo"): ScheduleParse {
-  const t = phrase.trim().toLowerCase();
-  if (!t) return { ok: false, error: "Escreva quando a rotina deve rodar." };
-  const hm = t.match(/(\d{1,2})\s*(?:h|:)\s*(\d{2})?/);
-  const hour = hm ? Number(hm[1]) : 9;
-  const minute = hm?.[2] ? Number(hm[2]) : 0;
-  if (hour > 23 || minute > 59) return { ok: false, error: "Horário inválido." };
-  const at = `${pad(hour)}:${pad(minute)}`;
-  const day = DAYS.findIndex((d) => t.includes(d));
-  const monthDay = t.match(/dia\s+(\d{1,2})\b/);
-  if (/dias? úteis|dia útil/.test(t)) {
-    return { ok: true, cron: `${minute} ${hour} * * 1-5`, description: `De segunda a sexta, às ${at}`, timezone };
-  }
-  if (day >= 0) {
-    return { ok: true, cron: `${minute} ${hour} * * ${day}`, description: `${DAY_LABEL[day]}, às ${at}`, timezone };
-  }
-  if (monthDay && Number(monthDay[1]) >= 1 && Number(monthDay[1]) <= 28) {
-    return {
-      ok: true,
-      cron: `${minute} ${hour} ${Number(monthDay[1])} * *`,
-      description: `Todo dia ${Number(monthDay[1])}, às ${at}`,
-      timezone,
-    };
-  }
-  if (/todo dia|todos os dias|diariamente/.test(t)) {
-    return { ok: true, cron: `${minute} ${hour} * * *`, description: `Todos os dias, às ${at}`, timezone };
-  }
-  return { ok: false, error: "Não entendi. Tente “toda segunda às 9h” ou “dias úteis às 18h”." };
+  const rule = PHRASES[phrase.trim().toLowerCase()];
+  if (!phrase.trim()) return { ok: false, error: "Escreva quando a rotina deve rodar." };
+  if (!rule) return { ok: false, error: UNREADABLE };
+  return { ok: true, cron: cronOf(rule), description: describeOf(rule), timezone };
 }
 
 /** Next time a `m h dom * dow` cron fires after `from` (local time). */
@@ -231,7 +243,15 @@ export function createMockPlanning(
     };
     const sched = (phrase: string) => {
       const p = parseSchedulePhrase(phrase) as Extract<ScheduleParse, { ok: true }>;
-      return { type: "schedule" as const, phrase, cron: p.cron, timezone: p.timezone, description: p.description };
+      const rule = { ...(PHRASES[phrase] as Omit<ApiRule, "timezone">), timezone: p.timezone };
+      return {
+        type: "schedule" as const,
+        phrase,
+        rule,
+        cron: p.cron,
+        timezone: p.timezone,
+        description: p.description,
+      };
     };
     const run = (mins: number, summary: string, status: RoutineRun["status"] = "ok"): RoutineRun => ({
       id: mockId("run"),
@@ -430,11 +450,10 @@ export function createMockPlanning(
       list: async (orgId) => clone((await store(orgId)).routines),
       parseSchedule: async (_orgId, phrase, timezone) => parseSchedulePhrase(phrase, timezone),
       parseRule: async (_orgId, phrase, timezone = "America/Sao_Paulo") => {
+        const rule = PHRASES[phrase.trim().toLowerCase()];
+        if (!rule) return { ok: false, error: UNREADABLE };
         const today = ctx.now();
-        const base = defaultRule(timezone, today);
-        const rule = phraseToRule(phrase, base);
-        if (!rule) return { ok: false, error: "Não entendi. Tente “toda segunda às 9h” ou “dias úteis às 18h”." };
-        return ruleInfo(toApiRule(rule), today);
+        return ruleInfo({ ...rule, timezone, start: localYmd(today), until: null, count: null }, today);
       },
       describeRule: async (_orgId, rule) => ruleInfo(rule, ctx.now()),
       create: async (orgId, input) => {
@@ -702,37 +721,41 @@ export function createMockPlanning(
   };
 }
 
-/** A schedule trigger from a phrase or a rule (the rule's phrase gives the mock its cron and description). */
+/** A schedule trigger from a phrase (looked up in the table) or a rule. */
 function scheduleOf(
   input: { type: "schedule"; phrase: string; timezone?: string } | { type: "schedule"; rule: ApiRule },
 ): Routine["trigger"] {
   if ("rule" in input) {
-    const rule = fromApiRule(input.rule, localYmd(new Date()));
-    const p = parseSchedulePhrase(ruleToPhrase(rule), rule.timezone);
     return {
       type: "schedule",
       phrase: null,
       rule: input.rule,
-      cron: p.ok ? p.cron : "0 9 * * *",
-      timezone: rule.timezone,
-      description: p.ok ? p.description : ruleToPhrase(rule),
+      cron: cronOf(input.rule),
+      timezone: input.rule.timezone,
+      description: describeOf(input.rule),
     };
   }
   const p = parseSchedulePhrase(input.phrase, input.timezone);
   if (!p.ok) throw new Error(p.error);
-  return { type: "schedule", phrase: input.phrase, cron: p.cron, timezone: p.timezone, description: p.description };
+  const rule = { ...(PHRASES[input.phrase.trim().toLowerCase()] as Omit<ApiRule, "timezone">), timezone: p.timezone };
+  return {
+    type: "schedule",
+    phrase: input.phrase,
+    rule,
+    cron: p.cron,
+    timezone: p.timezone,
+    description: p.description,
+  };
 }
 
 /** The mock's `parse-rule` / `describe-rule` answer. */
 function ruleInfo(api: ApiRule, now: Date): RuleInfo {
   const rule = fromApiRule(api, localYmd(now));
-  const phrase = ruleToPhrase(rule);
-  const p = parseSchedulePhrase(phrase, rule.timezone);
   return {
     ok: true,
     rule: api,
-    description: p.ok ? p.description : phrase,
-    cron: p.ok ? p.cron : "",
+    description: describeOf(api),
+    cron: cronOf(api),
     nextRuns: nextOccurrences(rule, now, 5).map((d) => d.toISOString()),
   };
 }

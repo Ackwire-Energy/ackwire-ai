@@ -17,7 +17,7 @@ import { getAgent } from "./agents";
 import type { ArtifactDeps } from "./artifacts";
 import { audienceError, audienceNotice, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
-import { type ContextDeps, resolveSummaryModel } from "./context/summaries";
+import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { nextCronTime, zonedTime } from "./cron";
 import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -38,7 +38,7 @@ import {
   type ScheduleRule,
 } from "./rrule";
 import { runErrorDetail } from "./runs";
-import { describeWhen, parseSchedule, phraseToRule, type ScheduleParse } from "./schedule";
+import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
 import { budgetPercent, monthStartUtc } from "./usage";
 
 const { routines, routineRuns, agentRuns, usageRecords, channelMembers, channels } = schema;
@@ -135,7 +135,7 @@ export interface RoutineDeps {
   pubsub: PubSub;
   /** Forum routines save their synthesis in the Drive. */
   artifacts?: ArtifactDeps;
-  /** For the model fallback of schedule parsing (`kind=summary`). */
+  /** Reads schedule phrases (`schedulesOf`: the org's cheap model, `kind=summary`). */
   context?: ContextDeps;
 }
 
@@ -353,25 +353,8 @@ async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
   });
 }
 
-/** The cheap model answers with a cron expression (fallback when the code can't parse the phrase). */
-function llmParser(deps: RoutineDeps, orgId: string) {
-  const context = deps.context;
-  if (!context) return undefined;
-  return async (phrase: string) => {
-    const result = await context.gateway.complete({
-      orgId,
-      kind: "summary",
-      model: await resolveSummaryModel(context, orgId),
-      system:
-        "Convert the schedule the person describes into a single 5-field cron expression (minute hour day month weekday). Answer with the expression only, or NONE.",
-      messages: [{ role: "user", content: phrase.slice(0, 300) }],
-      maxTokens: 30,
-      effort: "low",
-    });
-    const text = result.text.trim();
-    return text === "NONE" ? null : text;
-  };
-}
+/** The reader of schedule phrases; none without the context deps (then only cron expressions are read). */
+const readerOf = (deps: RoutineDeps) => (deps.context ? schedulesOf(deps.context) : null);
 
 const isTimeZone = (tz: string) => {
   try {
@@ -397,7 +380,7 @@ export async function routineTimezone(db: Database, actorId: string, orgId: stri
   return me?.timezone || settings.timezone || "UTC";
 }
 
-/** Natural language → cron in the creator's time zone (code first, then the cheap model). */
+/** A schedule phrase (any language) → cron and rule in the creator's time zone, read by the schedule reader. */
 export async function parseScheduleForOrg(
   deps: RoutineDeps,
   actorId: string,
@@ -406,7 +389,7 @@ export async function parseScheduleForOrg(
   timezone?: string | null,
 ): Promise<ScheduleParse> {
   const zone = await routineTimezone(deps.db, actorId, orgId, timezone);
-  return parseSchedule(phrase, { timezone: zone, llm: llmParser(deps, orgId) });
+  return parseSchedule(readerOf(deps), { orgId, phrase, timezone: zone });
 }
 
 const budgetNano = (usd: number | null | undefined) => {
@@ -440,40 +423,37 @@ async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string,
   if (trigger.type === "schedule") {
     const now = new Date();
     const phrase = trigger.phrase?.trim() ?? "";
-    // A rule from the picker, or the phrase read as a rule when it can be (it says more than cron).
     const zone = await routineTimezone(deps.db, actorId, orgId, trigger.rule?.timezone ?? trigger.timezone);
-    const asRule = trigger.rule
-      ? ({ ...trigger.rule, timezone: zone } as ScheduleRule)
-      : phrase
-        ? phraseToRule(phrase, zone, now)
-        : null;
-    if (!asRule && !phrase) throw new ValidationError("Say when the routine should run", "routine.schedule_required");
-    if (asRule) {
-      const rule = normalizeRule(asRule, now);
-      const next = nextOccurrence(rule, now);
-      if (!next) throw new ValidationError("This schedule never happens (or the series ended)", "schedule.never");
+    if (!trigger.rule && !phrase)
+      throw new ValidationError("Say when the routine should run", "routine.schedule_required");
+    // A rule from the picker as it is; a phrase read by the schedule reader (a rule, a cron, or a one-off).
+    const reading = trigger.rule ? null : await readSchedule(readerOf(deps), { orgId, phrase, timezone: zone, now });
+    if (reading && !reading.ok) throw new ValidationError(reading.error, reading.code, reading.params);
+    if (reading?.type === "once") {
+      return resolveTrigger(deps, actorId, orgId, { type: "once", at: reading.at.toISOString(), timezone: zone });
+    }
+    if (reading?.type === "cron") {
       return {
         ...none,
         triggerType: "schedule",
-        phrase: phrase || null,
-        cron: ruleToCron(rule),
-        timezone: rule.timezone,
-        description: describeRule(rule),
-        rule: rule as unknown as Record<string, unknown>,
-        nextRunAt: next as Date | null,
+        phrase,
+        cron: reading.cron,
+        timezone: zone,
+        description: reading.description,
+        nextRunAt: reading.next as Date | null,
       };
     }
-    const parsed = await parseScheduleForOrg(deps, actorId, orgId, phrase, zone);
-    if (!parsed.ok) throw new ValidationError(parsed.error, parsed.code);
-    const next = nextCronTime(parsed.cron, parsed.timezone, now);
-    if (!next) throw new ValidationError("This schedule never happens", "schedule.never");
+    const rule = reading ? reading.rule : normalizeRule({ ...trigger.rule, timezone: zone } as ScheduleRule, now);
+    const next = nextOccurrence(rule, now);
+    if (!next) throw new ValidationError("This schedule never happens (or the series ended)", "schedule.never");
     return {
       ...none,
       triggerType: "schedule",
-      phrase,
-      cron: parsed.cron,
-      timezone: parsed.timezone,
-      description: parsed.description,
+      phrase: phrase || null,
+      cron: ruleToCron(rule),
+      timezone: rule.timezone,
+      description: describeRule(rule),
+      rule: rule as unknown as Record<string, unknown>,
       nextRunAt: next as Date | null,
     };
   }

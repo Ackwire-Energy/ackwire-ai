@@ -3,10 +3,11 @@ import { and, asc, type Database, eq, inArray, schema, sql } from "@agenteschat/
 import { requireChannelAccess } from "../channels";
 import { NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent } from "../events";
+import type { Judge } from "../judge";
 import { getMessage } from "../messages";
 import { enqueue } from "../outbox";
 import type { Approval } from "../tools/gateway";
-import { type ConsolidateResult, consolidateItem, looksLikeSecret, touchesPermissions } from "./items";
+import { type ConsolidateResult, changesPermissions, consolidateItem, looksLikeSecret } from "./items";
 import { recordOutcome } from "./outcomes";
 import { proposeFromItem } from "./proposals";
 
@@ -19,7 +20,7 @@ const excerpt = (t: string, n = 120) => (t.length > n ? `${t.slice(0, n - 1)}…
  * an outcome. Verified: a person decided. Called after the decision commits.
  */
 export async function learnFromRefusal(
-  deps: { db: Database; pubsub?: PubSub },
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge },
   approval: Approval,
 ): Promise<ConsolidateResult | null> {
   if (approval.status !== "refused") return null;
@@ -35,7 +36,8 @@ export async function learnFromRefusal(
     threadRootId: approval.threadRootId,
   });
   const reason = approval.reason?.trim();
-  if (reason && (looksLikeSecret(reason) || touchesPermissions(reason))) return null;
+  if (reason && (looksLikeSecret(reason) || (await changesPermissions(deps.judge, approval.orgId, reason))))
+    return null;
   const at = new Date().toISOString();
   const res = await consolidateItem(deps.db, {
     orgId: approval.orgId,
@@ -66,7 +68,7 @@ export async function learnFromRefusal(
  * sources.
  */
 export async function correctAgentMessage(
-  deps: { db: Database; pubsub?: PubSub },
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge },
   userId: string,
   orgId: string,
   messageId: string,
@@ -79,22 +81,26 @@ export async function correctAgentMessage(
     throw new ValidationError("Only agent replies can be corrected");
   const text = correction.trim();
   if (!text) throw new ValidationError("The correction is empty");
-  const res = await consolidateItem(deps.db, {
-    orgId,
-    kind: "lesson",
-    scopeType: "agent",
-    scopeId: message.authorAgentId,
-    agentId: message.authorAgentId,
-    subject: `correction ${excerpt(text, 80)}`,
-    content: `A person corrected "${excerpt(message.body)}": ${excerpt(text, 500)}`,
-    sourceIds: [message.id],
-    channelIds: [message.channelId],
-    trust: "high",
-    evidence: [{ type: "human", ref: `${message.id}:${userId}`, at: new Date().toISOString() }],
-    confidence: 0.85,
-    createdByKind: "person",
-    createdById: userId,
-  });
+  const res = await consolidateItem(
+    deps.db,
+    {
+      orgId,
+      kind: "lesson",
+      scopeType: "agent",
+      scopeId: message.authorAgentId,
+      agentId: message.authorAgentId,
+      subject: `correction ${excerpt(text, 80)}`,
+      content: `A person corrected "${excerpt(message.body)}": ${excerpt(text, 500)}`,
+      sourceIds: [message.id],
+      channelIds: [message.channelId],
+      trust: "high",
+      evidence: [{ type: "human", ref: `${message.id}:${userId}`, at: new Date().toISOString() }],
+      confidence: 0.85,
+      createdByKind: "person",
+      createdById: userId,
+    },
+    deps.judge,
+  );
   await proposeFromItem(deps, res.item);
   return res;
 }

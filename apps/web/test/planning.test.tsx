@@ -164,7 +164,7 @@ describe("Rotinas", () => {
     await go("routines");
     const weekly = screen().getByRole("article", { name: "Resumo da semana" });
     expect(weekly.textContent).toContain("entrega em #eng");
-    expect(weekly.textContent).toContain("Toda segunda-feira, às 09:00");
+    expect(weekly.textContent).toContain("Toda semana, seg, às 09:00");
     expect(weekly.textContent).toMatch(/Próxima: /);
     // No money on the cards; a routine without its own cap shows no percentage either.
     expect(weekly.textContent).not.toContain("US$");
@@ -335,11 +335,12 @@ describe("sidebar", () => {
 });
 
 describe("planning helpers", () => {
-  test("schedule phrases and next runs", () => {
+  test("the mock's schedule table and next runs", () => {
     expect(parseSchedulePhrase("toda segunda às 9h")).toMatchObject({ ok: true, cron: "0 9 * * 1" });
     expect(parseSchedulePhrase("dias úteis às 18h")).toMatchObject({ ok: true, cron: "0 18 * * 1-5" });
     expect(parseSchedulePhrase("dia 1 às 8h")).toMatchObject({ ok: true, cron: "0 8 1 * *" });
     expect(parseSchedulePhrase("")).toMatchObject({ ok: false });
+    expect(parseSchedulePhrase("quando der")).toMatchObject({ ok: false });
     const wed = new Date(2026, 9, 14, 12, 0);
     expect(nextCronRun("0 9 * * 1", wed)?.toDateString()).toBe(new Date(2026, 9, 19).toDateString());
     expect(nextCronRun("0 18 * * 1-5", wed)?.getHours()).toBe(18);

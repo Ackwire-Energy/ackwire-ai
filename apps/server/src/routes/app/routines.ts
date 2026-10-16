@@ -1,23 +1,25 @@
 import {
   canViewCost,
   createRoutine,
-  cronToRule,
   deleteRoutine,
   describeRule,
+  describeWhen,
   duplicateRoutine,
   listRoutineRuns,
   listRoutines,
+  localDateTimeOf,
   normalizeRule,
   parseScheduleForOrg,
-  phraseToRule,
   ROUTINE_EVENTS,
   type RoutineDeps,
+  readSchedule,
   requirePermission,
   routineTimezone,
   ruleOccurrences,
   ruleToCron,
   runRoutineNow,
   type ScheduleRule,
+  schedulesOf,
   updateRoutine,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -210,7 +212,7 @@ export function routineRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/routines/parse-schedule",
       tags,
       security,
-      summary: "Natural language → cron, in the person's time zone (or the one given)",
+      summary: "A schedule phrase (any language) → cron and rule, in the person's time zone (or the one given)",
       request: {
         params: OrgParams,
         body: body(
@@ -239,7 +241,12 @@ export function routineRoutes(deps: AppDeps) {
                 description: "The same schedule as a rule (for the picker), when it maps.",
               }),
             }),
-            z.object({ ok: z.literal(false), error: z.string(), code: z.string() }),
+            z.object({
+              ok: z.literal(false),
+              error: z.string(),
+              code: z.string(),
+              params: z.record(z.string(), z.unknown()).optional(),
+            }),
           ]),
         ),
         ...errors,
@@ -248,12 +255,7 @@ export function routineRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       const { phrase, timezone } = c.req.valid("json");
-      const parsed = await parseScheduleForOrg(routines, c.get("user").id, orgId, phrase, timezone);
-      if (!parsed.ok) return c.json(parsed, 200);
-      const asRule = cronToRule(parsed.cron, parsed.timezone);
-      const rule = asRule ? normalizeRule(asRule) : null;
-      const description = rule ? describeRule(rule) : parsed.description;
-      return c.json({ ...parsed, description, rule }, 200);
+      return c.json(await parseScheduleForOrg(routines, c.get("user").id, orgId, phrase, timezone), 200);
     },
   );
 
@@ -310,8 +312,27 @@ export function routineRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const { phrase, timezone } = c.req.valid("json");
       const zone = await routineTimezone(db, c.get("user").id, orgId, timezone);
-      const rule = phraseToRule(phrase, zone);
-      if (!rule) {
+      const reader = routines.context ? schedulesOf(routines.context) : null;
+      const reading = await readSchedule(reader, { orgId, phrase, timezone: zone });
+      if (!reading.ok) {
+        const { ok: _ok, ...rest } = reading;
+        return c.json({ ok: false as const, ...rest }, 200);
+      }
+      if (reading.type === "once") {
+        // The picker's "once": that day and time in the zone.
+        const local = localDateTimeOf(reading.at, zone);
+        return c.json(
+          {
+            ok: true as const,
+            rule: { freq: "once" as const, start: local.slice(0, 10), times: [local.slice(11)], timezone: zone },
+            description: describeWhen(reading.at, zone),
+            cron: null,
+            nextRuns: [reading.at.toISOString()],
+          },
+          200,
+        );
+      }
+      if (reading.type === "cron") {
         return c.json(
           {
             ok: false as const,
@@ -321,21 +342,7 @@ export function routineRoutes(deps: AppDeps) {
           200,
         );
       }
-      try {
-        return c.json(answer(rule), 200);
-      } catch (error) {
-        return c.json(
-          {
-            ok: false as const,
-            error: error instanceof Error ? error.message : String(error),
-            code: (error as { code?: string }).code ?? "schedule.invalid",
-            ...((error as { params?: Record<string, unknown> }).params
-              ? { params: (error as { params?: Record<string, unknown> }).params }
-              : {}),
-          },
-          200,
-        );
-      }
+      return c.json(answer(reading.rule), 200);
     },
   );
 

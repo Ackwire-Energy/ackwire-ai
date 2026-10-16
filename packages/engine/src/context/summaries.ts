@@ -1,8 +1,10 @@
 import type { PubSub, SearchIndexResolver } from "@agenteschat/adapters";
 import { and, asc, type Database, desc, eq, gte, inArray, isNull, lt, schema } from "@agenteschat/db";
 import type { ModelGateway } from "../gateway";
+import { createLlmJudge, type Judge } from "../judge";
 import type { Message } from "../messages";
 import { cheapModelForOrg } from "../router";
+import { createLlmScheduleReader, type ScheduleReader } from "../schedule-reader";
 import { type ContextItem, insertContextItem, supersede } from "./items";
 
 const { messages, users, agents, contextItems, organizationSettings } = schema;
@@ -17,6 +19,25 @@ export interface ContextDeps {
   cheapModels?: Record<string, string>;
   pubsub?: PubSub;
   reflect?: { maxPerThread?: number; everyMessages?: number; idleMinutes?: number };
+  /** Semantic yes/no and choice judgments (judge.ts); default: the org's cheap model. Tests pass a fake. */
+  judge?: Judge;
+  /** Reads schedules and moments people write (schedule-reader.ts); default: the org's cheap model. Tests pass a fake. */
+  schedules?: ScheduleReader;
+}
+
+/** The judge of these deps: the configured one (Jev with fallback), else the org's cheap model. */
+export function judgeOf(deps: ContextDeps): Judge {
+  return (
+    deps.judge ?? createLlmJudge({ gateway: deps.gateway, resolveModel: (orgId) => resolveSummaryModel(deps, orgId) })
+  );
+}
+
+/** The schedule reader of these deps: the configured one, else the org's cheap model. */
+export function schedulesOf(deps: ContextDeps): ScheduleReader {
+  return (
+    deps.schedules ??
+    createLlmScheduleReader({ gateway: deps.gateway, resolveModel: (orgId) => resolveSummaryModel(deps, orgId) })
+  );
 }
 
 export async function resolveSummaryModel(

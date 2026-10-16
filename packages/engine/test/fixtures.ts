@@ -25,6 +25,8 @@ import {
   createChatToolSource,
   createContextToolSource,
   createCredential,
+  createFakeJudge,
+  createFakeScheduleReader,
   createForumToolSource,
   createIssueToolSource,
   createJobHandlers,
@@ -37,10 +39,14 @@ import {
   createSkillToolSource,
   createToolGateway,
   createWikiToolSource,
+  type FakeScheduleAnswer,
+  type FakeScheduleAnswers,
+  localDateTimeOf,
   type MemberRole,
   type SandboxDeps,
   type StorageDeps,
   type ToolSource,
+  zonedParts,
 } from "../src";
 
 export const SECRET = "test-secret-".padEnd(48, "x");
@@ -56,6 +62,41 @@ export async function addMember(db: Database, orgId: string, role: MemberRole, n
   await db.insert(schema.organizationMembers).values({ orgId, userId: user.id, role });
   return user;
 }
+
+const WORKDAYS = ["MO", "TU", "WE", "TH", "FR"];
+/** "YYYY-MM-DDTHH:mm" `days` after today at `time`, in the question's zone (date math, not language). */
+const dayAt =
+  (days: number, time: string) =>
+  ({ timezone, now }: { timezone: string; now: Date }): FakeScheduleAnswer => {
+    const p = zonedParts(now, timezone);
+    const d = new Date(Date.UTC(p.year, p.month - 1, p.day + days));
+    return { at: `${d.toISOString().slice(0, 10)}T${time}` };
+  };
+/** `minutes` from now, in the question's zone. */
+const inMinutes =
+  (minutes: number) =>
+  ({ timezone, now }: { timezone: string; now: Date }): FakeScheduleAnswer => ({
+    at: localDateTimeOf(new Date(now.getTime() + minutes * 60_000), timezone),
+  });
+
+/**
+ * What the fake schedule reader answers for the phrases these tests write:
+ * a lookup table standing in for the model, not a parser.
+ */
+export const TEST_SCHEDULES: FakeScheduleAnswers = {
+  "todo dia às 8h": { rule: { freq: "daily", times: ["08:00"] } },
+  "todo dia às 9h": { rule: { freq: "daily", times: ["09:00"] } },
+  "todo dia às 18h": { rule: { freq: "daily", times: ["18:00"] } },
+  "dias úteis às 9h": { rule: { freq: "weekly", byWeekday: WORKDAYS, times: ["09:00"] } },
+  "toda segunda às 9h": { rule: { freq: "weekly", byWeekday: ["MO"], times: ["09:00"] } },
+  "toda segunda às 10h": { rule: { freq: "weekly", byWeekday: ["MO"], times: ["10:00"] } },
+  "toda sexta às 17h": { rule: { freq: "weekly", byWeekday: ["FR"], times: ["17:00"] } },
+  "a cada hora": { rule: { freq: "hourly", times: ["00:00"] } },
+  "amanhã às 9h": dayAt(1, "09:00"),
+  "amanhã às 10h": dayAt(1, "10:00"),
+  "em 2 horas": inMinutes(120),
+  amanhã: { error: "time_missing" },
+};
 
 /**
  * A fresh database with one organization (owner `ana`), its `general`
@@ -94,6 +135,10 @@ export async function setup(
     sandbox?: SandboxProvider;
     /** Add the sandbox tools with connected machines (a machine hub on this db; with or without `sandbox`). */
     machines?: boolean;
+    /** Answers of the fake judge (judge.ts): by judgment kind and question id. Default: every Noul 0. */
+    judge?: Parameters<typeof createFakeJudge>[0];
+    /** The fake schedule reader's table (phrase → answer), on top of `TEST_SCHEDULES`. */
+    schedules?: FakeScheduleAnswers;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -143,6 +188,8 @@ export async function setup(
     summaryModel: "claude-haiku-5-5",
     pubsub,
     reflect: { everyMessages: 1000, idleMinutes: 120, maxPerThread: 5 },
+    judge: createFakeJudge(options.judge),
+    schedules: createFakeScheduleReader({ ...TEST_SCHEDULES, ...options.schedules }),
   };
   // Platform storage in memory; org buckets on a fake S3 server at s3.example.com (DNS faked: public IP).
   const platformBlobs = createMemoryBlobStore();

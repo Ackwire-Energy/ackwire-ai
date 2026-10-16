@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
+  createFakeScheduleReader,
   createIssue,
   createRoutine,
   drainOutbox,
@@ -11,7 +12,7 @@ import {
   nextCronTime,
   parseSchedule,
   parseScheduleForOrg,
-  phraseToCron,
+  readSchedule,
   runRoutineNow,
   setRoutineActive,
   updateOrgSettings,
@@ -48,39 +49,65 @@ describe("cron in a time zone", () => {
     expect(iso(first)).toBe("2026-11-01T05:30:00.000Z");
     expect(iso(nextCronTime("30 1 * * *", "America/New_York", first as Date))).toBe("2026-11-02T06:30:00.000Z");
   });
+});
 
-  test("phrases in Portuguese and English become cron", () => {
-    const cases: [string, string][] = [
-      ["dias úteis às 9h", "0 9 * * 1-5"],
-      ["de segunda a sexta às 18h30", "30 18 * * 1-5"],
-      ["toda segunda às 10h", "0 10 * * 1"],
-      ["toda segunda e quarta às 9h", "0 9 * * 1,3"],
-      ["todo dia às 8h", "0 8 * * *"],
-      ["todo dia 1 às 8h", "0 8 1 * *"],
-      ["a cada 15 minutos", "*/15 * * * *"],
-      ["a cada hora", "0 * * * *"],
-      ["a cada 2 horas", "0 */2 * * *"],
-      ["sexta às 17h", "0 17 * * 5"],
-      ["every weekday at 9am", "0 9 * * 1-5"],
-      ["every monday at 5pm", "0 17 * * 1"],
-      ["0 7 * * 2", "0 7 * * 2"],
-    ];
-    for (const [phrase, cron] of cases) expect(phraseToCron(phrase)?.cron).toBe(cron);
-    expect(phraseToCron("quando der vontade")).toBeNull();
+describe("schedule phrases", () => {
+  // Thursday 2026-10-15, 12:00 in São Paulo.
+  const now = new Date("2026-10-15T15:00:00Z");
+  const sp = "America/Sao_Paulo";
+  // What the model would answer (structured fields), looked up by phrase.
+  const reader = createFakeScheduleReader({
+    "toda segunda e quarta às 9h": { rule: { freq: "weekly", byWeekday: ["MO", "WE"], times: ["09:00"] } },
+    "every weekday at 6:30pm": {
+      rule: { freq: "weekly", byWeekday: ["MO", "TU", "WE", "TH", "FR"], times: ["18:30"] },
+    },
+    "a cada 2 semanas na sexta": { rule: { freq: "weekly", interval: 2, byWeekday: ["FR"] } },
+    "a cada 15 minutos": { everyMinutes: 15 },
+    "todo 30 de fevereiro": { rule: { freq: "yearly", byMonth: [2], byMonthDay: [30] } },
+    "todo dia às 25h": { rule: { freq: "daily", times: ["25:00"] } },
+    "amanhã às 9h": { at: "2026-10-16T09:00" },
+  });
+  const parse = (phrase: string) => parseSchedule(reader, { orgId: "org", phrase, timezone: sp, now });
+
+  test("the reader's rule becomes cron (when cron can say it), the rule and an English description", async () => {
+    expect(await parse("toda segunda e quarta às 9h")).toEqual({
+      ok: true,
+      cron: "0 9 * * 1,3",
+      description: "Every week, Mon and Wed, at 09:00 (Brasília time)",
+      timezone: sp,
+      rule: expect.objectContaining({ freq: "weekly", byWeekday: ["MO", "WE"], times: ["09:00"], timezone: sp }),
+    });
+    expect(await parse("every weekday at 6:30pm")).toMatchObject({ ok: true, cron: "30 18 * * 1-5" });
+    // No time said: 09:00. Every 2 weeks is a rule only.
+    expect(await parse("a cada 2 semanas na sexta")).toMatchObject({
+      ok: true,
+      cron: "",
+      description: "Every 2 weeks, Fri, at 09:00 (Brasília time)",
+      rule: { freq: "weekly", interval: 2 },
+    });
+    expect(await parse("a cada 15 minutos")).toMatchObject({ ok: true, cron: "*/15 * * * *", rule: null });
   });
 
-  test("the model is the fallback for phrases the code doesn't get", async () => {
-    const parsed = await parseSchedule("na primeira hora útil da semana", {
-      timezone: "America/Sao_Paulo",
-      llm: async () => "0 8 * * 1",
-    });
-    expect(parsed).toEqual({
+  test("a cron expression is read by code; never-firing, invalid, one-off and unreadable phrases are refused", async () => {
+    const before = reader.calls.length;
+    expect(await parse("0 7 * * 2")).toMatchObject({ ok: true, cron: "0 7 * * 2", rule: { byWeekday: ["TU"] } });
+    expect(await parse("*/5 * * * *")).toMatchObject({ ok: true, cron: "*/5 * * * *", rule: null });
+    expect(reader.calls.length).toBe(before);
+    expect(await parse("todo 30 de fevereiro")).toMatchObject({ ok: false, code: "schedule.never" });
+    expect(await parse("todo dia às 25h")).toMatchObject({ ok: false, code: "schedule.invalid_time" });
+    expect(await parse("amanhã às 9h")).toMatchObject({ ok: false, code: "schedule.not_recurring" });
+    expect(await parse("quando der vontade")).toMatchObject({ ok: false, code: "schedule.unreadable" });
+    expect(await parse("")).toMatchObject({ ok: false, code: "routine.schedule_required" });
+    // A one-off phrase is a moment for a routine: tomorrow 09:00 in São Paulo.
+    expect(await readSchedule(reader, { orgId: "org", phrase: "amanhã às 9h", timezone: sp, now })).toMatchObject({
       ok: true,
-      cron: "0 8 * * 1",
-      description: "na primeira hora útil da semana",
-      timezone: "America/Sao_Paulo",
+      type: "once",
+      at: new Date("2026-10-16T12:00:00Z"),
     });
-    expect((await parseSchedule("quando der vontade", { timezone: "UTC" })).ok).toBe(false);
+    // Without a reader only cron is read.
+    expect(
+      await parseSchedule(null, { orgId: "org", phrase: "toda segunda e quarta às 9h", timezone: sp }),
+    ).toMatchObject({ ok: false, code: "schedule.unreadable" });
   });
 });
 

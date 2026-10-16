@@ -1,13 +1,13 @@
 import { and, type Database, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import {
   type ConsolidateResult,
+  changesPermissions,
   consolidateItem,
   type Evidence,
   insertContextItem,
   looksLikeSecret,
   normalizeSubject,
   supersede,
-  touchesPermissions,
 } from "./items";
 import { type Outcome, outcomesForThread } from "./outcomes";
 import { proposeFromItem } from "./proposals";
@@ -16,6 +16,7 @@ import {
   type ContextDeps,
   ensureThreadSummary,
   isTrustedMessage,
+  judgeOf,
   loadThread,
   resolveSummaryModel,
 } from "./summaries";
@@ -129,6 +130,7 @@ export async function reflectThread(
   const { db } = deps;
   const out: ReflectResult = { results: [], rejected: [], proposals: [] };
   const cfg = { ...REFLECT_DEFAULTS, ...deps.reflect };
+  const judge = judgeOf(deps);
   const thread = await loadThread(db, input.orgId, input.threadRootId);
   const last = thread?.messages.at(-1);
   if (!thread || !last) return { ...out, skipped: "missing" };
@@ -204,7 +206,7 @@ export async function reflectThread(
       out.rejected.push({ content: item.content, reason: "secret" });
       continue;
     }
-    if (touchesPermissions(item.content) || touchesPermissions(item.subject)) {
+    if (await changesPermissions(judge, input.orgId, `${item.subject}\n${item.content}`)) {
       out.rejected.push({ content: item.content, reason: "permissions" });
       continue;
     }
@@ -267,7 +269,8 @@ export async function reflectThread(
   }
 
   for (const entity of parsed.entities.slice(0, 20)) {
-    if (!entity.note.trim() || looksLikeSecret(entity.note) || touchesPermissions(entity.note)) continue;
+    if (!entity.note.trim() || looksLikeSecret(entity.note)) continue;
+    if (await changesPermissions(judge, input.orgId, entity.note)) continue;
     await refreshEntityProfile(db, {
       orgId: input.orgId,
       name: entity.name,

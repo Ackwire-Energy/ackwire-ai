@@ -4,9 +4,9 @@ import type { MemoryUpdate } from "../events";
 import { can, getMembership } from "../organizations";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
-import { type ContextItem, consolidateItem, getContextItems, supersede } from "./items";
+import { type ContextItem, checkPermissionText, consolidateItem, getContextItems, supersede } from "./items";
 import { proposeChange } from "./proposals";
-import { type ContextDeps, ensureThreadSummary } from "./summaries";
+import { type ContextDeps, ensureThreadSummary, judgeOf } from "./summaries";
 
 const { contextItems, messages, outcomes } = schema;
 
@@ -169,27 +169,31 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         if (!requester) return notRequested;
         try {
           const content = str(input.content);
-          const res = await consolidateItem(ctx.db, {
-            orgId: ctx.orgId,
-            kind: (["fact", "preference", "decision", "note"].includes(str(input.kind)) ? str(input.kind) : "fact") as
-              | "fact"
-              | "preference"
-              | "decision"
-              | "note",
-            scopeType: "agent",
-            scopeId: ctx.agentId,
-            agentId: ctx.agentId,
-            title: str(input.title),
-            subject: str(input.title) || content.slice(0, 120),
-            content,
-            sourceIds: [ctx.triggerMessageId],
-            channelIds: [ctx.channelId],
-            trust: "high",
-            evidence: [{ type: "human", ref: ctx.triggerMessageId, at: new Date().toISOString() }],
-            confidence: 0.95,
-            createdByKind: "person",
-            createdById: requester,
-          });
+          const res = await consolidateItem(
+            ctx.db,
+            {
+              orgId: ctx.orgId,
+              kind: (["fact", "preference", "decision", "note"].includes(str(input.kind)) ? str(input.kind) : "fact") as
+                | "fact"
+                | "preference"
+                | "decision"
+                | "note",
+              scopeType: "agent",
+              scopeId: ctx.agentId,
+              agentId: ctx.agentId,
+              title: str(input.title),
+              subject: str(input.title) || content.slice(0, 120),
+              content,
+              sourceIds: [ctx.triggerMessageId],
+              channelIds: [ctx.channelId],
+              trust: "high",
+              evidence: [{ type: "human", ref: ctx.triggerMessageId, at: new Date().toISOString() }],
+              confidence: 0.95,
+              createdByKind: "person",
+              createdById: requester,
+            },
+            judgeOf(deps),
+          );
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: res.item.id }).catch(() => {});
           return memoryResult(ctx, `Saved (${res.action}) as ${res.item.id}.`, {
             action: "remembered",
@@ -220,6 +224,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         const item = await changeableItem(ctx, str(input.item_id), requester);
         if (typeof item === "string") return { content: item, isError: true };
         try {
+          await checkPermissionText(judgeOf(deps), ctx.orgId, str(input.content));
           const next = await ctx.db.transaction((tx) =>
             supersede(tx, item, {
               orgId: ctx.orgId,

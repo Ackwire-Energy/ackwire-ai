@@ -1,124 +1,159 @@
 import { isValidCron, nextCronTime, zonedParts, zonedTime } from "./cron";
-import { cronToRule, type ScheduleRule, timezoneName } from "./rrule";
+import type { ErrorParams } from "./errors";
+import {
+  cronToRule,
+  describeRule,
+  nextOccurrence,
+  normalizeRule,
+  ruleToCron,
+  type ScheduleRule,
+  timezoneName,
+} from "./rrule";
+import { type ScheduleReader, splitLocalDateTime } from "./schedule-reader";
 
+/**
+ * Schedules and moments people write ("toda segunda às 9h", "amanhã às 9h",
+ * in any language) become rules and instants here. The words are read by a
+ * `ScheduleReader` (a model with structured output); this code only checks
+ * what it answered, converts local times to UTC and refuses the past or
+ * rules that never fire. A cron expression is accepted as it is (syntax).
+ */
 export type ScheduleParse =
-  | { ok: true; cron: string; description: string; timezone: string }
+  | {
+      ok: true;
+      /** Empty when only the rule can say it ("every 2 weeks"). */
+      cron: string;
+      description: string;
+      timezone: string;
+      /** The structured form; null for a cron that doesn't map to one. */
+      rule: ScheduleRule | null;
+    }
   /** `code` is stable (the app translates it); `error` is the English fallback. */
-  | { ok: false; error: string; code: string };
+  | { ok: false; error: string; code: string; params?: ErrorParams };
 
-const WEEKDAYS: [RegExp, number][] = [
-  [/\bdomingos?\b|\bsundays?\b/, 0],
-  [/\bsegundas?(-feira)?s?\b|\bmondays?\b/, 1],
-  [/\bter[cç]as?(-feira)?s?\b|\btuesdays?\b/, 2],
-  [/\bquartas?(-feira)?s?\b|\bwednesdays?\b/, 3],
-  [/\bquintas?(-feira)?s?\b|\bthursdays?\b/, 4],
-  [/\bsextas?(-feira)?s?\b|\bfridays?\b/, 5],
-  [/\bs[aá]bados?\b|\bsaturdays?\b/, 6],
-];
+/** A schedule phrase read: a rule, a cron rules can't hold, or a one-off moment. */
+export type ScheduleReading =
+  | { ok: true; type: "rule"; rule: ScheduleRule; cron: string | null; description: string; next: Date }
+  | { ok: true; type: "cron"; cron: string; description: string; next: Date }
+  | { ok: true; type: "once"; at: Date; description: string }
+  | { ok: false; error: string; code: string; params?: ErrorParams };
+
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const andList = (items: string[]) =>
-  items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
-
-const plain = (s: string) => s.toLowerCase().normalize("NFC").replace(/\s+/g, " ").trim();
-
-/** "às 9h", "9:30", "18h15", "9am", "at 5 pm", "meio-dia" → [hour, minute]. */
-function timeOf(text: string): [number, number] | null {
-  if (/meio[- ]dia|\bnoon\b/.test(text)) return [12, 0];
-  if (/meia[- ]noite|\bmidnight\b/.test(text)) return [0, 0];
-  const t = text.replace(/(a cada|every)\s+\d+\s*(minutos?|min|minutes?|horas?|hours?)/g, "");
-  const suffix = "(h|hs|horas?|am|pm|a\\.m\\.|p\\.m\\.)";
-  const m =
-    new RegExp(`(?:às|as|at|@)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*${suffix}?`).exec(t) ??
-    new RegExp(`(\\d{1,2})(?::|h)(\\d{2})\\s*${suffix}?`).exec(t) ??
-    new RegExp(`(\\d{1,2})()\\s*${suffix}(?![a-z])`).exec(t);
-  if (!m) return null;
-  let hour = Number(m[1]);
-  const minute = m[2] ? Number(m[2]) : 0;
-  const ampm = m[3] ?? "";
-  if (/^p/.test(ampm) && hour < 12) hour += 12;
-  if (/^a/.test(ampm) && hour === 12) hour = 0;
-  if (/(da|de) noite|à noite|da tarde/.test(t) && hour < 12) hour += 12;
-  if (hour > 23 || minute > 59) return null;
-  return [hour, minute];
-}
-
 const hhmm = ([h, m]: [number, number]) => `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 
-/** Natural language (pt-BR or English) → cron, by code, with an English description. Null when it can't tell. */
-export function phraseToCron(phrase: string): { cron: string; description: string } | null {
-  const text = plain(phrase);
-  if (isValidCron(text) && text.split(" ").length === 5) return { cron: text, description: `cron ${text}` };
+const UNREADABLE = {
+  ok: false as const,
+  error: 'Couldn\'t read the schedule. Try "weekdays at 9am".',
+  code: "schedule.unreadable",
+};
 
-  const every = /(?:a cada|every)\s+(\d+)?\s*(minutos?|min|minutes?|horas?|hours?)\b/.exec(text);
-  if (every) {
-    const n = Number(every[1] ?? 1);
-    const unit = every[2] ?? "";
-    if (/^min/.test(unit)) {
-      if (n < 1 || n > 59) return null;
-      return { cron: `*/${n} * * * *`, description: n === 1 ? "Every minute" : `Every ${n} minutes` };
-    }
-    if (n < 1 || n > 23) return null;
+/** A 5-field cron expression as typed (syntax, not language); null when it isn't one. */
+function asCron(text: string) {
+  const cron = text.trim().replace(/\s+/g, " ");
+  return cron.split(" ").length === 5 && isValidCron(cron) ? cron : null;
+}
+
+const failure = (error: unknown) => ({
+  ok: false as const,
+  error: error instanceof Error ? error.message : String(error),
+  code: (error as { code?: string }).code ?? "schedule.invalid",
+  ...((error as { params?: ErrorParams }).params ? { params: (error as { params?: ErrorParams }).params } : {}),
+});
+
+/** A rule checked (`normalizeRule`) and known to fire after `now`. */
+function ruleReading(input: ScheduleRule, now: Date): ScheduleReading {
+  let rule: ScheduleRule;
+  try {
+    rule = normalizeRule(input, now);
+  } catch (error) {
+    return failure(error);
+  }
+  const next = nextOccurrence(rule, now);
+  if (!next) return { ok: false, error: "This schedule never happens (or the series ended)", code: "schedule.never" };
+  return { ok: true, type: "rule", rule, cron: ruleToCron(rule), description: describeRule(rule), next };
+}
+
+/** The instant of a local "YYYY-MM-DDTHH:mm" in `timezone`, refused when invalid, skipped by DST or past. */
+function momentReading(
+  local: string,
+  timezone: string,
+  now: Date,
+): { ok: true; at: Date } | { ok: false; error: string; code: string } {
+  const parts = splitLocalDateTime(local);
+  if (!parts) {
     return {
-      cron: n === 1 ? "0 * * * *" : `0 */${n} * * *`,
-      description: n === 1 ? "Every hour" : `Every ${n} hours`,
+      ok: false,
+      error: 'Couldn\'t tell when. Try something like "tomorrow at 9am", "Friday at 3pm" or "in 2 hours".',
+      code: "when.unreadable",
     };
   }
-  if (/\b(de hora em hora|toda hora|every hour|hourly)\b/.test(text))
-    return { cron: "0 * * * *", description: "Every hour" };
-
-  const time = timeOf(text) ?? (/(manh[ãa]|morning)/.test(text) ? ([9, 0] as [number, number]) : null);
-  const at = time ?? ([9, 0] as [number, number]);
-
-  // Day of the month: "todo dia 1", "no dia 15 de cada mês", "every month on the 1st".
-  const monthDay = /(?:todo|no|cada)\s+dia\s+(\d{1,2})\b|(?:on the|day)\s+(\d{1,2})(?:st|nd|rd|th)?\b/.exec(text);
-  if (monthDay && /(m[eê]s|month|todo dia \d)/.test(text)) {
-    const day = Number(monthDay[1] ?? monthDay[2]);
-    if (day < 1 || day > 31) return null;
-    return { cron: `${at[1]} ${at[0]} ${day} * *`, description: `Every month on day ${day} at ${hhmm(at)}` };
-  }
-
-  if (/(dias [úu]teis|de segunda a sexta|weekdays|every weekday|monday to friday|seg(unda)? a sex(ta)?)/.test(text)) {
-    return { cron: `${at[1]} ${at[0]} * * 1-5`, description: `Weekdays at ${hhmm(at)}` };
-  }
-  if (/(fins? de semana|weekends?)/.test(text)) {
-    return { cron: `${at[1]} ${at[0]} * * 0,6`, description: `Weekends at ${hhmm(at)}` };
-  }
-
-  const days = WEEKDAYS.filter(([re]) => re.test(text)).map(([, d]) => d);
-  if (days.length > 0) {
-    const names = andList(days.map((d) => WEEKDAY_NAMES[d] ?? ""));
-    return { cron: `${at[1]} ${at[0]} * * ${days.join(",")}`, description: `Every ${names} at ${hhmm(at)}` };
-  }
-
-  if (/(todo dia|todos os dias|diariamente|every day|daily|cada dia)/.test(text) || time) {
-    return { cron: `${at[1]} ${at[0]} * * *`, description: `Every day at ${hhmm(at)}` };
-  }
-  return null;
+  const at = zonedTime(parts.year, parts.month, parts.day, parts.hour, parts.minute, timezone);
+  if (!at) return { ok: false, error: "That time doesn't exist in this time zone.", code: "when.nonexistent" };
+  if (at.getTime() <= now.getTime()) return { ok: false, error: "That time has already passed.", code: "when.past" };
+  return { ok: true, at };
 }
 
 /**
- * Parses a schedule phrase in the workspace time zone: by code first, then
- * (optional) a cheap model that answers with a cron expression.
+ * A schedule phrase in `timezone`: a cron expression as it is, else what the
+ * reader answers (a rule, or a one-off moment), checked here.
  */
+export async function readSchedule(
+  reader: ScheduleReader | null | undefined,
+  input: { orgId: string; phrase: string; timezone: string; now?: Date },
+): Promise<ScheduleReading> {
+  const now = input.now ?? new Date();
+  const phrase = input.phrase.trim();
+  if (!phrase) return { ok: false, error: "Say when the routine should run", code: "routine.schedule_required" };
+  const cron = asCron(phrase);
+  if (cron) {
+    const asRule = cronToRule(cron, input.timezone);
+    if (asRule) return ruleReading(asRule, now);
+    const next = nextCronTime(cron, input.timezone, now);
+    if (!next) return { ok: false, error: "This schedule never happens", code: "schedule.never" };
+    return { ok: true, type: "cron", cron, description: `cron ${cron} (${timezoneName(input.timezone)})`, next };
+  }
+  if (!reader) return UNREADABLE;
+  const reading = await reader
+    .readRecurrence({ orgId: input.orgId, phrase: phrase.slice(0, 300), timezone: input.timezone, now })
+    .catch(() => null);
+  if (!reading) return UNREADABLE;
+  if (reading.type === "minutes") {
+    const every = `*/${reading.every} * * * *`;
+    const next = nextCronTime(every, input.timezone, now);
+    if (!next) return { ok: false, error: "This schedule never happens", code: "schedule.never" };
+    const description = reading.every === 1 ? "Every minute" : `Every ${reading.every} minutes`;
+    return { ok: true, type: "cron", cron: every, description, next };
+  }
+  if (reading.type === "once") {
+    const moment = momentReading(reading.localDateTime, input.timezone, now);
+    if (!moment.ok) return moment;
+    return { ok: true, type: "once", at: moment.at, description: describeWhen(moment.at, input.timezone, now) };
+  }
+  return ruleReading({ ...reading.rule, timezone: input.timezone }, now);
+}
+
+/** A recurring schedule as cron (when cron can say it) and rule; a one-off is refused. */
 export async function parseSchedule(
-  phrase: string,
-  options: { timezone: string; llm?: (phrase: string) => Promise<string | null>; now?: Date },
+  reader: ScheduleReader | null | undefined,
+  input: { orgId: string; phrase: string; timezone: string; now?: Date },
 ): Promise<ScheduleParse> {
-  const trimmed = phrase.trim();
-  if (!trimmed) return { ok: false, error: "Say when the routine should run", code: "routine.schedule_required" };
-  let parsed = phraseToCron(trimmed);
-  if (!parsed && options.llm) {
-    const cron = (await options.llm(trimmed).catch(() => null))?.trim() ?? null;
-    if (cron && isValidCron(cron)) parsed = { cron, description: trimmed };
+  const reading = await readSchedule(reader, input);
+  if (!reading.ok) return reading;
+  if (reading.type === "once") {
+    return {
+      ok: false,
+      error: 'That is a single moment, not a schedule that repeats. Try "every Monday at 9am".',
+      code: "schedule.not_recurring",
+    };
   }
-  if (!parsed) {
-    return { ok: false, error: 'Couldn\'t read the schedule. Try "weekdays at 9am".', code: "schedule.unreadable" };
-  }
-  if (!nextCronTime(parsed.cron, options.timezone, options.now ?? new Date())) {
-    return { ok: false, error: "This schedule never happens", code: "schedule.never" };
-  }
-  return { ok: true, cron: parsed.cron, description: parsed.description, timezone: options.timezone };
+  return {
+    ok: true,
+    cron: reading.cron ?? "",
+    description: reading.description,
+    timezone: input.timezone,
+    rule: reading.type === "rule" ? reading.rule : null,
+  };
 }
 
 // ── One-off times ("amanhã às 9h") for reminders ─────────────────────────────
@@ -150,59 +185,43 @@ export function describeWhen(at: Date, timezone: string, now = new Date()) {
   return `${day}, ${date}, at ${hhmm([p.hour, p.minute])} (${timezoneName(timezone)})`;
 }
 
+const ISO = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/;
+
 /**
- * A one-off time in natural language (pt-BR or English) or ISO 8601, read in
- * `timezone`: "amanhã às 9h", "hoje 15:30", "em 2 horas", "daqui a 30
- * minutos", "sexta às 10h", "16/10 às 9h", "2026-10-16T09:00". Needs a time
- * of day unless it's relative; the past is refused.
+ * A one-off time in `timezone`: ISO 8601 as it is (with an offset or Z:
+ * exact; without: local wall time), else what the reader answers ("amanhã às
+ * 9h", "in 2 hours", "vendredi à 15h"). Needs a time of day; the past is refused.
  */
-export function parseWhen(input: string, timezone: string, now = new Date()): WhenParse {
-  const raw = input.trim();
+export async function parseWhen(
+  reader: ScheduleReader | null | undefined,
+  input: { orgId: string; text: string; timezone: string; now?: Date },
+): Promise<WhenParse> {
+  const now = input.now ?? new Date();
+  const raw = input.text.trim();
   if (!raw) return { ok: false, error: "Say when.", code: "when.required" };
-  const done = (at: Date | null): WhenParse => {
-    if (!at || Number.isNaN(at.getTime())) {
-      return { ok: false, error: "That time doesn't exist in this time zone.", code: "when.nonexistent" };
-    }
-    if (at.getTime() <= now.getTime()) return { ok: false, error: "That time has already passed.", code: "when.past" };
-    return { ok: true, at, timezone, description: describeWhen(at, timezone, now) };
-  };
-  // ISO with an offset or Z: exact. Without: local wall time in the zone.
-  const iso = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/.exec(raw);
+  const done = (moment: ReturnType<typeof momentReading>): WhenParse =>
+    moment.ok
+      ? { ok: true, at: moment.at, timezone: input.timezone, description: describeWhen(moment.at, input.timezone, now) }
+      : moment;
+  const iso = ISO.exec(raw);
   if (iso) {
-    if (iso[6]) return done(new Date(raw));
-    return done(zonedTime(Number(iso[1]), Number(iso[2]), Number(iso[3]), Number(iso[4]), Number(iso[5]), timezone));
-  }
-  const text = plain(raw);
-  const rel =
-    /(?:em|daqui a|daqui|in)\s+(\d+|um|uma|meia)\s*(minutos?|min|horas?|h|dias?|minutes?|hours?|days?)\b/.exec(text);
-  if (rel) {
-    const n = rel[1] === "um" || rel[1] === "uma" ? 1 : rel[1] === "meia" ? 0.5 : Number(rel[1]);
-    const unit = rel[2] ?? "";
-    const ms = /^(min)/.test(unit) ? 60_000 : /^(h)/.test(unit) ? 3_600_000 : 86_400_000;
-    return done(new Date(Math.round((now.getTime() + n * ms) / 60_000) * 60_000));
-  }
-  const time = timeOf(text);
-  const today = zonedParts(now, timezone);
-  let date: { year: number; month: number; day: number } | null = null;
-  const dm = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/.exec(text);
-  if (dm) {
-    const year = dm[3] ? Number(dm[3].length === 2 ? `20${dm[3]}` : dm[3]) : today.year;
-    date = { year, month: Number(dm[2]), day: Number(dm[1]) };
-    if (!dm[3] && (date.month < today.month || (date.month === today.month && date.day < today.day))) date.year++;
-  } else if (/depois de amanh[aã]|day after tomorrow/.test(text)) date = addDays(today.year, today.month, today.day, 2);
-  else if (/amanh[aã]|tomorrow/.test(text)) date = addDays(today.year, today.month, today.day, 1);
-  else if (/\bhoje\b|\btoday\b|\btonight\b|hoje à noite/.test(text)) date = { ...today };
-  else {
-    const wd = WEEKDAYS.find(([re]) => re.test(text));
-    if (wd) {
-      const current = weekdayOf(today.year, today.month, today.day);
-      let ahead = (wd[1] - current + 7) % 7;
-      if (ahead === 0) ahead = 7;
-      date = addDays(today.year, today.month, today.day, ahead);
+    if (iso[6]) {
+      const at = new Date(raw);
+      if (Number.isNaN(at.getTime()))
+        return { ok: false, error: "That time doesn't exist in this time zone.", code: "when.nonexistent" };
+      if (at.getTime() <= now.getTime())
+        return { ok: false, error: "That time has already passed.", code: "when.past" };
+      return done({ ok: true, at });
     }
+    return done(momentReading(`${iso[1]}-${iso[2]}-${iso[3]}T${iso[4]}:${iso[5]}`, input.timezone, now));
   }
-  if (!time) {
-    return date
+  const reading = reader
+    ? await reader
+        .readMoment({ orgId: input.orgId, text: raw.slice(0, 300), timezone: input.timezone, now })
+        .catch(() => ({ error: "unreadable" as const }))
+    : ({ error: "unreadable" } as const);
+  if ("error" in reading) {
+    return reading.error === "time_missing"
       ? { ok: false, error: 'The time of day is missing (for example, "at 9am").', code: "when.time_missing" }
       : {
           ok: false,
@@ -210,104 +229,5 @@ export function parseWhen(input: string, timezone: string, now = new Date()): Wh
           code: "when.unreadable",
         };
   }
-  if (!date) {
-    // Only a time: today if it's still ahead, else tomorrow.
-    date = { ...today };
-    const at = zonedTime(date.year, date.month, date.day, time[0], time[1], timezone);
-    if (!at || at.getTime() <= now.getTime()) date = addDays(today.year, today.month, today.day, 1);
-  }
-  return done(zonedTime(date.year, date.month, date.day, time[0], time[1], timezone));
-}
-
-// ── Phrase → structured rule (the period picker) ─────────────────────────────
-
-const RULE_DAYS = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
-// Word edges by hand: `\b` is ASCII-only in JS, so it never matches before "último".
-const W = "(?<![\\p{L}\\p{N}])";
-const E = "(?![\\p{L}\\p{N}])";
-const ordinal = (body: string, extra = "") => new RegExp(`${W}(${body})${E}${extra}`, "u");
-const ORDINALS: [RegExp, number][] = [
-  [ordinal("primeir[ao]|1[ºªa°o]?|first"), 1],
-  [ordinal("segund[ao]|2[ºªa°o]?|second", "(?!-feira)"), 2],
-  [ordinal("terceir[ao]|3[ºªa°o]?|third"), 3],
-  [ordinal("quart[ao]|4[ºªa°o]?|fourth", "(?!-feira)"), 4],
-  [ordinal("[úu]ltim[ao]|last"), -1],
-];
-
-/**
- * A schedule phrase as a structured rule, for the picker (and the way back:
- * `describeRule`). Understands what cron can't: "a cada 2 semanas na
- * segunda e quarta às 9h", "último dia útil do mês às 18h", "2ª terça do
- * mês", "até 31/12", "10 vezes". Falls back to the cron reading of the phrase.
- */
-export function phraseToRule(phrase: string, timezone: string, now = new Date()): ScheduleRule | null {
-  const text = plain(phrase);
-  const time = timeOf(text);
-  const times = time ? [hhmm(time)] : undefined;
-  const today = zonedParts(now, timezone);
-  const extras: Partial<ScheduleRule> = {};
-  const until = /\b(?:até|ate|until)\s+(?:o dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/.exec(text);
-  if (until) {
-    let year = until[3] ? Number(until[3].length === 2 ? `20${until[3]}` : until[3]) : today.year;
-    const month = Number(until[2]);
-    const day = Number(until[1]);
-    if (!until[3] && (month < today.month || (month === today.month && day < today.day))) year++;
-    extras.until = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  }
-  const count = /\b(\d+)\s*(?:vezes|times)\b/.exec(text);
-  if (count) extras.count = Number(count[1]);
-  const days = WEEKDAYS.filter(([re]) => re.test(text)).map(([, d]) => RULE_DAYS[d] as string);
-  const workdays = /(dias? [úu]teis|de segunda a sexta|weekdays?|business days?)/.test(text);
-  const interval =
-    /(?:a cada|every)\s+(\d+)\s*(dias?|semanas?|meses|m[eê]s|anos?|horas?|days?|weeks?|months?|years?|hours?)\b/.exec(
-      text,
-    );
-  const base = { timezone, ...(times ? { times } : {}), ...extras };
-  const n = interval ? Number(interval[1]) : 1;
-  const unit = interval?.[2] ?? "";
-
-  // "último dia útil do mês", "primeiro dia útil".
-  if (/dia [úu]til/.test(text) && /(m[eê]s|month)/.test(text)) {
-    const pos = ORDINALS.find(([re]) => re.test(text))?.[1] ?? 1;
-    return {
-      freq: "monthly",
-      interval: /mes|m[eê]s|month/.test(unit) ? n : 1,
-      byWeekday: ["MO", "TU", "WE", "TH", "FR"],
-      bySetPos: [pos],
-      ...base,
-    };
-  }
-  // "último dia do mês".
-  if (/[úu]ltimo dia (do|de cada) m[eê]s|last day of (the )?month/.test(text)) {
-    return { freq: "monthly", byMonthDay: [-1], ...base };
-  }
-  // "2ª terça do mês", "última sexta de cada mês".
-  if (days.length > 0 && /(do|de cada|of the|of every) m[eê]s|month/.test(text)) {
-    const pos = ORDINALS.find(([re]) => re.test(text))?.[1];
-    if (pos) return { freq: "monthly", byWeekday: days.map((d) => `${pos}${d}`), ...base };
-  }
-  // "dia 15 de cada mês", "todo dia 1".
-  const monthDay = /(?:todo|no|cada)\s+dia\s+(\d{1,2})\b|(?:on the|day)\s+(\d{1,2})(?:st|nd|rd|th)?\b/.exec(text);
-  if (monthDay && /(m[eê]s|month|todo dia \d)/.test(text)) {
-    return {
-      freq: "monthly",
-      interval: /mes|m[eê]s|month/.test(unit) ? n : 1,
-      byMonthDay: [Number(monthDay[1] ?? monthDay[2])],
-      ...base,
-    };
-  }
-  if (/^(semana|week)/.test(unit) || (days.length > 0 && interval)) {
-    return { freq: "weekly", interval: n, ...(days.length ? { byWeekday: days } : {}), ...base };
-  }
-  if (/^(dia|day)/.test(unit)) return { freq: "daily", interval: n, ...base };
-  if (/^(m[eê]s|meses|month)/.test(unit)) return { freq: "monthly", interval: n, ...base };
-  if (/^(ano|year)/.test(unit)) return { freq: "yearly", interval: n, ...base };
-  if (/^(hora|hour)/.test(unit))
-    return { freq: "hourly", interval: n, times: [`00:${time ? hhmm(time).slice(3) : "00"}`], ...extras, timezone };
-  if (workdays) return { freq: "weekly", byWeekday: ["MO", "TU", "WE", "TH", "FR"], ...base };
-  if (days.length > 0) return { freq: "weekly", byWeekday: days, ...base };
-  // Everything else: the cron reading, as a rule.
-  const cron = phraseToCron(phrase);
-  const fromCron = cron ? cronToRule(cron.cron, timezone) : null;
-  return fromCron ? { ...fromCron, ...extras } : null;
+  return done(momentReading(reading.localDateTime, input.timezone, now));
 }

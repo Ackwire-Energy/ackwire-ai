@@ -13,8 +13,11 @@ import {
 import { testConfig } from "@agenteschat/config";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
+  createFakeJudge,
+  createFakeScheduleReader,
   createLocalKeyWrapper,
   drainOutbox,
+  type FakeScheduleAnswers,
   type McpConnect,
   type ResolveHost,
   type ToolSource,
@@ -28,6 +31,15 @@ import { createMachineSockets } from "../src/realtime/machines";
 import { createRealtime, type SocketData } from "../src/realtime/ws";
 
 export const ORIGIN = "http://localhost:3000";
+
+const WORKDAYS = ["MO", "TU", "WE", "TH", "FR"];
+/** What the fake schedule reader answers for the phrases these tests write (a lookup table, not a parser). */
+export const TEST_SCHEDULES: FakeScheduleAnswers = {
+  "dias úteis às 9h": { rule: { freq: "weekly", byWeekday: WORKDAYS, times: ["09:00"] } },
+  "a cada 2 semanas na segunda e quarta às 9h": {
+    rule: { freq: "weekly", interval: 2, byWeekday: ["MO", "WE"], times: ["09:00"] },
+  },
+};
 
 /**
  * The whole server wired like `start.ts`, but on PGlite, in-memory adapters
@@ -51,6 +63,10 @@ export async function createTestServer(
     sandbox?: SandboxProvider;
     /** Fake GitHub (git smart HTTP and REST) for the git proxy. */
     github?: { gitUrl: string; apiUrl: string; fetch: typeof fetch };
+    /** Answers of the fake judge (judge.ts). Default: every Noul 0. */
+    judge?: Parameters<typeof createFakeJudge>[0];
+    /** The fake schedule reader's table (phrase → answer), on top of `TEST_SCHEDULES`. */
+    schedules?: FakeScheduleAnswers;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -85,6 +101,8 @@ export async function createTestServer(
     resolveHost: options.resolveHost,
     sandbox: options.sandbox ?? null,
     github: options.github,
+    judge: createFakeJudge(options.judge),
+    schedules: createFakeScheduleReader({ ...TEST_SCHEDULES, ...options.schedules }),
   });
   const { handlers } = engine;
   const auth = createAuth({ db, config, log, emailDelivers: true });

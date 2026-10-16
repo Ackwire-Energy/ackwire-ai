@@ -475,18 +475,14 @@ export async function routeMessage(
     return { runs: [], selected: [], seenBy: candidates.map((c) => c.agentId) };
   }
 
-  // A short follow-up without a mention ("e agora?") goes only to the agent the person was talking to,
-  // unless it clearly speaks to several.
-  const followUp =
-    continuityAgentId !== null && isShortFollowUp(message.body) && !addressesSeveral(message.body, candidates);
+  // The router's own pick; when it picks several agents, the message speaks to several.
+  const picked = selectAgents(candidates, result, deps.policy, { continuityAgentId });
+  // A short follow-up without a mention ("and now?") goes only to the agent the person was talking to,
+  // unless the router heard it as for several agents.
+  const followUp = continuityAgentId !== null && isShortFollowUp(message.body) && picked.length < 2;
   // Another agent already answered this in the thread: don't pile on with a second answer.
   const duplicate = !followUp && (result.alreadyAnswered ?? 0) >= ALREADY_ANSWERED_THRESHOLD;
-  const selected =
-    followUp && continuityAgentId
-      ? [continuityAgentId]
-      : duplicate
-        ? []
-        : selectAgents(candidates, result, deps.policy, { continuityAgentId });
+  const selected = followUp && continuityAgentId ? [continuityAgentId] : duplicate ? [] : picked;
   const runs = await db.transaction(async (tx) => {
     const [decision] = await tx
       .insert(routingDecisions)
@@ -522,22 +518,9 @@ export async function routeMessage(
   };
 }
 
-/** "e agora?", "e aí?", "pode seguir", "and now?": short, no mention. */
+/** A short message without a mention ("and now?"): by length only. */
 export function isShortFollowUp(body: string) {
   const text = body.trim();
   if (!text || text.includes("@")) return false;
   return text.length <= 60 && text.split(/\s+/).length <= 8;
-}
-
-/** "vocês", "todos", "ambos", or the names of two or more of the agents. */
-export function addressesSeveral(body: string, candidates: Pick<RoutingCandidate, "name" | "handle">[]) {
-  const text = body.toLowerCase();
-  if (/\b(voc[eê]s|todos|todas|ambos|ambas|cada um|everyone|both|all of you|you all)\b/.test(text)) return true;
-  const named = candidates.filter((c) => {
-    const names = [c.name.toLowerCase(), c.handle.toLowerCase()].filter((n) => n.length >= 2);
-    return names.some((n) =>
-      new RegExp(`(^|[^\\p{L}\\d])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\p{L}\\d]|$)`, "u").test(text),
-    );
-  });
-  return named.length >= 2;
 }

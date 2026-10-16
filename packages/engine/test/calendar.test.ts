@@ -108,7 +108,7 @@ describe("calendar", () => {
       title: "Entrega",
       dueDate: "2026-10-21",
     });
-    await createRoutine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+    await createRoutine({ db: f.db, pubsub: f.pubsub, context: f.context }, f.owner.id, f.org.id, {
       agentId: f.agent.id,
       prompt: "Resumo",
       target: { type: "channel", channelId: f.general.id },

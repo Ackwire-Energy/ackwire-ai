@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { nextOccurrences, type RecurrenceRule } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { createI18n } from "@/i18n";
-import { fromApiRule, phraseToRule, ruleSentence, ruleToPhrase, toApiRule, upcomingLabels } from "@/lib/recurrence";
+import { fromApiRule, ruleSentence, toApiRule, upcomingLabels } from "@/lib/recurrence";
 
 const i18n = createI18n("pt-BR");
 const t = i18n.t.bind(i18n) as TFunction;
@@ -73,7 +73,7 @@ describe("next occurrences", () => {
   });
 });
 
-describe("rule ⇄ sentence ⇄ phrase", () => {
+describe("rule ⇄ sentence ⇄ API", () => {
   const now = new Date(2026, 9, 15);
   test("the live sentence", () => {
     expect(ruleSentence(t, "pt-BR", { ...base, interval: 2, byWeekday: ["MO", "WE"], until: "2026-12-31" }, now)).toBe(
@@ -95,7 +95,7 @@ describe("rule ⇄ sentence ⇄ phrase", () => {
     );
   });
 
-  test("picker → phrase → picker gives the same rule", () => {
+  test("picker → API rule → picker gives the same rule (the rule is what's sent, never a phrase)", () => {
     const rules: RecurrenceRule[] = [
       { ...base, interval: 2, byWeekday: ["MO", "WE"] },
       { ...base, freq: "daily", byWeekday: ["MO", "TU", "WE", "TH", "FR"], times: ["08:30"] },
@@ -103,11 +103,7 @@ describe("rule ⇄ sentence ⇄ phrase", () => {
       { ...base, freq: "monthly", byWeekday: ["TU"], bySetPos: 2 },
       { ...base, freq: "daily", interval: 3 },
     ];
-    for (const r of rules) {
-      const back = phraseToRule(ruleToPhrase(r), base);
-      expect(back && toApiRule(back)).toEqual(toApiRule(r));
-    }
-    expect(phraseToRule("quando der", base)).toBeNull();
+    for (const r of rules) expect(toApiRule(fromApiRule(toApiRule(r), base.start))).toEqual(toApiRule(r));
   });
 
   test("the API's positions (2TU, -1FR) and byMonth", () => {

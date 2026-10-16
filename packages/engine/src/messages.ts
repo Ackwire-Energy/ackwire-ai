@@ -14,12 +14,14 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { getAgentCached } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
 import { audienceSql, notifyBlocked } from "./audience";
 import { cancelRun } from "./cancel";
 import { requireChannelAccess } from "./channels";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
+import { isStopRequest, type Judge } from "./judge";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
@@ -29,10 +31,6 @@ const { messages, agents, channelMembers, channels, agentRuns, outbox, agentQues
 export type Message = typeof messages.$inferSelect;
 
 export const MAX_MESSAGE_LENGTH = 40_000;
-
-/** A message that only says stop ("para", "pare", "cancela", "stop"…) cancels the agent's task in progress. */
-export const STOP_WORDS =
-  /^(@[a-z0-9_-]+\s+)?(para|pare|parar|para tudo|pode parar|cancela|cancele|cancelar|interrompe|interrompa|stop|cancel)[\s.!]*$/i;
 
 export interface MessageView {
   id: string;
@@ -405,7 +403,8 @@ export async function insertMessageWithRuns(
  * then the message is published to real-time subscribers.
  */
 export async function postPersonMessage(
-  deps: { db: Database; pubsub: PubSub },
+  /** `judge`: tells a plain "stop" from a correction while an agent works (none = never a stop). */
+  deps: { db: Database; pubsub: PubSub; judge?: Judge },
   userId: string,
   orgId: string,
   channelId: string,
@@ -475,9 +474,13 @@ export async function postPersonMessage(
     });
   }
   if (steered.length > 0) {
-    // Delivered to the agent's task in progress (it reads it at its next step); "para" stops it.
-    const stop = STOP_WORDS.test(message.body.trim());
+    // Delivered to the agent's task in progress (it reads it at its next step); a plain "stop",
+    // in any language, cancels it instead (the judge decides; short messages only).
     for (const s of steered) {
+      const agentName = (await getAgentCached(deps.db, orgId, s.agentId))?.name ?? "the agent";
+      const stop = deps.judge
+        ? await isStopRequest(deps.judge, { orgId, text: message.body, agentName }).catch(() => false)
+        : false;
       const [active] = await deps.db.select().from(agentRuns).where(eq(agentRuns.id, s.id));
       const threadId =
         active && !(channel.kind === "dm" && active.threadRootId === active.triggerMessageId)

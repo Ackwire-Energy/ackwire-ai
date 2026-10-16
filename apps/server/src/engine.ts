@@ -14,7 +14,9 @@ import {
   createForumToolSource,
   createGitToolSource,
   createIssueToolSource,
+  createJevJudge,
   createJobHandlers,
+  createLlmJudge,
   createMachineHub,
   createModelGateway,
   createSandboxToolSource,
@@ -23,14 +25,18 @@ import {
   createToolGateway,
   createWikiToolSource,
   type GitProxyDeps,
+  type Judge,
   type McpConnect,
   notifyOwnerOnBudget,
   queueBudgetEmail,
   type ResolveHost,
   type RunExecutorDeps,
+  resolveSummaryModel,
   type SandboxDeps,
+  type ScheduleReader,
   type StorageDeps,
   type ToolSource,
+  withJudgeFallback,
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
 
@@ -49,6 +55,10 @@ export interface EngineOptions {
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
   /** Tests: fake TypeSafe transport. */
   jevFetch?: typeof fetch;
+  /** Tests: a fake judge (no model calls for "is this a stop?" and the like). */
+  judge?: Judge;
+  /** Tests: a fake schedule reader (no model calls for "toda segunda às 9h" and the like). */
+  schedules?: ScheduleReader;
   /** Tests: fake S3 server and DNS for org buckets. */
   s3Fetch?: S3Fetch;
   resolveHost?: ResolveHost;
@@ -93,12 +103,30 @@ export function buildEngine(o: EngineOptions) {
     summaryModel: config.SUMMARY_MODEL,
     cheapModels: { openai: config.OPENAI_CHEAP_MODEL },
     pubsub: adapters.pubsub,
+    judge: o.judge,
+    schedules: o.schedules,
     reflect: {
       everyMessages: config.REFLECT_EVERY_MESSAGES,
       idleMinutes: config.REFLECT_IDLE_MINUTES,
       maxPerThread: config.REFLECT_MAX_PER_THREAD,
     },
   };
+  // Semantic judgments (stop requests, hand-offs, permission changes): Jev when its platform key is
+  // set, with the org's cheap model as fallback; the cheap model alone otherwise.
+  if (!context.judge) {
+    const llmJudge = createLlmJudge({ gateway, resolveModel: (orgId) => resolveSummaryModel(context, orgId) });
+    context.judge = config.TYPESAFE_API_KEY
+      ? withJudgeFallback(
+          createJevJudge({
+            apiKey: config.TYPESAFE_API_KEY,
+            gateway,
+            timeoutMs: config.JEV_TIMEOUT_MS,
+            fetch: o.jevFetch,
+          }),
+          llmJudge,
+        )
+      : llmJudge;
+  }
   const connectorDeps = {
     db,
     keyWrappers,

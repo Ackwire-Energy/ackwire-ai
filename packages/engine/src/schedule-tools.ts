@@ -1,5 +1,6 @@
 import { and, eq, isNull, schema, sql } from "@agenteschat/db";
 import { getChannelCached } from "./context";
+import { schedulesOf } from "./context/summaries";
 import {
   cancelReminder,
   createReminder,
@@ -130,7 +131,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "schedule_reminder",
       description:
-        'Schedule a one-off reminder in this conversation: at that time you post "Reminder: …" mentioning the person (the app shows it as a reminder in their language). `when` is natural language in the person\'s time zone, Portuguese or English ("amanhã às 9h", "sexta às 15h", "em 2 horas", "tomorrow at 9am", "in 2 hours") or ISO. Write `message` in the person\'s language. Set ask_agent when, at that time, you should do something (not just remind). If the time is ambiguous, ask with ask_user first.',
+        'Schedule a one-off reminder in this conversation: at that time you post "Reminder: …" mentioning the person (the app shows it as a reminder in their language). `when` is what the person said, in their words and language ("amanhã às 9h", "tomorrow at 9am", "in 2 hours"), read in their time zone, or ISO 8601. Write `message` in the person\'s language. Set ask_agent when, at that time, you should do something (not just remind). If the time is ambiguous, ask with ask_user first.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -148,7 +149,8 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           const requester = await requesterOf(ctx);
           if (!requester) return noRequester;
           const timezone = await routineTimezone(ctx.db, requester, ctx.orgId);
-          const when = parseWhen(str(input.when), timezone);
+          const reader = deps.context ? schedulesOf(deps.context) : null;
+          const when = await parseWhen(reader, { orgId: ctx.orgId, text: str(input.when), timezone });
           if (!when.ok) {
             return { content: `${when.error} Ask the person (ask_user) for a clear date and time.`, isError: true };
           }

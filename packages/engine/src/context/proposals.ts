@@ -5,8 +5,9 @@ import { caches } from "../cache";
 import { sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError } from "../errors";
 import { publishUserEvent } from "../events";
+import type { Judge } from "../judge";
 import { can, requirePermission } from "../organizations";
-import { type ContextItem, checkContent, consolidateItem } from "./items";
+import { type ContextItem, checkContent, checkPermissionText, consolidateItem } from "./items";
 
 const { contextProposals, contextItems, agents, organizations, organizationMembers } = schema;
 
@@ -184,7 +185,7 @@ export async function decideProposal(
   orgId: string,
   proposalId: string,
   decision: "accept" | "reject",
-  options: { finalText?: string } = {},
+  options: { finalText?: string; judge?: Judge } = {},
 ): Promise<Proposal> {
   const [p] = await db
     .select()
@@ -196,7 +197,10 @@ export async function decideProposal(
   if (p.status !== "pending") throw new ConflictError("This proposal was already decided");
   // A person may adjust the text before accepting; it still can't carry secrets or permission rules.
   const finalText = options.finalText ?? p.proposedText;
-  if (options.finalText !== undefined) checkContent(options.finalText);
+  if (options.finalText !== undefined) {
+    checkContent(options.finalText);
+    await checkPermissionText(options.judge, orgId, options.finalText);
+  }
   const decided = await db.transaction(async (tx) => {
     let status: Proposal["status"] = decision === "accept" ? "accepted" : "rejected";
     if (decision === "accept") {
@@ -271,7 +275,7 @@ async function recordRefusal(db: Database, actorId: string, p: Proposal) {
  * and whether the requester can accept it inline.
  */
 export async function proposeChange(
-  deps: { db: Database; pubsub?: PubSub },
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge },
   input: {
     orgId: string;
     agentId: string;
@@ -283,6 +287,7 @@ export async function proposeChange(
 ): Promise<{ proposal: Proposal; canDecide: boolean }> {
   const { db } = deps;
   checkContent(input.change);
+  await checkPermissionText(deps.judge, input.orgId, input.change);
   let current: string;
   if (input.target === "agent_instructions") {
     const agent = await getAgent(db, input.orgId, input.agentId);
