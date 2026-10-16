@@ -18,6 +18,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { agents, providerCredentials } from "./agents";
 import { machines } from "./machines";
+import { missions } from "./missions";
 import { organizations } from "./tenancy";
 
 export const outboxStatusEnum = pgEnum("outbox_status", ["pending", "processing", "done", "failed"]);
@@ -306,9 +307,11 @@ export const approvals = pgTable(
       .primaryKey()
       .$defaultFn(() => Bun.randomUUIDv7()),
     orgId: uuid().notNull(),
-    runId: uuid()
-      .notNull()
-      .references(() => agentRuns.id, { onDelete: "cascade" }),
+    /** The run that asked; null for a mission's executor asking through the `agentes` MCP server (ADR 0029). */
+    runId: uuid().references(() => agentRuns.id, { onDelete: "cascade" }),
+    /** Asked by a mission's executor (`request_approval`): the decision resumes that task's session, not a run. */
+    missionId: uuid(),
+    missionTaskId: uuid(),
     agentId: uuid().notNull(),
     channelId: uuid().notNull(),
     threadRootId: uuid().notNull(),
@@ -512,6 +515,8 @@ export const machineTasks = pgTable(
     runId: uuid().references(() => agentRuns.id, { onDelete: "set null" }),
     /** The person behind that run (who the agent works for); null for routines and other agents' chains. */
     requestedByUserId: text(),
+    /** A mission's task (its main session or an item's): its end goes to the mission, not to an agent run. */
+    missionId: uuid().references(() => missions.id, { onDelete: "set null" }),
     title: text().notNull(),
     /** `claude`, `codex` or `shell`. */
     executor: text().notNull(),
@@ -552,5 +557,6 @@ export const machineTasks = pgTable(
     index().on(t.machineId, t.status),
     index().on(t.orgId, t.agentId, t.createdAt),
     index().on(t.orgId, t.channelId, t.threadRootId),
+    index().on(t.missionId),
   ],
 );
