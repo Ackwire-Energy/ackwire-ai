@@ -3534,8 +3534,23 @@ a.forum-card__title::after {
   color: var(--faint);
   flex: none;
 }
+/* Title on top (two lines at most), when below on one line: a narrow pane never squeezes the time. */
 .wiki-nav__recent {
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+}
+.wiki-nav__recent-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.35;
+}
+.wiki-nav__recent-time {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
 }
 .wiki-nav__section,
 .wiki-aside__section {

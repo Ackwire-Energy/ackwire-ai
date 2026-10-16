@@ -190,8 +190,8 @@ function WikiNav({ pages, current }: { pages: WikiPageSummary[]; current?: strin
               params={{ orgId: org.id, slug: p.slug }}
               className="wiki-nav__recent"
             >
-              <span>{p.title}</span>
-              <span className="small muted">{relativeTime(t, i18n.language, p.updatedAt)}</span>
+              <span className="wiki-nav__recent-title">{p.title}</span>
+              <span className="wiki-nav__recent-time">{relativeTime(t, i18n.language, p.updatedAt)}</span>
             </Link>
           ))}
         </section>
