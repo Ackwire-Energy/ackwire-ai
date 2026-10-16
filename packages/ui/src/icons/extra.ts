@@ -252,6 +252,18 @@ export const extraIcons = {
     ["rect", { x: "3.5", y: "3.5", width: "13", height: "13", rx: "3.5" }],
     ["path", { d: "M7.5 7.5h.01M12.5 12.5h.01M12.5 7.5h.01M7.5 12.5h.01" }],
   ],
+  /** Missions: Claude Code works on the computer (a terminal prompt with a small spark). Our own glyph, no logo. */
+  executorClaude: [
+    ["rect", { x: "2.5", y: "5", width: "12.5", height: "11", rx: "2.5" }],
+    ["path", { d: "m5.5 9 2 1.6-2 1.6M9.5 13h2.5" }],
+    ["path", { d: "M16.5 1.8c.3 1.3.7 1.7 2 2-1.3.3-1.7.7-2 2-.3-1.3-.7-1.7-2-2 1.3-.3 1.7-.7 2-2z" }],
+  ],
+  /** Missions: Codex works on the computer (a terminal prompt with a small cube). Our own glyph, no logo. */
+  executorCodex: [
+    ["rect", { x: "2.5", y: "5", width: "12.5", height: "11", rx: "2.5" }],
+    ["path", { d: "m5.5 9 2 1.6-2 1.6M9.5 13h2.5" }],
+    ["path", { d: "M16.5 1.5 18.6 2.7v2.4l-2.1 1.2-2.1-1.2V2.7zM14.4 2.7l2.1 1.2 2.1-1.2M16.5 3.9v2.4" }],
+  ],
   /** NovoAgente.html: sensitive actions always ask for approval. */
   shield: [["path", { d: "M10 3 4 5.5v4.5c0 3.6 2.6 6.4 6 7 3.4-.6 6-3.4 6-7V5.5z" }]],
   /** NovoAgente.html: "Conectar outro app". */

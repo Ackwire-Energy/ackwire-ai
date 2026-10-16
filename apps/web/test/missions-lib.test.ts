@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { bodyTones, type PlanStripCell, planCellPixel, STRIP_CELL } from "@agenteschat/ui";
+import { bodyTones, iconNames, type PlanStripCell, planCellPixel, STRIP_CELL } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import type { MachineTask, Message, Mission } from "@/api/types";
 import { threadRootsToLoad } from "@/chat/timeline";
@@ -9,7 +9,9 @@ import {
   appendOutputLine,
   cellsFromCounts,
   editDiff,
+  executorIcon,
   executorName,
+  executorOnText,
   formatSpan,
   isOpenMission,
   machineTaskOf,
@@ -56,8 +58,9 @@ const mission = (over: Partial<Mission> = {}): Mission => ({
   status: "active",
   repoDir: "",
   resumeTasks: true,
+  commandApproval: "low_risk_auto",
   plan: { version: 1, done: 4, total: 12, waiting: 1, doing: 2, items: [] },
-  pending: { decisions: 2, provisional: 0, reviews: 1, suggestions: 0, joinRequests: 0 },
+  pending: { decisions: 2, provisional: 0, reviews: 1, suggestions: 0, joinRequests: 0, commands: 0 },
   joinRequested: false,
   runningTasks: 2,
   machine: {
@@ -191,6 +194,19 @@ describe("what waits for you", () => {
     expect(waitingText(t, mission())).toBe("2 decisões, 1 revisão");
     expect(waitingText(te, mission())).toBe("2 decisions, 1 review");
     expect(waitingParts(mission({ canAct: false }))).toEqual([]);
+  });
+
+  test("command cards count too ('Esperando você: 2 decisões, 1 revisão, 3 comandos')", () => {
+    const m = mission({
+      pending: { decisions: 2, provisional: 0, reviews: 1, suggestions: 0, joinRequests: 0, commands: 3 },
+    });
+    expect(waitingParts(m).at(-1)).toEqual({ key: "commands", count: 3 });
+    expect(waitingText(t, m)).toBe("2 decisões, 1 revisão, 3 comandos");
+    expect(waitingText(te, m)).toBe("2 decisions, 1 review, 3 commands");
+    const one = mission({
+      pending: { decisions: 0, provisional: 0, reviews: 0, suggestions: 0, joinRequests: 0, commands: 1 },
+    });
+    expect(waitingText(t, one)).toBe("1 comando");
   });
 
   test("the strip of a view: its plan items when sent, else the counts with what is in progress", () => {
@@ -474,5 +490,25 @@ describe("the mission link card", () => {
     });
     expect(missionLinkOf({ missionLink: { missionId: "m1" } })).toBeNull();
     expect(missionLinkOf({})).toBeNull();
+  });
+});
+
+describe("who programs, as a mark", () => {
+  test("Claude Code and Codex have their own icons; the agent uses its avatar (no icon)", () => {
+    expect(executorIcon("claude")).toBe("executorClaude");
+    expect(executorIcon("codex")).toBe("executorCodex");
+    expect(executorIcon("agent")).toBeNull();
+    expect(iconNames).toContain("executorClaude");
+    expect(iconNames).toContain("executorCodex");
+  });
+
+  test("'Claude Code no mac' (no 'via'), the agent's name when it works itself; options carry the mark", () => {
+    expect(executorOnText(t, "claude", "Ada", "mac")).toBe("Claude Code no mac");
+    expect(executorOnText(te, "codex", "Ada", "mac")).toBe("Codex on mac");
+    expect(executorOnText(t, "agent", "Ada", "mac")).toBe("Ada no mac");
+    expect(executorOnText(t, "claude", "Ada", null)).toBe("Claude Code");
+    const options = executorOptions(t, ["claude", "codex", "agent"], "Ada", "a1");
+    expect(options.map((o) => o.label)).toEqual(["Claude Code", "Codex (experimental)", "Ada (o próprio agente)"]);
+    expect(options.every((o) => o.leading)).toBe(true);
   });
 });

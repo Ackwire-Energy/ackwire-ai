@@ -10,16 +10,18 @@ import {
   Field,
   FilterBar,
   FilterChip,
+  FilterToggle,
   Icon,
   Input,
-  SearchInput,
+  SearchField,
   Segmented,
   Select,
   Textarea,
+  Toolbar,
   WorkSweep,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { type DragEvent, type MouseEvent, useDeferredValue, useEffect, useState } from "react";
+import { type DragEvent, type MouseEvent, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useIssueAction, useIssues } from "@/api/queries";
 import type { Issue, IssuePriority, IssueStatus } from "@/api/types";
@@ -68,6 +70,7 @@ export function IssuesPage() {
   const [openNumber, setOpenNumber] = useState<number | null>(null);
   const actorOptions = useActorFilterOptions();
   const copy = useFilterCopy();
+  const searchRef = useRef<HTMLInputElement>(null);
   const [creating, setCreating] = useState(false);
   const search = useDeferredValue(q.trim());
   const issues = useIssues(org.id, search);
@@ -99,7 +102,7 @@ export function IssuesPage() {
         setCreating(true);
       } else if (e.key === "/") {
         e.preventDefault();
-        document.querySelector<HTMLInputElement>(".issues-tools__search input")?.focus();
+        searchRef.current?.focus();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -128,31 +131,59 @@ export function IssuesPage() {
           </Button>
         </header>
         <WorkingNow issues={all} onOpen={toggle} />
-        <div className="issues-tools">
-          <SearchInput
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={t("issues.search")}
-            aria-label={t("issues.search")}
-            className="issues-tools__search"
-          />
+        <Toolbar
+          search={
+            <SearchField
+              ref={searchRef}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onClear={() => setQ("")}
+              clearLabel={copy.clearSearch}
+              placeholder={t("issues.search")}
+              aria-label={t("issues.search")}
+            />
+          }
+          actions={
+            <Segmented
+              label={t("issues.view")}
+              value={view}
+              onValueChange={setView}
+              options={[
+                {
+                  value: "board",
+                  label: (
+                    <>
+                      <Icon name="grid" size={16} />
+                      {t("issues.board")}
+                    </>
+                  ),
+                },
+                {
+                  value: "list",
+                  label: (
+                    <>
+                      <Icon name="list" size={16} />
+                      {t("issues.list")}
+                    </>
+                  ),
+                },
+              ]}
+            />
+          }
+        >
           {/* biome-ignore lint/a11y/useSemanticElements: filter pills */}
-          <div className="issues-pills" role="group" aria-label={t("issues.filters")}>
+          <span className="ac-filterbar" role="group" aria-label={t("issues.filters")}>
             {FILTERS.map((f) => (
-              <button
+              <FilterToggle
                 key={f}
-                type="button"
-                className="issues-pill"
-                aria-pressed={filter === f}
-                onClick={() => setFilter(f)}
+                pressed={filter === f}
+                onPressedChange={() => setFilter(f)}
+                count={all.filter((i) => isOpen(i) && pass(i, f)).length}
               >
                 {t(`issues.filter.${f}`)}
-                <span className="issues-pill__count" aria-hidden="true">
-                  {all.filter((i) => isOpen(i) && pass(i, f)).length}
-                </span>
-              </button>
+              </FilterToggle>
             ))}
-          </div>
+          </span>
           <FilterBar
             label={t("issues.moreFilters")}
             clearText={copy.clearAll}
@@ -200,32 +231,7 @@ export function IssuesPage() {
               },
             ]}
           />
-          <Segmented
-            label={t("issues.view")}
-            value={view}
-            onValueChange={setView}
-            options={[
-              {
-                value: "board",
-                label: (
-                  <>
-                    <Icon name="grid" size={16} />
-                    {t("issues.board")}
-                  </>
-                ),
-              },
-              {
-                value: "list",
-                label: (
-                  <>
-                    <Icon name="list" size={16} />
-                    {t("issues.list")}
-                  </>
-                ),
-              },
-            ]}
-          />
-        </div>
+        </Toolbar>
         {issues.isLoading &&
           (view === "board" ? (
             <div className="issues-board">

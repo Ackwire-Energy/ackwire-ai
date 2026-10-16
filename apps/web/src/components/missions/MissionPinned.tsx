@@ -1,4 +1,4 @@
-import { AvatarStack, Button, Icon, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
+import { AvatarStack, Button, Icon, Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,10 +10,11 @@ import {
   useMissionParticipants,
   useMissionPlan,
   useRequestJoin,
+  useSetCommandApproval,
   useThreadTasks,
 } from "@/api/missions";
 import { useMachines } from "@/api/queries";
-import type { Mission, MissionControl } from "@/api/types";
+import type { CommandApproval, Mission, MissionControl } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -28,7 +29,15 @@ import {
   planCellTitles,
 } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
-import { MachineChip, MissionStatusChip, MissionStrip, useElapsedNow, useMissionPanel } from "./MissionBits";
+import {
+  COMMAND_APPROVALS,
+  ExecutorChip,
+  MachineChip,
+  MissionStatusChip,
+  MissionStrip,
+  useElapsedNow,
+  useMissionPanel,
+} from "./MissionBits";
 import { CloseMissionDialog, ShareMissionDialog } from "./MissionDialogs";
 import { SessionRows } from "./MissionSessions";
 
@@ -49,6 +58,7 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
   const tasks = useThreadTasks(org.id, m.threadId);
   const people = useMissionParticipants(org.id, m.id);
   const control = useMissionControl(org.id);
+  const setApproval = useSetCommandApproval(org.id, m.id);
   const api = useApi();
   const approveAll = useMissionAct(org.id, m.id, () => api.missions.approveProvisional(org.id, m.id));
   const [dialog, setDialog] = useState<"share" | "close" | null>(null);
@@ -60,7 +70,7 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
   const cells = items ? planCells(items, { offline }) : missionCells(m, { offline });
   const sessions = missionTasks(tasks.data ?? [], m.id);
   const interrupted = sessions.filter((x) => x.status === "interrupted" && !x.endedAt).length;
-  const waiting = m.pending.decisions + m.pending.reviews + m.pending.provisional;
+  const waiting = m.pending.decisions + m.pending.reviews + m.pending.provisional + m.pending.commands;
   // Running: the live session rows when loaded (`machine.task` updates them at once), else the mission's count.
   const running = tasks.data ? sessions.filter((x) => x.status === "running").length : m.runningTasks;
   const agentName = dir.agentById.get(m.agentId)?.name ?? "";
@@ -89,6 +99,7 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
           <span className="mi-pinned__lab">{t("missions.pinned.lab")}</span>
           <b>{m.title}</b>
           <MissionStatusChip mission={m} />
+          {m.machine && <ExecutorChip mission={m} agentName={agentName} />}
         </span>
         {who.length > 0 && (
           <button
@@ -139,6 +150,26 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
               </MenuItem>
             )}
             {m.canAct && <MenuSeparator />}
+            {m.canAct && (
+              <>
+                <MenuRadioGroup
+                  label={t("missions.commandApproval.label")}
+                  value={m.commandApproval}
+                  onValueChange={(raw) => {
+                    const v = raw as CommandApproval;
+                    setApproval.mutate(v, {
+                      onSuccess: () =>
+                        toast.show(
+                          t("missions.commandApproval.changed", { value: t(`missions.commandApproval.${v}` as const) }),
+                        ),
+                      onError: (error) => toast.show(errorText(t, error), "error"),
+                    });
+                  }}
+                  options={COMMAND_APPROVALS.map((v) => ({ value: v, label: t(`missions.commandApproval.${v}`) }))}
+                />
+                <MenuSeparator />
+              </>
+            )}
             <MenuItem icon="members" onSelect={() => setDialog("share")}>
               {t("missions.actions.share")}
             </MenuItem>
@@ -187,7 +218,8 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
             {t("missions.pinned.since", { span: formatSpan(t, (now - Date.parse(since)) / 1000) })}
           </span>
         )}
-        {(offline || !m.machine) && <MachineChip machine={m.machine} />}
+        {/* The computer is in the executor chip; only a missing one gets its own. */}
+        {!m.machine && <MachineChip machine={m.machine} />}
         {open && m.canAct && m.pending.provisional > 0 && (
           <Button
             size="sm"
@@ -213,7 +245,7 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
       )}
       {sessions.length > 0 && (
         <div className="mi-pinned__sessions">
-          <SessionRows tasks={sessions} computer={m.machine?.name} defaultOpen={false} />
+          <SessionRows tasks={sessions} defaultOpen={false} />
         </div>
       )}
       <ShareMissionDialog mission={m} open={dialog === "share"} onOpenChange={(o) => setDialog(o ? "share" : null)} />

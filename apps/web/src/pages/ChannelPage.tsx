@@ -87,6 +87,8 @@ import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
 import { MissionPanelProvider } from "@/components/missions/MissionBits";
 import {
+  AutoApprovedLine,
+  groupAutoApproved,
   MissionDecisionCard,
   MissionEphemeral,
   MissionLinkCard,
@@ -420,7 +422,7 @@ function ChannelView({
   const [draft, setDraft] = useState(() => (draftKey ? (peekDraft(draftKey) ?? "") : ""));
   // Esc (composer empty, nothing open): asks to stop the most recent run here that I may stop
   // (the confirmation; Esc twice within 1.5 s stops directly).
-  const { canStop: mayStop, stop: stopRun } = useStopRun();
+  const { canStop: mayStop } = useStopRun();
   const draftRef = useRef("");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -436,8 +438,6 @@ function ChannelView({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-  // An agent working here: the composer says the message goes into its task.
-  const workingRun = useStreams((s) => scopedRuns(s).find((r) => isStoppable(r) && !r.stopping));
   // "Responder em thread": the next message goes to that thread.
   const [replyTo, setReplyTo] = useState<MessageType | null>(null);
   // "Responder": the next message quotes this one (`meta.replyTo`), in the same conversation.
@@ -1387,28 +1387,10 @@ function ChannelView({
                     {offer && (
                       <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />
                     )}
-                    {chrome?.composerNote && !workingRun && !chrome.locked && (
+                    {chrome?.composerNote && !chrome.locked && (
                       <p className="ac-composer__hint">{chrome.composerNote}</p>
                     )}
-                    {(workingRun || chrome?.locked) && (
-                      <p className="ac-composer__hint">
-                        {workingRun && !chrome?.locked ? (
-                          <span className="composer-working">
-                            {t("run.working", {
-                              name: dir.agentById.get(workingRun.agentId)?.name ?? t("channel.unknownAgent"),
-                            })}
-                            {mayStop(workingRun) && (
-                              <>
-                                {" · "}
-                                <StopButton run={workingRun} onStop={stopRun} place="composer" />
-                              </>
-                            )}
-                          </span>
-                        ) : (
-                          chrome?.locked
-                        )}
-                      </p>
-                    )}
+                    {chrome?.locked && <p className="ac-composer__hint">{chrome.locked}</p>}
                   </>
                 )}
               </div>
@@ -1480,17 +1462,33 @@ const Timeline = memo(function Timeline({
       ),
     [items],
   );
+  // Commands allowed without a card, a minute apart: one line for the run of them.
+  const autoApproved = useMemo(
+    () => groupAutoApproved(items.flatMap((i) => (i.kind === "message" ? [i.message] : []))),
+    [items],
+  );
   let afterLive = false;
   /** A closed thread is one line; the root of a thread made from a range is its marker (or stub). */
   const threadRow = (key: string, m: MessageType) => {
     // A mission's automatic lines (the plan changed, the computer went offline, a task ended): not a voice.
     if (missionPlanChangeOf(m.meta)) return <MissionPlanChangeLine key={key} message={m} />;
     if (taskNoticeOf(m.meta)) return <TaskNoticeLine key={key} message={m} />;
+    if (autoApproved.hidden.has(m.id)) return <Fragment key={key} />;
+    const autoGroup = autoApproved.groups.get(m.id);
+    if (autoGroup) return <AutoApprovedLine key={key} messages={autoGroup} />;
     if (!threadsView) return null;
     const info = threadsView.byId.get(m.id);
     if (info?.state === "closed") return <ClosedThreadLine key={key} thread={info} />;
     const start = threadStartOf(m.meta);
     if (start && !start.moved && linked.has(m.id)) return <Fragment key={key} />;
+    // A thread that has a mission (also ones proposed before the link card existed): the same mission card.
+    if (start && info?.mission) {
+      return (
+        <div key={key} className="mi-linkrow" data-message-id={m.id}>
+          <MissionLinkCard link={{ missionId: info.mission.id, threadId: m.id }} />
+        </div>
+      );
+    }
     return start ? <ThreadStartLine key={key} message={m} start={start} thread={info} /> : null;
   };
   return (

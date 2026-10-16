@@ -30,6 +30,7 @@ import {
   resumeMission,
   retryBlockedCommand,
   sendMissionMessage,
+  setCommandApproval,
   setMissionExecutor,
   setMissionMachine,
   setParticipant,
@@ -63,6 +64,11 @@ const PlanItem = z.object({
   note: z.string().optional(),
 });
 
+const CommandApproval = z.enum(["always", "low_risk_auto", "never"]).openapi({
+  description:
+    '"Pedir aprovação de comandos": always (every command off the allow list asks), low_risk_auto (the judge allows low-risk ones within what code allows) or never (everything but the deny list).',
+});
+
 const Mission = z
   .object({
     id: z.uuid(),
@@ -76,6 +82,7 @@ const Mission = z
     status: Status,
     repoDir: z.string(),
     resumeTasks: z.boolean(),
+    commandApproval: CommandApproval,
     plan: z.object({
       version: z.number(),
       done: z.number(),
@@ -92,6 +99,9 @@ const Mission = z
       reviews: z.number(),
       suggestions: z.number(),
       joinRequests: z.number().openapi({ description: "Requests to join (0 unless you can answer them)." }),
+      commands: z
+        .number()
+        .openapi({ description: "Command cards waiting for an answer (0 unless you can answer them)." }),
     }),
     joinRequested: z.boolean().openapi({ description: "You asked to join and nobody answered yet." }),
     runningTasks: z.number(),
@@ -258,6 +268,7 @@ export function missionRoutes(deps: AppDeps) {
     artifacts: deps.extras?.artifacts,
     search: deps.extras?.context,
     publicUrl: config.PUBLIC_URL,
+    judge: deps.extras?.context?.judge,
   });
   const after = <T>(value: T) => {
     deps.wakeWorkers?.();
@@ -338,6 +349,7 @@ export function missionRoutes(deps: AppDeps) {
             executor: Executor.optional().openapi({
               description: "Default: Claude Code when the computer has it, else the agent itself.",
             }),
+            commandApproval: CommandApproval.optional().openapi({ description: "Default: low_risk_auto." }),
           }),
         ),
       },
@@ -846,6 +858,30 @@ export function missionRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, missionId } = c.req.valid("param");
       const out = await retryBlockedCommand(missions(), c.get("user").id, orgId, missionId, c.req.valid("json"));
+      return c.json(after(out), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/missions/{missionId}/command-approval",
+      tags,
+      security,
+      summary:
+        '"Pedir aprovação de comandos" (owner or deciders; Revogar on an automatic approval sets always). Audited.',
+      request: { params: MissionParams, body: body(z.object({ commandApproval: CommandApproval })) },
+      responses: { 200: json(z.object({ commandApproval: CommandApproval })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      const out = await setCommandApproval(
+        missions(),
+        c.get("user").id,
+        orgId,
+        missionId,
+        c.req.valid("json").commandApproval,
+      );
       return c.json(after(out), 200);
     },
   );

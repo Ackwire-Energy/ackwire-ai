@@ -726,6 +726,8 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
         tool_use_id: { type: "string", maxLength: 128 },
         /** The runner's follow-up: the state of a request it already made. */
         request_id: { type: "string", maxLength: 64 },
+        /** Added by the runner: where the task runs and its folders (the code-side rules check paths). */
+        scope: { type: "object" },
       },
     },
   },

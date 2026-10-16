@@ -66,12 +66,14 @@ const Thread = z
     mission: z
       .object({
         id: z.uuid(),
+        agentId: z.string().openapi({ description: "The mission's agent." }),
         status: z.enum(["proposed", "active", "paused", "done", "canceled"]),
         planDone: z.number(),
         planTotal: z.number(),
-        waitingYou: z
-          .number()
-          .openapi({ description: "Plan items waiting for people, pending decisions and reviews." }),
+        waitingYou: z.number().openapi({
+          description:
+            "Plan items waiting for people, pending decisions and reviews; command cards for whoever answers them.",
+        }),
       })
       .nullable()
       .openapi({ description: "The thread's mission, in short (details: `GET …/threads/{id}/mission`)." }),

@@ -188,7 +188,7 @@
     gap: 20px;
     padding: 20px 16px 28px;
   }
-  .tabs-bar .ac-search {
+  .tabs-bar .ac-toolbar {
     flex: 1 1 100%;
   }
   .proposals__list {
@@ -249,8 +249,7 @@
   .sidebar__jump,
   .settings__link,
   .pill,
-  .cal-toggle,
-  .cal-filter {
+  .ac-filtertoggle {
     height: auto;
     min-height: 40px;
   }
@@ -391,10 +390,6 @@
   }
   .agp-tile span {
     display: none;
-  }
-  .agp-search {
-    flex-basis: 100%;
-    max-width: none;
   }
   .agp-quick {
     margin-left: 0;

@@ -141,7 +141,7 @@ export function workHeader(t: TFunction, w: { steps: number; connectors: string[
   };
 }
 
-/** "Consultou o himetrica", "Criou uma issue", "Usou github list prs". */
+/** "Consultou o himetrica", "Atualizou o plano", and for an unknown tool "Usou a ferramenta send email". */
 export function stepLabel(t: TFunction, s: WorkItem) {
   return t(`chat.work.step.${s.kind}`, { app: s.app ?? "", tool: toolLabel(s.tool) });
 }

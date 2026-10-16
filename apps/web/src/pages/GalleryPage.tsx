@@ -15,6 +15,7 @@ import {
   diffLines,
   EmptyState,
   Field,
+  FilterToggle,
   Icon,
   Input,
   iconNames,
@@ -28,10 +29,12 @@ import {
   OptionCard,
   RadioCard,
   RadioGroup,
+  SearchField,
   Select,
   Steps,
   TabPanel,
   Tabs,
+  Toolbar,
 } from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -60,6 +63,8 @@ export function GalleryPage() {
   const [check, setCheck] = useState(true);
   const [radio, setRadio] = useState("platform");
   const [draft, setDraft] = useState("");
+  const [find, setFind] = useState("");
+  const [onlyMine, setOnlyMine] = useState(false);
   const [sent, setSent] = useState<string[]>([]);
   const [tab, setTab] = useState<"pending" | "done">("pending");
   const [open, setOpen] = useState(false);
@@ -121,6 +126,30 @@ export function GalleryPage() {
             />
           </Field>
         </div>
+      </Section>
+
+      <Section title="Toolbar · SearchField · FilterToggle">
+        <Toolbar
+          label="Filtros"
+          search={
+            <SearchField
+              aria-label="Buscar"
+              placeholder="Buscar"
+              value={find}
+              onChange={(e) => setFind(e.target.value)}
+              onClear={() => setFind("")}
+              clearLabel="Limpar busca"
+            />
+          }
+          actions={<Button size="sm">Ação</Button>}
+        >
+          <FilterToggle pressed={!onlyMine} onPressedChange={() => setOnlyMine(false)} count={6}>
+            Todas
+          </FilterToggle>
+          <FilterToggle icon="person" pressed={onlyMine} onPressedChange={setOnlyMine} count={2}>
+            Minhas
+          </FilterToggle>
+        </Toolbar>
       </Section>
 
       <Section title="Checkbox · Radio · Option">

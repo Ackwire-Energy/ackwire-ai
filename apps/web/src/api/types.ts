@@ -1733,10 +1733,12 @@ export interface ThreadInfo {
 
 export interface ThreadMissionSummary {
   id: string;
+  /** The mission's agent (the row's avatar). */
+  agentId: string;
   status: MissionStatus;
   planDone: number;
   planTotal: number;
-  /** Plan items waiting for people, pending decisions and reviews. */
+  /** Plan items waiting for people, pending decisions and reviews; command cards for whoever answers them. */
   waitingYou: number;
 }
 
@@ -1818,6 +1820,8 @@ export interface Mission {
   status: MissionStatus;
   repoDir: string;
   resumeTasks: boolean;
+  /** "Pedir aprovação de comandos". */
+  commandApproval: CommandApproval;
   plan: {
     version: number;
     done: number;
@@ -1835,6 +1839,8 @@ export interface Mission {
     suggestions: number;
     /** Requests to join (0 unless you can answer them). */
     joinRequests: number;
+    /** Command cards waiting for an answer (0 unless you can answer them). */
+    commands: number;
   };
   /** You asked to join and nobody answered yet. */
   joinRequested: boolean;
@@ -1937,6 +1943,18 @@ export interface TaskOutput {
   truncated: boolean;
 }
 
+/** "Pedir aprovação de comandos": every command, only the risky ones (Jev allows the low-risk ones), or never (but the blocked ones). */
+export type CommandApproval = "always" | "low_risk_auto" | "never";
+
+/** `meta.missionAutoApproved`: a command allowed without a card (one quiet line, Revogar). */
+export interface MissionAutoApprovedMeta {
+  missionId: string;
+  taskId: string;
+  tool: string;
+  command: string;
+  reason: "low_risk" | "never";
+}
+
 export interface MissionCreateInput {
   agentId: string;
   goal: string;
@@ -1949,6 +1967,8 @@ export interface MissionCreateInput {
   folder?: string;
   /** Default: Claude Code when the computer has it, else the agent itself. */
   executor?: MissionExecutor;
+  /** Default: low_risk_auto. */
+  commandApproval?: CommandApproval;
 }
 
 export interface MissionDecision {

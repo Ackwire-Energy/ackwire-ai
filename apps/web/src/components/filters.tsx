@@ -34,6 +34,7 @@ export function useFilterCopy() {
     searchPlaceholder: t("filters.searchPlaceholder"),
     noResults: t("filters.noResults"),
     clearAll: t("filters.clearAll"),
+    clearSearch: t("filters.clearSearch"),
     people: (count: number) => t("filters.people", { count }),
   };
 }

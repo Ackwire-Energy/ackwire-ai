@@ -116,21 +116,6 @@
 
 /* ── "Threads (N)" ─────────────────────────────────────────────────────── */
 /* The count as the same small neutral chip as the tabs' (no parentheses). */
-.thread-pop__count {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  box-sizing: border-box;
-  display: inline-grid;
-  place-items: center;
-  border-radius: var(--radius-full);
-  background: var(--sunken);
-  color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 600;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
 .thread-pop {
   width: min(400px, calc(100vw - 24px));
   padding: 8px;

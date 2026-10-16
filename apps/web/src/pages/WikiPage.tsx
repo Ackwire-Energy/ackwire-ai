@@ -1,4 +1,4 @@
-import { Button, EmptyState, Icon, Kbd, SearchInput } from "@agenteschat/ui";
+import { Button, EmptyState, Icon, Kbd, SearchField } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -280,11 +280,14 @@ function WikiNav({
           onClick={onNew}
         />
       </div>
-      <SearchInput
+      <SearchField
+        size="sm"
         aria-label={t("wiki.search")}
         placeholder={t("wiki.searchPlaceholder")}
         value={q}
         onChange={(e) => setQ(e.target.value)}
+        onClear={() => setQ("")}
+        clearLabel={t("filters.clearSearch")}
       />
       <div className="wiki-nav__list">
         <button

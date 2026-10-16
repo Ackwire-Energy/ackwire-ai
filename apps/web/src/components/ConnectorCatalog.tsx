@@ -1,4 +1,4 @@
-import { Chip, Dialog, Icon, initialsOf, SearchInput } from "@agenteschat/ui";
+import { Chip, Dialog, FilterToggle, Icon, initialsOf, SearchField, Toolbar } from "@agenteschat/ui";
 import { type CSSProperties, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ConnectorCategory, ConnectorDef } from "@/api/types";
@@ -108,27 +108,23 @@ export function ConnectorCatalogDialog({
       width={760}
     >
       <div className="ac-dialog__tools catalog__tools">
-        <SearchInput
+        <SearchField
+          size="sm"
           aria-label={t("connectors.search")}
           placeholder={t("connectors.searchPlaceholder")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          onClear={() => setQ("")}
+          clearLabel={t("filters.clearSearch")}
         />
         {present.length > 0 && (
-          <fieldset className="catalog__cats">
-            <legend className="ac-visually-hidden">{t("connectors.categories")}</legend>
+          <Toolbar size="sm" label={t("connectors.categories")}>
             {(["all", ...present] as const).map((c) => (
-              <button
-                key={c}
-                type="button"
-                className="catalog__cat"
-                aria-pressed={category === c}
-                onClick={() => setCategory(c)}
-              >
+              <FilterToggle key={c} pressed={category === c} onPressedChange={() => setCategory(c)}>
                 {t(`connectors.category.${c}`)}
-              </button>
+              </FilterToggle>
             ))}
-          </fieldset>
+          </Toolbar>
         )}
       </div>
       {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}

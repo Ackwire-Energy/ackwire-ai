@@ -334,6 +334,19 @@ describe("Logo, Icon, Meter", () => {
     expect(body().getByRole("img", { name: "Buscar" })).toBeTruthy();
   });
 
+  test("the spinner icon turns everywhere (one class; the CSS keeps it still under reduced motion)", async () => {
+    const { container, unmount } = render(<Icon name="spinner" size={14} className="x" />);
+    expect(container.querySelector("svg")?.getAttribute("class")).toBe("ac-icon ac-icon--spin x");
+    unmount();
+    const other = render(<Icon name="search" />);
+    expect(other.container.querySelector("svg")?.getAttribute("class")).toBe("ac-icon");
+    other.unmount();
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: no-preference\) \{\s*\.ac-icon--spin \{[^}]*animation: ac-spin 0\.9s linear infinite/,
+    );
+  });
+
   test("meter exposes value and max", () => {
     render(<Meter value={12.3} max={40} label="Orçamento usado" />);
     const meter = body().getByRole("meter", { name: "Orçamento usado" });

@@ -1,4 +1,4 @@
-import { Checkbox, SearchInput, Token, TokenList } from "@agenteschat/ui";
+import { Checkbox, SearchField, Token, TokenList } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
@@ -127,12 +127,15 @@ export function PeoplePicker({
           ))}
         </TokenList>
       )}
-      <SearchInput
+      <SearchField
+        size="sm"
         aria-label={searchLabel}
         placeholder={searchLabel}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         aria-describedby={help ? helpId : undefined}
+        onClear={() => setQuery("")}
+        clearLabel={t("filters.clearSearch")}
       />
       {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
       <div className="people-picker__results" role="region" aria-label={searchLabel}>

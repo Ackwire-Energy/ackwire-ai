@@ -9,9 +9,10 @@ import {
   Icon,
   type IconName,
   List,
-  SearchInput,
+  SearchField,
   Tabs,
   Textarea,
+  Toolbar,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -146,11 +147,17 @@ function MemoryView({ agent }: { agent: Agent }) {
         >
           {null}
         </Tabs>
-        <SearchInput
-          aria-label={t("memory.search")}
-          placeholder={t("memory.searchPlaceholder", g)}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
+        <Toolbar
+          search={
+            <SearchField
+              aria-label={t("memory.search")}
+              placeholder={t("memory.searchPlaceholder", g)}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onClear={() => setQ("")}
+              clearLabel={t("filters.clearSearch")}
+            />
+          }
         />
       </div>
 

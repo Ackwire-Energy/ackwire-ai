@@ -26,6 +26,7 @@ import type {
   CalendarRange,
   Channel,
   ChannelMember,
+  CommandApproval,
   ComputerTarget,
   Connection,
   ConnectorCatalog,
@@ -471,6 +472,12 @@ export interface ApiClient {
     setMachine(orgId: string, missionId: string, machineId: string, repoDir?: string): Promise<Mission>;
     /** Before Start, its owner switches who programs (the planning starts again). */
     setExecutor(orgId: string, missionId: string, executor: MissionExecutor): Promise<Mission>;
+    /** "Pedir aprovação de comandos" (owner or deciders; Revogar sets always). */
+    setCommandApproval(
+      orgId: string,
+      missionId: string,
+      commandApproval: CommandApproval,
+    ): Promise<{ commandApproval: CommandApproval }>;
     decisions(orgId: string, missionId: string): Promise<MissionDecision[]>;
     /** Commands the executor asked to run (its permission prompts), and the ones allowed for the whole mission. */
     commands(orgId: string, missionId: string): Promise<{ commands: MissionCommand[]; rules: string[] }>;

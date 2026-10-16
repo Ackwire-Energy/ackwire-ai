@@ -1,6 +1,7 @@
 import { type CSSProperties, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { cx } from "../cx";
 import { Button, type ButtonProps } from "./Button";
+import { CountChip } from "./Chip";
 
 export interface SegmentedOption<V extends string> {
   value: V;
@@ -93,7 +94,7 @@ export function Segmented<V extends string>({
           onClick={() => onValueChange(o.value)}
         >
           {o.label}
-          {o.count ? <span className="ac-seg__count">{o.count}</span> : null}
+          {o.count ? <CountChip size={size === "sm" ? "sm" : undefined}>{o.count}</CountChip> : null}
         </button>
       ))}
     </div>

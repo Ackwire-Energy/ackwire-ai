@@ -31,6 +31,26 @@ export function AttentionNote({ children, className, ...rest }: HTMLAttributes<H
   );
 }
 
+/**
+ * The one neutral count chip ("Missões 1", the sidebar's Threads, the
+ * channel's "Threads 4", filter chips): a fixed-height pill, the number
+ * centered on its box (line-height 1, tabular figures), never on the text
+ * baseline. `strong`: the filled neutral look of a chosen chip.
+ */
+export function CountChip({
+  className,
+  size,
+  strong,
+  ...rest
+}: HTMLAttributes<HTMLSpanElement> & { size?: "sm"; strong?: boolean }) {
+  return (
+    <span
+      className={cx("ac-countchip", size === "sm" && "ac-countchip--sm", strong && "ac-countchip--strong", className)}
+      {...rest}
+    />
+  );
+}
+
 /** Counter badge, e.g. pending approvals in the sidebar. */
 export function CountBadge({ className, ...rest }: HTMLAttributes<HTMLSpanElement>) {
   return <span className={cx("ac-count", className)} {...rest} />;

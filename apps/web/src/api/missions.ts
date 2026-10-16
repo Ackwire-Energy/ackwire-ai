@@ -3,6 +3,7 @@ import { useApi } from "./context";
 import { ApiError } from "./http";
 import { keys } from "./keys";
 import type {
+  CommandApproval,
   MachineTask,
   Mission,
   MissionControl,
@@ -230,6 +231,18 @@ export function useSetMissionExecutor(orgId: string) {
       cacheMission(qc, orgId, mission);
       void qc.invalidateQueries({ queryKey: keys.threadTasks(orgId, mission.threadId) });
     },
+  });
+}
+
+/** "Pedir aprovação de comandos" (and Revogar on an automatic approval: back to always). */
+export function useSetCommandApproval(orgId: string, missionId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (commandApproval: CommandApproval) =>
+      api.missions.setCommandApproval(orgId, missionId, commandApproval),
+    onSuccess: () => refreshMission(qc, orgId, missionId, []),
   });
 }
 

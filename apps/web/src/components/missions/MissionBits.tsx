@@ -1,13 +1,13 @@
-import { Chip, Icon, type IconName, PlanStrip } from "@agenteschat/ui";
+import { Chip, Icon, type IconName, PlanStrip, Select } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Mission, MissionExecutor, MissionFileName } from "@/api/types";
+import type { CommandApproval, Mission, MissionExecutor, MissionFileName, ThreadMissionSummary } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
-import { type PlanCell, tickFor } from "@/lib/missions";
+import { executorIcon, executorOnText, type PlanCell, tickFor } from "@/lib/missions";
 import { MissionFilesPanel } from "./MissionFiles";
 import "./missions.css";
 
@@ -18,15 +18,89 @@ import "./missions.css";
  */
 
 /**
- * "Quem programa": Claude Code, Codex (experimental) or the agent itself,
- * only those its computer can run, each with one line on what it means.
+ * Who programs, as a mark: Claude Code's and Codex's own icons, or the
+ * agent's small pixel avatar when it does the work itself.
  */
-export function executorOptions(t: TFunction, executors: MissionExecutor[], agentName: string) {
+export function ExecutorMark({
+  executor,
+  agentId,
+  agentName,
+}: {
+  executor: string;
+  agentId?: string;
+  agentName?: string;
+}) {
+  const icon = executorIcon(executor);
+  if (icon) return <Icon name={icon} size={14} className="mi-exec__icon" />;
+  return <AgentAvatar agentId={agentId} name={agentName ?? ""} size="xs" />;
+}
+
+/** "[mark] Claude Code no mac": who programs and where, one quiet chip (offline says so). */
+export function ExecutorChip({
+  mission,
+  agentName,
+}: {
+  mission: Pick<Mission, "executor" | "agentId" | "machine">;
+  agentName: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <span className="mi-pill mi-exec">
+      <ExecutorMark executor={mission.executor} agentId={mission.agentId} agentName={agentName} />
+      {executorOnText(t, mission.executor, agentName, mission.machine?.name)}
+      {mission.machine && !mission.machine.online && <small>{t("missions.offline")}</small>}
+    </span>
+  );
+}
+
+/**
+ * "Quem programa": Claude Code, Codex (experimental) or the agent itself,
+ * only those its computer can run, each with one line on what it means and
+ * its mark (`leading`).
+ */
+export function executorOptions(t: TFunction, executors: MissionExecutor[], agentName: string, agentId?: string) {
   return executors.map((e) => ({
     value: e,
     label: t(`missions.executor.${e}` as const, { name: agentName }),
     description: t(`missions.executor.${e}Text` as const, { name: agentName }),
+    leading: <ExecutorMark executor={e} agentId={agentId} agentName={agentName} />,
   }));
+}
+
+/** "Pedir aprovação de comandos", in the order people read them (the default first). */
+export const COMMAND_APPROVALS: readonly CommandApproval[] = ["low_risk_auto", "always", "never"];
+
+export function commandApprovalOptions(t: TFunction) {
+  return COMMAND_APPROVALS.map((v) => ({
+    value: v,
+    label: t(`missions.commandApproval.${v}` as const),
+    description: t(`missions.commandApproval.${v}Text` as const),
+  }));
+}
+
+/** The same choice everywhere (Nova missão, the plan card): a select with one line on each option. */
+export function CommandApprovalSelect({
+  value,
+  onChange,
+  disabled,
+  size,
+}: {
+  value: CommandApproval;
+  onChange: (value: CommandApproval) => void;
+  disabled?: boolean;
+  size?: "sm";
+}) {
+  const { t } = useTranslation();
+  return (
+    <Select
+      {...(size ? { size } : {})}
+      aria-label={t("missions.commandApproval.label")}
+      value={value}
+      disabled={disabled}
+      onValueChange={(v) => onChange(v as CommandApproval)}
+      options={commandApprovalOptions(t)}
+    />
+  );
 }
 
 /** Re-renders every `ms` while `active` (live durations). */
@@ -85,9 +159,18 @@ export function missionStatusKey(m: Pick<Mission, "status" | "runningTasks" | "p
   if (m.status === "done" || m.status === "canceled" || m.status === "proposed" || m.status === "paused") {
     return m.status;
   }
-  const waiting = m.canAct && m.pending.decisions + m.pending.reviews + m.pending.provisional > 0;
+  const waiting = m.canAct && m.pending.decisions + m.pending.reviews + m.pending.provisional + m.pending.commands > 0;
   if (waiting) return "needsYou";
   return m.runningTasks > 0 ? "working" : "active";
+}
+
+/** The same state from a thread row's summary (`working`: an agent run in the thread). */
+export function missionSummaryStatusKey(m: Pick<ThreadMissionSummary, "status" | "waitingYou">, working: boolean) {
+  if (m.status === "done" || m.status === "canceled" || m.status === "proposed" || m.status === "paused") {
+    return m.status;
+  }
+  if (m.waitingYou > 0) return "needsYou";
+  return working ? "working" : "active";
 }
 
 const STATUS_ICON: Record<MissionStatusKey, IconName> = {
@@ -102,11 +185,14 @@ const STATUS_ICON: Record<MissionStatusKey, IconName> = {
 
 export function MissionStatusChip({
   mission,
+  status,
 }: {
-  mission: Pick<Mission, "status" | "runningTasks" | "pending" | "canAct">;
+  mission?: Pick<Mission, "status" | "runningTasks" | "pending" | "canAct">;
+  /** A state already known (a thread row's summary). */
+  status?: MissionStatusKey;
 }) {
   const { t } = useTranslation();
-  const key = missionStatusKey(mission);
+  const key = status ?? (mission ? missionStatusKey(mission) : "active");
   return (
     <Chip icon={STATUS_ICON[key]} tone={key === "needsYou" ? "waiting" : "neutral"}>
       {t(`missions.status.${key}`)}

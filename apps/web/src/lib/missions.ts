@@ -1,9 +1,11 @@
+import type { IconName } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import type {
   MachineTask,
   MachineTaskMeta,
   Message,
   Mission,
+  MissionAutoApprovedMeta,
   MissionCommandMeta,
   MissionLinkMeta,
   MissionPlanChangeMeta,
@@ -102,7 +104,7 @@ export const isOpenMission = (m: Pick<Mission, "status">) =>
   m.status === "proposed" || m.status === "active" || m.status === "paused";
 
 /** What waits for people, in the order the cards show it ("2 decisões, 1 revisão"). */
-export type WaitingKey = "decisions" | "provisional" | "reviews" | "suggestions";
+export type WaitingKey = "decisions" | "provisional" | "reviews" | "suggestions" | "commands";
 export function waitingParts(m: Pick<Mission, "pending" | "canAct">): { key: WaitingKey; count: number }[] {
   if (!m.canAct) return [];
   const parts: { key: WaitingKey; count: number }[] = [
@@ -110,6 +112,7 @@ export function waitingParts(m: Pick<Mission, "pending" | "canAct">): { key: Wai
     { key: "provisional", count: m.pending.provisional },
     { key: "reviews", count: m.pending.reviews },
     { key: "suggestions", count: m.pending.suggestions },
+    { key: "commands", count: m.pending.commands },
   ];
   return parts.filter((p) => p.count > 0);
 }
@@ -321,6 +324,19 @@ export function machineTaskOf(meta: Message["meta"]): MachineTaskMeta | null {
   };
 }
 
+/** `meta.missionAutoApproved`: a command allowed without a card (the quiet line). */
+export function missionAutoApprovedOf(meta: Message["meta"]): MissionAutoApprovedMeta | null {
+  const p = obj(meta?.missionAutoApproved);
+  if (!p || !str(p.missionId) || !str(p.command)) return null;
+  return {
+    missionId: str(p.missionId),
+    taskId: str(p.taskId),
+    tool: str(p.tool) || "Bash",
+    command: str(p.command),
+    reason: str(p.reason) === "never" ? "never" : "low_risk",
+  };
+}
+
 /** `meta.missionCommand`: the executor asks to run a command (the command card). */
 export function missionCommandOf(meta: Message["meta"]): MissionCommandMeta | null {
   const p = obj(meta?.missionCommand);
@@ -348,6 +364,19 @@ export function taskNoticeOf(meta: Message["meta"]): { code: string; params: Rec
  */
 export const executorName = (executor: string, agentName = "") =>
   executor === "codex" ? "Codex" : executor === "agent" ? agentName : "Claude Code";
+
+/** The executor's own icon (Claude Code, Codex); null for our agent (its pixel avatar instead). */
+export function executorIcon(executor: string | null | undefined): IconName | null {
+  if (executor === "claude") return "executorClaude";
+  if (executor === "codex") return "executorCodex";
+  return null;
+}
+
+/** "Claude Code no MacBook do Walter", "Ada no MacBook do Walter": who programs and where (no "via"). */
+export function executorOnText(t: TFunction, executor: string, agentName: string, computer: string | null | undefined) {
+  const name = executor === "agent" ? agentName : executorName(executor);
+  return computer ? t("missions.executorOn", { executor: name, computer }) : name;
+}
 
 /** "via Claude Code no MacBook", or "Dev no MacBook" when the agent itself works there. */
 export function viaText(t: TFunction, executor: string, agentName: string, computer: string | null | undefined) {

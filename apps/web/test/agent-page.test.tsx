@@ -272,7 +272,8 @@ describe("agent page: memory and proposals", () => {
     expect(
       within(kinds)
         .getAllByRole("radio")
-        .map((r) => r.textContent),
+        // The count is a separate chip (CountChip): no text space between label and number.
+        .map((r) => r.textContent?.replace(/(\D)(\d+)$/, "$1 $2")),
     ).toEqual(["Fatos e decisões 4", "Lições 2", "Arquivados 1"]);
     await type(screen().getByRole("searchbox", { name: "Buscar" }), "zzz-nada");
     expect(document.body.textContent).toContain("Nada encontrado com “zzz-nada”.");

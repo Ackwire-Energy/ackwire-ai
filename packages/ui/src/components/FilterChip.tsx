@@ -3,6 +3,7 @@ import { type KeyboardEvent, type ReactNode, useId, useMemo, useRef, useState } 
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
+import { SearchField } from "./Toolbar";
 
 export interface FilterOption {
   value: string;
@@ -117,9 +118,8 @@ export function FilterChip({
           <RPopover.Content className="ac-menu ac-filter__menu" align="start" sideOffset={6}>
             {options.length > FILTER_SEARCH_AFTER && (
               <div className="ac-tz__searchrow">
-                <Icon name="search" size={16} />
-                <input
-                  className="ac-tz__search"
+                <SearchField
+                  size="sm"
                   aria-label={searchLabel ?? label}
                   placeholder={searchPlaceholder}
                   value={query}

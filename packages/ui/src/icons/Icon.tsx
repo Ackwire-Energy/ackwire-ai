@@ -20,12 +20,16 @@ export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {
   label?: string;
 }
 
-/** Our icon set: 20px grid, 1.6 stroke, drawn in `currentColor`. */
+/**
+ * Our icon set: 20px grid, 1.6 stroke, drawn in `currentColor`. `spinner`
+ * always turns (`ac-icon--spin`, 0.9 s; still under prefers-reduced-motion),
+ * wherever it is used: chips, pills, session rows, buttons.
+ */
 export function Icon({ name, size = 20, label, className, style, ...rest }: IconProps) {
   return (
     <svg
       viewBox="0 0 20 20"
-      className={cx("ac-icon", className)}
+      className={cx("ac-icon", name === "spinner" && "ac-icon--spin", className)}
       style={size === 20 ? style : { width: size, height: size, ...style }}
       aria-hidden={label ? undefined : true}
       role={label ? "img" : undefined}

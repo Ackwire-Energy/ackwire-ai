@@ -21,9 +21,11 @@ import {
   getMissionFiles,
   getTaskOutput,
   grantScopes,
+  LOW_RISK_THRESHOLD,
   listJoinRequests,
   listMissionCommands,
   listMissions,
+  listThreads,
   type MachineHub,
   MISSION_RULES,
   machineExecutors,
@@ -42,6 +44,7 @@ import {
   sendMissionMessage,
   setAgentAudience,
   setAgentComputerTarget,
+  setCommandApproval,
   setParticipant,
   startMachineTask,
   startMission,
@@ -170,8 +173,18 @@ const ok = (r: McpResult) => {
 };
 
 /** A mission made from the web (`/mission`), its runner connected, its plan task running. */
-async function proposed(options: { reply?: NonNullable<Parameters<typeof setup>[0]>["reply"] } = {}) {
-  f = await setup({ machines: true, missionTools: true, reply: options.reply ?? (() => ({ chunks: ["ok"] })) });
+async function proposed(
+  options: {
+    reply?: NonNullable<Parameters<typeof setup>[0]>["reply"];
+    judge?: NonNullable<Parameters<typeof setup>[0]>["judge"];
+  } = {},
+) {
+  f = await setup({
+    machines: true,
+    missionTools: true,
+    reply: options.reply ?? (() => ({ chunks: ["ok"] })),
+    ...(options.judge ? { judge: options.judge } : {}),
+  });
   const paired = await pairedMachine();
   const runner = missionRunner(f.machineHub as MachineHub);
   await runner.hello(paired.token);
@@ -1028,8 +1041,8 @@ describe("missions (ADR 0029)", () => {
 
   describe("command approvals (Claude Code's permission prompts)", () => {
     /** An active mission whose main session is running. */
-    async function working() {
-      const { view, runner, plan } = await proposed();
+    async function working(judge?: NonNullable<Parameters<typeof setup>[0]>["judge"]) {
+      const { view, runner, plan } = await proposed(judge ? { judge } : {});
       await startMission(md(), f.owner.id, f.org.id, view.id);
       await runner.done(plan.taskId);
       await drainOutbox(f.db, f.handlers);
@@ -1059,12 +1072,26 @@ describe("missions (ADR 0029)", () => {
       expect(
         (await prompt(main.taskId, { tool_name: "Bash", input: { command: "swift build -c release" } })).request_id,
       ).toBe(id);
-      // Only the owner or a decider answers.
+      // Only the owner or a decider answers (bia reads the conversation, but doesn't decide).
       const bia = await addMember(f.db, f.org.id, "member", "bia");
+      await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
       await expect(decideCommand(md(), bia.id, f.org.id, view.id, id, "allow")).rejects.toMatchObject({
         code: "mission.not_allowed",
       });
+      // The open card waits for the owner ("Esperando você", the thread row, the sidebar), not for bia.
+      const threadWaiting = async (userId: string) =>
+        (await listThreads(f.db, userId, { orgId: f.org.id, tab: "missions" })).threads.find(
+          (x) => x.mission?.id === view.id,
+        )?.mission?.waitingYou ?? -1;
+      expect((await getMission(md(), f.owner.id, f.org.id, view.id)).pending.commands).toBe(1);
+      expect((await getMission(md(), bia.id, f.org.id, view.id)).pending.commands).toBe(0);
+      expect((await listMissions(md(), f.owner.id, f.org.id, {})).missions[0]?.pending.commands).toBe(1);
+      expect((await listMissions(md(), f.owner.id, f.org.id, {})).counts.waitingYou).toBe(1);
+      const ownerWaiting = await threadWaiting(f.owner.id);
+      expect(await threadWaiting(bia.id)).toBe(ownerWaiting - 1);
       const decided = await decideCommand(md(), f.owner.id, f.org.id, view.id, id, "always");
+      expect((await getMission(md(), f.owner.id, f.org.id, view.id)).pending.commands).toBe(0);
+      expect(await threadWaiting(f.owner.id)).toBe(ownerWaiting - 1);
       expect(decided).toMatchObject({ state: "allowed", always: true, rules: ["Bash(swift build *)"] });
       expect(await prompt(main.taskId, { request_id: id })).toEqual({ behavior: "allow" });
       await expect(decideCommand(md(), f.owner.id, f.org.id, view.id, id, "deny")).rejects.toMatchObject({
@@ -1078,6 +1105,128 @@ describe("missions (ADR 0029)", () => {
       // A new task's settings carry it.
       ok(await runner.mcp(main.taskId, "start_task", { title: "Release", prompt: "Build it", branch: "release" }));
       expect((runner.started.at(-1) as TaskStartRequest).mission?.allow).toEqual(["Bash(swift build *)"]);
+    });
+
+    describe("Pedir aprovação de comandos (the deny list, plain reads, the judge)", () => {
+      /** What the fake judge says about commands (mission_command_risk), and how often it was asked. */
+      let risk: number | "error" = 0;
+      let asked = 0;
+      const judge: NonNullable<Parameters<typeof setup>[0]>["judge"] = (kind) => {
+        if (kind !== "mission_command_risk") return undefined;
+        asked++;
+        if (risk === "error") throw new Error("judge down");
+        return risk;
+      };
+      const scope = { cwd: "/Users/w/agentes/ada/app", folders: ["/Users/w/agentes/ada/app"], home: "/Users/w" };
+      const bash = (command: string, withScope = true) => ({
+        tool_name: "Bash",
+        input: { command },
+        ...(withScope ? { scope } : {}),
+      });
+      const threadMessages = async (threadId: string) =>
+        f.db.select().from(schema.messages).where(eq(schema.messages.threadId, threadId));
+      afterEach(() => {
+        risk = 0;
+        asked = 0;
+      });
+
+      test("new missions default to low_risk_auto; the deny list and plain reads are never judged nor carded", async () => {
+        const { view, main, prompt } = await working(judge);
+        expect(view.commandApproval).toBe("low_risk_auto");
+        risk = 0.99;
+        expect(await prompt(main.taskId, bash("npm publish"))).toMatchObject({ behavior: "deny" });
+        expect(await prompt(main.taskId, bash("git push origin main"))).toMatchObject({ behavior: "deny" });
+        for (const command of [
+          "ls /System/Library/Fonts /Library/Fonts",
+          "curl -sI https://commons.wikimedia.org/w/api.php",
+        ]) {
+          expect(await prompt(main.taskId, bash(command))).toEqual({ behavior: "allow" });
+        }
+        expect(asked).toBe(0);
+        const msgs = await threadMessages(view.threadId);
+        expect(msgs.some((m) => m.meta.missionCommand || m.meta.missionAutoApproved)).toBe(false);
+      });
+
+      test("the judge at the threshold or more allows with one quiet line; below, or failing, it is the card", async () => {
+        const { view, main, prompt } = await working(judge);
+        risk = LOW_RISK_THRESHOLD;
+        expect(await prompt(main.taskId, bash("swift build -c release"))).toEqual({ behavior: "allow" });
+        expect(asked).toBe(1);
+        let msgs = await threadMessages(view.threadId);
+        const line = msgs.find((m) => m.meta.missionAutoApproved);
+        expect(line?.meta.missionAutoApproved).toMatchObject({
+          missionId: view.id,
+          command: "swift build -c release",
+          reason: "low_risk",
+        });
+        expect(line?.meta.bodyCode).toBe("mission_auto_approved");
+        expect(msgs.some((m) => m.meta.missionCommand)).toBe(false);
+        const audits = await f.db
+          .select()
+          .from(schema.auditLog)
+          .where(eq(schema.auditLog.action, "mission.command_auto"));
+        expect(audits).toHaveLength(1);
+        // Below the threshold: the card.
+        risk = LOW_RISK_THRESHOLD - 0.01;
+        expect(await prompt(main.taskId, bash("make release"))).toMatchObject({ status: "pending" });
+        // The judge fails: the card (fail closed).
+        risk = "error";
+        expect(await prompt(main.taskId, bash("python3 tools/gen.py"))).toMatchObject({ status: "pending" });
+        // Code forbids it: the judge isn't even asked.
+        risk = 0.99;
+        const before = asked;
+        for (const command of ["sudo make install", "rm -rf ~/Documents", "npm i -g x", "scp a host:/tmp"]) {
+          expect(await prompt(main.taskId, bash(command))).toMatchObject({ status: "pending" });
+        }
+        // Without the runner's scope nothing writes outside: rm is forbidden there too.
+        expect(await prompt(main.taskId, bash("rm -rf build", false))).toMatchObject({ status: "pending" });
+        expect(asked).toBe(before);
+        msgs = await threadMessages(view.threadId);
+        expect(msgs.filter((m) => m.meta.missionCommand)).toHaveLength(7);
+        expect(msgs.filter((m) => m.meta.missionAutoApproved)).toHaveLength(1);
+      });
+
+      test("never allows everything but the deny list; always asks for every command; changes are audited", async () => {
+        const { view, main, prompt } = await working(judge);
+        const bia = await addMember(f.db, f.org.id, "member", "bia");
+        await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+        await expect(setCommandApproval(md(), bia.id, f.org.id, view.id, "never")).rejects.toMatchObject({
+          code: "mission.not_allowed",
+        });
+        await expect(setCommandApproval(md(), f.owner.id, f.org.id, view.id, "sometimes")).rejects.toMatchObject({
+          code: "mission.invalid_command_approval",
+        });
+        expect(await setCommandApproval(md(), f.owner.id, f.org.id, view.id, "never")).toEqual({
+          commandApproval: "never",
+        });
+        expect((await getMission(md(), f.owner.id, f.org.id, view.id)).commandApproval).toBe("never");
+        expect(await prompt(main.taskId, bash("brew install ffmpeg"))).toEqual({ behavior: "allow" });
+        expect(await prompt(main.taskId, bash("npm publish"))).toMatchObject({ behavior: "deny" });
+        expect(asked).toBe(0);
+        const line = (await threadMessages(view.threadId)).find((m) => m.meta.missionAutoApproved);
+        expect(line?.meta.missionAutoApproved).toMatchObject({ command: "brew install ffmpeg", reason: "never" });
+        // Revogar: back to always; even a low-risk command gets the card.
+        await setCommandApproval(md(), f.owner.id, f.org.id, view.id, "always");
+        risk = 0.99;
+        expect(await prompt(main.taskId, bash("swift build"))).toMatchObject({ status: "pending" });
+        expect(asked).toBe(0);
+        const audits = await f.db
+          .select()
+          .from(schema.auditLog)
+          .where(eq(schema.auditLog.action, "mission.command_approval"));
+        expect(audits.sort((a, b) => (a.id < b.id ? -1 : 1)).map((a) => a.details)).toEqual([
+          { from: "low_risk_auto", to: "never" },
+          { from: "never", to: "always" },
+        ]);
+        // Asked for at creation.
+        const other = await createMission(md(), f.owner.id, f.org.id, {
+          agentId: f.agent.id,
+          channelId: f.general.id,
+          goal: "Photos",
+          commandApproval: "always",
+        });
+        expect(other.commandApproval).toBe("always");
+      });
     });
 
     test("Recusar denies; nobody answering in time denies with the wait message; prompts per task are limited", async () => {

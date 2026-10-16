@@ -6,6 +6,7 @@ import { type Channel, requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { type Message, messageView, replyExcerpt } from "./messages";
+import { pendingCommandsSql } from "./mission-command-rules";
 import { can, type Membership, requirePermission } from "./organizations";
 
 const { threads, messages, channels, channelMembers } = schema;
@@ -105,10 +106,12 @@ export interface ThreadInfo {
 
 export interface ThreadMissionSummary {
   id: string;
+  /** The mission's agent (the row's avatar). */
+  agentId: string;
   status: "proposed" | "active" | "paused" | "done" | "canceled";
   planDone: number;
   planTotal: number;
-  /** Plan items waiting for people, pending decisions and pending reviews. */
+  /** Plan items waiting for people, pending decisions and pending reviews; command cards for whoever answers them. */
   waitingYou: number;
 }
 
@@ -892,6 +895,7 @@ interface ThreadSqlRow {
   working: boolean;
   needs_you: boolean;
   mission_id?: string | null;
+  mission_agent_id?: string | null;
   mission_status?: ThreadMissionSummary["status"] | null;
   mission_plan_done?: number | string | null;
   mission_plan_total?: number | string | null;
@@ -1011,11 +1015,14 @@ async function queryThreads(
               and (${isAdmin}::boolean or ap.owner_user_id = ${userId}))
           ) as needs_you,
           ${participated} as participated,
-          mi.id as mission_id, mi.status as mission_status, mi.plan_done as mission_plan_done,
+          mi.id as mission_id, mi.agent_id as mission_agent_id, mi.status as mission_status, mi.plan_done as mission_plan_done,
           mi.plan_total as mission_plan_total,
           case when mi.id is null then null else mi.plan_waiting
             + (select count(*)::int from ${schema.missionDecisions} md where md.mission_id = mi.id and md.status = 'pending')
             + (select count(*)::int from ${schema.missionReviews} mr where mr.mission_id = mi.id and mr.status = 'pending')
+            + case when mi.owner_id = ${userId} or exists (select 1 from ${schema.missionParticipants} mpc
+                where mpc.mission_id = mi.id and mpc.user_id = ${userId} and mpc.role = 'decide')
+              then ${pendingCommandsSql(sql`mi.id`)} else 0 end
           end as mission_waiting
         from candidates c
         join ${messages} root on root.id = c.root_id and root.org_id = ${orgId}::uuid
@@ -1130,6 +1137,7 @@ function toView(
       r.mission_id && r.mission_status
         ? {
             id: r.mission_id,
+            agentId: r.mission_agent_id ?? "",
             status: r.mission_status,
             planDone: Number(r.mission_plan_done ?? 0),
             planTotal: Number(r.mission_plan_total ?? 0),

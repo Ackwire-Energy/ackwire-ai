@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carregando</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&display=swap">
+<script>document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
+<style>
+/*
+  Prototype: our own "working" indicator, to replace the generic ring spinner in chips like
+  "1 rodando" and "Trabalhando". Three directions, all pixel, all in the agent's own tones
+  (bodyTones from packages/ui/src/agent/engine.js), static when the person asks for reduced motion.
+  A: pixel orbit — a 3×3 grid where one lit cell walks the ring, with a fading trail.
+  B: dither fill — a 4×4 block whose dither pattern shifts, like the run strips in Rotinas.
+  C: tiny agent — the agent itself at 16px, eyes as dashes (writing) and a soft halo pulse.
+*/
+:root{--bg:#f4f4f1;--raised:#fff;--sunken:#ebebe7;--line:rgba(23,23,22,.08);--ink:#151514;--muted:#5c5c58;--faint:#76766f;
+  --chip:#e9e9e5;--sans:"Onest",system-ui,sans-serif;--display:"Funnel Display",var(--sans);color-scheme:light}
+:root[data-theme="dark"]{--bg:#0f0f0e;--raised:#191918;--sunken:#0a0a09;--line:rgba(255,255,255,.07);--ink:#efefec;--muted:#a3a39e;--faint:#8b8b85;--chip:#232321;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14.5px;-webkit-font-smoothing:antialiased}
+main{max-width:980px;margin:0 auto;padding:40px 16px 80px}
+h1{font-family:var(--display);font-weight:300;font-size:40px;margin:0 0 6px}
+p.lead{color:var(--muted);margin:0 0 28px}
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:24px;flex-wrap:wrap}
+.btn{font:inherit;border:0;border-radius:999px;padding:8px 14px;background:var(--chip);color:var(--ink);cursor:pointer}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.opt{background:var(--raised);border-radius:20px;padding:20px;box-shadow:0 0 0 1px var(--line),0 2px 6px -2px rgba(0,0,0,.06)}
+.opt h2{font-size:15px;margin:0 0 4px}
+.opt p{color:var(--muted);margin:0 0 16px;font-size:13.5px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.chip{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px 0 12px;border-radius:999px;background:var(--chip);font-weight:600;font-size:14px}
+.big{display:flex;gap:18px;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.big small{color:var(--faint)}
+canvas{display:block;image-rendering:pixelated}
+</style>
+</head>
+<body>
+<main>
+  <h1>Carregando</h1>
+  <p class="lead">Três direções para o indicador de trabalho, no lugar do anel genérico. Todas em pixel, nas cores do agente. Escolha uma.</p>
+  <div class="bar" id="colors"></div>
+  <div class="grid">
+    <section class="opt"><h2>A · Órbita de pixel</h2><p>Uma grade 3×3: um pixel aceso dá a volta no anel, com rastro que apaga.</p>
+      <div class="row"><span class="chip"><canvas data-kind="orbit" data-size="14"></canvas>1 rodando</span><span class="chip"><canvas data-kind="orbit" data-size="14"></canvas>Trabalhando</span></div>
+      <div class="big"><canvas data-kind="orbit" data-size="32"></canvas><small>em tamanho maior</small></div></section>
+    <section class="opt"><h2>B · Dither que anda</h2><p>Um bloco 4×4 cujo padrão de dither desliza, como as colunas das Rotinas.</p>
+      <div class="row"><span class="chip"><canvas data-kind="dither" data-size="14"></canvas>1 rodando</span><span class="chip"><canvas data-kind="dither" data-size="14"></canvas>Trabalhando</span></div>
+      <div class="big"><canvas data-kind="dither" data-size="32"></canvas><small>em tamanho maior</small></div></section>
+    <section class="opt"><h2>C · O próprio agente</h2><p>O agente em miniatura, com os olhos em traço (escrevendo) e um halo pulsando.</p>
+      <div class="row"><span class="chip"><canvas data-kind="agent" data-size="16"></canvas>1 rodando</span><span class="chip"><canvas data-kind="agent" data-size="16"></canvas>Trabalhando</span></div>
+      <div class="big"><canvas data-kind="agent" data-size="32"></canvas><small>em tamanho maior</small></div></section>
+  </div>
+</main>
+<script type="module">
+import { drawAgent, bodyTones, AGENT_GRADIENTS, mixHex } from "../../../packages/ui/src/agent/engine.js";
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let color = "amber";
+const bar = document.getElementById("colors");
+for (const name of Object.keys(AGENT_GRADIENTS)) {
+  const b = document.createElement("button");
+  b.className = "btn"; b.textContent = name; b.setAttribute("aria-pressed", String(name === color));
+  b.onclick = () => { color = name; for (const x of bar.children) x.setAttribute("aria-pressed", String(x === b)); };
+  bar.append(b);
+}
+const canvases = [...document.querySelectorAll("canvas")].map((c) => {
+  const size = Number(c.dataset.size), dpr = devicePixelRatio || 1;
+  c.style.width = c.style.height = size + "px"; c.width = c.height = Math.round(size * dpr);
+  return { c, ctx: c.getContext("2d"), size, dpr, kind: c.dataset.kind };
+});
+const ring = [[0,0],[1,0],[2,0],[2,1],[2,2],[1,2],[0,2],[0,1]];
+function tones() { const t = bodyTones(color); return Array.isArray(t) ? t : Object.values(t); }
+function orbit({ ctx, c }, t) {
+  const n = 3, cell = c.width / n, gap = Math.max(1, Math.round(cell * 0.14)), tn = tones();
+  const faint = mixHex(tn[tn.length - 1] ?? "#999999", getComputedStyle(document.body).backgroundColor.startsWith("rgb(1") ? "#000000" : "#ffffff", 0.55);
+  ctx.clearRect(0, 0, c.width, c.height);
+  const head = reduce ? 0 : Math.floor(t / 110) % 8;
+  ring.forEach(([x, y], i) => {
+    const age = (head - i + 8) % 8;
+    ctx.fillStyle = age === 0 ? tn[0] : age === 1 ? tn[Math.min(1, tn.length - 1)] : age === 2 ? tn[Math.min(2, tn.length - 1)] : faint;
+    ctx.globalAlpha = age <= 2 ? 1 : 0.5;
+    ctx.fillRect(x * cell + gap / 2, y * cell + gap / 2, cell - gap, cell - gap);
+  });
+  ctx.globalAlpha = 1;
+}
+const bayer = [[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+function dither({ ctx, c }, t) {
+  const n = 4, cell = c.width / n, tn = tones(), shift = reduce ? 0 : Math.floor(t / 140);
+  ctx.clearRect(0, 0, c.width, c.height);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const level = (bayer[(y + shift) % 4][x] + shift * 3) % 16;
+    ctx.fillStyle = level < 6 ? tn[0] : level < 11 ? tn[Math.min(1, tn.length - 1)] : tn[tn.length - 1];
+    ctx.globalAlpha = level < 11 ? 1 : 0.45;
+    ctx.fillRect(Math.round(x * cell), Math.round(y * cell), Math.ceil(cell), Math.ceil(cell));
+  }
+  ctx.globalAlpha = 1;
+}
+function agent({ ctx, c, dpr, size }, t) {
+  ctx.clearRect(0, 0, c.width, c.height);
+  const pulse = reduce ? 0.5 : (Math.sin(t / 380) + 1) / 2, tn = tones();
+  ctx.fillStyle = tn[0]; ctx.globalAlpha = 0.12 + pulse * 0.18;
+  ctx.beginPath(); ctx.arc(c.width / 2, c.height / 2, c.width / 2, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+  const s = c.width * 0.78, o = (c.width - s) / 2;
+  drawAgent(ctx, o, o, s, { color, pose: { writing: true, squash: reduce ? 0 : Math.sin(t / 380) * 0.4 } });
+}
+const draw = { orbit, dither, agent };
+function frame(t) { for (const k of canvases) draw[k.kind](k, t); if (!reduce) requestAnimationFrame(frame); }
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

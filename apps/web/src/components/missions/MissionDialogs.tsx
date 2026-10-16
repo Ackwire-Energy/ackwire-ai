@@ -9,11 +9,12 @@ import {
   MenuSeparator,
   RadioCard,
   RadioGroup,
-  SearchInput,
+  SearchField,
   Segmented,
   Select,
   Switch,
   Textarea,
+  Toolbar,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -32,7 +33,7 @@ import {
   useMissionParticipants,
 } from "@/api/missions";
 import { useChannels } from "@/api/queries";
-import type { Mission, MissionExecutor, MissionParticipantRole } from "@/api/types";
+import type { CommandApproval, Mission, MissionExecutor, MissionParticipantRole } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -40,7 +41,7 @@ import { canTalk } from "@/lib/audience";
 import { errorText } from "@/lib/errors";
 import { executorName } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
-import { executorOptions } from "./MissionBits";
+import { CommandApprovalSelect, executorOptions } from "./MissionBits";
 import "./missions.css";
 
 /**
@@ -102,6 +103,7 @@ export function NewMissionDialog({
   const [home, setHome] = useState<"channel" | "dm">(initialChannelId || memberChannels.length ? "channel" : "dm");
   const [channelId, setChannelId] = useState(initialChannelId ?? memberChannels[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [approval, setApproval] = useState<CommandApproval>("low_risk_auto");
   // The one asked for when it can run a mission, else the first that can.
   const agent = agents.find((a) => a.id === agentId) ?? agents[0];
   const machine = agent?.machine ?? null;
@@ -127,7 +129,13 @@ export function NewMissionDialog({
       }
     }
     create.mutate(
-      { agentId: agent.id, goal: goal.trim(), channelId: where, ...(executor ? { executor } : {}) },
+      {
+        agentId: agent.id,
+        goal: goal.trim(),
+        channelId: where,
+        commandApproval: approval,
+        ...(executor ? { executor } : {}),
+      },
       {
         onSuccess: (mission) => {
           onOpenChange(false);
@@ -250,7 +258,7 @@ export function NewMissionDialog({
               aria-label={t("missions.new.who")}
               value={executor}
               onValueChange={(v) => setPicked(v as MissionExecutor)}
-              options={executorOptions(t, agent.executors, agent.name)}
+              options={executorOptions(t, agent.executors, agent.name, agent.id)}
             />
             {agent.codexTooOld && (
               <span className="mi-hint">
@@ -258,6 +266,12 @@ export function NewMissionDialog({
                 {t("missions.new.codexOld", { computer: agent.machine?.name ?? "" })}
               </span>
             )}
+          </div>
+        )}
+        {!none && (
+          <div className="mi-field">
+            <span className="mi-field__label">{t("missions.commandApproval.label")}</span>
+            <CommandApprovalSelect value={approval} onChange={setApproval} />
           </div>
         )}
         <div className="mi-field">
@@ -525,15 +539,20 @@ export function ShareMissionDialog({
         <DialogBody>
           {manage && (
             <>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <div style={{ flex: 1, minWidth: 180 }}>
-                  <SearchInput
+              <Toolbar
+                size="sm"
+                search={
+                  <SearchField
+                    size="sm"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     placeholder={t("missions.share.search")}
                     aria-label={t("missions.share.search")}
+                    onClear={() => setQ("")}
+                    clearLabel={t("filters.clearSearch")}
                   />
-                </div>
+                }
+              >
                 <Segmented
                   size="sm"
                   label={t("missions.share.newRole")}
@@ -541,7 +560,7 @@ export function ShareMissionDialog({
                   onValueChange={setRole}
                   options={roleOptions}
                 />
-              </div>
+              </Toolbar>
               {matches.length > 0 && (
                 <ul className="mi-people" style={{ marginTop: 8 }}>
                   {matches.map((m) => (

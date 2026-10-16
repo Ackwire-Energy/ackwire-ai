@@ -231,6 +231,7 @@ export async function setup(
     artifacts: artifactDeps,
     search: context,
     publicUrl: "http://localhost:3000",
+    judge: context.judge,
   };
   machineHub?.setMissionHooks(createMissionHooks({ db, ...missionDeps }));
   const sources = [

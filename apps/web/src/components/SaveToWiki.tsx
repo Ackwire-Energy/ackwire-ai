@@ -1,4 +1,4 @@
-import { Button, Dialog, DialogBody, DialogFooter, Icon, SearchInput } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Icon, SearchField } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useWikiAction, useWikiTree } from "@/api/queries";
@@ -68,11 +68,14 @@ export function SaveToWikiDialog({
       width={520}
     >
       <DialogBody>
-        <SearchInput
+        <SearchField
+          size="sm"
           aria-label={t("wiki.savePick")}
           placeholder={t("wiki.search")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          onClear={() => setQ("")}
+          clearLabel={t("filters.clearSearch")}
         />
         {/* biome-ignore lint/a11y/useSemanticElements: a scroll region of page choices */}
         <div className="save-wiki__list" role="region" aria-label={t("wiki.savePick")}>

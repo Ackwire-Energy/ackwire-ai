@@ -1,4 +1,4 @@
-import { EmptyState, List, SearchInput, TabPanel, Tabs } from "@agenteschat/ui";
+import { EmptyState, List, SearchField, TabPanel, Tabs } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -44,11 +44,13 @@ export function SearchPage() {
       <header className="page__header">
         <h1 className="page-title">{t("searchPage.title")}</h1>
       </header>
-      <SearchInput
+      <SearchField
         aria-label={t("searchPage.label")}
         placeholder={t("searchPage.placeholder")}
         value={input}
         onChange={(e) => setInput(e.target.value)}
+        onClear={() => setInput("")}
+        clearLabel={t("filters.clearSearch")}
         autoFocus
       />
       <Tabs

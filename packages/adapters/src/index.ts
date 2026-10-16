@@ -9,6 +9,7 @@ import type { SearchIndexResolver } from "./search";
 
 export * from "./blob";
 export * from "./blob-postgres";
+export * from "./command-policy";
 export * from "./email";
 export * from "./keys";
 export * from "./machine-protocol";

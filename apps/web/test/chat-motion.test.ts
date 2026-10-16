@@ -14,6 +14,7 @@ import {
 } from "@/lib/chat";
 import { dayLabel } from "@/lib/format";
 import { initialReveal, REVEAL_MAX_LAG_MS, rebaseReveal, revealStep, wordEnd } from "@/lib/reveal";
+import { stepLabel } from "@/lib/work";
 import { applyChannelEvent, emptyStreams, runsInChannel } from "@/realtime/streams";
 
 const i18n = createI18n("pt-BR");
@@ -82,6 +83,33 @@ describe("humanized activity", () => {
     expect(toolActivity("query", "Himetrica")).toEqual({ kind: "consulting", app: "Himetrica" });
     expect(toolActivity("send_email")).toEqual({ kind: "usingTool" });
     expect(toolActivity("weird")).toEqual({ kind: "usingTool" });
+  });
+
+  test("mission tools (the agent's and the executor's MCP ones) have their own words; no raw names", () => {
+    const step = (tool: string) => {
+      const a = toolActivity(tool);
+      return stepLabel(t, { kind: a.kind, app: a.app, tool } as Parameters<typeof stepLabel>[1]);
+    };
+    expect(step("propose_mission")).toBe("Propôs uma missão");
+    expect(step("send_to_mission")).toBe("Mandou um recado para a missão");
+    expect(step("update_plan")).toBe("Atualizou o plano");
+    expect(step("mcp__agentes__update_plan")).toBe("Atualizou o plano");
+    expect(step("report")).toBe("Relatou o progresso");
+    expect(step("ask_decision")).toBe("Pediu uma decisão");
+    expect(step("request_review")).toBe("Pediu uma revisão");
+    expect(step("request_approval")).toBe("Pediu aprovação");
+    expect(step("start_task")).toBe("Começou uma tarefa");
+    expect(step("list_tasks")).toBe("Viu as tarefas");
+    expect(step("task_status")).toBe("Conferiu uma tarefa");
+    expect(step("cancel_task")).toBe("Cancelou uma tarefa");
+    expect(step("upload_artifact")).toBe("Mandou um arquivo para o Drive");
+    expect(step("get_context")).toBe("Consultou o contexto");
+    expect(step("computer_status")).toBe("Conferiu o PC");
+    expect(step("search_wiki")).toBe("Leu a wiki");
+    expect(step("mcp__github__list_prs")).toBe("Consultou o GitHub");
+    // Unknown: a generic sentence around the humanized name.
+    expect(step("send_email")).toBe("Usou a ferramenta send email");
+    expect(activityText(t, [entry("Theo", toolActivity("update_plan"))])).toBe("Theo está atualizando o plano…");
   });
 
   const entry = (name: string, activity: ActivityEntry["activity"], type: ActivityEntry["type"] = "agent") => ({

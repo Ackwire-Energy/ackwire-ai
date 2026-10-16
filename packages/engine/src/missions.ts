@@ -21,6 +21,7 @@ import { requireChannelAccess } from "./channels";
 import { eligibleChannelAgents } from "./dispatch";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
+import type { Judge } from "./judge";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import {
   formatDuration,
@@ -32,7 +33,7 @@ import {
 } from "./machine-tasks";
 import { MachineOfflineError, machineOnline } from "./machines";
 import { insertMessage, type Message, messageView } from "./messages";
-import { missionAllowRules } from "./mission-command-rules";
+import { missionAllowRules, pendingCommandCounts, pendingCommandsSql } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
 import { enqueueRunJob } from "./mission-runs";
 import { can, requirePermission } from "./organizations";
@@ -96,6 +97,18 @@ export type MissionExecutor = "claude" | "codex" | "agent";
 export const MISSION_EXECUTORS: readonly MissionExecutor[] = ["claude", "codex", "agent"];
 export const isMissionExecutor = (v: unknown): v is MissionExecutor =>
   typeof v === "string" && (MISSION_EXECUTORS as readonly string[]).includes(v);
+
+/**
+ * "Pedir aprovação de comandos" (ADR 0029): `always` (every command off the
+ * allow list gets a card), `low_risk_auto` (the judge allows the low-risk
+ * ones within what code allows; the default for new missions) or `never`
+ * (everything but the deny list). Stored as text; validated here.
+ */
+export type CommandApproval = "always" | "low_risk_auto" | "never";
+export const COMMAND_APPROVALS: readonly CommandApproval[] = ["always", "low_risk_auto", "never"];
+export const isCommandApproval = (v: unknown): v is CommandApproval =>
+  typeof v === "string" && (COMMAND_APPROVALS as readonly string[]).includes(v);
+export const commandApprovalOf = (v: unknown): CommandApproval => (isCommandApproval(v) ? v : "always");
 
 /**
  * Codex needs `exec --json`, `exec … resume <id>` and no `--full-auto` (ADR
@@ -173,6 +186,8 @@ export interface MissionDeps {
   search?: SearchDeps;
   /** Our public URL (the runner pushes uploads there). */
   publicUrl?: string;
+  /** Semantic judgments (judge.ts): low-risk commands in `low_risk_auto` missions. */
+  judge?: Judge;
 }
 
 // ── Prompts the executor gets (English, plain) ───────────────────────────────
@@ -408,6 +423,8 @@ export interface MissionView {
   status: MissionStatus;
   repoDir: string;
   resumeTasks: boolean;
+  /** "Pedir aprovação de comandos". */
+  commandApproval: CommandApproval;
   plan: {
     version: number;
     done: number;
@@ -425,6 +442,8 @@ export interface MissionView {
     suggestions: number;
     /** Requests to join waiting for an answer (0 for whoever can't answer them). */
     joinRequests: number;
+    /** Command cards waiting for an answer (0 for whoever can't answer them). */
+    commands: number;
   };
   /** The caller asked to join and nobody answered yet. */
   joinRequested: boolean;
@@ -465,7 +484,7 @@ export async function missionViews(
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const machineIds = [...new Set(rows.flatMap((r) => (r.machineId ? [r.machineId] : [])))];
-  const [roles, counts, machineRows, running, plans, joins] = await Promise.all([
+  const [roles, counts, machineRows, running, plans, joins, commands] = await Promise.all([
     db
       .select({ missionId: missionParticipants.missionId, role: missionParticipants.role })
       .from(missionParticipants)
@@ -525,6 +544,7 @@ export async function missionViews(
       .from(missionJoinRequests)
       .where(and(inArray(missionJoinRequests.missionId, ids), eq(missionJoinRequests.status, "pending")))
       .groupBy(missionJoinRequests.missionId),
+    pendingCommandCounts(db, ids),
   ]);
   const planOf = new Map(plans.map((p) => [p.missionId, Array.isArray(p.items) ? p.items : []]));
   const joinOf = new Map(joins.map((j) => [j.missionId, j]));
@@ -551,6 +571,7 @@ export async function missionViews(
       status: r.status,
       repoDir: r.repoDir,
       resumeTasks: r.resumeTasks,
+      commandApproval: commandApprovalOf(r.commandApproval),
       plan: {
         version: r.planVersion,
         done: r.planDone,
@@ -565,6 +586,7 @@ export async function missionViews(
         reviews: count(r.id, "review"),
         suggestions: 0,
         joinRequests: mayAct(role) ? Number(join?.n ?? 0) : 0,
+        commands: mayAct(role) ? (commands.get(r.id) ?? 0) : 0,
       },
       joinRequested: role === "none" && join?.mine === true,
       runningTasks: runningOf.get(r.id) ?? 0,
@@ -634,7 +656,8 @@ export interface ListMissionsInput {
 
 /**
  * Something waits for this person in the mission (`m`): they can act and a
- * decision, a review, a plan item, a suggestion or a request to join waits.
+ * decision, a review, a plan item, a suggestion, a request to join or a
+ * command card waits.
  */
 const waitingYouSql = (userId: string) => sql`(m.owner_id = ${userId} or exists (select 1 from ${missionParticipants} mp
     where mp.mission_id = m.id and mp.user_id = ${userId} and mp.role = 'decide'))
@@ -643,7 +666,8 @@ const waitingYouSql = (userId: string) => sql`(m.owner_id = ${userId} or exists 
     or exists (select 1 from ${missionReviews} mr where mr.mission_id = m.id and mr.status = 'pending')
     or exists (select 1 from ${missionJoinRequests} mj where mj.mission_id = m.id and mj.status = 'pending')
     or exists (select 1 from ${messages} sm where sm.org_id = m.org_id and sm.thread_id = m.thread_root_id
-      and sm.meta->'missionSuggestion'->>'status' = 'pending'))`;
+      and sm.meta->'missionSuggestion'->>'status' = 'pending')
+    or ${pendingCommandsSql(sql`m.id`)} > 0)`;
 
 const OPEN_SQL = sql`m.status in ('proposed', 'active', 'paused')`;
 
@@ -781,6 +805,8 @@ export interface ProposeInput {
   repoDir?: string | null;
   /** Who programs: default Claude Code when the computer has it, else our agent. */
   executor?: MissionExecutor | null;
+  /** Default `low_risk_auto`. */
+  commandApproval?: CommandApproval | null;
   runId?: string | null;
 }
 
@@ -811,6 +837,9 @@ export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
   if (input.executor != null && !isMissionExecutor(input.executor)) {
     throw new ValidationError("Choose claude, codex or agent", "mission.invalid_executor");
   }
+  if (input.commandApproval != null && !isCommandApproval(input.commandApproval)) {
+    throw new ValidationError("Choose always, low_risk_auto or never", "mission.invalid_command_approval");
+  }
   const machine = await usableMachine(deps, input.orgId, agent.machineId ?? null, input.executor ?? null);
   const existing = await missionOfThread(db, input.orgId, input.threadRootId);
   if (existing) throw new ConflictError("This thread already has a mission", "mission.exists");
@@ -836,6 +865,7 @@ export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
         goal,
         mainSessionId: crypto.randomUUID(),
         repoDir,
+        ...(input.commandApproval ? { commandApproval: input.commandApproval } : {}),
         createdBy: input.ownerId,
       })
       .onConflictDoNothing()
@@ -917,6 +947,7 @@ export async function createMission(
     threadId?: string | null;
     repoDir?: string | null;
     executor?: MissionExecutor | null;
+    commandApproval?: CommandApproval | null;
   },
 ) {
   const { db } = deps;
@@ -978,6 +1009,7 @@ export async function createMission(
     goal,
     repoDir: input.repoDir,
     executor: input.executor ?? null,
+    commandApproval: input.commandApproval ?? null,
   });
   // A mission made in someone else's thread: whoever started that thread decides too (when the agent answers them).
   if (rootAuthor && (await agentAnswers(db, mission, rootAuthor))) {
