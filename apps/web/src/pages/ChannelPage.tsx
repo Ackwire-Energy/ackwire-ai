@@ -77,7 +77,7 @@ import { objectUrls } from "@/components/artifacts/FileView";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
-import { ForumMessageCard, forumTopicOfMessage } from "@/components/Forum";
+import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { LiveCodeToggle, LiveWorkList } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
@@ -2032,7 +2032,10 @@ export const TimelineMessage = memo(function TimelineMessage({
   const missionCard = Boolean(missionPlan || missionDecision || missionReview || missionCommand);
   // The root of a mission in the channel: its work lives in its thread.
   const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.replyInThread !== undefined;
-  const card = approvalId || proposalId || memoryUpdates.length > 0 || question || secretRequest || missionCard;
+  // An agent suggests a topic ("Vale um fórum?"): only a person opens it.
+  const forumSuggestion = m.author.type === "agent" ? forumSuggestionOf(meta) : null;
+  const card =
+    approvalId || proposalId || memoryUpdates.length > 0 || question || secretRequest || missionCard || forumSuggestion;
   const feedback = m.author.type === "agent" && !card && !m.local;
   // People see name, time and text; the date, model and tokens wait behind the time.
   const usage = m.author.type === "agent" ? messageUsage(m) : null;
@@ -2134,6 +2137,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       {quoted && <QuotedMessage reply={quoted} />}
       {(!routine || routineOpen) &&
         !missionCard &&
+        !forumSuggestion &&
         (body.trim() || (!card && !canceledNote && artifacts.length === 0)) && (
           <MessageText>
             <MessageBody
@@ -2163,7 +2167,8 @@ export const TimelineMessage = memo(function TimelineMessage({
       {m.author.type === "agent" && m.agentRunId && !card && !m.local && (
         <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} />
       )}
-      {forumTopicId && <ForumMessageCard topicId={forumTopicId} />}
+      {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
+      {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
       {missionPlan && <MissionPlanCard plan={missionPlan} />}
       {missionDecision && <MissionDecisionCard message={missionDecision} />}
       {missionReview && <MissionReviewCard message={missionReview} />}

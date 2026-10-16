@@ -27,6 +27,7 @@ import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "@/api/typ
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { useArtifactViewer } from "@/components/artifacts/ArtifactViewer";
+import { IssueForumCard, NewTopicDialog } from "@/components/Forum";
 import { useOrg } from "@/components/org-context";
 import { useEmojiLabels } from "@/components/Reactions";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
@@ -171,6 +172,7 @@ export function IssueDetails({
           </div>
         ))}
       </section>
+      <IssueForum issue={i} />
       {variant === "panel" && <Links issue={i} />}
       <Activity issue={i} />
     </>
@@ -184,6 +186,86 @@ export function IssueDetails({
         <Links issue={i} />
       </aside>
     </div>
+  );
+}
+
+/**
+ * The forum around an issue (D45): its sub-issues, the topics that evaluate
+ * it ("Em avaliação no fórum" / "Avaliado", with the mini track) and, while
+ * open, "Avaliar no fórum" (the new-topic dialog, prefilled, format plan).
+ */
+function IssueForum({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const actors = useActors();
+  const [evaluating, setEvaluating] = useState(false);
+  const subs = i.subIssues ?? [];
+  const topics = i.forumTopics ?? [];
+  const requester = i.createdBy.type === "person" ? i.createdBy.id : null;
+  const requesterName = requester ? actors.name(i.createdBy) : "";
+  const g = agentGrammar(t, requesterName);
+  const originText = requester
+    ? t("forum.origin.issueBy", { number: i.number, name: requesterName, of: g.of })
+    : t("forum.origin.issue", { number: i.number });
+  const going = topics.some((x) => x.status === "open" || x.status === "stalled");
+  if (subs.length === 0 && topics.length === 0 && !isOpen(i)) return null;
+  return (
+    <section aria-label={t("forum.issue.section")} className="issue-details__section">
+      {subs.length > 0 && (
+        <>
+          <h3 className="ac-eyebrow">{t("forum.issue.subIssues", { count: subs.length })}</h3>
+          <ul className="forum-subl">
+            {subs.map((s) => (
+              <li key={s.id}>
+                <Link to="/org/$orgId/issues/$number" params={{ orgId: org.id, number: String(s.number) }}>
+                  <span className="forum-subl__num">#{s.number}</span>
+                  <span className="forum-subl__tx">{s.title}</span>
+                  {s.assignee && (
+                    <span className="forum-subl__who">
+                      <ActorAvatar actor={s.assignee} name={actors.name(s.assignee)} size="xs" />
+                      {actors.name(s.assignee)}
+                    </span>
+                  )}
+                  <Chip icon={STATUS_ICON[s.status]}>{t(`issues.status.${s.status}`)}</Chip>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {topics.map((x) => (
+        <IssueForumCard key={x.id} topicId={x.id} />
+      ))}
+      {isOpen(i) && !going && (
+        <div className="forum-evaluate">
+          <span className="forum-evaluate__t">
+            <b>
+              <Icon name="message" size={16} />
+              {t("forum.issue.evaluateTitle")}
+            </b>
+            <small>{t("forum.issue.evaluateText")}</small>
+          </span>
+          <Button size="sm" variant="primary" icon="message" onClick={() => setEvaluating(true)}>
+            {t("forum.issue.evaluate")}
+          </Button>
+        </div>
+      )}
+      <NewTopicDialog
+        open={evaluating}
+        onClose={() => setEvaluating(false)}
+        preset={{
+          title: i.title,
+          goal: i.description.trim().slice(0, 1000),
+          format: "plan",
+          rounds: 2,
+          agentIds: i.assignee?.type === "agent" ? [i.assignee.id] : [],
+          userIds: requester ? [requester] : [],
+          originIssueId: i.id,
+          originText,
+          heading: "fromIssue",
+        }}
+      />
+    </section>
   );
 }
 
@@ -383,7 +465,10 @@ function Activity({ issue }: { issue: Issue }) {
       {list.map((a) =>
         a.kind === "event" ? (
           <div key={a.id} className="issue-event small muted">
-            <Icon name={a.event === "agent_asked" ? "agent" : "waiting"} size={16} />
+            <Icon
+              name={a.event === "agent_asked" ? "agent" : a.textCode?.startsWith("forum_") ? "message" : "waiting"}
+              size={16}
+            />
             <span>
               <b className="issue-event__who">{actors.name(a.author)}</b> {eventText(a)}
               {a.auto && (
