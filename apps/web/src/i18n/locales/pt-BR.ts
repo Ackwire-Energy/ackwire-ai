@@ -348,7 +348,6 @@ export const ptBR = {
     summary_other: "{{people}} membros · {{agents}} agentes",
     approvals: "Aprovações",
     issues: "Issues",
-    missions: "Missões",
     missionsWaiting_one: "{{count}} missão esperando você",
     missionsWaiting_other: "{{count}} missões esperando você",
     threads: "Threads",

@@ -342,7 +342,6 @@ export const en: Translations = {
     summary_other: "{{people}} members · {{agents}} agents",
     approvals: "Approvals",
     issues: "Issues",
-    missions: "Missions",
     missionsWaiting_one: "{{count}} mission waiting for you",
     missionsWaiting_other: "{{count}} missions waiting for you",
     threads: "Threads",

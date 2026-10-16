@@ -165,7 +165,7 @@ export function ChannelThreadsButton({ channelId, channelName }: { channelId: st
       trigger={
         <Button size="sm" icon="thread" aria-label={t("threads.popover.button", { count: threads.length })}>
           <span className="thread-pop__label">{t("threads.popover.title")}</span>
-          <span className="thread-pop__count">({count})</span>
+          <span className="thread-pop__count">{count}</span>
         </Button>
       }
     >

@@ -21,7 +21,9 @@ describe("Missões (Threads.html)", () => {
     expect(screen().getByRole("heading", { level: 1, name: "Missões" })).toBeTruthy();
     expect(screen().getByText("Nenhuma missão ainda")).toBeTruthy();
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
-    expect(within(nav).getByRole("link", { name: /Missões/ })).toBeTruthy();
+    // Missões is a tab of Threads: one sidebar item.
+    expect(within(nav).getByRole("link", { name: /Threads/ })).toBeTruthy();
+    expect(within(nav).queryByRole("link", { name: /^Missões/ })).toBeNull();
   });
 
   test("a mission's card: title, agent, state, the plan as items, the computer, Abrir thread", async () => {
