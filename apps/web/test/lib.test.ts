@@ -95,8 +95,16 @@ describe("text", () => {
     expect(validInvites(first).map((i) => i.email)).toEqual(["marina@acme.com.br", "joao@acme.com.br"]);
   });
   test("onboarding steps: ordered, the optional ones marked", () => {
-    expect(ONBOARDING_STEPS.map((s) => s.id)).toEqual(["workspace", "context", "agents", "computer", "team", "done"]);
-    expect(ONBOARDING_STEPS.filter((s) => s.optional).map((s) => s.id)).toEqual(["computer", "team"]);
+    expect(ONBOARDING_STEPS.map((s) => s.id)).toEqual([
+      "workspace",
+      "context",
+      "import",
+      "agents",
+      "computer",
+      "team",
+      "done",
+    ]);
+    expect(ONBOARDING_STEPS.filter((s) => s.optional).map((s) => s.id)).toEqual(["import", "computer", "team"]);
   });
   test("password and amounts", () => {
     expect(passwordState("")).toBe("empty");

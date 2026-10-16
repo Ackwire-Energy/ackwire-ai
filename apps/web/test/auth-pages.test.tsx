@@ -3,6 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { act, cleanup, fireEvent } from "@testing-library/react";
 import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
@@ -119,9 +121,9 @@ describe("Onboarding", () => {
   const next = () => click(button("Continuar"), 6);
   const calls = (state: ReturnType<typeof seedState>, method: string) => state.calls.filter((c) => c.method === method);
 
-  /** Workspace → Contexto → Agentes e chave, with Ada (the default) and Theo. */
-  const throughAgents = async (state: ReturnType<typeof seedState>) => {
-    expect(screen().getByText("Passo 1 de 6")).toBeTruthy();
+  /** Workspace → Contexto, up to "Trazer seus agentes". */
+  const throughContext = async (state: ReturnType<typeof seedState>) => {
+    expect(screen().getByText("Passo 1 de 7")).toBeTruthy();
     expect(screen().getByRole("heading", { name: "Comece pelo seu workspace" })).toBeTruthy();
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     await type("Nome", "Acme Saúde");
@@ -137,6 +139,15 @@ describe("Onboarding", () => {
     expect(calls(state, "orgs.updateSettings")[1]?.args[1]).toEqual({
       context: "A Acme Saúde faz um app para clínicas.",
     });
+    expect(screen().getByRole("heading", { name: "Trazer seus agentes de outro lugar" })).toBeTruthy();
+    expect(screen().getByText("Passo 3 de 7 · opcional")).toBeTruthy();
+  };
+
+  /** Workspace → Contexto → (no import) → Agentes e chave, with Ada (the default) and Theo. */
+  const throughAgents = async (state: ReturnType<typeof seedState>) => {
+    await throughContext(state);
+    // Optional: continuing without a source brings nothing.
+    await next();
 
     expect(screen().getByRole("heading", { name: "Escolha seus primeiros agentes" })).toBeTruthy();
     expect(button(/Ada · Dev/).getAttribute("aria-pressed")).toBe("true");
@@ -194,7 +205,7 @@ describe("Onboarding", () => {
     });
     expect(calls(state, "chat.addMember")).toHaveLength(2);
     expect(screen().getByRole("heading", { name: "Onde os agentes trabalham" })).toBeTruthy();
-    expect(screen().getByText("Passo 4 de 6 · opcional")).toBeTruthy();
+    expect(screen().getByText("Passo 5 de 7 · opcional")).toBeTruthy();
   });
 
   test("computer: this computer creates a pairing, shows the command and connects live; team invites go out", async () => {
@@ -264,6 +275,123 @@ describe("Onboarding", () => {
     expect(summary).toContain("Convites0");
     // The rail marks the steps done and lets you go back.
     const steps = screen().getByRole("navigation", { name: "Passos para começar" });
-    expect(steps.querySelectorAll("li[data-done]")).toHaveLength(5);
+    expect(steps.querySelectorAll("li[data-done]")).toHaveLength(6);
+  });
+
+  const fixture = (name: string) => readFileSync(join(import.meta.dir, "fixtures", "agent-import", name), "utf8");
+  const pickFiles = async (files: File[]) => {
+    const input = document.querySelector('.onb__main input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, "files", { configurable: true, value: files });
+    await act(async () => fireEvent.change(input));
+    await settle(8);
+  };
+  const keyAndContinue = async () => {
+    await type("Chave da API da Anthropic", "sk-ant-api03-abcdefghijklmnop");
+    await next();
+    await settle(4);
+  };
+
+  test("import: an OpenMausBot team file → what was found → the agents step prefilled → created with their instructions", async () => {
+    const { state } = await start();
+    await throughContext(state);
+    expect(button(/Começar do zero/).getAttribute("aria-pressed")).toBe("false");
+    await click(button(/OpenMausBot/), 1);
+    expect(button(/OpenMausBot/).getAttribute("aria-pressed")).toBe("true");
+    expect(document.body.textContent).toContain("Compartilhar time… → Salvar arquivo");
+
+    await pickFiles([new File([fixture("sales-desk.openmaus.json")], "sales-desk.openmaus.json")]);
+    expect(screen().getByRole("heading", { name: "Sales desk" })).toBeTruthy();
+    const bring = (name: string) => screen().getByRole("checkbox", { name: `Trazer ${name}` });
+    for (const name of ["Morgan", "Scout", "Quill"]) expect(bring(name).getAttribute("aria-checked")).toBe("true");
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("O que não vem junto");
+    expect(text).toContain("pricing-policy, research-brief, objection-handling");
+    expect(text).toContain("Daily digest (Scout), Weekly pipeline review (Morgan)");
+    expect(text).toContain("CRM (mcp.example.com)");
+    expect(text).toContain("Chaves, senhas e histórico de conversa nunca vêm.");
+    expect(text).toContain("Os agentes chegam com o modelo e a chave do workspace");
+    // Nothing is saved while reading.
+    expect(calls(state, "agents.create")).toHaveLength(0);
+
+    await click(bring("Quill"), 1);
+    expect(bring("Quill").getAttribute("aria-checked")).toBe("false");
+    await next();
+
+    expect(screen().getByRole("heading", { name: "Seus agentes, e mais alguém?" })).toBeTruthy();
+    expect(button(/Morgan · Sales lead/).getAttribute("aria-pressed")).toBe("true");
+    expect(button(/Scout · Prospect researcher/).getAttribute("aria-pressed")).toBe("true");
+    expect(button(/Quill · Outreach writer/).getAttribute("aria-pressed")).toBe("false");
+    expect(button(/Ada · Dev/).getAttribute("aria-pressed")).toBe("true");
+    expect(screen().getByText("3 agentes no #general.")).toBeTruthy();
+    await keyAndContinue();
+
+    const created = calls(state, "agents.create").map((c) => c.args[1] as Record<string, unknown>);
+    expect(created.map((a) => a.name)).toEqual(["Ada", "Morgan", "Scout"]);
+    expect(created[1]).toMatchObject({
+      name: "Morgan",
+      handle: "lead",
+      role: "Sales lead",
+      model: "claude-sonnet-5-5",
+      credentialId: null,
+      appearance: { color: "violet" },
+    });
+    expect(String(created[1]?.instructions)).toStartWith(
+      "You coordinate the desk. Keep answers short and cite the price list.\n\n## Qualify a lead",
+    );
+    expect(created[2]).toMatchObject({ handle: "scout", role: "Prospect researcher", appearance: { color: "sky" } });
+    expect(calls(state, "chat.addMember")).toHaveLength(3);
+    expect(screen().getByRole("heading", { name: "Onde os agentes trabalham" })).toBeTruthy();
+
+    // They're in the crew at the end.
+    await click(button("Pular por agora"), 6);
+    await next();
+    expect(document.body.textContent).toContain("Ada, Morgan e Scout já estão no #general.");
+  });
+
+  test("import: an OpenBot GitHub link is read by the backend; a bad link says so; starting from scratch drops it", async () => {
+    const { state } = await start();
+    const url = "https://github.com/acme/pacote/tree/main/tenant";
+    state.githubFiles = {
+      [url]: [
+        { path: "agents.yaml", text: fixture("agents.yaml") },
+        { path: "model.yaml", text: fixture("model.yaml") },
+      ],
+    };
+    await throughContext(state);
+    await click(button(/OpenBot/), 1);
+
+    await type("Ou um link público do GitHub", "https://github.com/acme/nada/blob/main/agents.yaml");
+    await click(button("Ler link"), 8);
+    expect(screen().getByRole("alert").textContent).toContain("Não deu para ler esse link");
+
+    await type("Ou um link público do GitHub", url);
+    await click(button("Ler link"), 8);
+    expect(calls(state, "agents.importFromGithub").at(-1)?.args[1]).toBe(url);
+    expect(screen().getByRole("heading", { name: "agents.yaml, model.yaml" })).toBeTruthy();
+    expect(screen().getByRole("checkbox", { name: "Trazer General Assistant" })).toBeTruthy();
+    expect(screen().getByRole("checkbox", { name: "Trazer Knowledge" })).toBeTruthy();
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Risk Analyst (remote-ag-ui), Your Bot (remote-ag-ui)");
+    expect(text).toContain("openai · gpt-5.6-terra");
+    expect(text).toContain("openai-api-key");
+
+    // Start from scratch: nothing imported reaches the agents step.
+    await click(button(/Começar do zero/), 1);
+    expect(screen().queryByRole("checkbox", { name: "Trazer Knowledge" })).toBeNull();
+    await next();
+    expect(screen().getByRole("heading", { name: "Escolha seus primeiros agentes" })).toBeTruthy();
+    expect(screen().queryByRole("button", { name: /Knowledge · Company Knowledge/ })).toBeNull();
+    await keyAndContinue();
+    expect(calls(state, "agents.create").map((c) => (c.args[1] as { name: string }).name)).toEqual(["Ada"]);
+  });
+
+  test("import: a file that isn't a team file is refused; skipping the step clears the source", async () => {
+    const { state } = await start();
+    await throughContext(state);
+    await click(button(/OpenMausBot/), 1);
+    await pickFiles([new File([fixture("agents.yaml")], "agents.yaml")]);
+    expect(screen().getByRole("alert").textContent).toContain("Isso não parece um arquivo de time do OpenMausBot");
+    await click(button("Pular por agora"), 6);
+    expect(screen().getByRole("heading", { name: "Escolha seus primeiros agentes" })).toBeTruthy();
   });
 });

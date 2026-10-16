@@ -61,6 +61,8 @@ export interface FakeState {
   /** `GET …/channels/{id}/active-runs`; unset = the endpoint doesn't exist yet (404). */
   activeRuns?: Record<string, ActiveRun[]>;
   platformKey: boolean;
+  /** What `agents.importFromGithub` returns per link (else a 400 like the backend's). */
+  githubFiles?: Record<string, { path: string; text: string }[]>;
   online: Set<string>;
   memories: Memory[];
   proposals: Proposal[];
@@ -835,6 +837,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.credentials = state.credentials.filter((c) => c.id !== credentialId);
       },
       platformKeyAvailable: async () => state.platformKey,
+      importFromGithub: async (orgId, url) => {
+        log("agents.importFromGithub", orgId, url);
+        const files = state.githubFiles?.[url];
+        if (!files) throw new ApiError(400, "invalid_request", `GitHub answered 404 for ${new URL(url).pathname}`);
+        return { files };
+      },
       detail: async (_orgId, agentId) => {
         const a = state.agents.find((x) => x.id === agentId);
         if (!a) throw new ApiError(404, "not_found", "Agent not found");

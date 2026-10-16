@@ -315,7 +315,25 @@ export async function importSkillZip(deps: SkillDeps, actorId: string, orgId: st
 
 const GITHUB_HOSTS = new Set(["github.com", "raw.githubusercontent.com", "api.github.com"]);
 
-async function fetchChecked(deps: SkillDeps, url: string, accept: string) {
+/** Outbound HTTP and DNS for GitHub reads (tests: fakes). */
+export interface GithubFetchDeps {
+  fetch?: (url: string, init?: RequestInit) => Promise<Response>;
+  resolveHost?: ResolveHost;
+}
+
+/**
+ * GET one GitHub URL (github.com, raw.githubusercontent.com or api.github.com
+ * only), with the SSRF guard, no redirects, a 15 s timeout and a size cap.
+ */
+export async function fetchGithub(
+  deps: GithubFetchDeps,
+  url: string,
+  accept: string,
+  limit: { maxBytes: number; tooLarge: string } = {
+    maxBytes: SKILL_LIMITS.maxBytes,
+    tooLarge: "The skill is too large (max 2 MB)",
+  },
+) {
   const u = await assertPublicHttpsUrl(url, deps.resolveHost);
   if (!GITHUB_HOSTS.has(u.hostname)) throw new ValidationError("Only GitHub URLs can be imported for now");
   const http = deps.fetch ?? ((input: string, init?: RequestInit) => fetch(input, init));
@@ -328,11 +346,13 @@ async function fetchChecked(deps: SkillDeps, url: string, accept: string) {
   });
   if (!res.ok) throw new ValidationError(`GitHub answered ${res.status} for ${u.pathname}`);
   const length = Number(res.headers.get("content-length") ?? 0);
-  if (length > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
+  if (length > limit.maxBytes) throw new ValidationError(limit.tooLarge);
   const data = new Uint8Array(await res.arrayBuffer());
-  if (data.byteLength > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
+  if (data.byteLength > limit.maxBytes) throw new ValidationError(limit.tooLarge);
   return data;
 }
+
+const fetchChecked = (deps: SkillDeps, url: string, accept: string) => fetchGithub(deps, url, accept);
 
 /**
  * Where a GitHub URL points: a folder (`/tree/{ref}/{path}`) or one

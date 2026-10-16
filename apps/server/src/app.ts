@@ -6,6 +6,7 @@ import { apiError, domainErrorResponse, validationHook } from "./http/errors";
 import { createLogger, type Logger } from "./logger";
 import { accessRoutes } from "./routes/app/access";
 import { accountRoutes } from "./routes/app/account";
+import { agentImportRoutes } from "./routes/app/agent-imports";
 import { agentRoutes } from "./routes/app/agents";
 import { approvalRoutes } from "./routes/app/approvals";
 import { artifactRoutes } from "./routes/app/artifacts";
@@ -108,6 +109,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", routineRoutes(deps));
     api.route("/app", calendarRoutes(deps));
     api.route("/app", skillRoutes(deps));
+    api.route("/app", agentImportRoutes(deps));
     api.route("/app", sandboxRoutes(deps));
     api.route("/app", machineAppRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));

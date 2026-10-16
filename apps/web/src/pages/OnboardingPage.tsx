@@ -24,9 +24,18 @@ import { useMachines, useModels, useSandboxSettings } from "@/api/queries";
 import type { Machine, MachinePairing, Role } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { CommandBlock, countdown, NO_EXEC_FLAG, osOf, PAIR_POLL_MS, useNow } from "@/components/Machines";
+import { type ImportChoice, OnboardingImport } from "@/components/OnboardingImport";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { OnboardingHorizon, WelcomeSky } from "@/components/Sky";
 import { ZonePicker } from "@/components/ZoneSelect";
+import {
+  IMPORT_MAX_BYTES,
+  ImportError,
+  type ImportResult,
+  importedModel,
+  parseImport,
+  uniqueHandle,
+} from "@/lib/agent-import";
 import { errorText } from "@/lib/errors";
 import { joinNames } from "@/lib/format";
 import { addInvites, type InviteDraft, ONBOARDING_STEPS, type OnboardingStepId, validInvites } from "@/lib/onboarding";
@@ -54,6 +63,18 @@ const TYPING_MS = 900;
 const HAPPY_MS = 1600;
 
 type Computer = "cloud" | "machine" | null;
+/** An agent created here (a preset or an imported one), for the later steps. */
+interface CrewMember {
+  key: string;
+  name: string;
+  appearance: AgentAppearance;
+  initials?: string;
+}
+/** An imported agent once created: its source key (per file), id and handle. */
+interface ImportedCrew extends CrewMember {
+  id: string;
+  handle: string;
+}
 type InstallOs = "darwin" | "linux" | "windows";
 const INSTALL_OSES: InstallOs[] = ["darwin", "linux", "windows"];
 
@@ -109,6 +130,11 @@ export function OnboardingPage() {
   // Context
   const [context, setContext] = useState("");
   const [savedContext, setSavedContext] = useState("");
+  // Import (OpenMausBot / OpenBot): the parsed file, the agents to bring, the ones created.
+  const [importFrom, setImportFrom] = useState<ImportChoice>(null);
+  const [imported, setImported] = useState<ImportResult | null>(null);
+  const [importPick, setImportPick] = useState<Set<string>>(new Set());
+  const [importedCrew, setImportedCrew] = useState<ImportedCrew[]>([]);
   // Agents and key
   const [chosen, setChosen] = useState<Set<Preset>>(new Set([GUIDE]));
   const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>({});
@@ -138,6 +164,24 @@ export function OnboardingPage() {
     desc: t(`onboarding.presets.${p}.desc`),
   });
   const createdPresets = PRESETS.filter((p) => agentIds[p]);
+  /** The import in use (none after "Começar do zero" or picking another source). */
+  const active = imported && importFrom === imported.source ? imported : null;
+  /** An imported agent's identity across files: the source, the files and its key. */
+  const importKey = (key: string) => `${active?.source}:${active?.files.join(",")}:${key}`;
+  const pickedImports = active ? active.agents.filter((a) => importPick.has(a.key)) : [];
+  const chosenCount = chosen.size + pickedImports.length;
+  const crew: CrewMember[] = [
+    ...createdPresets.map((p) => ({
+      key: p,
+      name: presetInfo(p).name,
+      appearance: PRESET_LOOK[p],
+      initials: p === "atlas" ? "At" : undefined,
+    })),
+    ...importedCrew,
+  ];
+  const crewIds = [...createdPresets.map((p) => agentIds[p]), ...importedCrew.map((c) => c.id)].filter(
+    (id): id is string => Boolean(id),
+  );
   const ready = validInvites(invites);
   const toSend = ready.filter((i) => !sent.has(i.email));
 
@@ -173,6 +217,45 @@ export function OnboardingPage() {
       setSavedContext(context);
     },
   });
+
+  const readImport = useMutation({
+    mutationFn: async (input: { files: File[] } | { url: string }) => {
+      if (!created || importFrom === null || importFrom === "none") return null;
+      const source = importFrom;
+      const files =
+        "files" in input
+          ? await Promise.all(
+              input.files.map(async (f) => {
+                if (f.size > IMPORT_MAX_BYTES) throw new ImportError("tooLarge");
+                return { name: f.webkitRelativePath || f.name, text: await f.text() };
+              }),
+            )
+          : (await api.agents.importFromGithub(created.orgId, input.url)).files.map((f) => ({
+              name: f.path,
+              text: f.text,
+            }));
+      const list = await qc.fetchQuery({ queryKey: keys.models, queryFn: () => api.agents.models() });
+      return parseImport(source, files, { models: list.models.map((m) => m.id) });
+    },
+    meta: { silent: true },
+    onSuccess: (result) => {
+      if (!result) return;
+      setImported(result);
+      setImportPick(new Set(result.agents.map((a) => a.key)));
+    },
+  });
+  const importError = readImport.isError
+    ? readImport.error instanceof ImportError
+      ? t(`onboarding.import.errors.${readImport.error.code}`)
+      : readImport.variables && "url" in readImport.variables
+        ? t("onboarding.import.errors.link")
+        : t("onboarding.import.errors.read")
+    : null;
+  const resetImport = () => {
+    setImported(null);
+    setImportPick(new Set());
+    readImport.reset();
+  };
 
   const saveAgents = useMutation({
     mutationFn: async () => {
@@ -211,6 +294,31 @@ export function OnboardingPage() {
         ids[p] = agent.id;
         setAgentIds({ ...ids });
       }
+      // Imported agents: their own name, role and instructions; our model unless theirs is in the catalog.
+      const crewSoFar = [...importedCrew];
+      const used = new Set([
+        ...PRESETS.filter((p) => ids[p]).map((p) => handleFrom(presetInfo(p).name)),
+        ...crewSoFar.map((c) => c.handle),
+      ]);
+      const modelIds = list.models.map((m) => m.id);
+      for (const a of pickedImports) {
+        const key = importKey(a.key);
+        if (crewSoFar.some((c) => c.key === key)) continue;
+        const handle = uniqueHandle(a.handle, used);
+        used.add(handle);
+        const agent = await api.agents.create(created.orgId, {
+          name: a.name,
+          handle,
+          role: a.role || undefined,
+          instructions: a.instructions || undefined,
+          model: importedModel(a, modelIds, suggestModel(list.models, provider, list.defaultModel)),
+          credentialId: null,
+          appearance: a.appearance,
+        });
+        await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: agent.id });
+        crewSoFar.push({ key, id: agent.id, handle, name: a.name, appearance: a.appearance });
+        setImportedCrew([...crewSoFar]);
+      }
     },
   });
 
@@ -226,10 +334,7 @@ export function OnboardingPage() {
       }
       // The chosen agents work on the connected computer (else they keep the cloud one).
       if (computer === "machine" && machine) {
-        for (const p of createdPresets) {
-          const agentId = agentIds[p];
-          if (agentId) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
-        }
+        for (const agentId of crewIds) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
       }
     },
   });
@@ -288,6 +393,9 @@ export function OnboardingPage() {
       if (step.id === "team") await sendInvites.mutateAsync();
     } else if (step.id === "computer") {
       setComputer(null);
+    } else if (step.id === "import") {
+      setImportFrom(null);
+      resetImport();
     }
     setDone((d) => new Set(d).add(step.id));
     guide.cheer();
@@ -298,13 +406,14 @@ export function OnboardingPage() {
     saveWorkspace.isPending ||
     saveContext.isPending ||
     saveAgents.isPending ||
+    readImport.isPending ||
     saveComputer.isPending ||
     sendInvites.isPending ||
     finish.isPending;
   const keyOk = key === "platform" || keySaved || keyLooksValid(key, apiKey);
   const blocked =
     (step.id === "workspace" && !org.trim()) ||
-    (step.id === "agents" && (chosen.size === 0 || !keyOk)) ||
+    (step.id === "agents" && (chosenCount === 0 || !keyOk)) ||
     (step.id === "computer" && computer === null);
 
   /** The heading's step (the last one has its own welcome card). */
@@ -319,19 +428,24 @@ export function OnboardingPage() {
       : step.id === "team" && toSend.length > 0
         ? t("onboarding.team.inviteAndContinue")
         : t("common.continue");
-  const showSkip = step.id === "computer" || (step.id === "team" && toSend.length > 0);
+  const showSkip =
+    step.id === "computer" ||
+    (step.id === "import" && importFrom !== null && importFrom !== "none") ||
+    (step.id === "team" && toSend.length > 0);
   const hint =
     step.id === "workspace"
       ? t("onboarding.workspace.hint")
       : step.id === "context"
         ? t("onboarding.context.hint")
-        : step.id === "agents"
-          ? chosen.size > 0
-            ? t("onboarding.agents.count", { count: chosen.size })
-            : t("onboarding.agents.none")
-          : step.id === "team" && ready.length > 0
-            ? t("onboarding.team.ready", { count: ready.length })
-            : "";
+        : step.id === "import" && active
+          ? t("onboarding.import.hint")
+          : step.id === "agents"
+            ? chosenCount > 0
+              ? t("onboarding.agents.count", { count: chosenCount })
+              : t("onboarding.agents.none")
+            : step.id === "team" && ready.length > 0
+              ? t("onboarding.team.ready", { count: ready.length })
+              : "";
 
   return (
     <div className="onb">
@@ -388,7 +502,11 @@ export function OnboardingPage() {
           {head && (
             <header className="onb__head">
               <p className="onb__eyebrow">{eyebrow}</p>
-              <h1 className="onb__title">{t(`onboarding.${head}.title`)}</h1>
+              <h1 className="onb__title">
+                {head === "agents" && active?.agents.length
+                  ? t("onboarding.agents.importedTitle")
+                  : t(`onboarding.${head}.title`)}
+              </h1>
               <p className="onb__lead">{t(`onboarding.${head}.lead`)}</p>
             </header>
           )}
@@ -469,8 +587,63 @@ export function OnboardingPage() {
             </Card>
           )}
 
+          {step.id === "import" && (
+            <OnboardingImport
+              source={importFrom}
+              onSource={(s) => {
+                setImportFrom(s);
+                if (s !== imported?.source) readImport.reset();
+              }}
+              result={imported}
+              picked={importPick}
+              onPick={(key, on) =>
+                setImportPick((p) => {
+                  const next = new Set(p);
+                  if (on) next.add(key);
+                  else next.delete(key);
+                  return next;
+                })
+              }
+              reading={readImport.isPending}
+              error={importError}
+              onFiles={(files) => readImport.mutate({ files })}
+              onLink={(url) => readImport.mutate({ url })}
+              onReset={resetImport}
+            />
+          )}
+
           {step.id === "agents" && (
             <>
+              {active && active.agents.length > 0 && (
+                <>
+                  <h2 className="onb__group">{t("onboarding.agents.imported")}</h2>
+                  {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+                  <div className="grid-options" role="group" aria-label={t("onboarding.agents.importedLabel")}>
+                    {active.agents.map((a) => (
+                      <OptionCard
+                        key={a.key}
+                        agent
+                        pressed={importPick.has(a.key)}
+                        onClick={() =>
+                          setImportPick((p) => {
+                            const next = new Set(p);
+                            if (next.has(a.key)) next.delete(a.key);
+                            else next.add(a.key);
+                            return next;
+                          })
+                        }
+                      >
+                        <AgentAvatar name={a.name} appearance={a.appearance} />
+                        <span className="ac-option__text">
+                          <span className="ac-option__title">{a.role ? `${a.name} · ${a.role}` : a.name}</span>
+                          {a.description && <span className="ac-option__desc">{a.description}</span>}
+                        </span>
+                      </OptionCard>
+                    ))}
+                  </div>
+                  <h2 className="onb__group">{t("onboarding.agents.ready")}</h2>
+                </>
+              )}
               {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
               <div className="grid-options" role="group" aria-label={t("onboarding.agents.listLabel")}>
                 {PRESETS.map((p) => {
@@ -618,19 +791,13 @@ export function OnboardingPage() {
           )}
 
           {step.id === "team" && created && (
-            <TeamStep
-              orgId={created.orgId}
-              invites={invites}
-              sent={sent}
-              onChange={setInvites}
-              agents={createdPresets}
-            />
+            <TeamStep orgId={created.orgId} invites={invites} sent={sent} onChange={setInvites} agents={crew} />
           )}
 
           {step.id === "done" && (
             <DoneStep
               orgName={orgName}
-              agents={createdPresets}
+              agents={crew}
               computer={computer === "cloud" ? "cloud" : computer === "machine" ? (machine?.name ?? null) : undefined}
               invites={sent.size}
             />
@@ -892,7 +1059,7 @@ function TeamStep({
   invites: InviteDraft[];
   sent: Set<string>;
   onChange: (list: InviteDraft[]) => void;
-  agents: Preset[];
+  agents: CrewMember[];
 }) {
   const { t } = useTranslation();
   const api = useApi();
@@ -1021,8 +1188,8 @@ function TeamStep({
       {agents.length > 0 && (
         <div className="row small muted" style={{ gap: 8 }}>
           <span>{t("onboarding.team.meet")}</span>
-          {agents.map((p) => (
-            <AgentAvatar key={p} name={t(`onboarding.presets.${p}.name`)} appearance={PRESET_LOOK[p]} size="sm" />
+          {agents.map((a) => (
+            <AgentAvatar key={a.key} name={a.name} initials={a.initials} appearance={a.appearance} size="sm" />
           ))}
         </div>
       )}
@@ -1038,7 +1205,7 @@ function DoneStep({
   invites,
 }: {
   orgName: string;
-  agents: Preset[];
+  agents: CrewMember[];
   /** "cloud", a machine's name, null while it waits to connect, undefined when skipped. */
   computer: string | null | undefined;
   invites: number;
@@ -1046,7 +1213,7 @@ function DoneStep({
   const { t } = useTranslation();
   const text = useRef<HTMLDivElement>(null);
   const names = joinNames(
-    agents.map((p) => t(`onboarding.presets.${p}.name`)),
+    agents.map((a) => a.name),
     t("newAgent.and"),
   );
   const computerLabel =
@@ -1076,8 +1243,8 @@ function DoneStep({
         </div>
         {agents.length > 0 && (
           <div className="onb__crew" aria-hidden="true">
-            {agents.map((p) => (
-              <AgentAvatar key={p} name={t(`onboarding.presets.${p}.name`)} appearance={PRESET_LOOK[p]} size="lg" />
+            {agents.map((a) => (
+              <AgentAvatar key={a.key} name={a.name} initials={a.initials} appearance={a.appearance} size="lg" />
             ))}
           </div>
         )}

@@ -167,6 +167,8 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         }),
       platformKeyAvailable: async (orgId) =>
         (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
+      importFromGithub: (orgId, url) =>
+        request<{ files: { path: string; text: string }[] }>(`${org(orgId)}/agent-imports/github`, { json: { url } }),
       detail: (orgId, agentId) => request<AgentDetail>(`${org(orgId)}/agents/${enc(agentId)}`),
       channels: async (orgId, agentId) =>
         (await request<{ channels: AgentChannel[] }>(`${org(orgId)}/agents/${enc(agentId)}/channels`)).channels,

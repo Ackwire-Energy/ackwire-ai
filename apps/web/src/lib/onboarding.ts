@@ -3,12 +3,13 @@ import { isEmail } from "@/lib/text";
 
 /**
  * The onboarding's steps, in order (docs/design/telas/OnboardingV2.html).
- * "import" (bring agents from OpenMausBot / OpenBot) comes later, between
- * "context" and "agents": add it here and render its view.
+ * "import" brings agents from OpenMausBot / OpenBot (lib/agent-import.ts);
+ * they arrive chosen in "agents".
  */
 export const ONBOARDING_STEPS = [
   { id: "workspace", optional: false },
   { id: "context", optional: false },
+  { id: "import", optional: true },
   { id: "agents", optional: false },
   { id: "computer", optional: true },
   { id: "team", optional: true },

@@ -174,6 +174,8 @@ export interface ApiClient {
     removeCredential(orgId: string, credentialId: string, purge?: boolean): Promise<void>;
     /** Whether this server offers the platform key (Cloud). */
     platformKeyAvailable(orgId: string): Promise<boolean>;
+    /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
+    importFromGithub(orgId: string, url: string): Promise<{ files: { path: string; text: string }[] }>;
     detail(orgId: string, agentId: string): Promise<AgentDetail>;
     channels(orgId: string, agentId: string): Promise<AgentChannel[]>;
     setChannels(
