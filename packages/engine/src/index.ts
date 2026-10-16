@@ -84,6 +84,7 @@ export * from "./secrets";
 export * from "./skill-tools";
 export * from "./skills";
 export * from "./storage";
+export * from "./threads";
 export * from "./tools/gateway";
 export * from "./tools/json-schema";
 export * from "./tools/scopes";

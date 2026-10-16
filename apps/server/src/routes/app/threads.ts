@@ -1,0 +1,249 @@
+import {
+  archiveThread,
+  closeThread,
+  createThreadFromRange,
+  deleteThread,
+  getThread,
+  listThreads,
+  moveContextIntoThread,
+  reopenThread,
+  returnContextToChannel,
+  type ThreadDeps,
+  unarchiveThread,
+  updateThread,
+} from "@agenteschat/engine";
+import { createRoute, z } from "@hono/zod-openapi";
+import {
+  type AppDeps,
+  body,
+  createAppRouter,
+  errors,
+  json,
+  noContent,
+  OrgParams,
+  requireSession,
+  security,
+} from "./context";
+
+const tags = ["Threads"];
+const Actor = z.object({ type: z.enum(["person", "agent"]), id: z.string().nullable() });
+const State = z.enum(["open", "closed", "archived"]);
+const Tab = z.enum(["all", "working", "closed", "archived"]);
+
+const Thread = z
+  .object({
+    id: z.uuid().openapi({ description: "The root message id (what replies carry as `threadId`)." }),
+    channelId: z.uuid(),
+    channelName: z.string(),
+    channelKind: z.enum(["channel", "dm", "forum"]),
+    title: z.string().nullable().openapi({ description: "Null: show `rootText`." }),
+    rootText: z.string(),
+    rootAuthor: Actor,
+    state: State,
+    createdBy: z.string().nullable(),
+    closedBy: z.string().nullable(),
+    closedAt: z.string().nullable(),
+    archivedBy: z.string().nullable(),
+    archivedAt: z.string().nullable(),
+    context: z
+      .object({
+        channelId: z.uuid(),
+        firstMessageId: z.uuid(),
+        lastMessageId: z.uuid(),
+        excludedMessageIds: z.array(z.uuid()),
+        moved: z.boolean().openapi({ description: "The range left the channel (a stub stays there)." }),
+        count: z.number(),
+      })
+      .nullable()
+      .openapi({ description: "The range of a conversation this thread was made from." }),
+    replyCount: z.number(),
+    lastActivityAt: z.string(),
+    lastMessage: z.object({ author: Actor, excerpt: z.string(), createdAt: z.string() }).nullable(),
+    participants: z.array(Actor),
+    working: z.boolean().openapi({ description: "An agent run is in progress (or waiting) in this thread." }),
+    needsYou: z.boolean(),
+    canManage: z.boolean().openapi({ description: "You may close, archive, rename or change the context." }),
+    createdAt: z.string(),
+  })
+  .openapi("Thread");
+
+const ThreadParams = OrgParams.extend({ threadId: z.uuid() });
+const ChannelParams = OrgParams.extend({ channelId: z.uuid() });
+const ListQuery = z.object({
+  tab: Tab.optional(),
+  agentId: z.uuid().optional(),
+  needsYou: z.stringbool().optional(),
+  mine: z.stringbool().optional(),
+  q: z.string().max(200).optional(),
+  cursor: z.string().max(400).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+const ThreadList = z.object({ threads: z.array(Thread), nextCursor: z.string().nullable() });
+
+/**
+ * Threads (ADR 0029): the Threads page, a thread made from a range of a
+ * conversation, moving that range out of the channel and back, closing and
+ * archiving. Everyone who reads the channel sees its threads; its creator,
+ * the root's author and admins manage them.
+ */
+export function threadRoutes(deps: AppDeps) {
+  const { db, adapters } = deps;
+  const app = createAppRouter(deps);
+  app.use("/organizations/*", requireSession(deps.auth));
+  const threads = (): ThreadDeps => ({ db, pubsub: adapters.pubsub });
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/threads",
+      tags,
+      security,
+      summary: "Threads you can see, most recent activity first",
+      request: { params: OrgParams, query: ListQuery.extend({ channelId: z.uuid().optional() }) },
+      responses: { 200: json(ThreadList), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const list = await listThreads(db, c.get("user").id, { orgId, ...c.req.valid("query") });
+      return c.json(list, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/threads",
+      tags,
+      security,
+      summary: "A channel's threads (its \"Threads (N)\")",
+      request: { params: ChannelParams, query: ListQuery },
+      responses: { 200: json(ThreadList), ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      const list = await listThreads(db, c.get("user").id, { orgId, channelId, ...c.req.valid("query") });
+      return c.json(list, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/threads",
+      tags,
+      security,
+      summary: "Create a thread from a range of a conversation (the range is its context; nothing moves)",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            channelId: z.uuid().openapi({ description: "Where the thread lives." }),
+            contextChannelId: z.uuid().optional().openapi({
+              description:
+                "Where the range comes from (default: `channelId`). Refused with `thread.context_not_visible` when someone in `channelId` can't see it.",
+            }),
+            firstMessageId: z.uuid(),
+            lastMessageId: z.uuid(),
+            excludedMessageIds: z.array(z.uuid()).max(500).optional(),
+            title: z.string().max(200).nullable().optional().openapi({
+              description: "Default: made from the first message of the range.",
+            }),
+          }),
+        ),
+      },
+      responses: { 201: json(Thread, "Created"), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const thread = await createThreadFromRange(threads(), c.get("user").id, { orgId, ...c.req.valid("json") });
+      return c.json(thread, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/threads/{threadId}",
+      tags,
+      security,
+      summary: "One thread (any state)",
+      request: { params: ThreadParams },
+      responses: { 200: json(Thread), ...errors },
+    }),
+    async (c) => {
+      const { orgId, threadId } = c.req.valid("param");
+      return c.json(await getThread(db, c.get("user").id, orgId, threadId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/threads/{threadId}",
+      tags,
+      security,
+      summary: "Rename a thread or change its range (\"Ajustar trecho\")",
+      request: {
+        params: ThreadParams,
+        body: body(
+          z.object({
+            title: z.string().max(200).nullable().optional().openapi({ description: "Empty or null: no title." }),
+            firstMessageId: z.uuid().optional(),
+            lastMessageId: z.uuid().optional(),
+            excludedMessageIds: z.array(z.uuid()).max(500).optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(Thread), ...errors },
+    }),
+    async (c) => {
+      const { orgId, threadId } = c.req.valid("param");
+      return c.json(await updateThread(threads(), c.get("user").id, orgId, threadId, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/threads/{threadId}",
+      tags,
+      security,
+      summary: "Undo a thread made from a range, while nobody replied in it",
+      request: { params: ThreadParams },
+      responses: { ...noContent, ...errors },
+    }),
+    async (c) => {
+      const { orgId, threadId } = c.req.valid("param");
+      await deleteThread(threads(), c.get("user").id, orgId, threadId);
+      return c.body(null, 204);
+    },
+  );
+
+  const actions = [
+    ["move", moveContextIntoThread, "Take the range out of the channel into the thread (a stub stays)"],
+    ["return", returnContextToChannel, "Put the moved messages back in the channel"],
+    ["close", closeThread, "Close: resolved; reopens when someone replies"],
+    ["reopen", reopenThread, "Reopen a closed thread"],
+    ["archive", archiveThread, "Archive: hidden from lists by default and read only"],
+    ["unarchive", unarchiveThread, "Unarchive (back to open or closed)"],
+  ] as const;
+  for (const [action, run, summary] of actions) {
+    app.openapi(
+      createRoute({
+        method: "post",
+        path: `/organizations/{orgId}/threads/{threadId}/${action}`,
+        tags,
+        security,
+        summary,
+        request: { params: ThreadParams },
+        responses: { 200: json(Thread), ...errors },
+      }),
+      async (c) => {
+        const { orgId, threadId } = c.req.valid("param");
+        return c.json(await run(threads(), c.get("user").id, orgId, threadId), 200);
+      },
+    );
+  }
+
+  return app;
+}

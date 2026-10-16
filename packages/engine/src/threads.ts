@@ -1,0 +1,1152 @@
+import type { PubSub } from "@agenteschat/adapters";
+import {
+  and,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  rowsOf,
+  schema,
+  sql,
+} from "@agenteschat/db";
+import { recordAudit } from "./audit";
+import { type Channel, requireChannelAccess } from "./channels";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { publishChannelEvent, publishMessageCreated } from "./events";
+import { type Message, messageView, replyExcerpt } from "./messages";
+import { can, type Membership, requirePermission } from "./organizations";
+
+const { threads, messages, channels, channelMembers } = schema;
+
+/**
+ * Threads (ADR 0029, sections 1, 9, 11 and 12).
+ *
+ * A thread is still implicit: its replies carry `thread_id` = the root
+ * message id. A `threads` row holds what a thread has of its own: a title,
+ * a state (`open | closed | archived`) and a context range.
+ *
+ * Thread from a range ("Criar thread a partir daqui"): the new thread needs
+ * a root, and no message of the range can be it (the range may change, may
+ * come from another channel, and its first message may already have
+ * replies). So the root is a NEW top-level message in the thread's channel,
+ * written by the person who created it, with the title as its text and
+ * `meta.threadStart` describing the range. It is written directly (no
+ * outbox): it routes to no agent and starts no run. The web shows it as the
+ * context marker ("Este trecho virou contexto da thread …") and, once the
+ * range is moved, as the stub ("N mensagens movidas para a thread …").
+ * Replies, runs and summaries then work exactly as for any thread.
+ */
+
+export type ThreadState = "open" | "closed" | "archived";
+export type ThreadChange =
+  | "created"
+  | "title"
+  | "context"
+  | "moved"
+  | "returned"
+  | "closed"
+  | "reopened"
+  | "archived"
+  | "unarchived"
+  | "deleted";
+export type ThreadTab = "all" | "working" | "closed" | "archived";
+
+/** The most messages a context range may hold (after exclusions). */
+export const MAX_CONTEXT_MESSAGES = 500;
+export const MAX_THREAD_TITLE_LENGTH = 200;
+/** An automatic title: the first message of the range, on one line, this long at most. */
+export const AUTO_TITLE_LENGTH = 60;
+/** Message ids carried by a `thread.updated` event at most (more: clients refetch). */
+const MAX_EVENT_IDS = 50;
+
+export interface ThreadDeps {
+  db: Database;
+  pubsub?: PubSub;
+}
+
+type Actor = { type: "person" | "agent"; id: string | null };
+
+export interface ThreadContextView {
+  channelId: string;
+  firstMessageId: string;
+  lastMessageId: string;
+  excludedMessageIds: string[];
+  /** The range left the channel and lives in the thread (a stub stays in the channel). */
+  moved: boolean;
+  /** Messages in the range now (deleted and excluded ones don't count). */
+  count: number;
+}
+
+export interface ThreadInfo {
+  /** The root message id (what replies carry as `threadId`). */
+  id: string;
+  channelId: string;
+  channelName: string;
+  channelKind: "channel" | "dm" | "forum";
+  /** Null: no title of its own (show `rootText`). */
+  title: string | null;
+  /** The root message's text, on one line (≤ 200 chars). */
+  rootText: string;
+  rootAuthor: Actor;
+  state: ThreadState;
+  createdBy: string | null;
+  closedBy: string | null;
+  closedAt: string | null;
+  archivedBy: string | null;
+  archivedAt: string | null;
+  context: ThreadContextView | null;
+  replyCount: number;
+  lastActivityAt: string;
+  lastMessage: { author: Actor; excerpt: string; createdAt: string } | null;
+  /** Distinct authors of the root and the replies: people and agents. */
+  participants: Actor[];
+  /** An agent run is in progress (or waiting for approval or an answer) in this thread. */
+  working: boolean;
+  /** An agent asked something here and the actor took part, or an approval here waits for the actor. */
+  needsYou: boolean;
+  /** Whether the actor may close, archive, rename or change the context. */
+  canManage: boolean;
+  createdAt: string;
+}
+
+/** `meta.threadStart` of a root written by `createThreadFromRange` (the web's context marker and stub). */
+export interface ThreadStartMeta {
+  title: string;
+  contextChannelId: string;
+  firstMessageId: string;
+  lastMessageId: string;
+  count: number;
+  moved: boolean;
+  movedCount: number;
+}
+
+// ── Access ─────────────────────────────────────────────────────────────────────
+
+type ThreadRow = typeof threads.$inferSelect;
+
+/**
+ * Who sees a thread: whoever reads its channel (ADR 0029 §9; the same check
+ * as the channel's messages). Returns the root, its row (if any), the channel
+ * and the actor's membership.
+ */
+async function requireThread(db: Database, userId: string, orgId: string, rootId: string) {
+  const [found] = await db
+    .select({ root: messages, row: threads })
+    .from(messages)
+    .leftJoin(threads, and(eq(threads.orgId, orgId), eq(threads.rootMessageId, messages.id)))
+    .where(and(eq(messages.id, rootId), eq(messages.orgId, orgId)));
+  if (!found || found.root.deletedAt || found.root.threadId) throw new NotFoundError("Thread not found");
+  const { channel, membership } = await requireChannelAccess(db, userId, orgId, found.root.channelId);
+  if (channel.kind === "forum") throw new NotFoundError("Thread not found");
+  return { root: found.root, row: found.row, channel, membership };
+}
+
+/** Plain threads have no owner (ADR 0029 §9): their creator, the root's author or an admin manage them. */
+function mayManage(userId: string, membership: Membership, row: ThreadRow | null, root: Message) {
+  return row?.createdBy === userId || root.authorUserId === userId || can(membership.role, "manage_members");
+}
+
+function requireManage(userId: string, membership: Membership, row: ThreadRow | null, root: Message) {
+  if (!mayManage(userId, membership, row, root)) {
+    throw new ForbiddenError(
+      "Only who created the thread, who wrote its first message or an admin can do this",
+      "thread.not_allowed",
+    );
+  }
+}
+
+/** The thread's row, created on first need (implicit threads get one when closed, archived or titled). */
+async function ensureRow(db: Executor, root: Message): Promise<ThreadRow> {
+  await db
+    .insert(threads)
+    .values({ orgId: root.orgId, channelId: root.channelId, rootMessageId: root.id })
+    .onConflictDoNothing({ target: [threads.orgId, threads.rootMessageId] });
+  const [row] = await db
+    .select()
+    .from(threads)
+    .where(and(eq(threads.orgId, root.orgId), eq(threads.rootMessageId, root.id)));
+  if (!row) throw new Error("thread row missing after upsert");
+  return row;
+}
+
+// ── Ranges ─────────────────────────────────────────────────────────────────────
+
+interface Range {
+  source: Channel;
+  first: Message;
+  last: Message;
+  excluded: string[];
+  count: number;
+}
+
+/** A message's exact `created_at` (microseconds), as SQL. */
+const createdAtOf = (orgId: string, messageId: string) =>
+  sql`(select x.created_at from ${messages} x where x.id = ${messageId}::uuid and x.org_id = ${orgId}::uuid)`;
+
+/**
+ * Checks a range: both ends are live top-level messages of the source
+ * channel (in either order), exclusions are kept only when they fall in it,
+ * and what is left holds 1 to MAX_CONTEXT_MESSAGES messages.
+ */
+async function resolveRange(
+  db: Database,
+  orgId: string,
+  source: Channel,
+  input: { firstMessageId: string; lastMessageId: string; excludedMessageIds?: string[] },
+  options: { rootId?: string; movedIds?: string[] } = {},
+): Promise<Range> {
+  const ends = await db
+    .select()
+    .from(messages)
+    .where(
+      and(eq(messages.orgId, orgId), inArray(messages.id, [...new Set([input.firstMessageId, input.lastMessageId])])),
+    );
+  const moved = new Set(options.movedIds ?? []);
+  const ok = (m: Message | undefined): m is Message =>
+    !!m &&
+    m.channelId === source.id &&
+    !m.deletedAt &&
+    m.id !== options.rootId &&
+    (m.threadId === null || (m.threadId === options.rootId && moved.has(m.id)));
+  let first = ends.find((m) => m.id === input.firstMessageId);
+  let last = ends.find((m) => m.id === input.lastMessageId);
+  if (!ok(first) || !ok(last)) {
+    throw new ValidationError(
+      "The range must start and end on messages of the conversation (not replies)",
+      "thread.range_invalid",
+    );
+  }
+  if (first.createdAt > last.createdAt || (+first.createdAt === +last.createdAt && first.id > last.id)) {
+    [first, last] = [last, first];
+  }
+  const wanted = [...new Set(input.excludedMessageIds ?? [])].slice(0, MAX_CONTEXT_MESSAGES);
+  const inRange = and(
+    eq(messages.orgId, orgId),
+    eq(messages.channelId, source.id),
+    // Bounds read in the database: a JS Date drops the microseconds and would lose the last message.
+    sql`${messages.createdAt} >= ${createdAtOf(orgId, first.id)}`,
+    sql`${messages.createdAt} <= ${createdAtOf(orgId, last.id)}`,
+    isNull(messages.deletedAt),
+    options.rootId ? ne(messages.id, options.rootId) : undefined,
+    options.movedIds?.length
+      ? sql`(${messages.threadId} is null or ${inArray(messages.id, options.movedIds)})`
+      : isNull(messages.threadId),
+  );
+  const [excludedRows, [total]] = await Promise.all([
+    wanted.length > 0
+      ? db
+          .select({ id: messages.id })
+          .from(messages)
+          .where(and(inRange, inArray(messages.id, wanted)))
+      : Promise.resolve([] as { id: string }[]),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(messages)
+      .where(inRange),
+  ]);
+  const excluded = excludedRows.map((r) => r.id);
+  const count = Number(total?.n ?? 0) - excluded.length;
+  if (count < 1) throw new ValidationError("The range has no messages left", "thread.range_empty");
+  if (count > MAX_CONTEXT_MESSAGES) {
+    throw new ValidationError(
+      `A thread's context holds at most ${MAX_CONTEXT_MESSAGES} messages`,
+      "thread.range_too_long",
+      { max: MAX_CONTEXT_MESSAGES },
+    );
+  }
+  return { source, first, last, excluded, count };
+}
+
+/**
+ * A range may only come from a channel everyone in the destination can see
+ * (ADR 0029 §1): a public channel, or one where every member of the
+ * destination (people and agents) is also a member. Refused with
+ * `thread.context_not_visible` and who can't see it.
+ */
+async function requireRangeVisible(db: Database, orgId: string, destinationId: string, source: Channel) {
+  if (source.id === destinationId) return;
+  if (source.kind === "channel" && source.visibility === "public") return;
+  const [dest, src] = await Promise.all(
+    [destinationId, source.id].map((channelId) =>
+      db
+        .select({ userId: channelMembers.userId, agentId: channelMembers.agentId })
+        .from(channelMembers)
+        .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId))),
+    ),
+  );
+  const seeing = new Set((src ?? []).map((m) => m.userId ?? `a:${m.agentId}`));
+  const blind = (dest ?? []).filter((m) => !seeing.has(m.userId ?? `a:${m.agentId}`));
+  if (blind.length === 0) return;
+  throw new ForbiddenError(
+    "Not everyone in this conversation can see where these messages come from",
+    "thread.context_not_visible",
+    {
+      userIds: blind.flatMap((m) => (m.userId ? [m.userId] : [])),
+      agentIds: blind.flatMap((m) => (m.agentId ? [m.agentId] : [])),
+    },
+  );
+}
+
+/** A short title from the first message: one line, no code fences. */
+export function autoThreadTitle(body: string): string {
+  return replyExcerpt(body, AUTO_TITLE_LENGTH) || "Thread";
+}
+
+const cleanTitle = (title: string | null | undefined) => {
+  const t = title?.replace(/\s+/g, " ").trim() ?? "";
+  if (t.length > MAX_THREAD_TITLE_LENGTH) {
+    throw new ValidationError(`A title has at most ${MAX_THREAD_TITLE_LENGTH} characters`, "thread.title_too_long", {
+      max: MAX_THREAD_TITLE_LENGTH,
+    });
+  }
+  return t || null;
+};
+
+/** Keeps the root's `meta.threadStart` (what the channel shows) in step with the row. */
+async function syncThreadStart(db: Executor, root: Message, patch: Partial<ThreadStartMeta>) {
+  if (!root.meta.threadStart) return;
+  await db
+    .update(messages)
+    .set({
+      meta: sql`jsonb_set(${messages.meta}, '{threadStart}',
+        coalesce(${messages.meta}->'threadStart', '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb)`,
+    })
+    .where(and(eq(messages.id, root.id), eq(messages.orgId, root.orgId)));
+}
+
+// ── Create, adjust, move ──────────────────────────────────────────────────────
+
+/**
+ * One click: a thread whose context is a range of a conversation (a
+ * reference; nothing leaves the channel). The range may come from another
+ * channel only when everyone in this one can see it. No title: one is made
+ * from the first message of the range.
+ */
+export async function createThreadFromRange(
+  deps: ThreadDeps,
+  actorId: string,
+  input: {
+    orgId: string;
+    /** Where the thread lives. */
+    channelId: string;
+    /** Where the range comes from (default: `channelId`). */
+    contextChannelId?: string;
+    firstMessageId: string;
+    lastMessageId: string;
+    excludedMessageIds?: string[];
+    title?: string | null;
+  },
+): Promise<ThreadInfo> {
+  const { db } = deps;
+  const { orgId } = input;
+  const { channel, membership } = await requireChannelAccess(db, actorId, orgId, input.channelId);
+  if (!can(membership.role, "post")) throw new ForbiddenError();
+  if (channel.kind === "forum") {
+    throw new ValidationError("Forum topics have no threads", "thread.forum");
+  }
+  const source =
+    input.contextChannelId && input.contextChannelId !== channel.id
+      ? (await requireChannelAccess(db, actorId, orgId, input.contextChannelId)).channel
+      : channel;
+  if (source.kind === "forum") throw new ValidationError("Forum topics have no threads", "thread.forum");
+  const range = await resolveRange(db, orgId, source, input);
+  await requireRangeVisible(db, orgId, channel.id, source);
+  const title = cleanTitle(input.title) ?? autoThreadTitle(range.first.body);
+  const start: ThreadStartMeta = {
+    title,
+    contextChannelId: source.id,
+    firstMessageId: range.first.id,
+    lastMessageId: range.last.id,
+    count: range.count,
+    moved: false,
+    movedCount: 0,
+  };
+  const root = await db.transaction(async (tx) => {
+    const [message] = await tx
+      .insert(messages)
+      .values({
+        // `created_at` from the database clock (now()), like every message: it sorts after the range.
+        id: Bun.randomUUIDv7(),
+        orgId,
+        channelId: channel.id,
+        authorType: "person",
+        authorUserId: actorId,
+        body: title,
+        meta: { threadStart: start },
+      })
+      .returning();
+    if (!message) throw new Error("thread root insert returned nothing");
+    await tx.insert(threads).values({
+      orgId,
+      channelId: channel.id,
+      rootMessageId: message.id,
+      title,
+      createdBy: actorId,
+      contextChannelId: source.id,
+      contextFirstMessageId: range.first.id,
+      contextLastMessageId: range.last.id,
+      contextFirstAt: createdAtOf(orgId, range.first.id),
+      contextLastAt: createdAtOf(orgId, range.last.id),
+      contextExcludedMessageIds: range.excluded,
+    });
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "thread.created",
+      target: { type: "thread", id: message.id },
+      details: { channelId: channel.id, contextChannelId: source.id, count: range.count },
+    });
+    return message;
+  });
+  if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(root));
+  return publishThread(deps, actorId, orgId, root.id, "created", { alsoChannelId: source.id });
+}
+
+/**
+ * Renames a thread, or changes its range ("Ajustar trecho"). A moved range is
+ * returned and moved again, so the channel and the thread stay consistent.
+ * An empty title goes back to the root's text.
+ */
+export async function updateThread(
+  deps: ThreadDeps,
+  actorId: string,
+  orgId: string,
+  rootId: string,
+  input: {
+    title?: string | null;
+    firstMessageId?: string;
+    lastMessageId?: string;
+    excludedMessageIds?: string[];
+  },
+): Promise<ThreadInfo> {
+  const { db } = deps;
+  const { root, row, channel, membership } = await requireThread(db, actorId, orgId, rootId);
+  requireManage(actorId, membership, row, root);
+  if (row?.state === "archived") throw new ConflictError("This thread is archived", "thread.archived");
+  const rangeChange =
+    input.firstMessageId !== undefined || input.lastMessageId !== undefined || input.excludedMessageIds !== undefined;
+  const titleChange = input.title !== undefined;
+  if (!rangeChange && !titleChange) return getThread(db, actorId, orgId, rootId);
+  let range: Range | null = null;
+  if (rangeChange) {
+    const sourceId = row?.contextChannelId ?? channel.id;
+    const source =
+      sourceId === channel.id ? channel : (await requireChannelAccess(db, actorId, orgId, sourceId)).channel;
+    const first = input.firstMessageId ?? row?.contextFirstMessageId;
+    const last = input.lastMessageId ?? row?.contextLastMessageId;
+    if (!first || !last) {
+      throw new ValidationError("Give the first and the last message of the range", "thread.range_invalid");
+    }
+    range = await resolveRange(
+      db,
+      orgId,
+      source,
+      {
+        firstMessageId: first,
+        lastMessageId: last,
+        excludedMessageIds: input.excludedMessageIds ?? row?.contextExcludedMessageIds ?? [],
+      },
+      { rootId: root.id, movedIds: row?.contextMovedMessageIds ?? [] },
+    );
+    await requireRangeVisible(db, orgId, channel.id, source);
+  }
+  const title = titleChange ? cleanTitle(input.title) : undefined;
+  let movedIds: string[] = [];
+  let returnedIds: string[] = [];
+  await db.transaction(async (tx) => {
+    const current = await ensureRow(tx, root);
+    const wasMoved = current.contextMoved;
+    if (range && wasMoved) returnedIds = await returnMoved(tx, current);
+    await tx
+      .update(threads)
+      .set({
+        ...(title !== undefined ? { title } : {}),
+        ...(range
+          ? {
+              contextChannelId: range.source.id,
+              contextFirstMessageId: range.first.id,
+              contextLastMessageId: range.last.id,
+              contextFirstAt: createdAtOf(orgId, range.first.id),
+              contextLastAt: createdAtOf(orgId, range.last.id),
+              contextExcludedMessageIds: range.excluded,
+              contextMoved: false,
+              contextMovedMessageIds: [],
+            }
+          : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(threads.id, current.id));
+    if (range && wasMoved) {
+      const [fresh] = await tx.select().from(threads).where(eq(threads.id, current.id));
+      if (fresh) movedIds = await moveRange(tx, fresh, root);
+    }
+    await syncThreadStart(tx, root, {
+      ...(title !== undefined ? { title: title ?? root.body } : {}),
+      ...(range
+        ? {
+            contextChannelId: range.source.id,
+            firstMessageId: range.first.id,
+            lastMessageId: range.last.id,
+            count: range.count,
+            moved: wasMoved,
+            movedCount: movedIds.length,
+          }
+        : {}),
+    });
+  });
+  if (rangeChange && (movedIds.length > 0 || returnedIds.length > 0)) {
+    // The channel redraws: some messages came back, others left.
+    const back = returnedIds.filter((id) => !movedIds.includes(id));
+    const left = movedIds.filter((id) => !returnedIds.includes(id));
+    if (back.length > 0) await publishThread(deps, actorId, orgId, rootId, "returned", { messageIds: back });
+    if (left.length > 0) await publishThread(deps, actorId, orgId, rootId, "moved", { messageIds: left });
+  }
+  return publishThread(deps, actorId, orgId, rootId, rangeChange ? "context" : "title");
+}
+
+/** Moves the range's messages into the thread (`thread_id` = root). Returns their ids. */
+async function moveRange(tx: Executor, row: ThreadRow, root: Message): Promise<string[]> {
+  if (!row.contextFirstAt || !row.contextLastAt) return [];
+  const moved = rowsOf<{ id: string }>(
+    await tx.execute(sql`update ${messages} m set thread_id = ${root.id}::uuid
+      from ${threads} t
+      where t.id = ${row.id}::uuid and m.org_id = t.org_id and m.channel_id = t.context_channel_id
+        and m.created_at >= t.context_first_at and m.created_at <= t.context_last_at
+        and m.thread_id is null and m.deleted_at is null and m.id <> ${root.id}::uuid
+        and not (m.id = any(t.context_excluded_message_ids))
+      returning m.id`),
+  ).map((r) => r.id);
+  await tx
+    .update(threads)
+    .set({ contextMoved: true, contextMovedMessageIds: moved, updatedAt: new Date() })
+    .where(eq(threads.id, row.id));
+  return moved;
+}
+
+/** Puts moved messages back in the channel: exactly the ones moved, never real replies. */
+async function returnMoved(tx: Executor, row: ThreadRow): Promise<string[]> {
+  if (!row.contextMoved || !row.contextFirstAt || !row.contextLastAt) return [];
+  const back = rowsOf<{ id: string }>(
+    await tx.execute(sql`update ${messages} m set thread_id = null
+      from ${threads} t
+      where t.id = ${row.id}::uuid and m.org_id = t.org_id and m.channel_id = t.context_channel_id
+        and m.created_at >= t.context_first_at and m.created_at <= t.context_last_at
+        and m.thread_id = t.root_message_id and m.id = any(t.context_moved_message_ids)
+      returning m.id`),
+  ).map((r) => r.id);
+  await tx
+    .update(threads)
+    .set({ contextMoved: false, contextMovedMessageIds: [], updatedAt: new Date() })
+    .where(eq(threads.id, row.id));
+  return back;
+}
+
+/**
+ * "Tirar do canal": the range leaves the channel and lives in the thread; the
+ * root stays in the channel as the stub ("N messages moved"). Only for a
+ * range of the thread's own channel; a message of the range that has
+ * replies of its own can't move (its thread would be lost).
+ */
+export async function moveContextIntoThread(
+  deps: ThreadDeps,
+  actorId: string,
+  orgId: string,
+  rootId: string,
+): Promise<ThreadInfo> {
+  const { db } = deps;
+  const { root, row, membership } = await requireThread(db, actorId, orgId, rootId);
+  requireManage(actorId, membership, row, root);
+  if (!row?.contextFirstAt || !row.contextLastAt) {
+    throw new ValidationError("This thread has no context range", "thread.no_context");
+  }
+  if (row.state === "archived") throw new ConflictError("This thread is archived", "thread.archived");
+  if (row.contextChannelId !== root.channelId) {
+    throw new ValidationError(
+      "Only messages of this thread's channel can move into it",
+      "thread.move_other_channel",
+    );
+  }
+  if (row.contextMoved) return getThread(db, actorId, orgId, rootId);
+  const nested = rowsOf<{ id: string }>(
+    await db.execute(sql`select m.id from ${messages} m
+      join ${threads} t on t.id = ${row.id}::uuid
+      where m.org_id = t.org_id and m.channel_id = t.context_channel_id
+        and m.created_at >= t.context_first_at and m.created_at <= t.context_last_at
+        and m.thread_id is null and m.deleted_at is null and m.id <> t.root_message_id
+        and not (m.id = any(t.context_excluded_message_ids))
+        and exists (select 1 from ${messages} r where r.org_id = m.org_id and r.thread_id = m.id
+          and r.deleted_at is null)
+      limit 20`),
+  ).map((r) => r.id);
+  if (nested.length > 0) {
+    throw new ConflictError("Some of these messages have replies of their own", "thread.range_has_replies", {
+      messageIds: nested,
+    });
+  }
+  const moved = await db.transaction(async (tx) => {
+    const ids = await moveRange(tx, row, root);
+    await syncThreadStart(tx, root, { moved: true, movedCount: ids.length });
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "thread.context_moved",
+      target: { type: "thread", id: root.id },
+      details: { channelId: root.channelId, count: ids.length },
+    });
+    return ids;
+  });
+  return publishThread(deps, actorId, orgId, rootId, "moved", { messageIds: moved });
+}
+
+/** Undo of "Tirar do canal": the moved messages go back to the channel; the thread keeps them as context. */
+export async function returnContextToChannel(
+  deps: ThreadDeps,
+  actorId: string,
+  orgId: string,
+  rootId: string,
+): Promise<ThreadInfo> {
+  const { db } = deps;
+  const { root, row, membership } = await requireThread(db, actorId, orgId, rootId);
+  requireManage(actorId, membership, row, root);
+  if (!row?.contextMoved) return getThread(db, actorId, orgId, rootId);
+  if (row.state === "archived") throw new ConflictError("This thread is archived", "thread.archived");
+  const back = await db.transaction(async (tx) => {
+    const ids = await returnMoved(tx, row);
+    await syncThreadStart(tx, root, { moved: false, movedCount: 0 });
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "thread.context_returned",
+      target: { type: "thread", id: root.id },
+      details: { channelId: root.channelId, count: ids.length },
+    });
+    return ids;
+  });
+  return publishThread(deps, actorId, orgId, rootId, "returned", { messageIds: back });
+}
+
+/**
+ * Undo of "Criar thread" (the toast's "Desfazer"): only a thread made from a
+ * range that nobody replied to yet. Moved messages go back first; the root
+ * is deleted (soft) and the row removed.
+ */
+export async function deleteThread(deps: ThreadDeps, actorId: string, orgId: string, rootId: string) {
+  const { db } = deps;
+  const { root, row, membership } = await requireThread(db, actorId, orgId, rootId);
+  requireManage(actorId, membership, row, root);
+  if (!row || !root.meta.threadStart) {
+    throw new ValidationError("Only a thread made from a range can be undone", "thread.not_undoable");
+  }
+  const [replies] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, orgId),
+        eq(messages.threadId, root.id),
+        isNull(messages.deletedAt),
+        row.contextMovedMessageIds.length > 0
+          ? sql`not (${messages.id} = any(${`{${row.contextMovedMessageIds.join(",")}}`}::uuid[]))`
+          : undefined,
+      ),
+    );
+  if (Number(replies?.n ?? 0) > 0) {
+    throw new ConflictError("Someone already replied in this thread", "thread.has_replies");
+  }
+  const back = await db.transaction(async (tx) => {
+    const ids = await returnMoved(tx, row);
+    await tx
+      .update(messages)
+      .set({ deletedAt: new Date() })
+      .where(and(eq(messages.id, root.id), eq(messages.orgId, orgId)));
+    await tx.delete(threads).where(eq(threads.id, row.id));
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "thread.deleted",
+      target: { type: "thread", id: root.id },
+      details: { channelId: root.channelId },
+    });
+    return ids;
+  });
+  const event = {
+    type: "thread.updated" as const,
+    threadId: root.id,
+    change: "deleted" as const,
+    ...(back.length > 0 && back.length <= MAX_EVENT_IDS ? { messageIds: back } : {}),
+  };
+  await publishChannelEvent(deps.pubsub, { ...event, channelId: root.channelId });
+  if (row.contextChannelId && row.contextChannelId !== root.channelId) {
+    await publishChannelEvent(deps.pubsub, { ...event, channelId: row.contextChannelId });
+  }
+}
+
+// ── Close and archive ─────────────────────────────────────────────────────────
+
+type StateAction = "close" | "reopen" | "archive" | "unarchive";
+
+/**
+ * Fechar / Reabrir / Arquivar / Desarquivar (ADR 0029 §11). Closed: resolved,
+ * reopens when a person replies. Archived: hidden from lists by default and
+ * read only. Unarchiving returns to what it was before (closed or open).
+ * Idempotent: asking for the state it is already in changes nothing.
+ */
+async function setThreadState(
+  deps: ThreadDeps,
+  actorId: string,
+  orgId: string,
+  rootId: string,
+  action: StateAction,
+): Promise<ThreadInfo> {
+  const { db } = deps;
+  const { root, row, membership } = await requireThread(db, actorId, orgId, rootId);
+  requireManage(actorId, membership, row, root);
+  const state: ThreadState = row?.state ?? "open";
+  if ((action === "close" || action === "reopen") && state === "archived") {
+    throw new ConflictError("This thread is archived", "thread.archived");
+  }
+  const next: ThreadState =
+    action === "close"
+      ? "closed"
+      : action === "reopen"
+        ? "open"
+        : action === "archive"
+          ? "archived"
+          : state === "archived"
+            ? row?.closedAt
+              ? "closed"
+              : "open"
+            : state;
+  if (next === state) return getThread(db, actorId, orgId, rootId);
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    const current = await ensureRow(tx, root);
+    await tx
+      .update(threads)
+      .set({
+        state: next,
+        ...(action === "close" ? { closedBy: actorId, closedAt: now } : {}),
+        ...(action === "reopen" ? { closedBy: null, closedAt: null } : {}),
+        ...(action === "archive" ? { archivedBy: actorId, archivedAt: now } : {}),
+        ...(action === "unarchive" ? { archivedBy: null, archivedAt: null } : {}),
+        updatedAt: now,
+      })
+      .where(eq(threads.id, current.id));
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: `thread.${{ close: "closed", reopen: "reopened", archive: "archived", unarchive: "unarchived" }[action]}`,
+      target: { type: "thread", id: root.id },
+      details: { channelId: root.channelId },
+    });
+  });
+  const change: ThreadChange = (
+    { close: "closed", reopen: "reopened", archive: "archived", unarchive: "unarchived" } as const
+  )[action];
+  return publishThread(deps, actorId, orgId, rootId, change);
+}
+
+export const closeThread = (deps: ThreadDeps, actorId: string, orgId: string, rootId: string) =>
+  setThreadState(deps, actorId, orgId, rootId, "close");
+export const reopenThread = (deps: ThreadDeps, actorId: string, orgId: string, rootId: string) =>
+  setThreadState(deps, actorId, orgId, rootId, "reopen");
+export const archiveThread = (deps: ThreadDeps, actorId: string, orgId: string, rootId: string) =>
+  setThreadState(deps, actorId, orgId, rootId, "archive");
+export const unarchiveThread = (deps: ThreadDeps, actorId: string, orgId: string, rootId: string) =>
+  setThreadState(deps, actorId, orgId, rootId, "unarchive");
+
+async function publishThread(
+  deps: ThreadDeps,
+  actorId: string,
+  orgId: string,
+  rootId: string,
+  change: ThreadChange,
+  options: { messageIds?: string[]; alsoChannelId?: string } = {},
+): Promise<ThreadInfo> {
+  const view = await getThread(deps.db, actorId, orgId, rootId);
+  const event = {
+    type: "thread.updated" as const,
+    threadId: view.id,
+    change,
+    state: view.state,
+    // `canManage` is the actor's own: everyone else reads theirs from the API. A large view
+    // (many exclusions or participants) is left out: clients fetch it.
+    ...(Buffer.byteLength(JSON.stringify(view)) <= 4000 ? { thread: { ...view, canManage: false } } : {}),
+    // Pub/sub payloads stay small (NOTIFY < 8 KB): a long list is left out and clients refetch.
+    ...(options.messageIds && options.messageIds.length <= MAX_EVENT_IDS ? { messageIds: options.messageIds } : {}),
+  };
+  await publishChannelEvent(deps.pubsub, { ...event, channelId: view.channelId });
+  const other = options.alsoChannelId ?? view.context?.channelId;
+  if (other && other !== view.channelId) await publishChannelEvent(deps.pubsub, { ...event, channelId: other });
+  return view;
+}
+
+// ── Listing ────────────────────────────────────────────────────────────────────
+
+export interface ListThreadsInput {
+  orgId: string;
+  tab?: ThreadTab;
+  channelId?: string;
+  /** The agent wrote in the thread or ran in it. */
+  agentId?: string;
+  /** "Precisa de você": an open question where the actor took part, or an approval waiting for them. */
+  needsYou?: boolean;
+  /** The actor created the thread, wrote its root or replied in it. */
+  mine?: boolean;
+  /** Words in the title or the root's text. */
+  q?: string;
+  cursor?: string | null;
+  limit?: number;
+}
+
+interface ThreadSqlRow {
+  id: string;
+  channel_id: string;
+  channel_name: string;
+  channel_kind: "channel" | "dm" | "forum";
+  created_at: Date | string;
+  body: string;
+  author_type: "person" | "agent";
+  author_user_id: string | null;
+  author_agent_id: string | null;
+  reply_count: number | string;
+  last_at: Date | string;
+  title: string | null;
+  state: ThreadState | null;
+  created_by: string | null;
+  closed_by: string | null;
+  closed_at: Date | string | null;
+  archived_by: string | null;
+  archived_at: Date | string | null;
+  context_channel_id: string | null;
+  context_first_message_id: string | null;
+  context_last_message_id: string | null;
+  context_excluded_message_ids: string[] | string | null;
+  context_moved: boolean | null;
+  context_count: number | string | null;
+  working: boolean;
+  needs_you: boolean;
+  /** `last_at` with microseconds, for the cursor. */
+  cursor_at: string;
+}
+
+const toDate = (v: Date | string) => (v instanceof Date ? v : new Date(v));
+const isoOrNull = (v: Date | string | null) => (v === null ? null : toDate(v).toISOString());
+const uuidArray = (v: string[] | string | null) =>
+  Array.isArray(v) ? v : v ? v.replace(/^{|}$/g, "").split(",").filter(Boolean) : [];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function encodeCursor(lastAt: string, id: string) {
+  return Buffer.from(`${lastAt}|${id}`).toString("base64url");
+}
+
+/** Microseconds kept (the database's precision), so a page never skips a row inside the same millisecond. */
+const CURSOR_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/;
+
+function decodeCursor(cursor: string): { at: string; id: string } {
+  const [at, id] = Buffer.from(cursor, "base64url").toString().split("|");
+  if (!at || !id || !UUID.test(id) || !CURSOR_AT.test(at)) {
+    throw new ValidationError("Invalid cursor", "invalid_cursor");
+  }
+  return { at, id };
+}
+
+const ACTIVE_RUN = sql`('queued', 'running', 'waiting_approval', 'waiting_input')`;
+
+/**
+ * Threads of the channels the actor reads (members only, like the channel's
+ * messages; DMs: its participants), built from the messages that have
+ * replies plus the `threads` rows (a thread made from a range may have no
+ * reply yet). Most recent activity first, paginated by a cursor.
+ *
+ * No unread count: reads are kept per channel (`channel_reads`), not per thread.
+ */
+async function queryThreads(
+  db: Database,
+  userId: string,
+  isAdmin: boolean,
+  input: ListThreadsInput & { rootId?: string; anyState?: boolean },
+): Promise<{ rows: ThreadSqlRow[]; nextCursor: string | null }> {
+  const limit = Math.min(Math.max(input.limit ?? 30, 1), 100);
+  const orgId = input.orgId;
+  const tab = input.tab ?? "all";
+  const cursor = input.cursor ? decodeCursor(input.cursor) : null;
+  const q = input.q?.trim().slice(0, 200);
+  const like = q ? `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
+  const participated = sql`(root.author_user_id = ${userId} or exists (select 1 from ${messages} pm
+    where pm.org_id = ${orgId}::uuid and pm.thread_id = root.id and pm.author_user_id = ${userId}
+      and pm.deleted_at is null))`;
+  const stateFilter = input.anyState
+    ? sql`true`
+    : tab === "closed"
+      ? sql`l.state = 'closed'`
+      : tab === "archived"
+        ? sql`l.state = 'archived'`
+        : tab === "working"
+          ? sql`l.state <> 'archived' and l.working`
+          : sql`l.state <> 'archived'`;
+  // The agent wrote the root or a reply, or ran in the thread.
+  const agentFilter = input.agentId
+    ? sql`and (l.author_agent_id = ${input.agentId}::uuid
+        or exists (select 1 from ${messages} am where am.org_id = ${orgId}::uuid and am.thread_id = l.id
+          and am.author_agent_id = ${input.agentId}::uuid)
+        or exists (select 1 from ${schema.agentRuns} ar2 where ar2.org_id = ${orgId}::uuid
+          and ar2.thread_root_id = l.id and ar2.agent_id = ${input.agentId}::uuid))`
+    : sql``;
+  const rows = rowsOf<ThreadSqlRow>(
+    await db.execute(sql`with visible as (
+        select c.id, c.name, c.kind from ${channelMembers} cm
+        join ${channels} c on c.id = cm.channel_id
+        where cm.org_id = ${orgId}::uuid and cm.user_id = ${userId} and c.org_id = ${orgId}::uuid
+          and c.archived_at is null and c.kind in ('channel', 'dm')
+          ${input.channelId ? sql`and c.id = ${input.channelId}::uuid` : sql``}
+      ), replies as (
+        select m.thread_id as root_id, count(*)::int as reply_count, max(m.created_at) as last_at
+        from ${messages} m
+        where m.org_id = ${orgId}::uuid and m.channel_id in (select id from visible)
+          and m.thread_id is not null and m.deleted_at is null
+          ${input.rootId ? sql`and m.thread_id = ${input.rootId}::uuid` : sql``}
+        group by m.thread_id
+      ), candidates as (
+        select root_id from replies
+        union
+        select t.root_message_id from ${threads} t
+        where t.org_id = ${orgId}::uuid and t.channel_id in (select id from visible)
+          ${input.rootId ? sql`and t.root_message_id = ${input.rootId}::uuid` : sql``}
+      ), listed as (
+        select root.id, root.channel_id, v.name as channel_name, v.kind as channel_kind, root.created_at,
+          root.body, root.author_type, root.author_user_id, root.author_agent_id,
+          coalesce(r.reply_count, 0) as reply_count, coalesce(r.last_at, root.created_at) as last_at,
+          t.title, coalesce(t.state, 'open') as state, t.created_by, t.closed_by, t.closed_at,
+          t.archived_by, t.archived_at, t.context_channel_id, t.context_first_message_id,
+          t.context_last_message_id, t.context_excluded_message_ids, t.context_moved,
+          case when t.context_first_at is null then null else (
+            select count(*)::int from ${messages} cx
+            where cx.org_id = ${orgId}::uuid and cx.channel_id = t.context_channel_id
+              and cx.created_at >= t.context_first_at and cx.created_at <= t.context_last_at
+              and cx.deleted_at is null and cx.id <> root.id
+              and (cx.thread_id is null or cx.id = any(t.context_moved_message_ids))
+              and not (cx.id = any(t.context_excluded_message_ids))
+          ) end as context_count,
+          exists (select 1 from ${schema.agentRuns} ar where ar.org_id = ${orgId}::uuid
+            and ar.thread_root_id = root.id and ar.status in ${ACTIVE_RUN}) as working,
+          (
+            (exists (select 1 from ${schema.agentQuestions} aq where aq.org_id = ${orgId}::uuid
+              and aq.channel_id = root.channel_id and aq.thread_id = root.id and aq.status = 'open'
+              and aq.expires_at > now()) and ${participated})
+            or exists (select 1 from ${schema.approvals} ap where ap.org_id = ${orgId}::uuid
+              and ap.status = 'pending' and ap.thread_root_id = root.id
+              and (${isAdmin}::boolean or ap.owner_user_id = ${userId}))
+          ) as needs_you,
+          ${participated} as participated
+        from candidates c
+        join ${messages} root on root.id = c.root_id and root.org_id = ${orgId}::uuid
+        join visible v on v.id = root.channel_id
+        left join replies r on r.root_id = root.id
+        left join ${threads} t on t.org_id = ${orgId}::uuid and t.root_message_id = root.id
+        where root.thread_id is null and root.deleted_at is null
+      )
+      select l.*, to_char(l.last_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_at
+      from listed l
+      where ${stateFilter}
+        ${agentFilter}
+        ${input.needsYou ? sql`and l.needs_you` : sql``}
+        ${input.mine ? sql`and (l.created_by = ${userId} or l.participated)` : sql``}
+        ${like ? sql`and (l.title ilike ${like} or l.body ilike ${like})` : sql``}
+        ${cursor ? sql`and (l.last_at, l.id) < (${cursor.at}::timestamptz, ${cursor.id}::uuid)` : sql``}
+      order by l.last_at desc, l.id desc
+      limit ${limit + 1}`),
+  );
+  const more = rows.length > limit;
+  const page = rows.slice(0, limit);
+  const tail = page.at(-1);
+  return { rows: page, nextCursor: more && tail ? encodeCursor(tail.cursor_at, tail.id) : null };
+}
+
+/** Distinct authors and the latest reply of each thread on the page (two queries for the whole page). */
+async function threadExtras(db: Database, orgId: string, rows: ThreadSqlRow[]) {
+  const ids = rows.map((r) => r.id);
+  if (ids.length === 0) return { authors: new Map<string, Actor[]>(), latest: new Map<string, Message>() };
+  const scope = and(eq(messages.orgId, orgId), inArray(messages.threadId, ids), isNull(messages.deletedAt));
+  const [authorRows, latestRows] = await Promise.all([
+    db
+      .selectDistinct({
+        threadId: messages.threadId,
+        authorType: messages.authorType,
+        userId: messages.authorUserId,
+        agentId: messages.authorAgentId,
+      })
+      .from(messages)
+      .where(scope),
+    db
+      .selectDistinctOn([messages.threadId])
+      .from(messages)
+      .where(scope)
+      .orderBy(messages.threadId, desc(messages.createdAt), desc(messages.id)),
+  ]);
+  const authors = new Map<string, Actor[]>();
+  const push = (threadId: string, a: Actor) => {
+    if (!a.id) return;
+    const list = authors.get(threadId) ?? [];
+    if (!list.some((x) => x.type === a.type && x.id === a.id)) list.push(a);
+    authors.set(threadId, list);
+  };
+  for (const r of rows) {
+    push(r.id, { type: r.author_type, id: r.author_type === "person" ? r.author_user_id : r.author_agent_id });
+  }
+  for (const a of authorRows) {
+    if (!a.threadId) continue;
+    push(a.threadId, { type: a.authorType, id: a.authorType === "person" ? a.userId : a.agentId });
+  }
+  const latest = new Map(latestRows.map((m) => [m.threadId ?? "", m]));
+  return { authors, latest };
+}
+
+function toView(
+  r: ThreadSqlRow,
+  extras: Awaited<ReturnType<typeof threadExtras>>,
+  userId: string,
+  isAdmin: boolean,
+): ThreadInfo {
+  const last = extras.latest.get(r.id);
+  return {
+    id: r.id,
+    channelId: r.channel_id,
+    channelName: r.channel_name,
+    channelKind: r.channel_kind,
+    title: r.title,
+    rootText: replyExcerpt(r.body),
+    rootAuthor: { type: r.author_type, id: r.author_type === "person" ? r.author_user_id : r.author_agent_id },
+    state: r.state ?? "open",
+    createdBy: r.created_by,
+    closedBy: r.closed_by,
+    closedAt: isoOrNull(r.closed_at),
+    archivedBy: r.archived_by,
+    archivedAt: isoOrNull(r.archived_at),
+    context:
+      r.context_channel_id && r.context_first_message_id && r.context_last_message_id
+        ? {
+            channelId: r.context_channel_id,
+            firstMessageId: r.context_first_message_id,
+            lastMessageId: r.context_last_message_id,
+            excludedMessageIds: uuidArray(r.context_excluded_message_ids),
+            moved: r.context_moved === true,
+            count: Number(r.context_count ?? 0),
+          }
+        : null,
+    replyCount: Number(r.reply_count),
+    lastActivityAt: toDate(r.last_at).toISOString(),
+    lastMessage: last
+      ? {
+          author: { type: last.authorType, id: last.authorType === "person" ? last.authorUserId : last.authorAgentId },
+          excerpt: replyExcerpt(last.body),
+          createdAt: last.createdAt.toISOString(),
+        }
+      : null,
+    participants: extras.authors.get(r.id) ?? [],
+    working: r.working === true,
+    needsYou: r.needs_you === true,
+    canManage: r.created_by === userId || (r.author_type === "person" && r.author_user_id === userId) || isAdmin,
+    createdAt: toDate(r.created_at).toISOString(),
+  };
+}
+
+/**
+ * The Threads page and a channel's "Threads (N)" (ADR 0029 §11): tabs
+ * `all` (not archived), `working` (an agent run in progress), `closed`,
+ * `archived`; filters by channel, agent, "needs you", "mine" and words.
+ */
+export async function listThreads(
+  db: Database,
+  actorId: string,
+  input: ListThreadsInput,
+): Promise<{ threads: ThreadInfo[]; nextCursor: string | null }> {
+  const membership = await requirePermission(db, actorId, input.orgId, "read");
+  // A channel's list: the same check as reading the channel (403 for non-members).
+  if (input.channelId) await requireChannelAccess(db, actorId, input.orgId, input.channelId);
+  const isAdmin = can(membership.role, "manage_members");
+  const { rows, nextCursor } = await queryThreads(db, actorId, isAdmin, input);
+  const extras = await threadExtras(db, input.orgId, rows);
+  return { threads: rows.map((r) => toView(r, extras, actorId, isAdmin)), nextCursor };
+}
+
+/** One thread as the list shows it (any state), for whoever reads its channel. */
+export async function getThread(db: Database, actorId: string, orgId: string, rootId: string): Promise<ThreadInfo> {
+  if (!UUID.test(rootId)) throw new NotFoundError("Thread not found");
+  const { channel, membership } = await requireThread(db, actorId, orgId, rootId);
+  const isAdmin = can(membership.role, "manage_members");
+  const { rows } = await queryThreads(db, actorId, isAdmin, {
+    orgId,
+    channelId: channel.id,
+    rootId,
+    anyState: true,
+    limit: 1,
+  });
+  const [found] = rows;
+  if (!found) {
+    // A plain message without replies nor state: not a thread yet; it shows as an empty one.
+    const [root] = await db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.id, rootId), eq(messages.orgId, orgId)));
+    if (!root) throw new NotFoundError("Thread not found");
+    const r: ThreadSqlRow = {
+      id: root.id,
+      channel_id: root.channelId,
+      channel_name: channel.name,
+      channel_kind: channel.kind,
+      created_at: root.createdAt,
+      body: root.body,
+      author_type: root.authorType,
+      author_user_id: root.authorUserId,
+      author_agent_id: root.authorAgentId,
+      reply_count: 0,
+      last_at: root.createdAt,
+      title: null,
+      state: "open",
+      created_by: null,
+      closed_by: null,
+      closed_at: null,
+      archived_by: null,
+      archived_at: null,
+      context_channel_id: null,
+      context_first_message_id: null,
+      context_last_message_id: null,
+      context_excluded_message_ids: null,
+      context_moved: null,
+      context_count: null,
+      working: false,
+      needs_you: false,
+      cursor_at: root.createdAt.toISOString(),
+    };
+    return toView(r, await threadExtras(db, orgId, [r]), actorId, isAdmin);
+  }
+  return toView(found, await threadExtras(db, orgId, rows), actorId, isAdmin);
+}
+
+// ── Run context ───────────────────────────────────────────────────────────────
+
+/** A thread's context range for the run's context builder (one indexed read by root; no cache: ranges change). */
+export async function threadContextOf(db: Database, orgId: string, rootId: string) {
+  const [row] = await db
+    .select({
+      contextChannelId: threads.contextChannelId,
+      contextFirstAt: threads.contextFirstAt,
+      contextLastAt: threads.contextLastAt,
+      contextExcludedMessageIds: threads.contextExcludedMessageIds,
+      title: threads.title,
+    })
+    .from(threads)
+    .where(and(eq(threads.orgId, orgId), eq(threads.rootMessageId, rootId)));
+  if (!row?.contextChannelId || !row.contextFirstAt || !row.contextLastAt) return null;
+  return {
+    channelId: row.contextChannelId,
+    firstAt: row.contextFirstAt,
+    lastAt: row.contextLastAt,
+    excluded: row.contextExcludedMessageIds,
+    title: row.title,
+  };
+}

@@ -25,6 +25,7 @@ export interface MemoryUpdate {
 import type { AgentQuestion } from "./questions";
 import type { RunStatus } from "./runs";
 import type { SecretRequestView } from "./secrets";
+import type { ThreadChange, ThreadInfo, ThreadState } from "./threads";
 
 /**
  * Real-time events sent to WebSocket clients subscribed to a channel. The
@@ -215,6 +216,21 @@ export type ChannelEvent =
     }
   /** A sensitive action waits for a person (`approval.created`) or was decided/expired (`approval.decided`). */
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: ApprovalView }
+  /**
+   * A thread's state, title or context changed (ADR 0029). `thread` is the
+   * fresh view when the server has it at hand (a reply that reopened a closed
+   * thread sends only `state`). `messageIds`: messages that left the channel
+   * (`moved`) or came back (`returned`).
+   */
+  | {
+      type: "thread.updated";
+      channelId: string;
+      threadId: string;
+      change: ThreadChange;
+      state?: ThreadState;
+      thread?: ThreadInfo;
+      messageIds?: string[];
+    }
   /** Someone reacted or took a reaction back: the message's reactions now (replace, don't merge). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] };
 

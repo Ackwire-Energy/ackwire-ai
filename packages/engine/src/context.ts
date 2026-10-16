@@ -1,10 +1,25 @@
-import { and, asc, type Database, desc, eq, inArray, isNull, lte, ne, rowsOf, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  notInArray,
+  rowsOf,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import type { Message } from "./messages";
 import type { AgentRun } from "./runs";
+import { threadContextOf } from "./threads";
 
 const { messages, users, agents, channels, channelMembers, organizations, agentScopes } = schema;
 
@@ -81,7 +96,7 @@ export async function buildRunContext(
   // Independent lookups go out together (the database may be remote); org,
   // channel and members come from the per-process cache when enabled.
   const scope = and(eq(messages.orgId, run.orgId), eq(messages.channelId, run.channelId), isNull(messages.deletedAt));
-  const [org, channel, triggerRows] = await Promise.all([
+  const [org, channel, triggerRows, range] = await Promise.all([
     getOrgCached(db, run.orgId),
     getChannelCached(db, run.orgId, run.channelId),
     options.trigger
@@ -90,6 +105,9 @@ export async function buildRunContext(
           .select()
           .from(messages)
           .where(and(eq(messages.id, run.triggerMessageId), eq(messages.orgId, run.orgId))),
+    // A thread made from a range of a conversation (ADR 0029): that range is its context.
+    // A run started by the root itself (a new top-level message) can't have one yet: no query.
+    run.threadRootId === run.triggerMessageId ? null : threadContextOf(db, run.orgId, run.threadRootId),
   ]);
   const trigger = triggerRows[0];
   if (!org || !channel || !trigger) throw new Error("run context is incomplete (org, channel or trigger missing)");
@@ -112,24 +130,55 @@ export async function buildRunContext(
       .where(and(scope, eq(messages.threadId, run.threadRootId), upToTrigger))
       .orderBy(desc(messages.createdAt), desc(messages.id))
       .limit(options.maxMessages),
-    db
-      .select()
-      .from(messages)
-      .where(
-        and(
-          scope,
-          isNull(messages.threadId),
-          sql`${messages.createdAt} <= ${rootTime}`,
-          ne(messages.id, run.threadRootId),
-        ),
-      )
-      .orderBy(desc(messages.createdAt), desc(messages.id))
-      .limit(Math.max(1, options.maxMessages - 1)),
+    range
+      ? // The range instead of "the channel before the root": its messages still in the
+        // channel (moved ones are replies now, read with the thread), minus the excluded.
+        db
+          .select()
+          .from(messages)
+          .where(
+            and(
+              eq(messages.orgId, run.orgId),
+              eq(messages.channelId, range.channelId),
+              isNull(messages.threadId),
+              isNull(messages.deletedAt),
+              // The bounds from the row itself (exact to the microsecond, unlike a JS Date).
+              sql`${messages.createdAt} >= (select t.context_first_at from ${schema.threads} t
+                where t.org_id = ${run.orgId}::uuid and t.root_message_id = ${run.threadRootId}::uuid)`,
+              sql`${messages.createdAt} <= (select t.context_last_at from ${schema.threads} t
+                where t.org_id = ${run.orgId}::uuid and t.root_message_id = ${run.threadRootId}::uuid)`,
+              ne(messages.id, run.threadRootId),
+              range.excluded.length > 0 ? notInArray(messages.id, range.excluded) : undefined,
+            ),
+          )
+          .orderBy(desc(messages.createdAt), desc(messages.id))
+          .limit(Math.max(1, options.maxMessages - 1))
+      : db
+          .select()
+          .from(messages)
+          .where(
+            and(
+              scope,
+              isNull(messages.threadId),
+              sql`${messages.createdAt} <= ${rootTime}`,
+              ne(messages.id, run.threadRootId),
+            ),
+          )
+          .orderBy(desc(messages.createdAt), desc(messages.id))
+          .limit(Math.max(1, options.maxMessages - 1)),
   ]);
   const root = rootRows[0];
-  // The thread comes first; earlier channel messages fill what's left.
+  // The thread comes first; earlier channel messages (or the range) fill what's left.
+  // A range longer than that loses its oldest messages (the thread summary, when the
+  // thread itself is long, covers the thread, not the range).
+  const fetched = before.length;
   before.splice(Math.max(0, options.maxMessages - thread.length - 1));
-  const history: Message[] = [...before.reverse(), ...(root ? [root] : []), ...thread.reverse()];
+  const rangeCut = range !== null && (before.length < fetched || fetched >= Math.max(1, options.maxMessages - 1));
+  const history: Message[] = [
+    ...before.reverse(),
+    ...(root ? [rangeRoot(root, range !== null)] : []),
+    ...thread.reverse(),
+  ];
   if (!history.some((m) => m.id === trigger.id)) history.push(trigger);
 
   const [names, members] = await Promise.all([
@@ -326,6 +375,19 @@ export async function buildRunContext(
                   : ""
               }`,
     },
+    ...(range
+      ? [
+          {
+            text: `# Where this thread comes from\nThis thread was started from part of the conversation in ${
+              range.channelId === run.channelId
+                ? `#${channel.name}`
+                : `#${(await getChannelCached(db, run.orgId, range.channelId))?.name ?? "another channel"}`
+            }${range.title ? ` ("${range.title}")` : ""}: those messages come first in the history${
+              rangeCut ? ", the oldest ones left out" : ""
+            }. They are the subject of this thread.`,
+          },
+        ]
+      : []),
     ...(trigger.meta.routine
       ? [
           {
@@ -341,6 +403,14 @@ export async function buildRunContext(
     messages: toTurns(history, agent.id, names, trigger.id),
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
   };
+}
+
+/** The root of a thread made from a range carries only its title: say what it is. */
+function rangeRoot(root: Message, fromRange: boolean): Message {
+  const start = root.meta?.threadStart as { title?: unknown } | undefined;
+  if (!fromRange || !start) return root;
+  const title = typeof start.title === "string" ? start.title : root.body;
+  return { ...root, body: `(started the thread "${title}" from part of the conversation)` };
 }
 
 async function authorNames(db: Database, history: Message[]) {

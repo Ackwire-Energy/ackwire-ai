@@ -29,6 +29,7 @@ import { sandboxRoutes } from "./routes/app/sandboxes";
 import { secretRoutes } from "./routes/app/secrets";
 import { skillRoutes } from "./routes/app/skills";
 import { storageRoutes } from "./routes/app/storage";
+import { threadRoutes } from "./routes/app/threads";
 import { wikiRoutes } from "./routes/app/wiki";
 import { registerGitProxy } from "./routes/git";
 import { registerHealth } from "./routes/health";
@@ -107,6 +108,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", artifactRoutes(deps));
     api.route("/app", issueRoutes(deps));
     api.route("/app", forumRoutes(deps));
+    api.route("/app", threadRoutes(deps));
     api.route("/app", wikiRoutes(deps));
     api.route("/app", routineRoutes(deps));
     api.route("/app", calendarRoutes(deps));
