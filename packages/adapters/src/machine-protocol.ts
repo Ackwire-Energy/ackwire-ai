@@ -93,7 +93,11 @@ export interface TaskStart {
   resume?: boolean;
   /** Relative to the agent's folder (default: the folder itself). */
   cwd?: string;
-  /** Work in a new git worktree on this new branch (`<agent folder>/.worktrees/<taskId>`), when `cwd` is a git repository. */
+  /**
+   * Work in a new git worktree on this new branch (`<agent folder>/.worktrees/<taskId>`) when `cwd` is a git
+   * repository. When it isn't, a `claude`/`codex` task runs without a branch in its own subfolder
+   * `<cwd>/work/<last part of the branch>/` (`shell` tasks are refused).
+   */
   branch?: string;
   /** Killed (the whole process group) after this long; default and cap are the runner's. */
   maxSeconds?: number;
@@ -510,13 +514,34 @@ export interface MissionMcpTool {
   inputSchema: Record<string, unknown>;
 }
 
+const RULES_START =
+  "You work on an agentes.chat mission. Read the files in .agentes/ first (mission.md, decisions.md, notes.md). Use the agentes tools: keep the plan with update_plan, report milestones with report, ask decisions only with ask_decision, and ask for a review with request_review when you have something to show. Write plan items, reports, decisions and reviews in the language the people use in the thread (the language of the mission goal), short and plain.";
+const RULES_END =
+  "Write what you learn and the next steps in .agentes/notes.md. When a tool tells you to stop and wait, end your turn.";
+
+/**
+ * What a mission's executor is told on every task (ADR 0029) when its folder
+ * is a git repository: appended to Claude Code's system prompt
+ * (`--append-system-prompt`) and written in `.agentes/mission.md`. Plain
+ * characters only: the runner passes it as one shell argument (`cleanRules`).
+ */
+export const MISSION_RULES = `${RULES_START} Never merge, deploy or roll back directly: ask with request_approval and wait. Work on your own branch, commit work in progress after each step and push the branch now and then. ${RULES_END}`;
+
+/**
+ * The same rules for a mission folder that is not a git repository (images,
+ * documents, files for the Drive): no branches, commits, pull requests or
+ * pushes; results go to the people with upload_artifact or request_review.
+ * The runner picks this one when the task's folder isn't a repository.
+ */
+export const MISSION_RULES_NO_GIT = `${RULES_START} Never deploy or publish anything directly: ask with request_approval and wait. This mission folder is not a git repository and doesn't need one: don't create one. Work in your folder (an item started with start_task gets its own subfolder under work/), and deliver results with upload_artifact or request_review. ${RULES_END}`;
+
 const PLAN_STATUSES = ["todo", "doing", "waiting_you", "done", "dropped"];
 
 export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "report",
     description:
-      "Tell the people in the mission's thread where things stand: a milestone, what you found, what is next. One short paragraph in their language; no internal details (tool names, logs). Use it at milestones, not for every step. pr_url: a pull request you opened.",
+      "Tell the people in the mission's thread where things stand: a milestone, what you found, what is next. One short paragraph in the language the people use in the thread; no internal details (tool names, logs). Use it at milestones, not for every step. pr_url: a pull request you opened.",
     inputSchema: {
       type: "object",
       properties: {
@@ -531,7 +556,7 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "update_plan",
     description:
-      "Replace the mission's plan: the whole checklist, every time (keep each item's id stable). Statuses: todo, doing, waiting_you (needs a person), done, dropped. People see each change as one line in the thread.",
+      "Replace the mission's plan: the whole checklist, every time (keep each item's id stable). Statuses: todo, doing, waiting_you (needs a person), done, dropped. Write titles and notes in the language the people use in the thread, short (a title is at most 200 characters; details go in note). Keep an item's title unless what it means changed. People see each change as one line in the thread.",
     inputSchema: {
       type: "object",
       properties: {
@@ -559,7 +584,7 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "ask_decision",
     description:
-      "Ask the people a product or technical decision as a card with 2 to 4 options. blocking: true when you can't go on without it (then stop and wait; you are resumed with the answer). blocking: false to go on with your recommendation as a provisional decision they review later.",
+      "Ask the people a product or technical decision as a card with 2 to 4 options, in the language the people use in the thread. blocking: true when you can't go on without it (then stop and wait; you are resumed with the answer). blocking: false to go on with your recommendation as a provisional decision they review later.",
     inputSchema: {
       type: "object",
       properties: {
@@ -582,7 +607,7 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "request_review",
     description:
-      "Ask the people to look at something you can show (screens, a prototype, a PR). paths: files in your folder to attach (uploaded to the Drive). Then stop and wait: you are resumed with their answer (approved, or the changes they want).",
+      "Ask the people to look at something you can show (screens, files, a prototype, a PR), with the title and summary in the language the people use in the thread. paths: files in your folder to attach (uploaded to the Drive). Then stop and wait: you are resumed with their answer (approved, or the changes they want).",
     inputSchema: {
       type: "object",
       properties: {
@@ -638,7 +663,7 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "start_task",
     description:
-      "Main session only: start one plan item as its own background session on a new git branch (it runs in parallel in its own worktree). You are told when it ends. Give it everything it needs in prompt.",
+      "Main session only: start one plan item as its own background session that runs in parallel. In a git repository it works on a new branch in its own worktree; otherwise in its own subfolder work/<branch>/ of the mission folder (branch is then just that subfolder's name). You are told when it ends. Give it everything it needs in prompt. Small work you can just do yourself.",
     inputSchema: {
       type: "object",
       properties: {

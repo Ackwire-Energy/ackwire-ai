@@ -2,7 +2,12 @@ import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { parseRunnerFrame, type RunnerFrame } from "@agenteschat/adapters/machine-protocol";
+import {
+  MISSION_RULES,
+  MISSION_RULES_NO_GIT,
+  parseRunnerFrame,
+  type RunnerFrame,
+} from "@agenteschat/adapters/machine-protocol";
 import { cachedExecutors, detectExecutors } from "../../runner/executors";
 import {
   claudePermissionSettings,
@@ -119,6 +124,26 @@ test("permission profile: work allows git, tests and pushes to the mission's bra
   expect(plan.allow.some((r) => r.startsWith("Bash(git commit") || r.startsWith("Bash(npm"))).toBe(false);
   expect(plan.deny).toContain("Edit");
   expect(plan.deny).toContain("Write");
+  // A real run: `git status 2>&1 | head -3`, `git -C <folder> status` and `ls ~/.claude/skills` were denied.
+  for (const rule of ["Bash(git status)", "Bash(git -C * status *)", "Bash(head *)", "Bash(ls)", "Bash(ls *)"]) {
+    expect(plan.allow).toContain(rule);
+    expect(work.allow).toContain(rule);
+  }
+  expect(plan.allow.some((r) => r.startsWith("Bash(python"))).toBe(false);
+  expect(work.allow).toContain("Bash(git -C * commit *)");
+  expect(work.allow).toContain("Bash(mkdir *)");
+  // `-C <path>` spellings are denied like the plain ones.
+  for (const rule of [
+    "Bash(git -C * merge *)",
+    "Bash(git -C * push * main)",
+    "Bash(git -C * push * master)",
+    "Bash(git -C * push --force*)",
+    "Bash(git -C * push * -f*)",
+    "Bash(git push * main *)",
+  ]) {
+    expect(work.deny).toContain(rule);
+    expect(plan.deny).toContain(rule);
+  }
 });
 
 test.skipIf(!posix)("a mission task's Claude Code gets the settings file; the plan turn runs read only", async () => {
@@ -271,4 +296,107 @@ test.skipIf(!posix || !hasGit)(
     expect(existsSync(path.join(repo, ".git", "info", "exclude"))).toBe(true);
     expect(readFileSync(path.join(repo, ".git", "info", "exclude"), "utf8")).toContain(".agentes/");
   },
+);
+
+/** A Claude Code stand-in that records where it ran and what it read on stdin. */
+function fakeClaude(bin: string) {
+  writeFileSync(
+    path.join(bin, "claude"),
+    [
+      "#!/bin/sh",
+      'pwd > "$PWD/.seen-cwd"',
+      'cat > "$PWD/.seen-prompt"',
+      `printf '%s\\n' '{"type":"result","result":"ok"}'`,
+    ].join("\n"),
+  );
+  chmodSync(path.join(bin, "claude"), 0o755);
+}
+
+test.skipIf(!posix)(
+  "a mission folder without git: an item runs without a branch in its own subfolder, with rules that never mention branches",
+  async () => {
+    const bin = tempDir("bin-");
+    const ws = tempDir("ws-");
+    const home = tempDir("home-");
+    dirs.push(bin, ws, home);
+    fakeClaude(bin);
+    const tasks = manager(home, ws, {
+      secrets: async () => ({ env: { PATH: `${bin}:${process.env.PATH ?? ""}` }, redact: (s) => s }),
+    });
+    await tasks.init();
+    const folder = await agentWorkspace(ws, AGENT);
+    mkdirSync(path.join(folder, ".agentes"), { recursive: true });
+    writeFileSync(path.join(folder, ".agentes", "mission.md"), "# Mission\n");
+    const started = await tasks.start(AGENT, {
+      taskId: id(20),
+      executor: "claude",
+      prompt: "Make the contact sheet",
+      session: "0193aaaa-0000-7000-8000-0000000000c1",
+      branch: "agentes/000000bb/contact-sheet",
+      mission: { id: MISSION, rules: MISSION_RULES, mode: "work", branchPrefix: "agentes/000000bb/" },
+    });
+    expect(started.branch).toBeUndefined();
+    expect(started.cwd).toBe("work/contact-sheet");
+    expect(started.command).toContain("not a git repository");
+    expect(started.command).not.toContain("own branch");
+    expect(MISSION_RULES_NO_GIT).not.toMatch(/branch|commit|push|pull request/i);
+    expect(MISSION_RULES_NO_GIT).toContain("upload_artifact");
+    expect(MISSION_RULES).toContain("language the people use");
+    const item = path.join(folder, "work", "contact-sheet");
+    await waitFor(() => existsSync(path.join(item, ".seen-prompt")), 10_000);
+    expect(readFileSync(path.join(item, ".seen-prompt"), "utf8")).toStartWith("Your folder: work/contact-sheet/");
+    // It reads the mission's files from its subfolder.
+    expect(readFileSync(path.join(item, ".agentes", "mission.md"), "utf8")).toBe("# Mission\n");
+    // The same name again gets a folder of its own.
+    const again = await tasks.start(AGENT, {
+      taskId: id(21),
+      executor: "claude",
+      prompt: "Again",
+      session: "0193aaaa-0000-7000-8000-0000000000c2",
+      branch: "contact-sheet",
+      mission: { id: MISSION, rules: MISSION_RULES, mode: "work" },
+    });
+    expect(again.cwd).toBe(`work/contact-sheet-${id(21).replace(/-/g, "").slice(-8)}`);
+    // A shell task still needs a repository for a branch.
+    await expect(
+      tasks.start(AGENT, { taskId: id(22), executor: "shell", command: "true", branch: "x" }),
+    ).rejects.toMatchObject({ code: "bad_request" });
+  },
+  20_000,
+);
+
+test.skipIf(!posix || !hasGit)(
+  "a mission folder with git: an item keeps its branch and worktree, and the git rules",
+  async () => {
+    const bin = tempDir("bin-");
+    const ws = tempDir("ws-");
+    const home = tempDir("home-");
+    dirs.push(bin, ws, home);
+    fakeClaude(bin);
+    const tasks = manager(home, ws, {
+      secrets: async () => ({ env: { PATH: `${bin}:${process.env.PATH ?? ""}` }, redact: (s) => s }),
+    });
+    await tasks.init();
+    const folder = await agentWorkspace(ws, AGENT);
+    const git = (...args: string[]) =>
+      spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: folder, encoding: "utf8" });
+    git("init", "-q");
+    writeFileSync(path.join(folder, "README.md"), "hi\n");
+    git("add", ".");
+    git("commit", "-qm", "init");
+    const started = await tasks.start(AGENT, {
+      taskId: id(23),
+      executor: "claude",
+      prompt: "Build the tabs",
+      session: "0193aaaa-0000-7000-8000-0000000000c3",
+      branch: "agentes/000000bb/nav",
+      mission: { id: MISSION, rules: MISSION_RULES, mode: "work", branchPrefix: "agentes/000000bb/" },
+    });
+    expect(started).toMatchObject({ branch: "agentes/000000bb/nav", cwd: `.worktrees/${id(23)}` });
+    expect(started.command).toContain("own branch");
+    const wt = path.join(folder, ".worktrees", id(23));
+    await waitFor(() => existsSync(path.join(wt, ".seen-prompt")), 10_000);
+    expect(readFileSync(path.join(wt, ".seen-prompt"), "utf8")).toStartWith("Your branch: agentes/000000bb/nav");
+  },
+  20_000,
 );

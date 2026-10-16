@@ -42,7 +42,7 @@ export const TASK_OFFLINE_GRACE_MS = 60_000;
 export const MAX_TASK_RESUMES = 3;
 /** What a resumed Claude Code session is told. */
 export const RESUME_PROMPT =
-  "You were interrupted (the computer went offline). Check git status in your folder and continue where you stopped.";
+  "You were interrupted (the computer went offline). Look at your folder (git status when it is a git repository) and continue where you stopped.";
 export const TASK_TEXT_LIMITS = { title: 120, command: 2000, prompt: 20_000, wakeResult: 4000 } as const;
 
 const ACTIVE: MachineTaskStatus[] = ["queued", "running", "interrupted"];
@@ -247,7 +247,8 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
         status: "running",
         command: String(started.command ?? row.command).slice(0, TASK_TEXT_LIMITS.command),
         cwd: started.cwd ?? null,
-        branch: started.branch ?? row.branch,
+        // A runner answers the branch it made; none when the folder had no git (the item got its own subfolder).
+        branch: started.branch ?? null,
         startedAt: Number.isNaN(at.getTime()) ? new Date() : at,
         lastEventAt: new Date(),
         updatedAt: new Date(),

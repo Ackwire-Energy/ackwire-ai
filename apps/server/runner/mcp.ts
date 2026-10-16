@@ -528,9 +528,38 @@ const GIT_WORK = [
 ];
 const GIT_READ = ["status", "diff", "log", "show", "rev-parse", "branch --list", "ls-files"];
 
+/** Plain file work a work turn may do in its folder (non-code missions: images, documents, archives). */
+const FILE_WORK = ["mkdir", "cp", "mv", "touch", "zip", "unzip", "tar", "sips"];
+
+/** Read-only shell commands any mission turn may run (alone or in a pipeline) to look at its folder. */
+const READ_ONLY_COMMANDS = ["ls", "cat", "head", "tail", "wc", "grep", "rg", "pwd", "file", "stat", "du", "tree"];
+const readOnlyShell = () => READ_ONLY_COMMANDS.flatMap((c) => [`Bash(${c})`, `Bash(${c} *)`]);
+
+/** The same git rule with `-C <path>` before the subcommand (`git -C /path status`). */
+const gitC = (rules: string[]) =>
+  rules.flatMap((r) => (r.startsWith("Bash(git ") ? [r, r.replace("Bash(git ", "Bash(git -C * ")] : [r]));
+
 /** Never without a person's approval (`request_approval`): merges, pushes elsewhere, force pushes, deploys. */
 const DENY_RULES = [
+  "Bash(git merge)",
   "Bash(git merge *)",
+  "Bash(git -C * merge *)",
+  "Bash(git -C * push --force*)",
+  "Bash(git -C * push -f*)",
+  "Bash(git -C * push * --force*)",
+  "Bash(git -C * push * -f*)",
+  "Bash(git -C * push *+*)",
+  "Bash(git -C * push *:*)",
+  "Bash(git -C * push * main)",
+  "Bash(git -C * push * master)",
+  "Bash(git push * main *)",
+  "Bash(git push * master *)",
+  "Bash(git -C * push * main *)",
+  "Bash(git -C * push * master *)",
+  "Bash(git -C * push * --delete *)",
+  "Bash(git -C * push * -d *)",
+  "Bash(git -C * push * --all*)",
+  "Bash(git -C * push * --mirror*)",
   "Bash(git push --force*)",
   "Bash(git push -f*)",
   "Bash(git push * --force*)",
@@ -571,16 +600,27 @@ const DENY_RULES = [
 /**
  * The `--settings` file of a mission task's Claude Code (protocol 7): what
  * it may run without asking (`-p` can't ask: anything else is denied).
- * `plan`: read only and our tools. `work`: edits (`acceptEdits`), git on its
- * own branches, pushes only to branches under the mission's prefix, pull
- * requests, tests and builds; merges, other pushes and deploys are denied
- * (they go through `request_approval`). Deny rules win over allow rules.
+ * `plan`: read only: our tools, reading files and read-only shell commands
+ * (`ls`, `cat`, `head`, `git status`, also `git -C <path> …`; Claude Code
+ * checks each part of a pipeline). `work`: edits (`acceptEdits`), the same
+ * read-only commands, plain file work, git on its own branches, pushes only
+ * to branches under the mission's prefix, pull requests, tests and builds;
+ * merges, other pushes and deploys are denied (they go through
+ * `request_approval`). Deny rules win over allow rules.
  */
 export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: string) {
   if (mode === "plan") {
     return {
       permissions: {
-        allow: ["mcp__agentes", "Read", "Glob", "Grep", "LS", ...GIT_READ.map((c) => `Bash(git ${c} *)`)],
+        allow: [
+          "mcp__agentes",
+          "Read",
+          "Glob",
+          "Grep",
+          "LS",
+          ...readOnlyShell(),
+          ...gitC(GIT_READ.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`])),
+        ],
         deny: ["Edit", "Write", "NotebookEdit", ...DENY_RULES],
       },
     };
@@ -590,7 +630,9 @@ export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: st
     permissions: {
       allow: [
         "mcp__agentes",
-        ...GIT_WORK.map((c) => `Bash(git ${c} *)`),
+        ...readOnlyShell(),
+        ...FILE_WORK.map((c) => `Bash(${c} *)`),
+        ...gitC(GIT_WORK.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`])),
         `Bash(git push origin ${prefix}*)`,
         `Bash(git push -u origin ${prefix}*)`,
         `Bash(git push --set-upstream origin ${prefix}*)`,

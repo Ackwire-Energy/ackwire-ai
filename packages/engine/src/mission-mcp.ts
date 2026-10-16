@@ -280,7 +280,8 @@ async function run(
       const branch = asked.startsWith(prefix) ? asked : `${prefix}${asked}`;
       const prompt = [
         `You work on one item of the mission "${mission.title}": ${title}.`,
-        `Your branch: ${branch}. Read .agentes/ first. When you are done, report, and request_review if there is something to show.`,
+        // The runner adds where it works (its branch, or its own subfolder when the mission folder has no git).
+        "Read .agentes/ first. When you are done, report, and request_review if there is something to show.",
         "",
         str(args.prompt).slice(0, MISSION_LIMITS.sendText * 2),
       ].join("\n");
@@ -294,7 +295,8 @@ async function run(
       });
       await recordMissionEvent(deps.db, mission, "task_started", { taskId: row.id, title, branch });
       await publishMissionEvent(deps, mission, "task", { taskId: row.id });
-      return `Started task ${row.id} ("${title}") on branch ${row.branch ?? branch}. You'll be told when it ends; don't wait for it.`;
+      const place = row.branch ? `on branch ${row.branch}` : `in its own folder ${row.cwd || "work/"}`;
+      return `Started task ${row.id} ("${title}") ${place}. You'll be told when it ends; don't wait for it.`;
     }
     default:
       return `Unknown tool ${tool}.`;
