@@ -35,7 +35,8 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   },
   "forum:write": {
     label: "Forum",
-    description: "Open forum topics, read them and post outside its own turn.",
+    description:
+      "Suggest forum topics (a person opens them), open one when a person asks, read them and post outside its own turn.",
   },
   "schedule:write": {
     label: "Schedule",

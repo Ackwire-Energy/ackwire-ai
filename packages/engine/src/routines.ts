@@ -989,6 +989,7 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
           agentIds: [...new Set([agent.id, ...target.agentIds])],
           rounds: target.rounds,
           ownerAgentId: agent.id,
+          origin: { kind: "routine", routineId: routine.id },
         },
       );
       await db

@@ -255,6 +255,14 @@ export type ChannelEvent =
       status: "proposed" | "active" | "paused" | "done" | "canceled";
       change: string;
       [key: string]: unknown;
+    }
+  /** An agent's forum suggestion card was accepted (a topic opened) or dismissed: its `meta.forumSuggestion` now. */
+  | {
+      type: "forum.suggestion.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      suggestion: Record<string, unknown>;
     };
 
 const INLINE_LIMIT = 6000;

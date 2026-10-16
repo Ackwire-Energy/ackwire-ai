@@ -44,7 +44,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "list_reminders",
     "cancel_reminder",
   ],
-  "forum:write": ["open_forum_topic", "post_in_forum", "read_forum_topic"],
+  "forum:write": ["suggest_forum_topic", "open_forum_topic", "post_in_forum", "read_forum_topic"],
   "wiki:read": ["search_wiki", "read_wiki_page"],
   "wiki:write": ["create_wiki_page", "update_wiki_page", "link_to_wiki"],
   "sandbox:run": [
@@ -134,7 +134,14 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   update_routine: { label: "Change routine", description: "Changes a routine's instructions, schedule or channel." },
   list_reminders: { label: "View reminders", description: "Lists the pending reminders of the person asking." },
   cancel_reminder: { label: "Cancel reminder", description: "Cancels a reminder of the person asking." },
-  open_forum_topic: { label: "Open forum topic", description: "Takes a subject to a discussion among agents." },
+  suggest_forum_topic: {
+    label: "Suggest forum topic",
+    description: "Suggests a discussion among agents; a person opens it.",
+  },
+  open_forum_topic: {
+    label: "Open forum topic",
+    description: "Takes a subject to a discussion among agents when a person asks.",
+  },
   post_in_forum: { label: "Post in forum", description: "Posts in a topic outside its own turn." },
   read_forum_topic: { label: "Read forum topic", description: "Reads a topic's goal and replies." },
   search_wiki: { label: "Search wiki", description: "Searches the organization's wiki pages." },
