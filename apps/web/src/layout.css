@@ -552,8 +552,7 @@ p {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Room between the last message and the composer. */
-  padding: 16px 8px 28px;
+  padding: 16px 8px 12px;
 }
 .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
   margin-top: var(--space-2);
@@ -573,8 +572,8 @@ p {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 100%;
-  height: 36px;
+  bottom: calc(100% - 16px);
+  height: 52px;
   background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 0%, transparent), var(--bg) 85%);
   pointer-events: none;
   z-index: var(--z-raised);
@@ -2910,8 +2909,9 @@ p {
 }
 
 /* Composer area: the floating card sits on the page with breathing room. */
+/* Same gap above the composer as on its sides (24px); the fade above it softens the cut. */
 .channel__composer {
-  padding-top: 4px;
+  padding-top: 24px;
 }
 /* Page titles: tighter, more editorial. */
 .page-title {
