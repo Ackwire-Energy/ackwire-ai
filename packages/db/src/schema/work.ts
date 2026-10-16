@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   date,
@@ -61,6 +62,8 @@ export const issues = pgTable(
     /** `{ type: "manual" | "message" | "forum" | "agent" | "webhook", … }`. */
     source: jsonb().$type<Record<string, unknown>>().notNull().default({ type: "manual" }),
     channelId: uuid(),
+    /** A sub-issue of this one (e.g. a step of a plan the forum made for it, D45). */
+    parentIssueId: uuid().references((): AnyPgColumn => issues.id, { onDelete: "set null" }),
     /** `[{ number, url, openedBy }]`. */
     pullRequests: jsonb().$type<Record<string, unknown>[]>().notNull().default([]),
     artifactIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
@@ -69,7 +72,12 @@ export const issues = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.orgId, t.number), index().on(t.orgId, t.status), index().on(t.orgId, t.dueDate)],
+  (t) => [
+    unique().on(t.orgId, t.number),
+    index().on(t.orgId, t.status),
+    index().on(t.orgId, t.dueDate),
+    index().on(t.parentIssueId),
+  ],
 );
 
 /** Comments (people and agents) and events ("asked Ada to implement") of an issue. */
