@@ -216,6 +216,20 @@ export type ChannelEvent =
   | { type: "message.created"; channelId: string; messageId: string; message?: Message }
   /** Someone reacted or took it back: the message's reactions now (replace). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
+  /**
+   * A thread's state, title or context changed (ADR 0029). `thread` is the fresh view when the
+   * server had it (its `canManage` is always false: read yours from the API). `messageIds`: messages
+   * that left the channel (`moved`) or came back (`returned`).
+   */
+  | {
+      type: "thread.updated";
+      channelId: string;
+      threadId: string;
+      change: ThreadChange;
+      state?: ThreadState;
+      thread?: ThreadInfo;
+      messageIds?: string[];
+    }
   | ArtifactEvent
   | {
       type: "agent.delta";
@@ -300,6 +314,22 @@ export type ChannelEvent =
       agentId: string;
       runId: string;
       update: MemoryUpdate;
+    }
+  /** A background task on a connected computer changed (`task` is its whole view: replace). */
+  | { type: "machine.task"; channelId: string; threadId: string | null; task: MachineTask }
+  /** A mission changed (ADR 0029): `change` says what; refetch the mission for the rest. */
+  | {
+      type: "mission.updated";
+      channelId: string;
+      threadId: string;
+      missionId: string;
+      status: MissionStatus;
+      change: string;
+      decision?: MissionDecision;
+      review?: MissionReview;
+      messageId?: string;
+      planVersion?: number;
+      file?: string;
     };
 
 /** Events for one person (`{ type: "event", scope: "user" }` frames), e.g. approvals they can decide. */
@@ -315,7 +345,10 @@ export type ApprovalStatus = "pending" | "approved" | "refused" | "expired";
 /** A sensitive action waiting for a person (apps/server/src/routes/app/approvals.ts). */
 export interface Approval {
   id: string;
-  runId: string;
+  /** Null when a mission's executor asked (`missionId`). */
+  runId: string | null;
+  /** A mission's executor asked (ADR 0029). */
+  missionId?: string | null;
   agentId: string;
   channelId: string;
   threadId: string;
@@ -1631,4 +1664,459 @@ export interface WikiGraph {
     sourceType?: string | null;
   }[];
   edges: { from: string; to: string }[];
+}
+
+// ── Threads (ADR 0029; apps/server/src/routes/app/threads.ts) ──────────────────
+
+export type ThreadState = "open" | "closed" | "archived";
+export type ThreadTab = "all" | "working" | "missions" | "closed" | "archived";
+export type ThreadChange =
+  | "created"
+  | "title"
+  | "context"
+  | "moved"
+  | "returned"
+  | "closed"
+  | "reopened"
+  | "archived"
+  | "unarchived"
+  | "deleted";
+
+/** A person or an agent in a thread (`id` null: someone who left). */
+export interface ThreadActor {
+  type: AuthorType;
+  id: string | null;
+}
+
+/** The range of a conversation a thread was made from. */
+export interface ThreadContext {
+  channelId: string;
+  firstMessageId: string;
+  lastMessageId: string;
+  excludedMessageIds: string[];
+  /** The range left the channel (a stub stays there). */
+  moved: boolean;
+  /** Messages in the range now (deleted and excluded ones don't count). */
+  count: number;
+}
+
+export interface ThreadInfo {
+  /** The root message id (what replies carry as `threadId`). */
+  id: string;
+  channelId: string;
+  channelName: string;
+  channelKind: "channel" | "dm" | "forum";
+  /** Null: show `rootText`. */
+  title: string | null;
+  rootText: string;
+  rootAuthor: ThreadActor;
+  state: ThreadState;
+  createdBy: string | null;
+  closedBy: string | null;
+  closedAt: string | null;
+  archivedBy: string | null;
+  archivedAt: string | null;
+  context: ThreadContext | null;
+  replyCount: number;
+  lastActivityAt: string;
+  lastMessage: { author: ThreadActor; excerpt: string; createdAt: string } | null;
+  participants: ThreadActor[];
+  /** An agent run is in progress (or waiting) in this thread. */
+  working: boolean;
+  needsYou: boolean;
+  /** You may close, archive, rename or change the context. */
+  canManage: boolean;
+  /** The thread's mission, in short (details: `GET …/threads/{id}/mission`). */
+  mission?: ThreadMissionSummary | null;
+  createdAt: string;
+}
+
+export interface ThreadMissionSummary {
+  id: string;
+  status: MissionStatus;
+  planDone: number;
+  planTotal: number;
+  /** Plan items waiting for people, pending decisions and reviews. */
+  waitingYou: number;
+}
+
+export interface ThreadPage {
+  threads: ThreadInfo[];
+  nextCursor: string | null;
+}
+
+export interface ThreadFilters {
+  tab?: ThreadTab;
+  channelId?: string;
+  agentId?: string;
+  needsYou?: boolean;
+  mine?: boolean;
+  q?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ThreadCreateInput {
+  /** Where the thread lives. */
+  channelId: string;
+  /** Where the range comes from (default: `channelId`). */
+  contextChannelId?: string;
+  firstMessageId: string;
+  lastMessageId: string;
+  excludedMessageIds?: string[];
+  title?: string | null;
+}
+
+export interface ThreadPatch {
+  /** Empty or null: no title of its own. */
+  title?: string | null;
+  firstMessageId?: string;
+  lastMessageId?: string;
+  excludedMessageIds?: string[];
+}
+
+export type ThreadAction = "move" | "return" | "close" | "reopen" | "archive" | "unarchive";
+
+/** `meta.threadStart` on the root of a thread made from a range: the channel shows it as a marker. */
+export interface ThreadStartMeta {
+  title: string;
+  contextChannelId: string;
+  firstMessageId: string;
+  lastMessageId: string;
+  count: number;
+  moved: boolean;
+  movedCount: number;
+}
+
+// ── Missions (ADR 0029; apps/server/src/routes/app/missions.ts) ────────────────
+
+export type MissionStatus = "proposed" | "active" | "paused" | "done" | "canceled";
+export type MissionRole = "owner" | "decide" | "comment" | "none";
+export type PlanItemStatus = "todo" | "doing" | "waiting_you" | "done" | "dropped";
+
+export interface PlanItem {
+  id: string;
+  title: string;
+  status: PlanItemStatus;
+  note?: string;
+}
+
+/** Who programs a mission: Claude Code, Codex (experimental) or the agent itself with its own tools. */
+export type MissionExecutor = "claude" | "codex" | "agent";
+
+export interface Mission {
+  id: string;
+  /** The home thread (root message id). */
+  threadId: string;
+  channelId: string;
+  agentId: string;
+  ownerId: string | null;
+  /** "claude" | "codex" | "agent". */
+  executor: string;
+  title: string;
+  goal: string;
+  status: MissionStatus;
+  repoDir: string;
+  resumeTasks: boolean;
+  plan: {
+    version: number;
+    done: number;
+    total: number;
+    waiting: number;
+    /** Items in progress now. */
+    doing: number;
+    /** The latest plan in order (at most 40), for the strip. */
+    items: Pick<PlanItem, "id" | "title" | "status">[];
+  };
+  pending: {
+    decisions: number;
+    provisional: number;
+    reviews: number;
+    suggestions: number;
+    /** Requests to join (0 unless you can answer them). */
+    joinRequests: number;
+  };
+  /** You asked to join and nobody answered yet. */
+  joinRequested: boolean;
+  runningTasks: number;
+  machine: {
+    id: string;
+    name: string;
+    online: boolean;
+    lentBy: string | null;
+    /** Who can program on that computer (the plan card switches before Start). */
+    executors: MissionExecutor[];
+    /** Codex is installed but too old for missions. */
+    codexTooOld: boolean;
+  } | null;
+  /** Handed over without a computer: the owner sets one. */
+  needsComputer: boolean;
+  /** Your role in it. */
+  role: MissionRole;
+  /** You may start work, decide, review, pause and stop. */
+  canAct: boolean;
+  /** You may close it and change who takes part. */
+  canManage: boolean;
+  createdAt: string;
+  startedAt: string | null;
+  pausedAt: string | null;
+  closedAt: string | null;
+  closeReason: string | null;
+  wikiPageId: string | null;
+}
+
+export type MissionListStatus = "open" | "closed" | "waiting_you" | MissionStatus;
+
+/** `GET …/missions` filters (the server's; the Missões tab sends them). */
+export interface MissionListQuery {
+  status?: MissionListStatus;
+  channelId?: string;
+  agentId?: string;
+  /** Words of the title or the goal. */
+  q?: string;
+  limit?: number;
+}
+
+/** Same filters, any status: the tabs and the sidebar's count. */
+export interface MissionCounts {
+  active: number;
+  waitingYou: number;
+  closed: number;
+}
+
+export interface MissionList {
+  missions: Mission[];
+  counts: MissionCounts;
+}
+
+/** "Pedir para participar": answered by the owner and those who decide. */
+export interface MissionJoinRequest {
+  id: string;
+  missionId: string;
+  userId: string;
+  name: string;
+  status: "pending" | "accepted" | "declined";
+  role: MissionParticipantRole | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+/** An agent that can run a mission for you (a connected computer it may use). */
+export interface MissionEligibleAgent {
+  agentId: string;
+  handle: string;
+  name: string;
+  machine: { id: string; name: string; online: boolean };
+  ready: boolean;
+  /** Who can program on its computer ("Quem programa"), and the default. */
+  executors: MissionExecutor[];
+  defaultExecutor: MissionExecutor;
+  codexTooOld: boolean;
+}
+
+/** "Ver saída": the last lines of a task, from the computer or what the server kept. */
+export interface TaskOutput {
+  taskId: string;
+  status: MachineTaskStatus;
+  source: "computer" | "saved";
+  lines: string[];
+  truncated: boolean;
+}
+
+export interface MissionCreateInput {
+  agentId: string;
+  goal: string;
+  title?: string;
+  /** Where it starts (a new thread there). */
+  channelId?: string;
+  /** Or the thread that becomes its home. */
+  threadId?: string;
+  /** The repository on the computer, relative to the agent's folder. */
+  folder?: string;
+  /** Default: Claude Code when the computer has it, else the agent itself. */
+  executor?: MissionExecutor;
+}
+
+export interface MissionDecision {
+  id: string;
+  missionId: string;
+  taskId: string | null;
+  messageId: string | null;
+  question: string;
+  options: string[];
+  recommendation: string | null;
+  why: string | null;
+  impact: string | null;
+  blocking: boolean;
+  status: "pending" | "provisional" | "taken";
+  chosen: string | null;
+  chosenBy: string | null;
+  chosenAt: string | null;
+  opinions: { userId: string; option: string; at: string }[];
+  createdAt: string;
+}
+
+export interface MissionReview {
+  id: string;
+  missionId: string;
+  taskId: string | null;
+  messageId: string | null;
+  title: string;
+  summary: string;
+  prUrl: string | null;
+  artifactIds: string[];
+  status: "pending" | "approved" | "changes_requested";
+  note: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+export type MissionParticipantRole = "decide" | "comment";
+
+export interface MissionParticipants {
+  owner: { userId: string; name: string } | null;
+  participants: {
+    userId: string;
+    name: string;
+    role: MissionParticipantRole;
+    addedBy: string | null;
+    createdAt: string;
+  }[];
+}
+
+export type MachineTaskStatus = "queued" | "running" | "interrupted" | "done" | "failed" | "canceled";
+
+/** A background task on a connected computer (one session of a mission's executor). */
+export interface MachineTask {
+  id: string;
+  agentId: string;
+  machineId: string;
+  channelId: string;
+  threadId: string | null;
+  missionId: string | null;
+  title: string;
+  executor: string;
+  status: MachineTaskStatus;
+  exitCode: number | null;
+  seconds: number | null;
+  lastLine: string | null;
+  files: string[];
+  /** A pull request it opened (detected by the server). */
+  prUrl?: string | null;
+  branch: string | null;
+  cwd: string | null;
+  resumedFromId: string | null;
+  resumedTaskId: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  lastEventAt: string | null;
+  createdAt: string;
+}
+
+export type MissionFileName = "mission.md" | "decisions.md" | "notes.md";
+
+export interface MissionFile {
+  name: MissionFileName | string;
+  content: string | null;
+  source: string | null;
+  writtenAt: string | null;
+  updatedAt: string | null;
+}
+
+/** A `.agentes/` file edited on the machine: we kept the approved version. */
+export interface MissionFileEdit {
+  id?: string;
+  name?: string;
+  approved?: string;
+  edited?: string;
+  diff?: string;
+  at?: string;
+  [key: string]: unknown;
+}
+
+export interface MissionFiles {
+  files: MissionFile[];
+  editedOnMachine: MissionFileEdit[];
+}
+
+/** `/summary`: where it stands, from the database. */
+export interface MissionSummary {
+  missionId: string;
+  text: string;
+  plan: { done: number; total: number; doing: number; waiting: number };
+  running: number;
+  pendingDecisions: number;
+  provisionalDecisions: number;
+  pendingReviews: number;
+}
+
+export interface MissionPlanVersion {
+  version: number;
+  items: PlanItem[];
+  source: string;
+  taskId: string | null;
+  createdAt: string;
+}
+
+/** `/plan`: the latest version and the history. */
+export interface MissionPlan {
+  missionId: string;
+  current: MissionPlanVersion | null;
+  history: MissionPlanVersion[];
+}
+
+export type MissionControl = "start" | "pause" | "resume" | "stop";
+
+/** `meta.missionPlan`: the plan card (Começar / Mudar algo). */
+export interface MissionPlanMeta {
+  missionId: string;
+  title: string;
+  goal: string;
+  computer: string;
+  executor: string;
+}
+
+/** `meta.missionReport`: a report the executor wrote in the thread. */
+export interface MissionReportMeta {
+  missionId: string;
+  taskId: string;
+  status: string;
+  executor: string;
+  computer: string | null;
+  main: boolean;
+}
+
+/** `meta.missionPlanChange`: one line per plan change. */
+export interface MissionPlanChangeMeta {
+  missionId: string;
+  version: number;
+  added: { id: string; title: string }[];
+  removed: { id: string; title: string }[];
+  changed: { id: string; title: string; from: PlanItemStatus; to: PlanItemStatus; renamedFrom?: string }[];
+}
+
+/** `meta.missionSuggestion`: a person without the right to ask for work addressed the agent. */
+export interface MissionSuggestionMeta {
+  status: "pending" | "accepted" | "declined";
+  missionId: string;
+  by?: string;
+  at?: string;
+}
+
+/** `meta.machineTask`: the notice when a background task ended. */
+export interface MachineTaskMeta {
+  id: string;
+  title: string;
+  status: MachineTaskStatus;
+  exitCode: number | null;
+  seconds: number;
+  computer: string;
+  executor: string;
+  branch?: string;
+  lastLine?: string;
+  files?: string[];
+  result?: string;
+  missionId?: string;
 }

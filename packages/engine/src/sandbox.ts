@@ -25,6 +25,7 @@ import { gitAccess } from "./git/proxy";
 import type { MachineCaller } from "./machine-hub";
 import { createMachineSandboxProvider } from "./machine-provider";
 import { type ComputerTarget, computerTarget, MachineOfflineError } from "./machines";
+import { missionOfRun } from "./mission-context";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { grantedScopeKeys } from "./tools/scopes";
@@ -530,7 +531,14 @@ export async function withSandbox<T>(
   fn: (computer: ComputerHandle) => Promise<T>,
   onNotice?: (notice: string) => void,
 ): Promise<T> {
-  const agent = await getAgentCached(deps.db, ctx.orgId, ctx.agentId);
+  const [agent, mission] = await Promise.all([getAgentCached(deps.db, ctx.orgId, ctx.agentId), missionOfRun(ctx)]);
+  // In a mission's thread the work runs on the mission's computer (ADR 0029), never on another one.
+  if (mission) {
+    if (!mission.machineId) {
+      throw new SandboxUnavailableError("This mission has no computer yet: its owner chooses one first.");
+    }
+    return withMachine(deps, ctx, { machineId: mission.machineId, handle: agent?.handle ?? "agent" }, fn);
+  }
   if (agent?.machineId) return withMachine(deps, ctx, { machineId: agent.machineId, handle: agent.handle }, fn);
   const { settings, updatedAt } = await settingsRow(deps.db, ctx.orgId);
   const provider = deps.provider;
@@ -600,14 +608,27 @@ export async function agentComputerInfo(
   deps: Pick<SandboxDeps, "db" | "provider" | "machines">,
   orgId: string,
   agentId: string,
+  /** In a mission's thread: the mission's computer (ADR 0029), which may not be the agent's. */
+  machineOverride?: { machineId: string | null } | null,
 ): Promise<
   | { kind: "cloud"; available: boolean }
-  | { kind: "machine"; machineId: string; name: string; online: boolean; execAllowed: boolean; os: string }
+  | {
+      kind: "machine";
+      machineId: string;
+      name: string;
+      online: boolean;
+      execAllowed: boolean;
+      os: string;
+      /** The runner's protocol (4+: background tasks). */
+      protocol: number;
+    }
   | { kind: "removed" }
 > {
   const agent = await getAgentCached(deps.db, orgId, agentId);
-  if (!agent?.machineId) return { kind: "cloud", available: Boolean(deps.provider) };
-  const status = await deps.machines?.hub.status(agent.machineId);
+  if (machineOverride && !machineOverride.machineId) return { kind: "removed" };
+  const machineId = machineOverride?.machineId ?? agent?.machineId;
+  if (!machineId) return { kind: "cloud", available: Boolean(deps.provider) };
+  const status = await deps.machines?.hub.status(machineId);
   if (!status || status.orgId !== orgId) return { kind: "removed" };
   return {
     kind: "machine",
@@ -616,6 +637,7 @@ export async function agentComputerInfo(
     online: status.online,
     execAllowed: status.execAllowed,
     os: status.os,
+    protocol: status.protocol,
   };
 }
 

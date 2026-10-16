@@ -39,10 +39,21 @@ import type {
   IssueActivity,
   Machine,
   MachinePairing,
+  MachineTask,
   Me,
   Member,
   Memory,
   Message,
+  Mission,
+  MissionDecision,
+  MissionEligibleAgent,
+  MissionFiles,
+  MissionJoinRequest,
+  MissionList,
+  MissionParticipants,
+  MissionPlan,
+  MissionReview,
+  MissionSummary,
   Model,
   Organization,
   OrgOverview,
@@ -66,6 +77,10 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
+  TaskOutput,
+  ThreadFilters,
+  ThreadInfo,
+  ThreadPage,
   TrashedArtifact,
   UsageReport,
   WikiGraph,
@@ -77,6 +92,18 @@ import type {
 } from "./types";
 
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
+
+/** The list's query string (booleans as "true"; nothing for what isn't set). */
+const threadQuery = (f: Partial<ThreadFilters>) => ({
+  tab: f.tab,
+  channelId: f.channelId,
+  agentId: f.agentId,
+  needsYou: f.needsYou ? "true" : undefined,
+  mine: f.mine ? "true" : undefined,
+  q: f.q?.trim() || undefined,
+  cursor: f.cursor,
+  limit: f.limit,
+});
 
 /** The real backend: `/api/health` and `/api/app/*` (apps/server/src/routes/app). */
 export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
@@ -430,6 +457,106 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       askAgent: (orgId, id, agentId) =>
         request<Issue>(`${org(orgId)}/issues/${enc(id)}/ask-agent`, { json: { agentId } }),
     },
+    threads: {
+      list: (orgId, filters = {}) => request<ThreadPage>(`${org(orgId)}/threads`, { query: threadQuery(filters) }),
+      inChannel: (orgId, channelId, filters = {}) =>
+        request<ThreadPage>(`${org(orgId)}/channels/${enc(channelId)}/threads`, { query: threadQuery(filters) }),
+      get: (orgId, threadId) => request<ThreadInfo>(`${org(orgId)}/threads/${enc(threadId)}`),
+      create: (orgId, input) => request<ThreadInfo>(`${org(orgId)}/threads`, { json: input }),
+      update: (orgId, threadId, patch) =>
+        request<ThreadInfo>(`${org(orgId)}/threads/${enc(threadId)}`, { method: "PATCH", json: patch }),
+      remove: (orgId, threadId) => request<void>(`${org(orgId)}/threads/${enc(threadId)}`, { method: "DELETE" }),
+      act: (orgId, threadId, action) =>
+        request<ThreadInfo>(`${org(orgId)}/threads/${enc(threadId)}/${action}`, { json: {} }),
+    },
+    missions: ((): HttpApi["missions"] => {
+      const one = (orgId: string, missionId: string) => `${org(orgId)}/missions/${enc(missionId)}`;
+      return {
+        list: (orgId, query = {}) =>
+          request<MissionList>(`${org(orgId)}/missions`, {
+            query: {
+              status: query.status,
+              channelId: query.channelId,
+              agentId: query.agentId,
+              q: query.q || undefined,
+              limit: query.limit === undefined ? undefined : String(query.limit),
+            },
+          }),
+        eligibleAgents: async (orgId) =>
+          (await request<{ agents: MissionEligibleAgent[] }>(`${org(orgId)}/missions/eligible-agents`)).agents,
+        taskOutput: (orgId, taskId, tail) =>
+          request<TaskOutput>(`${org(orgId)}/tasks/${enc(taskId)}/output`, {
+            query: { tail: tail === undefined ? undefined : String(tail) },
+          }),
+        joinRequests: async (orgId, missionId) =>
+          (await request<{ requests: MissionJoinRequest[] }>(`${one(orgId, missionId)}/join-requests`)).requests,
+        requestJoin: (orgId, missionId) =>
+          request<MissionJoinRequest>(`${one(orgId, missionId)}/join-requests`, { json: {} }),
+        decideJoin: (orgId, missionId, userId, outcome, role) =>
+          request<MissionJoinRequest>(`${one(orgId, missionId)}/join-requests/${enc(userId)}/${outcome}`, {
+            json: outcome === "accept" ? { role: role ?? "comment" } : {},
+          }),
+        create: (orgId, input) => request<Mission>(`${org(orgId)}/missions`, { json: input }),
+        get: (orgId, missionId) => request<Mission>(one(orgId, missionId)),
+        ofThread: (orgId, threadId) => request<Mission>(`${org(orgId)}/threads/${enc(threadId)}/mission`),
+        threadTasks: async (orgId, threadId) =>
+          (await request<{ tasks: MachineTask[] }>(`${org(orgId)}/threads/${enc(threadId)}/tasks`)).tasks,
+        control: (orgId, missionId, action) =>
+          request<Mission & { canceledTasks?: number }>(`${one(orgId, missionId)}/${action}`, { json: {} }),
+        close: (orgId, missionId, input) => request<Mission>(`${one(orgId, missionId)}/close`, { json: input }),
+        message: (orgId, missionId, text) =>
+          request<{ delivered: boolean; taskId?: string }>(`${one(orgId, missionId)}/messages`, { json: { text } }),
+        participants: (orgId, missionId) => request<MissionParticipants>(`${one(orgId, missionId)}/participants`),
+        setParticipant: (orgId, missionId, userId, role, existing) =>
+          existing
+            ? request<MissionParticipants>(`${one(orgId, missionId)}/participants/${enc(userId)}`, {
+                method: "PATCH",
+                json: { role },
+              })
+            : request<MissionParticipants>(`${one(orgId, missionId)}/participants`, { json: { userId, role } }),
+        removeParticipant: (orgId, missionId, userId) =>
+          request<void>(`${one(orgId, missionId)}/participants/${enc(userId)}`, { method: "DELETE" }),
+        transfer: (orgId, missionId, input) =>
+          request<Mission & { code?: string }>(`${one(orgId, missionId)}/transfer`, { json: input }),
+        setMachine: (orgId, missionId, machineId, repoDir) =>
+          request<Mission>(`${one(orgId, missionId)}/machine`, {
+            method: "PUT",
+            json: { machineId, ...(repoDir ? { repoDir } : {}) },
+          }),
+        setExecutor: (orgId, missionId, executor) =>
+          request<Mission>(`${one(orgId, missionId)}/executor`, { method: "PUT", json: { executor } }),
+        decisions: async (orgId, missionId) =>
+          (await request<{ decisions: MissionDecision[] }>(`${one(orgId, missionId)}/decisions`)).decisions,
+        choose: (orgId, missionId, decisionId, option) =>
+          request<MissionDecision>(`${one(orgId, missionId)}/decisions/${enc(decisionId)}/choose`, {
+            json: { option },
+          }),
+        opinion: (orgId, missionId, decisionId, option) =>
+          request<MissionDecision>(`${one(orgId, missionId)}/decisions/${enc(decisionId)}/opinion`, {
+            json: { option },
+          }),
+        approveProvisional: async (orgId, missionId) =>
+          (
+            await request<{ decisions: MissionDecision[] }>(`${one(orgId, missionId)}/decisions/approve-provisional`, {
+              json: {},
+            })
+          ).decisions,
+        reviews: async (orgId, missionId) =>
+          (await request<{ reviews: MissionReview[] }>(`${one(orgId, missionId)}/reviews`)).reviews,
+        review: (orgId, missionId, reviewId, outcome, note) =>
+          request<MissionReview>(`${one(orgId, missionId)}/reviews/${enc(reviewId)}/${outcome}`, {
+            json: note ? { note } : {},
+          }),
+        suggestion: (orgId, missionId, messageId, outcome) =>
+          request<{ messageId: string; status: "accepted" | "declined" }>(
+            `${one(orgId, missionId)}/suggestions/${enc(messageId)}/${outcome}`,
+            { json: {} },
+          ),
+        files: (orgId, missionId) => request<MissionFiles>(`${one(orgId, missionId)}/files`),
+        summary: (orgId, missionId) => request<MissionSummary>(`${one(orgId, missionId)}/summary`),
+        plan: (orgId, missionId) => request<MissionPlan>(`${one(orgId, missionId)}/plan`),
+      };
+    })(),
     routines: {
       list: async (orgId) => (await request<{ routines: Routine[] }>(`${org(orgId)}/routines`)).routines,
       parseSchedule: (orgId, phrase, timezone) =>

@@ -1,5 +1,15 @@
-import { type ExecRequest, type ExecResult, type NetworkMode, type PubSub, workspacePath } from "@agenteschat/adapters";
+import {
+  type ExecRequest,
+  type ExecResult,
+  type NetworkMode,
+  type PubSub,
+  TASK_EXECUTORS,
+  TASKS_PROTOCOL,
+  type TaskExecutor,
+  workspacePath,
+} from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
+import { getAgentCached } from "./agents";
 import {
   ARTIFACT_LIMITS,
   type ArtifactActor,
@@ -15,6 +25,22 @@ import {
 import { recordAudit } from "./audit";
 import { getChannelCached } from "./context";
 import { publishChannelEvent } from "./events";
+import { MachineRequestError } from "./machine-hub";
+import {
+  enqueueWake,
+  formatDuration,
+  getConversationTask,
+  listConversationTasks,
+  type MachineTaskRow,
+  machineTaskView,
+  publishTaskEvent,
+  startMachineTask,
+  taskRequester,
+  taskSeconds,
+  taskThreadOf,
+} from "./machine-tasks";
+import { MachineOfflineError } from "./machines";
+import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
 import {
   agentComputerInfo,
   type ComputerHandle,
@@ -45,6 +71,76 @@ import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tool
 import { completeUpload, createUpload, failUpload, type UploadRow, uploadedFile, waitForUpload } from "./uploads";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+/** Tools that change the computer (or start work on it); the rest only read. */
+const WRITE_TOOLS = new Set(["run_code", "write_file", "start_task", "run_skill_script", "import_file", "cancel_task"]);
+
+const READ_ONLY_COMMANDS = new Set([
+  "ls",
+  "cat",
+  "head",
+  "tail",
+  "wc",
+  "pwd",
+  "find",
+  "grep",
+  "rg",
+  "tree",
+  "file",
+  "stat",
+  "du",
+  "echo",
+  "which",
+  "sed -n",
+]);
+const READ_ONLY_GIT = new Set(["status", "log", "diff", "show", "branch", "rev-parse", "ls-files", "remote"]);
+
+/**
+ * A bash command that only reads (a proposed mission is planned read only,
+ * ADR 0029): every part (split on `&&`, `||`, `;`, `|`, newlines) starts with
+ * a reading command, with no redirection, substitution or `-exec`/`-delete`.
+ */
+export function isReadOnlyCommand(command: string): boolean {
+  if (/[<>`]|\$\(|-exec\b|-delete\b|-i\b/.test(command)) return false;
+  const parts = command
+    .split(/&&|\|\||;|\||\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return false;
+  return parts.every((part) => {
+    const words = part.split(/\s+/);
+    if (words[0] === "cd") return words.length <= 2;
+    if (words[0] === "git")
+      return READ_ONLY_GIT.has(words[1] ?? "") && !/\s-(D|d|m|M|c|C)\b|--delete|--move/.test(part);
+    if (words[0] === "sed") return words[1] === "-n";
+    return READ_ONLY_COMMANDS.has(words[0] ?? "");
+  });
+}
+
+/**
+ * In a mission's thread (ADR 0029) the computer's tools act for the mission:
+ * work only while it is active (proposed: reading and read-only commands;
+ * paused: reading), and only for its owner and deciders or when the mission
+ * woke the run.
+ */
+async function missionGate(name: string, input: Record<string, unknown>, ctx: ToolContext, run: RunMission) {
+  const mission = await missionOfRun(ctx);
+  if (!mission || mission.id !== run.id || !WRITE_TOOLS.has(name)) return null;
+  if (!(await runActsForMission(ctx, mission))) {
+    return "Only the mission's owner or someone who can decide can make work run on the mission's computer. Tell the person; the owner can accept their suggestion.";
+  }
+  if (mission.status === "paused") return "The mission is paused: don't start or change anything now.";
+  if (mission.status === "proposed") {
+    const code = name === "run_code" && str(input.language) === "bash" ? str(input.code) : "";
+    const command =
+      name === "start_task" && (str(input.executor) === "shell" || !str(input.prompt)) ? str(input.command) : "";
+    const readOnly = (code && isReadOnlyCommand(code)) || (command && isReadOnlyCommand(command));
+    if (!readOnly) {
+      return "The plan isn't approved yet: only read now (read_file, list_files, bash commands that only read). The people press Start first.";
+    }
+  }
+  return null;
+}
 
 /** Live output of one call: at most this much, at most this often. */
 export const LIVE_OUTPUT_CHARS = 64 * 1024;
@@ -93,9 +189,15 @@ const maxTimeoutOf = (info: ComputerInfo) =>
  * per conversation (the thread's id, a UUID), resumed on every follow-up.
  * Sessions live per folder, and each agent has its own folder there.
  */
-export function claudeCodeSentence(sessionId: string) {
-  return `If Claude Code (\`claude\`) is installed there and the work suits it, run it non-interactively from your workspace with one session per conversation, so it remembers earlier turns: the first time \`claude -p --session-id ${sessionId} "<task>"\`, afterwards \`claude -p --resume ${sessionId} "<follow-up>"\` (if it says there's no such conversation, start it with --session-id). Add \`--permission-mode acceptEdits\` so it can edit files; never add --dangerously-skip-permissions unless the person asks. Give it a long timeout_seconds (real tasks take minutes) and pass on what it reports.`;
+export function claudeCodeSentence(sessionId: string, tasks = false) {
+  const run = `If Claude Code (\`claude\`) is installed there and the work suits it, run it non-interactively from your workspace with one session per conversation, so it remembers earlier turns: the first time \`claude -p --session-id ${sessionId} "<task>"\`, afterwards \`claude -p --resume ${sessionId} "<follow-up>"\` (if it says there's no such conversation, start it with --session-id). Add \`--permission-mode acceptEdits\` so it can edit files; never add --dangerously-skip-permissions unless the person asks.`;
+  return tasks
+    ? `${run} For anything that takes more than a couple of minutes (building a feature, a refactor, a long test run), use start_task with executor "claude" instead: it runs in the background in the same session, survives the connection dropping, and you are woken here when it finishes. Keep run_code for short commands and quick questions.`
+    : `${run} Give it a long timeout_seconds (real tasks take minutes) and pass on what it reports.`;
 }
+
+/** A connected machine that can run background tasks: commands allowed and a runner of protocol 4+. */
+const tasksOn = (info: ComputerInfo) => info.kind === "machine" && info.execAllowed && info.protocol >= TASKS_PROTOCOL;
 
 /** DNS failures and refused or unreachable connections: what blocked network looks like. */
 const NO_NETWORK =
@@ -483,7 +585,7 @@ export function createSandboxToolSource(
       ? `${bin} ${/^[\w./-]+$/.test(file) ? file : quote(file)}${args ? ` ${args}` : ""}`
       : `timeout -k 5 ${timeout} ${bin} ${quote(file)}${args ? ` ${args}` : ""}`;
 
-  const build = (
+  const baseTools = (
     requireApproval: boolean,
     execTimeout: number,
     network: Network = { mode: "blocked", domains: [] },
@@ -493,7 +595,7 @@ export function createSandboxToolSource(
   ): ToolDefinition[] => [
     {
       name: "run_code",
-      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo, network)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId)}` : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.`,
+      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo, network)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; long work needs it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.`,
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
       inputSchema: {
@@ -960,6 +1062,252 @@ export function createSandboxToolSource(
     },
   ];
 
+  /** The machine's hub (task calls go to whichever replica holds its socket). */
+  const hubOf = () => {
+    const hub = deps.machines?.hub;
+    if (!hub) throw new Error("Connected computers are not available on this server.");
+    return hub;
+  };
+  const taskLine = (row: MachineTaskRow) =>
+    `- ${row.id} "${row.title}" (${row.executor}): ${row.status}, ${formatDuration(taskSeconds(row))}${row.exitCode !== null ? `, exit code ${row.exitCode}` : ""}${row.lastLine ? ` — ${row.lastLine}` : ""}`;
+  const taskIdProp = { type: "string", minLength: 36, maxLength: 36, description: "The task id start_task returned" };
+
+  /** Background tasks on a connected computer (ADR 0029): start, list, look at, cancel. */
+  const taskTools = (requireApproval: boolean, info: Extract<ComputerInfo, { kind: "machine" }>): ToolDefinition[] => [
+    {
+      name: "start_task",
+      description: `Start long work in the background on the connected computer "${info.name}" and return at once with its id. With executor "claude" (the default when you give a prompt) Claude Code works on \`prompt\` in your folder, in this conversation's session (it remembers earlier turns), editing files on its own; "codex" runs Codex the same way; "shell" runs \`command\`. With \`branch\` it works in its own git worktree on that new branch (your folder must be a git repository). It keeps running if the connection drops; if the computer goes offline it resumes when it's back. You are woken in this conversation when it finishes, with its result: don't poll it with task_status, don't wait; tell the people it started and end your turn. Use run_code for short commands.`,
+      scope: SANDBOX_SCOPE,
+      sensitive: requireApproval,
+      inputSchema: {
+        type: "object",
+        properties: {
+          title: { type: "string", minLength: 1, maxLength: 120, description: "A few words people see on the task" },
+          prompt: { type: "string", minLength: 1, maxLength: 20_000, description: "What the executor should do" },
+          command: { type: "string", minLength: 1, maxLength: 2000, description: "With executor shell: the command" },
+          executor: { enum: [...TASK_EXECUTORS] },
+          branch: { type: "string", minLength: 1, maxLength: 120, description: "Work on this new git branch" },
+        },
+        required: ["title"],
+        additionalProperties: false,
+      },
+      describe: (input) => ({
+        title: `Start the task ${str(input.title)}`,
+        detail: (str(input.prompt) || str(input.command)).slice(0, 500),
+      }),
+      async execute(input, ctx) {
+        try {
+          const prompt = str(input.prompt).trim();
+          const command = str(input.command).trim();
+          const asked = str(input.executor);
+          const executor: TaskExecutor = (TASK_EXECUTORS as readonly string[]).includes(asked)
+            ? (asked as TaskExecutor)
+            : prompt
+              ? "claude"
+              : "shell";
+          if (executor === "shell" && !command) return { content: "A shell task needs `command`.", isError: true };
+          if (executor !== "shell" && !prompt)
+            return { content: `A ${executor} task needs \`prompt\`.`, isError: true };
+          const hub = hubOf();
+          const row = await run(ctx, 120, async (computer) => {
+            if (!computer.machineId) throw new Error("Background tasks run only on a connected computer.");
+            const status = await hub.status(computer.machineId);
+            const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+            // One session per conversation for Claude Code and Codex (the runner maps Codex's own thread id).
+            const session = executor === "claude" || executor === "codex" ? ctx.threadRootId : null;
+            const [before] = session
+              ? await ctx.db
+                  .select({ id: schema.machineTasks.id })
+                  .from(schema.machineTasks)
+                  .where(
+                    and(
+                      eq(schema.machineTasks.orgId, ctx.orgId),
+                      eq(schema.machineTasks.agentId, ctx.agentId),
+                      eq(schema.machineTasks.sessionId, session),
+                    ),
+                  )
+                  .limit(1)
+              : [];
+            return startMachineTask(
+              { db: ctx.db, pubsub: deps.pubsub, call: hub.call },
+              {
+                orgId: ctx.orgId,
+                agent: { id: ctx.agentId, handle: agent?.handle ?? "agent" },
+                machineId: computer.machineId,
+                protocol: status?.protocol ?? 0,
+                machineName: status?.name ?? info.name,
+                channelId: ctx.channelId,
+                threadRootId: await taskThreadOf(ctx),
+                runId: ctx.runId,
+                requestedByUserId: await taskRequester(ctx),
+                title: str(input.title),
+                executor,
+                ...(executor === "shell" ? { command } : { prompt }),
+                sessionId: session,
+                resume: Boolean(before),
+                branch: str(input.branch).trim() || null,
+                // In a mission's thread the task is the mission's (its end, pause, stop and close).
+                missionId: (await missionOfRun(ctx))?.id ?? null,
+              },
+            );
+          });
+          await recordAudit(deps.db, {
+            orgId: ctx.orgId,
+            actor: { type: "agent", id: ctx.agentId },
+            action: "machine.task_started",
+            target: { type: "machine", id: row.machineId },
+            details: {
+              taskId: row.id,
+              title: row.title,
+              executor: row.executor,
+              command: maskSecrets(row.command.slice(0, 200)),
+              branch: row.branch,
+              runId: ctx.runId ?? null,
+            },
+          }).catch(() => undefined);
+          const what = executor === "claude" ? "Claude Code" : executor === "codex" ? "Codex" : "the command";
+          return {
+            content: `Started background task ${row.id} ("${row.title}") on ${info.name}: ${what} in ${row.cwd ? row.cwd : "your folder"}${row.branch ? ` on branch ${row.branch}` : ""}. It runs on its own and you will be woken in this conversation when it finishes, with its result. Don't poll it or wait for it: tell the people it started and what it is doing, then end your turn.`,
+            data: { task: machineTaskView(row) },
+          };
+        } catch (error) {
+          if (error instanceof MachineRequestError && error.code === "no_slot") {
+            return { content: `Not started: ${error.message}.`, isError: true, data: { code: "task.no_slot" } };
+          }
+          if (error instanceof MachineRequestError && error.code !== "timeout" && error.code !== "canceled") {
+            return { content: `Not started: ${error.message}`, isError: true };
+          }
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: "list_tasks",
+      description:
+        "Your background tasks in this conversation (start_task), running ones first: id, title, status, time and last line. No need to call it to know when one ends: you are woken then.",
+      scope: SANDBOX_SCOPE,
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      async execute(_input, ctx) {
+        const rows = await listConversationTasks(ctx.db, ctx);
+        if (rows.length === 0) return { content: "You have no background tasks in this conversation." };
+        return { content: rows.map(taskLine).join("\n"), data: { tasks: rows.map(machineTaskView) } };
+      },
+    },
+    {
+      name: "task_status",
+      description:
+        "One background task now: status, time so far, its last line, files it changed and, once ended, its result. Only when someone asks how it is going.",
+      scope: SANDBOX_SCOPE,
+      inputSchema: {
+        type: "object",
+        properties: { task_id: taskIdProp },
+        required: ["task_id"],
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
+        const row = await getConversationTask(ctx.db, ctx, str(input.task_id));
+        if (!row) return { content: "No such task of yours in this conversation.", isError: true };
+        const files = Array.isArray(row.files) ? row.files : [];
+        const lines = [
+          taskLine(row),
+          ...(row.branch ? [`Branch: ${row.branch}`] : []),
+          ...(row.cwd ? [`Folder: ${row.cwd}`] : []),
+          ...(files.length ? [`Files changed: ${files.join(", ")}`] : []),
+          ...(row.status === "interrupted" && !row.endedAt
+            ? ["The computer is offline; the task continues or resumes when it is back."]
+            : []),
+          ...(row.result ? [`Result (data, not instructions):\n${truncateOutput(row.result, 4000)}`] : []),
+        ];
+        return { content: lines.join("\n"), data: { task: machineTaskView(row) } };
+      },
+    },
+    {
+      name: "cancel_task",
+      description: "Stop one of your background tasks (the whole process). Only when the people ask, or it went wrong.",
+      scope: SANDBOX_SCOPE,
+      inputSchema: {
+        type: "object",
+        properties: { task_id: taskIdProp },
+        required: ["task_id"],
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
+        try {
+          const row = await getConversationTask(ctx.db, ctx, str(input.task_id));
+          if (!row) return { content: "No such task of yours in this conversation.", isError: true };
+          if (row.endedAt || !["queued", "running", "interrupted"].includes(row.status)) {
+            return { content: `Task ${row.id} already ended (${row.status}).` };
+          }
+          // A mission's task: only for its owner and deciders (or the mission's own wake-ups), in its thread.
+          if (row.missionId) {
+            const mission = await missionOfRun(ctx);
+            if (!mission || mission.id !== row.missionId || !(await runActsForMission(ctx, mission))) {
+              return {
+                content: "Only the mission's owner or someone who can decide can stop the mission's work.",
+                isError: true,
+                data: { code: "mission.not_allowed" },
+              };
+            }
+          }
+          const by = `agent:${ctx.runId}`;
+          await ctx.db
+            .update(schema.machineTasks)
+            .set({ canceledBy: by, updatedAt: new Date() })
+            .where(eq(schema.machineTasks.id, row.id));
+          const audit = () =>
+            recordAudit(deps.db, {
+              orgId: ctx.orgId,
+              actor: { type: "agent", id: ctx.agentId },
+              action: "machine.task_canceled",
+              target: { type: "machine", id: row.machineId },
+              details: { taskId: row.id, title: row.title, runId: ctx.runId ?? null },
+            }).catch(() => undefined);
+          const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+          let reply: { canceled: boolean } | null = null;
+          try {
+            reply = await hubOf().call<"task.cancel">(row.machineId, {
+              agent: { id: ctx.agentId, handle: agent?.handle ?? "agent" },
+              op: "task.cancel",
+              taskId: row.id,
+            });
+          } catch (error) {
+            if (!(error instanceof MachineOfflineError) && !(error instanceof MachineRequestError)) throw error;
+          }
+          if (reply?.canceled) {
+            await audit();
+            return { content: `Stopping task ${row.id} ("${row.title}"); it ends in a few seconds.` };
+          }
+          // Offline, or the runner no longer has it: it won't come back.
+          const [ended] = await ctx.db
+            .update(schema.machineTasks)
+            .set({ status: "canceled", endedAt: new Date(), updatedAt: new Date() })
+            .where(and(eq(schema.machineTasks.id, row.id), eq(schema.machineTasks.canceledBy, by)))
+            .returning();
+          if (ended) await publishTaskEvent(deps.pubsub, ended);
+          // A mission's task still gets its end handled (notes, inbox), even canceled by the agent.
+          if (ended?.missionId) await enqueueWake(ctx.db, ended);
+          await audit();
+          return {
+            content: `Task ${row.id} ("${row.title}") is canceled${reply ? "" : " (its computer is offline; it won't resume)"}.`,
+          };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+  ];
+
+  const build = (
+    requireApproval: boolean,
+    execTimeout: number,
+    network: Network = { mode: "blocked", domains: [] },
+    computerInfo: ComputerInfo = { kind: "cloud", available: true },
+    sessionId?: string,
+  ): ToolDefinition[] => [
+    ...baseTools(requireApproval, execTimeout, network, computerInfo, sessionId),
+    ...(computerInfo.kind === "machine" && tasksOn(computerInfo) ? taskTools(requireApproval, computerInfo) : []),
+  ];
+
   return {
     name: "sandbox",
     async tools(ctx) {
@@ -980,18 +1328,38 @@ export function createSandboxToolSource(
           "computer_stop",
           "computer_status",
           REQUEST_SECRET_TOOL,
+          "start_task",
+          "list_tasks",
+          "task_status",
+          "cancel_task",
         ].some((n) => keys.has(grantKey(null, toolAllowScope(n))));
       if (!granted) return withNotices(build(false, 60));
       const settings = await getSandboxSettings(ctx.db, ctx.orgId);
       if (!settings.enabled) return [];
-      const computer = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
+      // A mission's thread: its computer, and its rules (ADR 0029).
+      const mission = await missionOfRun(ctx);
+      const computer = await agentComputerInfo(
+        deps,
+        ctx.orgId,
+        ctx.agentId,
+        mission ? { machineId: mission.machineId } : null,
+      );
       const network: Network =
         computer.kind === "machine"
           ? { mode: "machine", domains: [] }
           : { mode: settings.network, domains: settings.allowDomains };
-      return withNotices(
+      const tools = withNotices(
         build(settings.requireApproval, settings.execTimeoutSeconds, network, computer, ctx.threadRootId),
       );
+      if (!mission) return tools;
+      return tools.map((t) => ({
+        ...t,
+        async execute(input, toolCtx) {
+          const refused = await missionGate(t.name, input, toolCtx, mission);
+          if (refused) return { content: refused, isError: true, data: { code: "mission.not_allowed" } };
+          return t.execute(input, toolCtx);
+        },
+      }));
     },
   };
 }

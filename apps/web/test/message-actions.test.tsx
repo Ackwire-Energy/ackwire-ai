@@ -22,7 +22,7 @@ const openMenu = async (trigger: HTMLElement) => {
 };
 
 describe("message action bars", () => {
-  test("people's messages get the glass bar with '…': Salvar na wiki, Copiar link, Responder, Responder em thread", async () => {
+  test("people's messages get the glass bar with '…': Salvar na wiki, Copiar link, Responder, Criar thread, Responder em thread", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
     await settle(8);
     const bar = screen().getByRole("toolbar", { name: "Ações da mensagem de João" });
@@ -32,7 +32,7 @@ describe("message action bars", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((i) => i.textContent),
-    ).toEqual(["Salvar na wiki", "Copiar link", "Responder", "Responder em thread"]);
+    ).toEqual(["Salvar na wiki", "Copiar link", "Responder", "Criar thread a partir daqui", "Responder em thread"]);
   });
 
   test("agents keep 👍 👎 ✏️, get Reagir and Responder, and the same '…'", async () => {

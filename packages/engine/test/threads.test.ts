@@ -1,0 +1,366 @@
+import { afterEach, beforeEach, expect, test } from "bun:test";
+import { eq, schema } from "@agenteschat/db";
+import { systemText } from "@agenteschat/providers";
+import {
+  addChannelMember,
+  archiveThread,
+  buildRunContext,
+  closeThread,
+  createChannel,
+  createThreadFromRange,
+  deleteThread,
+  drainOutbox,
+  getThread,
+  listMessages,
+  listThreads,
+  moveContextIntoThread,
+  openDm,
+  postPersonMessage,
+  reopenThread,
+  returnContextToChannel,
+  unarchiveThread,
+  updateThread,
+} from "../src";
+import { addMember, type Fixture, setup } from "./fixtures";
+
+let f: Fixture;
+beforeEach(async () => {
+  f = await setup();
+});
+afterEach(() => f.close());
+
+const deps = () => ({ db: f.db, pubsub: f.pubsub });
+const post = (userId: string, channelId: string, body: string, threadId?: string) =>
+  postPersonMessage(deps(), userId, f.org.id, channelId, { body, threadId });
+const ids = (list: { id: string }[]) => list.map((m) => m.id);
+const topLevel = async (channelId = f.general.id) => ids(await listMessages(f.db, f.owner.id, f.org.id, channelId));
+const inThread = async (rootId: string) =>
+  ids(await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: rootId }));
+const listed = async (userId: string, input: Omit<Parameters<typeof listThreads>[2], "orgId"> = {}) =>
+  ids((await listThreads(f.db, userId, { orgId: f.org.id, ...input })).threads);
+
+test("a thread from a range: auto title, a root in the channel, exclusions; nothing moves, nobody runs", async () => {
+  const a = await post(f.owner.id, f.general.id, "Onboarding is too long for new teams");
+  const b = await post(f.owner.id, f.general.id, "Agree, step 3 is confusing");
+  const off = await post(f.owner.id, f.general.id, "lunch?");
+  const c = await post(f.owner.id, f.general.id, "Let's cut it to 2 steps");
+  const events = f.listen(f.general.id);
+  // The ends may come in either order.
+  const thread = await createThreadFromRange(deps(), f.owner.id, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    firstMessageId: c.id,
+    lastMessageId: a.id,
+    excludedMessageIds: [off.id],
+  });
+  expect(thread).toMatchObject({
+    title: "Onboarding is too long for new teams",
+    state: "open",
+    replyCount: 0,
+    canManage: true,
+    createdBy: f.owner.id,
+    context: {
+      channelId: f.general.id,
+      firstMessageId: a.id,
+      lastMessageId: c.id,
+      excludedMessageIds: [off.id],
+      moved: false,
+      count: 3,
+    },
+  });
+  expect(await topLevel()).toEqual([a.id, b.id, off.id, c.id, thread.id]);
+  const [root] = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: thread.id });
+  expect(root?.meta.threadStart).toMatchObject({ count: 3, moved: false, firstMessageId: a.id });
+  expect(events.some((e) => e.type === "thread.updated" && e.change === "created")).toBe(true);
+  expect(events.some((e) => e.type === "message.created" && e.messageId === thread.id)).toBe(true);
+  // The root routes to nobody.
+  const outbox = await f.db.select().from(schema.outbox);
+  expect(outbox.some((o) => JSON.stringify(o.payload).includes(thread.id))).toBe(false);
+  expect(await listed(f.owner.id)).toEqual([thread.id]);
+  // Undo (the toast's "Desfazer"): gone, the channel as before.
+  await deleteThread(deps(), f.owner.id, f.org.id, thread.id);
+  expect(await topLevel()).toEqual([a.id, b.id, off.id, c.id]);
+  expect(await listed(f.owner.id)).toEqual([]);
+});
+
+test("a range is top-level messages of one channel; from another channel, everyone here must see it", async () => {
+  const root = await post(f.owner.id, f.general.id, "root");
+  const reply = await post(f.owner.id, f.general.id, "reply", root.id);
+  const create = (input: { channelId: string; contextChannelId?: string; first: string; last: string }) =>
+    createThreadFromRange(deps(), f.owner.id, {
+      orgId: f.org.id,
+      channelId: input.channelId,
+      contextChannelId: input.contextChannelId,
+      firstMessageId: input.first,
+      lastMessageId: input.last,
+    });
+  await expect(create({ channelId: f.general.id, first: root.id, last: reply.id })).rejects.toMatchObject({
+    code: "thread.range_invalid",
+  });
+  await expect(
+    createThreadFromRange(deps(), f.owner.id, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      firstMessageId: root.id,
+      lastMessageId: root.id,
+      excludedMessageIds: [root.id],
+    }),
+  ).rejects.toMatchObject({ code: "thread.range_empty" });
+
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  const board = await createChannel(f.db, f.owner.id, f.org.id, { name: "board", visibility: "private" });
+  const secret = await post(f.owner.id, board.id, "Trial of 14 days");
+  // #general has Bia and @dev, who are not in #board.
+  await expect(
+    create({ channelId: f.general.id, contextChannelId: board.id, first: secret.id, last: secret.id }),
+  ).rejects.toMatchObject({
+    code: "thread.context_not_visible",
+    params: { userIds: [bia.id], agentIds: [f.agent.id] },
+  });
+  // Bia can't even read #board.
+  await expect(
+    createThreadFromRange(deps(), bia.id, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      contextChannelId: board.id,
+      firstMessageId: secret.id,
+      lastMessageId: secret.id,
+    }),
+  ).rejects.toMatchObject({ code: "forbidden" });
+  // In #board itself it's fine.
+  const here = await create({ channelId: board.id, first: secret.id, last: secret.id });
+  expect(here.context).toMatchObject({ channelId: board.id, count: 1 });
+
+  await addChannelMember(f.db, f.owner.id, f.org.id, board.id, { userId: bia.id });
+  await addChannelMember(f.db, f.owner.id, f.org.id, board.id, { agentId: f.agent.id });
+  const cross = await create({
+    channelId: f.general.id,
+    contextChannelId: board.id,
+    first: secret.id,
+    last: secret.id,
+  });
+  expect(cross).toMatchObject({ channelId: f.general.id, title: "Trial of 14 days", context: { channelId: board.id } });
+  await expect(moveContextIntoThread(deps(), f.owner.id, f.org.id, cross.id)).rejects.toMatchObject({
+    code: "thread.move_other_channel",
+  });
+  // A plain thread has no owner: its creator, the root's author or an admin manage it.
+  await expect(closeThread(deps(), bia.id, f.org.id, cross.id)).rejects.toMatchObject({ code: "thread.not_allowed" });
+  expect((await getThread(f.db, bia.id, f.org.id, cross.id)).canManage).toBe(false);
+});
+
+test("moving takes the range out of the channel (the root is the stub); returning puts those back", async () => {
+  const a = await post(f.owner.id, f.general.id, "first point");
+  const x = await post(f.owner.id, f.general.id, "off topic");
+  const b = await post(f.owner.id, f.general.id, "second point");
+  const thread = await createThreadFromRange(deps(), f.owner.id, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    firstMessageId: a.id,
+    lastMessageId: b.id,
+    excludedMessageIds: [x.id],
+  });
+  const reply = await post(f.owner.id, f.general.id, "a real reply", thread.id);
+  const events = f.listen(f.general.id);
+  const moved = await moveContextIntoThread(deps(), f.owner.id, f.org.id, thread.id);
+  expect(moved.context).toMatchObject({ moved: true, count: 2 });
+  expect(await topLevel()).toEqual([x.id, thread.id]);
+  expect(await inThread(thread.id)).toEqual([thread.id, a.id, b.id, reply.id]);
+  const stub = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).find((m) => m.id === thread.id);
+  expect(stub?.meta.threadStart).toMatchObject({ moved: true, movedCount: 2 });
+  const movedEvent = events.find((e) => e.type === "thread.updated" && e.change === "moved");
+  expect(((movedEvent?.messageIds as string[]) ?? []).sort()).toEqual([a.id, b.id].sort());
+
+  // Adjusting a moved range moves the new range.
+  const c = await post(f.owner.id, f.general.id, "third point");
+  const adjusted = await updateThread(deps(), f.owner.id, f.org.id, thread.id, {
+    lastMessageId: c.id,
+    title: "Three points",
+  });
+  expect(adjusted).toMatchObject({ title: "Three points", context: { lastMessageId: c.id, moved: true, count: 3 } });
+  expect(await topLevel()).toEqual([x.id, thread.id]);
+
+  const back = await returnContextToChannel(deps(), f.owner.id, f.org.id, thread.id);
+  expect(back.context?.moved).toBe(false);
+  expect(await topLevel()).toEqual([a.id, x.id, b.id, thread.id, c.id]);
+  expect(await inThread(thread.id)).toEqual([thread.id, reply.id]);
+  const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.targetId, thread.id));
+  expect(audit.map((r) => r.action)).toEqual(
+    expect.arrayContaining(["thread.created", "thread.context_moved", "thread.context_returned"]),
+  );
+  // Undo is only for a thread nobody replied to.
+  await expect(deleteThread(deps(), f.owner.id, f.org.id, thread.id)).rejects.toMatchObject({
+    code: "thread.has_replies",
+  });
+
+  // A message of the range with its own replies can't move.
+  const nested = await post(f.owner.id, f.general.id, "has a thread of its own");
+  await post(f.owner.id, f.general.id, "inner reply", nested.id);
+  const other = await createThreadFromRange(deps(), f.owner.id, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    firstMessageId: nested.id,
+    lastMessageId: nested.id,
+  });
+  await expect(moveContextIntoThread(deps(), f.owner.id, f.org.id, other.id)).rejects.toMatchObject({
+    code: "thread.range_has_replies",
+  });
+});
+
+test("closing; a person's reply reopens it; an archived thread is read only; unarchiving goes back", async () => {
+  const root = await post(f.owner.id, f.general.id, "deploy broke");
+  await post(f.owner.id, f.general.id, "fixed", root.id);
+  const closed = await closeThread(deps(), f.owner.id, f.org.id, root.id);
+  expect(closed).toMatchObject({ state: "closed", closedBy: f.owner.id });
+  expect(await listed(f.owner.id, { tab: "closed" })).toEqual([root.id]);
+  expect(await listed(f.owner.id)).toEqual([root.id]);
+
+  const events = f.listen(f.general.id);
+  await post(f.owner.id, f.general.id, "it broke again", root.id);
+  expect((await getThread(f.db, f.owner.id, f.org.id, root.id)).state).toBe("open");
+  expect(events.some((e) => e.type === "thread.updated" && e.change === "reopened" && e.state === "open")).toBe(true);
+  expect(await listed(f.owner.id, { tab: "closed" })).toEqual([]);
+
+  await closeThread(deps(), f.owner.id, f.org.id, root.id);
+  const archived = await archiveThread(deps(), f.owner.id, f.org.id, root.id);
+  expect(archived).toMatchObject({ state: "archived", archivedBy: f.owner.id });
+  await expect(post(f.owner.id, f.general.id, "late", root.id)).rejects.toMatchObject({ code: "thread.archived" });
+  await expect(reopenThread(deps(), f.owner.id, f.org.id, root.id)).rejects.toMatchObject({
+    code: "thread.archived",
+  });
+  expect(await listed(f.owner.id)).toEqual([]);
+  expect(await listed(f.owner.id, { tab: "archived" })).toEqual([root.id]);
+  // A top-level message in the channel is not affected.
+  await post(f.owner.id, f.general.id, "new subject");
+
+  expect((await unarchiveThread(deps(), f.owner.id, f.org.id, root.id)).state).toBe("closed");
+  expect((await reopenThread(deps(), f.owner.id, f.org.id, root.id)).state).toBe("open");
+  const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.targetId, root.id));
+  expect(audit.map((r) => r.action)).toEqual(
+    expect.arrayContaining(["thread.closed", "thread.archived", "thread.unarchived", "thread.reopened"]),
+  );
+});
+
+test("the list shows threads of the channels you read: private channel members and DM participants", async () => {
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  for (const u of [bia, caio]) await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: u.id });
+  const core = await createChannel(f.db, f.owner.id, f.org.id, { name: "core", visibility: "private" });
+  await addChannelMember(f.db, f.owner.id, f.org.id, core.id, { userId: bia.id });
+  const priv = await post(f.owner.id, core.id, "private plan");
+  await post(bia.id, core.id, "ok", priv.id);
+  const pub = await post(f.owner.id, f.general.id, "public question");
+  await post(caio.id, f.general.id, "an answer", pub.id);
+  const dm = await openDm(f.db, f.owner.id, f.org.id, { userId: bia.id });
+  const direct = await post(f.owner.id, dm.id, "just us");
+  await post(bia.id, dm.id, "sure", direct.id);
+
+  const all = [priv.id, pub.id, direct.id].sort();
+  expect((await listed(f.owner.id)).sort()).toEqual(all);
+  expect((await listed(bia.id)).sort()).toEqual(all);
+  expect(await listed(caio.id)).toEqual([pub.id]);
+  await expect(listThreads(f.db, caio.id, { orgId: f.org.id, channelId: core.id })).rejects.toMatchObject({
+    code: "forbidden",
+  });
+  await expect(getThread(f.db, caio.id, f.org.id, priv.id)).rejects.toMatchObject({ code: "forbidden" });
+  await expect(closeThread(deps(), caio.id, f.org.id, direct.id)).rejects.toMatchObject({ code: "forbidden" });
+  expect(await listed(bia.id, { channelId: core.id })).toEqual([priv.id]);
+
+  const [view] = (await listThreads(f.db, caio.id, { orgId: f.org.id })).threads;
+  expect(view).toMatchObject({
+    channelId: f.general.id,
+    channelName: "general",
+    title: null,
+    rootText: "public question",
+    replyCount: 1,
+    lastMessage: { author: { type: "person", id: caio.id }, excerpt: "an answer" },
+    working: false,
+    canManage: false,
+  });
+  expect(view?.participants).toEqual([
+    { type: "person", id: f.owner.id },
+    { type: "person", id: caio.id },
+  ]);
+});
+
+test("filters: working, agent, mine, words, needs you; pages by cursor", async () => {
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  const alpha = await post(f.owner.id, f.general.id, "alpha plan");
+  const ask = await post(f.owner.id, f.general.id, "@dev check alpha", alpha.id);
+  const beta = await post(bia.id, f.general.id, "beta release");
+  await post(bia.id, f.general.id, "more on beta", beta.id);
+
+  expect(await listed(f.owner.id, { tab: "working" })).toEqual([alpha.id]);
+  expect(await listed(f.owner.id, { agentId: f.agent.id })).toEqual([alpha.id]);
+  expect(await listed(f.owner.id, { mine: true })).toEqual([alpha.id]);
+  expect(await listed(bia.id, { mine: true })).toEqual([beta.id]);
+  expect(await listed(f.owner.id, { q: "BETA" })).toEqual([beta.id]);
+
+  const first = await listThreads(f.db, f.owner.id, { orgId: f.org.id, limit: 1 });
+  expect(ids(first.threads)).toEqual([beta.id]);
+  const second = await listThreads(f.db, f.owner.id, { orgId: f.org.id, limit: 1, cursor: first.nextCursor });
+  expect(ids(second.threads)).toEqual([alpha.id]);
+  expect(second.nextCursor).toBeNull();
+
+  // The agent asks something in alpha: it needs the people who took part there.
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, ask.id));
+  if (!run) throw new Error("no run");
+  await f.db.insert(schema.agentQuestions).values({
+    orgId: f.org.id,
+    runId: run.id,
+    agentId: f.agent.id,
+    channelId: f.general.id,
+    threadId: alpha.id,
+    toolUseId: "toolu_1",
+    text: "Which environment?",
+    expiresAt: new Date(Date.now() + 3_600_000),
+  });
+  expect(await listed(f.owner.id, { needsYou: true })).toEqual([alpha.id]);
+  expect(await listed(bia.id, { needsYou: true })).toEqual([]);
+
+  await drainOutbox(f.db, f.handlers);
+  const done = await getThread(f.db, f.owner.id, f.org.id, alpha.id);
+  expect(done.working).toBe(false);
+  expect(done.participants).toContainEqual({ type: "agent", id: f.agent.id });
+});
+
+test("the run's context reads the thread's range (minus exclusions), not the channel before the root", async () => {
+  await post(f.owner.id, f.general.id, "unrelated old talk");
+  const a = await post(f.owner.id, f.general.id, "Onboarding: step 3 confuses people");
+  const x = await post(f.owner.id, f.general.id, "anyone for lunch?");
+  const b = await post(f.owner.id, f.general.id, "Let's merge steps 2 and 3");
+  await post(f.owner.id, f.general.id, "something later in the channel");
+  const thread = await createThreadFromRange(deps(), f.owner.id, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    firstMessageId: a.id,
+    lastMessageId: b.id,
+    excludedMessageIds: [x.id],
+    title: "Lighter onboarding",
+  });
+  const contextFor = async (body: string) => {
+    const ask = await post(f.owner.id, f.general.id, body, thread.id);
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, ask.id));
+    if (!run) throw new Error("no run");
+    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, run.id));
+    const ctx = await buildRunContext(f.db, run, f.agent, { maxMessages: 30 });
+    return { text: JSON.stringify(ctx.messages), system: systemText(ctx.system) };
+  };
+  const check = ({ text, system }: { text: string; system: string }) => {
+    expect(text.split("step 3 confuses people").length).toBe(2);
+    expect(text.split("merge steps 2 and 3").length).toBe(2);
+    expect(text).toContain('started the thread \\"Lighter onboarding\\"');
+    expect(text).not.toContain("lunch");
+    expect(text).not.toContain("unrelated old talk");
+    expect(text).not.toContain("something later");
+    expect(system).toContain("# Where this thread comes from");
+    expect(system).toContain("#general");
+  };
+  const referenced = await contextFor("@dev summarize the plan");
+  check(referenced);
+  expect(referenced.text.indexOf("step 3 confuses")).toBeLessThan(referenced.text.indexOf("started the thread"));
+  // Moved into the thread: the same messages, read once (as replies now).
+  await moveContextIntoThread(deps(), f.owner.id, f.org.id, thread.id);
+  check(await contextFor("@dev and now?"));
+});

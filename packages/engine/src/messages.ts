@@ -19,14 +19,14 @@ import { withDeletedArtifacts } from "./artifacts";
 import { audienceSql, notifyBlocked } from "./audience";
 import { cancelRun } from "./cancel";
 import { requireChannelAccess } from "./channels";
-import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { isStopRequest, type Judge } from "./judge";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 
-const { messages, agents, channelMembers, channels, agentRuns, outbox, agentQuestions } = schema;
+const { messages, agents, channelMembers, channels, agentRuns, outbox, agentQuestions, threads } = schema;
 
 export type Message = typeof messages.$inferSelect;
 
@@ -209,6 +209,16 @@ interface RawMessage {
   blocked?: string[] | string | null;
   /** Active runs this message was delivered to (no new run). */
   steered?: { id: string; agentId: string }[] | string | null;
+  /** The reply reopened a closed thread. */
+  reopened?: boolean | null;
+}
+
+async function isThreadArchived(db: Executor, orgId: string, rootId: string) {
+  const [row] = await db
+    .select({ state: threads.state })
+    .from(threads)
+    .where(and(eq(threads.orgId, orgId), eq(threads.rootMessageId, rootId)));
+  return row?.state === "archived";
 }
 
 const asDate = (v: Date | string | null) => (v === null ? null : v instanceof Date ? v : new Date(v));
@@ -236,6 +246,8 @@ export async function insertMessageWithRuns(
   blocked: string[];
   /** Runs already active in this conversation that will read the message at their next step. */
   steered: { id: string; agentId: string }[];
+  /** A person's reply reopened a closed thread. */
+  reopened: boolean;
 }> {
   const body = input.body.trim();
   // Files alone are a message (`meta.artifacts`): the text may be empty then.
@@ -254,7 +266,24 @@ export async function insertMessageWithRuns(
   const threadId = input.threadId ?? null;
   const startRuns = options.startRuns && person;
   const rows = rowsOf<RawMessage>(
-    await tx.execute(sql`with mentioned as (
+    await tx.execute(sql`with archived as (
+        -- An archived thread is read only for people (ADR 0029); an agent's run already going still lands.
+        select 1 from ${threads} th
+        where ${person}::boolean and ${threadId}::uuid is not null and th.org_id = ${input.orgId}::uuid
+          and th.root_message_id = ${threadId}::uuid and th.state = 'archived'
+      ), muted as (
+        -- A mission's thread (ADR 0029): only its owner and those who can decide make its agent act.
+        -- Anyone else addressing it starts nothing: the message becomes a suggestion.
+        select mi.id as mission_id, mi.agent_id,
+          not exists (select 1 from ${schema.missionParticipants} mo
+            where mo.mission_id = mi.id and mo.user_id = ${userId}) as outsider
+        from ${schema.missions} mi
+        where ${person}::boolean and ${threadId}::uuid is not null and mi.org_id = ${input.orgId}::uuid
+          and mi.thread_root_id = ${threadId}::uuid and mi.status in ('proposed', 'active', 'paused')
+          and mi.owner_id is distinct from ${userId}
+          and not exists (select 1 from ${schema.missionParticipants} mp
+            where mp.mission_id = mi.id and mp.user_id = ${userId} and mp.role = 'decide')
+      ), mentioned as (
         select a.id from ${agents} a
         join ${channelMembers} cm on cm.agent_id = a.id and cm.channel_id = ${input.channelId}::uuid
         where a.org_id = ${input.orgId}::uuid and a.archived_at is null
@@ -269,13 +298,14 @@ export async function insertMessageWithRuns(
         -- A person's reply where an agent asked something (same channel and thread) answers it.
         update ${agentQuestions} q set status = 'answered', answer = ${body}, answered_by_user_id = ${userId},
           answered_at = now()
-        where ${person}::boolean and q.status = 'open' and q.id = (
+        where ${person}::boolean and q.status = 'open' and not exists (select 1 from archived) and q.id = (
             select oq.id from ${agentQuestions} oq
             where oq.org_id = ${input.orgId}::uuid and oq.channel_id = ${input.channelId}::uuid
               and oq.status = 'open' and oq.expires_at > now()
               and oq.thread_id is not distinct from ${threadId}::uuid
             order by oq.created_at desc limit 1)
           and (not exists (select 1 from mentioned) or q.agent_id in (select id from mentioned))
+          and q.agent_id not in (select agent_id from muted)
           and exists (select 1 from ${agents} qa where qa.id = q.agent_id and ${audienceSql("qa", sql`${userId}::text`)})
           and (${threadId}::uuid is null or exists (
             select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
@@ -293,7 +323,7 @@ export async function insertMessageWithRuns(
               select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
       ), answering as (
         -- Who can talk to the agent (D31): the others get no run, only a notice for the sender.
-        select agent_id, trig from addressed where allowed
+        select agent_id, trig from addressed where allowed and agent_id not in (select agent_id from muted)
       ), active as (
         -- One active run per agent and conversation: a new message goes to it instead of a second run.
         -- Addressed agents (mention, DM) with a run in this conversation, and, for a reply in a
@@ -303,6 +333,7 @@ export async function insertMessageWithRuns(
         where ${person}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
           and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
           and r.agent_id not in (select agent_id from answered)
+          and r.agent_id not in (select agent_id from muted)
           and (
             (r.agent_id in (select agent_id from answering)
               and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid) or exists (
@@ -323,10 +354,24 @@ export async function insertMessageWithRuns(
             -- Delivered to a task in progress: nobody routes it again (no second run).
             || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(ac.id)) from active ac
                 having count(*) > 0), '{}'::jsonb)
-        where ${threadId}::uuid is null or exists (
+            -- Addressed the mission's agent without the right to: a suggestion the owner decides.
+            || coalesce((select jsonb_build_object('missionSuggestion',
+                  jsonb_build_object('status', 'pending', 'missionId', mu.mission_id))
+                from muted mu where mu.agent_id in (select agent_id from addressed)
+                  -- A plain reply there by someone who takes no part: a suggestion too, so the owner sees it.
+                  or (mu.outsider and not exists (select 1 from mentioned)) limit 1), '{}'::jsonb)
+        where (${threadId}::uuid is null or exists (
           select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
-            and r.channel_id = ${input.channelId}::uuid and r.thread_id is null)
+            and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))
+          -- An archived thread is read only for people (ADR 0029); an agent's run already going still lands.
+          and not exists (select 1 from archived)
         returning *
+      ), reopened as (
+        -- A person replying in a closed thread reopens it (one indexed update; no row = nothing to do).
+        update ${threads} t set state = 'open', closed_by = null, closed_at = null, updated_at = now()
+        where ${person}::boolean and ${threadId}::uuid is not null and t.org_id = ${input.orgId}::uuid
+          and t.root_message_id = ${threadId}::uuid and t.state = 'closed' and exists (select 1 from m)
+        returning t.id
       ), steered as (
         update ${agentRuns} r set pending_message_ids = array_append(r.pending_message_ids, ${id}::uuid),
           updated_at = now()
@@ -362,11 +407,18 @@ export async function insertMessageWithRuns(
         coalesce((select json_agg(ad.agent_id) from addressed ad where not ad.allowed), '[]'::json) as blocked,
         coalesce((select json_agg(json_build_object('id', s.id, 'agentId', s.agent_id)) from steered s), '[]'::json)
           as steered,
-        (select count(*) from jobs)::int as jobs
+        (select count(*) from jobs)::int as jobs,
+        exists (select 1 from reopened) as reopened
       from m`),
   );
   const row = rows[0];
-  if (!row) throw new ValidationError("threadId must be a top-level message of this channel");
+  if (!row) {
+    // Only on the failure path: tell an archived thread from a wrong thread id.
+    if (threadId && person && (await isThreadArchived(tx, input.orgId, threadId))) {
+      throw new ConflictError("This thread is archived: unarchive it to reply", "thread.archived");
+    }
+    throw new ValidationError("threadId must be a top-level message of this channel");
+  }
   const message: Message = {
     id: row.id,
     createdAt: asDate(row.created_at) as Date,
@@ -394,6 +446,7 @@ export async function insertMessageWithRuns(
     runs: parseJson(row.runs, []),
     blocked: parseJson(row.blocked ?? null, [] as string[]),
     steered: parseJson(row.steered ?? null, [] as { id: string; agentId: string }[]),
+    reopened: row.reopened === true || (row.reopened as unknown) === "t",
   };
 }
 
@@ -437,7 +490,7 @@ export async function postPersonMessage(
       ? { ...(input.meta ?? {}), ...(replyTo ? { replyTo } : {}), ...(files ? { artifacts: files } : {}) }
       : input.meta;
   // One statement: the message, its jobs, and the runs of agents that will surely answer.
-  const { message, runs, blocked, steered } = await insertMessageWithRuns(
+  const { message, runs, blocked, steered, reopened } = await insertMessageWithRuns(
     deps.db,
     {
       orgId,
@@ -460,6 +513,15 @@ export async function postPersonMessage(
       messageId: message.id,
       threadId: message.threadId,
       byUserId: userId,
+    });
+  }
+  if (reopened && message.threadId) {
+    await publishChannelEvent(deps.pubsub, {
+      type: "thread.updated",
+      channelId,
+      threadId: message.threadId,
+      change: "reopened",
+      state: "open",
     });
   }
   const answers = message.meta.answersQuestionId;

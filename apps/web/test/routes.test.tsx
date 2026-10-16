@@ -52,14 +52,16 @@ describe("route guards", () => {
     expect(screen().getByRole("heading", { name: "Você não faz parte desta organização" })).toBeTruthy();
   });
 
-  test("linked-only screens render designed empty states", async () => {
-    for (const [path, title] of [["threads/x", "Threads"]] as const) {
-      await renderApp(`/org/${ORG_ID}/${path}`, { api: createFakeApi() });
-      await settle();
-      expect(screen().getByRole("heading", { level: 1, name: title })).toBeTruthy();
-      expect(screen().getByText("Em breve")).toBeTruthy();
-      cleanup();
-    }
+  test("Threads: the page, and a thread that doesn't exist (designed states)", async () => {
+    await renderApp(`/org/${ORG_ID}/threads`, { api: createFakeApi() });
+    await settle();
+    expect(screen().getByRole("heading", { level: 1, name: "Threads" })).toBeTruthy();
+    expect(screen().getByText("Nenhuma thread ainda")).toBeTruthy();
+    cleanup();
+    await renderApp(`/org/${ORG_ID}/threads/x`, { api: createFakeApi() });
+    await settle();
+    expect(screen().getByText("Thread não encontrada")).toBeTruthy();
+    cleanup();
   });
 
   test("unknown paths show the not-found page", async () => {

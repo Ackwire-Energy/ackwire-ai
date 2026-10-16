@@ -6,6 +6,7 @@ import type { ApiClient } from "@/api/client";
 import { useApi } from "@/api/context";
 import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
+import { cacheTask, refreshMission } from "@/api/missions";
 import { cacheApproval, cacheMessage } from "@/api/queries";
 import type {
   ActiveRun,
@@ -13,9 +14,11 @@ import type {
   AgentQuestion,
   BudgetEvent,
   ChannelEvent,
+  MachineTask,
   MemoryUpdate,
   Message,
   SecretRequest,
+  ThreadInfo,
 } from "@/api/types";
 import { formatPercent } from "@/lib/format";
 import { useToast } from "@/lib/toast";
@@ -327,6 +330,10 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
       }
       if (isAgentUnavailable(event)) streams.unavailable(event);
+      // A mission waits for me (a decision, a review, an approval): the lists and the sidebar's count.
+      if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string") {
+        refreshMission(qc, orgId, event.missionId);
+      }
       // Someone changed the calendar: the open ranges refetch.
       if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {
         void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
@@ -433,6 +440,67 @@ const quietStore = () => {
   return quiet;
 };
 
+/**
+ * `thread.updated` (ADR 0029): the thread's view (keeping my own `canManage`,
+ * which the event never carries), every thread list, and the conversation
+ * when messages left it or came back (moved, returned, a new marker, undo).
+ */
+export function applyThreadEvent(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  event: Extract<ChannelEvent, { type: "thread.updated" }>,
+) {
+  const one = keys.threadInfo(orgId, event.threadId);
+  if (event.change === "deleted") qc.removeQueries({ queryKey: one });
+  else if (event.thread) {
+    const fresh = event.thread;
+    qc.setQueryData<ThreadInfo>(one, (old) => (old ? { ...fresh, canManage: old.canManage } : undefined));
+    if (!qc.getQueryData(one)) void qc.invalidateQueries({ queryKey: one });
+  } else void qc.invalidateQueries({ queryKey: one });
+  void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
+  if (["created", "context", "moved", "returned", "deleted"].includes(event.change)) {
+    void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", event.channelId] });
+  }
+}
+
+/**
+ * `mission.updated`: the mission and the reads its `change` touches (a
+ * decision, a review, the plan, the files, who takes part). Messages it posts
+ * arrive on their own (`message.created`).
+ */
+export function applyMissionEvent(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  event: Extract<ChannelEvent, { type: "mission.updated" }>,
+) {
+  const parts: Record<string, string[]> = {
+    decision: ["decisions", "files"],
+    review: ["reviews"],
+    plan: ["plan", "files"],
+    file_edited: ["files"],
+    files: ["files"],
+    participants: ["participants", "joinRequests"],
+    owner: ["participants"],
+    join_requests: ["joinRequests"],
+    suggestion: [],
+    task: [],
+  };
+  refreshMission(qc, orgId, event.missionId, parts[event.change] ?? undefined);
+  void qc.invalidateQueries({ queryKey: keys.threadMission(orgId, event.threadId) });
+  if (event.change === "suggestion" || event.change === "closed" || event.change === "done") {
+    void qc.invalidateQueries({ queryKey: keys.thread(orgId, event.channelId, event.threadId) });
+  }
+}
+
+/** `machine.task`: the thread's session rows; a mission's counts (running tasks) follow. */
+export function applyTaskEvent(qc: ReturnType<typeof useQueryClient>, orgId: string, task: MachineTask) {
+  cacheTask(qc, orgId, task);
+  if (task.missionId) {
+    void qc.invalidateQueries({ queryKey: keys.mission(orgId, task.missionId) });
+    if (task.threadId) void qc.invalidateQueries({ queryKey: keys.threadMission(orgId, task.threadId) });
+  }
+}
+
 /** Subscribes to a channel while mounted: live runs + message cache updates. */
 export function useChannelRealtime(orgId: string, channelId: string, enabled: boolean) {
   const { connection, streams } = useRealtime();
@@ -466,6 +534,10 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if ((event.type as string) === "artifact.deleted")
           void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       }
+      if (event.type === "thread.updated") applyThreadEvent(qc, orgId, event);
+      // Missions (ADR 0029): the pinned card, the cards in the thread, the lists; a task's row.
+      if (event.type === "mission.updated") applyMissionEvent(qc, orgId, event);
+      if (event.type === "machine.task") applyTaskEvent(qc, orgId, event.task);
       // Someone reacted: the pills under that message change for everyone.
       if (event.type === "message.reactions") {
         qc.setQueryData(keys.reactions(orgId, event.messageId), event.reactions);

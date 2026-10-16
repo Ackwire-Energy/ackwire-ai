@@ -13,6 +13,8 @@ export interface Launch {
   runtime: string;
   script: string;
   home: string;
+  /** The PATH services get (default: the installing shell's). */
+  path?: string;
 }
 
 export function currentLaunch(): Launch {
@@ -51,6 +53,8 @@ export function launchdPlistPath(home = os.homedir()) {
 /**
  * The systemd user unit. Exit codes 0 (another runner took over), 2 (token
  * revoked) and 3 (runner too old) don't restart: retrying can't fix them.
+ * `KillMode=process`: stopping or restarting the runner (an update) leaves
+ * its background tasks running (ADR 0029); they are in the unit's cgroup.
  */
 export function systemdUnit(launch: Launch): string {
   return [
@@ -63,9 +67,12 @@ export function systemdUnit(launch: Launch): string {
     `ExecStart=${systemdQuote(launch.runtime)} ${systemdQuote(launch.script)} start`,
     `Environment=${systemdEnv("AGENTES_RUNNER_HOME", launch.home)}`,
     "Environment=AGENTES_RUNNER_SERVICE=systemd",
+    // The install-time PATH (like the launchd plist): tasks find claude, codex, git, node, gh.
+    `Environment=${systemdEnv("PATH", launch.path ?? process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin")}`,
     "Restart=always",
     "RestartSec=5",
     "RestartPreventExitStatus=0 2 3",
+    "KillMode=process",
     "",
     "[Install]",
     "WantedBy=default.target",
@@ -76,6 +83,7 @@ export function systemdUnit(launch: Launch): string {
 /**
  * The launchd agent. KeepAlive restarts it unless it exits cleanly; under
  * launchd the runner exits 0 when retrying can't help (see main.ts).
+ * `AbandonProcessGroup`: background tasks outlive a runner restart.
  */
 export function launchdPlist(launch: Launch): string {
   const log = path.join(launch.home, "runner.log");
@@ -108,6 +116,8 @@ export function launchdPlist(launch: Launch): string {
     <key>SuccessfulExit</key>
     <false/>
   </dict>
+  <key>AbandonProcessGroup</key>
+  <true/>
   <key>ThrottleInterval</key>
   <integer>10</integer>
   <key>StandardOutPath</key>

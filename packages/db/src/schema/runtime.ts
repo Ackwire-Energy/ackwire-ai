@@ -14,9 +14,12 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { agents, providerCredentials } from "./agents";
+import { machines } from "./machines";
+import { missions } from "./missions";
 import { organizations } from "./tenancy";
 
 export const outboxStatusEnum = pgEnum("outbox_status", ["pending", "processing", "done", "failed"]);
@@ -305,9 +308,11 @@ export const approvals = pgTable(
       .primaryKey()
       .$defaultFn(() => Bun.randomUUIDv7()),
     orgId: uuid().notNull(),
-    runId: uuid()
-      .notNull()
-      .references(() => agentRuns.id, { onDelete: "cascade" }),
+    /** The run that asked; null for a mission's executor asking through the `agentes` MCP server (ADR 0029). */
+    runId: uuid().references(() => agentRuns.id, { onDelete: "cascade" }),
+    /** Asked by a mission's executor (`request_approval`): the decision resumes that task's session, not a run. */
+    missionId: uuid(),
+    missionTaskId: uuid(),
     agentId: uuid().notNull(),
     channelId: uuid().notNull(),
     threadRootId: uuid().notNull(),
@@ -473,5 +478,103 @@ export const secretRequests = pgTable(
     unique().on(t.runId, t.toolUseId),
     index().on(t.agentId, t.status),
     index().on(t.expiresAt).where(sql`${t.status} = 'pending'`),
+  ],
+);
+
+/**
+ * Background tasks on a connected machine (ADR 0029 section 4): started by an
+ * agent's `start_task`, run detached by the runner, and finished by its
+ * `task.done`, which wakes the conversation. `interrupted`: the process went
+ * away without an exit (the machine went offline); `ended_at` null means it
+ * may still come back or be resumed, set means that was final.
+ */
+export const machineTaskStatusEnum = pgEnum("machine_task_status", [
+  "queued",
+  "running",
+  "interrupted",
+  "done",
+  "failed",
+  "canceled",
+]);
+
+export const machineTasks = pgTable(
+  "machine_tasks",
+  {
+    /** Also the runner's task id. */
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    agentId: uuid().notNull(),
+    machineId: uuid()
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    channelId: uuid().notNull(),
+    /** The thread it reports to; null = the main timeline (a flat DM). */
+    threadRootId: uuid(),
+    /** The run whose `start_task` started it (null: resumed by the server). */
+    runId: uuid().references(() => agentRuns.id, { onDelete: "set null" }),
+    /** The person behind that run (who the agent works for); null for routines and other agents' chains. */
+    requestedByUserId: text(),
+    /** A mission's task (its main session or an item's): its end goes to the mission, not to an agent run. */
+    missionId: uuid().references(() => missions.id, { onDelete: "set null" }),
+    title: text().notNull(),
+    /** `claude`, `codex` or `shell`. */
+    executor: text().notNull(),
+    /** What the runner ran (capped); never secrets of ours. */
+    command: text().notNull().default(""),
+    /** The prompt for an executor (kept to resume it); capped. */
+    prompt: text(),
+    /** Claude Code's session (the thread id), resumed after an interruption. */
+    sessionId: text(),
+    branch: text(),
+    /** Where it ran, relative to the agent's folder. */
+    cwd: text(),
+    status: machineTaskStatusEnum().notNull().default("queued"),
+    exitCode: integer(),
+    signal: text(),
+    seconds: integer(),
+    lastLine: text(),
+    /**
+     * The latest human lines (at most 50, oldest first), from `task.event`:
+     * "Ver saída" when the computer is offline. Throttled like the events.
+     */
+    recentLines: jsonb().$type<string[]>().notNull().default([]),
+    /** A pull request the task opened (from the executor's tools or its output). */
+    prUrl: text(),
+    /** Files it touched (relative paths, at most 50). */
+    files: jsonb().$type<string[]>().notNull().default([]),
+    /** The executor's final answer or the last lines of output (capped). */
+    result: text(),
+    /** `agent:<runId>` or a person's id, when someone canceled it. */
+    canceledBy: text(),
+    /** The task this one resumes after an interruption, and how many resumes the chain had. */
+    resumedFromId: uuid(),
+    resumedTaskId: uuid(),
+    resumeCount: integer().notNull().default(0),
+    /**
+     * A mission task's executor stopped to wait for people (a blocking
+     * `ask_decision`, `request_review` or `request_approval`): `decision`,
+     * `review` or `approval`. Its end then means "waiting", not "done".
+     */
+    waitingFor: text(),
+    /** The conversation was woken for its end (the `machine.task_done` job ran). */
+    wokeAt: timestamp({ withTimezone: true }),
+    startedAt: timestamp({ withTimezone: true }),
+    endedAt: timestamp({ withTimezone: true }),
+    lastEventAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    index().on(t.machineId, t.status),
+    index().on(t.orgId, t.agentId, t.createdAt),
+    index().on(t.orgId, t.channelId, t.threadRootId),
+    index().on(t.missionId),
+    // One live task per mission session: two resumes of the same session never run at once (ADR 0029).
+    uniqueIndex("machine_tasks_live_session")
+      .on(t.missionId, t.sessionId)
+      .where(sql`${t.missionId} is not null and ${t.sessionId} is not null and ${t.endedAt} is null`),
   ],
 );

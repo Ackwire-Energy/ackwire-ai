@@ -61,7 +61,7 @@ A new artifact kind `file` (migration adds the enum value): any bytes, with the 
 
 **Connection.** Outbound WebSocket to `/api/machines/connect`: no public IP, port or tunnel on the machine. The first frame is `hello` with the token (not a header: Node's WebSocket client can't set one); no valid `hello` in 10 s closes the socket. Then the server sends `welcome`, pings every 25 s, and marks the machine offline when the socket closes. `machine.status { machineId, online }` goes to the organization.
 
-**Protocol.** `packages/adapters/src/machine-protocol.ts` (shared by server and runner): `request { id, op }` with `exec`, `read`, `write`, `list`, `push`; `output` frames while a command runs; `result { id, ok, data | error }`; `cancel { id }`. Files travel base64 inside JSON for `read`/`write` (5 MB); uploads always use `push`.
+**Protocol.** `packages/adapters/src/machine-protocol.ts` (shared by server and runner): `request { id, op }` with `exec`, `read`, `write`, `list`, `push` (protocol 3 adds `secret`, ADR 0027; protocol 4 adds `task.*`, section 5a; protocol 5 adds `mcp.call`/`mcp.result` for missions, section 5b; protocol 6 adds `task.output`, section 5c); `output` frames while a command runs; `result { id, ok, data | error }`; `cancel { id }`. Files travel base64 inside JSON for `read`/`write` (5 MB); uploads always use `push`.
 
 **On the machine.**
 - Every path is relative to the workspace folder chosen at pairing (default `~/agentes`); `..` and absolute paths are refused, and symlinks that leave the workspace are refused for reads, writes and uploads.
@@ -71,6 +71,44 @@ A new artifact kind `file` (migration adds the enum value): any bytes, with the 
 - The runner never receives secrets from us. Whatever the machine already has (a Claude Code login, SSH keys) stays there and is used under the machine owner's responsibility.
 
 **Across replicas.** The replica holding the socket executes requests. Another replica writes the request to `machine_rpc` and signals the holder through pub/sub; the reply comes back the same way (Postgres `NOTIFY` payloads are too small for file bodies). Live output streaming works only on the replica holding the socket; elsewhere the command reports its output at the end.
+
+### 5a. Protocol 4: background tasks
+
+Runner protocol 4 (`TASKS_PROTOCOL`, runner 0.4.0) adds work that outlives a request, the socket and the runner itself (ADR 0029 sections 4 and 5):
+
+- **Ops.** `task.start { taskId, agent, executor: claude | codex | shell, command? | prompt?, session?, resume?, cwd?, branch?, maxSeconds? }` → `{ taskId, pid, startedAt, cwd, branch?, command }`; `task.status { taskId? }` (this agent's tasks when omitted); `task.cancel { taskId }`. Runner → server: `task.event { taskId, kind: line | files | progress, line?, files?, seconds? }` (throttled to one line every 2 s, a progress beat every 30 s) and `task.done { taskId, exitCode | null, signal?, seconds, result?, lastLine?, files?, canceled?, timedOut?, interrupted?, session? }`. Server → runner: `task.ack { taskId }`. `hello` carries `tasks: [{ taskId, agentId, status: running | done | interrupted, pid?, startedAt, endedAt?, exitCode?, seconds?, lastLine?, files? }]` from the journal. The server refuses task ops on older runners ("update it with `agentes-runner update`") and the agent gets no task tools there.
+- **Detached under a wrapper.** The runner writes `<runner home>/tasks/wrap.mjs` (plain JavaScript) and starts it with its own runtime, `detached` (own process group) and `unref()`ed, with the agent's secret env (ADR 0027) in its environment only. The wrapper starts the command through the platform shell, with stdout and stderr appended to `tasks/<taskId>/stdout.log` and `stderr.log` and the prompt (for executors) as stdin (`stdin.txt`), so no prompt is ever quoted for a shell. It touches `alive` every 15 s, enforces `maxSeconds` (default 4 h, cap 24 h), stops the command's whole group on SIGTERM or when a `cancel` file appears (the way that also works on Windows, through `taskkill /T /F`), and writes `exit.json` (atomically) with the exit code, signal and reason (`canceled`, `timeout`). A pid alone can't say "still running" after a reboot (pids are reused); a pid that answers plus a fresh `alive` can. No `exit.json` and the wrapper gone means **interrupted**.
+- **Journal.** `tasks/journal.json` (written whole, then renamed) lists every task (agent, executor, command, folder, pid, state, last line, files, the `task.done` payload and whether the server acknowledged it). A new runner process loads it, keeps watching running tasks, and finishes the ones that ended meanwhile. `task.done` is sent once and again after each reconnect until `task.ack`; acknowledged tasks are forgotten (with their logs) after 7 days.
+- **Executors.** `claude -p --output-format stream-json --verbose --permission-mode acceptEdits` plus `--session-id <s>` or `--resume <s>`: the runner resumes when Claude Code has that session in the task's folder (`~/.claude/projects/<folder with every non-alphanumeric as ->/<s>.jsonl`, or `$CLAUDE_CONFIG_DIR`), and uses the server's hint when it can't tell. The watcher turns its events into a human last line ("Editing src/app.ts", "Running: npm test", the first line of a message), the files its edit tools touched, and the final `result`. Codex runs as `codex exec --json` (see ADR 0029, "Codex"); its JSONL events become the same lines, files and result. `shell` sends its last plain lines. Everything that leaves the machine is redacted like exec output.
+- **Worktrees.** With `branch`, the folder must be a git repository: `git worktree add -b <branch> <agent folder>/.worktrees/<taskId>`, with `.worktrees/` added to the repository's `info/exclude`.
+- **Slots and sleep.** At most `maxConcurrentTasks` (config, default 3) running per machine: beyond that `no_slot` (the tool says `task.no_slot`). On macOS a `caffeinate -i -w <runner pid>` child holds off idle sleep while at least one task runs.
+- **Services.** The systemd unit has `KillMode=process` and the launchd agent `AbandonProcessGroup`, so `agentes-runner update` (a service restart) doesn't kill running tasks.
+
+### 5b. Protocol 5: the `agentes` MCP server of mission tasks
+
+Runner protocol 5 (`MISSION_PROTOCOL`, runner 0.5.0) lets a task work for a mission (ADR 0029):
+
+- **`task.start { …, mission: { id, rules } }`.** For an executor task the runner makes a random per-task token (in the journal and `tasks/<taskId>/mcp-token`, mode 600) and gives the executor our MCP server. Claude Code: `--mcp-config tasks/<taskId>/mcp.json` (one stdio server `agentes`: this runtime running `agentes-runner mcp --task <taskId>`, with `AGENTES_MCP_TOKEN` and `AGENTES_MCP_SOCKET` in its env), `--allowedTools mcp__agentes` (`-p` can't ask for permission) and `--append-system-prompt <rules>`. No `--strict-mcp-config`: the person's own MCP servers stay. Codex: repeatable `-c mcp_servers.agenteschat_agentes.*` overrides (token, socket and runner home passed by name through `env_vars`, never on the command line), and the rules as `developer_instructions` on the first turn (ADR 0029, "Codex"). The rules and paths are single shell arguments (plain characters only for the rules).
+- **`agentes-runner mcp --task <id>`**: a small stdio MCP server (JSON-RPC lines; `initialize`, `tools/list`, `tools/call`, `ping`; no SDK). Each call goes over a local endpoint of the running daemon: `<runner home>/mcp.sock` (a named pipe `\\.\pipe\agentes-runner-<hash>` on Windows), one JSON line per request with `{ taskId, token, tool, args }`. The daemon checks the token against the task (constant-time), that the task still runs, and the tool name, then relays.
+- **Frames.** Runner → server `mcp.call { callId, taskId, tool, args }` (args ≤ 64 KB); server → runner `mcp.result { callId, ok, text | error }`. Calls in flight fail when the connection drops (the executor may retry); a call waits at most 6 minutes (uploads).
+- **Server.** The replica holding the socket runs the call without blocking other frames: the task must be this machine's and belong to an open mission on this machine; the input is validated against the tool's JSON Schema (`MISSION_MCP_TOOLS` in `machine-protocol.ts`, shared). Older runners get no mission features ("run agentes-runner update").
+
+### 5c. Protocol 6: a task's output
+
+Runner protocol 6 (`TASK_OUTPUT_PROTOCOL`, runner 0.6.0) adds what "Ver saída" needs (ADR 0029):
+
+- **`task.output { taskId, tail }`** → `{ lines, truncated }`: the last `tail` (≤ 200) human lines of the task, read from the end of `stdout.log` (512 KB) and then `stderr.log`, parsed like the watcher does (Claude Code's `stream-json` becomes "Editing src/app.ts", never raw JSON) and redacted with the agent's secrets. Only the request's agent's tasks.
+- **`task.event { …, prUrl? }`**: the first pull (or merge) request URL the task's output shows (a Claude Code tool result such as `gh pr create`, its answer, a plain line), sent once.
+- **Compatibility.** A runner ignores a request whose op it doesn't know (no reply), so the server asks `task.output` only of runners at protocol 6 or later; older ones get the lines the server kept (`machine_tasks.recent_lines`).
+
+### 5d. Protocol 7: coding CLIs and the permission profile
+
+Runner protocol 7 (`EXECUTORS_PROTOCOL`, runner 0.7.0):
+
+- **`hello.executors`**: `{ claude?: { version }, codex?: { version } }`, the CLIs on the runner's PATH (`<cli> --version`, first line, best effort, cached 10 min; empty with `--no-exec`). The server keeps it in `machines.executors` with `detectedAt`; missions offer only what the computer has (ADR 0029, "Executor agent").
+- **`task.start.mission.mode`** (`plan | work`) and **`branchPrefix`**: Claude Code gets a generated `--settings` file with what it may run without asking (`plan`: read only, `--permission-mode dontAsk`; `work`: git on the mission's branches, tests and builds; merges, other pushes and deploys denied). Older servers send no mode: `work`.
+- **MCP calls** carry arguments with the agent's secrets masked, and paths resolved against the task's folder (`@folder/…` for elsewhere in the agent's folder; outside: refused).
+- The systemd unit sets `Environment=PATH=` from the install-time PATH, like the launchd plist.
 
 ### 6. Which computer an agent uses
 

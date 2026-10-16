@@ -7,7 +7,8 @@ const tags = ["Approvals"];
 export const Approval = z
   .object({
     id: z.uuid(),
-    runId: z.uuid(),
+    runId: z.uuid().nullable().openapi({ description: "Null when a mission's executor asked (`missionId`)." }),
+    missionId: z.uuid().nullable(),
     agentId: z.uuid(),
     channelId: z.uuid(),
     threadId: z.uuid(),

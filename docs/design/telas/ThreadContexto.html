@@ -1,0 +1,2154 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thread a partir daqui</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&family=Martian+Mono:wght@400&display=swap">
+<script>document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
+<style>
+/*
+  Prototype: organizing a conversation AFTER the fact (sibling of MissaoChat.html and TarefaLonga.html,
+  same tokens, sidebar, messages, composer, menus, glass toasts and agent engine).
+  Problem: a subject starts in #produto, grows, and floods the channel. The answer is a ladder that is
+  always offered and never forced: channel conversation -> thread -> (thread with work) -> own channel.
+  Guided story (prototype bar, steps + "Próximo"; every step is also reachable from the UI):
+  1  #produto is busy; a discreet inline hint "Isso virou um assunto. Levar para uma thread?" (Criar thread /
+     Agora não). Every message's ⋯ also has "Criar thread a partir daqui".
+  2  One click: the thread is created with the suggested range as context (a reference; the messages stay in
+     the channel), an auto title, and opens. Toast "Thread criada com 10 mensagens · Ajustar · Desfazer".
+  3  "Ajustar trecho" (context block): selection mode in place on the channel (checkboxes, draggable Início /
+     Fim handles, off-topic rows collapsed), then Salvar.
+  4  "Tirar do canal" (context block): the messages leave #produto; a stub with the link stays; Desfazer.
+  5  The thread: Walter asks "@dev continua daqui"; Dev quotes the range and starts the live work card.
+     The title is edited inline by clicking it.
+  6  Adjusting the range and opening private #diretoria: blocked inline ("Ana não está em #diretoria"),
+     locked messages, or "Criar thread em #diretoria" instead.
+  7  Next rung: thread ⋯ › Mover para canal novo (name, who joins); #produto keeps a line with the link.
+  Scenario "App mobile" (A1..A7): the conversation becomes a thread; the Claude Code explores the repo and Dev
+  posts a short plan card (checklist, computer, Começar / Mudar algo). The plan is a living checklist in
+  .agentes/mission.md, no phases or gates; the pinned card shows "N de 12 itens" as a pixel strip; reviews
+  arrive when there is something to see ("Pronto para você ver", Aprovar / Pedir ajustes). One row per
+  session; a question from a session updates decisions.md; a local edit keeps the approved version; Mac
+  offline -> resume. A mission has no budget of its own (the executor runs on the person's plan).
+  Neutral selection (ink/gray), brand blue only for agents (avatar, running ring, streaming cursor).
+  Mono only for paths, branches and commands. Agents come from packages/ui/src/agent/engine.js (serve the
+  repo root over http).
+*/
+:root{
+  --bg:#f4f4f1;--raised:#ffffff;--sunken:#ebebe7;--paper:#ffffff;--glass:rgba(255,255,255,.72);
+  --line:rgba(23,23,22,.08);--line2:rgba(23,23,22,.14);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#76766f;
+  --agent:#0063d1;--agent2:#3d8bff;
+  --ok:#1f7a45;--ok-soft:#e3f2e8;--warn:#9a5b00;--warn-soft:#fbeed5;--danger:#b42a20;
+  --plate:rgba(127,127,127,.1);
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.10),0 0 0 1px var(--line);
+  --e3:0 2px 4px rgba(23,23,22,.04),0 24px 56px -16px rgba(23,23,22,.30),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --scrim:rgba(20,20,18,.28);
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  --sans:"Onest","Segoe UI",system-ui,sans-serif;--display:"Funnel Display",var(--sans);--mono:"Martian Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0f0f0e;--raised:#191918;--sunken:#0a0a09;--paper:#1f1f1d;--glass:rgba(30,30,28,.66);
+  --line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8b8b85;
+  --agent:#5aa8ff;--agent2:#8cc3ff;
+  --ok:#5fc48a;--ok-soft:#14281c;--warn:#e0a84a;--warn-soft:#33260e;--danger:#f08a80;
+  --plate:rgba(127,127,127,.14);
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);--e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --e3:0 28px 64px -16px rgba(0,0,0,.8),0 0 0 1px var(--line2);--top:inset 0 1px 0 rgba(255,255,255,.06);
+  --scrim:rgba(0,0,0,.5);color-scheme:dark}
+*{box-sizing:border-box}
+html,body{overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"ss01","tnum";display:flex;flex-direction:column;height:100vh;height:100dvh}
+h1,h2,h3,p{margin:0}
+a{color:inherit;text-decoration:none}
+button,input,textarea{font:inherit;color:inherit}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+svg.i.sm{width:14px;height:14px}
+code,.mono{font-family:var(--mono);font-size:.84em;letter-spacing:-.01em}
+
+/* ---------- design system bits (verbatim from MissaoChat.html) ---------- */
+.kbd{font-family:var(--sans);font-size:11px;font-weight:600;min-width:18px;height:18px;padding:0 5px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:rgba(127,127,127,.14);color:inherit;opacity:.75;box-shadow:inset 0 -1px 0 rgba(0,0,0,.12);flex:none}
+.b{font:inherit;font-size:14px;font-weight:600;letter-spacing:-.005em;height:40px;padding:0 16px;border-radius:12px;border:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .18s var(--spring),box-shadow .18s var(--out),background .15s,color .15s,filter .15s;white-space:nowrap;color:var(--ink);background:transparent}
+.b:active{transform:scale(.97) translateY(.5px)}
+.b:focus-visible,.ib:focus-visible,.seg button:focus-visible,.mi:focus-visible,.opt:focus-visible,.workh:focus-visible,.sb-item:focus-visible,.react:focus-visible,.send:focus-visible,.stp:focus-visible,.ck:focus-visible,.hp:focus-visible,.who-row:focus-visible,.qt:focus-visible,.cxb-h:focus-visible,.tsum:focus-visible{outline:none;box-shadow:0 0 0 2px var(--raised),0 0 0 4px var(--ink)}
+.b1{color:var(--bg);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--bg)) 0%,var(--ink) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)}
+.b1:hover{filter:brightness(1.08)}
+.b2{background:var(--raised);box-shadow:var(--e1),var(--top)}
+.b2:hover{box-shadow:var(--e2),var(--top)}
+.bg{color:var(--muted)}
+.bg:hover{background:rgba(127,127,127,.1);color:var(--ink)}
+.b.sm{height:34px;padding:0 12px;font-size:13px;border-radius:10px;gap:7px}
+.b.xs{height:28px;padding:0 10px;font-size:12.5px;border-radius:9px;gap:6px}
+.b:disabled{opacity:.5;cursor:default;transform:none;filter:none}
+.ib{width:34px;height:34px;border-radius:10px;border:0;background:transparent;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:none;transition:background .15s,color .15s,transform .18s var(--spring)}
+.ib:hover{background:rgba(127,127,127,.12);color:var(--ink)}
+.ib:active{transform:scale(.94)}
+.seg{display:inline-flex;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 1px 2px rgba(0,0,0,.06);position:relative;flex:none;max-width:100%}
+.seg button{position:relative;z-index:1;font-size:13px;font-weight:600;height:30px;padding:0 12px;border:0;border-radius:9px;background:transparent;color:var(--muted);cursor:pointer;transition:color .2s;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.seg button[aria-pressed="true"]{color:var(--ink)}
+.seg .pill{position:absolute;top:3px;left:0;height:30px;border-radius:9px;background:var(--raised);box-shadow:var(--e1),var(--top);transition:transform .32s var(--spring),width .32s var(--spring)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--sunken);color:var(--muted);white-space:nowrap;flex:none}
+.chip svg.i{width:12px;height:12px}
+.chip.ink{background:var(--ink);color:var(--bg)}
+.chip.okc{color:var(--ok)}
+.chip.dang{color:var(--danger)}
+.glass{background:var(--glass);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);box-shadow:var(--e3)}
+@keyframes popin{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.spin{animation:spin 1.2s linear infinite;transform-origin:50% 50%}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blinkc{50%{opacity:0}}
+.hint{font-size:12.5px;color:var(--faint);display:inline-flex;align-items:center;gap:6px}
+.hint svg.i{width:14px;height:14px}
+.inp{display:flex;align-items:center;gap:9px;min-height:38px;padding:0 12px;border-radius:12px;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2),inset 0 1px 2px rgba(0,0,0,.04);transition:box-shadow .15s;min-width:0}
+.inp:focus-within{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.inp input{all:unset;flex:1;min-width:0;font-size:14.5px;color:var(--ink)}
+.inp .pre{color:var(--faint);font-weight:600}
+.where-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:12px;background:var(--sunken);font-size:13.5px;min-width:0;border:0;text-align:left;color:inherit}
+.where-row .ic{width:28px;height:28px;border-radius:9px;background:var(--raised);box-shadow:var(--e1);display:flex;align-items:center;justify-content:center;color:var(--muted);flex:none}
+.where-row .t{flex:1;min-width:0}
+.where-row b{font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.where-row small{display:block;color:var(--faint);font-size:12px}
+.q-f{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px}
+.q-f .grow{flex:1}
+
+/* Agents: the engine's body (canvas). People: a circle with the initial. */
+.agw{position:relative;display:inline-flex;flex:none}
+canvas.av{display:block}
+.agw.run::after{content:"";position:absolute;inset:-3px;border-radius:32% 32% 32% 12%;border:1.5px solid color-mix(in srgb,var(--agent) 55%,transparent);animation:halo 1.6s var(--out) infinite}
+@keyframes halo{0%{opacity:.9;transform:scale(.94)}100%{opacity:0;transform:scale(1.14)}}
+.pp{--s:20px;width:var(--s);height:var(--s);border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;font-weight:650;font-size:calc(var(--s) * .42);background:linear-gradient(160deg,#e9e9e5,#d4d4cf);color:#2a2a28;line-height:1}
+:root[data-theme="dark"] .pp{background:linear-gradient(160deg,#3a3a37,#2a2a28);color:#efefec}
+
+/* ---------- prototype bar (not product) ---------- */
+.proto{position:relative;z-index:75;background:var(--bg);display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:9px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);flex:none}
+.proto b{color:var(--ink);font-weight:650}
+.proto .grow{flex:1}
+.proto .seg button{height:26px;font-size:12px;padding:0 10px}
+.proto .seg .pill{height:26px}
+.proto .lab{font-size:12px;color:var(--faint)}
+.steps{display:flex;gap:3px;flex-wrap:wrap}
+.stp{height:26px;min-width:26px;padding:0 8px;border-radius:8px;border:0;background:var(--sunken);color:var(--muted);font-size:12px;font-weight:650;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .15s,color .15s,transform .18s var(--spring)}
+.stp:hover{color:var(--ink)}
+.stp:active{transform:scale(.95)}
+.stp[aria-current="step"]{background:var(--ink);color:var(--bg)}
+.stp .l{display:none}
+.stp[aria-current="step"] .l{display:inline}
+.proto .now{color:var(--ink2);font-weight:600;flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- app frame ---------- */
+.app{flex:1;min-height:0;display:grid;grid-template-columns:248px minmax(0,1fr)}
+.app.th{grid-template-columns:248px minmax(0,1fr) minmax(0,1.05fr)}
+.apane{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
+.thpane{border-left:1px solid var(--line);display:none}
+.app.th .thpane{display:flex}
+.phd{display:flex;align-items:center;gap:10px;padding:10px 14px 10px 18px;border-bottom:1px solid var(--line);min-height:58px;flex:none}
+.phd .t{flex:1;min-width:0}
+.phd h1{font-size:16px;font-weight:650;letter-spacing:-.015em;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.phd h1 svg.i{color:var(--faint)}
+.phd small{display:block;color:var(--faint);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.phd .back{display:none}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 10px 18px;min-height:0}
+
+/* ---------- sidebar ---------- */
+.sb{position:relative;background:var(--sunken);display:flex;flex-direction:column;gap:16px;padding:14px 12px;overflow-y:auto;border-right:1px solid var(--line);min-height:0}
+.org-in{display:flex;align-items:center;gap:10px;padding:4px 6px}
+.org-in .tx{min-width:0}
+.org-in b{display:block;font-weight:700;font-size:14.5px;letter-spacing:-.01em}
+.org-in small{display:block;color:var(--muted);font-size:12px}
+.sb-jump{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border-radius:10px;background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--faint);font-size:13.5px;flex:none;border:0;cursor:pointer;width:100%;text-align:left}
+.sb-jump span:not(.kbd){flex:1}
+.sb-group{display:flex;flex-direction:column;gap:1px}
+.sb-label{font-size:12px;font-weight:650;color:var(--faint);padding:0 8px 4px}
+.sb-item{position:relative;display:flex;align-items:center;gap:10px;min-height:34px;padding:4px 8px;border-radius:10px;color:var(--ink2);font-size:14.5px;cursor:pointer;user-select:none;border:0;background:transparent;width:100%;text-align:left}
+.sb-item:hover{background:var(--plate)}
+.sb-item.on{background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--ink)}
+.sb-item .lbl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-item .meta{font-size:12px;color:var(--muted);white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.sb-item .meta svg.i{width:12px;height:12px}
+.sb-item svg.i{color:var(--faint)}
+.sb-item.on svg.i{color:var(--ink2)}
+.sb-item.fresh{animation:popin .35s var(--spring) both}
+.sb-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.me{display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px}
+.me .tx{flex:1;min-width:0}
+.me b{display:block;font-size:13.5px;font-weight:650}
+.me small{display:block;font-size:12px;color:var(--muted)}
+
+/* ---------- messages (MissaoChat.html) ---------- */
+.day{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:650;color:var(--faint);margin:14px 12px 6px}
+.day::before,.day::after{content:"";flex:1;height:1px;background:var(--line)}
+.msg{position:relative;display:flex;gap:12px;padding:10px 12px;border-radius:14px;transition:background .15s,opacity .2s;animation:fi .3s var(--out) both}
+.msg:hover{background:rgba(127,127,127,.05)}
+.msg.flash,.cx-row.flash{animation:flash 1.6s var(--out)}
+@keyframes flash{0%{background:color-mix(in srgb,var(--ink) 12%,transparent)}100%{background:transparent}}
+.msg .av-col{width:34px;flex:none;display:flex;justify-content:center;align-items:flex-start}
+.msg .body{flex:1;min-width:0}
+.mhdr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:20px}
+.mn{font-weight:650;font-size:14.5px;letter-spacing:-.01em}
+.mt{font-size:12px;color:var(--faint)}
+.mx{font-size:14.5px;line-height:1.6;margin-top:2px;color:var(--ink2);overflow-wrap:anywhere}
+.mx p+p{margin-top:6px}
+.mx b{color:var(--ink);font-weight:650}
+.mention{display:inline;white-space:nowrap;font-weight:600;color:var(--ink);background:var(--sunken);padding:1px 6px 1px 3px;border-radius:7px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.mention .agw{display:inline-flex;vertical-align:-3px;margin-right:4px}
+.thinking{display:inline-flex;align-items:center;gap:8px;color:var(--faint);font-size:13.5px}
+.curs{display:inline-block;width:7px;height:15px;background:var(--agent);vertical-align:-2px;margin-left:2px;animation:blinkc 1s steps(1) infinite}
+.macts{position:absolute;top:-12px;right:12px;display:none;gap:2px;padding:3px;border-radius:12px;z-index:4}
+.macts .ib{width:28px;height:28px;border-radius:8px}
+.macts .ib svg.i{width:15px;height:15px}
+.msg:hover .macts,.macts.show{display:flex}
+.wake{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.wake svg.i{width:12px;height:12px}
+.sysline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--faint);padding:4px 12px 4px 58px}
+.sysline svg.i{width:13px;height:13px}
+.sysline b{color:var(--ink2);font-weight:600}
+.sysline>span{flex:0 1 auto;min-width:0}
+.tsum{margin-top:8px;display:inline-flex;align-items:center;gap:9px;padding:6px 12px 6px 6px;border-radius:12px;border:0;background:var(--raised);box-shadow:var(--e1),var(--top);font-size:13px;color:var(--muted);cursor:pointer;text-align:left;max-width:100%;transition:box-shadow .15s}
+.tsum:hover{box-shadow:var(--e2),var(--top)}
+.tsum b{color:var(--ink);font-weight:650}
+.tsum .who{display:flex}
+.tsum .who>*+*{margin-left:-6px}
+.tsum .who .pp{box-shadow:0 0 0 2px var(--raised)}
+.react{height:26px;padding:0 9px;border-radius:999px;border:0;background:var(--sunken);font-size:12.5px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+
+/* ---------- the system hint: discreet, inline, not a card ---------- */
+.ahint{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;margin:6px 12px 6px 58px;padding:5px 6px 5px 10px;border-radius:12px;box-shadow:inset 0 0 0 1px var(--line);font-size:13px;color:var(--muted);animation:fi .4s var(--out) both;max-width:640px}
+.ahint>svg.i{width:14px;height:14px;color:var(--faint)}
+.ahint .t{flex:1 1 220px;min-width:0}
+.ahint .t b{color:var(--ink2);font-weight:600}
+.ahint .acts{display:flex;gap:4px}
+
+/* ---------- selection mode (neutral: ink and gray only) ----------
+   The range is one continuous surface: rows in range share a band (raised + hairline, radius only at the
+   outer corners, no gaps), a thin ink rail in the gutter joins them, and the start/end are small bracket
+   caps on the rail. Excluded rows collapse to one quiet line; the rail goes dashed there. */
+.selr{--rx:16px;--rail:color-mix(in srgb,var(--ink) 55%,transparent);cursor:pointer;user-select:none;-webkit-user-select:none;gap:10px;padding-left:34px;border-radius:14px;animation:none}
+.selr .mx{pointer-events:none}
+.selr:hover{background:color-mix(in srgb,var(--ink) 3%,transparent)}
+.selr.out{opacity:.5}
+.selr.out:hover{opacity:.8}
+.selr.inr{border-radius:0;background:var(--raised);box-shadow:inset 1px 0 0 var(--line),inset -1px 0 0 var(--line)}
+.selr.inr:hover{background:color-mix(in srgb,var(--ink) 2.5%,var(--raised))}
+.selr.inr.first{border-top-left-radius:20px;border-top-right-radius:20px;box-shadow:inset 1px 0 0 var(--line),inset -1px 0 0 var(--line),inset 0 1px 0 var(--line);padding-top:32px}
+.selr.inr.last{border-bottom-left-radius:20px;border-bottom-right-radius:20px;box-shadow:inset 1px 0 0 var(--line),inset -1px 0 0 var(--line),inset 0 -1px 0 var(--line),0 6px 16px -10px rgba(0,0,0,.18);padding-bottom:32px}
+.selr.inr.first.last{box-shadow:inset 0 0 0 1px var(--line)}
+.selr.inr::before{content:"";position:absolute;left:var(--rx);top:0;bottom:0;width:1.5px;background:var(--rail)}
+.selr.inr.first::before{top:16px}
+.selr.inr.last::before{bottom:16px}
+.selr.inr.exc::before{background:repeating-linear-gradient(to bottom,var(--rail) 0 3px,transparent 3px 7px)}
+.grp-row.selr{margin:0;padding-left:34px}
+/* small outline checkbox; on desktop it shows on hover, always for excluded rows and on touch */
+.ck{width:16px;height:16px;border-radius:5px;border:0;padding:0;flex:none;margin-top:9px;background:transparent;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--ink) 30%,transparent);display:inline-flex;align-items:center;justify-content:center;color:transparent;cursor:pointer;transition:background .15s,box-shadow .15s,color .15s,opacity .15s,transform .2s var(--spring)}
+.ck svg.i{width:11px;height:11px;stroke-width:2.8}
+.ck[aria-checked="true"]{background:var(--ink);color:var(--bg);box-shadow:none}
+.ck.lk,.ck.lk[aria-checked="true"]{background:transparent;color:var(--muted);box-shadow:none}
+.ck.lk svg.i{stroke-width:1.9;width:13px;height:13px}
+.ck:active{transform:scale(.88)}
+.selr>.ck{opacity:0}
+.selr:hover>.ck,.selr>.ck:focus-visible,.selr.exc>.ck,.selr>.ck.lk{opacity:1}
+@media (hover:none),(max-width:760px){.selr>.ck{opacity:1}}
+.grp-row.selr>.ck{margin-top:0}
+/* excluded rows: one compact line inside the band; consecutive ones grouped */
+.exl{display:none;align-items:center;gap:8px;min-width:0;flex:1;font-size:12.5px;color:var(--faint)}
+.exl .ck{margin-top:0;opacity:1}
+.exl .eo{display:inline-flex;align-items:center;gap:4px;min-width:0;border:0;background:transparent;padding:2px 0;font:inherit;color:inherit;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exl .eo:hover{color:var(--ink2)}
+.exl .eo span{overflow:hidden;text-overflow:ellipsis}
+.exl .b{margin-left:auto;flex:none}
+.selr.exc:not(.open){padding-top:5px;padding-bottom:5px}
+.selr.exc.first:not(.open){padding-top:32px}
+.selr.exc.last:not(.open){padding-bottom:32px}
+.selr.exc:not(.open)>:not(.exl):not(.cap){display:none}
+.selr.exc:not(.open)>.exl{display:flex}
+.selr.exc-hid:not(.open){display:none}
+.selr.exc.open>.av-col,.selr.exc.open>.body,.selr.exc.open>.gi,.selr.exc.open>.t{opacity:.55}
+.selr .offt{display:none}
+.selr.exc.open .offt{display:inline-flex}
+/* bracket caps on the rail: the time, draggable */
+.cap{position:absolute;left:var(--rx);display:flex;align-items:center;gap:8px;z-index:3;pointer-events:none}
+.cap.ca{top:7px}
+.cap.cb{bottom:7px}
+.cap::before{content:"";width:8px;height:1.5px;background:var(--rail);flex:none;margin-right:-6px}
+.hp{pointer-events:auto;display:inline-flex;align-items:center;gap:3px;height:19px;padding:0 6px 0 3px;border-radius:6px;border:0;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2),0 1px 2px rgba(0,0,0,.06);color:var(--ink2);font-size:11.5px;font-weight:650;font-variant-numeric:tabular-nums;cursor:ns-resize;touch-action:none;user-select:none;-webkit-user-select:none;transition:transform .2s var(--spring),box-shadow .15s}
+.hp svg.i{width:11px;height:11px;color:var(--faint)}
+.hp:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ink) 35%,transparent)}
+.cap.drag .hp{transform:scale(1.06);box-shadow:inset 0 0 0 1.5px var(--ink)}
+.hn{pointer-events:auto;font-size:11.5px;color:var(--faint);white-space:nowrap}
+.hn button{border:0;background:transparent;padding:0;font:inherit;font-weight:650;color:var(--ink2);cursor:pointer;text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+.grp-row{position:relative;display:flex;align-items:center;gap:12px;margin:2px 0;padding:10px 12px;border-radius:14px;font-size:13.5px;color:var(--muted);animation:fi .3s var(--out) both}
+.grp-row .gi{width:34px;display:flex;justify-content:center;color:var(--faint);flex:none}
+.grp-row .t{flex:1;min-width:0}
+.grp-row b{color:var(--ink2);font-weight:600}
+.selbar{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;padding:8px 8px 8px 14px;border-radius:16px;background:var(--raised);box-shadow:var(--e1),var(--top);animation:popin .28s var(--spring) both}
+.selbar .t{flex:1 1 220px;min-width:0;display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap}
+.selbar b{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.selbar .sp{font-size:13px;color:var(--faint);font-variant-numeric:tabular-nums}
+.selbar .acts{display:flex;gap:6px;margin-left:auto}
+
+/* results in the channel: the stub (Mover) and the quiet mark (Levar como contexto) */
+.stub{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin:6px 12px 6px 58px;padding:8px 8px 8px 10px;border-radius:14px;background:var(--raised);box-shadow:var(--e1),var(--top);font-size:13.5px;color:var(--ink2);animation:popin .32s var(--spring) both;max-width:640px}
+.stub .ic{width:28px;height:28px;border-radius:9px;background:var(--sunken);display:flex;align-items:center;justify-content:center;color:var(--ink2);flex:none}
+.stub .t{flex:1 1 200px;min-width:0}
+.stub b{font-weight:650;color:var(--ink)}
+.stub small{display:block;font-size:12px;color:var(--faint)}
+.msg.ctxm::before{content:"";position:absolute;left:3px;top:8px;bottom:8px;width:2px;border-radius:2px;background:color-mix(in srgb,var(--ink) 18%,transparent)}
+.ctxl{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;font-size:12.5px;color:var(--faint);padding:0 12px 8px 58px;animation:fi .35s var(--out) both}
+.ctxl svg.i{width:13px;height:13px}
+.ctxl b{color:var(--ink2);font-weight:600}
+
+/* ---------- side panel: new thread ---------- */
+.pn{padding:14px 16px 18px}
+.fs{padding:0 0 18px}
+.fl{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:650;color:var(--faint);margin-bottom:8px}
+.fs .hint{margin-top:6px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.opt{position:relative;display:flex;flex-direction:column;gap:8px;text-align:left;padding:12px;border-radius:16px;border:0;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2);cursor:pointer;transition:box-shadow .18s var(--out),transform .2s var(--spring),background .15s}
+.opt:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ink) 35%,transparent)}
+.opt:active{transform:scale(.985)}
+.opt[aria-checked="true"]{box-shadow:inset 0 0 0 2px var(--ink);background:color-mix(in srgb,var(--sunken) 40%,var(--raised))}
+.opt .top{display:flex;align-items:flex-start;gap:10px}
+.opt .rd{width:18px;height:18px;border-radius:50%;flex:none;margin-top:1px;box-shadow:inset 0 0 0 1.5px var(--line2);transition:box-shadow .2s var(--spring)}
+.opt[aria-checked="true"] .rd{box-shadow:inset 0 0 0 5.5px var(--ink)}
+.opt b{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:650;letter-spacing:-.01em}
+.opt b svg.i{color:var(--muted)}
+.opt small{display:block;font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+.pv{border-radius:16px;background:var(--raised);box-shadow:var(--e1),var(--top);overflow:hidden}
+.pv-h{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
+.pv-h b{flex:1 1 140px;font-size:13.5px;font-weight:650;min-width:0}
+.pv-b{max-height:320px;overflow:auto;padding:4px 0}
+.pv-f{display:flex;align-items:flex-start;gap:7px;padding:9px 12px 10px;font-size:12.5px;color:var(--faint);border-top:1px solid var(--line)}
+.pv-f svg.i{width:13px;height:13px;margin-top:3px}
+.pv-f b{color:var(--ink2);font-weight:600}
+.cx-row{display:grid;grid-template-columns:20px minmax(0,1fr);gap:9px;padding:6px 12px;font-size:13px;color:var(--ink2);border-radius:10px;animation:fi .25s var(--out) both}
+.cx-row .cxa{display:flex;justify-content:center;padding-top:1px;color:var(--faint)}
+.cx-row .h{display:flex;align-items:baseline;gap:6px}
+.cx-row .h b{font-weight:650;font-size:12.5px;color:var(--ink)}
+.cx-row .h span{font-size:11.5px;color:var(--faint)}
+.cx-row .h svg.i{width:12px;height:12px;color:var(--muted);align-self:center}
+.cx-row p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--muted);line-height:1.45}
+.cx-row.lk p{color:var(--faint)}
+.cx-row.grp .h b{font-weight:600}
+.sumy{padding:10px 12px 6px}
+.sumy ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ink2)}
+.sumy li{display:flex;gap:8px;align-items:flex-start}
+.sumy li svg.i{width:13px;height:13px;color:var(--faint);margin-top:3px}
+.sumy .by{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--faint);margin-bottom:8px}
+.more-row{padding:2px 8px 8px}
+.npf{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px 14px;border-top:1px solid var(--line);flex:none;background:var(--bg)}
+.npf .grow{flex:1}
+.blk{display:flex;gap:12px;padding:12px;border-radius:16px;background:var(--sunken);font-size:13.5px;color:var(--ink2);margin-bottom:18px;animation:popin .3s var(--spring) both}
+.blk .ic{width:30px;height:30px;border-radius:10px;background:var(--raised);box-shadow:var(--e1);display:flex;align-items:center;justify-content:center;color:var(--danger);flex:none}
+.blk .t{flex:1;min-width:0}
+.blk b{display:block;color:var(--ink);font-weight:650;font-size:14px}
+.blk p{margin-top:2px;color:var(--muted)}
+.blk .q-f{margin-top:10px}
+
+/* ---------- thread: context block, quote ---------- */
+.cxb{border-radius:16px;background:var(--raised);box-shadow:var(--e1),var(--top);margin:6px 2px 10px;overflow:hidden;animation:popin .3s var(--spring) both}
+.cxb-h{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;background:transparent;text-align:left;cursor:pointer;border-radius:16px}
+.cxb-h:hover{background:rgba(127,127,127,.05)}
+.cxb-h .ic{width:30px;height:30px;border-radius:10px;background:var(--sunken);display:flex;align-items:center;justify-content:center;color:var(--ink2);flex:none}
+.cxb-h .t{flex:1;min-width:0}
+.cxb-h b{display:block;font-size:14px;font-weight:650;letter-spacing:-.01em}
+.cxb-h small{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;font-size:12.5px;color:var(--faint);margin-top:1px}
+.cxb-b{border-top:1px solid var(--line);padding:4px 0 0}
+.cxb-a{display:flex;flex-wrap:wrap;gap:4px 16px;padding:0 12px 10px 52px;font-size:12.5px}
+.cxb-a .tlink{display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--muted)}
+.cxb-a .tlink:hover{color:var(--ink)}
+.cxb-a svg.i{width:13px;height:13px}
+.ttl-b{min-width:0;padding:0 4px;margin:0 -4px;border:0;border-radius:6px;background:transparent;font:inherit;color:inherit;letter-spacing:inherit;cursor:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ttl-b:hover{background:var(--sunken)}
+.ttl-i{min-width:0;flex:1;height:28px;padding:0 6px;border:0;border-radius:8px;background:var(--sunken);font:inherit;color:var(--ink);outline:none;box-shadow:inset 0 0 0 1.5px var(--line2)}
+.cxb-b .pv-f{margin-top:4px}
+.chev{transition:transform .25s var(--out);flex:none;color:var(--faint)}
+[aria-expanded="true"]>.chev{transform:rotate(90deg)}
+.qt{display:block;width:100%;max-width:560px;text-align:left;margin:8px 0;padding:8px 12px;border:0;border-left:2px solid color-mix(in srgb,var(--ink) 22%,transparent);background:var(--sunken);border-radius:4px 12px 12px 4px;cursor:pointer;color:var(--ink2);font-size:13.5px;line-height:1.5;transition:background .15s}
+.qt:hover{background:color-mix(in srgb,var(--ink) 8%,var(--sunken))}
+.qt .qs{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--faint);margin-bottom:3px}
+.qt .qs svg.i{width:12px;height:12px}
+
+/* ---------- the live work card (verbatim from TarefaLonga.html) ---------- */
+.wk{margin-top:10px;border-radius:16px;background:var(--raised);box-shadow:var(--e1),var(--top);overflow:hidden;position:relative;max-width:640px}
+.wk-h{display:flex;align-items:center;gap:10px;padding:12px 12px 0 14px}
+.wk-h .ic{width:30px;height:30px;border-radius:10px;background:var(--sunken);display:flex;align-items:center;justify-content:center;color:var(--ink2);flex:none}
+.wk-h .t{flex:1;min-width:0}
+.wk-h b{display:block;font-size:13.5px;font-weight:650;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-h small{display:flex;align-items:center;gap:5px;flex-wrap:wrap;color:var(--faint);font-size:12px}
+.wk-h small .tick{color:var(--ink2);font-weight:600;font-variant-numeric:tabular-nums}
+.wk-m{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px 0 54px}
+.wk-m code{font-size:10.5px;color:var(--ink2)}
+.wk-o{display:flex;align-items:flex-start;gap:7px;margin:8px 14px 0 54px;font-size:12.5px;color:var(--muted)}
+.wk-o svg.i{width:13px;height:13px;margin-top:3px;color:var(--faint)}
+.wk-o code{font-size:10.5px;color:var(--ink2)}
+.wk-last{display:flex;align-items:center;gap:8px;margin:10px 14px 0;padding:8px 10px;border-radius:10px;background:var(--sunken);min-width:0}
+.wk-last .tx{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2);min-width:0}
+.wk-last.fresh .tx{animation:fi .35s var(--out)}
+.cur{display:inline-block;width:7px;height:13px;background:var(--agent);vertical-align:-2px;animation:blinkc 1s steps(1) infinite;flex:none}
+.workh{display:flex;align-items:center;gap:10px;width:100%;margin-top:6px;padding:9px 14px;border:0;background:transparent;font:inherit;font-size:13px;color:var(--muted);cursor:pointer;text-align:left}
+.workh:hover{background:rgba(127,127,127,.06)}
+.workh b{color:var(--ink2);font-weight:600}
+.wsteps{padding:0 0 6px}
+.wstep{display:flex;align-items:center;gap:10px;padding:6px 14px 6px 16px;font-size:13px;color:var(--ink2);animation:fi .25s var(--out) both;min-width:0}
+.wstep>span:nth-child(2){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wstep .t{margin-left:auto;font-size:12px;color:var(--faint);white-space:nowrap;padding-left:8px}
+.wstep.now{color:var(--ink)}
+.wstep.todo{color:var(--faint)}
+.tk{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok);flex:none}
+.tk svg.i{width:11px;height:11px;stroke-width:2.4}
+.tk.now{background:transparent;color:var(--muted)}
+.tk.now svg.i{width:16px;height:16px}
+.tk.todo{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line2)}
+.wk-f{display:flex;align-items:center;gap:6px;padding:8px 12px 14px 14px;flex-wrap:wrap}
+.wk-f .grow{flex:1}
+.wk-f .hint{font-size:12px}
+.wk-f .hint svg.i{width:13px;height:13px}
+canvas.strip{position:absolute;left:0;right:0;bottom:0;width:100%;height:3px;image-rendering:pixelated;pointer-events:none}
+.log{margin:0 12px 6px;padding:12px 14px;border-radius:12px;background:var(--sunken);font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--ink2);max-height:240px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+.log .ln{display:block;animation:fi .25s var(--out) both}
+.log .cmd{color:var(--ink)}
+.log .dim{color:var(--faint)}
+.log .okl{color:var(--ok)}
+
+/* ---------- composer ---------- */
+.cmpw{padding:0 14px 14px;flex:none;position:relative}
+.composer{border-radius:18px;background:var(--raised);box-shadow:var(--e2),var(--top);transition:box-shadow .2s var(--out);position:relative}
+.composer:focus-within{box-shadow:var(--e3),var(--top)}
+.composer textarea{display:block;width:100%;border:0;outline:none;background:transparent;font-size:15px;color:var(--ink);padding:14px 16px 4px;resize:none;line-height:1.5;min-height:48px;max-height:160px}
+.composer textarea::placeholder{color:var(--faint)}
+.ctools{display:flex;align-items:center;gap:6px;padding:6px 8px 8px 10px;flex-wrap:wrap}
+.cpill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 4px;border-radius:999px;font-size:12.5px;font-weight:600;background:var(--sunken);color:var(--ink2);border:0;white-space:nowrap}
+.cpill.np{padding-left:9px}
+.cpill svg.i{width:13px;height:13px;color:var(--muted)}
+.send{margin-left:auto;height:34px;padding:0 12px;border-radius:11px;border:0;display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .25s var(--spring);flex:none}
+.send.off{background:var(--sunken);color:var(--faint);width:34px;padding:0;justify-content:center}
+.send.on{color:var(--bg);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--bg)) 0%,var(--ink) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)}
+.send.on .kbd{background:rgba(255,255,255,.18)}
+
+/* ---------- menus, dialog, toasts ---------- */
+.menu{position:fixed;z-index:80;min-width:240px;max-width:calc(100vw - 24px);border-radius:16px;padding:6px;animation:popin .22s var(--spring) both}
+.mi{display:flex;align-items:center;gap:10px;width:100%;min-height:38px;padding:0 10px;border-radius:10px;border:0;background:transparent;font-size:14px;color:var(--ink);cursor:pointer;text-align:left}
+.mi:hover,.mi.on{background:rgba(127,127,127,.12)}
+.mi .sub{color:var(--faint);font-size:12.5px;margin-left:auto;padding-left:10px;white-space:nowrap}
+.msep{height:1px;margin:6px 8px;background:var(--line)}
+.mgroup{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:8px 10px 4px}
+.scrim{position:fixed;inset:0;z-index:70;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:16px;animation:fi .2s var(--out) both}
+.dlg{width:min(460px,100%);max-height:calc(100dvh - 32px);overflow:auto;border-radius:22px;background:var(--raised);box-shadow:var(--e3),var(--top);padding:18px;animation:popin .28s var(--spring) both}
+.dlg-h{display:flex;align-items:flex-start;gap:10px}
+.dlg-h .t{flex:1;min-width:0}
+.dlg h3{font-family:var(--display);font-weight:300;font-size:26px;letter-spacing:-.03em;line-height:1.1}
+.dlg-h p{color:var(--muted);font-size:13.5px;margin-top:4px}
+.dlg .fs{padding:14px 0 0}
+.who{display:flex;flex-direction:column;gap:2px}
+.who-row{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:4px 8px;border-radius:12px;border:0;background:transparent;text-align:left;cursor:pointer;font-size:14px;color:var(--ink2)}
+.who-row:hover{background:var(--plate)}
+.who-row .ck{margin-top:0}
+.who-row .tx{flex:1;min-width:0}
+.who-row small{display:block;font-size:12px;color:var(--faint)}
+.who-row[aria-disabled="true"]{cursor:default}
+.dlg .notes{display:flex;flex-direction:column;gap:6px;margin-top:14px;padding:10px 12px;border-radius:14px;background:var(--sunken);font-size:13px;color:var(--ink2)}
+.dlg .notes div{display:flex;gap:8px;align-items:flex-start}
+.dlg .notes svg.i{width:14px;height:14px;color:var(--faint);margin-top:2px}
+.toasts{position:fixed;right:18px;bottom:18px;z-index:90;display:flex;flex-direction:column;gap:10px;align-items:flex-end;pointer-events:none}
+.toast{pointer-events:auto;display:flex;align-items:center;gap:12px;padding:10px 10px 10px 12px;border-radius:16px;width:380px;max-width:calc(100vw - 24px);animation:popin .25s var(--spring) both}
+.toast .tic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;background:var(--sunken);color:var(--ink2)}
+.toast .tic.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+.toast .tt{flex:1;min-width:0}
+.toast .tt b{display:block;font-size:14px;font-weight:600}
+.toast .tt small{display:block;color:var(--muted);font-size:12.5px}
+.toast.out{animation:toastout .2s var(--out) both}
+@keyframes toastout{to{opacity:0;transform:translateY(6px) scale(.98)}}
+
+
+/* ===================== Scenario B: App mobile (a real code task with progress) ===================== */
+/* proposal / plan card (MissaoChat.html) */
+.prop{border-radius:20px;background:var(--raised);box-shadow:var(--e1),var(--top);margin-top:10px;max-width:640px;position:relative;overflow:hidden;animation:popin .32s var(--spring) both}
+.prop-h{display:flex;align-items:flex-start;gap:12px;padding:16px 16px 4px}
+.prop-h .t{flex:1;min-width:0}
+.prop-h h3{font-family:var(--display);font-weight:300;font-size:26px;letter-spacing:-.03em;line-height:1.1}
+.prop-h p{color:var(--muted);font-size:13.5px;margin-top:4px}
+.prop-b{padding:10px 16px 2px;display:flex;flex-direction:column;gap:12px}
+.pf{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;align-items:center;font-size:13.5px}
+.pf>.k{font-size:12.5px;font-weight:650;color:var(--faint)}
+.pf>.v{min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--ink2)}
+.pf>.v small{color:var(--faint);font-size:12.5px}
+.pf>.v code{font-size:10.5px}
+.phs{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.phs .pc{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:10px;background:var(--sunken);font-size:13px;font-weight:600;color:var(--ink2)}
+.phs .pc .n{color:var(--faint);font-weight:500;font-size:12px}
+.phs .gt{color:var(--faint);display:inline-flex}
+.phs .gt svg.i{width:13px;height:13px}
+.whyp{display:flex;align-items:flex-start;gap:8px;margin:12px 16px 0;padding:10px 12px;border-radius:14px;background:var(--sunken);font-size:13px;color:var(--ink2)}
+.whyp svg.i{width:14px;height:14px;color:var(--faint);margin-top:3px}
+.prop-f{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:14px 16px 16px}
+.prop-f .grow{flex:1}
+.created{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px;padding:10px 12px;border-radius:16px;background:var(--raised);box-shadow:var(--e1),var(--top);max-width:640px;animation:popin .3s var(--spring) both}
+.created .fl{width:32px;height:32px;border-radius:10px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;flex:none}
+.created .t{flex:1;min-width:0}
+.created b{display:block;font-weight:650;font-size:14.5px}
+.created small{display:block;color:var(--faint);font-size:12.5px}
+.stamp{position:absolute;inset:0;border-radius:20px;display:flex;align-items:center;justify-content:center;gap:10px;background:color-mix(in srgb,var(--raised) 86%,transparent);font-weight:650;font-size:15px;animation:fi .2s var(--out) both;z-index:2}
+.stamp .ok{width:30px;height:30px;border-radius:10px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center}
+/* decision card */
+.card{border-radius:20px;background:var(--raised);box-shadow:var(--e1),var(--top);padding:16px;position:relative;margin-top:10px;max-width:680px;animation:popin .3s var(--spring) both}
+.card.flash{animation:cflash 1.4s var(--out)}
+@keyframes cflash{0%{box-shadow:0 0 0 2px var(--ink),var(--top)}100%{box-shadow:var(--e1),var(--top)}}
+.q-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.q-h h3{font-size:16.5px;font-weight:650;letter-spacing:-.015em;line-height:1.3}
+.q-h p{color:var(--muted);font-size:13.5px;margin-top:4px;max-width:70ch}
+.card .opts{margin-top:14px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.opt .othumb{display:flex;justify-content:center;padding:10px 0 0;border-radius:12px;background:var(--sunken);overflow:hidden;height:112px}
+.why{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px 12px;margin-top:14px;padding:12px 14px;border-radius:14px;background:var(--sunken);font-size:13.5px;color:var(--ink2)}
+.why .k{font-size:12px;font-weight:650;color:var(--faint);padding-top:1px;white-space:nowrap;display:flex;align-items:flex-start;gap:6px}
+.decided{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.decided .ok{width:30px;height:30px;border-radius:10px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;flex:none}
+.decided .t{flex:1;min-width:0}
+.decided b{display:block;font-weight:650;font-size:14.5px;letter-spacing:-.01em}
+.decided small{display:block;color:var(--muted);font-size:12.5px}
+.decided small code{font-size:10.5px}
+/* fake phone screens (Missao.html) */
+.phone{--w:108px;width:var(--w);height:calc(var(--w) * 2.05);flex:none;border-radius:calc(var(--w) * .16) calc(var(--w) * .16) 0 0;background:#151514;padding:calc(var(--w) * .035) calc(var(--w) * .035) 0;box-shadow:0 10px 24px -10px rgba(0,0,0,.35)}
+.phone .scr{width:100%;height:100%;border-radius:calc(var(--w) * .13) calc(var(--w) * .13) 0 0;background:#fbfbf9;overflow:hidden;position:relative;display:flex;flex-direction:column;font-size:calc(var(--w) * .062);color:#2a2a28;line-height:1.3}
+:root[data-theme="dark"] .phone{background:#2c2c2a}
+:root[data-theme="dark"] .phone .scr{background:#141413;color:#d6d6d2}
+.phone .isl{width:32%;height:calc(var(--w) * .06);border-radius:99px;background:#151514;margin:calc(var(--w) * .04) auto calc(var(--w) * .03)}
+:root[data-theme="dark"] .phone .isl{background:#000}
+.phone .ttl{font-weight:700;font-size:calc(var(--w) * .095);padding:0 9% 4%;letter-spacing:-.02em}
+.phone .rw{display:flex;align-items:center;gap:6%;padding:3.5% 9%}
+.phone .ln{display:block;height:calc(var(--w) * .03);border-radius:3px;background:color-mix(in srgb,currentColor 18%,transparent)}
+.phone .ln.s{width:55%}
+.phone .ln.m{width:75%}
+.phone .lns{display:flex;flex-direction:column;gap:calc(var(--w) * .025);flex:1}
+.phone .hashc{width:calc(var(--w) * .1);height:calc(var(--w) * .1);border-radius:30%;background:color-mix(in srgb,currentColor 12%,transparent);flex:none}
+.phone .tabs{margin-top:auto;display:flex;justify-content:space-around;padding:5% 6% 9%;border-top:1px solid color-mix(in srgb,currentColor 10%,transparent)}
+.phone .tabs i{width:calc(var(--w) * .085);height:calc(var(--w) * .085);border-radius:28%;background:color-mix(in srgb,currentColor 22%,transparent)}
+.phone .tabs i.on{background:currentColor}
+.phone .bub{max-width:72%;padding:4% 6%;border-radius:calc(var(--w) * .06);margin:2% 7%;background:color-mix(in srgb,currentColor 9%,transparent);display:flex;flex-direction:column;gap:calc(var(--w) * .02)}
+.phone .bub.me{align-self:flex-end;background:#151514;color:#fbfbf9}
+:root[data-theme="dark"] .phone .bub.me{background:#efefec;color:#141413}
+.phone .cmp{margin:auto 7% 8%;height:calc(var(--w) * .13);border-radius:99px;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 18%,transparent)}
+.phone .drw{position:absolute;inset:0;display:flex}
+.phone .drw .pane{width:68%;height:100%;background:color-mix(in srgb,#ebebe7 90%,transparent);padding-top:22%;display:flex;flex-direction:column;box-shadow:6px 0 14px -6px rgba(0,0,0,.3)}
+:root[data-theme="dark"] .phone .drw .pane{background:#0a0a09}
+.phone .drw .dim{flex:1;background:rgba(0,0,0,.18)}
+/* pinned live card (MissaoChat.html) */
+.pinned{position:sticky;top:-8px;z-index:6;margin:0 2px 8px;border-radius:18px;background:var(--raised);box-shadow:var(--e2),var(--top);padding:12px 14px 0;overflow:hidden;animation:popin .32s var(--spring) both}
+.pin-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pin-h .t{flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pin-h .t b{font-weight:650;font-size:14.5px;letter-spacing:-.01em;white-space:nowrap}
+.pin-h .t .lab{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.pin-stage{position:relative;height:46px;margin-top:6px}
+.pin-ps{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:13px;color:var(--ink2);min-width:0}
+.pin-ps b{font-weight:650;white-space:nowrap}
+canvas.ps{height:14px;max-width:100%;image-rendering:pixelated;flex:none}
+.pl-cap{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--faint);margin-bottom:6px}
+.pl-cap svg.i{width:13px;height:13px}
+.pl-list{list-style:none;margin:10px 16px 0;padding:0;display:flex;flex-direction:column;gap:7px;font-size:13.5px;color:var(--ink2)}
+.pl-list li{display:flex;align-items:center;gap:10px}
+.pl-list .bx{width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1.5px var(--line2);flex:none}
+.pl-note{margin:8px 16px 0 40px;font-size:12.5px;color:var(--faint)}
+.pl-meta{display:flex;align-items:center;gap:7px;margin:12px 16px 0;font-size:12.5px;color:var(--muted)}
+.pl-meta svg.i{width:14px;height:14px;color:var(--faint)}
+.rv-shots{display:flex;gap:12px;margin-top:12px;height:120px;overflow:hidden}
+.cpill .x{display:inline-flex;border:0;background:transparent;padding:0;margin-left:2px;color:var(--faint);cursor:pointer}
+.md .l.ckl{position:relative;padding-left:30px}
+.md .ckl .bx{position:absolute;left:6px;top:.32em;width:13px;height:13px;border-radius:4px;box-shadow:inset 0 0 0 1.5px var(--line2);display:flex;align-items:center;justify-content:center}
+.md .ckl .bx svg.i{width:10px;height:10px;stroke-width:2.6}
+.md .ckl.on .bx{background:var(--ink);box-shadow:none;color:var(--bg)}
+.md .ckl.on{color:var(--muted)}
+.md .ckl small{margin-left:8px;font-size:12px;color:var(--faint)}
+.pin-ph{display:grid;font-size:11.5px;color:var(--faint);padding:2px 0 0}
+.pin-ph span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px;border-left:1px dashed var(--line2)}
+.pin-ph span:first-child{border-left:0;padding-left:0}
+.pin-ph span.on{color:var(--ink);font-weight:650}
+.pin-ph span.done{color:var(--muted)}
+.pin-m{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 0 12px}
+.pm{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 8px;border-radius:999px;background:var(--sunken);font-size:12.5px;font-weight:600;color:var(--ink2);white-space:nowrap;border:0}
+button.pm{cursor:pointer}
+.pm svg.i{width:13px;height:13px;color:var(--muted)}
+.pm .run{color:var(--agent);display:inline-flex}
+.pm small{color:var(--faint);font-weight:500;font-size:12px}
+.pm .bar{width:40px;height:5px;border-radius:5px;background:color-mix(in srgb,var(--ink) 10%,transparent);overflow:hidden}
+.pm .bar i{display:block;height:100%;background:var(--ink);border-radius:5px}
+/* work steps: one row per Claude Code session (status, title, one human line, time, PR) */
+.mw{margin-top:10px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--line);overflow:hidden;max-width:640px}
+.mwh{display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;border:0;background:transparent;font-size:13px;color:var(--muted);cursor:pointer;text-align:left}
+.mwh:hover{background:rgba(127,127,127,.06)}
+.mwh b{color:var(--ink2);font-weight:600}
+.ms{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:start;gap:10px;padding:9px 14px;font-size:13px;color:var(--ink2);border-top:1px solid var(--line)}
+.ms:hover{background:rgba(127,127,127,.05)}
+.ms .wi{width:20px;height:20px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;background:var(--sunken);color:var(--ink2);margin-top:1px}
+.ms .wi svg.i{width:12px;height:12px;stroke-width:2.2}
+.ms .wi.done{background:var(--ink);color:var(--bg)}
+.ms .wi.run{color:var(--agent);background:transparent;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--agent) 30%,transparent)}
+.ms .wi.fail{color:var(--danger)}
+.ms-t{display:block;min-width:0;width:100%;padding:0;border:0;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.ms-t b{display:flex;align-items:center;gap:6px;font-weight:600;min-width:0}
+.ms-t b>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ms-t b svg.chev{width:13px;height:13px;color:var(--faint);flex:none;transition:transform .2s var(--out)}
+.ms-t[aria-expanded="true"] b svg.chev{transform:rotate(90deg)}
+.ms .sl{display:flex;align-items:center;gap:6px;min-width:0;margin-top:2px;font-size:12.5px;color:var(--muted)}
+.ms .sl>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ms .sl.fresh>span:first-child{animation:fi .35s var(--out)}
+.ms .sl .cur{height:11px;width:6px}
+.ms .br{display:flex;align-items:center;gap:4px;margin-top:3px;font-size:11px;color:var(--faint);min-width:0}
+.ms .br svg.i{width:11px;height:11px;flex:none}
+.ms .br code{font-size:10px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ms-r{display:flex;align-items:center;gap:6px;padding-top:1px}
+.ms .wd{font-size:12px;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ms .wd.live{color:var(--ink2);font-weight:600}
+.prc{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border:0;border-radius:999px;background:var(--sunken);font:inherit;font-size:11.5px;font-weight:600;color:var(--ink2);white-space:nowrap;cursor:pointer}
+.prc:hover{background:color-mix(in srgb,var(--ink) 10%,transparent)}
+.prc svg.i{width:12px;height:12px;color:var(--muted)}
+.sx{margin:0 14px 10px 44px;padding:10px 12px;border-radius:12px;background:var(--sunken);display:flex;flex-direction:column;gap:8px;animation:fi .25s var(--out) both;min-width:0}
+.sx h4{margin:0;display:flex;align-items:baseline;gap:6px;font-size:12px;font-weight:650;color:var(--ink2)}
+.sx h4 span{font-weight:500;color:var(--faint)}
+.sx ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;min-width:0}
+.sx li{min-width:0}
+.sx li code{display:block;font-size:10.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sx .more{align-self:flex-start;padding:0;border:0;background:transparent;font:inherit;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+.sx .more:hover{color:var(--ink)}
+.sx .none{font-size:12.5px;color:var(--faint)}
+.sx .log{margin:0}
+.sx-f{display:flex;gap:6px;flex-wrap:wrap}
+.mwf{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px 14px 10px;font-size:12px;color:var(--faint);border-top:1px solid var(--line)}
+.mwf svg.i{width:13px;height:13px}
+/* thread events (automatic, not a voice) */
+.evt{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;margin:4px 12px 4px 58px;font-size:12.5px;color:var(--faint);animation:fi .35s var(--out) both}
+.evt>svg.i{width:13px;height:13px}
+.evt b{color:var(--ink2);font-weight:600}
+.evt code{font-size:10.5px;color:var(--ink2)}
+.evt .chip{height:20px;font-size:11px}
+/* mission files drawer: side panel on desktop, bottom sheet on phone */
+.drawer{position:fixed;z-index:60;top:64px;right:12px;bottom:12px;width:min(460px,calc(100vw - 24px));border-radius:22px;background:var(--raised);box-shadow:var(--e3),var(--top);display:flex;flex-direction:column;overflow:hidden;animation:popin .3s var(--spring) both}
+.dr-h{display:flex;align-items:center;gap:10px;padding:14px 12px 10px 16px}
+.dr-h .t{flex:1;min-width:0}
+.dr-h b{display:block;font-size:16px;font-weight:650;letter-spacing:-.015em}
+.dr-h small{display:block;font-size:12.5px;color:var(--faint)}
+.dr-h small code{font-size:10.5px}
+.dr-tabs{padding:0 16px 10px}
+.dr-tabs .seg button{font-family:var(--mono);font-size:11.5px;font-weight:400;padding:0 10px}
+.dr-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:10px 16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12px;color:var(--faint)}
+.dr-meta code{font-size:10.5px;color:var(--ink2)}
+.dr-b{flex:1;overflow:auto;padding:14px 18px 20px;min-height:0}
+.md{font-size:13.5px;color:var(--ink2);line-height:1.55}
+.md .l{padding:1px 8px;margin:0 -8px;border-radius:6px}
+.md .h1{font-family:var(--display);font-weight:300;font-size:24px;letter-spacing:-.03em;color:var(--ink);margin:2px -8px 6px}
+.md .h2{font-weight:650;font-size:14px;color:var(--ink);margin-top:12px}
+.md .li{position:relative;padding-left:22px}
+.md .li::before{content:"";position:absolute;left:10px;top:.72em;width:4px;height:4px;border-radius:50%;background:var(--faint)}
+.md .p{margin-top:4px}
+.md .q{color:var(--muted);box-shadow:inset 2px 0 0 color-mix(in srgb,var(--ink) 18%,transparent);margin-top:6px}
+.md code{font-size:.8em;color:var(--ink)}
+.md .add.new{animation:mdin .35s var(--out) both}
+.md .at{margin-left:8px;font-size:12px;color:var(--faint);font-weight:400;white-space:nowrap}
+@keyframes mdin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.dr-foot{display:flex;align-items:flex-start;gap:7px;padding:10px 16px 14px;border-top:1px solid var(--line);font-size:12px;color:var(--faint)}
+.dr-foot svg.i{width:13px;height:13px;margin-top:2px}
+.cfl{flex-basis:100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--muted);font-size:12px}
+.cfl>svg.i{width:12px;height:12px;color:var(--faint);flex:none}
+.tlink{padding:0;border:0;background:transparent;font:inherit;font-weight:600;color:var(--ink2);cursor:pointer}
+.tlink:hover{text-decoration:underline;text-underline-offset:2px}
+.difw{margin:0 0 16px;display:flex;flex-direction:column;gap:6px;animation:mdin .3s var(--out) both}
+.difw>small{font-size:12px;color:var(--faint)}
+.diff{font-family:var(--mono);font-size:10.5px;line-height:1.8;padding:8px 10px;border-radius:10px;background:var(--sunken);white-space:pre-wrap;overflow-wrap:anywhere}
+.diff .d{display:block;color:var(--danger)}
+.diff .a{display:block;color:var(--ok)}
+.diff .c{display:block;color:var(--faint)}
+body[data-scn="onb"] .app-only,body[data-scn="app"] .onb-only{display:none !important}
+@media (max-width:760px){
+  .pf{grid-template-columns:minmax(0,1fr);gap:4px}
+  .prop-h,.prop-b{padding-left:14px;padding-right:14px}
+  .card{padding:14px}
+  .card .opts{grid-template-columns:minmax(0,1fr)}
+  .opt .othumb{height:96px}
+  .why{grid-template-columns:minmax(0,1fr);gap:4px}
+  .pinned{position:relative;top:0}
+  .sx{margin-left:14px}
+  .ms .br{display:none}
+  .evt{margin-left:12px}
+  .drawer{top:auto;left:0;right:0;bottom:0;width:auto;height:84dvh;border-radius:22px 22px 0 0}
+}
+
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+
+/* ---------- responsive ---------- */
+@media (max-width:1240px){
+  .app.th{grid-template-columns:248px minmax(0,1fr)}
+  .app.th .chan{display:none}
+  .app.th .thpane{border-left:0}
+  .phd .back{display:inline-flex}
+}
+@media (max-width:760px){
+  .app,.app.th{grid-template-columns:minmax(0,1fr)}
+  .sb{display:none}
+  .proto{padding:8px 16px}
+  .hide-s{display:none}
+  .phd{padding:8px 10px 8px 16px}
+  .scroll{padding:6px 4px 16px}
+  .pn{padding:12px 16px 16px}
+  .msg{gap:10px;padding:10px 12px}
+  .selr,.grp-row.selr{gap:8px;padding-left:30px;--rx:13px}
+  .msg .av-col{width:28px}
+  .sysline{padding-left:50px}
+  .ahint,.stub{margin-left:12px}
+  .ctxl{padding-left:50px}
+  .cmpw{padding:0 10px 10px}
+  .opts{grid-template-columns:minmax(0,1fr)}
+  .wk-m,.wk-o{padding-left:14px;margin-left:14px}
+  .wk-m{margin-left:0}
+  .scrim{align-items:flex-end;padding:8px}
+  .dlg{border-radius:22px 22px 18px 18px}
+  .toasts{right:12px;left:12px;bottom:12px;align-items:stretch}
+  .toast{width:auto}
+  .selbar .acts{width:100%}
+  .selbar .acts .b{flex:1}
+}
+</style>
+</head>
+<body data-scn="onb">
+<div class="proto">
+  <b>Protótipo · Thread a partir daqui</b>
+  <div class="steps" id="steps" role="group" aria-label="Passos"></div>
+  <span class="now hide-s" id="stepNow"></span>
+  <span class="grow"></span>
+  <span class="lab hide-s">Cenário</span>
+  <div class="seg" id="scnSeg" role="group" aria-label="Cenário"><span class="pill" aria-hidden="true"></span><button type="button" data-v="onb">Onboarding</button><button type="button" data-v="app">App mobile</button></div>
+  <span class="lab hide-s onb-only">Trecho</span>
+  <div class="seg onb-only" id="longSeg" role="group" aria-label="Tamanho do trecho"><span class="pill" aria-hidden="true"></span><button type="button" data-v="short">Curto</button><button type="button" data-v="long">Longo</button></div>
+  <button class="b bg sm app-only" type="button" data-sim id="simBtn">Simular: Mac desliga</button>
+  <button class="b b2 sm" type="button" data-next>Próximo</button>
+  <div class="seg" id="theme" role="group" aria-label="Tema"><span class="pill" aria-hidden="true"></span><button type="button" data-v="light">Claro</button><button type="button" data-v="dark">Escuro</button></div>
+</div>
+
+<div class="app" id="app">
+  <nav class="sb" id="sb" aria-label="Navegação"></nav>
+  <section class="apane chan" id="chan" aria-label="Canal"></section>
+  <section class="apane thpane" id="thpane" aria-label="Thread"></section>
+</div>
+<div id="dlgRoot"></div>
+<div id="drawerRoot"></div>
+<div class="toasts" id="toasts"></div>
+
+<script type="module">
+import { drawAgent, idlePose, AGENT_GRADIENTS, mixHex, bodyTones, spriteGrid } from "../../../packages/ui/src/agent/engine.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+void spriteGrid;
+
+/* ---------- icons (MissaoChat.html set + a few for this flow) ---------- */
+const sv = (d, cls = "i") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const I = {
+  plus: sv('<path d="M12 5v14M5 12h14"/>'),
+  x: sv('<path d="M6 6l12 12M18 6 6 18"/>'),
+  check: sv('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
+  more: sv('<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>'),
+  thread: sv('<path d="M4 5h16v9H11l-4 3.5V14H4Z"/><path d="M9 9h6"/>'),
+  laptop: sv('<rect x="5" y="5" width="14" height="10" rx="1.5"/><path d="M3 19h18"/>'),
+  coin: sv('<circle cx="12" cy="12" r="8.5"/><path d="M14.5 9.5c-.4-.9-1.4-1.5-2.5-1.5-1.5 0-2.5.8-2.5 2s1 1.7 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2.1-.6-2.5-1.5M12 6.5V8M12 16v1.5"/>'),
+  clock: sv('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  branch: sv('<circle cx="6" cy="5.5" r="2"/><circle cx="6" cy="18.5" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 7.5v9M18 10c0 4-6 3.5-11 6.5"/>'),
+  term: sv('<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="m7.5 10 3 2.5-3 2.5M12.5 15.5h4"/>'),
+  doc: sv('<path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
+  lock: sv('<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>'),
+  spark: sv('<path d="M12 4v4M12 16v4M4 12h4M16 12h4M7 7l2 2M15 15l2 2M17 7l-2 2M9 15l-2 2"/>'),
+  alert: sv('<path d="M12 4 2.5 20h19Z"/><path d="M12 10v4.5M12 17.5h.01"/>'),
+  sun: sv('<circle cx="12" cy="12" r="3.5"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>'),
+  chat: sv('<path d="M4 5h16v11H9l-5 4V5Z"/>'),
+  edit: sv('<path d="M4 20h4L19 9l-4-4L4 16v4ZM13 7l4 4"/>'),
+  open: sv('<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
+  chevr: sv('<path d="m10 7 5 5-5 5"/>', "i sm chev"),
+  chevl: sv('<path d="m14 7-5 5 5 5"/>'),
+  layers: sv('<path d="m12 4 8.5 4.5L12 13 3.5 8.5Z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5"/>'),
+  hash: sv('<path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/>'),
+  search: sv('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>'),
+  send: sv('<path d="M12 19V5M6 11l6-6 6 6"/>'),
+  clip: sv('<path d="M16.5 11 11 16.5a3.5 3.5 0 0 1-5-5l6-6a2.4 2.4 0 0 1 3.4 3.4l-6 6a1.2 1.2 0 0 1-1.7-1.7L13 8"/>'),
+  smile: sv('<circle cx="12" cy="12" r="8.5"/><path d="M8.5 14a4.5 4.5 0 0 0 7 0M9.5 9.5h.01M14.5 9.5h.01" stroke-width="2"/>'),
+  bell: sv('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
+  issue: sv('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/>'),
+  routine: sv('<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4.5h-4.5M12 8v4l2.5 1.5"/>'),
+  drive: sv('<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/>'),
+  flag: sv('<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>'),
+  link: sv('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
+  stop: sv('<rect x="6.5" y="6.5" width="11" height="11" rx="2"/>'),
+  grip: sv('<path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" stroke-width="2.6"/>'),
+  move: sv('<path d="M4 12h11M11 7l5 5-5 5"/><path d="M20 4.5v15"/>'),
+  undo: sv('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),
+  users: sv('<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.5a3 3 0 0 1 0 6M17.5 14a5 5 0 0 1 3 5"/>'),
+  ladder: sv('<path d="M7 3v18M17 3v18M7 7.5h10M7 12h10M7 16.5h10"/>'),
+  spinner: sv('<path d="M12 3.5a8.5 8.5 0 1 1-8.5 8.5" />', "i spin"),
+  shield: sv('<path d="M12 3.5 5 6.5v5c0 4.3 3 7.6 7 9 4-1.4 7-4.7 7-9v-5Z"/><path d="m9 12 2 2 4-4"/>'),
+  pause: sv('<path d="M8.5 5.5v13M15.5 5.5v13"/>'),
+  queue: sv('<path d="M5 7h14M5 12h14M5 17h8"/>'),
+  ask: sv('<circle cx="12" cy="12" r="8.5"/><path d="M9.8 9.5a2.3 2.3 0 0 1 4.4.9c0 1.6-2.2 2-2.2 3.4M12 17h.01"/>'),
+  refresh: sv('<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4.5h-4.5"/>'),
+  live: sv('<path d="M5 12.5a10 10 0 0 1 14 0M8 15.5a5.5 5.5 0 0 1 8 0"/><path d="M12 18.5h.01" stroke-width="2.6"/>'),
+};
+
+/* ---------- data ---------- */
+const AGENTS = {
+  dev: { name: "Dev", role: "Engenharia", color: "indigo", eyes: "round" },
+  theo: { name: "Theo", role: "PM", color: "amber", eyes: "round" },
+  lia: { name: "Lia", role: "Front-end", color: "sky", eyes: "round" },
+  nina: { name: "Nina", role: "Dados", color: "green", eyes: "dots" },
+};
+const PEOPLE = { walter: "Walter", ana: "Ana", rafa: "Rafa" };
+const nameOf = (id) => AGENTS[id]?.name || PEOPLE[id];
+const t = (h, m) => new Date(2026, 9, 16, h, m);
+const hm = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+const NOW0 = t(10, 34).getTime(), T0 = performance.now();
+const nowMs = () => NOW0 + (performance.now() - T0);
+const min = 60e3;
+const dur = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)), m = Math.floor(s / 60), h = Math.floor(m / 60); return h ? `${h} h ${String(m % 60).padStart(2, "0")} min` : `${m}:${String(s % 60).padStart(2, "0")}`; };
+const ASK = "@dev continua daqui: faz a v2 no meu Mac";
+const MACHINE = "MacBook do Walter";
+const BRANCH = "onboarding/v2-leve";
+
+// #produto, a busy morning: the onboarding subject (topic) interleaved with lunch and the deploy (off).
+const PRODUTO = [
+  { id: "p1", who: "ana", at: t(9, 5), text: "Bom dia! Alguém viu o e-mail da Stripe sobre a fatura de outubro?" },
+  { id: "p2", who: "dev", at: t(9, 6), html: "<p>Vi. É só o recibo; o valor bate com o de setembro.</p>" },
+  { id: "p3", who: "walter", at: t(10, 2), text: "@dev o onboarding tá longo demais. 41% das pessoas param no passo 3, o de conectar o primeiro conector." },
+  { id: "p4", who: "dev", at: t(10, 4), html: "<p>Confirmei nos eventos: quem para no passo 3 nem chega a ver um agente respondendo. O passo pede OAuth antes de mostrar valor.</p><p>Proposta: tirar o conector do onboarding e sugerir depois da primeira conversa.</p>" },
+  { id: "p5", who: "ana", at: t(10, 6), text: "Concordo em tirar do caminho. Mas o import do Obsidian fica no passo 2, é o que mais converte." },
+  { id: "p6", who: "dev", at: t(10, 9), html: "<p>Então ficam 3 passos: <b>1</b> nome da equipe e convite, <b>2</b> import (Obsidian ou OpenMausBot), <b>3</b> primeira conversa com um agente. O conector vira um card na primeira resposta.</p>" },
+  { id: "p7", who: "rafa", at: t(10, 12), text: "alguém vai almoçar no japonês hoje? 12h30", off: true },
+  { id: "p8", who: "walter", at: t(10, 14), text: "Gostei. E o céu em pixel fica só no trilho, como horizonte. Nada de tela cheia." },
+  { id: "p9", who: "ana", at: t(10, 17), text: "+1. E o “Pular” precisa ficar visível desde o passo 1." },
+  { id: "p10", who: "rafa", at: t(10, 19), text: "@dev o deploy das 10h subiu?", off: true },
+  { id: "p11", who: "dev", at: t(10, 19), html: "<p>Subiu. CI verde e nenhum erro novo desde 10:03.</p>", off: true },
+  { id: "p12", who: "dev", at: t(10, 22), html: "<p>Fechando o que decidimos:</p><p>3 passos; o conector sai do onboarding e vira sugestão depois da primeira conversa; import no passo 2; céu só como horizonte; “Pular” sempre visível.</p><p>Quer que eu faça uma v2?</p>", sum: "Fechando o que decidimos: 3 passos; o conector sai do onboarding e vira sugestão depois da primeira conversa; import no passo 2; céu só como horizonte; “Pular” sempre visível." },
+  { id: "p13", who: "walter", at: t(10, 26), text: "Quero, mas antes a Ana revisa o texto do passo 1." },
+  { id: "p14", who: "ana", at: t(10, 28), text: "Revisei: “Como chama sua equipe?” no lugar de “Nome da organização”. Mais curto e menos formal." },
+  { id: "p15", who: "dev", at: t(10, 31), html: "<p>Anotado. Começo quando vocês disserem.</p>" },
+  { id: "p16", who: "rafa", at: t(10, 33), text: "ninguém pro japonês então? vou sozinho", off: true },
+];
+// "Trecho longo": the same subject had 24 earlier messages (the funnel numbers, screenshots, first ideas).
+const GROUP = { id: "grp", group: true, n: 24, from: t(9, 14), at: t(10, 1), sum: "números do funil, prints do passo 3 e a primeira ideia de pular o conector" };
+const DIRETORIA = [
+  { id: "d1", who: "walter", at: t(9, 30), text: "Pensando no onboarding novo: e se o trial passar de 7 para 14 dias?" },
+  { id: "d2", who: "theo", at: t(9, 32), html: "<p>Com 14 dias a conversão para pago cai uns 3 pontos nos nossos números, mas a ativação sobe. A margem do plano Time aguenta.</p>" },
+  { id: "d3", who: "rafa", at: t(9, 35), text: "Só não anuncia antes da reunião com o investidor na terça." },
+  { id: "d4", who: "walter", at: t(9, 40), text: "Fechado, fica entre nós até terça." },
+];
+const SUMMARY = [
+  [I.check, "3 passos: nome da equipe e convite, import, primeira conversa com um agente"],
+  [I.check, "O conector sai do onboarding; vira sugestão depois da primeira conversa"],
+  [I.check, "Import do Obsidian fica no passo 2 (Ana: é o que mais converte)"],
+  [I.check, "Céu em pixel só como horizonte; “Pular” visível desde o passo 1"],
+  [I.edit, "Texto do passo 1: “Como chama sua equipe?”, revisado pela Ana"],
+  [I.clock, "Em aberto: nada. Dev começa a v2 quando pedirem"],
+];
+const WK_STEPS = [["Ler o contexto da thread", "6 s"], ["Plano dos 3 passos", "48 s"], ["Passo 1: equipe e convite", "1 min"], ["Passo 2: import", ""], ["Passo 3: primeira conversa", ""], ["Rodar e tirar prints", ""]];
+const WK_LOG = [
+  ["cmd", "$ claude -p \"Onboarding v2 a partir de .agentes/mission.md\" --worktree"],
+  ["dim", "Reading .agentes/mission.md"],
+  ["dim", "Reading apps/web/src/onboarding/Onboarding.tsx"],
+  ["", "Writing docs/onboarding-v2/plano.md"],
+  ["", "Edit apps/web/src/onboarding/steps.ts (+12 −41)"],
+  ["dim", "Reading apps/web/src/onboarding/ImportStep.tsx"],
+  ["", "Edit apps/web/src/onboarding/TeamStep.tsx (+18 −6)"],
+  ["", "Edit apps/web/src/i18n/pt-BR.json (+3 −3)"],
+  ["cmd", "$ bun run typecheck"],
+  ["okl", "✓ typecheck ok"],
+  ["", "Writing apps/web/src/onboarding/FirstChatStep.tsx"],
+  ["dim", "Reading apps/web/src/sky/PixelSky.tsx"],
+  ["", "Edit apps/web/src/onboarding/Rail.tsx (+22 −9)"],
+];
+const plain = (m) => m.sum ?? m.text ?? m.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+/* ---------- state ---------- */
+const STEPS = [["1", "Canal cheio"], ["2", "Thread criada"], ["3", "Ajustar trecho"], ["4", "Tirar do canal"], ["5", "Thread"], ["6", "Canal privado"], ["7", "Canal novo"]];
+const STEP_HINT = {
+  "1": "#produto ficou cheio: um clique em Criar thread",
+  "2": "A thread nasce com o trecho sugerido como contexto; as mensagens ficam no canal",
+  "3": "Ajustar trecho: toque nas mensagens, arraste Início e Fim e salve",
+  "4": "Tirar do canal: as mensagens saem de #produto e fica um aviso com o link",
+  "5": "Peça ao Dev para continuar; clique no título para renomear",
+  "6": "Ajustando o trecho, tentar trazer mensagens de um canal privado: bloqueado",
+  "7": "Próximo degrau: a thread vira um canal próprio",
+};
+let S;
+function reset(keep = {}) {
+  S = {
+    step: "1", chan: "produto", mode: "ctx", long: false, hint: "show",
+    sel: null, adjust: false, editTitle: false, reply: null, dest: "existing", title: "Onboarding mais leve", pvAll: false,
+    ctx: null, result: null, thread: null, ctxOpen: false, ctxAll: false,
+    th: [], work: null, wopen: true, logOpen: false, drafts: { chan: "", th: "" },
+    chTail: { produto: [], diretoria: [] }, scn: "onb", app: appState(), dirCtx: null, dialog: null, newChan: null, newChanWho: null,
+    ...keep,
+  };
+}
+
+/* ---------- avatars (engine): idle blinks, think looks around, write = dashes, run = dashes + halo ---------- */
+const live = [];
+const seedOf = (id) => [...id].reduce((s, c) => s + c.charCodeAt(0), 0) % 7;
+function makeAgent(id, size, mode = "idle") {
+  const a = AGENTS[id];
+  const w = document.createElement("span");
+  w.className = "agw" + (mode === "run" ? " run" : "");
+  const cv = document.createElement("canvas");
+  cv.className = "av";
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = cv.height = Math.round(size * dpr);
+  cv.style.width = cv.style.height = size + "px";
+  cv.setAttribute("role", "img");
+  cv.setAttribute("aria-label", `${a.name}, agente${mode === "think" ? ", pensando" : mode === "write" ? ", escrevendo" : mode === "run" ? ", trabalhando" : ""}`);
+  w.append(cv);
+  live.push({ cv, a, size, seed: seedOf(id) + Math.random(), mode });
+  return w;
+}
+const avHTML = (id, size = 20, mode = "idle") => `<span class="avs" data-a="${id}" data-s="${size}" data-m="${mode}"></span>`;
+const ppHTML = (name, size = 20) => `<span class="pp" style="--s:${size}px" aria-label="${esc(name)}">${esc(name[0])}</span>`;
+const whoAv = (id, size) => AGENTS[id] ? avHTML(id, size) : ppHTML(PEOPLE[id], size);
+function hydrate(root = document) {
+  for (const el of $$(".avs", root)) el.replaceWith(makeAgent(el.dataset.a, +el.dataset.s, el.dataset.m));
+  for (const cv of $$("canvas.strip:not([data-on])", root)) addStrip(cv);
+}
+function drawLive(tt) {
+  for (let i = live.length - 1; i >= 0; i--) {
+    const it = live[i];
+    if (!it.cv.isConnected) { live.splice(i, 1); continue; }
+    const ctx = it.cv.getContext("2d"), s = it.cv.width;
+    ctx.clearRect(0, 0, s, s);
+    const inner = s * 0.86;
+    let pose;
+    if (it.mode === "think") { pose = idlePose(tt * 1.5, it.seed, { active: true, expressions: [] }); pose.blink = false; }
+    else { pose = idlePose(tt, it.seed, { every: 13, active: it.mode === "run" || it.mode === "write", expressions: ["happy", "wink", "star"] }); if (it.mode === "run" || it.mode === "write") { pose.writing = true; pose.expression = undefined; } }
+    drawAgent(ctx, (s - inner) / 2, s - inner, inner, { color: it.a.color, eyes: it.a.eyes, cells: it.size <= 32 ? 12 : undefined, pose });
+  }
+}
+
+/* ---------- dither: the running strip of the work card, in the agent's tones (TarefaLonga.html) ---------- */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+const u32 = (h) => { const n = parseInt(h.slice(1, 7), 16); return ((255 << 24) | ((n & 255) << 16) | (((n >> 8) & 255) << 8) | (n >> 16)) >>> 0; };
+let varCache = {};
+const cssVar = (n) => varCache[n] || (varCache[n] = getComputedStyle(document.documentElement).getPropertyValue(n).trim());
+void AGENT_GRADIENTS;
+const TONES = () => bodyTones(AGENTS.dev.color);
+const fromAgent = (v, depth = 1) => { const bg = cssVar(v), tn = TONES(); return [bg, mixHex(bg, tn[4], .35 * depth), mixHex(bg, tn[3], .5 * depth), mixHex(bg, tn[2], .65 * depth), tn[2], tn[1]]; };
+const dithers = [];
+function addDither(cv, o) { cv.dataset.on = "1"; dithers.push({ cv, ctx: cv.getContext("2d"), o, w: 0, h: 0, img: null, buf: null }); }
+function addStrip(cv) { addDither(cv, { pixel: 2, pal: () => fromAgent("--raised", .9), f: (u, v, tt) => { const c = ((tt * .45 + (cv.dataset.seed || 0) * .37) % 1.6) - .3, d = u - c; return .1 + .85 * Math.exp(-(d * d) / .02); } }); }
+function drawDithers(tt) {
+  for (let i = dithers.length - 1; i >= 0; i--) {
+    const d = dithers[i];
+    if (!d.cv.isConnected) { dithers.splice(i, 1); continue; }
+    const r = d.cv.getBoundingClientRect(); if (!r.width) continue;
+    const P = d.o.pixel, w = Math.max(2, Math.ceil(r.width / P)), h = Math.max(2, Math.ceil(r.height / P));
+    if (w !== d.w || h !== d.h) { d.w = w; d.h = h; d.cv.width = w; d.cv.height = h; d.img = d.ctx.createImageData(w, h); d.buf = new Uint32Array(d.img.data.buffer); }
+    const pal = d.o.pal().map(u32), L = pal.length - 1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let f = d.o.f(x / w, y / h, tt); f = f < 0 ? 0 : f > 1 ? 1 : f;
+      const s2 = f * L, b = s2 | 0, idx = s2 - b > BAYER[((y & 3) << 2) | (x & 3)] ? b + 1 : b;
+      d.buf[y * w + x] = pal[idx > L ? L : idx];
+    }
+    d.ctx.putImageData(d.img, 0, 0);
+  }
+}
+let lastT = 0;
+(function loop(now) {
+  if (now - lastT > 45) { lastT = now; const tt = REDUCED ? 2 : now / 1000; drawLive(tt); drawDithers(tt); drawPS(tt); }
+  requestAnimationFrame(loop);
+})(0);
+
+/* ---------- channel items and the selection model ---------- */
+function items(ch) {
+  if (ch === "produto" && S.scn === "app") return APPCH;
+  if (ch === "produto") return S.long ? [PRODUTO[0], PRODUTO[1], GROUP, ...PRODUTO.slice(2)] : PRODUTO;
+  if (ch === "diretoria") return DIRETORIA;
+  return [];
+}
+const SUGGEST = {
+  produto: () => S.scn === "app" ? { a: "q2", b: "q10", excl: ["q5"] } : ({ a: S.long ? "grp" : "p3", b: "p15", excl: ["p7", "p10", "p11"] }),
+  diretoria: () => ({ a: "d1", b: "d4", excl: [] }),
+};
+const idx = (L, id) => L.findIndex((x) => x.id === id);
+function startSel(ch, fromId) {
+  const sg = SUGGEST[ch](), L = items(ch);
+  let a = sg.a, b = sg.b;
+  if (fromId) {
+    // "Criar thread a partir daqui": the clicked message is where the range starts; the end and the
+    // exclusions come from the suggestion, and the handle offers where the subject really started.
+    const i = idx(L, fromId);
+    a = fromId; if (i > idx(L, b)) b = fromId;
+  }
+  const ia = idx(L, a), ib = idx(L, b);
+  S.sel = { ch, a, b, excl: new Set(sg.excl.filter((id) => { const j = idx(L, id); return j >= ia && j <= ib; })) };
+  S.title = ch === "diretoria" ? "Trial de 14 dias" : S.scn === "app" ? "App mobile" : "Onboarding mais leve";
+  S.pvAll = false;
+}
+function selInfo() {
+  const L = items(S.sel.ch), ia = idx(L, S.sel.a), ib = idx(L, S.sel.b);
+  const range = L.slice(ia, ib + 1), inc = range.filter((x) => !S.sel.excl.has(x.id)), out = range.filter((x) => S.sel.excl.has(x.id));
+  const count = inc.reduce((s, x) => s + (x.n || 1), 0);
+  return { L, ia, ib, range, inc, out, count, from: inc[0] ? (inc[0].from || inc[0].at) : null, to: inc.length ? inc[inc.length - 1].at : null };
+}
+const isBlocked = () => !!S.sel && S.sel.ch === "diretoria" && S.dest === "existing";
+function ctxInfo() {
+  const inc = items("produto").filter((x) => S.ctx.ids.has(x.id) || x.id === "grp");
+  const count = inc.reduce((s, x) => s + (x.n || 1), 0);
+  return { inc, count, from: inc[0].from || inc[0].at, to: inc[inc.length - 1].at };
+}
+const tokens = (n) => { const k = n * 0.18; return k < 1 ? `${Math.round(k * 1000)}` : `${k.toFixed(1).replace(".", ",")} mil`; };
+const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
+
+/* ---------- message pieces ---------- */
+const mention = (id) => `<span class="mention">${avHTML(id, 16)}${AGENTS[id].name}</span>`;
+const fmtText = (s) => esc(s).replace(/@dev\b/g, mention("dev"));
+function msgHTML(m, inner, o = {}) {
+  const isAgent = !!AGENTS[m.who], name = nameOf(m.who);
+  const av = isAgent ? avHTML(m.who, 34, m.mode || "idle") : ppHTML(name, 34);
+  const ck = o.sel ? `<button class="ck" type="button" role="checkbox" aria-checked="false" data-ck="${m.id}" aria-label="Incluir a mensagem de ${esc(name)}, ${hm(m.at)}">${I.check}</button>` : "";
+  const acts = o.sel ? "" : `<div class="macts glass"><button class="ib" type="button" data-toast="Reagir" aria-label="Reagir">${I.smile}</button>${o.thread ? "" : `<button class="ib" type="button" data-toast="Responder na thread" aria-label="Responder na thread">${I.thread}</button>`}<button class="ib" type="button" data-mmore="${m.id}" aria-label="Mais ações">${I.more}</button></div>`;
+  const cls = ["msg"]; if (o.sel) cls.push("selr"); if (o.ctxm) cls.push("ctxm"); if (m.flash) cls.push("flash");
+  return `<div class="${cls.join(" ")}" id="msg-${m.id}"${o.sel ? ` data-sid="${m.id}"` : ""}>${ck}
+    <div class="av-col">${av}</div>
+    <div class="body"><div class="mhdr"><span class="mn">${esc(name)}</span>${isAgent ? `<span class="chip" style="height:19px;padding:0 6px">agente</span>` : ""}<span class="mt">${hm(m.at)}</span>${m.wake ? `<span class="wake">${I.sun}${esc(m.wake)}</span>` : ""}${o.sel && m.off ? `<span class="chip offt">${I.x}fora do assunto</span>` : ""}</div>${inner}</div>
+    ${o.sel ? `<div class="exl"></div>` : ""}${acts}</div>`;
+}
+const textBody = (m) => m.mode === "think" ? `<div class="mx"><span class="thinking">pensando…</span></div>` : `<div class="mx">${m.html ?? `<p>${fmtText(m.text)}</p>`}${m.mode === "write" ? '<span class="curs" aria-hidden="true"></span>' : ""}</div>`;
+function grpHTML(m, o = {}) {
+  return `<div class="grp-row${o.sel ? " selr" : ""}" id="msg-grp"${o.sel ? ` data-sid="grp"` : ""}>${o.sel ? `<button class="ck" type="button" role="checkbox" aria-checked="false" data-ck="grp" aria-label="Incluir as ${m.n} mensagens anteriores">${I.check}</button>` : ""}<span class="gi">${I.layers}</span><span class="t"><b>${m.n} mensagens antes</b> · ${hm(m.from)}–${hm(m.at)} · ${esc(m.sum)}</span>${o.sel ? `<div class="exl"></div>` : `<button class="b bg xs" type="button" data-toast="Mostra as ${m.n} mensagens">Mostrar</button>`}</div>`;
+}
+function cxRowHTML(m, lock = false) {
+  if (m.group) return `<div class="cx-row grp"><span class="cxa">${I.layers}</span><div><div class="h"><b>${m.n} mensagens antes</b><span>${hm(m.from)}–${hm(m.at)}</span></div><p>${esc(m.sum)}</p></div></div>`;
+  return `<div class="cx-row${lock ? " lk" : ""}" id="cx-${m.id}"><span class="cxa">${whoAv(m.who, 18)}</span><div><div class="h"><b>${esc(nameOf(m.who))}</b><span>${hm(m.at)}</span>${lock ? `<span title="Só quem está em #diretoria vê" aria-label="Bloqueada">${I.lock}</span>` : ""}</div><p>${esc(plain(m))}</p></div></div>`;
+}
+function summaryHTML(n) {
+  return `<div class="sumy"><div class="by">${avHTML("dev", 16)}Resumo do Dev, a partir de ${n} mensagens</div><ul>${SUMMARY.map(([ic, s]) => `<li>${ic}<span>${esc(s)}</span></li>`).join("")}</ul></div>`;
+}
+
+/* ---------- the system hint, the stub, the context marker ---------- */
+function suggestedCount() {
+  const sg = SUGGEST.produto(), L = items("produto"), ia = idx(L, sg.a), ib = idx(L, sg.b);
+  return L.slice(ia, ib + 1).filter((x) => !sg.excl.includes(x.id)).reduce((s, x) => s + (x.n || 1), 0);
+}
+function hintHTML() {
+  return `<div class="ahint" role="note" id="ahint">${I.spark}<span class="t"><b>Isso virou um assunto.</b> ${suggestedCount()} mensagens sobre ${S.scn === "app" ? "o app mobile" : "o onboarding"} no meio de outras conversas. Levar para uma thread?</span><span class="acts"><button class="b b2 xs" type="button" data-hint-yes>${I.thread}Criar thread</button><button class="b bg xs" type="button" data-hint-no>Agora não</button></span></div>`;
+}
+function stubHTML(c) {
+  const chan = S.newChan ? `, que virou o canal <b>#${esc(S.newChan)}</b>` : "";
+  return `<div class="stub" id="stub">${`<span class="ic">${I.thread}</span>`}<span class="t">${plural(c.count, "mensagem movida", "mensagens movidas")} para a thread <b>${esc(S.ctx.title)}</b>${chan}<small>por Walter · 10:34 · ${hm(c.from)}–${hm(c.to)}</small></span>${S.newChan ? `<button class="b b2 xs" type="button" data-chan="onb">${I.hash}Abrir canal</button>` : `<button class="b b2 xs" type="button" data-open-thread>${I.thread}Abrir thread</button>`}</div>`;
+}
+function ctxLineHTML() {
+  const where = S.newChan ? `, hoje no canal <b>#${esc(S.newChan)}</b>` : "";
+  return `<div class="ctxl" id="ctxl">${I.link}<span>Este trecho virou contexto da thread <b>${esc(S.ctx.title)}</b>${where}</span>${S.newChan ? `<button class="b bg xs" type="button" data-chan="onb">Abrir canal</button>` : `<button class="b bg xs" type="button" data-open-thread>${I.thread}Abrir thread</button>`}</div>`;
+}
+function handleHTML(k) {
+  return `<div class="cap ${k === "a" ? "ca" : "cb"}" id="hdl-${k}"><button class="hp" type="button" data-hdl="${k}" aria-label="${k === "a" ? "Início" : "Fim"} do trecho. Arraste ou use as setas">${I.grip}<span class="hl"></span></button><span class="hn"></span></div>`;
+}
+
+/* ---------- the live work card (TarefaLonga.html) ---------- */
+const lineHTML = ([k, s]) => `<span class="ln ${k}">${esc(s)}</span>`;
+function workHTML() {
+  const W = S.work; if (!W) return "";
+  const prog = W.prog;
+  let last = ["", "Começando…"]; for (let k = Math.min(W.li, WK_LOG.length) - 1; k >= 0; k--) if (WK_LOG[k][0] !== "cmd") { last = WK_LOG[k]; break; }
+  const c = ctxInfo();
+  const steps = WK_STEPS.map(([l, tt], i) => {
+    const cls = i < prog ? "" : i === prog ? "now" : "todo";
+    const tk = i < prog ? `<span class="tk">${I.check}</span>` : i === prog ? `<span class="tk now">${I.spinner}</span>` : `<span class="tk todo"></span>`;
+    return `<div class="wstep ${cls}">${tk}<span>${esc(l)}</span>${tt && i < prog ? `<span class="t">${esc(tt)}</span>` : ""}</div>`;
+  }).join("");
+  const log = S.logOpen ? `<pre class="log" data-log>${WK_LOG.slice(0, Math.min(W.li, WK_LOG.length)).map(lineHTML).join("")}<span class="cur" aria-hidden="true"></span></pre>` : "";
+  return `<div class="wk run" data-wk>
+    <div class="wk-h"><span class="ic">${I.laptop}</span><div class="t"><b>Trabalhando no ${esc(MACHINE)}</b><small>sessão Claude Code<span>·</span><span class="tick" data-tick>${dur(nowMs() - W.started)}</span><span>·</span>nova nesta thread</small></div><button class="b b2 xs" type="button" data-toast="Parar a sessão do Claude Code">${I.stop}Parar</button></div>
+    <div class="wk-m"><span class="chip">${I.branch}<code>${BRANCH}</code></span><span class="chip">${I.layers}contexto: ${plural(c.count, "mensagem", "mensagens")}</span></div>
+    <div class="wk-o">${I.doc}<span>Origem enviada ao Claude Code: ${c.count > 20 ? "resumo do contexto" : "o trecho e um resumo"} em <code>.agentes/mission.md</code></span></div>
+    <div class="wk-last" data-last><span class="tx">${esc(last[1])}</span><span class="cur" aria-hidden="true"></span></div>
+    <button class="workh" type="button" data-wopen aria-expanded="${S.wopen}">${I.chevr}<span><b>${prog} de ${WK_STEPS.length} passos</b> · Claude Code</span></button>
+    ${S.wopen ? `<div class="wsteps">${steps}</div>` : ""}
+    ${log}
+    <div class="wk-f"><button class="b bg xs" type="button" data-logt>${I.term}${S.logOpen ? "Esconder saída" : "Ver saída"}</button><span class="grow"></span><span class="hint">${I.bell}Pode sair: te aviso quando terminar</span></div>
+    <canvas class="strip" data-seed="3" aria-hidden="true"></canvas>
+  </div>`;
+}
+function quoteHTML() {
+  const m = PRODUTO.find((x) => x.id === "p12");
+  const where = S.ctx?.mode === "move" ? "no contexto desta thread" : "em #produto";
+  return `<button class="qt" type="button" data-jump="p12">${`<span class="qs">${avHTML("dev", 16)}Dev · ${hm(m.at)} · ${where}</span>`}${esc(m.sum)}</button>`;
+}
+function devCtxReply() {
+  return `<p>Continuando do que vocês fecharam:</p>${quoteHTML()}<p>Uso também o texto que a Ana revisou para o passo 1, “Como chama sua equipe?”. Abri uma sessão do Claude Code no ${esc(MACHINE)} só para esta thread; ela recebe o contexto como arquivo.</p>`;
+}
+
+/* ---------- context block at the top of the thread ---------- */
+function ctxBlockHTML(fromChan = "produto") {
+  const c = ctxInfo(), long = c.count > 20, open = S.ctxOpen;
+  const head = long ? "Resumo do contexto" : `Contexto: ${c.count} mensagens de #${fromChan}, ${hm(c.from)}–${hm(c.to)}`;
+  const chip = S.ctx.mode === "move" ? `<span class="chip">${I.thread}movidas do canal</span>` : `<span class="chip">${I.link}referência ao canal</span>`;
+  const sub = long ? `${c.count} mensagens de #${fromChan}, ${hm(c.from)}–${hm(c.to)}` : "O Dev lê isto antes de responder";
+  let body = "";
+  if (open) {
+    body = long && !S.ctxAll ? `${summaryHTML(c.count)}<div class="more-row"><button class="b bg xs" type="button" data-ctx-all>${I.layers}Ver as ${c.count} mensagens</button></div>` : c.inc.map((m) => cxRowHTML(m)).join("");
+    body += S.ctx.mode === "ctx" ? `<div class="pv-f">${I.link}<span>Nada foi copiado: se alguém editar uma dessas mensagens em #produto, a thread vê a versão nova.</span></div>` : `<div class="pv-f">${I.thread}<span>Estas mensagens saíram de #produto e agora moram aqui. No canal ficou um aviso com o link.</span></div>`;
+  }
+  const acts = `<div class="cxb-a"><button class="tlink" type="button" data-ctx-adjust>${I.edit}Ajustar trecho</button>${S.ctx.mode === "move" ? `<button class="tlink" type="button" data-ctx-back>${I.undo}Devolver ao canal</button>` : `<button class="tlink" type="button" data-ctx-move>${I.move}Tirar do canal</button>`}</div>`;
+  return `<div class="cxb" id="cxb"><button class="cxb-h" type="button" data-ctx-toggle aria-expanded="${open}"><span class="ic">${I.layers}</span><span class="t"><b>${head}</b><small>${chip}<span>${sub}</span></small></span>${I.chevr}</button>${acts}${open ? `<div class="cxb-b">${body}</div>` : ""}</div>`;
+}
+
+/* ---------- views ---------- */
+function sidebarHTML() {
+  const r = !!S.work || (S.scn === "app" && appRunning() > 0);
+  const item = (ic, lbl, extra = "", on = false, attrs = "", cls = "") => `<button class="sb-item${on ? " on" : ""}${cls}" type="button" ${attrs}>${ic}<span class="lbl">${lbl}</span>${extra}</button>`;
+  return `<div class="org-in"><span id="logo"></span><span class="tx"><b>agentes.chat</b><small>Walter · 6 pessoas</small></span></div>
+    <button class="sb-jump" type="button" data-toast="Paleta de comandos">${I.search}<span>Ir para…</span><span class="kbd">⌘K</span></button>
+    <div class="sb-group">
+      ${item(I.bell, "Atividade", "", false, 'data-toast="Atividade"')}
+      ${item(I.flag, "Missões", "", false, 'data-href="MissaoChat.html"')}
+      ${item(I.issue, "Issues", "", false, 'data-toast="Issues"')}
+      ${item(I.routine, "Rotinas", "", false, 'data-toast="Rotinas"')}
+      ${item(I.drive, "Drive", "", false, 'data-toast="Drive"')}
+    </div>
+    <div class="sb-group"><div class="sb-label">Canais</div>
+      ${item(I.hash, "geral", "", false, 'data-toast="#geral"')}
+      ${item(I.hash, "produto", S.thread && S.chan === "produto" ? `<span class="meta">${I.thread}1</span>` : "", S.chan === "produto", 'data-chan="produto"')}
+      ${S.newChan ? item(I.hash, esc(S.newChan), r ? `<span class="meta">${I.spinner}</span>` : "", S.chan === "onb", 'data-chan="onb"', " fresh") : ""}
+      ${item(I.hash, "engenharia", '<span class="meta">3</span>', false, 'data-toast="#engenharia"')}
+      ${item(I.lock, "diretoria", "", S.chan === "diretoria", 'data-chan="diretoria"')}
+    </div>
+    <div class="sb-group"><div class="sb-label">Agentes</div>
+      ${item(avHTML("dev", 22, r ? "run" : "idle"), "Dev", r ? `<span class="meta">${I.spinner}1 sessão</span>` : "", false, 'data-toast="DM com o Dev"')}
+      ${item(avHTML("theo", 22), "Theo", "", false, 'data-toast="DM com o Theo"')}
+      ${item(avHTML("lia", 22), "Lia", "", false, 'data-toast="DM com a Lia"')}
+      ${item(avHTML("nina", 22), "Nina", "", false, 'data-toast="DM com a Nina"')}
+    </div>
+    <div class="sb-foot"><div class="me">${ppHTML("Walter", 30)}<span class="tx"><b>Walter</b><small>online</small></span></div></div>`;
+}
+function composerHTML(ch, placeholder, pills = "") {
+  const v = S.drafts[ch] || "", has = v.trim().length > 0;
+  return `<div class="cmpw"><div class="composer">
+    <label for="ta-${ch}" style="position:absolute;left:-9999px">Mensagem</label>
+    <textarea id="ta-${ch}" data-ta="${ch}" rows="1" placeholder="${esc(placeholder)}">${esc(v)}</textarea>
+    <div class="ctools">${pills}<button class="ib" type="button" aria-label="Anexar" data-toast="Anexar arquivo">${I.clip}</button>
+      <button class="send ${has ? "on" : "off"}" type="button" data-send="${ch}" aria-label="Enviar">${has ? `<span>Enviar</span><span class="kbd">↵</span>` : ""}${I.send}</button></div>
+  </div></div>`;
+}
+function selbarInner() {
+  const i = selInfo(), blocked = isBlocked();
+  const allOff = i.out.every((m) => m.off), outN = i.out.reduce((n, m) => n + (m.n || 1), 0);
+  const chip = blocked ? `<span class="chip">${I.lock}Ana não está em #diretoria</span>`
+    : outN ? `<span class="chip">${I.x}${outN} ${allOff ? "fora do assunto" : "de fora"}</span>` : "";
+  const save = S.sel.ch === "diretoria" && S.dest === "new" ? `${I.thread}Criar thread aqui` : `${I.check}Salvar`;
+  return `<div class="t">${S.adjust && S.ctx ? `<span class="sp" style="flex-basis:100%">Ajustando o trecho de <b style="font-size:13px">${esc(S.ctx.title)}</b></span>` : ""}<b>${plural(i.count, "mensagem", "mensagens")}</b>${i.from ? `<span class="sp">${hm(i.from)}–${hm(i.to)}</span>` : ""}${chip}</div>
+    <div class="acts"><button class="b bg sm" type="button" data-sel-cancel>Cancelar</button><button class="b b1 sm" type="button" data-sel-save ${i.count && !blocked ? "" : "disabled"}>${save}</button></div>`;
+}
+function channelBody() {
+  if (S.chan === "onb") return onbBody();
+  const sel = !!S.sel && S.sel.ch === S.chan;
+  const L = items(S.chan), out = [`<div class="day">Hoje, sexta 16 out</div>`];
+  if (S.chan === "diretoria") out.push(`<div class="sysline">${I.lock}<span>Canal privado · <b>Walter</b>, <b>Rafa</b> e <b>Theo</b></span></div>`);
+  const c = S.chan === "produto" && S.ctx && !sel ? ctxInfo() : null;
+  const ids = c ? new Set(c.inc.map((x) => x.id)) : null, lastId = c ? c.inc[c.inc.length - 1].id : null;
+  let stub = false;
+  for (const m of L) {
+    if (c && S.result === "move" && ids.has(m.id)) { if (!stub) { out.push(stubHTML(c)); stub = true; } continue; }
+    const o = { sel, ctxm: !!c && S.result === "ctx" && ids.has(m.id) && !m.group };
+    out.push(m.group ? grpHTML(m, o) : msgHTML(m, textBody(m), o));
+    if (c && S.result === "ctx" && m.id === lastId) out.push(ctxLineHTML());
+    if (S.chan === "diretoria" && S.dirCtx && m.id === S.dirCtx.last) out.push(`<div class="ctxl">${I.link}<span>Este trecho virou contexto da thread <b>${esc(S.dirCtx.title)}</b> · só em #diretoria</span><button class="b bg xs" type="button" data-toast="Abre a thread ${esc(S.dirCtx.title)}">${I.thread}Abrir thread</button></div>`);
+  }
+  if (sel) out.push(handleHTML("a"), handleHTML("b"));
+  if (sel && isBlocked()) out.push(`<div class="blk" role="alert" style="margin:10px 12px 4px"><span class="ic">${I.lock}</span><div class="t"><b>Esse trecho não pode ir para a thread</b><p>Ana não está em #diretoria. Contexto só vai para onde todo mundo que lê a thread já podia ler.</p>
+      <div class="q-f"><button class="b b2 xs" type="button" data-dest="new">${I.thread}Criar thread em #diretoria</button><button class="b bg xs" type="button" data-toast="Pedido enviado ao Rafa, que administra #diretoria">Pedir para incluir a Ana</button></div></div></div>`);
+  if (S.chan === "produto" && !sel && !S.ctx) {
+    if (S.hint === "show") out.push(hintHTML());
+    else if (S.hint === "no") out.push(`<div class="sysline">${I.spark}<span>Tudo bem. Se precisar depois: ⋯ numa mensagem › Criar thread a partir daqui.</span></div>`);
+  }
+  if (S.chan === "produto" && S.newChan) out.push(`<div class="sysline">${I.hash}<span>A thread <b>${esc(S.ctx.title)}</b> virou o canal <b>#${esc(S.newChan)}</b> · 10:52</span><button class="b bg xs" type="button" data-chan="onb">Abrir canal</button></div>`);
+  for (const m of S.chTail[S.chan] || []) out.push(msgHTML(m, textBody(m)));
+  return out.join("");
+}
+function onbBody() {
+  const who = S.newChanWho || ["Walter", "Ana", "Dev"];
+  return `<div class="day">Hoje, sexta 16 out</div>
+    <div class="sysline">${I.hash}<span><b>Walter</b> criou o canal a partir da thread <b>${esc(S.ctx.title)}</b>, de #produto · ${esc(who.join(", "))} · 10:52</span></div>
+    ${ctxBlockHTML("produto")}
+    ${S.th.map((m) => msgHTML(m, textBody(m) + (m.card ? m.card() : ""))).join("")}`;
+}
+function channelHTML() {
+  const sel = !!S.sel && S.sel.ch === S.chan;
+  const head = S.chan === "diretoria"
+    ? `<h1>${I.lock}diretoria</h1><small>Privado · Walter, Rafa e Theo</small>`
+    : S.chan === "onb" ? `<h1>${I.hash}${esc(S.newChan)}</h1><small>Veio da thread ${esc(S.ctx.title)}, de #produto</small>`
+    : `<h1>${I.hash}produto</h1><small>Produto e roadmap · 6 pessoas, 4 agentes</small>`;
+  const cmp = sel ? `<div class="cmpw"><div class="selbar" id="selbar" role="region" aria-label="Trecho selecionado">${selbarInner()}</div></div>`
+    : composerHTML("chan", S.chan === "onb" ? `Mensagem em #${S.newChan}` : "Escreva, use @ para chamar um agente");
+  return `<header class="phd"><div class="t">${head}</div><button class="ib" type="button" data-toast="Buscar no canal" aria-label="Buscar">${I.search}</button><button class="ib" type="button" data-chmore aria-label="Mais ações do canal">${I.more}</button></header>
+    <div class="scroll" id="chanScroll">${channelBody()}</div>${cmp}`;
+}
+function threadHTML() {
+  const c = ctxInfo();
+  return `<header class="phd"><button class="ib back" type="button" data-close-thread aria-label="Voltar para #produto">${I.chevl}</button><div class="t"><h1>${I.thread}${S.editTitle ? `<input class="ttl-i" id="thTitle" value="${esc(S.ctx.title)}" aria-label="Título da thread" autocomplete="off">` : `<button class="ttl-b" type="button" data-ttl-edit title="Renomear">${esc(S.ctx.title)}</button>`}</h1><small>thread em #produto · Walter, Ana e Dev</small></div><button class="ib" type="button" data-thmore aria-label="Mais ações da thread">${I.more}</button><button class="ib" type="button" data-close-thread aria-label="Fechar thread">${I.x}</button></header>
+    <div class="scroll" id="thScroll">${S.scn === "app" && S.app.pinned ? pinnedHTML() : ""}
+      <div class="sysline" style="padding-left:12px">${I.thread}<span><b>Walter</b> criou a thread a partir de ${plural(c.count, "mensagem", "mensagens")} de #produto · 10:34</span></div>
+      ${ctxBlockHTML()}
+      ${S.th.map((m) => m.evt ? m.evt() : msgHTML(m, textBody(m) + (m.card ? m.card() : ""), { thread: true })).join("")}
+    </div>
+    ${composerHTML("th", S.reply ? `Responder sobre: ${S.reply}` : "Responder na thread", S.reply ? `<span class="cpill np">${I.chat}Respondendo: ${esc(S.reply)}<button class="x" type="button" data-reply-x aria-label="Cancelar resposta">${I.x}</button></span>` : `<span class="cpill np">${I.layers}com o contexto</span>`)}`;
+}
+
+/* ---------- dialog: Mover para canal novo ---------- */
+function dialogHTML() {
+  const D = S.dialog; if (!D) return "";
+  const row = (k, av, nm, sub, fixed = false) => `<button class="who-row" type="button" role="checkbox" aria-checked="${!!D.who[k]}" ${fixed ? 'aria-disabled="true"' : `data-dwho="${k}"`}><span class="ck" aria-hidden="true" ${D.who[k] ? "" : ""}>${I.check}</span>${av}<span class="tx">${esc(nm)}<small>${esc(sub)}</small></span></button>`;
+  return `<div class="scrim" data-scrim><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT">
+    <div class="dlg-h"><div class="t"><h3 id="dlgT">Mover para canal novo</h3><p>A thread vira o primeiro assunto de um canal próprio.</p></div><button class="ib" type="button" data-dlg-cancel aria-label="Fechar">${I.x}</button></div>
+    <div class="fs"><div class="fl"><label for="chname">Nome do canal</label></div><div class="inp"><span class="pre">#</span><input id="chname" value="${esc(D.name)}" autocomplete="off" spellcheck="false"></div></div>
+    <div class="fs"><div class="fl">Quem entra</div><div class="who">
+      ${row("walter", ppHTML("Walter", 26), "Walter", "você", true)}
+      ${row("ana", ppHTML("Ana", 26), "Ana", "participou da thread")}
+      ${row("dev", avHTML("dev", 26, S.work ? "run" : "idle"), "Dev", "agente · está trabalhando na v2")}
+      ${row("rafa", ppHTML("Rafa", 26), "Rafa", "está em #produto, não participou")}
+      ${row("lia", avHTML("lia", 26), "Lia", "agente de front-end")}
+    </div></div>
+    <div class="notes"><div>${I.thread}<span>Vai junto: o contexto, as ${plural(S.th.length, "resposta", "respostas")} e a sessão do Claude Code, que segue rodando.</span></div><div>${I.link}<span>Em #produto fica uma linha com o link para o canal.</span></div></div>
+    <div class="q-f"><span class="grow"></span><button class="b bg sm" type="button" data-dlg-cancel>Cancelar</button><button class="b b1 sm" type="button" data-dlg-create>${I.hash}Criar canal</button></div>
+  </div></div>`;
+}
+function renderDialog() {
+  const root = $("#dlgRoot"), had = !!root.firstElementChild;
+  const focusId = document.activeElement?.id;
+  root.innerHTML = dialogHTML(); hydrate(root);
+  for (const r of $$(".who-row", root)) r.querySelector(".ck").setAttribute("aria-checked", r.getAttribute("aria-checked"));
+  if (S.dialog && !had) setTimeout(() => $("#chname")?.focus(), 40);
+  else if (focusId && document.getElementById(focusId)) document.getElementById(focusId).focus({ preventScroll: true });
+}
+
+/* ---------- render ---------- */
+let pendingScroll = null;
+function render() {
+  const cs = $("#chanScroll")?.scrollTop, ts = $("#thScroll")?.scrollTop, ps = $("#pnScroll")?.scrollTop;
+  const key = `${S.chan}|${S.thread}`, prev = render.key;
+  const focusId = document.activeElement?.id, selS = document.activeElement?.selectionStart;
+  $("#app").classList.toggle("th", !!S.thread);
+  $("#sb").innerHTML = sidebarHTML();
+  $("#chan").innerHTML = channelHTML();
+  $("#thpane").innerHTML = S.thread ? threadHTML() : "";
+  $("#logo").append(makeAgent("theo", 28));
+  hydrate(document);
+  const c = $("#chanScroll"), th = $("#thScroll"), pn = $("#pnScroll");
+  if (c) c.scrollTop = prev && prev.split("|")[0] === S.chan && cs != null ? cs : c.scrollHeight;
+  if (th) th.scrollTop = prev === key && ts != null ? ts : th.scrollHeight;
+  if (pn && ps != null && prev === key) pn.scrollTop = ps;
+  render.key = key;
+  for (const ta of $$("[data-ta]")) autosize(ta);
+  const tti = $("#thTitle"); if (tti && document.activeElement !== tti) { tti.focus(); tti.select(); }
+  if (focusId && focusId !== "thTitle") { const f = document.getElementById(focusId); if (f) { f.focus({ preventScroll: true }); if (selS != null && f.setSelectionRange) try { f.setSelectionRange(selS, selS); } catch {} } }
+  applySel();
+  renderSteps();
+  renderDialog();
+  renderDrawer();
+  if (pendingScroll) { const p = pendingScroll; pendingScroll = null; requestAnimationFrame(() => requestAnimationFrame(() => scrollToEl(p.id, p.where, p.flash))); }
+}
+function autosize(ta) { ta.style.height = "auto"; ta.style.height = Math.min(160, ta.scrollHeight) + "px"; }
+function scrollToEl(id, where = "center", flash = false) {
+  const el = document.getElementById(id); if (!el) return;
+  const sc = el.closest(".scroll"); if (!sc) return;
+  const er = el.getBoundingClientRect(), sr = sc.getBoundingClientRect();
+  let top = sc.scrollTop + er.top - sr.top - 12;
+  if (where === "center") top -= Math.max(0, (sc.clientHeight - er.height) / 2);
+  sc.scrollTo({ top, behavior: REDUCED ? "auto" : "smooth" });
+  if (flash) { el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); }
+}
+const toBottom = () => requestAnimationFrame(() => { for (const id of ["thScroll", "chanScroll"]) { const s = $("#" + id); if (s && (id === "thScroll" || S.chan === "onb")) s.scrollTo({ top: s.scrollHeight, behavior: REDUCED ? "auto" : "smooth" }); } });
+
+/* Selection decorations are applied in place (no re-render), so dragging a handle stays smooth. */
+function exlHTML(run) {
+  const n = run.reduce((k, m) => k + (m.n || 1), 0), allOff = run.every((m) => m.off);
+  const names = [...new Set(run.filter((m) => !m.group).map((m) => nameOf(m.who)))];
+  const label = n === 1 && !run[0].group ? `${esc(names[0])} · ${allOff ? "fora do assunto" : "deixada de fora"}`
+    : `${n} mensagens ${allOff ? "fora do assunto" : "deixadas de fora"}${names.length ? ` · ${esc(names.join(" e "))}` : ""}`;
+  const ids = run.map((m) => m.id).join(",");
+  return `<span class="ck" aria-hidden="true">${I.check}</span><button class="eo" type="button" data-exl-open="${ids}" aria-label="Ver ${n === 1 ? "a mensagem" : "as mensagens"}"><span>${label}</span>${I.chevr}</button><button class="b bg xs" type="button" data-exl-inc="${ids}">Incluir</button>`;
+}
+function applySel() {
+  const sc = $("#chanScroll");
+  if (!sc || !S.sel || S.sel.ch !== S.chan) return;
+  const i = selInfo(), blocked = isBlocked(), sg = SUGGEST[S.sel.ch]();
+  const open = S.sel.open || (S.sel.open = new Set());
+  // runs of consecutive collapsed exclusions inside the range: the first row speaks for the group
+  const head = new Map(), hid = new Set();
+  let run = [];
+  const flush = () => { if (run.length) { head.set(run[0].id, run); for (const m of run.slice(1)) hid.add(m.id); } run = []; };
+  for (const m of i.range) { if (S.sel.excl.has(m.id) && !open.has(m.id)) run.push(m); else flush(); }
+  flush();
+  for (const el of $$("[data-sid]", sc)) {
+    const id = el.dataset.sid, j = idx(i.L, id), inR = j >= i.ia && j <= i.ib, ex = S.sel.excl.has(id), inc = inR && !ex;
+    const cl = el.classList;
+    cl.toggle("out", !inR); cl.toggle("inr", inR); cl.toggle("exc", inR && ex); cl.toggle("inc", inc);
+    cl.toggle("first", j === i.ia); cl.toggle("last", j === i.ib || (hid.has(id) ? false : (head.has(id) && idx(i.L, head.get(id).at(-1).id) === i.ib)));
+    cl.toggle("open", inR && ex && open.has(id)); cl.toggle("exc-hid", hid.has(id));
+    const exl = el.querySelector(".exl"); if (exl) exl.innerHTML = head.has(id) ? exlHTML(head.get(id)) : "";
+    const ck = el.querySelector(":scope > .ck");
+    ck.setAttribute("aria-checked", String(inc));
+    const lock = inc && blocked;
+    if (ck.classList.contains("lk") !== lock) { ck.classList.toggle("lk", lock); ck.innerHTML = lock ? I.lock : I.check; }
+  }
+  const ha = $("#hdl-a"), hb = $("#hdl-b");
+  const ra = sc.querySelector(`[data-sid="${S.sel.a}"]`), rbId = S.sel.b;
+  // the end cap goes on the last visible row of the range (a grouped exclusion may hide the real last one)
+  let rb = sc.querySelector(`[data-sid="${rbId}"]`);
+  if (hid.has(rbId)) for (const [h, r] of head) if (r.some((m) => m.id === rbId)) rb = sc.querySelector(`[data-sid="${h}"]`);
+  if (rb) rb.classList.add("last");
+  if (ha && ra && ha.parentElement !== ra) ra.append(ha);
+  if (hb && rb && hb.parentElement !== rb) rb.append(hb);
+  const A = i.L[i.ia], B = i.L[i.ib], who = S.sel.ch === "diretoria" ? "Theo" : "Dev";
+  if (ha) {
+    ha.querySelector(".hl").textContent = hm(A.from || A.at);
+    const sgA = i.L[idx(i.L, sg.a)];
+    ha.querySelector(".hn").innerHTML = S.sel.a === sg.a ? `sugerido pelo ${who}` : `sugerido: ${hm(sgA.from || sgA.at)} · <button type="button" data-use-sug>usar</button>`;
+  }
+  if (hb) { hb.querySelector(".hl").textContent = hm(B.at); hb.querySelector(".hn").textContent = ""; }
+  const bar = $("#selbar"); if (bar) bar.innerHTML = selbarInner();
+}
+function pickRow(id) {
+  const L = items(S.sel.ch), j = idx(L, id), ia = idx(L, S.sel.a), ib = idx(L, S.sel.b);
+  if (j < ia) S.sel.a = id;
+  else if (j > ib) S.sel.b = id;
+  else if (S.sel.excl.has(id)) { S.sel.excl.delete(id); S.sel.open?.delete(id); }
+  else { S.sel.excl.add(id); S.sel.open?.delete(id); }
+  applySel(); renderSteps();
+}
+function moveHandle(k, id) {
+  const L = items(S.sel.ch), j = idx(L, id);
+  if (k === "a" && j > idx(L, S.sel.b)) id = S.sel.b;
+  if (k === "b" && j < idx(L, S.sel.a)) id = S.sel.a;
+  if (S.sel[k] === id) return;
+  S.sel[k] = id; applySel();
+}
+
+/* ---------- handle drag (mouse and touch) ---------- */
+let drag = null;
+document.addEventListener("pointerdown", (e) => {
+  const h = e.target.closest("[data-hdl]"); if (!h || !S.sel) return;
+  e.preventDefault(); drag = { k: h.dataset.hdl, moved: false }; h.closest(".cap").classList.add("drag");
+});
+window.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  e.preventDefault(); drag.moved = true;
+  const sc = $("#chanScroll"); if (!sc) return;
+  const r = sc.getBoundingClientRect();
+  if (e.clientY < r.top + 40) sc.scrollTop -= 14; else if (e.clientY > r.bottom - 40) sc.scrollTop += 14;
+  let best = null, bd = Infinity;
+  for (const el of $$("[data-sid]", sc)) {
+    const rr = el.getBoundingClientRect(); if (!rr.height) continue;
+    if (e.clientY >= rr.top && e.clientY < rr.bottom) { best = el; break; }
+    const d = Math.min(Math.abs(e.clientY - rr.top), Math.abs(e.clientY - rr.bottom)); if (d < bd) { bd = d; best = el; }
+  }
+  if (best) moveHandle(drag.k, best.dataset.sid);
+}, { passive: false });
+window.addEventListener("pointerup", () => { if (!drag) return; for (const x of $$(".cap.drag")) x.classList.remove("drag"); drag.done = true; setTimeout(() => { drag = null; }, 0); });
+
+/* ---------- steps ---------- */
+function renderSteps() {
+  document.body.dataset.scn = S.scn;
+  const sb = $("#simBtn"); if (sb) sb.textContent = S.app?.offline ? "Simular: Mac volta" : "Simular: Mac desliga";
+  $("#steps").innerHTML = (S.scn === "app" ? APP_STEPS : STEPS).map(([k, l]) => `<button class="stp" type="button" data-step-go="${k}" ${S.step === k ? 'aria-current="step"' : ""} title="${k}. ${esc(l)}">${k}<span class="l">${esc(l)}</span></button>`).join("");
+  $("#stepNow").textContent = (S.scn === "app" ? APP_HINT : STEP_HINT)[S.step] || "";
+}
+function silentCreate() {
+  const i = selInfo();
+  S.ctx = { ids: new Set(i.inc.map((x) => x.id).filter((id) => id !== "grp")), mode: "ctx", title: S.title || "Onboarding mais leve" };
+  S.result = "ctx"; S.sel = null; S.adjust = false; S.hint = "done";
+}
+// One click: the suggested range becomes the thread's context (a reference; nothing leaves the channel).
+function quickCreate(ch = "produto", fromId) {
+  closeMenu();
+  startSel(ch, fromId);
+  if (ch === "diretoria") { S.dest = "new"; return create(); }
+  const n = selInfo().count;
+  silentCreate();
+  S.chan = "produto"; S.thread = "onb";
+  if (S.scn === "app") { S.step = "A2"; S.drafts.th = ASK_APP; } else { S.step = "2"; if (!S.drafts.th) S.drafts.th = ASK; }
+  render();
+  toast({ icon: I.thread, title: `Thread criada com ${n} mensagens`, sub: "Elas ficam no canal; a thread aponta para elas.", actions: [{ label: "Ajustar", run: startAdjust }, { label: "Desfazer", run: undo }], ms: 7000 });
+}
+// "Ajustar trecho": the selection mode opens in place on the channel, from the thread's current range.
+function startAdjust() {
+  if (!S.ctx) return;
+  closeMenu();
+  const L = items("produto"), on = (x) => S.ctx.ids.has(x.id) || (x.id === "grp" && S.long);
+  const js = L.map((x, j) => on(x) ? j : -1).filter((j) => j >= 0), ia = Math.min(...js), ib = Math.max(...js);
+  S.sel = { ch: "produto", a: L[ia].id, b: L[ib].id, excl: new Set(L.slice(ia, ib + 1).filter((x) => !on(x)).map((x) => x.id)) };
+  S.adjust = true; S.dest = "existing"; S.chan = "produto"; S.thread = null; S.title = S.ctx.title;
+  if (S.scn !== "app") S.step = "3";
+  pendingScroll = { id: "hdl-a", where: "start" };
+  render();
+}
+function saveAdjust() {
+  if (!S.sel || isBlocked()) return;
+  if (S.sel.ch === "diretoria") return create();
+  const i = selInfo(); if (!i.count) return;
+  S.ctx.ids = new Set(i.inc.map((x) => x.id).filter((id) => id !== "grp"));
+  S.sel = null; S.adjust = false; S.chan = "produto"; S.thread = "onb";
+  render();
+  toast({ icon: I.layers, title: `Trecho salvo: ${plural(i.count, "mensagem", "mensagens")}`, sub: "O Dev lê o trecho novo na próxima resposta." });
+}
+function cancelAdjust() {
+  const back = S.adjust && S.ctx;
+  S.sel = null; S.adjust = false; S.dest = "existing";
+  if (back) { S.chan = "produto"; S.thread = "onb"; }
+  render();
+}
+// "Tirar do canal": the messages leave #produto and live in the thread; a stub with the link stays.
+function moveOut() {
+  if (!S.ctx) return;
+  const n = ctxInfo().count;
+  S.ctx.mode = "move"; S.result = "move";
+  if (S.scn !== "app") S.step = "4";
+  render();
+  toast({ icon: I.move, title: "Tiradas do canal", sub: `${plural(n, "mensagem saiu", "mensagens saíram")} de #produto; lá ficou um aviso com o link.`, action: { label: "Desfazer", run: moveBack }, ms: 7000 });
+}
+function moveBack() { if (!S.ctx) return; S.ctx.mode = "ctx"; S.result = "ctx"; render(); toast({ icon: I.undo, ok: false, title: "Devolvidas ao canal", sub: "As mensagens voltaram para #produto; a thread segue com elas como contexto." }); }
+function create() {
+  if (isBlocked() || !S.sel) return;
+  const i = selInfo(); if (!i.count) return;
+  if (S.sel.ch === "diretoria") {
+    S.dirCtx = { last: i.inc[i.inc.length - 1].id, title: "Trial de 14 dias" }; S.sel = null; S.adjust = false; S.dest = "existing"; S.chan = "diretoria"; S.thread = null; render();
+    toast({ icon: I.thread, title: `Thread ${S.dirCtx.title} criada em #diretoria`, sub: "Com o trecho como contexto. Só quem está em #diretoria vê." });
+  }
+}
+function undo() {
+  S.result = null; S.ctx = null; S.thread = null; S.th = []; S.work = null; S.sel = null; S.adjust = false; S.hint = "done"; S.chan = "produto";
+  if (S.scn !== "app") S.step = "1";
+  render();
+  toast({ icon: I.undo, ok: false, title: "Desfeito", sub: "A thread foi apagada; o canal ficou como antes." });
+}
+function openThread() {
+  if (!S.ctx) return;
+  S.chan = "produto"; S.thread = "onb"; S.step = S.scn === "app" ? "A2" : "5";
+  if (!S.th.length && !S.drafts.th) S.drafts.th = S.scn === "app" ? ASK_APP : ASK;
+  render(); setTimeout(() => { const ta = $("#ta-th"); if (ta && matchMedia("(min-width: 761px)").matches) ta.focus({ preventScroll: true }); }, 60);
+}
+function seedThread() {
+  S.th = [
+    { id: "s1", who: "walter", at: t(10, 36), text: ASK },
+    { id: "s2", who: "dev", at: t(10, 36), mode: "run", html: devCtxReply(), card: workHTML },
+  ];
+  S.work = { started: nowMs() - 3 * min - 12e3, prog: 3, li: 7, tick: 0 };
+}
+function goStep(k) {
+  if (k.startsWith("A")) return goApp(k);
+  closeMenu();
+  for (const el of $$("#toasts .toast")) el.remove();
+  reset({ long: S?.long || false, scn: "onb" });
+  S.step = k;
+  if (k === "1") { render(); return; }
+  startSel("produto"); silentCreate();
+  if (k === "2") { S.thread = "onb"; S.drafts.th = ASK; render(); return; }
+  if (k === "3") return startAdjust();
+  if (k === "4") { S.ctx.mode = "move"; S.result = "move"; S.thread = "onb"; S.drafts.th = ASK; pendingScroll = { id: "stub", where: "center" }; render(); return; }
+  if (k === "5") return openThread();
+  seedThread();
+  if (k === "6") { startAdjust(); S.step = "6"; S.chan = "diretoria"; startSel("diretoria"); S.adjust = true; S.dest = "existing"; pendingScroll = { id: "hdl-a", where: "start" }; render(); return; }
+  if (k === "7") { S.thread = "onb"; S.dialog = { name: "onboarding-v2", who: { walter: true, ana: true, dev: true, rafa: false, lia: false } }; render(); }
+}
+function next() {
+  const k = S.step;
+  if (S.scn === "app") return nextApp();
+  if (k === "1") return S.ctx ? openThread() : quickCreate();
+  if (k === "2") return startAdjust();
+  if (k === "3") return S.sel ? saveAdjust() : moveOut();
+  if (k === "4") return openThread();
+  if (k === "5") { if (!S.th.some((m) => m.who === "walter")) { if (!S.drafts.th.trim()) S.drafts.th = ASK; return send("th"); } return goStep("6"); }
+  if (k === "6") return goStep("7");
+  if (k === "7") { if (S.dialog) return createChannel(); if (!S.newChan) { openChannelDialog(); } }
+}
+function openChannelDialog() { S.dialog = { name: "onboarding-v2", who: { walter: true, ana: true, dev: true, rafa: false, lia: false } }; S.step = "7"; renderSteps(); renderDialog(); }
+function createChannel() {
+  const D = S.dialog; if (!D) return;
+  const name = (D.name || "onboarding-v2").replace(/^#/, "") || "onboarding-v2";
+  S.newChan = name; S.newChanWho = Object.entries(D.who).filter(([, v]) => v).map(([k]) => nameOf(k));
+  S.chan = "onb"; S.thread = null; S.dialog = null; S.step = "7";
+  render();
+  toast({ icon: I.hash, title: `Canal #${name} criado`, sub: "A thread foi como o primeiro assunto, com o contexto e o trabalho do Dev.", action: { label: "Desfazer", run: () => { S.newChan = null; S.chan = "produto"; S.thread = "onb"; render(); } }, ms: 7000 });
+}
+function commitTitle(v) {
+  const t2 = (v || "").trim(); S.editTitle = false;
+  if (t2 && S.ctx && t2 !== S.ctx.title) { S.ctx.title = t2; S.title = t2; render(); toast({ icon: I.edit, title: "Thread renomeada", sub: esc(t2) }); return; }
+  render();
+}
+
+/* ---------- Dev replies: think (looks around), write (dashes, cursor), then the message ---------- */
+let mid = 0;
+function devReply(list, m, delay = 1000, after) {
+  const msg = { id: "x" + (++mid), who: "dev", at: new Date(nowMs()), mode: "think", ...m };
+  const html = msg.html; msg.html = undefined; const card = msg.card; msg.card = undefined;
+  list.push(msg); render(); toBottom();
+  setTimeout(() => { msg.mode = "write"; msg.html = html; render(); toBottom(); }, REDUCED ? 0 : delay);
+  setTimeout(() => { msg.mode = m.mode || "idle"; after?.(); msg.card = card; render(); toBottom(); }, REDUCED ? 0 : delay + 700);
+}
+function send(ch) {
+  const text = (S.drafts[ch] || "").trim(); if (!text) return;
+  S.drafts[ch] = "";
+  if (ch === "th" || (ch === "chan" && S.chan === "onb")) {
+    const first = !S.th.some((m) => m.who === "walter");
+    S.th.push({ id: "x" + (++mid), who: "walter", at: new Date(nowMs()), text });
+    if (ch === "th" && S.scn !== "app") S.step = "5";
+    if (first && S.scn === "app" && /@dev/i.test(text)) return devReply(S.th, { html: PLAN_INTRO, card: planCardHTML }, 1300);
+    if (S.reply && S.scn === "app") {
+      const about = S.reply; S.reply = null;
+      if (about === "Plano") return devReply(S.th, { html: "<p>Passei para o Claude Code; ele ajustou a lista. O card mostra o plano novo.</p>" }, 1000, () => S.th.push({ id: "x" + (++mid), evt: () => `<div class="evt">${I.edit}<span><b>Plano atualizado</b>: + o que você pediu · − Drawer lateral</span><button class="tlink" type="button" data-files="mission">Ver plano</button></div>` }));
+      return devReply(S.th, { mode: "run", html: "<p>Anotado. O Claude Code ajusta os protótipos e eu te chamo de novo quando estiver pronto para ver.</p>" });
+    }
+    if (first && /@dev/i.test(text)) return devReply(S.th, { mode: "run", html: devCtxReply(), card: workHTML }, 1300, () => { S.work = { started: nowMs(), prog: 0, li: 1, tick: 0 }; });
+    return devReply(S.th, { html: "<p>Anotado. Passo para a sessão do Claude Code na próxima pausa; ela já tem o contexto.</p>" });
+  }
+  (S.chTail[S.chan] ||= []).push({ id: "x" + (++mid), who: "walter", at: new Date(nowMs()), text });
+  render();
+}
+
+/* ---------- live: streamed lines, steps and ticking time ---------- */
+setInterval(() => {
+  const W = S.work; if (!W) return;
+  W.li++; W.tick++;
+  const line = WK_LOG[(W.li - 1) % WK_LOG.length];
+  if (line[0] !== "cmd") for (const el of $$("[data-last]")) { el.innerHTML = `<span class="tx">${esc(line[1])}</span><span class="cur" aria-hidden="true"></span>`; el.classList.remove("fresh"); void el.offsetWidth; el.classList.add("fresh"); }
+  for (const lg of $$("[data-log]")) { const cur = lg.querySelector(".cur"); if (W.li <= WK_LOG.length) cur?.insertAdjacentHTML("beforebegin", lineHTML(line)); lg.scrollTop = lg.scrollHeight; }
+  if (W.tick % 4 === 0 && W.prog < 4) { W.prog++; for (const el of $$("[data-wk]")) { const tmp = document.createElement("div"); tmp.innerHTML = workHTML(); el.replaceWith(tmp.firstElementChild); } hydrate(); }
+}, 1600);
+setInterval(() => { if (S.work) for (const el of $$("[data-tick]")) el.textContent = dur(nowMs() - S.work.started); }, 1000);
+
+/* ---------- menus ---------- */
+let menuEl = null;
+function closeMenu() { menuEl?.remove(); menuEl = null; }
+function openMenu(anchor, html, align = "end") {
+  closeMenu();
+  const m = document.createElement("div");
+  m.className = "menu glass"; m.setAttribute("role", "menu");
+  m.innerHTML = html;
+  document.body.append(m); menuEl = m;
+  hydrate(m);
+  const r = anchor.getBoundingClientRect(), mw = m.offsetWidth, mh = m.offsetHeight;
+  let left = align === "end" ? r.right - mw : r.left;
+  left = Math.min(Math.max(12, left), innerWidth - mw - 12);
+  let top = r.bottom + 6;
+  if (top + mh > innerHeight - 12) top = Math.max(12, r.top - mh - 6);
+  m.style.left = left + "px"; m.style.top = top + "px";
+  m.querySelector(".mi")?.focus({ preventScroll: true });
+}
+
+/* ---------- toasts ---------- */
+function toast({ icon = I.check, ok = true, title, sub = "", action, actions, ms = 3800 }) {
+  const el = document.createElement("div");
+  const acts = actions || (action ? [action] : []);
+  el.className = "toast glass"; el.setAttribute("role", "status");
+  el.innerHTML = `<span class="tic ${ok ? "ok" : ""}">${icon}</span><div class="tt"><b>${esc(title)}</b>${sub ? `<small>${sub}</small>` : ""}</div>${acts.map((a2, k) => `<button class="b ${k === acts.length - 1 ? "b2" : "bg"} sm" type="button" data-ta-i="${k}">${a2.label === "Desfazer" ? I.undo : ""}${esc(a2.label)}</button>`).join("")}`;
+  for (const b of el.querySelectorAll("[data-ta-i]")) b.onclick = () => { acts[+b.dataset.taI].run(); dismiss(el); };
+  $("#toasts").append(el);
+  setTimeout(() => dismiss(el), ms);
+}
+function dismiss(el) { if (!el.isConnected) return; el.classList.add("out"); setTimeout(() => el.remove(), 200); }
+
+/* ---------- events ---------- */
+document.addEventListener("input", (e) => {
+  const ta = e.target.closest?.("[data-ta]");
+  if (ta) {
+    const ch = ta.dataset.ta; S.drafts[ch] = ta.value; autosize(ta);
+    const btn = $(`[data-send="${ch}"]`), has = ta.value.trim().length > 0;
+    if (btn && btn.classList.contains("on") !== has) { btn.className = `send ${has ? "on" : "off"}`; btn.innerHTML = `${has ? `<span>Enviar</span><span class="kbd">↵</span>` : ""}${I.send}`; }
+    return;
+  }
+  if (e.target.id === "chname" && S.dialog) {
+    const v = e.target.value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9-]+/g, "-").replace(/^-+/, "");
+    if (v !== e.target.value) { const p = e.target.selectionStart; e.target.value = v; try { e.target.setSelectionRange(p, p); } catch {} }
+    S.dialog.name = v;
+  }
+});
+document.addEventListener("focusout", (e) => { if (e.target.id === "thTitle" && S.editTitle) commitTitle(e.target.value); });
+document.addEventListener("keydown", (e) => {
+  const ta = e.target.closest?.("[data-ta]");
+  if (ta && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(ta.dataset.ta); return; }
+  const h = e.target.closest?.("[data-hdl]");
+  if (h && S.sel && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+    e.preventDefault();
+    const L = items(S.sel.ch), k = h.dataset.hdl, j = idx(L, S.sel[k]) + (e.key === "ArrowUp" ? -1 : 1);
+    if (j >= 0 && j < L.length) moveHandle(k, L[j].id);
+    $(`[data-hdl="${k}"]`)?.focus();
+    return;
+  }
+  if (e.target.id === "chname" && e.key === "Enter") { e.preventDefault(); createChannel(); return; }
+  if (e.target.id === "thTitle" && e.key === "Enter") { e.preventDefault(); commitTitle(e.target.value); return; }
+  if (e.key === "Escape") {
+    if (menuEl) return closeMenu();
+    if (S.dialog) { S.dialog = null; renderDialog(); return; }
+    if (S.app?.drawer) { S.app.drawer = null; renderDrawer(); return; }
+    if (S.editTitle) { S.editTitle = false; render(); return; }
+    if (S.sel) { cancelAdjust(); return; }
+    if (S.thread) { S.thread = null; render(); }
+  }
+});
+document.addEventListener("click", (e) => {
+  const tg = e.target;
+  if (menuEl && !menuEl.contains(tg) && !tg.closest("[data-mmore],[data-thmore],[data-chmore]")) closeMenu();
+  if (menuEl && menuEl.contains(tg)) {
+    const m = tg.closest("[data-m]"); if (!m) return; closeMenu();
+    const k = m.dataset.m;
+    if (k.startsWith("from:")) return quickCreate(S.chan, k.slice(5));
+    if (k === "rename") { S.editTitle = true; render(); return; }
+    if (k === "newchan") return openChannelDialog();
+    return toast({ icon: I.open, ok: false, title: m.querySelector("span")?.textContent.trim() || "" });
+  }
+  if (tg.closest("[data-scrim]") && !tg.closest(".dlg")) { S.dialog = null; renderDialog(); return; }
+  if (tg.closest("[data-next]")) return next();
+  const sg = tg.closest("[data-step-go]"); if (sg) return goStep(sg.dataset.stepGo);
+  const hr = tg.closest("[data-href]"); if (hr) { location.href = hr.dataset.href; return; }
+  if (tg.closest("[data-hdl]")) return;
+  if (tg.closest("[data-use-sug]")) { S.sel.a = SUGGEST[S.sel.ch]().a; applySel(); return; }
+  const eo = tg.closest("[data-exl-open]"); if (eo && S.sel) { for (const id of eo.dataset.exlOpen.split(",")) (S.sel.open ||= new Set()).add(id); applySel(); return; }
+  const ei = tg.closest("[data-exl-inc]"); if (ei && S.sel) { for (const id of ei.dataset.exlInc.split(",")) { S.sel.excl.delete(id); S.sel.open?.delete(id); } applySel(); renderSteps(); return; }
+  // selection mode: the checkbox and the whole row do the same thing
+  const row = tg.closest("[data-sid]");
+  if (row && S.sel && !drag) { pickRow(row.dataset.sid); return; }
+  const sn = tg.closest("[data-send]"); if (sn) return send(sn.dataset.send);
+  if (tg.closest("[data-hint-yes]")) return quickCreate();
+  if (tg.closest("[data-hint-no]")) { S.hint = "no"; render(); return; }
+  if (tg.closest("[data-sel-cancel]")) return cancelAdjust();
+  if (tg.closest("[data-sel-save]")) return saveAdjust();
+  const dst = tg.closest("[data-dest]"); if (dst) { S.dest = dst.dataset.dest; render(); return; }
+  if (tg.closest("[data-ctx-adjust]")) return startAdjust();
+  if (tg.closest("[data-ctx-move]")) return moveOut();
+  if (tg.closest("[data-ctx-back]")) return moveBack();
+  if (tg.closest("[data-ttl-edit]")) { S.editTitle = true; render(); return; }
+  if (tg.closest("[data-reply-x]")) { S.reply = null; render(); return; }
+  if (tg.closest("[data-open-thread]")) return openThread();
+  if (tg.closest("[data-close-thread]")) { S.thread = null; render(); return; }
+  const chn = tg.closest("[data-chan]");
+  if (chn) {
+    const ch = chn.dataset.chan;
+    if (ch === "onb" && !S.newChan) return;
+    // adjusting the range: opening a private channel lets you try to bring messages from it
+    if (S.adjust && ch === "diretoria") { S.chan = ch; startSel("diretoria"); S.adjust = true; S.dest = "existing"; if (S.scn !== "app") S.step = "6"; pendingScroll = { id: "hdl-a", where: "start" }; render(); return; }
+    if (S.adjust && ch === "produto" && S.sel?.ch !== "produto") return startAdjust();
+    if (S.sel && S.sel.ch !== ch) { S.sel = null; S.adjust = false; }
+    S.chan = ch; if (ch !== "produto") S.thread = null; render(); return;
+  }
+  if (tg.closest("[data-ctx-toggle]")) { S.ctxOpen = !S.ctxOpen; render(); return; }
+  if (tg.closest("[data-ctx-all]")) { S.ctxAll = true; render(); return; }
+  const jp = tg.closest("[data-jump]");
+  if (jp) {
+    const id = jp.dataset.jump;
+    S.ctxOpen = true; S.ctxAll = true; render();
+    requestAnimationFrame(() => {
+      scrollToEl("cx-" + id, "center", true);
+      if (S.ctx.mode === "ctx" && S.chan === "produto" && $("#chan").offsetParent) scrollToEl("msg-" + id, "center", true);
+    });
+    return;
+  }
+  if (tg.closest("[data-wopen]")) { S.wopen = !S.wopen; render(); return; }
+  if (tg.closest("[data-logt]")) { S.logOpen = !S.logOpen; render(); return; }
+  if (tg.closest("[data-dlg-cancel]")) { S.dialog = null; renderDialog(); return; }
+  if (tg.closest("[data-dlg-create]")) return createChannel();
+  const dw = tg.closest("[data-dwho]"); if (dw) { S.dialog.who[dw.dataset.dwho] = !S.dialog.who[dw.dataset.dwho]; renderDialog(); return; }
+  const mm = tg.closest("[data-mmore]");
+  if (mm) {
+    const id = mm.dataset.mmore, canFrom = (S.chan === "produto" || S.chan === "diretoria") && items(S.chan).some((x) => x.id === id) && !(S.ctx && S.result === "move" && S.ctx.ids.has(id));
+    return openMenu(mm, `<button class="mi" type="button" data-m="reply">${I.thread}<span>Responder na thread</span></button>
+      <button class="mi" type="button" data-m="link">${I.link}<span>Copiar link</span></button>
+      <button class="mi" type="button" data-m="issue">${I.issue}<span>Criar issue</span></button>
+      ${canFrom ? `<div class="msep"></div><button class="mi" type="button" data-m="from:${id}">${I.thread}<span>Criar thread a partir daqui</span><span class="sub">com o trecho como contexto</span></button>` : ""}`);
+  }
+  const thm = tg.closest("[data-thmore]");
+  if (thm) return openMenu(thm, `<div class="mgroup">Organizar</div>
+      <button class="mi" type="button" data-m="rename">${I.edit}<span>Renomear thread</span></button>
+      <button class="mi" type="button" data-m="newchan">${I.hash}<span>Mover para canal novo</span><span class="sub">próximo degrau</span></button>
+      <div class="msep"></div><button class="mi" type="button" data-m="link">${I.link}<span>Copiar link</span></button>`);
+  const chm = tg.closest("[data-chmore]");
+  if (chm) return openMenu(chm, `<button class="mi" type="button" data-m="details">${I.users}<span>Detalhes do canal</span></button><button class="mi" type="button" data-m="threads">${I.thread}<span>Threads do canal</span></button>`);
+  if (appClick(tg)) return;
+  const ts = tg.closest("[data-toast]"); if (ts) return toast({ icon: I.open, ok: false, title: ts.dataset.toast });
+});
+
+
+/* ===================== Scenario B: App mobile ===================== */
+// Same names and data as Missao.html / MissaoChat.html. The executor on the Mac (Claude Code) is the brain;
+// our side shows, stores and asks for approval. The UI shows each session as one human line; how the
+// progress travels (ADR 0029/0030) stays out of the product.
+const ASK_APP = "@dev constrói isso com o Claude Code no meu Mac";
+const APPCH = [
+  { id: "q1", who: "rafa", at: t(9, 40), text: "Subi a versão nova do site. Alguém olha o rodapé no celular?" },
+  { id: "q2", who: "walter", at: t(10, 5), text: "Tá na hora do app mobile. Metade dos acessos ao web já vem do celular." },
+  { id: "q3", who: "dev", at: t(10, 7), html: "<p>Dá para ir de Expo e reaproveitar bastante do web: o cliente da API, os tipos e os tokens do packages/ui. Nativo puro dobra o trabalho sem ganho claro na v1.</p>" },
+  { id: "q4", who: "ana", at: t(10, 9), text: "Expo por mim. Mas a v1 precisa de push, senão ninguém vê as aprovações." },
+  { id: "q5", who: "rafa", at: t(10, 11), text: "quem pegou meu carregador USB-C da sala?", off: true },
+  { id: "q6", who: "dev", at: t(10, 13), html: "<p>Push no Expo pede um development build: funciona, só não roda no Expo Go. Proponho a v1 com canais, chat, DMs, aprovações e push.</p>" },
+  { id: "q7", who: "walter", at: t(10, 16), text: "Fechado. Onboarding fica para a v2; no celular entra direto pelo link mágico." },
+  { id: "q8", who: "ana", at: t(10, 18), text: "E a navegação? A sidebar do web não cabe no celular." },
+  { id: "q9", who: "dev", at: t(10, 20), html: "<p>Dá para tabs embaixo ou drawer. Faço protótipos dos dois e vocês escolhem no celular.</p>" },
+  { id: "q10", who: "walter", at: t(10, 22), text: "Perfeito. Faz no meu Mac quando der." },
+  { id: "q11", who: "rafa", at: t(10, 25), text: "achei o carregador, valeu", off: true },
+];
+const APP_STEPS = [["A1", "Conversa vira thread"], ["A2", "Plano"], ["A3", "Arquivos"], ["A4", "Progresso"], ["A5", "Decisão"], ["A6", "Anotações"], ["A7", "Mac offline"]];
+const APP_HINT = {
+  A1: "A conversa sobre o app vira uma thread com o trecho como contexto",
+  A2: "Peça ao Dev; o Claude Code explora o repositório e propõe um plano curto; você começa",
+  A3: "Os arquivos da missão em .agentes/: plano, decisões e anotações",
+  A4: "Sessões em paralelo, uma linha cada; quando há algo para ver, chega um pedido de revisão",
+  A5: "Uma sessão pergunta; decidir atualiza decisions.md",
+  A6: "O Claude Code faz anotações; edição no Mac não muda o que foi aprovado",
+  A7: "O Mac desliga: tarefas interrompidas; ao voltar, a sessão retoma",
+};
+// The plan is a living checklist that Claude Code keeps in .agentes/mission.md (no fixed phases, no gates):
+// reviews happen when there is something to show.
+const PLAN_ITEMS = [
+  { k: "protos", t: "Protótipos de navegação" }, { k: "tema", t: "Tema e tokens do design system" }, { k: "shell", t: "Navegação e shell" },
+  { k: "api", t: "Cliente da API" }, { k: "chat", t: "Tela de chat" }, { k: "login", t: "Login com link mágico" },
+  { k: "canais", t: "Canais e DMs" }, { k: "aprov", t: "Aprovações no celular" }, { k: "push", t: "Notificações" },
+  { k: "links", t: "Deep links" }, { k: "loja", t: "Ícones e telas da loja" }, { k: "tf", t: "Publicar na TestFlight" },
+];
+const PLAN_SHOW = ["shell", "chat", "login", "push", "tf"];
+// done | run | wait (waiting for you) | int (stopped with the Mac) | todo, from what the sessions are doing
+function itemState(k) {
+  const a = A(), ss = (id) => a.sess.find((x) => x.id === id)?.state;
+  const map = { protos: "nav", api: "api", chat: "chat", shell: "shell" };
+  if (k === "protos") return !ss("nav") ? (ss("plan") === "run" ? "run" : "todo") : a.review === "pending" ? "wait" : "done";
+  if (k === "tema") return ss("nav") ? "done" : "todo";
+  if (k === "login") return ss("api") === "done" ? "done" : "todo";
+  if (k === "shell" && a.decision === "pending") return "wait";
+  const st = ss(map[k]);
+  return st === "done" ? "done" : st === "run" ? (a.offline ? "int" : "run") : st === "int" ? "int" : "todo";
+}
+const planCounts = () => { const st = PLAN_ITEMS.map((x) => itemState(x.k)); return { done: st.filter((x) => x === "done").length, run: st.filter((x) => x === "run").length, wait: st.filter((x) => x === "wait").length, int: st.filter((x) => x === "int").length }; };
+const PLAN_INTRO = "<p>Pedi ao Claude Code para explorar o repositório com o contexto desta thread. Este é o plano dele:</p>";
+const ALOGS = {
+  nav: [["cmd", "$ claude -p \"Protótipos de navegação: tabs e drawer\""], ["dim", "Reading .agentes/mission.md"], ["", "Writing apps/mobile/app/(tabs)/_layout.tsx"], ["", "Writing apps/mobile/app/(drawer)/_layout.tsx"], ["cmd", "$ npx tsc --noEmit -p apps/mobile"], ["okl", "✓ gh pr create --draft · PR #431"]],
+  plan: [["", "Reading .agentes/mission.md"], ["dim", "Reading apps/web/src/routes.tsx"], ["dim", "Reading apps/web/src/api/http-client.ts"], ["", "Writing docs/missoes/app-mobile/plano.md"]],
+  chat: [["", "Writing apps/mobile/app/(tabs)/canais/[id].tsx"], ["", "Edit apps/mobile/src/chat/MessageList.tsx (+52 −8)"], ["dim", "Reading packages/engine/src/events.ts"], ["", "Writing apps/mobile/src/realtime/socket.ts"], ["cmd", "$ npx tsc --noEmit -p apps/mobile"]],
+  api: [["dim", "Reading apps/web/src/api/types.ts"], ["", "Writing packages/api-client/src/index.ts"], ["", "Writing apps/mobile/src/session/magic-link.ts"], ["", "Edit apps/mobile/app/_layout.tsx (+18 −2)"]],
+  shell: [["cmd", "$ claude -p --resume nav-shell \"Decisão: tabs embaixo\""], ["dim", "Reading .agentes/decisions.md"], ["", "Writing apps/mobile/app/(tabs)/_layout.tsx"]],
+};
+const FILES0 = () => ({
+  mission: [
+    "# App mobile",
+    "**Objetivo:** app mobile do agentes.chat em Expo, com base no web atual. Dev coordena; o Claude Code roda no MacBook do Walter.",
+    "{{PLAN}}",
+    "## Regras",
+    "- Merge, deploy e rollback pedem aprovação no chat",
+    "- Quando houver algo para mostrar, pedir revisão na thread",
+    "- Uma tarefa por branch: `mission/app-mobile/<tarefa>`",
+    "- Até 3 tarefas em paralelo",
+    "- Antes de começar uma sessão: ler `.agentes/decisions.md` e `.agentes/notes.md`",
+    "## Pendências",
+    "- Nenhuma por enquanto",
+    "## Origem",
+    "> Resumo da conversa em #produto, 10:05–10:22 (8 mensagens de Walter, Ana e Dev): Expo e reaproveitar o web (cliente da API, tipos, tokens do packages/ui); v1 com canais, chat, DMs, aprovações e push; push pede development build; onboarding fica para a v2; navegação: protótipos de tabs e de drawer para escolher no celular.",
+  ],
+  decisions: [
+    "# Decisões",
+    "## Expo, não nativo puro",
+    "Por quê: reaproveita o cliente da API, os tipos e os tokens do web. · Walter, 16 out (no canal)",
+    "## Expo Router para navegação",
+    "Por quê: rotas por arquivo, como o TanStack Router do web, e deep links de graça. · aprovada por Walter",
+    "## Zustand para o estado local",
+    "Por quê: pequeno e sem provider; o estado do servidor fica no TanStack Query. · aprovada por Walter",
+  ],
+  notes: [
+    "# Anotações do Claude Code",
+    "## Aprendizados",
+    "- Expo SDK 54; `expo-notifications` precisa de development build, não roda no Expo Go",
+    "- O cliente da API do web roda no React Native sem mudanças; só o `EventSource` precisou de polyfill",
+    "## Próximos passos",
+    "- Tela de chat: falta o streaming das respostas",
+    "- Cliente da API: sessão com link mágico e `expo-secure-store`",
+  ],
+});
+function appState() {
+  return { pinned: false, plan: "none", review: "none", sess: [], open: { mw: true }, lay: {}, more: {}, logs: {},
+    drawer: null, diff: false, decision: "none", pick: null, files: FILES0(), sync: { mission: "10:42", decisions: "10:42", notes: "10:42" }, conflict: false, offline: false, live: {} };
+}
+const A = () => S.app;
+const appRunning = () => (S.app?.sess || []).filter((x) => x.state === "run").length;
+const SESS = () => ({
+  plan: { id: "plan", name: "Protótipos de navegação", slug: "nav-protos", state: "run", started: nowMs() - 2 * min, log: "plan" },
+  nav: { id: "nav", name: "Navegação A e B", slug: "nav-protos", state: "done", took: "14 min", log: "nav", pr: "#431", report: "Os dois protótipos de navegação estão prontos para testar no celular",
+    files: ["apps/mobile/app/(tabs)/_layout.tsx", "apps/mobile/app/(drawer)/_layout.tsx", "apps/mobile/src/nav/Tabs.tsx", "apps/mobile/src/nav/Drawer.tsx", "apps/mobile/src/nav/routes.ts", "apps/mobile/app/(tabs)/canais.tsx", "apps/mobile/app/(tabs)/dms.tsx", "apps/mobile/app/(tabs)/atividade.tsx", "apps/mobile/app/(tabs)/voce.tsx", "apps/mobile/app/(drawer)/canais.tsx", "apps/mobile/app/(drawer)/dms.tsx", "apps/mobile/app.json"] },
+  chat: { id: "chat", name: "Tela de chat", slug: "chat-screen", state: "run", started: nowMs() - 18 * min - 20e3, log: "chat", report: "Lista e composer prontos; falta o streaming", files: ["apps/mobile/src/chat/MessageList.tsx", "apps/mobile/src/chat/Composer.tsx", "apps/mobile/app/(tabs)/canais/[id].tsx", "apps/mobile/src/realtime/socket.ts", "apps/mobile/src/chat/useMessages.ts"] },
+  api: { id: "api", name: "Cliente da API e sessão", slug: "api-client", state: "run", started: nowMs() - 9 * min - 5e3, log: "api", report: null, files: ["packages/api-client/src/index.ts", "apps/mobile/src/session/magic-link.ts", "apps/mobile/app/_layout.tsx"] },
+  shell: { id: "shell", name: "Navegação e shell", slug: "nav-shell", state: "run", started: nowMs() - 20e3, log: "shell", report: null, files: [] },
+});
+
+/* ---------- plan strip: one pixel cell per item, in the agent's tones ---------- */
+// done = filled dithered cell, running = animated cell, waiting for you = outlined, stopped = dotted outline
+const PS_W = 9, PS_H = 7, PS_GAP = 2, pss = [];
+function addPS(cv) { cv.dataset.on = "1"; pss.push({ cv, ctx: cv.getContext("2d") }); }
+function drawPS(tt) {
+  if (!pss.length) return;
+  const tones = TONES(), line = cssVar("--line2"), ink = cssVar("--ink2");
+  for (let k = pss.length - 1; k >= 0; k--) {
+    const P = pss[k];
+    if (!P.cv.isConnected) { pss.splice(k, 1); continue; }
+    const n = PLAN_ITEMS.length, W = n * PS_W + (n - 1) * PS_GAP;
+    if (P.cv.width !== W) { P.cv.width = W; P.cv.height = PS_H; }
+    const ctx = P.ctx; ctx.clearRect(0, 0, W, PS_H);
+    PLAN_ITEMS.forEach((it, i) => {
+      const st = itemState(it.k), x0 = i * (PS_W + PS_GAP);
+      for (let y = 0; y < PS_H; y++) for (let x = 0; x < PS_W; x++) {
+        const edge = x === 0 || y === 0 || x === PS_W - 1 || y === PS_H - 1, b = BAYER[((y & 3) << 2) | (x & 3)];
+        let c = null;
+        if (st === "done") { const f = 1 - y / (PS_H - 1); c = [tones[1], tones[2], tones[3]][Math.min(2, Math.floor(f * 2 + b))]; }
+        else if (st === "run") { const w = (Math.sin(tt * 4 - x * .7 + i) + 1) / 2; if (w + b * .8 > .7) c = [tones[2], tones[3], tones[4]][Math.min(2, Math.floor((w + b) * 1.5))]; else if (edge) c = tones[3]; }
+        else if (st === "wait") { if (edge) c = ink; }
+        else if (st === "int") { if (edge && (x + y) % 2 === 0) c = ink; }
+        else if (y === PS_H - 1 && x % 2 === 0) c = line;
+        if (c) { ctx.fillStyle = c; ctx.fillRect(x0 + x, y, 1, 1); }
+      }
+    });
+  }
+}
+const _hydrate0 = hydrate;
+hydrate = function (root = document) { _hydrate0(root); for (const cv of $$("canvas.ps:not([data-on])", root)) addPS(cv); };
+
+/* ---------- fake phone screens (Missao.html) ---------- */
+function phoneHTML(kind, w = 108) {
+  const tabs = (on = 0) => `<div class="tabs">${[0, 1, 2, 3].map((i) => `<i class="${i === on ? "on" : ""}"></i>`).join("")}</div>`;
+  const rows = (n, agentAt = [1]) => Array.from({ length: n }, (_, i) => `<div class="rw">${agentAt.includes(i) ? avHTML(i === 1 ? "dev" : "lia", Math.round(w * .11)) : `<span class="hashc"></span>`}<span class="lns"><span class="ln ${i % 2 ? "s" : "m"}"></span></span></div>`).join("");
+  const body = kind === "tabs" ? `<div class="ttl">Canais</div>${rows(6, [1, 4])}${tabs(0)}`
+    : `<div class="ttl">#geral</div><div class="bub"><span class="ln m"></span><span class="ln s"></span></div><div class="bub me"><span class="ln m"></span></div><div class="cmp"></div><div class="drw"><div class="pane">${rows(6, [2])}</div><div class="dim"></div></div>`;
+  return `<div class="phone" style="--w:${w}px" aria-hidden="true"><div class="scr"><div class="isl"></div>${body}</div></div>`;
+}
+
+/* ---------- cards ---------- */
+function planCardHTML() {
+  if (A().plan === "ok") return `<div class="created"><span class="fl">${I.check}</span><span class="t"><b>Plano começou</b><small>${PLAN_ITEMS.length} itens · no ${esc(MACHINE)}</small></span><button class="b b2 xs" type="button" data-files="mission">${I.doc}Ver plano</button></div>`;
+  const list = PLAN_SHOW.map((k) => PLAN_ITEMS.find((x) => x.k === k).t);
+  return `<div class="prop pl" id="prop">
+    <div class="prop-h"><div class="t"><span class="pl-cap">${I.term}Plano do Claude Code</span><h3>App mobile</h3><p>O app do agentes.chat em Expo, reaproveitando o que já existe no web.</p></div></div>
+    <ul class="pl-list">${list.map((x) => `<li><span class="bx" aria-hidden="true"></span>${esc(x)}</li>`).join("")}</ul>
+    <p class="pl-note">o Claude Code vai ajustando a lista conforme avança</p>
+    <div class="pl-meta">${I.laptop}<span>No ${esc(MACHINE)} · online</span></div>
+    <div class="prop-f"><button class="b b1 sm" type="button" data-plan-ok>${I.check}Começar</button><button class="b b2 sm" type="button" data-plan-edit>${I.edit}Mudar algo</button></div>
+  </div>`;
+}
+function pinnedHTML() {
+  const a = A(), c = planCounts();
+  const since = ["2 min", "2 min", "2 min", "1 h 25", "1 h 31", "2 h 10", "4 h 10"][Math.max(0, APP_STEPS.findIndex(([k]) => k === S.step))] || "2 min";
+  return `<div class="pinned" id="pinned" aria-label="Plano fixado">
+    <div class="pin-h">${avHTML("dev", 26, c.run && !a.offline ? "run" : "idle")}<span class="t"><span class="lab">Plano</span><b>App mobile</b>${a.offline ? `<span class="chip">${I.laptop}Mac offline</span>` : ""}</span>
+      <button class="b b2 xs" type="button" data-files="mission">${I.doc}Arquivos</button></div>
+    <div class="pin-ps"><b>${c.done} de ${PLAN_ITEMS.length} itens</b><canvas class="ps" role="img" aria-label="${c.done} de ${PLAN_ITEMS.length} itens prontos"></canvas></div>
+    <div class="pin-m">
+      <span class="pm">${a.offline ? `${I.pause}${c.int} interrompidas` : `<span class="run">${I.spinner}</span>${c.run} rodando`}</span>
+      <span class="pm">${c.wait ? `${I.ask}${c.wait} esperando você` : `${I.check}nada esperando você`}</span>
+      <span class="pm">${I.clock}há ${since}</span>
+    </div>
+  </div>`;
+}
+function reviewHTML() {
+  const a = A();
+  if (a.review === "ok") return `<div class="card" id="card-rv"><div class="decided"><span class="ok">${I.check}</span><span class="t"><b>Protótipos de navegação aprovados</b><small>Por você · 11:24</small></span></div></div>`;
+  return `<div class="card" id="card-rv">
+    <div class="q-h"><h3>Pronto para você ver: protótipos de navegação</h3><p>Tabs embaixo e drawer lateral, no Expo. Abra no celular pelo Expo Go e compare.</p></div>
+    <div class="rv-shots">${phoneHTML("tabs", 84)}${phoneHTML("drawer", 84)}</div>
+    <div class="q-f"><button class="b b1 sm" type="button" data-rv-ok>${I.check}Aprovar</button><button class="b b2 sm" type="button" data-rv-adj>${I.edit}Pedir ajustes</button></div>
+  </div>`;
+}
+const liveText = (line) => line && line[0] !== "cmd" ? line[1] : "Trabalhando…";
+function sessLine(x) {
+  const a = A();
+  if (x.state === "int") return `<span class="sl"><span>Parou às 14:32, quando o Mac desligou</span></span>`;
+  if (x.state === "run" && !a.offline) {
+    if (x.report) return `<span class="sl"><span>${esc(x.report)}</span></span>`;
+    return `<span class="sl" data-alive="${x.id}"><span>${esc(liveText(a.live[x.id]))}</span><span class="cur" aria-hidden="true"></span></span>`;
+  }
+  if (x.state === "queue") return `<span class="sl"><span>Na fila: começa quando abrir uma vaga</span></span>`;
+  return x.report ? `<span class="sl"><span>${esc(x.report)}</span></span>` : "";
+}
+function sessDetailHTML(x) {
+  const a = A(), fs = x.files || [], all = a.more[x.id], shown = all ? fs : fs.slice(0, 3);
+  const changed = fs.length
+    ? `<h4>O que mudou<span>${plural(fs.length, "arquivo", "arquivos")}</span></h4><ul>${shown.map((f) => `<li><code>${esc(f)}</code></li>`).join("")}</ul>${fs.length > 3 ? `<button class="more" type="button" data-smore="${x.id}">${all ? "Mostrar menos" : `+${fs.length - 3}`}</button>` : ""}`
+    : `<h4>O que mudou</h4><span class="none">Nada ainda</span>`;
+  const out = a.logs[x.id] ? `<pre class="log">${(ALOGS[x.log || x.id] || []).map(lineHTML).join("")}${x.state === "run" && !a.offline ? `<span class="cur" aria-hidden="true"></span>` : ""}</pre>` : "";
+  return `<div class="sx">${changed}${out}<div class="sx-f"><button class="b bg xs" type="button" data-slog="${x.id}" aria-expanded="${!!a.logs[x.id]}">${I.term}${a.logs[x.id] ? "Esconder saída" : "Ver saída"}</button></div></div>`;
+}
+function sessIcon(x) {
+  return x.state === "done" ? `<span class="wi done" title="Concluída">${I.check}</span>`
+    : x.state === "int" ? `<span class="wi" title="Interrompida">${I.pause}</span>`
+    : x.state === "wait" ? `<span class="wi" title="Esperando você">${I.ask}</span>`
+    : x.state === "fail" ? `<span class="wi fail" title="Falhou">${I.alert}</span>`
+    : x.state === "queue" ? `<span class="wi" title="Na fila">${I.queue}</span>`
+    : `<span class="wi run" title="Rodando">${I.spinner}</span>`;
+}
+function sessionsHTML(id, ids, foot = true) {
+  const a = A(), list = ids.map((k) => a.sess.find((x) => x.id === k)).filter(Boolean);
+  const open = a.open[id] ?? true, r = list.filter((x) => x.state === "run").length, d = list.filter((x) => x.state === "done").length, it = list.filter((x) => x.state === "int").length;
+  const sum = `<b>${plural(list.length, "sessão", "sessões")}</b> · ${[d ? `${d} concluída${d > 1 ? "s" : ""}` : "", r ? `${r} rodando` : "", it ? `${it} interrompida${it > 1 ? "s" : ""}` : ""].filter(Boolean).join(", ")} · ${esc(MACHINE)}`;
+  const rows = list.map((x) => {
+    const lo = !!a.lay[x.id];
+    const tm = x.state === "run" ? `<span class="wd live" data-atick="${x.id}">${dur(nowMs() - x.started)}</span>` : `<span class="wd">${esc(x.took || (x.state === "int" ? "parada" : ""))}</span>`;
+    const pr = x.pr ? `<button class="prc" type="button" data-toast="Abrir o PR ${esc(x.pr)} no GitHub">${I.branch}PR ${esc(x.pr)}</button>` : "";
+    return `<div class="ms">${sessIcon(x)}<button class="ms-t" type="button" data-ms="${x.id}" aria-expanded="${lo}"><b><span>${esc(x.name)}</span>${I.chevr}</b>${sessLine(x)}<span class="br">${I.branch}<code>mission/app-mobile/${esc(x.slug)}</code></span></button><span class="ms-r">${tm}${pr}</span></div>${lo ? sessDetailHTML(x) : ""}`;
+  }).join("");
+  return `<div class="mw"><button class="mwh" type="button" data-mw="${id}" aria-expanded="${open}">${I.chevr}<span>${sum}</span></button>
+    ${open ? rows : ""}
+    ${foot ? `<div class="mwf">${I.chat}<span>As sessões não falam com você: o Dev revisa e fala uma vez.</span></div>` : ""}</div>`;
+}
+function decisionHTML() {
+  const a = A();
+  if (a.decision === "taken") return `<div class="card" id="card-nav"><div class="decided"><span class="ok">${I.check}</span><span class="t"><b>Navegação: ${esc(a.choice)}</b><small>Tomada por você · 11:32 · em <code>.agentes/decisions.md</code></small></span><button class="b b2 xs" type="button" data-files="decisions">${I.doc}Ver no arquivo</button></div></div>`;
+  const opts = [["tabs", "Tabs embaixo", "Canais, DMs, Atividade e Você numa barra fixa.", true], ["drawer", "Drawer lateral", "Igual à sidebar do web, abre deslizando da esquerda.", false]];
+  return `<div class="card" id="card-nav" data-anav>
+    <div class="q-tags"><span class="chip ink">${I.lock}Bloqueia “Navegação e shell”</span><span class="chip">${I.term}via Claude Code no ${esc(MACHINE)}</span></div>
+    <div class="q-h"><h3>Navegação: tabs embaixo ou drawer?</h3><p>A sessão “Navegação A e B” terminou os dois protótipos e parou aqui: a escolha muda as rotas do Expo Router e o shell inteiro.</p></div>
+    <div class="opts" role="radiogroup" aria-label="Navegação">${opts.map(([k, tt, d, rec]) => `<button class="opt" type="button" role="radio" aria-checked="${a.pick === k}" data-apick="${k}"><span class="othumb">${phoneHTML(k, 74)}</span><span class="top"><span class="rd"></span><span style="min-width:0"><b>${tt}</b><small>${d}</small>${rec ? `<span class="chip" style="margin-top:8px">${I.spark}Recomendação do Dev</span>` : ""}</span></span></button>`).join("")}</div>
+    <div class="why"><span class="k">${avHTML("dev", 16)}Por quê</span><span>Dá para usar com uma mão e é o padrão de iOS e Android. As 4 áreas do web cabem numa barra.</span><span class="k">Impacto</span><span>Destrava “Navegação e shell”. Trocar depois custa cerca de 1 dia.</span></div>
+    <div class="q-f"><button class="b b1 sm" type="button" data-adecide ${a.pick ? "" : "disabled"}>${I.check}${a.pick ? `Decidir: ${a.pick === "tabs" ? "Tabs embaixo" : "Drawer lateral"}` : "Escolha uma opção"}</button><span class="grow"></span><span class="hint">${I.doc}Vai para <code>.agentes/decisions.md</code></span></div>
+  </div>`;
+}
+
+/* ---------- mission files drawer ---------- */
+function planLines() {
+  const lab = { run: "em andamento", wait: "esperando você", int: "parado" };
+  return ["## Plano", ...PLAN_ITEMS.map((x) => { const st = itemState(x.k); return `- [${st === "done" ? "x" : " "}] ${x.t}${lab[st] ? ` · ${lab[st]}` : ""}`; })];
+}
+function mdHTML(lines, at = "", fresh = false) {
+  lines = lines.flatMap((l) => l === "{{PLAN}}" ? planLines() : [l]);
+  const fmt = (x) => esc(x).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  return lines.map((raw) => {
+    const add = raw.startsWith("+"), l = add ? raw.slice(1) : raw, c = add ? ` add${fresh ? " new" : ""}` : "";
+    const inl = (x) => fmt(x) + (add && at ? `<span class="at">${esc(at)}</span>` : "");
+    if (l.startsWith("# ")) return `<div class="l h1${c}">${inl(l.slice(2))}</div>`;
+    if (l.startsWith("## ")) return `<div class="l h2${c}">${inl(l.slice(3))}</div>`;
+    const ck = l.match(/^- \[( |x)\] (.*?)(?: · (.+))?$/);
+    if (ck) return `<div class="l ckl${ck[1] === "x" ? " on" : ""}${c}"><span class="bx">${ck[1] === "x" ? I.check : ""}</span>${inl(ck[2])}${ck[3] ? `<small>${esc(ck[3])}</small>` : ""}</div>`;
+    if (l.startsWith("- ")) return `<div class="l li${c}">${inl(l.slice(2))}</div>`;
+    if (l.startsWith("> ")) return `<div class="l p q${c}">${inl(l.slice(2))}</div>`;
+    return `<div class="l p${c}">${inl(l)}</div>`;
+  }).join("");
+}
+// new lines: a short neutral fade and a faint time at the end ("agora", then the time it arrived)
+const addSeen = {};
+function addLabel(tab) {
+  const n = A().files[tab].filter((x) => x.startsWith("+")).length, k = tab + A().files[tab].length + ":" + n;
+  if (!n) return { label: "", fresh: false };
+  const cur = addSeen[tab];
+  if (!cur || cur.k !== k) {
+    addSeen[tab] = { k, fresh: true };
+    setTimeout(() => { const c = addSeen[tab]; if (!c || c.k !== k) return; c.fresh = false; for (const el of $$("#drawerRoot .md .at")) el.textContent = A().sync[tab]; }, REDUCED ? 0 : 4000);
+    return { label: "agora", fresh: true };
+  }
+  return { label: cur.fresh ? "agora" : A().sync[tab], fresh: false };
+}
+function drawerHTML() {
+  const a = A(), tab = a.drawer; if (!tab) return "";
+  const who = { mission: "Plano e regras · atualizado pelo agentes.chat", decisions: "Decisões aprovadas", notes: "Anotações do Claude Code" }[tab];
+  const foot = tab === "notes" ? "O Claude Code anota aqui o que aprendeu e os próximos passos." : "Vale o que foi aprovado no chat. Para mudar, peça na thread.";
+  const cfl = tab === "decisions" && a.conflict ? `<span class="cfl">${I.refresh}<span>Editado no Mac — mantivemos a versão aprovada</span><button class="tlink" type="button" data-diff aria-expanded="${a.diff}">${a.diff ? "Esconder diferença" : "Ver diferença"}</button></span>` : "";
+  const conf = tab === "decisions" && a.conflict && a.diff ? `<div class="difw"><div class="diff"><span class="c">.agentes/decisions.md · 12:04 no Mac</span><span class="d">- ## Jotai para o estado local</span><span class="a">+ ## Zustand para o estado local</span></div><small>Para mudar, peça na thread: vira uma decisão nova.</small></div>` : "";
+  const at = addLabel(tab);
+  return `<aside class="drawer" role="dialog" aria-label="Arquivos da missão">
+    <div class="dr-h"><div class="t"><b>Arquivos da missão</b><small>pasta <code>.agentes/</code> no repositório</small></div><button class="ib" type="button" data-fclose aria-label="Fechar">${I.x}</button></div>
+    <div class="dr-tabs"><div class="seg" data-fseg role="group" aria-label="Arquivo"><span class="pill" aria-hidden="true"></span><button type="button" data-v="mission">mission.md</button><button type="button" data-v="decisions">decisions.md</button><button type="button" data-v="notes">notes.md</button></div></div>
+    <div class="dr-meta"><b style="color:var(--ink2);font-weight:600">${who}</b><span>sincronizado há 2 min · commit <code>${tab === "notes" && a.files.notes.some((x) => x.startsWith("+")) ? "e4f5a6b" : "a1b2c3d"}</code></span>${cfl}</div>
+    <div class="dr-b">${conf}<div class="md">${mdHTML(a.files[tab], at.label, at.fresh)}</div></div>
+    <div class="dr-foot">${I.alert}<span>${foot}</span></div>
+  </aside>`;
+}
+function renderDrawer() {
+  const root = $("#drawerRoot"); if (!root) return;
+  const sc = $(".dr-b", root)?.scrollTop;
+  root.innerHTML = S.scn === "app" ? drawerHTML() : "";
+  const f = $("[data-fseg]", root); if (f) seg(f, A().drawer, (v) => { A().drawer = v; renderDrawer(); });
+  const b = $(".dr-b", root); if (b && sc != null) b.scrollTop = sc;
+  const add = $(".md .add", root); if (add && !A().diff && root.dataset.lastAdd !== A().drawer + A().files[A().drawer].length) { root.dataset.lastAdd = A().drawer + A().files[A().drawer].length; requestAnimationFrame(() => add.scrollIntoView({ block: "center", behavior: REDUCED ? "auto" : "smooth" })); }
+}
+function openFiles(tab) { A().drawer = tab; renderDrawer(); }
+
+/* ---------- story ---------- */
+const appMsg = (id, who, h, m, extra) => ({ id, who, at: t(h, m), ...extra });
+function seedApp(upto) {
+  const a = A(), SS = SESS();
+  S.title = "App mobile"; S.mode = "ctx";
+  startSel("produto"); silentCreate();
+  S.thread = "onb"; S.chan = "produto";
+  S.th = [appMsg("w1", "walter", 10, 40, { text: ASK_APP }), appMsg("w2", "dev", 10, 40, { html: PLAN_INTRO, card: planCardHTML })];
+  a.plan = "ok"; a.pinned = true;
+  if (upto === "A3") {
+    a.sess = [SS.plan];
+    S.th.push(appMsg("w3", "dev", 10, 41, { mode: "run", html: START_MSG, card: () => sessionsHTML("m-plan", ["plan"], false) }));
+    return;
+  }
+  // later the same day: plan approved at gate 1, Protótipos running with 3 sessions in parallel
+  a.review = "pending";
+  a.sess = [SS.nav, SS.chat, SS.api];
+  a.lay = { nav: true, chat: true };
+  S.th.push({ id: "e1", evt: () => `<div class="evt">${I.check}<span><b>Walter</b> começou o plano · 10:41</span></div>` });
+  S.th.push(appMsg("w4", "dev", 11, 20, { wake: "tarefa terminou", mode: "run", html: "<p>Terminei <b>Navegação A e B</b>: revisei o diff, 12 arquivos, PR #431 como rascunho. As outras 2 sessões seguem em paralelo.</p>", card: () => sessionsHTML("m-now", ["nav", "chat", "api"]) }));
+  S.th.push(appMsg("w4b", "dev", 11, 21, { html: "<p>Tem algo para você ver:</p>", card: reviewHTML }));
+  if (upto === "A4") return;
+  a.review = "ok";
+  a.decision = "pending"; a.files.mission = a.files.mission.map((x) => x === "- Nenhuma por enquanto" ? "- Navegação: tabs ou drawer (esperando Walter)" : x);
+  S.th.push(appMsg("w5", "dev", 11, 26, { wake: "a sessão perguntou", html: "<p>A sessão da navegação parou numa decisão de produto e me perguntou. Repasso para você:</p>", card: decisionHTML }));
+  if (upto === "A5") return;
+  takeDecision("tabs", true);
+  S.th.push({ id: "e2", evt: planEvt });
+  a.files.decisions = a.files.decisions.map((x) => x.startsWith("+") ? x.slice(1) : x);
+  const api = a.sess.find((x) => x.id === "api"); Object.assign(api, { state: "done", took: "22 min", pr: "#434", report: "Login por link mágico funcionando no celular" });
+  a.files.notes = [...a.files.notes, "+- O tema do web não serve direto no React Native; criei tokens em `packages/mobile/theme`", "+- `react-native-svg` para os ícones do design system, os mesmos SVGs do web"];
+  a.sync.notes = "12:05";
+  a.conflict = true; a.sync.decisions = "12:05";
+  S.th.push({ id: "e3", evt: () => `<div class="evt">${I.term}<span>Claude Code atualizou <code>.agentes/notes.md</code> · +2 linhas · 12:05</span><button class="b bg xs" type="button" data-files="notes">Ver</button></div>` });
+  S.th.push({ id: "e4", evt: () => `<div class="evt">${I.refresh}<span><code>decisions.md</code> editado no Mac — mantivemos a versão aprovada</span><button class="tlink" type="button" data-files="decisions" data-diffopen>Ver diferença</button></div>` });
+}
+const START_MSG = "<p>Combinado. O plano está em <code>.agentes/mission.md</code> e o Claude Code começou pelos protótipos de navegação. Te chamo quando tiver algo para ver.</p>";
+const planEvt = () => `<div class="evt">${I.edit}<span><b>Plano atualizado</b>: + Build de desenvolvimento para notificações · − Drawer lateral</span><button class="tlink" type="button" data-files="mission">Ver plano</button></div>`;
+function takeDecision(k, silent = false) {
+  const a = A(), choice = k === "tabs" ? "Tabs embaixo" : "Drawer lateral";
+  a.decision = "taken"; a.choice = choice; a.sync.decisions = "11:32";
+  a.files.decisions = [...a.files.decisions.map((x) => x.startsWith("+") ? x.slice(1) : x), `+## Navegação: ${choice.toLowerCase()}`, `+Por quê: ${k === "tabs" ? "uma mão, padrão de iOS e Android; as 4 áreas do web cabem numa barra" : "igual ao web; os canais ficam a um gesto"}. · Walter, 16 out, nesta thread`];
+  a.files.mission = a.files.mission.map((x) => x.startsWith("- Navegação: tabs ou drawer") ? "- Nenhuma por enquanto" : x);
+  const SS = SESS(); a.sess.push(SS.shell);
+  const reply = appMsg("w6", "dev", 11, 32, { wake: "você respondeu", mode: "run", html: `<p>Anotei em <code>.agentes/decisions.md</code> e respondi a sessão: retomando a sessão com a decisão (${esc(choice.toLowerCase())}). “Navegação e shell” começou.</p>`, card: () => sessionsHTML("m-shell", ["shell"], false) });
+  if (silent) { S.th.push(reply); return; }
+  return reply;
+}
+function goApp(k) {
+  closeMenu();
+  for (const el of $$("#toasts .toast")) el.remove();
+  clearTimeout(goApp.tm);
+  reset({ scn: "app", mode: "ctx" });
+  S.step = k;
+  if (k === "A1") { render(); return; }
+  if (k === "A2") { S.title = "App mobile"; startSel("produto"); silentCreate(); S.thread = "onb"; S.drafts.th = ASK_APP; render(); return; }
+  seedApp(k === "A7" ? "A6" : k);
+  if (k === "A3") A().drawer = "mission";
+  if (k === "A6") { A().drawer = "notes"; const n = A().files.notes; A().files.notes = n.slice(0, -2); goApp.tm = setTimeout(() => { A().files.notes = n; renderDrawer(); }, REDUCED ? 0 : 900); }
+  render();
+  if (k === "A4") pendingScroll = null;
+  if (k === "A7") goApp.tm = setTimeout(() => macOff(), REDUCED ? 0 : 700);
+}
+function nextApp() {
+  const k = S.step, a = A();
+  if (k === "A1") {
+    if (!S.ctx) return quickCreate();
+    return goApp("A2");
+  }
+  if (k === "A2") {
+    if (!S.th.length) { if (!S.drafts.th.trim()) S.drafts.th = ASK_APP; return send("th"); }
+    if (a.plan !== "ok") return planOk();
+    return goApp("A3");
+  }
+  if (k === "A3") return goApp("A4");
+  if (k === "A4") { if (a.review === "pending") return reviewOk(); return goApp("A5"); }
+  if (k === "A5") { if (a.decision === "pending") { a.pick = a.pick || "tabs"; return decideApp(); } return goApp("A6"); }
+  if (k === "A6") return goApp("A7");
+  if (k === "A7") { if (!a.offline && !a.back) return macOff(); if (a.offline) return macOn(); }
+}
+function planOk() {
+  const a = A(), p = $("#prop");
+  if (p && !REDUCED) p.insertAdjacentHTML("beforeend", `<div class="stamp"><span class="ok">${I.check}</span>Começou</div>`);
+  setTimeout(() => {
+    a.plan = "ok"; a.pinned = true; a.sess = [SESS().plan];
+    devReply(S.th, { mode: "run", html: START_MSG, card: () => sessionsHTML("m-plan", ["plan"], false) }, 700);
+    toast({ icon: I.check, title: "Plano começou", sub: "O plano fica fixado no topo da thread e em .agentes/mission.md.", action: { label: "Ver plano", run: () => { S.step = "A3"; renderSteps(); openFiles("mission"); } } });
+  }, REDUCED ? 0 : 600);
+}
+function reviewOk() {
+  const a = A(), card = $("#card-rv");
+  if (card && !REDUCED) card.insertAdjacentHTML("beforeend", `<div class="stamp"><span class="ok">${I.check}</span>Aprovado</div>`);
+  setTimeout(() => { a.review = "ok"; render(); toast({ icon: I.check, title: "Protótipos aprovados", sub: "O Claude Code segue; falta escolher a navegação." }); }, REDUCED ? 0 : 500);
+}
+function replyTo(label, text = "") {
+  S.reply = label; S.drafts.th = text; render();
+  setTimeout(() => { const ta = $("#ta-th"); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }, 40);
+}
+function decideApp() {
+  const a = A(); if (!a.pick) return;
+  const card = $("#card-nav");
+  if (card && !REDUCED) card.insertAdjacentHTML("beforeend", `<div class="stamp"><span class="ok">${I.check}</span>Decidido</div>`);
+  setTimeout(() => {
+    const reply = takeDecision(a.pick);
+    const { id: _id, ...r } = reply; render(); devReply(S.th, r, 700);
+    openFiles("decisions");
+    toast({ icon: I.doc, title: "decisions.md atualizado", sub: "A entrada nova está destacada no arquivo; a sessão retomou com a decisão." });
+  }, REDUCED ? 0 : 600);
+}
+function macOff() {
+  const a = A(); if (a.offline) return;
+  S.step = "A7"; a.offline = true; a.back = false;
+  for (const x of a.sess) if (x.state === "run") x.state = "int";
+  S.th.push({ id: "o1", evt: () => `<div class="evt">${I.laptop}<span><b>${esc(MACHINE)}</b> ficou offline · 14:32</span></div>` });
+  devReply(S.th, { at: t(14, 32), html: "<p>O MacBook do Walter ficou offline. 2 tarefas ficaram interrompidas: <b>Tela de chat</b> e <b>Navegação e shell</b>. Nada se perde: o Mac guarda o que cada tarefa já fez e eu retomo quando ele voltar.</p>", card: () => sessionsHTML("m-off", a.sess.filter((x) => x.state === "int" || x.id === "api").map((x) => x.id), false) }, 700);
+  clearTimeout(goApp.tm);
+  goApp.tm = setTimeout(() => macOn(), REDUCED ? 0 : 4200);
+}
+function macOn() {
+  const a = A(); if (!a.offline) return;
+  clearTimeout(goApp.tm);
+  a.offline = false; a.back = true;
+  const resumed = a.sess.filter((x) => x.state === "int");
+  for (const x of resumed) { x.state = "run"; x.started = nowMs() - 30e3; x.hold = 3; a.live[x.id] = ["", "Retomando de onde parou"]; }
+  a.files.notes = [...a.files.notes.map((x) => x.startsWith("+") ? x.slice(1) : x), "+- 14:51: retomei depois da queda do Mac; `git status` limpo em chat-screen, 2 arquivos pendentes em nav-shell"];
+  a.sync.notes = "14:52";
+  S.th.push({ id: "o2", evt: () => `<div class="evt">${I.laptop}<span><b>${esc(MACHINE)}</b> voltou · 14:51</span></div>` });
+  devReply(S.th, { at: t(14, 51), mode: "run", html: `<p>Retomei ${resumed.length} tarefas de onde pararam (li <code>.agentes/notes.md</code> e o <code>git status</code>). Cada uma continuou a própria sessão, com o que já tinha feito.</p>`, card: () => sessionsHTML("m-back", resumed.map((x) => x.id), false) }, 900);
+  toast({ icon: I.laptop, title: "Mac de volta", sub: `${resumed.length} tarefas retomadas da mesma sessão.` });
+}
+function appClick(tg) {
+  if (S.scn !== "app") return false;
+  const a = A();
+  if (tg.closest("[data-sim]")) { if (a.offline) macOn(); else if (S.step !== "A7" || a.back) goApp("A7"); else macOff(); return true; }
+  if (tg.closest("[data-plan-ok]")) { planOk(); return true; }
+  if (tg.closest("[data-plan-edit]")) { replyTo("Plano"); return true; }
+  if (tg.closest("[data-rv-ok]")) { reviewOk(); return true; }
+  if (tg.closest("[data-rv-adj]")) { replyTo("Protótipos de navegação"); return true; }
+  const fo = tg.closest("[data-files]"); if (fo) { if (fo.hasAttribute("data-diffopen")) a.diff = true; openFiles(fo.dataset.files); return true; }
+  if (tg.closest("[data-fclose]")) { a.drawer = null; renderDrawer(); return true; }
+  if (tg.closest("[data-diff]")) { a.diff = !a.diff; renderDrawer(); return true; }
+  const mw = tg.closest("[data-mw]"); if (mw) { a.open[mw.dataset.mw] = !(a.open[mw.dataset.mw] ?? true); render(); return true; }
+  const ms = tg.closest("[data-ms]"); if (ms) { a.lay[ms.dataset.ms] = !a.lay[ms.dataset.ms]; render(); return true; }
+  const sm = tg.closest("[data-smore]"); if (sm) { a.more[sm.dataset.smore] = !a.more[sm.dataset.smore]; render(); return true; }
+  const sl = tg.closest("[data-slog]"); if (sl) { a.logs[sl.dataset.slog] = !a.logs[sl.dataset.slog]; render(); return true; }
+  const pk = tg.closest("[data-apick]"); if (pk) { a.pick = pk.dataset.apick; render(); return true; }
+  if (tg.closest("[data-adecide]")) { decideApp(); return true; }
+  return false;
+}
+// the live last line of each running session (commands stay in the output view)
+setInterval(() => {
+  if (S.scn !== "app" || A().offline) return;
+  const a = A();
+  for (const x of a.sess) {
+    if (x.state !== "run" || !x.log) continue;
+    if (x.hold) { x.hold--; continue; }
+    const L = ALOGS[x.log]; x.li = (x.li || 0) + 1; const line = L[x.li % L.length]; if (line[0] === "cmd") continue; a.live[x.id] = line;
+    for (const el of $$(`[data-alive="${x.id}"]`)) { el.innerHTML = `<span>${esc(line[1])}</span><span class="cur" aria-hidden="true"></span>`; el.classList.remove("fresh"); void el.offsetWidth; el.classList.add("fresh"); }
+  }
+}, 1700);
+setInterval(() => { if (S.scn !== "app") return; for (const x of A().sess) if (x.state === "run") for (const el of $$(`[data-atick="${x.id}"]`)) el.textContent = dur(nowMs() - x.started); }, 1000);
+
+/* ---------- segmented controls: theme and trecho ---------- */
+function seg(el, value, on) {
+  const pill = el.querySelector(".pill");
+  const place = () => { const b = el.querySelector(`[data-v="${value}"]`); if (!b) return; pill.style.width = b.offsetWidth + "px"; pill.style.transform = `translateX(${b.offsetLeft}px)`; for (const x of el.querySelectorAll("button")) x.setAttribute("aria-pressed", x === b); };
+  el.onclick = (e) => { const b = e.target.closest("button"); if (!b) return; value = b.dataset.v; place(); on(value); };
+  requestAnimationFrame(place);
+}
+seg($("#theme"), document.documentElement.dataset.theme, (v) => { document.documentElement.dataset.theme = v; varCache = {}; render(); });
+seg($("#scnSeg"), "onb", (v) => { reset({ scn: v }); goStep(v === "app" ? "A1" : "1"); });
+seg($("#longSeg"), "short", (v) => {
+  S.long = v === "long";
+  if (S.sel && S.sel.ch === "produto") { if (S.long && S.sel.a === "p3") S.sel.a = "grp"; if (!S.long && S.sel.a === "grp") S.sel.a = "p3"; S.pvAll = false; }
+  S.ctxAll = false;
+  render();
+});
+
+reset();
+render();
+// Fonts arrive after the first paint; keep the busy channel pinned to its newest messages.
+document.fonts?.ready.then(() => { const c = $("#chanScroll"); if (c && S.step === "1") c.scrollTop = c.scrollHeight; });
+</script>
+</body>
+</html>

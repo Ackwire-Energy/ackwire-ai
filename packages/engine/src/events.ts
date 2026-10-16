@@ -3,6 +3,7 @@ import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
 import type { CalendarEventView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
+import type { MachineTaskView } from "./machine-tasks";
 import type { MessageView, ReactionCount } from "./messages";
 
 /** What a memory tool changed, for the "memory updated" card (persisted in the reply's `meta.memoryUpdates`). */
@@ -25,6 +26,7 @@ export interface MemoryUpdate {
 import type { AgentQuestion } from "./questions";
 import type { RunStatus } from "./runs";
 import type { SecretRequestView } from "./secrets";
+import type { ThreadChange, ThreadInfo, ThreadState } from "./threads";
 
 /**
  * Real-time events sent to WebSocket clients subscribed to a channel. The
@@ -215,8 +217,45 @@ export type ChannelEvent =
     }
   /** A sensitive action waits for a person (`approval.created`) or was decided/expired (`approval.decided`). */
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: ApprovalView }
+  /**
+   * A thread's state, title or context changed (ADR 0029). `thread` is the
+   * fresh view when the server has it at hand (a reply that reopened a closed
+   * thread sends only `state`). `messageIds`: messages that left the channel
+   * (`moved`) or came back (`returned`).
+   */
+  | {
+      type: "thread.updated";
+      channelId: string;
+      threadId: string;
+      change: ThreadChange;
+      state?: ThreadState;
+      thread?: ThreadInfo;
+      messageIds?: string[];
+    }
   /** Someone reacted or took a reaction back: the message's reactions now (replace, don't merge). */
-  | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] };
+  | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
+  /**
+   * A background task on a connected computer started, reported progress
+   * (last line, files, elapsed), ended, was interrupted or resumed (ADR 0029).
+   * `task` is its whole view (replace, don't merge); `threadId` null = main timeline.
+   */
+  | { type: "machine.task"; channelId: string; threadId: string | null; task: MachineTaskView }
+  /**
+   * A mission changed (ADR 0029): status, plan, participants, owner,
+   * computer, a decision, a review, a suggestion, a task, a file edited on
+   * the machine. `change` says what; small details ride along (`decision`,
+   * `review`, `messageId`…); clients refetch `GET …/missions/{missionId}` for
+   * the rest. `threadId` is the mission's home thread.
+   */
+  | {
+      type: "mission.updated";
+      channelId: string;
+      threadId: string;
+      missionId: string;
+      status: "proposed" | "active" | "paused" | "done" | "canceled";
+      change: string;
+      [key: string]: unknown;
+    };
 
 const INLINE_LIMIT = 6000;
 

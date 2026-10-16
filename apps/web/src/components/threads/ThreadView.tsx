@@ -1,0 +1,365 @@
+import { Button, Chip, cx, Icon, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useChannels, useThreadMutation, useThreadRange } from "@/api/queries";
+import type { ThreadInfo } from "@/api/types";
+import { ActorAvatar } from "@/components/AgentAvatar";
+import { NavToggle } from "@/components/NavDrawer";
+import { useOrg } from "@/components/org-context";
+import { useDirectory } from "@/hooks/useDirectory";
+import { errorText } from "@/lib/errors";
+import { formatTime, joinNames } from "@/lib/format";
+import { quoteExcerpt } from "@/lib/reply";
+import { threadTitle, timeSpan } from "@/lib/threads";
+import { useToast } from "@/lib/toast";
+import { ThreadStatusChip, useThreadControls, useThreadFlows } from "./ThreadBits";
+import "./threads.css";
+
+/**
+ * The thread view's own parts (ThreadContexto.html, steps 2–5): the header
+ * with the title edited in place and the ⋯ menu, the context block on top,
+ * and the read-only note of an archived thread. The conversation itself is
+ * the channel's (ChannelPage in thread mode).
+ */
+
+/** "thread em #produto · Walter, Ana e Dev". */
+function useWho(thread: ThreadInfo) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const names = thread.participants.flatMap((p) =>
+    p.id ? [dir.authorName({ type: p.type, id: p.id } as Parameters<typeof dir.authorName>[0])] : [],
+  );
+  return joinNames(names.slice(0, 4), t("newAgent.and"));
+}
+
+/** The title: a click (or Enter) edits it; Enter or leaving saves, Esc cancels. */
+function ThreadTitle({ thread }: { thread: ThreadInfo }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const mutation = useThreadMutation(org.id);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+  // The new title while the server saves it (no flash of the old one).
+  const [saving, setSaving] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const title = threadTitle(thread);
+  const canEdit = thread.canManage && thread.state !== "archived";
+  useEffect(() => {
+    if (editing) input.current?.select();
+  }, [editing]);
+  const commit = () => {
+    setEditing(false);
+    const next = value.replace(/\s+/g, " ").trim();
+    if (!next || next === title) return;
+    setSaving(next);
+    mutation.mutate(
+      { type: "update", thread, patch: { title: next } },
+      {
+        onSuccess: () => toast.show(t("threads.view.renamed", { title: next })),
+        onError: (error) => toast.show(errorText(t, error), "error"),
+        onSettled: () => setSaving(null),
+      },
+    );
+  };
+  if (editing) {
+    return (
+      <input
+        ref={input}
+        className="thread-title__input"
+        value={value}
+        maxLength={200}
+        aria-label={t("threads.view.titleLabel")}
+        autoComplete="off"
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          }
+          if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            setEditing(false);
+          }
+        }}
+      />
+    );
+  }
+  if (!canEdit) return <span className="thread-title__text">{title}</span>;
+  return (
+    <button
+      type="button"
+      className="thread-title__button"
+      title={t("threads.view.rename")}
+      onClick={() => {
+        setValue(title);
+        setEditing(true);
+      }}
+    >
+      {saving ?? title}
+    </button>
+  );
+}
+
+/** The thread's header: back to the channel, the title, who is in it, its state and ⋯. */
+export function ThreadHeader({ thread }: { thread: ThreadInfo }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const controls = useThreadControls();
+  const flows = useThreadFlows();
+  const navigate = useNavigate();
+  const who = useWho(thread);
+  const channelParams = { orgId: org.id, channelId: thread.channelId };
+  const where =
+    thread.channelKind === "dm" ? t("threads.view.inDm") : t("threads.view.in", { channel: thread.channelName });
+  const archived = thread.state === "archived";
+  const more = t("threads.view.more");
+  return (
+    <header className="channel__header thread-head">
+      <NavToggle />
+      <Button
+        size="sm"
+        variant="ghost"
+        iconOnly
+        icon="chevronLeft"
+        aria-label={t("threads.view.back", { channel: thread.channelName })}
+        onClick={() => void navigate({ to: "/org/$orgId/c/$channelId", params: channelParams })}
+      />
+      <div className="thread-head__text">
+        <h1 className="channel__title thread-title">
+          <Icon name="thread" size={18} />
+          <ThreadTitle thread={thread} />
+        </h1>
+        <span className="channel__topic">{who ? `${where} · ${who}` : where}</span>
+      </div>
+      {thread.state !== "open" && <ThreadStatusChip thread={thread} />}
+      <Menu
+        align="end"
+        label={more}
+        trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={more} />}
+      >
+        <MenuItem
+          icon="channel"
+          onSelect={() =>
+            void navigate({ to: "/org/$orgId/c/$channelId", params: channelParams, search: { m: thread.id } })
+          }
+        >
+          {t("threads.view.seeInChannel", { channel: thread.channelName })}
+        </MenuItem>
+        <MenuItem
+          icon="link"
+          onSelect={async () => {
+            await navigator.clipboard?.writeText(`${window.location.origin}/org/${org.id}/threads/${thread.id}`);
+            toast.show(t("channel.linkCopied"));
+          }}
+        >
+          {t("channel.copyLink")}
+        </MenuItem>
+        {thread.canManage && thread.context && !archived && (
+          <MenuItem icon="edit" onSelect={() => flows.adjust(thread)}>
+            {t("threads.context.adjust")}
+          </MenuItem>
+        )}
+        {thread.canManage && (
+          <>
+            <MenuSeparator />
+            {archived ? (
+              <MenuItem icon="unarchive" onSelect={() => controls.request([thread], "unarchive")}>
+                {t("threads.actions.unarchive")}
+              </MenuItem>
+            ) : (
+              <>
+                {thread.state === "closed" ? (
+                  <MenuItem icon="refresh" onSelect={() => controls.request([thread], "reopen")}>
+                    {t("threads.actions.reopen")}
+                  </MenuItem>
+                ) : (
+                  <MenuItem
+                    icon="check"
+                    description={t("threads.actions.closeHint")}
+                    onSelect={() => controls.request([thread], "close")}
+                  >
+                    {t("threads.actions.close")}
+                  </MenuItem>
+                )}
+                <MenuItem icon="archiveBox" onSelect={() => controls.request([thread], "archive")}>
+                  {t("threads.actions.archive")}
+                </MenuItem>
+              </>
+            )}
+          </>
+        )}
+      </Menu>
+      {controls.dialog}
+    </header>
+  );
+}
+
+/**
+ * On top of a thread made from a range: "Contexto: 10 mensagens de #produto,
+ * 10:02–10:31", collapsible, the range listed compactly, and the actions
+ * (Ajustar trecho, Tirar do canal / Devolver ao canal) for who manages it.
+ */
+export function ContextBlock({ thread }: { thread: ThreadInfo }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const controls = useThreadControls();
+  const flows = useThreadFlows();
+  const range = useThreadRange(org.id, thread);
+  const channels = useChannels(org.id);
+  const [open, setOpen] = useState(false);
+  const ctx = thread.context;
+  if (!ctx) return null;
+  const list = range.data ?? [];
+  const first = list[0];
+  const last = list.at(-1);
+  const channel =
+    ctx.channelId === thread.channelId
+      ? thread.channelName
+      : (channels.data?.find((c) => c.id === ctx.channelId)?.name ?? t("threads.context.otherChannel"));
+  const span = first && last ? timeSpan(i18n.language, first.createdAt, last.createdAt) : null;
+  const canChange = thread.canManage && thread.state !== "archived";
+  const sameChannel = ctx.channelId === thread.channelId;
+  return (
+    <section className="thread-context" aria-label={t("threads.context.label")}>
+      <button
+        type="button"
+        className="thread-context__head"
+        aria-expanded={open}
+        aria-controls={`thread-context-${thread.id}`}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="thread-context__icon" aria-hidden="true">
+          <Icon name="layers" size={16} />
+        </span>
+        <span className="thread-context__title">
+          <b>
+            {span
+              ? t("threads.context.title", { count: ctx.count, channel, span })
+              : t("threads.context.titleNoSpan", { count: ctx.count, channel })}
+          </b>
+          <small>
+            <Chip icon={ctx.moved ? "thread" : "link"}>
+              {ctx.moved ? t("threads.context.moved") : t("threads.context.reference")}
+            </Chip>
+            <span>{t("threads.context.agentsRead")}</span>
+          </small>
+        </span>
+        <Icon name="chevronRight" size={16} className={cx("thread-context__chev", open && "is-open")} />
+      </button>
+      {canChange && (
+        <div className="thread-context__actions">
+          <button type="button" className="thread-context__link" onClick={() => flows.adjust(thread)}>
+            <Icon name="edit" size={14} />
+            {t("threads.context.adjust")}
+          </button>
+          {sameChannel &&
+            (ctx.moved ? (
+              <button
+                type="button"
+                className="thread-context__link"
+                onClick={() => controls.request([thread], "return")}
+              >
+                <Icon name="undo" size={14} />
+                {t("threads.context.return")}
+              </button>
+            ) : (
+              <button type="button" className="thread-context__link" onClick={() => controls.request([thread], "move")}>
+                <Icon name="move" size={14} />
+                {t("threads.context.move")}
+              </button>
+            ))}
+        </div>
+      )}
+      {open && (
+        <div className="thread-context__body" id={`thread-context-${thread.id}`}>
+          {range.isLoading && <p className="thread-context__note">{t("common.loading")}</p>}
+          {list.map((m) => {
+            const name = dir.authorName(m.author);
+            return (
+              <Link
+                key={m.id}
+                className="thread-context__row"
+                to="/org/$orgId/c/$channelId"
+                params={{ orgId: org.id, channelId: m.channelId }}
+                search={{ m: m.id }}
+              >
+                <span className="thread-context__who">
+                  {m.author.id ? (
+                    <ActorAvatar actor={{ type: m.author.type, id: m.author.id }} name={name} size="xs" />
+                  ) : null}
+                </span>
+                <span>
+                  <span className="thread-context__row-head">
+                    <b>{name}</b>
+                    <span>{formatTime(i18n.language, m.createdAt)}</span>
+                  </span>
+                  <span className="thread-context__excerpt">{quoteExcerpt(m.body)}</span>
+                </span>
+              </Link>
+            );
+          })}
+          <p className="thread-context__note">
+            <Icon name={ctx.moved ? "thread" : "link"} size={14} />
+            <span>
+              {ctx.moved
+                ? t("threads.context.movedNote", { channel })
+                : t("threads.context.referenceNote", { channel })}
+            </span>
+          </p>
+        </div>
+      )}
+      {controls.dialog}
+    </section>
+  );
+}
+
+/** "Walter criou a thread a partir de 10 mensagens de #produto · 10:34". */
+export function ThreadOrigin({ thread }: { thread: ThreadInfo }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  if (!thread.context) return null;
+  const name = thread.createdBy
+    ? (dir.memberById.get(thread.createdBy)?.name ?? t("threads.someone"))
+    : t("threads.someone");
+  return (
+    <p className="thread-origin">
+      <Icon name="thread" size={14} />
+      <span>
+        {t("threads.view.origin", {
+          name,
+          count: thread.context.count,
+          channel: thread.channelName,
+          time: formatTime(i18n.language, thread.createdAt),
+        })}
+      </span>
+    </p>
+  );
+}
+
+/** An archived thread is read only: a note (and Desarquivar for who may) in place of the composer. */
+export function ArchivedNote({ thread }: { thread: ThreadInfo }) {
+  const { t } = useTranslation();
+  const controls = useThreadControls();
+  return (
+    <div className="thread-archived" role="note">
+      <Icon name="lock" size={16} />
+      <span>
+        <b>{t("threads.view.archivedTitle")}</b> {t("threads.view.archivedText")}
+      </span>
+      {thread.canManage && (
+        <Button size="sm" icon="unarchive" onClick={() => controls.request([thread], "unarchive")}>
+          {t("threads.actions.unarchive")}
+        </Button>
+      )}
+      {controls.dialog}
+    </div>
+  );
+}

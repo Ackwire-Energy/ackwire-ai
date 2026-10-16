@@ -1,4 +1,11 @@
-import { queryOptions, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useInfiniteQuery,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useCallback } from "react";
 import { upsertMessage } from "@/chat/timeline";
 import { artifactRefs } from "@/lib/artifacts";
@@ -34,6 +41,11 @@ import type {
   SeriesScope,
   SkillInput,
   SkillPatch,
+  ThreadAction,
+  ThreadCreateInput,
+  ThreadFilters,
+  ThreadInfo,
+  ThreadPatch,
   ToolDecision,
   WikiPage,
   WikiPageInput,
@@ -297,6 +309,8 @@ export function usePostMessage(
     mentioned?: (body: string) => string[];
     onSent?: (message: Message, local: Message) => void;
     onOptimistic?: (local: Message) => void;
+    /** The server refused it (the message turns "failed" with a retry either way). */
+    onFailed?: (error: unknown) => void;
   },
 ) {
   const api = useApi();
@@ -344,7 +358,8 @@ export function usePostMessage(
       cacheMessage(qc, orgId, echoed);
       if (ctx?.local) options.onSent?.(echoed, ctx.local);
     },
-    onError: (_error, { clientId }) => {
+    onError: (error, { clientId }) => {
+      options.onFailed?.(error);
       qc.setQueryData<Message[]>(key, (list) =>
         list?.map((m) => (m.local && m.clientId === clientId ? { ...m, local: "failed" as const } : m)),
       );
@@ -1420,5 +1435,147 @@ export function useWikiAction(orgId: string) {
       qc.setQueryData(keys.wikiPage(orgId, page.slug), page);
       void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
     },
+  });
+}
+
+// ── Threads (ADR 0029) ──────────────────────────────────────────────────────
+
+/** The Threads page: one page per cursor, most recent activity first. */
+export function useThreadList(orgId: string, filters: ThreadFilters, enabled = true) {
+  const api = useApi();
+  return useInfiniteQuery({
+    enabled,
+    queryKey: keys.threadList(orgId, filters),
+    queryFn: ({ pageParam }) => api.threads.list(orgId, { ...filters, ...(pageParam ? { cursor: pageParam } : {}) }),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: (prev) => prev,
+    staleTime: 15_000,
+  });
+}
+
+/** A channel's threads (its "Threads (N)", closed lines and context marks). One page of 100. */
+export function useChannelThreads(orgId: string, channelId: string, tab: "all" | "archived", enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.channelThreads(orgId, channelId, tab),
+    queryFn: () => api.threads.inChannel(orgId, channelId, { tab, limit: 100 }),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useThreadInfo(orgId: string, threadId: string | null | undefined) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.threadInfo(orgId, threadId ?? ""),
+    queryFn: () => api.threads.get(orgId, threadId ?? ""),
+    enabled: Boolean(threadId),
+    staleTime: 15_000,
+  });
+}
+
+/** A thread's root and replies (the same cache the channel uses for agent replies). */
+export function useThreadMessages(orgId: string, channelId: string | undefined, rootId: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.thread(orgId, channelId ?? "", rootId),
+    queryFn: () => api.chat.messages(orgId, channelId ?? "", { threadId: rootId, limit: 200 }),
+    enabled: Boolean(channelId),
+    staleTime: 30_000,
+  });
+}
+
+/** How far back the context block looks for the start of a range (pages of 200). */
+const RANGE_PAGES = 5;
+
+/**
+ * The messages of a thread's context range, oldest first. Not moved: the
+ * context channel's top-level messages from the first to the last, minus the
+ * excluded ones. Moved: they are replies of the root now, written before it
+ * (real replies always come after the root, which is made after the range).
+ */
+export async function loadThreadRange(api: ApiClient, orgId: string, thread: ThreadInfo): Promise<Message[]> {
+  const ctx = thread.context;
+  if (!ctx) return [];
+  if (ctx.moved) {
+    const all = await api.chat.messages(orgId, thread.channelId, { threadId: thread.id, limit: 200 });
+    return all.filter((m) => m.id !== thread.id && m.createdAt < thread.createdAt);
+  }
+  let list = await api.chat.messages(orgId, ctx.channelId, { limit: 200 });
+  for (let page = 1; page < RANGE_PAGES && !list.some((m) => m.id === ctx.firstMessageId); page++) {
+    const oldest = list[0];
+    if (!oldest) break;
+    const older = await api.chat.messages(orgId, ctx.channelId, { before: oldest.createdAt, limit: 200 });
+    if (older.length === 0) break;
+    list = [...older, ...list];
+  }
+  const from = list.findIndex((m) => m.id === ctx.firstMessageId);
+  const to = list.findIndex((m) => m.id === ctx.lastMessageId);
+  if (from < 0 || to < from) return [];
+  const excluded = new Set(ctx.excludedMessageIds);
+  return list.slice(from, to + 1).filter((m) => !excluded.has(m.id) && m.id !== thread.id && !m.meta?.threadStart);
+}
+
+export function useThreadRange(orgId: string, thread: ThreadInfo | undefined, enabled = true) {
+  const api = useApi();
+  const ctx = thread?.context;
+  return useQuery({
+    queryKey: [
+      ...keys.threadRange(orgId, thread?.id ?? ""),
+      ctx?.firstMessageId,
+      ctx?.lastMessageId,
+      ctx?.excludedMessageIds.length,
+      ctx?.moved,
+    ],
+    queryFn: () => (thread ? loadThreadRange(api, orgId, thread) : Promise.resolve([])),
+    enabled: Boolean(enabled && thread?.context),
+    staleTime: 30_000,
+  });
+}
+
+/** After a change: lists, the thread, and both conversations (markers, moved messages). */
+function refreshThread(qc: ReturnType<typeof useQueryClient>, orgId: string, thread: ThreadInfo, gone = false) {
+  if (gone) qc.removeQueries({ queryKey: keys.threadInfo(orgId, thread.id) });
+  else qc.setQueryData(keys.threadInfo(orgId, thread.id), thread);
+  void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
+  for (const channelId of new Set([thread.channelId, thread.context?.channelId].filter(Boolean) as string[])) {
+    void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
+  }
+}
+
+export function useCreateThread(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (input: ThreadCreateInput) => api.threads.create(orgId, input),
+    onSuccess: (thread) => refreshThread(qc, orgId, thread),
+  });
+}
+
+/**
+ * Every change to one thread: rename or adjust (`update`), the actions
+ * (move, return, close, reopen, archive, unarchive) and undoing a new one
+ * (`delete`). Errors are the caller's to say (translated by code).
+ */
+export function useThreadMutation(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: async (
+      change:
+        | { type: "update"; thread: ThreadInfo; patch: ThreadPatch }
+        | { type: "action"; thread: ThreadInfo; action: ThreadAction }
+        | { type: "delete"; thread: ThreadInfo },
+    ): Promise<ThreadInfo | null> => {
+      if (change.type === "update") return api.threads.update(orgId, change.thread.id, change.patch);
+      if (change.type === "action") return api.threads.act(orgId, change.thread.id, change.action);
+      await api.threads.remove(orgId, change.thread.id);
+      return null;
+    },
+    // The view a change came back with (its `canManage` is ours); a deleted thread leaves the cache.
+    onSuccess: (thread, change) => refreshThread(qc, orgId, thread ?? change.thread, change.type === "delete"),
   });
 }

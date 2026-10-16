@@ -25,6 +25,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
+import { useMissionList } from "@/api/missions";
 import { useChannels, useDms, useOverview, usePrefetchMessages } from "@/api/queries";
 import type { Agent } from "@/api/types";
 import { useAuth } from "@/auth/context";
@@ -79,6 +80,13 @@ export function Sidebar() {
   const overview = useOverview(orgId);
   const [creatingChannel, setCreatingChannel] = useState(false);
   const pending = overview.data?.approvalsWaitingForMe ?? 0;
+  // Missões: how many open missions wait for me (the server counts: a decision, a review, a suggestion…).
+  const missionList = useMissionList(orgId, { status: "waiting_you", limit: 1 });
+  const missionsWaiting = missionList.data?.counts.waitingYou ?? 0;
+  const onMissionsTab = useRouterState({
+    select: (s) =>
+      s.location.pathname.endsWith("/threads") && (s.location.search as { tab?: string }).tab === "missions",
+  });
   const people = dir.members.filter((m) => m.userId !== me.user.id);
   const budgetUsed = overview.data ? overview.data.budgetUsedPercent : null;
   const dms = useDms(orgId);
@@ -228,6 +236,34 @@ export function Sidebar() {
             <span className="sidebar__item-label">{t("shell.approvals")}</span>
             {pending > 0 && (
               <CountBadge aria-label={t("shell.pendingApprovals", { count: pending })}>{pending}</CountBadge>
+            )}
+          </Link>
+          {/* No count: "precisa de você" across every thread is a heavy query; Aprovações already counts. */}
+          <Link
+            to="/org/$orgId/threads"
+            params={{ orgId }}
+            className="sidebar__item"
+            title={t("shell.threads")}
+            // On the Missões tab only "Missões" is the current item.
+            activeOptions={onMissionsTab ? { exact: true, includeSearch: true } : undefined}
+          >
+            <Icon name="thread" />
+            <span className="sidebar__item-label">{t("shell.threads")}</span>
+          </Link>
+          <Link
+            to="/org/$orgId/threads"
+            params={{ orgId }}
+            search={{ tab: "missions" }}
+            className="sidebar__item"
+            title={t("shell.missions")}
+            activeOptions={{ exact: true, includeSearch: true }}
+          >
+            <Icon name="flag" />
+            <span className="sidebar__item-label">{t("shell.missions")}</span>
+            {missionsWaiting > 0 && (
+              <CountBadge aria-label={t("shell.missionsWaiting", { count: missionsWaiting })}>
+                {missionsWaiting}
+              </CountBadge>
             )}
           </Link>
           <Link to="/org/$orgId/issues" params={{ orgId }} className="sidebar__item" title={t("shell.issues")}>

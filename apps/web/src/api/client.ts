@@ -50,10 +50,26 @@ import type {
   IssuePatch,
   Machine,
   MachinePairing,
+  MachineTask,
   Me,
   Member,
   Memory,
   Message,
+  Mission,
+  MissionControl,
+  MissionCreateInput,
+  MissionDecision,
+  MissionEligibleAgent,
+  MissionExecutor,
+  MissionFiles,
+  MissionJoinRequest,
+  MissionList,
+  MissionListQuery,
+  MissionParticipantRole,
+  MissionParticipants,
+  MissionPlan,
+  MissionReview,
+  MissionSummary,
   Model,
   Organization,
   OrgOverview,
@@ -87,6 +103,13 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
+  TaskOutput,
+  ThreadAction,
+  ThreadCreateInput,
+  ThreadFilters,
+  ThreadInfo,
+  ThreadPage,
+  ThreadPatch,
   ToolDecision,
   TrashedArtifact,
   UsageReport,
@@ -375,6 +398,99 @@ export interface ApiClient {
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
     /** "Pedir à Ada para implementar": assigns the agent and starts a run on the issue. */
     askAgent(orgId: string, id: string, agentId: string): Promise<Issue>;
+  };
+  /** Threads (ADR 0029): the Threads page, a thread from a range, moving it, closing and archiving. */
+  threads: {
+    /** Threads you can see, most recent activity first (archived only with `tab: "archived"`). */
+    list(orgId: string, filters?: ThreadFilters): Promise<ThreadPage>;
+    /** A channel's threads (its "Threads (N)"). */
+    inChannel(orgId: string, channelId: string, filters?: Omit<ThreadFilters, "channelId">): Promise<ThreadPage>;
+    get(orgId: string, threadId: string): Promise<ThreadInfo>;
+    /** "Criar thread a partir daqui": the range is its context; nothing moves. */
+    create(orgId: string, input: ThreadCreateInput): Promise<ThreadInfo>;
+    /** Rename, or change the range ("Ajustar trecho"). */
+    update(orgId: string, threadId: string, patch: ThreadPatch): Promise<ThreadInfo>;
+    /** Undo a thread made from a range, while nobody replied (`thread.has_replies`). */
+    remove(orgId: string, threadId: string): Promise<void>;
+    /** Tirar do canal / Devolver ao canal / Fechar / Reabrir / Arquivar / Desarquivar. */
+    act(orgId: string, threadId: string, action: ThreadAction): Promise<ThreadInfo>;
+  };
+  /** Missions (ADR 0029): long work by the agent's executor on a connected computer, in one thread. */
+  missions: {
+    /** Missions you can see (the Missões tab), most recently changed first, with the counts for the tabs. */
+    list(orgId: string, query?: MissionListQuery): Promise<MissionList>;
+    /** "Nova missão": agents that can run a mission for you. */
+    eligibleAgents(orgId: string): Promise<MissionEligibleAgent[]>;
+    /** "Ver saída": the last lines of a background task. */
+    taskOutput(orgId: string, taskId: string, tail?: number): Promise<TaskOutput>;
+    /** Pending requests to join (all for whoever answers them; else your own). */
+    joinRequests(orgId: string, missionId: string): Promise<MissionJoinRequest[]>;
+    /** "Pedir para participar". */
+    requestJoin(orgId: string, missionId: string): Promise<MissionJoinRequest>;
+    /** Aceitar (with a role) or Recusar. */
+    decideJoin(
+      orgId: string,
+      missionId: string,
+      userId: string,
+      outcome: "accept" | "decline",
+      role?: MissionParticipantRole,
+    ): Promise<MissionJoinRequest>;
+    /** `/mission <goal>` and "Nova missão": the executor plans it; a plan card follows. */
+    create(orgId: string, input: MissionCreateInput): Promise<Mission>;
+    get(orgId: string, missionId: string): Promise<Mission>;
+    /** The mission of a thread (`mission.not_found` when it has none). */
+    ofThread(orgId: string, threadId: string): Promise<Mission>;
+    /** The background tasks of a thread, newest first (`machine.task` keeps them live). */
+    threadTasks(orgId: string, threadId: string): Promise<MachineTask[]>;
+    /** Começar (owner only), `/pause`, resume, `/stop` (cancels its running tasks and pauses). */
+    control(orgId: string, missionId: string, action: MissionControl): Promise<Mission & { canceledTasks?: number }>;
+    close(
+      orgId: string,
+      missionId: string,
+      input: { outcome: "done" | "canceled"; saveToWiki?: boolean; note?: string },
+    ): Promise<Mission>;
+    /** "Mudar algo": to the executor's main session (queued when it can't hear now). */
+    message(orgId: string, missionId: string, text: string): Promise<{ delivered: boolean; taskId?: string }>;
+    participants(orgId: string, missionId: string): Promise<MissionParticipants>;
+    setParticipant(
+      orgId: string,
+      missionId: string,
+      userId: string,
+      role: MissionParticipantRole,
+      existing?: boolean,
+    ): Promise<MissionParticipants>;
+    removeParticipant(orgId: string, missionId: string, userId: string): Promise<void>;
+    /** Hand it over; the computer doesn't move (`code: mission.needs_computer` when it pauses). */
+    transfer(
+      orgId: string,
+      missionId: string,
+      input: { userId: string; lendMachine?: boolean },
+    ): Promise<Mission & { code?: string }>;
+    /** Its owner points it at a computer they paired (new sessions start from the mission files). */
+    setMachine(orgId: string, missionId: string, machineId: string, repoDir?: string): Promise<Mission>;
+    /** Before Start, its owner switches who programs (the planning starts again). */
+    setExecutor(orgId: string, missionId: string, executor: MissionExecutor): Promise<Mission>;
+    decisions(orgId: string, missionId: string): Promise<MissionDecision[]>;
+    choose(orgId: string, missionId: string, decisionId: string, option: string): Promise<MissionDecision>;
+    opinion(orgId: string, missionId: string, decisionId: string, option: string): Promise<MissionDecision>;
+    approveProvisional(orgId: string, missionId: string): Promise<MissionDecision[]>;
+    reviews(orgId: string, missionId: string): Promise<MissionReview[]>;
+    review(
+      orgId: string,
+      missionId: string,
+      reviewId: string,
+      outcome: "approve" | "changes",
+      note?: string,
+    ): Promise<MissionReview>;
+    suggestion(
+      orgId: string,
+      missionId: string,
+      messageId: string,
+      outcome: "accept" | "decline",
+    ): Promise<{ messageId: string; status: "accepted" | "declined" }>;
+    files(orgId: string, missionId: string): Promise<MissionFiles>;
+    summary(orgId: string, missionId: string): Promise<MissionSummary>;
+    plan(orgId: string, missionId: string): Promise<MissionPlan>;
   };
   routines: {
     list(orgId: string): Promise<Routine[]>;

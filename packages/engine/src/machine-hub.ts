@@ -12,9 +12,21 @@ import {
   parseRunnerFrame,
   type RunnerFrame,
   type ServerFrame,
+  TASKS_PROTOCOL,
   type Unsubscribe,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, lt, schema } from "@agenteschat/db";
+import {
+  applyTaskDone,
+  applyTaskEvent,
+  getTask,
+  type LocalTaskStarter,
+  reconcileMachineTasks,
+  settleInterruptedTask,
+  startMachineTask,
+  TASK_OFFLINE_GRACE_MS,
+  type TaskCall,
+} from "./machine-tasks";
 import {
   authenticateMachine,
   getMachineById,
@@ -23,6 +35,7 @@ import {
   machineOnline,
   publishMachineStatus,
 } from "./machines";
+import { enqueue } from "./outbox";
 
 const { machines, machineRpc } = schema;
 
@@ -39,6 +52,10 @@ const { machines, machineRpc } = schema;
  * - `call` sends a `request` and resolves on its `result`, forwarding
  *   `output`; aborting sends `cancel`. A machine held by another replica is
  *   reached through a `machine_rpc` row plus a pub/sub signal both ways.
+ * - Background tasks (protocol 4, `machine-tasks.ts`): this replica persists
+ *   the `task.event` and `task.done` frames of the sockets it holds and acks
+ *   each `task.done`; `hello` reconciles the runner's journal; a socket that
+ *   closes schedules `machine.tasks_offline` after a grace.
  */
 export interface MachineSocket {
   send(text: string): void;
@@ -82,6 +99,8 @@ export interface MachineStatus {
   os: string;
   /** The runner's protocol (from its last hello). */
   protocol: number;
+  /** Coding CLIs found at its last hello (protocol 7; empty for older runners). */
+  executors: schema.MachineExecutors;
 }
 
 /** What the machine provider needs from the hub. */
@@ -124,6 +143,8 @@ export interface MachineHubDeps {
   helloTimeoutMs?: number;
   /** Cross-replica callers read the `machine_rpc` row this often (the signal usually comes first). */
   rpcPollMs?: number;
+  /** A machine offline this long has its running tasks interrupted (default 60 s). */
+  taskOfflineGraceMs?: number;
   log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
 
@@ -139,18 +160,29 @@ type RpcReply = { ok: true; data: unknown } | { ok: false; error: { code: string
 /** `machine_rpc` rows older than this are deleted (opportunistically). */
 export const MACHINE_RPC_KEEP_MS = 60 * 60_000;
 
+/** What missions plug into the hub (ADR 0029): the `agentes` MCP calls of their tasks, and a machine coming back. */
+export interface MachineMissionHooks {
+  mcp?(
+    machineId: string,
+    frame: Extract<RunnerFrame, { type: "mcp.call" }>,
+  ): Promise<{ ok: true; text: string } | { ok: false; error: { code: string; message: string } }>;
+  online?(machineId: string): Promise<void>;
+}
+
 export function createMachineHub(deps: MachineHubDeps) {
   const { db, pubsub } = deps;
   const replicaId = deps.replicaId ?? crypto.randomUUID();
   const heartbeatMs = deps.heartbeatMs ?? HEARTBEAT_MS;
   const helloTimeoutMs = deps.helloTimeoutMs ?? HELLO_TIMEOUT_MS;
   const rpcPollMs = deps.rpcPollMs ?? 500;
+  const taskOfflineGraceMs = deps.taskOfflineGraceMs ?? TASK_OFFLINE_GRACE_MS;
   /** Sockets on this replica, by machine id. */
   const local = new Map<string, MachineConnection>();
   /** Cross-replica requests this replica is running, to cancel them. */
   const running = new Map<string, AbortController>();
   let lastCleanup = 0;
   const subscriptions: Unsubscribe[] = [];
+  let hooks: MachineMissionHooks = {};
 
   const send = (conn: MachineConnection, frame: ServerFrame) => {
     if (conn.closed) return;
@@ -179,8 +211,40 @@ export function createMachineHub(deps: MachineHubDeps) {
       .set({ online: false, connectedReplica: null, updatedAt: new Date() })
       .where(and(eq(machines.id, machineId), eq(machines.connectedReplica, replicaId)))
       .returning({ orgId: machines.orgId });
-    if (row) await publishMachineStatus(pubsub, row.orgId ?? orgId, machineId, false);
+    if (!row) return false;
+    await publishMachineStatus(pubsub, row.orgId ?? orgId, machineId, false);
+    // Its running tasks become interrupted if it isn't back after the grace (any replica's worker runs it).
+    await enqueue(db, {
+      orgId: row.orgId,
+      kind: "machine.tasks_offline",
+      payload: { machineId },
+      dedupeKey: `machine.tasks_offline:${machineId}:${Date.now()}`,
+      runAt: new Date(Date.now() + taskOfflineGraceMs),
+    }).catch(() => undefined);
+    return true;
   };
+
+  /** Starts a task through this socket (resuming one after an interruption). */
+  const localStarter =
+    (conn: MachineConnection): LocalTaskStarter =>
+    (input) => {
+      const call: TaskCall = (_machineId, request) => callLocal(conn, request);
+      return startMachineTask({ db, pubsub, call }, input);
+    };
+
+  /** `task.done`: persisted (and the conversation woken), then acknowledged so the runner stops re-sending it. */
+  async function taskDone(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "task.done" }>) {
+    const machineId = conn.machineId as string;
+    if (frame.interrupted) {
+      const row = await getTask(db, frame.taskId);
+      if (row && row.machineId === machineId) {
+        await settleInterruptedTask({ db, pubsub, start: localStarter(conn) }, row, frame);
+      }
+    } else {
+      await applyTaskDone({ db, pubsub }, machineId, frame);
+    }
+    send(conn, { type: "task.ack", taskId: frame.taskId });
+  }
 
   async function hello(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "hello" }>) {
     if (conn.machineId || conn.authing) return;
@@ -222,6 +286,8 @@ export function createMachineHub(deps: MachineHubDeps) {
         protocol: frame.protocol,
         workspace: frame.workspace,
         execAllowed: frame.exec,
+        // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
+        ...(frame.executors ? { executors: { ...frame.executors, detectedAt: now.toISOString() } } : {}),
         updatedAt: now,
       })
       .where(eq(machines.id, machine.id));
@@ -238,6 +304,45 @@ export function createMachineHub(deps: MachineHubDeps) {
       send(conn, { type: "ping", at: Date.now() });
     }, heartbeatMs);
     await publishMachineStatus(pubsub, machine.orgId, machine.id, true);
+    if (frame.protocol >= TASKS_PROTOCOL) {
+      await reconcileMachineTasks({ db, pubsub, start: localStarter(conn) }, machine.id, frame.tasks ?? []).catch(
+        (error) => deps.log?.warn("task reconcile failed", { machineId: machine.id, error: String(error) }),
+      );
+    }
+    // Missions on this machine: queued messages and `.agentes/` files go out now (not in this frame's path).
+    if (hooks.online) {
+      const online = hooks.online;
+      queueMicrotask(
+        () =>
+          void online(machine.id).catch((error) =>
+            deps.log?.warn("mission reconnect failed", { machineId: machine.id, error: String(error) }),
+          ),
+      );
+    }
+  }
+
+  /** `mcp.call` (protocol 5): run by the missions hook, answered with `mcp.result`; never blocks other frames. */
+  function mcpCall(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "mcp.call" }>) {
+    const machineId = conn.machineId as string;
+    const run = hooks.mcp
+      ? hooks.mcp(machineId, frame)
+      : Promise.resolve({
+          ok: false as const,
+          error: { code: "mission.unavailable", message: "Missions are not available on this server." },
+        });
+    void run
+      .catch((error: unknown) => ({
+        ok: false as const,
+        error: { code: "internal", message: error instanceof Error ? error.message : String(error) },
+      }))
+      .then((out) =>
+        send(
+          conn,
+          out.ok
+            ? { type: "mcp.result", callId: frame.callId, ok: true, text: out.text.slice(0, 50_000) }
+            : { type: "mcp.result", callId: frame.callId, ok: false, error: out.error },
+        ),
+      );
   }
 
   async function touch(conn: MachineConnection) {
@@ -483,6 +588,16 @@ export function createMachineHub(deps: MachineHubDeps) {
       if (frame.type === "output") conn.pending.get(frame.id)?.onOutput?.(frame.stream, frame.chunk);
       else if (frame.type === "result") conn.pending.get(frame.id)?.settle(frame);
       else if (frame.type === "pong") await touch(conn);
+      else if (frame.type === "task.event") {
+        await applyTaskEvent({ db, pubsub }, conn.machineId, frame).catch(() => undefined);
+      } else if (frame.type === "mcp.call") {
+        mcpCall(conn, frame);
+      } else if (frame.type === "task.done") {
+        // Not acknowledged on failure: the runner sends it again after its next reconnect.
+        await taskDone(conn, frame).catch((error) =>
+          deps.log?.warn("task.done failed", { taskId: frame.taskId, error: String(error) }),
+        );
+      }
     },
 
     /** The socket closed (either side): pending requests fail, and the machine goes offline unless replaced. */
@@ -517,7 +632,13 @@ export function createMachineHub(deps: MachineHubDeps) {
         execAllowed: row.execAllowed,
         os: row.os,
         protocol: row.protocol,
+        executors: row.executors ?? {},
       };
+    },
+
+    /** Missions plug in their MCP tools and their reconnect follow-up (set once the engine is built). */
+    setMissionHooks(next: MachineMissionHooks) {
+      hooks = next;
     },
 
     /** Whether this replica holds the machine's socket. */

@@ -363,3 +363,73 @@ export function WorkSweep({
   }, !waiting);
   return <canvas ref={ref} className={cx("ac-work-sweep", className)} />;
 }
+
+/**
+ * A mission's plan as a pixel strip (telas/ThreadContexto.html): one cell
+ * per checklist item, in the agent's own tones. Done is a filled dithered
+ * cell, doing an animated one, waiting for a person an ink outline, stopped
+ * with the computer a dotted outline, dropped a dotted base, to do a faint
+ * base. The caller gives the words (`aria-label` on `role="img"`).
+ */
+export type PlanStripCell = "done" | "doing" | "waiting" | "stopped" | "dropped" | "todo";
+
+export function PlanStrip({
+  cells,
+  color = "sky",
+  label,
+  className,
+}: {
+  cells: PlanStripCell[];
+  color?: AgentColor;
+  /** "4 de 12 itens prontos". */
+  label: string;
+  className?: string;
+}) {
+  const W = 9;
+  const H = 7;
+  const GAP = 2;
+  const n = Math.max(1, cells.length);
+  const width = n * W + (n - 1) * GAP;
+  const moving = cells.includes("doing");
+  const ref = useCanvas((ctx, canvas, t) => {
+    const tones = bodyTones(color);
+    const tone = (i: number) => tones[i] ?? "#888888";
+    const line = token(canvas, "--line-strong", "#cfcfc9");
+    const ink = token(canvas, "--ink2", "#2a2a28");
+    const still = reduced();
+    ctx.clearRect(0, 0, width, H);
+    cells.forEach((st, i) => {
+      const x0 = i * (W + GAP);
+      for (let y = 0; y < H; y++)
+        for (let x = 0; x < W; x++) {
+          const edge = x === 0 || y === 0 || x === W - 1 || y === H - 1;
+          const b = BAYER[((y & 3) << 2) | (x & 3)] ?? 0.5;
+          let c: string | null = null;
+          if (st === "done") {
+            const f = 1 - y / (H - 1);
+            c = tone(1 + Math.min(2, Math.floor(f * 2 + b)));
+          } else if (st === "doing") {
+            const w = still ? 0.6 : (Math.sin(t * 4 - x * 0.7 + i) + 1) / 2;
+            if (w + b * 0.8 > 0.7) c = tone(2 + Math.min(2, Math.floor((w + b) * 1.5)));
+            else if (edge) c = tone(3);
+          } else if (st === "waiting") {
+            if (edge) c = ink;
+          } else if (st === "stopped") {
+            if (edge && (x + y) % 2 === 0) c = ink;
+          } else if (st === "dropped") {
+            if (y === Math.floor(H / 2) && x % 2 === 0) c = line;
+          } else if (y === H - 1 && x % 2 === 0) c = line;
+          if (c) {
+            ctx.fillStyle = c;
+            ctx.fillRect(x0 + x, y, 1, 1);
+          }
+        }
+    });
+  }, moving);
+  return (
+    <span className={cx("ac-plan-strip", className)} role="img" aria-label={label}>
+      {/* Height follows the width (the canvas's own ratio), so a long plan scales down whole. */}
+      <canvas ref={ref} width={width} height={H} style={{ width: width * CELL }} />
+    </span>
+  );
+}

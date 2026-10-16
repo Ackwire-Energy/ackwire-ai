@@ -109,6 +109,8 @@ export {
 } from "./components/RecurrencePicker";
 export {
   CriteriaPixels,
+  PlanStrip,
+  type PlanStripCell,
   RunKey,
   RunLane,
   type RunPixel,

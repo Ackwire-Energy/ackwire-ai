@@ -2,6 +2,13 @@ import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid 
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
+/** What `hello` says about the coding CLIs on the machine (ADR 0025, protocol 7). */
+export interface MachineExecutors {
+  claude?: { version: string };
+  codex?: { version: string };
+  detectedAt?: string;
+}
+
 /**
  * Connected computers (ADR 0025): machines people paired, where our runner
  * keeps one outbound WebSocket open. The token is stored as SHA-256 only;
@@ -30,6 +37,14 @@ export const machines = pgTable(
     workspace: text().notNull().default(""),
     /** `false`: the runner was started with `--no-exec` (files and uploads only). */
     execAllowed: boolean().notNull().default(true),
+    /**
+     * Coding CLIs the runner found on the machine at its last `hello`
+     * (`claude`, `codex`: their `--version`), and when it looked. Empty: an
+     * older runner that doesn't report them.
+     */
+    executors: jsonb().$type<MachineExecutors>().notNull().default({}),
+    /** A background task interrupted by the machine going away resumes by itself when it comes back (ADR 0029). */
+    resumeTasks: boolean().notNull().default(true),
     /** Last known; trust it only with a recent `last_seen_at` (a replica may have died). */
     online: boolean().notNull().default(false),
     /** The server process holding its socket. */

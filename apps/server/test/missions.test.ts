@@ -1,0 +1,252 @@
+import { afterEach, expect, test } from "bun:test";
+import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
+import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+
+let t: TestServer;
+afterEach(() => t.close());
+
+const RUNNER = {
+  hostname: "mac",
+  os: "darwin",
+  arch: "arm64",
+  version: "0.5.0",
+  protocol: MACHINE_PROTOCOL_VERSION,
+  workspace: "/Users/w/agentes",
+};
+
+/** A connected runner on the test server's hub that starts and cancels tasks. */
+function fakeRunner(extra: Record<string, unknown> = {}) {
+  const hub = t.engine.machineHub;
+  const started: Extract<ServerFrame, { type: "request"; op: "task.start" }>[] = [];
+  const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
+  const conn = hub.open({
+    send(text: string) {
+      const frame = JSON.parse(text) as ServerFrame;
+      if (frame.type !== "request") return;
+      setTimeout(() => {
+        const ok = (data: unknown) => void reply({ type: "result", id: frame.id, ok: true, data });
+        if (frame.op === "task.start") {
+          started.push(frame);
+          return ok({
+            taskId: frame.taskId,
+            pid: 7,
+            startedAt: new Date().toISOString(),
+            cwd: frame.cwd ?? "",
+            command: "claude -p",
+          });
+        }
+        if (frame.op === "task.cancel") return ok({ canceled: true });
+        if (frame.op === "task.output") return ok({ lines: ["Reading app/package.json"], truncated: false });
+        if (frame.op === "read") return ok({ base64: null, size: 0 });
+        return ok({ size: 0 });
+      }, 1);
+    },
+    close() {},
+  });
+  return {
+    started,
+    hello: (token: string) =>
+      hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true, ...extra })),
+  };
+}
+
+interface Mission {
+  id: string;
+  threadId: string;
+  status: string;
+  role: string;
+  canAct: boolean;
+  plan: { total: number };
+}
+
+test("missions API: session and same origin; create, read, start (owner only), list, summary, stop, close", async () => {
+  t = await createTestServer({ env: { ALLOW_SIGNUP: "true" }, reply: () => ({ chunks: ["ok"] }) });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+
+  // A computer for the agent, its runner connected.
+  const pairing = (await (await api("/machines/pairings", { json: { name: "MacBook" } })).json()) as { code: string };
+  const paired = (await (
+    await t.app.request("/api/machines/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
+      body: JSON.stringify({ code: pairing.code, ...RUNNER, exec: true }),
+    })
+  ).json()) as { machineId: string; token: string };
+  expect(
+    (await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: paired.machineId } })).status,
+  ).toBe(200);
+  const runner = fakeRunner();
+  await runner.hello(paired.token);
+
+  const anon = browser(t);
+  expect((await anon(`/api/app/organizations/${orgId}/missions`)).status).toBe(401);
+  const input = { agentId, channelId, goal: "Build our mobile app", title: "Mobile app" };
+  expect((await api("/missions", { json: input, origin: "https://evil.example" })).status).toBe(403);
+
+  const created = await api("/missions", { json: input });
+  expect(created.status).toBe(201);
+  const mission = (await created.json()) as Mission;
+  expect(mission).toMatchObject({ status: "proposed", role: "owner", canAct: true });
+  expect(runner.started).toHaveLength(1);
+  expect(runner.started[0]?.mission?.id).toBe(mission.id);
+
+  const byThread = await api(`/threads/${mission.threadId}/mission`);
+  expect(((await byThread.json()) as Mission).id).toBe(mission.id);
+  const tasks = (await (await api(`/threads/${mission.threadId}/tasks`)).json()) as { tasks: { missionId: string }[] };
+  expect(tasks.tasks.map((x) => x.missionId)).toEqual([mission.id]);
+  const threads = (await (await api("/threads?tab=missions")).json()) as {
+    threads: { id: string; mission: { id: string; status: string } | null }[];
+  };
+  expect(threads.threads).toEqual([
+    expect.objectContaining({
+      id: mission.threadId,
+      mission: expect.objectContaining({ id: mission.id, status: "proposed" }),
+    }),
+  ]);
+
+  // A member who reads the channel sees it, but can't start it, decide or stop it.
+  const bia = browser(t);
+  await signUp(bia, "bia@example.com");
+  const { url } = (await (
+    await api("/invitations", { json: { email: "bia@example.com", role: "member" } })
+  ).json()) as {
+    url: string;
+  };
+  await bia(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
+  const asBia = (path: string, init?: Parameters<typeof bia>[1]) => bia(`/api/app/organizations/${orgId}${path}`, init);
+  const seen = await asBia(`/missions/${mission.id}`);
+  expect(seen.status).toBe(200);
+  expect(((await seen.json()) as Mission).role).toBe("none");
+  const refused = await asBia(`/missions/${mission.id}/start`, { json: {} });
+  expect(refused.status).toBe(403);
+  expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("mission.not_owner");
+  expect((await asBia(`/missions/${mission.id}/stop`, { json: {} })).status).toBe(403);
+  expect((await asBia(`/missions/${mission.id}/close`, { json: { outcome: "done" } })).status).toBe(403);
+
+  const startRes = await api(`/missions/${mission.id}/start`, { json: {} });
+  expect(startRes.status).toBe(200);
+  expect(((await startRes.json()) as Mission).status).toBe("active");
+  expect((await api(`/missions/${mission.id}/start`, { json: {} })).status).toBe(409);
+
+  const list = (await (await api("/missions?status=open")).json()) as { missions: Mission[] };
+  expect(list.missions.map((m) => m.id)).toEqual([mission.id]);
+  const summary = (await (await api(`/missions/${mission.id}/summary`)).json()) as { text: string };
+  expect(summary.text).toContain('"Mobile app": active.');
+  const plan = (await (await api(`/missions/${mission.id}/plan`)).json()) as {
+    missionId: string;
+    current: unknown;
+    history: unknown[];
+  };
+  expect(plan).toEqual({ missionId: mission.id, current: null, history: [] });
+  expect((await api(`/missions/${mission.id}/files`)).status).toBe(200);
+  expect((await api(`/missions/${mission.id}/participants`)).status).toBe(200);
+  expect((await api(`/missions/${mission.id}/decisions`)).status).toBe(200);
+
+  // The list's counts and filters, the agents that can run a mission.
+  const counted = (await (await api(`/missions?status=open&agentId=${agentId}&q=mobile`)).json()) as {
+    missions: Mission[];
+    counts: { active: number; waitingYou: number; closed: number };
+  };
+  expect(counted.counts).toEqual({ active: 1, waitingYou: 0, closed: 0 });
+  expect(counted.missions).toHaveLength(1);
+  expect(((await (await api("/missions?q=nothing-like-it")).json()) as { missions: Mission[] }).missions).toEqual([]);
+  const eligible = (await (await api("/missions/eligible-agents")).json()) as {
+    agents: { agentId: string; machine: { online: boolean } }[];
+  };
+  expect(eligible.agents).toEqual([
+    expect.objectContaining({ agentId, machine: expect.objectContaining({ online: true }) }),
+  ]);
+
+  // "Ver saída": anyone who reads the thread.
+  const taskId = runner.started[0]?.taskId as string;
+  const output = await asBia(`/tasks/${taskId}/output?tail=20`);
+  expect(output.status).toBe(200);
+  expect(await output.json()).toMatchObject({ source: "computer", lines: ["Reading app/package.json"] });
+
+  // Bia asks to join; the owner sees it and accepts her as someone who decides.
+  const asked = await asBia(`/missions/${mission.id}/join-requests`, { json: {} });
+  expect(asked.status).toBe(200);
+  expect(((await (await asBia(`/missions/${mission.id}`)).json()) as { joinRequested: boolean }).joinRequested).toBe(
+    true,
+  );
+  const pending = (await (await api(`/missions/${mission.id}/join-requests`)).json()) as {
+    requests: { userId: string; name: string }[];
+  };
+  expect(pending.requests).toHaveLength(1);
+  const biaId = pending.requests[0]?.userId as string;
+  expect((await asBia(`/missions/${mission.id}/join-requests/${biaId}/decline`, { json: {} })).status).toBe(403);
+  const accepted = await api(`/missions/${mission.id}/join-requests/${biaId}/accept`, { json: { role: "decide" } });
+  expect(accepted.status).toBe(200);
+  expect(((await (await asBia(`/missions/${mission.id}`)).json()) as Mission).role).toBe("decide");
+  expect((await asBia(`/missions/${mission.id}/join-requests`, { json: {} })).status).toBe(409);
+
+  const stopped = await api(`/missions/${mission.id}/stop`, { json: {} });
+  expect(stopped.status).toBe(200);
+  expect((await stopped.json()) as { status: string; canceledTasks: number }).toMatchObject({
+    status: "paused",
+    canceledTasks: 1,
+  });
+  const closed = await api(`/missions/${mission.id}/close`, { json: { outcome: "canceled" } });
+  expect(closed.status).toBe(200);
+  expect(((await closed.json()) as Mission).status).toBe("canceled");
+  expect((await api(`/missions/${mission.id}/resume`, { json: {} })).status).toBe(409);
+});
+
+test("missions API: who programs: eligible agents list it, POST takes it, the owner switches it before Start", async () => {
+  t = await createTestServer({ reply: () => ({ chunks: ["ok"] }) });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const pairing = (await (await api("/machines/pairings", { json: { name: "MacBook" } })).json()) as { code: string };
+  const paired = (await (
+    await t.app.request("/api/machines/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
+      body: JSON.stringify({ code: pairing.code, ...RUNNER, exec: true }),
+    })
+  ).json()) as { machineId: string; token: string };
+  await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: paired.machineId } });
+  // The runner found Claude Code on the machine.
+  const runner = fakeRunner({ executors: { claude: { version: "2.1.300 (Claude Code)" } } });
+  await runner.hello(paired.token);
+
+  const eligible = (await (await api("/missions/eligible-agents")).json()) as {
+    agents: { executors: string[]; defaultExecutor: string; codexTooOld: boolean }[];
+  };
+  expect(eligible.agents[0]).toMatchObject({
+    executors: ["claude", "agent"],
+    defaultExecutor: "claude",
+    codexTooOld: false,
+  });
+
+  const bad = await api("/missions", { json: { agentId, channelId, goal: "Build it", executor: "codex" } });
+  expect(bad.status).toBe(409);
+  expect(((await bad.json()) as { error: { code: string } }).error.code).toBe("mission.executor_unavailable");
+
+  const created = await api("/missions", { json: { agentId, channelId, goal: "Build it", executor: "agent" } });
+  expect(created.status).toBe(201);
+  const mission = (await created.json()) as Mission & {
+    executor: string;
+    machine: { executors: string[] };
+  };
+  expect(mission.executor).toBe("agent");
+  expect(mission.machine.executors).toEqual(["claude", "agent"]);
+  // The agent plans it itself: no executor session on the machine.
+  expect(runner.started).toHaveLength(0);
+
+  const switched = await api(`/missions/${mission.id}/executor`, { method: "PUT", json: { executor: "claude" } });
+  expect(switched.status).toBe(200);
+  expect(((await switched.json()) as { executor: string }).executor).toBe("claude");
+  expect(runner.started).toHaveLength(1);
+  expect(runner.started[0]?.mission).toMatchObject({ id: mission.id, mode: "plan" });
+
+  await api(`/missions/${mission.id}/start`, { json: {} });
+  const late = await api(`/missions/${mission.id}/executor`, { method: "PUT", json: { executor: "agent" } });
+  expect(late.status).toBe(409);
+});

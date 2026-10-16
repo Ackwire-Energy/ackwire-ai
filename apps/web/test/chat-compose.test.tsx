@@ -154,7 +154,13 @@ describe("quote reply", () => {
     const items = within(screen().getByRole("menu"))
       .getAllByRole("menuitem")
       .map((i) => i.textContent);
-    expect(items).toEqual(["Salvar na wiki", "Copiar link", "Responder", "Responder em thread"]);
+    expect(items).toEqual([
+      "Salvar na wiki",
+      "Copiar link",
+      "Responder",
+      "Criar thread a partir daqui",
+      "Responder em thread",
+    ]);
   });
 
   test("quote helpers: one-line excerpt, meta read back safely", () => {

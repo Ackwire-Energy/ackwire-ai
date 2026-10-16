@@ -129,6 +129,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           .values({
             orgId: ctx.orgId,
             runId: ctx.runId,
+            missionId: tool.missionId ?? null,
             agentId: ctx.agentId,
             channelId: ctx.channelId,
             threadRootId: ctx.threadRootId,

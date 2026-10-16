@@ -5,6 +5,7 @@ import {
   type ComposerCommand,
   ComposerFile,
   type ComposerFormatLabels,
+  cx,
   DayDivider,
   Dialog,
   DialogFooter,
@@ -31,6 +32,7 @@ import { Fragment, memo, type ReactNode, useEffect, useLayoutEffect, useMemo, us
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
+import { useCreateMission, useMissionControl, useThreadMission } from "@/api/missions";
 import {
   MESSAGES_PAGE,
   sendHelpers,
@@ -39,11 +41,15 @@ import {
   useApprovals,
   useChannelMembers,
   useChannels,
+  useChannelThreads,
+  useCreateThread,
   useJoinChannel,
   useMessages,
   useModels,
   usePostMessage,
   useRoster,
+  useThreadInfo,
+  useThreadMessages,
   useThreads,
   useUpdateChannel,
   useWikiTree,
@@ -59,10 +65,11 @@ import type {
   Message as MessageType,
   ReplyRef,
   SecretRequest,
+  ThreadInfo,
 } from "@/api/types";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
-import { buildTimeline, mergeTimeline, threadRootsToLoad } from "@/chat/timeline";
+import { buildTimeline, mergeTimeline, type TimelineItem, threadRootsToLoad } from "@/chat/timeline";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
@@ -78,12 +85,36 @@ import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageMoreMenu, PersonMessageActions, QuoteReplyButton } from "@/components/MessageMore";
 import { MessageReceipts } from "@/components/MessageReceipts";
 import { MessageWork } from "@/components/MessageWork";
+import { MissionPanelProvider } from "@/components/missions/MissionBits";
+import {
+  MissionDecisionCard,
+  MissionEphemeral,
+  MissionPlanCard,
+  MissionPlanChangeLine,
+  MissionReportExtras,
+  MissionReviewCard,
+  MissionStartLink,
+  MissionSuggestionBar,
+  TaskNoticeLine,
+} from "@/components/missions/MissionCards";
+import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { askToStop, isStoppable, StopButton, useStopRun } from "@/components/StopRun";
+import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
+import { useThreadFlows } from "@/components/threads/ThreadBits";
+import {
+  ArchivedThreadsNote,
+  ChannelThreadsButton,
+  ChannelThreadsContext,
+  type ChannelThreadsView,
+  ClosedThreadLine,
+  ThreadStartLine,
+  useChannelThreadsView,
+} from "@/components/threads/ThreadLines";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
@@ -93,15 +124,25 @@ import { artifactRefs } from "@/lib/artifacts";
 import { audienceNotice, canTalk } from "@/lib/audience";
 import { entersWithMotion, greetingSuggestions, messageUsage, nearBottom, usageLine } from "@/lib/chat";
 import { clearDraft, peekDraft } from "@/lib/drafts";
-import { errorText } from "@/lib/errors";
+import { errorCode, errorText } from "@/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { serverBody } from "@/lib/message-body";
+import {
+  isOpenMission,
+  missionPlanChangeOf,
+  missionPlanOf,
+  missionReportOf,
+  missionSuggestionOf,
+  parseMissionCommand,
+  taskNoticeOf,
+} from "@/lib/missions";
 import { reportPainted } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { localMeta, quoteExcerpt, replyOf } from "@/lib/reply";
 import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@/lib/routines";
+import { contextMarks, hiddenByThreads, rangeCandidates, suggestRange, threadStartOf } from "@/lib/threads";
 import { useToast } from "@/lib/toast";
 import { splitCanceled } from "@/lib/work";
 import {
@@ -114,7 +155,14 @@ import {
   useStreams,
   useTypingSender,
 } from "@/realtime/context";
-import { agentStateOfRun, isQuiet, type LiveRun, narrationOf, runsInChannel } from "@/realtime/streams";
+import {
+  agentStateOfRun,
+  isQuiet,
+  type LiveRun,
+  narrationOf,
+  runsInChannel,
+  type StreamsState,
+} from "@/realtime/streams";
 import { typingIn } from "@/realtime/typing";
 
 /** Header and empty state of a channel, or of a DM (same layout). */
@@ -131,6 +179,14 @@ export interface ChannelChrome {
   emptyTitle?: string;
   /** Empty conversation: first messages to pick (they go to the composer). */
   suggestions?: string[];
+  /** Above the messages (a thread's origin and context block). */
+  top?: ReactNode;
+  /** The composer's label and placeholder ("Responder na thread"). */
+  composerLabel?: string;
+  /** In place of the composer (an archived thread's read-only note). */
+  composerReplacement?: ReactNode;
+  /** Under the composer (a mission someone only reads: "para pedir algo, peça para participar"). */
+  composerNote?: ReactNode;
 }
 
 const sameRuns = (a: LiveRun[], b: LiveRun[]) => a.length === b.length && a.every((r, i) => r === b[i]);
@@ -224,9 +280,15 @@ export function ChannelPage({
   chrome,
   fallback,
   focusMessageId,
+  adjustThreadId,
+  thread,
 }: {
   channelId: string;
   chrome?: ChannelChrome;
+  /** "Ajustar trecho": the selection of this thread's range, in place of the timeline. */
+  adjustThreadId?: string;
+  /** Thread view: this thread's conversation (root and replies), with replies going to it. */
+  thread?: ThreadInfo;
   /** Open at this message (a copied link): load around it, scroll to it and highlight it. */
   focusMessageId?: string;
   /** DMs may not be in the channel list: the page still works with this. */
@@ -247,7 +309,19 @@ export function ChannelPage({
       </main>
     );
   }
-  return <ChannelView key={channel.id} channel={channel} chrome={chrome} focusMessageId={focusMessageId} />;
+  return (
+    // "Arquivos", "Ver plano", "Ver no arquivo": any mission card here opens the same files panel.
+    <MissionPanelProvider>
+      <ChannelView
+        key={`${channel.id}:${thread?.id ?? ""}:${adjustThreadId ?? ""}`}
+        channel={channel}
+        chrome={chrome}
+        focusMessageId={focusMessageId}
+        adjustThreadId={adjustThreadId}
+        thread={thread}
+      />
+    </MissionPanelProvider>
+  );
 }
 
 /**
@@ -292,19 +366,47 @@ function ChannelView({
   channel,
   chrome,
   focusMessageId,
+  adjustThreadId,
+  thread,
 }: {
   channel: Channel;
   chrome?: ChannelChrome;
   focusMessageId?: string;
+  adjustThreadId?: string;
+  thread?: ThreadInfo;
 }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const isMember = channel.isMember;
   const members = useChannelMembers(org.id, channel.id, isMember);
-  const messages = useMessages(org.id, channel.id, isMember);
-  const roots = useMemo(() => threadRootsToLoad(messages.data ?? []), [messages.data]);
-  const threads = useThreads(org.id, channel.id, isMember ? roots : []);
+  const channelMessages = useMessages(org.id, channel.id, isMember);
+  // Thread view: the thread's root and replies (the channel's page still holds my unsent replies).
+  const threadMessages = useThreadMessages(org.id, thread && isMember ? channel.id : undefined, thread?.id ?? "");
+  const messages = thread ? threadMessages : channelMessages;
+  const roots = useMemo(() => threadRootsToLoad(channelMessages.data ?? []), [channelMessages.data]);
+  const threads = useThreads(org.id, channel.id, isMember && !thread ? roots : []);
+  // The channel's threads: closed lines, context marks, markers (not in a thread view or while adjusting).
+  const listsThreads = isMember && !thread;
+  const openThreads = useChannelThreads(org.id, channel.id, "all", listsThreads);
+  const archivedThreads = useChannelThreads(org.id, channel.id, "archived", listsThreads);
+  const threadList = useMemo(
+    () => [...(openThreads.data?.threads ?? []), ...(archivedThreads.data?.threads ?? [])],
+    [openThreads.data, archivedThreads.data],
+  );
+  // Live runs shown here: a thread view shows its own; the channel hides those of threads it draws as
+  // one line (closed) or a marker (made from a range): their replies don't land in the channel.
+  const hiddenRunThreads = useMemo(
+    () =>
+      new Set([
+        ...threadList.filter((x) => x.state !== "open").map((x) => x.id),
+        ...(channelMessages.data ?? []).filter((m) => threadStartOf(m.meta) || m.meta?.missionStart).map((m) => m.id),
+      ]),
+    [threadList, channelMessages.data],
+  );
+  const runVisible = useRef<(r: LiveRun) => boolean>(() => true);
+  runVisible.current = thread ? (r) => r.threadId === thread.id : (r) => !hiddenRunThreads.has(r.threadId);
+  const scopedRuns = (s: StreamsState) => runsInChannel(s, channel.id).filter((r) => runVisible.current(r));
   const live = useLiveStore();
   const status = useConnectionStatus();
   const join = useJoinChannel(org.id, channel.id);
@@ -320,7 +422,7 @@ function ChannelView({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || draftRef.current.trim()) return;
       if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
-      const target = runsInChannel(live.get().streams, channel.id)
+      const target = scopedRuns(live.get().streams)
         .filter((r) => isStoppable(r) && !r.stopping && mayStop(r))
         .at(-1);
       if (!target) return;
@@ -331,11 +433,17 @@ function ChannelView({
     return () => window.removeEventListener("keydown", onKey);
   });
   // An agent working here: the composer says the message goes into its task.
-  const workingRun = useStreams((s) => runsInChannel(s, channel.id).find((r) => isStoppable(r) && !r.stopping));
+  const workingRun = useStreams((s) => scopedRuns(s).find((r) => isStoppable(r) && !r.stopping));
   // "Responder em thread": the next message goes to that thread.
   const [replyTo, setReplyTo] = useState<MessageType | null>(null);
   // "Responder": the next message quotes this one (`meta.replyTo`), in the same conversation.
   const [quote, setQuote] = useState<MessageType | null>(null);
+  // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
+  const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
+  // `/summary` and `/plan`: a card only I see, under the conversation.
+  const [ephemeral, setEphemeral] = useState<{ kind: "summary" | "plan"; missionId: string } | null>(null);
+  // `/mission` with several agents and none named: "Nova missão" with the goal filled in.
+  const [missionDraft, setMissionDraft] = useState<string | null>(null);
   draftRef.current = draft;
   useEffect(() => {
     if (draftKey) clearDraft(draftKey);
@@ -381,6 +489,7 @@ function ChannelView({
       .filter((a): a is Agent => Boolean(a && canTalk(a) && channelAgents.some((c) => c.id === a.id)))
       .map((a) => a.id);
 
+  const toast = useToast();
   const post = usePostMessage(org.id, channel.id, {
     me: { id: me.user.id },
     mentioned,
@@ -395,12 +504,16 @@ function ChannelView({
       if (agents.length > 0) live.expect(channel.id, local.id, agents);
     },
     onSent: (message, local) => live.retarget(local.id, message.id),
+    // A thread archived meanwhile (`thread.archived`): say so in the person's language.
+    onFailed: (error) => {
+      if (errorCode(error)?.startsWith("thread.")) toast.show(errorText(t, error), "error");
+    },
   });
   const { send, retry } = sendHelpers(post);
 
   // Reading the channel marks it read (unread counts in the DM list).
   const api = useApi();
-  const lastId = messages.data?.at(-1)?.id;
+  const lastId = channelMessages.data?.at(-1)?.id;
   useEffect(() => {
     if (isMember && lastId) api.dms.markRead(org.id, channel.id).catch(() => {});
   }, [api, org.id, channel.id, isMember, lastId]);
@@ -428,7 +541,8 @@ function ChannelView({
   );
   const anchor = useRef<{ height: number; top: number } | null>(null);
   const loadOlder = () => {
-    if (olderState !== "idle" || !messages.data) return;
+    // A thread view loads its whole conversation at once.
+    if (thread || olderState !== "idle" || !messages.data) return;
     const oldest = older[0] ?? messages.data[0];
     if (!oldest || messages.data.length < MESSAGES_PAGE) {
       setOlderState("done");
@@ -461,18 +575,39 @@ function ChannelView({
     el.scrollTop = el.scrollHeight - a.height + a.top;
   }, [older]);
 
-  const timeline = useMemo(
-    () =>
-      buildTimeline(
-        mergeTimeline(
-          [...older, ...(messages.data ?? [])],
-          threads.map((q) => q.data),
-        ),
-        [],
-        [],
-      ),
-    [older, messages.data, threads],
-  );
+  // The channel's threads as the timeline draws them (none in a thread view).
+  const threadsView = useMemo<ChannelThreadsView | null>(() => {
+    if (thread) return null;
+    return {
+      byId: new Map(threadList.filter((x) => x.state !== "archived").map((x) => [x.id, x])),
+      marks: contextMarks(threadList, [...older, ...(channelMessages.data ?? [])], channel.id),
+    };
+  }, [thread, threadList, older, channelMessages.data, channel.id]);
+  const timeline = useMemo(() => {
+    if (thread) {
+      // The thread's conversation. One made from a range: not its root (the channel's marker) nor the
+      // moved messages (written before the root; the context block lists them).
+      const mine = (channelMessages.data ?? []).filter((m) => m.local && m.threadId === thread.id);
+      const list = mergeTimeline(threadMessages.data ?? [], [mine]).filter(
+        (m) => !thread.context || m.local || (m.id !== thread.id && m.createdAt > thread.createdAt),
+      );
+      return buildTimeline(list, [], []);
+    }
+    const merged = mergeTimeline(
+      [...older, ...(channelMessages.data ?? [])],
+      threads.map((q) => q.data),
+    );
+    const hidden = hiddenByThreads(threadList, merged);
+    const items = buildTimeline(
+      merged.filter((m) => !hidden(m)),
+      [],
+      [],
+    );
+    // A marker or a closed line is not a message: nothing groups under it.
+    const special = (m: MessageType) =>
+      Boolean(threadStartOf(m.meta)) || threadsView?.byId.get(m.id)?.state === "closed";
+    return ungroupAfter(items, special);
+  }, [thread, older, channelMessages.data, threadMessages.data, threads, threadList, threadsView]);
 
   // Newest at the bottom: follow new messages and streaming text while the person is at the
   // bottom; if they scrolled up, offer "Novas mensagens" instead of jumping.
@@ -513,8 +648,8 @@ function ChannelView({
   }, [isMember]);
   const reducedMotion = usePrefersReducedMotion();
   const [unseen, setUnseen] = useState(false);
-  const runCount = useStreams((s) => runsInChannel(s, channel.id).length);
-  const streamSize = useStreams((s) => runsInChannel(s, channel.id).reduce((n, r) => n + r.text.length, 0));
+  const runCount = useStreams((s) => scopedRuns(s).length);
+  const streamSize = useStreams((s) => scopedRuns(s).reduce((n, r) => n + r.text.length, 0));
   const lastKey = timeline.at(-1)?.key;
   const previousLastKey = useRef(lastKey);
   const openedAt = useRef(Date.now());
@@ -582,8 +717,22 @@ function ChannelView({
   );
   const pillAgents = dmAgent ? [dmAgent] : draftAgents;
   const composerPills =
-    pillAgents.length > 0 || replyTo ? (
+    pillAgents.length > 0 || replyTo || missionReply ? (
       <>
+        {missionReply && (
+          <span className="ac-composer__pill composer-reply">
+            <Icon name="message" size={14} />
+            {t("missions.reply.pill", { label: missionReply.label })}
+            <button
+              type="button"
+              className="composer-reply__close"
+              aria-label={t("missions.reply.cancel")}
+              onClick={() => setMissionReply(null)}
+            >
+              <Icon name="close" size={14} />
+            </button>
+          </span>
+        )}
         {replyTo && (
           <span className="ac-composer__pill composer-reply">
             <Icon name="message" size={14} />
@@ -637,6 +786,94 @@ function ChannelView({
         },
       ]
     : [];
+  // Mission commands (English, like the server's): `/mission` anywhere with an agent; the rest in a mission's thread.
+  const threadMission = useThreadMission(org.id, thread?.id);
+  const homeMission = threadMission.data && isOpenMission(threadMission.data) ? threadMission.data : null;
+  if (commandAgent && !homeMission) {
+    commands.push({
+      key: "mission",
+      label: "/mission",
+      description: t("missions.commands.mission"),
+      leading: <Icon name="flag" size={16} />,
+      insert: "/mission ",
+    });
+  }
+  if (homeMission) {
+    const run = (text: string) => () => void runCommand(text);
+    const can = homeMission.canAct;
+    commands.push(
+      ...[
+        { key: "summary" as const, icon: "layers" as const, show: true },
+        { key: "plan" as const, icon: "document" as const, show: true },
+        { key: "pause" as const, icon: "pause" as const, show: can && homeMission.status === "active" },
+        { key: "resume" as const, icon: "play" as const, show: can && homeMission.status === "paused" },
+        { key: "stop" as const, icon: "stop" as const, show: can && homeMission.status !== "proposed" },
+      ]
+        .filter((c) => c.show)
+        .map((c) => ({
+          key: c.key,
+          label: `/${c.key}`,
+          description: t(`missions.commands.${c.key}`),
+          leading: <Icon name={c.icon} size={16} />,
+          ...(c.key === "stop" ? { insert: "/stop" } : { insert: "", onPick: run(`/${c.key}`) }),
+        })),
+    );
+  }
+  const createMission = useCreateMission(org.id);
+  const missionControl = useMissionControl(org.id);
+  /** `/mission`, `/stop`, `/pause`, `/resume`, `/summary`, `/plan`: nothing is posted. True when handled. */
+  async function runCommand(text: string): Promise<boolean> {
+    const cmd = parseMissionCommand(text);
+    if (!cmd) return false;
+    setDraft("");
+    if (cmd.command === "mission") {
+      const named = mentioned(cmd.arg)[0];
+      const agentId = named ?? dmAgent?.id ?? (channelAgents.length === 1 ? channelAgents[0]?.id : undefined);
+      if (!agentId) {
+        setMissionDraft(cmd.arg);
+        return true;
+      }
+      createMission.mutate(
+        { agentId, goal: cmd.arg, ...(thread ? { threadId: thread.id } : { channelId: channel.id }) },
+        {
+          onSuccess: (mission) => {
+            toast.show(t("missions.new.created", { name: dir.agentById.get(agentId)?.name ?? "" }));
+            if (mission.threadId !== thread?.id) {
+              void navigateTo({
+                to: "/org/$orgId/threads/$threadId",
+                params: { orgId: org.id, threadId: mission.threadId },
+              });
+            }
+          },
+          onError: (error) => toast.show(errorText(t, error), "error"),
+        },
+      );
+      return true;
+    }
+    const mission = threadMission.data;
+    if (!mission) {
+      toast.show(t("missions.commands.noMission"), "error");
+      return true;
+    }
+    if (cmd.command === "summary" || cmd.command === "plan") {
+      setEphemeral({ kind: cmd.command, missionId: mission.id });
+      return true;
+    }
+    const action = cmd.command;
+    missionControl.mutate(
+      { missionId: mission.id, action },
+      {
+        onSuccess: (out) =>
+          toast.show(
+            action === "stop"
+              ? t("missions.toast.stopped", { count: out.canceledTasks ?? 0 })
+              : t(`missions.toast.${action}`),
+          ),
+        onError: (error) => toast.show(errorText(t, error), "error"),
+      },
+    );
+    return true;
+  }
 
   // Any new page of data (first load, refetch, cache → server) re-pins while at the bottom,
   // without waiting for observers (some environments have none).
@@ -687,7 +924,6 @@ function ChannelView({
   };
 
   // Files for the next message: uploaded to the Drive (this channel) right away; sending waits for them.
-  const toast = useToast();
   const [files, setFiles] = useState<PendingFile[]>([]);
   // Thumbnails are object URLs: freed when a file leaves the composer and when the page goes.
   const previews = useRef(new Set<string>());
@@ -738,10 +974,27 @@ function ChannelView({
 
   const onSend = (text: string) => {
     if (uploading || (!text && attached.length === 0)) return;
+    if (attached.length === 0 && parseMissionCommand(text)) {
+      void runCommand(text);
+      return;
+    }
+    if (missionReply && text) {
+      const target = missionReply;
+      setDraft("");
+      setMissionReply(null);
+      api.missions
+        .message(org.id, target.missionId, text)
+        .then((out) => toast.show(out.delivered ? t("missions.reply.sent") : t("missions.reply.queued")))
+        .catch((error) => {
+          setDraft(text);
+          toast.show(errorText(t, error), "error");
+        });
+      return;
+    }
     toBottom(true);
     setDraft("");
     const meta = localMeta(quote, quote ? dir.authorName(quote.author) : "", attached);
-    send(text, replyTo ? (replyTo.threadId ?? replyTo.id) : null, meta);
+    send(text, thread ? thread.id : replyTo ? (replyTo.threadId ?? replyTo.id) : null, meta);
     setReplyTo(null);
     setQuote(null);
     dropFiles(() => false);
@@ -749,7 +1002,7 @@ function ChannelView({
   // Live rows sit by time: right after the message that started them (never at the bottom glued
   // to a later reply). `liveKey` only changes when runs start or end.
   const liveKey = useStreams((s) =>
-    runsInChannel(s, channel.id)
+    scopedRuns(s)
       .filter(isWriting)
       .map((r) => JSON.stringify([r.runId, r.startedAt ?? 0, r.threadId, r.triggerMessageId ?? null]))
       .join("\n"),
@@ -760,6 +1013,61 @@ function ChannelView({
     const first = channelAgents[0];
     return first ? greetingSuggestions(t, first.role).map((s) => `@${first.handle} ${s}`) : [];
   }, [chrome?.suggestions, channelAgents, t]);
+
+  const createThread = useCreateThread(org.id);
+  const flows = useThreadFlows();
+  function createThreadFrom(message: MessageType) {
+    const range = suggestRange([...older, ...(channelMessages.data ?? [])], message.id);
+    if (!range || createThread.isPending) return;
+    createThread.mutate(
+      { channelId: channel.id, firstMessageId: range.firstId, lastMessageId: range.lastId },
+      { onSuccess: flows.created, onError: (error) => toast.show(errorText(t, error), "error") },
+    );
+  }
+
+  // "Ajustar trecho": the channel's messages that can be in the range (and the moved ones, back in
+  // their place), with the selection band in place of the timeline and its bar in place of the composer.
+  const adjustInfo = useThreadInfo(org.id, adjustThreadId);
+  const adjusting = adjustInfo.data;
+  const movedMessages = useThreadMessages(
+    org.id,
+    adjusting?.context?.moved ? adjusting.channelId : undefined,
+    adjusting?.id ?? "",
+  );
+  const adjustList = useMemo(() => {
+    if (!adjusting) return [];
+    const moved = adjusting.context?.moved
+      ? (movedMessages.data ?? []).filter((m) => m.id !== adjusting.id && m.createdAt < adjusting.createdAt)
+      : [];
+    return rangeCandidates(
+      mergeTimeline([...older, ...(channelMessages.data ?? [])], [moved.map((m) => ({ ...m, threadId: null }))]),
+    );
+  }, [adjusting, movedMessages.data, older, channelMessages.data]);
+  const adjust = useRangeAdjust({
+    thread: adjusting,
+    list: adjustList,
+    channelName: channel.name,
+    onDone: () => {},
+  });
+  // The range starts further back than what is loaded: page back to it (like `?m=`).
+  const adjustFirst = adjusting?.context?.firstMessageId;
+  const adjustFound = adjustList.some((m) => m.id === adjustFirst);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: steps while older pages arrive
+  useEffect(() => {
+    if (!adjustFirst || adjustFound || !messages.isSuccess || olderState !== "idle") return;
+    loadOlder();
+  }, [adjustFirst, adjustFound, messages.isSuccess, olderState, older.length]);
+  // Esc leaves the selection (back to the thread).
+  useEffect(() => {
+    if (!adjusting) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+      adjust.cancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   const actions: ChannelActions = {
     insertMention: (handle) => {
@@ -777,15 +1085,25 @@ function ChannelView({
       if (el && stick.current && Date.now() >= autoScrollUntil.current) el.scrollTop = el.scrollHeight;
     },
     channelAgents,
-    replyInThread: (message) => {
-      setReplyTo(message);
-      composer.current?.focus();
-    },
+    // In a thread view everything already goes to the thread.
+    replyInThread: thread
+      ? undefined
+      : (message) => {
+          setReplyTo(message);
+          composer.current?.focus();
+        },
     quoteReply: (message) => {
       setQuote(message);
       composer.current?.focus();
     },
     jumpTo,
+    // "Criar thread a partir daqui": the suggested range becomes a thread's context (not in a thread view).
+    createThreadFrom: thread || adjustThreadId ? undefined : createThreadFrom,
+    replyToMission: (missionId, label) => {
+      setMissionReply({ missionId, label });
+      setReplyTo(null);
+      composer.current?.focus();
+    },
   };
 
   const agentNames = joinNames(
@@ -801,262 +1119,326 @@ function ChannelView({
 
   return (
     <ChannelActionsContext.Provider value={actions}>
-      <main className="shell__main shell__main--chat">
-        {chrome?.header ?? (
-          <header className="channel__header">
-            <NavToggle />
-            <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
-              <h1 className="channel__title"># {channel.name}</h1>
-              {subtitle && <span className="channel__topic">{subtitle}</span>}
-            </div>
-            <ChannelMembersStack
-              channelId={channel.id}
-              people={channelPeople}
-              agents={channelAgents}
-              onDetails={() => setDetailsOpen(true)}
-            />
-            <Button size="sm" onClick={() => setDetailsOpen(true)}>
-              {t("channel.details")}
-            </Button>
-          </header>
-        )}
-        {!chrome && isMember && (
-          <ChannelWelcome channelId={channel.id} messages={messages.data} agents={channelAgents} />
-        )}
-
-        {!isMember ? (
-          <div className="channel__empty">
-            <EmptyState
-              icon="channel"
-              title={t("channel.notMemberTitle")}
-              actions={
-                <Button
-                  variant="primary"
-                  onClick={() => join.mutate()}
-                  disabled={join.isPending}
-                  loading={join.isPending}
-                >
-                  {t("channel.join", { channel: channel.name })}
-                </Button>
-              }
-            >
-              {t("channel.notMemberText")}
-            </EmptyState>
-          </div>
-        ) : (
-          <>
-            {olderState === "loading" && (
-              <div className="channel__older" role="status">
-                <span className="channel__older-pill">
-                  <Spinner size={14} />
-                  {t("channel.loadingOlder")}
-                </span>
+      <ChannelThreadsContext.Provider value={threadsView}>
+        <main className="shell__main shell__main--chat">
+          {chrome?.header ?? (
+            <header className="channel__header">
+              <NavToggle />
+              <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+                <h1 className="channel__title"># {channel.name}</h1>
+                {subtitle && <span className="channel__topic">{subtitle}</span>}
               </div>
-            )}
-            <section
-              ref={scroller}
-              className="channel__messages"
-              data-fresh={fresh || undefined}
-              aria-label={t("channel.messages")}
-              aria-live="polite"
-              aria-relevant="additions"
-              onWheel={markGesture}
-              onTouchMove={markGesture}
-              onPointerDown={markGesture}
-              onKeyDown={markGesture}
-              onScroll={(e) => {
-                lastScrollTop.current = e.currentTarget.scrollTop;
-                // Only the person scrolling unpins (or loads older pages); layout changes never do.
-                const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
-                if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
-                const near = nearBottom(e.currentTarget);
-                if (!near && (!byPerson || Date.now() < autoScrollUntil.current)) return;
-                stick.current = near;
-                if (near) setUnseen(false);
-              }}
-            >
-              {/* Pushes short channels down, next to the composer. */}
-              <div className="channel__spacer" aria-hidden="true" />
-              {messages.isLoading && <LoadingConversation />}
-              {messages.isError && !messages.data && (
-                <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
-              )}
-              {messages.isSuccess && timeline.length === 0 && streamSize === 0 && (
-                <div className="channel__empty">
-                  <EmptyState
-                    icon="message"
-                    title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
-                    actions={
-                      emptySuggestions.length > 0 ? (
-                        <fieldset className="channel__suggestions">
-                          <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
-                          {emptySuggestions.map((s) => (
-                            <Button
-                              key={s}
-                              size="sm"
-                              onClick={() => {
-                                setDraft(s);
-                                composer.current?.focus();
-                              }}
-                            >
-                              {s}
-                            </Button>
-                          ))}
-                        </fieldset>
-                      ) : undefined
-                    }
+              <ChannelMembersStack
+                channelId={channel.id}
+                people={channelPeople}
+                agents={channelAgents}
+                onDetails={() => setDetailsOpen(true)}
+              />
+              {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
+              <Button size="sm" onClick={() => setDetailsOpen(true)}>
+                {t("channel.details")}
+              </Button>
+            </header>
+          )}
+          {!chrome && isMember && (
+            <ChannelWelcome channelId={channel.id} messages={messages.data} agents={channelAgents} />
+          )}
+
+          {!isMember ? (
+            <div className="channel__empty">
+              <EmptyState
+                icon="channel"
+                title={t("channel.notMemberTitle")}
+                actions={
+                  <Button
+                    variant="primary"
+                    onClick={() => join.mutate()}
+                    disabled={join.isPending}
+                    loading={join.isPending}
                   >
-                    {chrome?.emptyText ?? t("channel.empty")}
-                  </EmptyState>
+                    {t("channel.join", { channel: channel.name })}
+                  </Button>
+                }
+              >
+                {t("channel.notMemberText")}
+              </EmptyState>
+            </div>
+          ) : (
+            <>
+              {olderState === "loading" && (
+                <div className="channel__older" role="status">
+                  <span className="channel__older-pill">
+                    <Spinner size={14} />
+                    {t("channel.loadingOlder")}
+                  </span>
                 </div>
               )}
-              <Timeline items={timeline} ready={messages.isSuccess} anchors={anchors} />
-              <LiveMemoryCards channelId={channel.id} />
-              <LiveNotices channelId={channel.id} />
-              {unanchored.map((runId) => (
-                <LiveRunSlot key={runId} runId={runId} />
-              ))}
-            </section>
-            {unseen && (
-              <div className="channel__pill">
-                <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
-                  {t("channel.newMessages")}
-                  <Icon name="chevronDown" size={16} />
-                </Button>
-              </div>
-            )}
-            {status === "reconnecting" && (
-              <p className="channel__status" role="status">
-                {t("channel.reconnecting")}
-              </p>
-            )}
-            {/* Esc in the box (nothing else open) drops the quote first. */}
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: Esc from the composer's controls bubbles here */}
-            <div
-              className="channel__composer"
-              onKeyDown={(e) => {
-                if (e.key !== "Escape" || !quote || e.defaultPrevented) return;
-                e.preventDefault();
-                setQuote(null);
-              }}
-            >
-              <ActivityBar channelId={channel.id} />
-              <Composer
-                header={
-                  quote ? (
-                    <QuoteBar
-                      name={dir.authorName(quote.author)}
-                      excerpt={quoteExcerpt(quote.body)}
-                      onCancel={() => {
-                        setQuote(null);
-                        composer.current?.focus();
-                      }}
-                    />
-                  ) : undefined
-                }
-                attachments={
-                  files.length > 0
-                    ? files.map((f) => (
-                        <ComposerFile
-                          key={f.key}
-                          name={f.name}
-                          icon={f.icon}
-                          preview={f.preview}
-                          detail={formatBytes(i18n.language, f.size)}
-                          status={f.status}
-                          statusLabel={
-                            f.status === "uploading"
-                              ? t("channel.uploading")
-                              : f.status === "failed"
-                                ? t("channel.uploadFailed")
-                                : undefined
-                          }
-                          removeLabel={t("channel.removeFile", { name: f.name })}
-                          onRemove={() => dropFiles((x) => x.key !== f.key)}
-                        />
-                      ))
-                    : undefined
-                }
-                onFiles={chrome?.locked ? undefined : addFiles}
-                canSendEmpty={attached.length > 0}
-                sendBlocked={uploading}
-                format={formatLabels}
-                emoji={emojiLabels}
-                id={`composer-${channel.id}`}
-                textareaRef={composer}
-                value={draft}
-                onChange={(v) => {
-                  setDraft(v);
-                  if (v.trim()) sendTyping();
+              <section
+                ref={scroller}
+                className="channel__messages"
+                data-fresh={fresh || undefined}
+                aria-label={t("channel.messages")}
+                aria-live="polite"
+                aria-relevant="additions"
+                onWheel={markGesture}
+                onTouchMove={markGesture}
+                onPointerDown={markGesture}
+                onKeyDown={markGesture}
+                onScroll={(e) => {
+                  lastScrollTop.current = e.currentTarget.scrollTop;
+                  // Only the person scrolling unpins (or loads older pages); layout changes never do.
+                  const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
+                  if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
+                  const near = nearBottom(e.currentTarget);
+                  if (!near && (!byPerson || Date.now() < autoScrollUntil.current)) return;
+                  stick.current = near;
+                  if (near) setUnseen(false);
                 }}
-                onSend={onSend}
-                disabled={Boolean(chrome?.locked)}
-                label={
-                  chrome?.composerTarget
-                    ? t("channel.composerDm", { name: chrome.composerTarget })
-                    : t("channel.composerLabel", { channel: channel.name })
-                }
-                placeholder={
-                  // DMs name the person or agent ("Mensagem para Theo"); channels keep "#nome".
-                  chrome?.composerTarget
-                    ? t("channel.composerDm", { name: chrome.composerTarget })
-                    : t("channel.composerPlaceholder", { channel: channel.name })
-                }
-                sendLabel={t("channel.send")}
-                sendText={t("channel.send")}
-                attachLabel={t("channel.attach")}
-                pills={composerPills}
-                links={{
-                  listLabel: t("wiki.editor.suggest"),
-                  search: (q) =>
-                    (wikiPages.data ?? [])
-                      .filter((p) => p.title.toLowerCase().includes(q.trim().toLowerCase()))
-                      .slice(0, 8)
-                      .map((p) => ({
-                        key: `wiki:${p.slug}`,
-                        insert: p.title,
-                        label: p.title,
-                        description: p.folder || undefined,
-                        leading: <Icon name="book" size={16} />,
-                      })),
-                }}
-                commands={commandAgent ? { listLabel: t("composer.commands"), list: commands } : undefined}
-                mentions={{
-                  search: mentionSearch,
-                  listLabel: t("mentions.list"),
-                  onPick: (item) => {
-                    if (item.note && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
-                  },
-                }}
-              />
-              {offer && <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />}
-              {(workingRun || chrome?.locked) && (
-                <p className="ac-composer__hint">
-                  {workingRun && !chrome?.locked ? (
-                    <span className="composer-working">
-                      {t("run.working", {
-                        name: dir.agentById.get(workingRun.agentId)?.name ?? t("channel.unknownAgent"),
-                      })}
-                      {mayStop(workingRun) && (
-                        <>
-                          {" · "}
-                          <StopButton run={workingRun} onStop={stopRun} place="composer" />
-                        </>
-                      )}
-                    </span>
-                  ) : (
-                    chrome?.locked
-                  )}
+              >
+                {/* Pushes short channels down, next to the composer. */}
+                <div className="channel__spacer" aria-hidden="true" />
+                {chrome?.top}
+                {messages.isLoading && <LoadingConversation />}
+                {messages.isError && !messages.data && (
+                  <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
+                )}
+                {messages.isSuccess && timeline.length === 0 && streamSize === 0 && !thread && !adjusting && (
+                  <div className="channel__empty">
+                    <EmptyState
+                      icon="message"
+                      title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
+                      actions={
+                        emptySuggestions.length > 0 ? (
+                          <fieldset className="channel__suggestions">
+                            <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
+                            {emptySuggestions.map((s) => (
+                              <Button
+                                key={s}
+                                size="sm"
+                                onClick={() => {
+                                  setDraft(s);
+                                  composer.current?.focus();
+                                }}
+                              >
+                                {s}
+                              </Button>
+                            ))}
+                          </fieldset>
+                        ) : undefined
+                      }
+                    >
+                      {chrome?.emptyText ?? t("channel.empty")}
+                    </EmptyState>
+                  </div>
+                )}
+                {adjustThreadId ? (
+                  <RangeRows
+                    adjust={adjust}
+                    scroller={scroller}
+                    renderMessage={(m) => (
+                      <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
+                    )}
+                  />
+                ) : (
+                  <>
+                    <Timeline items={timeline} ready={messages.isSuccess} anchors={anchors} />
+                    {!thread && (
+                      <ArchivedThreadsNote channelId={channel.id} count={archivedThreads.data?.threads.length ?? 0} />
+                    )}
+                  </>
+                )}
+                {ephemeral && (
+                  <MissionEphemeral
+                    kind={ephemeral.kind}
+                    missionId={ephemeral.missionId}
+                    onClose={() => setEphemeral(null)}
+                  />
+                )}
+                <LiveMemoryCards channelId={channel.id} />
+                <LiveNotices channelId={channel.id} />
+                {unanchored.map((runId) => (
+                  <LiveRunSlot key={runId} runId={runId} />
+                ))}
+              </section>
+              {unseen && (
+                <div className="channel__pill">
+                  <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
+                    {t("channel.newMessages")}
+                    <Icon name="chevronDown" size={16} />
+                  </Button>
+                </div>
+              )}
+              {status === "reconnecting" && (
+                <p className="channel__status" role="status">
+                  {t("channel.reconnecting")}
                 </p>
               )}
-            </div>
-          </>
-        )}
+              {/* Esc in the box (nothing else open) drops the quote first. */}
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: Esc from the composer's controls bubbles here */}
+              <div
+                className="channel__composer"
+                onKeyDown={(e) => {
+                  if (e.key !== "Escape" || !quote || e.defaultPrevented) return;
+                  e.preventDefault();
+                  setQuote(null);
+                }}
+              >
+                <ActivityBar channelId={channel.id} visible={runVisible} />
+                {adjustThreadId ? (
+                  <RangeBar adjust={adjust} />
+                ) : chrome?.composerReplacement ? (
+                  chrome.composerReplacement
+                ) : (
+                  <>
+                    <Composer
+                      header={
+                        quote ? (
+                          <QuoteBar
+                            name={dir.authorName(quote.author)}
+                            excerpt={quoteExcerpt(quote.body)}
+                            onCancel={() => {
+                              setQuote(null);
+                              composer.current?.focus();
+                            }}
+                          />
+                        ) : undefined
+                      }
+                      attachments={
+                        files.length > 0
+                          ? files.map((f) => (
+                              <ComposerFile
+                                key={f.key}
+                                name={f.name}
+                                icon={f.icon}
+                                preview={f.preview}
+                                detail={formatBytes(i18n.language, f.size)}
+                                status={f.status}
+                                statusLabel={
+                                  f.status === "uploading"
+                                    ? t("channel.uploading")
+                                    : f.status === "failed"
+                                      ? t("channel.uploadFailed")
+                                      : undefined
+                                }
+                                removeLabel={t("channel.removeFile", { name: f.name })}
+                                onRemove={() => dropFiles((x) => x.key !== f.key)}
+                              />
+                            ))
+                          : undefined
+                      }
+                      onFiles={chrome?.locked ? undefined : addFiles}
+                      canSendEmpty={attached.length > 0}
+                      sendBlocked={uploading}
+                      format={formatLabels}
+                      emoji={emojiLabels}
+                      id={`composer-${channel.id}`}
+                      textareaRef={composer}
+                      value={draft}
+                      onChange={(v) => {
+                        setDraft(v);
+                        if (v.trim()) sendTyping();
+                      }}
+                      onSend={onSend}
+                      disabled={Boolean(chrome?.locked)}
+                      label={
+                        chrome?.composerLabel ??
+                        (chrome?.composerTarget
+                          ? t("channel.composerDm", { name: chrome.composerTarget })
+                          : t("channel.composerLabel", { channel: channel.name }))
+                      }
+                      placeholder={
+                        // DMs name the person or agent ("Mensagem para Theo"); channels keep "#nome".
+                        chrome?.composerLabel ??
+                        (chrome?.composerTarget
+                          ? t("channel.composerDm", { name: chrome.composerTarget })
+                          : t("channel.composerPlaceholder", { channel: channel.name }))
+                      }
+                      sendLabel={t("channel.send")}
+                      sendText={t("channel.send")}
+                      attachLabel={t("channel.attach")}
+                      pills={composerPills}
+                      links={{
+                        listLabel: t("wiki.editor.suggest"),
+                        search: (q) =>
+                          (wikiPages.data ?? [])
+                            .filter((p) => p.title.toLowerCase().includes(q.trim().toLowerCase()))
+                            .slice(0, 8)
+                            .map((p) => ({
+                              key: `wiki:${p.slug}`,
+                              insert: p.title,
+                              label: p.title,
+                              description: p.folder || undefined,
+                              leading: <Icon name="book" size={16} />,
+                            })),
+                      }}
+                      commands={commands.length > 0 ? { listLabel: t("composer.commands"), list: commands } : undefined}
+                      mentions={{
+                        search: mentionSearch,
+                        listLabel: t("mentions.list"),
+                        onPick: (item) => {
+                          if (item.note && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
+                        },
+                      }}
+                    />
+                    {offer && (
+                      <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />
+                    )}
+                    {chrome?.composerNote && !workingRun && !chrome.locked && (
+                      <p className="ac-composer__hint">{chrome.composerNote}</p>
+                    )}
+                    {(workingRun || chrome?.locked) && (
+                      <p className="ac-composer__hint">
+                        {workingRun && !chrome?.locked ? (
+                          <span className="composer-working">
+                            {t("run.working", {
+                              name: dir.agentById.get(workingRun.agentId)?.name ?? t("channel.unknownAgent"),
+                            })}
+                            {mayStop(workingRun) && (
+                              <>
+                                {" · "}
+                                <StopButton run={workingRun} onStop={stopRun} place="composer" />
+                              </>
+                            )}
+                          </span>
+                        ) : (
+                          chrome?.locked
+                        )}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
 
-        {!chrome?.header && <ChannelDetails open={detailsOpen} onOpenChange={setDetailsOpen} channel={channel} />}
-      </main>
+          {!chrome?.header && <ChannelDetails open={detailsOpen} onOpenChange={setDetailsOpen} channel={channel} />}
+          {missionDraft !== null && (
+            <NewMissionDialog
+              open
+              onOpenChange={(o) => !o && setMissionDraft(null)}
+              initialGoal={missionDraft}
+              initialChannelId={chrome?.dmAgentId ? undefined : channel.id}
+              initialAgentId={channelAgents[0]?.id}
+            />
+          )}
+        </main>
+      </ChannelThreadsContext.Provider>
     </ChannelActionsContext.Provider>
   );
+}
+
+/** Rows right after a thread marker or a closed thread's line keep their own header. */
+function ungroupAfter(items: TimelineItem[], special: (m: MessageType) => boolean): TimelineItem[] {
+  let after = false;
+  return items.map((item) => {
+    if (item.kind !== "message") {
+      after = false;
+      return item;
+    }
+    const out = after && item.grouped ? { ...item, grouped: false } : item;
+    after = special(item.message);
+    return out;
+  });
 }
 
 /** Persisted rows. Memoized: streaming deltas don't re-render it. */
@@ -1082,7 +1464,19 @@ const Timeline = memo(function Timeline({
   const initialKeys = useRef<Set<string> | null>(null);
   if (ready && initialKeys.current === null) initialKeys.current = new Set(items.map((i) => i.key));
   const initial = initialKeys.current;
+  const threadsView = useChannelThreadsView();
   let afterLive = false;
+  /** A closed thread is one line; the root of a thread made from a range is its marker (or stub). */
+  const threadRow = (key: string, m: MessageType) => {
+    // A mission's automatic lines (the plan changed, the computer went offline, a task ended): not a voice.
+    if (missionPlanChangeOf(m.meta)) return <MissionPlanChangeLine key={key} message={m} />;
+    if (taskNoticeOf(m.meta)) return <TaskNoticeLine key={key} message={m} />;
+    if (!threadsView) return null;
+    const info = threadsView.byId.get(m.id);
+    if (info?.state === "closed") return <ClosedThreadLine key={key} thread={info} />;
+    const start = threadStartOf(m.meta);
+    return start ? <ThreadStartLine key={key} message={m} start={start} thread={info} /> : null;
+  };
   return (
     <>
       {items.map((item) => {
@@ -1091,14 +1485,17 @@ const Timeline = memo(function Timeline({
           item.kind === "day" ? (
             <DayDivider key={item.key}>{dayLabel(t, i18n.language, item.iso)}</DayDivider>
           ) : item.kind === "message" ? (
-            <TimelineMessage
-              key={item.key}
-              message={item.message}
-              // Right after a live row, always a full header (never "grouped" under it).
-              grouped={item.grouped && !afterLive}
-              entering={initial !== null && entersWithMotion(item.key, item.message.createdAt, initial, mountedAt)}
-              modelLabels={modelLabels}
-            />
+            (threadRow(item.key, item.message) ?? (
+              <TimelineMessage
+                key={item.key}
+                message={item.message}
+                // Right after a live row, always a full header (never "grouped" under it).
+                grouped={item.grouped && !afterLive}
+                entering={initial !== null && entersWithMotion(item.key, item.message.createdAt, initial, mountedAt)}
+                modelLabels={modelLabels}
+                contextMark={threadsView?.marks.has(item.message.id)}
+              />
+            ))
           ) : null;
         afterLive = Boolean(live?.length);
         return live?.length ? (
@@ -1117,6 +1514,8 @@ const Timeline = memo(function Timeline({
 });
 
 const CLOCK_SLACK_MS = 3000;
+/** Model names for the rows of "Ajustar trecho" (no usage line is shown there). */
+const NO_LABELS = new Map<string, string>();
 
 /**
  * Where each live run goes: after the message that started it (`triggerMessageId`;
@@ -1405,12 +1804,19 @@ function useRowsBehind(runs: LiveRun[]) {
  * dots (still with reduced motion). Agents leave it when their first words
  * arrive in the timeline.
  */
-function ActivityBar({ channelId }: { channelId: string }) {
+function ActivityBar({
+  channelId,
+  visible,
+}: {
+  channelId: string;
+  /** Which runs belong here (a thread view shows only its own). */
+  visible?: { current: (r: LiveRun) => boolean };
+}) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const [now, setNow] = useState(() => Date.now());
-  const runs = useStreams((s) => runsInChannel(s, channelId), sameRuns);
+  const runs = useStreams((s) => runsInChannel(s, channelId).filter((r) => visible?.current(r) ?? true), sameRuns);
   const typing = useLive((s) => s.typing[channelId]);
   const ids = typingIn({ [channelId]: typing ?? {} }, channelId, now, me.user.id);
   useEffect(() => {
@@ -1511,16 +1917,19 @@ function ActivityBar({ channelId }: { channelId: string }) {
 }
 
 /** One persisted row; agent replies get feedback actions, people's messages get receipts. */
-const TimelineMessage = memo(function TimelineMessage({
+export const TimelineMessage = memo(function TimelineMessage({
   message: m,
   grouped,
   entering,
   modelLabels,
+  contextMark,
 }: {
   message: MessageType;
   grouped: boolean;
   entering: boolean;
   modelLabels: Map<string, string>;
+  /** Part of a thread's context (still in the channel): the quiet mark in the gutter. */
+  contextMark?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -1596,7 +2005,16 @@ const TimelineMessage = memo(function TimelineMessage({
   const quoted = useMemo(() => replyOf(m.meta), [m.meta]);
   // An agent opened a forum topic from here: the topic card with "Ver discussão".
   const forumTopicId = m.author.type === "agent" ? forumTopicOfMessage(meta) : null;
-  const card = approvalId || proposalId || memoryUpdates.length > 0 || question || secretRequest;
+  // A mission's cards (ADR 0029): the plan, a decision, a review; a report says where it ran.
+  const missionPlan = m.author.type === "agent" ? missionPlanOf(meta) : null;
+  const missionDecision = m.author.type === "agent" && meta.missionDecision ? m : null;
+  const missionReview = m.author.type === "agent" && meta.missionReview ? m : null;
+  const missionReport = m.author.type === "agent" ? missionReportOf(meta) : null;
+  const missionSuggestion = m.author.type === "person" ? missionSuggestionOf(meta) : null;
+  const missionCard = Boolean(missionPlan || missionDecision || missionReview);
+  // The root of a mission in the channel: its work lives in its thread.
+  const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.replyInThread !== undefined;
+  const card = approvalId || proposalId || memoryUpdates.length > 0 || question || secretRequest || missionCard;
   const feedback = m.author.type === "agent" && !card && !m.local;
   // People see name, time and text; the date, model and tokens wait behind the time.
   const usage = m.author.type === "agent" ? messageUsage(m) : null;
@@ -1612,7 +2030,7 @@ const TimelineMessage = memo(function TimelineMessage({
       data-message-id={m.id}
       grouped={grouped}
       entering={entering && !replacesLive}
-      className={m.local ? `ac-msg--local ac-msg--${m.local}` : undefined}
+      className={cx(m.local && `ac-msg--local ac-msg--${m.local}`, contextMark && "msg--context")}
       onMouseEnter={feedback ? () => setActive(true) : undefined}
       onFocus={feedback ? () => setActive(true) : undefined}
       avatar={
@@ -1696,11 +2114,18 @@ const TimelineMessage = memo(function TimelineMessage({
         </p>
       )}
       {quoted && <QuotedMessage reply={quoted} />}
-      {(!routine || routineOpen) && (body.trim() || (!card && !canceledNote && artifacts.length === 0)) && (
-        <MessageText>
-          <MessageBody body={body} resolveMention={dir.mentionName} renderMention={renderMention} wikiLink={wikiLink} />
-        </MessageText>
-      )}
+      {(!routine || routineOpen) &&
+        !missionCard &&
+        (body.trim() || (!card && !canceledNote && artifacts.length === 0)) && (
+          <MessageText>
+            <MessageBody
+              body={body}
+              resolveMention={dir.mentionName}
+              renderMention={renderMention}
+              wikiLink={wikiLink}
+            />
+          </MessageText>
+        )}
       {canceledNote && <p className="ac-msg__activity run-canceled">{canceledNote}</p>}
       {m.local === "failed" && (
         <p className="ac-msg__error" role="alert">
@@ -1721,6 +2146,12 @@ const TimelineMessage = memo(function TimelineMessage({
         <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} />
       )}
       {forumTopicId && <ForumMessageCard topicId={forumTopicId} />}
+      {missionPlan && <MissionPlanCard plan={missionPlan} />}
+      {missionDecision && <MissionDecisionCard message={missionDecision} />}
+      {missionReview && <MissionReviewCard message={missionReview} />}
+      {missionReport && <MissionReportExtras report={missionReport} message={m} />}
+      {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
+      {missionStart && <MissionStartLink message={m} />}
       {artifacts.length > 0 && (
         <div className="artifact-cards">
           {artifacts.map((r) => (

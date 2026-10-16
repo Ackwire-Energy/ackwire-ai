@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { Message } from "@/api/types";
 import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
+import { threadStartOf } from "@/lib/threads";
 import { useToast } from "@/lib/toast";
 import { ReactButton, reactionOf, useMessageReactions } from "./Reactions";
 import { SaveToWikiDialog } from "./SaveToWiki";
@@ -41,6 +42,11 @@ export function MessageMoreMenu({ message, channelName }: { message: Message; ch
         {actions?.quoteReply && (
           <MenuItem icon="reply" onSelect={() => actions.quoteReply?.(message)}>
             {t("channel.quoteReply")}
+          </MenuItem>
+        )}
+        {actions?.createThreadFrom && !message.threadId && !message.local && !threadStartOf(message.meta) && (
+          <MenuItem icon="thread" onSelect={() => actions.createThreadFrom?.(message)}>
+            {t("threads.createFromHere")}
           </MenuItem>
         )}
         {actions?.replyInThread && (

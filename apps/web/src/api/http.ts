@@ -7,11 +7,14 @@
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
-  constructor(status: number, code: string, message: string) {
+  /** Details for the translated text (`{ error: { params } }`), e.g. who can't see a range. */
+  readonly params?: Record<string, unknown>;
+  constructor(status: number, code: string, message: string, params?: Record<string, unknown>) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    if (params) this.params = params;
   }
 }
 
@@ -58,11 +61,14 @@ async function parseResponse<T>(res: Response): Promise<T> {
     data = undefined;
   }
   if (!res.ok) {
-    const error = (data as { error?: { code?: string; message?: string } } | undefined)?.error;
+    const error = (
+      data as { error?: { code?: string; message?: string; params?: Record<string, unknown> } } | undefined
+    )?.error;
     throw new ApiError(
       res.status,
       error?.code ?? `http_${res.status}`,
       error?.message ?? (res.statusText || `HTTP ${res.status}`),
+      error?.params && typeof error.params === "object" ? error.params : undefined,
     );
   }
   return data as T;

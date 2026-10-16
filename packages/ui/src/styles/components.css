@@ -4313,6 +4313,20 @@ a.ac-list__row:focus-visible {
   }
 }
 
+/* A mission's plan in pixels (PlanStrip): one cell per item, scaled down whole when long. */
+.ac-plan-strip {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  flex: none;
+}
+.ac-plan-strip canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
 /* Routine runs in pixels (RunPixels.tsx): 2px cells, never smoothed. */
 .ac-run-strip,
 .ac-run-key {

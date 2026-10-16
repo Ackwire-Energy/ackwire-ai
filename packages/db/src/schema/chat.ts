@@ -135,9 +135,63 @@ export const messages = pgTable(
     foreignKey({ columns: [t.orgId, t.channelId], foreignColumns: [channels.orgId, channels.id] }).onDelete("cascade"),
     index().on(t.channelId, t.createdAt),
     index().on(t.threadId, t.createdAt),
+    // The Threads page: replies grouped by thread within the channels a person sees.
+    index().on(t.channelId, t.threadId, t.createdAt).where(sql`${t.threadId} is not null`),
     check(
       "messages_author",
       sql`(${t.authorType} = 'person' and ${t.authorAgentId} is null) or (${t.authorType} = 'agent' and ${t.authorUserId} is null)`,
     ),
+  ],
+);
+
+export const threadStateEnum = pgEnum("thread_state", ["open", "closed", "archived"]);
+
+/**
+ * State of a thread (ADR 0029). Threads stay implicit (`messages.thread_id` =
+ * the root message id); a row exists only once a thread has state of its
+ * own: created from a range of a conversation, closed, archived or titled.
+ * Keyed by the root message (unique per org; no foreign key to `messages`,
+ * which is partitioned).
+ *
+ * Context range (`context_*`): messages of `context_channel_id` from the
+ * first to the last (by time), minus the excluded ones. The run's context
+ * reads that range instead of "the channel messages before the root".
+ * `context_moved`: the range left the channel and lives in the thread
+ * (`thread_id` = root); `context_moved_message_ids` are exactly the moved
+ * ones, so returning them never touches real replies.
+ */
+export const threads = pgTable(
+  "threads",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    rootMessageId: uuid().notNull(),
+    /** Null: the web shows the root message's text. */
+    title: text(),
+    state: threadStateEnum().notNull().default("open"),
+    createdBy: text().references(() => users.id, { onDelete: "set null" }),
+    closedBy: text().references(() => users.id, { onDelete: "set null" }),
+    closedAt: timestamp({ withTimezone: true }),
+    archivedBy: text().references(() => users.id, { onDelete: "set null" }),
+    archivedAt: timestamp({ withTimezone: true }),
+    contextChannelId: uuid().references(() => channels.id, { onDelete: "set null" }),
+    contextFirstMessageId: uuid(),
+    contextLastMessageId: uuid(),
+    /** Times of the first and last message of the range (the range query scans `(channel_id, created_at)`). */
+    contextFirstAt: timestamp({ withTimezone: true }),
+    contextLastAt: timestamp({ withTimezone: true }),
+    contextExcludedMessageIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    contextMoved: boolean().notNull().default(false),
+    contextMovedMessageIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.channelId], foreignColumns: [channels.orgId, channels.id] }).onDelete("cascade"),
+    unique().on(t.orgId, t.rootMessageId),
+    index().on(t.orgId, t.channelId, t.state),
   ],
 );

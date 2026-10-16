@@ -20,7 +20,7 @@ import {
   unregisterRunAbort,
 } from "./cancel";
 import { describeCapabilities } from "./capabilities";
-import { buildRunContext, getChannelCached, isNoReply, ROUTINE_NO_REPLY } from "./context";
+import { buildRunContext, getChannelCached, isNoReply, ROUTINE_NO_REPLY, taskNotice } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
@@ -31,6 +31,7 @@ import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { mirrorReplyToIssue } from "./issues";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
+import { notifyMissionApproval } from "./mission-tools";
 import { PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
 import {
@@ -274,12 +275,38 @@ async function executeRunInner(
   const later = (write: () => Promise<unknown>) => {
     deferred = deferred.then(write).catch(() => {});
   };
+  /** Messages people sent to this conversation while the run was active (one run per agent and conversation). */
+  const takeSteering = async () =>
+    db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ pending: agentRuns.pendingMessageIds })
+        .from(agentRuns)
+        .where(eq(agentRuns.id, run.id))
+        .for("update");
+      const ids = row?.pending ?? [];
+      if (ids.length === 0) return [];
+      await tx.update(agentRuns).set({ pendingMessageIds: [] }).where(eq(agentRuns.id, run.id));
+      return ids;
+    });
+  /**
+   * Messages taken by this run that it never read get their own run (the
+   * last one; it reads the thread), so a failure never swallows them.
+   */
+  const redispatchPending = async () => {
+    const pending = await takeSteering().catch(() => [] as string[]);
+    const last = pending.at(-1);
+    if (!last || run.trigger === "forum") return;
+    const message = await getMessage(db, run.orgId, last);
+    if (message && !message.deletedAt) await createAgentRuns(db, message, [run.agentId], run.trigger);
+  };
   const fail = async (reason: string) => {
     await deferred;
     await addRunStep(db, run, "error", { reason });
     await transitionRun(db, run.id, "running", "failed", { error: reason });
     await publishChannelEvent(deps.pubsub, event("failed", reason));
     await finished("failed", reason);
+    // An archived agent answers nobody; any other failure leaves the waiting messages a run of their own.
+    if (reason !== "agent_archived") await redispatchPending();
   };
 
   const ctx: ToolContext = {
@@ -525,19 +552,6 @@ async function executeRunInner(
     await finished("canceled");
   };
 
-  /** Messages people sent to this conversation while the run was active (one run per agent and conversation). */
-  const takeSteering = async () =>
-    db.transaction(async (tx) => {
-      const [row] = await tx
-        .select({ pending: agentRuns.pendingMessageIds })
-        .from(agentRuns)
-        .where(eq(agentRuns.id, run.id))
-        .for("update");
-      const ids = row?.pending ?? [];
-      if (ids.length === 0) return [];
-      await tx.update(agentRuns).set({ pendingMessageIds: [] }).where(eq(agentRuns.id, run.id));
-      return ids;
-    });
   /** Appends them to the conversation as "New message from …" (a step records it), so the model reads them next. */
   const deliverSteering = async () => {
     const ids = await takeSteering();
@@ -546,6 +560,7 @@ async function executeRunInner(
       .select({
         id: schema.messages.id,
         body: schema.messages.body,
+        meta: schema.messages.meta,
         name: sql<string | null>`coalesce(${users.name}, ${schema.agents.name})`,
         createdAt: schema.messages.createdAt,
       })
@@ -558,7 +573,12 @@ async function executeRunInner(
     rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     if (rows.length === 0) return false;
     const text = rows
-      .map((m) => `[New message from ${m.name ?? "someone"}, while you were working]: ${m.body}`)
+      .map(
+        (m) =>
+          // A background task that ended while it worked: the notice with its result.
+          taskNotice({ body: m.body, meta: m.meta }, true) ??
+          `[New message from ${m.name ?? "someone"}, while you were working]: ${m.body}`,
+      )
       .join("\n\n");
     const t = transcript as Transcript;
     const last = t.messages.at(-1);
@@ -862,7 +882,11 @@ async function executeRunInner(
         prof.mark("persist");
         for (const m of await withWikiLinks(db, run.orgId, posted.messages.map(messageView)))
           await publishMessageCreated(deps.pubsub, m);
-        for (const card of posted.cards) await publishApproval(deps, card, "approval.created");
+        for (const card of posted.cards) {
+          await publishApproval(deps, card, "approval.created");
+          // A mission's approval (agent mode): its owner hears it waits.
+          if (card.missionId) await notifyMissionApproval({ db, pubsub: deps.pubsub }, card).catch(() => undefined);
+        }
         for (const q of posted.questions) await publishQuestion(deps.pubsub, q, "question.asked");
         for (const r of posted.secrets) await publishSecret(deps.pubsub, r, "secret.requested");
         const waitingFor = asks.length > 0 || secretAsks.length > 0 ? "waiting_input" : "waiting_approval";
@@ -953,12 +977,7 @@ async function executeRunInner(
       await finished("done");
       prof.mark("events");
       // A message that slipped in between the last check and `done` gets its own run (never lost).
-      const orphans = await takeSteering().catch(() => [] as string[]);
-      const lastOrphan = orphans.at(-1);
-      if (lastOrphan && run.trigger !== "forum") {
-        const message = await getMessage(db, run.orgId, lastOrphan);
-        if (message && !message.deletedAt) await createAgentRuns(db, message, [run.agentId], run.trigger);
-      }
+      await redispatchPending();
       return;
     }
   } catch (error) {
