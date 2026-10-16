@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { orgTopic, type ServerFrame } from "@agenteschat/adapters";
+import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   authenticateMachine,
@@ -45,7 +45,7 @@ const RUNNER = {
   os: "linux",
   arch: "x64",
   version: "0.1.0",
-  protocol: 1,
+  protocol: MACHINE_PROTOCOL_VERSION,
   workspace: "/home/u/agentes",
 };
 
@@ -519,6 +519,10 @@ describe("tools on a connected machine", () => {
     expect(runner.sent.find((s) => s.type === "request" && s.op === "push")).toMatchObject({
       url: `http://localhost:3000/api/machines/uploads/${row?.id}`,
     });
+    // Every request says which agent it's for: the runner keeps each agent in its own folder.
+    const requests = runner.sent.filter((s) => s.type === "request");
+    expect(requests.length).toBeGreaterThan(3);
+    for (const r of requests) expect(r.agent).toEqual({ id: f.agent.id, handle: "dev" });
 
     const status = await call(ctx, "computer_status", {});
     expect(status.content).toContain('connected computer "Build box" (Linux), online');
@@ -547,5 +551,19 @@ describe("tools on a connected machine", () => {
     expect(out.content).toContain("Commands are turned off on the computer Files only");
     // Files still work.
     expect((await call(ctx, "write_file", { path: "a.txt", content: "x" })).isError).toBeFalsy();
+  });
+
+  test("a runner too old for agent folders is refused instead of sharing one folder", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    const paired = await pair();
+    const runner = fakeRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token, { protocol: 1 });
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
+    const ctx = await runCtx();
+    const out = await call(ctx, "write_file", { path: "a.txt", content: "x" });
+    expect(out).toMatchObject({ isError: true });
+    expect(out.content).toContain("agentes-runner update");
+    expect(runner.sent.filter((s) => s.type === "request")).toEqual([]);
   });
 });

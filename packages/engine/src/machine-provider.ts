@@ -1,4 +1,5 @@
 import {
+  type AgentScope,
   type ExecRequest,
   type ExecResult,
   MAX_INLINE_FILE_BYTES,
@@ -44,9 +45,10 @@ function explain(error: unknown, name: string, path?: string): Error {
  * Connected machines as a `SandboxProvider` (ADR 0025): no lifecycle (a
  * machine is on while its runner is connected; we never create, start or
  * stop it) and a channel over the hub. Files travel base64 up to 5 MB;
- * uploads go through `push`, straight to our upload URL.
+ * uploads go through `push`, straight to our upload URL. Every request is
+ * for `agent`, which the runner keeps in its own folder of the workspace.
  */
-export function createMachineSandboxProvider(hub: MachineCaller): SandboxProvider {
+export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentScope): SandboxProvider {
   const nameOf = async (id: string) => (await hub.status(id))?.name ?? "computer";
   const guard = async <T>(id: string, fn: () => Promise<T>, path?: string): Promise<T> => {
     try {
@@ -65,6 +67,7 @@ export function createMachineSandboxProvider(hub: MachineCaller): SandboxProvide
       const r = await hub.call(
         id,
         {
+          agent,
           op: "exec",
           command: request.command,
           ...(request.cwd ? { cwd: request.cwd } : {}),
@@ -114,20 +117,32 @@ export function createMachineSandboxProvider(hub: MachineCaller): SandboxProvide
           `${path} is too large to copy to a connected computer (max ${MB(MAX_INLINE_FILE_BYTES)}); ask the person to put it on that machine.`,
         );
       }
-      await guard(id, () => hub.call(id, { op: "write", path, base64: Buffer.from(data).toString("base64") }), path);
+      await guard(
+        id,
+        () => hub.call(id, { agent, op: "write", path, base64: Buffer.from(data).toString("base64") }),
+        path,
+      );
     },
     async readFile(id, path) {
-      const r = await guard(id, () => hub.call(id, { op: "read", path, maxBytes: MAX_INLINE_FILE_BYTES }), path);
+      const r = await guard(id, () => hub.call(id, { agent, op: "read", path, maxBytes: MAX_INLINE_FILE_BYTES }), path);
       return r.base64 === null ? null : new Uint8Array(Buffer.from(r.base64, "base64"));
     },
     async listFiles(id, path, depth = 3) {
-      const r = await guard(id, () => hub.call(id, { op: "list", path, depth }), path);
+      const r = await guard(id, () => hub.call(id, { agent, op: "list", path, depth }), path);
       return r.entries;
     },
     async pushFile(id, path, target) {
       return guard(
         id,
-        () => hub.call(id, { op: "push", path, url: target.url, uploadId: target.uploadId, maxBytes: target.maxBytes }),
+        () =>
+          hub.call(id, {
+            agent,
+            op: "push",
+            path,
+            url: target.url,
+            uploadId: target.uploadId,
+            maxBytes: target.maxBytes,
+          }),
         path,
       );
     },

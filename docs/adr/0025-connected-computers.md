@@ -65,6 +65,7 @@ A new artifact kind `file` (migration adds the enum value): any bytes, with the 
 
 **On the machine.**
 - Every path is relative to the workspace folder chosen at pairing (default `~/agentes`); `..` and absolute paths are refused, and symlinks that leave the workspace are refused for reads, writes and uploads.
+- Each agent works in its own folder of the workspace, `<handle>-<first 8 of id>` (protocol 2: every request carries `agent: { id, handle }`). The runner creates it on first use, treats it as that request's workspace (`/workspace` for the agent, `cwd` of its commands), and finds it by the id suffix after a rename. Many agents can share one computer without seeing each other's files through the file tools; a shell command can still `cd` anywhere the OS user can. The server refuses tools on runners older than protocol 2 (they would ignore `agent`), and `agentes-runner update` replaces the bundle and restarts the service without pairing again.
 - Commands run as the user that runs the runner, with `cwd` in the workspace. A shell command can reach anything that user can, so the install guide recommends a dedicated OS user. `--no-exec` turns commands off (files and uploads only); `run_code` then says so.
 - The runner never receives secrets from us. Whatever the machine already has (a Claude Code login, SSH keys) stays there and is used under the machine owner's responsibility.
 

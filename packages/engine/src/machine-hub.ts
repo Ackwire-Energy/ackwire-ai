@@ -80,6 +80,8 @@ export interface MachineStatus {
   online: boolean;
   execAllowed: boolean;
   os: string;
+  /** The runner's protocol (from its last hello). */
+  protocol: number;
 }
 
 /** What the machine provider needs from the hub. */
@@ -507,7 +509,15 @@ export function createMachineHub(deps: MachineHubDeps) {
       const row = await getMachineById(db, machineId);
       if (!row || row.deletedAt) return null;
       const online = local.has(machineId) || (machineOnline(row) && row.connectedReplica !== replicaId);
-      return { id: row.id, orgId: row.orgId, name: row.name, online, execAllowed: row.execAllowed, os: row.os };
+      return {
+        id: row.id,
+        orgId: row.orgId,
+        name: row.name,
+        online,
+        execAllowed: row.execAllowed,
+        os: row.os,
+        protocol: row.protocol,
+      };
     },
 
     /** Whether this replica holds the machine's socket. */

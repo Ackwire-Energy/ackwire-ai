@@ -6,8 +6,10 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 1;
+export const MACHINE_PROTOCOL_VERSION = 2;
 export const MIN_RUNNER_PROTOCOL = 1;
+/** From this protocol on, requests carry `agent` and each agent works in its own folder. */
+export const AGENT_FOLDERS_PROTOCOL = 2;
 
 /** No valid `hello` within this time closes the socket. */
 export const HELLO_TIMEOUT_MS = 10_000;
@@ -42,8 +44,18 @@ export interface FileEntry {
   size: number;
 }
 
-/** What the server asks. Paths are always relative to the workspace. */
-export type MachineRequest =
+/**
+ * The agent a request is for (protocol 2+). The runner gives each agent its
+ * own folder inside the workspace, `<handle>-<first 8 of id>`, and treats it
+ * as that request's workspace; a renamed agent keeps its folder (found by id).
+ */
+export interface AgentScope {
+  id: string;
+  handle: string;
+}
+
+/** What the server asks. Paths are always relative to the workspace (the agent's folder when `agent` is set). */
+export type MachineRequest = (
   | {
       op: "exec";
       command: string;
@@ -63,7 +75,8 @@ export type MachineRequest =
       url: string;
       uploadId: string;
       maxBytes: number;
-    };
+    }
+) & { agent?: AgentScope };
 
 export type MachineOp = MachineRequest["op"];
 

@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
-import { normalizeRequestPath, resolveInWorkspace } from "../../runner/paths";
+import { agentFolderName, normalizeRequestPath, resolveInWorkspace } from "../../runner/paths";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -107,4 +107,61 @@ test("read, write and list inside the workspace", async () => {
       { path: "a/b/c.txt", isDir: false, size: 5 },
     ],
   });
+});
+
+test("each agent works in its own folder, named <handle>-<id>, kept across a rename", async () => {
+  const ws = tempDir();
+  dirs.push(ws);
+  const ctx = { workspaceReal: ws, exec: true, token: "agm_x" };
+  const dev = { id: "01a142cb-489d-7000-87a3-efb5adb382ca", handle: "dev" };
+  const ops = { id: "9f00aa11-0000-7000-8000-000000000000", handle: "ops" };
+  expect(agentFolderName(dev).name).toBe("dev-01a142cb");
+  expect(agentFolderName({ id: dev.id, handle: "../Weird Name!" }).name).toBe("weird-name-01a142cb");
+  expect(await errorCode(() => agentFolderName({ id: "x", handle: "dev" }))).toBe("bad_request");
+
+  const write = (agent: typeof dev, text: string) =>
+    handleRequest(
+      ctx,
+      { agent, op: "write", path: "/workspace/notes.txt", base64: Buffer.from(text).toString("base64") },
+      scope(),
+    );
+  await write(dev, "dev's");
+  await write(ops, "ops'");
+  expect(readdirSync(ws).sort()).toEqual(["dev-01a142cb", "ops-9f00aa11"]);
+  expect(readFileSync(path.join(ws, "dev-01a142cb", "notes.txt"), "utf8")).toBe("dev's");
+
+  // Paths can't reach another agent's folder.
+  expect(
+    await errorCode(() =>
+      handleRequest(ctx, { agent: dev, op: "read", path: "../ops-9f00aa11/notes.txt", maxBytes: 100 }, scope()),
+    ),
+  ).toBe("outside_workspace");
+  const pwd = (await handleRequest(
+    ctx,
+    { agent: ops, op: "exec", command: "pwd", timeoutSeconds: 10, stream: false },
+    scope(),
+  )) as { stdout: string };
+  expect(pwd.stdout.trim()).toBe(path.join(ws, "ops-9f00aa11"));
+
+  // Renamed: the same folder, under the new handle.
+  const renamed = { ...dev, handle: "builder" };
+  const read = (await handleRequest(
+    ctx,
+    { agent: renamed, op: "read", path: "notes.txt", maxBytes: 100 },
+    scope(),
+  )) as {
+    base64: string;
+  };
+  expect(Buffer.from(read.base64, "base64").toString()).toBe("dev's");
+  expect(readdirSync(ws).sort()).toEqual(["builder-01a142cb", "ops-9f00aa11"]);
+
+  // A symlink in the agent's place is refused.
+  const outside = tempDir("runner-outside-");
+  dirs.push(outside);
+  symlinkSync(outside, path.join(ws, "evil-aaaaaaaa"));
+  expect(
+    await errorCode(() =>
+      handleRequest(ctx, { agent: { id: "aaaaaaaa-0000", handle: "evil" }, op: "list", path: "", depth: 1 }, scope()),
+    ),
+  ).toBe("bad_request");
 });

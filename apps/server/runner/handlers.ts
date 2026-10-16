@@ -11,7 +11,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
-import { isInside, resolveInWorkspace } from "./paths";
+import { agentWorkspace, isInside, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
 
 export const MAX_CONCURRENT_REQUESTS = 8;
@@ -159,6 +159,8 @@ async function doList(
 
 /** Runs one request; throws RunnerError (or fs errors) on failure. */
 export async function handleRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
+  // Each agent works in its own folder: that folder is its workspace.
+  if (req.agent) ctx = { ...ctx, workspaceReal: await agentWorkspace(ctx.workspaceReal, req.agent) };
   switch (req.op) {
     case "exec":
       return doExec(ctx, req, scope);
@@ -186,6 +188,11 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
 
 /** One log line per request: the op and the path or the head of the command, never file contents. */
 export function describeRequest(req: MachineRequest): string {
+  const who = req.agent ? `[${String(req.agent.handle ?? "")}] ` : "";
+  return who + describeOp(req);
+}
+
+function describeOp(req: MachineRequest): string {
   switch (req.op) {
     case "exec": {
       const head = String(req.command ?? "")

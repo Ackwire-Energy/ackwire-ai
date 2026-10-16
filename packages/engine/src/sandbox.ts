@@ -1,4 +1,5 @@
 import {
+  AGENT_FOLDERS_PROTOCOL,
   maskProvider,
   type PubSub,
   SandboxGoneError,
@@ -22,6 +23,7 @@ import {
 } from "./git/credential";
 import { gitAccess } from "./git/proxy";
 import type { MachineCaller } from "./machine-hub";
+import { createMachineSandboxProvider } from "./machine-provider";
 import { type ComputerTarget, computerTarget, MachineOfflineError } from "./machines";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -55,7 +57,7 @@ export interface SandboxDeps {
   /** The cloud computers (Daytona); null when this server has none (agents may still use connected machines). */
   provider: SandboxProvider | null;
   /** Connected machines (ADR 0025): the provider over the hub, and the hub for names and online state. */
-  machines?: { provider: SandboxProvider; hub: Pick<MachineCaller, "status"> } | null;
+  machines?: { hub: MachineCaller } | null;
   pricing: SandboxPricing;
   autoStopMinutes: number;
   /** A stopped computer is archived (cheaper storage, files kept) after this many days; never deleted. */
@@ -527,7 +529,7 @@ export async function withSandbox<T>(
   onNotice?: (notice: string) => void,
 ): Promise<T> {
   const agent = await getAgentCached(deps.db, ctx.orgId, ctx.agentId);
-  if (agent?.machineId) return withMachine(deps, ctx, agent.machineId, fn);
+  if (agent?.machineId) return withMachine(deps, ctx, { machineId: agent.machineId, handle: agent.handle }, fn);
   const { settings, updatedAt } = await settingsRow(deps.db, ctx.orgId);
   const provider = deps.provider;
   if (!provider) throw new SandboxUnavailableError(NO_COMPUTER_MESSAGE);
@@ -566,7 +568,7 @@ export async function withSandbox<T>(
 async function withMachine<T>(
   deps: SandboxDeps,
   ctx: ToolContext,
-  machineId: string,
+  { machineId, handle }: { machineId: string; handle: string },
   fn: (computer: ComputerHandle) => Promise<T>,
 ): Promise<T> {
   const settings = await getSandboxSettings(deps.db, ctx.orgId);
@@ -581,7 +583,14 @@ async function withMachine<T>(
     );
   }
   if (!status.online) throw new MachineOfflineError(status.name);
-  return fn({ id: machineId, provider: machines.provider, ref: `machine:${machineId}`, machineId });
+  // An old runner would ignore `agent` and put every agent in the same folder.
+  if (status.protocol < AGENT_FOLDERS_PROTOCOL) {
+    throw new SandboxUnavailableError(
+      `The runner on the computer ${status.name} is out of date (it can't give each agent its own folder). Tell the person: its owner should update it with \`agentes-runner update\`.`,
+    );
+  }
+  const provider = createMachineSandboxProvider(machines.hub, { id: ctx.agentId, handle });
+  return fn({ id: machineId, provider, ref: `machine:${machineId}`, machineId });
 }
 
 /** Which computer the agent's tools act on, as the agent reads it (tool descriptions, `computer_status`). */

@@ -29,7 +29,6 @@ import {
   createJobHandlers,
   createLocalKeyWrapper,
   createMachineHub,
-  createMachineSandboxProvider,
   createModelGateway,
   createOrganization,
   createSandboxToolSource,
@@ -166,7 +165,7 @@ export async function setup(
       ? {
           db,
           provider: options.sandbox ?? null,
-          machines: machineHub ? { provider: createMachineSandboxProvider(machineHub), hub: machineHub } : null,
+          machines: machineHub ? { hub: machineHub } : null,
           pricing: { vcpuHourUsd: 0.0504, memoryGibHourUsd: 0.0162, diskGibHourUsd: 0.000108 },
           autoStopMinutes: 10,
           archiveAfterDays: 7,

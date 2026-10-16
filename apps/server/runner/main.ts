@@ -3,7 +3,7 @@
  * (ADR 0025). Bundled to one file for Node.js 22+ and Bun:
  *   bun build apps/server/runner/main.ts --target=node --banner '#!/usr/bin/env node' --outfile apps/web/dist/runner/agentes-runner.mjs
  */
-import { mkdirSync, realpathSync } from "node:fs";
+import { mkdirSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import { MACHINE_PROTOCOL_VERSION, type MachineOs, type RunnerInfo } from "@agenteschat/adapters/machine-protocol";
 import { configPath, connectUrl, expandHome, normalizeServerUrl, readConfig, runnerHome, writeConfig } from "./config";
@@ -22,6 +22,8 @@ Usage:
       Connects and stays connected (reconnects on its own).
   agentes-runner service install|uninstall
       Runs it in the background at login (systemd user unit, launchd agent, or Task Scheduler on Windows).
+  agentes-runner update
+      Downloads the latest runner from the server and restarts the service (keeps the pairing).
   agentes-runner status
   agentes-runner --help | --version
 
@@ -198,7 +200,7 @@ async function start(): Promise<number> {
       return 0;
     case "outdated":
       log(outcome.message);
-      log("This runner is too old for the server. Update it by running the install command again.");
+      log("This runner is too old for the server. Update it: agentes-runner update");
       return serviceSafe(3);
     default:
       log(outcome.message);
@@ -210,6 +212,35 @@ async function start(): Promise<number> {
 /** Under launchd (KeepAlive unless it exits cleanly), a refusal exits 0 so it isn't restarted in a loop. */
 function serviceSafe(code: number) {
   return process.env.AGENTES_RUNNER_SERVICE === "launchd" ? 0 : code;
+}
+
+/** Replaces this script with the server's latest bundle; the pairing and the workspace stay. */
+async function update(): Promise<number> {
+  const config = readConfig();
+  if (!config) {
+    console.error("Not paired yet: run the install command from Settings > Computers.");
+    return 1;
+  }
+  const script = realpathSync(process.argv[1] ?? "");
+  const url = `${config.server}/runner/agentes-runner.mjs`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    console.error(`Download failed: ${res.status} ${url}`);
+    return 1;
+  }
+  const text = await res.text();
+  if (!text.startsWith("#!") || !text.includes("agentes-runner")) {
+    console.error(`${url} doesn't look like the runner; nothing changed.`);
+    return 1;
+  }
+  writeFileSync(`${script}.new`, text, { mode: 0o755 });
+  renameSync(`${script}.new`, script);
+  console.log(`Updated ${script}.`);
+  if (!serviceStatus()) {
+    console.log("Restart the runner (agentes-runner start) to use it.");
+    return 0;
+  }
+  return installService({ print: (l) => console.log(l) });
 }
 
 function status(): number {
@@ -252,6 +283,8 @@ async function main(argv: string[]): Promise<number> {
       return start();
     case "status":
       return status();
+    case "update":
+      return update();
     case "service":
       if (sub === "install") return installService({ print: (l) => console.log(l) });
       if (sub === "uninstall") return uninstallService({ print: (l) => console.log(l) });

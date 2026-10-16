@@ -1,5 +1,6 @@
-import { lstat, realpath } from "node:fs/promises";
+import { lstat, mkdir, readdir, realpath, rename } from "node:fs/promises";
 import path from "node:path";
+import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { errnoCode, RunnerError } from "./errors";
 
 /** Agents see their computer's root as `/workspace`; on the machine it is the workspace folder. */
@@ -85,4 +86,52 @@ export async function resolveInWorkspace(workspaceReal: string, input: string): 
       parent = up;
     }
   }
+}
+
+/** `<handle>-<first 8 of id>`: readable, and the id part survives a rename. */
+export function agentFolderName(agent: AgentScope): { name: string; suffix: string } {
+  const id = String(agent.id ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 8);
+  if (id.length < 8) throw new RunnerError("bad_request", "The agent id is not valid");
+  const handle = String(agent.handle ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^[-_.]+|[-_.]+$/g, "")
+    .slice(0, 40);
+  const suffix = `-${id}`;
+  return { name: `${handle || "agent"}${suffix}`, suffix };
+}
+
+/**
+ * The agent's own folder in the workspace (created on first use), as a real
+ * path: the request's workspace from then on. A folder from before a rename
+ * (same id, other handle) is renamed, or used as is when the new name is taken.
+ */
+export async function agentWorkspace(workspaceReal: string, agent: AgentScope): Promise<string> {
+  const { name, suffix } = agentFolderName(agent);
+  let folder = name;
+  try {
+    await lstat(path.join(workspaceReal, name));
+  } catch (err) {
+    if (errnoCode(err) !== "ENOENT") throw err;
+    const entries = await readdir(workspaceReal, { withFileTypes: true });
+    const old = entries.find((e) => e.isDirectory() && e.name.endsWith(suffix));
+    if (old) {
+      await rename(path.join(workspaceReal, old.name), path.join(workspaceReal, name)).catch(() => {
+        folder = old.name;
+      });
+    } else {
+      await mkdir(path.join(workspaceReal, name), { recursive: true });
+    }
+  }
+  const abs = path.join(workspaceReal, folder);
+  const st = await lstat(abs);
+  if (!st.isDirectory()) throw new RunnerError("bad_request", `${folder} in the workspace is not a folder`);
+  const real = await realpath(abs);
+  if (real === workspaceReal || !isInside(workspaceReal, real)) {
+    throw new RunnerError("outside_workspace", `${folder} points outside the workspace`);
+  }
+  return real;
 }

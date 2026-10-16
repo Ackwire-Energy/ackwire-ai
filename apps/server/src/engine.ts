@@ -15,7 +15,6 @@ import {
   createIssueToolSource,
   createJobHandlers,
   createMachineHub,
-  createMachineSandboxProvider,
   createModelGateway,
   createSandboxToolSource,
   createScheduleToolSource,
@@ -122,7 +121,7 @@ export function buildEngine(o: EngineOptions) {
   const sandbox: SandboxDeps = {
     db,
     provider: sandboxProvider,
-    machines: { provider: createMachineSandboxProvider(machineHub), hub: machineHub },
+    machines: { hub: machineHub },
     pricing: {
       vcpuHourUsd: config.SANDBOX_PRICE_VCPU_HOUR_USD,
       memoryGibHourUsd: config.SANDBOX_PRICE_MEMORY_GIB_HOUR_USD,
