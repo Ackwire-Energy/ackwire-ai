@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent } from "@testing-library/react";
-import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
 import { renderApp, screen, settle } from "./render";
 
@@ -104,86 +104,165 @@ describe("Aceitar convite", () => {
 });
 
 describe("Onboarding", () => {
-  test("4 steps create the org, the first agent in #general, and the invitations", async () => {
+  const start = async () => {
     const state = seedState();
     if (state.me) state.me.organizations = [];
     const api = createFakeApi(state);
-    const { router } = await renderApp("/onboarding", { api });
-    const next = () => act(async () => fireEvent.click(screen().getByRole("button", { name: "Continuar" })));
+    const r = await renderApp("/onboarding", { api });
+    return { ...r, api, state };
+  };
+  const button = (name: string | RegExp) => screen().getByRole("button", { name });
+  const click = async (el: HTMLElement, rounds = 4) => {
+    await act(async () => fireEvent.click(el));
+    await settle(rounds);
+  };
+  const next = () => click(button("Continuar"), 6);
+  const calls = (state: ReturnType<typeof seedState>, method: string) => state.calls.filter((c) => c.method === method);
 
-    expect(screen().getByText("Passo 1 de 4 · Organização")).toBeTruthy();
-    expect(screen().getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(true);
-    await type("Nome da organização", "Acme Saúde");
-    expect((screen().getByLabelText("Endereço") as HTMLInputElement).value).toBe("acme-saude");
+  /** Workspace → Contexto → Agentes e chave, with Ada (the default) and Theo. */
+  const throughAgents = async (state: ReturnType<typeof seedState>) => {
+    expect(screen().getByText("Passo 1 de 6")).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Comece pelo seu workspace" })).toBeTruthy();
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+    await type("Nome", "Acme Saúde");
     await next();
-    await settle();
+    // The workspace exists after step 1 (so the logo can be sent); the time zone goes to its settings.
+    expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Acme Saúde" });
+    const zone = calls(state, "orgs.updateSettings")[0]?.args[1] as { timezone?: unknown };
+    expect(typeof zone.timezone).toBe("string");
 
-    expect(screen().getByRole("heading", { name: "Conte aos agentes sobre a Acme Saúde" })).toBeTruthy();
-    await type("Contexto da organização", "A Acme Saúde faz um app para clínicas.");
+    expect(screen().getByRole("heading", { name: "O que todo agente deve saber" })).toBeTruthy();
+    await type("Contexto", "A Acme Saúde faz um app para clínicas.");
     await next();
-    await settle(4);
-    expect(state.calls.find((c) => c.method === "orgs.create")?.args[0]).toEqual({
-      name: "Acme Saúde",
+    expect(calls(state, "orgs.updateSettings")[1]?.args[1]).toEqual({
       context: "A Acme Saúde faz um app para clínicas.",
     });
 
-    expect(screen().getByRole("heading", { name: "Chame o primeiro agente" })).toBeTruthy();
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: /Ada · Dev/ })));
-    expect(
-      screen()
-        .getByRole("button", { name: /Ada · Dev/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
+    expect(screen().getByRole("heading", { name: "Escolha seus primeiros agentes" })).toBeTruthy();
+    expect(button(/Ada · Dev/).getAttribute("aria-pressed")).toBe("true");
+    await click(button(/Ada · Dev/), 1);
+    expect(screen().getByText("Escolha pelo menos um agente.")).toBeTruthy();
+    await click(button(/Ada · Dev/), 1);
+    await click(button(/Theo · PM/), 1);
+    expect(button(/Theo · PM/).getAttribute("aria-pressed")).toBe("true");
+    expect(screen().getByText("2 agentes no #general.")).toBeTruthy();
     // The workspace key is required; the platform key isn't offered by this server.
-    expect(screen().getByRole("heading", { name: "Chave de API do seu workspace" })).toBeTruthy();
-    expect(screen().queryByRole("button", { name: /Usar a chave do agentes/ })).toBeNull();
-    expect(screen().getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(true);
+    expect(screen().queryByRole("button", { name: /Usar créditos da plataforma/ })).toBeNull();
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
     expect(document.body.textContent).toContain("Começa com Claude Sonnet 5.5.");
     await type("Chave da API da Anthropic", "sk-errado");
-    expect(screen().getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(true);
     await act(async () => fireEvent.blur(screen().getByLabelText("Chave da API da Anthropic")));
     expect(document.body.textContent).toContain("As chaves da Anthropic começam com sk-ant-.");
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Avançado" })));
+    await click(button("Avançado"), 1);
     await type("ID do workspace da Anthropic", "wrkspc_01ABC");
     await type("Chave da API da Anthropic", "sk-ant-api03-abcdefghijklmnop");
     await next();
-    await settle(6);
-    expect(state.calls.find((c) => c.method === "agents.addCredential")?.args[1]).toEqual({
+    await settle(4);
+    expect(calls(state, "agents.addCredential")[0]?.args[1]).toEqual({
       provider: "anthropic",
       label: "Anthropic",
       apiKey: "[redacted]",
       workspaceId: "wrkspc_01ABC",
     });
-    // It becomes the workspace default key; the agent uses it (credentialId null) with the suggested model.
     const cred = state.credentials[state.credentials.length - 1];
-    expect(state.calls.find((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({
-      defaultCredentialId: cred?.id,
+    expect(
+      calls(state, "orgs.updateSettings").some(
+        (c) => (c.args[1] as { defaultCredentialId?: string }).defaultCredentialId === cred?.id,
+      ),
+    ).toBe(true);
+  };
+
+  test("every chosen preset is created with its own look and joins #general", async () => {
+    const { state } = await start();
+    await throughAgents(state);
+    const created = calls(state, "agents.create").map((c) => c.args[1] as Record<string, unknown>);
+    expect(created).toHaveLength(2);
+    expect(created[0]).toMatchObject({
+      name: "Theo",
+      handle: "theo",
+      role: "PM",
+      model: "claude-sonnet-5-5",
+      credentialId: null,
+      appearance: { color: "indigo", eyes: "round", accessory: "cap" },
     });
-    const created = state.calls.find((c) => c.method === "agents.create")?.args[1] as Record<string, unknown>;
-    expect(created).toMatchObject({
+    expect(created[1]).toMatchObject({
       name: "Ada",
       handle: "ada",
       role: "Dev",
-      model: "claude-sonnet-5-5",
       credentialId: null,
-      // Each preset has its own face.
       appearance: { color: "green", eyes: "wide", accessory: "headphones" },
     });
-    expect(state.calls.some((c) => c.method === "chat.addMember")).toBe(true);
+    expect(calls(state, "chat.addMember")).toHaveLength(2);
+    expect(screen().getByRole("heading", { name: "Onde os agentes trabalham" })).toBeTruthy();
+    expect(screen().getByText("Passo 4 de 6 · opcional")).toBeTruthy();
+  });
 
-    expect(screen().getByText("Ada já está esperando no #general. Chame quem vai trabalhar com ela.")).toBeTruthy();
-    await type("E-mail", "marina@acme.com.br");
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Adicionar" })));
-    await type("E-mail", "não-é-email");
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Adicionar" })));
-    expect(screen().getByText("Confira o e-mail: falta algo como nome@empresa.com.br.")).toBeTruthy();
-    expect(screen().getByRole("button", { name: "Remover marina@acme.com.br" })).toBeTruthy();
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Enviar 1 convite e entrar" })));
+  test("computer: this computer creates a pairing, shows the command and connects live; team invites go out", async () => {
+    const { state, api, services, router } = await start();
+    await throughAgents(state);
+
+    expect(button("Continuar").hasAttribute("disabled")).toBe(true);
+    await click(button(/Este computador ou um servidor/), 8);
+    expect(calls(state, "machines.createPairing")[0]?.args[1]).toEqual({ name: "Meu computador" });
+    expect(document.querySelector(".machine-command__code")?.textContent).toContain(
+      "install.sh | sh -s -- --code K7QM-4XTB",
+    );
+    expect(document.body.textContent).toContain("acrescente --no-exec ao final");
+    expect(document.body.textContent).toContain("Esperando o computador conectar…");
+    expect(screen().getByRole("radiogroup", { name: "Sistema" })).toBeTruthy();
+
+    // The runner pairs; the list refreshes (polling, or an invalidation like here).
+    fakeMachinesOf.get(api)?.pair({ name: "MacBook do Walter", os: "darwin" });
+    await act(async () => services.queryClient.invalidateQueries());
     await settle(6);
-    expect(state.calls.find((c) => c.method === "orgs.invite")?.args[1]).toEqual({
-      email: "marina@acme.com.br",
-      role: "member",
-    });
+    expect(document.body.textContent).toContain("MacBook do Walter conectado · macOS.");
+    await next();
+    // Both agents now use the connected computer.
+    expect(calls(state, "sandbox.setTarget")).toHaveLength(2);
+
+    expect(screen().getByRole("heading", { name: "Chame quem trabalha com você" })).toBeTruthy();
+    const link = screen().getByLabelText("Link de convite") as HTMLInputElement;
+    expect(link.value).toMatch(/^http:\/\/localhost:3000\/invite\/link-/);
+    const emails = screen().getByLabelText("E-mails");
+    await act(async () =>
+      fireEvent.change(emails, { target: { value: "Marina@acme.com.br, joao@acme.com.br\nnao-e-email" } }),
+    );
+    await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
+    expect(button("Remover marina@acme.com.br")).toBeTruthy();
+    expect(button("Remover joao@acme.com.br")).toBeTruthy();
+    expect(button("Remover nao-e-email")).toBeTruthy();
+    expect(screen().getByText("confira")).toBeTruthy();
+    expect(screen().getByText("2 convites prontos")).toBeTruthy();
+    await click(button("Remover joao@acme.com.br"), 1);
+    await click(button("Convidar e continuar"), 8);
+    // Only the valid addresses are invited.
+    expect(calls(state, "orgs.invite").map((c) => c.args[1])).toEqual([
+      { email: "marina@acme.com.br", role: "member" },
+    ]);
+
+    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    expect(document.body.textContent).toContain("Theo e Ada já estão no #general.");
+    expect(document.body.textContent).toContain("MacBook do Walter");
+    await click(button("Abrir o #general"), 8);
     expect(router.state.location.pathname).toMatch(/^\/org\/org-\d+\/c\/chan-\d+$/);
+  });
+
+  test("optional steps can be skipped: no computer, no invites", async () => {
+    const { state } = await start();
+    await throughAgents(state);
+    await click(button("Pular por agora"), 6);
+    expect(calls(state, "machines.createPairing")).toHaveLength(0);
+    expect(calls(state, "sandbox.setTarget")).toHaveLength(0);
+
+    expect(screen().getByRole("heading", { name: "Chame quem trabalha com você" })).toBeTruthy();
+    await next();
+    expect(calls(state, "orgs.invite")).toHaveLength(0);
+    expect(screen().getByRole("heading", { name: "Bem-vindo à Acme Saúde" })).toBeTruthy();
+    const summary = document.querySelector(".onb__summary")?.textContent ?? "";
+    expect(summary).toContain("Depois");
+    expect(summary).toContain("Convites0");
+    // The rail marks the steps done and lets you go back.
+    const steps = screen().getByRole("navigation", { name: "Passos para começar" });
+    expect(steps.querySelectorAll("li[data-done]")).toHaveLength(5);
   });
 });

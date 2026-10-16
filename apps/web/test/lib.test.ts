@@ -16,6 +16,7 @@ import {
 } from "@/lib/format";
 import { agentGrammar, isFeminineName } from "@/lib/grammar";
 import { landingFor, membershipIn, safeRedirect } from "@/lib/guards";
+import { addInvites, ONBOARDING_STEPS, splitEmails, validInvites } from "@/lib/onboarding";
 import { can } from "@/lib/permissions";
 import { handleFrom, isEmail, parseAmount, parseEmails, passwordState, slugify } from "@/lib/text";
 
@@ -68,6 +69,34 @@ describe("text", () => {
     expect(isEmail("nome@empresa.com.br")).toBe(true);
     expect(isEmail("nome@empresa")).toBe(false);
     expect(parseEmails("A@x.com, b@x.com ,bad, a@x.com")).toEqual(["a@x.com", "b@x.com"]);
+  });
+  test("onboarding: typed or pasted e-mails become chips (commas, spaces, new lines); invalid ones stay marked", () => {
+    expect(splitEmails(" A@x.com,b@x.com\n\nc@x.com;  bad  a@x.com ")).toEqual([
+      "a@x.com",
+      "b@x.com",
+      "c@x.com",
+      "bad",
+    ]);
+    const first = addInvites([], "Marina@acme.com.br, joao@acme.com.br\nnão-é-email");
+    expect(first).toEqual([
+      { email: "marina@acme.com.br", role: "member", valid: true },
+      { email: "joao@acme.com.br", role: "member", valid: true },
+      { email: "não-é-email", role: "member", valid: false },
+    ]);
+    // Already there: kept as is (its role too); nothing new returns the same list.
+    const admin = first.map((i) => (i.email === "joao@acme.com.br" ? { ...i, role: "admin" as const } : i));
+    expect(addInvites(admin, "joao@acme.com.br")).toBe(admin);
+    expect(addInvites(admin, "  ,\n ")).toBe(admin);
+    expect(addInvites(admin, "ana@acme.com.br", "admin").at(-1)).toEqual({
+      email: "ana@acme.com.br",
+      role: "admin",
+      valid: true,
+    });
+    expect(validInvites(first).map((i) => i.email)).toEqual(["marina@acme.com.br", "joao@acme.com.br"]);
+  });
+  test("onboarding steps: ordered, the optional ones marked", () => {
+    expect(ONBOARDING_STEPS.map((s) => s.id)).toEqual(["workspace", "context", "agents", "computer", "team", "done"]);
+    expect(ONBOARDING_STEPS.filter((s) => s.optional).map((s) => s.id)).toEqual(["computer", "team"]);
   });
   test("password and amounts", () => {
     expect(passwordState("")).toBe("empty");

@@ -385,3 +385,64 @@ export function SidebarHorizon({ working, total }: { working: number; total: num
     </span>
   );
 }
+
+/* ---------- Onboarding ---------- */
+
+/**
+ * The onboarding rail's horizon: soft tones rising from the rail's surface into
+ * the sky (no edge), a little higher with each step done; the guide sits on it.
+ */
+export function OnboardingHorizon({ progress }: { progress: number }) {
+  const target = 0.45 + 0.4 * Math.max(0, Math.min(1, progress));
+  const level = useRef({ now: target, target });
+  level.current.target = target;
+  if (prefersReducedMotion()) level.current.now = target;
+  const opts: SkyOptions = {
+    pixel: 4,
+    surface: "--sunken",
+    palette: (bg) => softTones("sky", bg),
+    body: spriteTone("sky"),
+    near: 0,
+    ceil: 0.3,
+    light: 0.06,
+    sprites: 3,
+    base: (u, v, tt) => {
+      const s = Math.max(0, (v - 0.08) / 0.92);
+      const e = s * s * (3 - 2 * s);
+      return level.current.now * e * 0.85 + 0.05 * S(u * 4 + tt * 0.5) * e;
+    },
+    blobs: (tt) => {
+      const l = level.current;
+      l.now += (l.target - l.now) * 0.04;
+      return [
+        [0.2 + 0.1 * C(tt * 0.17), 0.95, 0.05, 0.1 * l.now],
+        [0.8 + 0.1 * S(tt * 0.13), 0.92, 0.05, 0.1 * l.now],
+      ];
+    },
+  };
+  return (
+    <span className="onb__horizon" aria-hidden="true">
+      <PixelSky options={opts} />
+    </span>
+  );
+}
+
+/** The onboarding's last card: a small sky, calm behind its text. */
+export function WelcomeSky({ calm }: { calm: () => (Element | null)[] }) {
+  return (
+    <PixelSky
+      options={{
+        pixel: 4,
+        palette: SKY_TONES,
+        sprites: { area: 1300, max: 24 },
+        calm,
+        base: (u, v) => 0.95 - 0.4 * u - 0.45 * v,
+        blobs: (tt) => [
+          [0.2 + 0.05 * S(tt * 0.21), 0.25 + 0.05 * C(tt * 0.17), 0.12, 0.12],
+          [0.85 + 0.05 * C(tt * 0.15), 0.95, 0.14, -0.3],
+          [0.5 + 0.1 * C(tt * 0.11), 1, 0.1, -0.16],
+        ],
+      }}
+    />
+  );
+}

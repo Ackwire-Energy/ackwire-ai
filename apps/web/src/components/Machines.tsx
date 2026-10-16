@@ -30,7 +30,7 @@ const OSES: MachineOs[] = ["linux", "darwin", "windows", "other"];
 export const osOf = (os: string): MachineOs => (OSES.includes(os as MachineOs) ? (os as MachineOs) : "other");
 
 /** Refetch the list this often while a pairing waits (events usually arrive first). */
-const PAIR_POLL_MS = 5000;
+export const PAIR_POLL_MS = 5000;
 /** Flag for files-only machines; shown as is in the steps. */
 export const NO_EXEC_FLAG = "--no-exec";
 
@@ -42,7 +42,7 @@ export function countdown(expiresAt: string, now: number): string | null {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
-function useNow(active: boolean) {
+export function useNow(active: boolean) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!active) return;
@@ -231,7 +231,7 @@ function RemoveDialog({ machine, onClose }: { machine: Machine | null; onClose: 
 }
 
 /** The install command in a code block, with Copiar. */
-function CommandBlock({ command }: { command: string }) {
+export function CommandBlock({ command }: { command: string }) {
   const { t } = useTranslation();
   const toast = useToast();
   return (

@@ -5691,3 +5691,415 @@ button.live-call__head:hover {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ---------- Onboarding (docs/design/telas/OnboardingV2.html) ----------
+ * A rail like the app's sidebar (its surface, the steps), the sky only as a
+ * horizon rising from its bottom with the guide on it; the step on the right. */
+.onb {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+}
+.onb__rail {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 16px;
+  background: var(--sunken);
+  border-right: 1px solid var(--line);
+  isolation: isolate;
+}
+.onb__brand {
+  display: flex;
+  padding: 0 6px;
+}
+.onb__horizon {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 46%;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.onb__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.onb__step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.onb__step:hover:not(:disabled):not([aria-current="step"]) {
+  background: var(--plate);
+  color: var(--ink);
+}
+.onb__step:disabled {
+  cursor: default;
+}
+.onb__step[aria-current="step"] {
+  background: var(--raised);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--e1);
+}
+.onb__step:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.onb__n {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px 8px 8px 3px;
+  background: var(--plate);
+  font-family: var(--font-dot);
+  font-variation-settings: "ROND" 100;
+  font-size: 13px;
+  font-weight: 600;
+}
+.onb__steps li[data-done] .onb__n {
+  background: var(--ink);
+  color: var(--bg);
+}
+.onb__step-name {
+  min-width: 0;
+}
+.onb__opt {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--faint);
+}
+.onb__guide {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.onb__bubble {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--raised);
+  box-shadow: var(--e2);
+  color: var(--ink2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.onb__guide .onb__guide-agent {
+  align-self: center;
+  width: 72px;
+  height: 72px;
+}
+.onb__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.onb__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 860px;
+  padding: 40px clamp(16px, 5vw, 64px) 32px;
+}
+.onb__head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.onb__eyebrow {
+  margin: 0;
+  font-family: var(--font-dot);
+  font-variation-settings: "ROND" 100;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.onb__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.onb__lead {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--muted);
+}
+.onb__label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.onb__error {
+  color: var(--danger);
+}
+.onb__foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px clamp(16px, 5vw, 64px);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+}
+.onb__hint {
+  margin-right: auto;
+  color: var(--muted);
+  font-size: 13px;
+}
+.onb__logo {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1.5px dashed var(--line2);
+  border-radius: 18px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.onb__logo:hover {
+  background: var(--plate);
+}
+.onb__logo:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.onb__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+}
+.onb__choice {
+  position: relative;
+  padding: 16px;
+  gap: 6px;
+}
+.onb__choice[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.6;
+}
+.onb__tag {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--plate);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.onb__ic {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+  border-radius: 12px 12px 12px 4px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.onb__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--plate);
+  overflow-wrap: anywhere;
+}
+.onb__emails {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: text;
+}
+.onb__emails:focus-within {
+  box-shadow:
+    inset 0 0 0 1px var(--line2),
+    var(--field-ring);
+}
+.onb__emails-input {
+  flex: 1;
+  min-width: min(100%, 180px);
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+}
+.onb__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 2px 2px 2px 4px;
+  border-radius: 999px;
+  background: var(--raised);
+  box-shadow: var(--e1);
+  font-size: 13px;
+}
+.onb__chip[data-invalid] {
+  box-shadow: 0 0 0 1px var(--danger);
+}
+.onb__chip-email {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.onb__chip-bad {
+  padding-right: 2px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+}
+.onb__welcome {
+  position: relative;
+  min-height: 220px;
+  padding: 24px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #2b74e6;
+  color: var(--sky-ink);
+  isolation: isolate;
+}
+.onb__welcome-text {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: fit-content;
+  max-width: 52ch;
+}
+.onb__eyebrow--sky {
+  color: var(--sky-ink2);
+}
+.onb__welcome-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.onb__welcome-lead {
+  margin: 0;
+  color: var(--sky-ink2);
+  font-weight: 500;
+}
+.onb__crew {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.onb__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.onb__summary dd {
+  margin: 0;
+}
+.onb__stat {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+/* Phone: the rail is a compact step bar (numbers only, no guide). */
+@media (max-width: 760px) {
+  .onb {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .onb__rail {
+    position: relative;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .onb__rail nav {
+    min-width: 0;
+    flex: 1;
+  }
+  .onb__guide,
+  .onb__horizon {
+    display: none;
+  }
+  .onb__steps {
+    flex-direction: row;
+    gap: 4px;
+    overflow-x: auto;
+  }
+  .onb__step {
+    width: auto;
+    padding: 4px;
+  }
+  .onb__step-name,
+  .onb__opt {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .onb__body {
+    padding-top: 24px;
+  }
+}

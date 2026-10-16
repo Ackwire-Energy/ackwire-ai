@@ -24,7 +24,6 @@ export function ZoneSelect({
   disabled?: boolean;
   "aria-label"?: string;
 }) {
-  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const settings = useSettings(org.id);
   const dir = useDirectory(org.id);
@@ -35,6 +34,35 @@ export function ZoneSelect({
     () => [browserTimezone() ?? "", orgZone ?? "", ...dir.members.map((m) => m.timezone), "UTC"].filter(Boolean),
     [orgZone, people],
   );
+  return (
+    <ZonePicker
+      value={value}
+      onChange={onChange}
+      id={id}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      suggested={suggested}
+    />
+  );
+}
+
+/** The selector itself, outside a workspace (onboarding): the caller gives the suggestions. */
+export function ZonePicker({
+  value,
+  onChange,
+  id,
+  disabled,
+  suggested,
+  "aria-label": ariaLabel,
+}: {
+  value: string;
+  onChange: (zone: string) => void;
+  id?: string;
+  disabled?: boolean;
+  suggested: string[];
+  "aria-label"?: string;
+}) {
+  const { t, i18n } = useTranslation();
   return (
     <TimezoneSelect
       value={value}

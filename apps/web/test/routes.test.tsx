@@ -25,7 +25,7 @@ describe("route guards", () => {
     if (state.me) state.me.organizations = [];
     const { router } = await renderApp("/", { api: createFakeApi(state) });
     expect(router.state.location.pathname).toBe("/onboarding");
-    expect(screen().getByRole("heading", { name: "Crie o espaço do seu time" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Comece pelo seu workspace" })).toBeTruthy();
   });
 
   test("signed in: / → the organization → #general", async () => {
