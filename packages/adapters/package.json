@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./machine-protocol": "./src/machine-protocol.ts",
+    "./command-policy": "./src/command-policy.ts",
     "./secret-box": "./src/secret-box.ts"
   },
   "scripts": {

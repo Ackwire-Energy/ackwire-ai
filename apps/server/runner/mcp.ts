@@ -4,6 +4,7 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import { createConnection, createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import { type CommandScope, readOnlyCall } from "@agenteschat/adapters/command-policy";
 import {
   isSafeRule,
   MCP_ARGS_MAX_CHARS,
@@ -333,7 +334,11 @@ const rpcError = (id: JsonRpcId, code: number, message: string) => ({
  * One JSON-RPC message from the executor; the response, or null for a
  * notification. Only what an MCP client needs from a tools-only server.
  */
-export async function handleMcpMessage(message: unknown, call: ToolCaller): Promise<Record<string, unknown> | null> {
+export async function handleMcpMessage(
+  message: unknown,
+  call: ToolCaller,
+  scope?: CommandScope,
+): Promise<Record<string, unknown> | null> {
   if (typeof message !== "object" || message === null || Array.isArray(message)) {
     return rpcError(null, -32600, "Invalid request");
   }
@@ -380,7 +385,7 @@ export async function handleMcpMessage(message: unknown, call: ToolCaller): Prom
           : {};
       // Claude Code's permission prompt: always an answer it understands (allow or deny JSON), never an error.
       if (name === PERMISSION_TOOL) {
-        const answer = await permissionPrompt(args, call);
+        const answer = await permissionPrompt(args, call, { ...(scope ? { scope } : {}) });
         return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(answer) }] } };
       }
       const reply = await call(name, args);
@@ -409,7 +414,9 @@ const NEVER_MESSAGE =
 /**
  * Claude Code asks (`--permission-prompt-tool mcp__agentes__permission_prompt`)
  * when a command isn't on the task's allow list. Deny-list commands are
- * refused here at once (never shown to anyone); the rest go to the server,
+ * refused here at once (never shown to anyone); plain reads (`readOnlyCall`:
+ * `ls` of any folder, read-only git, a GET with curl) are allowed at once,
+ * with no card and nothing posted; the rest go to the server,
  * which allows it by a mission rule or posts the command card in the thread.
  * Then we ask the server every `pollMs` (short calls; no request stays open)
  * until someone answers or `waitMs` passes: then it is denied.
@@ -417,7 +424,14 @@ const NEVER_MESSAGE =
 export async function permissionPrompt(
   args: Record<string, unknown>,
   call: ToolCaller,
-  opts: { waitMs?: number; pollMs?: number; sleep?: (ms: number) => Promise<void>; now?: () => number } = {},
+  opts: {
+    waitMs?: number;
+    pollMs?: number;
+    sleep?: (ms: number) => Promise<void>;
+    now?: () => number;
+    /** Where the task runs: plain reads are allowed here without asking. */
+    scope?: CommandScope;
+  } = {},
 ): Promise<PermissionAnswer> {
   const toolName = typeof args.tool_name === "string" ? args.tool_name : "";
   const input =
@@ -427,6 +441,7 @@ export async function permissionPrompt(
   if (!toolName) return { behavior: "deny", message: "Unknown tool." };
   if (DENY_RULES.some((rule) => ruleMatches(rule, toolName, input)))
     return { behavior: "deny", message: NEVER_MESSAGE };
+  if (opts.scope && readOnlyCall(toolName, input, opts.scope)) return { behavior: "allow", updatedInput: input };
   const now = opts.now ?? Date.now;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const deadline = now() + (opts.waitMs ?? PERMISSION_WAIT_MS);
@@ -443,6 +458,7 @@ export async function permissionPrompt(
     tool_name: toolName.slice(0, 64),
     input,
     ...(typeof args.tool_use_id === "string" ? { tool_use_id: args.tool_use_id.slice(0, 128) } : {}),
+    ...(opts.scope ? { scope: opts.scope } : {}),
   });
   const requestId = "request_id" in out && typeof out.request_id === "string" ? out.request_id : "";
   for (;;) {
@@ -469,6 +485,7 @@ export async function runMcpServer(options: {
   tokenFile?: string;
   input?: NodeJS.ReadableStream;
   output?: NodeJS.WritableStream;
+  scope?: CommandScope;
 }): Promise<number> {
   const token =
     options.token ??
@@ -482,6 +499,7 @@ export async function runMcpServer(options: {
   const out = options.output ?? process.stdout;
   const write = (msg: unknown) => out.write(`${JSON.stringify(msg)}\n`);
   const call: ToolCaller = (tool, args) => ipcCall(options.socketPath, { taskId: options.taskId, token, tool, args });
+  const scope = options.scope ?? mcpScopeFromEnv(process.env);
   const rl = createInterface({ input: options.input ?? process.stdin, crlfDelay: Number.POSITIVE_INFINITY });
   const inflight = new Set<Promise<void>>();
   for await (const line of rl) {
@@ -493,7 +511,7 @@ export async function runMcpServer(options: {
       write(rpcError(null, -32700, "Parse error"));
       continue;
     }
-    const p = handleMcpMessage(message, call)
+    const p = handleMcpMessage(message, call, scope)
       .then((res) => {
         if (res) write(res);
       })
@@ -525,8 +543,24 @@ export function cleanRules(rules: string) {
     .slice(0, 4000);
 }
 
+/** Where the task runs and its folders, for our MCP process (`AGENTES_MCP_CWD`, `AGENTES_MCP_FOLDERS`). */
+export function mcpScopeFromEnv(env: NodeJS.ProcessEnv): CommandScope | undefined {
+  const cwd = env.AGENTES_MCP_CWD?.trim();
+  if (!cwd || !path.isAbsolute(cwd)) return undefined;
+  const folders = (env.AGENTES_MCP_FOLDERS ?? "").split(path.delimiter).filter((f) => f && path.isAbsolute(f));
+  return { cwd, folders: folders.length ? folders : [cwd], ...(env.HOME ? { home: env.HOME } : {}) };
+}
+
 /** The MCP config Claude Code reads (`--mcp-config <file>`): our server, bound to the task. */
-export function claudeMcpConfig(input: { command: string[]; taskId: string; socketPath: string; token: string }) {
+export function claudeMcpConfig(input: {
+  command: string[];
+  taskId: string;
+  socketPath: string;
+  token: string;
+  /** Where the task runs and the mission folder (plain reads there need no card). */
+  cwd?: string;
+  folders?: string[];
+}) {
   const [command, ...args] = input.command;
   return {
     mcpServers: {
@@ -534,7 +568,12 @@ export function claudeMcpConfig(input: { command: string[]; taskId: string; sock
         type: "stdio",
         command,
         args: [...args, "mcp", "--task", input.taskId],
-        env: { AGENTES_MCP_TOKEN: input.token, AGENTES_MCP_SOCKET: input.socketPath },
+        env: {
+          AGENTES_MCP_TOKEN: input.token,
+          AGENTES_MCP_SOCKET: input.socketPath,
+          ...(input.cwd ? { AGENTES_MCP_CWD: input.cwd } : {}),
+          ...(input.folders?.length ? { AGENTES_MCP_FOLDERS: input.folders.join(path.delimiter) } : {}),
+        },
       },
     },
   };

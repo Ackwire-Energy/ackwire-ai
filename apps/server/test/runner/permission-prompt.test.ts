@@ -12,6 +12,7 @@ import {
   DENY_RULES,
   handleMcpMessage,
   type IpcReply,
+  mcpScopeFromEnv,
   missionExecutorArgs,
   permissionPrompt,
 } from "../../runner/mcp";
@@ -104,6 +105,48 @@ test("deploys, cluster changes and package publishes are on the deny list (any p
     expect(await permissionPrompt(bash(command), s.call, instant)).toMatchObject({ behavior: "deny" });
     expect(s.calls).toHaveLength(0);
   }
+});
+
+test("the prompt tool: plain reads are allowed at once (no card, nothing posted); the rest carry the scope", async () => {
+  const scope = { cwd: "/w/ada/m1", folders: ["/w/ada/m1"], home: "/Users/w" };
+  for (const command of [
+    "ls /System/Library/Fonts /Library/Fonts",
+    "curl -sI https://commons.wikimedia.org/w/api.php",
+    "git -C /w/app log -3",
+  ]) {
+    const s = server([]);
+    expect(await permissionPrompt(bash(command), s.call, { ...instant, scope })).toEqual({
+      behavior: "allow",
+      updatedInput: { command },
+    });
+    expect(s.calls).toHaveLength(0);
+  }
+  // The deny list still comes first.
+  const denied = server([]);
+  expect((await permissionPrompt(bash("npm publish"), denied.call, { ...instant, scope })).behavior).toBe("deny");
+  expect(denied.calls).toHaveLength(0);
+  // Not a plain read: the server decides, told where the task runs.
+  for (const command of ["curl -d a=1 https://example.com", "ls | xargs rm", "cat ~/.ssh/id_rsa"]) {
+    const s = server([{ behavior: "allow" }]);
+    await permissionPrompt(bash(command), s.call, { ...instant, scope });
+    expect(s.calls[0]).toMatchObject({ tool_name: "Bash", input: { command }, scope });
+  }
+  // Without a scope (an older MCP config) nothing is allowed locally.
+  const old = server([{ behavior: "allow" }]);
+  await permissionPrompt(bash("ls /System"), old.call, instant);
+  expect(old.calls).toHaveLength(1);
+  expect(
+    mcpScopeFromEnv({
+      AGENTES_MCP_CWD: "/w/ada/m1/work/x",
+      AGENTES_MCP_FOLDERS: "/w/ada/m1/work/x:/w/ada/m1",
+      HOME: "/Users/w",
+    }),
+  ).toEqual({
+    cwd: "/w/ada/m1/work/x",
+    folders: ["/w/ada/m1/work/x", "/w/ada/m1"],
+    home: "/Users/w",
+  });
+  expect(mcpScopeFromEnv({ AGENTES_MCP_CWD: "relative" })).toBeUndefined();
 });
 
 test("the prompt tool: pending, then allowed (the input comes back as is)", async () => {

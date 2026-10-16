@@ -267,6 +267,10 @@ test.skipIf(!posix)(
     const config = JSON.parse(readFileSync(path.join(home, "tasks", TASK, "mcp.json"), "utf8"));
     expect(config.mcpServers.agentes.env.AGENTES_MCP_TOKEN).toBe(info?.token);
     expect(config.mcpServers.agentes.args).toEqual(["/opt/agentes-runner.mjs", "mcp", "--task", TASK]);
+    // Where it runs, so plain reads there need no card.
+    const cwd = config.mcpServers.agentes.env.AGENTES_MCP_CWD as string;
+    expect(path.isAbsolute(cwd)).toBe(true);
+    expect(String(config.mcpServers.agentes.env.AGENTES_MCP_FOLDERS).split(path.delimiter)).toContain(cwd);
     expect(existsSync(path.join(home, "tasks", TASK, "mcp-token"))).toBe(true);
     // The token never leaves the machine (not in the journal's view sent to the server).
     expect(JSON.stringify(tasks.list())).not.toContain(info?.token ?? "none");

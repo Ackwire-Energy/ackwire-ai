@@ -791,6 +791,8 @@ export class TaskManager {
     let branch: string | undefined;
     // Where an item works, told first in its prompt (the server's prompt doesn't know whether there is git).
     let where = "";
+    // The mission folder (an item's worktree or subfolder is inside or next to it): writes and saves are fine here.
+    const missionRoot = cwd;
     if (typeof req.branch === "string" && req.branch.trim() !== "") {
       const repo = cwd;
       if (executor === "shell" || isGitRepo(cwd)) {
@@ -842,6 +844,8 @@ export class TaskManager {
           taskId,
           socketPath: this.opts.mcp.socketPath,
           token: mcpToken,
+          cwd,
+          folders: [...new Set([cwd, missionRoot])],
         });
         writeFileSync(configFile, JSON.stringify(config), { mode: 0o600 });
         // What it may run without asking (protocol 7; older servers send no mode: work).
