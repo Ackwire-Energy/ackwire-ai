@@ -1,5 +1,6 @@
 import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { cx } from "../cx";
+import { PixelSpinner } from "./PixelSpinner";
 
 /** Skeletons wait this long before showing: fast loads never flash. */
 export const SKELETON_DELAY_MS = 150;
@@ -204,7 +205,10 @@ export function TopProgress({
   return <div className="ac-top-progress" role="progressbar" aria-label={label} aria-busy="true" />;
 }
 
-/** Inline spinner (buttons, long actions). Decorative: the control says what's happening. */
+/**
+ * Inline spinner (buttons, long actions): the pixel orbit, neutral. Decorative:
+ * the control says what's happening. Under 16 it is the 14px orbit.
+ */
 export function Spinner({ size = 16, className }: { size?: number; className?: string }) {
-  return <span aria-hidden="true" className={cx("ac-spinner", className)} style={{ width: size, height: size }} />;
+  return <PixelSpinner size={size >= 32 ? 32 : size >= 24 ? 24 : size >= 16 ? 16 : 14} className={className} />;
 }

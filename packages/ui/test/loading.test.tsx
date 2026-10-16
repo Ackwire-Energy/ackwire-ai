@@ -76,7 +76,7 @@ describe("Button loading", () => {
     expect(button.getAttribute("aria-busy")).toBe("true");
     expect(button.hasAttribute("disabled")).toBe(true);
     expect(button.className).toContain("ac-btn--loading");
-    expect(button.querySelector(".ac-spinner")).toBeTruthy();
+    expect(button.querySelector(".ac-pixspin")).toBeTruthy();
     expect(button.textContent).toBe("Salvar");
     button.click();
     expect(clicks).toBe(0);
@@ -86,7 +86,7 @@ describe("Button loading", () => {
     render(<Button>Salvar</Button>);
     const button = body().getByRole("button", { name: "Salvar" });
     expect(button.hasAttribute("aria-busy")).toBe(false);
-    expect(button.querySelector(".ac-spinner")).toBeNull();
+    expect(button.querySelector(".ac-pixspin")).toBeNull();
   });
 });
 

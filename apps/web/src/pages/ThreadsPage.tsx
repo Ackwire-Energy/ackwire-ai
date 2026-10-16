@@ -448,7 +448,10 @@ function ThreadRow({
         </span>
         <span className="thread-row__state">
           {thread.mission && thread.state === "open" ? (
-            <MissionStatusChip status={missionSummaryStatusKey(thread.mission, thread.working)} />
+            <MissionStatusChip
+              status={missionSummaryStatusKey(thread.mission, thread.working)}
+              agentId={thread.mission.agentId}
+            />
           ) : (
             <ThreadStatusChip thread={thread} />
           )}

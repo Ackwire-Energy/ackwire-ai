@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useTaskOutput } from "@/api/missions";
 import type { MachineTask } from "@/api/types";
+import { AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { formatTime } from "@/lib/format";
 import { appendOutputLine, formatSpan, type SessionState, sessionState, taskPr, taskSeconds } from "@/lib/missions";
@@ -97,7 +98,7 @@ function SessionRow({ task, now }: { task: MachineTask; now: number }) {
     <>
       <div className="mi-session">
         <span className="mi-session__icon" data-state={state} title={t(`missions.sessions.state.${state}`)}>
-          <Icon name={ICON[state]} size={14} />
+          {state === "running" ? <AgentSpinner agentId={task.agentId} /> : <Icon name={ICON[state]} size={14} />}
         </span>
         <button type="button" className="mi-session__title" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           <b>

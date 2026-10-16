@@ -66,7 +66,7 @@ export function WorkSummary({
                   aria-hidden="true"
                 >
                   {s.pending ? (
-                    <Spinner size={10} />
+                    <Spinner size={14} />
                   ) : s.failed ? (
                     <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                       <path d="M6 3v3.5M6 8.6v.1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />

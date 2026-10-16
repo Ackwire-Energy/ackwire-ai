@@ -117,10 +117,6 @@ button.mi-pill--need:hover {
 .mi-pill--need .ac-icon {
   color: var(--bg);
 }
-.mi-run {
-  display: inline-flex;
-  color: var(--agent);
-}
 .mi-pills {
   display: flex;
   flex-wrap: wrap;
@@ -447,10 +443,9 @@ button.mi-pill--need:hover {
   background: var(--ink);
   color: var(--bg);
 }
+/* Running: the agent's own pixel orbit, no ring around it. */
 .mi-session__icon[data-state="running"] {
   background: transparent;
-  color: var(--agent);
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--agent) 30%, transparent);
 }
 .mi-session__icon[data-state="failed"] {
   color: var(--danger);

@@ -322,7 +322,7 @@ describe("Logo, Icon, Meter", () => {
   });
 
   test("every icon renders a stroke-only 20px glyph, decorative unless labelled", () => {
-    for (const name of iconNames) {
+    for (const name of iconNames.filter((n) => n !== "spinner")) {
       const { container, unmount } = render(<Icon name={name} />);
       const svg = container.querySelector("svg");
       expect(svg?.getAttribute("viewBox")).toBe("0 0 20 20");
@@ -334,17 +334,20 @@ describe("Logo, Icon, Meter", () => {
     expect(body().getByRole("img", { name: "Buscar" })).toBeTruthy();
   });
 
-  test("the spinner icon turns everywhere (one class; the CSS keeps it still under reduced motion)", async () => {
+  test("the spinner icon is the pixel orbit everywhere (no ring), decorative, 14 or 16 px", () => {
     const { container, unmount } = render(<Icon name="spinner" size={14} className="x" />);
-    expect(container.querySelector("svg")?.getAttribute("class")).toBe("ac-icon ac-icon--spin x");
+    const orbit = container.querySelector("canvas");
+    expect(orbit?.getAttribute("class")).toBe("ac-pixspin ac-icon--orbit x");
+    expect(orbit?.getAttribute("aria-hidden")).toBe("true");
+    expect((orbit as HTMLElement).style.width).toBe("14px");
+    expect(container.querySelector("svg")).toBeNull();
     unmount();
+    const big = render(<Icon name="spinner" />);
+    expect((big.container.querySelector("canvas") as HTMLElement).style.width).toBe("16px");
+    big.unmount();
     const other = render(<Icon name="search" />);
     expect(other.container.querySelector("svg")?.getAttribute("class")).toBe("ac-icon");
     other.unmount();
-    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
-    expect(css).toMatch(
-      /@media \(prefers-reduced-motion: no-preference\) \{\s*\.ac-icon--spin \{[^}]*animation: ac-spin 0\.9s linear infinite/,
-    );
   });
 
   test("meter exposes value and max", () => {

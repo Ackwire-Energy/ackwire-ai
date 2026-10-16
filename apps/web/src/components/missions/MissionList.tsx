@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useMissionList } from "@/api/missions";
 import { useChannels } from "@/api/queries";
 import type { Mission } from "@/api/types";
+import { AgentSpinner } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -172,9 +173,7 @@ function MissionCard({ mission: m }: { mission: Mission }) {
           )}
           {m.runningTasks > 0 && (
             <span className="mi-pill">
-              <span className="mi-run">
-                <Icon name="spinner" size={14} />
-              </span>
+              <AgentSpinner agentId={m.agentId} />
               {t("missions.list.running", { count: m.runningTasks })}
             </span>
           )}

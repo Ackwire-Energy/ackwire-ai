@@ -2293,31 +2293,14 @@ a.ac-list__row:focus-visible {
     transform: translateX(250%);
   }
 }
-.ac-spinner {
+/* The working indicator (PixelSpinner, telas/Carregando.html option A): a 3×3
+   pixel orbit drawn on a canvas; it reads `color` for the neutral ink. Still
+   under reduced motion (the component stops its clock). */
+.ac-pixspin {
   display: inline-block;
   flex: none;
-  box-sizing: border-box;
-  border-radius: var(--radius-full);
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  opacity: 0.8;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .ac-spinner {
-    animation: ac-spin 0.8s linear infinite;
-  }
-}
-@keyframes ac-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-/* The spinner icon turns everywhere it is used (Icon adds the class). */
-@media (prefers-reduced-motion: no-preference) {
-  .ac-icon--spin {
-    transform-origin: 50% 50%;
-    animation: ac-spin 0.9s linear infinite;
-  }
+  vertical-align: middle;
+  image-rendering: pixelated;
 }
 /* Loading button: the label keeps its width under the spinner. */
 .ac-btn--loading {
@@ -3703,8 +3686,9 @@ a.ac-list__row:focus-visible {
     transform: translateX(-50%);
   }
 }
+/* Pending: the pixel orbit alone (a square in the round tick would poke out). */
 .ac-tick--pending {
-  background: var(--sunken);
+  background: transparent;
   color: var(--muted);
 }
 .ac-work__detail {

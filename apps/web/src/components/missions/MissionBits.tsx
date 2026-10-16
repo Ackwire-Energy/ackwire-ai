@@ -3,7 +3,7 @@ import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CommandApproval, Mission, MissionExecutor, MissionFileName, ThreadMissionSummary } from "@/api/types";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -186,15 +186,23 @@ const STATUS_ICON: Record<MissionStatusKey, IconName> = {
 export function MissionStatusChip({
   mission,
   status,
+  agentId,
 }: {
-  mission?: Pick<Mission, "status" | "runningTasks" | "pending" | "canAct">;
+  mission?: Pick<Mission, "status" | "runningTasks" | "pending" | "canAct" | "agentId">;
   /** A state already known (a thread row's summary). */
   status?: MissionStatusKey;
+  /** Whose work it is ("Trabalhando" in that agent's tones); the mission's agent by default. */
+  agentId?: string;
 }) {
   const { t } = useTranslation();
   const key = status ?? (mission ? missionStatusKey(mission) : "active");
+  const who = agentId ?? mission?.agentId;
   return (
-    <Chip icon={STATUS_ICON[key]} tone={key === "needsYou" ? "waiting" : "neutral"}>
+    <Chip
+      icon={STATUS_ICON[key]}
+      lead={key === "working" && who ? <AgentSpinner agentId={who} /> : undefined}
+      tone={key === "needsYou" ? "waiting" : "neutral"}
+    >
       {t(`missions.status.${key}`)}
     </Chip>
   );

@@ -15,7 +15,7 @@ import {
 } from "@/api/missions";
 import { useMachines } from "@/api/queries";
 import type { CommandApproval, Mission, MissionControl } from "@/api/types";
-import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { errorText } from "@/lib/errors";
@@ -198,13 +198,7 @@ export function MissionPinned({ mission: m }: { mission: Mission }) {
           </span>
         ) : (
           <span className="mi-pill">
-            {running > 0 ? (
-              <span className="mi-run">
-                <Icon name="spinner" size={14} />
-              </span>
-            ) : (
-              <Icon name="pause" size={14} />
-            )}
+            {running > 0 ? <AgentSpinner agentId={m.agentId} /> : <Icon name="pause" size={14} />}
             {running > 0 ? t("missions.pinned.running", { count: running }) : t("missions.pinned.idle")}
           </span>
         )}

@@ -98,6 +98,14 @@ export { Mention } from "./components/Mention";
 export { Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "./components/Menu";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
 export { glowOptions, PixelSky, SkyGlow } from "./components/PixelSky";
+export {
+  ORBIT_RING,
+  ORBIT_STEP_MS,
+  orbitShades,
+  PixelSpinner,
+  type PixelSpinnerProps,
+  type PixelSpinnerSize,
+} from "./components/PixelSpinner";
 export { Popover } from "./components/Popover";
 export {
   modeOf,

@@ -3,6 +3,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useChannels, useDms } from "@/api/queries";
 import type { Channel, Run } from "@/api/types";
+import { AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import type { Field } from "@/lib/agent-edit";
 import { useAgentEdit } from "./context";
@@ -57,7 +58,7 @@ export function RunIcon({ run }: { run: Pick<Run, "status"> }) {
 }
 
 /** The run's state as a chip (icon and word). */
-export function RunChip({ run }: { run: Pick<Run, "status"> }) {
+export function RunChip({ run }: { run: Pick<Run, "status"> & Partial<Pick<Run, "agentId">> }) {
   const { t } = useTranslation();
   if (run.status === "failed") return <Chip icon="alert">{t("agentPage.activity.failed")}</Chip>;
   if (run.status === "waiting_approval" || run.status === "waiting_input")
@@ -67,7 +68,11 @@ export function RunChip({ run }: { run: Pick<Run, "status"> }) {
       </Chip>
     );
   if (run.status === "running" || run.status === "queued")
-    return <Chip icon="spinner">{t("agentPage.activity.running")}</Chip>;
+    return (
+      <Chip icon="spinner" lead={run.agentId ? <AgentSpinner agentId={run.agentId} /> : undefined}>
+        {t("agentPage.activity.running")}
+      </Chip>
+    );
   if (run.status === "canceled") return <Chip icon="stop">{t("agentPage.activity.canceled")}</Chip>;
   return <Chip icon="check">{t("agentPage.activity.done")}</Chip>;
 }
