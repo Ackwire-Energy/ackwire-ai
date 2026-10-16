@@ -610,7 +610,12 @@ const readOnlyShell = () => READ_ONLY_COMMANDS.flatMap((c) => [`Bash(${c})`, `Ba
 const gitC = (rules: string[]) =>
   rules.flatMap((r) => (r.startsWith("Bash(git ") ? [r, r.replace("Bash(git ", "Bash(git -C * ")] : [r]));
 
-/** Never without a person's approval (`request_approval`): merges, pushes elsewhere, force pushes, deploys. */
+/**
+ * Never without a person's approval (`request_approval`): merges, pushes
+ * elsewhere, force pushes, deploys, cluster/infra changes and package
+ * publishes. Never promptable: Claude Code checks deny before asking, and our
+ * prompt tool refuses a match at once (`permissionPrompt`).
+ */
 export const DENY_RULES = [
   "Bash(git merge)",
   "Bash(git merge *)",
@@ -652,11 +657,11 @@ export const DENY_RULES = [
   "Bash(vercel --prod*)",
   "Bash(vercel * --prod*)",
   "Bash(npx vercel *)",
-  "Bash(railway up *)",
-  "Bash(railway deploy *)",
+  "Bash(railway up*)",
+  "Bash(railway deploy*)",
   "Bash(npx railway *)",
-  "Bash(fly deploy *)",
-  "Bash(flyctl deploy *)",
+  "Bash(fly deploy*)",
+  "Bash(flyctl deploy*)",
   "Bash(netlify deploy *)",
   "Bash(npx netlify *)",
   "Bash(eas submit *)",
@@ -664,8 +669,24 @@ export const DENY_RULES = [
   "Bash(npx eas *)",
   "Bash(npx eas-cli *)",
   "Bash(kubectl apply *)",
+  "Bash(kubectl rollout *)",
+  "Bash(kubectl delete *)",
+  "Bash(helm install *)",
+  "Bash(helm upgrade *)",
+  "Bash(helm uninstall *)",
   "Bash(terraform apply *)",
-  "Bash(npm publish *)",
+  "Bash(terraform destroy *)",
+  "Bash(docker push*)",
+  "Bash(gh release create*)",
+  // Publishing packages (`bun publish` and friends; `yarn npm publish` is Yarn 2+).
+  "Bash(npm publish*)",
+  "Bash(pnpm publish*)",
+  "Bash(yarn publish*)",
+  "Bash(yarn npm publish*)",
+  "Bash(bun publish*)",
+  "Bash(cargo publish*)",
+  "Bash(gem push*)",
+  "Bash(twine upload*)",
 ];
 
 /**

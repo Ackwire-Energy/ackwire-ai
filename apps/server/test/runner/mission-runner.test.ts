@@ -89,6 +89,7 @@ test("permission profile: work allows git, tests and pushes to the mission's bra
   expect(missionBranchPrefix(MISSION, "agentes/custom/")).toBe("agentes/custom/");
   expect(missionBranchPrefix(MISSION, "../x/")).toBe("agentes/000000bb/");
   const work = claudePermissionSettings("work", "agentes/0193aaaa/").permissions;
+  const plan = claudePermissionSettings("plan", prefix).permissions;
   for (const rule of [
     "mcp__agentes",
     "Bash(git commit *)",
@@ -114,11 +115,31 @@ test("permission profile: work allows git, tests and pushes to the mission's bra
     "Bash(vercel deploy *)",
     "Bash(eas submit *)",
     "Bash(kubectl apply *)",
+    "Bash(kubectl rollout *)",
+    "Bash(kubectl delete *)",
+    "Bash(helm install *)",
+    "Bash(helm upgrade *)",
+    "Bash(helm uninstall *)",
     "Bash(terraform apply *)",
+    "Bash(terraform destroy *)",
+    "Bash(railway up*)",
+    "Bash(railway deploy*)",
+    "Bash(fly deploy*)",
+    "Bash(flyctl deploy*)",
+    "Bash(npm publish*)",
+    "Bash(pnpm publish*)",
+    "Bash(yarn publish*)",
+    "Bash(yarn npm publish*)",
+    "Bash(bun publish*)",
+    "Bash(cargo publish*)",
+    "Bash(gem push*)",
+    "Bash(twine upload*)",
+    "Bash(docker push*)",
+    "Bash(gh release create*)",
   ]) {
     expect(work.deny).toContain(rule);
+    expect(plan.deny).toContain(rule);
   }
-  const plan = claudePermissionSettings("plan", prefix).permissions;
   expect(plan.allow).toContain("mcp__agentes");
   expect(plan.allow).toContain("Bash(git log *)");
   expect(plan.allow.some((r) => r.startsWith("Bash(git commit") || r.startsWith("Bash(npm"))).toBe(false);

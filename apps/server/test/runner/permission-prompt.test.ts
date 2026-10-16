@@ -54,6 +54,58 @@ test("the prompt tool: a deny-list command is refused at once, never asked", asy
   expect(s.calls).toHaveLength(0);
 });
 
+test("deploys, cluster changes and package publishes are on the deny list (any part, bare or with arguments)", async () => {
+  const denied = (command: string) => DENY_RULES.some((r) => ruleMatches(r, "Bash", { command }));
+  for (const command of [
+    "kubectl rollout restart deploy/web",
+    "kubectl delete pod web-1",
+    "kubectl apply -f k8s/",
+    "helm install web ./chart",
+    "helm upgrade web ./chart",
+    "helm uninstall web",
+    "terraform apply -auto-approve",
+    "terraform destroy",
+    "railway up",
+    "railway up --detach",
+    "railway deploy",
+    "fly deploy",
+    "flyctl deploy --remote-only",
+    "npm publish",
+    "npm publish --access public",
+    "pnpm publish",
+    "yarn publish",
+    "yarn npm publish",
+    "bun publish",
+    "cargo publish",
+    "gem push x-1.0.gem",
+    "twine upload dist/*",
+    "docker push ghcr.io/acme/web:1",
+    "gh release create v1.0.0",
+    "npm test && npm publish",
+    "git -C /w push origin main",
+    "git -C /w push origin master",
+    "git -C /w push -u origin main --tags",
+  ]) {
+    expect(denied(command)).toBe(true);
+  }
+  for (const command of [
+    "kubectl get pods",
+    "helm list",
+    "terraform plan",
+    "npm test",
+    "docker build .",
+    "gh pr create",
+  ]) {
+    expect(denied(command)).toBe(false);
+  }
+  // Never promptable: refused at once, nothing reaches the server.
+  for (const command of ["npm publish", "helm upgrade web ./chart", "docker push x"]) {
+    const s = server([]);
+    expect(await permissionPrompt(bash(command), s.call, instant)).toMatchObject({ behavior: "deny" });
+    expect(s.calls).toHaveLength(0);
+  }
+});
+
 test("the prompt tool: pending, then allowed (the input comes back as is)", async () => {
   const s = server([
     { status: "pending", request_id: "r1" },
