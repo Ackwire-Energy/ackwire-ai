@@ -129,7 +129,26 @@ svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-widt
 canvas.av{display:block;flex:none}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
 @media (max-width:820px){.shell{grid-template-columns:1fr}.rail{position:relative;height:auto;padding:16px;gap:12px}.guide{display:none}.steps{flex-direction:row;overflow-x:auto}.steps .t,.steps .opt{display:none}.foot{left:0}}
+/* Obsidian vault → wiki (step 2) */
+.vault{margin-top:14px}
+.vault .vh{display:flex;gap:12px;align-items:center}
+.vault .vh .t{flex:1}
+.vault .vh b{display:block}
+.obs{width:22px;height:22px}
+.drop.over{background:var(--plate);border-color:var(--ink)}
+.vstats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.vstats div{padding:10px 12px;border-radius:14px;background:var(--sunken)}
+.vstats b{display:block;font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:700;font-size:26px;line-height:1.1}
+.vstats span{color:var(--muted);font-size:12px;font-weight:600}
+.vlist .frow svg{flex:none}
+.vlist .ok{color:var(--ok)}
+.vlist .wn{color:var(--warn)}
+.prog{height:6px;border-radius:99px;background:var(--sunken);overflow:hidden;flex:1}
+.prog i{display:block;height:100%;border-radius:99px;background:var(--ink);transition:width .2s}
+.linkish{all:unset;cursor:pointer;color:var(--ink);font-weight:600;text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+@media (max-width:620px){.vstats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 <div class="shell">
@@ -146,6 +165,7 @@ canvas.av{display:block;flex:none}
 
 <script type="module">
 import { drawAgent, idlePose, drawAccessory, ACCESSORY_REACH, AGENT_GRADIENTS } from "../../../packages/ui/src/agent/engine.js";
+import { readVault, filesFromList, filesFromDrop, sampleVault, fmtBytes } from "./assets/obsidian.js";
 
 const STEPS = [
   { id: "workspace", t: "Workspace" },
@@ -195,6 +215,7 @@ const S = {
   step: 0, done: new Set(),
   org: "Acme", tz: "America/Sao_Paulo", logo: false,
   context: "",
+  vault: { state: "idle", res: null, done: 0, total: 0 },
   importFrom: null, importState: "idle", importPick: {},
   presets: new Set(["ada"]), provider: "anthropic", key: "",
   computer: null, pairing: "idle",
@@ -303,7 +324,7 @@ function railSky(t) {
 const GUIDE = { look: { color: "green", eyes: "wide", accessory: "headphones" }, happyUntil: 0, typingUntil: 0 };
 const SAYS = [
   "Oi! Eu sou a <b>Ada</b>. Vamos montar o lugar onde você e os agentes vão trabalhar?",
-  "Me conta o que a empresa faz. Eu e os outros agentes lemos isso em toda conversa.",
+  "Me conta o que a empresa faz. Eu e os outros agentes lemos isso em toda conversa. Tem notas no <b>Obsidian</b>? Traz que eu leio também.",
   "Já tem agentes em outro lugar? Traz eles: chegam com as instruções e ganham a cara daqui.",
   "Quem entra no time? Eu já estou aqui; chame mais alguém se quiser.",
   "Para rodar código e testes eu preciso de um computador. O da nuvem já resolve.",
@@ -358,7 +379,9 @@ const VIEWS = {
       <div class="card stack">
         <div class="field"><label for="site">Puxar do site (opcional)</label><div class="linkbox"><input id="site" type="text" placeholder="https://acme.com.br"><button class="btn" data-site>Ler site</button></div><span class="help">Lemos a página e escrevemos um rascunho para você revisar.</span></div>
         <div class="field"><label for="ctx">Contexto</label><textarea id="ctx" placeholder="Ex.: A Acme vende software de estoque para varejo. Falamos com clientes em português. Deploy só às terças, com aprovação do João.">${esc(S.context)}</textarea></div>
-      </div>`;
+      </div>
+      <div class="card stack vault" id="vault"></div>`;
+    renderVault();
     foot({ hint: "Dá para editar depois em Configurações → Geral.", skip: true });
   },
   import() {
@@ -493,13 +516,77 @@ const VIEWS = {
         <div class="card"><span class="help">Agentes</span><b>${agents.length}</b></div>
         <div class="card"><span class="help">Computador</span><b>${S.computer === "cloud" ? "Nuvem" : S.computer === "mine" ? (S.pairing === "connected" ? "MacBook" : "Pendente") : "Depois"}</b></div>
         <div class="card"><span class="help">Convites</span><b>${S.emails.length}</b></div>
+        <div class="card"><span class="help">Wiki</span><b>${vaultReady() ? S.vault.res.notes.length + " páginas" : "—"}</b></div>
         <div class="card"><span class="help">Para conectar</span><b>${S.importFrom && S.importFrom !== "none" && S.importState === "ready" ? IMPORTS[S.importFrom].apps.length + " apps" : "—"}</b></div>
       </div>
-      <div class="notice" style="margin-top:14px">${I.info}<span>Próximos passos ficam num checklist no #general: conectar ${S.importFrom && S.importFrom !== "none" && S.importState === "ready" ? IMPORTS[S.importFrom].apps.join(", ") : "GitHub ou Notion"}, revisar as rotinas importadas e dar as permissões de cada agente.</span></div>`;
+      <div class="notice" style="margin-top:14px">${I.info}<span>Próximos passos ficam num checklist no #general: conectar ${S.importFrom && S.importFrom !== "none" && S.importState === "ready" ? IMPORTS[S.importFrom].apps.join(", ") : "GitHub ou Notion"}, revisar as rotinas importadas${vaultReady() ? ", conferir a wiki que veio do Obsidian" : ""} e dar as permissões de cada agente.</span></div>`;
     const crew = $("#crew"); for (const a of agents) crew.append(avatar(a.look, 48));
     foot({ next: "Abrir o #general", back: true });
   },
 };
+/* Obsidian: the vault becomes the workspace wiki (D34); agents read it as the team's source. */
+const OBS = '<svg class="obs" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="ogv" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9a2ff"/><stop offset="1" stop-color="#6a3fe0"/></linearGradient></defs><path d="M9.1 2.5 16 5.2l2.8 7-2.4 8.2-6.9 1.2-4.7-5.6 1.7-8.6z" fill="url(#ogv)"/><path d="M9.1 2.5 11 11.6l-5.4 4.2M11 11.6l7.8.6M11 11.6l-1.5 10" stroke="rgba(255,255,255,.4)" stroke-width="1" fill="none"/></svg>';
+const WARN = '<svg class="i" viewBox="0 0 24 24"><path d="M12 4 2.8 19.5h18.4L12 4Z"/><path d="M12 10v4.5M12 17h.01"/></svg>';
+function renderVault() {
+  const el = $("#vault");
+  if (!el) return;
+  const V = S.vault;
+  const head = `<div class="vh"><span class="ic" style="margin:0">${OBS}</span><span class="t"><b>Já tem documentação no Obsidian?</b><span class="help">A vault vira a wiki do workspace, com pastas, tags e [[links]]. Os agentes leem a wiki quando respondem.</span></span>${V.state === "ready" ? `<span class="chip ok">${I.check}Pronta</span>` : '<span class="chip">opcional</span>'}</div>`;
+  if (V.state === "idle") {
+    el.innerHTML = head + `
+      <div class="drop" id="vdrop" tabindex="0" role="button" aria-label="Escolher o .zip da vault">${I.upload}<b style="color:var(--ink)">Solte o .zip da vault aqui</b><span>Também serve a pasta da vault ou arquivos .md soltos</span></div>
+      <span class="help">Ou <button class="linkish" type="button" data-vdir>escolha a pasta</button> · <button class="linkish" type="button" data-vsample>teste com uma vault de exemplo</button>. Para gerar o .zip: botão direito na pasta da vault → Comprimir.</span>
+      <input type="file" id="vzip" accept=".zip,.md" multiple hidden><input type="file" id="vdir" webkitdirectory hidden>`;
+    const dz = $("#vdrop");
+    dz.onclick = () => $("#vzip").click();
+    dz.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("#vzip").click(); } };
+    dz.ondragover = (e) => { e.preventDefault(); dz.classList.add("over"); };
+    dz.ondragleave = () => dz.classList.remove("over");
+    dz.ondrop = (e) => { e.preventDefault(); dz.classList.remove("over"); readIt(filesFromDrop(e.dataTransfer)); };
+    $("#vzip").onchange = (e) => e.target.files.length && readIt(filesFromList(e.target.files));
+    $("#vdir").onchange = (e) => e.target.files.length && readIt(filesFromList(e.target.files), e.target.files[0].webkitRelativePath.split("/")[0]);
+    return;
+  }
+  if (V.state === "reading") {
+    el.innerHTML = head + `<div class="wait"><span class="spin"></span><span id="vcount">Lendo a vault… ${V.done}${V.total ? ` de ${V.total}` : ""} notas</span></div><div class="row"><div class="prog"><i id="vprog" style="width:${V.total ? (V.done / V.total) * 100 : 6}%"></i></div></div>`;
+    return;
+  }
+  const r = V.res;
+  const row = (ic, cls, t) => `<div class="frow"><span class="${cls}">${ic}</span><span class="t">${t}</span></div>`;
+  el.innerHTML = head + `
+    <div class="row" style="justify-content:space-between"><b>${esc(r.vault)}</b><button class="btn ghost sm" type="button" data-vagain>Trocar</button></div>
+    <div class="vstats"><div><b>${r.notes.length}</b><span>notas</span></div><div><b>${r.folders.filter((f) => f.name).length}</b><span>pastas</span></div><div><b>${r.links}</b><span>links</span></div><div><b>${r.attachments.length}</b><span>anexos</span></div></div>
+    <div class="row" style="gap:6px">${r.folders.map((f) => `<span class="chip">${esc(f.name || "raiz")} · ${f.count}</span>`).join("")}</div>
+    <div class="found vlist">
+      ${row(I.check, "ok", "[[Links]], tags e apelidos continuam funcionando")}
+      ${r.attachments.length ? row(I.check, "ok", `${r.attachments.length} anexos vão para o Drive (${fmtBytes(r.bytes)})`) : ""}
+      ${r.broken.length ? row(WARN, "wn", `${r.broken.length} links para notas que não existem viram “página para criar”`) : ""}
+      ${r.dataview ? row(WARN, "wn", `${r.dataview} ${r.dataview === 1 ? "consulta Dataview entra" : "consultas Dataview entram"} como texto`) : ""}
+      ${r.skipped.config ? row(I.x, "help", `.obsidian (plugins e temas) fica de fora`) : ""}
+    </div>
+    <div class="notice">${I.info}<span>Entra na wiki quando você terminar o onboarding. Dá para revisar pasta por pasta depois em Wiki → Importar.</span></div>`;
+}
+async function readIt(filesP, name) {
+  const V = S.vault;
+  V.state = "reading"; V.done = 0; V.total = 0;
+  renderVault();
+  try {
+    const t0 = performance.now();
+    const res = await readVault(await filesP, { name, onProgress: (d, t) => { V.done = d; V.total = t; const c = $("#vcount"), p = $("#vprog"); if (c) c.textContent = `Lendo a vault… ${d} de ${t} notas`; if (p) p.style.width = `${(d / t) * 100}%`; } });
+    await new Promise((r) => setTimeout(r, Math.max(0, 900 - (performance.now() - t0))));
+    if (!res.notes.length) throw new Error("Nenhuma nota .md encontrada.");
+    V.res = res; V.state = "ready";
+    GUIDE.happyUntil = performance.now() + 1600;
+  } catch (err) {
+    V.state = "idle";
+    renderVault();
+    $("#vault").insertAdjacentHTML("beforeend", `<div class="notice" style="color:var(--warn)">${WARN}<span>${esc(String(err.message || err))} Mande o .zip da pasta da vault, a pasta ou arquivos .md.</span></div>`);
+    return;
+  }
+  renderVault();
+}
+const vaultReady = () => S.vault.state === "ready";
+
 function chosenAgents() {
   const imported = S.importFrom && S.importFrom !== "none" && S.importState === "ready" ? IMPORTS[S.importFrom].agents.filter((a) => S.importPick[S.importFrom]?.[a.name] !== false) : [];
   return [...imported, ...PRESETS.filter((p) => S.presets.has(p.id))];
@@ -515,6 +602,9 @@ document.addEventListener("click", (e) => {
   if ("next" in d) { GUIDE.happyUntil = performance.now() + 1600; S.done.add(S.step); if (S.step === 0) S.org = $("#org")?.value || S.org; if (S.step === 1) S.context = $("#ctx")?.value ?? ""; return go(S.step + 1); }
   if ("back" in d) return go(S.step - 1);
   if ("logo" in d) { S.logo = !S.logo; return render(); }
+  if ("vdir" in d) return $("#vdir").click();
+  if ("vsample" in d) return readIt(Promise.resolve(sampleVault()));
+  if ("vagain" in d) { S.vault.state = "idle"; return renderVault(); }
   if ("site" in d) { S.context = "A Acme faz software de gestão de estoque para varejo (lojas físicas e e-commerce). Atendemos em português. Valores: clareza com o cliente, entregas semanais."; return render(); }
   if (d.src) { S.importFrom = d.src; S.importState = "idle"; return render(); }
   if ("file" in d) { S.importState = "reading"; render(); setTimeout(() => { S.importState = "ready"; render(); }, 900); return; }
@@ -537,6 +627,7 @@ const at = STEPS.findIndex((s) => s.id === h[0]);
 if (at >= 0) { for (let i = 0; i < at; i++) S.done.add(i); S.step = at; }
 if (h[1] && IMPORTS[h[1]]) { S.importFrom = h[1]; S.importState = "ready"; }
 if (h[1] === "cloud" || h[1] === "mine") S.computer = h[1];
+if (h[1] === "obsidian") setTimeout(() => readIt(Promise.resolve(sampleVault())), 0);
 render();
 </script>
 </body>
