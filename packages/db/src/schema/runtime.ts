@@ -14,6 +14,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { agents, providerCredentials } from "./agents";
@@ -551,6 +552,12 @@ export const machineTasks = pgTable(
     resumedFromId: uuid(),
     resumedTaskId: uuid(),
     resumeCount: integer().notNull().default(0),
+    /**
+     * A mission task's executor stopped to wait for people (a blocking
+     * `ask_decision`, `request_review` or `request_approval`): `decision`,
+     * `review` or `approval`. Its end then means "waiting", not "done".
+     */
+    waitingFor: text(),
     /** The conversation was woken for its end (the `machine.task_done` job ran). */
     wokeAt: timestamp({ withTimezone: true }),
     startedAt: timestamp({ withTimezone: true }),
@@ -565,5 +572,9 @@ export const machineTasks = pgTable(
     index().on(t.orgId, t.agentId, t.createdAt),
     index().on(t.orgId, t.channelId, t.threadRootId),
     index().on(t.missionId),
+    // One live task per mission session: two resumes of the same session never run at once (ADR 0029).
+    uniqueIndex("machine_tasks_live_session")
+      .on(t.missionId, t.sessionId)
+      .where(sql`${t.missionId} is not null and ${t.sessionId} is not null and ${t.endedAt} is null`),
   ],
 );

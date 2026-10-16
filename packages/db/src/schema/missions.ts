@@ -69,7 +69,7 @@ export const missions = pgTable(
     machineId: uuid().references(() => machines.id, { onDelete: "set null" }),
     /** The machine belongs to this person (not the owner), who keeps lending it explicitly. */
     machineLentBy: text().references(() => users.id, { onDelete: "set null" }),
-    /** `claude` or `codex`. */
+    /** `claude`, `codex` or `agent` (our agent works on the machine itself with its own tools); validated in code. */
     executor: text().notNull().default("claude"),
     title: text().notNull(),
     goal: text().notNull(),
@@ -80,6 +80,11 @@ export const missions = pgTable(
     repoDir: text().notNull().default(""),
     /** Interrupted mission tasks resume by themselves when the machine comes back. */
     resumeTasks: boolean().notNull().default(true),
+    /**
+     * Agent mode: the agent's wake-ups in a row with no plan item changing
+     * state (the stuck-loop guard pauses the mission at 5).
+     */
+    idleWakeups: integer().notNull().default(0),
     /** From the latest plan version (cheap counts for lists). */
     planVersion: integer().notNull().default(0),
     planDone: integer().notNull().default(0),
