@@ -1498,7 +1498,7 @@ const TimelineMessage = memo(function TimelineMessage({
   modelLabels: Map<string, string>;
 }) {
   const { t, i18n } = useTranslation();
-  const { org, me } = useOrg();
+  const { org } = useOrg();
   // The streamed row it replaces was already on screen: take its place without sliding in again.
   const replacesLive = useStreams((s) => Boolean(m.agentRunId && s.finished[m.agentRunId]));
   const dir = useDirectory(org.id);
@@ -1569,12 +1569,11 @@ const TimelineMessage = memo(function TimelineMessage({
   const forumTopicId = m.author.type === "agent" ? forumTopicOfMessage(meta) : null;
   const card = approvalId || proposalId || memoryUpdates.length > 0 || question;
   const feedback = m.author.type === "agent" && !card && !m.local;
-  // People see name, time and text; the date, model, tokens and cost wait behind the time.
+  // People see name, time and text; the date, model and tokens wait behind the time.
   const usage = m.author.type === "agent" ? messageUsage(m) : null;
-  const showCost = can(org.role, "view_usage") || (agent?.ownerUserId != null && agent.ownerUserId === me.user.id);
   const details = [
     formatFullDate(i18n.language, m.createdAt),
-    usage ? usageLine(t, i18n.language, usage, { modelLabel: modelLabels.get(usage.model), showCost }) : null,
+    usage ? usageLine(t, i18n.language, usage, { modelLabel: modelLabels.get(usage.model) }) : null,
   ]
     .filter(Boolean)
     .join(" · ");

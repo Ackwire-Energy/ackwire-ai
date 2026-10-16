@@ -47,7 +47,7 @@ import {
   reached,
 } from "@/lib/computer";
 import { errorText } from "@/lib/errors";
-import { formatUsd, relativeTime } from "@/lib/format";
+import { relativeTime } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
@@ -89,7 +89,7 @@ export function ComputerChip({ status }: { status: ComputerDisplay }) {
   );
 }
 
-/** "1,2 GB · US$ 0,84 este mês · usado há 2 h". */
+/** "1,2 GB · usado há 2 h" (its cost counts in the agent's budget; admins see money in Usage). */
 function ComputerFacts({ pc }: { pc: AgentComputer }) {
   const { t, i18n } = useTranslation();
   if (pc.status === "none") return <span className="muted">{t("computer.none")}</span>;
@@ -97,7 +97,6 @@ function ComputerFacts({ pc }: { pc: AgentComputer }) {
     <span className="small muted tabular">
       {t("computer.facts", {
         disk: new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(pc.diskUsedGib),
-        cost: formatUsd(t, i18n.language, pc.costMonthUsd),
         when: pc.lastUsedAt ? relativeTime(t, i18n.language, pc.lastUsedAt) : t("computer.never"),
       })}
     </span>

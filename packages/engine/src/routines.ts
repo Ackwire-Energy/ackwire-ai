@@ -38,7 +38,7 @@ import {
 } from "./rrule";
 import { runErrorDetail } from "./runs";
 import { parseSchedule, phraseToRule, type ScheduleParse } from "./schedule";
-import { monthStartUtc } from "./usage";
+import { budgetPercent, monthStartUtc } from "./usage";
 
 const { routines, routineRuns, agentRuns, usageRecords, channelMembers, channels } = schema;
 
@@ -85,7 +85,6 @@ export interface RoutineRunView {
   summary: string;
   summaryCode: string | null;
   summaryParams?: Record<string, string>;
-  costUsd: number;
 }
 
 export interface RoutineView {
@@ -99,9 +98,10 @@ export interface RoutineView {
   nextRunAt: string | null;
   running: boolean;
   lastRun: RoutineRunView | null;
-  monthCostUsd: number;
-  /** Spend cap of this routine per calendar month; null = only the agent's own budget. */
+  /** Spend cap of this routine per calendar month; null = only the agent's own budget. Routes send it to admins only. */
   budgetUsd: number | null;
+  /** This month's share of `budgetUsd` used; null without a routine budget. No money for members. */
+  budgetUsedPercent: number | null;
   createdAt: string;
 }
 
@@ -182,7 +182,7 @@ function triggerOf(r: RoutineRow): RoutineTrigger {
 }
 
 /** Run outcome, from the routine run and its agent run. */
-function runView(run: RunRow, agentRun: { status: string; error: string | null } | undefined, costNanoUsd: number) {
+function runView(run: RunRow, agentRun: { status: string; error: string | null } | undefined) {
   let status: RoutineRunView["status"] =
     run.status === "skipped" ? "skipped" : run.status === "failed" ? "failed" : "ok";
   let summary = run.summary;
@@ -203,7 +203,6 @@ function runView(run: RunRow, agentRun: { status: string; error: string | null }
     summary,
     summaryCode: coded?.code ?? null,
     ...(coded?.params ? { summaryParams: coded.params } : {}),
-    costUsd: costNanoUsd / 1e9,
   };
 }
 
@@ -303,11 +302,9 @@ async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
       active: r.active,
       nextRunAt: r.active && r.nextRunAt ? r.nextRunAt.toISOString() : null,
       running,
-      lastRun: last
-        ? runView(last, agentRun, last.agentRunId ? (details.costById.get(last.agentRunId) ?? 0) : 0)
-        : null,
-      monthCostUsd: monthCost / 1e9,
+      lastRun: last ? runView(last, agentRun) : null,
       budgetUsd: r.monthlyBudgetNanoUsd === null ? null : r.monthlyBudgetNanoUsd / 1e9,
+      budgetUsedPercent: r.monthlyBudgetNanoUsd === null ? null : budgetPercent(monthCost, r.monthlyBudgetNanoUsd),
       createdAt: r.createdAt.toISOString(),
     };
   });
@@ -759,13 +756,7 @@ export async function listRoutineRuns(db: Database, actorId: string, orgId: stri
     .orderBy(desc(routineRuns.at))
     .limit(100);
   const details = await runDetails(db, runs);
-  return runs.map((r) =>
-    runView(
-      r,
-      r.agentRunId ? details.agentRunsById.get(r.agentRunId) : undefined,
-      r.agentRunId ? (details.costById.get(r.agentRunId) ?? 0) : 0,
-    ),
-  );
+  return runs.map((r) => runView(r, r.agentRunId ? details.agentRunsById.get(r.agentRunId) : undefined));
 }
 
 /**

@@ -3,6 +3,7 @@ import { and, type Database, type Executor, eq, inArray, isNull, lt, schema } fr
 import { approverIds } from "./approvals";
 import { adminIds } from "./gateway";
 import { enqueue, PermanentJobError } from "./outbox";
+import { budgetPercent } from "./usage";
 
 const { users, organizations, agents, approvals } = schema;
 
@@ -26,8 +27,8 @@ export type EmailTemplate =
       level: "warning" | "exhausted";
       agentName: string;
       orgName: string;
-      spentUsd: number;
-      budgetUsd: number;
+      /** Share of the budget used (owners who aren't admins never see money). */
+      percent: number;
       url: string;
     }
   | {
@@ -39,7 +40,7 @@ export type EmailTemplate =
 
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
-const usd = (n: number) => `US$ ${n.toFixed(2).replace(".", ",")}`;
+const percent = (n: number) => `${Math.round(n)}%`;
 const ROLE: Record<string, string> = { owner: "dono", admin: "admin", member: "membro" };
 
 const LAYOUT = {
@@ -197,9 +198,9 @@ export function renderEmail(t: EmailTemplate): { subject: string; html: string; 
             ? `${t.agentName} chegou a ${pct} do orçamento`
             : `${t.agentName} parou: orçamento atingido`,
           [
-            `${esc(t.agentName)}, em ${esc(t.orgName)}, gastou ${esc(usd(t.spentUsd))} de ${esc(usd(t.budgetUsd))} este mês.`,
+            `${esc(t.agentName)}, em ${esc(t.orgName)}, usou ${esc(percent(t.percent))} do orçamento deste mês.`,
             t.level === "warning"
-              ? "Quando chegar a 100%, o agente para e avisa no canal. Você pode ajustar o limite a qualquer momento."
+              ? "Quando chegar a 100%, o agente para e avisa no canal. Um admin do workspace pode ajustar o limite."
               : "O agente não responde mais até o mês virar ou até o limite subir.",
           ],
           { label: "Ver o agente", url: t.url },
@@ -295,8 +296,7 @@ export async function queueBudgetEmail(
       level: e.level,
       agentName: e.agent.name,
       orgName: org.name,
-      spentUsd: e.spentNanoUsd / 1e9,
-      budgetUsd: e.budgetNanoUsd / 1e9,
+      percent: budgetPercent(e.spentNanoUsd, e.budgetNanoUsd),
       url: `${publicUrl.replace(/\/$/, "")}/org/${e.agent.orgId}/agents/${e.agent.id}`,
     },
   });

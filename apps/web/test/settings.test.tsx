@@ -151,6 +151,19 @@ describe("Configurações da organização", () => {
     const usage = screen().getByRole("region", { name: "Uso deste mês" });
     expect(usage.textContent).toContain("Agentes154 chamadasUS$ 15,40");
     expect(usage.textContent).toContain("Roteador80 chamadasUS$ 0,50");
+    // The one place with money: each agent's spend against its budget, and the default budget.
+    const byAgent = screen().getByRole("region", { name: "Por agente" });
+    expect(byAgent.textContent).toContain("US$ 12,30 de US$ 40,00");
+    expect(within(byAgent).getByRole("meter", { name: "Orçamento usado de Ada" }).getAttribute("aria-valuenow")).toBe(
+      "30.8",
+    );
+    const fallback = screen().getByRole("region", { name: "Orçamento padrão dos agentes" });
+    const field = within(fallback).getByLabelText("Orçamento mensal por agente (US$)") as HTMLInputElement;
+    expect(field.value).toBe("50");
+    await act(async () => fireEvent.change(field, { target: { value: "80" } }));
+    await click(within(fallback).getByRole("button", { name: "Salvar" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({ defaultAgentBudgetUsd: 80 });
     // Jev / the router's own key is internal: never in the UI.
     expect(document.body.textContent).not.toMatch(/jev|typesafe/i);
   });
@@ -190,15 +203,12 @@ describe("budget alerts over the WebSocket", () => {
         event: {
           type: "budget.warning",
           agentId: "00000000-0000-4000-8000-0000000000a1",
-          spentNanoUsd: 32e9,
-          budgetNanoUsd: 40e9,
+          percent: 80.4,
         },
       }),
     );
     await settle();
-    expect(screen().getByRole("alert").textContent).toContain(
-      "Ada passou de 80% do orçamento do mês: US$ 32,00 de US$ 40,00.",
-    );
+    expect(screen().getByRole("alert").textContent).toContain("Ada usou 80% do orçamento do mês.");
   });
 });
 

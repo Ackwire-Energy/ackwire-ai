@@ -9,7 +9,7 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useScopeGroups } from "@/hooks/useScopeGroups";
 import { audienceNotice, audienceSummary, canTalk, modeOf } from "@/lib/audience";
-import { formatUsd, relativeTime, shortModel } from "@/lib/format";
+import { formatPercent, relativeTime, shortModel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { scopeSummary } from "@/lib/scopes";
 
@@ -245,16 +245,12 @@ function Spend({ agent, locale }: { agent: Agent; locale: string }) {
   const { org } = useOrg();
   const detail = useAgentDetail(org.id, agent.id);
   if (!detail.data) return null;
-  const spent = detail.data.spentThisMonthUsd;
-  const budget = detail.data.monthlyBudgetUsd;
+  // A percentage of its budget, never money (owners who aren't admins see this too).
+  const used = detail.data.budgetUsedPercent;
   return (
     <div className="stack-4" style={{ gap: 4 }}>
-      <span className="small">
-        {budget
-          ? t("profile.spendOf", { spent: formatUsd(t, locale, spent), budget: formatUsd(t, locale, budget) })
-          : t("profile.spend", { spent: formatUsd(t, locale, spent) })}
-      </span>
-      {budget ? <Meter value={spent} max={budget} label={t("profile.spendLabel")} /> : null}
+      <span className="small">{t("profile.budgetUsed", { percent: formatPercent(locale, used) })}</span>
+      <Meter value={Math.min(100, used)} max={100} label={t("profile.spendLabel")} />
     </div>
   );
 }

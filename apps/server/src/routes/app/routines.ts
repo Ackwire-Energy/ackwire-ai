@@ -1,4 +1,5 @@
 import {
+  canViewCost,
   createRoutine,
   cronToRule,
   deleteRoutine,
@@ -102,7 +103,6 @@ const RoutineRun = z
     at: z.string(),
     status: z.enum(["ok", "failed", "skipped"]),
     summary: z.string(),
-    costUsd: z.number(),
   })
   .openapi("RoutineRun");
 const Routine = z
@@ -133,8 +133,15 @@ const Routine = z
     nextRunAt: z.string().nullable(),
     running: z.boolean(),
     lastRun: RoutineRun.nullable(),
-    monthCostUsd: z.number(),
-    budgetUsd: z.number().nullable().openapi({ description: "Monthly spend cap of this routine (null = none)." }),
+    budgetUsd: z
+      .number()
+      .nullable()
+      .optional()
+      .openapi({ description: "Admins only: monthly spend cap of this routine (null = none)." }),
+    budgetUsedPercent: z
+      .number()
+      .nullable()
+      .openapi({ description: "This month's share of the routine's cap used; null without a cap." }),
     createdAt: z.string(),
   })
   .openapi("Routine");
@@ -159,6 +166,13 @@ const Budget = z.number().min(0).max(100_000).nullable().optional();
 
 const RoutineParams = OrgParams.extend({ routineId: z.uuid() });
 
+/** A routine as this person may see it: its cap is money, so admins only. */
+const forViewer = <R extends { budgetUsd: number | null }>(r: R, seesCost: boolean) => {
+  if (seesCost) return r;
+  const { budgetUsd: _budget, ...rest } = r;
+  return rest;
+};
+
 /** Routines: an agent does something on a schedule (in the workspace time zone) or when an event happens. */
 export function routineRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
@@ -177,11 +191,17 @@ export function routineRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/routines",
       tags,
       security,
-      summary: "Routines with their next run, last run and this month's cost",
+      summary: "Routines with their next run, last run and this month's budget use",
       request: { params: OrgParams },
       responses: { 200: json(z.object({ routines: z.array(Routine) })), ...errors },
     }),
-    async (c) => c.json({ routines: await listRoutines(db, c.get("user").id, c.req.valid("param").orgId) }, 200),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      const list = await listRoutines(db, actor, orgId);
+      const seesCost = await canViewCost(db, actor, orgId);
+      return c.json({ routines: list.map((r) => forViewer(r, seesCost)) }, 200);
+    },
   );
 
   app.openapi(
@@ -388,8 +408,13 @@ export function routineRoutes(deps: AppDeps) {
       responses: { 201: json(Routine, "Created"), ...errors },
     }),
     async (c) => {
-      const created = await createRoutine(routines, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"));
-      return c.json(created, 201);
+      const { orgId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      const seesCost = await canViewCost(db, actor, orgId);
+      // Members never set money: their routines run on the agent's budget only.
+      const { budgetUsd, ...input } = c.req.valid("json");
+      const created = await createRoutine(routines, actor, orgId, seesCost ? { ...input, budgetUsd } : input);
+      return c.json(forViewer(created, seesCost), 201);
     },
   );
 
@@ -422,8 +447,17 @@ export function routineRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, routineId } = c.req.valid("param");
-      const routine = await updateRoutine(routines, c.get("user").id, orgId, routineId, c.req.valid("json"));
-      return c.json(routine, 200);
+      const actor = c.get("user").id;
+      const seesCost = await canViewCost(db, actor, orgId);
+      const { budgetUsd, ...patch } = c.req.valid("json");
+      const routine = await updateRoutine(
+        routines,
+        actor,
+        orgId,
+        routineId,
+        seesCost ? { ...patch, budgetUsd } : patch,
+      );
+      return c.json(forViewer(routine, seesCost), 200);
     },
   );
 
@@ -456,7 +490,9 @@ export function routineRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, routineId } = c.req.valid("param");
-      return c.json(await duplicateRoutine(routines, c.get("user").id, orgId, routineId), 201);
+      const actor = c.get("user").id;
+      const copy = await duplicateRoutine(routines, actor, orgId, routineId);
+      return c.json(forViewer(copy, await canViewCost(db, actor, orgId)), 201);
     },
   );
 
@@ -472,9 +508,10 @@ export function routineRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, routineId } = c.req.valid("param");
-      const routine = await runRoutineNow(routines, c.get("user").id, orgId, routineId);
+      const actor = c.get("user").id;
+      const routine = await runRoutineNow(routines, actor, orgId, routineId);
       deps.wakeWorkers?.();
-      return c.json(routine, 200);
+      return c.json(forViewer(routine, await canViewCost(db, actor, orgId)), 200);
     },
   );
 
@@ -484,7 +521,7 @@ export function routineRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/routines/{routineId}/runs",
       tags,
       security,
-      summary: "Run history with cost",
+      summary: "Run history",
       request: { params: RoutineParams },
       responses: { 200: json(z.object({ runs: z.array(RoutineRun) })), ...errors },
     }),

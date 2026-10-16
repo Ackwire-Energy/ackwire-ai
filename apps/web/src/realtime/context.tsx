@@ -8,7 +8,7 @@ import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
 import { cacheApproval, cacheMessage } from "@/api/queries";
 import type { ActiveRun, Agent, AgentQuestion, BudgetEvent, ChannelEvent, MemoryUpdate, Message } from "@/api/types";
-import { formatUsd } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { type ConnectionStatus, RealtimeConnection, realtimeUrl, type SocketFactory } from "./connection";
 import { applyComputerEvent, applyMachineEvent } from "./machines";
@@ -263,13 +263,11 @@ const browserSocket: SocketFactory = (url) => new WebSocket(url) as unknown as R
 export const SocketFactoryContext = createContext<SocketFactory>(browserSocket);
 
 /** One WebSocket per organization, opened while the org shell is mounted. */
-/** Text of a budget alert for the agent's owner. */
+/** Text of a budget alert for the agent's owner: a percentage, never money. */
 export function budgetAlert(t: TFunction, locale: string, event: BudgetEvent, agentName: string) {
-  const spent = formatUsd(t, locale, event.spentNanoUsd / 1e9);
-  const budget = formatUsd(t, locale, event.budgetNanoUsd / 1e9);
   return event.type === "budget.exhausted"
-    ? t("budget.exhausted", { name: agentName, budget })
-    : t("budget.warning", { name: agentName, spent, budget });
+    ? t("budget.exhausted", { name: agentName })
+    : t("budget.warning", { name: agentName, percent: formatPercent(locale, event.percent) });
 }
 
 export function RealtimeProvider({

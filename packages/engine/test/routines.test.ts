@@ -112,8 +112,9 @@ describe("routines", () => {
     expect(trigger?.body).toBe("@dev Resuma o dia no canal.");
     const [view] = await listRoutines(f.db, f.owner.id, f.org.id);
     expect(view?.lastRun).toMatchObject({ status: "ok", summary: "Resposta no canal" });
-    expect(view?.lastRun?.costUsd).toBeGreaterThan(0);
-    expect(view?.monthCostUsd).toBeGreaterThan(0);
+    // No money in the view; without a routine cap there is no percentage either.
+    expect(view?.lastRun).not.toHaveProperty("costUsd");
+    expect(view?.budgetUsedPercent).toBeNull();
     expect(view?.running).toBe(false);
     expect(new Date(view?.nextRunAt ?? 0).getTime()).toBeGreaterThan(Date.now());
   });

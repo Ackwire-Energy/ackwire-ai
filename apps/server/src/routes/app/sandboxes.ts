@@ -32,7 +32,6 @@ const Computer = z
       .enum(["starting", "running", "stopping", "stopped", "archived", "error", "none"])
       .openapi({ description: "`none`: never created yet. Changes also come as `agent.computer` events." }),
     diskUsedGib: z.number().openapi({ description: "Size of the workspace, last measured while it ran." }),
-    costMonthUsd: z.number(),
     createdAt: z.string().nullable(),
     lastUsedAt: z.string().nullable(),
     network: z

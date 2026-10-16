@@ -77,6 +77,11 @@ describe("route guards", () => {
     for (const name of ["eng", "general", "Ada", "Atlas", "João", "Criar agente"]) {
       expect(nav.textContent).toContain(name);
     }
-    expect(nav.textContent).toContain("US$ 15,40 este mês");
+    // The workspace's budget use as a percentage, never money (US$ 15,40 of US$ 60).
+    expect(nav.textContent).toContain("26%");
+    expect(nav.textContent).not.toContain("US$");
+    expect(
+      screen().getByRole("button", { name: /^Conta: .+\. 26% do orçamento dos agentes usado este mês$/ }),
+    ).toBeTruthy();
   });
 });

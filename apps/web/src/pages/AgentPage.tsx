@@ -43,7 +43,7 @@ import { useOrg } from "@/components/org-context";
 import { ManageSkillsDialog } from "@/components/Skills";
 import { AgentCover } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
-import { formatInt, formatMonth, formatTokensShort, formatUsd, joinNames, whenAt } from "@/lib/format";
+import { formatInt, formatMonth, formatPercent, formatTokensShort, formatUsd, joinNames, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
 import { parseAmount } from "@/lib/text";
@@ -109,7 +109,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
   const close = () => setDialog(null);
   const navigate = useNavigate();
 
-  const spent = detail.data?.spentThisMonthUsd ?? 0;
+  const used = detail.data?.budgetUsedPercent ?? 0;
   const tokens = detail.data?.tokensThisMonth ?? 0;
   const runs = detail.data?.runsThisMonth ?? 0;
   const credentialId = detail.data?.credentialId ?? null;
@@ -284,17 +284,14 @@ function AgentProfile({ agent }: { agent: Agent }) {
             <span className="small muted">{t("agent.usageHidden")}</span>
           ) : (
             <>
+              {/* A percentage of its budget, never money: admins see amounts in Settings → Usage. */}
               <div className="budget-figure">
-                <span className="budget-figure__value">{formatUsd(t, i18n.language, spent)}</span>
+                <span className="budget-figure__value">{formatPercent(i18n.language, used)}</span>
                 <span className="muted">
-                  {agent.monthlyBudgetUsd === null
-                    ? t("agent.noBudget")
-                    : t("agent.budgetOf", { amount: formatUsd(t, i18n.language, agent.monthlyBudgetUsd) })}
+                  {detail.data?.monthlyBudgetUsd === null ? t("agent.ofDefaultBudget") : t("agent.ofBudget")}
                 </span>
               </div>
-              {agent.monthlyBudgetUsd !== null && (
-                <Meter value={spent} max={agent.monthlyBudgetUsd} label={t("agent.budgetUsed")} />
-              )}
+              <Meter value={Math.min(100, used)} max={100} label={t("agent.budgetUsed")} />
               <span className="small muted">
                 {owner
                   ? t("agent.budgetStats", {
@@ -662,7 +659,6 @@ function RunsDialog({
                 {r.status === "waiting_approval" && ` · ${t("channel.waitingApproval")}`}
               </span>
             </span>
-            <span className="small">{formatUsd(t, i18n.language, r.costUsd)}</span>
           </div>
         ))}
       </DialogSearchList>
@@ -688,9 +684,12 @@ function BudgetDialog({
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const update = useUpdateAgent(org.id, agent.id);
+  const settings = useSettings(org.id);
   const g = agentGrammar(t, agent.name);
+  // Empty = the workspace default (every agent has a budget).
   const initial =
-    agent.monthlyBudgetUsd === null ? "" : new Intl.NumberFormat(i18n.language).format(agent.monthlyBudgetUsd);
+    agent.monthlyBudgetUsd == null ? "" : new Intl.NumberFormat(i18n.language).format(agent.monthlyBudgetUsd);
+  const fallback = settings.data?.defaultAgentBudgetUsd;
   const [value, setValue] = useState(initial);
   const [touched, setTouched] = useState(false);
   useEffect(() => {
@@ -699,11 +698,12 @@ function BudgetDialog({
       setTouched(false);
     }
   }, [open, initial]);
-  const error = touched ? budgetError(t, value) : null;
+  const empty = value.trim() === "";
+  const error = touched && !empty ? budgetError(t, value) : null;
   const save = () => {
     setTouched(true);
-    if (budgetError(t, value)) return;
-    update.mutate({ monthlyBudgetUsd: parseAmount(value) }, { onSuccess: () => onOpenChange(false) });
+    if (!empty && budgetError(t, value)) return;
+    update.mutate({ monthlyBudgetUsd: empty ? null : parseAmount(value) }, { onSuccess: () => onOpenChange(false) });
   };
   return (
     <Dialog
@@ -724,12 +724,23 @@ function BudgetDialog({
             label={t("agent.monthlyLimit")}
             id="bud-v"
             error={error}
-            help={t("agent.budgetHelp", {
-              ...g,
-              ownerNote: ownerName ? t("agent.budgetOwnerNote", { owner: ownerName }) : "",
-            })}
+            help={[
+              fallback === undefined
+                ? t("agent.budgetDefaultHelp")
+                : t("agent.budgetDefaultHelpAmount", { amount: formatUsd(t, i18n.language, fallback) }),
+              t("agent.budgetHelp", {
+                ...g,
+                ownerNote: ownerName ? t("agent.budgetOwnerNote", { owner: ownerName }) : "",
+              }),
+            ].join(" ")}
           >
-            <Input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} autoFocus />
+            <Input
+              inputMode="decimal"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder={fallback === undefined ? undefined : new Intl.NumberFormat(i18n.language).format(fallback)}
+              autoFocus
+            />
           </Field>
         </DialogBody>
         <DialogFooter>

@@ -159,7 +159,7 @@ describe("user events and resumed runs", () => {
     conn.subscribe("c1", (e) => channel.push(e));
     conn.start();
     last().open();
-    const budget = { type: "budget.warning", agentId: "a", spentNanoUsd: 32e9, budgetNanoUsd: 40e9 };
+    const budget = { type: "budget.warning", agentId: "a", percent: 80 };
     last().push({ type: "event", scope: "user", event: budget });
     expect(user).toEqual([budget]);
     expect(channel).toEqual([]);

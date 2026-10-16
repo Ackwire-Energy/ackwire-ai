@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { formatInt, formatUsd, shortModel } from "./format";
+import { formatInt, shortModel } from "./format";
 
 /**
  * Small pure helpers of the chat timeline: the machine numbers behind a
@@ -7,12 +7,11 @@ import { formatInt, formatUsd, shortModel } from "./format";
  * bottom, and first-message suggestions for an empty conversation.
  */
 
-/** `usage` of an agent message in lists (packages/engine/src/messages.ts `MessageUsage`). */
+/** `usage` of an agent message in lists (packages/engine/src/messages.ts `MessageUsage`): no money. */
 export interface MessageUsage {
   model: string;
   inputTokens: number;
   outputTokens: number;
-  costUsd: number;
 }
 
 export function messageUsage(m: object): MessageUsage | null {
@@ -25,23 +24,15 @@ export function messageUsage(m: object): MessageUsage | null {
     model: o.model,
     inputTokens: num(o.inputTokens),
     outputTokens: num(o.outputTokens),
-    costUsd: num(o.costUsd),
   };
 }
 
-/** "sonnet 5.5 · 1.240 tokens · US$ 0,004"; the cost only for who may see spending. */
-export function usageLine(
-  t: TFunction,
-  locale: string,
-  usage: MessageUsage,
-  options: { modelLabel?: string; showCost: boolean },
-) {
-  const parts = [
+/** "sonnet 5.5 · 1.240 tokens" (money only in the admins' usage report). */
+export function usageLine(t: TFunction, locale: string, usage: MessageUsage, options: { modelLabel?: string } = {}) {
+  return [
     shortModel(options.modelLabel ?? usage.model),
     t("chat.tokens", { value: formatInt(locale, usage.inputTokens + usage.outputTokens) }),
-  ];
-  if (options.showCost) parts.push(formatUsd(t, locale, usage.costUsd));
-  return parts.join(" · ");
+  ].join(" · ");
 }
 
 /** Rows newer than this (relative to when the channel opened) may slide in. */

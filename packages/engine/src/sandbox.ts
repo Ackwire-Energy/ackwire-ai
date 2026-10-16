@@ -27,7 +27,7 @@ import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { grantedScopeKeys } from "./tools/scopes";
 import type { ToolContext } from "./tools/types";
-import { monthStartUtc } from "./usage";
+import { effectiveAgentBudget, monthStartUtc } from "./usage";
 
 const { sandboxes, orgSandboxSettings, sandboxUsageDays, usageRecords, agentBudgetPeriods } = schema;
 
@@ -233,12 +233,11 @@ async function checkLimits(deps: CloudSandboxDeps, ctx: ToolContext, settings: S
   }
   const agent = await getAgentCached(deps.db, ctx.orgId, ctx.agentId);
   if (!agent) throw new NotFoundError("Agent not found");
-  if (agent.monthlyBudgetNanoUsd !== null) {
-    const state = await agentBudgetState(deps.db, ctx.orgId, ctx.agentId, now);
-    const estimate = sandboxCostNanoUsd(seconds, { cpu: 1, memoryGiB: 1, diskGiB: 3 }, deps.pricing);
-    if (state.spentNanoUsd + state.reservedNanoUsd + estimate > agent.monthlyBudgetNanoUsd) {
-      throw new BudgetExceededError(agent.id, state.spentNanoUsd, agent.monthlyBudgetNanoUsd);
-    }
+  const budget = await effectiveAgentBudget(deps.db, agent);
+  const state = await agentBudgetState(deps.db, ctx.orgId, ctx.agentId, now);
+  const estimate = sandboxCostNanoUsd(seconds, { cpu: 1, memoryGiB: 1, diskGiB: 3 }, deps.pricing);
+  if (state.spentNanoUsd + state.reservedNanoUsd + estimate > budget) {
+    throw new BudgetExceededError(agent.id, state.spentNanoUsd, budget);
   }
 }
 
@@ -615,7 +614,6 @@ export type ComputerStatus = "starting" | "running" | "stopping" | "stopped" | "
 export interface AgentComputerView {
   status: ComputerStatus;
   diskUsedGib: number;
-  costMonthUsd: number;
   createdAt: string | null;
   lastUsedAt: string | null;
   network?: "blocked" | "allowlist" | "open" | "provider-default";
@@ -667,26 +665,12 @@ export async function publishComputerEvent(
 
 async function computerView(
   deps: Pick<SandboxDeps, "db" | "provider">,
-  orgId: string,
-  agentId: string,
   row: SandboxRow | null,
 ): Promise<AgentComputerView> {
-  const [spent] = await deps.db
-    .select({ total: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)` })
-    .from(usageRecords)
-    .where(
-      and(
-        eq(usageRecords.orgId, orgId),
-        eq(usageRecords.agentId, agentId),
-        eq(usageRecords.kind, "sandbox"),
-        sql`${usageRecords.createdAt} >= ${monthStartUtc(new Date()).toISOString()}::timestamptz`,
-      ),
-    );
-  const costMonthUsd = Number(spent?.total ?? 0) / 1e9;
-  if (!row) return { status: "none", diskUsedGib: 0, costMonthUsd, createdAt: null, lastUsedAt: null };
+  // No money here: the computer's cost is in the agent's budget percentage (admins see it in Usage).
+  if (!row) return { status: "none", diskUsedGib: 0, createdAt: null, lastUsedAt: null };
   const base = {
     diskUsedGib: Math.round((row.diskUsedMib / 1024) * 100) / 100,
-    costMonthUsd,
     createdAt: row.createdAt.toISOString(),
     lastUsedAt: row.lastUsedAt.toISOString(),
     network: row.network as AgentComputerView["network"],
@@ -720,7 +704,7 @@ async function computerView(
 
 /** The agent's own computer, for its tools (no person's permission: it's the agent asking about itself). */
 export async function ownComputerStatus(deps: Pick<SandboxDeps, "db" | "provider">, orgId: string, agentId: string) {
-  return computerView(deps, orgId, agentId, await liveComputer(deps.db, orgId, agentId));
+  return computerView(deps, await liveComputer(deps.db, orgId, agentId));
 }
 
 /** The agent turns its own computer off (`computer_stop`); files stay. */
@@ -751,7 +735,7 @@ export async function getAgentComputer(
   agentId: string,
 ) {
   await requireComputerManager(deps.db, actorId, orgId, agentId);
-  const view = await computerView(deps, orgId, agentId, await liveComputer(deps.db, orgId, agentId));
+  const view = await computerView(deps, await liveComputer(deps.db, orgId, agentId));
   return { ...view, target: await computerTarget(deps.db, orgId, agentId) };
 }
 

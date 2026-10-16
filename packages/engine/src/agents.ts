@@ -98,8 +98,9 @@ export async function createAgent(
         .values(defaults.map((s) => ({ orgId, agentId: agent.id, skillId: s.id, enabled: true })))
         .onConflictDoNothing();
     }
-    // The month's counter exists from the start, so the first call reserves in one statement.
-    if (agent.monthlyBudgetNanoUsd !== null) await resyncBudgetCounter(db, orgId, agent.id);
+    // Every agent has a budget (its own or the org's default): the month's counter exists
+    // from the start, so the first call reserves in one statement.
+    await resyncBudgetCounter(db, orgId, agent.id);
     return agent;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`@${values.handle} is already taken`);

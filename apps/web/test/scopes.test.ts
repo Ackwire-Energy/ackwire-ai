@@ -60,8 +60,11 @@ describe("agent permissions model", () => {
     expect(approvalAction({ tool: "run_workflow", scope: "github:actions.run" })).toBe("deploy");
     expect(approvalAction({ tool: "share_file", scope: "drive:files.share" })).toBe("publish");
     expect(approvalAction({ tool: "x", scope: "y" })).toBe("other");
-    expect(
-      budgetAlert(t, "pt-BR", { type: "budget.warning", agentId: "a", spentNanoUsd: 32e9, budgetNanoUsd: 40e9 }, "Ada"),
-    ).toBe("Ada passou de 80% do orçamento do mês: US$ 32,00 de US$ 40,00.");
+    expect(budgetAlert(t, "pt-BR", { type: "budget.warning", agentId: "a", percent: 80.4 }, "Ada")).toBe(
+      "Ada usou 80% do orçamento do mês.",
+    );
+    expect(budgetAlert(t, "pt-BR", { type: "budget.exhausted", agentId: "a", percent: 100 }, "Ada")).toBe(
+      "Ada atingiu o orçamento do mês e parou. Um admin pode aumentar o limite para continuar.",
+    );
   });
 });

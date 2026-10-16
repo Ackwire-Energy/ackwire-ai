@@ -42,8 +42,8 @@ test("computer API: settings, the agent's computer, and the access tree shows 'R
   expect(await (await api(`/agents/${agentId}/computer`)).json()).toMatchObject({
     status: "running",
     network: "allowlist",
-    costMonthUsd: 0,
   });
+  expect(await (await api(`/agents/${agentId}/computer`)).json()).not.toHaveProperty("costMonthUsd");
   const off = await api(`/agents/${agentId}/computer/stop`, { json: {} });
   expect(off.status).toBe(202);
   expect(await off.json()).toEqual({ status: "stopping" });

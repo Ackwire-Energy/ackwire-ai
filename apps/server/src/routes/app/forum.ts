@@ -1,5 +1,6 @@
 import {
   cancelForumTopic,
+  canViewCost,
   concludeForumTopic,
   createForumIssues,
   createForumTopic,
@@ -31,8 +32,10 @@ const Topic = z
     channelId: z.uuid().openapi({ description: "The topic's channel: subscribe to it for the agents' live runs." }),
     createdAt: z.string(),
     lastActivityAt: z.string(),
-    costUsd: z.number(),
-    budgetUsd: z.number().nullable(),
+    budgetUsedPercent: z
+      .number()
+      .nullable()
+      .openapi({ description: "Share of the discussion's spend cap used, in %; null without a cap." }),
     activeAgentIds: z.array(z.uuid()),
     synthesis: z
       .object({
@@ -115,13 +118,10 @@ export function forumRoutes(deps: AppDeps) {
             agentIds: z.array(z.uuid()).min(1).max(8),
             userIds: z.array(z.string()).max(50).optional(),
             rounds: z.number().int().min(1).max(10).optional(),
-            budgetUsd: z
-              .number()
-              .positive()
-              .max(1000)
-              .nullable()
-              .optional()
-              .openapi({ description: "Spend cap for the whole discussion (default 0.50; null = no cap)." }),
+            budgetUsd: z.number().positive().max(1000).nullable().optional().openapi({
+              description:
+                "Admins only: spend cap for the whole discussion (default 0.50; null = no cap). Ignored for members.",
+            }),
             deadline: z.iso.datetime().optional(),
             ownerAgentId: z
               .uuid()
@@ -133,13 +133,16 @@ export function forumRoutes(deps: AppDeps) {
       responses: { 201: json(Detail, "Created"), ...errors },
     }),
     async (c) => {
-      const input = c.req.valid("json");
-      const topic = await createForumTopic(
-        forum(),
-        { type: "person", userId: c.get("user").id },
-        c.req.valid("param").orgId,
-        { ...input, deadline: input.deadline ? new Date(input.deadline) : null },
-      );
+      const { budgetUsd, ...input } = c.req.valid("json");
+      const { orgId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      // Members never set money: their discussions get the default cap.
+      const seesCost = await canViewCost(db, actor, orgId);
+      const topic = await createForumTopic(forum(), { type: "person", userId: actor }, orgId, {
+        ...input,
+        ...(seesCost ? { budgetUsd } : {}),
+        deadline: input.deadline ? new Date(input.deadline) : null,
+      });
       return c.json(topic, 201);
     },
   );

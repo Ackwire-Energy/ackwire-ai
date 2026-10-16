@@ -6,6 +6,7 @@ import { ptBR } from "@/i18n/locales/pt-BR";
 import {
   dayLabel,
   formatInt,
+  formatPercent,
   formatTokensShort,
   formatUsd,
   joinNames,
@@ -31,6 +32,12 @@ describe("format (pt-BR, machine numbers precise)", () => {
     expect(formatUsd(t, "pt-BR", 0.004)).toBe("US$ 0,004");
     expect(formatUsd(t, "pt-BR", 0)).toBe("US$ 0,00");
     expect(formatUsd(t, "pt-BR", 1234.5)).toBe("US$ 1.234,50");
+    // Budget use: whole percents from 10%, one decimal below, "<1%" for a tiny share.
+    expect(formatPercent("pt-BR", 30.8)).toBe("31%");
+    expect(formatPercent("pt-BR", 2.5)).toBe("2,5%");
+    expect(formatPercent("pt-BR", 0)).toBe("0%");
+    expect(formatPercent("pt-BR", 0.006)).toBe("<1%");
+    expect(formatPercent("en", 120)).toBe("120%");
   });
   test("tokens", () => {
     expect(formatInt("pt-BR", 1240)).toBe("1.240");

@@ -41,12 +41,13 @@ describe("templates (pt-BR)", () => {
       level: "warning",
       agentName: "Ada",
       orgName: "Acme",
-      spentUsd: 8,
-      budgetUsd: 10,
+      percent: 80.4,
       url: "u",
     });
     expect(b.subject).toBe("Ada usou 80% do orçamento do mês");
-    expect(b.text).toContain("US$ 8,00 de US$ 10,00");
+    // A percentage only: owners who aren't admins never see money.
+    expect(b.text).toContain("usou 80% do orçamento deste mês");
+    expect(b.text).not.toContain("US$");
     const d = renderEmail({
       kind: "approval_digest",
       orgName: "Acme",

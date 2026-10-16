@@ -24,12 +24,14 @@ const go = async (path: string, state = seedState()) => {
 const card = (title: string) => screen().getByRole("article", { name: title });
 
 describe("Fórum: the list", () => {
-  test("cards: title, goal, participants, status with round, last activity, cost; filters", async () => {
+  test("cards: title, goal, participants, status with round, last activity, cap used; filters", async () => {
     await go("forum");
     const pricing = card("Plano de preços do Q1");
     expect(pricing.textContent).toContain("Decidir se mudamos o plano de entrada");
     expect(pricing.textContent).toContain("Em discussão · rodada 2 de 3");
-    expect(pricing.textContent).toContain("0,42");
+    // The cap used as a percentage, never money (everyone reads the forum).
+    expect(pricing.textContent).toContain("21% do limite de gasto");
+    expect(pricing.textContent).not.toContain("US$");
     expect(pricing.textContent).toContain("Última atividade");
     expect(within(pricing).getByRole("img", { name: /Participantes: Ada/ })).toBeTruthy();
     expect(screen().queryByRole("article", { name: "Onboarding em 5 minutos" })).toBeNull();
@@ -56,8 +58,7 @@ describe("Fórum: the list", () => {
       createdBy: { type: "agent", id: "a" },
       createdAt: "",
       lastActivityAt: "",
-      costUsd: 0,
-      budgetUsd: null,
+      budgetUsedPercent: null,
       synthesis: null,
       ...over,
     });
@@ -92,6 +93,21 @@ describe("Fórum: the list", () => {
 });
 
 describe("Novo tópico", () => {
+  test("members don't see the spending cap (money); their topics get the default", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    await go("forum", state);
+    await click(screen().getByRole("button", { name: "Novo tópico" }));
+    const dialog = screen().getByRole("dialog", { name: "Novo tópico" });
+    expect(within(dialog).queryByLabelText("Limite de gasto (opcional)")).toBeNull();
+    await type(within(dialog).getByLabelText("Título"), "Roadmap do Q2");
+    await type(within(dialog).getByLabelText("Pergunta ou objetivo"), "O que entra no Q2?");
+    await click(within(dialog).getByRole("checkbox", { name: "Ada" }));
+    await click(within(dialog).getByRole("button", { name: "Abrir tópico" }));
+    await settle(8);
+    expect(state.calls.find((c) => c.method === "forum.create")?.args[1]).not.toHaveProperty("budgetUsd");
+  });
+
   test("title, question, agents (only those that answer me), people, rounds, cap → opens the topic", async () => {
     const state = seedState();
     const atlas = state.agents.find((a) => a.id === ATLAS_ID);

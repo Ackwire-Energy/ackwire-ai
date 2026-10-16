@@ -169,6 +169,8 @@ export function useUpdateAgent(orgId: string, agentId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
       void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, agentId) });
+      void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.usageReport(orgId) });
     },
   });
 }
@@ -487,6 +489,12 @@ export function useUpdateSettings(orgId: string) {
       qc.setQueryData(keys.settings(orgId), settings);
       void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+      // The default agent budget moves every percentage that follows it.
+      void qc.invalidateQueries({ queryKey: keys.usageReport(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      void qc.invalidateQueries({
+        predicate: (q) => q.queryKey[0] === "org" && q.queryKey[1] === orgId && q.queryKey[4] === "detail",
+      });
     },
   });
 }

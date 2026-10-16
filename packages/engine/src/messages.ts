@@ -91,11 +91,11 @@ export function replyExcerpt(body: string, max = REPLY_EXCERPT_LENGTH): string {
 /** Files a person may attach to one message. */
 export const MAX_MESSAGE_ATTACHMENTS = 10;
 
+/** Model and tokens of the run that wrote an agent message (no money: everyone in the channel sees it). */
 export interface MessageUsage {
   model: string;
   inputTokens: number;
   outputTokens: number;
-  costUsd: number;
 }
 
 export const messageView = (m: Message): MessageView => ({
@@ -687,7 +687,7 @@ async function withReplies(db: Database, orgId: string, roots: MessageView[]): P
   });
 }
 
-/** Tokens and cost of the runs that wrote these agent messages. */
+/** Tokens of the runs that wrote these agent messages. */
 async function usageFor(db: Database, orgId: string, list: Message[]) {
   const runIds = [...new Set(list.flatMap((m) => (m.authorType === "agent" && m.agentRunId ? [m.agentRunId] : [])))];
   const out = new Map<string, MessageUsage>();
@@ -699,7 +699,6 @@ async function usageFor(db: Database, orgId: string, list: Message[]) {
       model: sql<string>`max(${u.model})`,
       input: sql<number>`coalesce(sum(${u.inputTokens} + ${u.cacheReadTokens} + ${u.cacheWriteTokens}), 0)::int`,
       output: sql<number>`coalesce(sum(${u.outputTokens}), 0)::int`,
-      cost: sql<number>`coalesce(sum(${u.costNanoUsd}), 0)::bigint`,
     })
     .from(u)
     .where(and(eq(u.orgId, orgId), inArray(u.runId, runIds), eq(u.kind, "agent")))
@@ -710,7 +709,6 @@ async function usageFor(db: Database, orgId: string, list: Message[]) {
       model: r.model,
       inputTokens: Number(r.input),
       outputTokens: Number(r.output),
-      costUsd: Number(r.cost) / 1e9,
     });
   }
   return out;

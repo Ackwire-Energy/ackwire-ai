@@ -34,7 +34,7 @@ import { useOrg } from "@/components/org-context";
 import { SkillPicker } from "@/components/Skills";
 import { LEVELS, type Level, saveLevels } from "@/lib/access-levels";
 import { itemName } from "@/lib/connected";
-import { joinNames } from "@/lib/format";
+import { formatUsd, joinNames } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
 import { modelChoices, providerLabel } from "@/lib/providers";
@@ -142,7 +142,8 @@ export function NewAgentPage() {
   const [instructions, setInstructions] = useState(t("newAgent.roles.qa.instructions"));
   const [model, setModel] = useState<string | undefined>(undefined);
   const [key, setKey] = useState<string | undefined>(undefined);
-  const [budget, setBudget] = useState("25");
+  // Empty = the workspace default budget (every agent has one).
+  const [budget, setBudget] = useState("");
   const [on, setOn] = useState<Record<string, boolean>>({});
   // "Skills" (optional): only when the library exists and has something.
   const library = useSkills(org.id);
@@ -198,8 +199,9 @@ export function NewAgentPage() {
 
   const displayName = name.trim() || t("newAgent.defaultName");
   const handle = handleFrom(name.trim() || t("newAgent.defaultName"));
-  const amount = parseAmount(budget);
-  const budgetInvalid = !(amount > 0);
+  const amount = budget.trim() === "" ? null : parseAmount(budget);
+  const budgetInvalid = amount !== null && !(amount > 0);
+  const defaultBudget = settings.data?.defaultAgentBudgetUsd;
   const cannotCreate = budgetInvalid || !name.trim() || create.isPending;
 
   const pickRole = (id: RoleId) => {
@@ -385,9 +387,21 @@ export function NewAgentPage() {
             label={t("newAgent.budget")}
             id="ag-budget"
             error={budgetInvalid ? t("newAgent.budgetInvalid") : undefined}
-            help={t("newAgent.budgetHelp")}
+            help={[
+              defaultBudget === undefined
+                ? t("agent.budgetDefaultHelp")
+                : t("agent.budgetDefaultHelpAmount", { amount: formatUsd(t, i18n.language, defaultBudget) }),
+              t("newAgent.budgetHelp"),
+            ].join(" ")}
           >
-            <Input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} />
+            <Input
+              inputMode="decimal"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              placeholder={
+                defaultBudget === undefined ? undefined : new Intl.NumberFormat(i18n.language).format(defaultBudget)
+              }
+            />
           </Field>
         </div>
       </section>

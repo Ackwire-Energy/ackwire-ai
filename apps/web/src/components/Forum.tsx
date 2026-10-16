@@ -23,7 +23,8 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { canTalk } from "@/lib/audience";
-import { formatUsd, joinNames, relativeTime } from "@/lib/format";
+import { formatPercent, joinNames, relativeTime } from "@/lib/format";
+import { can } from "@/lib/permissions";
 import { parseAmount } from "@/lib/text";
 import { useToast } from "@/lib/toast";
 
@@ -59,16 +60,13 @@ export function ForumParticipants({ topic, max = 5 }: { topic: ForumTopic; max?:
   );
 }
 
-/** "US$ 0,42 até agora" or "US$ 0,42 de US$ 2,00". */
+/** "12% do limite": the discussion's spend cap used (never money: everyone reads the forum). Null without a cap. */
 export function useForumCost() {
   const { t, i18n } = useTranslation();
   return (topic: ForumTopic) =>
-    topic.budgetUsd
-      ? t("forum.costOf", {
-          amount: formatUsd(t, i18n.language, topic.costUsd),
-          budget: formatUsd(t, i18n.language, topic.budgetUsd),
-        })
-      : t("forum.cost", { amount: formatUsd(t, i18n.language, topic.costUsd) });
+    topic.budgetUsedPercent === null
+      ? null
+      : t("forum.budgetUsed", { percent: formatPercent(i18n.language, topic.budgetUsedPercent) });
 }
 
 /** A topic in the list: title, one line of goal, participants, status, last activity and cost. */
@@ -133,6 +131,7 @@ export function NewTopicDialog({ open, onClose }: { open: boolean; onClose: () =
   const query = q.trim().toLowerCase();
   const agents = dir.agents.filter((a) => !query || `${a.name} ${a.handle} ${a.role}`.toLowerCase().includes(query));
   const people = dir.members.filter((m) => m.userId !== me.user.id);
+  const seesCost = can(org.role, "view_usage");
   const budgetValue = budget.trim() ? parseAmount(budget) : null;
   const budgetError = budgetValue !== null && !(budgetValue > 0) ? t("forum.form.budgetInvalid") : undefined;
   const valid = title.trim() && goal.trim() && agentIds.length > 0 && !budgetError;
@@ -149,7 +148,7 @@ export function NewTopicDialog({ open, onClose }: { open: boolean; onClose: () =
           agentIds,
           userIds,
           rounds: Number(rounds),
-          budgetUsd: budgetValue,
+          ...(seesCost ? { budgetUsd: budgetValue } : {}),
         },
       },
       {
@@ -265,9 +264,22 @@ export function NewTopicDialog({ open, onClose }: { open: boolean; onClose: () =
                 options={ROUND_OPTIONS.map((r) => ({ value: r, label: r }))}
               />
             </div>
-            <Field label={t("forum.form.budget")} id="ft-budget" help={t("forum.form.budgetHelp")} error={budgetError}>
-              <Input inputMode="decimal" placeholder="US$" value={budget} onChange={(e) => setBudget(e.target.value)} />
-            </Field>
+            {/* A spend cap is money: admins only (members' discussions get the default cap). */}
+            {seesCost && (
+              <Field
+                label={t("forum.form.budget")}
+                id="ft-budget"
+                help={t("forum.form.budgetHelp")}
+                error={budgetError}
+              >
+                <Input
+                  inputMode="decimal"
+                  placeholder="US$"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                />
+              </Field>
+            )}
           </div>
           {touched && !valid && !budgetError && <p className="small muted">{t("forum.form.required")}</p>}
         </DialogBody>

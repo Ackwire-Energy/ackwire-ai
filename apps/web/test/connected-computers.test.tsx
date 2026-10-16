@@ -375,7 +375,6 @@ describe("realtime: machines and agent computers", () => {
   const pc: AgentComputer = {
     status: "stopped",
     diskUsedGib: 1,
-    costMonthUsd: 0.5,
     createdAt: null,
     lastUsedAt: null,
     target: { kind: "machine", machineId: "m1", name: "Escritório", online: true },
@@ -413,7 +412,7 @@ describe("realtime: machines and agent computers", () => {
     applyComputerEvent(qc, ORG_ID, {
       type: "agent.computer",
       agentId: ADA_ID,
-      computer: { status: "running", diskUsedGib: 2, costMonthUsd: 1, createdAt: null, lastUsedAt: null },
+      computer: { status: "running", diskUsedGib: 2, createdAt: null, lastUsedAt: null },
     } as never);
     expect(qc.getQueryData<AgentComputer>(keys.computer(ORG_ID, ADA_ID))).toMatchObject({
       status: "running",

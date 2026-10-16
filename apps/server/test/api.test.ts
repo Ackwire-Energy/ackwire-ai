@@ -147,6 +147,7 @@ describe("chat over HTTP", () => {
       ["agent", "Echo: [owner]: @dev status?."],
     ]);
     expect(t.provider.calls[0]?.apiKey).toBe("sk-ant-api-secret-9876");
+    // Per-agent cost is an admin endpoint (the owner here); members get 403 (see above).
     const usage = (await (await owner(`/api/app/organizations/${orgId}/usage`)).json()) as {
       usage: { calls: number; costUsd: number }[];
     };

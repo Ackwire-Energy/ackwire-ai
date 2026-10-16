@@ -51,8 +51,8 @@ export function createFakeForum(
       createdBy: { type: "person", id: meId },
       createdAt: minutesAgo(now, 90),
       lastActivityAt: minutesAgo(now, 4),
-      costUsd: 0.42,
-      budgetUsd: 2,
+      // US$ 0,42 of a US$ 2 cap.
+      budgetUsedPercent: 21,
       synthesis: null,
       posts: [
         post("p1", "topic-pricing", 1, { type: "agent", id: a1.id }, "Proponho US$ 19 com 3 agentes e 1 GB.", 80),
@@ -78,8 +78,7 @@ export function createFakeForum(
       createdBy: { type: "agent", id: a1.id },
       createdAt: minutesAgo(now, 60 * 30),
       lastActivityAt: minutesAgo(now, 60 * 26),
-      costUsd: 0.31,
-      budgetUsd: null,
+      budgetUsedPercent: null,
       synthesis: {
         artifactId: "art-onboarding",
         version: 1,
@@ -140,8 +139,7 @@ export function createFakeForum(
         createdBy: { type: "person", id: me?.user.id ?? "" },
         createdAt: now,
         lastActivityAt: now,
-        costUsd: 0,
-        budgetUsd: input.budgetUsd ?? null,
+        budgetUsedPercent: input.budgetUsd === null ? null : 0,
         activeAgentIds: input.agentIds.slice(0, 1),
         synthesis: null,
         posts: [],

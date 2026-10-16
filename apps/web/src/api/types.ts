@@ -97,7 +97,10 @@ export interface Agent {
   model: string;
   ownerUserId: string | null;
   hasCredential: boolean;
-  monthlyBudgetUsd: number | null;
+  /** Admins only: its own monthly budget; null = the workspace default. Absent for members. */
+  monthlyBudgetUsd?: number | null;
+  /** This month's spend over its budget, in % (agent list). */
+  budgetUsedPercent?: number;
   createdAt: string;
   /** Expected from the backend; absent = everyone. */
   audience?: AgentAudience;
@@ -449,6 +452,8 @@ export interface OrgSettings {
   routerModel: string | null;
   summaryModel: string | null;
   timezone: string;
+  /** Admins only: monthly budget of every agent without its own (US$). Absent for members. */
+  defaultAgentBudgetUsd?: number;
 }
 
 /** Sidebar counts. */
@@ -457,8 +462,8 @@ export interface OrgOverview {
   role: Role;
   people: number;
   agents: number;
-  /** This month's spend of the agents you own. */
-  myAgentsSpendUsd: number;
+  /** What the workspace's agents spent this month over the sum of their budgets, in %. */
+  budgetUsedPercent: number;
   approvalsWaitingForMe: number;
 }
 
@@ -508,10 +513,12 @@ export interface AgentDetail {
   ownerUserId: string | null;
   /** Null = platform key (Cloud). */
   credentialId: string | null;
-  monthlyBudgetUsd: number | null;
-  spentThisMonthUsd: number;
-  /** Held for calls in flight. */
-  reservedUsd: number;
+  /** This month's spend over its budget (its own, else the workspace default), in %. */
+  budgetUsedPercent: number;
+  /** Admins only: its own budget; null = the workspace default. Absent for members. */
+  monthlyBudgetUsd?: number | null;
+  /** Admins only, when it follows the default: the workspace default budget. */
+  defaultBudgetUsd?: number;
   tokensThisMonth: number;
   runsThisMonth: number;
   pendingApprovals: number;
@@ -532,7 +539,6 @@ export interface Run {
   turns: number;
   inputTokens: number;
   outputTokens: number;
-  costUsd: number;
   createdAt: string;
   finishedAt: string | null;
 }
@@ -546,6 +552,8 @@ export interface RunStep {
 
 export interface UsageReport {
   since: string;
+  /** Budget of agents without their own. */
+  defaultAgentBudgetUsd: number;
   totalUsd: number;
   byKind: {
     kind: "agent" | "router" | "embedding" | "summary" | "sandbox";
@@ -563,7 +571,10 @@ export interface UsageReport {
     inputTokens: number;
     outputTokens: number;
     costUsd: number;
-    monthlyBudgetUsd: number | null;
+    /** Its effective budget (own or the default). */
+    monthlyBudgetUsd: number;
+    budgetIsDefault: boolean;
+    budgetUsedPercent: number;
   }[];
 }
 
@@ -581,8 +592,8 @@ export interface RosterMember {
 export interface BudgetEvent {
   type: "budget.warning" | "budget.exhausted";
   agentId: string;
-  spentNanoUsd: number;
-  budgetNanoUsd: number;
+  /** Share of the budget used (no money: owners may be members). */
+  percent: number;
 }
 
 // ── Custom MCP servers (apps/server/src/routes/app/connectors-custom.ts) ─────
@@ -973,9 +984,10 @@ export interface Routine {
   nextRunAt: string | null;
   running: boolean;
   lastRun: RoutineRun | null;
-  monthCostUsd: number;
-  /** Monthly cap for this routine (US$); null/absent = only the agent's own budget. */
+  /** Admins only: monthly cap for this routine (US$); null/absent = only the agent's own budget. */
   budgetUsd?: number | null;
+  /** This month's share of the routine's cap used; null without a cap. */
+  budgetUsedPercent?: number | null;
   /** Event routines that can be triggered by a webhook: the URL to call. */
   webhookUrl?: string | null;
   createdAt: string;
@@ -990,7 +1002,6 @@ export interface RoutineRun {
   /** The same as a code ("routine_run.paused") and its values: shown in the UI language. */
   summaryCode?: string | null;
   summaryParams?: Record<string, string>;
-  costUsd: number;
 }
 
 export interface RoutineInput {
@@ -1251,7 +1262,6 @@ export type SandboxSettingsInput = Partial<
 export interface AgentComputer {
   status: "running" | "stopped" | "archived" | "none";
   diskUsedGib: number;
-  costMonthUsd: number;
   createdAt: string | null;
   lastUsedAt: string | null;
   /** `provider-default` when the provider can't apply our domain list (plan limitation). */
@@ -1336,8 +1346,8 @@ export interface ForumTopic {
   channelId: string;
   createdAt: string;
   lastActivityAt: string;
-  costUsd: number;
-  budgetUsd: number | null;
+  /** Share of the discussion's spend cap used, in %; null without a cap. */
+  budgetUsedPercent: number | null;
   /** Agents working right now. */
   activeAgentIds: string[];
   synthesis: {

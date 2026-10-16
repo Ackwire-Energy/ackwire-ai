@@ -483,7 +483,6 @@ describe("the agent's computer API", () => {
     expect(await getAgentComputer(deps, f.owner.id, f.org.id, f.agent.id)).toEqual({
       status: "none",
       diskUsedGib: 0,
-      costMonthUsd: 0,
       createdAt: null,
       lastUsedAt: null,
       target: { kind: "cloud" },

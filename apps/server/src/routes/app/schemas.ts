@@ -90,7 +90,15 @@ export const Agent = z
     model: z.string(),
     ownerUserId: z.string().nullable(),
     hasCredential: z.boolean(),
-    monthlyBudgetUsd: z.number().nullable(),
+    monthlyBudgetUsd: z
+      .number()
+      .nullable()
+      .optional()
+      .openapi({ description: "Admins only: its own monthly budget; null = the workspace default." }),
+    budgetUsedPercent: z
+      .number()
+      .optional()
+      .openapi({ description: "This month's spend over its budget, in % (in the agent list)." }),
     createdAt: z.string(),
     audience: AgentAudience,
     audienceMode: z.enum(["everyone", "people", "owner"]),
@@ -116,8 +124,8 @@ export const Channel = z
   .openapi("Channel");
 
 const MessageUsage = z
-  .object({ model: z.string(), inputTokens: z.number(), outputTokens: z.number(), costUsd: z.number() })
-  .openapi("MessageUsage", { description: "Agent messages: model, tokens and cost of the run that wrote it." });
+  .object({ model: z.string(), inputTokens: z.number(), outputTokens: z.number() })
+  .openapi("MessageUsage", { description: "Agent messages: model and tokens of the run that wrote it (no money)." });
 
 const MessageBase = z.object({
   id: z.uuid(),

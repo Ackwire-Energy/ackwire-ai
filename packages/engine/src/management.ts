@@ -7,7 +7,15 @@ import { invalidateDefaults } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { agentBudgetState } from "./gateway";
 import { can, getMembership, requirePermission } from "./organizations";
-import { monthStartUtc } from "./usage";
+import {
+  agentBudgetsThisMonth,
+  budgetPercent,
+  DEFAULT_AGENT_BUDGET_NANO_USD,
+  effectiveAgentBudget,
+  monthStartUtc,
+  orgDefaultAgentBudget,
+  workspaceBudgetPercent,
+} from "./usage";
 
 const {
   organizations,
@@ -38,6 +46,8 @@ export interface OrgSettings {
   timezone: string;
   /** From onboarding: `solo`, `small`, `medium` or `large`. */
   teamSize: TeamSize | null;
+  /** Monthly budget of agents without their own (nano-USD). Routes show it to admins only. */
+  defaultAgentBudgetNanoUsd: number;
 }
 
 export const TEAM_SIZES = ["solo", "small", "medium", "large"] as const;
@@ -57,6 +67,7 @@ export async function getOrgSettings(db: Database, actorId: string, orgId: strin
     summaryModel: s?.summaryModel ?? null,
     timezone: s?.timezone ?? "UTC",
     teamSize: TEAM_SIZES.includes(s?.teamSize as TeamSize) ? (s?.teamSize as TeamSize) : null,
+    defaultAgentBudgetNanoUsd: s?.defaultAgentBudgetNanoUsd ?? DEFAULT_AGENT_BUDGET_NANO_USD,
   };
 }
 
@@ -84,6 +95,9 @@ export async function updateOrgSettings(
     if (model && !isKnownModel(model)) throw new ValidationError(`Unknown model ${model}`);
   }
   if (input.teamSize && !TEAM_SIZES.includes(input.teamSize)) throw new ValidationError("invalid teamSize");
+  if (input.defaultAgentBudgetNanoUsd !== undefined && !(input.defaultAgentBudgetNanoUsd > 0)) {
+    throw new ValidationError("the default agent budget must be above zero");
+  }
   if (input.timezone !== undefined && !isValidTimeZone(input.timezone))
     throw new ValidationError("timezone must be an IANA time zone");
   for (const [provider, id] of Object.entries(input.defaultCredentialIds ?? {})) {
@@ -138,6 +152,9 @@ export async function updateOrgSettings(
       ...(input.summaryModel !== undefined ? { summaryModel: input.summaryModel } : {}),
       ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
       ...(input.teamSize !== undefined ? { teamSize: input.teamSize } : {}),
+      ...(input.defaultAgentBudgetNanoUsd !== undefined
+        ? { defaultAgentBudgetNanoUsd: Math.round(input.defaultAgentBudgetNanoUsd) }
+        : {}),
     };
     if (Object.keys(settings).length > 0) {
       await tx
@@ -147,11 +164,12 @@ export async function updateOrgSettings(
     }
   });
   caches.orgs.delete(`${orgId}:`);
+  caches.orgs.delete(`${orgId}:agent-budget`);
   invalidateDefaults(orgId);
   return getOrgSettings(db, actorId, orgId);
 }
 
-/** Counts for the sidebar: people, agents, what my agents spent this month, approvals waiting for me. */
+/** Counts for the sidebar: people, agents, the workspace's budget use, approvals waiting for me. */
 export async function orgOverview(db: Database, actorId: string, orgId: string, now = new Date()) {
   const membership = await requirePermission(db, actorId, orgId, "read");
   const [people] = await db
@@ -162,17 +180,6 @@ export async function orgOverview(db: Database, actorId: string, orgId: string, 
     .select({ n: sql<number>`count(*)::int` })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)));
-  const [mine] = await db
-    .select({ cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)` })
-    .from(usageRecords)
-    .innerJoin(agents, eq(agents.id, usageRecords.agentId))
-    .where(
-      and(
-        eq(usageRecords.orgId, orgId),
-        eq(agents.ownerUserId, actorId),
-        gte(usageRecords.createdAt, monthStartUtc(now)),
-      ),
-    );
   const admin = can(membership.role, "manage_agents");
   const [pending] = await db
     .select({ n: sql<number>`count(*)::int` })
@@ -189,7 +196,8 @@ export async function orgOverview(db: Database, actorId: string, orgId: string, 
     role: membership.role,
     people: people?.n ?? 0,
     agents: agentCount?.n ?? 0,
-    myAgentsSpendNanoUsd: Number(mine?.cost ?? 0),
+    /** This month's spend of the workspace's agents over the sum of their budgets (no money). */
+    budgetUsedPercent: await workspaceBudgetPercent(db, orgId, now),
     approvalsWaitingForMe: pending?.n ?? 0,
   };
 }
@@ -219,12 +227,17 @@ export async function agentDetail(db: Database, actorId: string, orgId: string, 
     .where(and(eq(approvals.agentId, agentId), eq(approvals.status, "pending")));
   const channelsOf = await listAgentChannels(db, orgId, agentId);
   const budget = await agentBudgetState(db, orgId, agentId, now);
+  const budgetNanoUsd = await effectiveAgentBudget(db, agent);
+  const spentNanoUsd = Number(usage?.cost ?? 0);
   return {
     agent,
     month: {
       since,
-      spentNanoUsd: Number(usage?.cost ?? 0),
+      spentNanoUsd,
       reservedNanoUsd: budget.reservedNanoUsd,
+      /** Its own budget, else the organization's default. */
+      budgetNanoUsd,
+      budgetUsedPercent: budgetPercent(spentNanoUsd, budgetNanoUsd),
       tokens: Number(usage?.tokens ?? 0),
       runs: runs?.n ?? 0,
     },
@@ -512,6 +525,7 @@ export async function usageReport(db: Database, actorId: string, orgId: string, 
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
     .groupBy(agents.id, agents.handle, agents.name, agents.monthlyBudgetNanoUsd)
     .orderBy(asc(agents.handle));
+  const budgets = await agentBudgetsThisMonth(db, orgId);
   const kinds = byKind.map((k) => ({
     kind: k.kind,
     calls: k.calls,
@@ -522,18 +536,26 @@ export async function usageReport(db: Database, actorId: string, orgId: string, 
   }));
   return {
     since,
+    defaultAgentBudgetNanoUsd: await orgDefaultAgentBudget(db, orgId),
     totalNanoUsd: kinds.reduce((n, k) => n + k.costNanoUsd, 0),
     byKind: kinds,
     platformBilled: { calls: platform?.calls ?? 0, costNanoUsd: Number(platform?.cost ?? 0) },
-    agents: perAgent.map((a) => ({
-      agentId: a.agentId,
-      handle: a.handle,
-      name: a.name,
-      calls: a.calls,
-      inputTokens: Number(a.inputTokens),
-      outputTokens: Number(a.outputTokens),
-      costNanoUsd: Number(a.cost),
-      monthlyBudgetNanoUsd: a.budget,
-    })),
+    agents: perAgent.map((a) => {
+      const budget = budgets.get(a.agentId);
+      const budgetNanoUsd = budget?.budgetNanoUsd ?? a.budget ?? DEFAULT_AGENT_BUDGET_NANO_USD;
+      return {
+        agentId: a.agentId,
+        handle: a.handle,
+        name: a.name,
+        calls: a.calls,
+        inputTokens: Number(a.inputTokens),
+        outputTokens: Number(a.outputTokens),
+        costNanoUsd: Number(a.cost),
+        /** Its effective budget (own or default); `budgetIsDefault` tells which. */
+        monthlyBudgetNanoUsd: budgetNanoUsd,
+        budgetIsDefault: a.budget === null,
+        budgetUsedPercent: budgetPercent(budget?.spentNanoUsd ?? 0, budgetNanoUsd),
+      };
+    }),
   };
 }

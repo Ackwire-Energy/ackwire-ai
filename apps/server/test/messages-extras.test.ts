@@ -23,7 +23,7 @@ test("agent messages carry model, tokens and cost; include=replies summarizes th
   type Msg = {
     id: string;
     author: { type: string };
-    usage?: { model: string; inputTokens: number; outputTokens: number; costUsd: number };
+    usage?: { model: string; inputTokens: number; outputTokens: number; costUsd?: number };
     replies?: { count: number; lastAt: string | null; latest: { body: string }[] };
   };
   const thread = (await (await api(`/channels/${channelId}/messages?threadId=${root.id}`)).json()) as {
@@ -31,7 +31,8 @@ test("agent messages carry model, tokens and cost; include=replies summarizes th
   };
   const reply = thread.messages.find((m) => m.author.type === "agent");
   expect(reply?.usage).toMatchObject({ model: "claude-sonnet-5-5", inputTokens: 100, outputTokens: 10 });
-  expect(reply?.usage?.costUsd).toBeGreaterThan(0);
+  // Everyone in the channel reads it: tokens, never money.
+  expect(reply?.usage).not.toHaveProperty("costUsd");
   expect(thread.messages.find((m) => m.author.type === "person")?.usage).toBeUndefined();
 
   const plain = (await (await api(`/channels/${channelId}/messages`)).json()) as { messages: Msg[] };

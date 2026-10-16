@@ -221,7 +221,7 @@ export function createMockPlanning(
         nextRunAt: null,
         running: false,
         lastRun: null,
-        monthCostUsd: 0,
+        budgetUsedPercent: null,
         createdAt: minutesAgo(now, 20000),
         ...over,
       };
@@ -233,32 +233,28 @@ export function createMockPlanning(
       const p = parseSchedulePhrase(phrase) as Extract<ScheduleParse, { ok: true }>;
       return { type: "schedule" as const, phrase, cron: p.cron, timezone: p.timezone, description: p.description };
     };
-    const run = (mins: number, summary: string, status: RoutineRun["status"] = "ok", costUsd = 0.01): RoutineRun => ({
+    const run = (mins: number, summary: string, status: RoutineRun["status"] = "ok"): RoutineRun => ({
       id: mockId("run"),
       at: minutesAgo(now, mins),
       status,
       summary,
-      costUsd,
     });
     const weekly = routine({
       name: "Resumo da semana",
       agentId: agent(3).id,
       prompt: "Resuma o que aconteceu na semana: decisões, issues fechadas e o que ficou pendente.",
       trigger: sched("toda segunda às 9h"),
-      monthCostUsd: 0.04,
     });
     const errors = routine({
       name: "Erros do Sentry do dia",
       agentId: agent(1).id,
       trigger: sched("dias úteis às 18h"),
-      monthCostUsd: 0.11,
     });
     const pr = routine({
       name: "Revisar PR aberto",
       agentId: agent(0).id,
       target: { type: "artifact" },
       trigger: { type: "event", event: "github.pr_opened" },
-      monthCostUsd: 0.32,
     });
     const monthly = routine({
       name: "Relatório mensal de reviews",
@@ -266,17 +262,16 @@ export function createMockPlanning(
       target: { type: "artifact" },
       trigger: sched("dia 1 às 8h"),
       active: false,
-      monthCostUsd: 0.02,
     });
     s.routines.push(weekly, errors, pr, monthly);
     s.runs.set(weekly.id, [
       run(7 * 1440, "Resumo postado no canal"),
       run(14 * 1440, "Resumo postado no canal"),
-      run(21 * 1440, "Orçamento do mês esgotado", "skipped", 0),
+      run(21 * 1440, "Orçamento do mês esgotado", "skipped"),
       run(28 * 1440, "Resumo postado no canal"),
     ]);
-    s.runs.set(errors.id, [run(1440, "Abriu 1 issue", "ok", 0.03)]);
-    s.runs.set(pr.id, [run(180, "Revisou o PR #42", "ok", 0.08)]);
+    s.runs.set(errors.id, [run(1440, "Abriu 1 issue")]);
+    s.runs.set(pr.id, [run(180, "Revisou o PR #42")]);
     s.runs.set(monthly.id, [run(13 * 1440, "Relatório no Drive")]);
     for (const r of s.routines) r.lastRun = s.runs.get(r.id)?.[0] ?? null;
 
@@ -466,8 +461,8 @@ export function createMockPlanning(
           nextRunAt: trigger.type === "schedule" ? (nextCronRun(trigger.cron, ctx.now())?.toISOString() ?? null) : null,
           running: false,
           lastRun: null,
-          monthCostUsd: 0,
           budgetUsd: input.budgetUsd ?? null,
+          budgetUsedPercent: input.budgetUsd == null ? null : 0,
           createdAt: ctx.now().toISOString(),
         };
         s.routines.push(r);
@@ -514,7 +509,6 @@ export function createMockPlanning(
           nextRunAt: null,
           running: false,
           lastRun: null,
-          monthCostUsd: 0,
           createdAt: ctx.now().toISOString(),
         };
         (await store(orgId)).routines.push(copy);

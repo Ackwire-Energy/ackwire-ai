@@ -25,7 +25,7 @@ import { caches } from "./cache";
 import { decryptCredential } from "./credentials";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
-import { monthStartUtc } from "./usage";
+import { budgetPercent, monthStartUtc, withEffectiveBudget } from "./usage";
 
 const { usageRecords, agentBudgetPeriods, budgetReservations, providerCredentials, organizationSettings } = schema;
 
@@ -294,7 +294,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     reservation: Pick<typeof budgetReservations.$inferSelect, "id" | "agentId" | "periodStart"> | null;
     maxTokens: number;
   }> {
-    // No budget: nothing to reserve; the counter is updated when the call settles.
+    // No budget (callers pass the effective one, so only defensive): nothing to reserve.
     if (agent.monthlyBudgetNanoUsd === null) return { reservation: null, maxTokens };
     const at = now();
     const period = periodOf(at);
@@ -487,11 +487,13 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   return {
     /** An agent's model call (runs). Streams deltas through `onDelta`. */
     async stream(call: GatewayCall): Promise<GatewayResult> {
-      const agent =
+      const row =
         call.agent && call.agent.id === call.agentId && call.agent.orgId === call.orgId
           ? call.agent
           : await getAgent(db, call.orgId, call.agentId);
-      if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
+      if (!row || row.archivedAt) throw new NotFoundError("Agent not found");
+      // Every agent has a budget: its own, else the organization's default.
+      const agent = await withEffectiveBudget(db, row);
       const info = MODEL_CATALOG[agent.model];
       if (!info) throw new ValidationError(`Model ${agent.model} is not in the catalog`);
       const provider = providerFor(info.provider);
@@ -685,11 +687,11 @@ export function notifyOwnerOnBudget(pubsub: PubSub, db?: Database): NonNullable<
   return async ({ agent, level, spentNanoUsd, budgetNanoUsd }) => {
     const recipients = agent.ownerUserId ? [agent.ownerUserId] : db ? await adminIds(db, agent.orgId) : [];
     for (const userId of recipients) {
+      // A percentage only: owners who aren't admins never see money.
       await publishUserEvent(pubsub, agent.orgId, userId, {
         type: `budget.${level}`,
         agentId: agent.id,
-        spentNanoUsd,
-        budgetNanoUsd,
+        percent: budgetPercent(spentNanoUsd, budgetNanoUsd),
       });
     }
   };

@@ -76,10 +76,11 @@ describe("Agente", () => {
     expect(document.querySelector(".agent-page textarea, .agent-page select")).toBeNull();
     expect(document.querySelector(".agent-page [role='combobox']")).toBeNull();
     const budget = screen().getByRole("region", { name: /Orçamento de/ });
-    expect(budget.textContent).toContain("US$ 12,30");
-    expect(budget.textContent).toContain("de US$ 40,00");
+    // A percentage of its budget, never money (US$ 12,30 of US$ 40).
+    expect(budget.textContent).toContain("31%do orçamento do agente");
+    expect(budget.textContent).not.toContain("US$");
     expect(budget.textContent).toContain("142 execuções · 3,1 mi de tokens · aviso ao João em 80%.");
-    expect(within(budget).getByRole("meter", { name: "Orçamento usado" }).getAttribute("aria-valuenow")).toBe("12.3");
+    expect(within(budget).getByRole("meter", { name: "Orçamento usado" }).getAttribute("aria-valuenow")).toBe("30.8");
     // One level per connector and built-in area, right on the page.
     const access = screen().getByRole("region", { name: "O que a Ada pode fazer" });
     expect(within(access).getByRole("radiogroup", { name: "Nível em GitHub" })).toBeTruthy();
@@ -166,6 +167,17 @@ describe("Agente", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({ monthlyBudgetUsd: 55.5 });
     expect(screen().queryByRole("dialog")).toBeNull();
+  });
+
+  test("an empty budget goes back to the workspace default", async () => {
+    const { state } = await go(`agents/${ADA_ID}`);
+    await click(screen().getByRole("button", { name: "Ajustar orçamento" }));
+    const dialog = screen().getByRole("dialog", { name: "Orçamento mensal" });
+    expect(dialog.textContent).toContain("Vazio: o padrão do workspace (US$ 50,00).");
+    await type(within(dialog).getByLabelText("Limite mensal (US$)"), "");
+    await click(within(dialog).getByRole("button", { name: "Salvar limite" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({ monthlyBudgetUsd: null });
   });
 
   test("Ver execuções: searchable run history", async () => {
@@ -333,7 +345,8 @@ describe("Membros", () => {
     const agents = screen().getByRole("region", { name: "Agentes" });
     expect(agents.textContent).toContain("Ada · Dev");
     expect(agents.textContent).toContain("Responsável: João");
-    expect(agents.textContent).toMatch(/US\$ 12,30 de US\$ 40,00 em \S+/);
+    expect(agents.textContent).toMatch(/31% do orçamento de \S+/);
+    expect(agents.textContent).not.toContain("US$");
   });
 
   test("batch invites: one result per email; resend and revoke; expired status", async () => {

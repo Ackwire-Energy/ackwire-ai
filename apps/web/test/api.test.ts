@@ -202,7 +202,7 @@ describe("HTTP client: management (phase 4)", () => {
       [`POST ${org}/credentials/k/rotate`]: { status: 200, body: { id: "k", keyHint: "9999" } },
       [`DELETE ${org}/credentials/k?purge=true`]: { status: 204 },
       [`${org}/credentials/platform`]: { status: 200, body: { available: false } },
-      [`${org}/agents/a1`]: { status: 200, body: { id: "a1", spentThisMonthUsd: 12.3 } },
+      [`${org}/agents/a1`]: { status: 200, body: { id: "a1", budgetUsedPercent: 30.8 } },
       [`PUT ${org}/agents/a1/channels`]: {
         status: 200,
         body: { channels: [{ id: "c1", name: "eng", autoReply: false }] },
@@ -216,7 +216,7 @@ describe("HTTP client: management (phase 4)", () => {
     expect((await api.agents.rotateCredential("o1", "k", { apiKey: "sk-ant-9999" })).keyHint).toBe("9999");
     await api.agents.removeCredential("o1", "k", true);
     expect(await api.agents.platformKeyAvailable("o1")).toBe(false);
-    expect((await api.agents.detail("o1", "a1")).spentThisMonthUsd).toBe(12.3);
+    expect((await api.agents.detail("o1", "a1")).budgetUsedPercent).toBe(30.8);
     expect(await api.agents.setChannels("o1", "a1", [{ channelId: "c1" }])).toHaveLength(1);
     expect(await api.agents.runs("o1", { agentId: "a1", limit: 200 })).toEqual([{ id: "r1" }] as never);
     expect((await api.agents.run("o1", "r1")).steps).toEqual([]);

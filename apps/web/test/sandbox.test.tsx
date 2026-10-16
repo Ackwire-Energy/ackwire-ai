@@ -210,7 +210,6 @@ describe("creating the PC feels alive", () => {
   const running = {
     status: "running" as const,
     diskUsedGib: 0.1,
-    costMonthUsd: 0,
     createdAt: new Date().toISOString(),
     lastUsedAt: new Date().toISOString(),
   };

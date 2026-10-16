@@ -4,8 +4,10 @@ import { schema } from "@agenteschat/db";
 import {
   acceptInvitation,
   agentDetail,
+  budgetPercent,
   ConflictError,
   createModelGateway,
+  DEFAULT_AGENT_BUDGET_NANO_USD,
   deleteCredential,
   drainOutbox,
   ForbiddenError,
@@ -126,7 +128,14 @@ describe("agents, runs and usage", () => {
     const cost = 1000 * 2000 + 100 * 10000;
 
     const detail = await agentDetail(f.db, f.owner.id, f.org.id, f.agent.id);
-    expect(detail.month).toMatchObject({ spentNanoUsd: cost, runs: 1, tokens: 1100 });
+    expect(detail.month).toMatchObject({
+      spentNanoUsd: cost,
+      runs: 1,
+      tokens: 1100,
+      // No budget of its own: the workspace default counts.
+      budgetNanoUsd: DEFAULT_AGENT_BUDGET_NANO_USD,
+      budgetUsedPercent: budgetPercent(cost, DEFAULT_AGENT_BUDGET_NANO_USD),
+    });
     expect(detail.channels.map((c) => c.name)).toEqual(["general"]);
 
     const [run] = await listRuns(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
@@ -146,7 +155,13 @@ describe("agents, runs and usage", () => {
     expect(report.agents.find((a) => a.handle === "dev")?.costNanoUsd).toBe(cost);
 
     const overview = await orgOverview(f.db, f.owner.id, f.org.id);
-    expect(overview).toMatchObject({ people: 1, agents: 1, myAgentsSpendNanoUsd: cost, approvalsWaitingForMe: 0 });
+    expect(overview).toMatchObject({
+      people: 1,
+      agents: 1,
+      budgetUsedPercent: budgetPercent(cost, DEFAULT_AGENT_BUDGET_NANO_USD),
+      approvalsWaitingForMe: 0,
+    });
+    expect(overview).not.toHaveProperty("myAgentsSpendNanoUsd");
 
     // Owners of an agent see its runs; other members don't.
     const member = await addMember(f.db, f.org.id, "member");

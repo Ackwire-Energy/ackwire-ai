@@ -5,6 +5,7 @@ import {
   availableProviders,
   cancelRun,
   canTalkTo,
+  canViewCost,
   getOrgSettings,
   getRun,
   inviteMany,
@@ -24,7 +25,7 @@ import {
   updateOrgSettings,
   usageReport,
 } from "@agenteschat/engine";
-import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS } from "@agenteschat/providers";
+import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
 import { AgentAppearance, AgentAudience, Credential, Role } from "./schemas";
@@ -49,8 +50,17 @@ const Settings = z
     summaryModel: z.string().nullable().openapi({ description: "Null = the deployment's SUMMARY_MODEL." }),
     timezone: z.string().openapi({ example: "America/Sao_Paulo" }),
     teamSize: z.enum(["solo", "small", "medium", "large"]).nullable(),
+    defaultAgentBudgetUsd: z.number().optional().openapi({
+      description: "Monthly budget of every agent without its own. Admins only (absent for members).",
+    }),
   })
   .openapi("OrgSettings");
+
+/** Settings as this person may see them: the default budget is money, so admins only. */
+const settingsFor = (s: Awaited<ReturnType<typeof getOrgSettings>>, seesCost: boolean) => {
+  const { defaultAgentBudgetNanoUsd, ...rest } = s;
+  return seesCost ? { ...rest, defaultAgentBudgetUsd: nanoUsdToUsd(defaultAgentBudgetNanoUsd) } : rest;
+};
 
 const Person = z
   .object({
@@ -93,9 +103,13 @@ const AgentDetail = z
     model: z.string(),
     ownerUserId: z.string().nullable(),
     credentialId: z.uuid().nullable().openapi({ description: "Null = platform key (Cloud)." }),
-    monthlyBudgetUsd: z.number().nullable(),
-    spentThisMonthUsd: z.number(),
-    reservedUsd: z.number().openapi({ description: "Held for calls in flight." }),
+    budgetUsedPercent: z
+      .number()
+      .openapi({ description: "This month's spend over its budget (its own, else the workspace default), in %." }),
+    monthlyBudgetUsd: z.number().nullable().optional().openapi({
+      description: "Admins only: its own budget; null = the workspace default (`defaultBudgetUsd`).",
+    }),
+    defaultBudgetUsd: z.number().optional().openapi({ description: "Admins only: the workspace default budget." }),
     tokensThisMonth: z.number(),
     runsThisMonth: z.number(),
     pendingApprovals: z.number(),
@@ -123,20 +137,24 @@ const Run = z
     turns: z.number(),
     inputTokens: z.number(),
     outputTokens: z.number(),
-    costUsd: z.number(),
     createdAt: z.string(),
     finishedAt: z.string().nullable(),
   })
   .openapi("Run");
 
-const toRun = (r: Awaited<ReturnType<typeof listRuns>>[number]) => ({
+// Runs carry tokens, never money: owners who aren't admins read them too (admins see cost in the usage report).
+const toRun = ({ costNanoUsd: _cost, ...r }: Awaited<ReturnType<typeof listRuns>>[number]) => ({
   ...r,
   ...runErrorDetail(r.error),
-  costUsd: nanoUsdToUsd(r.costNanoUsd),
-  costNanoUsd: undefined,
   createdAt: r.createdAt.toISOString(),
   finishedAt: iso(r.finishedAt),
 });
+
+/** A run step's data without its cost (`model_call` steps record it). */
+const stepData = (data: Record<string, unknown>) => {
+  const { costNanoUsd: _cost, ...rest } = data;
+  return rest;
+};
 
 /** Management screens: settings, people, invitations, credential rotation, agent detail, runs and usage. */
 export function managementRoutes(deps: AppDeps) {
@@ -156,7 +174,12 @@ export function managementRoutes(deps: AppDeps) {
       request: { params: OrgParams },
       responses: { 200: json(Settings), ...errors },
     }),
-    async (c) => c.json(await getOrgSettings(db, c.get("user").id, c.req.valid("param").orgId), 200),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      const settings = await getOrgSettings(db, actor, orgId);
+      return c.json(settingsFor(settings, await canViewCost(db, actor, orgId)), 200);
+    },
   );
 
   app.openapi(
@@ -178,13 +201,29 @@ export function managementRoutes(deps: AppDeps) {
             summaryModel: ModelId.nullable().optional(),
             timezone: z.string().max(64).optional(),
             teamSize: z.enum(["solo", "small", "medium", "large"]).nullable().optional(),
+            defaultAgentBudgetUsd: z
+              .number()
+              .positive()
+              .max(1_000_000)
+              .optional()
+              .openapi({ description: "Monthly budget of every agent without its own." }),
           }),
         ),
       },
       responses: { 200: json(Settings), ...errors },
     }),
-    async (c) =>
-      c.json(await updateOrgSettings(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json")), 200),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      const { defaultAgentBudgetUsd, ...input } = c.req.valid("json");
+      const settings = await updateOrgSettings(db, actor, orgId, {
+        ...input,
+        ...(defaultAgentBudgetUsd !== undefined
+          ? { defaultAgentBudgetNanoUsd: usdToNanoUsd(defaultAgentBudgetUsd) }
+          : {}),
+      });
+      return c.json(settingsFor(settings, await canViewCost(db, actor, orgId)), 200);
+    },
   );
 
   app.openapi(
@@ -193,7 +232,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/overview",
       tags: ["Organization"],
       security,
-      summary: "Sidebar counts: people, agents, my agents' spend this month, approvals waiting for me",
+      summary: "Sidebar counts: people, agents, the workspace's budget use this month, approvals waiting for me",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -202,18 +241,16 @@ export function managementRoutes(deps: AppDeps) {
             role: Role,
             people: z.number(),
             agents: z.number(),
-            myAgentsSpendUsd: z.number(),
+            budgetUsedPercent: z.number().openapi({
+              description: "What the workspace's agents spent this month over the sum of their budgets, in %.",
+            }),
             approvalsWaitingForMe: z.number(),
           }),
         ),
         ...errors,
       },
     }),
-    async (c) => {
-      const o = await orgOverview(db, c.get("user").id, c.req.valid("param").orgId);
-      const { myAgentsSpendNanoUsd, ...rest } = o;
-      return c.json({ ...rest, myAgentsSpendUsd: nanoUsdToUsd(myAgentsSpendNanoUsd) }, 200);
-    },
+    async (c) => c.json(await orgOverview(db, c.get("user").id, c.req.valid("param").orgId), 200),
   );
 
   // ── People and invitations ────────────────────────────────────────────────
@@ -531,7 +568,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/agents/{agentId}",
       tags: ["Agents"],
       security,
-      summary: "An agent with spend, runs and channels this month",
+      summary: "An agent with its budget use (%), runs and channels this month",
       request: { params: AgentParams },
       responses: { 200: json(AgentDetail), ...errors },
     }),
@@ -539,6 +576,7 @@ export function managementRoutes(deps: AppDeps) {
       const { orgId, agentId } = c.req.valid("param");
       const d = await agentDetail(db, c.get("user").id, orgId, agentId);
       const v = agentView(d.agent);
+      const seesCost = await canViewCost(db, c.get("user").id, orgId);
       return c.json(
         {
           id: v.id,
@@ -549,9 +587,13 @@ export function managementRoutes(deps: AppDeps) {
           model: v.model,
           ownerUserId: v.ownerUserId,
           credentialId: d.agent.credentialId,
-          monthlyBudgetUsd: usd(v.monthlyBudgetNanoUsd),
-          spentThisMonthUsd: nanoUsdToUsd(d.month.spentNanoUsd),
-          reservedUsd: nanoUsdToUsd(d.month.reservedNanoUsd),
+          budgetUsedPercent: d.month.budgetUsedPercent,
+          ...(seesCost
+            ? {
+                monthlyBudgetUsd: usd(v.monthlyBudgetNanoUsd),
+                defaultBudgetUsd: v.monthlyBudgetNanoUsd === null ? nanoUsdToUsd(d.month.budgetNanoUsd) : undefined,
+              }
+            : {}),
           tokensThisMonth: d.month.tokens,
           runsThisMonth: d.month.runs,
           pendingApprovals: d.pendingApprovals,
@@ -615,7 +657,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/runs",
       tags: ["Usage"],
       security,
-      summary: "Run history with tokens and cost (admins; owners for their agents)",
+      summary: "Run history with tokens (admins; owners for their agents). Cost is in the usage report",
       request: {
         params: OrgParams,
         query: z.object({
@@ -673,7 +715,10 @@ export function managementRoutes(deps: AppDeps) {
       const { run, steps } = await getRun(db, c.get("user").id, orgId, runId);
       if (!run) return c.json({ error: { code: "not_found", message: "Run not found" } }, 404);
       return c.json(
-        { run: toRun(run), steps: steps.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() })) },
+        {
+          run: toRun(run),
+          steps: steps.map((s) => ({ ...s, data: stepData(s.data), createdAt: s.createdAt.toISOString() })),
+        },
         200,
       );
     },
@@ -719,12 +764,13 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/usage/report",
       tags: ["Usage"],
       security,
-      summary: "Spend by kind (agent, router, embedding, summary, sandbox) and per agent with budgets",
+      summary: "Spend by kind (agent, router, embedding, summary, sandbox) and per agent with budgets (admins)",
       request: { params: OrgParams, query: z.object({ since: z.iso.datetime().optional() }) },
       responses: {
         200: json(
           z.object({
             since: z.string(),
+            defaultAgentBudgetUsd: z.number().openapi({ description: "Budget of agents without their own." }),
             totalUsd: z.number(),
             platformBilled: z
               .object({ calls: z.number(), costUsd: z.number() })
@@ -748,7 +794,9 @@ export function managementRoutes(deps: AppDeps) {
                 inputTokens: z.number(),
                 outputTokens: z.number(),
                 costUsd: z.number(),
-                monthlyBudgetUsd: z.number().nullable(),
+                monthlyBudgetUsd: z.number().openapi({ description: "Its effective budget (own or the default)." }),
+                budgetIsDefault: z.boolean(),
+                budgetUsedPercent: z.number(),
               }),
             ),
           }),
@@ -764,13 +812,14 @@ export function managementRoutes(deps: AppDeps) {
       return c.json(
         {
           since: r.since.toISOString(),
+          defaultAgentBudgetUsd: nanoUsdToUsd(r.defaultAgentBudgetNanoUsd),
           totalUsd: nanoUsdToUsd(r.totalNanoUsd),
           platformBilled: { calls: r.platformBilled.calls, costUsd: nanoUsdToUsd(r.platformBilled.costNanoUsd) },
           byKind: r.byKind.map(({ costNanoUsd, ...k }) => ({ ...k, costUsd: nanoUsdToUsd(costNanoUsd) })),
           agents: r.agents.map(({ costNanoUsd, monthlyBudgetNanoUsd, ...a }) => ({
             ...a,
             costUsd: nanoUsdToUsd(costNanoUsd),
-            monthlyBudgetUsd: usd(monthlyBudgetNanoUsd),
+            monthlyBudgetUsd: nanoUsdToUsd(monthlyBudgetNanoUsd),
           })),
         },
         200,

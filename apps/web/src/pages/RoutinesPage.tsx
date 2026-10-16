@@ -50,8 +50,9 @@ import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
-import { formatUsd, toYmd, whenAt } from "@/lib/format";
+import { formatPercent, toYmd, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
+import { can } from "@/lib/permissions";
 import {
   defaultRule,
   fromApiRule,
@@ -366,7 +367,11 @@ function RoutineCard({ routine: r, onRuns, onEdit }: { routine: Routine; onRuns:
             : t("routines.never")}
         </span>
         {next && <span>{next}</span>}
-        <span className="tabular">{t("routines.cost", { amount: formatUsd(t, i18n.language, r.monthCostUsd) })}</span>
+        {r.budgetUsedPercent != null && (
+          <span className="tabular">
+            {t("routines.budgetUsed", { percent: formatPercent(i18n.language, r.budgetUsedPercent) })}
+          </span>
+        )}
       </p>
       <Dialog
         open={deleting}
@@ -423,7 +428,6 @@ function RunsDialog({ routine, onClose }: { routine: Routine | null; onClose: ()
               </span>
               <span style={{ flex: 1 }}>{runSummary(t, x)}</span>
               <Chip icon={x.status === "ok" ? "check" : "alert"}>{t(`routines.runStatus.${x.status}`)}</Chip>
-              <span className="small muted tabular">{formatUsd(t, i18n.language, x.costUsd)}</span>
             </div>
           ))}
         </List>
@@ -607,7 +611,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             JSON.stringify(trigger()) !== JSON.stringify({ type: "once", at: r.trigger.at, timezone: savedZone })
           : r.trigger.type !== "schedule" || JSON.stringify(toApiRule(rule)) !== savedRule;
     if (triggerChanged) patch.trigger = trigger();
-    if (budgetValue !== (r.budgetUsd ?? null)) patch.budgetUsd = budgetValue;
+    if (can(org.role, "view_usage") && budgetValue !== (r.budgetUsd ?? null)) patch.budgetUsd = budgetValue;
     if (active !== r.active) patch.active = active;
     return patch;
   };
@@ -653,7 +657,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
           prompt: prompt.trim(),
           target: targetValue(),
           trigger: trigger(),
-          ...(budgetValue !== null ? { budgetUsd: budgetValue } : {}),
+          ...(budgetValue !== null && can(org.role, "view_usage") ? { budgetUsd: budgetValue } : {}),
         },
       },
       {
@@ -845,14 +849,17 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
               <span>{t("routines.form.active")}</span>
             </label>
           )}
-          <Field
-            label={t("routines.form.budget")}
-            id="nr-budget"
-            help={budgetOk ? t("routines.form.budgetHelp") : undefined}
-            error={budgetOk ? undefined : t("routines.form.budgetInvalid")}
-          >
-            <Input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="5" />
-          </Field>
+          {/* A routine's own cap is money: admins only (members' routines use the agent's budget). */}
+          {can(org.role, "view_usage") && (
+            <Field
+              label={t("routines.form.budget")}
+              id="nr-budget"
+              help={budgetOk ? t("routines.form.budgetHelp") : undefined}
+              error={budgetOk ? undefined : t("routines.form.budgetInvalid")}
+            >
+              <Input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="5" />
+            </Field>
+          )}
         </DialogBody>
         <DialogFooter>
           <Button type="button" onClick={onClose}>

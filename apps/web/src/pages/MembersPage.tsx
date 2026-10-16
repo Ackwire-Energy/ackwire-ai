@@ -20,7 +20,6 @@ import {
   usePeople,
   useResendInvitation,
   useRevokeInvitation,
-  useUsage,
 } from "@/api/queries";
 import type { InvitationWithStatus, Role } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -28,7 +27,7 @@ import { useFilterCopy } from "@/components/filters";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { formatMonth, formatShortDate, formatUsd, relativeTime, timeLeft } from "@/lib/format";
+import { formatMonth, formatPercent, formatShortDate, relativeTime, timeLeft } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { parseEmails } from "@/lib/text";
 import { useToast } from "@/lib/toast";
@@ -61,7 +60,6 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const revoke = useRevokeInvitation(org.id);
   const changeRole = useChangeRole(org.id);
   const peopleQuery = usePeople(org.id);
-  const usage = useUsage(org.id);
   const [draft, setDraft] = useState("");
   const [role, setRole] = useState<Role>("member");
   const [error, setError] = useState<string | null>(null);
@@ -300,7 +298,6 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
           {dir.agents.length === 0 && <div className="ac-list__row muted">{t("members.noAgents")}</div>}
           {dir.agents.map((a) => {
             const owner = a.ownerUserId ? dir.memberById.get(a.ownerUserId) : undefined;
-            const spent = usage.data?.find((u) => u.agentId === a.id)?.costUsd ?? 0;
             return (
               <Link
                 key={a.id}
@@ -318,15 +315,9 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                     {owner ? t("members.ownerLine", { name: owner.name }) : t("members.noOwner")}
                   </span>
                 </span>
-                {usage.data && (
+                {a.budgetUsedPercent !== undefined && (
                   <span className="small muted tabular" style={{ flex: "0 1 220px" }}>
-                    {a.monthlyBudgetUsd === null
-                      ? t("members.budgetLineNoLimit", { spent: formatUsd(t, i18n.language, spent), month })
-                      : t("members.budgetLine", {
-                          spent: formatUsd(t, i18n.language, spent),
-                          budget: formatUsd(t, i18n.language, a.monthlyBudgetUsd),
-                          month,
-                        })}
+                    {t("members.budgetLine", { percent: formatPercent(i18n.language, a.budgetUsedPercent), month })}
                   </span>
                 )}
               </Link>

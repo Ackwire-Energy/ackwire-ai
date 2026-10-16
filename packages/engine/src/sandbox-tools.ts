@@ -538,7 +538,7 @@ export function createSandboxToolSource(
     },
     {
       name: "computer_status",
-      description: "Is your computer on? Which computer it is, disk used, this month's cost, and its internet access.",
+      description: "Is your computer on? Which computer it is, disk used and its internet access.",
       scope: SANDBOX_SCOPE,
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       async execute(_input, ctx) {
@@ -570,7 +570,7 @@ export function createSandboxToolSource(
           if (!target.available) return { content: NO_COMPUTER_MESSAGE, isError: true };
           const s = await ownComputerStatus(deps, ctx.orgId, ctx.agentId);
           return {
-            content: `Status: ${s.status}; disk used: ${s.diskUsedGib} GB; cost this month: US$ ${s.costMonthUsd.toFixed(2)}; network: ${s.network ?? "none yet"}.`,
+            content: `Status: ${s.status}; disk used: ${s.diskUsedGib} GB; network: ${s.network ?? "none yet"}.`,
             data: { computer: s },
           };
         } catch (error) {

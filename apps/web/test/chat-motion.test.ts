@@ -193,19 +193,14 @@ describe("grouping and day dividers", () => {
 });
 
 describe("chat details", () => {
-  test("model, tokens and cost live behind the time; the cost only for who sees spending", () => {
-    const usage = { model: "claude-sonnet-5-5", inputTokens: 1000, outputTokens: 240, costUsd: 0.004 };
-    expect(usageLine(t, "pt-BR", usage, { modelLabel: "Claude Sonnet 5.5", showCost: true })).toBe(
-      "sonnet 5.5 · 1.240 tokens · US$ 0,004",
-    );
-    expect(usageLine(t, "pt-BR", usage, { modelLabel: "Claude Sonnet 5.5", showCost: false })).toBe(
-      "sonnet 5.5 · 1.240 tokens",
-    );
-    expect(messageUsage({ usage: { model: "m", inputTokens: 3 } })).toEqual({
+  test("model and tokens live behind the time; never money (admins see it in Settings → Usage)", () => {
+    const usage = { model: "claude-sonnet-5-5", inputTokens: 1000, outputTokens: 240 };
+    expect(usageLine(t, "pt-BR", usage, { modelLabel: "Claude Sonnet 5.5" })).toBe("sonnet 5.5 · 1.240 tokens");
+    // An old server's `costUsd` is dropped.
+    expect(messageUsage({ usage: { model: "m", inputTokens: 3, costUsd: 0.5 } })).toEqual({
       model: "m",
       inputTokens: 3,
       outputTokens: 0,
-      costUsd: 0,
     });
     expect(messageUsage({})).toBeNull();
   });

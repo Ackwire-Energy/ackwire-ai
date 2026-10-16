@@ -71,7 +71,7 @@ export const agents = pgTable(
     credentialId: uuid().references(() => providerCredentials.id, { onDelete: "set null" }),
     /** Person accountable for this agent (receives approvals, budget alerts). */
     ownerUserId: text().references(() => users.id, { onDelete: "set null" }),
-    /** Spend cap per calendar month (UTC) in nano-USD (1e-9 USD). Null = no cap. */
+    /** Spend cap per calendar month (UTC) in nano-USD (1e-9 USD). Null = the organization's default (`organization_settings.default_agent_budget_nano_usd`). */
     monthlyBudgetNanoUsd: bigint({ mode: "number" }),
     /**
      * Who can talk to it (D31): `everyone`, `people` (`audience_user_ids`,
@@ -121,5 +121,10 @@ export const organizationSettings = pgTable("organization_settings", {
   timezone: text().notNull().default("UTC"),
   /** From onboarding: `solo`, `small`, `medium` or `large`. */
   teamSize: text(),
+  /**
+   * Monthly budget of every agent without one of its own (`agents.monthly_budget_nano_usd`
+   * null), in nano-USD. Set by admins; members only ever see percentages.
+   */
+  defaultAgentBudgetNanoUsd: bigint({ mode: "number" }).notNull().default(50_000_000_000),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

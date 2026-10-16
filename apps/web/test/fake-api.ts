@@ -72,6 +72,8 @@ export interface FakeState {
   calls: { method: string; args: unknown[] }[];
   context?: string;
   defaultCredentialId?: string | null;
+  /** The workspace default agent budget (US$); 50 when unset. */
+  defaultAgentBudgetUsd?: number;
   /** Make `chat.post` fail (optimistic send tests). */
   failPosts?: boolean;
   /** `chat.post` waits for this (to see the pending state). */
@@ -417,7 +419,8 @@ function approval(
   };
 }
 
-function run(id: string, agentId: string, what: string, tokens: number, costUsd: number, minutes: number): Run {
+/** `_costUsd` documents the run's price; runs carry tokens only (money is in the admins' usage report). */
+function run(id: string, agentId: string, what: string, tokens: number, _costUsd: number, minutes: number): Run {
   return {
     id,
     agentId,
@@ -430,7 +433,6 @@ function run(id: string, agentId: string, what: string, tokens: number, costUsd:
     turns: 1,
     inputTokens: tokens - 100,
     outputTokens: 100,
-    costUsd,
     createdAt: minutesAgo(minutes),
     finishedAt: minutesAgo(minutes - 1),
   };
@@ -580,6 +582,16 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     if (!state.me) throw new ApiError(401, "unauthorized", "Sign in to continue");
     return state.me;
   };
+  // Budgets like the backend: every agent has one (its own or the default); members see only percentages.
+  const seesCost = () => state.me?.organizations[0]?.role !== "member";
+  const spentOf = (agentId: string) => (agentId === ADA_ID ? 12.3 : agentId === ATLAS_ID ? 3.1 : 0);
+  const budgetOf = (a: Agent) => a.monthlyBudgetUsd ?? state.defaultAgentBudgetUsd ?? 50;
+  const percentOf = (a: Agent) => Math.round((spentOf(a.id) / budgetOf(a)) * 1000) / 10;
+  const workspacePercent = () => {
+    const spent = state.agents.reduce((n, a) => n + spentOf(a.id), 0);
+    const budget = state.agents.reduce((n, a) => n + budgetOf(a), 0);
+    return budget > 0 ? Math.round((spent / budget) * 1000) / 10 : 0;
+  };
   return {
     system: { health: async () => ({ status: "ok", version: "test", edition: "cloud" }) },
     waitlist: {
@@ -683,11 +695,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         routerModel: null,
         summaryModel: null,
         timezone: "America/Sao_Paulo",
+        // Money: admins only, like the backend.
+        ...(seesCost() ? { defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50 } : {}),
       }),
       updateSettings: async (orgId, input) => {
         log("orgs.updateSettings", orgId, input);
         if (input.context !== undefined) state.context = input.context;
         if (input.defaultCredentialId !== undefined) state.defaultCredentialId = input.defaultCredentialId;
+        if (input.defaultAgentBudgetUsd !== undefined) state.defaultAgentBudgetUsd = input.defaultAgentBudgetUsd;
         return {
           name: input.name ?? "Acme",
           context: state.context ?? "",
@@ -702,7 +717,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         role: state.me?.organizations[0]?.role ?? "member",
         people: state.members.length,
         agents: state.agents.length,
-        myAgentsSpendUsd: 15.4,
+        budgetUsedPercent: workspacePercent(),
         approvalsWaitingForMe: state.approvals.filter((a) => a.status === "pending" && a.canDecide).length,
       }),
       people: async () =>
@@ -738,12 +753,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       usageReport: async () => ({
         since: minutesAgo(60 * 24 * 14),
+        defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50,
         totalUsd: 15.9,
         byKind: [
           { kind: "agent", calls: 154, partialCalls: 0, inputTokens: 3_200_000, outputTokens: 110_000, costUsd: 15.4 },
           { kind: "router", calls: 80, partialCalls: 0, inputTokens: 90_000, outputTokens: 4_000, costUsd: 0.5 },
         ],
-        agents: [],
+        agents: state.agents.map((a) => ({
+          agentId: a.id,
+          handle: a.handle,
+          name: a.name,
+          calls: a.id === ADA_ID ? 142 : 12,
+          inputTokens: a.id === ADA_ID ? 3_000_000 : 200_000,
+          outputTokens: a.id === ADA_ID ? 100_000 : 10_000,
+          costUsd: spentOf(a.id),
+          monthlyBudgetUsd: budgetOf(a),
+          budgetIsDefault: a.monthlyBudgetUsd == null,
+          budgetUsedPercent: percentOf(a),
+        })),
       }),
     },
     agents: {
@@ -756,7 +783,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             mode === "everyone" ||
             a.ownerUserId === me ||
             (mode === "people" && (a.audience?.userIds ?? []).includes(me));
-          return { ...a, audienceMode: mode, canTalk };
+          const { monthlyBudgetUsd, ...rest } = a;
+          return {
+            ...rest,
+            ...(seesCost() ? { monthlyBudgetUsd } : {}),
+            budgetUsedPercent: percentOf(a),
+            audienceMode: mode,
+            canTalk,
+          };
         }),
       create: async (orgId, input) => {
         log("agents.create", orgId, input);
@@ -849,11 +883,17 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const channels = Object.entries(state.channelMembers)
           .filter(([, ms]) => ms.some((m) => m.type === "agent" && m.id === agentId))
           .map(([cid]) => ({ id: cid, name: state.channels.find((c) => c.id === cid)?.name ?? "", autoReply: false }));
+        const { monthlyBudgetUsd, ...rest } = a;
         return {
-          ...a,
+          ...rest,
           credentialId: a.hasCredential ? "cred-1" : null,
-          spentThisMonthUsd: agentId === ADA_ID ? 12.3 : 3.1,
-          reservedUsd: 0,
+          budgetUsedPercent: percentOf(a),
+          ...(seesCost()
+            ? {
+                monthlyBudgetUsd,
+                ...(monthlyBudgetUsd == null ? { defaultBudgetUsd: state.defaultAgentBudgetUsd ?? 50 } : {}),
+              }
+            : {}),
           tokensThisMonth: agentId === ADA_ID ? 3_100_000 : 210_000,
           runsThisMonth: agentId === ADA_ID ? 142 : 12,
           pendingApprovals: state.approvals.filter((x) => x.agentId === agentId && x.status === "pending").length,

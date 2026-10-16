@@ -10,6 +10,7 @@ import {
   type IconName,
   Input,
   List,
+  Meter,
   Select,
   Textarea,
 } from "@agenteschat/ui";
@@ -28,6 +29,7 @@ import {
 } from "@/api/queries";
 import type { Credential, Role } from "@/api/types";
 import { AccessMatrixSection } from "@/components/AccessLevels";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { SandboxSection } from "@/components/AgentComputer";
 import { ConnectorsSection } from "@/components/Connectors";
 import { ErrorState, LoadingList } from "@/components/Loading";
@@ -37,9 +39,10 @@ import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
-import { formatShortDate, formatUsd, relativeTime } from "@/lib/format";
+import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { isProviderId, keyLooksValid, PROVIDERS, type ProviderId, providerLabel } from "@/lib/providers";
+import { parseAmount } from "@/lib/text";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
 
@@ -452,6 +455,7 @@ function KeyDialog({
   );
 }
 
+/** The one place with money (admins): the default agent budget, this month's spend by kind and per agent. */
 function UsageSection() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -459,31 +463,127 @@ function UsageSection() {
   const report = useUsageReport(org.id, allowed);
   if (!allowed) return null;
   return (
-    <Card aria-labelledby="sec-usage">
-      <h2 id="sec-usage" className="ac-card__title">
-        {t("settings.usageTitle")}
-      </h2>
-      {report.isLoading && <LoadingList count={4} avatar={false} trailing />}
-      {report.isError && !report.data && <ErrorState error={report.error} onRetry={() => void report.refetch()} />}
-      {report.data && (
-        <>
-          <span className="small muted">
-            {t("settings.usageTotal", {
-              amount: formatUsd(t, i18n.language, report.data.totalUsd),
-              since: formatShortDate(i18n.language, report.data.since),
-            })}
-          </span>
-          <div>
-            {report.data.byKind.map((k) => (
-              <div key={k.kind} className="connector-row">
-                <span className="connector-row__name">{t(`settings.kinds.${k.kind}`)}</span>
-                <span className="connector-row__granted tabular">{t("settings.usageCalls", { count: k.calls })}</span>
-                <span className="tabular">{formatUsd(t, i18n.language, k.costUsd)}</span>
-              </div>
+    <>
+      <DefaultBudgetCard />
+      <Card aria-labelledby="sec-usage">
+        <h2 id="sec-usage" className="ac-card__title">
+          {t("settings.usageTitle")}
+        </h2>
+        {report.isLoading && <LoadingList count={4} avatar={false} trailing />}
+        {report.isError && !report.data && <ErrorState error={report.error} onRetry={() => void report.refetch()} />}
+        {report.data && (
+          <>
+            <span className="small muted">
+              {t("settings.usageTotal", {
+                amount: formatUsd(t, i18n.language, report.data.totalUsd),
+                since: formatShortDate(i18n.language, report.data.since),
+              })}
+            </span>
+            <div>
+              {report.data.byKind.map((k) => (
+                <div key={k.kind} className="connector-row">
+                  <span className="connector-row__name">{t(`settings.kinds.${k.kind}`)}</span>
+                  <span className="connector-row__granted tabular">{t("settings.usageCalls", { count: k.calls })}</span>
+                  <span className="tabular">{formatUsd(t, i18n.language, k.costUsd)}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Card>
+      {report.data && report.data.agents.length > 0 && (
+        <Card aria-labelledby="sec-usage-agents">
+          <h2 id="sec-usage-agents" className="ac-card__title">
+            {t("settings.usageAgents")}
+          </h2>
+          <List>
+            {report.data.agents.map((a) => (
+              <Link
+                key={a.agentId}
+                to="/org/$orgId/agents/$agentId"
+                params={{ orgId: org.id, agentId: a.agentId }}
+                className="ac-list__row usage-agent"
+              >
+                <AgentAvatar agentId={a.agentId} size="sm" name={a.name} />
+                <span className="list-col">
+                  <span style={{ fontWeight: 600 }}>{a.name}</span>
+                  <span className="small muted tabular">
+                    {t(a.budgetIsDefault ? "settings.usageAgentLineDefault" : "settings.usageAgentLine", {
+                      spent: formatUsd(t, i18n.language, a.costUsd),
+                      budget: formatUsd(t, i18n.language, a.monthlyBudgetUsd),
+                    })}
+                  </span>
+                </span>
+                <span className="usage-agent__meter">
+                  <Meter
+                    value={Math.min(100, a.budgetUsedPercent)}
+                    max={100}
+                    label={t("settings.usageAgentMeter", { name: a.name })}
+                  />
+                  <span className="small tabular">{formatPercent(i18n.language, a.budgetUsedPercent)}</span>
+                </span>
+              </Link>
             ))}
-          </div>
-        </>
+          </List>
+        </Card>
       )}
+    </>
+  );
+}
+
+/** Budget of every agent without its own; members only ever see percentages of it. */
+function DefaultBudgetCard() {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const settings = useSettings(org.id);
+  const update = useUpdateSettings(org.id);
+  const toast = useToast();
+  const editable = can(org.role, "configure");
+  const saved = settings.data?.defaultAgentBudgetUsd;
+  const [value, setValue] = useState("");
+  useEffect(() => {
+    if (saved !== undefined) setValue(new Intl.NumberFormat(i18n.language).format(saved));
+  }, [saved, i18n.language]);
+  const amount = parseAmount(value);
+  const invalid = value.trim() !== "" && !(amount > 0);
+  const dirty = saved !== undefined && amount > 0 && amount !== saved;
+  return (
+    <Card aria-labelledby="sec-default-budget">
+      <h2 id="sec-default-budget" className="ac-card__title">
+        {t("settings.defaultBudgetTitle")}
+      </h2>
+      <form
+        className="row"
+        style={{ gap: 12, alignItems: "flex-end" }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!dirty) return;
+          update.mutate(
+            { defaultAgentBudgetUsd: amount },
+            { onSuccess: () => toast.show(t("settings.defaultBudgetSaved")) },
+          );
+        }}
+      >
+        <Field
+          label={t("settings.defaultBudget")}
+          id="set-default-budget"
+          help={t("settings.defaultBudgetHelp")}
+          error={invalid ? t("agent.budgetInvalid") : undefined}
+        >
+          <Input
+            inputMode="decimal"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            readOnly={!editable}
+            disabled={saved === undefined}
+          />
+        </Field>
+        {editable && (
+          <Button type="submit" variant="primary" disabled={!dirty || update.isPending} loading={update.isPending}>
+            {t("common.save")}
+          </Button>
+        )}
+      </form>
     </Card>
   );
 }

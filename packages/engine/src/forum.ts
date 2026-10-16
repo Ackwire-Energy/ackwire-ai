@@ -23,6 +23,7 @@ import { createIssue } from "./issues";
 import { insertMessageWithRuns, type Message, messageView } from "./messages";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
+import { budgetPercent } from "./usage";
 
 const { forumTopics, forumParticipants, channels, channelMembers, messages, agentRuns, usageRecords, agents } = schema;
 
@@ -59,8 +60,8 @@ export interface ForumTopicView {
   channelId: string;
   createdAt: string;
   lastActivityAt: string;
-  costUsd: number;
-  budgetUsd: number | null;
+  /** Share of the discussion's spend cap used; null without a cap. No money: everyone in the org reads the forum. */
+  budgetUsedPercent: number | null;
   activeAgentIds: string[];
   synthesis: { artifactId: string; version: number; suggestedIssues: ForumSuggestedIssue[]; deleted?: boolean } | null;
 }
@@ -157,8 +158,7 @@ async function views(db: Database, rows: TopicRow[]): Promise<ForumTopicView[]> 
       channelId: r.channelId,
       createdAt: r.createdAt.toISOString(),
       lastActivityAt: r.lastActivityAt.toISOString(),
-      costUsd: (costs.get(r.channelId) ?? 0) / 1e9,
-      budgetUsd: r.budgetNanoUsd === null ? null : r.budgetNanoUsd / 1e9,
+      budgetUsedPercent: r.budgetNanoUsd === null ? null : budgetPercent(costs.get(r.channelId) ?? 0, r.budgetNanoUsd),
       activeAgentIds: active.filter((a) => a.id === r.currentRunId).map((a) => a.agentId),
       synthesis: r.synthesisArtifactId
         ? {

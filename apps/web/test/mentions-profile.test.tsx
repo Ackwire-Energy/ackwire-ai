@@ -118,7 +118,7 @@ describe("profile card", () => {
     );
   });
 
-  test("agent: role, owner, model, what it can do, spend vs budget, DM and profile", async () => {
+  test("agent: role, owner, model, what it can do, budget used (%), DM and profile", async () => {
     await go(`c/${ENG_ID}`);
     await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
     await settle(6);
@@ -128,8 +128,9 @@ describe("profile card", () => {
     expect(c.textContent).toContain("João");
     expect(c.textContent).toContain("sonnet 5.5");
     expect(c.textContent).toContain("Pode");
-    expect(c.textContent).toMatch(/US\$\s?12,30 de US\$\s?40,00 este mês/);
-    expect(within(c).getByRole("meter", { name: "Gasto do mês" })).toBeTruthy();
+    expect(c.textContent).toContain("31% do orçamento usado este mês");
+    expect(c.textContent).not.toContain("US$");
+    expect(within(c).getByRole("meter", { name: "Orçamento usado no mês" })).toBeTruthy();
     expect(within(c).getByRole("link", { name: "Mensagem direta" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
     );

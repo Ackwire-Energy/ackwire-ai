@@ -48,12 +48,11 @@ export function createFakeSandbox(
           ? {
               status: "running",
               diskUsedGib: 1.2,
-              costMonthUsd: 0.84,
               createdAt: ctx.now().toISOString(),
               lastUsedAt: ctx.now().toISOString(),
               network: "allowlist",
             }
-          : { status: "none", diskUsedGib: 0, costMonthUsd: 0, createdAt: null, lastUsedAt: null };
+          : { status: "none", diskUsedGib: 0, createdAt: null, lastUsedAt: null };
       pcs.set(agentId, c);
     }
     return c;
@@ -85,7 +84,7 @@ export function createFakeSandbox(
     },
     remove: async (orgId, agentId) => {
       log("sandbox.remove", orgId, agentId);
-      pcs.set(agentId, { status: "none", diskUsedGib: 0, costMonthUsd: 0, createdAt: null, lastUsedAt: null });
+      pcs.set(agentId, { status: "none", diskUsedGib: 0, createdAt: null, lastUsedAt: null });
     },
     setTarget: async (orgId, agentId, machineId) => {
       log("sandbox.setTarget", orgId, agentId, machineId);

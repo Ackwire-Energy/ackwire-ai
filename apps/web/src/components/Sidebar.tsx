@@ -32,7 +32,7 @@ import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type LocaleCode, locales, setLocale } from "@/i18n";
 import { audienceChip } from "@/lib/audience";
-import { formatUsd } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
 import { markOpen } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { browserTimezone } from "@/lib/routines";
@@ -67,7 +67,7 @@ function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boo
 
 /** The workspace sidebar (telas/Sidebar.dc.html). */
 export function Sidebar() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { org, me } = useOrg();
   const orgId = org.id;
   const dir = useDirectory(orgId);
@@ -76,7 +76,7 @@ export function Sidebar() {
   const [creatingChannel, setCreatingChannel] = useState(false);
   const pending = overview.data?.approvalsWaitingForMe ?? 0;
   const people = dir.members.filter((m) => m.userId !== me.user.id);
-  const spent = overview.data ? overview.data.myAgentsSpendUsd : null;
+  const budgetUsed = overview.data ? overview.data.budgetUsedPercent : null;
   const dms = useDms(orgId);
   const dmChannels = new Set((dms.data ?? []).map((d) => d.channelId));
   // Unread per DM partner (agents show it on their "Agentes" row; people under "Mensagens diretas").
@@ -310,7 +310,7 @@ export function Sidebar() {
           </Button>
         )}
         <div className="sidebar__me">
-          <AccountMenu spent={spent === null ? null : formatUsd(t, i18n.language, spent)} />
+          <AccountMenu budgetUsed={budgetUsed} />
           <Button asChild variant="ghost" iconOnly style={{ width: 32, height: 32 }}>
             <Link
               to="/org/$orgId/settings"
@@ -384,7 +384,8 @@ function UnreadCount({ count }: { count: number }) {
   );
 }
 
-function AccountMenu({ spent }: { spent: string | null }) {
+/** The account button; under the name, the workspace's budget use this month (a percentage, never money). */
+function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -410,12 +411,18 @@ function AccountMenu({ spent }: { spent: string | null }) {
           <button
             type="button"
             className="sidebar__user"
-            aria-label={`${t("shell.account")}: ${me.user.name}`}
+            aria-label={
+              budgetUsed === null
+                ? `${t("shell.account")}: ${me.user.name}`
+                : `${t("shell.account")}: ${me.user.name}. ${t("shell.budgetUsed", { percent: formatPercent(i18n.language, budgetUsed) })}`
+            }
             title={me.user.name}
           >
             <Avatar name={me.user.name} size="sm" imageUrl={dir.memberById.get(me.user.id)?.image ?? me.user.image} />
-            <span className="sidebar__user-name">{me.user.name}</span>
-            {spent && <span className="sidebar__user-spend">{t("shell.spentThisMonth", { amount: spent })}</span>}
+            <span className="sidebar__user-text">
+              <span className="sidebar__user-name">{me.user.name}</span>
+              {budgetUsed !== null && <BudgetBar percent={budgetUsed} />}
+            </span>
           </button>
         }
       >
@@ -639,4 +646,23 @@ export function isTimeZone(zone: string) {
   } catch {
     return false;
   }
+}
+
+/** Thin bar + "37%": how much of the agents' monthly budgets the workspace used. */
+function BudgetBar({ percent }: { percent: number }) {
+  const { t, i18n } = useTranslation();
+  const level = percent >= 100 ? "full" : percent >= 80 ? "high" : "ok";
+  return (
+    <span
+      className="sidebar__usage"
+      data-level={level}
+      title={t("shell.budgetUsedHint", { percent: formatPercent(i18n.language, percent) })}
+      aria-hidden="true"
+    >
+      <span className="sidebar__usage-track">
+        <span className="sidebar__usage-bar" style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} />
+      </span>
+      <span className="sidebar__usage-value">{formatPercent(i18n.language, percent)}</span>
+    </span>
+  );
 }

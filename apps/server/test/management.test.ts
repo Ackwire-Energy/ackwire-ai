@@ -30,7 +30,9 @@ test("management API: settings, overview, people, invitations, credentials, agen
 
   const overview = (await (await api("/overview")).json()) as Record<string, number>;
   expect(overview).toMatchObject({ people: 1, agents: 1, approvalsWaitingForMe: 0 });
-  expect(overview.myAgentsSpendUsd).toBeCloseTo((100 * 2000 + 10 * 10000) / 1e9);
+  // A percentage of the budgets (dev has US$ 50), never money.
+  expect(overview.budgetUsedPercent).toBe(0);
+  expect(overview).not.toHaveProperty("myAgentsSpendUsd");
 
   const people = (await (await api("/people")).json()) as { people: { email: string; online: boolean }[] };
   expect(people.people).toEqual([expect.objectContaining({ email: "owner@example.com", online: false })]);
@@ -56,23 +58,35 @@ test("management API: settings, overview, people, invitations, credentials, agen
   expect(detail).toMatchObject({
     handle: "dev",
     runsThisMonth: 1,
+    budgetUsedPercent: 0,
     monthlyBudgetUsd: 50,
     channels: [{ id: channelId, name: "general", autoReply: true }],
   });
 
   const runs = (await (await api(`/runs?agentId=${agentId}`)).json()) as {
-    runs: { id: string; costUsd: number; status: string }[];
+    runs: { id: string; status: string }[];
   };
   expect(runs.runs).toHaveLength(1);
   expect(runs.runs[0]?.status).toBe("done");
-  const run = (await (await api(`/runs/${runs.runs[0]?.id}`)).json()) as { steps: { kind: string }[] };
+  expect(runs.runs[0]).not.toHaveProperty("costUsd");
+  const run = (await (await api(`/runs/${runs.runs[0]?.id}`)).json()) as {
+    steps: { kind: string; data: Record<string, unknown> }[];
+  };
   expect(run.steps.map((s) => s.kind)).toEqual(["context", "model_call", "message"]);
+  expect(run.steps.find((s) => s.kind === "model_call")?.data).not.toHaveProperty("costNanoUsd");
 
   const usage = (await (await api("/usage/report")).json()) as {
     byKind: { kind: string; calls: number }[];
     totalUsd: number;
+    defaultAgentBudgetUsd: number;
+    agents: { handle: string; monthlyBudgetUsd: number; budgetIsDefault: boolean }[];
   };
   expect(usage.byKind).toEqual([expect.objectContaining({ kind: "agent", calls: 1 })]);
+  expect(usage.totalUsd).toBeCloseTo((100 * 2000 + 10 * 10000) / 1e9);
+  expect(usage.defaultAgentBudgetUsd).toBe(50);
+  expect(usage.agents).toEqual([
+    expect.objectContaining({ handle: "dev", monthlyBudgetUsd: 50, budgetIsDefault: false }),
+  ]);
 
   const renamed = await api(`/channels/${channelId}`, { method: "PATCH", json: { topic: "All hands" } });
   expect(await renamed.json()).toMatchObject({ topic: "All hands" });

@@ -1,9 +1,12 @@
 import {
   type Agent as AgentRow,
+  agentBudgetsThisMonth,
   agentView,
   archiveAgent,
   audienceOf,
+  budgetPercent,
   canTalkTo,
+  canViewCost,
   createAgent,
   createCredential,
   deleteCredential,
@@ -35,12 +38,16 @@ import { Agent, AgentAppearance, AgentAudience, Credential, Model, Usage } from 
 
 const tags = ["Agents"];
 
-const toAgent = (a: AgentRow, viewerId: string) => {
+/** An agent as this person may see it: its budget is money, so admins only (`seesCost`). */
+const toAgent = (a: AgentRow, viewerId: string, seesCost: boolean, budgetUsedPercent?: number) => {
   const v = agentView(a);
   const { monthlyBudgetNanoUsd, ...rest } = v;
   return {
     ...rest,
-    monthlyBudgetUsd: monthlyBudgetNanoUsd === null ? null : nanoUsdToUsd(monthlyBudgetNanoUsd),
+    ...(budgetUsedPercent !== undefined ? { budgetUsedPercent } : {}),
+    ...(seesCost
+      ? { monthlyBudgetUsd: monthlyBudgetNanoUsd === null ? null : nanoUsdToUsd(monthlyBudgetNanoUsd) }
+      : {}),
     createdAt: v.createdAt.toISOString(),
     audience: audienceOf(a),
     audienceMode: a.audienceMode,
@@ -59,12 +66,10 @@ const AgentFields = z.object({
     .optional()
     .openapi({ description: "Provider credential of this organization. Null = platform key (Cloud only)." }),
   ownerUserId: z.string().nullable().optional(),
-  monthlyBudgetUsd: z
-    .number()
-    .min(0)
-    .nullable()
-    .optional()
-    .openapi({ description: "Spend cap per calendar month (UTC). Null = no cap." }),
+  monthlyBudgetUsd: z.number().min(0).nullable().optional().openapi({
+    description:
+      "Spend cap per calendar month (UTC), admins only. Null = the workspace default (every agent has a budget).",
+  }),
   audience: AgentAudience.optional().openapi({
     description: "Who can talk to it. The agent's owner or admins can change it.",
   }),
@@ -205,15 +210,17 @@ export function agentRoutes(deps: AppDeps) {
       request: { params: OrgParams },
       responses: { 200: json(z.object({ agents: z.array(Agent) })), ...errors },
     }),
-    async (c) =>
-      c.json(
-        {
-          agents: (await listAgents(db, c.get("user").id, c.req.valid("param").orgId)).map((a) =>
-            toAgent(a, c.get("user").id),
-          ),
-        },
-        200,
-      ),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      const list = await listAgents(db, actor, orgId);
+      const [seesCost, budgets] = await Promise.all([canViewCost(db, actor, orgId), agentBudgetsThisMonth(db, orgId)]);
+      const percent = (id: string) => {
+        const b = budgets.get(id);
+        return b ? budgetPercent(b.spentNanoUsd, b.budgetNanoUsd) : 0;
+      };
+      return c.json({ agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id))) }, 200);
+    },
   );
 
   app.openapi(
@@ -238,7 +245,7 @@ export function agentRoutes(deps: AppDeps) {
       );
       if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
       if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
-      return c.json(toAgent(agent, c.get("user").id), 201);
+      return c.json(toAgent(agent, c.get("user").id, await canViewCost(db, c.get("user").id, orgId)), 201);
     },
   );
 
@@ -271,7 +278,7 @@ export function agentRoutes(deps: AppDeps) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");
       }
-      return c.json(toAgent(agent, actor), 200);
+      return c.json(toAgent(agent, actor, await canViewCost(db, actor, orgId)), 200);
     },
   );
 

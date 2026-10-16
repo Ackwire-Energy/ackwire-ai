@@ -23,7 +23,7 @@ We call the REST API directly instead of the official `@daytonaio/sdk`. Adding t
 - A stopped or archived computer is started again on use.
 - Only when the provider lost it is the row marked deleted and a new, empty one created. That is audited (`sandbox.recreated`), and the tool result tells the agent its old files are gone, so it can tell the people.
 
-**API.** `GET …/agents/{id}/computer` returns `{ status, diskUsedGib, costMonthUsd, createdAt, lastUsedAt, network }`, where `status` is `running`, `stopped`, `archived` or `none`. The disk size is measured with `du` while the computer runs and kept for when it is stopped. `POST …/computer/start|stop` and `DELETE …/computer` complete the set. The agent's owner and admins can use all of it; everything is audited.
+**API.** `GET …/agents/{id}/computer` returns `{ status, diskUsedGib, createdAt, lastUsedAt, network }` (`costMonthUsd` was dropped in 0026: the cost counts in the agent's budget percentage), where `status` is `running`, `stopped`, `archived` or `none`. The disk size is measured with `du` while the computer runs and kept for when it is stopped. `POST …/computer/start|stop` and `DELETE …/computer` complete the set. The agent's owner and admins can use all of it; everything is audited.
 
 **Network mode.** `org_sandbox_settings.network` is one of three modes:
 - `blocked`, the default (`networkBlockAll`);

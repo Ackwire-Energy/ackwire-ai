@@ -19,7 +19,6 @@ const base = {
   agentId: ADA_ID,
   prompt: "Ligar para o fornecedor",
   running: false,
-  monthCostUsd: 0,
   createdAt: "2026-10-15T12:00:00.000Z",
 };
 const once = (at: string) => ({ type: "once" as const, at, timezone: "America/Sao_Paulo", description: "" });
@@ -52,7 +51,7 @@ const routines: Routine[] = [
     trigger: once("2026-10-14T12:00:00.000Z"),
     active: false,
     nextRunAt: null,
-    lastRun: { id: "x", at: "2026-10-14T12:00:00.000Z", status: "ok", summary: "Lembrete enviado", costUsd: 0 },
+    lastRun: { id: "x", at: "2026-10-14T12:00:00.000Z", status: "ok", summary: "Lembrete enviado" },
   },
 ];
 

@@ -160,13 +160,14 @@ describe("Issue detail", () => {
 });
 
 describe("Rotinas", () => {
-  test("cards with agent, target, schedule, next and last run, cost", async () => {
+  test("cards with agent, target, schedule, next and last run, budget use", async () => {
     await go("routines");
     const weekly = screen().getByRole("article", { name: "Resumo da semana" });
     expect(weekly.textContent).toContain("entrega em #eng");
     expect(weekly.textContent).toContain("Toda segunda-feira, às 09:00");
     expect(weekly.textContent).toMatch(/Próxima: /);
-    expect(weekly.textContent).toContain("Este mês: US$ 0,04");
+    // No money on the cards; a routine without its own cap shows no percentage either.
+    expect(weekly.textContent).not.toContain("US$");
     const pr = screen().getByRole("article", { name: "Revisar PR aberto" });
     expect(pr.textContent).toContain("PR aberto no GitHub");
     expect(pr.textContent).toContain("Espera o próximo evento");

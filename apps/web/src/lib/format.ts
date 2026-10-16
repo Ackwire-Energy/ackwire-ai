@@ -15,6 +15,14 @@ export function formatUsd(t: TFunction, locale: string, value: number) {
   return t("format.usd", { value: text });
 }
 
+/** Budget use: "37,5%", "12%", "<1%" (members never see money, only this). */
+export function formatPercent(locale: string, value: number) {
+  const fmt = (v: number, digits: number) =>
+    new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: digits }).format(v / 100);
+  if (value > 0 && value < 1) return `<${fmt(1, 0)}`;
+  return fmt(value, value < 10 ? 1 : 0);
+}
+
 /** "1.240" */
 export const formatInt = (locale: string, value: number) => new Intl.NumberFormat(locale).format(Math.round(value));
 
