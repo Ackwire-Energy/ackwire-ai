@@ -118,7 +118,6 @@ test("the bridge checks the task's token, needs a connection, relays the call an
   });
   expect(await b.handle({ ...req, taskId: "0193aaaa-0000-7000-8000-000000000099" })).toMatchObject({ ok: false });
   expect(await b.handle({ ...req, tool: "rm_rf" })).toMatchObject({ ok: false, error: "Unknown tool rm_rf" });
-  expect(await b.handle(req)).toMatchObject({ ok: false, error: expect.stringContaining("not connected") });
   b.attach((f) => frames.push(f));
   const pending = b.handle(req);
   await waitFor(() => frames.length === 1);
@@ -131,6 +130,43 @@ test("the bridge checks the task's token, needs a connection, relays the call an
   await waitFor(() => frames.length === 2);
   b.detach();
   expect(await second).toMatchObject({ ok: false });
+});
+
+test("while the connection is down (a runner restart, a reconnect) a call waits and is relayed after it comes back", async () => {
+  const { b, frames } = bridge({ token: "secret-token-1", missionId: "m1", running: true });
+  const req = { taskId: TASK, token: "secret-token-1", tool: "report", args: { summary: "hi" } };
+  const early = b.handle(req);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(frames).toHaveLength(0);
+  b.attach((f) => frames.push(f));
+  await waitFor(() => frames.length === 1);
+  const sent = frames[0] as Extract<RunnerFrame, { type: "mcp.call" }>;
+  b.result({ type: "mcp.result", callId: sent.callId, ok: true, text: "Reported in the thread." });
+  expect(await early).toEqual({ ok: true, text: "Reported in the thread." });
+  // A permission prompt in flight when the link drops is sent again on the next connection (never denied for it).
+  const prompt = b.handle({ ...req, tool: "permission_prompt", args: { tool_name: "Bash", input: { command: "ls" } } });
+  await waitFor(() => frames.length === 2);
+  b.detach();
+  const resent: RunnerFrame[] = [];
+  b.attach((f) => resent.push(f));
+  await waitFor(() => resent.length === 1);
+  const again = resent[0] as Extract<RunnerFrame, { type: "mcp.call" }>;
+  expect(again.tool).toBe("permission_prompt");
+  b.result({ type: "mcp.result", callId: again.callId, ok: true, text: '{"behavior":"allow"}' });
+  expect(await prompt).toEqual({ ok: true, text: '{"behavior":"allow"}' });
+});
+
+test("a call that waited out its timeout without a connection says so (transient)", async () => {
+  const frames: RunnerFrame[] = [];
+  const b = new McpBridge({
+    socketPath: "unused",
+    task: (id) => (id === TASK ? { token: "secret-token-1", missionId: "m1", running: true } : null),
+    callTimeoutMs: 30,
+  });
+  closers.push(() => b.close());
+  const out = await b.handle({ taskId: TASK, token: "secret-token-1", tool: "report", args: {} });
+  expect(out).toMatchObject({ ok: false, transient: true, error: expect.stringContaining("not connected") });
+  expect(frames).toHaveLength(0);
 });
 
 test("an ended task has no tools any more", async () => {
