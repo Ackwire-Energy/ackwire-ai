@@ -225,7 +225,8 @@ describe("Onboarding", () => {
     expect(link.value).toMatch(/^http:\/\/localhost:3000\/invite\/link-/);
     const emails = screen().getByLabelText("E-mails");
     await act(async () =>
-      fireEvent.change(emails, { target: { value: "Marina@acme.com.br, joao@acme.com.br\nnao-e-email" } }),
+      // A one-line field drops line breaks as you type (pasting with new lines goes through onPaste).
+      fireEvent.change(emails, { target: { value: "Marina@acme.com.br, joao@acme.com.br nao-e-email" } }),
     );
     await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
     expect(button("Remover marina@acme.com.br")).toBeTruthy();
