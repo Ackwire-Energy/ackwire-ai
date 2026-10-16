@@ -7,7 +7,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import type { Routine } from "@/api/types";
 import { createI18n } from "@/i18n";
 import { activityText, toolActivity } from "@/lib/activity";
-import { onceParts, reminderBody, routineOfMessage } from "@/lib/routines";
+import { isRoutineCall, onceParts, reminderBody, routineOfMessage } from "@/lib/routines";
 import { isDoneOnce } from "@/pages/RoutinesPage";
 import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -136,7 +136,7 @@ describe("reminder messages and activity", () => {
     expect(routineOfMessage({ routine: { id: "r", name: "x" } })).toEqual({ id: "r", name: "x" });
   });
 
-  test("a routine's message is one line (whom it called); its instructions open on demand", async () => {
+  test("a routine's top-level call message is hidden: only the agent's answer shows", async () => {
     const state = seedState();
     state.messages.push({
       id: "m-routine",
@@ -151,13 +151,16 @@ describe("reminder messages and activity", () => {
     });
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(8);
-    const row = screen()
-      .getAllByRole("article")
-      .find((a) => a.textContent?.includes("Rotina · Eventos")) as HTMLElement;
-    expect(row.textContent).toContain("Chamou @Ada com as instruções da rotina.");
-    expect(row.textContent).not.toContain("Verifique os eventos novos");
-    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Ver instruções" })));
-    expect(row.textContent).toContain("Verifique os eventos novos");
+    const rows = screen().getAllByRole("article");
+    expect(rows.some((a) => a.textContent?.includes("Rotina · Eventos"))).toBe(false);
+    expect(rows.some((a) => a.textContent?.includes("Verifique os eventos novos"))).toBe(false);
+    expect(
+      isRoutineCall({ threadId: null, author: { type: "person" }, meta: { routine: { id: "r", name: "x" } } }),
+    ).toBe(true);
+    // In a thread (a routine answering in a conversation) the call still shows, as one line.
+    expect(
+      isRoutineCall({ threadId: "m-1", author: { type: "person" }, meta: { routine: { id: "r", name: "x" } } }),
+    ).toBe(false);
   });
 
   test("activity verbs for scheduling from the chat", () => {

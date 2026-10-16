@@ -215,13 +215,14 @@ async function executeRunInner(
   // DMs are flat: a reply to a top-level DM message goes in the main timeline, not a thread.
   // So is a routine's answer in a channel: the routine's own message isn't shown, so its
   // result can't hang in a thread under it.
-  const channelRow = await getChannelCached(db, run.orgId, run.channelId);
+  // A top-level trigger is read here, together with the channel, and reused for the context below.
   const topLevel = run.threadRootId === run.triggerMessageId;
+  const [channelRow, topTrigger] = await Promise.all([
+    getChannelCached(db, run.orgId, run.channelId),
+    topLevel ? getMessage(db, run.orgId, run.triggerMessageId) : Promise.resolve(null),
+  ]);
   const flat =
-    topLevel &&
-    (channelRow?.kind === "dm" ||
-      channelRow?.kind === "forum" ||
-      Boolean((await getMessage(db, run.orgId, run.triggerMessageId))?.meta.routine));
+    topLevel && (channelRow?.kind === "dm" || channelRow?.kind === "forum" || Boolean(topTrigger?.meta.routine));
   const replyThreadId: string | null = flat ? null : run.threadRootId;
   const where = { channelId: run.channelId, threadId: replyThreadId, agentId: run.agentId, runId: run.id };
   await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where });
@@ -295,12 +296,14 @@ async function executeRunInner(
   // Independent reads together: the agent (cached), the trigger, and the tools it may use.
   const [agent, triggerRows, tools] = await Promise.all([
     getAgentCached(db, run.orgId, run.agentId),
-    needsContext
-      ? db
-          .select()
-          .from(schema.messages)
-          .where(and(eq(schema.messages.orgId, run.orgId), eq(schema.messages.id, run.triggerMessageId)))
-      : Promise.resolve([]),
+    !needsContext
+      ? Promise.resolve([])
+      : topTrigger
+        ? Promise.resolve([topTrigger])
+        : db
+            .select()
+            .from(schema.messages)
+            .where(and(eq(schema.messages.orgId, run.orgId), eq(schema.messages.id, run.triggerMessageId))),
     deps.tools ? deps.tools.list(ctx) : Promise.resolve([]),
   ]);
   const trigger = triggerRows[0];

@@ -165,12 +165,12 @@ test("write implies read for built-ins: issues:write lets the agent list its iss
   expect(tree.builtins.find((b) => b.scope === "calendar:read")?.state).toBe("off");
 });
 
-test("tools carry a pt-BR label, a description and readOnly", async () => {
+test("tools carry a label, a description and readOnly", async () => {
   f = await setup();
   const tree = await getAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id);
   const tools = tree.builtins.flatMap((b) => b.tools);
-  expect(tools.find((t) => t.name === "list_issues")).toMatchObject({ label: "Ver issues", readOnly: true });
-  expect(tools.find((t) => t.name === "create_issue")).toMatchObject({ label: "Criar issue", readOnly: false });
+  expect(tools.find((t) => t.name === "list_issues")).toMatchObject({ label: "View issues", readOnly: true });
+  expect(tools.find((t) => t.name === "create_issue")).toMatchObject({ label: "Create issue", readOnly: false });
   const matrix = await accessMatrix(f.db, f.owner.id, f.org.id);
-  expect(matrix.tools.find((t) => t.name === "read_artifact")).toMatchObject({ label: "Ler arquivo", readOnly: true });
+  expect(matrix.tools.find((t) => t.name === "read_artifact")).toMatchObject({ label: "Read file", readOnly: true });
 });

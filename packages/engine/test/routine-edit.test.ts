@@ -152,6 +152,6 @@ describe("editing routines", () => {
     await drainOutbox(f.db, f.handlers);
     const runs = await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id);
     expect(runs.map((r) => r.status)).toEqual(["skipped", "ok"]);
-    expect(runs[0]?.summary).toContain("Orçamento");
+    expect(runs[0]?.summary).toContain("Routine budget used up this month");
   });
 });

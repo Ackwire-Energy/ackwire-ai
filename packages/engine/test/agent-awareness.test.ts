@@ -60,7 +60,7 @@ describe("what earlier runs did", () => {
     expect(prompt).toContain("# Recent actions in this thread");
     expect(prompt).toMatch(/@dev create_issue → Created #1 \[todo\] Integração com TikTok Ads.*\(ok\)/);
     expect(prompt).toContain("not with `search_context`");
-    expect(prompt).toContain("Nunca diga que não fez");
+    expect(prompt).toContain("Never say you didn't do");
   });
 });
 

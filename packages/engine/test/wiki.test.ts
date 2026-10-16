@@ -264,7 +264,7 @@ describe("pages", () => {
     const source = { kind: "message" as const, channelId: f.general.id, messageId: msg.id };
     const page = await createPageFromSource(deps, f.owner.id, f.org.id, { source, title: "Decisões" });
     expect(page.body).toContain("Decidimos usar Postgres como fila.");
-    expect(page.body).toContain("em #general");
+    expect(page.body).toContain("in #general");
     expect(page.source).toEqual({ type: "message", id: msg.id, channelId: f.general.id });
     const appended = await appendSourceToWiki(deps, f.owner.id, f.org.id, "decisoes", { source, section: "Fila" });
     expect(appended.version).toBe(2);
@@ -352,7 +352,7 @@ describe("agents", () => {
     const first = f.provider.calls[0]?.request;
     const names = (first?.tools ?? []).map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(["search_wiki", "read_wiki_page", "create_wiki_page"]));
-    expect(systemText(first?.system ?? "")).toContain("Só escreva na wiki");
+    expect(systemText(first?.system ?? "")).toContain("Only write to the wiki");
 
     const page = await getWikiPage(f.db, person(f.owner.id), f.org.id, "deploy");
     expect(page).toMatchObject({
