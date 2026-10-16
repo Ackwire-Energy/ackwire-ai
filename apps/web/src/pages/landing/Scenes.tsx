@@ -126,7 +126,7 @@ export function SceneRouter({ run }: SceneProps) {
         <Icon name="agent" />
         {t("landing.scenes.router")}{" "}
         <small>
-          {MODELS.haiku} · {t("landing.ms", { n: 180 })}
+          {MODELS.router} · {t("landing.ms", { n: 180 })}
         </small>
       </span>
       <svg className="lp-wires" viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
@@ -295,7 +295,7 @@ export function SceneApproval() {
 }
 
 const LEDGER = [
-  { who: "router", model: MODELS.haiku, tokens: 412, cost: 0.0004 },
+  { who: "router", model: MODELS.router, tokens: 412, cost: 0.0004 },
   { who: "investigation", model: MODELS.sonnet, tokens: 2188, cost: 0.013 },
   { who: "answer", model: MODELS.sonnet, tokens: 812, cost: 0.0049 },
   { who: "rollback", model: MODELS.sonnet, tokens: 1304, cost: 0.0079 },

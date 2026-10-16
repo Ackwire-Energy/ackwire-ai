@@ -2774,7 +2774,7 @@ export const en: Translations = {
       s2: {
         n: "The router",
         title: "A router picks who answers.",
-        text: "A cheap, fixed model reads the conversation and calls zero, one or two agents. It only picks who speaks. Permission never comes from it.",
+        text: "Jev, a small and fast model, reads the conversation and calls zero, one or two agents. It only picks who speaks. Permission never comes from it.",
       },
       s3: {
         n: "The work",

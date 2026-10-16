@@ -2785,7 +2785,7 @@ export const ptBR = {
       s2: {
         n: "O roteador",
         title: "Um roteador escolhe quem responde.",
-        text: "Um modelo barato e fixo lê a conversa e chama zero, um ou dois agentes. Ele só escolhe quem fala. Permissão nunca vem dele.",
+        text: "O Jev, um modelo pequeno e rápido, lê a conversa e chama zero, um ou dois agentes. Ele só escolhe quem fala. Permissão nunca vem dele.",
       },
       s3: {
         n: "O trabalho",
