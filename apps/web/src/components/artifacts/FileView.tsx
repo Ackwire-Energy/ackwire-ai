@@ -37,10 +37,10 @@ export function FileSummary({ content }: { content: ArtifactFileContent }) {
 }
 
 /** Images up to this size get a thumbnail in the chat card (bigger ones only in the viewer). */
-const MAX_THUMB_BYTES = 8 * 1024 * 1024;
+export const MAX_THUMB_BYTES = 8 * 1024 * 1024;
 
 /** The blob of a previewable file as an object URL of exactly the allowed type (null until loaded). */
-function usePreviewUrl(artifactId: string, version: number, contentType: string, enabled: boolean) {
+export function usePreviewUrl(artifactId: string, version: number, contentType: string, enabled: boolean) {
   const { org } = useOrg();
   const blob = useArtifactBlob(org.id, artifactId, version, enabled);
   const [url, setUrl] = useState<string | null>(null);

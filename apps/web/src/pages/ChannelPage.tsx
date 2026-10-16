@@ -101,7 +101,7 @@ import { serverBody } from "@/lib/message-body";
 import { reportPainted } from "@/lib/perf";
 import { can } from "@/lib/permissions";
 import { localMeta, quoteExcerpt, replyOf } from "@/lib/reply";
-import { isReminderMessage, reminderBody, routineOfMessage } from "@/lib/routines";
+import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
 import { splitCanceled } from "@/lib/work";
 import {
@@ -1534,6 +1534,8 @@ const TimelineMessage = memo(function TimelineMessage({
   const name = dir.authorName(m.author);
   // Posted by a routine on its creator's behalf: shown as the routine, never as if the person typed it.
   const routine = routineOfMessage(m.meta);
+  // An agent's answer to a routine (`meta.viaRoutine`): the routine's call is hidden, so a small tag says so.
+  const viaRoutine = viaRoutineOf(m.meta);
   // Its text is the instructions it gives the agent: one line ("Chamou @Theo"), the instructions on demand.
   const [routineOpen, setRoutineOpen] = useState(false);
   const routineAgents = useMemo(() => {
@@ -1657,6 +1659,12 @@ const TimelineMessage = memo(function TimelineMessage({
                 <Icon name="bell" size={14} />
                 {t("channel.reminder")}
               </span>
+            )}
+            {viaRoutine && (
+              <Link to="/org/$orgId/routines" params={{ orgId: org.id }} className="msg-reminder msg-reminder--link">
+                <Icon name="routines" size={14} />
+                {t("channel.viaRoutine", { name: viaRoutine.name })}
+              </Link>
             )}
           </>
         ) : (

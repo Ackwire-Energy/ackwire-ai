@@ -8,6 +8,12 @@ import type { AgentRun } from "./runs";
 
 const { messages, users, agents, channels, channelMembers, organizations, agentScopes } = schema;
 
+/** A routine run's whole answer when there is nothing to report: the run ends without posting. */
+export const ROUTINE_NO_REPLY = "NO_REPLY";
+
+/** True when a reply is the routine's "nothing to report" (tolerates spacing and a trailing period). */
+export const isNoReply = (text: string) => text.trim().replace(/\.$/, "") === ROUTINE_NO_REPLY;
+
 type ActionRow = {
   data: unknown;
   created_at: string | Date;
@@ -320,6 +326,13 @@ export async function buildRunContext(
                   : ""
               }`,
     },
+    ...(trigger.meta.routine
+      ? [
+          {
+            text: `# This is a routine run\nA routine started this run on a schedule; nobody is waiting for a reply right now. Follow its instructions. When they say to post only if there is something new (or to stay quiet otherwise) and there is nothing to report, answer with exactly ${ROUTINE_NO_REPLY} and nothing else: then nothing is posted. Never write ${ROUTINE_NO_REPLY} in any other case.`,
+          },
+        ]
+      : []),
   ];
   const systemChars = system.reduce((n, b) => n + b.text.length, 0);
 

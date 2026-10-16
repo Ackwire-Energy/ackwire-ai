@@ -183,7 +183,10 @@ function triggerOf(r: RoutineRow): RoutineTrigger {
 }
 
 /** Run outcome, from the routine run and its agent run. */
-function runView(run: RunRow, agentRun: { status: string; error: string | null } | undefined) {
+function runView(
+  run: RunRow,
+  agentRun: { status: string; error: string | null; replyMessageId: string | null } | undefined,
+) {
   let status: RoutineRunView["status"] =
     run.status === "skipped" ? "skipped" : run.status === "failed" ? "failed" : "ok";
   let summary = run.summary;
@@ -194,6 +197,9 @@ function runView(run: RunRow, agentRun: { status: string; error: string | null }
         agentRun.error === "budget_exceeded"
           ? RUN_SUMMARY["routine_run.agent_budget"]
           : `${FAILED_PREFIX}${agentRun.error ?? "error"}`;
+    } else if (agentRun.status === "done" && !agentRun.replyMessageId) {
+      // The agent answered NO_REPLY: its instructions said to stay quiet without news.
+      summary = RUN_SUMMARY["routine_run.nothing_new"];
     } else if (agentRun.status !== "done") {
       summary =
         agentRun.status === "waiting_approval"
@@ -228,6 +234,7 @@ const RUN_SUMMARY = {
   "routine_run.delivered_channel": "Answered in the channel",
   "routine_run.delivered_drive": "File in the Drive",
   "routine_run.delivered_dm": "Sent in the DM",
+  "routine_run.nothing_new": "Nothing new; nothing posted",
 } as const;
 type RunSummaryCode = keyof typeof RUN_SUMMARY;
 
@@ -288,7 +295,12 @@ async function runDetails(db: Database, runs: RunRow[]) {
   if (ids.length === 0) return { agentRunsById: new Map(), costById: new Map<string, number>() };
   const [statusRows, costRows] = await Promise.all([
     db
-      .select({ id: agentRuns.id, status: agentRuns.status, error: agentRuns.error })
+      .select({
+        id: agentRuns.id,
+        status: agentRuns.status,
+        error: agentRuns.error,
+        replyMessageId: agentRuns.replyMessageId,
+      })
       .from(agentRuns)
       .where(inArray(agentRuns.id, ids)),
     db

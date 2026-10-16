@@ -139,9 +139,10 @@ export function sortRows(rows: string[][], col: number, dir: "asc" | "desc", loc
 
 // ── Files ────────────────────────────────────────────────────────────────────
 
-export function fileName(title: string, content: ArtifactContent, table: "csv" = "csv") {
+/** The name a download gets. Without the content (a Drive list row), uploaded files go by their title. */
+export function fileName(title: string, content: ArtifactContent | { kind: ArtifactKind }, table: "csv" = "csv") {
   // Uploaded files keep their original name.
-  if (content.kind === "file") return content.name;
+  if (content.kind === "file") return "name" in content ? content.name : title;
   const slug =
     title
       .normalize("NFD")

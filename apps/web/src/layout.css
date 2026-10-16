@@ -2861,6 +2861,12 @@ p {
   color: var(--muted);
   vertical-align: middle;
 }
+.msg-reminder--link {
+  text-decoration: none;
+}
+.msg-reminder--link:hover {
+  color: var(--ink);
+}
 
 /* ── Forum ── */
 .forum-list {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import type { ModelRequest } from "@agenteschat/providers";
+import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   createFakeScheduleReader,
   createIssue,
@@ -249,6 +249,36 @@ describe("routines", () => {
       summary: "Monthly budget used up",
       summaryCode: "routine_run.agent_budget",
     });
+  });
+
+  test("the answer carries the routine; with nothing new the agent answers NO_REPLY and nothing is posted", async () => {
+    let answer = "Novidade: 3 avaliações novas.";
+    f = await setup({ reply: () => ({ chunks: [answer] }) });
+    const routine = await createRoutine(routineDeps(), f.owner.id, f.org.id, {
+      name: "Avaliações",
+      agentId: f.agent.id,
+      prompt: "Veja as avaliações novas. Se não houver novidade, não mande mensagem.",
+      target: { type: "channel", channelId: f.general.id },
+      trigger: { type: "schedule", phrase: "todo dia às 8h" },
+    });
+    const agentMessages = async () =>
+      (await f.db.select().from(schema.messages)).filter((m) => m.authorAgentId === f.agent.id);
+
+    await runRoutineNow(routineDeps(), f.owner.id, f.org.id, routine.id);
+    await drainOutbox(f.db, f.handlers);
+    const [first] = await agentMessages();
+    expect(first?.threadId).toBeNull();
+    expect(first?.meta.viaRoutine).toEqual({ id: routine.id, name: "Avaliações" });
+    expect(systemText(f.provider.calls.at(-1)?.request.system ?? "")).toContain("answer with exactly NO_REPLY");
+
+    answer = "NO_REPLY";
+    await runRoutineNow(routineDeps(), f.owner.id, f.org.id, routine.id);
+    await drainOutbox(f.db, f.handlers);
+    expect(await agentMessages()).toHaveLength(1);
+    const [last] = await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id);
+    expect(last).toMatchObject({ status: "ok", summaryCode: "routine_run.nothing_new" });
+    const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, f.agent.id));
+    expect(runs.map((r) => r.status)).toEqual(["done", "done"]);
   });
 
   test("event routines run when the event happens, with the event as data", async () => {

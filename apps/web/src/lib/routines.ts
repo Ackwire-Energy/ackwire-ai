@@ -20,6 +20,12 @@ export function routineOfMessage(meta: Record<string, unknown> | undefined): { i
   return r && typeof r.id === "string" && typeof r.name === "string" ? { id: r.id, name: r.name } : null;
 }
 
+/** The routine an agent's message answers (`meta.viaRoutine`), shown as a small tag next to its name. */
+export function viaRoutineOf(meta: Record<string, unknown> | undefined): { id: string; name: string } | null {
+  const r = meta?.viaRoutine as { id?: unknown; name?: unknown } | undefined;
+  return r && typeof r.id === "string" && typeof r.name === "string" ? { id: r.id, name: r.name } : null;
+}
+
 /**
  * The message a routine posts on its creator's behalf to call its agent
  * (top level): hidden from the timeline, only the agent's answer shows.

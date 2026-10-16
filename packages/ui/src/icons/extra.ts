@@ -260,4 +260,25 @@ export const extraIcons = {
   undo: [["path", { d: "M7.5 11.5 3.5 7.5l4-4M3.5 7.5h8a5 5 0 0 1 0 10H9" }]],
   /** NovoAgente.html: go somewhere (a channel). */
   arrowRight: [["path", { d: "M4 10h12M11 5l5 5-5 5" }]],
+  /** Drive.html: grid view. */
+  grid: [
+    ["rect", { x: "3.5", y: "3.5", width: "5.5", height: "5.5", rx: "1.6" }],
+    ["rect", { x: "11", y: "3.5", width: "5.5", height: "5.5", rx: "1.6" }],
+    ["rect", { x: "3.5", y: "11", width: "5.5", height: "5.5", rx: "1.6" }],
+    ["rect", { x: "11", y: "11", width: "5.5", height: "5.5", rx: "1.6" }],
+  ],
+  /** Drive.html: list view. */
+  list: [["path", { d: "M7.5 5h9M7.5 10h9M7.5 15h9M3.8 5h.01M3.8 10h.01M3.8 15h.01" }]],
+  /** Drive.html: group and sort ("Organizar"). */
+  layers: [
+    ["path", { d: "m10 2.8 7 3.9-7 3.9-7-3.9z" }],
+    ["path", { d: "m3 10.6 7 3.9 7-3.9" }],
+  ],
+  /** Drive.html: time left in the trash, group by date. */
+  clock: [
+    ["circle", { cx: "10", cy: "10", r: "7" }],
+    ["path", { d: "M10 6.5V10l2.5 1.7" }],
+  ],
+  /** Drive.html: open (in the viewer). */
+  external: [["path", { d: "M11.5 3.5h5v5M16.5 3.5 9.5 10.5M15 11.5v4a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" }]],
 } satisfies Record<string, IconShape[]>;

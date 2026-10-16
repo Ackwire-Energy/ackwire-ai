@@ -20,7 +20,7 @@ import {
   unregisterRunAbort,
 } from "./cancel";
 import { describeCapabilities } from "./capabilities";
-import { buildRunContext, getChannelCached } from "./context";
+import { buildRunContext, getChannelCached, isNoReply, ROUTINE_NO_REPLY } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
@@ -312,6 +312,17 @@ async function executeRunInner(
   if (!agent || agent.archivedAt) return fail("agent_archived");
   await publishChannelEvent(deps.pubsub, event("running"));
 
+  // Started by a routine: its answer carries the routine (the app shows a small tag on the
+  // agent's message, since the routine's own call isn't shown), and it may end in silence.
+  const routineCall = (trigger ?? topTrigger ?? (await getMessage(db, run.orgId, run.triggerMessageId)))?.meta
+    .routine as { id?: unknown; name?: unknown } | undefined;
+  const viaRoutine =
+    routineCall && typeof routineCall.id === "string" && typeof routineCall.name === "string"
+      ? { id: routineCall.id, name: routineCall.name }
+      : null;
+  const post = (tx: Executor, threadId: string | null, body: string, meta?: Record<string, unknown>) =>
+    postAgentMessage(tx, run, threadId, body, viaRoutine ? { ...meta, viaRoutine } : meta);
+
   const saveTranscript = (tx: Executor, t: Transcript) =>
     tx
       .update(agentRuns)
@@ -484,7 +495,7 @@ async function executeRunInner(
       .join("\n\n");
     const note = `_Stopped${person ? ` by ${person.name}` : ""}._`;
     const message = await db.transaction(async (tx) => {
-      const m = await postAgentMessage(tx, run, replyThreadId, said ? `${said}\n\n${note}` : note, {
+      const m = await post(tx, replyThreadId, said ? `${said}\n\n${note}` : note, {
         ...(takeMemoryUpdates(t) ?? {}),
         // `text`: what the agent wrote; the app adds "Stopped by …" in the person's language.
         canceled: { byUserId: by, text: said },
@@ -579,6 +590,7 @@ async function executeRunInner(
           turn,
           event: { type: "agent.typing", ...where },
           onFirst: () => deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id }),
+          holdBack: viaRoutine ? ROUTINE_NO_REPLY : undefined,
         },
       );
       let result: Awaited<ReturnType<ModelGateway["stream"]>>;
@@ -749,7 +761,7 @@ async function executeRunInner(
           const out: Message[] = [];
           // Only this turn's text (it introduces the approval or question); earlier narration is in the steps.
           const said = turnText;
-          if (said) out.push(await postAgentMessage(tx, run, replyThreadId, said, takeMemoryUpdates(t)));
+          if (said) out.push(await post(tx, replyThreadId, said, takeMemoryUpdates(t)));
           t.postedUpTo = t.messages.length;
           t.postedCount += out.length + waiting.length + asks.length + secretAsks.length;
           const cards: Approval[] = [];
@@ -762,7 +774,7 @@ async function executeRunInner(
               .where(eq(secretRequests.id, requestId))
               .returning();
             if (!request) continue;
-            const message = await postAgentMessage(tx, run, replyThreadId, `Secret request: ${request.name}`, {
+            const message = await post(tx, replyThreadId, `Secret request: ${request.name}`, {
               ...bodyCode("secret_request", { name: request.name }),
               secretRequestId: request.id,
               secretRequest: secretRequestView(request),
@@ -798,7 +810,7 @@ async function executeRunInner(
               .onConflictDoNothing()
               .returning();
             if (!inserted) continue;
-            const message = await postAgentMessage(tx, run, replyThreadId, ask.text, {
+            const message = await post(tx, replyThreadId, ask.text, {
               questionId: id,
               question: questionView(inserted),
             });
@@ -815,7 +827,7 @@ async function executeRunInner(
             }
           }
           for (const approval of waiting) {
-            const card = await postAgentMessage(tx, run, replyThreadId, `Approval request: ${approval.title}`, {
+            const card = await post(tx, replyThreadId, `Approval request: ${approval.title}`, {
               ...bodyCode("approval_request", { title: approval.title }),
               approvalId: approval.id,
             });
@@ -854,12 +866,15 @@ async function executeRunInner(
       const updates = transcript.memoryUpdates ?? [];
       const saved = (transcript.artifacts ?? []).length > 0 ? "File saved." : "";
       const anythingPosted = transcript.postedCount > 0;
+      // A routine with nothing to report ends here without posting (its instructions asked for silence).
+      const silent = Boolean(viaRoutine) && isNoReply(turnText);
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
-      const text =
-        turnText ||
-        (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "") ||
-        saved ||
-        closingSummary(transcript, anythingPosted);
+      const text = silent
+        ? ""
+        : turnText ||
+          (updates.length > 0 ? updates.map(describeUpdate).join("\n") : "") ||
+          saved ||
+          closingSummary(transcript, anythingPosted);
       // A line the server wrote (not the model): its code, so the app shows it in the person's language.
       const code =
         turnText || text === ""
@@ -871,7 +886,7 @@ async function executeRunInner(
               : text === DONE_TEXT
                 ? bodyCode("done")
                 : undefined;
-      if (!text && !anythingPosted) return fail("empty_reply");
+      if (!text && !anythingPosted && !silent) return fail("empty_reply");
       const t = transcript;
       // Someone wrote while it answered: post this answer, then read the new message(s) and go on.
       const [still] = await db
@@ -881,7 +896,7 @@ async function executeRunInner(
       if ((still?.pending.length ?? 0) > 0) {
         const posted = text
           ? await db.transaction(async (tx) => {
-              const m = await postAgentMessage(tx, run, replyThreadId, text, withCode(takeMemoryUpdates(t), code));
+              const m = await post(tx, replyThreadId, text, withCode(takeMemoryUpdates(t), code));
               t.postedUpTo = t.messages.length;
               t.postedCount++;
               await addRunStep(tx, run, "message", { messageId: m.id });
@@ -896,9 +911,7 @@ async function executeRunInner(
         continue;
       }
       const reply = await db.transaction(async (tx) => {
-        const message = text
-          ? await postAgentMessage(tx, run, replyThreadId, text, withCode(takeMemoryUpdates(t), code))
-          : null;
+        const message = text ? await post(tx, replyThreadId, text, withCode(takeMemoryUpdates(t), code)) : null;
         t.postedUpTo = t.messages.length;
         if (message) t.postedCount++;
         if (message) {
@@ -989,7 +1002,13 @@ function createDeltaPublisher(
   threadId: string | null,
   flushMs: number,
   startSeq = 0,
-  first: { turn: number; event?: ChannelEvent; onFirst?: () => void },
+  first: {
+    turn: number;
+    event?: ChannelEvent;
+    onFirst?: () => void;
+    /** A whole answer never shown live (a routine's NO_REPLY): held while the text could still be it. */
+    holdBack?: string;
+  },
 ) {
   let started = false;
   const MAX_CHUNK = 2000;
@@ -999,9 +1018,12 @@ function createDeltaPublisher(
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: Promise<void> = Promise.resolve();
 
+  const holdBack = first.holdBack;
+  const held = () => holdBack?.startsWith(all.trim().replace(/\.$/, "")) === true;
   const send = () => {
     if (timer) clearTimeout(timer);
     timer = null;
+    if (held()) return;
     while (buffer.length > 0) {
       const text = buffer.slice(0, MAX_CHUNK);
       buffer = buffer.slice(MAX_CHUNK);
@@ -1033,6 +1055,8 @@ function createDeltaPublisher(
       else timer ??= setTimeout(send, flushMs);
     },
     async flush() {
+      // The whole answer was the held word (or a prefix of it): nothing to show.
+      if (held()) buffer = "";
       send();
       await pending;
     },
