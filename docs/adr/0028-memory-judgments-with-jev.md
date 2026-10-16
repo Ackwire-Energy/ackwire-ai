@@ -31,6 +31,7 @@ Most of the missing pieces are **judgments**, not generation: is A the same as B
 - Platform key only, never per org, never sent to clients.
 - **On by default:** `MEMORY_JUDGE_ORGS` defaults to `*` (every organization). A list of org ids limits it, and an empty value turns it off (words only), as an emergency switch.
 - **If the judge is off or both judges fail,** each point falls back to today's behavior. Memory never blocks on the judge and a run never fails because of it.
+- **Memory moves need Jev itself** (`calibrated` requests): the first live eval (2026-10-16, 46 cases) gave Jev 91–93% right actions with 0 harmful moves, against the cheap LLM's 83% with 8 harmful ones, because the LLM has no real probabilities and passes every threshold. Without Jev, consolidation uses words, as before.
 - Questions are in English; state carries the original text.
 
 ### 1. Semantic consolidation (first to build)

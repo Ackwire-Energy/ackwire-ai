@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { consolidateItem, createFakeJudge, insertContextItem, itemLabel, type NewContextItem } from "../src";
+import {
+  consolidateItem,
+  createFakeJudge,
+  createLlmJudge,
+  insertContextItem,
+  itemLabel,
+  type NewContextItem,
+  withJudgeFallback,
+} from "../src";
 import {
   decide,
   findCandidates,
@@ -238,4 +246,18 @@ describe("memory judgments: consolidateItem carries out the plan", () => {
     });
     expect(fallback).toMatchObject({ action: "merged", item: { id: related.item.id } });
   });
+});
+
+test("memory never takes the LLM fallback's word: without Jev, words decide", async () => {
+  f = await setup();
+  const old = await consolidateItem(f.db, fact(f, "We host the app on Railway."));
+  const llmOnly = createLlmJudge({
+    gateway: { complete: async () => Promise.reject(new Error("must not be called")) },
+    resolveModel: async () => "claude-haiku-5-5",
+  });
+  const jevDown = withJudgeFallback({ name: "jev", ask: async () => Promise.reject(new Error("timeout")) }, llmOnly);
+  for (const judge of [llmOnly, jevDown]) {
+    const res = await consolidateItem(f.db, fact(f, "We host the app on Railway."), { judge, semantic: true });
+    expect(res).toMatchObject({ action: "merged", item: { id: old.item.id } }); // by words, as today
+  }
 });

@@ -25,8 +25,13 @@ export const RELATIONS = {
 
 export type Relation = keyof typeof RELATIONS;
 
-/** Minimum probability for each move; below it the items are only linked (`related_ids`). */
-export const THRESHOLDS = { merge: 0.75, change: 0.7, conflict: 0.7, related: 0.5 };
+/**
+ * Minimum probability for each move; below it the items are only linked (`related_ids`).
+ * From `bun run eval:memory` (2026-10-16, Jev, 46 cases): no false "contradicts" at any
+ * probability, while true ones came in at 0.56–0.68, so conflicts start at 0.55; a wrong
+ * "refines" at 0.59 keeps `change` at 0.7; `merge` stays strict (a miss only links).
+ */
+export const THRESHOLDS = { merge: 0.75, change: 0.7, conflict: 0.55, related: 0.5 };
 
 /** Candidates the judge compares against (one Choice each, in one request). */
 export const MAX_CANDIDATES = 8;
@@ -145,6 +150,7 @@ export async function judgeRelations(
   const answers = await judge.ask({
     orgId: input.orgId,
     kind: "memory_relation",
+    calibrated: true,
     state: {
       new_item: { kind: input.kind, title: input.title || null, content: input.content.slice(0, 2000) },
       existing_items: candidates.map((c) => ({

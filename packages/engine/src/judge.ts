@@ -32,6 +32,13 @@ export interface JudgeRequest {
   /** What the questions are about; message text goes in as written. */
   state: Record<string, unknown>;
   questions: Record<string, JudgeQuestion>;
+  /**
+   * Only a calibrated judge (Jev) may answer: the caller acts on the probabilities, and the
+   * LLM fallback can't give real ones (it answers 1). Without Jev the request fails, and the
+   * caller does what it did before. Memory consolidation asks this way (eval:memory showed the
+   * LLM archiving items it shouldn't).
+   */
+  calibrated?: boolean;
 }
 
 export interface Judge {
@@ -107,6 +114,7 @@ export function createLlmJudge(deps: {
   return {
     name: "llm",
     async ask(request) {
+      if (request.calibrated) throw new Error("judge: a calibrated judge is required (no Jev)");
       const ids = Object.keys(request.questions);
       const properties: Record<string, unknown> = {};
       for (const [id, q] of Object.entries(request.questions)) {
@@ -159,7 +167,8 @@ export function withJudgeFallback(primary: Judge, fallback: Judge): Judge {
     async ask(request) {
       try {
         return await primary.ask(request);
-      } catch {
+      } catch (error) {
+        if (request.calibrated) throw error;
         return fallback.ask(request);
       }
     },

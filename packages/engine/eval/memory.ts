@@ -92,7 +92,8 @@ const strategies: Record<string, () => Strategy | null> = {
       },
       resolveModel: async () => process.env.EVAL_LLM_MODEL ?? "claude-haiku-5-5",
     });
-    return viaJudge("llm", judge);
+    // Measured as if it were allowed to answer: in the product memory never takes the LLM's word (it has no real probabilities).
+    return viaJudge("llm", { name: "llm", ask: (request) => judge.ask({ ...request, calibrated: false }) });
   },
   jev: () => {
     const apiKey = process.env.TYPESAFE_API_KEY;
@@ -156,8 +157,14 @@ for (const [key, make] of Object.entries(strategies)) {
     if (got.relation === c.label) right++;
     else wrong.push(`  ${c.id}: expected ${c.label}, got ${got.relation} (${got.p.toFixed(2)})`);
     if (predicted === gold) rightAction++;
-    else if (predicted === "merge" || predicted === "supersede" || predicted === "resolve") harmful++;
-    else missed++;
+    else {
+      if (predicted === "merge" || predicted === "supersede" || predicted === "resolve") harmful++;
+      else missed++;
+      if (got.relation === c.label)
+        wrong.push(
+          `  ${c.id}: right relation (${got.relation} ${got.p.toFixed(2)}) but ${predicted} instead of ${gold}`,
+        );
+    }
     for (const l of labels) {
       const m = per.get(l)!;
       if (got.relation === l && c.label === l) m.tp++;
