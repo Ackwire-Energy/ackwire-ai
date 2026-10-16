@@ -280,5 +280,7 @@ export const extraIcons = {
     ["path", { d: "M10 6.5V10l2.5 1.7" }],
   ],
   /** Drive.html: open (in the viewer). */
-  external: [["path", { d: "M11.5 3.5h5v5M16.5 3.5 9.5 10.5M15 11.5v4a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" }]],
+  external: [
+    ["path", { d: "M11.5 3.5h5v5M16.5 3.5 9.5 10.5M15 11.5v4a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" }],
+  ],
 } satisfies Record<string, IconShape[]>;

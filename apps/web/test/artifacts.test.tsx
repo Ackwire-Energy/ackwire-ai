@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -10,6 +10,7 @@ import { fileSaver } from "@/components/artifacts/ArtifactViewer";
 import { HTML_SANDBOX } from "@/components/artifacts/HtmlFrame";
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { documentPreview, parsePatch, patchCounts, sideBySide, sortRows, toCsv } from "@/lib/artifacts";
+import { daysLeft, groupArtifacts, rangeOf, sortArtifacts } from "@/lib/drive";
 import { Markdown, parseMarkdown } from "@/lib/markdown";
 import { ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -347,21 +348,37 @@ describe("versions and editing", () => {
 });
 
 describe("Drive", () => {
-  const goDrive = async (options: { seed?: boolean; path?: string } = {}) => {
-    const api = createFakeApi(seedState(), { seed: options.seed ?? true });
+  const goDrive = async (options: { seed?: boolean; path?: string; api?: ApiClient } = {}) => {
+    const state = seedState();
+    const api = options.api ?? createFakeApi(state, { seed: options.seed ?? true });
     const r = await renderApp(`/org/${ORG_ID}/drive${options.path ?? ""}`, { api });
     await settle(8);
-    return { ...r, api };
+    return { ...r, api, state };
   };
-  const names = () =>
-    screen()
-      .queryAllByRole("row")
-      .slice(1)
-      .map((r) => r.querySelector("button")?.textContent);
+  /** The items' titles, in the order shown (cards or rows). */
+  const names = () => Array.from(document.querySelectorAll(".drive-hit")).map((b) => b.textContent);
+  const card = (title: string) => screen().getByRole("button", { name: title });
+  const keyDown = (key: string, init: Record<string, unknown> = {}) =>
+    act(async () => fireEvent.keyDown(document.body, { key, ...init }));
+  /** Opens a dropdown (Radix: keyboard) and picks one of its radio items. */
+  const pickRadio = async (trigger: RegExp, item: string) => {
+    const button = screen().getByRole("button", { name: trigger });
+    button.focus();
+    await act(async () => {
+      fireEvent.keyDown(button, { key: "Enter" });
+      fireEvent.keyUp(button, { key: "Enter" });
+    });
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    await click(within(screen().getByRole("menu")).getByRole("menuitemradio", { name: item }));
+    await settle(2);
+  };
+  beforeEach(() => localStorage.removeItem("agentes.drive.view"));
 
-  test("lists everything, newest update first; search and filters narrow it", async () => {
+  test("lists everything, newest update first; search and kind chips narrow it", async () => {
     await goDrive();
     expect(screen().getByRole("heading", { level: 1, name: "Drive" })).toBeTruthy();
+    // Grid by default, grouped by date.
+    expect(document.querySelector(".drive-grid")).not.toBeNull();
     expect(names()).toEqual([
       "Painel de erros da semana",
       "Organograma do time",
@@ -372,30 +389,39 @@ describe("Drive", () => {
     await type(screen().getByRole("searchbox", { name: "Buscar arquivos" }), "pedidos");
     await settle(4);
     expect(names()).toEqual(["Pedidos mais comuns nos reviews"]);
+    expect(screen().getByText("1 item")).toBeTruthy();
     await type(screen().getByRole("searchbox", { name: "Buscar arquivos" }), "");
     await settle(4);
 
-    // A filter chip: it reads its value once set, raised, with a × to clear.
-    await click(screen().getByRole("button", { name: "Tipo" }));
-    await click(
-      within(screen().getByRole("listbox", { name: "Tipo" })).getByRole("option", { name: "Alteração de código" }),
-    );
+    // A kind chip: a toggle with the kind's icon and its count.
+    const kinds = screen().getByRole("group", { name: "Tipos" });
+    const diffs = within(kinds).getByRole("button", { name: "Alterações de código: 1" });
+    expect(diffs.querySelector("svg")).not.toBeNull();
+    await click(diffs);
     await settle(4);
+    expect(diffs.getAttribute("aria-pressed")).toBe("true");
     expect(names()).toEqual(["Corrige o checkout com carrinho vazio"]);
-    const chip = screen().getByRole("button", { name: "Tipo: Alteração de código" });
-    expect(chip.closest(".ac-filter")?.classList.contains("ac-filter--active")).toBe(true);
-    // Active filters come first in the bar.
-    expect(document.querySelector(".ac-filterbar__item .ac-filter--active")).toBe(chip.closest(".ac-filter"));
-    expect(screen().getByRole("button", { name: "Limpar Tipo" })).toBeTruthy();
+    // Two kinds: either of them.
+    await click(within(kinds).getByRole("button", { name: "Diagramas: 1" }));
+    await settle(4);
+    expect(names()).toEqual(["Organograma do time", "Corrige o checkout com carrinho vazio"]);
 
-    // Nothing matches → explained, with a way out.
+    // Nothing matches → explained, with a way out that also clears the search.
     await type(screen().getByRole("searchbox", { name: "Buscar arquivos" }), "nada disso");
     await settle(4);
     expect(screen().getByText("Nenhum arquivo com esses filtros.")).toBeTruthy();
-    // The bar's "Limpar filtros" and the empty state's; the latter also clears the search.
-    const clears = screen().getAllByRole("button", { name: "Limpar filtros" });
-    expect(clears).toHaveLength(2);
-    await click(clears[clears.length - 1] as HTMLElement);
+    await click(screen().getByRole("button", { name: "Limpar filtros" }));
+    await settle(4);
+    expect(names()).toHaveLength(5);
+  });
+
+  test("who made it: agents or people", async () => {
+    await goDrive();
+    await click(screen().getByRole("radio", { name: "Pessoas" }));
+    await settle(4);
+    expect(names()).toEqual([]);
+    expect(screen().getByText("Nenhum arquivo com esses filtros.")).toBeTruthy();
+    await click(screen().getByRole("radio", { name: "Agentes" }));
     await settle(4);
     expect(names()).toHaveLength(5);
   });
@@ -444,18 +470,129 @@ describe("Drive", () => {
     expect(screen().getByText(/aparecem aqui/)).toBeTruthy();
   });
 
-  test("rows open the same viewer; a shared link opens it directly", async () => {
-    const first = await goDrive();
-    await click(screen().getByRole("button", { name: "Organograma do time" }));
-    await settle(4);
-    expect(screen().getByRole("dialog", { name: "Organograma do time" })).toBeTruthy();
-    const table = (await first.api.artifacts.list(ORG_ID)).find((a) => a.kind === "table") as Artifact;
+  test("grid or list, remembered", async () => {
+    await goDrive();
+    const view = screen().getByRole("radiogroup", { name: "Visualização" });
+    expect(within(view).getByRole("radio", { name: "Grade" }).getAttribute("aria-checked")).toBe("true");
+    await click(within(view).getByRole("radio", { name: "Lista" }));
+    await settle(2);
+    expect(document.querySelector(".drive-grid")).toBeNull();
+    expect(document.querySelectorAll(".drive-list .drive-row")).toHaveLength(5);
+    expect(localStorage.getItem("agentes.drive.view")).toBe("list");
+    // Rows keep the same actions: the "…" menu per file.
+    expect(screen().getByRole("button", { name: "Mais ações: Organograma do time" })).toBeTruthy();
     cleanup();
 
+    await goDrive();
+    expect(document.querySelector(".drive-grid")).toBeNull();
+    expect(names()).toHaveLength(5);
+  });
+
+  test("group by channel or none, sort by name", async () => {
+    await goDrive();
+    await pickRadio(/^Organizar:/, "Sem grupos");
+    expect(document.querySelectorAll(".drive-group__head")).toHaveLength(0);
+    await pickRadio(/^Organizar:/, "Nome");
+    expect(names()).toEqual([
+      "Corrige o checkout com carrinho vazio",
+      "Organograma do time",
+      "Painel de erros da semana",
+      "Pedidos mais comuns nos reviews",
+      "Relatório de incidente: checkout",
+    ]);
+    await pickRadio(/^Organizar:/, "Canal");
+    expect(document.querySelector(".drive-group__title")?.textContent).toMatch(/^#/);
+  });
+
+  test("a click shows the details: preview, Abrir, Baixar, Copiar link, versions, where", async () => {
+    await goDrive();
+    await click(card("Organograma do time"));
+    await settle(4);
+    expect(card("Organograma do time").getAttribute("aria-expanded")).toBe("true");
+    const panel = screen().getByRole("complementary", { name: "Detalhes de Organograma do time" });
+    expect(within(panel).getByRole("heading", { level: 2, name: "Organograma do time" })).toBeTruthy();
+    expect(panel.querySelector(".drive-pv--lg")).not.toBeNull();
+    expect(panel.textContent).toContain("Feito por");
+    expect(panel.textContent).toContain("Onde aparece");
+
+    // Baixar: diagrams have one format (the original).
+    await click(within(panel).getByRole("button", { name: "Baixar" }));
+    await settle(2);
+    expect(saved[0]?.name).toBe("organograma-do-time.mmd");
+    await click(within(panel).getByRole("button", { name: "Copiar link" }));
+    await settle(2);
+    expect(copied[0]).toContain("/drive?artifact=");
+    expect(within(panel).getByRole("button", { name: "Mais ações: Organograma do time" })).toBeTruthy();
+
+    // Esc closes it.
+    await keyDown("Escape");
+    expect(screen().queryByRole("complementary", { name: /^Detalhes de/ })).toBeNull();
+
+    // Abrir: the same viewer as everywhere.
+    await click(card("Organograma do time"));
+    await settle(4);
+    await click(
+      within(screen().getByRole("complementary", { name: /^Detalhes de/ })).getByRole("button", { name: "Abrir" }),
+    );
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "Organograma do time" })).toBeTruthy();
+  });
+
+  test("details list the versions; Ver opens an older one", async () => {
+    await goDrive();
+    await click(card("Relatório de incidente: checkout"));
+    await settle(6);
+    const panel = screen().getByRole("complementary", { name: "Detalhes de Relatório de incidente: checkout" });
+    expect(panel.querySelectorAll(".drive-versions li")).toHaveLength(2);
+    expect(panel.textContent).toContain("Acrescentei quem foi afetado.");
+    await click(within(panel).getByRole("button", { name: "Ver a v1" }));
+    await settle(6);
+    expect(screen().getByRole("dialog").textContent).toContain("Vendo a v1");
+  });
+
+  test("a shared link opens the viewer directly", async () => {
+    const first = await goDrive();
+    const table = (await first.api.artifacts.list(ORG_ID)).find((a) => a.kind === "table") as Artifact;
+    cleanup();
     // Links are per tab (mock store), so check with the same client.
-    await renderApp(`/org/${ORG_ID}/drive?artifact=${table.id}`, { api: first.api });
-    await settle(8);
+    await goDrive({ api: first.api, path: `?artifact=${table.id}` });
     expect(screen().getByRole("dialog", { name: "Pedidos mais comuns nos reviews" })).toBeTruthy();
+  });
+
+  test("multi-select: checkbox, ⌘-click, ⌘A and Esc; the bar downloads, copies links and trashes", async () => {
+    const { state } = await goDrive();
+    await click(screen().getByRole("checkbox", { name: "Selecionar Organograma do time" }));
+    const bar = () => screen().getByRole("toolbar", { name: "Seleção" });
+    expect(bar().textContent).toContain("1 selecionado");
+    // While selecting, a click selects (no details).
+    await act(async () => fireEvent.click(card("Pedidos mais comuns nos reviews"), { metaKey: true }));
+    expect(bar().textContent).toContain("2 selecionados");
+    expect(screen().queryByRole("complementary", { name: /^Detalhes de/ })).toBeNull();
+
+    await click(within(bar()).getByRole("button", { name: "Copiar links" }));
+    await settle(2);
+    expect(copied[0]?.split("\n")).toHaveLength(2);
+    await click(within(bar()).getByRole("button", { name: "Baixar" }));
+    await settle(4);
+    expect(saved.map((s) => s.name).sort()).toEqual(["organograma-do-time.mmd", "pedidos-mais-comuns-nos-reviews.csv"]);
+
+    await click(within(bar()).getByRole("button", { name: "Mover para a lixeira" }));
+    const confirm = screen().getByRole("dialog", { name: "Apagar 2 arquivos?" });
+    await click(within(confirm).getByRole("button", { name: "Apagar" }));
+    await settle(5);
+    expect(state.calls.filter((c) => c.method === "artifacts.remove")).toHaveLength(2);
+    expect(names()).toHaveLength(3);
+    expect(screen().queryByRole("toolbar", { name: "Seleção" })).toBeNull();
+    await click(screen().getByRole("button", { name: "Desfazer" }));
+    await settle(5);
+    expect(state.calls.filter((c) => c.method === "artifacts.restore")).toHaveLength(2);
+    expect(names()).toHaveLength(5);
+
+    // ⌘A selects everything shown; Esc clears.
+    await keyDown("a", { metaKey: true });
+    expect(bar().textContent).toContain("5 selecionados");
+    await keyDown("Escape");
+    expect(screen().queryByRole("toolbar", { name: "Seleção" })).toBeNull();
   });
 });
 
@@ -478,6 +615,36 @@ describe("artifact helpers", () => {
   test("CSV quoting and number-aware sort", () => {
     expect(toCsv(["a", "b"], [["1,5", 'diz "oi"']])).toBe('a,b\n"1,5","diz ""oi"""');
     expect(sortRows([["10"], ["9"], ["1.200,5"]], 0, "asc", "pt-BR").map((r) => r[0])).toEqual(["9", "10", "1.200,5"]);
+  });
+
+  test("Drive arrangement: groups by date, sorts by name, shift ranges, days left in the trash", () => {
+    const now = new Date("2026-10-16T12:00:00");
+    const at = (id: string, title: string, iso: string) =>
+      ({
+        id,
+        title,
+        kind: "document",
+        updatedAt: iso,
+        channelId: null,
+        createdBy: { type: "agent", id: "a" },
+      }) as Artifact;
+    const list = [
+      at("1", "b", "2026-10-16T09:00:00"),
+      at("2", "a", "2026-10-13T09:00:00"),
+      at("3", "c", "2026-09-01T09:00:00"),
+    ];
+    expect(groupArtifacts(list, "date", now).map((s) => [s.key, s.items.map((a) => a.id)])).toEqual([
+      ["today", ["1"]],
+      ["week", ["2"]],
+      ["earlier", ["3"]],
+    ]);
+    expect(groupArtifacts(list, "none", now)).toHaveLength(1);
+    expect(groupArtifacts(list, "channel", now).map((s) => s.key)).toEqual([""]);
+    expect(sortArtifacts(list, "name", "pt-BR").map((a) => a.title)).toEqual(["a", "b", "c"]);
+    expect(rangeOf(["1", "2", "3", "4"], "3", "1")).toEqual(["1", "2", "3"]);
+    expect(rangeOf(["1", "2"], null, "2")).toEqual(["2"]);
+    expect(daysLeft("2026-10-19T12:00:00", now)).toBe(3);
+    expect(daysLeft("2026-10-01T12:00:00", now)).toBe(0);
   });
 
   test("document preview skips marks and code", () => {
@@ -521,14 +688,18 @@ describe("deleting a file", () => {
 
   test("Apagar asks, naming the file; then 'Arquivo apagado · Desfazer' restores it", async () => {
     const { state } = await goDrive();
-    const row = screen().getByRole("button", { name: "Organograma do time" }).closest("tr") as HTMLElement;
-    await pick(row, /^Mais ações: /, "Apagar arquivo");
+    // From the details panel's "…".
+    await click(screen().getByRole("button", { name: "Organograma do time" }));
+    await settle(4);
+    const panel = screen().getByRole("complementary", { name: "Detalhes de Organograma do time" });
+    await pick(panel, /^Mais ações: /, "Apagar arquivo");
     const confirm = screen().getByRole("dialog", { name: "Apagar “Organograma do time”?" });
     expect(confirm.textContent).toContain("lixeira por 30 dias");
     await click(within(confirm).getByRole("button", { name: "Apagar" }));
     await settle(5);
     expect(state.calls.some((c) => c.method === "artifacts.remove")).toBe(true);
     expect(screen().queryByRole("button", { name: "Organograma do time" })).toBeNull();
+    expect(screen().queryByRole("complementary", { name: /^Detalhes de/ })).toBeNull();
     expect(screen().getByText("Arquivo apagado")).toBeTruthy();
     await click(screen().getByRole("button", { name: "Desfazer" }));
     await settle(5);

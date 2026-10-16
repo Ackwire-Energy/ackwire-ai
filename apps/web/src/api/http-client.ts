@@ -399,10 +399,11 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         request<ArtifactDetail>(`${org(orgId)}/artifacts/${enc(id)}/versions`, { json: input }),
       remove: (orgId, id) => request<void>(`${org(orgId)}/artifacts/${enc(id)}`, { method: "DELETE" }),
       trash: async (orgId) => {
-        const res = await request<{ artifacts: TrashedArtifact[] } | TrashedArtifact[]>(
+        // The server answers `{ files }`.
+        const res = await request<{ files?: TrashedArtifact[]; artifacts?: TrashedArtifact[] } | TrashedArtifact[]>(
           `${org(orgId)}/artifacts-trash`,
         );
-        return Array.isArray(res) ? res : res.artifacts;
+        return Array.isArray(res) ? res : (res.files ?? res.artifacts ?? []);
       },
       restore: (orgId, id) =>
         request<ArtifactDetail | undefined>(`${org(orgId)}/artifacts/${enc(id)}/restore`, { json: {} }),

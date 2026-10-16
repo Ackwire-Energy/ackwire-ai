@@ -30,4 +30,6 @@ export const STORAGE_KEYS = {
   waitlist: "agentes.waitlist",
   /** Set once the visitor opened the link in the confirmation email. */
   waitlistConfirmed: "agentes.waitlist.confirmed",
+  /** The Drive's view: "grid" (default) or "list". */
+  driveView: "agentes.drive.view",
 } as const;

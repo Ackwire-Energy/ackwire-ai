@@ -8,10 +8,17 @@ import { errorText } from "@/lib/errors";
 import { fitsUpload, MAX_UPLOAD_MB } from "@/lib/files";
 import { useToast } from "@/lib/toast";
 
+/** One file of an upload batch, for the progress toast. */
+export interface UploadItem {
+  name: string;
+  status: "waiting" | "sending" | "done" | "failed";
+}
+
 /**
  * Sends files to the Drive one at a time: the 50 MB limit is checked here
  * first (a translated message, nothing sent), then the server checks again.
- * `artifactId`: a new version of that file instead of a new file.
+ * `artifactId`: a new version of that file instead of a new file. `queue`:
+ * the batch being sent, file by file (empty once it's over).
  */
 export function useDriveUpload(onUploaded?: (saved: ArtifactDetail, file: File) => void) {
   const { t } = useTranslation();
@@ -19,23 +26,32 @@ export function useDriveUpload(onUploaded?: (saved: ArtifactDetail, file: File) 
   const toast = useToast();
   const mutation = useUploadFile(org.id);
   const [current, setCurrent] = useState<string | null>(null);
+  const [queue, setQueue] = useState<UploadItem[]>([]);
+  const mark = (i: number, status: UploadItem["status"]) =>
+    setQueue((q) => q.map((item, j) => (j === i ? { ...item, status } : item)));
   const upload = async (files: File[], target?: { artifactId: string }) => {
-    for (const file of files) {
+    setQueue(files.map((f) => ({ name: f.name, status: "waiting" })));
+    for (const [i, file] of files.entries()) {
       if (!fitsUpload(file)) {
         toast.show(t("files.tooLarge", { name: file.name, max: MAX_UPLOAD_MB }), "error");
+        mark(i, "failed");
         continue;
       }
       setCurrent(file.name);
+      mark(i, "sending");
       try {
         const saved = await mutation.mutateAsync(target ? { file, artifactId: target.artifactId } : { file });
+        mark(i, "done");
         onUploaded?.(saved, file);
       } catch (error) {
+        mark(i, "failed");
         toast.show(errorText(t, error), "error");
       }
     }
     setCurrent(null);
+    setQueue([]);
   };
-  return { upload, busy: current !== null, current };
+  return { upload, busy: current !== null, current, queue };
 }
 
 /** A button that opens the file picker (the input itself stays hidden). */

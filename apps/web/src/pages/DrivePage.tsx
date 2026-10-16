@@ -1,32 +1,64 @@
 import {
   Button,
+  cx,
   EmptyState,
   FilterBar,
   FilterChip,
   type FilterOption,
   Icon,
-  type IconName,
-  List,
-  MenuItem,
+  Kbd,
+  Menu,
+  MenuRadioGroup,
+  MenuSeparator,
   SearchInput,
+  Segmented,
 } from "@agenteschat/ui";
-import { type DragEvent, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { type MouseEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useArtifacts, useArtifactTrash, useChannels } from "@/api/queries";
+import { useArtifacts, useChannels } from "@/api/queries";
 import type { Artifact, ArtifactFilters, ArtifactKind } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
-import { ArtifactMoreMenu, useDeleteArtifact } from "@/components/artifacts/ArtifactActions";
-import { useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
+import { useArtifactDownload, useDeleteArtifact } from "@/components/artifacts/ArtifactActions";
+import { artifactLink, useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
 import { UploadButton, useDriveUpload } from "@/components/artifacts/Upload";
+import { DriveDetails } from "@/components/drive/DriveDetails";
+import { DriveCard, DriveRow, type ItemProps } from "@/components/drive/DriveItems";
+import { DriveTrash } from "@/components/drive/DriveTrash";
+import { DropOverlay, UploadProgress, useFileDrop } from "@/components/drive/DriveUploads";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { ARTIFACT_KINDS, isArtifactKind, KIND_ICON } from "@/lib/artifacts";
-import { fileIcon } from "@/lib/files";
-import { relativeTime } from "@/lib/format";
+import {
+  byWho,
+  DRIVE_GROUPS,
+  DRIVE_SORTS,
+  type DriveGroup,
+  type DriveSection,
+  type DriveSort,
+  type DriveView,
+  type DriveWho,
+  groupArtifacts,
+  isDriveView,
+  rangeOf,
+  sortArtifacts,
+} from "@/lib/drive";
+import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 
-/** Drive: every artifact the viewer can see, with search and filters; opens the shared viewer. */
+/** Authors shown on a channel's group header. */
+const STACK_MAX = 5;
+
+const typing = (el: Element | null) =>
+  el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+/** A menu, listbox or dialog is open: Esc and shortcuts are theirs. */
+const layerOpen = () => Boolean(document.querySelector('[role="menu"], [role="listbox"], [role="dialog"]'));
+
+/**
+ * Drive (docs/design/telas/Drive.html): everything the viewer can see, as a
+ * grid of real previews (or a list), with quick filters, grouping, a details
+ * panel, multi-select with a floating bar, drop to upload and the trash.
+ */
 export function DrivePage({ open }: { open?: { id: string; version?: number } }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -34,56 +66,174 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   const dir = useDirectory(org.id);
   const authorName = useAuthorName();
   const channels = useChannels(org.id);
+  const toast = useToast();
+  const downloads = useArtifactDownload();
+  const searchRef = useRef<HTMLInputElement>(null);
+
   const [q, setQ] = useState("");
   const [trashOpen, setTrashOpen] = useState(false);
-  const remover = useDeleteArtifact();
-  const [kind, setKind] = useState<string[]>([]);
+  const [view, setViewState] = useState<DriveView>(() => {
+    const saved = storage.get(STORAGE_KEYS.driveView);
+    return isDriveView(saved) ? saved : "grid";
+  });
+  const setView = (v: DriveView) => {
+    setViewState(v);
+    storage.set(STORAGE_KEYS.driveView, v);
+  };
+  const [who, setWho] = useState<DriveWho>("all");
+  const [kinds, setKinds] = useState<ArtifactKind[]>([]);
   const [channelIds, setChannelIds] = useState<string[]>([]);
   const [authors, setAuthors] = useState<string[]>([]);
+  const [group, setGroup] = useState<DriveGroup>("date");
+  const [sort, setSort] = useState<DriveSort>("recent");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const anchor = useRef<string | null>(null);
+  const [uploadsHidden, setUploadsHidden] = useState(false);
+
   const search = useDeferredValue(q.trim());
-  const filters = useMemo<ArtifactFilters>(() => {
+  // One value of a filter goes to the server; several are matched here.
+  const baseFilters = useMemo<ArtifactFilters>(() => {
     const f: ArtifactFilters = {};
     if (search) f.q = search;
-    const k = kind[0];
-    if (k && isArtifactKind(k)) f.kind = k;
-    // One value goes to the server; several are matched here.
     if (channelIds.length === 1) f.channelId = channelIds[0];
     const [type, id] = (authors.length === 1 ? (authors[0] ?? "") : "").split(":");
     if ((type === "agent" || type === "person") && id) f.author = { type, id };
     return f;
-  }, [search, kind, channelIds, authors]);
+  }, [search, channelIds, authors]);
+  const filters = useMemo<ArtifactFilters>(() => {
+    const k = kinds.length === 1 ? kinds[0] : undefined;
+    return k && isArtifactKind(k) ? { ...baseFilters, kind: k } : baseFilters;
+  }, [baseFilters, kinds]);
   const list = useArtifacts(org.id, filters);
-  const toast = useToast();
+  // Without the kind: the counts on the kind chips (the same query when no single kind is picked).
+  const base = useArtifacts(org.id, baseFilters);
+
+  const remover = useDeleteArtifact((ids) => {
+    setSelected((s) => new Set([...s].filter((id) => !ids.includes(id))));
+    setOpenId((o) => (o && ids.includes(o) ? null : o));
+  });
   const uploader = useDriveUpload((saved) =>
     toast.show(t("files.uploaded", { name: saved.title }), "info", {
       label: t("artifacts.openFile"),
       run: () => viewer.open(saved.id),
     }),
   );
-  const upload = (files: File[]) => void uploader.upload(files);
-  const drop = useFileDrop(upload, !trashOpen);
-  const filtered = Object.keys(filters).length > 0 || channelIds.length > 1 || authors.length > 1;
-  const clearFilters = () => {
-    setKind([]);
-    setChannelIds([]);
-    setAuthors([]);
+  const upload = (files: File[]) => {
+    setUploadsHidden(false);
+    void uploader.upload(files);
   };
+  const drop = useFileDrop(upload, !trashOpen);
 
   // A shared link (`/drive?artifact=…&v=…`) opens the viewer.
   useEffect(() => {
     if (open?.id) viewer.open(open.id, open.version);
   }, [open?.id, open?.version, viewer]);
 
-  const channelName = (id: string | null) => {
-    const c = id ? channels.data?.find((x) => x.id === id) : undefined;
-    return c ? `#${c.name}` : t("artifacts.noChannel");
+  const channelName = useCallback(
+    (id: string | null) => {
+      const c = id ? channels.data?.find((x) => x.id === id) : undefined;
+      return c ? `#${c.name}` : null;
+    },
+    [channels.data],
+  );
+  const channelLabel = (id: string | null) => channelName(id) ?? t("artifacts.noChannel");
+
+  /** The client-side filters (who made it, several channels or authors). */
+  const matches = (a: Artifact) =>
+    byWho(a, who) &&
+    (channelIds.length < 2 || (a.channelId !== null && channelIds.includes(a.channelId))) &&
+    (authors.length < 2 ||
+      authors.some(
+        (x) => x === `${a.createdBy.type}:${a.createdBy.id}` || x === `${a.updatedBy.type}:${a.updatedBy.id}`,
+      ));
+  const rows = sortArtifacts(
+    (list.data ?? []).filter((a) => matches(a) && (kinds.length < 2 || kinds.includes(a.kind))),
+    sort,
+    i18n.language,
+  );
+  const sections = groupArtifacts(rows, group);
+  const shown = sections.flatMap((s) => s.items);
+  const counts = new Map<ArtifactKind, number>();
+  for (const a of base.data ?? []) if (matches(a)) counts.set(a.kind, (counts.get(a.kind) ?? 0) + 1);
+
+  const filtered = Boolean(search) || kinds.length > 0 || channelIds.length > 0 || authors.length > 0 || who !== "all";
+  const clearFilters = () => {
+    setKinds([]);
+    setChannelIds([]);
+    setAuthors([]);
+    setWho("all");
   };
-  const kindOptions: FilterOption[] = ARTIFACT_KINDS.map((k) => ({
-    value: k,
-    label: t(`artifacts.kind.${k}`),
-    leading: <Icon name={KIND_ICON[k]} size={16} />,
-  }));
-  const channelOptions: FilterOption[] = (channels.data ?? []).map((c) => ({ value: c.id, label: `#${c.name}` }));
+  const openItem = rows.find((a) => a.id === openId);
+  const picked = shown.filter((a) => selected.has(a.id));
+
+  const toggle = (a: Artifact) => {
+    anchor.current = a.id;
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(a.id)) next.delete(a.id);
+      else next.add(a.id);
+      return next;
+    });
+  };
+  const pick = (a: Artifact, e: MouseEvent) => {
+    if (e.shiftKey) {
+      const range = rangeOf(
+        shown.map((x) => x.id),
+        anchor.current,
+        a.id,
+      );
+      anchor.current = a.id;
+      setSelected((s) => new Set([...s, ...range]));
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || selected.size > 0) {
+      toggle(a);
+      return;
+    }
+    anchor.current = a.id;
+    setOpenId((o) => (o === a.id ? null : a.id));
+  };
+  const openViewer = (a: Artifact) => viewer.open(a.id);
+
+  // "/" searches, ⌘A selects what's shown, Esc clears the selection, then closes the details.
+  const keys = useRef({ shown, selected, openId, trashOpen });
+  keys.current = { shown, selected, openId, trashOpen };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const s = keys.current;
+      if (s.trashOpen || layerOpen()) return;
+      const active = document.activeElement;
+      if (e.key === "Escape") {
+        if (typing(active)) return;
+        if (s.selected.size > 0) setSelected(new Set());
+        else if (s.openId) setOpenId(null);
+        return;
+      }
+      if (typing(active) || e.altKey) return;
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a" && s.shown.length > 0) {
+        e.preventDefault();
+        setSelected(new Set(s.shown.map((a) => a.id)));
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  const downloadPicked = async () => {
+    for (const a of picked) await downloads.save(a, undefined, a.version);
+  };
+  const copyLinks = async () => {
+    await navigator.clipboard?.writeText(
+      picked.map((a) => artifactLink(window.location.origin, org.id, a.id)).join("\n"),
+    );
+    toast.show(t("drive.linksCopied", { count: picked.length }));
+  };
+  const deletable = picked.filter((a) => a.canDelete);
+
   const authorOptions: FilterOption[] = [
     ...dir.agents.map((a) => ({
       value: `agent:${a.id}`,
@@ -98,282 +248,406 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
       leading: <ActorAvatar actor={{ type: "person", id: m.userId }} size="xs" name={m.name} />,
     })),
   ];
-  const rows = (list.data ?? []).filter(
-    (a) =>
-      (channelIds.length < 2 || (a.channelId !== null && channelIds.includes(a.channelId))) &&
-      (authors.length < 2 ||
-        authors.some(
-          (x) => x === `${a.createdBy.type}:${a.createdBy.id}` || x === `${a.updatedBy.type}:${a.updatedBy.id}`,
-        )),
-  );
+  const channelOptions: FilterOption[] = (channels.data ?? []).map((c) => ({ value: c.id, label: `#${c.name}` }));
   const clearOf = (name: string) => t("filters.clear", { name });
   const chipText = {
     searchLabel: t("filters.search"),
     searchPlaceholder: t("filters.searchPlaceholder"),
     noResults: t("filters.noResults"),
   };
+  const itemProps = (a: Artifact): ItemProps => ({
+    artifact: a,
+    open: a.id === openId,
+    selected: selected.has(a.id),
+    channelName: channelLabel,
+    onPick: pick,
+    onToggle: toggle,
+    onOpen: openViewer,
+  });
+
+  const sectionTitle = (s: DriveSection) => {
+    if (group === "date")
+      return t(s.key === "today" ? "drive.today" : s.key === "week" ? "drive.thisWeek" : "drive.earlier");
+    if (group === "channel") return channelName(s.key || null) ?? t("drive.noChannel");
+    const first = s.items[0];
+    return first ? authorName(first.createdBy) : "";
+  };
+  const sectionHead = (s: DriveSection) => {
+    if (group === "none") return null;
+    const first = s.items[0];
+    const people = new Map(s.items.map((a) => [`${a.createdBy.type}:${a.createdBy.id}`, a.createdBy]));
+    return (
+      <div className="drive-group__head">
+        {group === "author" && first && (
+          <ActorAvatar size="xs" actor={first.createdBy} name={authorName(first.createdBy)} />
+        )}
+        {group === "channel" && <Icon name={s.key ? "channel" : "drive"} size={16} />}
+        <h2 className="drive-group__title">{sectionTitle(s)}</h2>
+        <span className="drive-count tabular">{s.items.length}</span>
+        {group === "channel" && (
+          <span className="drive-group__stack" aria-hidden="true">
+            {[...people.values()].slice(0, STACK_MAX).map((p) => (
+              <ActorAvatar key={`${p.type}:${p.id}`} size="xs" actor={p} name={authorName(p)} />
+            ))}
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const kindChips = ARTIFACT_KINDS.filter((k) => (counts.get(k) ?? 0) > 0 || kinds.includes(k));
 
   return (
-    <div className={`page page--xwide drive-drop${drop.over ? " drive-drop--over" : ""}`} {...drop.props}>
-      {drop.over && (
-        <div className="drive-drop__hint" aria-hidden="true">
-          <Icon name="upload" />
-          <span>{t("files.dropHint")}</span>
-        </div>
-      )}
-      <header
-        className="page__header page__header--row"
-        style={{ alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}
-      >
-        <div className="stack-4" style={{ flex: "1 1 320px", gap: 4 }}>
-          <h1 className="page-title">{trashOpen ? t("artifacts.trashTitle") : t("drive.title")}</h1>
-          <p className="muted" style={{ margin: 0 }}>
-            {trashOpen ? t("artifacts.trashHint") : t("drive.subtitle")}
-          </p>
-        </div>
-        <div className="row" style={{ gap: 8, alignItems: "center" }}>
-          {uploader.current && (
-            <span className="small muted drive-upload-status" role="status">
-              {t("files.uploading", { name: uploader.current })}
-            </span>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={trashOpen ? "chevronLeft" : "trash"}
-            aria-pressed={trashOpen}
-            onClick={() => setTrashOpen((o) => !o)}
-          >
-            {trashOpen ? t("artifacts.backToDrive") : t("artifacts.trash")}
-          </Button>
+    <div
+      className={cx("page drive drive-drop", drop.over && "drive-drop--over", openItem && !trashOpen && "drive--panel")}
+      {...drop.props}
+    >
+      {drop.over && <DropOverlay />}
+      <div className="drive__main">
+        <header className="drive-head">
+          <div className="drive-head__text">
+            <div className="drive-head__title">
+              {trashOpen && (
+                <Button
+                  variant="ghost"
+                  iconOnly
+                  icon="chevronLeft"
+                  aria-label={t("artifacts.backToDrive")}
+                  title={t("artifacts.backToDrive")}
+                  onClick={() => setTrashOpen(false)}
+                />
+              )}
+              <h1>{trashOpen ? t("artifacts.trashTitle") : t("drive.title")}</h1>
+            </div>
+            <p className="drive-head__sub">{trashOpen ? t("artifacts.trashHint") : t("drive.subtitle")}</p>
+          </div>
           {!trashOpen && (
-            <UploadButton label={t("files.upload")} busy={uploader.busy} multiple onFiles={upload} variant="primary" />
+            <div className="drive-head__actions">
+              <Button
+                variant="ghost"
+                icon="trash"
+                onClick={() => {
+                  setTrashOpen(true);
+                  setOpenId(null);
+                  setSelected(new Set());
+                }}
+              >
+                {t("artifacts.trash")}
+              </Button>
+              <UploadButton
+                size="md"
+                label={t("files.upload")}
+                busy={uploader.busy}
+                multiple
+                onFiles={upload}
+                variant="primary"
+              />
+            </div>
           )}
-        </div>
-      </header>
-      {trashOpen && <DriveTrash />}
-      {remover.dialog}
-      {!trashOpen && (
-        <FilterBar
-          label={t("drive.filters")}
-          className="drive-filters"
-          clearText={t("drive.clear")}
-          onClear={clearFilters}
-          filters={[
-            {
-              key: "kind",
-              active: kind.length > 0,
-              node: (
-                <FilterChip
-                  label={t("drive.kind")}
-                  icon="document"
-                  options={kindOptions}
-                  value={kind}
-                  onChange={setKind}
-                  clearLabel={clearOf(t("drive.kind"))}
-                  {...chipText}
+        </header>
+
+        {trashOpen && <DriveTrash />}
+        {remover.dialog}
+
+        {!trashOpen && (
+          <>
+            <div className="drive-tools">
+              <span className="drive-search">
+                <SearchInput
+                  ref={searchRef}
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape" && q) {
+                      e.stopPropagation();
+                      setQ("");
+                    }
+                  }}
+                  placeholder={t("drive.search")}
+                  aria-label={t("drive.search")}
+                  className="drive-search__input"
                 />
-              ),
-            },
-            {
-              key: "channel",
-              active: channelIds.length > 0,
-              node: (
-                <FilterChip
-                  label={t("drive.channel")}
-                  icon="channel"
-                  multiple
-                  options={channelOptions}
-                  value={channelIds}
-                  onChange={setChannelIds}
-                  valueText={(o) => o.label}
-                  countText={(count) => t("filters.channels", { count })}
-                  clearLabel={clearOf(t("drive.channel"))}
-                  {...chipText}
+                <Kbd className="drive-search__kbd" title={t("drive.searchHint")} aria-hidden="true">
+                  /
+                </Kbd>
+              </span>
+              <Segmented<DriveWho>
+                label={t("drive.who")}
+                value={who}
+                onValueChange={setWho}
+                options={[
+                  { value: "all", label: t("drive.everyone") },
+                  {
+                    value: "agents",
+                    label: (
+                      <>
+                        <Icon name="agent" size={16} />
+                        {t("drive.agents")}
+                      </>
+                    ),
+                  },
+                  {
+                    value: "people",
+                    label: (
+                      <>
+                        <Icon name="person" size={16} />
+                        {t("drive.people")}
+                      </>
+                    ),
+                  },
+                ]}
+              />
+              <FilterBar
+                label={t("drive.filters")}
+                className="drive-filters"
+                clearText={t("drive.clear")}
+                onClear={clearFilters}
+                filters={[
+                  {
+                    key: "channel",
+                    active: channelIds.length > 0,
+                    node: (
+                      <FilterChip
+                        label={t("drive.channel")}
+                        icon="channel"
+                        multiple
+                        options={channelOptions}
+                        value={channelIds}
+                        onChange={setChannelIds}
+                        valueText={(o) => o.label}
+                        countText={(count) => t("filters.channels", { count })}
+                        clearLabel={clearOf(t("drive.channel"))}
+                        {...chipText}
+                      />
+                    ),
+                  },
+                  {
+                    key: "author",
+                    active: authors.length > 0,
+                    node: (
+                      <FilterChip
+                        label={t("drive.author")}
+                        icon="person"
+                        multiple
+                        options={authorOptions}
+                        value={authors}
+                        onChange={setAuthors}
+                        valueText={(o) => o.label}
+                        countText={(count) => t("filters.people", { count })}
+                        clearLabel={clearOf(t("drive.author"))}
+                        {...chipText}
+                      />
+                    ),
+                  },
+                ]}
+              />
+              <span className="drive-tools__end">
+                <Menu
+                  align="end"
+                  label={t("drive.arrange")}
+                  trigger={
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon="layers"
+                      aria-label={t("drive.arrangeValue", { group: t(`drive.group.${group}`) })}
+                    >
+                      {t(`drive.group.${group}`)}
+                    </Button>
+                  }
+                >
+                  <MenuRadioGroup
+                    label={t("drive.groupBy")}
+                    value={group}
+                    onValueChange={(v) => setGroup(v as DriveGroup)}
+                    options={DRIVE_GROUPS.map((g) => ({ value: g, label: t(`drive.group.${g}`) }))}
+                  />
+                  <MenuSeparator />
+                  <MenuRadioGroup
+                    label={t("drive.sortBy")}
+                    value={sort}
+                    onValueChange={(v) => setSort(v as DriveSort)}
+                    options={DRIVE_SORTS.map((s) => ({ value: s, label: t(`drive.sort.${s}`) }))}
+                  />
+                </Menu>
+                <Segmented<DriveView>
+                  size="sm"
+                  label={t("drive.view")}
+                  value={view}
+                  onValueChange={setView}
+                  className="drive-view"
+                  options={[
+                    {
+                      value: "grid",
+                      label: (
+                        <>
+                          <Icon name="grid" size={16} />
+                          <span className="ac-visually-hidden">{t("drive.viewGrid")}</span>
+                        </>
+                      ),
+                    },
+                    {
+                      value: "list",
+                      label: (
+                        <>
+                          <Icon name="list" size={16} />
+                          <span className="ac-visually-hidden">{t("drive.viewList")}</span>
+                        </>
+                      ),
+                    },
+                  ]}
                 />
-              ),
-            },
-            {
-              key: "author",
-              active: authors.length > 0,
-              node: (
-                <FilterChip
-                  label={t("drive.author")}
-                  icon="person"
-                  multiple
-                  options={authorOptions}
-                  value={authors}
-                  onChange={setAuthors}
-                  valueText={(o) => o.label}
-                  countText={(count) => t("filters.people", { count })}
-                  clearLabel={clearOf(t("drive.author"))}
-                  {...chipText}
+              </span>
+            </div>
+
+            {kindChips.length > 0 && (
+              // biome-ignore lint/a11y/useSemanticElements: a group of toggles, styled as chips
+              <div className="drive-kinds" role="group" aria-label={t("drive.kinds")}>
+                {kindChips.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className="drive-kind"
+                    aria-pressed={kinds.includes(k)}
+                    aria-label={t("drive.kindCount", { kind: t(`drive.kindMany.${k}`), count: counts.get(k) ?? 0 })}
+                    onClick={() => setKinds((ks) => (ks.includes(k) ? ks.filter((x) => x !== k) : [...ks, k]))}
+                  >
+                    <Icon name={KIND_ICON[k]} size={16} />
+                    {t(`drive.kindMany.${k}`)}
+                    <span className="drive-kind__count tabular">{counts.get(k) ?? 0}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {filtered && list.isSuccess && rows.length > 0 && (
+              <div className="drive-summary">
+                <span>{t("drive.count", { count: rows.length })}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="close"
+                  onClick={() => {
+                    setQ("");
+                    clearFilters();
+                  }}
+                >
+                  {t("drive.clear")}
+                </Button>
+              </div>
+            )}
+
+            {list.isLoading && <LoadingList count={5} trailing />}
+            {list.isError && !list.data && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
+            {list.isSuccess && rows.length === 0 && !filtered && (
+              <EmptyState sky icon="drive" title={t("drive.emptyTitle")}>
+                {t("drive.emptyText")} {t("files.emptyHint")}
+              </EmptyState>
+            )}
+            {list.isSuccess && rows.length === 0 && filtered && (
+              <EmptyState
+                icon="search"
+                title={t("drive.noResults")}
+                actions={
+                  <Button
+                    onClick={() => {
+                      setQ("");
+                      clearFilters();
+                    }}
+                  >
+                    {t("drive.clear")}
+                  </Button>
+                }
+              >
+                {t("drive.noResultsHint")}
+              </EmptyState>
+            )}
+
+            {rows.length > 0 && view === "grid" && (
+              <div className={cx("drive-sections", selected.size > 0 && "drive--selecting")}>
+                {sections.map((s) => (
+                  <section key={s.key || "all"} className="drive-group">
+                    {sectionHead(s)}
+                    <div className="drive-grid">
+                      {s.items.map((a) => (
+                        <DriveCard key={a.id} {...itemProps(a)} />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+            {rows.length > 0 && view === "list" && (
+              <div className={cx("drive-table", selected.size > 0 && "drive--selecting")}>
+                <div className="drive-table__head" aria-hidden="true">
+                  <span />
+                  <span>{t("drive.name")}</span>
+                  <span>{t("drive.by")}</span>
+                  <span className="drive-row__where">{t("drive.where")}</span>
+                  <span>{t("drive.when")}</span>
+                  <span />
+                </div>
+                {sections.map((s) => (
+                  <section key={s.key || "all"} className="drive-group">
+                    {sectionHead(s)}
+                    <ul className="drive-list">
+                      {s.items.map((a) => (
+                        <DriveRow key={a.id} {...itemProps(a)} onDelete={(x) => remover.ask(x)} />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            )}
+
+            {picked.length > 0 && (
+              <div className="drive-selbar" role="toolbar" aria-label={t("drive.selection")}>
+                <span className="drive-selbar__count">{t("drive.selected", { count: picked.length })}</span>
+                <Button size="sm" variant="ghost" icon="download" onClick={() => void downloadPicked()}>
+                  <span className="drive-selbar__label">{t("artifacts.download")}</span>
+                </Button>
+                <Button size="sm" variant="ghost" icon="link" onClick={() => void copyLinks()}>
+                  <span className="drive-selbar__label">{t("drive.copyLinks")}</span>
+                </Button>
+                {deletable.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon="trash"
+                    className="drive-selbar__danger"
+                    onClick={() => remover.ask(deletable)}
+                  >
+                    <span className="drive-selbar__label">{t("drive.moveToTrash")}</span>
+                  </Button>
+                )}
+                <span className="drive-selbar__sep" aria-hidden="true" />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon="close"
+                  aria-label={t("drive.clearSelection")}
+                  title={t("drive.clearSelection")}
+                  onClick={() => setSelected(new Set())}
                 />
-              ),
-            },
-          ]}
-        >
-          <SearchInput
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={t("drive.search")}
-            aria-label={t("drive.search")}
-            className="drive-filters__search"
-          />
-        </FilterBar>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {openItem && !trashOpen && (
+        <DriveDetails
+          key={openItem.id}
+          artifact={openItem}
+          channelName={channelName}
+          onClose={() => setOpenId(null)}
+          onDelete={(a) => remover.ask(a)}
+        />
       )}
-      {!trashOpen && list.isLoading && <LoadingList count={5} trailing />}
-      {!trashOpen && list.isError && !list.data && (
-        <ErrorState error={list.error} onRetry={() => void list.refetch()} />
-      )}
-      {!trashOpen && list.isSuccess && rows.length === 0 && !filtered && (
-        <EmptyState sky icon="drive" title={t("drive.emptyTitle")}>
-          {t("drive.emptyText")} {t("files.emptyHint")}
-        </EmptyState>
-      )}
-      {!trashOpen && list.isSuccess && rows.length === 0 && filtered && (
-        <EmptyState
-          icon="search"
-          actions={
-            <Button
-              onClick={() => {
-                setQ("");
-                clearFilters();
-              }}
-            >
-              {t("drive.clear")}
-            </Button>
-          }
-        >
-          {t("drive.noResults")}
-        </EmptyState>
-      )}
-      {!trashOpen && rows.length > 0 && (
-        <div className="drive-table">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">{t("drive.name")}</th>
-                <th scope="col">{t("drive.type")}</th>
-                <th scope="col">{t("drive.by")}</th>
-                <th scope="col">{t("drive.where")}</th>
-                <th scope="col">{t("drive.when")}</th>
-                <th scope="col">
-                  <span className="ac-visually-hidden">{t("artifacts.moreShort")}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((a) => (
-                <tr key={a.id} data-kind={a.kind}>
-                  <td>
-                    <button type="button" className="drive-table__open" onClick={() => viewer.open(a.id)}>
-                      <Icon name={rowIcon(a)} />
-                      <span>{a.title}</span>
-                    </button>
-                  </td>
-                  <td>{t(`artifacts.kind.${a.kind}`)}</td>
-                  <td>
-                    <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
-                      <ActorAvatar size="xs" actor={a.createdBy} name={authorName(a.createdBy)} />
-                      {authorName(a.createdBy)}
-                    </span>
-                  </td>
-                  <td>{channelName(a.channelId)}</td>
-                  <td className="tabular">
-                    <time dateTime={a.updatedAt}>{relativeTime(t, i18n.language, a.updatedAt)}</time>
-                  </td>
-                  <td className="drive-table__more">
-                    <ArtifactMoreMenu
-                      artifact={a}
-                      onDelete={() => remover.ask(a)}
-                      extra={
-                        <MenuItem icon="document" onSelect={() => viewer.open(a.id)}>
-                          {t("artifacts.openFile")}
-                        </MenuItem>
-                      }
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {uploader.queue.length > 0 && !uploadsHidden && (
+        <UploadProgress queue={uploader.queue} onHide={() => setUploadsHidden(true)} />
       )}
     </div>
-  );
-}
-
-/** The kind's icon; uploaded files by their name (the list has no content type). */
-const rowIcon = (a: Pick<Artifact, "kind" | "title">): IconName =>
-  a.kind === "file" ? fileIcon(a.title) : (KIND_ICON[a.kind as ArtifactKind] ?? "file");
-
-/**
- * Drag files from the computer onto the Drive. `over` while something is
- * dragged over the page (a counter: children fire enter/leave too).
- */
-function useFileDrop(onFiles: (files: File[]) => void, enabled: boolean) {
-  const [depth, setDepth] = useState(0);
-  const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
-  const props = enabled
-    ? {
-        onDragEnter: (e: DragEvent) => {
-          if (!hasFiles(e)) return;
-          e.preventDefault();
-          setDepth((d) => d + 1);
-        },
-        onDragOver: (e: DragEvent) => {
-          if (!hasFiles(e)) return;
-          e.preventDefault();
-          if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-        },
-        onDragLeave: (e: DragEvent) => {
-          if (!hasFiles(e)) return;
-          setDepth((d) => Math.max(0, d - 1));
-        },
-        onDrop: (e: DragEvent) => {
-          if (!hasFiles(e)) return;
-          e.preventDefault();
-          setDepth(0);
-          const files = Array.from(e.dataTransfer?.files ?? []);
-          if (files.length > 0) onFiles(files);
-        },
-      }
-    : {};
-  return { over: enabled && depth > 0, props };
-}
-
-/** "Lixeira": deleted files for 30 days, with Restaurar. */
-function DriveTrash() {
-  const { t, i18n } = useTranslation();
-  const { org } = useOrg();
-  const trash = useArtifactTrash(org.id);
-  const remover = useDeleteArtifact();
-  const list = trash.data ?? [];
-  if (trash.isLoading) return <LoadingList count={3} trailing />;
-  if (trash.isError && !trash.data) return <ErrorState error={trash.error} onRetry={() => void trash.refetch()} />;
-  if (list.length === 0) return <EmptyState icon="trash">{t("artifacts.trashEmpty")}</EmptyState>;
-  return (
-    <List>
-      {list.map((a) => (
-        <div key={a.id} className="ac-list__row" data-kind={a.kind}>
-          <Icon name={rowIcon(a)} />
-          <span className="list-col" style={{ flex: 1 }}>
-            <span style={{ fontWeight: 600 }}>{a.title}</span>
-            <span className="small muted">
-              {t("artifacts.trashRow", {
-                when: relativeTime(t, i18n.language, a.deletedAt),
-                date: new Intl.DateTimeFormat(i18n.language, { day: "numeric", month: "short" }).format(
-                  new Date(a.purgeAt),
-                ),
-              })}
-            </span>
-          </span>
-          <Button size="sm" onClick={() => void remover.restore(a.id).then(() => void trash.refetch())}>
-            {t("artifacts.restore")}
-          </Button>
-        </div>
-      ))}
-    </List>
   );
 }

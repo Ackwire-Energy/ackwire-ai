@@ -1,28 +1,15 @@
-import {
-  Alert,
-  Button,
-  Chip,
-  Field,
-  Icon,
-  type IconName,
-  Input,
-  Menu,
-  MenuItem,
-  Sheet,
-  Textarea,
-} from "@agenteschat/ui";
+import { Alert, Button, Chip, Field, Icon, Input, Menu, MenuItem, Sheet, Textarea } from "@agenteschat/ui";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useApi } from "@/api/context";
 import { useArtifact, useArtifactVersions, useChannels, useSaveArtifact } from "@/api/queries";
 import type { ArtifactAuthor, ArtifactContent, ArtifactDetail } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { fileName, KIND_ICON } from "@/lib/artifacts";
+import { KIND_ICON } from "@/lib/artifacts";
 import { fileIcon } from "@/lib/files";
 import { relativeTime } from "@/lib/format";
 import { useToast } from "@/lib/toast";
-import { ArtifactMoreMenu, useDeleteArtifact } from "./ArtifactActions";
+import { ArtifactMoreMenu, type DownloadFormat, useArtifactDownload, useDeleteArtifact } from "./ArtifactActions";
 import { fileSaver } from "./fileSaver";
 import { UploadButton, useDriveUpload } from "./Upload";
 import { ArtifactContentView, TableEditor } from "./views";
@@ -87,7 +74,6 @@ export function ArtifactViewer({
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const api = useApi();
   const toast = useToast();
   const authorName = useAuthorName();
   const channels = useChannels(org.id);
@@ -101,50 +87,18 @@ export function ArtifactViewer({
     toast.show(t("artifacts.saved", { version: saved.version }));
     onVersion(undefined);
   });
-  const download = async () => {
-    if (!a) return;
-    // Uploaded files: the same-origin attachment, with their real name.
-    if (a.content.kind === "file") {
-      fileSaver.save(api.artifacts.fileUrl(org.id, a.id, { version: a.shownVersion }), a.content.name);
-      return;
-    }
-    const { url } = await api.artifacts.download(org.id, a.id, a.shownVersion);
-    fileSaver.save(url, fileName(a.title, a.content));
+  const downloads = useArtifactDownload();
+  const save = (format?: DownloadFormat) => {
+    if (a) void downloads.save(a, format, a.shownVersion, a.content);
   };
-  const save = (format?: "pdf" | "docx" | "csv") => {
-    if (!a) return;
-    if (!format) {
-      void download();
-      return;
-    }
-    const ext = { pdf: ".pdf", docx: ".docx", csv: ".csv" }[format];
-    fileSaver.save(
-      api.artifacts.fileUrl(org.id, a.id, { version: a.shownVersion, format }),
-      fileName(a.title, a.content).replace(/\.[a-z0-9]+$/i, ext),
-    );
-  };
-  const formats: { key: string; format?: "pdf" | "docx" | "csv"; icon: IconName; label: string }[] = !a
-    ? []
-    : [
-        ...(a.kind === "document"
-          ? [
-              { key: "pdf", format: "pdf" as const, icon: "document" as const, label: t("artifacts.formatPdf") },
-              { key: "docx", format: "docx" as const, icon: "page" as const, label: t("artifacts.formatDocx") },
-            ]
-          : []),
-        ...(a.kind === "table"
-          ? [{ key: "csv", format: "csv" as const, icon: "table" as const, label: t("artifacts.formatCsv") }]
-          : []),
-        ...(a.kind !== "table"
-          ? [{ key: "original", icon: "download" as const, label: t("artifacts.formatOriginal") }]
-          : []),
-      ];
+  const download = () => save();
+  const formats = a ? downloads.formats(a.kind) : [];
   const canEditNow = Boolean(a?.canEdit && !old && !editing && (a?.kind === "document" || a?.kind === "table"));
   const canUploadVersion = Boolean(a?.canEdit && !old && a?.kind === "file");
   const actions = a && (
     <>
       {a.kind === "file" ? (
-        <Button size="sm" variant="ghost" icon="download" className="artifact-download" onClick={() => void download()}>
+        <Button size="sm" variant="ghost" icon="download" className="artifact-download" onClick={download}>
           {t("artifacts.download")}
         </Button>
       ) : (
