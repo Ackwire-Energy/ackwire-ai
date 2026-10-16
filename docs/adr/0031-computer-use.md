@@ -28,9 +28,32 @@ Our side today: tool results are text only (`packages/providers/src/anthropic.ts
 |---|---|---|---|
 | **Agent browser** | Daytona computer or connected machine | A Chromium the runner starts, with a profile per agent in the agent's folder. Not logged in to anything of the owner's. | Works with every isolation level |
 | **Virtual desktop** | Daytona computer, or a Linux VM/container the owner provides (level 3) | A full desktop on a virtual display (Xvfb + a window manager), inside the box | The box is the boundary |
-| **Owner's desktop** | Connected machine, opt-in at pairing (`--desktop`) | The real screen, mouse and keyboard of the person logged in | None: acts as the owner (see §4) |
+| **Owner's desktop** | Connected machine that supports it (`--desktop`), given to one agent at a time by the machine's owner | The real screen, mouse and keyboard of the person logged in | None: acts as the owner (see §4) |
 
 The agent sees one tool family, `computer_*` (scope `computer:use`, outside "all tools", like `sandbox:run`). `computer_status` (already exists) says which screen it has, if any.
+
+The real trade-off is not "computer use or terminal": only the owner's desktop rules out the sandbox (§7). An agent with a terminal and the agent browser, or a virtual desktop, keeps protected mode.
+
+### 1a. Chosen per agent
+
+Each agent has two settings on its page, next to the computer it uses (`agents.machine_id`, ADR 0025):
+
+- **Screen** (`agents.screen`): `none` (default) · `browser` · `virtual_desktop` · `owner_desktop`.
+- **Protected mode** (`agents.protected`, ADR 0030 level 2): on or off.
+
+What can be chosen depends on the computer, and options that don't apply are shown disabled with the reason:
+
+| Screen | Cloud (Daytona) | Connected machine |
+|---|---|---|
+| `none` | yes | yes |
+| `browser` | yes | yes (runner protocol 4 with the `browser` capability) |
+| `virtual_desktop` | yes | only on a machine that reports a virtual display (VM/container, level 3) |
+| `owner_desktop` | no | only on a machine paired with `--desktop`, and only set by the person who paired it (not even an admin) |
+
+- `owner_desktop` forces protected mode off for that agent; the page says "this agent acts as you on this computer". Turning protected mode on moves the screen back to `browser`.
+- The screen is a ceiling: the agent can't raise it, and the server only offers the tools it allows. Changes are audited.
+- Changing the agent's computer resets the screen to `none` if the new computer can't serve it.
+- Machine side, `--desktop` only means "this machine can offer its desktop" (helper installed, permissions granted). It gives nothing to any agent by itself.
 
 The recommended path for "use a computer" is the virtual desktop. The owner's desktop is for what only exists there.
 
@@ -54,7 +77,7 @@ The Tool Gateway gets a provider-neutral action set: `screenshot`, `zoom`, `clic
 
 What it means: the agent does whatever the owner's session can do, with their logins, files and open apps. Treat it like giving someone remote control.
 
-- **Opt-in at pairing** (`agentes-runner pair … --desktop`) or later from the machine page, by the person who paired it. The pairing screen spells out the consequence.
+- **Two opt-ins:** the machine offers it (`agentes-runner pair … --desktop`, or later from the machine page, by the person who paired it), then that person gives it to a specific agent (§1a). The pairing screen spells out the consequence.
 - **Native helper:** the runner is a JavaScript bundle and can't capture the screen or inject input on its own. A small signed helper per OS (`agentes-desktop`) is downloaded only when desktop mode is on:
   - macOS: ScreenCaptureKit + CGEvent. Needs Screen Recording and Accessibility permissions, granted by hand in System Settings (we show how). The helper must be signed and notarized, so permissions stick to it and not to `node`.
   - Linux X11: `xdotool` + `xwd`/`import`, or the helper. Wayland: the RemoteDesktop/ScreenCast portal, which asks the user each session; documented as limited.
@@ -80,11 +103,13 @@ What it means: the agent does whatever the owner's session can do, with their lo
 | | Agent browser | Virtual desktop | Owner's desktop |
 |---|---|---|---|
 | **Level 1** (environment per agent) | Yes. Profile and downloads in the agent's folder. | n/a (lives in a box) | Yes, but level 1 isolates git, not the screen: every agent with desktop access sees everything. |
-| **Level 2** (Seatbelt / bubblewrap) | Yes, with an adjusted profile: Chromium needs its own cache dir, GPU/shm access and network (allowlist works). Chromium's sandbox inside ours needs testing on each OS; fall back to `--no-sandbox` only inside our sandbox. | n/a | **No.** Driving the real screen escapes any process sandbox: one click opens Terminal and types a command as the owner. Desktop mode and protected mode are exclusive per machine; the pairing screen and `computer_status` say so. |
+| **Level 2** (Seatbelt / bubblewrap) | Yes, with an adjusted profile: Chromium needs its own cache dir, GPU/shm access and network (allowlist works). Chromium's sandbox inside ours needs testing on each OS; fall back to `--no-sandbox` only inside our sandbox. | n/a | **No.** Driving the real screen escapes any process sandbox: one click opens Terminal and types a command as the owner. So an agent has either the owner's desktop or protected mode, never both (§1a). Other agents on the same machine can still be protected. |
 | **Level 3** (dedicated user / VM / container) | Yes. | **Best fit**: a VM or container with Xvfb is a full desktop the owner's machine never exposes. We document the image. | A dedicated OS user has no graphical session unless one is logged in (macOS fast user switching, Linux a second X session); possible, not something we manage. |
 | **Daytona** | Yes (Chromium in the image). | Yes: Xvfb + window manager in our image, actions via `xdotool`. Network follows the org's mode. | n/a |
 
-So the safe default is: agent browser everywhere, virtual desktop for full computer use, owner's desktop only as an explicit, exclusive, watched-by-default choice.
+So the safe default is: agent browser everywhere, virtual desktop for full computer use, owner's desktop only as an explicit, per-agent, watched-by-default choice.
+
+One limit to state: protected mode limits what *that* agent reaches. It doesn't hide a protected agent's folder from an unprotected agent on the same machine (one with the owner's desktop, or just a shell without the sandbox), since those act as the owner. Agents that must not see each other's work need protected mode on both, or separate machines.
 
 ### 8. Runner protocol 4
 
@@ -95,7 +120,7 @@ New ops: `screen.info` (monitors, scale), `screen.capture { monitor, maxEdge, fo
 1. Gateway: image tool results stored in file storage, provider-defined tools, the Anthropic toolset mapping, screenshot clearing. Tests with the fake provider.
 2. Agent browser on Daytona and on the runner (protocol 4), live view, Stop, caps.
 3. Virtual desktop in the Daytona image; documented VM/container image for level 3.
-4. Owner's desktop: macOS helper first (signing, permissions flow), then Windows, then Linux X11; exclusive with protected mode; session approval card.
+4. Owner's desktop: macOS helper first (signing, permissions flow), then Windows, then Linux X11; per-agent choice that turns protected mode off; session approval card.
 5. `type_secret`.
 
 ## Consequences
