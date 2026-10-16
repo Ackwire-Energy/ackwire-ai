@@ -3225,7 +3225,6 @@ export const en: Translations = {
     steeredStep: "New message from {{name}}",
     steeredStepAnon: "New message",
     steered: "{{name}} got it during the task",
-    working: "{{name}} is working. Your message goes into the current task",
     stillWorking: "{{name}} still working",
     inProgress: "in progress",
     quiet: "no news for {{minutes}} min",

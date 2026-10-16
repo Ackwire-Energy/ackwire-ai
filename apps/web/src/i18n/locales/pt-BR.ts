@@ -3234,7 +3234,6 @@ export const ptBR = {
     steeredStep: "Nova mensagem de {{name}}",
     steeredStepAnon: "Nova mensagem",
     steered: "{{name}} recebeu durante a tarefa",
-    working: "{{name}} está trabalhando. Sua mensagem entra na tarefa atual",
     stillWorking: "{{name}} ainda trabalhando",
     inProgress: "em andamento",
     quiet: "sem notícias há {{minutes}} min",

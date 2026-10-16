@@ -4735,12 +4735,6 @@ button.live-call__head:hover {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.composer-working {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-}
 .msg-steered {
   margin: 4px 0 0;
   font-style: italic;

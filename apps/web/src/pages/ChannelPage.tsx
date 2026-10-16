@@ -420,7 +420,7 @@ function ChannelView({
   const [draft, setDraft] = useState(() => (draftKey ? (peekDraft(draftKey) ?? "") : ""));
   // Esc (composer empty, nothing open): asks to stop the most recent run here that I may stop
   // (the confirmation; Esc twice within 1.5 s stops directly).
-  const { canStop: mayStop, stop: stopRun } = useStopRun();
+  const { canStop: mayStop } = useStopRun();
   const draftRef = useRef("");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -436,8 +436,6 @@ function ChannelView({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-  // An agent working here: the composer says the message goes into its task.
-  const workingRun = useStreams((s) => scopedRuns(s).find((r) => isStoppable(r) && !r.stopping));
   // "Responder em thread": the next message goes to that thread.
   const [replyTo, setReplyTo] = useState<MessageType | null>(null);
   // "Responder": the next message quotes this one (`meta.replyTo`), in the same conversation.
@@ -1387,28 +1385,10 @@ function ChannelView({
                     {offer && (
                       <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />
                     )}
-                    {chrome?.composerNote && !workingRun && !chrome.locked && (
+                    {chrome?.composerNote && !chrome.locked && (
                       <p className="ac-composer__hint">{chrome.composerNote}</p>
                     )}
-                    {(workingRun || chrome?.locked) && (
-                      <p className="ac-composer__hint">
-                        {workingRun && !chrome?.locked ? (
-                          <span className="composer-working">
-                            {t("run.working", {
-                              name: dir.agentById.get(workingRun.agentId)?.name ?? t("channel.unknownAgent"),
-                            })}
-                            {mayStop(workingRun) && (
-                              <>
-                                {" · "}
-                                <StopButton run={workingRun} onStop={stopRun} place="composer" />
-                              </>
-                            )}
-                          </span>
-                        ) : (
-                          chrome?.locked
-                        )}
-                      </p>
-                    )}
+                    {chrome?.locked && <p className="ac-composer__hint">{chrome.locked}</p>}
                   </>
                 )}
               </div>

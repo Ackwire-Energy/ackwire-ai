@@ -158,7 +158,7 @@ describe("live row in the timeline", () => {
     expect(later.classList.contains("ac-msg--grouped")).toBe(false);
   });
 
-  test("'ainda trabalhando' jumps back to the row; steering shows on my message and in the row; composer hint", async () => {
+  test("'ainda trabalhando' jumps back to the row; steering shows on my message and in the row; no composer hint", async () => {
     const proto = HTMLElement.prototype as unknown as { scrollIntoView?: () => void };
     const before = proto.scrollIntoView;
     const scrolled: string[] = [];
@@ -170,9 +170,10 @@ describe("live row in the timeline", () => {
       await ev({ type: "agent.run", ...ids, status: "running" });
       await ev({ type: "agent.delta", ...ids, seq: 0, text: "Olhando o login." });
       await settle(2);
-      const hint = document.querySelector(".ac-composer__hint") as HTMLElement;
-      expect(hint.textContent).toContain("Ada está trabalhando. Sua mensagem entra na tarefa atual");
-      expect(within(hint).getByRole("button", { name: "Parar" })).toBeTruthy();
+      // No "is working" line under the composer: stopping stays on the run itself (and Esc, /stop).
+      expect(document.body.textContent).not.toContain("Sua mensagem entra na tarefa atual");
+      expect(document.body.textContent).not.toContain("Ada está trabalhando");
+      expect(within(row()).getByRole("button", { name: "Parar" })).toBeTruthy();
 
       await post(ev, "m-steer", "Olha também o refresh");
       await ev({ type: "agent.run.steered", ...ids, messageId: "m-steer" });

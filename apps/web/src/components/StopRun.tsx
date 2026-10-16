@@ -59,7 +59,7 @@ const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
 interface Confirming {
   runId: string;
-  /** Which button it hangs from ("row", "bar", "composer", "forum"). */
+  /** Which button it hangs from ("row", "bar", "forum"). */
   place: string;
   /** Opened with Esc at this time: a second Esc within 1.5 s stops directly. */
   viaEscAt: number | null;
