@@ -851,7 +851,13 @@ export class TaskManager {
         // What it may run without asking (protocol 7; older servers send no mode: work).
         const prefix = missionBranchPrefix(missionId, req.mission?.branchPrefix);
         const allow = Array.isArray(req.mission?.allow) ? req.mission.allow.filter((r) => typeof r === "string") : [];
-        writeFileSync(settingsFile, JSON.stringify(claudePermissionSettings(mode, prefix, allow)), { mode: 0o600 });
+        // An item in its own worktree or subfolder: the mission folder too (its .agentes/, shared inputs).
+        const away = missionTask && path.resolve(cwd) !== path.resolve(missionRoot);
+        writeFileSync(
+          settingsFile,
+          JSON.stringify(claudePermissionSettings(mode, prefix, allow, away ? path.resolve(missionRoot) : undefined)),
+          { mode: 0o600 },
+        );
       }
       extra = missionExecutorArgs(executor === "codex" ? "codex" : "claude", {
         configFile,
@@ -859,7 +865,15 @@ export class TaskManager {
         taskId,
         socketPath: this.opts.mcp.socketPath,
         rules,
-        ...(executor === "claude" ? { settingsFile, promptTool: mode === "work" } : { resumed: Boolean(codexThread) }),
+        ...(executor === "claude"
+          ? {
+              settingsFile,
+              promptTool: mode === "work",
+              ...(missionTask && path.resolve(cwd) !== path.resolve(missionRoot)
+                ? { addDirs: [path.resolve(missionRoot)] }
+                : {}),
+            }
+          : { resumed: Boolean(codexThread) }),
       });
     } else if (missionId) {
       this.log(`task ${taskId} works for a mission, but this runner has no MCP endpoint`);

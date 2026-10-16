@@ -13,12 +13,14 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import {
   claudeMcpConfig,
+  claudePermissionSettings,
   cleanRules,
   handleMcpMessage,
   ipcCall,
   McpBridge,
   type McpTaskInfo,
   missionExecutorArgs,
+  missionFolderRules,
   runMcpServer,
 } from "../../runner/mcp";
 import { agentWorkspace } from "../../runner/paths";
@@ -357,4 +359,50 @@ test("the permission prompt tool Claude Code is told to use is one our server ad
     "darwin",
   );
   expect(plan).not.toContain("--permission-prompt-tool");
+});
+
+test("an item away from the mission folder may use it (--add-dir, Read/Edit/Write there only); the main session needs nothing", () => {
+  const folder = "/Users/ana/agentes/app";
+  expect(missionFolderRules(folder, ["Read", "Edit", "Write"])).toEqual([
+    "Read(//Users/ana/agentes/app/**)",
+    "Edit(//Users/ana/agentes/app/**)",
+    "Write(//Users/ana/agentes/app/**)",
+  ]);
+  // Never a relative, wildcard or parent path.
+  expect(missionFolderRules("app", ["Read"])).toEqual([]);
+  expect(missionFolderRules("/Users/*", ["Read"])).toEqual([]);
+  expect(missionFolderRules("/Users/ana/../bob", ["Read"])).toEqual([]);
+  const work = claudePermissionSettings("work", "agentes/abcd1234/", [], folder);
+  expect(work.permissions.allow).toContain("Edit(//Users/ana/agentes/app/**)");
+  // Nothing broader: no bare Edit/Write, and the deny list stays.
+  expect(work.permissions.allow).not.toContain("Edit");
+  expect(work.permissions.allow).not.toContain("Write");
+  expect(work.permissions.deny.length).toBeGreaterThan(0);
+  const plan = claudePermissionSettings("plan", "agentes/abcd1234/", [], folder);
+  expect(plan.permissions.allow).toContain("Read(//Users/ana/agentes/app/**)");
+  expect(plan.permissions.allow.some((r) => r.startsWith("Edit("))).toBe(false);
+  expect(claudePermissionSettings("work", "agentes/abcd1234/").permissions.allow.some((r) => r.includes("//"))).toBe(
+    false,
+  );
+  const args = missionExecutorArgs(
+    "claude",
+    {
+      configFile: "/tmp/mcp.json",
+      command: ["agentes-runner"],
+      taskId: TASK,
+      socketPath: "/tmp/mcp.sock",
+      rules: "",
+      promptTool: true,
+      addDirs: [folder],
+    },
+    "darwin",
+  );
+  expect(args.join(" ")).toContain(`--add-dir ${folder}`);
+  expect(
+    missionExecutorArgs(
+      "claude",
+      { configFile: "/tmp/mcp.json", command: ["x"], taskId: TASK, socketPath: "/tmp/s", rules: "" },
+      "darwin",
+    ),
+  ).not.toContain("--add-dir");
 });

@@ -724,7 +724,25 @@ export const DENY_RULES = MISSION_DENY_RULES;
  * merges, other pushes and deploys are denied (they go through
  * `request_approval`). Deny rules win over allow rules.
  */
-export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: string, missionAllow: string[] = []) {
+/**
+ * File rules for the mission folder (absolute; `//` is Claude Code's prefix
+ * for an absolute path): an item in its own worktree or subfolder reads and
+ * writes the mission's `.agentes/` and its shared inputs there, and nothing
+ * outside it (other paths still ask through the prompt tool).
+ */
+export function missionFolderRules(missionFolder: string | undefined, tools: readonly string[]) {
+  const dir = (missionFolder ?? "").replace(/\\/g, "/").replace(/\/+$/, "");
+  if (!dir.startsWith("/") || dir.includes("*") || /\.\.(\/|$)/.test(dir)) return [];
+  return tools.map((tool) => `${tool}(/${dir}/**)`);
+}
+
+export function claudePermissionSettings(
+  mode: "plan" | "work",
+  branchPrefix: string,
+  missionAllow: string[] = [],
+  /** An item's mission folder when it runs elsewhere (its worktree or subfolder). */
+  missionFolder?: string,
+) {
   if (mode === "plan") {
     return {
       permissions: {
@@ -736,6 +754,7 @@ export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: st
           "LS",
           ...readOnlyShell(),
           ...gitC(GIT_READ.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`])),
+          ...missionFolderRules(missionFolder, ["Read"]),
         ],
         deny: ["Edit", "Write", "NotebookEdit", ...MISSION_DENY_RULES],
       },
@@ -759,6 +778,8 @@ export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: st
         "Bash(gh pr diff *)",
         "Bash(gh pr status *)",
         ...BUILD_RULES,
+        // The mission folder, for an item working in its own worktree or subfolder.
+        ...missionFolderRules(missionFolder, ["Read", "Edit", "Write"]),
         // What a person allowed for the whole mission ("Aprovar sempre nesta missão").
         ...missionAllow.filter(isSafeRule).slice(0, 100),
       ],
@@ -822,6 +843,8 @@ export function missionExecutorArgs(
     resumed?: boolean;
     /** Claude Code work turns: commands off the allow list ask a person through our tool. */
     promptTool?: boolean;
+    /** Claude Code: folders it may use besides its own (an item's mission folder). */
+    addDirs?: string[];
   },
   platform: NodeJS.Platform = process.platform,
 ): string[] {
@@ -835,6 +858,7 @@ export function missionExecutorArgs(
       "--allowedTools",
       "mcp__agentes",
       ...(input.promptTool ? ["--permission-prompt-tool", PERMISSION_PROMPT_TOOL] : []),
+      ...(input.addDirs ?? []).flatMap((d) => ["--add-dir", q(d)]),
       ...(rules ? ["--append-system-prompt", q(rules)] : []),
     ];
   }

@@ -68,7 +68,7 @@ export type CommandDecision = "allow" | "deny" | "always";
 export type CommandState = "pending" | "allowed" | "denied" | "expired";
 
 /** Prompts per task in 10 minutes: a loop can't flood the thread. */
-export const COMMAND_PROMPTS_PER_TASK = 10;
+export const COMMAND_PROMPTS_PER_TASK = 30;
 /** `low_risk_auto`: the judge's probability that a command is low risk and needed, to allow it without a card. */
 export const LOW_RISK_THRESHOLD = 0.85;
 /** The judge answers within this, or it is the card. */

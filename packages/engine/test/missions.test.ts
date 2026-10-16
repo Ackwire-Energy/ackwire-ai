@@ -1246,14 +1246,14 @@ describe("missions (ADR 0029)", () => {
       await expect(decideCommand(md(), f.owner.id, f.org.id, view.id, b, "allow")).rejects.toMatchObject({
         code: "mission.command_expired",
       });
-      // At most 10 in 10 minutes per task (a is one of them).
+      // At most COMMAND_PROMPTS_PER_TASK (30) in 10 minutes per task (a is one of them; b is older).
       const answers = [];
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 30; i++) {
         answers.push(await prompt(main.taskId, { tool_name: "Bash", input: { command: `tool${i} --run` } }));
       }
-      expect(answers.slice(0, 9).every((x) => x.status === "pending")).toBe(true);
-      expect(answers[9]).toMatchObject({ behavior: "deny" });
-      expect(answers[9]?.message).toContain("Too many");
+      expect(answers.slice(0, 29).every((x) => x.status === "pending")).toBe(true);
+      expect(answers[29]).toMatchObject({ behavior: "deny" });
+      expect(answers[29]?.message).toContain("Too many");
     });
 
     test("refused commands reach the task's end notice; Liberar e repetir adds the rule and resumes the session", async () => {
