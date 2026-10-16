@@ -313,6 +313,9 @@ p {
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sidebar__group {
   display: flex;
@@ -1749,10 +1752,11 @@ p {
   margin: 0;
   padding: 0;
 }
+/* Icon, text and the level control line up on the name's row; long tool lists stay at two lines. */
 .level-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   padding: 10px 0;
   border-top: 1px solid var(--line);
@@ -1769,6 +1773,12 @@ p {
 }
 .level-row__name {
   font-weight: 600;
+}
+.level-row__text > .small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .level-row__asks {
   display: flex;
@@ -6527,7 +6537,8 @@ button.live-call__head:hover {
 }
 .newag__tips {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Three across when there's room; one per row in a narrow card (titles stay on one line). */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
   gap: 10px;
   margin-top: 14px;
 }
