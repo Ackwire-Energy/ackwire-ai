@@ -16,9 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import {
-  useAccessMatrix,
   useChannels,
-  useConnections,
   useCreateAgent,
   useCredentials,
   useDms,
@@ -29,13 +27,13 @@ import {
   useSkills,
 } from "@/api/queries";
 import type { Agent, AgentAudience, Credential, Model } from "@/api/types";
-import { AccessTree } from "@/components/AccessTree";
+import { LevelRow, ResourceIcon, useConnectedById } from "@/components/AccessLevels";
 import { AudienceChoice, audienceValid } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { SkillPicker } from "@/components/Skills";
-import { useAreaLabel } from "@/hooks/useAreaLabel";
-import { type AccessModel, type Preset, presetModel, toInput, treeFromMatrix } from "@/lib/access";
+import { LEVELS, type Level, saveLevels } from "@/lib/access-levels";
+import { itemName } from "@/lib/connected";
 import { joinNames } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
@@ -107,15 +105,15 @@ export function modelOptions(
   );
 }
 
-/** Connector toggles of "Onde trabalha e com o quê": one per connector, granting its non-gated scopes. */
-export const CONNECTOR_DEFAULT_SCOPES: Record<string, string[]> = {
-  github: ["github:repo.read", "github:pr.read", "github:pr.write"],
-  sentry: ["sentry:issues.read"],
-  linear: ["linear:issues.read", "linear:issues.write"],
-  drive: ["drive:files.read", "drive:files.write"],
-};
-const isKnownConnector = (id: string): id is "github" | "sentry" | "linear" | "drive" =>
-  Object.hasOwn(CONNECTOR_DEFAULT_SCOPES, id);
+/**
+ * Starting level of each connection on "Criar agente": "Ler" for the
+ * organization's own connectors (Drive starts off), nothing for servers
+ * connected by address. Sensitive actions ask for approval at any level.
+ */
+export function defaultLevel(item: { custom: boolean; def: { id: string } | null }): Level {
+  if (item.custom) return "none";
+  return item.def?.id === "drive" ? "none" : "read";
+}
 
 /** telas/NovoAgente.dc.html */
 export function NewAgentPage() {
@@ -129,9 +127,10 @@ export function NewAgentPage() {
   const channels = useChannels(org.id);
   const dms = useDms(org.id);
   const dmChannels = useMemo(() => new Set((dms.data ?? []).map((d) => d.channelId)), [dms.data]);
-  const connections = useConnections(org.id);
-  const activeConnections = useMemo(() => connections.data?.filter((c) => !c.revokedAt), [connections.data]);
-  const connectors = { data: activeConnections };
+  // What the agent can use: one level per connection (the same levels as the agent page).
+  const connected = useConnectedById();
+  const connectedList = useMemo(() => [...connected.values()], [connected]);
+  const [levels, setLevels] = useState<Record<string, Level>>({});
   const create = useCreateAgent(org.id);
   const platform = usePlatformKey(org.id);
   const settings = useSettings(org.id);
@@ -145,14 +144,6 @@ export function NewAgentPage() {
   const [key, setKey] = useState<string | undefined>(undefined);
   const [budget, setBudget] = useState("25");
   const [on, setOn] = useState<Record<string, boolean>>({});
-  // "Ferramentas": a preset, then the same tree as "Editar permissões" (only when the backend has it).
-  const accessMatrix = useAccessMatrix(org.id, can(org.role, "configure"));
-  const areaLabel = useAreaLabel();
-  const toolTree = useMemo(
-    () => (accessMatrix.data ? treeFromMatrix(accessMatrix.data, areaLabel) : null),
-    [accessMatrix.data, areaLabel],
-  );
-  const [preset, setPreset] = useState<Preset>("standard");
   // "Skills" (optional): only when the library exists and has something.
   const library = useSkills(org.id);
   const [skillIds, setSkillIds] = useState<Set<string> | null>(null);
@@ -161,10 +152,6 @@ export function NewAgentPage() {
     if (library.data && skillIds === null)
       setSkillIds(new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)));
   }, [library.data, skillIds]);
-  const [access, setAccess] = useState<AccessModel | null>(null);
-  useEffect(() => {
-    if (toolTree && !access) setAccess(presetModel(toolTree, "standard"));
-  }, [toolTree, access]);
   const [created, setCreated] = useState<{ agent: Agent; channels: { id: string; name: string }[] } | null>(null);
 
   const myChannels = useMemo(
@@ -185,15 +172,18 @@ export function NewAgentPage() {
     if (!key) setKey(DEFAULT_KEY);
   }, [key]);
   useEffect(() => {
-    // Defaults like the screen: the channels you're in and the read-only connectors.
+    // Defaults like the screen: the channels you're in, and reading the connectors.
     setOn((prev) => {
       const next = { ...prev };
       for (const c of myChannels) if (next[`ch:${c.id}`] === undefined) next[`ch:${c.id}`] = c.name !== "general";
-      for (const c of activeConnections ?? [])
-        if (next[`co:${c.id}`] === undefined) next[`co:${c.id}`] = c.connector !== "drive";
       return next;
     });
-  }, [myChannels, activeConnections]);
+    setLevels((prev) => {
+      const next = { ...prev };
+      for (const item of connectedList) next[item.id] ??= defaultLevel(item);
+      return next;
+    });
+  }, [myChannels, connectedList]);
 
   if (!allowed) {
     return (
@@ -240,15 +230,14 @@ export function NewAgentPage() {
         joined.map((c) => ({ channelId: c.id })),
       );
     }
-    const extra = (connectors.data ?? [])
-      .filter((c) => on[`co:${c.id}`])
-      .flatMap((c) => (CONNECTOR_DEFAULT_SCOPES[c.connector] ?? []).map((scope) => ({ connectionId: c.id, scope })));
-    if (extra.length > 0) {
-      // New agents start with the built-in defaults; add the chosen connector scopes.
-      const current = await api.scopes.get(org.id, agent.id);
-      await api.scopes.set(org.id, agent.id, [...current, ...extra]);
-    }
-    if (toolTree && access) await api.access.set(org.id, agent.id, toInput(access, toolTree));
+    // New agents start with the built-in defaults; the chosen connector levels go on top, in one
+    // write that reads the agent's grants first (nothing written afterwards replaces them).
+    const chosen = Object.fromEntries(
+      connectedList
+        .filter((item) => (levels[item.id] ?? "none") !== "none")
+        .map((item) => [`connector:${item.id}`, levels[item.id] as Level]),
+    );
+    if (Object.keys(chosen).length > 0) await saveLevels(api, org.id, agent.id, chosen);
     const libraryList = library.data ?? [];
     if (libraryList.length > 0) {
       await api.skills.setForAgent(
@@ -315,13 +304,7 @@ export function NewAgentPage() {
     credentials.data ?? [],
     platform.data ?? false,
   );
-  const toggles = [
-    ...myChannels.map((c) => ({ id: `ch:${c.id}`, label: `#${c.name}` })),
-    ...(connectors.data ?? []).map((c) => ({
-      id: `co:${c.id}`,
-      label: isKnownConnector(c.connector) ? t(`newAgent.connectors.${c.connector}`) : c.label,
-    })),
-  ];
+  const toggles = myChannels.map((c) => ({ id: `ch:${c.id}`, label: `#${c.name}` }));
 
   return (
     <div className="page page--narrow">
@@ -425,34 +408,25 @@ export function NewAgentPage() {
             </CheckboxPill>
           ))}
         </div>
+        {connectedList.length > 0 && (
+          <ul className="level-list" aria-label={t("newAgent.connectorsLabel")}>
+            {connectedList.map((item) => {
+              const name = itemName(t, item);
+              return (
+                <LevelRow
+                  key={item.id}
+                  icon={<ResourceIcon resource={{ connectionId: item.id, area: null }} items={connected} name={name} />}
+                  name={name}
+                  levels={LEVELS}
+                  value={levels[item.id] ?? "none"}
+                  onChange={(l) => setLevels((prev) => ({ ...prev, [item.id]: l }))}
+                />
+              );
+            })}
+          </ul>
+        )}
         <span className="small muted">{t("newAgent.whereNote")}</span>
       </section>
-
-      {toolTree && access && (
-        <section aria-labelledby="q-tools" className="section">
-          <h2 id="q-tools" className="section-title">
-            {t("access.toolsStep")}
-          </h2>
-          <span className="small muted">{t("access.toolsStepText")}</span>
-          <div className="grid-options grid-options--sm">
-            {(["readonly", "standard", "all"] as const).map((p) => (
-              <OptionCard
-                key={p}
-                stacked
-                pressed={preset === p}
-                onClick={() => {
-                  setPreset(p);
-                  setAccess(presetModel(toolTree, p));
-                }}
-              >
-                <span className="ac-option__title">{t(`access.preset.${p}`)}</span>
-                <span className="ac-option__desc">{t(`access.preset.${p}Text`)}</span>
-              </OptionCard>
-            ))}
-          </div>
-          <AccessTree tree={toolTree} model={access} onChange={setAccess} />
-        </section>
-      )}
 
       {(library.data ?? []).length > 0 && (
         <section aria-labelledby="q-skills" className="section">

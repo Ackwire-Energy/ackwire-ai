@@ -101,25 +101,6 @@ export function scopeSummary(groups: ScopeGroup[], grants: ScopeGrant[], none: s
   };
 }
 
-/** Filters groups by a search over group name, label and description. */
-export function searchGroups(groups: ScopeGroup[], query: string) {
-  const q = query.trim().toLowerCase();
-  if (!q) return groups;
-  return groups
-    .map((g) => ({
-      ...g,
-      scopes: g.scopes.filter((s) => `${g.name} ${s.label} ${s.description}`.toLowerCase().includes(q)),
-    }))
-    .filter((g) => g.scopes.length > 0);
-}
-
-/** Toggles one grant in a list (keeps the others as they are). */
-export function toggleGrant(grants: ScopeGrant[], grant: ScopeGrant, on: boolean): ScopeGrant[] {
-  const key = grantKey(grant);
-  const rest = grants.filter((g) => grantKey(g) !== key);
-  return on ? [...rest, grant] : rest;
-}
-
 /** A custom MCP server has two scopes: its read tools, and its write tools (those that ask approval included). */
 function customScopes(t: TFunction, connectionId: string): ScopeRow[] {
   const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;

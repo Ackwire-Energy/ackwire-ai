@@ -1,6 +1,5 @@
 import type {
   AccessInput,
-  AccessMatrix,
   ActiveRun,
   Agent,
   AgentAccess,
@@ -300,8 +299,6 @@ export interface ApiClient {
     /** The agent's tool tree with each node's state. 404 while the backend doesn't have it. */
     get(orgId: string, agentId: string): Promise<AgentAccess>;
     set(orgId: string, agentId: string, input: AccessInput): Promise<AgentAccess>;
-    /** Agents × tools (admins). */
-    matrix(orgId: string): Promise<AccessMatrix>;
   };
   scopes: {
     get(orgId: string, agentId: string): Promise<ScopeGrant[]>;

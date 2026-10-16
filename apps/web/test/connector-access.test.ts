@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentAccess, Connection, CustomServer, ToolDecision } from "@/api/types";
 import { createI18n } from "@/i18n";
+import { catalogToolClass, inputFromAccess, inputWithLevels, levelIn, resourcesOf } from "@/lib/access-levels";
 import { connectedIds, connectedItems } from "@/lib/connected";
-import { catalogToolClass, inputFromAccess, levelOf, readScopesOf, withLevel } from "@/lib/connector-access";
 import { decisionsOf, defaultAccess, draftFrom, exposedTools, humanize, toolsToReview } from "@/lib/custom-tools";
 import { connectorName } from "@/lib/scopes";
 import { CATALOG } from "./fake-api";
@@ -150,30 +150,44 @@ function t(name: string, scope: string, connectionId: string | null, readOnly = 
 
 describe("one level per agent and connection", () => {
   test("the level comes from the tree: the connection whole = write; only reads = read", () => {
-    expect(levelOf(tree(), "conn-gh")).toBe("none");
-    expect(levelOf(undefined, "conn-gh")).toBe("none");
+    expect(levelIn(tree(), "connector:conn-gh")).toBe("none");
+    expect(levelIn(undefined, "connector:conn-gh")).toBe("none");
     const whole = tree((a) => {
       const gh = a.connectors[0];
-      if (gh) gh.state = "granted";
+      if (gh) {
+        gh.state = "granted";
+        for (const s of gh.scopes) for (const x of s.tools) x.state = "inherited";
+      }
     });
-    expect(levelOf(whole, "conn-gh")).toBe("write");
+    expect(levelIn(whole, "connector:conn-gh")).toBe("write");
     const reads = tree((a) => {
       const s = a.connectors[0]?.scopes[0];
       if (s) {
         s.state = "granted";
-        for (const x of s.tools) x.state = "granted";
+        for (const x of s.tools) x.state = "inherited";
       }
     });
-    expect(levelOf(reads, "conn-gh")).toBe("read");
-    // "Todas as ferramentas": every connection is inherited, so write.
-    const all = tree((a) => {
-      a.all = true;
-      for (const c of a.connectors) c.state = "inherited";
+    expect(levelIn(reads, "connector:conn-gh")).toBe("read");
+    // A server with only read tools: "Ler" unless the whole connection is granted.
+    const serverRead = tree((a) => {
+      for (const x of a.connectors[1]?.scopes[0]?.tools ?? []) x.state = "inherited";
     });
-    expect(levelOf(all, "s1")).toBe("write");
+    expect(levelIn(serverRead, "connector:s1")).toBe("read");
+    const serverWhole = tree((a) => {
+      const s1 = a.connectors[1];
+      if (s1) s1.state = "granted";
+      for (const x of s1?.scopes[0]?.tools ?? []) x.state = "inherited";
+    });
+    expect(levelIn(serverWhole, "connector:s1")).toBe("write");
   });
 
-  test("setting a level keeps every other grant (built-ins, other connections, denials, repository limits)", () => {
+  test("read scopes: a catalog connector's *.read scopes, a custom server's own read scope", () => {
+    const [github, server] = resourcesOf(tree());
+    expect(github?.readScopes).toEqual(["github:repo.read"]);
+    expect(server?.readScopes).toEqual(["custom:s1:read"]);
+  });
+
+  test("setting a level keeps every other grant (built-ins, other connections, repository limits)", () => {
     const access = tree((a) => {
       const s1 = a.connectors[1];
       if (s1) s1.state = "granted";
@@ -191,24 +205,19 @@ describe("one level per agent and connection", () => {
       { connectionId: "gone", scope: "github:repo.read" },
       { connectionId: "s1", scope: "connector:*" },
     ];
-    const ghRead = readScopesOf({
-      connectionId: "conn-gh",
-      def: CATALOG.connectors.find((d) => d.id === "github") ?? null,
-      custom: false,
-    });
-    expect(ghRead).toEqual(["github:repo.read", "github:pr.read"]);
-    const read = withLevel(access, "conn-gh", ghRead, "read", raw);
+    const read = inputWithLevels(access, raw, { "connector:conn-gh": "read" });
     expect(read.connectors).toEqual({ s1: true });
     expect(read.scopes).toEqual([
       { connectionId: null, scope: "memory:write" },
       { connectionId: "conn-gh", scope: "github:git.repo:acme/app" },
       { connectionId: "conn-gh", scope: "github:repo.read" },
-      { connectionId: "conn-gh", scope: "github:pr.read" },
     ]);
-    expect(read.tools.deny).toEqual([{ connectionId: "conn-gh", name: "github_merge" }]);
-    const none = withLevel(access, "s1", readScopesOf({ connectionId: "s1", def: null, custom: true }), "none");
+    // A level says it all: the connection's own denials go with it.
+    expect(read.tools.deny).toEqual([]);
+    const none = inputWithLevels(access, [], { "connector:s1": "none" });
     expect(none.connectors).toEqual({});
-    const write = withLevel(access, "conn-gh", ghRead, "write");
+    expect(none.tools.deny).toEqual([{ connectionId: "conn-gh", name: "github_merge" }]);
+    const write = inputWithLevels(access, [], { "connector:conn-gh": "write" });
     expect(write.connectors).toEqual({ s1: true, "conn-gh": true });
     expect(write.scopes.some((s) => s.connectionId === "conn-gh")).toBe(false);
   });

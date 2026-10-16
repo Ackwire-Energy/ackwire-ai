@@ -218,7 +218,6 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     expect(input.connectors["conn-gh"]).toBeUndefined();
     expect(input.scopes.filter((s) => s.connectionId === "conn-gh")).toEqual([
       { connectionId: "conn-gh", scope: "github:repo.read" },
-      { connectionId: "conn-gh", scope: "github:pr.read" },
     ]);
   });
 

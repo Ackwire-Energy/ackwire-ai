@@ -483,7 +483,8 @@ export async function pendingConnectors(
     } else if (!tools.some((t) => offeredToolNames.has(t.name))) {
       out.push({
         label: c.label,
-        reason: "conectado, mas as ferramentas não foram liberadas para você; peça a um admin em Editar permissões",
+        reason:
+          "conectado, mas as ferramentas não foram liberadas para você; peça a um admin para liberar em Agentes e acesso ou na página do agente",
       });
     }
   }

@@ -13,12 +13,13 @@ import {
 } from "@/api/queries";
 import type { Agent } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { ConnectFlow, type FlowState, useAgentsAccess } from "@/components/ConnectFlow";
+import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorCatalogDialog, ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useAgentsAccess } from "@/hooks/useAgentsAccess";
+import { levelIn } from "@/lib/access-levels";
 import { type ConnectedItem, connectedIds, connectedItems, itemName } from "@/lib/connected";
-import { levelOf } from "@/lib/connector-access";
 import { relativeTime } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
@@ -47,7 +48,8 @@ export function ConnectorsSection({ connected, review }: { connected?: string; r
   const items = connectedItems(connections.data ?? [], servers.data ?? [], defs);
   const agentList = agents.data ?? [];
   const access = useAgentsAccess(agentList, items.length > 0);
-  const using = (item: ConnectedItem) => agentList.filter((a) => levelOf(access.byAgent.get(a.id), item.id) !== "none");
+  const using = (item: ConnectedItem) =>
+    agentList.filter((a) => levelIn(access.byAgent.get(a.id), `connector:${item.id}`) !== "none");
 
   // Back from OAuth: open "O que faz" for the connection that just came in.
   const returned = useRef(false);

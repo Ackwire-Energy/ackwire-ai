@@ -7,7 +7,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import type { AgentAccess } from "@/api/types";
 import { isDomain } from "@/components/AgentComputer";
 import { createI18n } from "@/i18n";
-import { countTools, modelFrom, resolve, treeFromAccess } from "@/lib/access";
+import { inputWithLevels, levelsOf, resourcesOf } from "@/lib/access-levels";
 import { activityText, toolActivity } from "@/lib/activity";
 import { busyView, ELAPSED_AFTER_MS, GIVE_UP_MS, PREPARE_AFTER_MS, reached } from "@/lib/computer";
 import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
@@ -168,12 +168,15 @@ describe("Rodar código is not covered by 'Todas as ferramentas'", () => {
       ],
       connectors: [],
     };
-    const tree = treeFromAccess(access);
-    const r = resolve(tree, modelFrom(access));
-    expect(r.find((g) => g.id === "area:sandbox")?.label).toBe("Rodar código");
-    expect(r.find((g) => g.id === "area:sandbox")?.children[0]?.state).toBe("off");
-    expect(r.find((g) => g.id === "area:issues")?.children[0]?.state).toBe("inherited");
-    expect(countTools(r)).toEqual({ on: 1, total: 2 });
+    expect(resourcesOf(access).map((r) => [r.id, r.levels.join("/"), r.notInAll])).toEqual([
+      ["area:issues", "none/write", false],
+      ["area:sandbox", "none/write", true],
+    ]);
+    expect(levelsOf(access)).toEqual({ "area:issues": "write", "area:sandbox": "none" });
+    // Lowering another area spells "all tools" out, and running code stays off.
+    const put = inputWithLevels(access, [], { "area:issues": "none" });
+    expect(put.all).toBe(false);
+    expect(put.scopes).toEqual([]);
   });
 });
 

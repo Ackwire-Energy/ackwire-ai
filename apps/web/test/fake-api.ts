@@ -1299,7 +1299,6 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     wiki: createFakeWiki(ctx, (method, ...args) => state.calls.push({ method, args })),
     skills: createFakeSkills(ctx, (method, ...args) => state.calls.push({ method, args })),
     access: createFakeAccess(
-      ctx,
       (orgId) => http.connectors.list(orgId),
       (method, ...args) => state.calls.push({ method, args }),
       (orgId) => customConnectors.list(orgId),

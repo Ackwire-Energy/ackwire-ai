@@ -80,9 +80,10 @@ describe("Agente", () => {
     expect(budget.textContent).toContain("de US$ 40,00");
     expect(budget.textContent).toContain("142 execuções · 3,1 mi de tokens · aviso ao João em 80%.");
     expect(within(budget).getByRole("meter", { name: "Orçamento usado" }).getAttribute("aria-valuenow")).toBe("12.3");
-    expect(screen().getByRole("region", { name: "O que a Ada pode fazer" }).textContent).toContain(
-      "5 de 15 ferramentas",
-    );
+    // One level per connector and built-in area, right on the page.
+    const access = screen().getByRole("region", { name: "O que a Ada pode fazer" });
+    expect(within(access).getByRole("radiogroup", { name: "Nível em GitHub" })).toBeTruthy();
+    expect(within(access).getByRole("radiogroup", { name: "Nível em Contexto e memória" })).toBeTruthy();
     expect(screen().getByRole("region", { name: "Modelo e chave" }).textContent).toContain(
       "Claude Sonnet 5.5 · com a chave da Acme",
     );
@@ -95,7 +96,6 @@ describe("Agente", () => {
       "Editar conhecimento",
       "Editar Modelo e chave",
       "Editar Responsável",
-      "Editar permissões",
       "Editar Skills",
     ]) {
       expect(screen().getByRole("button", { name })).toBeTruthy();
@@ -184,47 +184,31 @@ describe("Agente", () => {
     expect(dialog.textContent).toContain("Nenhuma execução com “nada disso”.");
   });
 
-  test("Editar permissões: the tool tree (all tools, connector, deny) saves with PUT …/access", async () => {
+  test("what the agent can use: one level per connector and built-in area, saved on change", async () => {
     const { state } = await go(`agents/${ADA_ID}`);
-    await click(screen().getByRole("button", { name: "Editar permissões" }));
-    await settle(4);
-    const dialog = screen().getByRole("dialog", { name: "Permissões da Ada" });
-    expect(dialog.textContent).toContain("5 de 15 ferramentas");
-    // Built-ins are grouped by area; only the memory tools are on, so the area is partial.
-    const memory = within(dialog).getByRole("region", { name: "Contexto e memória" });
-    expect(within(memory).getByRole("checkbox", { name: "Contexto e memória" }).getAttribute("aria-checked")).toBe(
-      "mixed",
-    );
-    const github = within(dialog).getByRole("region", { name: "GitHub" });
-    const merge = within(github).getByRole("checkbox", { name: "Fazer merge" });
-    expect(merge.closest("li")?.textContent).toContain("pede aprovação");
-    // One tool of the connector: the connector checkbox goes indeterminate.
-    await click(within(github).getByRole("checkbox", { name: "Abrir PR" }));
-    expect(within(github).getByRole("checkbox", { name: "Todas deste conector" }).getAttribute("aria-checked")).toBe(
-      "mixed",
-    );
-    // All tools: children inherited; deny one.
-    await click(within(dialog).getByRole("switch", { name: "Todas as ferramentas (atuais e futuras)" }));
-    expect(dialog.textContent).toContain("Ações sensíveis continuam pedindo aprovação.");
-    await click(within(github).getByRole("button", { name: "Bloquear Fazer merge" }));
-    expect(merge.closest("li")?.textContent).toContain("Bloqueada");
-    expect(dialog.textContent).toContain("14 de 15 ferramentas");
-    await type(within(dialog).getByRole("searchbox", { name: "Buscar ferramenta" }), "merge");
+    const section = screen().getByRole("region", { name: "O que a Ada pode fazer" });
+    const connectors = within(section).getByRole("region", { name: "Conectores" });
+    const github = within(connectors).getByRole("radiogroup", { name: "Nível em GitHub" });
+    expect(within(github).getByRole("radio", { name: "Sem acesso" }).getAttribute("aria-checked")).toBe("true");
+    expect(connectors.textContent).toContain("Sem acesso.");
+    await click(within(github).getByRole("radio", { name: "Ler e escrever" }));
+    await settle(6);
+    const put = state.calls.filter((c) => c.method === "access.set").at(-1);
+    expect(put?.args[1]).toBe(ADA_ID);
+    const body = put?.args[2] as { connectors: Record<string, boolean> };
+    expect(body.connectors).toEqual({ "conn-gh": true });
+    // What the level gives, and what still asks a person.
+    expect(connectors.textContent).toContain("List pull requests · Create pull request");
+    expect(connectors.textContent).toContain("Merge pull request pede aprovação");
+    // Built-in areas: the same levels, with what each means.
+    const builtin = within(section).getByRole("region", { name: "Nativos" });
+    const skills = within(builtin).getByRole("radiogroup", { name: "Nível em Skills" });
     expect(
-      within(dialog)
-        .getAllByRole("checkbox")
-        .filter((c) => c.closest("li")),
-    ).toHaveLength(1);
-    await click(within(dialog).getByRole("button", { name: "Salvar permissões" }));
-    await settle(4);
-    const put = state.calls.filter((c) => c.method === "access.set").at(-1)?.args[2] as {
-      all: boolean;
-      tools: { allow: { name: string }[]; deny: { name: string }[] };
-    };
-    expect(put.all).toBe(true);
-    expect(put.tools.deny.map((x) => x.name)).toEqual(["github_merge_pull_request"]);
-    expect(put.tools.allow.map((x) => x.name)).toContain("github_create_pull_request");
-    expect(screen().getByText("Permissões da Ada salvas.")).toBeTruthy();
+      within(skills)
+        .getAllByRole("radio")
+        .map((r) => r.textContent),
+    ).toEqual(["Sem acesso", "Ler"]);
+    expect(builtin.textContent).toContain("Usa as skills ligadas para o agente.");
   });
 
   test("members see the profile read-only (no edit buttons)", async () => {
@@ -233,7 +217,10 @@ describe("Agente", () => {
     await go(`agents/${ADA_ID}`, state);
     expect(screen().queryByRole("button", { name: /^Editar/ })).toBeNull();
     expect(screen().queryByRole("button", { name: "Ajustar orçamento" })).toBeNull();
-    expect(screen().queryByRole("button", { name: "Editar permissões" })).toBeNull();
+    // Levels are shown, not editable.
+    const section = screen().getByRole("region", { name: "O que a Ada pode fazer" });
+    expect(within(section).queryByRole("radiogroup")).toBeNull();
+    expect(section.textContent).toContain("Sem acesso");
     expect(document.body.textContent).toContain("Só admins editam agentes.");
   });
 });
@@ -422,15 +409,12 @@ describe("Criar agente", () => {
       monthlyBudgetUsd: 25,
     });
     expect(state.calls.find((c) => c.method === "agents.setChannels")?.args[2]).toEqual([{ channelId: ENG_ID }]);
-    const scopes = state.calls.find((c) => c.method === "scopes.set")?.args[2] as {
-      connectionId: string;
-      scope: string;
-    }[];
-    expect(scopes.filter((g) => g.connectionId === "conn-gh").map((g) => g.scope)).toEqual([
-      "github:repo.read",
-      "github:pr.read",
-      "github:pr.write",
-    ]);
+    // The connectors at their chosen level (GitHub starts at "Ler"): one write, after creation.
+    const access = state.calls.filter((c) => c.method === "access.set");
+    expect(access).toHaveLength(1);
+    const body = access[0]?.args[2] as { scopes: { connectionId: string | null; scope: string }[] };
+    const scopes = body.scopes;
+    expect(scopes.filter((g) => g.connectionId === "conn-gh").map((g) => g.scope)).toEqual(["github:repo.read"]);
     expect(screen().getByRole("heading", { name: "Íris entrou no time" })).toBeTruthy();
     expect(document.body.textContent).toContain("Já está em #eng. Mencione @iris numa conversa para começar.");
     expect(screen().getByRole("link", { name: "Ir para o #eng" })).toBeTruthy();

@@ -632,14 +632,6 @@ p {
   display: flex;
   flex-direction: column;
 }
-.scope-group {
-  display: flex;
-  flex-direction: column;
-  padding: 8px 0 4px;
-}
-.scope-group__label {
-  padding: 8px 0 4px;
-}
 .scope-row {
   display: flex;
   align-items: flex-start;
@@ -1746,187 +1738,162 @@ p {
   flex: 1 1 220px;
 }
 
-/* Agent access: tool tree ("Editar permissões", "Criar agente → Ferramentas") */
-.access-tree {
+/* Agent access: one level per connector (Sem acesso / Ler / Ler e escrever). Neutral surfaces, light and dark. */
+.level-panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  width: 100%;
 }
-.access-tree__all {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-}
-.access-group {
+.level-panel__group {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  gap: 4px;
 }
-.access-group__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 12px;
-  background: var(--surface-sunken);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-}
-.access-group__name {
-  font-weight: 600;
-}
-.access-group__tools {
+.level-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.access-row,
-.access-row__check {
+.level-row {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-.access-row {
   flex-wrap: wrap;
-  padding: 8px 12px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
   border-top: 1px solid var(--line);
 }
-.access-row__text {
-  flex: 1 1 200px;
-  min-width: 0;
+.level-row:first-child {
+  border-top: 0;
 }
-.access-row .ac-chip {
+.level-row__text {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.level-row__name {
+  font-weight: 600;
+}
+.level-row__asks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.level-row__asks .ac-chip {
   margin-left: 0;
 }
-/* Inherited from "all tools" or the group: checked and muted. */
-.access-row[data-inherited] .ac-check {
-  opacity: 0.55;
+.level-note,
+.level-legend__asks {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
 }
-.access-row[data-state="denied"] .access-row__text label {
-  color: var(--ink-muted);
-  text-decoration: line-through;
+.level-note .ac-icon,
+.level-legend__asks .ac-icon {
+  flex: none;
+  width: 15px;
+  height: 15px;
 }
-
-/* Settings → Agentes e acesso: the matrix dialog (neutral surfaces, works in light and dark) */
-.access-matrix-dialog {
-  --ac-dialog-width: 1120px;
-}
-.access-matrix {
-  overflow: auto;
+.level-matrix {
+  overflow-x: auto;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
 }
-.access-matrix table {
+.level-matrix table {
   width: 100%;
-  table-layout: fixed;
-  border-collapse: separate;
-  border-spacing: 0;
+  min-width: 560px;
+  border-collapse: collapse;
   font-size: 14px;
 }
-.access-matrix__first {
-  width: 280px;
-}
-.access-matrix th,
-.access-matrix td {
-  height: 40px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--line);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  background: var(--surface-raised);
-  color: var(--ink);
-}
-.access-matrix thead th {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--ink-muted);
-  background: var(--surface-raised);
-  border-bottom: 1px solid var(--line-strong);
-}
-/* First column stays while scrolling sideways. */
-.access-matrix .access-matrix__sticky {
-  position: sticky;
-  left: 0;
-  z-index: var(--z-sticky);
+.level-matrix th,
+.level-matrix td {
+  padding: 10px 12px;
   text-align: left;
-  border-right: 1px solid var(--line);
+  vertical-align: middle;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
 }
-.access-matrix thead .access-matrix__sticky {
-  z-index: calc(var(--z-sticky) + 1);
+.level-matrix tbody tr:last-child th,
+.level-matrix tbody tr:last-child td {
+  border-bottom: 0;
 }
-.access-matrix__group th,
-.access-matrix__group td {
-  background: var(--surface-sunken);
+.level-matrix thead th {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-muted);
 }
-.access-matrix__group th {
+.level-matrix tbody th {
   font-weight: 600;
 }
-.access-matrix__tool-name {
-  padding-left: 22px;
-  font-weight: 400;
+.level-matrix__head,
+.level-matrix__agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
-.access-matrix__toggle,
-.access-matrix__btn,
-.access-matrix__icon {
+.level-matrix__head .connector-icon {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
+.level-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px;
+  height: 28px;
+  padding: 0 10px;
   border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
+  border-radius: var(--radius-full);
   font: inherit;
-  color: inherit;
-}
-.access-matrix__toggle,
-.access-matrix__btn {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
+  transition: background 0.15s;
 }
-.access-matrix__btn:hover,
-.access-matrix__toggle:hover {
-  background: var(--surface-sunken);
+.level-pill .ac-icon {
+  width: 14px;
+  height: 14px;
 }
-.access-matrix__btn:focus-visible,
-.access-matrix__toggle:focus-visible {
+.level-pill:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-/* Inherited: the same check, muted. Off: muted dash. */
-.access-matrix__cell[data-state="inherited"] .ac-icon,
-.access-matrix__cell[data-state="off"] .ac-icon,
-.access-matrix__cell[data-state="partial"] .ac-icon,
-.access-matrix__legend [data-state="inherited"] .ac-icon,
-.access-matrix__legend [data-state="off"] .ac-icon {
-  color: var(--ink-muted);
+.level-pill[disabled] {
+  cursor: progress;
   opacity: 0.6;
 }
-/* A staged change waits for "Salvar". */
-.access-matrix__cell[data-changed] .access-matrix__btn {
-  box-shadow: inset 0 0 0 1.5px var(--ink);
+.level-pill--static {
+  cursor: default;
 }
-.access-matrix__foot {
+.level-pill[data-level="none"] {
+  background: transparent;
+  color: var(--faint);
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+.level-pill[data-level="read"],
+.level-pill[data-level="custom"] {
+  background: var(--surface-sunken);
+  color: var(--ink2);
+}
+.level-pill[data-level="custom"] {
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+.level-pill[data-level="write"] {
+  background: var(--ink);
+  color: var(--bg);
+}
+.level-legend {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-}
-.access-matrix__legend {
-  display: inline-flex;
-  flex-wrap: wrap;
   gap: 12px;
-}
-.access-agent .ac-chip {
-  margin-left: 0;
 }
 
 /* Skills: library rows, detail sheet, file viewer, picker */

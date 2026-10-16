@@ -11,26 +11,20 @@ import {
   Segmented,
   Switch,
 } from "@agenteschat/ui";
-import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useAgents, useCatalog, useConnectWithKey, useCustomServerAction, useStartOAuth } from "@/api/queries";
-import type { Agent, AgentAccess, ConnectorDef, CustomServer, ToolAccess } from "@/api/types";
+import type { ConnectorDef, CustomServer, ToolAccess } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useAgentsAccess } from "@/hooks/useAgentsAccess";
+import { catalogToolClass, LEVELS, type Level, type LevelState, levelIn, saveLevels } from "@/lib/access-levels";
 import { type ConnectedItem, fromConnection, fromServer, itemName } from "@/lib/connected";
-import {
-  type ConnectorLevel,
-  catalogToolClass,
-  LEVELS,
-  levelOf,
-  readScopesOf,
-  withLevel,
-} from "@/lib/connector-access";
 import { decisionsOf, draftFrom, humanize, isHttpsUrl, type ToolDraft } from "@/lib/custom-tools";
 import { navigateAway } from "@/lib/navigate";
 import { connectorDescription, connectorName } from "@/lib/scopes";
@@ -50,26 +44,6 @@ const CLASSES: ToolAccess[] = ["read", "write", "approval"];
 
 /** Back from OAuth the app lands here; the server adds `?connected=…`. */
 const returnPath = (orgId: string) => `/org/${orgId}/settings/connectors`;
-
-/** Every agent's access tree (shared cache with the agent page and the matrix). */
-export function useAgentsAccess(agents: Agent[], enabled = true) {
-  const api = useApi();
-  const { org } = useOrg();
-  const queries = useQueries({
-    queries: agents.map((a) => ({
-      queryKey: keys.agentAccess(org.id, a.id),
-      queryFn: () => api.access.get(org.id, a.id),
-      enabled,
-      retry: false,
-    })),
-  });
-  const byAgent = new Map<string, AgentAccess>();
-  queries.forEach((q, i) => {
-    const a = agents[i];
-    if (a && q.data) byAgent.set(a.id, q.data);
-  });
-  return { byAgent, loading: queries.some((q) => q.isLoading) };
-}
 
 export function ConnectFlow({
   flow,
@@ -486,27 +460,34 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
   const agents = useAgents(org.id);
   const list = agents.data ?? [];
   const access = useAgentsAccess(list);
-  const current = (agentId: string) => levelOf(access.byAgent.get(agentId), item.id);
-  const [who, setWho] = useState<Record<string, ConnectorLevel>>({});
+  const resourceId = `connector:${item.id}`;
+  const current = (agentId: string) => levelIn(access.byAgent.get(agentId), resourceId);
+  const [who, setWho] = useState<Record<string, LevelState>>({});
   const ready = agents.isSuccess && !access.loading;
   // Starts from each agent's current level, once loaded.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when loading ends
   useEffect(() => {
     if (ready) setWho(Object.fromEntries(list.map((a) => [a.id, current(a.id)])));
   }, [ready]);
-  const levelLabel = (l: ConnectorLevel) => t(`connectFlow.level.${l}`);
-  const options = LEVELS.map((l) => ({ value: l, label: levelLabel(l) }));
+  const levelLabel = (l: LevelState) => t(`access.level.${l}`);
+  const options = (agentId: string) => [
+    ...LEVELS.map((l) => ({ value: l as LevelState, label: levelLabel(l) })),
+    // Granted tool by tool before: shown as is until a level is picked.
+    ...(current(agentId) === "custom" ? [{ value: "custom" as LevelState, label: levelLabel("custom") }] : []),
+  ];
   const asks = item.server
     ? item.server.tools.filter((x) => x.access === "approval").map((x) => x.label || humanize(x.name))
     : (item.def?.tools ?? []).filter((x) => x.sensitive).map((x) => humanize(x.name));
 
   const grant = useMutation({
     mutationFn: async () => {
-      const readScopes = readScopesOf({ connectionId: item.id, def: item.def, custom: item.custom });
-      const changed = list.filter((a) => (who[a.id] ?? "none") !== current(a.id));
+      const changed = list.filter((a) => {
+        const level = who[a.id] ?? "none";
+        return level !== "custom" && level !== current(a.id);
+      });
       for (const a of changed) {
-        const [tree, raw] = await Promise.all([api.access.get(org.id, a.id), api.scopes.get(org.id, a.id)]);
-        await api.access.set(org.id, a.id, withLevel(tree, item.id, readScopes, who[a.id] ?? "none", raw));
+        const saved = await saveLevels(api, org.id, a.id, { [resourceId]: who[a.id] as Level });
+        qc.setQueryData(keys.agentAccess(org.id, a.id), saved);
       }
       return changed.length;
     },
@@ -555,7 +536,7 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
                     label={t("connectFlow.levelOf", { name: a.name })}
                     value={who[a.id] ?? "none"}
                     onValueChange={(l) => setWho((w) => ({ ...w, [a.id]: l }))}
-                    options={options}
+                    options={options(a.id)}
                   />
                 </li>
               ))}

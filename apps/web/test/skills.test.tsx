@@ -174,14 +174,13 @@ describe("agent skills", () => {
     expect(screen().getByRole("region", { name: "Skills" }).textContent).toContain("Atendimento");
   });
 
-  test("Criar agente: an optional Skills step after Ferramentas", async () => {
+  test("Criar agente: an optional Skills step after where it works", async () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/agents/new`, { api: createFakeApi(state) });
     await settle(8);
-    // The tool tree above also has a "Skills" area: pick the step itself.
     const step = document.querySelector('section[aria-labelledby="q-skills"]') as HTMLElement;
     const order = Array.from(document.querySelectorAll("section.section h2")).map((h) => h.textContent);
-    expect(order.indexOf("Skills")).toBeGreaterThan(order.indexOf("Ferramentas"));
+    expect(order.indexOf("Skills")).toBeGreaterThan(order.indexOf("Onde trabalha e com o quê"));
     // "Ligar em agentes novos" skills start checked.
     expect(
       within(step)

@@ -1162,14 +1162,6 @@ export interface AccessInput {
   tools: { allow: ToolRef[]; deny: ToolRef[] };
 }
 
-/** `GET …/access-matrix` (admins): agents × tools, effective state per cell. */
-export interface AccessMatrix {
-  agents: { id: string; name: string; handle: string }[];
-  tools: (Omit<AccessTool, "state"> & { group: string; key: string })[];
-  /** cells[agentId][tool.key]. */
-  cells: Record<string, Record<string, AccessState>>;
-}
-
 // ── Skills (apps/server/src/routes/app/skills.ts) ────────────────────────────
 
 /** How it was installed: a zip, a link (GitHub), or written here. */

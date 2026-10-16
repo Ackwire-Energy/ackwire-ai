@@ -51,7 +51,6 @@ export const keys = {
   agentSkills: (orgId: string, agentId: string) => ["org", orgId, "skills", "agent", agentId] as const,
   access: (orgId: string) => ["org", orgId, "access"] as const,
   agentAccess: (orgId: string, agentId: string) => ["org", orgId, "access", "agent", agentId] as const,
-  accessMatrix: (orgId: string) => ["org", orgId, "access", "matrix"] as const,
   issues: (orgId: string) => ["org", orgId, "issues"] as const,
   issueList: (orgId: string, q: string) => ["org", orgId, "issues", "list", q] as const,
   issue: (orgId: string, number: number) => ["org", orgId, "issues", "one", number] as const,

@@ -2,19 +2,9 @@
  * Test fake — agent tool access, same shapes and resolution order as the
  * backend (packages/engine/src/access.ts): deny > tool > connector > scope > all.
  * - `GET/PUT /api/app/organizations/{orgId}/agents/{agentId}/access`
- * - `GET …/access-matrix`
  */
 import type { ApiClient } from "@/api/client";
-import type {
-  AccessInput,
-  AccessMatrix,
-  AccessScope,
-  AccessState,
-  AgentAccess,
-  Connection,
-  CustomServer,
-} from "@/api/types";
-import type { MockContext } from "./context";
+import type { AccessInput, AccessScope, AccessState, AgentAccess, Connection, CustomServer } from "@/api/types";
 
 type FakeTool = { name: string; label: string; description: string; sensitive: boolean; readOnly: boolean };
 const tool = (name: string, label: string, description: string, readOnly = false, sensitive = false): FakeTool => ({
@@ -98,6 +88,7 @@ const empty = (): AccessInput => ({
   all: false,
   connectors: {},
   scopes: [
+    { connectionId: null, scope: "context:read" },
     { connectionId: null, scope: "memory:write" },
     { connectionId: null, scope: "skills:read" },
   ],
@@ -180,7 +171,6 @@ export function fakeAccessTree(
 }
 
 export function createFakeAccess(
-  ctx: MockContext,
   connections: (orgId: string) => Promise<Connection[]>,
   log: (method: string, ...args: unknown[]) => void,
   /** Custom MCP servers (their classified tools join the tree). */
@@ -196,34 +186,6 @@ export function createFakeAccess(
       log("access.set", orgId, agentId, input);
       inputs.set(agentId, structuredClone(input));
       return tree(orgId, input);
-    },
-    matrix: async (orgId) => {
-      const agents = await ctx.lookup.agents(orgId);
-      const tools: (AccessMatrix["tools"][number] & { state: AccessState })[] = [];
-      const sample = await tree(orgId, empty());
-      for (const s of sample.builtins) {
-        for (const t of s.tools) tools.push({ ...t, group: "agentes", key: `builtin|${t.name}` });
-      }
-      for (const c of sample.connectors) {
-        for (const s of c.scopes) {
-          for (const t of s.tools) tools.push({ ...t, group: c.label, key: `${c.connectionId}|${t.name}` });
-        }
-      }
-      const cells: AccessMatrix["cells"] = {};
-      for (const a of agents) {
-        const agentTree = await tree(orgId, of(a.id));
-        const row: Record<string, AccessState> = {};
-        for (const s of agentTree.builtins) for (const t of s.tools) row[`builtin|${t.name}`] = t.state;
-        for (const c of agentTree.connectors) {
-          for (const s of c.scopes) for (const t of s.tools) row[`${c.connectionId}|${t.name}`] = t.state;
-        }
-        cells[a.id] = row;
-      }
-      return {
-        agents: agents.map((a) => ({ id: a.id, name: a.name, handle: a.handle })),
-        tools: tools.map(({ state: _s, ...t }) => t),
-        cells,
-      };
     },
   };
 }

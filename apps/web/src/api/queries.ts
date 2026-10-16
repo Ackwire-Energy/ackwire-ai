@@ -7,7 +7,6 @@ import type { ApiClient } from "./client";
 import { useApi } from "./context";
 import { keys } from "./keys";
 import type {
-  AccessInput,
   AgentComputer,
   AgentInput,
   ApiRule,
@@ -31,7 +30,6 @@ import type {
   RoutinePatch,
   S3Input,
   SandboxSettingsInput,
-  ScopeGrant,
   SearchKind,
   SeriesScope,
   SkillInput,
@@ -467,15 +465,6 @@ export const useAgentScopes = (orgId: string, agentId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.scopes(orgId, agentId), queryFn: () => api.scopes.get(orgId, agentId) });
 };
-
-export function useSetAgentScopes(orgId: string, agentId: string) {
-  const api = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (grants: ScopeGrant[]) => api.scopes.set(orgId, agentId, grants),
-    onSuccess: (grants) => qc.setQueryData(keys.scopes(orgId, agentId), grants),
-  });
-}
 
 // ── Management (phase 4) ────────────────────────────────────────────────────
 
@@ -1049,29 +1038,6 @@ export const useAgentAccess = (orgId: string, agentId: string, enabled = true) =
     retry: false,
   });
 };
-
-export const useAccessMatrix = (orgId: string, enabled = true) => {
-  const api = useApi();
-  return useQuery({
-    queryKey: keys.accessMatrix(orgId),
-    queryFn: () => api.access.matrix(orgId),
-    enabled,
-    retry: false,
-  });
-};
-
-export function useSetAgentAccess(orgId: string) {
-  const api = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ agentId, input }: { agentId: string; input: AccessInput }) => api.access.set(orgId, agentId, input),
-    onSuccess: (saved, { agentId }) => {
-      qc.setQueryData(keys.agentAccess(orgId, agentId), saved);
-      void qc.invalidateQueries({ queryKey: keys.accessMatrix(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.scopes(orgId, agentId) });
-    },
-  });
-}
 
 // ── Skills ───────────────────────────────────────────────────────────────────
 

@@ -5,18 +5,16 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import type { AccessInput } from "@/api/types";
-import { groupState } from "@/components/AccessMatrix";
 import {
-  countTools,
-  cycleTool,
-  modelFrom,
-  presetModel,
-  resolve,
-  setDenied,
-  toggle,
-  toInput,
-  treeFromAccess,
-} from "@/lib/access";
+  asksAt,
+  inputWithLevels,
+  levelIn,
+  levelOf,
+  levelsOf,
+  nextLevel,
+  resourcesOf,
+  toolsAt,
+} from "@/lib/access-levels";
 import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { fakeAccessTree } from "./fakes/access";
 import { renderApp, screen, settle } from "./render";
@@ -44,164 +42,194 @@ const input = (over: Partial<AccessInput> = {}): AccessInput => ({
   tools: { allow: [], deny: [] },
   ...over,
 });
+const gh = (name: string) => ({ connectionId: "conn-gh", name });
+const builtin = (scope: string) => ({ connectionId: null, scope });
 
-describe("access model (same order as the gateway: deny > tool > connector > scope > all)", () => {
-  test("round-trips the server tree: grants, connector, denials", () => {
+describe("one level per connector and built-in area", () => {
+  test("resources come from the tree: connectors first, then the built-in areas with the levels they offer", () => {
+    const access = fakeAccessTree(input({ scopes: [builtin("context:read"), builtin("memory:write")] }), conns);
+    const resources = resourcesOf(access);
+    expect(resources.map((r) => [r.id, r.levels.join("/")])).toEqual([
+      ["connector:conn-gh", "none/read/write"],
+      ["area:context", "none/read/write"],
+      ["area:drive", "none/write"],
+      ["area:issues", "none/write"],
+      ["area:calendar", "none/write"],
+      ["area:skills", "none/read"],
+    ]);
+    const github = resources[0];
+    if (!github) throw new Error("github");
+    expect(github.readScopes).toEqual(["github:repo.read"]);
+    // "Ler" gives the read tools; "Ler e escrever" everything, and merge still asks.
+    expect(toolsAt(github, "read").map((t) => t.name)).toEqual(["github_list_pull_requests"]);
+    expect(asksAt(github, "read")).toEqual([]);
+    expect(asksAt(github, "write").map((t) => t.name)).toEqual(["github_merge_pull_request"]);
+    expect(levelsOf(access)).toMatchObject({
+      "connector:conn-gh": "none",
+      "area:context": "write",
+      "area:drive": "none",
+    });
+  });
+
+  test("the level from the grants: read scopes = Ler, the connection = Ler e escrever, anything else = custom", () => {
+    expect(
+      levelIn(
+        fakeAccessTree(input({ scopes: [{ connectionId: "conn-gh", scope: "github:repo.read" }] }), conns),
+        "connector:conn-gh",
+      ),
+    ).toBe("read");
+    expect(levelIn(fakeAccessTree(input({ connectors: { "conn-gh": true } }), conns), "connector:conn-gh")).toBe(
+      "write",
+    );
+    // One tool on its own (older editors), or a denial: custom until someone picks a level.
+    const one = fakeAccessTree(input({ tools: { allow: [gh("github_create_pull_request")], deny: [] } }), conns);
+    expect(levelIn(one, "connector:conn-gh")).toBe("custom");
+    const denied = fakeAccessTree(
+      input({ connectors: { "conn-gh": true }, tools: { allow: [], deny: [gh("github_merge_pull_request")] } }),
+      conns,
+    );
+    expect(levelIn(denied, "connector:conn-gh")).toBe("custom");
+    // "All tools": every connector and area is Ler e escrever (or its top level).
+    const all = fakeAccessTree(input({ all: true }), conns);
+    expect(levelsOf(all)).toMatchObject({ "connector:conn-gh": "write", "area:drive": "write", "area:skills": "read" });
+    expect(levelIn(undefined, "connector:conn-gh")).toBe("none");
+  });
+
+  test("a matrix click cycles through the levels a resource has", () => {
+    const resources = resourcesOf(fakeAccessTree(input(), conns));
+    const by = (id: string) => resources.find((r) => r.id === id) ?? { levels: [] };
+    expect(nextLevel(by("connector:conn-gh"), "none")).toBe("read");
+    expect(nextLevel(by("connector:conn-gh"), "read")).toBe("write");
+    expect(nextLevel(by("connector:conn-gh"), "write")).toBe("none");
+    expect(nextLevel(by("connector:conn-gh"), "custom")).toBe("read");
+    expect(nextLevel(by("area:drive"), "none")).toBe("write");
+    expect(nextLevel(by("area:skills"), "read")).toBe("none");
+  });
+
+  test("setting a level replaces that resource's grants and keeps the rest (repository limits too)", () => {
     const access = fakeAccessTree(
       input({
-        connectors: { "conn-gh": true },
-        scopes: [{ connectionId: null, scope: "drive:write" }],
-        tools: { allow: [], deny: [{ connectionId: "conn-gh", name: "github_merge_pull_request" }] },
+        scopes: [builtin("memory:write")],
+        tools: { allow: [gh("github_create_pull_request")], deny: [gh("github_merge_pull_request")] },
       }),
       conns,
     );
-    const tree = treeFromAccess(access);
-    const model = modelFrom(access);
-    expect(model.grants.has("connector:conn-gh")).toBe(true);
-    expect(model.grants.has("area:drive")).toBe(true);
-    expect(model.denies.has("tool:conn-gh|github_merge_pull_request")).toBe(true);
-    const back = toInput(model, tree);
-    expect(back.connectors).toEqual({ "conn-gh": true });
-    expect(back.scopes).toEqual([{ connectionId: null, scope: "drive:write" }]);
-    expect(back.tools.deny).toEqual([{ connectionId: "conn-gh", name: "github_merge_pull_request" }]);
-    // "Perguntar à pessoa" is always on and never sent as a grant.
-    const resolved = resolve(tree, model);
-    expect(resolved.find((g) => g.id === "area:chat")?.checked).toBe(true);
-    expect(back.scopes.some((s) => s.scope === "")).toBe(false);
+    const raw = [
+      { connectionId: "conn-gh", scope: "github:git.repo:acme/app" },
+      { connectionId: "gone", scope: "github:repo.read" },
+    ];
+    const read = inputWithLevels(access, raw, { "connector:conn-gh": "read" });
+    expect(read).toEqual({
+      all: false,
+      connectors: {},
+      scopes: [
+        builtin("memory:write"),
+        { connectionId: "conn-gh", scope: "github:git.repo:acme/app" },
+        { connectionId: "conn-gh", scope: "github:repo.read" },
+      ],
+      tools: { allow: [], deny: [] },
+    });
+    const write = inputWithLevels(access, raw, { "connector:conn-gh": "write" });
+    expect(write.connectors).toEqual({ "conn-gh": true });
+    expect(write.scopes.filter((s) => s.connectionId === "conn-gh")).toEqual([
+      { connectionId: "conn-gh", scope: "github:git.repo:acme/app" },
+    ]);
+    const none = inputWithLevels(access, raw, { "connector:conn-gh": "none" });
+    expect(none.tools).toEqual({ allow: [], deny: [] });
+    // Built-in areas: their scopes.
+    expect(inputWithLevels(access, [], { "area:drive": "write" }).scopes).toContainEqual(builtin("drive:write"));
+    expect(inputWithLevels(access, [], {})).toEqual(inputWithLevels(access, [], { "area:unknown": "write" }));
   });
 
-  test("tri-state groups, inherited children, deny under 'all tools', counts", () => {
-    const access = fakeAccessTree(input(), conns);
-    const tree = treeFromAccess(access);
-    let model = modelFrom(access);
-    const gh = tree.find((g) => g.id === "connector:conn-gh");
-    const pr = gh?.children.find((t) => t.ref.kind === "tool" && t.ref.name === "github_create_pull_request");
-    if (!gh || !pr) throw new Error("tree");
-    model = toggle(model, pr, true, false);
-    expect(resolve(tree, model).find((g) => g.id === gh.id)?.checked).toBe("indeterminate");
-    model = { ...model, allTools: true };
-    model = setDenied(model, "tool:conn-gh|github_merge_pull_request", true);
-    const r = resolve(tree, model);
-    expect(r.find((g) => g.id === "area:issues")?.children[0]?.state).toBe("inherited");
-    expect(countTools(r)).toEqual({ on: 14, total: 15 });
-    // Unchecking an inherited tool is a denial; checking it again lifts it.
-    const issues = tree.find((g) => g.id === "area:issues");
-    const first = issues?.children[0];
-    if (!issues || !first) throw new Error("tree");
-    model = toggle(model, first, false, true);
-    expect(model.denies.has(first.id)).toBe(true);
-    model = toggle(model, first, true, true);
-    expect(model.denies.has(first.id)).toBe(false);
-    // A denied group becomes denials of its tools.
-    model = toggle(model, gh, false, true);
-    expect(
-      toInput(model, tree)
-        .tools.deny.map((t) => t.name)
-        .sort(),
-    ).toEqual(["github_create_pull_request", "github_list_pull_requests", "github_merge_pull_request"]);
-  });
-
-  test("presets: read only, standard (no approval), all", () => {
-    const tree = treeFromAccess(fakeAccessTree(input(), conns));
-    const ro = presetModel(tree, "readonly");
-    expect([...ro.grants].sort()).toContain("tool:conn-gh|github_list_pull_requests");
-    expect(ro.grants.has("tool:conn-gh|github_create_pull_request")).toBe(false);
-    const std = presetModel(tree, "standard");
-    expect(std.grants.has("tool:conn-gh|github_merge_pull_request")).toBe(false);
-    expect(std.grants.has("tool:conn-gh|github_create_pull_request")).toBe(true);
-    expect(presetModel(tree, "all").allTools).toBe(true);
-  });
-
-  test("matrix cell cycle and group summary", () => {
-    const access = fakeAccessTree(input(), conns);
-    const tree = treeFromAccess(access);
-    let model = modelFrom(access);
-    model = cycleTool(model, tree, "conn-gh|github_merge_pull_request");
-    expect(model.grants.has("tool:conn-gh|github_merge_pull_request")).toBe(true);
-    model = cycleTool(model, tree, "conn-gh|github_merge_pull_request");
-    expect(model.denies.has("tool:conn-gh|github_merge_pull_request")).toBe(true);
-    model = cycleTool(model, tree, "conn-gh|github_merge_pull_request");
-    expect(model.denies.has("tool:conn-gh|github_merge_pull_request")).toBe(false);
-    expect(groupState(["granted", "inherited"])).toBe("granted");
-    expect(groupState(["inherited", "inherited"])).toBe("inherited");
-    expect(groupState(["off", "denied"])).toBe("denied");
-    expect(groupState(["off", "granted"])).toBe("partial");
+  test("lowering one resource under 'all tools' spells the others out, so nothing else changes", () => {
+    const access = fakeAccessTree(
+      input({ all: true, tools: { allow: [], deny: [gh("github_merge_pull_request")] } }),
+      conns,
+    );
+    const put = inputWithLevels(access, [], { "area:drive": "none" });
+    expect(put.all).toBe(false);
+    expect(put.scopes.map((s) => s.scope).sort()).toEqual([
+      "calendar:write",
+      "context:read",
+      "issues:write",
+      "memory:write",
+      "skills:read",
+    ]);
+    // GitHub had a denial (custom): kept tool by tool.
+    expect(put.connectors).toEqual({});
+    expect(put.tools.allow).toEqual([gh("github_list_pull_requests"), gh("github_create_pull_request")]);
+    expect(put.tools.deny).toEqual([gh("github_merge_pull_request")]);
+    const after = fakeAccessTree(put, conns);
+    expect(levelsOf(after)).toMatchObject({
+      "connector:conn-gh": "custom",
+      "area:context": "write",
+      "area:drive": "none",
+      "area:skills": "read",
+    });
+    expect(levelOf(resourcesOf(after)[0] as never)).toBe("custom");
   });
 });
 
-describe("Configurações → Agentes e acesso", () => {
+describe("Configurações → Agentes e acesso: the matrix", () => {
   const goAccess = async (state = seedState()) => {
     await renderApp(`/org/${ORG_ID}/settings/access`, { api: createFakeApi(state) });
     await settle(8);
     return within(screen().getByRole("region", { name: "Acesso dos agentes" }));
   };
 
-  test("one row per agent with a summary; Editar opens that agent's permissions", async () => {
-    const section = await goAccess();
-    const rows = Array.from(document.querySelectorAll(".access-agent")).map((r) => r.textContent ?? "");
-    expect(rows[0]).toContain("Ada");
-    expect(rows[0]).toContain("5 de 15 ferramentas · Contexto e memória, Skills");
-    await click(section.getByRole("button", { name: "Editar permissões de Ada" }));
-    await settle(4);
-    expect(screen().getByRole("dialog", { name: "Permissões da Ada" })).toBeTruthy();
-  });
-
-  test("matrix dialog: staged changes, one PUT per changed agent on Salvar; Descartar reverts", async () => {
+  test("agents × connectors; a click cycles Sem acesso → Ler → Ler e escrever and saves right away", async () => {
     const state = seedState();
     const section = await goAccess(state);
-    await click(section.getByRole("button", { name: "Ver todas as permissões" }));
-    await settle(4);
-    const dialog = screen().getByRole("dialog", { name: "Todas as permissões" });
-    const headers = within(dialog)
-      .getAllByRole("columnheader")
-      .map((h) => h.textContent);
-    expect(headers).toEqual(["Ferramenta", "Ada", "Atlas"]);
-    // Groups show how many tools they hold.
-    expect(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Issues" }).textContent).toContain(
-      "Issues · 2",
-    );
-    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de GitHub" }));
-    await click(within(dialog).getByRole("button", { name: "Ada · Fazer merge: sem acesso" }));
-    await click(within(dialog).getByRole("button", { name: "Atlas · Abrir PR: sem acesso" }));
-    // Nothing saved yet: the footer counts the staged changes.
-    expect(state.calls.some((c) => c.method === "access.set")).toBe(false);
-    expect(dialog.textContent).toContain("2 alterações");
-    expect(within(dialog).getByRole("button", { name: "Ada · Fazer merge: liberada" })).toBeTruthy();
-    await click(within(dialog).getByRole("button", { name: "Descartar" }));
-    expect(within(dialog).getByRole("button", { name: "Ada · Fazer merge: sem acesso" })).toBeTruthy();
-    expect(dialog.textContent).not.toContain("alterações");
-    await click(within(dialog).getByRole("button", { name: "Ada · Fazer merge: sem acesso" }));
-    await click(within(dialog).getByRole("button", { name: "Atlas · Abrir PR: sem acesso" }));
-    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(section.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Agente", "GitHub"]);
+    const rows = section.getAllByRole("rowheader").map((h) => h.textContent ?? "");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain("Ada · Dev");
+    expect(rows[1]).toContain("Atlas · Ops");
+    await click(section.getByRole("button", { name: "Ada em GitHub: Sem acesso" }));
     await settle(6);
-    const puts = state.calls.filter((c) => c.method === "access.set");
-    expect(puts.map((c) => c.args[1]).sort()).toEqual([ADA_ID, ATLAS_ID].sort());
-    expect((puts.find((c) => c.args[1] === ADA_ID)?.args[2] as AccessInput | undefined)?.tools.allow).toContainEqual({
-      connectionId: "conn-gh",
-      name: "github_merge_pull_request",
+    const puts = () => state.calls.filter((c) => c.method === "access.set");
+    expect(puts().map((c) => c.args[1])).toEqual([ADA_ID]);
+    const read = puts().at(-1)?.args[2] as AccessInput;
+    expect(read.scopes).toContainEqual({ connectionId: "conn-gh", scope: "github:repo.read" });
+    expect(read.connectors["conn-gh"]).toBeUndefined();
+    // Ler e escrever: the whole connection; the lock says merge still asks.
+    await click(section.getByRole("button", { name: "Ada em GitHub: Ler" }));
+    await settle(6);
+    const whole = puts().at(-1)?.args[2] as AccessInput;
+    expect(whole.connectors["conn-gh"]).toBe(true);
+    const write = section.getByRole("button", {
+      name: "Ada em GitHub: Ler e escrever, ações sensíveis pedem aprovação",
     });
+    expect(write.getAttribute("data-level")).toBe("write");
+    await click(write);
+    await settle(6);
+    const none = puts().at(-1)?.args[2] as AccessInput;
+    expect(none.connectors).toEqual({});
+    expect(none.scopes.some((s) => s.connectionId === "conn-gh")).toBe(false);
+    // Atlas was never touched.
+    expect(section.getByRole("button", { name: "Atlas em GitHub: Sem acesso" })).toBeTruthy();
   });
 
-  test("inherited cells: a muted check with a tooltip saying where it comes from; closing with changes asks", async () => {
-    const section = await goAccess();
-    await click(section.getByRole("button", { name: "Ver todas as permissões" }));
-    await settle(4);
-    const dialog = screen().getByRole("dialog", { name: "Todas as permissões" });
-    const context = within(dialog).getByRole("button", { name: "Mostrar ferramentas de Contexto e memória" });
-    expect(context.textContent).toContain("Contexto e memória · 3");
-    await click(context);
-    const memoryCell = within(dialog).getByRole("button", { name: "Ada · Lembrar: liberada" });
-    expect(memoryCell.closest("td")?.getAttribute("data-state")).toBe("granted");
-    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Conversa" }));
-    const ask = within(dialog).getByRole("button", { name: "Ada · Perguntar: Liberada por Conversa" });
-    expect(ask.getAttribute("title")).toBe("Liberada por Conversa");
-    expect(ask.closest("td")?.getAttribute("data-state")).toBe("inherited");
-    // Group rows only show a summary; tool cells are the buttons. Expand Issues and stage one change.
-    await click(within(dialog).getByRole("button", { name: "Mostrar ferramentas de Issues" }));
-    await click(within(dialog).getByRole("button", { name: "Ada · Ler issues: sem acesso" }));
-    expect(dialog.textContent).toContain("1 alteração");
-    await click(within(dialog).getByRole("button", { name: "Fechar" }));
-    expect(dialog.textContent).toContain("Descartar as alterações?");
+  test("built-in areas in the same matrix: their own levels", async () => {
+    const state = seedState();
+    const section = await goAccess(state);
+    await click(section.getByRole("radio", { name: "Nativos" }));
+    expect(section.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "Agente",
+      "Contexto e memória",
+      "Drive",
+      "Issues",
+      "Agenda",
+      "Skills",
+    ]);
+    expect(section.getByRole("button", { name: "Atlas em Skills: Ler" })).toBeTruthy();
+    await click(section.getByRole("button", { name: "Atlas em Drive: Sem acesso" }));
+    await settle(6);
+    const put = state.calls.filter((c) => c.method === "access.set").at(-1);
+    expect(put?.args[1]).toBe(ATLAS_ID);
+    const drive = put?.args[2] as AccessInput;
+    expect(drive.scopes).toContainEqual(builtin("drive:write"));
+    expect(section.getByRole("button", { name: "Atlas em Drive: Ler e escrever" })).toBeTruthy();
   });
 
   test("members don't see it", async () => {
@@ -213,30 +241,46 @@ describe("Configurações → Agentes e acesso", () => {
   });
 });
 
-describe("Criar agente → Ferramentas", () => {
-  test("presets open the same tree; the choice is saved with the new agent", async () => {
+describe("Criar agente → connector levels", () => {
+  test("the levels chosen for the connectors survive creation (nothing written afterwards replaces them)", async () => {
     const state = seedState();
-    await renderApp(`/org/${ORG_ID}/agents/new`, { api: createFakeApi(state) });
+    const api = createFakeApi(state);
+    await renderApp(`/org/${ORG_ID}/agents/new`, { api });
     await settle(8);
-    const tools = screen().getByRole("region", { name: "Ferramentas" });
-    expect(
-      within(tools)
-        .getByRole("button", { name: /Padrão/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
-    expect(within(tools).getByRole("checkbox", { name: "Fazer merge" }).getAttribute("aria-checked")).toBe("false");
-    await click(within(tools).getByRole("button", { name: /Só leitura/ }));
-    expect(within(tools).getByRole("checkbox", { name: "Abrir PR" }).getAttribute("aria-checked")).toBe("false");
-    await click(within(tools).getByRole("button", { name: /Todas/ }));
-    expect(
-      within(tools)
-        .getByRole("switch", { name: "Todas as ferramentas (atuais e futuras)" })
-        .getAttribute("aria-checked"),
-    ).toBe("true");
+    const levels = screen().getByRole("list", { name: "Conectores e níveis" });
+    const github = within(levels).getByRole("radiogroup", { name: "Nível em GitHub" });
+    // Our connectors start at "Ler".
+    expect(within(github).getByRole("radio", { name: "Ler" }).getAttribute("aria-checked")).toBe("true");
+    await click(within(github).getByRole("radio", { name: "Ler e escrever" }));
     await type(screen().getByLabelText("Nome"), "Iris");
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
-    const put = state.calls.filter((c) => c.method === "access.set").at(-1)?.args[2] as AccessInput;
-    expect(put.all).toBe(true);
+    const created = state.calls.find((c) => c.method === "agents.create");
+    expect(created).toBeTruthy();
+    const puts = state.calls.filter((c) => c.method === "access.set");
+    expect(puts).toHaveLength(1);
+    const agentId = puts[0]?.args[1] as string;
+    const put = puts[0]?.args[2] as AccessInput;
+    expect(put.connectors).toEqual({ "conn-gh": true });
+    // The built-in defaults of a new agent stay.
+    expect(put.scopes).toContainEqual(builtin("memory:write"));
+    // No other write to the grants after it.
+    expect(state.calls.some((c) => c.method === "scopes.set")).toBe(false);
+    const saved = await api.access.get(ORG_ID, agentId);
+    expect(levelIn(saved, "connector:conn-gh")).toBe("write");
+  });
+
+  test("a connector left at Sem acesso isn't granted", async () => {
+    const state = seedState();
+    await renderApp(`/org/${ORG_ID}/agents/new`, { api: createFakeApi(state) });
+    await settle(8);
+    const github = within(screen().getByRole("list", { name: "Conectores e níveis" })).getByRole("radiogroup", {
+      name: "Nível em GitHub",
+    });
+    await click(within(github).getByRole("radio", { name: "Sem acesso" }));
+    await type(screen().getByLabelText("Nome"), "Iris");
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(state.calls.some((c) => c.method === "access.set")).toBe(false);
   });
 });

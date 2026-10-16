@@ -1,7 +1,6 @@
 import type { HttpApi } from "./client";
 import { ApiError, createFileRequester, createRequester, enc, type FetchLike } from "./http";
 import type {
-  AccessMatrix,
   ActiveRun,
   Agent,
   AgentAccess,
@@ -337,7 +336,6 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       get: (orgId, agentId) => request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`),
       set: (orgId, agentId, input) =>
         request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`, { method: "PUT", json: input }),
-      matrix: (orgId) => request<AccessMatrix>(`${org(orgId)}/access-matrix`),
     },
     invites: {
       createLink: (orgId) => request<{ url: string; expiresAt: string }>(`${org(orgId)}/invite-links`, { json: {} }),

@@ -1,7 +1,5 @@
 import {
-  AttentionNote,
   Button,
-  Checkbox,
   Chip,
   Dialog,
   DialogBody,
@@ -18,12 +16,10 @@ import {
 } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  useAgentAccess,
   useAgentDetail,
-  useAgentScopes,
   useAgentSkills,
   useChannels,
   useCredentials,
@@ -32,13 +28,11 @@ import {
   usePlatformKey,
   useProposals,
   useRuns,
-  useSetAgentAccess,
-  useSetAgentScopes,
   useSettings,
   useUpdateAgent,
 } from "@/api/queries";
-import type { Agent, AgentAccess } from "@/api/types";
-import { AccessTree } from "@/components/AccessTree";
+import type { Agent } from "@/api/types";
+import { AgentAccessPanel } from "@/components/AccessLevels";
 import { AudienceChip, AudienceRow } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentComputerRow } from "@/components/AgentComputer";
@@ -48,14 +42,10 @@ import { LoadingLine, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { ManageSkillsDialog } from "@/components/Skills";
 import { AgentCover } from "@/components/Sky";
-import { useAreaLabel } from "@/hooks/useAreaLabel";
 import { useDirectory } from "@/hooks/useDirectory";
-import { useScopeGroups } from "@/hooks/useScopeGroups";
-import { type AccessModel, countTools, modelFrom, resolve, toInput, treeFromAccess } from "@/lib/access";
 import { formatInt, formatMonth, formatTokensShort, formatUsd, joinNames, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
 import { can } from "@/lib/permissions";
-import { scopeSummary, searchGroups, toggleGrant } from "@/lib/scopes";
 import { parseAmount } from "@/lib/text";
 import { useToast } from "@/lib/toast";
 import { DEFAULT_KEY, keyOptions, modelOptions, NO_OWNER } from "./NewAgentPage";
@@ -97,13 +87,14 @@ function AgentProfile({ agent }: { agent: Agent }) {
   const detail = useAgentDetail(org.id, agent.id);
   const channels = useChannels(org.id);
   const settings = useSettings(org.id);
-  const access = useAgentAccess(org.id, agent.id);
   const skills = useAgentSkills(org.id, agent.id);
   const memory = useMemory(org.id, agent.id);
   const proposals = useProposals(org.id);
   const editable = can(org.role, "manage_agents");
   // The look: admins and the agent's owner.
   const canLook = editable || (agent.ownerUserId != null && agent.ownerUserId === me.user.id);
+  // Access levels: same rule as the server (admins or the agent's owner).
+  const canAccess = canLook;
   const g = agentGrammar(t, agent.name);
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const modelLabel = models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model;
@@ -113,17 +104,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
     .find((c) => c !== undefined);
   const month = formatMonth(i18n.language, new Date());
   const [dialog, setDialog] = useState<
-    | null
-    | "runs"
-    | "budget"
-    | "perms"
-    | "instructions"
-    | "knowledge"
-    | "model"
-    | "owner"
-    | "skills"
-    | "look"
-    | "identity"
+    null | "runs" | "budget" | "instructions" | "knowledge" | "model" | "owner" | "skills" | "look" | "identity"
   >(null);
   const close = () => setDialog(null);
   const navigate = useNavigate();
@@ -138,7 +119,6 @@ function AgentProfile({ agent }: { agent: Agent }) {
       : agent.hasCredential
         ? t("agent.withOrgKey", { org: org.name })
         : t("agent.withPlatformKey");
-  const tools = access.data ? countTools(resolve(treeFromAccess(access.data), modelFrom(access.data))) : null;
   const enabledSkills = (skills.data ?? []).filter((x) => x.enabled);
   const active = (memory.data ?? []).filter((m) => !m.archived);
   const facts = active.filter((m) => m.kind === "fact" || m.kind === "decision").length;
@@ -257,28 +237,9 @@ function AgentProfile({ agent }: { agent: Agent }) {
 
         <AudienceRow agent={agent} />
 
-        <SummaryRow
-          id="sec-perm"
-          title={t("agent.permissionsTitle", g)}
-          action={
-            editable ? (
-              <Button size="sm" aria-label={t("agent.editPermissions")} onClick={() => setDialog("perms")}>
-                {t("agent.edit")}
-              </Button>
-            ) : null
-          }
-        >
-          {access.isLoading ? (
-            <LoadingLine width={160} />
-          ) : tools ? (
-            <span>
-              {access.data?.all
-                ? t("agent.toolsAll", { on: tools.on, total: tools.total })
-                : t("agent.toolsCount", { on: tools.on, total: tools.total })}
-            </span>
-          ) : (
-            <ScopeSummary agent={agent} />
-          )}
+        <SummaryRow id="sec-perm" title={t("agent.permissionsTitle", g)} action={null}>
+          <span className="small muted">{t("access.agentSubtitle")}</span>
+          <AgentAccessPanel agent={agent} editable={canAccess} />
         </SummaryRow>
 
         <SummaryRow id="sec-skills" title={t("skills.agentTitle")} action={edit(t("skills.agentTitle"), "skills")}>
@@ -370,7 +331,6 @@ function AgentProfile({ agent }: { agent: Agent }) {
         agent={agent}
         ownerName={owner?.name}
       />
-      <PermissionsDialog open={dialog === "perms"} onOpenChange={(o) => setDialog(o ? "perms" : null)} agent={agent} />
     </div>
   );
 }
@@ -397,23 +357,6 @@ function SummaryRow({
       </div>
       {action && <div className="summary-row__action">{action}</div>}
     </section>
-  );
-}
-
-/** Before the access API: what is granted per scope group. */
-function ScopeSummary({ agent }: { agent: Agent }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const groups = useScopeGroups(org.id);
-  const grants = useAgentScopes(org.id, agent.id);
-  const summary = groups && grants.data ? scopeSummary(groups, grants.data, t("agent.noPermission")) : null;
-  if (!summary) return null;
-  return (
-    <span>
-      {summary.connectors > 0
-        ? t("agent.permissionsSummary", { ...summary, count: summary.connectors, org: org.name })
-        : t("agent.permissionsSummaryBuiltin", { ...summary, org: org.name })}
-    </span>
   );
 }
 
@@ -796,163 +739,6 @@ function BudgetDialog({
           </Button>
         </DialogFooter>
       </form>
-    </Dialog>
-  );
-}
-
-/**
- * "Editar permissões": the tool tree (`…/agents/{id}/access`). Until the
- * backend has it (404), the older per-scope list.
- */
-export function PermissionsDialog({
-  open,
-  onOpenChange,
-  agent,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  agent: Agent;
-}) {
-  const { org } = useOrg();
-  const access = useAgentAccess(org.id, agent.id, open);
-  if (access.isError && (access.error as { status?: number }).status === 404) {
-    return <ScopePermissionsDialog open={open} onOpenChange={onOpenChange} agent={agent} />;
-  }
-  return <AccessDialog open={open} onOpenChange={onOpenChange} agent={agent} access={access.data} />;
-}
-
-function AccessDialog({
-  open,
-  onOpenChange,
-  agent,
-  access,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  agent: Agent;
-  access: AgentAccess | undefined;
-}) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const toast = useToast();
-  const save = useSetAgentAccess(org.id);
-  const g = agentGrammar(t, agent.name);
-  const [model, setModel] = useState<AccessModel | null>(null);
-  const areaLabel = useAreaLabel();
-  const tree = useMemo(() => (access ? treeFromAccess(access, areaLabel) : null), [access, areaLabel]);
-  // Start from the server's state each time the dialog opens.
-  useEffect(() => {
-    if (open && access) setModel(modelFrom(access));
-    if (!open) setModel(null);
-  }, [open, access]);
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={t("agent.permissionsDialog", g)}
-      closeLabel={t("common.close")}
-      width={640}
-    >
-      <DialogBody>
-        {tree && model ? (
-          <AccessTree tree={tree} model={model} onChange={setModel} />
-        ) : (
-          <p className="small muted">{t("common.loading")}</p>
-        )}
-      </DialogBody>
-      <DialogFooter bar note={t("agent.permFooter")}>
-        <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
-        <Button
-          variant="primary"
-          disabled={!model || !tree || save.isPending}
-          loading={save.isPending}
-          onClick={() => {
-            if (!model || !tree) return;
-            save.mutate(
-              { agentId: agent.id, input: toInput(model, tree) },
-              {
-                onSuccess: () => {
-                  toast.show(t("access.saved", g));
-                  onOpenChange(false);
-                },
-              },
-            );
-          }}
-        >
-          {t("access.save")}
-        </Button>
-      </DialogFooter>
-    </Dialog>
-  );
-}
-
-function ScopePermissionsDialog({
-  open,
-  onOpenChange,
-  agent,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  agent: Agent;
-}) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const groups = useScopeGroups(org.id) ?? [];
-  const grants = useAgentScopes(org.id, agent.id);
-  const set = useSetAgentScopes(org.id, agent.id);
-  const [q, setQ] = useState("");
-  const g = agentGrammar(t, agent.name);
-  const granted = useMemo(
-    () => new Set((grants.data ?? []).map((x) => `${x.connectionId ?? ""}|${x.scope}`)),
-    [grants.data],
-  );
-  const shown = searchGroups(groups, q);
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={t("agent.permissionsDialog", g)}
-      closeLabel={t("common.close")}
-    >
-      <DialogSearchList
-        query={q}
-        onQueryChange={setQ}
-        searchLabel={t("agent.permSearch")}
-        searchPlaceholder={t("agent.permPlaceholder")}
-        isEmpty={shown.length === 0}
-        emptyText={t("agent.permEmpty", { q })}
-      >
-        {shown.map((group) => (
-          <div key={group.id} className="scope-group">
-            <span className="ac-eyebrow scope-group__label">
-              {group.name} · {group.note}
-            </span>
-            {group.scopes.map((s) => {
-              const id = `scope-${s.key.replace(/[^a-zA-Z0-9]/g, "-")}`;
-              return (
-                <label key={s.key} htmlFor={id} className="scope-row">
-                  <Checkbox
-                    id={id}
-                    checked={granted.has(s.key)}
-                    disabled={set.isPending}
-                    onCheckedChange={(on) => set.mutate(toggleGrant(grants.data ?? [], s.grant, on))}
-                  />
-                  <span className="scope-row__text">
-                    <span>{s.label}</span>
-                    <span className="small muted">{s.description}</span>
-                  </span>
-                  {s.sensitive && <AttentionNote>{t("agent.asksApprovalShort")}</AttentionNote>}
-                </label>
-              );
-            })}
-          </div>
-        ))}
-      </DialogSearchList>
-      <DialogFooter bar note={t("agent.permFooter")}>
-        <Button variant="primary" onClick={() => onOpenChange(false)}>
-          {t("agent.done")}
-        </Button>
-      </DialogFooter>
     </Dialog>
   );
 }

@@ -27,7 +27,7 @@ import {
   useUsageReport,
 } from "@/api/queries";
 import type { Credential, Role } from "@/api/types";
-import { AccessMatrixSection } from "@/components/AccessMatrix";
+import { AccessMatrixSection } from "@/components/AccessLevels";
 import { SandboxSection } from "@/components/AgentComputer";
 import { ConnectorsSection } from "@/components/Connectors";
 import { ErrorState, LoadingList } from "@/components/Loading";

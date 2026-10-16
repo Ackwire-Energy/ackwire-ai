@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import { approvalAction } from "@/components/ApprovalItem";
 import { createI18n } from "@/i18n";
-import { grantKey, scopeGroups, scopeSummary, searchGroups, toggleGrant } from "@/lib/scopes";
+import { scopeGroups, scopeSummary } from "@/lib/scopes";
 import { budgetAlert } from "@/realtime/context";
 import { CATALOG, seedState } from "./fake-api";
 
@@ -53,14 +53,6 @@ describe("agent permissions model", () => {
     const summary = scopeSummary(groups, state.scopes[Object.keys(state.scopes)[0] ?? ""] ?? [], "Nenhuma permissão");
     expect(summary).toMatchObject({ total: 7, granted: 4, connectors: 1 });
     expect(summary.rows[1]).toEqual({ id: "conn-gh", name: "GitHub", granted: "ler código", gated: ["fazer merge"] });
-  });
-
-  test("search and toggling grants", () => {
-    expect(searchGroups(groups, "merge").map((g) => g.scopes.length)).toEqual([1]);
-    const g = { connectionId: "conn-gh", scope: "github:pr.read" };
-    const on = toggleGrant([], g, true);
-    expect(on.map(grantKey)).toEqual(["conn-gh|github:pr.read"]);
-    expect(toggleGrant(on, g, false)).toEqual([]);
   });
 
   test("approve button verb from the tool/scope; budget alert copy", () => {

@@ -1,9 +1,11 @@
 import type { TFunction } from "i18next";
 import type { Run, RunStep } from "@/api/types";
 import type { LiveCode, LiveOutput } from "@/realtime/streams";
-import { toolLabel } from "./access";
 import { type ActivityKind, toolActivity } from "./activity";
 import { joinNames } from "./format";
+
+/** Fallback when a tool has no label: "github_merge_pull_request" → "github merge pull request". */
+export const toolLabel = (name: string) => name.replace(/[_-]+/g, " ").trim();
 
 /** One thing the agent did (a tool call), for the work summary. */
 export interface WorkItem {
