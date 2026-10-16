@@ -144,7 +144,7 @@ describe("memory judgments: policy", () => {
     ).toMatchObject({ action: "resolve", winner: "new" });
     // Low confidence in the contradiction: nothing is archived, they're only linked.
     expect(
-      decide(fact(f, "Never deploy on Fridays.", { evidence: [human("m7")] }), [{ ...j[0], p: 0.55 } as Judged]),
+      decide(fact(f, "Never deploy on Fridays.", { evidence: [human("m7")] }), [{ ...j[0], p: 0.5 } as Judged]),
     ).toEqual({ action: "create", related: [personSaid.id] });
   });
 

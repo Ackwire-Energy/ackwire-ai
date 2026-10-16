@@ -109,6 +109,8 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
 
 test("agents answer each other at most once in a row without a person", async () => {
   f = await setup({
+    // The judge hears both "@x over to you" and "@x back to you" as hand-offs; the hop limit stops the second.
+    judge: (kind) => (kind === "mention_handoff" ? 0.9 : 0),
     reply: (req) => ({ chunks: [systemText(req.system).includes("@dev)") ? "@qa over to you" : "@dev back to you"] }),
   });
   const qa = await createAgent(

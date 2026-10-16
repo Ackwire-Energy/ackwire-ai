@@ -78,7 +78,8 @@ describe("agent page: tabs and the URL", () => {
     const { router } = await go();
     const hero = document.querySelector(".agp-hero") as HTMLElement;
     expect(hero.textContent).toContain("Esperando aprovação");
-    expect(hero.textContent).toContain("Responde quando chamam por @ada");
+    // The fake agent waits for an approval: the line under the status counts the requests.
+    expect(hero.textContent).toContain("1 pedido");
     expect(hero.textContent).toContain("US$ 12,30");
     expect(hero.textContent).toContain("de US$ 40");
     expect(hero.textContent).toContain("Responsável: João");
