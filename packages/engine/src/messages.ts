@@ -274,7 +274,10 @@ export async function insertMessageWithRuns(
       ), muted as (
         -- A mission's thread (ADR 0029): only its owner and those who can decide make its agent act.
         -- Anyone else addressing it starts nothing: the message becomes a suggestion.
-        select mi.id as mission_id, mi.agent_id from ${schema.missions} mi
+        select mi.id as mission_id, mi.agent_id,
+          not exists (select 1 from ${schema.missionParticipants} mo
+            where mo.mission_id = mi.id and mo.user_id = ${userId}) as outsider
+        from ${schema.missions} mi
         where ${person}::boolean and ${threadId}::uuid is not null and mi.org_id = ${input.orgId}::uuid
           and mi.thread_root_id = ${threadId}::uuid and mi.status in ('proposed', 'active', 'paused')
           and mi.owner_id is distinct from ${userId}
@@ -354,7 +357,9 @@ export async function insertMessageWithRuns(
             -- Addressed the mission's agent without the right to: a suggestion the owner decides.
             || coalesce((select jsonb_build_object('missionSuggestion',
                   jsonb_build_object('status', 'pending', 'missionId', mu.mission_id))
-                from muted mu where mu.agent_id in (select agent_id from addressed) limit 1), '{}'::jsonb)
+                from muted mu where mu.agent_id in (select agent_id from addressed)
+                  -- A plain reply there by someone who takes no part: a suggestion too, so the owner sees it.
+                  or (mu.outsider and not exists (select 1 from mentioned)) limit 1), '{}'::jsonb)
         where (${threadId}::uuid is null or exists (
           select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
             and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))

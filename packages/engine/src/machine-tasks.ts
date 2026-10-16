@@ -173,7 +173,9 @@ export interface StartTaskInput {
   /** Where it runs, relative to the agent's folder (a mission's repository, or the worktree of the session to resume). */
   cwd?: string | null;
   /** A mission's task (protocol 5): the runner gives its executor the `agentes` MCP server and these rules. */
-  mission?: { id: string; rules: string } | null;
+  mission?: { id: string; rules: string; mode?: "plan" | "work"; branchPrefix?: string } | null;
+  /** Tags the task as the mission's without the MCP server (our agent's own tasks in agent mode; protocol 4). */
+  missionId?: string | null;
 }
 
 /** A runner older than protocol 4 can't run background tasks: the person has to update it. */
@@ -209,7 +211,7 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
       threadRootId: input.threadRootId,
       runId: input.runId,
       requestedByUserId: input.requestedByUserId,
-      missionId: input.mission?.id ?? null,
+      missionId: input.mission?.id ?? input.missionId ?? null,
       title: plainTitle(input.title),
       executor: input.executor,
       command: (input.command ?? "").slice(0, TASK_TEXT_LIMITS.command),
@@ -296,6 +298,54 @@ export async function listAgentTasks(db: Executor, orgId: string, agentId: strin
       desc(machineTasks.createdAt),
     )
     .limit(limit);
+}
+
+/**
+ * The agent's tasks this conversation may see (`list_tasks`, `task_status`,
+ * `cancel_task`): those of its channel, and a mission's tasks only in that
+ * mission's thread (ADR 0029). Running ones first.
+ */
+export async function listConversationTasks(
+  db: Executor,
+  scope: { orgId: string; agentId: string; channelId: string; threadRootId: string },
+  limit = 20,
+) {
+  return db
+    .select()
+    .from(machineTasks)
+    .where(and(eq(machineTasks.orgId, scope.orgId), eq(machineTasks.agentId, scope.agentId), taskVisibleSql(scope)))
+    .orderBy(
+      sql`case when ${machineTasks.status} in ('queued', 'running') then 0 else 1 end`,
+      desc(machineTasks.createdAt),
+    )
+    .limit(limit);
+}
+
+const taskVisibleSql = (scope: { channelId: string; threadRootId: string }) =>
+  and(
+    eq(machineTasks.channelId, scope.channelId),
+    sql`(${machineTasks.missionId} is null or ${machineTasks.threadRootId} = ${scope.threadRootId}::uuid)`,
+  );
+
+/** One of the agent's tasks, if this conversation may see it (see `listConversationTasks`). */
+export async function getConversationTask(
+  db: Executor,
+  scope: { orgId: string; agentId: string; channelId: string; threadRootId: string },
+  taskId: string,
+) {
+  if (!/^[0-9a-f-]{36}$/i.test(taskId)) return null;
+  const [row] = await db
+    .select()
+    .from(machineTasks)
+    .where(
+      and(
+        eq(machineTasks.orgId, scope.orgId),
+        eq(machineTasks.agentId, scope.agentId),
+        eq(machineTasks.id, taskId),
+        taskVisibleSql(scope),
+      ),
+    );
+  return row ?? null;
 }
 
 /** A thread's tasks (the app's live card, the agent's context). */
@@ -418,14 +468,15 @@ export async function applyTaskDone(
       )
       .returning();
     if (!ended) return null;
-    if (!ended.canceledBy?.startsWith("agent:")) await enqueueWake(tx, ended);
+    // A task the agent canceled itself wakes nobody; a mission's still gets its end handled (notes, inbox).
+    if (!ended.canceledBy?.startsWith("agent:") || ended.missionId) await enqueueWake(tx, ended);
     return ended;
   });
   if (row) await publishTaskEvent(deps.pubsub, row);
   return row;
 }
 
-const enqueueWake = (tx: Executor, row: Pick<MachineTaskRow, "id" | "orgId">) =>
+export const enqueueWake = (tx: Executor, row: Pick<MachineTaskRow, "id" | "orgId">) =>
   enqueue(tx, {
     orgId: row.orgId,
     kind: "machine.task_done",
@@ -433,6 +484,14 @@ const enqueueWake = (tx: Executor, row: Pick<MachineTaskRow, "id" | "orgId">) =>
     dedupeKey: `machine.task_done:${row.id}`,
     maxAttempts: 6,
   });
+
+/**
+ * A task the agent started itself with `start_task` (a shell command, or
+ * Claude Code in the conversation's session), not one of a mission
+ * executor's sessions (those have their own session id).
+ */
+export const isAgentTask = (row: Pick<MachineTaskRow, "sessionId" | "threadRootId">) =>
+  !row.sessionId || row.sessionId === row.threadRootId;
 
 /** Starts a task on the machine whose socket is here (resume after an interruption). */
 export type LocalTaskStarter = (input: StartTaskInput) => Promise<MachineTaskRow>;
@@ -468,7 +527,12 @@ export async function settleInterruptedTask(
   // A mission's task resumes when the mission says so and still runs (ADR 0029).
   const [mission] = claimed.missionId
     ? await deps.db
-        .select({ id: schema.missions.id, status: schema.missions.status, resumeTasks: schema.missions.resumeTasks })
+        .select({
+          id: schema.missions.id,
+          status: schema.missions.status,
+          resumeTasks: schema.missions.resumeTasks,
+          executor: schema.missions.executor,
+        })
         .from(schema.missions)
         .where(eq(schema.missions.id, claimed.missionId))
     : [];
@@ -509,7 +573,19 @@ export async function settleInterruptedTask(
         resumeCount: claimed.resumeCount + 1,
         // The session lives in its folder (a worktree for a branch): resume it there.
         cwd: claimed.cwd || null,
-        mission: mission ? { id: mission.id, rules: MISSION_RULES } : null,
+        // Agent mode: the agent's own task, only tagged; otherwise the executor gets the mission's tools again.
+        ...(mission && (mission.executor === "agent" || isAgentTask(claimed))
+          ? { missionId: mission.id }
+          : {
+              mission: mission
+                ? {
+                    id: mission.id,
+                    rules: MISSION_RULES,
+                    mode: mission.status === "proposed" ? ("plan" as const) : ("work" as const),
+                    branchPrefix: `agentes/${mission.id.replace(/-/g, "").slice(-8)}/`,
+                  }
+                : null,
+            }),
       });
       const [linked] = await deps.db
         .update(machineTasks)
@@ -651,6 +727,36 @@ function endText(row: MachineTaskRow, computer: string) {
   }
 }
 
+/** A task's end as the notice the agent reads (`meta.machineTask` with the result) and people see. */
+export function taskEndNotice(row: MachineTaskRow, computer: string) {
+  const files = Array.isArray(row.files) ? row.files : [];
+  return {
+    body: endText(row, computer),
+    meta: {
+      machineTask: {
+        id: row.id,
+        title: row.title,
+        status: row.status,
+        exitCode: row.exitCode,
+        seconds: taskSeconds(row),
+        computer,
+        executor: row.executor,
+        ...(row.branch ? { branch: row.branch } : {}),
+        ...(row.lastLine ? { lastLine: row.lastLine } : {}),
+        ...(files.length ? { files: files.slice(0, 20) } : {}),
+        ...(row.result ? { result: row.result.slice(0, TASK_TEXT_LIMITS.wakeResult) } : {}),
+      },
+      bodyCode: `machine_task_${row.status}`,
+      bodyParams: {
+        title: row.title,
+        computer,
+        seconds: String(taskSeconds(row)),
+        exitCode: String(row.exitCode ?? ""),
+      },
+    } as Record<string, unknown> & { machineTask: Record<string, unknown> },
+  };
+}
+
 /**
  * `machine.task_done`: wakes the conversation once per task. A notice in the
  * task's thread (as its agent) carries the result for the model
@@ -662,14 +768,26 @@ function endText(row: MachineTaskRow, computer: string) {
 export async function wakeConversationForTask(deps: TaskDeps, taskId: string, options: { maxHops: number }) {
   const row = await getTask(deps.db, taskId);
   if (!row || row.wokeAt || !row.endedAt) return null;
-  if (row.missionId) return claimMissionTaskEnd(deps, row);
+  if (row.missionId) {
+    // The agent's own task in a Claude Code or Codex mission's thread wakes the agent like any task;
+    // the executor's sessions (and everything in agent mode) end through the mission.
+    const [mission] = await deps.db
+      .select({ executor: schema.missions.executor })
+      .from(schema.missions)
+      .where(eq(schema.missions.id, row.missionId));
+    if (mission?.executor === "agent" || !isAgentTask(row)) return claimMissionTaskEnd(deps, row);
+  }
+  // A task the agent canceled itself wakes nobody.
+  if (row.canceledBy?.startsWith("agent:")) {
+    await deps.db.update(machineTasks).set({ wokeAt: new Date() }).where(eq(machineTasks.id, row.id));
+    return null;
+  }
   const machine = await getMachineById(deps.db, row.machineId);
   const computer = machine?.name ?? "the computer";
   const [origin] = row.runId
     ? await deps.db.select({ hop: agentRuns.hop }).from(agentRuns).where(eq(agentRuns.id, row.runId))
     : [];
   const hop = origin?.hop ?? 1;
-  const files = Array.isArray(row.files) ? row.files : [];
   const eligible = await eligibleChannelAgents(
     deps.db,
     row.orgId,
@@ -677,6 +795,7 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
     [row.agentId],
     row.requestedByUserId ? { requesterUserId: row.requestedByUserId } : {},
   );
+  const notice = taskEndNotice(row, computer);
   const result = await deps.db.transaction(async (tx) => {
     const [claimed] = await tx
       .update(machineTasks)
@@ -689,29 +808,8 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
       channelId: row.channelId,
       threadId: row.threadRootId,
       author: { type: "agent", agentId: row.agentId, runId: null, hop },
-      body: endText(row, computer),
-      meta: {
-        machineTask: {
-          id: row.id,
-          title: row.title,
-          status: row.status,
-          exitCode: row.exitCode,
-          seconds: taskSeconds(row),
-          computer,
-          executor: row.executor,
-          ...(row.branch ? { branch: row.branch } : {}),
-          ...(row.lastLine ? { lastLine: row.lastLine } : {}),
-          ...(files.length ? { files: files.slice(0, 20) } : {}),
-          ...(row.result ? { result: row.result.slice(0, TASK_TEXT_LIMITS.wakeResult) } : {}),
-        },
-        bodyCode: `machine_task_${row.status}`,
-        bodyParams: {
-          title: row.title,
-          computer,
-          seconds: String(taskSeconds(row)),
-          exitCode: String(row.exitCode ?? ""),
-        },
-      },
+      body: notice.body,
+      meta: notice.meta,
     });
     const runs =
       eligible.length > 0 && message.hop < options.maxHops
@@ -743,7 +841,14 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
 async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
   const machine = await getMachineById(deps.db, row.machineId);
   const computer = machine?.name ?? "the computer";
-  const notice = row.status === "failed" || row.status === "interrupted";
+  // Agent mode: the mission posts the end itself, as the notice that wakes the agent.
+  const [mission] = row.missionId
+    ? await deps.db
+        .select({ executor: schema.missions.executor })
+        .from(schema.missions)
+        .where(eq(schema.missions.id, row.missionId))
+    : [];
+  const notice = mission?.executor !== "agent" && (row.status === "failed" || row.status === "interrupted");
   const claimed = await deps.db.transaction(async (tx) => {
     const [won] = await tx
       .update(machineTasks)
@@ -797,6 +902,10 @@ export async function taskRequester(ctx: ToolContext): Promise<string | null> {
   if (!trigger) return null;
   const woke = trigger.meta?.machineTask as { id?: unknown } | undefined;
   if (typeof woke?.id === "string") return (await getTask(ctx.db, woke.id))?.requestedByUserId ?? null;
+  // Woken by its mission (agent mode): the person the mission said it works for.
+  const inbox = trigger.meta?.missionInbox as { requestedBy?: unknown } | undefined;
+  if (inbox && trigger.authorAgentId === ctx.agentId)
+    return typeof inbox.requestedBy === "string" ? inbox.requestedBy : null;
   return requesterOf(ctx.db, trigger);
 }
 

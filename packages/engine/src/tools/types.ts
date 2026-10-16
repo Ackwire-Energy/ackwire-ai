@@ -53,6 +53,8 @@ export interface ToolDefinition {
   connectorLabel?: string;
   /** Needs a person's approval for every call. Merge, deploy and rollback always do. */
   sensitive?: boolean;
+  /** A mission's tool (agent mode, ADR 0029): its approvals are bound to that mission too. */
+  missionId?: string;
   /** Human summary of a call, for approval cards. */
   describe?(input: Record<string, unknown>): { title: string; detail?: string };
   execute(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput>;

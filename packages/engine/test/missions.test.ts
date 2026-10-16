@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, isNull, schema } from "@agenteschat/db";
 import {
   addChannelMember,
   approveProvisionalDecisions,
@@ -23,7 +23,10 @@ import {
   listMissions,
   type MachineHub,
   MISSION_RULES,
+  machineExecutors,
+  missionBranchPrefix,
   missionSummary,
+  onMissionApprovalDecided,
   opineDecision,
   pauseMission,
   postPersonMessage,
@@ -31,6 +34,7 @@ import {
   requestFilesSync,
   requestToJoin,
   START_PROMPT,
+  sendMissionMessage,
   setAgentAudience,
   setAgentComputerTarget,
   setParticipant,
@@ -207,6 +211,8 @@ describe("missions (ADR 0029)", () => {
     const plan = runner.started[0] as TaskStartRequest;
     expect(plan).toMatchObject({ executor: "claude", session: mission.mainSessionId, mission: { id: mission.id } });
     expect(plan.mission?.rules).toBe(MISSION_RULES);
+    // Before Start the executor only reads (runner protocol 7 permission profile).
+    expect(plan.mission?.mode).toBe("plan");
     expect(plan.prompt).toContain("PLAN MODE");
     const thread = await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, ask.id));
     const card = thread.find((m) => m.meta.missionPlan);
@@ -226,7 +232,12 @@ describe("missions (ADR 0029)", () => {
     await runner.done(plan.taskId);
     await drainOutbox(f.db, f.handlers);
     const proceed = runner.started[1] as TaskStartRequest;
-    expect(proceed).toMatchObject({ session: mission.mainSessionId, resume: true, prompt: START_PROMPT });
+    expect(proceed).toMatchObject({
+      session: mission.mainSessionId,
+      resume: true,
+      prompt: START_PROMPT,
+      mission: { mode: "work", branchPrefix: missionBranchPrefix(mission.id) },
+    });
     expect((await missionRow()).inbox).toHaveLength(0);
     // A mission task's end wakes no agent run.
     expect((await f.db.select().from(schema.agentRuns)).length).toBe(1);
@@ -445,9 +456,14 @@ describe("missions (ADR 0029)", () => {
     const started = ok(
       await runner.mcp(plan.taskId, "start_task", { title: "Navigation", prompt: "Build the tabs", branch: "nav" }),
     );
-    expect(started).toContain("on branch nav");
+    // Item branches live under the mission's prefix (the only ones its executors may push).
+    expect(started).toContain(`on branch ${missionBranchPrefix(view.id)}nav`);
     const item = runner.started.at(-1) as TaskStartRequest;
-    expect(item).toMatchObject({ branch: "nav", cwd: "app", mission: { id: view.id } });
+    expect(item).toMatchObject({
+      branch: `${missionBranchPrefix(view.id)}nav`,
+      cwd: "app",
+      mission: { id: view.id, mode: "work", branchPrefix: missionBranchPrefix(view.id) },
+    });
     expect(item.session).not.toBe(plan.session);
     await pauseMission(md(), f.owner.id, f.org.id, view.id);
     const refused = await runner.mcp(plan.taskId, "start_task", { title: "Auth", prompt: "Sign-in", branch: "auth" });
@@ -724,7 +740,7 @@ describe("missions (ADR 0029)", () => {
     await expect(requestToJoin(md(), zed.id, f.org.id, view.id)).rejects.toMatchObject({ code: "mission.not_found" });
   });
 
-  test("eligible agents: a computer with commands and protocol 5+, and the caller in the audience; offline still listed", async () => {
+  test("eligible agents: a computer with commands (protocol 4+), the caller in the audience, and who can program there; offline still listed", async () => {
     f = await setup({ machines: true, missionTools: true });
     expect(await eligibleMissionAgents(md(), f.owner.id, f.org.id)).toEqual([]);
     const paired = await pairedMachine();
@@ -738,6 +754,10 @@ describe("missions (ADR 0029)", () => {
         name: f.agent.name,
         machine: { id: paired.machineId, name: "MacBook", online: true },
         ready: true,
+        // An older runner that doesn't report its CLIs: Claude Code is assumed.
+        executors: ["claude", "agent"],
+        defaultExecutor: "claude",
+        codexTooOld: false,
       },
     ]);
     const bia = await addMember(f.db, f.org.id, "member", "bia");
@@ -746,7 +766,13 @@ describe("missions (ADR 0029)", () => {
     expect(await eligibleMissionAgents(md(), bia.id, f.org.id)).toHaveLength(0);
     await runner.close();
     expect((await eligibleMissionAgents(md(), f.owner.id, f.org.id))[0]?.machine.online).toBe(false);
+    // Protocol 4: only the agent itself can program there (no mission tools for executors).
     await f.db.update(schema.machines).set({ protocol: 4 }).where(eq(schema.machines.id, paired.machineId));
+    expect((await eligibleMissionAgents(md(), f.owner.id, f.org.id))[0]).toMatchObject({
+      executors: ["agent"],
+      defaultExecutor: "agent",
+    });
+    await f.db.update(schema.machines).set({ protocol: 3 }).where(eq(schema.machines.id, paired.machineId));
     expect(await eligibleMissionAgents(md(), f.owner.id, f.org.id)).toHaveLength(0);
     await f.db
       .update(schema.machines)
@@ -781,5 +807,138 @@ describe("missions (ADR 0029)", () => {
     const closed = await listMissions(md(), f.owner.id, f.org.id, { status: "closed" });
     expect(closed.counts).toEqual({ active: 0, waitingYou: 0, closed: 1 });
     expect(closed.missions.map((m) => m.id)).toEqual([view.id]);
+  });
+
+  test("an item that stops to wait is told to the main session as waiting, not done", async () => {
+    const { view, runner, plan } = await proposed();
+    await startMission(md(), f.owner.id, f.org.id, view.id);
+    await runner.done(plan.taskId);
+    await drainOutbox(f.db, f.handlers);
+    const main = runner.started.at(-1) as TaskStartRequest;
+    ok(await runner.mcp(main.taskId, "start_task", { title: "Navigation", prompt: "Build the tabs", branch: "nav" }));
+    const item = runner.started.at(-1) as TaskStartRequest;
+    ok(
+      await runner.mcp(item.taskId, "ask_decision", {
+        question: "Tabs or drawer?",
+        options: ["Tabs", "Drawer"],
+        blocking: true,
+      }),
+    );
+    const [row] = await f.db.select().from(schema.machineTasks).where(eq(schema.machineTasks.id, item.taskId));
+    expect(row?.waitingFor).toBe("decision");
+    await runner.done(item.taskId);
+    await drainOutbox(f.db, f.handlers);
+    // The main session still runs: the news waits in the inbox, as "waiting".
+    const inbox = (await missionRow()).inbox.map((e) => e.text).join("\n");
+    expect(inbox).toContain('"Navigation"');
+    expect(inbox).toContain("is waiting for a decision");
+    expect(inbox).not.toContain("done after");
+  });
+
+  test("two resumes of one session never run at once: the second waits in the inbox", async () => {
+    const { view, runner, plan } = await proposed();
+    await startMission(md(), f.owner.id, f.org.id, view.id);
+    await runner.done(plan.taskId);
+    await drainOutbox(f.db, f.handlers);
+    await runner.done((runner.started.at(-1) as TaskStartRequest).taskId);
+    await drainOutbox(f.db, f.handlers);
+    const before = runner.started.length;
+    const mission = await missionRow();
+    const out = await Promise.all([
+      sendMissionMessage(md(), f.owner.id, f.org.id, view.id, "first"),
+      sendMissionMessage(md(), f.owner.id, f.org.id, view.id, "second"),
+    ]);
+    expect(out.filter((o) => o.delivered)).toHaveLength(1);
+    expect(runner.started.length).toBe(before + 1);
+    const live = await f.db
+      .select()
+      .from(schema.machineTasks)
+      .where(and(eq(schema.machineTasks.sessionId, mission.mainSessionId), isNull(schema.machineTasks.endedAt)));
+    expect(live).toHaveLength(1);
+    expect((await missionRow()).inbox).toHaveLength(1);
+    const audits = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "mission.message_sent"));
+    expect(audits).toHaveLength(2);
+  });
+
+  test("mission tools are rate limited per task, and what looks like a secret never reaches a card", async () => {
+    const { view, runner, plan } = await proposed();
+    await startMission(md(), f.owner.id, f.org.id, view.id);
+    ok(await runner.mcp(plan.taskId, "report", { summary: "Pushed with token ghp_abcdefghijklmnopqrstuvwxyz0123" }));
+    const report = (await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, view.threadId))).find(
+      (m) => m.meta.missionReport,
+    );
+    expect(report?.body).not.toContain("ghp_abcdefghijklmnopqrstuvwxyz0123");
+    expect(report?.body).toContain("••••");
+    for (let i = 0; i < 5; i++) {
+      ok(await runner.mcp(plan.taskId, "request_approval", { action: "deploy", target: `build ${i}` }));
+    }
+    const sixth = await runner.mcp(plan.taskId, "request_approval", { action: "deploy", target: "build 6" });
+    expect(sixth).toMatchObject({ ok: false, error: { code: "mission.rate_limited" } });
+  });
+
+  test("an approval's outcome is told to the session once, even when the job runs again", async () => {
+    const { view, runner, plan } = await proposed();
+    await startMission(md(), f.owner.id, f.org.id, view.id);
+    ok(await runner.mcp(plan.taskId, "request_approval", { action: "merge", target: "PR #9" }));
+    const [approval] = await f.db.select().from(schema.approvals);
+    await runner.done(plan.taskId);
+    await drainOutbox(f.db, f.handlers);
+    await runner.done((runner.started.at(-1) as TaskStartRequest).taskId);
+    await drainOutbox(f.db, f.handlers);
+    await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id as string, {
+      decision: "approve",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const count = runner.started.length;
+    await onMissionApprovalDecided(md(), approval?.id as string);
+    expect(runner.started.length).toBe(count);
+    expect(runner.started.at(-1)?.prompt).toContain("Approval for Merge PR #9: approved by ana");
+  });
+
+  test("hello stores the coding CLIs; Codex counts only from the minimum version; Claude Code is required to choose it", async () => {
+    f = await setup({ machines: true, missionTools: true });
+    const paired = await pairedMachine();
+    const runner = missionRunner(f.machineHub as MachineHub);
+    await runner.close();
+    const hub = f.machineHub as MachineHub;
+    const conn = hub.open({ send() {}, close() {} });
+    await hub.message(
+      conn,
+      JSON.stringify({
+        type: "hello",
+        token: paired.token,
+        ...RUNNER,
+        exec: true,
+        executors: { codex: { version: "codex-cli 0.150.0" } },
+      }),
+    );
+    const [machine] = await f.db.select().from(schema.machines);
+    expect(machine?.executors).toMatchObject({ codex: { version: "codex-cli 0.150.0" } });
+    expect(machineExecutors(machine as typeof schema.machines.$inferSelect)).toEqual({
+      available: ["agent"],
+      codexTooOld: true,
+    });
+    expect(
+      machineExecutors({
+        protocol: 7,
+        execAllowed: true,
+        executors: { codex: { version: "codex-cli 0.163.0" }, detectedAt: "x" },
+      }).available,
+    ).toEqual(["codex", "agent"]);
+    await expect(
+      createMission(md(), f.owner.id, f.org.id, {
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        goal: "Build",
+        executor: "codex",
+      }),
+    ).rejects.toMatchObject({ code: "mission.executor_outdated" });
+    const view = await createMission(md(), f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      goal: "Build",
+    });
+    expect(view.executor).toBe("agent");
+    expect(view.machine?.executors).toEqual(["agent"]);
   });
 });

@@ -31,6 +31,7 @@ import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { mirrorReplyToIssue } from "./issues";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
+import { notifyMissionApproval } from "./mission-tools";
 import { PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
 import {
@@ -881,7 +882,11 @@ async function executeRunInner(
         prof.mark("persist");
         for (const m of await withWikiLinks(db, run.orgId, posted.messages.map(messageView)))
           await publishMessageCreated(deps.pubsub, m);
-        for (const card of posted.cards) await publishApproval(deps, card, "approval.created");
+        for (const card of posted.cards) {
+          await publishApproval(deps, card, "approval.created");
+          // A mission's approval (agent mode): its owner hears it waits.
+          if (card.missionId) await notifyMissionApproval({ db, pubsub: deps.pubsub }, card).catch(() => undefined);
+        }
         for (const q of posted.questions) await publishQuestion(deps.pubsub, q, "question.asked");
         for (const r of posted.secrets) await publishSecret(deps.pubsub, r, "secret.requested");
         const waitingFor = asks.length > 0 || secretAsks.length > 0 ? "waiting_input" : "waiting_approval";

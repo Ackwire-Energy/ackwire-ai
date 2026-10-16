@@ -27,9 +27,10 @@ import { getChannelCached } from "./context";
 import { publishChannelEvent } from "./events";
 import { MachineRequestError } from "./machine-hub";
 import {
+  enqueueWake,
   formatDuration,
-  getAgentTask,
-  listAgentTasks,
+  getConversationTask,
+  listConversationTasks,
   type MachineTaskRow,
   machineTaskView,
   publishTaskEvent,
@@ -39,6 +40,7 @@ import {
   taskThreadOf,
 } from "./machine-tasks";
 import { MachineOfflineError } from "./machines";
+import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
 import {
   agentComputerInfo,
   type ComputerHandle,
@@ -69,6 +71,76 @@ import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tool
 import { completeUpload, createUpload, failUpload, type UploadRow, uploadedFile, waitForUpload } from "./uploads";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+/** Tools that change the computer (or start work on it); the rest only read. */
+const WRITE_TOOLS = new Set(["run_code", "write_file", "start_task", "run_skill_script", "import_file", "cancel_task"]);
+
+const READ_ONLY_COMMANDS = new Set([
+  "ls",
+  "cat",
+  "head",
+  "tail",
+  "wc",
+  "pwd",
+  "find",
+  "grep",
+  "rg",
+  "tree",
+  "file",
+  "stat",
+  "du",
+  "echo",
+  "which",
+  "sed -n",
+]);
+const READ_ONLY_GIT = new Set(["status", "log", "diff", "show", "branch", "rev-parse", "ls-files", "remote"]);
+
+/**
+ * A bash command that only reads (a proposed mission is planned read only,
+ * ADR 0029): every part (split on `&&`, `||`, `;`, `|`, newlines) starts with
+ * a reading command, with no redirection, substitution or `-exec`/`-delete`.
+ */
+export function isReadOnlyCommand(command: string): boolean {
+  if (/[<>`]|\$\(|-exec\b|-delete\b|-i\b/.test(command)) return false;
+  const parts = command
+    .split(/&&|\|\||;|\||\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return false;
+  return parts.every((part) => {
+    const words = part.split(/\s+/);
+    if (words[0] === "cd") return words.length <= 2;
+    if (words[0] === "git")
+      return READ_ONLY_GIT.has(words[1] ?? "") && !/\s-(D|d|m|M|c|C)\b|--delete|--move/.test(part);
+    if (words[0] === "sed") return words[1] === "-n";
+    return READ_ONLY_COMMANDS.has(words[0] ?? "");
+  });
+}
+
+/**
+ * In a mission's thread (ADR 0029) the computer's tools act for the mission:
+ * work only while it is active (proposed: reading and read-only commands;
+ * paused: reading), and only for its owner and deciders or when the mission
+ * woke the run.
+ */
+async function missionGate(name: string, input: Record<string, unknown>, ctx: ToolContext, run: RunMission) {
+  const mission = await missionOfRun(ctx);
+  if (!mission || mission.id !== run.id || !WRITE_TOOLS.has(name)) return null;
+  if (!(await runActsForMission(ctx, mission))) {
+    return "Only the mission's owner or someone who can decide can make work run on the mission's computer. Tell the person; the owner can accept their suggestion.";
+  }
+  if (mission.status === "paused") return "The mission is paused: don't start or change anything now.";
+  if (mission.status === "proposed") {
+    const code = name === "run_code" && str(input.language) === "bash" ? str(input.code) : "";
+    const command =
+      name === "start_task" && (str(input.executor) === "shell" || !str(input.prompt)) ? str(input.command) : "";
+    const readOnly = (code && isReadOnlyCommand(code)) || (command && isReadOnlyCommand(command));
+    if (!readOnly) {
+      return "The plan isn't approved yet: only read now (read_file, list_files, bash commands that only read). The people press Start first.";
+    }
+  }
+  return null;
+}
 
 /** Live output of one call: at most this much, at most this often. */
 export const LIVE_OUTPUT_CHARS = 64 * 1024;
@@ -1073,6 +1145,8 @@ export function createSandboxToolSource(
                 sessionId: session,
                 resume: Boolean(before),
                 branch: str(input.branch).trim() || null,
+                // In a mission's thread the task is the mission's (its end, pause, stop and close).
+                missionId: (await missionOfRun(ctx))?.id ?? null,
               },
             );
           });
@@ -1109,12 +1183,12 @@ export function createSandboxToolSource(
     {
       name: "list_tasks",
       description:
-        "Your background tasks (start_task), running ones first: id, title, status, time and last line. No need to call it to know when one ends: you are woken then.",
+        "Your background tasks in this conversation (start_task), running ones first: id, title, status, time and last line. No need to call it to know when one ends: you are woken then.",
       scope: SANDBOX_SCOPE,
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       async execute(_input, ctx) {
-        const rows = await listAgentTasks(ctx.db, ctx.orgId, ctx.agentId);
-        if (rows.length === 0) return { content: "You have no background tasks." };
+        const rows = await listConversationTasks(ctx.db, ctx);
+        if (rows.length === 0) return { content: "You have no background tasks in this conversation." };
         return { content: rows.map(taskLine).join("\n"), data: { tasks: rows.map(machineTaskView) } };
       },
     },
@@ -1130,8 +1204,8 @@ export function createSandboxToolSource(
         additionalProperties: false,
       },
       async execute(input, ctx) {
-        const row = await getAgentTask(ctx.db, ctx.orgId, ctx.agentId, str(input.task_id));
-        if (!row) return { content: "No such task of yours.", isError: true };
+        const row = await getConversationTask(ctx.db, ctx, str(input.task_id));
+        if (!row) return { content: "No such task of yours in this conversation.", isError: true };
         const files = Array.isArray(row.files) ? row.files : [];
         const lines = [
           taskLine(row),
@@ -1158,10 +1232,21 @@ export function createSandboxToolSource(
       },
       async execute(input, ctx) {
         try {
-          const row = await getAgentTask(ctx.db, ctx.orgId, ctx.agentId, str(input.task_id));
-          if (!row) return { content: "No such task of yours.", isError: true };
+          const row = await getConversationTask(ctx.db, ctx, str(input.task_id));
+          if (!row) return { content: "No such task of yours in this conversation.", isError: true };
           if (row.endedAt || !["queued", "running", "interrupted"].includes(row.status)) {
             return { content: `Task ${row.id} already ended (${row.status}).` };
+          }
+          // A mission's task: only for its owner and deciders (or the mission's own wake-ups), in its thread.
+          if (row.missionId) {
+            const mission = await missionOfRun(ctx);
+            if (!mission || mission.id !== row.missionId || !(await runActsForMission(ctx, mission))) {
+              return {
+                content: "Only the mission's owner or someone who can decide can stop the mission's work.",
+                isError: true,
+                data: { code: "mission.not_allowed" },
+              };
+            }
           }
           const by = `agent:${ctx.runId}`;
           await ctx.db
@@ -1198,6 +1283,8 @@ export function createSandboxToolSource(
             .where(and(eq(schema.machineTasks.id, row.id), eq(schema.machineTasks.canceledBy, by)))
             .returning();
           if (ended) await publishTaskEvent(deps.pubsub, ended);
+          // A mission's task still gets its end handled (notes, inbox), even canceled by the agent.
+          if (ended?.missionId) await enqueueWake(ctx.db, ended);
           await audit();
           return {
             content: `Task ${row.id} ("${row.title}") is canceled${reply ? "" : " (its computer is offline; it won't resume)"}.`,
@@ -1248,14 +1335,30 @@ export function createSandboxToolSource(
       if (!granted) return withNotices(build(false, 60));
       const settings = await getSandboxSettings(ctx.db, ctx.orgId);
       if (!settings.enabled) return [];
-      const computer = await agentComputerInfo(deps, ctx.orgId, ctx.agentId);
+      // A mission's thread: its computer, and its rules (ADR 0029).
+      const mission = await missionOfRun(ctx);
+      const computer = await agentComputerInfo(
+        deps,
+        ctx.orgId,
+        ctx.agentId,
+        mission ? { machineId: mission.machineId } : null,
+      );
       const network: Network =
         computer.kind === "machine"
           ? { mode: "machine", domains: [] }
           : { mode: settings.network, domains: settings.allowDomains };
-      return withNotices(
+      const tools = withNotices(
         build(settings.requireApproval, settings.execTimeoutSeconds, network, computer, ctx.threadRootId),
       );
+      if (!mission) return tools;
+      return tools.map((t) => ({
+        ...t,
+        async execute(input, toolCtx) {
+          const refused = await missionGate(t.name, input, toolCtx, mission);
+          if (refused) return { content: refused, isError: true, data: { code: "mission.not_allowed" } };
+          return t.execute(input, toolCtx);
+        },
+      }));
     },
   };
 }

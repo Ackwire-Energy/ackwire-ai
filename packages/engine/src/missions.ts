@@ -1,4 +1,4 @@
-import { MISSION_PROTOCOL, type PubSub, TASK_OUTPUT_PROTOCOL } from "@agenteschat/adapters";
+import { MISSION_PROTOCOL, type PubSub, TASK_OUTPUT_PROTOCOL, TASKS_PROTOCOL } from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -19,7 +19,7 @@ import { audienceSql } from "./audience";
 import { recordAudit } from "./audit";
 import { requireChannelAccess } from "./channels";
 import { eligibleChannelAgents } from "./dispatch";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import {
@@ -33,6 +33,7 @@ import {
 import { MachineOfflineError, machineOnline } from "./machines";
 import { insertMessage, type Message, messageView } from "./messages";
 import { MISSION_RULES } from "./mission-rules";
+import { enqueueRunJob } from "./mission-runs";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import type { SearchDeps } from "./search";
@@ -83,6 +84,67 @@ export type PlanItem = schema.MissionPlanItem;
 export type PlanStatus = PlanItem["status"];
 
 export const PLAN_STATUSES: PlanStatus[] = ["todo", "doing", "waiting_you", "done", "dropped"];
+
+/**
+ * Who does the work on the computer: Claude Code or Codex (the executor is
+ * the brain, ADR 0029), or `agent`: our agent itself, with its own tools
+ * (`start_task`, `run_code`, files) on the connected computer, keeping the
+ * plan with its mission tools. Stored as text; validated here.
+ */
+export type MissionExecutor = "claude" | "codex" | "agent";
+export const MISSION_EXECUTORS: readonly MissionExecutor[] = ["claude", "codex", "agent"];
+export const isMissionExecutor = (v: unknown): v is MissionExecutor =>
+  typeof v === "string" && (MISSION_EXECUTORS as readonly string[]).includes(v);
+
+/**
+ * Codex needs `exec --json`, `exec … resume <id>` and no `--full-auto` (ADR
+ * 0029, "Codex"): 0.163.0 is the release verified on a real machine.
+ */
+export const CODEX_MIN_VERSION = "0.163.0";
+
+/** `codex-cli 0.163.0` → [0, 163, 0]; null when there is no version in it. */
+export function versionOf(text: string | undefined): number[] | null {
+  const m = /(\d+)\.(\d+)\.(\d+)/.exec(text ?? "");
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+const atLeast = (have: number[], want: number[]) => {
+  for (let i = 0; i < 3; i++) if ((have[i] ?? 0) !== (want[i] ?? 0)) return (have[i] ?? 0) > (want[i] ?? 0);
+  return true;
+};
+
+/** What a computer can run a mission with: what it has installed (protocol 7) and what its runner speaks. */
+export function machineExecutors(machine: {
+  protocol: number;
+  execAllowed: boolean;
+  executors?: schema.MachineExecutors | null;
+}): { available: MissionExecutor[]; codexTooOld: boolean } {
+  if (!machine.execAllowed || machine.protocol < TASKS_PROTOCOL) return { available: [], codexTooOld: false };
+  const found = machine.executors ?? {};
+  // A runner that doesn't report its CLIs (older than protocol 7): Claude Code is assumed, as before.
+  const unknown = !found.detectedAt;
+  const available: MissionExecutor[] = [];
+  let codexTooOld = false;
+  if (machine.protocol >= MISSION_PROTOCOL) {
+    if (unknown || found.claude) available.push("claude");
+    if (found.codex) {
+      const v = versionOf(found.codex.version);
+      if (v && atLeast(v, versionOf(CODEX_MIN_VERSION) as number[])) available.push("codex");
+      else codexTooOld = true;
+    }
+  }
+  available.push("agent");
+  return { available, codexTooOld };
+}
+
+/** The default: Claude Code when the computer has it, else our agent. */
+export const defaultExecutor = (available: MissionExecutor[]): MissionExecutor =>
+  available.includes("claude") ? "claude" : "agent";
+
+/** The stuck-loop guard (agent mode): the same task failing this many times in a row, or this many idle wake-ups. */
+export const MISSION_STUCK = { failures: 3, idleWakeups: 5 } as const;
+
+/** The mission's branches start with this (the runner lets its executor push only these). */
+export const missionBranchPrefix = (missionId: string) => `agentes/${missionId.replace(/-/g, "").slice(-8)}/`;
 export const MISSION_LIMITS = {
   title: 120,
   goal: 2000,
@@ -124,6 +186,19 @@ export function planPrompt(mission: Pick<MissionRow, "title" | "goal">) {
     "and call report with the goal in one sentence for the people. Then end your turn: the people review the plan and press Start.",
   ].join("\n");
 }
+
+/** Agent mode: what our agent is told when its mission is proposed (it plans it itself). */
+export function agentPlanPrompt(mission: Pick<MissionRow, "title" | "goal">) {
+  return [
+    `Mission proposed: ${mission.title}. Goal: ${mission.goal}`,
+    "PLAN MODE: explore the repository on the computer read-only (read_file, list_files, run_code with read-only commands); don't change anything yet.",
+    "Then call update_plan with the first items (a checklist; short, stable ids) and report the goal in one sentence. Then end your turn: the people review the plan and press Start.",
+  ].join("\n");
+}
+
+/** Agent mode: what our agent is told when the owner presses Start. */
+export const AGENT_START_PROMPT =
+  "The person approved the plan. Do the work now on the computer: start_task for anything long (it wakes you when it ends), run_code for short commands; keep the plan with update_plan, report milestones, ask decisions with ask_decision, request_review when there is something to show, and request_approval before any merge, deploy or rollback.";
 
 export const START_PROMPT =
   "The person approved the plan. Proceed: split the work into tasks (each in its own branch) using the agentes tools; keep the plan updated; ask for a review when you have something to show.";
@@ -200,6 +275,57 @@ function requireAct(role: MissionRole, what = "do this") {
 
 function requireOpen(mission: MissionRow) {
   if (!OPEN.includes(mission.status)) throw new ConflictError("This mission is closed", "mission.closed");
+}
+
+/** The mission's agent answers this person (D31) and is still in the mission's conversation. */
+export async function agentAnswers(
+  db: Executor,
+  mission: Pick<MissionRow, "orgId" | "channelId" | "agentId">,
+  userId: string,
+) {
+  const ok = await eligibleChannelAgents(db, mission.orgId, mission.channelId, [mission.agentId], {
+    requesterUserId: userId,
+  });
+  return ok.length > 0;
+}
+
+/**
+ * Mission tools per hour, per task (the executor's MCP tools) or per agent
+ * (agent mode): a loop can't flood the thread or the approvers. Beyond it the
+ * call fails with `mission.rate_limited`.
+ */
+export const MISSION_TOOL_RATES: Record<string, number> = {
+  report: 30,
+  update_plan: 60,
+  ask_decision: 10,
+  request_review: 10,
+  request_approval: 5,
+  upload_artifact: 30,
+  start_task: 30,
+};
+
+/** Counts this call (a `tool_call` event) and refuses past the hourly limit. */
+export async function checkMissionToolRate(
+  db: Executor,
+  mission: Pick<MissionRow, "id" | "orgId">,
+  tool: string,
+  key: string,
+) {
+  const limit = MISSION_TOOL_RATES[tool];
+  if (!limit) return;
+  const rows = rowsOf<{ n: number | string }>(
+    await db.execute(sql`select count(*)::int as n from ${missionEvents}
+      where mission_id = ${mission.id}::uuid and kind = 'tool_call' and created_at > now() - interval '1 hour'
+        and data->>'tool' = ${tool} and data->>'key' = ${key}`),
+  );
+  if (Number(rows[0]?.n ?? 0) >= limit) {
+    throw new ConflictError(
+      `Too many ${tool} calls in the last hour (at most ${limit}). Slow down: do the work, then report once.`,
+      "mission.rate_limited",
+      { tool, limit: String(limit) },
+    );
+  }
+  await recordMissionEvent(db, mission, "tool_call", { tool, key });
 }
 
 /** Appends to the mission's feed. */
@@ -300,7 +426,16 @@ export interface MissionView {
   /** The caller asked to join and nobody answered yet. */
   joinRequested: boolean;
   runningTasks: number;
-  machine: { id: string; name: string; online: boolean; lentBy: string | null } | null;
+  machine: {
+    id: string;
+    name: string;
+    online: boolean;
+    lentBy: string | null;
+    /** Who can do the work there (the plan card lets the owner switch before Start). */
+    executors: MissionExecutor[];
+    /** Codex is installed but older than `CODEX_MIN_VERSION`. */
+    codexTooOld: boolean;
+  } | null;
   /** The owner has no computer for it (handed over without one): work can't start until they set one. */
   needsComputer: boolean;
   /** The caller's role, and what it allows. */
@@ -352,6 +487,9 @@ export async function missionViews(
             lastSeenAt: machines.lastSeenAt,
             pairedBy: machines.pairedByUserId,
             deletedAt: machines.deletedAt,
+            protocol: machines.protocol,
+            execAllowed: machines.execAllowed,
+            executors: machines.executors,
           })
           .from(machines)
           .where(inArray(machines.id, machineIds))
@@ -427,7 +565,16 @@ export async function missionViews(
       },
       joinRequested: role === "none" && join?.mine === true,
       runningTasks: runningOf.get(r.id) ?? 0,
-      machine: m ? { id: m.id, name: m.name, online: machineOnline(m), lentBy: r.machineLentBy } : null,
+      machine: m
+        ? {
+            id: m.id,
+            name: m.name,
+            online: machineOnline(m),
+            lentBy: r.machineLentBy,
+            executors: machineExecutors(m).available,
+            codexTooOld: machineExecutors(m).codexTooOld,
+          }
+        : null,
       needsComputer,
       role,
       canAct: mayAct(role) && OPEN.includes(r.status),
@@ -569,8 +716,18 @@ function hubOf(deps: MissionDeps) {
   return deps.hub;
 }
 
-/** The agent's connected computer, usable for missions (online, commands on, runner protocol 5). */
-async function usableMachine(deps: MissionDeps, orgId: string, machineId: string | null) {
+/**
+ * The agent's connected computer, usable for missions: online, commands on,
+ * and able to run the chosen executor (Claude Code or Codex: runner protocol
+ * 5 and the CLI there; our agent: protocol 4). No executor asked: Claude Code
+ * when the computer has it, else our agent.
+ */
+async function usableMachine(
+  deps: MissionDeps,
+  orgId: string,
+  machineId: string | null,
+  asked?: MissionExecutor | null,
+) {
   if (!machineId) {
     throw new ConflictError("Missions run on a connected computer, and this agent has none", "mission.no_computer");
   }
@@ -583,11 +740,21 @@ async function usableMachine(deps: MissionDeps, orgId: string, machineId: string
       computer: status.name,
     });
   }
-  if (status.protocol < MISSION_PROTOCOL) {
+  const { available, codexTooOld } = machineExecutors(status);
+  if (available.length === 0 || (asked && asked !== "agent" && status.protocol < MISSION_PROTOCOL)) {
     throw new ConflictError(
       `The runner on ${status.name} is too old for missions: run agentes-runner update`,
       "mission.runner_outdated",
       { computer: status.name },
+    );
+  }
+  if (asked && !available.includes(asked)) {
+    throw new ConflictError(
+      asked === "codex" && codexTooOld
+        ? `Codex on ${status.name} is too old for missions (needs ${CODEX_MIN_VERSION} or later): update it there`
+        : `${asked === "codex" ? "Codex" : "Claude Code"} isn't installed on ${status.name}`,
+      asked === "codex" && codexTooOld ? "mission.executor_outdated" : "mission.executor_unavailable",
+      { computer: status.name, executor: asked, ...(asked === "codex" ? { minVersion: CODEX_MIN_VERSION } : {}) },
     );
   }
   if (!status.online) {
@@ -595,7 +762,7 @@ async function usableMachine(deps: MissionDeps, orgId: string, machineId: string
       computer: status.name,
     });
   }
-  return status;
+  return { ...status, executor: asked ?? defaultExecutor(available) };
 }
 
 export interface ProposeInput {
@@ -609,7 +776,8 @@ export interface ProposeInput {
   goal: string;
   /** The repository on the machine, relative to the agent's folder. */
   repoDir?: string | null;
-  executor?: "claude" | "codex";
+  /** Who programs: default Claude Code when the computer has it, else our agent. */
+  executor?: MissionExecutor | null;
   runId?: string | null;
 }
 
@@ -637,7 +805,10 @@ export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
   if (!title || !goal) throw new ValidationError("A mission needs a title and a goal", "mission.invalid");
   const agent = await getAgentCached(db, input.orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  const machine = await usableMachine(deps, input.orgId, agent.machineId ?? null);
+  if (input.executor != null && !isMissionExecutor(input.executor)) {
+    throw new ValidationError("Choose claude, codex or agent", "mission.invalid_executor");
+  }
+  const machine = await usableMachine(deps, input.orgId, agent.machineId ?? null, input.executor ?? null);
   const existing = await missionOfThread(db, input.orgId, input.threadRootId);
   if (existing) throw new ConflictError("This thread already has a mission", "mission.exists");
   const [paired] = await db
@@ -657,7 +828,7 @@ export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
         machineId: machine.id,
         // The computer is someone else's (the agent's): they lend it to this mission.
         machineLentBy: paired?.pairedBy && paired.pairedBy !== input.ownerId ? paired.pairedBy : null,
-        executor: input.executor ?? "claude",
+        executor: machine.executor,
         title,
         goal,
         mainSessionId: crypto.randomUUID(),
@@ -692,25 +863,35 @@ export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
     });
     return row;
   });
-  try {
-    await startSessionTask(deps, mission, {
-      title: `Plan: ${title}`,
-      prompt: planPrompt(mission),
-      sessionId: mission.mainSessionId,
-      cwd: repoDir,
-      resume: false,
-      runId: input.runId ?? null,
-    });
-  } catch (error) {
-    // Nothing started: no mission either.
-    await db.delete(missions).where(eq(missions.id, mission.id));
-    throw error;
+  if (mission.executor !== "agent") {
+    try {
+      await startSessionTask(deps, mission, {
+        title: `Plan: ${title}`,
+        prompt: planPrompt(mission),
+        sessionId: mission.mainSessionId,
+        cwd: repoDir,
+        resume: false,
+        runId: input.runId ?? null,
+      });
+    } catch (error) {
+      // Nothing started: no mission either.
+      await db.delete(missions).where(eq(missions.id, mission.id));
+      throw error;
+    }
   }
   await postMissionMessage(deps, mission, `Plan for "${title}": ${goal}`, {
     missionPlan: { missionId: mission.id, title, goal, computer: machine.name, executor: mission.executor },
     bodyCode: "mission_plan",
     bodyParams: { title, computer: machine.name },
   });
+  // Agent mode: the agent itself explores (read only) and writes the plan, in the thread.
+  if (mission.executor === "agent") {
+    await wakeMissionAgent(deps, mission, agentPlanPrompt(mission), {
+      from: "the mission",
+      kind: "system",
+      requestedBy: input.ownerId,
+    });
+  }
   await requestFilesSync(db, mission);
   await publishMissionEvent(deps, mission, "proposed");
   return mission;
@@ -732,18 +913,25 @@ export async function createMission(
     channelId?: string | null;
     threadId?: string | null;
     repoDir?: string | null;
+    executor?: MissionExecutor | null;
   },
 ) {
   const { db } = deps;
   let channelId = input.channelId ?? null;
   let rootId = input.threadId ?? null;
+  /** Someone else's thread: its author keeps a say (added as `decide`). */
+  let rootAuthor: string | null = null;
   if (rootId) {
-    const [root] = await db
-      .select()
+    const [found] = await db
+      .select({ root: messages, createdBy: threads.createdBy })
       .from(messages)
+      .leftJoin(threads, and(eq(threads.orgId, messages.orgId), eq(threads.rootMessageId, messages.id)))
       .where(and(eq(messages.id, rootId), eq(messages.orgId, orgId)));
+    const root = found?.root;
     if (!root || root.threadId || root.deletedAt) throw new NotFoundError("Thread not found");
     channelId = root.channelId;
+    const theirs = root.authorUserId === userId || found?.createdBy === userId;
+    if (!theirs && root.authorUserId) rootAuthor = root.authorUserId;
   }
   if (!channelId) throw new ValidationError("Give the conversation (channelId) or the thread (threadId)");
   const { channel, membership } = await requireChannelAccess(db, userId, orgId, channelId);
@@ -786,7 +974,23 @@ export async function createMission(
     title,
     goal,
     repoDir: input.repoDir,
+    executor: input.executor ?? null,
   });
+  // A mission made in someone else's thread: whoever started that thread decides too (when the agent answers them).
+  if (rootAuthor && (await agentAnswers(db, mission, rootAuthor))) {
+    await db
+      .insert(missionParticipants)
+      .values({ orgId, missionId: mission.id, userId: rootAuthor, role: "decide", addedBy: userId })
+      .onConflictDoNothing();
+    await recordMissionEvent(db, mission, "participant_added", { by: userId, userId: rootAuthor, role: "decide" });
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "mission.participant_added",
+      target: { type: "mission", id: mission.id },
+      details: { userId: rootAuthor, role: "decide", reason: "thread_author" },
+    });
+  }
   return viewFor(deps, mission, userId, can(membership.role, "manage_members"));
 }
 
@@ -851,7 +1055,13 @@ export async function startSessionTask(
       resume: input.resume,
       cwd: input.cwd || null,
       branch: input.branch ?? null,
-      mission: { id: mission.id, rules: MISSION_RULES },
+      mission: {
+        id: mission.id,
+        rules: MISSION_RULES,
+        // Before Start the executor only reads; after it, it works on the mission's branches (runner protocol 7).
+        mode: mission.status === "proposed" ? "plan" : "work",
+        branchPrefix: missionBranchPrefix(mission.id),
+      },
     },
   );
 }
@@ -891,9 +1101,21 @@ export async function tellSession(
   mission: MissionRow,
   target: { sessionId: string; cwd?: string | null },
   text: string,
-  options: { title?: string; requestedBy?: string | null } = {},
-): Promise<{ delivered: boolean; taskId?: string }> {
+  options: { title?: string; requestedBy?: string | null; from?: string; kind?: WakeKind } = {},
+): Promise<{ delivered: boolean; taskId?: string; runId?: string }> {
   if (!OPEN.includes(mission.status)) return { delivered: false };
+  // Work on someone's computer only for people the agent answers (D31).
+  if (options.requestedBy && !(await agentAnswers(deps.db, mission, options.requestedBy))) {
+    throw new ForbiddenError("The mission's agent doesn't answer this person", "mission.agent_unavailable");
+  }
+  // Agent mode: the main session is the agent's own runs in the home thread.
+  if (mission.executor === "agent") {
+    return wakeMissionAgent(deps, mission, text, {
+      requestedBy: options.requestedBy ?? null,
+      from: options.from ?? "the mission",
+      kind: options.kind ?? (options.requestedBy ? "person" : "system"),
+    });
+  }
   const last = await sessionTask(deps.db, mission.id, target.sessionId);
   const cwd = target.cwd ?? last?.cwd ?? mission.repoDir;
   const entry = {
@@ -923,6 +1145,8 @@ export async function tellSession(
   } catch (error) {
     if (
       error instanceof MachineOfflineError ||
+      // Another resume of this session started at the same moment (one live task per session): wait for it.
+      isUniqueViolation(error) ||
       (error instanceof MachineRequestError && ["no_slot", "timeout"].includes(error.code))
     ) {
       await queueForSession(deps.db, mission, entry);
@@ -933,13 +1157,158 @@ export async function tellSession(
 }
 
 /**
+ * Why the agent wakes (agent mode): a person's message or answer (resets the
+ * stuck guard), its own task's end, or anything else the mission says.
+ */
+export type WakeKind = "person" | "task" | "system";
+
+/** Agent mode: whether the agent may be woken now (an active mission, or a proposed one being planned). */
+const agentCanWork = (mission: Pick<MissionRow, "status" | "machineId">) =>
+  Boolean(mission.machineId) && (mission.status === "active" || mission.status === "proposed");
+
+/**
+ * Agent mode (ADR 0029, "Executor agent"): the mission's "main session" is
+ * the agent's own runs in the home thread. Telling it something posts an
+ * agent-facing notice there (`meta.missionInbox`, or a task's end as
+ * `meta.machineTask`) and starts a run of the agent on it, or joins the run
+ * already working in the thread. These wake-ups are hop 0: inside a mission
+ * the agent's own tasks and inbox don't count toward the agent-to-agent
+ * limit; its budget is the brake, plus the stuck-loop guard (5 wake-ups in a
+ * row with no plan item changing state pause the mission). Paused, closed or
+ * without a computer: the text stays in the inbox.
+ */
+export async function wakeMissionAgent(
+  deps: MissionDeps,
+  mission: MissionRow,
+  text: string,
+  options: {
+    requestedBy?: string | null;
+    from?: string;
+    kind?: WakeKind;
+    /** The notice's own body and meta (a task's end); default: the text as `meta.missionInbox`. */
+    notice?: { body: string; meta: Record<string, unknown> };
+  } = {},
+): Promise<{ delivered: boolean; runId?: string }> {
+  const body = text.slice(0, MISSION_LIMITS.sendText);
+  const fresh = (await getMissionRow(deps.db, mission.id)) ?? mission;
+  if (!OPEN.includes(fresh.status)) return { delivered: false };
+  const entry = { sessionId: fresh.mainSessionId, cwd: fresh.repoDir, text: body, at: new Date().toISOString() };
+  if (!agentCanWork(fresh)) {
+    await queueForSession(deps.db, fresh, entry);
+    return { delivered: false };
+  }
+  const kind = options.kind ?? "system";
+  // The stuck-loop guard: a person's word resets it; other wake-ups count until the plan moves.
+  const [counted] = await deps.db
+    .update(missions)
+    .set({ idleWakeups: kind === "person" ? 0 : sql`${missions.idleWakeups} + 1` })
+    .where(eq(missions.id, fresh.id))
+    .returning({ idle: missions.idleWakeups });
+  if (fresh.status === "active" && (counted?.idle ?? 0) > MISSION_STUCK.idleWakeups) {
+    await queueForSession(deps.db, fresh, entry);
+    await pauseStuck(deps, fresh, "no_progress");
+    return { delivered: false };
+  }
+  const requester = options.requestedBy ?? fresh.ownerId;
+  const answers = requester ? await agentAnswers(deps.db, fresh, requester) : false;
+  const from = options.from ?? "the mission";
+  const out = await deps.db.transaction(async (tx) => {
+    const message = await insertMessage(tx, {
+      orgId: fresh.orgId,
+      channelId: fresh.channelId,
+      threadId: fresh.threadRootId,
+      author: { type: "agent", agentId: fresh.agentId, runId: null, hop: 0 },
+      body: options.notice?.body ?? (noMentions(body).slice(0, 39_000) || "…"),
+      meta: options.notice?.meta ?? {
+        missionInbox: { missionId: fresh.id, from, text: noMentions(body), requestedBy: requester, kind },
+        bodyCode: "mission_inbox",
+        bodyParams: { from },
+      },
+    });
+    const started = answers ? await enqueueRunJob(tx, message, fresh.agentId) : { run: null, steered: null };
+    return { message, ...started };
+  });
+  if (deps.pubsub) {
+    await publishMessageCreated(deps.pubsub, messageView(out.message));
+    if (out.run) {
+      await publishChannelEvent(deps.pubsub, {
+        type: "agent.thinking",
+        channelId: fresh.channelId,
+        threadId: fresh.threadRootId,
+        agentId: fresh.agentId,
+        runId: out.run.id,
+      });
+    }
+  }
+  await recordMissionEvent(deps.db, fresh, "agent_woken", {
+    kind,
+    messageId: out.message.id,
+    runId: out.run?.id ?? out.steered,
+  });
+  const runId = out.run?.id ?? out.steered ?? undefined;
+  return { delivered: Boolean(runId), ...(runId ? { runId } : {}) };
+}
+
+/**
+ * The stuck-loop guard fired (agent mode): the mission pauses with a code
+ * (`mission.paused_stuck`) and a notice asking the owner what to do.
+ */
+export async function pauseStuck(
+  deps: MissionDeps,
+  mission: MissionRow,
+  reason: "no_progress" | "repeated_failure",
+  detail: { title?: string } = {},
+) {
+  const [row] = await deps.db
+    .update(missions)
+    .set({ status: "paused", pausedAt: new Date(), idleWakeups: 0, updatedAt: new Date() })
+    .where(and(eq(missions.id, mission.id), eq(missions.status, "active")))
+    .returning();
+  if (!row) return null;
+  await recordMissionEvent(deps.db, row, "paused_stuck", { reason, ...detail });
+  await recordAudit(deps.db, {
+    orgId: row.orgId,
+    actor: { type: "system", id: null },
+    action: "mission.paused",
+    target: { type: "mission", id: row.id },
+    details: { code: "mission.paused_stuck", reason, ...detail },
+  });
+  const why =
+    reason === "repeated_failure"
+      ? `"${detail.title ?? "a task"}" failed ${MISSION_STUCK.failures} times in a row`
+      : `I was woken ${MISSION_STUCK.idleWakeups} times without the plan moving`;
+  await postMissionMessage(deps, row, `I paused the mission: ${why}. What should I do? Resume it to let me go on.`, {
+    missionStuck: { missionId: row.id, reason, ...detail },
+    bodyCode: reason === "repeated_failure" ? "mission_stuck_failure" : "mission_stuck_idle",
+    bodyParams: {
+      title: detail.title ?? "",
+      count: String(reason === "repeated_failure" ? MISSION_STUCK.failures : MISSION_STUCK.idleWakeups),
+    },
+  });
+  await publishMissionEvent(deps, row, "paused", { code: "mission.paused_stuck", reason });
+  if (row.ownerId) {
+    await publishUserEvent(deps.pubsub, row.orgId, row.ownerId, {
+      type: "mission.needs_you",
+      kind: "stuck",
+      missionId: row.id,
+      threadId: row.threadRootId,
+      code: "mission.paused_stuck",
+    });
+  }
+  await requestFilesSync(deps.db, row);
+  return row;
+}
+
+/**
  * Sends what waits in the inbox to the sessions that can hear now (one
  * resume per session, the texts together). Called when a mission task
  * ends, when the mission resumes and when its computer comes back.
  */
 export async function deliverInbox(deps: MissionDeps, missionId: string) {
   const mission = await getMissionRow(deps.db, missionId);
-  if (!mission || mission.inbox.length === 0 || !deps.hub) return 0;
+  if (!mission || mission.inbox.length === 0) return 0;
+  if (mission.executor === "agent") return deliverAgentInbox(deps, mission);
+  if (!deps.hub) return 0;
   const bySession = new Map<string, schema.MissionInboxEntry[]>();
   for (const e of mission.inbox) bySession.set(e.sessionId, [...(bySession.get(e.sessionId) ?? []), e]);
   let sent = 0;
@@ -979,6 +1348,23 @@ export async function deliverInbox(deps: MissionDeps, missionId: string) {
   return sent;
 }
 
+/** Agent mode: everything waiting goes to the agent at once (one notice, one run or steer). */
+async function deliverAgentInbox(deps: MissionDeps, mission: MissionRow) {
+  if (!agentCanWork(mission) || mission.status !== "active") return 0;
+  const [claimed] = await deps.db
+    .update(missions)
+    .set({ inbox: [] })
+    .where(and(eq(missions.id, mission.id), sql`jsonb_array_length(${missions.inbox}) > 0`))
+    .returning({ id: missions.id });
+  if (!claimed) return 0;
+  const text = mission.inbox.map((e) => e.text).join("\n\n");
+  const out = await wakeMissionAgent(deps, mission, text, { from: "the mission", kind: "system" }).catch(async () => {
+    for (const e of mission.inbox) await queueForSession(deps.db, mission, e);
+    return { delivered: false };
+  });
+  return out.delivered ? 1 : 0;
+}
+
 /** What people (or the agent) send to the mission: to its main session. */
 export async function sendToMainSession(
   deps: MissionDeps,
@@ -995,6 +1381,8 @@ export async function sendToMainSession(
     `Message from ${from.name}: ${body}`,
     {
       requestedBy: from.userId ?? null,
+      from: from.name,
+      kind: from.userId ? "person" : "system",
     },
   );
   await recordMissionEvent(deps.db, mission, "sent_to_main", { by: from.userId ?? null, delivered: out.delivered });
@@ -1012,7 +1400,15 @@ export async function sendMissionMessage(
   const { mission, role } = await requireMission(deps, userId, orgId, missionId);
   requireAct(role, "send work to the computer");
   requireOpen(mission);
-  return sendToMainSession(deps, mission, text, { name: await nameOf(deps.db, userId), userId });
+  const out = await sendToMainSession(deps, mission, text, { name: await nameOf(deps.db, userId), userId });
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "person", id: userId },
+    action: "mission.message_sent",
+    target: { type: "mission", id: mission.id },
+    details: { delivered: out.delivered, chars: text.length },
+  });
+  return out;
 }
 
 // ── Controls ─────────────────────────────────────────────────────────────────
@@ -1055,9 +1451,13 @@ export async function startMission(deps: MissionDeps, userId: string, orgId: str
     { status: "active", startedAt: new Date() },
     "mission.started",
   );
-  await tellSession(deps, row, { sessionId: row.mainSessionId, cwd: row.repoDir }, START_PROMPT, {
-    requestedBy: userId,
-  });
+  await tellSession(
+    deps,
+    row,
+    { sessionId: row.mainSessionId, cwd: row.repoDir },
+    row.executor === "agent" ? AGENT_START_PROMPT : START_PROMPT,
+    { requestedBy: userId, from: await nameOf(deps.db, userId), kind: "person" },
+  );
   await requestFilesSync(deps.db, row);
   await publishMissionEvent(deps, row, "started");
   return viewFor(deps, (await getMissionRow(deps.db, row.id)) ?? row, userId, isAdmin);
@@ -1075,6 +1475,8 @@ export async function pauseMission(deps: MissionDeps, userId: string, orgId: str
     { status: "paused", pausedAt: new Date() },
     "mission.paused",
   );
+  // Agent mode: nothing of the mission keeps running on the computer while it is paused.
+  if (row.executor === "agent") await cancelMissionTasks(deps, row, userId);
   await requestFilesSync(deps.db, row);
   await publishMissionEvent(deps, row, "paused");
   return viewFor(deps, row, userId, isAdmin);
@@ -1092,7 +1494,7 @@ export async function resumeMission(deps: MissionDeps, userId: string, orgId: st
     mission,
     userId,
     ["paused"],
-    { status: "active", pausedAt: null },
+    { status: "active", pausedAt: null, idleWakeups: 0 },
     "mission.resumed",
   );
   await deliverInbox(deps, row.id);
@@ -1331,6 +1733,10 @@ export async function setParticipant(
   if (input.userId === mission.ownerId)
     throw new ValidationError("The owner already does everything", "mission.is_owner");
   await requireSeesHome(deps.db, orgId, mission, input.userId);
+  // Deciding makes work run on someone's computer: only for people the agent answers (D31).
+  if (input.role === "decide" && !(await agentAnswers(deps.db, mission, input.userId))) {
+    throw new ValidationError("The mission's agent doesn't answer this person", "mission.agent_unavailable");
+  }
   const before = await missionRole(deps.db, mission, input.userId);
   await deps.db
     .insert(missionParticipants)
@@ -1517,6 +1923,9 @@ export async function decideJoinRequest(
   requireOpen(mission);
   const given = input.outcome === "accepted" ? (input.role ?? "comment") : null;
   if (given) await requireSeesHome(deps.db, orgId, mission, userId);
+  if (given === "decide" && !(await agentAnswers(deps.db, mission, userId))) {
+    throw new ValidationError("The mission's agent doesn't answer this person", "mission.agent_unavailable");
+  }
   const row = await deps.db.transaction(async (tx) => {
     const [updated] = await tx
       .update(missionJoinRequests)
@@ -1578,6 +1987,9 @@ export async function transferMission(
   const { mission, isAdmin } = await requireManage(deps, actorId, orgId, missionId);
   if (input.userId === mission.ownerId) throw new ValidationError("This person already owns it", "mission.is_owner");
   await requireSeesHome(deps.db, orgId, mission, input.userId);
+  if (!(await agentAnswers(deps.db, mission, input.userId))) {
+    throw new ValidationError("The mission's agent doesn't answer this person", "mission.agent_unavailable");
+  }
   const [machine] = mission.machineId
     ? await deps.db
         .select({ pairedBy: machines.pairedByUserId })
@@ -1585,6 +1997,13 @@ export async function transferMission(
         .where(eq(machines.id, mission.machineId))
     : [];
   const theirs = machine?.pairedBy === input.userId;
+  // Only the computer's own person (who paired it, or who lends it now) can keep lending it.
+  if (!theirs && input.lendMachine) {
+    const lenderNow = mission.machineLentBy ?? machine?.pairedBy ?? null;
+    if (actorId !== lenderNow && actorId !== machine?.pairedBy) {
+      throw new ForbiddenError("Only the computer's owner can lend it", "mission.not_your_computer");
+    }
+  }
   const lender = theirs
     ? null
     : input.lendMachine
@@ -1663,9 +2082,9 @@ export async function setMissionMachine(
   if (machine.pairedByUserId !== actorId) {
     throw new ForbiddenError("Choose a computer you paired", "mission.not_your_computer");
   }
-  if (machine.protocol < MISSION_PROTOCOL) {
+  if (!machineExecutors(machine).available.includes(mission.executor as MissionExecutor)) {
     throw new ConflictError(
-      `The runner on ${machine.name} is too old for missions: run agentes-runner update`,
+      `The runner on ${machine.name} can't run this mission: run agentes-runner update`,
       "mission.runner_outdated",
       { computer: machine.name },
     );
@@ -1698,6 +2117,63 @@ export async function setMissionMachine(
   await requestFilesSync(deps.db, row as MissionRow);
   await publishMissionEvent(deps, row as MissionRow, "machine");
   return viewFor(deps, row as MissionRow, actorId, isAdmin);
+}
+
+/**
+ * "Quem programa" on the plan card, before Start: the owner switches who does
+ * the work (Claude Code, Codex, our agent). The planning that runs stops and
+ * starts again with the new one (a new main session).
+ */
+export async function setMissionExecutor(
+  deps: MissionDeps,
+  actorId: string,
+  orgId: string,
+  missionId: string,
+  executor: unknown,
+) {
+  const { mission, role, isAdmin } = await requireMission(deps, actorId, orgId, missionId);
+  if (role !== "owner") throw new ForbiddenError("Only the mission's owner can choose this", "mission.not_owner");
+  if (!isMissionExecutor(executor))
+    throw new ValidationError("Choose claude, codex or agent", "mission.invalid_executor");
+  if (mission.status !== "proposed") {
+    throw new ConflictError("Who programs is chosen before Start", "mission.wrong_status", { status: mission.status });
+  }
+  if (executor === mission.executor) return viewFor(deps, mission, actorId, isAdmin);
+  await usableMachine(deps, orgId, mission.machineId, executor);
+  await cancelMissionTasks(deps, mission, actorId);
+  const [row] = await deps.db
+    .update(missions)
+    .set({ executor, mainSessionId: crypto.randomUUID(), inbox: [], idleWakeups: 0, updatedAt: new Date() })
+    .where(and(eq(missions.id, mission.id), eq(missions.status, "proposed")))
+    .returning();
+  if (!row) throw new ConflictError("The mission changed meanwhile", "mission.wrong_status");
+  await recordMissionEvent(deps.db, row, "executor_changed", { by: actorId, from: mission.executor, to: executor });
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "mission.executor_changed",
+    target: { type: "mission", id: row.id },
+    details: { from: mission.executor, to: executor },
+  });
+  if (executor === "agent") {
+    await wakeMissionAgent(deps, row, agentPlanPrompt(row), {
+      requestedBy: actorId,
+      from: "the mission",
+      kind: "system",
+    });
+  } else {
+    await startSessionTask(deps, row, {
+      title: `Plan: ${row.title}`,
+      prompt: planPrompt(row),
+      sessionId: row.mainSessionId,
+      cwd: row.repoDir,
+      resume: false,
+      requestedBy: actorId,
+    });
+  }
+  await requestFilesSync(deps.db, row);
+  await publishMissionEvent(deps, row, "executor", { executor });
+  return viewFor(deps, row, actorId, isAdmin);
 }
 
 // ── The plan ─────────────────────────────────────────────────────────────────
@@ -1803,9 +2279,11 @@ export async function updatePlan(
       .onConflictDoNothing()
       .returning({ version: missionPlanVersions.version });
     if (!inserted) throw new ConflictError("The plan changed at the same time; send it again", "mission.plan_conflict");
+    // An item changing state is progress: the stuck-loop guard starts over.
+    const moved = change.added.length > 0 || change.changed.some((c) => c.from !== c.to);
     await tx
       .update(missions)
-      .set({ planVersion: version, ...planCounts(items), updatedAt: new Date() })
+      .set({ planVersion: version, ...planCounts(items), ...(moved ? { idleWakeups: 0 } : {}), updatedAt: new Date() })
       .where(eq(missions.id, mission.id));
     await recordMissionEvent(tx, mission, "plan_updated", { version, ...change, taskId: input.taskId ?? null });
     let message: Message | null = null;
@@ -2462,6 +2940,11 @@ export interface EligibleAgent {
   machine: { id: string; name: string; online: boolean };
   /** Online: a mission can start now. Offline agents are listed (their computer comes back). */
   ready: boolean;
+  /** Who can do the work on that computer ("Quem programa"), and the default. */
+  executors: MissionExecutor[];
+  defaultExecutor: MissionExecutor;
+  /** Codex is there but too old (`CODEX_MIN_VERSION`). */
+  codexTooOld: boolean;
 }
 
 /**
@@ -2479,13 +2962,15 @@ export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userI
     machine_name: string;
     online: boolean;
     last_seen_at: Date | string | null;
+    protocol: number;
+    executors: schema.MachineExecutors | string | null;
   }>(
     await deps.db.execute(sql`select agents.id, agents.handle, agents.name, mc.id as machine_id, mc.name as machine_name,
-        mc.online, mc.last_seen_at
+        mc.online, mc.last_seen_at, mc.protocol, mc.executors
       from ${schema.agents} agents
       join ${machines} mc on mc.id = agents.machine_id and mc.org_id = agents.org_id
       where agents.org_id = ${orgId}::uuid and agents.archived_at is null
-        and mc.deleted_at is null and mc.exec_allowed and mc.protocol >= ${MISSION_PROTOCOL}
+        and mc.deleted_at is null and mc.exec_allowed and mc.protocol >= ${TASKS_PROTOCOL}
         and ${audienceSql("agents", sql`${userId}::text`)}
       order by agents.name`),
   );
@@ -2495,12 +2980,21 @@ export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userI
       lastSeenAt: r.last_seen_at ? new Date(r.last_seen_at) : null,
       deletedAt: null,
     });
+    const found = typeof r.executors === "string" ? (JSON.parse(r.executors) as schema.MachineExecutors) : r.executors;
+    const { available, codexTooOld } = machineExecutors({
+      protocol: Number(r.protocol),
+      execAllowed: true,
+      executors: found,
+    });
     return {
       agentId: r.id,
       handle: r.handle,
       name: r.name,
       machine: { id: r.machine_id, name: r.machine_name, online },
       ready: online,
+      executors: available,
+      defaultExecutor: defaultExecutor(available),
+      codexTooOld,
     };
   });
 }

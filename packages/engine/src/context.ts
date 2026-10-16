@@ -20,7 +20,7 @@ import { summarizeScopes } from "./capabilities";
 import type { Message } from "./messages";
 import { missionBrief } from "./mission-brief";
 import type { AgentRun } from "./runs";
-import { threadRunInfo } from "./threads";
+import { rangeStillVisible, threadRunInfo } from "./threads";
 
 const { messages, users, agents, channels, channelMembers, organizations, agentScopes } = schema;
 
@@ -111,7 +111,14 @@ export async function buildRunContext(
     // Its mission (ADR 0029) comes from the same read.
     run.threadRootId === run.triggerMessageId ? null : threadRunInfo(db, run.orgId, run.threadRootId),
   ]);
-  const range = threadInfo?.range ?? null;
+  // A range from another channel counts only while everyone here can still see it (re-checked, cached).
+  const rawRange = threadInfo?.range ?? null;
+  const range =
+    rawRange && rawRange.channelId !== run.channelId
+      ? (await rangeStillVisible(db, run.orgId, run.channelId, rawRange.channelId))
+        ? rawRange
+        : null
+      : rawRange;
   // A mission's thread: a compact brief instead of making the agent dig (only there; one lookup above decided).
   const briefing = threadInfo?.missionId ? missionBrief(db, threadInfo.missionId).catch(() => null) : null;
   const trigger = triggerRows[0];
@@ -478,6 +485,17 @@ export function attachedLine(m: Pick<Message, "authorUserId" | "meta">): string 
 
 /** The text the model reads for a task-end notice (`meta.machineTask`), with its result; null for other messages. */
 export function taskNotice(m: Pick<Message, "body" | "meta">, current = false): string | null {
+  // Agent mode (ADR 0029): what the mission tells its agent (an answer, a request, a message from people).
+  const inbox = m.meta?.missionInbox as { from?: unknown; text?: unknown } | undefined;
+  if (inbox && typeof inbox === "object") {
+    const from = typeof inbox.from === "string" ? inbox.from : "the mission";
+    const text = typeof inbox.text === "string" ? inbox.text : m.body;
+    return `[Mission, from ${from}]: ${text}${
+      current
+        ? "\nYou do this mission's work yourself: act on it now with your tools, keep the plan with update_plan, and tell the people briefly."
+        : ""
+    }`;
+  }
   const t = m.meta?.machineTask as
     | { title?: unknown; result?: unknown; lastLine?: unknown; files?: unknown; branch?: unknown; id?: unknown }
     | undefined;

@@ -99,6 +99,8 @@ export interface MachineStatus {
   os: string;
   /** The runner's protocol (from its last hello). */
   protocol: number;
+  /** Coding CLIs found at its last hello (protocol 7; empty for older runners). */
+  executors: schema.MachineExecutors;
 }
 
 /** What the machine provider needs from the hub. */
@@ -284,6 +286,8 @@ export function createMachineHub(deps: MachineHubDeps) {
         protocol: frame.protocol,
         workspace: frame.workspace,
         execAllowed: frame.exec,
+        // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
+        ...(frame.executors ? { executors: { ...frame.executors, detectedAt: now.toISOString() } } : {}),
         updatedAt: now,
       })
       .where(eq(machines.id, machine.id));
@@ -628,6 +632,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         execAllowed: row.execAllowed,
         os: row.os,
         protocol: row.protocol,
+        executors: row.executors ?? {},
       };
     },
 

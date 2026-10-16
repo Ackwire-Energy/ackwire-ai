@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, ne, rowsOf, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
+import { caches } from "./cache";
 import { type Channel, requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
@@ -157,6 +158,37 @@ function requireManage(userId: string, membership: Membership, row: ThreadRow | 
   }
 }
 
+/**
+ * While a mission is open in a thread (ADR 0029 §9), only its owner and
+ * admins close, archive, move or re-range it; otherwise as for a plain thread.
+ */
+async function requireManageThread(
+  db: Database,
+  userId: string,
+  membership: Membership,
+  row: ThreadRow | null,
+  root: Message,
+) {
+  const [mission] = await db
+    .select({ ownerId: schema.missions.ownerId })
+    .from(schema.missions)
+    .where(
+      and(
+        eq(schema.missions.orgId, root.orgId),
+        eq(schema.missions.threadRootId, root.id),
+        inArray(schema.missions.status, ["proposed", "active", "paused"]),
+      ),
+    );
+  if (mission) {
+    if (mission.ownerId === userId || can(membership.role, "manage_members")) return;
+    throw new ForbiddenError(
+      "Only the mission's owner or an admin can do this while the mission is open",
+      "thread.not_allowed",
+    );
+  }
+  requireManage(userId, membership, row, root);
+}
+
 /** The thread's row, created on first need (implicit threads get one when closed, archived or titled). */
 async function ensureRow(db: Executor, root: Message): Promise<ThreadRow> {
   await db
@@ -262,6 +294,26 @@ async function resolveRange(
  * destination (people and agents) is also a member. Refused with
  * `thread.context_not_visible` and who can't see it.
  */
+/**
+ * At run time (ADR 0029): a range from another channel is used only while
+ * everyone in the thread can still see that channel (cached briefly; a run
+ * with it gone reads the thread without the range).
+ */
+export async function rangeStillVisible(db: Database, orgId: string, destinationId: string, sourceId: string) {
+  if (sourceId === destinationId) return true;
+  return (await caches.rangeVisible.getOrLoad(`${orgId}:${destinationId}:${sourceId}`, async () => {
+    const [source] = await db
+      .select()
+      .from(schema.channels)
+      .where(and(eq(schema.channels.orgId, orgId), eq(schema.channels.id, sourceId)));
+    if (!source) return false;
+    return requireRangeVisible(db, orgId, destinationId, source as Channel).then(
+      () => true,
+      () => false,
+    );
+  })) as boolean;
+}
+
 async function requireRangeVisible(db: Database, orgId: string, destinationId: string, source: Channel) {
   if (source.id === destinationId) return;
   if (source.kind === "channel" && source.visibility === "public") return;
@@ -420,7 +472,7 @@ export async function updateThread(
 ): Promise<ThreadInfo> {
   const { db } = deps;
   const { root, row, channel, membership } = await requireThread(db, actorId, orgId, rootId);
-  requireManage(actorId, membership, row, root);
+  await requireManageThread(db, actorId, membership, row, root);
   if (row?.state === "archived") throw new ConflictError("This thread is archived", "thread.archived");
   const rangeChange =
     input.firstMessageId !== undefined || input.lastMessageId !== undefined || input.excludedMessageIds !== undefined;
@@ -448,6 +500,23 @@ export async function updateThread(
       { rootId: root.id, movedIds: row?.contextMovedMessageIds ?? [] },
     );
     await requireRangeVisible(db, orgId, channel.id, source);
+  }
+  // A moved range moves again with its new bounds: none of the new messages may have replies of their own.
+  if (range && row?.contextMoved) {
+    const nested = rowsOf<{ id: string }>(
+      await db.execute(sql`select m.id from ${messages} m
+        where m.org_id = ${orgId}::uuid and m.channel_id = ${range.source.id}::uuid
+          and m.created_at >= ${createdAtOf(orgId, range.first.id)} and m.created_at <= ${createdAtOf(orgId, range.last.id)}
+          and (m.thread_id is null or m.thread_id = ${root.id}::uuid) and m.deleted_at is null and m.id <> ${root.id}::uuid
+          and not (m.id = any(${`{${range.excluded.join(",")}}`}::uuid[]))
+          and exists (select 1 from ${messages} r where r.org_id = m.org_id and r.thread_id = m.id and r.deleted_at is null)
+        limit 20`),
+    ).map((r) => r.id);
+    if (nested.length > 0) {
+      throw new ConflictError("Some of these messages have replies of their own", "thread.range_has_replies", {
+        messageIds: nested,
+      });
+    }
   }
   const title = titleChange ? cleanTitle(input.title) : undefined;
   let movedIds: string[] = [];
@@ -554,7 +623,7 @@ export async function moveContextIntoThread(
 ): Promise<ThreadInfo> {
   const { db } = deps;
   const { root, row, membership } = await requireThread(db, actorId, orgId, rootId);
-  requireManage(actorId, membership, row, root);
+  await requireManageThread(db, actorId, membership, row, root);
   if (!row?.contextFirstAt || !row.contextLastAt) {
     throw new ValidationError("This thread has no context range", "thread.no_context");
   }
@@ -603,7 +672,7 @@ export async function returnContextToChannel(
 ): Promise<ThreadInfo> {
   const { db } = deps;
   const { root, row, membership } = await requireThread(db, actorId, orgId, rootId);
-  requireManage(actorId, membership, row, root);
+  await requireManageThread(db, actorId, membership, row, root);
   if (!row?.contextMoved) return getThread(db, actorId, orgId, rootId);
   if (row.state === "archived") throw new ConflictError("This thread is archived", "thread.archived");
   const back = await db.transaction(async (tx) => {
@@ -629,7 +698,7 @@ export async function returnContextToChannel(
 export async function deleteThread(deps: ThreadDeps, actorId: string, orgId: string, rootId: string) {
   const { db } = deps;
   const { root, row, membership } = await requireThread(db, actorId, orgId, rootId);
-  requireManage(actorId, membership, row, root);
+  await requireManageThread(db, actorId, membership, row, root);
   if (!row || !root.meta.threadStart) {
     throw new ValidationError("Only a thread made from a range can be undone", "thread.not_undoable");
   }
@@ -696,7 +765,7 @@ async function setThreadState(
 ): Promise<ThreadInfo> {
   const { db } = deps;
   const { root, row, membership } = await requireThread(db, actorId, orgId, rootId);
-  requireManage(actorId, membership, row, root);
+  await requireManageThread(db, actorId, membership, row, root);
   const state: ThreadState = row?.state ?? "open";
   if ((action === "close" || action === "reopen") && state === "archived") {
     throw new ConflictError("This thread is archived", "thread.archived");

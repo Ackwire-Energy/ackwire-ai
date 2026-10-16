@@ -8,10 +8,12 @@ import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./
 import { createMissionApproval, onMachineOnline } from "./mission-sync";
 import {
   askDecision,
+  checkMissionToolRate,
   getMissionRow,
   MISSION_LIMITS,
   type MissionDeps,
   type MissionRow,
+  missionBranchPrefix,
   noMentions,
   postMissionMessage,
   publishMissionEvent,
@@ -21,6 +23,7 @@ import {
   updatePlan,
 } from "./missions";
 import { agentSearchChannels, searchVisible } from "./search";
+import { maskSecrets } from "./tool-detail";
 import { validateJson } from "./tools/json-schema";
 import { createUpload, failUpload, uploadedFile, waitForUpload } from "./uploads";
 
@@ -42,8 +45,28 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 /** How long `upload_artifact` waits for the bytes. */
 const UPLOAD_WAIT_MS = 5 * 60_000;
 
+/** The runner sends paths elsewhere in the agent's folder (outside the task's own) with this prefix. */
+const FOLDER_PREFIX = "@folder/";
+
+/** Every string through `maskSecrets` (tokens and keys never land in cards or approvals). */
+const masked = (value: unknown): unknown =>
+  typeof value === "string"
+    ? maskSecrets(value)
+    : Array.isArray(value)
+      ? value.map(masked)
+      : value && typeof value === "object"
+        ? Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, masked(v)]))
+        : value;
+
 /** A path the executor gave (relative to where it runs) as a path in the agent's folder. */
 function taskPath(task: Pick<MachineTaskRow, "cwd">, given: string) {
+  if (given.startsWith(FOLDER_PREFIX)) {
+    const inFolder = workspacePath(given.slice(FOLDER_PREFIX.length));
+    if (!inFolder || inFolder.split("/").includes("..")) {
+      throw new ValidationError("The path leaves your folder", "mission.bad_path");
+    }
+    return inFolder;
+  }
   const rel = workspacePath(given);
   if (!rel) throw new ValidationError("Give a path inside your folder", "mission.bad_path");
   if (rel.split("/").includes("..")) throw new ValidationError("The path leaves your folder", "mission.bad_path");
@@ -112,8 +135,10 @@ export async function handleMissionMcpCall(
   if (!tool) return refuse("mission.unknown_tool", `Unknown tool ${frame.tool}.`);
   const problems = validateJson(tool.inputSchema, frame.args);
   if (problems.length > 0) return refuse("mission.invalid_input", `Invalid input: ${problems.slice(0, 5).join("; ")}`);
-  const args = frame.args;
+  // The runner masked the agent's secrets; anything that still looks like a key is masked here too.
+  const args = masked(frame.args) as Record<string, unknown>;
   try {
+    await checkMissionToolRate(deps.db, mission, tool.name, task.id);
     const text = await run(deps, mission, task, tool.name, args, frame.callId);
     await recordAudit(deps.db, {
       orgId: mission.orgId,
@@ -182,6 +207,7 @@ async function run(
         impact: args.impact,
         blocking,
       });
+      if (blocking) await markWaiting(deps, task.id, "decision");
       return blocking
         ? "Recorded. Stop now and wait; you'll be resumed with the decision."
         : "Recorded as provisional: continue with your recommendation.";
@@ -205,6 +231,7 @@ async function run(
       });
       const pr = str(args.pr_url).trim() || findPullRequestUrl(str(args.summary));
       if (pr) await setTaskPrUrl(deps, task.id, pr);
+      await markWaiting(deps, task.id, "review");
       return `Review requested${artifactIds.length ? ` with ${artifactIds.length} file(s)` : ""}${
         failed.length ? `; not uploaded: ${failed.join(", ")}` : ""
       }. Stop now and wait; you'll be resumed with the people's answer.`;
@@ -217,6 +244,7 @@ async function run(
         detail: noMentions(str(args.detail).trim()).slice(0, 1000),
         callId,
       });
+      await markWaiting(deps, task.id, "approval");
       return `Approval requested (${approval.id}); you'll be resumed with the outcome. Stop now and wait.`;
     }
     case "upload_artifact": {
@@ -246,7 +274,10 @@ async function run(
       }
       if (mission.status !== "active") return "The plan isn't approved yet: wait for the people to press Start.";
       const title = str(args.title).trim().slice(0, 120);
-      const branch = str(args.branch).trim().slice(0, 120);
+      // Item branches live under the mission's prefix: the only ones its executors may push.
+      const prefix = missionBranchPrefix(mission.id);
+      const asked = str(args.branch).trim().replace(/^\/+/, "").slice(0, 100);
+      const branch = asked.startsWith(prefix) ? asked : `${prefix}${asked}`;
       const prompt = [
         `You work on one item of the mission "${mission.title}": ${title}.`,
         `Your branch: ${branch}. Read .agentes/ first. When you are done, report, and request_review if there is something to show.`,
@@ -268,6 +299,14 @@ async function run(
     default:
       return `Unknown tool ${tool}.`;
   }
+}
+
+/** A blocking ask: the task's end means "waiting for people", not "done" (ADR 0029). */
+async function markWaiting(deps: MissionDeps, taskId: string, what: "decision" | "review" | "approval") {
+  await deps.db
+    .update(machineTasks)
+    .set({ waitingFor: what, updatedAt: new Date() })
+    .where(eq(machineTasks.id, taskId));
 }
 
 /** What the machine hub calls for missions (`setMissionHooks`). */

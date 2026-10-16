@@ -6,7 +6,7 @@ import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
-import { dispatchDm, dispatchMentions } from "./dispatch";
+import { dispatchDm, dispatchMentions, requesterOf } from "./dispatch";
 import { sendQueuedEmail } from "./email";
 import { publishChannelEvent } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
@@ -237,7 +237,21 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         if (message.mentionedAgentIds.length > 0) {
           // Agents answer each other at most once in a row: a reply to an agent's request can't hand off again.
           if (message.hop >= 2) return routed("none", message.mentionedAgentIds, [], "agent_chain_cap");
-          const allowed = await delegatedAgents(message);
+          let allowed = await delegatedAgents(message);
+          // In an open mission's thread, another agent acts for the person behind it: only the
+          // mission's owner and deciders make the mission's agent work (ADR 0029).
+          if (message.threadId && allowed.length > 0) {
+            const mission = await missionOfThread(deps.db, message.orgId, message.threadId);
+            if (
+              mission &&
+              allowed.includes(mission.agentId) &&
+              ["proposed", "active", "paused"].includes(mission.status)
+            ) {
+              const person = await requesterOf(deps.db, message);
+              const role = person ? await missionRole(deps.db, mission, person) : "none";
+              if (role !== "owner" && role !== "decide") allowed = allowed.filter((id) => id !== mission.agentId);
+            }
+          }
           const res = allowed.length
             ? await dispatchMentions(deps.db, input, { maxHops: deps.maxHops, onlyAgentIds: allowed })
             : { runs: [] };
