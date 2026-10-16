@@ -37,7 +37,10 @@ import type {
   DmTarget,
   ForumParticipantsInput,
   ForumPost,
+  ForumPostInput,
   ForumSuggestedIssue,
+  ForumSuggestion,
+  ForumSuggestionOverrides,
   ForumTopic,
   ForumTopicDetail,
   ForumTopicInput,
@@ -570,19 +573,35 @@ export interface ApiClient {
       },
     ): Promise<WikiPage>;
   };
-  /** The forum: agents discuss a question in rounds and end with a synthesis. */
+  /** The forum: agents (and seated people) discuss a question in rounds and end with a synthesis. */
   forum: {
     list(orgId: string): Promise<ForumTopic[]>;
     get(orgId: string, topicId: string): Promise<ForumTopicDetail>;
     create(orgId: string, input: ForumTopicInput): Promise<ForumTopicDetail>;
-    /** A person's message; it enters before the next round. */
-    post(orgId: string, topicId: string, body: string): Promise<ForumPost>;
-    /** Stops the rounds and writes the synthesis now. */
+    /** A person's post: their seated turn, or it leads the next round; `requestRound` asks for one more. */
+    post(orgId: string, topicId: string, input: ForumPostInput): Promise<ForumPost>;
+    /** No more turns; the synthesis is written next. */
     conclude(orgId: string, topicId: string): Promise<ForumTopicDetail>;
     cancel(orgId: string, topicId: string): Promise<ForumTopicDetail>;
+    /** "Passar a vez": my seated turn goes by. */
+    pass(orgId: string, topicId: string): Promise<ForumTopicDetail>;
+    /** "Retomar": a stalled topic starts the stopped turn again. */
+    resume(orgId: string, topicId: string): Promise<ForumTopicDetail>;
     participants(orgId: string, topicId: string, input: ForumParticipantsInput): Promise<ForumTopicDetail>;
-    /** Creates the chosen suggested issues; returns their numbers. */
-    createIssues(orgId: string, topicId: string, items: ForumSuggestedIssue[]): Promise<{ numbers: number[] }>;
+    /** Creates the approved suggested issues (sub-issues of the origin issue, when there is one). */
+    createIssues(
+      orgId: string,
+      topicId: string,
+      items: ForumSuggestedIssue[],
+    ): Promise<{ numbers: number[]; issues: { id: string; number: number; title: string }[] }>;
+    /** "Abrir fórum" on an agent's suggestion (the card's message); it is mine. */
+    acceptSuggestion(
+      orgId: string,
+      messageId: string,
+      overrides?: ForumSuggestionOverrides,
+    ): Promise<{ topic: ForumTopicDetail; suggestion: ForumSuggestion }>;
+    /** "Agora não": the card stays, marked dismissed. */
+    dismissSuggestion(orgId: string, messageId: string): Promise<{ suggestion: ForumSuggestion }>;
   };
   calendar: {
     /** Events, routine runs, issue deadlines and proposals between `from` and `to` (ISO). */

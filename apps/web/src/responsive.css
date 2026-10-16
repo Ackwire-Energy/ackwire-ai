@@ -259,11 +259,6 @@
     display: none;
   }
 }
-@media (max-width: 760px) {
-  .forum-composer {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
-  }
-}
 @media (max-width: 760px), (pointer: coarse) {
   .wiki-editor__text {
     font-size: 16px;

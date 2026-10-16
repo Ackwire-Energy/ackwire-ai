@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,13 +8,14 @@ import { useApi } from "@/api/context";
 import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
 import { cacheTask, refreshMission } from "@/api/missions";
-import { cacheApproval, cacheMessage } from "@/api/queries";
+import { cacheApproval, cacheForumSuggestion, cacheMessage } from "@/api/queries";
 import type {
   ActiveRun,
   Agent,
   AgentQuestion,
   BudgetEvent,
   ChannelEvent,
+  ForumUserEvent,
   MachineTask,
   MemoryUpdate,
   Message,
@@ -312,6 +314,10 @@ export function RealtimeProvider({
   // Latest `t` without reconnecting when the language changes.
   const tRef = useRef(t);
   tRef.current = t;
+  // Toasts that open a page ("Abrir"): the router when there is one (tests may render without).
+  const router = useRouter({ warn: false });
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: one socket per org; toast and language are read live
   useEffect(() => {
@@ -343,6 +349,31 @@ export function RealtimeProvider({
         const topicId = String(event.topicId);
         void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
         void qc.invalidateQueries({ queryKey: keys.forumTopic(orgId, topicId) });
+      }
+      // For me: my seated turn, a topic opened on my request, one I asked for concluded.
+      if (
+        (event.type === "forum.your_turn" || event.type === "forum.requested" || event.type === "forum.concluded") &&
+        "topicId" in event
+      ) {
+        const e = event as ForumUserEvent;
+        void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
+        void qc.invalidateQueries({ queryKey: keys.forumTopic(orgId, e.topicId) });
+        // Not while that topic is open on screen: it already shows "Sua vez" / the synthesis.
+        if (!window.location.pathname.endsWith(`/forum/${e.topicId}`))
+          toast.show(
+            tRef.current(`forum.notify.${e.type.slice("forum.".length) as "your_turn" | "requested" | "concluded"}`, {
+              title: e.title,
+            }),
+            "info",
+            {
+              label: tRef.current("forum.notify.open"),
+              run: () =>
+                void routerRef.current?.navigate({
+                  to: "/org/$orgId/forum/$topicId",
+                  params: { orgId, topicId: e.topicId },
+                }),
+            },
+          );
       }
       // The agent's PC changed (started, stopped, deleted, switched computers): no more polling needed.
       applyComputerEvent(qc, orgId, event);
@@ -539,6 +570,11 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       // Missions (ADR 0029): the pinned card, the cards in the thread, the lists; a task's row.
       if (event.type === "mission.updated") applyMissionEvent(qc, orgId, event);
       if (event.type === "machine.task") applyTaskEvent(qc, orgId, event.task);
+      // An agent's "Vale um fórum?" card was accepted or dismissed (by anyone).
+      if (event.type === "forum.suggestion.updated") {
+        cacheForumSuggestion(qc, orgId, channelId, event.messageId, event.suggestion);
+        if (event.suggestion.topicId) void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
+      }
       // Someone reacted: the pills under that message change for everyone.
       if (event.type === "message.reactions") {
         qc.setQueryData(keys.reactions(orgId, event.messageId), event.reactions);

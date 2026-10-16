@@ -24,7 +24,10 @@ import type {
   CalendarEventInput,
   CalendarEventPatch,
   ForumParticipantsInput,
+  ForumPostInput,
   ForumSuggestedIssue,
+  ForumSuggestion,
+  ForumSuggestionOverrides,
   ForumTopicDetail,
   ForumTopicInput,
   IssueInput,
@@ -288,6 +291,27 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
     message.clientId ? list?.filter((m) => !(m.local && m.clientId === message.clientId)) : list;
   if (message.threadId && message.clientId) qc.setQueryData<Message[]>(channelKey, withoutLocal);
   qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list), message));
+}
+
+/**
+ * A forum suggestion card changed (accepted, dismissed, or my own "Agora não"):
+ * the message's `meta.forumSuggestion` in every loaded list of that channel.
+ */
+export function cacheForumSuggestion(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  messageId: string,
+  suggestion: ForumSuggestion,
+) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === messageId)) return data;
+    return list.map((m) =>
+      m.id === messageId ? { ...m, meta: { ...(m.meta ?? {}), forumSuggestion: suggestion } } : m,
+    );
+  });
 }
 
 const newClientId = () =>
@@ -1288,7 +1312,7 @@ export const useForumTopics = (orgId: string, enabled = true) => {
   });
 };
 
-/** A topic with its posts; refreshed every few seconds while the discussion is on. */
+/** A topic with its posts; refreshed every few seconds while the discussion is on (or stalled). */
 export const useForumTopic = (orgId: string, topicId: string | null) => {
   const api = useApi();
   return useQuery({
@@ -1300,38 +1324,56 @@ export const useForumTopic = (orgId: string, topicId: string | null) => {
   });
 };
 
+export type ForumAction =
+  | { type: "create"; input: ForumTopicInput }
+  | { type: "post"; topicId: string; input: ForumPostInput }
+  | { type: "conclude"; topicId: string }
+  | { type: "cancel"; topicId: string }
+  | { type: "pass"; topicId: string }
+  | { type: "resume"; topicId: string }
+  | { type: "participants"; topicId: string; input: ForumParticipantsInput }
+  | { type: "issues"; topicId: string; items: ForumSuggestedIssue[] }
+  | { type: "accept"; messageId: string; overrides?: ForumSuggestionOverrides }
+  | { type: "dismiss"; messageId: string };
+
 export function useForumAction(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (
-      action:
-        | { type: "create"; input: ForumTopicInput }
-        | { type: "post"; topicId: string; body: string }
-        | { type: "conclude"; topicId: string }
-        | { type: "cancel"; topicId: string }
-        | { type: "participants"; topicId: string; input: ForumParticipantsInput }
-        | { type: "issues"; topicId: string; items: ForumSuggestedIssue[] },
-    ): Promise<unknown> => {
+    mutationFn: (action: ForumAction): Promise<unknown> => {
       switch (action.type) {
         case "create":
           return api.forum.create(orgId, action.input);
         case "post":
-          return api.forum.post(orgId, action.topicId, action.body);
+          return api.forum.post(orgId, action.topicId, action.input);
         case "conclude":
           return api.forum.conclude(orgId, action.topicId);
         case "cancel":
           return api.forum.cancel(orgId, action.topicId);
+        case "pass":
+          return api.forum.pass(orgId, action.topicId);
+        case "resume":
+          return api.forum.resume(orgId, action.topicId);
         case "participants":
           return api.forum.participants(orgId, action.topicId, action.input);
         case "issues":
           return api.forum.createIssues(orgId, action.topicId, action.items);
+        case "accept":
+          return api.forum.acceptSuggestion(orgId, action.messageId, action.overrides);
+        case "dismiss":
+          return api.forum.dismissSuggestion(orgId, action.messageId);
       }
     },
     onSuccess: (result, action) => {
+      if (action.type === "accept") {
+        const topic = (result as { topic?: ForumTopicDetail }).topic;
+        if (topic) qc.setQueryData(keys.forumTopic(orgId, topic.id), topic);
+        return;
+      }
       if (
         action.type !== "issues" &&
         action.type !== "post" &&
+        action.type !== "dismiss" &&
         result &&
         typeof result === "object" &&
         "id" in result
@@ -1341,6 +1383,7 @@ export function useForumAction(orgId: string) {
     },
     onSettled: (_r, _e, action) => {
       void qc.invalidateQueries({ queryKey: keys.forum(orgId) });
+      if ("topicId" in action) void qc.invalidateQueries({ queryKey: keys.forumTopic(orgId, action.topicId) });
       if (action.type === "issues") void qc.invalidateQueries({ queryKey: ["org", orgId, "issues"] });
     },
   });

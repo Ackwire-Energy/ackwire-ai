@@ -30,6 +30,7 @@ import type {
   CustomServer,
   DirectMessage,
   ForumPost,
+  ForumSuggestion,
   ForumTopic,
   ForumTopicDetail,
   Health,
@@ -625,19 +626,35 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       list: async (orgId) => (await request<{ topics: ForumTopic[] }>(`${org(orgId)}/forum/topics`)).topics,
       get: (orgId, topicId) => request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}`),
       create: (orgId, input) => request<ForumTopicDetail>(`${org(orgId)}/forum/topics`, { json: input }),
-      post: (orgId, topicId, body) =>
-        request<ForumPost>(`${org(orgId)}/forum/topics/${enc(topicId)}/posts`, { json: { body } }),
+      post: (orgId, topicId, input) =>
+        request<ForumPost>(`${org(orgId)}/forum/topics/${enc(topicId)}/posts`, { json: input }),
       conclude: (orgId, topicId) =>
         request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/conclude`, { json: {} }),
       cancel: (orgId, topicId) =>
         request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/cancel`, { json: {} }),
+      pass: (orgId, topicId) =>
+        request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/pass`, { json: {} }),
+      resume: (orgId, topicId) =>
+        request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/resume`, { json: {} }),
       participants: (orgId, topicId, input) =>
         request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/participants`, {
           method: "PUT",
           json: input,
         }),
       createIssues: (orgId, topicId, items) =>
-        request<{ numbers: number[] }>(`${org(orgId)}/forum/topics/${enc(topicId)}/issues`, { json: { items } }),
+        request<{ numbers: number[]; issues: { id: string; number: number; title: string }[] }>(
+          `${org(orgId)}/forum/topics/${enc(topicId)}/issues`,
+          { json: { items } },
+        ),
+      acceptSuggestion: (orgId, messageId, overrides) =>
+        request<{ topic: ForumTopicDetail; suggestion: ForumSuggestion }>(
+          `${org(orgId)}/forum/suggestions/${enc(messageId)}/accept`,
+          { json: overrides ?? {} },
+        ),
+      dismissSuggestion: (orgId, messageId) =>
+        request<{ suggestion: ForumSuggestion }>(`${org(orgId)}/forum/suggestions/${enc(messageId)}/dismiss`, {
+          json: {},
+        }),
     },
     calendar: {
       range: (orgId, from, to) => request<CalendarRange>(`${org(orgId)}/calendar`, { query: { from, to } }),
