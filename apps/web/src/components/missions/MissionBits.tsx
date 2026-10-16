@@ -2,7 +2,7 @@ import { Chip, Icon, type IconName, PlanStrip } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Mission, MissionExecutor, MissionFileName } from "@/api/types";
+import type { Mission, MissionExecutor, MissionFileName, ThreadMissionSummary } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
@@ -85,9 +85,18 @@ export function missionStatusKey(m: Pick<Mission, "status" | "runningTasks" | "p
   if (m.status === "done" || m.status === "canceled" || m.status === "proposed" || m.status === "paused") {
     return m.status;
   }
-  const waiting = m.canAct && m.pending.decisions + m.pending.reviews + m.pending.provisional > 0;
+  const waiting = m.canAct && m.pending.decisions + m.pending.reviews + m.pending.provisional + m.pending.commands > 0;
   if (waiting) return "needsYou";
   return m.runningTasks > 0 ? "working" : "active";
+}
+
+/** The same state from a thread row's summary (`working`: an agent run in the thread). */
+export function missionSummaryStatusKey(m: Pick<ThreadMissionSummary, "status" | "waitingYou">, working: boolean) {
+  if (m.status === "done" || m.status === "canceled" || m.status === "proposed" || m.status === "paused") {
+    return m.status;
+  }
+  if (m.waitingYou > 0) return "needsYou";
+  return working ? "working" : "active";
 }
 
 const STATUS_ICON: Record<MissionStatusKey, IconName> = {
@@ -102,11 +111,14 @@ const STATUS_ICON: Record<MissionStatusKey, IconName> = {
 
 export function MissionStatusChip({
   mission,
+  status,
 }: {
-  mission: Pick<Mission, "status" | "runningTasks" | "pending" | "canAct">;
+  mission?: Pick<Mission, "status" | "runningTasks" | "pending" | "canAct">;
+  /** A state already known (a thread row's summary). */
+  status?: MissionStatusKey;
 }) {
   const { t } = useTranslation();
-  const key = missionStatusKey(mission);
+  const key = status ?? (mission ? missionStatusKey(mission) : "active");
   return (
     <Chip icon={STATUS_ICON[key]} tone={key === "needsYou" ? "waiting" : "neutral"}>
       {t(`missions.status.${key}`)}

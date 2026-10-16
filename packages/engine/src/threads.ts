@@ -106,6 +106,8 @@ export interface ThreadInfo {
 
 export interface ThreadMissionSummary {
   id: string;
+  /** The mission's agent (the row's avatar). */
+  agentId: string;
   status: "proposed" | "active" | "paused" | "done" | "canceled";
   planDone: number;
   planTotal: number;
@@ -893,6 +895,7 @@ interface ThreadSqlRow {
   working: boolean;
   needs_you: boolean;
   mission_id?: string | null;
+  mission_agent_id?: string | null;
   mission_status?: ThreadMissionSummary["status"] | null;
   mission_plan_done?: number | string | null;
   mission_plan_total?: number | string | null;
@@ -1012,7 +1015,7 @@ async function queryThreads(
               and (${isAdmin}::boolean or ap.owner_user_id = ${userId}))
           ) as needs_you,
           ${participated} as participated,
-          mi.id as mission_id, mi.status as mission_status, mi.plan_done as mission_plan_done,
+          mi.id as mission_id, mi.agent_id as mission_agent_id, mi.status as mission_status, mi.plan_done as mission_plan_done,
           mi.plan_total as mission_plan_total,
           case when mi.id is null then null else mi.plan_waiting
             + (select count(*)::int from ${schema.missionDecisions} md where md.mission_id = mi.id and md.status = 'pending')
@@ -1134,6 +1137,7 @@ function toView(
       r.mission_id && r.mission_status
         ? {
             id: r.mission_id,
+            agentId: r.mission_agent_id ?? "",
             status: r.mission_status,
             planDone: Number(r.mission_plan_done ?? 0),
             planTotal: Number(r.mission_plan_total ?? 0),

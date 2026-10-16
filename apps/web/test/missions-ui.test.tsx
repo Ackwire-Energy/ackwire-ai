@@ -39,6 +39,30 @@ describe("Missões (Threads.html)", () => {
     expect(within(card).getAllByRole("button", { name: /Abrir thread/ }).length).toBeGreaterThan(0);
   });
 
+  test("a thread with a mission (Todas): the mission header's look in the row — agent, Missão · N de M itens, its state", async () => {
+    const api = createFakeApi(seedState());
+    const base = { channelId: ENG_ID, firstMessageId: "m1", lastMessageId: "m1" };
+    await api.threads.create(ORG_ID, {
+      ...base,
+      title: "App mobile",
+      mission: { id: "mission_1", agentId: ADA_ID, status: "active", planDone: 4, planTotal: 12, waitingYou: 2 },
+    } as Parameters<typeof api.threads.create>[1]);
+    await api.threads.create(ORG_ID, { ...base, title: "Só conversa" });
+    await renderApp(`/org/${ORG_ID}/threads`, { api });
+    await settle(6);
+    const row = screen().getByRole("article", { name: "App mobile" });
+    const line = row.querySelector(".thread-row__mission") as HTMLElement;
+    expect(line.textContent).toContain("Missão");
+    expect(line.textContent).toContain("4 de 12 itens");
+    // The agent's avatar in the kind column (and a small one in the line for phones), no flag icon.
+    expect(row.querySelector(".thread-kind--agent .ac-avatar")).toBeTruthy();
+    expect(line.querySelector(".ac-avatar")).toBeTruthy();
+    expect(within(row).getByText("Esperando você")).toBeTruthy();
+    const plain = screen().getByRole("article", { name: "Só conversa" });
+    expect(plain.querySelector(".thread-row__mission")).toBeNull();
+    expect(plain.querySelector(".thread-kind--agent")).toBeNull();
+  });
+
   const pick = (agentId: string, name: string, extra: Partial<MissionEligibleAgent> = {}): MissionEligibleAgent => ({
     agentId,
     handle: name.toLowerCase(),

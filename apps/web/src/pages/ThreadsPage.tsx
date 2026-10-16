@@ -19,10 +19,11 @@ import { useTranslation } from "react-i18next";
 import { useMissionList } from "@/api/missions";
 import { useChannels, useThreadList } from "@/api/queries";
 import type { ThreadActor, ThreadInfo, ThreadTab } from "@/api/types";
-import { ActorAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { MissionStatusChip, missionSummaryStatusKey } from "@/components/missions/MissionBits";
 import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { MissionsTab } from "@/components/missions/MissionList";
 import { useOrg } from "@/components/org-context";
@@ -382,6 +383,7 @@ function ThreadRow({
   const last = thread.lastMessage;
   const where = thread.channelKind === "dm" ? t("threads.dm") : `#${thread.channelName}`;
   const more = t("threads.more", { title });
+  const missionAgent = thread.mission ? actors.name({ type: "agent", id: thread.mission.agentId }) : "";
   return (
     // biome-ignore lint/a11y: a mouse shortcut to the details; the title button is the keyboard way
     <article
@@ -400,9 +402,16 @@ function ThreadRow({
         onCheckedChange={onPick}
         aria-label={t("threads.pick", { title })}
       />
-      <span className="thread-kind" aria-hidden="true">
-        <Icon name="thread" size={16} />
-      </span>
+      {thread.mission ? (
+        // A mission's thread: the mission header's look (its agent, "Missão · 4 de 12 itens", its state).
+        <span className="thread-kind thread-kind--agent" aria-hidden="true">
+          <AgentAvatar agentId={thread.mission.agentId} name={missionAgent} size="md" />
+        </span>
+      ) : (
+        <span className="thread-kind" aria-hidden="true">
+          <Icon name="thread" size={16} />
+        </span>
+      )}
       <div className="thread-row__title">
         <button type="button" className="thread-row__name" aria-expanded={open} onClick={onOpen}>
           {title}
@@ -415,9 +424,11 @@ function ThreadRow({
           {thread.mission && (
             <>
               <span aria-hidden="true">·</span>
-              <span className="thread-row__where">
-                <Icon name="flag" size={14} />
-                {t("missions.chip", { done: thread.mission.planDone, count: thread.mission.planTotal })}
+              <span className="thread-row__mission">
+                <AgentAvatar agentId={thread.mission.agentId} name={missionAgent} size="xs" />
+                <b>{t("missions.pinned.lab")}</b>
+                <span aria-hidden="true">·</span>
+                {t("missions.items", { done: thread.mission.planDone, count: thread.mission.planTotal })}
               </span>
             </>
           )}
@@ -442,7 +453,11 @@ function ThreadRow({
           {people.length > 4 && <span className="thread-row__more">+{people.length - 4}</span>}
         </span>
         <span className="thread-row__state">
-          <ThreadStatusChip thread={thread} />
+          {thread.mission && thread.state === "open" ? (
+            <MissionStatusChip status={missionSummaryStatusKey(thread.mission, thread.working)} />
+          ) : (
+            <ThreadStatusChip thread={thread} />
+          )}
         </span>
       </div>
       <div className="thread-row__end">

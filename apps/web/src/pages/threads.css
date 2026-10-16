@@ -282,6 +282,28 @@
 .thread-row__where .ac-icon {
   color: var(--faint);
 }
+/* A mission's thread: the mission header's look ("Missão · 4 de 12 itens"); the avatar sits in the kind column. */
+.thread-kind--agent {
+  background: none;
+}
+.thread-kind--agent .ac-avatar {
+  width: 32px;
+  height: 32px;
+}
+.thread-row__mission {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  color: var(--muted);
+}
+.thread-row__mission b {
+  font-weight: 600;
+  color: var(--ink2);
+}
+.thread-row__mission > .ac-avatar {
+  display: none;
+}
 .thread-row__last {
   min-width: 0;
   overflow: hidden;
@@ -384,6 +406,10 @@
   .thread-row__check,
   .thread-row > .thread-kind {
     display: none;
+  }
+  /* No kind column on a phone: the agent's small avatar leads the mission line instead. */
+  .thread-row__mission > .ac-avatar {
+    display: inline-flex;
   }
   .threads-list[data-selecting] .thread-row {
     grid-template-columns: 18px minmax(0, 1fr) auto;

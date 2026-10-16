@@ -1733,10 +1733,12 @@ export interface ThreadInfo {
 
 export interface ThreadMissionSummary {
   id: string;
+  /** The mission's agent (the row's avatar). */
+  agentId: string;
   status: MissionStatus;
   planDone: number;
   planTotal: number;
-  /** Plan items waiting for people, pending decisions and reviews. */
+  /** Plan items waiting for people, pending decisions and reviews; command cards for whoever answers them. */
   waitingYou: number;
 }
 

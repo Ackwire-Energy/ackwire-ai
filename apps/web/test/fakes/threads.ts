@@ -75,6 +75,8 @@ export function createFakeThreads(
         working: false,
         needsYou: false,
         canManage: true,
+        // Tests may seed the row's mission summary (the server joins it from `missions`).
+        mission: (input as { mission?: ThreadInfo["mission"] }).mission ?? null,
         createdAt: now,
       };
       (await store(orgId)).push(thread);
