@@ -101,6 +101,15 @@ Runner protocol 6 (`TASK_OUTPUT_PROTOCOL`, runner 0.6.0) adds what "Ver saída" 
 - **`task.event { …, prUrl? }`**: the first pull (or merge) request URL the task's output shows (a Claude Code tool result such as `gh pr create`, its answer, a plain line), sent once.
 - **Compatibility.** A runner ignores a request whose op it doesn't know (no reply), so the server asks `task.output` only of runners at protocol 6 or later; older ones get the lines the server kept (`machine_tasks.recent_lines`).
 
+### 5d. Protocol 7: coding CLIs and the permission profile
+
+Runner protocol 7 (`EXECUTORS_PROTOCOL`, runner 0.7.0):
+
+- **`hello.executors`**: `{ claude?: { version }, codex?: { version } }`, the CLIs on the runner's PATH (`<cli> --version`, first line, best effort, cached 10 min; empty with `--no-exec`). The server keeps it in `machines.executors` with `detectedAt`; missions offer only what the computer has (ADR 0029, "Executor agent").
+- **`task.start.mission.mode`** (`plan | work`) and **`branchPrefix`**: Claude Code gets a generated `--settings` file with what it may run without asking (`plan`: read only, `--permission-mode dontAsk`; `work`: git on the mission's branches, tests and builds; merges, other pushes and deploys denied). Older servers send no mode: `work`.
+- **MCP calls** carry arguments with the agent's secrets masked, and paths resolved against the task's folder (`@folder/…` for elsewhere in the agent's folder; outside: refused).
+- The systemd unit sets `Environment=PATH=` from the install-time PATH, like the launchd plist.
+
 ### 6. Which computer an agent uses
 
 `agents.machine_id` (nullable). Null: the Daytona computer (when the server has one). Set: that connected machine.
