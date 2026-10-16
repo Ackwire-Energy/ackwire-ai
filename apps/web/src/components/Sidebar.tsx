@@ -5,6 +5,7 @@ import {
   Button,
   Checkbox,
   CountBadge,
+  CountChip,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -239,13 +240,13 @@ export function Sidebar() {
             <Icon name="thread" />
             <span className="sidebar__item-label">{t("shell.threads")}</span>
             {missionsWaiting > 0 && (
-              <span
-                className="sidebar__unread"
+              <CountChip
+                className="sidebar__count"
                 role="img"
                 aria-label={t("shell.missionsWaiting", { count: missionsWaiting })}
               >
                 {missionsWaiting}
-              </span>
+              </CountChip>
             )}
           </Link>
           <Link to="/org/$orgId/issues" params={{ orgId }} className="sidebar__item" title={t("shell.issues")}>

@@ -10,6 +10,7 @@ import {
   Button,
   CommandPalette,
   Composer,
+  CountChip,
   filterPalette,
   Kbd,
   type PaletteItem,
@@ -79,6 +80,51 @@ describe("segmented control", () => {
     expect(within(group).getByRole("radio", { name: "Escrevendo" }).getAttribute("aria-checked")).toBe("true");
     await act(async () => fireEvent.keyDown(group, { key: "ArrowRight" }));
     expect(within(group).getByRole("radio", { name: "Disponível" }).getAttribute("aria-checked")).toBe("true");
+  });
+});
+
+describe("the count chip", () => {
+  test("Segmented counts use the shared CountChip (sm in a small control); the CSS centers it on its box", async () => {
+    render(
+      <>
+        <Segmented
+          label="Abas"
+          value="a"
+          onValueChange={() => {}}
+          options={[
+            { value: "a", label: "Todas" },
+            { value: "m", label: "Missões", count: 1 },
+          ]}
+        />
+        <Segmented
+          size="sm"
+          label="Pequeno"
+          value="a"
+          onValueChange={() => {}}
+          options={[{ value: "a", label: "Um", count: 12 }]}
+        />
+        <CountChip strong>6</CountChip>
+      </>,
+    );
+    const tab = body().getByRole("radio", { name: /^Missões/ });
+    expect(tab.querySelector(".ac-countchip")?.textContent).toBe("1");
+    const small = body().getByRole("radio", { name: /^Um/ });
+    expect(small.querySelector(".ac-countchip")?.className).toBe("ac-countchip ac-countchip--sm");
+    expect(body().getByText("6").className).toBe("ac-countchip ac-countchip--strong");
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = /\.ac-countchip \{([^}]*)\}/.exec(css)?.[1] ?? "";
+    for (const decl of [
+      "display: inline-flex",
+      "align-items: center",
+      "justify-content: center",
+      "line-height: 1",
+      "font-variant-numeric: tabular-nums",
+      "align-self: center",
+      "height: var(--count-h)",
+      "min-width: var(--count-h)",
+    ]) {
+      expect(rule).toContain(decl);
+    }
   });
 });
 

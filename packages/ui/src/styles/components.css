@@ -2708,27 +2708,40 @@ a.ac-list__row:focus-visible {
   white-space: nowrap;
 }
 /* A count inside a segment ("Missões 1"): neutral chip, the segment grows to fit. */
-.ac-seg__count {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+/* The count chip (CountChip): one look for every neutral count. */
+.ac-countchip {
+  --count-h: 18px;
+  flex: none;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
-  display: inline-grid;
-  place-items: center;
+  height: var(--count-h);
+  min-width: var(--count-h);
+  padding: 0 5px;
   border-radius: var(--radius-full);
   background: var(--sunken);
-  color: var(--faint);
-  font-size: 11.5px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.ac-seg__item[data-on] .ac-seg__count {
   color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 650;
+  /* Centered on its box, not on the label's baseline. */
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
-.ac-seg--sm .ac-seg__count {
-  min-width: 16px;
-  height: 16px;
+.ac-countchip--sm {
+  --count-h: 16px;
+  padding: 0 4px;
   font-size: 11px;
+}
+.ac-countchip--strong {
+  background: var(--ink);
+  color: var(--bg);
+}
+.ac-seg__item[data-on] .ac-countchip {
+  color: var(--ink2);
 }
 .ac-seg--sm .ac-seg__item {
   height: 26px;

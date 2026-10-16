@@ -5668,6 +5668,7 @@ button.live-call__head:hover {
   gap: 0;
 }
 .sidebar[data-rail="true"] .sidebar__unread,
+.sidebar[data-rail="true"] .sidebar__count,
 .sidebar[data-rail="true"] .sidebar__item .ac-count {
   position: absolute;
   top: 2px;

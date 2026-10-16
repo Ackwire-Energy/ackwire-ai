@@ -59,7 +59,7 @@ export {
   RadioGroup,
   Switch,
 } from "./components/Checkbox";
-export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge } from "./components/Chip";
+export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge, CountChip } from "./components/Chip";
 export { CommandPalette, filterPalette, type PaletteItem } from "./components/CommandPalette";
 export {
   Composer,
