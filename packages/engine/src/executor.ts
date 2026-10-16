@@ -20,7 +20,7 @@ import {
   unregisterRunAbort,
 } from "./cancel";
 import { describeCapabilities } from "./capabilities";
-import { buildRunContext, getChannelCached, isNoReply, ROUTINE_NO_REPLY } from "./context";
+import { buildRunContext, getChannelCached, isNoReply, ROUTINE_NO_REPLY, taskNotice } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
@@ -546,6 +546,7 @@ async function executeRunInner(
       .select({
         id: schema.messages.id,
         body: schema.messages.body,
+        meta: schema.messages.meta,
         name: sql<string | null>`coalesce(${users.name}, ${schema.agents.name})`,
         createdAt: schema.messages.createdAt,
       })
@@ -558,7 +559,12 @@ async function executeRunInner(
     rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     if (rows.length === 0) return false;
     const text = rows
-      .map((m) => `[New message from ${m.name ?? "someone"}, while you were working]: ${m.body}`)
+      .map(
+        (m) =>
+          // A background task that ended while it worked: the notice with its result.
+          taskNotice({ body: m.body, meta: m.meta }, true) ??
+          `[New message from ${m.name ?? "someone"}, while you were working]: ${m.body}`,
+      )
       .join("\n\n");
     const t = transcript as Transcript;
     const last = t.messages.at(-1);

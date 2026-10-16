@@ -3,6 +3,7 @@ import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
 import type { CalendarEventView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
+import type { MachineTaskView } from "./machine-tasks";
 import type { MessageView, ReactionCount } from "./messages";
 
 /** What a memory tool changed, for the "memory updated" card (persisted in the reply's `meta.memoryUpdates`). */
@@ -232,7 +233,13 @@ export type ChannelEvent =
       messageIds?: string[];
     }
   /** Someone reacted or took a reaction back: the message's reactions now (replace, don't merge). */
-  | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] };
+  | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
+  /**
+   * A background task on a connected computer started, reported progress
+   * (last line, files, elapsed), ended, was interrupted or resumed (ADR 0029).
+   * `task` is its whole view (replace, don't merge); `threadId` null = main timeline.
+   */
+  | { type: "machine.task"; channelId: string; threadId: string | null; task: MachineTaskView };
 
 const INLINE_LIMIT = 6000;
 

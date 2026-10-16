@@ -58,6 +58,7 @@ export * from "./jobs";
 export * from "./judge";
 export * from "./machine-hub";
 export * from "./machine-provider";
+export * from "./machine-tasks";
 export * from "./machines";
 export * from "./management";
 export * from "./messages";

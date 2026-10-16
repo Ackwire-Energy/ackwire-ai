@@ -30,6 +30,8 @@ export const machines = pgTable(
     workspace: text().notNull().default(""),
     /** `false`: the runner was started with `--no-exec` (files and uploads only). */
     execAllowed: boolean().notNull().default(true),
+    /** A background task interrupted by the machine going away resumes by itself when it comes back (ADR 0029). */
+    resumeTasks: boolean().notNull().default(true),
     /** Last known; trust it only with a recent `last_seen_at` (a replica may have died). */
     online: boolean().notNull().default(false),
     /** The server process holding its socket. */

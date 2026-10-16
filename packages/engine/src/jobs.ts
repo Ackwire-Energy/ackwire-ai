@@ -12,6 +12,7 @@ import { publishChannelEvent } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { advanceForumTopic } from "./forum";
 import { mentionHandoffs } from "./judge";
+import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
 import { getMessage } from "./messages";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import {
@@ -314,6 +315,16 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "email.send": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");
       await sendQueuedEmail(deps.email, job.payload);
+    },
+    // A background task on a connected computer ended: its conversation wakes (ADR 0029).
+    "machine.task_done": async (job) => {
+      await wakeConversationForTask({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.taskId), {
+        maxHops: deps.maxHops,
+      });
+    },
+    // A machine went offline a grace ago: if still offline, its running tasks are interrupted (one notice per thread).
+    "machine.tasks_offline": async (job) => {
+      await interruptOfflineMachineTasks({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.machineId));
     },
     "context.consolidate": async (job) => {
       if (!deps.context) return;
