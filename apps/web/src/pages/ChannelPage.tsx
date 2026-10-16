@@ -98,6 +98,7 @@ import {
   MissionSuggestionBar,
   TaskNoticeLine,
 } from "@/components/missions/MissionCards";
+import { MissionCommandCard } from "@/components/missions/MissionCommandCard";
 import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
@@ -132,6 +133,7 @@ import { agentGrammar } from "@/lib/grammar";
 import { serverBody } from "@/lib/message-body";
 import {
   isOpenMission,
+  missionCommandOf,
   missionLinkOf,
   missionPlanChangeOf,
   missionPlanOf,
@@ -2023,11 +2025,13 @@ export const TimelineMessage = memo(function TimelineMessage({
   const missionPlan = m.author.type === "agent" ? missionPlanOf(meta) : null;
   const missionDecision = m.author.type === "agent" && meta.missionDecision ? m : null;
   const missionReview = m.author.type === "agent" && meta.missionReview ? m : null;
+  // The executor asks to run a command off its allow list: the command card (Aprovar / Recusar / Aprovar sempre).
+  const missionCommand = m.author.type === "agent" ? missionCommandOf(meta) : null;
   const missionReport = m.author.type === "agent" ? missionReportOf(meta) : null;
   const missionSuggestion = m.author.type === "person" ? missionSuggestionOf(meta) : null;
   // A mission proposed from here whose thread lives elsewhere: its link card under the reply.
   const missionLink = m.author.type === "agent" ? missionLinkOf(meta) : null;
-  const missionCard = Boolean(missionPlan || missionDecision || missionReview);
+  const missionCard = Boolean(missionPlan || missionDecision || missionReview || missionCommand);
   // The root of a mission in the channel: its work lives in its thread.
   const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.replyInThread !== undefined;
   const card = approvalId || proposalId || memoryUpdates.length > 0 || question || secretRequest || missionCard;
@@ -2165,6 +2169,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       {missionPlan && <MissionPlanCard plan={missionPlan} />}
       {missionDecision && <MissionDecisionCard message={missionDecision} />}
       {missionReview && <MissionReviewCard message={missionReview} />}
+      {missionCommand && <MissionCommandCard command={missionCommand} />}
       {missionReport && <MissionReportExtras report={missionReport} message={m} />}
       {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
       {missionStart && <MissionStartLink message={m} />}

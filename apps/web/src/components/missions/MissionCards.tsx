@@ -35,6 +35,7 @@ import { formatTime } from "@/lib/format";
 import {
   executorName,
   formatSpan,
+  machineTaskOf,
   missionCardRef,
   missionPlanChangeOf,
   planChangeParts,
@@ -45,6 +46,7 @@ import {
 } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
 import { executorOptions, MissionHead, MissionStatusChip, useMissionPanel } from "./MissionBits";
+import { BlockedCommands } from "./MissionCommandCard";
 import { SessionRows } from "./MissionSessions";
 
 /**
@@ -592,8 +594,11 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   if (!notice) return null;
   const p = notice.params;
   const seconds = Number(p.seconds ?? 0);
+  // Commands it was refused (Liberar e repetir).
+  const task = machineTaskOf(message.meta);
+  const blocked = task?.blocked ?? [];
   return (
-    <div className="mi-evt" data-message-id={message.id}>
+    <div className={blocked.length > 0 ? "mi-evt mi-evt--blocked" : "mi-evt"} data-message-id={message.id}>
       <Icon name={NOTICE_ICON[notice.code] ?? "computer"} size={14} />
       <span>
         {t(`missions.notice.${notice.code}`, {
@@ -604,6 +609,9 @@ export function TaskNoticeLine({ message }: { message: Message }) {
         })}{" "}
         · {formatTime(i18n.language, message.createdAt)}
       </span>
+      {blocked.length > 0 && task?.missionId && (
+        <BlockedCommands missionId={task.missionId} taskId={task.id} blocked={blocked} />
+      )}
     </div>
   );
 }

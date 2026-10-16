@@ -2138,4 +2138,32 @@ export interface MachineTaskMeta {
   files?: string[];
   result?: string;
   missionId?: string;
+  /** Commands it was refused with nobody to ask ("Bloqueado", "Liberar e repetir"). */
+  blocked?: { tool: string; command: string }[];
+}
+
+/** `meta.missionCommand`: the executor asks to run a command off its allow list (the command card). */
+export interface MissionCommandMeta {
+  id: string;
+  missionId: string;
+  taskId: string;
+  tool: string;
+  command: string;
+}
+
+/** A command the executor asked to run, and what became of it. */
+export interface MissionCommand {
+  id: string;
+  missionId: string;
+  taskId: string;
+  tool: string;
+  command: string;
+  state: "pending" | "allowed" | "denied" | "expired";
+  /** "Aprovar sempre": the rules it adds (`Bash(swift *)`). */
+  rules: string[];
+  decidedBy: string | null;
+  decidedAt: string | null;
+  always: boolean;
+  createdAt: string;
+  expiresAt: string;
 }

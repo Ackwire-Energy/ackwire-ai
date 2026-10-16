@@ -4,6 +4,7 @@ import type {
   MachineTaskMeta,
   Message,
   Mission,
+  MissionCommandMeta,
   MissionLinkMeta,
   MissionPlanChangeMeta,
   MissionPlanMeta,
@@ -310,6 +311,26 @@ export function machineTaskOf(meta: Message["meta"]): MachineTaskMeta | null {
     ...(Array.isArray(p.files) ? { files: p.files.map(String) } : {}),
     ...(str(p.result) ? { result: str(p.result) } : {}),
     ...(str(p.missionId) ? { missionId: str(p.missionId) } : {}),
+    ...(Array.isArray(p.blocked)
+      ? {
+          blocked: p.blocked
+            .map((d) => obj(d))
+            .flatMap((d) => (d && str(d.command) ? [{ tool: str(d.tool) || "Bash", command: str(d.command) }] : [])),
+        }
+      : {}),
+  };
+}
+
+/** `meta.missionCommand`: the executor asks to run a command (the command card). */
+export function missionCommandOf(meta: Message["meta"]): MissionCommandMeta | null {
+  const p = obj(meta?.missionCommand);
+  if (!p || !str(p.id) || !str(p.missionId)) return null;
+  return {
+    id: str(p.id),
+    missionId: str(p.missionId),
+    taskId: str(p.taskId),
+    tool: str(p.tool) || "Bash",
+    command: str(p.command),
   };
 }
 

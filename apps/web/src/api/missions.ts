@@ -129,6 +129,11 @@ export function useMissionDecisions(orgId: string, missionId: string | null | un
   const api = useApi();
   return useMissionPart(orgId, missionId, "decisions", () => api.missions.decisions(orgId, missionId ?? ""));
 }
+/** The executor's command prompts (the command cards) and the commands allowed for the whole mission. */
+export function useMissionCommands(orgId: string, missionId: string | null | undefined) {
+  const api = useApi();
+  return useMissionPart(orgId, missionId, "commands", () => api.missions.commands(orgId, missionId ?? ""));
+}
 export function useMissionReviews(orgId: string, missionId: string | null | undefined) {
   const api = useApi();
   return useMissionPart(orgId, missionId, "reviews", () => api.missions.reviews(orgId, missionId ?? ""));

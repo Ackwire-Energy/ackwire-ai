@@ -484,6 +484,7 @@ export function applyMissionEvent(
     join_requests: ["joinRequests"],
     suggestion: [],
     task: [],
+    command: ["commands"],
   };
   refreshMission(qc, orgId, event.missionId, parts[event.change] ?? undefined);
   void qc.invalidateQueries({ queryKey: keys.threadMission(orgId, event.threadId) });
