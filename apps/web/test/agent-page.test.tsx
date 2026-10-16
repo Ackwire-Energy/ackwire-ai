@@ -71,15 +71,13 @@ describe("agent page: tabs and the URL", () => {
         .getByRole("tab", { name: /^Memória/ })
         .getAttribute("aria-selected"),
     ).toBe("true");
-    expect(
-      screen().getByRole("article", { name: "Manter PRs pequenos e pedir revisão do João em pagamentos" }),
-    ).toBeTruthy();
+    expect(screen().getByRole("article", { name: "Atualizar as instruções da Ada" })).toBeTruthy();
   });
 
   test("the cover: status, numbers on the sky (money for admins), Conversar, Editar opens Configurações", async () => {
     const { router } = await go();
     const hero = document.querySelector(".agp-hero") as HTMLElement;
-    expect(hero.textContent).toContain("Disponível");
+    expect(hero.textContent).toContain("Esperando aprovação");
     expect(hero.textContent).toContain("Responde quando chamam por @ada");
     expect(hero.textContent).toContain("US$ 12,30");
     expect(hero.textContent).toContain("de US$ 40");
@@ -148,7 +146,7 @@ describe("agent page: inline editing and the save bar", () => {
     await type(screen().getByLabelText("Nome"), "Ada Lovelace");
     const bar = saveBar() as HTMLElement;
     expect(bar.textContent).toContain("2 alterações");
-    expect(bar.textContent).toContain("Instruções e Nome");
+    expect(bar.textContent).toContain("Nome e Instruções");
     await click(within(bar).getByRole("button", { name: "Ver" }));
     const list = screen().getByRole("dialog", { name: "O que mudou" });
     expect(list.textContent).toContain("1 linha nova");
@@ -236,7 +234,7 @@ describe("agent page: inline editing and the save bar", () => {
 describe("agent page: memory and proposals", () => {
   test("Aceitar mudança uses the proposals API", async () => {
     const { state } = await go("?tab=memory");
-    const card = screen().getByRole("article", { name: "Manter PRs pequenos e pedir revisão do João em pagamentos" });
+    const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
     expect(card.textContent).toContain("Aguardando você");
     await click(within(card).getByRole("button", { name: "Aceitar mudança" }));
     await settle(4);
@@ -246,7 +244,7 @@ describe("agent page: memory and proposals", () => {
 
   test("Editar antes de aceitar sends the final text; Recusar refuses", async () => {
     const { state } = await go("?tab=memory");
-    const card = screen().getByRole("article", { name: "Manter PRs pequenos e pedir revisão do João em pagamentos" });
+    const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
     await click(within(card).getByRole("button", { name: "Editar antes de aceitar" }));
     await type(within(card).getByLabelText("Texto final das instruções"), "Só PRs pequenos.");
     await click(within(card).getByRole("button", { name: "Aceitar com ajustes" }));
@@ -259,9 +257,9 @@ describe("agent page: memory and proposals", () => {
     cleanup();
     const second = await go("?tab=memory");
     await click(
-      within(
-        screen().getByRole("article", { name: "Manter PRs pequenos e pedir revisão do João em pagamentos" }),
-      ).getByRole("button", { name: "Recusar" }),
+      within(screen().getByRole("article", { name: "Atualizar as instruções da Ada" })).getByRole("button", {
+        name: "Recusar",
+      }),
     );
     await settle(4);
     expect(second.state.calls.find((c) => c.method === "proposals.refuse")?.args).toEqual([ORG_ID, "prop-1"]);

@@ -60,12 +60,9 @@ const Proposal = z
         where: z.string(),
         what: z.string(),
         channelId: z.string().nullable().optional(),
-        type: z
-          .enum(["outcome", "human", "agent", "self"])
-          .optional()
-          .openapi({
-            description: "Where the evidence came from; the app translates it (`where` is the English text).",
-          }),
+        type: z.enum(["outcome", "human", "agent", "self"]).optional().openapi({
+          description: "Where the evidence came from; the app translates it (`where` is the English text).",
+        }),
       }),
     ),
     before: z.string(),
