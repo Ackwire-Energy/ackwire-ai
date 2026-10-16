@@ -76,37 +76,42 @@ export function NewMissionDialog({
   const navigate = useNavigate();
   const channels = useChannels(org.id);
   const create = useCreateMission(org.id);
-  // Only agents with a computer they can run a mission on, for me (the server checks audience and runner).
+  // Every agent I can talk to; the ones that can't run a mission say why (the server checks audience and runner).
   const eligible = useEligibleAgents(org.id, open);
-  const ready = eligible.data ?? [];
-  const agents = ready.flatMap((e) => {
+  const choices = (eligible.data ?? []).flatMap((e) => {
     const a = dir.agentById.get(e.agentId);
-    return a
-      ? [
-          {
-            ...a,
-            machine: e.machine,
-            executors: e.executors ?? [],
-            defaultExecutor: e.defaultExecutor,
-            codexTooOld: e.codexTooOld,
-          },
-        ]
-      : [];
+    if (!a || e.reason === "not_in_audience") return [];
+    return [
+      {
+        ...a,
+        eligible: e.eligible !== false && Boolean(e.machine),
+        reason: e.reason ?? null,
+        canManage: e.canManage === true,
+        machine: e.machine,
+        executors: e.executors ?? [],
+        defaultExecutor: e.defaultExecutor,
+        codexTooOld: e.codexTooOld,
+      },
+    ];
   });
+  const agents = choices.filter((a) => a.eligible);
+  const blocked = choices.filter((a) => !a.eligible);
   const [goal, setGoal] = useState(initialGoal);
   const [agentId, setAgentId] = useState(initialAgentId ?? "");
   const memberChannels = (channels.data ?? []).filter((c) => c.isMember);
   const [home, setHome] = useState<"channel" | "dm">(initialChannelId || memberChannels.length ? "channel" : "dm");
   const [channelId, setChannelId] = useState(initialChannelId ?? memberChannels[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
+  // The one asked for when it can run a mission, else the first that can.
   const agent = agents.find((a) => a.id === agentId) ?? agents[0];
   const machine = agent?.machine ?? null;
   // "Quem programa": only who can work on that computer; default Claude Code when it's there, else the agent.
   const [picked, setPicked] = useState<MissionExecutor | null>(null);
   const executor: MissionExecutor | undefined =
-    agent && picked && agent.executors.includes(picked) ? picked : agent?.defaultExecutor;
-  // Nobody can run one yet: where to connect a computer (an agent I can talk to).
-  const setupAgent = dir.agents.find((a) => canTalk(a));
+    agent && picked && agent.executors.includes(picked) ? picked : (agent?.defaultExecutor ?? undefined);
+  // Nobody can run one yet: where to connect a computer (an agent I can talk to, mine first).
+  const setupAgent =
+    dir.agentById.get(blocked.find((a) => a.canManage)?.id ?? "") ?? dir.agents.find((a) => canTalk(a));
   const none = eligible.isSuccess && agents.length === 0;
   const goalId = useId();
   const submit = async () => {
@@ -187,13 +192,17 @@ export function NewMissionDialog({
                 value={agent?.id}
                 onValueChange={setAgentId}
                 placeholder={eligible.isPending ? "…" : undefined}
-                options={agents.map((a) => ({
+                options={[...agents, ...blocked].map((a) => ({
                   value: a.id,
                   label: a.name,
-                  description: t("missions.new.agentOn", {
-                    computer: a.machine.name,
-                    state: a.machine.online ? t("missions.online") : t("missions.offline"),
-                  }),
+                  disabled: !a.eligible,
+                  description:
+                    a.eligible && a.machine
+                      ? t("missions.new.agentOn", {
+                          computer: a.machine.name,
+                          state: a.machine.online ? t("missions.online") : t("missions.offline"),
+                        })
+                      : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" }),
                   leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
                 }))}
               />
@@ -208,6 +217,32 @@ export function NewMissionDialog({
             </div>
           </div>
         )}
+        {!none && blocked.some((a) => a.canManage) && (
+          <ul className="mi-blocked" aria-label={t("missions.new.blockedLabel")}>
+            {blocked
+              .filter((a) => a.canManage)
+              .map((a) => (
+                <li key={a.id} className="mi-blocked__row">
+                  <AgentAvatar agentId={a.id} name={a.name} size="xs" />
+                  <span className="mi-blocked__text">
+                    <b>{a.name}</b>
+                    <span>
+                      {t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" })}
+                    </span>
+                  </span>
+                  <Link
+                    className="mi-lnk"
+                    to="/org/$orgId/agents/$agentId"
+                    params={{ orgId: org.id, agentId: a.id }}
+                    search={{ tab: "settings", sec: "computer" }}
+                    onClick={() => onOpenChange(false)}
+                  >
+                    {t("missions.new.connect")}
+                  </Link>
+                </li>
+              ))}
+          </ul>
+        )}
         {agent && agent.executors.length > 0 && (
           <div className="mi-field">
             <span className="mi-field__label">{t("missions.new.who")}</span>
@@ -220,7 +255,7 @@ export function NewMissionDialog({
             {agent.codexTooOld && (
               <span className="mi-hint">
                 <Icon name="info" size={14} />
-                {t("missions.new.codexOld", { computer: agent.machine.name })}
+                {t("missions.new.codexOld", { computer: agent.machine?.name ?? "" })}
               </span>
             )}
           </div>

@@ -753,20 +753,25 @@ a.mi-pr:hover {
   min-height: 0;
   padding: 0;
 }
+/* The tabs and the file's line make one block: room above and below, one divider under it. */
 .mi-files__tabs {
-  padding: 0 16px 10px;
+  padding: 12px 20px 0;
 }
-.mi-files__tabs button {
+/* File names in mono, at the weight of any other segmented control (mono at 600 reads heavier). */
+.mi-files__tabs .ac-seg__item {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.mi-files__tabs .ac-seg__item[data-on] {
+  color: var(--ink2);
 }
 .mi-files__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 8px;
-  padding: 10px 16px;
-  border-top: 1px solid var(--line);
+  padding: 10px 20px 12px;
   border-bottom: 1px solid var(--line);
   font-size: 12px;
   color: var(--faint);
@@ -1129,6 +1134,13 @@ a.mi-pr:hover {
   .mi-grid2 {
     grid-template-columns: minmax(0, 1fr);
   }
+  .mi-files__tabs {
+    padding: 12px 16px 0;
+    overflow-x: auto;
+  }
+  .mi-files__meta {
+    padding: 10px 16px 12px;
+  }
   .mi-files.ac-sheet {
     top: auto;
     left: 0;
@@ -1175,4 +1187,39 @@ a.mi-pr:hover {
   display: grid;
   gap: 8px;
   justify-items: start;
+}
+/* Agents that can't run a mission yet (mine): why, and where to connect a computer. */
+.mi-blocked {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--sunken);
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.mi-blocked__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.mi-blocked__text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  flex: 1;
+  min-width: 0;
+}
+.mi-blocked__text b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.mi-blocked__text span {
+  color: var(--muted);
+}
+.mi-blocked .mi-lnk {
+  flex: none;
 }

@@ -2933,70 +2933,124 @@ export async function missionsOnMachine(db: Executor, machineId: string) {
 
 // ── Who can run a mission for the caller ─────────────────────────────────────
 
+/** Why an agent can't run a mission for the caller ("Nova missão" shows it, translated). */
+export type MissionIneligibleReason =
+  | "no_computer"
+  | "cloud_computer"
+  | "exec_off"
+  | "runner_outdated"
+  | "not_in_audience";
+
 export interface EligibleAgent {
   agentId: string;
   handle: string;
   name: string;
-  machine: { id: string; name: string; online: boolean };
-  /** Online: a mission can start now. Offline agents are listed (their computer comes back). */
+  /** It can run a mission for the caller now (or when its computer comes back online). */
+  eligible: boolean;
+  /** Set when not eligible. `cloud_computer`: missions on cloud computers come later. */
+  reason: MissionIneligibleReason | null;
+  /** The caller can choose its computer (an admin or the agent's owner): the web links to its settings. */
+  canManage: boolean;
+  /** Its connected computer; null on the cloud computer or with none. */
+  machine: { id: string; name: string; online: boolean } | null;
+  /** Eligible and online: a mission can start now. Offline agents are listed (their computer comes back). */
   ready: boolean;
-  /** Who can do the work on that computer ("Quem programa"), and the default. */
+  /** Who can do the work on that computer ("Quem programa"), and the default (null when not eligible). */
   executors: MissionExecutor[];
-  defaultExecutor: MissionExecutor;
+  defaultExecutor: MissionExecutor | null;
   /** Codex is there but too old (`CODEX_MIN_VERSION`). */
   codexTooOld: boolean;
 }
 
 /**
- * "Nova missão": the agents that can run a mission for the caller: a
- * connected computer that allows commands with a runner on protocol 5 or
- * later, and the caller in the agent's audience (D31). One query.
+ * "Nova missão": every agent of the organization, each saying whether it can
+ * run a mission for the caller: a connected computer that allows commands
+ * with a runner on protocol 4 or later, and the caller in its audience (D31).
+ * The others carry the reason (`cloud`: the server has cloud computers, so an
+ * agent without a connected one is on the cloud computer). Eligible first. One query.
  */
-export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userId: string, orgId: string) {
-  await requirePermission(deps.db, userId, orgId, "read");
+export async function eligibleMissionAgents(
+  deps: Pick<MissionDeps, "db">,
+  userId: string,
+  orgId: string,
+  opts: { cloud?: boolean } = {},
+) {
+  const membership = await requirePermission(deps.db, userId, orgId, "read");
+  const admin = can(membership.role, "manage_agents");
   const rows = rowsOf<{
     id: string;
     handle: string;
     name: string;
-    machine_id: string;
-    machine_name: string;
-    online: boolean;
+    owner_user_id: string | null;
+    can_talk: boolean;
+    machine_id: string | null;
+    machine_name: string | null;
+    online: boolean | null;
     last_seen_at: Date | string | null;
-    protocol: number;
+    protocol: number | null;
+    exec_allowed: boolean | null;
     executors: schema.MachineExecutors | string | null;
   }>(
-    await deps.db.execute(sql`select agents.id, agents.handle, agents.name, mc.id as machine_id, mc.name as machine_name,
-        mc.online, mc.last_seen_at, mc.protocol, mc.executors
+    await deps.db.execute(sql`select agents.id, agents.handle, agents.name, agents.owner_user_id,
+        ${audienceSql("agents", sql`${userId}::text`)} as can_talk,
+        mc.id as machine_id, mc.name as machine_name, mc.online, mc.last_seen_at, mc.protocol,
+        mc.exec_allowed, mc.executors
       from ${schema.agents} agents
-      join ${machines} mc on mc.id = agents.machine_id and mc.org_id = agents.org_id
+      left join ${machines} mc on mc.id = agents.machine_id and mc.org_id = agents.org_id and mc.deleted_at is null
       where agents.org_id = ${orgId}::uuid and agents.archived_at is null
-        and mc.deleted_at is null and mc.exec_allowed and mc.protocol >= ${TASKS_PROTOCOL}
-        and ${audienceSql("agents", sql`${userId}::text`)}
       order by agents.name`),
   );
-  return rows.map((r): EligibleAgent => {
-    const online = machineOnline({
-      online: r.online,
-      lastSeenAt: r.last_seen_at ? new Date(r.last_seen_at) : null,
-      deletedAt: null,
-    });
+  const list = rows.map((r): EligibleAgent => {
+    const canManage = admin || (r.owner_user_id != null && r.owner_user_id === userId);
+    const machine = r.machine_id
+      ? {
+          id: r.machine_id,
+          name: r.machine_name ?? "",
+          online: machineOnline({
+            online: Boolean(r.online),
+            lastSeenAt: r.last_seen_at ? new Date(r.last_seen_at) : null,
+            deletedAt: null,
+          }),
+        }
+      : null;
+    const protocol = Number(r.protocol ?? 0);
+    const reason: MissionIneligibleReason | null = !r.can_talk
+      ? "not_in_audience"
+      : !machine
+        ? opts.cloud
+          ? "cloud_computer"
+          : "no_computer"
+        : !r.exec_allowed
+          ? "exec_off"
+          : protocol < TASKS_PROTOCOL
+            ? "runner_outdated"
+            : null;
+    const base = { agentId: r.id, handle: r.handle, name: r.name, canManage, machine };
+    if (reason) {
+      return {
+        ...base,
+        eligible: false,
+        reason,
+        ready: false,
+        executors: [],
+        defaultExecutor: null,
+        codexTooOld: false,
+      };
+    }
     const found = typeof r.executors === "string" ? (JSON.parse(r.executors) as schema.MachineExecutors) : r.executors;
-    const { available, codexTooOld } = machineExecutors({
-      protocol: Number(r.protocol),
-      execAllowed: true,
-      executors: found,
-    });
+    const { available, codexTooOld } = machineExecutors({ protocol, execAllowed: true, executors: found });
     return {
-      agentId: r.id,
-      handle: r.handle,
-      name: r.name,
-      machine: { id: r.machine_id, name: r.machine_name, online },
-      ready: online,
+      ...base,
+      eligible: true,
+      reason: null,
+      ready: Boolean(machine?.online),
       executors: available,
       defaultExecutor: defaultExecutor(available),
       codexTooOld,
     };
   });
+  // Eligible first (by name, as the query sorts): the dialog picks the first one.
+  return [...list.filter((a) => a.eligible), ...list.filter((a) => !a.eligible)];
 }
 
 // ── A task's output ("Ver saída") ────────────────────────────────────────────

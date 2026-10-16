@@ -7,6 +7,7 @@ import {
   buildRunContext,
   chooseDecision,
   closeMission,
+  createAgent,
   createMachinePairing,
   createMission,
   decideApproval,
@@ -740,18 +741,38 @@ describe("missions (ADR 0029)", () => {
     await expect(requestToJoin(md(), zed.id, f.org.id, view.id)).rejects.toMatchObject({ code: "mission.not_found" });
   });
 
-  test("eligible agents: a computer with commands (protocol 4+), the caller in the audience, and who can program there; offline still listed", async () => {
+  test("eligible agents: every agent, with a reason when it can't (no computer, cloud, commands off, old runner, audience); offline still eligible", async () => {
     f = await setup({ machines: true, missionTools: true });
-    expect(await eligibleMissionAgents(md(), f.owner.id, f.org.id)).toEqual([]);
-    const paired = await pairedMachine();
-    const runner = missionRunner(f.machineHub as MachineHub);
-    await runner.hello(paired.token);
-    const list = await eligibleMissionAgents(md(), f.owner.id, f.org.id);
-    expect(list).toEqual([
+    const elig = (userId = f.owner.id, opts: { cloud?: boolean } = {}) =>
+      eligibleMissionAgents(md(), userId, f.org.id, opts);
+    expect(await elig()).toEqual([
       {
         agentId: f.agent.id,
         handle: f.agent.handle,
         name: f.agent.name,
+        eligible: false,
+        reason: "no_computer",
+        canManage: true,
+        machine: null,
+        ready: false,
+        executors: [],
+        defaultExecutor: null,
+        codexTooOld: false,
+      },
+    ]);
+    // The server has cloud computers: missions there come later.
+    expect((await elig(f.owner.id, { cloud: true }))[0]?.reason).toBe("cloud_computer");
+    const paired = await pairedMachine();
+    const runner = missionRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    expect(await elig()).toEqual([
+      {
+        agentId: f.agent.id,
+        handle: f.agent.handle,
+        name: f.agent.name,
+        eligible: true,
+        reason: null,
+        canManage: true,
         machine: { id: paired.machineId, name: "MacBook", online: true },
         ready: true,
         // An older runner that doesn't report its CLIs: Claude Code is assumed.
@@ -760,25 +781,48 @@ describe("missions (ADR 0029)", () => {
         codexTooOld: false,
       },
     ]);
+    // A second agent on the same computer: both eligible, by name ("Ada" before "Dev").
+    const ada = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ada", handle: "ada", role: "Developer", instructions: "", credentialId: null },
+      { model: "claude-sonnet-5-5" },
+    );
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, ada.id, paired.machineId);
+    expect((await elig()).map((a) => [a.name, a.eligible, a.machine?.name])).toEqual([
+      ["Ada", true, "MacBook"],
+      ["Dev", true, "MacBook"],
+    ]);
+    // Ada back on the cloud computer: listed after the eligible ones.
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, ada.id, null);
+    expect((await elig(f.owner.id, { cloud: true })).map((a) => [a.name, a.reason])).toEqual([
+      ["Dev", null],
+      ["Ada", "cloud_computer"],
+    ]);
     const bia = await addMember(f.db, f.org.id, "member", "bia");
-    expect(await eligibleMissionAgents(md(), bia.id, f.org.id)).toHaveLength(1);
+    expect((await elig(bia.id)).find((a) => a.agentId === f.agent.id)).toMatchObject({
+      eligible: true,
+      canManage: false,
+    });
     await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "owner", userIds: [] });
-    expect(await eligibleMissionAgents(md(), bia.id, f.org.id)).toHaveLength(0);
+    expect((await elig(bia.id)).find((a) => a.agentId === f.agent.id)?.reason).toBe("not_in_audience");
     await runner.close();
-    expect((await eligibleMissionAgents(md(), f.owner.id, f.org.id))[0]?.machine.online).toBe(false);
+    const offline = (await elig()).find((a) => a.agentId === f.agent.id);
+    expect(offline).toMatchObject({ eligible: true, ready: false, machine: { online: false } });
     // Protocol 4: only the agent itself can program there (no mission tools for executors).
     await f.db.update(schema.machines).set({ protocol: 4 }).where(eq(schema.machines.id, paired.machineId));
-    expect((await eligibleMissionAgents(md(), f.owner.id, f.org.id))[0]).toMatchObject({
+    expect((await elig()).find((a) => a.agentId === f.agent.id)).toMatchObject({
       executors: ["agent"],
       defaultExecutor: "agent",
     });
     await f.db.update(schema.machines).set({ protocol: 3 }).where(eq(schema.machines.id, paired.machineId));
-    expect(await eligibleMissionAgents(md(), f.owner.id, f.org.id)).toHaveLength(0);
+    expect((await elig()).find((a) => a.agentId === f.agent.id)?.reason).toBe("runner_outdated");
     await f.db
       .update(schema.machines)
       .set({ protocol: 5, execAllowed: false })
       .where(eq(schema.machines.id, paired.machineId));
-    expect(await eligibleMissionAgents(md(), f.owner.id, f.org.id)).toHaveLength(0);
+    expect((await elig()).find((a) => a.agentId === f.agent.id)?.reason).toBe("exec_off");
   });
 
   test("list filters (status, conversation, agent, words) and counts (active, waiting for you, closed)", async () => {

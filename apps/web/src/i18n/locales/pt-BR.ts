@@ -1832,7 +1832,6 @@ export const ptBR = {
     copyName: "{{name}} (cópia)",
   },
   missions: {
-    tabCount: "{{label}} · {{count}}",
     chip: "Missão · {{done}} de {{count}}",
     join: {
       ask: "Pedir para participar",
@@ -2126,6 +2125,15 @@ export const ptBR = {
       open: "Abrir o arquivo",
       check: { doing: "em andamento", waiting: "esperando você", dropped: "fora do plano" },
     },
+    strip: {
+      cell: "{{title}} · {{status}}",
+      todo: "a fazer",
+      doing: "em andamento",
+      done: "pronto",
+      waiting: "esperando você",
+      stopped: "parado com o computador",
+      dropped: "fora do plano",
+    },
     list: {
       noItems: "Sem itens ainda",
       waitingYouCount_one: "{{count}} esperando você",
@@ -2151,6 +2159,15 @@ export const ptBR = {
       noEligibleTitle: "Nenhum agente pode rodar uma missão para você ainda",
       noEligibleText: "Conecte um computador a um agente para criar missões. O trabalho roda nele, com o Claude Code.",
       connectComputer: "Conectar um computador ao {{name}}",
+      connect: "Conectar computador",
+      blockedLabel: "Agentes que ainda não podem rodar uma missão",
+      reason: {
+        no_computer: "Sem computador conectado",
+        cloud_computer: "No computador na nuvem: missões lá chegam depois",
+        exec_off: "Comandos desligados no {{computer}}",
+        runner_outdated: "Runner antigo no {{computer}}: atualize",
+        not_in_audience: "Não responde você",
+      },
       agentOn: "No {{computer}} · {{state}}",
       open: "Nova missão",
       title: "Nova missão",

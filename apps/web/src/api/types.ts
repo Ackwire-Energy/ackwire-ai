@@ -1902,16 +1902,29 @@ export interface MissionJoinRequest {
   createdAt: string;
 }
 
-/** An agent that can run a mission for you (a connected computer it may use). */
+/** Why an agent can't run a mission for you (`cloud_computer`: missions on cloud computers come later). */
+export type MissionIneligibleReason =
+  | "no_computer"
+  | "cloud_computer"
+  | "exec_off"
+  | "runner_outdated"
+  | "not_in_audience";
+
+/** An agent for "Nova missão": whether it can run a mission for you, and why not. */
 export interface MissionEligibleAgent {
   agentId: string;
   handle: string;
   name: string;
-  machine: { id: string; name: string; online: boolean };
+  /** Older servers only listed eligible agents (absent = eligible). */
+  eligible?: boolean;
+  reason?: MissionIneligibleReason | null;
+  /** You can choose its computer (an admin or its owner). */
+  canManage?: boolean;
+  machine: { id: string; name: string; online: boolean } | null;
   ready: boolean;
   /** Who can program on its computer ("Quem programa"), and the default. */
   executors: MissionExecutor[];
-  defaultExecutor: MissionExecutor;
+  defaultExecutor: MissionExecutor | null;
   codexTooOld: boolean;
 }
 

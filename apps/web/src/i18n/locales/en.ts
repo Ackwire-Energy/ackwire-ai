@@ -1821,7 +1821,6 @@ export const en: Translations = {
     copyName: "{{name}} (copy)",
   },
   missions: {
-    tabCount: "{{label}} · {{count}}",
     chip: "Mission · {{done}} of {{count}}",
     join: {
       ask: "Ask to join",
@@ -2115,6 +2114,15 @@ export const en: Translations = {
       open: "Open the file",
       check: { doing: "in progress", waiting: "waiting for you", dropped: "out of the plan" },
     },
+    strip: {
+      cell: "{{title}} · {{status}}",
+      todo: "to do",
+      doing: "in progress",
+      done: "done",
+      waiting: "waiting for you",
+      stopped: "stopped with the computer",
+      dropped: "out of the plan",
+    },
     list: {
       noItems: "No items yet",
       waitingYouCount_one: "{{count}} waiting for you",
@@ -2140,6 +2148,15 @@ export const en: Translations = {
       noEligibleTitle: "No agent can run a mission for you yet",
       noEligibleText: "Connect a computer to an agent to create missions. The work runs there, with Claude Code.",
       connectComputer: "Connect a computer to {{name}}",
+      connect: "Connect a computer",
+      blockedLabel: "Agents that can't run a mission yet",
+      reason: {
+        no_computer: "No connected computer",
+        cloud_computer: "On the cloud computer: missions there come later",
+        exec_off: "Commands are off on {{computer}}",
+        runner_outdated: "Old runner on {{computer}}: update it",
+        not_in_audience: "Doesn't answer you",
+      },
       agentOn: "On {{computer}} · {{state}}",
       open: "New mission",
       title: "New mission",
