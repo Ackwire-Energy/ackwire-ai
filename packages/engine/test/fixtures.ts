@@ -22,6 +22,7 @@ import {
   createAskUserToolSource,
   createBlobStoreResolver,
   createCalendarToolSource,
+  createChatToolSource,
   createContextToolSource,
   createCredential,
   createForumToolSource,
@@ -74,6 +75,7 @@ export async function setup(
     askUser?: boolean;
     /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
     artifactTools?: boolean;
+    chatTools?: boolean;
     /** Add the issue tools (create_issue, comment_issue…). */
     issueTools?: boolean;
     /** Add the calendar tools (list_events, find_free_time, propose_event). */
@@ -175,6 +177,7 @@ export async function setup(
   const sources = [
     ...(options.askUser ? [createAskUserToolSource()] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
+    ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
     ...(options.calendarTools ? [createCalendarToolSource({ db, pubsub })] : []),
     ...(options.skillTools ? [createSkillToolSource({ db, blobs: artifactDeps.blobs })] : []),

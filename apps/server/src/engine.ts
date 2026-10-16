@@ -8,6 +8,7 @@ import {
   createAskUserToolSource,
   createBlobStoreResolver,
   createCalendarToolSource,
+  createChatToolSource,
   createConnectorToolSource,
   createContextToolSource,
   createForumToolSource,
@@ -148,6 +149,7 @@ export function buildEngine(o: EngineOptions) {
     sources: [
       createAskUserToolSource(),
       createArtifactToolSource(artifacts),
+      createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
       createSkillToolSource({ db, blobs: artifacts.blobs }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),

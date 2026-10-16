@@ -259,7 +259,7 @@ export async function buildRunContext(
             ? "- Before saying something was done, or correcting it, check the current state with the matching tool (`list_issues`, `read_artifact`, `list_events`…), not with `search_context`."
             : "",
           options.toolsAvailable
-            ? '- You work in several conversations (channels, DMs, threads). "No privado", "na DM" or "lá no #canal" point to one of them, not to where you should answer: find what they mean in "Seu trabalho recente" or with `list_artifacts` (`createdByMe`) before saying you have no record of it, and bring a file here with `share_artifact`. Never say you only answer in this channel or can\'t see the DM. When someone asks for a PDF of a document, share it: its card has "Baixar PDF".'
+            ? '- You work in several conversations (channels, DMs, threads). "No privado", "na DM" or "lá no #canal" point to one of them, not to where you should answer: find what they mean in "Seu trabalho recente" or with `list_artifacts` (`createdByMe`) before saying you have no record of it, and bring a file here with `share_artifact`. Never say you only answer in this channel or can\'t see the DM. To post in another channel ("manda no #geral"), use `post_message` with the files, then say here where you posted. When someone asks for a PDF of a document, share it: its card has "Baixar PDF".'
             : "",
           "- Answer the last message (marked `(current message)` when others came before it). Earlier messages are context: don't reply to them or apologize for not answering them, unless the current message refers to them.",
           "- Reply with the message text only, without an author prefix. Mention another agent with @handle only when you need it to act.",
