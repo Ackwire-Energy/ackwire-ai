@@ -10,6 +10,7 @@ import { MACHINE_PROTOCOL_VERSION, type MachineOs, type RunnerInfo } from "@agen
 import { configPath, connectUrl, expandHome, normalizeServerUrl, readConfig, runnerHome, writeConfig } from "./config";
 import { RunnerConnection } from "./connection";
 import { RUNNER_VERSION } from "./errors";
+import { MCP_TOKEN_FILE, McpBridge, mcpSocketPath, runMcpServer } from "./mcp";
 import { agentWorkspace } from "./paths";
 import { agentSecrets } from "./secrets";
 import { installService, serviceStatus, uninstallService } from "./service";
@@ -29,6 +30,8 @@ Usage:
   agentes-runner update
       Downloads the latest runner from the server and restarts the service (keeps the pairing).
   agentes-runner status
+  agentes-runner mcp --task <taskId>
+      The agentes MCP server of a mission task (started by Claude Code or Codex, not by people).
   agentes-runner --help | --version
 
 Config: $AGENTES_RUNNER_HOME or ~/.agentes-runner (config.json, mode 600; optional
@@ -56,7 +59,7 @@ interface Parsed {
   flags: Map<string, string | true>;
 }
 
-const VALUE_FLAGS = new Set(["server", "code", "dir", "name"]);
+const VALUE_FLAGS = new Set(["server", "code", "dir", "name", "task"]);
 
 function parseArgs(argv: string[]): Parsed {
   const positional: string[] = [];
@@ -183,8 +186,12 @@ async function start(): Promise<number> {
     exec: config.exec,
   };
   const secretsDir = path.join(runnerHome(), "secrets");
+  const socketPath = mcpSocketPath(runnerHome());
+  // How an executor starts our MCP server: this runtime running this very script.
+  const script = realpathSync(process.argv[1] ?? "");
   // Background tasks outlive this process: their journal is picked up again here.
   const tasks = new TaskManager({
+    mcp: { socketPath, command: [process.execPath, script] },
     root: path.join(runnerHome(), "tasks"),
     workspaceReal,
     maxConcurrent: config.maxConcurrentTasks,
@@ -194,7 +201,13 @@ async function start(): Promise<number> {
     secrets: (agent) => agentSecrets(secretsDir, agent),
   });
   await tasks.init();
+  // The local endpoint of mission tasks' MCP servers (protocol 5).
+  const mcp = new McpBridge({ socketPath, task: (taskId) => tasks.mcpTask(taskId), log });
+  await mcp
+    .listen()
+    .catch((err: unknown) => log(`mission tools unavailable: ${err instanceof Error ? err.message : String(err)}`));
   const connection = new RunnerConnection({
+    mcp,
     url: connectUrl(config.server),
     token: config.token,
     info,
@@ -203,6 +216,7 @@ async function start(): Promise<number> {
   });
   const stop = () => {
     tasks.close();
+    void mcp.close();
     connection.stop();
   };
   process.once("SIGINT", stop);
@@ -304,6 +318,19 @@ async function main(argv: string[]): Promise<number> {
       return start();
     case "status":
       return status();
+    case "mcp": {
+      const taskId = flagString(p, "task");
+      if (!taskId || !/^[a-zA-Z0-9-]{8,64}$/.test(taskId)) {
+        console.error("Usage: agentes-runner mcp --task <taskId>");
+        return 1;
+      }
+      return runMcpServer({
+        taskId,
+        socketPath: process.env.AGENTES_MCP_SOCKET || mcpSocketPath(runnerHome()),
+        token: process.env.AGENTES_MCP_TOKEN || null,
+        tokenFile: path.join(runnerHome(), "tasks", taskId, MCP_TOKEN_FILE),
+      });
+    }
     case "update":
       return update();
     case "service":

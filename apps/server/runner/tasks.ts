@@ -26,6 +26,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
 import { shellCommand } from "./exec";
+import { claudeMcpConfig, MCP_TOKEN_FILE, type McpTaskInfo, missionExecutorArgs, newMcpToken } from "./mcp";
 import { isInside, resolveInWorkspace } from "./paths";
 
 /**
@@ -95,6 +96,9 @@ interface Entry {
   maxSeconds: number;
   lastLine?: string;
   files: string[];
+  /** Protocol 5: the mission this task works for, and its token for the local `agentes` MCP server. */
+  missionId?: string;
+  mcpToken?: string;
   /** Set by `task.cancel` (a canceled task that vanished is canceled, not interrupted). */
   canceling?: boolean;
   done?: TaskDone;
@@ -137,6 +141,12 @@ export interface TaskManagerOptions {
   runtime?: string;
   /** Tests: where Claude Code keeps its sessions (default `$CLAUDE_CONFIG_DIR` or `~/.claude`). */
   claudeHome?: string;
+  /**
+   * Protocol 5: the local `agentes` MCP server for mission tasks: where the
+   * daemon listens, and how to start `agentes-runner mcp` (runtime + script).
+   * Without it a mission task runs without our tools.
+   */
+  mcp?: { socketPath: string; command: string[] };
   /** macOS: keep the machine awake while tasks run (default on darwin). */
   caffeinate?: boolean;
   now?: () => number;
@@ -234,15 +244,17 @@ export function claudeSessionFile(claudeHome: string, cwd: string, session: stri
  */
 export function executorCommand(
   executor: TaskExecutor,
-  options: { command?: string; session?: string; resume?: boolean },
+  options: { command?: string; session?: string; resume?: boolean; extra?: string[] },
 ): string {
   if (executor === "shell") {
     const command = (options.command ?? "").trim();
     if (!command) throw new RunnerError("bad_request", "A shell task needs a command");
     return command;
   }
-  if (executor === "codex") return "codex exec --json --full-auto -";
+  // `extra`: a mission task's MCP server and rules (already quoted for the shell).
+  if (executor === "codex") return ["codex", "exec", "--json", "--full-auto", ...(options.extra ?? []), "-"].join(" ");
   const parts = ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits"];
+  parts.push(...(options.extra ?? []));
   if (options.session) parts.push(options.resume ? "--resume" : "--session-id", options.session);
   return parts.join(" ");
 }
@@ -535,14 +547,48 @@ export class TaskManager {
       const home = this.opts.claudeHome ?? process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
       if (existsSync(path.join(home, "projects"))) resume = existsSync(claudeSessionFile(home, cwd, session));
     }
-    const command = executorCommand(executor, { command: req.command, session, resume });
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    // A mission task (protocol 5): our MCP server for its executor, bound to this task by a token.
+    const missionId =
+      executor !== "shell" && typeof req.mission?.id === "string" && TASK_ID.test(req.mission.id)
+        ? req.mission.id
+        : undefined;
+    let extra: string[] = [];
+    let mcpToken: string | undefined;
+    let input = prompt;
+    if (missionId && this.opts.mcp) {
+      mcpToken = newMcpToken();
+      writeFileSync(path.join(dir, MCP_TOKEN_FILE), mcpToken, { mode: 0o600 });
+      const configFile = path.join(dir, "mcp.json");
+      const rules = typeof req.mission?.rules === "string" ? req.mission.rules : "";
+      if (executor === "claude") {
+        const config = claudeMcpConfig({
+          command: this.opts.mcp.command,
+          taskId,
+          socketPath: this.opts.mcp.socketPath,
+          token: mcpToken,
+        });
+        writeFileSync(configFile, JSON.stringify(config), { mode: 0o600 });
+      } else if (rules) {
+        input = `${rules}\n\n${prompt}`;
+      }
+      extra = missionExecutorArgs(executor === "codex" ? "codex" : "claude", {
+        configFile,
+        command: this.opts.mcp.command,
+        taskId,
+        socketPath: this.opts.mcp.socketPath,
+        rules,
+      });
+    } else if (missionId) {
+      this.log(`task ${taskId} works for a mission, but this runner has no MCP endpoint`);
+    }
+    const command = executorCommand(executor, { command: req.command, session, resume, extra });
     const maxSeconds = clampInt(
       req.maxSeconds,
       1,
       TASK_MAX_SECONDS_CAP,
       this.opts.defaultMaxSeconds ?? DEFAULT_TASK_MAX_SECONDS,
     );
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
     const shell = shellCommand(command);
     writeJson(path.join(dir, "spec.json"), {
       file: shell.file,
@@ -551,7 +597,7 @@ export class TaskManager {
       cwd,
       maxSeconds,
     });
-    if (executor !== "shell") writeFileSync(path.join(dir, "stdin.txt"), prompt, { mode: 0o600 });
+    if (executor !== "shell") writeFileSync(path.join(dir, "stdin.txt"), input, { mode: 0o600 });
     const wrapper = path.join(this.opts.root, "wrap.mjs");
     writeFileSync(wrapper, WRAPPER_SOURCE, { mode: 0o600 });
     const secrets = (await this.opts.secrets?.(agent)) ?? null;
@@ -583,6 +629,8 @@ export class TaskManager {
       cwdRel: rel,
       ...(branch ? { branch } : {}),
       ...(session ? { session } : {}),
+      ...(missionId ? { missionId } : {}),
+      ...(mcpToken ? { mcpToken } : {}),
       status: "running",
       pid,
       startedAt: new Date(this.now()).toISOString(),
@@ -595,6 +643,13 @@ export class TaskManager {
     this.updateCaffeinate();
     this.log(`[${entry.agentHandle}] task ${taskId} started: ${command.slice(0, 80)}`);
     return { taskId, pid, startedAt: entry.startedAt, cwd: rel, ...(branch ? { branch } : {}), command };
+  }
+
+  /** For the MCP bridge: a mission task's token and whether it still runs. */
+  mcpTask(taskId: string): McpTaskInfo | null {
+    const t = this.journal.tasks.find((x) => x.taskId === taskId);
+    if (!t?.missionId || !t.mcpToken) return null;
+    return { token: t.mcpToken, missionId: t.missionId, running: t.status === "running" };
   }
 
   status(agent: AgentScope | undefined, taskId?: string): MachineReplies["task.status"] {

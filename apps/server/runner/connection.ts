@@ -6,6 +6,7 @@ import {
   type RunnerInfo,
 } from "@agenteschat/adapters/machine-protocol";
 import { type HandlerContext, handleRequest, RequestRunner } from "./handlers";
+import type { McpBridge } from "./mcp";
 
 export const BACKOFF_MIN_MS = 1_000;
 export const BACKOFF_MAX_MS = 60_000;
@@ -96,6 +97,8 @@ export interface ConnectionOptions {
    * marks one delivered. Defaults to `context.tasks`.
    */
   tasks?: Pick<NonNullable<HandlerContext["tasks"]>, "list" | "attach" | "detach" | "ack">;
+  /** Protocol 5: the local MCP endpoint of mission tasks; its calls go out while connected. */
+  mcp?: Pick<McpBridge, "attach" | "detach" | "result">;
   /** Called after each `welcome`. */
   onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number }) => void;
 }
@@ -183,6 +186,7 @@ export class RunnerConnection {
         if (watchdog) clearTimeout(watchdog);
         runner.close();
         tasks?.detach();
+        opts.mcp?.detach();
         socket?.close();
         this.endSession = undefined;
         resolve({ welcomed, outcome });
@@ -209,8 +213,12 @@ export class RunnerConnection {
             arm();
             opts.onWelcome?.({ machineId: frame.machineId, name: frame.name, heartbeatMs });
             tasks?.attach(send);
+            opts.mcp?.attach(send);
             return;
           }
+          case "mcp.result":
+            opts.mcp?.result(frame);
+            return;
           case "task.ack":
             tasks?.ack(frame.taskId);
             return;

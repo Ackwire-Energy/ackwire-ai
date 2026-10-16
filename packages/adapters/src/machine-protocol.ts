@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 4;
+export const MACHINE_PROTOCOL_VERSION = 5;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -14,6 +14,12 @@ export const AGENT_FOLDERS_PROTOCOL = 2;
 export const SECRETS_PROTOCOL = 3;
 /** From this protocol on, the runner runs background tasks that outlive a request (`task.*`, ADR 0029). */
 export const TASKS_PROTOCOL = 4;
+/**
+ * From this protocol on, a task can belong to a mission: the runner gives the
+ * executor the local `agentes` MCP server and relays its calls (`mcp.call` /
+ * `mcp.result`, ADR 0029).
+ */
+export const MISSION_PROTOCOL = 5;
 
 /** No valid `hello` within this time closes the socket. */
 export const HELLO_TIMEOUT_MS = 10_000;
@@ -77,6 +83,11 @@ export interface TaskStart {
   branch?: string;
   /** Killed (the whole process group) after this long; default and cap are the runner's. */
   maxSeconds?: number;
+  /**
+   * Protocol 5: the task works for a mission. The runner gives the executor
+   * the local `agentes` MCP server (bound to this task) and the mission's rules.
+   */
+  mission?: { id: string; rules?: string };
 }
 
 /** A task as the runner's journal has it (in `hello` and `task.status`). */
@@ -232,6 +243,9 @@ export type ServerFrame =
   | { type: "ping"; at: number }
   /** The server stored this task's `task.done`: the runner stops re-sending it. */
   | { type: "task.ack"; taskId: string }
+  /** Protocol 5: the answer to an `mcp.call` (the text the executor's tool call returns). */
+  | { type: "mcp.result"; callId: string; ok: true; text: string }
+  | { type: "mcp.result"; callId: string; ok: false; error: { code: string; message: string } }
   /** The server closes after sending this (bad token, revoked, outdated runner). */
   | { type: "refused"; reason: "invalid_token" | "revoked" | "outdated" | "replaced"; message: string };
 
@@ -251,7 +265,16 @@ export type RunnerFrame =
       files?: string[];
       seconds?: number;
     }
-  | ({ type: "task.done" } & TaskDone);
+  | ({ type: "task.done" } & TaskDone)
+  /**
+   * Protocol 5: the executor of a mission task called a tool of the local
+   * `agentes` MCP server. The server checks the task belongs to this machine
+   * and to a mission, runs the tool and answers `mcp.result`.
+   */
+  | { type: "mcp.call"; callId: string; taskId: string; tool: string; args: Record<string, unknown> };
+
+/** Largest `mcp.call` arguments (JSON characters). */
+export const MCP_ARGS_MAX_CHARS = 64 * 1024;
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const isString = (v: unknown): v is string => typeof v === "string";
@@ -371,6 +394,18 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(session !== undefined ? { session } : {}),
       };
     }
+    case "mcp.call": {
+      if (!isString(f.callId) || !isString(f.taskId) || !isString(f.tool)) return null;
+      const args = isObject(f.args) && !Array.isArray(f.args) ? f.args : {};
+      if (JSON.stringify(args).length > MCP_ARGS_MAX_CHARS) return null;
+      return {
+        type: "mcp.call",
+        callId: f.callId.slice(0, 64),
+        taskId: f.taskId.slice(0, 64),
+        tool: f.tool.slice(0, 64),
+        args,
+      };
+    }
     default:
       return null;
   }
@@ -392,7 +427,8 @@ export function parseServerFrame(raw: string): ServerFrame | null {
   }
   if ((f.type === "cancel" || f.type === "request") && !isString(f.id)) return null;
   if (f.type === "task.ack" && !isString(f.taskId)) return null;
-  if (!["welcome", "request", "cancel", "ping", "refused", "task.ack"].includes(f.type)) return null;
+  if (f.type === "mcp.result" && !isString(f.callId)) return null;
+  if (!["welcome", "request", "cancel", "ping", "refused", "task.ack", "mcp.result"].includes(f.type)) return null;
   return f as ServerFrame;
 }
 
@@ -400,3 +436,155 @@ export function parseServerFrame(raw: string): ServerFrame | null {
 export function normalizePairingCode(code: string) {
   return code.replace(/[\s-]/g, "").toUpperCase();
 }
+
+/**
+ * The tools of the local `agentes` MCP server a mission task's executor gets
+ * (protocol 5, ADR 0029). The runner lists them (`tools/list`) and relays
+ * calls; the server validates and runs them, bound to the task's mission.
+ */
+export interface MissionMcpTool {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+const PLAN_STATUSES = ["todo", "doing", "waiting_you", "done", "dropped"];
+
+export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
+  {
+    name: "report",
+    description:
+      "Tell the people in the mission's thread where things stand: a milestone, what you found, what is next. One short paragraph in their language; no internal details (tool names, logs). Use it at milestones, not for every step.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        summary: { type: "string", minLength: 1, maxLength: 4000 },
+        status: { enum: ["working", "blocked", "done"] },
+      },
+      required: ["summary"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "update_plan",
+    description:
+      "Replace the mission's plan: the whole checklist, every time (keep each item's id stable). Statuses: todo, doing, waiting_you (needs a person), done, dropped. People see each change as one line in the thread.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          minItems: 1,
+          maxItems: 60,
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", minLength: 1, maxLength: 40 },
+              title: { type: "string", minLength: 1, maxLength: 200 },
+              status: { enum: PLAN_STATUSES },
+              note: { type: "string", maxLength: 500 },
+            },
+            required: ["title", "status"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["items"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "ask_decision",
+    description:
+      "Ask the people a product or technical decision as a card with 2 to 4 options. blocking: true when you can't go on without it (then stop and wait; you are resumed with the answer). blocking: false to go on with your recommendation as a provisional decision they review later.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        question: { type: "string", minLength: 1, maxLength: 500 },
+        options: {
+          type: "array",
+          minItems: 2,
+          maxItems: 4,
+          items: { type: "string", minLength: 1, maxLength: 200 },
+        },
+        recommendation: { type: "string", maxLength: 200 },
+        why: { type: "string", maxLength: 1000 },
+        impact: { type: "string", maxLength: 500 },
+        blocking: { type: "boolean" },
+      },
+      required: ["question", "options", "blocking"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "request_review",
+    description:
+      "Ask the people to look at something you can show (screens, a prototype, a PR). paths: files in your folder to attach (uploaded to the Drive). Then stop and wait: you are resumed with their answer (approved, or the changes they want).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", minLength: 1, maxLength: 200 },
+        summary: { type: "string", maxLength: 4000 },
+        pr_url: { type: "string", maxLength: 500 },
+        paths: { type: "array", maxItems: 10, items: { type: "string", minLength: 1, maxLength: 300 } },
+      },
+      required: ["title"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "request_approval",
+    description:
+      "Ask a person to approve a merge, a deploy or a rollback before you do it. Never merge, deploy or roll back without an approval. Then stop and wait: you are resumed with the outcome.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { enum: ["merge", "deploy", "rollback"] },
+        target: { type: "string", minLength: 1, maxLength: 300 },
+        detail: { type: "string", maxLength: 1000 },
+      },
+      required: ["action", "target"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "upload_artifact",
+    description:
+      "Send a file (or a folder, as a .zip) from your folder to the team's Drive and get its id. The bytes go straight to the Drive.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", minLength: 1, maxLength: 300 },
+        title: { type: "string", maxLength: 200 },
+      },
+      required: ["path"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_context",
+    description:
+      "Search what the organization already knows (conversations, decisions, wiki, documents) that this mission's agent may see. Short results.",
+    inputSchema: {
+      type: "object",
+      properties: { query: { type: "string", minLength: 1, maxLength: 500 } },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "start_task",
+    description:
+      "Main session only: start one plan item as its own background session on a new git branch (it runs in parallel in its own worktree). You are told when it ends. Give it everything it needs in prompt.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", minLength: 1, maxLength: 120 },
+        prompt: { type: "string", minLength: 1, maxLength: 20000 },
+        branch: { type: "string", minLength: 1, maxLength: 120 },
+      },
+      required: ["title", "prompt", "branch"],
+      additionalProperties: false,
+    },
+  },
+];
