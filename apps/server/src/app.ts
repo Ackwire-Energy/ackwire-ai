@@ -23,6 +23,7 @@ import { issueRoutes } from "./routes/app/issues";
 import { knowledgeRoutes } from "./routes/app/knowledge";
 import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
+import { missionRoutes } from "./routes/app/missions";
 import { questionRoutes } from "./routes/app/questions";
 import { routineRoutes } from "./routes/app/routines";
 import { sandboxRoutes } from "./routes/app/sandboxes";
@@ -109,6 +110,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", issueRoutes(deps));
     api.route("/app", forumRoutes(deps));
     api.route("/app", threadRoutes(deps));
+    api.route("/app", missionRoutes(deps));
     api.route("/app", wikiRoutes(deps));
     api.route("/app", routineRoutes(deps));
     api.route("/app", calendarRoutes(deps));

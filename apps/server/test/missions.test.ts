@@ -1,0 +1,157 @@
+import { afterEach, expect, test } from "bun:test";
+import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
+import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+
+let t: TestServer;
+afterEach(() => t.close());
+
+const RUNNER = {
+  hostname: "mac",
+  os: "darwin",
+  arch: "arm64",
+  version: "0.5.0",
+  protocol: MACHINE_PROTOCOL_VERSION,
+  workspace: "/Users/w/agentes",
+};
+
+/** A connected runner on the test server's hub that starts and cancels tasks. */
+function fakeRunner() {
+  const hub = t.engine.machineHub;
+  const started: Extract<ServerFrame, { type: "request"; op: "task.start" }>[] = [];
+  const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
+  const conn = hub.open({
+    send(text: string) {
+      const frame = JSON.parse(text) as ServerFrame;
+      if (frame.type !== "request") return;
+      setTimeout(() => {
+        const ok = (data: unknown) => void reply({ type: "result", id: frame.id, ok: true, data });
+        if (frame.op === "task.start") {
+          started.push(frame);
+          return ok({
+            taskId: frame.taskId,
+            pid: 7,
+            startedAt: new Date().toISOString(),
+            cwd: frame.cwd ?? "",
+            command: "claude -p",
+          });
+        }
+        if (frame.op === "task.cancel") return ok({ canceled: true });
+        if (frame.op === "read") return ok({ base64: null, size: 0 });
+        return ok({ size: 0 });
+      }, 1);
+    },
+    close() {},
+  });
+  return {
+    started,
+    hello: (token: string) => hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true })),
+  };
+}
+
+interface Mission {
+  id: string;
+  threadId: string;
+  status: string;
+  role: string;
+  canAct: boolean;
+  plan: { total: number };
+}
+
+test("missions API: session and same origin; create, read, start (owner only), list, summary, stop, close", async () => {
+  t = await createTestServer({ env: { ALLOW_SIGNUP: "true" }, reply: () => ({ chunks: ["ok"] }) });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+
+  // A computer for the agent, its runner connected.
+  const pairing = (await (await api("/machines/pairings", { json: { name: "MacBook" } })).json()) as { code: string };
+  const paired = (await (
+    await t.app.request("/api/machines/pair", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
+      body: JSON.stringify({ code: pairing.code, ...RUNNER, exec: true }),
+    })
+  ).json()) as { machineId: string; token: string };
+  expect(
+    (await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: paired.machineId } })).status,
+  ).toBe(200);
+  const runner = fakeRunner();
+  await runner.hello(paired.token);
+
+  const anon = browser(t);
+  expect((await anon(`/api/app/organizations/${orgId}/missions`)).status).toBe(401);
+  const input = { agentId, channelId, goal: "Build our mobile app", title: "Mobile app" };
+  expect((await api("/missions", { json: input, origin: "https://evil.example" })).status).toBe(403);
+
+  const created = await api("/missions", { json: input });
+  expect(created.status).toBe(201);
+  const mission = (await created.json()) as Mission;
+  expect(mission).toMatchObject({ status: "proposed", role: "owner", canAct: true });
+  expect(runner.started).toHaveLength(1);
+  expect(runner.started[0]?.mission?.id).toBe(mission.id);
+
+  const byThread = await api(`/threads/${mission.threadId}/mission`);
+  expect(((await byThread.json()) as Mission).id).toBe(mission.id);
+  const tasks = (await (await api(`/threads/${mission.threadId}/tasks`)).json()) as { tasks: { missionId: string }[] };
+  expect(tasks.tasks.map((x) => x.missionId)).toEqual([mission.id]);
+  const threads = (await (await api("/threads?tab=missions")).json()) as {
+    threads: { id: string; mission: { id: string; status: string } | null }[];
+  };
+  expect(threads.threads).toEqual([
+    expect.objectContaining({
+      id: mission.threadId,
+      mission: expect.objectContaining({ id: mission.id, status: "proposed" }),
+    }),
+  ]);
+
+  // A member who reads the channel sees it, but can't start it, decide or stop it.
+  const bia = browser(t);
+  await signUp(bia, "bia@example.com");
+  const { url } = (await (
+    await api("/invitations", { json: { email: "bia@example.com", role: "member" } })
+  ).json()) as {
+    url: string;
+  };
+  await bia(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
+  const asBia = (path: string, init?: Parameters<typeof bia>[1]) => bia(`/api/app/organizations/${orgId}${path}`, init);
+  const seen = await asBia(`/missions/${mission.id}`);
+  expect(seen.status).toBe(200);
+  expect(((await seen.json()) as Mission).role).toBe("none");
+  const refused = await asBia(`/missions/${mission.id}/start`, { json: {} });
+  expect(refused.status).toBe(403);
+  expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("mission.not_owner");
+  expect((await asBia(`/missions/${mission.id}/stop`, { json: {} })).status).toBe(403);
+  expect((await asBia(`/missions/${mission.id}/close`, { json: { outcome: "done" } })).status).toBe(403);
+
+  const startRes = await api(`/missions/${mission.id}/start`, { json: {} });
+  expect(startRes.status).toBe(200);
+  expect(((await startRes.json()) as Mission).status).toBe("active");
+  expect((await api(`/missions/${mission.id}/start`, { json: {} })).status).toBe(409);
+
+  const list = (await (await api("/missions?status=open")).json()) as { missions: Mission[] };
+  expect(list.missions.map((m) => m.id)).toEqual([mission.id]);
+  const summary = (await (await api(`/missions/${mission.id}/summary`)).json()) as { text: string };
+  expect(summary.text).toContain('"Mobile app": active.');
+  const plan = (await (await api(`/missions/${mission.id}/plan`)).json()) as {
+    missionId: string;
+    current: unknown;
+    history: unknown[];
+  };
+  expect(plan).toEqual({ missionId: mission.id, current: null, history: [] });
+  expect((await api(`/missions/${mission.id}/files`)).status).toBe(200);
+  expect((await api(`/missions/${mission.id}/participants`)).status).toBe(200);
+  expect((await api(`/missions/${mission.id}/decisions`)).status).toBe(200);
+
+  const stopped = await api(`/missions/${mission.id}/stop`, { json: {} });
+  expect(stopped.status).toBe(200);
+  expect((await stopped.json()) as { status: string; canceledTasks: number }).toMatchObject({
+    status: "paused",
+    canceledTasks: 1,
+  });
+  const closed = await api(`/missions/${mission.id}/close`, { json: { outcome: "canceled" } });
+  expect(closed.status).toBe(200);
+  expect(((await closed.json()) as Mission).status).toBe("canceled");
+  expect((await api(`/missions/${mission.id}/resume`, { json: {} })).status).toBe(409);
+});

@@ -28,7 +28,7 @@ import {
 const tags = ["Threads"];
 const Actor = z.object({ type: z.enum(["person", "agent"]), id: z.string().nullable() });
 const State = z.enum(["open", "closed", "archived"]);
-const Tab = z.enum(["all", "working", "closed", "archived"]);
+const Tab = z.enum(["all", "working", "missions", "closed", "archived"]);
 
 const Thread = z
   .object({
@@ -63,6 +63,18 @@ const Thread = z
     working: z.boolean().openapi({ description: "An agent run is in progress (or waiting) in this thread." }),
     needsYou: z.boolean(),
     canManage: z.boolean().openapi({ description: "You may close, archive, rename or change the context." }),
+    mission: z
+      .object({
+        id: z.uuid(),
+        status: z.enum(["proposed", "active", "paused", "done", "canceled"]),
+        planDone: z.number(),
+        planTotal: z.number(),
+        waitingYou: z
+          .number()
+          .openapi({ description: "Plan items waiting for people, pending decisions and reviews." }),
+      })
+      .nullable()
+      .openapi({ description: "The thread's mission, in short (details: `GET …/threads/{id}/mission`)." }),
     createdAt: z.string(),
   })
   .openapi("Thread");
