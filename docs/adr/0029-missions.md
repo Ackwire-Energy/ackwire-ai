@@ -142,7 +142,7 @@ A mission has no budget. What runs on a connected machine (Claude Code, Codex) u
 
 ### 12. Data
 
-- `threads` gains `context_from` (source channel, first and last message), `state` (`open | closed | archived`), `closed_by/at`, `archived_by/at`.
+- `threads` gains `context_from` (source channel, first and last message), `state` (`open | closed | archived`), `closed_by/at`, `archived_by/at`. Built in migration 0047; see "Threads as built" below.
 - `missions` (`org_id`, agent, owner, home thread, objective, status `active | paused | done | canceled`, machine, executor, slots, timestamps). One mission per thread.
 - `mission_participants` (`org_id`, mission, user, role `decide | comment`, added by, at).
 - `mission_plan_versions` (`org_id`, mission, items JSON, by the executor, at).
@@ -150,6 +150,18 @@ A mission has no budget. What runs on a connected machine (Claude Code, Codex) u
 - `mission_decisions` (`org_id`, mission, question, options, recommendation, why, impact, blocking, status `pending | provisional | taken`, chosen, by whom, when).
 - `mission_reviews` (`org_id`, mission, title, summary, PR, artifacts, status `pending | approved | changes_requested`, by whom, when).
 - `mission_events` (append-only feed: reports, plan changes, task events, wake-ups) driving the thread, the pinned card and the Threads page in real time.
+
+### Threads as built (sections 1, 9, 11, 12)
+
+- **Threads stay implicit.** Replies keep `messages.thread_id` = the root message id. The new `threads` table (migration 0047) has one row per thread that has state of its own (title, `open | closed | archived`, a context range), keyed by `(org_id, root_message_id)`; an implicit thread gets its row the first time it is closed, archived or renamed. `context_from` became columns: `context_channel_id`, `context_first_message_id`, `context_last_message_id` (plus their exact times), `context_excluded_message_ids`, `context_moved` and `context_moved_message_ids` (exactly what moved, so returning never touches real replies).
+- **The root of a thread made from a range is a new message.** No message of the range can be the root (the range can change, can come from another channel, and its first message may already have replies). `createThreadFromRange` writes a top-level message in the thread's channel, by the person who created it, with the title as its text and `meta.threadStart` (`title`, `contextChannelId`, `firstMessageId`, `lastMessageId`, `count`, `moved`, `movedCount`). It is written directly, without the outbox: it routes to no agent. The web draws it as the context marker and, after "Tirar do canal", as the stub. The automatic title is the first message of the range on one line (≤ 60 chars).
+- **Moving** sets the range's messages' `thread_id` to the root (only for a range of the thread's own channel; a message with replies of its own can't move: `thread.range_has_replies`). Returning sets it back for exactly the moved ids. Adjusting a moved range returns it and moves the new one. Undo of creation (`DELETE`) works while nobody replied.
+- **Another channel's range** is accepted when it is public or every member of the destination (people and agents) is a member of it; otherwise `thread.context_not_visible` with `params.userIds` and `params.agentIds`.
+- **Who manages a plain thread:** who created it, the root message's author, and admins (`thread.not_allowed` otherwise).
+- **Close and archive.** A person's reply in a closed thread reopens it inside the message insert statement (one conditional update by root id). Posting by a person in an archived thread is refused with `thread.archived` (409); an agent's run already going still posts its reply. Unarchiving returns to closed or open.
+- **Who sees** a thread in lists: the people who read its channel. In this codebase reading a channel needs membership (public channels too, like search for people), so the Threads page lists threads of the channels and DMs the person is in.
+- **Context:** a run in a thread with a range reads the range (minus exclusions, oldest first) instead of the channel before the root; moved messages are read once, as replies. A range longer than the window loses its oldest messages (the thread summary covers the thread, not the range), and the prompt says the thread came from that part of the conversation.
+- **Not yet:** per-thread unread counts (reads are per channel), the "Missões" tab, and the close-with-work-running choices (the web asks; the server closes).
 
 ### 13. UI (prototypes)
 
