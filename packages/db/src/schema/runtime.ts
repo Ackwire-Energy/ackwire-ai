@@ -107,6 +107,12 @@ export const agentRuns = pgTable(
      * next call ("New message from …"), instead of starting a second run.
      */
     pendingMessageIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /**
+     * The issue this run works on: set when someone asks the agent to
+     * implement it, or when the run uses an issue tool on it. The issue shows
+     * "working now" from a live run, and "stalled" when none is alive.
+     */
+    issueId: uuid(),
     /** Bumped by the worker while it executes the run; a stale one means the worker died (recovered on boot). */
     heartbeatAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -122,6 +128,7 @@ export const agentRuns = pgTable(
     index().on(t.threadRootId),
     // An agent's recent work across conversations (context: "Seu trabalho recente").
     index().on(t.orgId, t.agentId, t.createdAt),
+    index().on(t.issueId, t.createdAt),
   ],
 );
 

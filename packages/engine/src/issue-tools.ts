@@ -8,12 +8,18 @@ import {
   type IssueStatus,
   type IssueView,
   listIssues,
+  setCriterion,
   updateIssue,
 } from "./issues";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
-const actorOf = (ctx: ToolContext): IssueActor => ({ type: "agent", agentId: ctx.agentId, channelId: ctx.channelId });
+const actorOf = (ctx: ToolContext): IssueActor => ({
+  type: "agent",
+  agentId: ctx.agentId,
+  channelId: ctx.channelId,
+  runId: ctx.runId,
+});
 const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
@@ -23,7 +29,7 @@ const line = (i: IssueView) =>
   `#${i.number} [${i.status}] ${i.title}${i.assignee ? ` (→ ${i.assignee.type} ${i.assignee.id})` : ""} id=${i.id}`;
 
 function describeIssue(i: IssueView) {
-  const criteria = i.criteria.map((c) => `- [${c.done ? "x" : " "}] ${c.text}`).join("\n");
+  const criteria = i.criteria.map((c, k) => `${k + 1}. [${c.done ? "x" : " "}] ${c.text}`).join("\n");
   return [
     line(i),
     `Priority: ${i.priority}${i.dueDate ? ` · due ${i.dueDate}` : ""}${i.labels.length ? ` · ${i.labels.join(", ")}` : ""}`,
@@ -113,7 +119,8 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
     },
     {
       name: "update_issue",
-      description: "Change an issue's status, priority, title or description, or link a pull request to it.",
+      description:
+        "Change an issue's status, priority, title or description, check acceptance criteria you met, or link a pull request to it. Linking a PR moves the issue to review on its own.",
       scope: "issues:write",
       inputSchema: {
         type: "object",
@@ -125,6 +132,12 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
           description: { type: "string", maxLength: 20000 },
           pull_request_url: { type: "string", maxLength: 500 },
           pull_request_number: { type: "integer", minimum: 1 },
+          done_criteria: {
+            type: "array",
+            items: { type: "integer", minimum: 1 },
+            maxItems: 50,
+            description: "Acceptance criteria now met, by their number (1, 2…) as list_issues shows them.",
+          },
         },
         required: ["issue"],
         additionalProperties: false,
@@ -143,7 +156,13 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             description: typeof input.description === "string" ? input.description : undefined,
             ...(url && prNumber ? { addPullRequest: { number: prNumber, url } } : {}),
           });
-          return { content: `Updated ${line(i)}` };
+          const done = Array.isArray(input.done_criteria) ? input.done_criteria.map(Number) : [];
+          let latest = i;
+          for (const n of [...new Set(done)]) {
+            const c = latest.criteria[n - 1];
+            if (c && !c.done) latest = await setCriterion(deps, actorOf(ctx), ctx.orgId, i.id, c.id, true);
+          }
+          return { content: `Updated ${line(latest)}` };
         } catch (error) {
           return failed(error);
         }

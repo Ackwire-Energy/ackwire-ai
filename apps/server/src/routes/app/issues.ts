@@ -33,12 +33,28 @@ const Issue = z
     assignee: Actor.nullable(),
     labels: z.array(z.string()),
     dueDate: z.string().nullable(),
-    criteria: z.array(z.object({ id: z.string(), text: z.string(), done: z.boolean() })),
+    criteria: z.array(
+      z.object({ id: z.string(), text: z.string(), done: z.boolean(), doneBy: Actor.nullable().optional() }),
+    ),
     createdBy: Actor,
     source: z.record(z.string(), z.unknown()),
     channelId: z.uuid().nullable(),
     pullRequests: z.array(z.object({ number: z.number(), url: z.string(), openedBy: Actor.nullable() })),
     artifacts: z.array(z.object({ id: z.uuid(), title: z.string(), createdBy: Actor })),
+    work: z
+      .object({
+        agentId: z.uuid(),
+        runId: z.uuid().nullable(),
+        state: z.enum(["running", "waiting_approval", "waiting_input", "stalled"]),
+        since: z.string(),
+        steps: z.array(z.object({ tool: z.string(), detail: z.string().optional(), at: z.string() })),
+        reason: z.enum(["failed", "canceled", "budget"]).optional(),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "The assigned agent's work, from its runs: live (running, waiting) or stalled (in progress, no run alive).",
+      }),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -53,6 +69,7 @@ const Activity = z
     event: z.string().optional(),
     textCode: z.string().optional(),
     textParams: z.record(z.string(), z.string()).optional(),
+    auto: z.boolean().optional().openapi({ description: "The system moved it on its own (runs and PRs)." }),
     createdAt: z.string(),
   })
   .openapi("IssueActivity");

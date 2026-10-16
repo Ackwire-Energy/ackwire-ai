@@ -149,6 +149,60 @@ describe("issues", () => {
     expect(activity.some((a) => a.event === "agent_asked")).toBe(true);
   });
 
+  test("the issue follows the agent's work: in progress when it starts, working while the run lives, stalled after, review with a PR", async () => {
+    let step = 0;
+    f = await setup({
+      issueTools: true,
+      reply: (req: ModelRequest) => {
+        step++;
+        const last = JSON.stringify(req.messages.at(-1)?.content);
+        const id = /issue_id ([0-9a-f-]{36})/.exec(last)?.[1];
+        if (step === 1 && id)
+          return { chunks: [], toolUses: [{ name: "update_issue", input: { issue: id, done_criteria: [1] } }] };
+        return { chunks: ["Plano escrito; falta o teste."] };
+      },
+    });
+    await grantScopes(f.db, f.org.id, f.agent.id, ISSUES);
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, {
+      title: "Frete lento",
+      criteria: ["Responde em 2 s", "Tem teste"],
+    });
+    expect(issue.work).toBeNull();
+
+    // Asked: the run is queued, so the agent is working and the status moved by itself.
+    const asked = await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+    expect(asked.status).toBe("in_progress");
+    expect(asked.work).toMatchObject({ agentId: f.agent.id, state: "running" });
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs.map((r) => r.issueId)).toEqual([issue.id]);
+
+    // The run ends without a PR: still in progress with the agent, nothing alive → stalled.
+    await drainOutbox(f.db, f.handlers);
+    const after = await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id });
+    expect(after.status).toBe("in_progress");
+    expect(after.work?.state).toBe("stalled");
+    expect(after.work?.steps.map((s) => s.tool)).toEqual(["update_issue"]);
+    // The agent checked the first criterion; it remembers who.
+    expect(after.criteria.map((c) => [c.done, c.doneBy?.type ?? null])).toEqual([
+      [true, "agent"],
+      [false, null],
+    ]);
+    const moved = (await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id)).filter(
+      (a) => a.event === "status_changed",
+    );
+    expect(moved.map((a) => [a.textParams?.status, a.auto ?? false])).toEqual([["in_progress", true]]);
+
+    // A linked PR moves it to review on its own; in review, an ended run is not "stalled".
+    const reviewed = await updateIssue(deps, person(f.owner.id), f.org.id, issue.id, {
+      addPullRequest: { number: 7, url: "https://github.com/acme/app/pull/7" },
+    });
+    expect(reviewed.status).toBe("in_review");
+    expect(reviewed.work).toBeNull();
+    const last = (await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id)).at(-1);
+    expect(last).toMatchObject({ event: "status_changed", auto: true, textParams: { status: "in_review" } });
+  });
+
   test("an agent without issues:write can't create issues; one in another channel can't see private ones", async () => {
     f = await setup({
       issueTools: true,

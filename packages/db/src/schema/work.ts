@@ -53,7 +53,11 @@ export const issues = pgTable(
     labels: text().array().notNull().default(sql`'{}'::text[]`),
     dueDate: date({ mode: "string" }),
     /** `[{ id, text, done }]`. */
-    criteria: jsonb().$type<{ id: string; text: string; done: boolean }[]>().notNull().default([]),
+    /** `doneBy`: who checked it (`{ type, id }`), when done. */
+    criteria: jsonb()
+      .$type<{ id: string; text: string; done: boolean; doneBy?: { type: "person" | "agent"; id: string } | null }[]>()
+      .notNull()
+      .default([]),
     /** `{ type: "manual" | "message" | "forum" | "agent" | "webhook", … }`. */
     source: jsonb().$type<Record<string, unknown>>().notNull().default({ type: "manual" }),
     channelId: uuid(),

@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -8,9 +8,10 @@ import { getMessage, postPersonMessage } from "./messages";
 import { can, getMembership } from "./organizations";
 import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
+import { toolDetail } from "./tool-detail";
 import { syncWikiLinks } from "./wiki-links";
 
-const { issues, issueActivity, issueCounters, channels, channelMembers, artifacts } = schema;
+const { issues, issueActivity, issueCounters, channels, channelMembers, artifacts, agentRuns, agentRunSteps } = schema;
 
 export type IssueStatus = "todo" | "in_progress" | "in_review" | "done" | "canceled";
 export type IssuePriority = "low" | "normal" | "high";
@@ -36,14 +37,35 @@ export interface IssueView {
   assignee: WorkActor | null;
   labels: string[];
   dueDate: string | null;
-  criteria: { id: string; text: string; done: boolean }[];
+  /** `doneBy`: who checked it (an agent shows its face next to it). */
+  criteria: { id: string; text: string; done: boolean; doneBy?: WorkActor | null }[];
   createdBy: WorkActor;
   source: IssueSource;
   channelId: string | null;
   pullRequests: { number: number; url: string; openedBy: WorkActor | null }[];
   artifacts: { id: string; title: string; createdBy: WorkActor }[];
+  /** The assigned agent's work on it, from its runs (null: a person has it, nobody, or it is closed). */
+  work: IssueWork | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * What the assigned agent is doing on an issue, derived from its runs (never
+ * a status the agent sets): `running` / `waiting_approval` / `waiting_input`
+ * while a linked run is alive; `stalled` when the issue is in progress with
+ * the agent and no run is alive (it ended, failed or was stopped).
+ */
+export interface IssueWork {
+  agentId: string;
+  runId: string | null;
+  state: "running" | "waiting_approval" | "waiting_input" | "stalled";
+  /** When the live run started, or when the work stopped (stalled). */
+  since: string;
+  /** The run's last tool calls, oldest first (safe labels only: built-in details, no connector inputs). */
+  steps: { tool: string; detail?: string; at: string }[];
+  /** Stalled: how the last run ended, when it did not finish on its own. */
+  reason?: "failed" | "canceled" | "budget";
 }
 
 export interface IssueActivityView {
@@ -55,6 +77,8 @@ export interface IssueActivityView {
   /** An event in the app's words (`issues.event.{textCode}`), with its params; `text` is the English fallback. */
   textCode?: string;
   textParams?: Record<string, string>;
+  /** The system moved it on its own (status follows the agent's runs and PRs). */
+  auto?: boolean;
   createdAt: string;
 }
 
@@ -79,7 +103,10 @@ export type IssuePatch = Partial<{
 }>;
 
 /** Who acts: a person, or an agent during a run (it sees what its channel lets it see). */
-export type IssueActor = { type: "person"; userId: string } | { type: "agent"; agentId: string; channelId: string };
+export type IssueActor =
+  | { type: "person"; userId: string }
+  /** `runId`: the run acting (links the run to the issue it touches). */
+  | { type: "agent"; agentId: string; channelId: string; runId?: string };
 
 type IssueRow = typeof issues.$inferSelect;
 
@@ -138,7 +165,92 @@ async function requireOrgMember(db: Database, actor: IssueActor, orgId: string) 
   return membership;
 }
 
+const LIVE_RUN = new Set(["queued", "running", "waiting_approval", "waiting_input"]);
+const OPEN_FOR_WORK = new Set<IssueStatus>(["todo", "in_progress", "in_review"]);
+const STEPS_SHOWN = 8;
+
+/** The assigned agents' work on these issues: their latest linked run and its last tool calls. */
+async function workOf(db: Database, rows: IssueRow[]): Promise<Map<string, IssueWork>> {
+  const out = new Map<string, IssueWork>();
+  const withAgent = rows.filter((r) => r.assigneeType === "agent" && r.assigneeId && OPEN_FOR_WORK.has(r.status));
+  if (withAgent.length === 0) return out;
+  const latest = await db
+    .selectDistinctOn([agentRuns.issueId], {
+      id: agentRuns.id,
+      issueId: agentRuns.issueId,
+      agentId: agentRuns.agentId,
+      status: agentRuns.status,
+      error: agentRuns.error,
+      createdAt: agentRuns.createdAt,
+      startedAt: agentRuns.startedAt,
+      finishedAt: agentRuns.finishedAt,
+      updatedAt: agentRuns.updatedAt,
+    })
+    .from(agentRuns)
+    .where(
+      inArray(
+        agentRuns.issueId,
+        withAgent.map((r) => r.id),
+      ),
+    )
+    .orderBy(agentRuns.issueId, desc(agentRuns.createdAt));
+  const runOf = new Map(latest.map((r) => [r.issueId ?? "", r]));
+  const runIds = latest.map((r) => r.id);
+  const steps = runIds.length
+    ? await db
+        .select({ runId: agentRunSteps.runId, data: agentRunSteps.data, createdAt: agentRunSteps.createdAt })
+        .from(agentRunSteps)
+        .where(and(inArray(agentRunSteps.runId, runIds), eq(agentRunSteps.kind, "tool_call")))
+        .orderBy(asc(agentRunSteps.seq))
+    : [];
+  const stepsOf = new Map<string, IssueWork["steps"]>();
+  for (const st of steps) {
+    const name = typeof st.data.name === "string" ? st.data.name : "";
+    if (!name) continue;
+    const detail = toolDetail(name, st.data.input as Record<string, unknown> | undefined);
+    const list = stepsOf.get(st.runId) ?? [];
+    list.push({ tool: name, ...(detail ? { detail } : {}), at: st.createdAt.toISOString() });
+    stepsOf.set(st.runId, list);
+  }
+  for (const r of withAgent) {
+    const run = runOf.get(r.id);
+    // A run of another agent (the issue changed hands) is not this agent's work.
+    const mine = run && run.agentId === r.assigneeId ? run : undefined;
+    const runSteps = mine ? (stepsOf.get(mine.id) ?? []).slice(-STEPS_SHOWN) : [];
+    if (mine && LIVE_RUN.has(mine.status)) {
+      out.set(r.id, {
+        agentId: r.assigneeId as string,
+        runId: mine.id,
+        state: mine.status === "waiting_approval" || mine.status === "waiting_input" ? mine.status : "running",
+        since: (mine.startedAt ?? mine.createdAt).toISOString(),
+        steps: runSteps,
+      });
+      continue;
+    }
+    // Committed but not running: in progress with the agent, nothing alive.
+    if (r.status !== "in_progress") continue;
+    const reason =
+      mine?.status === "canceled"
+        ? ("canceled" as const)
+        : mine?.status === "failed"
+          ? mine.error === "budget_exceeded"
+            ? ("budget" as const)
+            : ("failed" as const)
+          : undefined;
+    out.set(r.id, {
+      agentId: r.assigneeId as string,
+      runId: mine?.id ?? null,
+      state: "stalled",
+      since: (mine ? (mine.finishedAt ?? mine.updatedAt) : r.updatedAt).toISOString(),
+      steps: runSteps,
+      ...(reason ? { reason } : {}),
+    });
+  }
+  return out;
+}
+
 async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
+  const work = await workOf(db, rows);
   const ids = [...new Set(rows.flatMap((r) => r.artifactIds))];
   const files = ids.length
     ? await db
@@ -166,6 +278,7 @@ async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
       const f = byId.get(id);
       return f ? [{ id: f.id, title: f.title, createdBy: { type: f.type as WorkActor["type"], id: f.by } }] : [];
     }),
+    work: work.get(r.id) ?? null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   }));
@@ -206,6 +319,7 @@ const activityView = (a: typeof issueActivity.$inferSelect): IssueActivityView =
   text: a.text,
   ...(a.event ? { event: a.event } : {}),
   ...(a.kind === "event" ? eventDetail(a.event, a.data as Record<string, unknown>) : {}),
+  ...((a.data as Record<string, unknown>).auto === true ? { auto: true } : {}),
   createdAt: a.createdAt.toISOString(),
 });
 
@@ -438,6 +552,15 @@ export async function updateIssue(
     set.pullRequests = [...prs, pr] as unknown as Record<string, unknown>[];
     events.push({ text: `linked PR #${pr.number}`, event: "pr_linked", data: { url: pr.url, number: pr.number } });
   }
+  // A linked PR moves open work to review on its own (unless the status is being set now).
+  if (patch.addPullRequest && !patch.status && (current.status === "todo" || current.status === "in_progress")) {
+    set.status = "in_review";
+    events.push({
+      text: `changed the status to ${STATUS_WORDS.in_review} (automatic: a PR was linked)`,
+      event: "status_changed",
+      data: { from: current.status, to: "in_review", auto: true },
+    });
+  }
   if (patch.addArtifactId && !current.artifactIds.includes(patch.addArtifactId)) {
     set.artifactIds = [...current.artifactIds, patch.addArtifactId];
     events.push({ text: "attached a file", event: "artifact_linked", data: { artifactId: patch.addArtifactId } });
@@ -452,9 +575,49 @@ export async function updateIssue(
     }
     return updated;
   });
-  const view = await one(db, row);
+  await linkRun(deps, actor, row);
+  const view = await one(db, (await reload(db, row)) ?? row);
   await announce(deps.pubsub, orgId, view, "issue.updated");
   return view;
+}
+
+const reload = async (db: Database, row: IssueRow) => (await db.select().from(issues).where(eq(issues.id, row.id)))[0];
+
+/**
+ * An agent's run touched this issue (an issue tool, or "implement" asked):
+ * the run is linked to it, and an issue the agent has that is still "to do"
+ * moves to "in progress" on its own.
+ */
+async function linkRun(deps: IssueDeps, actor: IssueActor, issue: IssueRow) {
+  if (actor.type !== "agent" || !actor.runId) return;
+  await startedWork(deps, issue, actor.agentId, [actor.runId]);
+}
+
+async function startedWork(deps: IssueDeps, issue: IssueRow, agentId: string, runIds: string[]) {
+  if (runIds.length === 0) return;
+  await deps.db
+    .update(agentRuns)
+    .set({ issueId: issue.id })
+    .where(and(inArray(agentRuns.id, runIds), isNull(agentRuns.issueId), eq(agentRuns.orgId, issue.orgId)));
+  const [current] = await deps.db.select().from(issues).where(eq(issues.id, issue.id));
+  const isMineToStart =
+    current?.status === "todo" && current.assigneeType === "agent" && current.assigneeId === agentId;
+  if (!current || !isMineToStart) return;
+  await deps.db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(issues)
+      .set({ status: "in_progress", updatedAt: new Date() })
+      .where(and(eq(issues.id, current.id), eq(issues.status, "todo")))
+      .returning();
+    if (!updated) return;
+    await addActivity(tx, updated, {
+      kind: "event",
+      author: { type: "agent", id: agentId },
+      text: `changed the status to ${STATUS_WORDS.in_progress} (automatic: the agent started)`,
+      event: "status_changed",
+      data: { from: "todo", to: "in_progress", auto: true },
+    });
+  });
 }
 
 /** Checks or unchecks one acceptance criterion. */
@@ -469,7 +632,9 @@ export async function setCriterion(
   const current = await findVisible(deps.db, actor, orgId, { id: issueId });
   const criterion = current.criteria.find((c) => c.id === criterionId);
   if (!criterion) throw new NotFoundError("Criterion not found");
-  const criteria = current.criteria.map((c) => (c.id === criterionId ? { ...c, done } : c));
+  const criteria = current.criteria.map((c) =>
+    c.id === criterionId ? { ...c, done, doneBy: done ? actorOf(actor) : null } : c,
+  );
   const row = await deps.db.transaction(async (tx) => {
     const [updated] = await tx
       .update(issues)
@@ -486,7 +651,8 @@ export async function setCriterion(
     });
     return updated;
   });
-  const view = await one(deps.db, row);
+  await linkRun(deps, actor, row);
+  const view = await one(deps.db, (await reload(deps.db, row)) ?? row);
   await announce(deps.pubsub, orgId, view, "issue.updated");
   return view;
 }
@@ -512,6 +678,7 @@ export async function commentIssue(deps: IssueDeps, actor: IssueActor, orgId: st
     return a;
   });
   const view = activityView(row);
+  await linkRun(deps, actor, issue);
   const event = { type: "issue.comment" as const, issueId: issue.id, activity: view };
   if (issue.channelId) await publishChannelEvent(deps.pubsub, { ...event, channelId: issue.channelId });
   else await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event });
@@ -590,7 +757,7 @@ export async function askAgentToImplement(
     `@${agent.handle} implement issue #${issue.number}: ${issue.title}`,
     issue.description.trim(),
     criteria ? `Acceptance criteria:\n${criteria}` : "",
-    `Report progress on the issue with comment_issue (issue_id ${issue.id}) and link the PR with update_issue.`,
+    `Report progress on the issue with comment_issue (issue_id ${issue.id}), check the criteria you meet with update_issue (done_criteria), and link the PR with update_issue. The issue's status follows your work on its own.`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -599,6 +766,11 @@ export async function askAgentToImplement(
     body,
     meta: { issueId: issue.id },
   });
+  // The message started the agent's run: it works on this issue from now on.
+  const runs = await db
+    .select({ id: agentRuns.id })
+    .from(agentRuns)
+    .where(and(eq(agentRuns.triggerMessageId, message.id), eq(agentRuns.agentId, agentId)));
   await db.transaction(async (tx) => {
     await addActivity(tx, issue, {
       kind: "event",
@@ -615,7 +787,17 @@ export async function askAgentToImplement(
       details: { agentId },
     });
   });
-  return updated;
+  await startedWork(
+    deps,
+    issue,
+    agentId,
+    runs.map((r) => r.id),
+  );
+  const fresh = await reload(db, issue);
+  if (!fresh) return updated;
+  const view = await one(db, fresh);
+  await announce(deps.pubsub, orgId, view, "issue.updated");
+  return view;
 }
 
 /** Mirrors an agent's final reply to the issue it was asked to implement (trigger `meta.issueId`). */
