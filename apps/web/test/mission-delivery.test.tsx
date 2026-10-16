@@ -83,7 +83,7 @@ async function withDelivery(patch: Partial<MissionDelivery> = {}, missionPatch: 
   return { calls, delivery };
 }
 
-const card = () => screen().getByRole("group", { name: "Entrega da missão" });
+const card = () => screen().getByRole("region", { name: "Entrega da missão" });
 
 describe("the delivery card", () => {
   test("summary, O que conferir checked per person, Concluir missão with Salvar na wiki", async () => {

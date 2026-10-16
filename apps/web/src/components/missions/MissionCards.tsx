@@ -751,7 +751,7 @@ export function MissionDeliveryCard({ message }: { message: Message }) {
   const time = d.decidedAt ? formatTime(i18n.language, d.decidedAt) : "";
   if (d.status !== "pending") {
     return (
-      <div className="mi-card" role="group" aria-label={t("missions.delivery.label")}>
+      <section className="mi-card" aria-label={t("missions.delivery.label")}>
         <div className="mi-decided">
           <span className="mi-ok">
             <Icon name={d.status === "accepted" ? "check" : "edit"} size={16} />
@@ -764,7 +764,7 @@ export function MissionDeliveryCard({ message }: { message: Message }) {
             </small>
           </span>
         </div>
-      </div>
+      </section>
     );
   }
   const decide = m.canAct && m.status !== "done" && m.status !== "canceled";
@@ -784,9 +784,8 @@ export function MissionDeliveryCard({ message }: { message: Message }) {
     });
   const checked = d.checklist.filter((c) => c.checkedBy.includes(me.user.id)).length;
   return (
-    <div
+    <section
       className={d.auto ? "mi-card mi-delivery mi-delivery--auto" : "mi-card mi-delivery"}
-      role="group"
       aria-label={t("missions.delivery.label")}
     >
       <div className="mi-tags">
@@ -884,10 +883,10 @@ export function MissionDeliveryCard({ message }: { message: Message }) {
               <Button size="sm" icon="edit" disabled={accept.isPending} onClick={() => setAsking(true)}>
                 {t("missions.delivery.askChanges")}
               </Button>
-              <label className="mi-delivery__wiki">
-                <Switch checked={wiki} onCheckedChange={setWiki} aria-label={t("missions.delivery.saveToWiki")} />
-                <span>{t("missions.delivery.saveToWiki")}</span>
-              </label>
+              <span className="mi-delivery__wiki">
+                <Switch id={`dl-wiki-${d.id}`} checked={wiki} onCheckedChange={setWiki} />
+                <label htmlFor={`dl-wiki-${d.id}`}>{t("missions.delivery.saveToWiki")}</label>
+              </span>
             </>
           )}
         </div>
@@ -897,7 +896,7 @@ export function MissionDeliveryCard({ message }: { message: Message }) {
         </div>
       )}
       {stamp.node}
-    </div>
+    </section>
   );
 }
 
