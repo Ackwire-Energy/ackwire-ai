@@ -150,7 +150,10 @@ export interface ServiceIo {
   print: (line: string) => void;
   run?: RunCommand;
   launch?: Launch;
+  sleep?: (ms: number) => void;
 }
+
+const sleepSync = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /** Installs and starts the service. Returns the process exit code. */
 export function installService(io: ServiceIo): number {
@@ -187,9 +190,19 @@ export function installService(io: ServiceIo): number {
     mkdirSync(path.dirname(file), { recursive: true });
     mkdirSync(launch.home, { recursive: true, mode: 0o700 });
     const uid = process.getuid?.() ?? os.userInfo().uid;
-    run("launchctl", ["bootout", `gui/${uid}/${LAUNCHD_LABEL}`]);
+    const sleep = io.sleep ?? sleepSync;
+    const service = `gui/${uid}/${LAUNCHD_LABEL}`;
+    // `bootout` returns before the old service is gone; a `bootstrap` right
+    // after fails ("Input/output error") and leaves nothing running.
+    if (run("launchctl", ["bootout", service]).code === 0) {
+      for (let i = 0; i < 50 && run("launchctl", ["print", service]).code === 0; i++) sleep(100);
+    }
     writeFileSync(file, launchdPlist(launch));
-    const r = run("launchctl", ["bootstrap", `gui/${uid}`, file]);
+    let r = run("launchctl", ["bootstrap", `gui/${uid}`, file]);
+    for (let i = 0; i < 5 && r.code !== 0; i++) {
+      sleep(500);
+      r = run("launchctl", ["bootstrap", `gui/${uid}`, file]);
+    }
     if (r.code !== 0) {
       const legacy = run("launchctl", ["load", "-w", file]);
       if (legacy.code !== 0) {
