@@ -238,9 +238,9 @@ export const envVars = {
     section: "Agents",
   },
   MEMORY_JUDGE_ORGS: {
-    schema: z.string().default(""),
+    schema: z.string().default("*"),
     description:
-      "Organizations whose memory writes go through the judge (Jev, with the cheap model as fallback): duplicates, refinements, updates and contradictions found by meaning, not by words (ADR 0028). Organization ids separated by commas, or `*` for all. Empty: off, words only.",
+      "Organizations whose memory writes go through the judge (Jev, with the cheap model as fallback): duplicates, refinements, updates and contradictions found by meaning, not by words (ADR 0028). Default `*` (all). Organization ids separated by commas to limit it; empty turns it off (words only).",
     section: "Agents",
   },
   EMBEDDINGS_PROVIDER: {

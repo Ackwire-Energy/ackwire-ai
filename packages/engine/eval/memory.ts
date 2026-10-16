@@ -134,7 +134,7 @@ for (const [key, make] of Object.entries(strategies)) {
   }
   let right = 0;
   let rightAction = 0;
-  /** Merged or archived something it shouldn't have (information lost or wrongly joined). */
+  /** Merged or archived something it shouldn't have (joined wrongly, or archived as outdated or outvoted). */
   let harmful = 0;
   /** Left a duplicate or a stale item active (memory gets noisy, nothing is lost). */
   let missed = 0;
@@ -156,7 +156,7 @@ for (const [key, make] of Object.entries(strategies)) {
     if (got.relation === c.label) right++;
     else wrong.push(`  ${c.id}: expected ${c.label}, got ${got.relation} (${got.p.toFixed(2)})`);
     if (predicted === gold) rightAction++;
-    else if (predicted === "merge" || predicted === "supersede") harmful++;
+    else if (predicted === "merge" || predicted === "supersede" || predicted === "resolve") harmful++;
     else missed++;
     for (const l of labels) {
       const m = per.get(l)!;

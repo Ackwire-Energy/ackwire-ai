@@ -108,26 +108,35 @@ describe("memory judgments: policy", () => {
     expect(decide(next, j("unrelated", 0.99))).toEqual({ action: "create", related: [] });
   });
 
-  test("a contradiction keeps both; who is disputed depends on the evidence", async () => {
+  test("a contradiction resolves itself: stronger evidence wins, and on a tie the newer word", async () => {
     f = await setup();
-    const verified = await insertContextItem(f.db, fact(f, "Deploys are on Fridays.", { evidence: [human("m1")] }));
-    const j: Judged[] = [{ candidate: verified, relation: "contradicts", p: 0.9 }];
-    // Two verified, trusted items: a person decides (both labeled).
+    const personSaid = await insertContextItem(f.db, fact(f, "Deploys are on Fridays.", { evidence: [human("m1")] }));
+    const j: Judged[] = [{ candidate: personSaid, relation: "contradicts", p: 0.9 }];
+    // A person again, later: the latest word is how things are now.
     expect(decide(fact(f, "Never deploy on Fridays.", { evidence: [human("m2")] }), j)).toMatchObject({
-      action: "conflict",
-      disputed: "both",
+      action: "resolve",
+      winner: "new",
     });
-    // An agent's claim against a person's word: the claim is the disputed one.
+    // An agent's claim against a person's word: the person's word stays.
     expect(decide(fact(f, "Never deploy on Fridays.", { evidence: [agentClaim("m3")] }), j)).toMatchObject({
-      action: "conflict",
-      disputed: "new",
+      action: "resolve",
+      winner: "old",
     });
-    const claim = await insertContextItem(f.db, fact(f, "Deploys are on Mondays.", { evidence: [agentClaim("m4")] }));
+    // Untrusted text (from outside the team) never overrules the team.
+    expect(decide(fact(f, "Never deploy on Fridays.", { evidence: [human("m4")], trust: "low" }), j)).toMatchObject({
+      action: "resolve",
+      winner: "old",
+    });
+    const claim = await insertContextItem(f.db, fact(f, "Deploys are on Mondays.", { evidence: [agentClaim("m5")] }));
     expect(
-      decide(fact(f, "Deploys are on Tuesdays.", { evidence: [human("m5")] }), [
+      decide(fact(f, "Deploys are on Tuesdays.", { evidence: [human("m6")] }), [
         { candidate: claim, relation: "contradicts", p: 0.9 },
       ]),
-    ).toMatchObject({ action: "conflict", disputed: "old" });
+    ).toMatchObject({ action: "resolve", winner: "new" });
+    // Low confidence in the contradiction: nothing is archived, they're only linked.
+    expect(
+      decide(fact(f, "Never deploy on Fridays.", { evidence: [human("m7")] }), [{ ...j[0], p: 0.55 } as Judged]),
+    ).toEqual({ action: "create", related: [personSaid.id] });
   });
 
   test("across channels nothing merges or archives: items are only linked", async () => {
@@ -182,19 +191,36 @@ describe("memory judgments: consolidateItem carries out the plan", () => {
     expect(archived).toMatchObject({ status: "archived", supersededBy: next.item.id });
   });
 
-  test("a contradiction keeps both, linked both ways, disputed as the evidence says; the prompt says so", async () => {
+  test("contradictions resolve themselves; the loser stays as history, linked", async () => {
     f = await setup();
     const old = await consolidateItem(f.db, fact(f, "Deploys are on Fridays.", { evidence: [human("m1")] }));
     const judge = judgeBy({ "Deploys are on Fridays.": "contradicts" });
-    const next = await consolidateItem(f.db, fact(f, "Never deploy on Fridays.", { evidence: [human("m2")] }), {
+    // A person's newer word wins.
+    const won = await consolidateItem(f.db, fact(f, "Never deploy on Fridays.", { evidence: [human("m2")] }), {
       judge,
       semantic: true,
     });
-    expect(next).toMatchObject({ action: "conflicted", item: { disputed: true, relatedIds: [old.item.id] } });
-    const [before] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, old.item.id));
-    expect(before).toMatchObject({ status: "active", disputed: true, relatedIds: [next.item.id] });
-    expect(itemLabel(next.item)).toContain("disputed");
+    expect(won).toMatchObject({ action: "superseded", previous: { id: old.item.id } });
+    // An agent's claim against it loses: the person's word stays current, the claim is history.
+    const judge2 = judgeBy({ "Never deploy on Fridays.": "contradicts" });
+    const lost = await consolidateItem(
+      f.db,
+      fact(f, "Fridays are fine for deploys.", { evidence: [agentClaim("m3")] }),
+      {
+        judge: judge2,
+        semantic: true,
+      },
+    );
+    expect(lost).toMatchObject({ action: "outweighed", item: { id: won.item.id } });
+    const [history] = await f.db
+      .select()
+      .from(schema.contextItems)
+      .where(eq(schema.contextItems.id, lost.previous?.id ?? ""));
+    expect(history).toMatchObject({ status: "archived", supersededBy: won.item.id, relatedIds: [won.item.id] });
+    const [current] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, won.item.id));
+    expect(current).toMatchObject({ status: "active", relatedIds: [lost.previous?.id] });
     expect(itemLabel({ kind: "fact", verified: true, trust: "high" })).toBe("[fact]");
+    expect(itemLabel({ kind: "fact", verified: true, trust: "high", disputed: true })).toContain("disputed");
   });
 
   test("related items are linked; a failing judge falls back to words", async () => {

@@ -200,8 +200,11 @@ export async function supersede(tx: Executor, old: ContextItem, next: NewContext
 }
 
 export type ConsolidateResult = {
-  /** `conflicted`: kept apart from an item it contradicts; both linked, one or both disputed (ADR 0028). */
-  action: "created" | "merged" | "superseded" | "conflicted";
+  /**
+   * `outweighed`: it contradicts an item with stronger evidence, so that one stays current
+   * (`item`) and the new one is kept only as history (`previous`) (ADR 0028).
+   */
+  action: "created" | "merged" | "superseded" | "outweighed";
   item: ContextItem;
   previous?: ContextItem;
 };
@@ -293,14 +296,13 @@ async function mergeInto(tx: Executor, old: ContextItem, input: NewContextItem) 
   return merged;
 }
 
-/** Links `ids` back to `itemId` (both directions), optionally marking them disputed. */
-async function linkBack(tx: Executor, ids: string[], itemId: string, disputed = false) {
+/** Links `ids` back to `itemId` (both directions). */
+async function linkBack(tx: Executor, ids: string[], itemId: string) {
   if (ids.length === 0) return;
   await tx
     .update(contextItems)
     .set({
       relatedIds: sql`array_append(array_remove(${contextItems.relatedIds}, ${itemId}::uuid), ${itemId}::uuid)`,
-      ...(disputed ? { disputed: true } : {}),
       updatedAt: new Date(),
     })
     .where(inArray(contextItems.id, ids));
@@ -330,13 +332,18 @@ async function applyPlan(tx: Executor, input: NewContextItem, plan: Plan): Promi
     const item = await supersede(tx, target, { ...input, subject: input.subject ?? target.subjectKey });
     return { action: "superseded", item, previous: target };
   }
-  const item = await insertContextItem(tx, {
-    ...input,
-    relatedIds: [target.id],
-    disputed: plan.disputed !== "old",
-  });
-  await linkBack(tx, [target.id], item.id, plan.disputed !== "new");
-  return { action: "conflicted", item, previous: target };
+  if (plan.winner === "new") {
+    const item = await supersede(tx, target, { ...input, subject: input.subject ?? target.subjectKey });
+    return { action: "superseded", item, previous: target };
+  }
+  // The existing item has stronger evidence: the new claim is kept as history behind it.
+  const loser = await insertContextItem(tx, { ...input, subject: input.subject ?? target.subjectKey });
+  await tx
+    .update(contextItems)
+    .set({ status: "archived", supersededBy: target.id, relatedIds: [target.id], updatedAt: new Date() })
+    .where(eq(contextItems.id, loser.id));
+  await linkBack(tx, [target.id], loser.id);
+  return { action: "outweighed", item: target, previous: { ...loser, status: "archived", supersededBy: target.id } };
 }
 
 // ── Reading and editing (APIs: "What Ada knows") ────────────────────────────

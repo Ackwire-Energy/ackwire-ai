@@ -29,7 +29,7 @@ Most of the missing pieces are **judgments**, not generation: is A the same as B
 - Memory uses the shared `Judge` (`packages/engine/src/judge.ts`, `ContextDeps.judge`, `judgeOf`): Jev when `TYPESAFE_API_KEY` is set, and the org's cheap model through the Model Gateway when Jev errors or times out, the same fallback the router uses. No second Jev client.
 - Usage is recorded like the judge's other calls (kind `router`, provider `typesafe`, billed to the platform). A separate `memory` kind is a follow-up once usage is shown per kind.
 - Platform key only, never per org, never sent to clients.
-- **Per organization:** `MEMORY_JUDGE_ORGS` (org ids separated by commas, or `*`) turns the judgments on. It starts with our own workspace only.
+- **On by default:** `MEMORY_JUDGE_ORGS` defaults to `*` (every organization). A list of org ids limits it, and an empty value turns it off (words only), as an emergency switch.
 - **If the judge is off or both judges fail,** each point falls back to today's behavior. Memory never blocks on the judge and a run never fails because of it.
 - Questions are in English; state carries the original text.
 
@@ -51,12 +51,12 @@ On every write through `consolidateItem` (people, agents, reflection) and in the
    - `same` with confidence ≥ τ_merge: merge (evidence united, recurrence +1, as today).
    - `refines`: new version supersedes, evidence carried over.
    - `updates`: supersede and close the old one in time (point 2).
-   - `contradicts`: if both items are verified and high-trust, keep both, link them (`conflicts_with`) and raise a conflict for a person (point 1b). Otherwise the one with stronger evidence (`EVIDENCE_WEIGHT`) stays active and the other is marked disputed.
+   - `contradicts`: resolved without a person. The stronger evidence wins (`EVIDENCE_WEIGHT`: an observed outcome, then a person, then an agent; untrusted text never overrules the team), and on a tie the newer item wins, because the latest word is how things are now. The loser is archived as history (`superseded_by`), both are linked (`related_ids`), and a person can bring the old one back from the memory page.
    - Low confidence on any of these: keep both items, link them as `related`, and let the daily job ask again with more context. A low-confidence answer never deletes or merges.
 4. **Visibility:** a merge or supersede never mixes visibility. If the candidate's channels differ from the new item's, the result may only *narrow* who can see it, never widen it. If the narrowing would hide the item from readers who see it today, keep both.
 5. **Fallback:** today's subject key with Jaccard.
 
-**1b. Conflicts for people.** A conflict appears next to proposals ("Ada learned two incompatible things"), showing both items and their evidence. The agent owner or an admin picks one, edits, or keeps both with a note; that choice is human evidence. Until it's resolved, both go into prompts labeled as disputed.
+**1b. Conflicts resolve themselves (decided 2026-10-16).** There's no conflict screen to begin with: the rule above settles contradictions, and nothing is lost (history plus undo). When an agent's `remember` loses to an item with stronger evidence, the tool tells the agent to show the person what is on record and ask which one is right. `context_items.disputed` stays in the schema, and the prompt labels an item that has it, for cases a later step can't settle on its own.
 
 ### 2. Time on facts
 
@@ -107,7 +107,7 @@ On every write through `consolidateItem` (people, agents, reflection) and in the
 ## Order of attack
 
 1. **0 + 1 + the first part of 7:** the per-org switch, semantic consolidation on the shared judge, CI cases, and the first labeled set for consolidation (synthetic cases in the repo; anonymized real cases only in a local file that git ignores).
-2. **1b:** conflicts in the app (API plus the UI next to proposals).
+2. **1b:** done with 1 (contradictions resolve themselves). A screen only if the evals show cases the rule gets wrong.
 3. **5:** choosing what goes into the prompt.
 4. **6:** capture on signal.
 5. **2:** time on facts.

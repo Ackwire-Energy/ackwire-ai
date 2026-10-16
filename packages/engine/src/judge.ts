@@ -267,7 +267,7 @@ export async function mentionHandoffs(
 
 /**
  * For tests: answers from `answer(kind, questionId, state, question)` (default: every
- * Noul 0, every Choice its first option). Never calls a model.
+ * Noul 0, no Choice picked). Never calls a model.
  */
 export function createFakeJudge(
   answer?: (
@@ -288,7 +288,7 @@ export function createFakeJudge(
         const a = answer?.(request.kind, id, request.state, q);
         if (q.type === "noul") out[id] = { noul: clamp(typeof a === "number" ? a : 0) };
         else {
-          const choice = typeof a === "string" ? a : Object.keys(q.criteria)[0];
+          const choice = typeof a === "string" ? a : undefined;
           out[id] = { choice, probabilities: choice ? { [choice]: 1 } : {} };
         }
       }

@@ -1,13 +1,6 @@
 import { and, desc, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import type { Judge, JudgeQuestion } from "../judge";
-import {
-  type ContextItem,
-  type ContextKind,
-  evidenceWeight,
-  isVerified,
-  type NewContextItem,
-  normalizeSubject,
-} from "./items";
+import { type ContextItem, type ContextKind, evidenceWeight, type NewContextItem, normalizeSubject } from "./items";
 
 const { contextItems } = schema;
 
@@ -174,8 +167,12 @@ export type Plan =
   | { action: "create"; related: string[] }
   | { action: "merge"; target: ContextItem }
   | { action: "supersede"; target: ContextItem; relation: "refines" | "updates" }
-  /** Both stay active and linked; `disputed` says which one is labeled as disputed. */
-  | { action: "conflict"; target: ContextItem; disputed: "both" | "old" | "new" };
+  /**
+   * A contradiction resolves itself: the stronger evidence wins (a person's word over an agent's
+   * claim), and on a tie the newer one (the latest word is how things are now). The loser stays as
+   * history, linked, and a person can bring it back.
+   */
+  | { action: "resolve"; target: ContextItem; winner: "new" | "old" };
 
 const best = (list: Judged[], relations: Relation[], min: number) =>
   list
@@ -199,11 +196,10 @@ export function decide(input: NewContextItem, judged: Judged[]): Plan {
   const conflict = best(movable, ["contradicts"], THRESHOLDS.conflict);
   if (conflict) {
     const old = conflict.candidate;
-    const evidence = input.evidence ?? [];
-    const newVerified = evidence.length === 0 || isVerified(evidence);
-    const bothStrong = old.verified && old.trust === "high" && newVerified && (input.trust ?? "high") === "high";
-    const disputed = bothStrong ? "both" : evidenceWeight(evidence) >= evidenceWeight(old.evidence) ? "old" : "new";
-    return { action: "conflict", target: old, disputed };
+    const strength = (evidence: ContextItem["evidence"], trust: string | undefined) =>
+      evidenceWeight(evidence) - (trust === "low" ? 10 : 0);
+    const fresh = strength(input.evidence ?? [], input.trust);
+    return { action: "resolve", target: old, winner: fresh >= strength(old.evidence, old.trust) ? "new" : "old" };
   }
   const related = judged
     .filter((j) => j.relation !== "unrelated" && j.p >= THRESHOLDS.related)

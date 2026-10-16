@@ -197,6 +197,11 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             memoryJudging(deps, ctx.orgId),
           );
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: res.item.id }).catch(() => {});
+          if (res.action === "outweighed") {
+            return {
+              content: `Not saved as current: it contradicts memory ${res.item.id} ("${res.item.content.slice(0, 200)}"), which has stronger evidence (an observed outcome). It was kept as history. Tell the person what you have on record and ask them to confirm which is right; if they confirm, use update_memory on ${res.item.id}.`,
+            };
+          }
           return memoryResult(ctx, `Saved (${res.action}) as ${res.item.id}.`, {
             action: "remembered",
             itemId: res.item.id,
