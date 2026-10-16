@@ -3,8 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { cleanup, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import type { MissionEligibleAgent } from "@/api/types";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -20,7 +21,9 @@ describe("Missões (Threads.html)", () => {
     expect(screen().getByRole("heading", { level: 1, name: "Missões" })).toBeTruthy();
     expect(screen().getByText("Nenhuma missão ainda")).toBeTruthy();
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
-    expect(within(nav).getByRole("link", { name: /Missões/ })).toBeTruthy();
+    // Missões is a tab of Threads: one sidebar item.
+    expect(within(nav).getByRole("link", { name: /Threads/ })).toBeTruthy();
+    expect(within(nav).queryByRole("link", { name: /^Missões/ })).toBeNull();
   });
 
   test("a mission's card: title, agent, state, the plan as items, the computer, Abrir thread", async () => {
@@ -34,5 +37,70 @@ describe("Missões (Threads.html)", () => {
     expect(within(card).getByText("Sem itens ainda")).toBeTruthy();
     expect(within(card).getAllByText(/MacBook/).length).toBeGreaterThan(0);
     expect(within(card).getAllByRole("button", { name: /Abrir thread/ }).length).toBeGreaterThan(0);
+  });
+
+  const pick = (agentId: string, name: string, extra: Partial<MissionEligibleAgent> = {}): MissionEligibleAgent => ({
+    agentId,
+    handle: name.toLowerCase(),
+    name,
+    eligible: true,
+    reason: null,
+    canManage: true,
+    machine: { id: "machine_1", name: "mac", online: true },
+    ready: true,
+    executors: ["claude", "agent"],
+    defaultExecutor: "claude",
+    codexTooOld: false,
+    ...extra,
+  });
+  const openAgents = async () => {
+    await act(async () => fireEvent.click(screen().getAllByRole("button", { name: /Nova missão/ })[0] as HTMLElement));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Nova missão" });
+    const trigger = within(dialog).getByRole("combobox", { name: "Agente" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    return { dialog, trigger };
+  };
+
+  test("Nova missão: two agents on one computer are both selectable; the first eligible is chosen", async () => {
+    const api = createFakeApi(seedState());
+    api.missions.eligibleAgents = async () => [pick(ADA_ID, "Ada"), pick(ATLAS_ID, "Atlas")];
+    await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
+    await settle(6);
+    const { trigger } = await openAgents();
+    expect(trigger.textContent).toContain("Ada");
+    const ada = screen().getByRole("option", { name: /^Ada/ });
+    const atlas = screen().getByRole("option", { name: /^Atlas/ });
+    expect(ada.getAttribute("aria-disabled")).not.toBe("true");
+    expect(atlas.getAttribute("aria-disabled")).not.toBe("true");
+    expect(atlas.textContent).toContain("No mac");
+  });
+
+  test("Nova missão: an agent that can't run one is listed disabled with the reason, and a link for its owner", async () => {
+    const api = createFakeApi(seedState());
+    api.missions.eligibleAgents = async () => [
+      pick(ADA_ID, "Ada"),
+      pick(ATLAS_ID, "Atlas", {
+        eligible: false,
+        reason: "cloud_computer",
+        machine: null,
+        ready: false,
+        executors: [],
+        defaultExecutor: null,
+      }),
+    ];
+    await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
+    await settle(6);
+    const { dialog } = await openAgents();
+    const atlas = screen().getByRole("option", { name: /^Atlas/ });
+    expect(atlas.getAttribute("aria-disabled")).toBe("true");
+    expect(atlas.textContent).toContain("missões lá chegam depois");
+    const blocked = within(dialog).getByRole("list", { name: "Agentes que ainda não podem rodar uma missão" });
+    expect(within(blocked).getByRole("link", { name: "Conectar computador" }).getAttribute("href")).toContain(
+      `/agents/${ATLAS_ID}`,
+    );
+    // Somebody can: no empty state.
+    expect(within(dialog).queryByText("Nenhum agente pode rodar uma missão para você ainda")).toBeNull();
   });
 });

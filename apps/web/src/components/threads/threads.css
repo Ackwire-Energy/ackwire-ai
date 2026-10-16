@@ -29,6 +29,27 @@
   font-size: 12.5px;
   color: var(--faint);
 }
+.thread-marker > .ac-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.thread-marker__open {
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+}
+.thread-marker__open:hover {
+  color: var(--ink2);
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+}
+.thread-marker__open:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 .thread-marker b,
 .thread-stub b,
 .thread-closed b {
@@ -94,9 +115,21 @@
 }
 
 /* ── "Threads (N)" ─────────────────────────────────────────────────────── */
+/* The count as the same small neutral chip as the tabs' (no parentheses). */
 .thread-pop__count {
-  color: var(--faint);
-  font-weight: 500;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .thread-pop {
   width: min(400px, calc(100vw - 24px));

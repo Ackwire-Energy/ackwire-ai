@@ -32,6 +32,7 @@ import {
 } from "./machine-tasks";
 import { MachineOfflineError, machineOnline } from "./machines";
 import { insertMessage, type Message, messageView } from "./messages";
+import { missionAllowRules } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
 import { enqueueRunJob } from "./mission-runs";
 import { can, requirePermission } from "./organizations";
@@ -181,9 +182,10 @@ export function planPrompt(mission: Pick<MissionRow, "title" | "goal">) {
     `Mission: ${mission.title}`,
     `Goal: ${mission.goal}`,
     "",
-    "PLAN MODE. Explore the repository read-only: don't change any file and don't run anything that writes.",
+    "PLAN MODE. Explore the mission folder (a code repository or plain files) read-only: don't change any file and don't run anything that writes.",
     "Then call the agentes tool update_plan with the first items of the plan (a checklist; short, stable ids),",
     "and call report with the goal in one sentence for the people. Then end your turn: the people review the plan and press Start.",
+    "Write the plan items, reports, decisions and reviews in the language of the goal (the people's language).",
   ].join("\n");
 }
 
@@ -191,8 +193,9 @@ export function planPrompt(mission: Pick<MissionRow, "title" | "goal">) {
 export function agentPlanPrompt(mission: Pick<MissionRow, "title" | "goal">) {
   return [
     `Mission proposed: ${mission.title}. Goal: ${mission.goal}`,
-    "PLAN MODE: explore the repository on the computer read-only (read_file, list_files, run_code with read-only commands); don't change anything yet.",
+    "PLAN MODE: explore the mission folder on the computer read-only (read_file, list_files, run_code with read-only commands); don't change anything yet.",
     "Then call update_plan with the first items (a checklist; short, stable ids) and report the goal in one sentence. Then end your turn: the people review the plan and press Start.",
+    "Write the plan items, reports, decisions and reviews in the language of the goal (the people's language).",
   ].join("\n");
 }
 
@@ -201,7 +204,7 @@ export const AGENT_START_PROMPT =
   "The person approved the plan. Do the work now on the computer: start_task for anything long (it wakes you when it ends), run_code for short commands; keep the plan with update_plan, report milestones, ask decisions with ask_decision, request_review when there is something to show, and request_approval before any merge, deploy or rollback.";
 
 export const START_PROMPT =
-  "The person approved the plan. Proceed: split the work into tasks (each in its own branch) using the agentes tools; keep the plan updated; ask for a review when you have something to show.";
+  "The person approved the plan. Proceed: split the work into tasks with start_task (each gets its own branch in a git repository, its own subfolder otherwise; small work you can do yourself) using the agentes tools; keep the plan updated; ask for a review when you have something to show.";
 
 // ── Small helpers ────────────────────────────────────────────────────────────
 
@@ -257,7 +260,7 @@ export async function missionRole(db: Executor, mission: Pick<MissionRow, "id" |
 const mayAct = (role: MissionRole) => role === "owner" || role === "decide";
 
 /** The mission and the caller's place in it; whoever reads its home channel sees it. */
-async function requireMission(deps: MissionDeps, userId: string, orgId: string, missionId: string) {
+export async function requireMission(deps: MissionDeps, userId: string, orgId: string, missionId: string) {
   const mission = await getMissionRow(deps.db, missionId);
   if (!mission || mission.orgId !== orgId) throw new NotFoundError("Mission not found", "mission.not_found");
   const { membership } = await requireChannelAccess(deps.db, userId, orgId, mission.channelId).catch(() => {
@@ -267,13 +270,13 @@ async function requireMission(deps: MissionDeps, userId: string, orgId: string, 
   return { mission, role, isAdmin: can(membership.role, "manage_members") };
 }
 
-function requireAct(role: MissionRole, what = "do this") {
+export function requireAct(role: MissionRole, what = "do this") {
   if (!mayAct(role)) {
     throw new ForbiddenError(`Only the mission's owner or someone who can decide can ${what}`, "mission.not_allowed");
   }
 }
 
-function requireOpen(mission: MissionRow) {
+export function requireOpen(mission: MissionRow) {
   if (!OPEN.includes(mission.status)) throw new ConflictError("This mission is closed", "mission.closed");
 }
 
@@ -1061,6 +1064,8 @@ export async function startSessionTask(
         // Before Start the executor only reads; after it, it works on the mission's branches (runner protocol 7).
         mode: mission.status === "proposed" ? "plan" : "work",
         branchPrefix: missionBranchPrefix(mission.id),
+        // Commands a person allowed for the whole mission ("Aprovar sempre nesta missão").
+        allow: await missionAllowRules(deps.db, mission.id),
       },
     },
   );
@@ -2933,70 +2938,124 @@ export async function missionsOnMachine(db: Executor, machineId: string) {
 
 // ── Who can run a mission for the caller ─────────────────────────────────────
 
+/** Why an agent can't run a mission for the caller ("Nova missão" shows it, translated). */
+export type MissionIneligibleReason =
+  | "no_computer"
+  | "cloud_computer"
+  | "exec_off"
+  | "runner_outdated"
+  | "not_in_audience";
+
 export interface EligibleAgent {
   agentId: string;
   handle: string;
   name: string;
-  machine: { id: string; name: string; online: boolean };
-  /** Online: a mission can start now. Offline agents are listed (their computer comes back). */
+  /** It can run a mission for the caller now (or when its computer comes back online). */
+  eligible: boolean;
+  /** Set when not eligible. `cloud_computer`: missions on cloud computers come later. */
+  reason: MissionIneligibleReason | null;
+  /** The caller can choose its computer (an admin or the agent's owner): the web links to its settings. */
+  canManage: boolean;
+  /** Its connected computer; null on the cloud computer or with none. */
+  machine: { id: string; name: string; online: boolean } | null;
+  /** Eligible and online: a mission can start now. Offline agents are listed (their computer comes back). */
   ready: boolean;
-  /** Who can do the work on that computer ("Quem programa"), and the default. */
+  /** Who can do the work on that computer ("Quem programa"), and the default (null when not eligible). */
   executors: MissionExecutor[];
-  defaultExecutor: MissionExecutor;
+  defaultExecutor: MissionExecutor | null;
   /** Codex is there but too old (`CODEX_MIN_VERSION`). */
   codexTooOld: boolean;
 }
 
 /**
- * "Nova missão": the agents that can run a mission for the caller: a
- * connected computer that allows commands with a runner on protocol 5 or
- * later, and the caller in the agent's audience (D31). One query.
+ * "Nova missão": every agent of the organization, each saying whether it can
+ * run a mission for the caller: a connected computer that allows commands
+ * with a runner on protocol 4 or later, and the caller in its audience (D31).
+ * The others carry the reason (`cloud`: the server has cloud computers, so an
+ * agent without a connected one is on the cloud computer). Eligible first. One query.
  */
-export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userId: string, orgId: string) {
-  await requirePermission(deps.db, userId, orgId, "read");
+export async function eligibleMissionAgents(
+  deps: Pick<MissionDeps, "db">,
+  userId: string,
+  orgId: string,
+  opts: { cloud?: boolean } = {},
+) {
+  const membership = await requirePermission(deps.db, userId, orgId, "read");
+  const admin = can(membership.role, "manage_agents");
   const rows = rowsOf<{
     id: string;
     handle: string;
     name: string;
-    machine_id: string;
-    machine_name: string;
-    online: boolean;
+    owner_user_id: string | null;
+    can_talk: boolean;
+    machine_id: string | null;
+    machine_name: string | null;
+    online: boolean | null;
     last_seen_at: Date | string | null;
-    protocol: number;
+    protocol: number | null;
+    exec_allowed: boolean | null;
     executors: schema.MachineExecutors | string | null;
   }>(
-    await deps.db.execute(sql`select agents.id, agents.handle, agents.name, mc.id as machine_id, mc.name as machine_name,
-        mc.online, mc.last_seen_at, mc.protocol, mc.executors
+    await deps.db.execute(sql`select agents.id, agents.handle, agents.name, agents.owner_user_id,
+        ${audienceSql("agents", sql`${userId}::text`)} as can_talk,
+        mc.id as machine_id, mc.name as machine_name, mc.online, mc.last_seen_at, mc.protocol,
+        mc.exec_allowed, mc.executors
       from ${schema.agents} agents
-      join ${machines} mc on mc.id = agents.machine_id and mc.org_id = agents.org_id
+      left join ${machines} mc on mc.id = agents.machine_id and mc.org_id = agents.org_id and mc.deleted_at is null
       where agents.org_id = ${orgId}::uuid and agents.archived_at is null
-        and mc.deleted_at is null and mc.exec_allowed and mc.protocol >= ${TASKS_PROTOCOL}
-        and ${audienceSql("agents", sql`${userId}::text`)}
       order by agents.name`),
   );
-  return rows.map((r): EligibleAgent => {
-    const online = machineOnline({
-      online: r.online,
-      lastSeenAt: r.last_seen_at ? new Date(r.last_seen_at) : null,
-      deletedAt: null,
-    });
+  const list = rows.map((r): EligibleAgent => {
+    const canManage = admin || (r.owner_user_id != null && r.owner_user_id === userId);
+    const machine = r.machine_id
+      ? {
+          id: r.machine_id,
+          name: r.machine_name ?? "",
+          online: machineOnline({
+            online: Boolean(r.online),
+            lastSeenAt: r.last_seen_at ? new Date(r.last_seen_at) : null,
+            deletedAt: null,
+          }),
+        }
+      : null;
+    const protocol = Number(r.protocol ?? 0);
+    const reason: MissionIneligibleReason | null = !r.can_talk
+      ? "not_in_audience"
+      : !machine
+        ? opts.cloud
+          ? "cloud_computer"
+          : "no_computer"
+        : !r.exec_allowed
+          ? "exec_off"
+          : protocol < TASKS_PROTOCOL
+            ? "runner_outdated"
+            : null;
+    const base = { agentId: r.id, handle: r.handle, name: r.name, canManage, machine };
+    if (reason) {
+      return {
+        ...base,
+        eligible: false,
+        reason,
+        ready: false,
+        executors: [],
+        defaultExecutor: null,
+        codexTooOld: false,
+      };
+    }
     const found = typeof r.executors === "string" ? (JSON.parse(r.executors) as schema.MachineExecutors) : r.executors;
-    const { available, codexTooOld } = machineExecutors({
-      protocol: Number(r.protocol),
-      execAllowed: true,
-      executors: found,
-    });
+    const { available, codexTooOld } = machineExecutors({ protocol, execAllowed: true, executors: found });
     return {
-      agentId: r.id,
-      handle: r.handle,
-      name: r.name,
-      machine: { id: r.machine_id, name: r.machine_name, online },
-      ready: online,
+      ...base,
+      eligible: true,
+      reason: null,
+      ready: Boolean(machine?.online),
       executors: available,
       defaultExecutor: defaultExecutor(available),
       codexTooOld,
     };
   });
+  // Eligible first (by name, as the query sorts): the dialog picks the first one.
+  return [...list.filter((a) => a.eligible), ...list.filter((a) => !a.eligible)];
 }
 
 // ── A task's output ("Ver saída") ────────────────────────────────────────────

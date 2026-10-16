@@ -258,20 +258,44 @@ button.mi-pill--need:hover {
   font-size: 12.5px;
   color: var(--faint);
 }
+/* The plan's meta: one block, one left edge and icon column (the computer, who programs), then the actions. */
+.mi-plan__metas {
+  display: grid;
+  gap: 8px;
+  margin: 12px 16px 0;
+}
 .mi-plan__meta {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin: 12px 16px 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 20px;
   font-size: 12.5px;
   color: var(--muted);
+}
+.mi-plan__meta > .ac-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--faint);
+}
+/* A small inline select, the height of the card's buttons. */
+.mi-plan__who {
+  width: auto;
+  min-width: 160px;
+}
+.mi-plan__who .ac-select__trigger {
+  height: 28px;
+  padding-left: 10px;
+  border-radius: 10px;
+  font-size: 13px;
 }
 .mi-plan__foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 14px 16px 16px;
+  padding: 16px;
 }
 .mi-created {
   display: flex;
@@ -753,20 +777,25 @@ a.mi-pr:hover {
   min-height: 0;
   padding: 0;
 }
+/* The tabs and the file's line make one block: room above and below, one divider under it. */
 .mi-files__tabs {
-  padding: 0 16px 10px;
+  padding: 12px 20px 0;
 }
-.mi-files__tabs button {
+/* File names in mono, at the weight of any other segmented control (mono at 600 reads heavier). */
+.mi-files__tabs .ac-seg__item {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.mi-files__tabs .ac-seg__item[data-on] {
+  color: var(--ink2);
 }
 .mi-files__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 8px;
-  padding: 10px 16px;
-  border-top: 1px solid var(--line);
+  padding: 10px 20px 12px;
   border-bottom: 1px solid var(--line);
   font-size: 12px;
   color: var(--faint);
@@ -788,7 +817,7 @@ a.mi-pr:hover {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 14px 18px 20px;
+  padding: 14px 20px 20px;
 }
 .mi-files__diff {
   display: flex;
@@ -805,7 +834,7 @@ a.mi-pr:hover {
   display: flex;
   align-items: flex-start;
   gap: 7px;
-  padding: 10px 16px 14px;
+  padding: 10px 20px 14px;
   border-top: 1px solid var(--line);
   font-size: 12px;
   color: var(--faint);
@@ -1009,47 +1038,91 @@ a.mi-pr:hover {
 .mi-mc:hover {
   box-shadow: var(--e2), var(--top);
 }
-.mi-mc__head {
-  display: flex;
-  align-items: flex-start;
+/* A mission card's header: avatar | title over one meta line, on the title's left edge | chip and menu. */
+.mi-head {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: start;
   gap: 12px;
 }
-.mi-mc__t {
-  flex: 1;
+.mi-head > .ac-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+}
+.mi-head__t {
   min-width: 0;
 }
-.mi-mc__t h3 {
+.mi-head__t h3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   min-width: 0;
+  margin: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 17px;
+  overflow-wrap: anywhere;
+  font-size: 16px;
   font-weight: 650;
   line-height: 1.3;
   letter-spacing: -0.015em;
+  color: var(--ink);
 }
-.mi-mc__t h3 a {
+.mi-head__t h3 a {
   color: inherit;
   text-decoration: none;
 }
-.mi-mc__t h3 a:hover {
+.mi-head__t h3 a:hover {
   text-decoration: underline;
   text-decoration-color: var(--line2);
   text-underline-offset: 3px;
 }
-.mi-mc__t small {
+.mi-head__meta {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 4px 8px;
-  margin-top: 2px;
+  align-items: center;
+  gap: 2px 0;
+  margin: 4px 0 0;
   font-size: 12.5px;
+  line-height: 18px;
   color: var(--muted);
 }
-.mi-mc__r {
+.mi-head__part {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.mi-head__dot {
+  padding: 0 6px;
+  color: var(--faint);
+}
+.mi-head__r {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+/* A quiet text link (where the thread lives): muted, underlined only on hover. */
+.mi-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+.mi-quiet .ac-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--faint);
+}
+.mi-quiet:hover {
+  color: var(--ink2);
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 3px;
+}
+.mi-quiet:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 .mi-lnk {
   display: inline-flex;
@@ -1096,17 +1169,43 @@ a.mi-pr:hover {
   border-top: 1px solid var(--line);
 }
 
+@media (max-width: 480px) {
+  /* Narrow: the chip and menu go under the title, on its left edge. */
+  .mi-head {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+  .mi-head__r {
+    grid-column: 2;
+    justify-content: space-between;
+  }
+}
+
 @media (max-width: 760px) {
   .mi-pinned {
     position: relative;
     top: 0;
     margin: 0 4px 8px;
   }
-  .mi-plan__head,
-  .mi-plan__list {
-    padding-left: 0;
-  }
   .mi-card {
+    padding: 14px;
+  }
+  /* The plan card keeps its own insets: every block on one 14px left edge. */
+  .mi-card.mi-plan {
+    padding: 0;
+  }
+  .mi-plan__head {
+    padding: 14px 14px 4px;
+  }
+  .mi-plan__list,
+  .mi-plan__metas {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+  .mi-plan__note {
+    margin-left: 38px;
+    margin-right: 14px;
+  }
+  .mi-plan__foot {
     padding: 14px;
   }
   .mi-opts {
@@ -1128,6 +1227,19 @@ a.mi-pr:hover {
   }
   .mi-grid2 {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .mi-files__tabs {
+    padding: 12px 16px 0;
+    overflow-x: auto;
+  }
+  .mi-files__meta {
+    padding: 10px 16px 12px;
+  }
+  .mi-files__body {
+    padding: 12px 16px 16px;
+  }
+  .mi-files__foot {
+    padding: 10px 16px 12px;
   }
   .mi-files.ac-sheet {
     top: auto;
@@ -1175,4 +1287,110 @@ a.mi-pr:hover {
   display: grid;
   gap: 8px;
   justify-items: start;
+}
+/* Agents that can't run a mission yet (mine): why, and where to connect a computer. */
+.mi-blocked {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--sunken);
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.mi-blocked__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.mi-blocked__text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  flex: 1;
+  min-width: 0;
+}
+.mi-blocked__text b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.mi-blocked__text span {
+  color: var(--muted);
+}
+.mi-blocked .mi-lnk {
+  flex: none;
+}
+
+/* ── The mission's link card, in the conversation where it was asked ─────── */
+.mi-linkcard {
+  max-width: 560px;
+  padding: 14px 16px;
+}
+.mi-linkcard__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-left: 44px;
+}
+@media (max-width: 480px) {
+  .mi-linkcard__foot {
+    padding-left: 0;
+  }
+}
+
+/* ── Command approvals (MissionCommandCard): the executor asks to run a command ── */
+.mi-cmd {
+  max-width: 600px;
+}
+.mi-cmd__line {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sunken);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.mi-cmd .mi-foot {
+  margin-top: 12px;
+}
+.mi-cmd > .mi-hint {
+  margin-top: 10px;
+}
+/* A task's end notice: the commands it was refused, each with Liberar e repetir. */
+.mi-evt--blocked {
+  align-items: flex-start;
+}
+.mi-cmd-blocked {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mi-cmd-blocked li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.mi-cmd-blocked li > .ac-icon {
+  flex: none;
+  color: var(--faint);
+}
+.mi-cmd-blocked__t {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink2);
 }

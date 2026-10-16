@@ -9,6 +9,7 @@ import { ApiError } from "@/api/http";
 import type {
   MachineTask,
   Mission,
+  MissionCommand,
   MissionDecision,
   MissionJoinRequest,
   MissionParticipants,
@@ -28,6 +29,8 @@ interface Store {
   joins: MissionJoinRequest[];
   /** What "Ver saída" answers, per task. */
   outputs: Map<string, string[]>;
+  commands: MissionCommand[];
+  rules: Map<string, string[]>;
 }
 
 export function createFakeMissions(
@@ -45,6 +48,8 @@ export function createFakeMissions(
       files: new Map(),
       joins: [],
       outputs: new Map(),
+      commands: [],
+      rules: new Map(),
     }),
   );
   const find = async (orgId: string, missionId: string) => {
@@ -105,6 +110,9 @@ export function createFakeMissions(
         agentId: a.id,
         handle: a.handle,
         name: a.name,
+        eligible: true,
+        reason: null,
+        canManage: true,
         machine: { id: "machine_1", name: "MacBook", online: true },
         ready: true,
         executors: ["claude", "codex", "agent"] as ("claude" | "codex" | "agent")[],
@@ -299,6 +307,37 @@ export function createFakeMissions(
     },
     decisions: async (orgId, missionId) =>
       clone((await store(orgId)).decisions.filter((d) => d.missionId === missionId)),
+    commands: async (orgId, missionId) => {
+      const s = await store(orgId);
+      return clone({
+        commands: s.commands.filter((c) => c.missionId === missionId),
+        rules: s.rules.get(missionId) ?? [],
+      });
+    },
+    decideCommand: async (orgId, missionId, commandId, decision) => {
+      log("missions.decideCommand", orgId, missionId, commandId, decision);
+      const s = await store(orgId);
+      const c = s.commands.find((x) => x.id === commandId && x.missionId === missionId);
+      if (!c) throw new ApiError(404, "mission.command_not_found", "Command not found");
+      if (c.state !== "pending") throw new ApiError(409, "mission.command_decided", "Already answered");
+      const me = await ctx.lookup.me();
+      Object.assign(c, {
+        state: decision === "deny" ? "denied" : "allowed",
+        always: decision === "always",
+        decidedBy: me?.user.id ?? null,
+        decidedAt: ctx.now().toISOString(),
+      });
+      if (decision === "always") s.rules.set(missionId, [...(s.rules.get(missionId) ?? []), ...c.rules]);
+      return clone(c);
+    },
+    retryCommand: async (orgId, missionId, input) => {
+      log("missions.retryCommand", orgId, missionId, input);
+      const word = input.command.split(" ")[0] ?? "";
+      const rules = [`Bash(${word} *)`];
+      const s = await store(orgId);
+      s.rules.set(missionId, [...(s.rules.get(missionId) ?? []), ...rules]);
+      return { rules, delivered: true };
+    },
     choose: async (orgId, missionId, decisionId, option) => {
       log("missions.choose", orgId, missionId, decisionId, option);
       const d = (await store(orgId)).decisions.find((x) => x.id === decisionId);

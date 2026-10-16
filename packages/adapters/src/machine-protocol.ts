@@ -93,7 +93,11 @@ export interface TaskStart {
   resume?: boolean;
   /** Relative to the agent's folder (default: the folder itself). */
   cwd?: string;
-  /** Work in a new git worktree on this new branch (`<agent folder>/.worktrees/<taskId>`), when `cwd` is a git repository. */
+  /**
+   * Work in a new git worktree on this new branch (`<agent folder>/.worktrees/<taskId>`) when `cwd` is a git
+   * repository. When it isn't, a `claude`/`codex` task runs without a branch in its own subfolder
+   * `<cwd>/work/<last part of the branch>/` (`shell` tasks are refused).
+   */
   branch?: string;
   /** Killed (the whole process group) after this long; default and cap are the runner's. */
   maxSeconds?: number;
@@ -112,6 +116,12 @@ export interface TaskStart {
     mode?: "plan" | "work";
     /** Protocol 7: the mission's branches start with this (`agentes/<id>/`); only these may be pushed. */
     branchPrefix?: string;
+    /**
+     * Commands a person allowed for the whole mission ("Aprovar sempre nesta
+     * missão"), as Claude Code permission rules (`Bash(swift *)`); added to
+     * a work turn's allow list (the deny list still wins).
+     */
+    allow?: string[];
   };
 }
 
@@ -156,10 +166,27 @@ export interface TaskDone {
   interrupted?: boolean;
   /** Claude Code's session id, when it reported one. */
   session?: string;
+  /**
+   * Commands the executor wasn't allowed to run and nobody approved
+   * (Claude Code's `permission_denials`, Codex's declined commands): the
+   * task's end notice lists them ("Liberar e repetir").
+   */
+  denials?: TaskDenial[];
+}
+
+/** One command an executor was refused. */
+export interface TaskDenial {
+  /** Claude Code's tool name (`Bash`, `WebFetch`…); `Bash` for Codex commands. */
+  tool: string;
+  /** The command line, or what the tool would touch (a URL, a path). */
+  command: string;
 }
 
 /** Largest pieces of task frames (characters / entries); the runner cuts, the server cuts again. */
 export const TASK_LIMITS = {
+  /** Refused commands kept per task, and each one's length. */
+  denials: 10,
+  denial: 300,
   line: 500,
   files: 50,
   filePath: 300,
@@ -336,6 +363,20 @@ const fileList = (v: unknown) =>
         .map((p) => p.slice(0, TASK_LIMITS.filePath))
     : undefined;
 const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+/** `task.done.denials`: at most `TASK_LIMITS.denials`, each cut, duplicates dropped. */
+const denialList = (v: unknown): TaskDenial[] => {
+  if (!Array.isArray(v)) return [];
+  const out: TaskDenial[] = [];
+  for (const d of v) {
+    if (!isObject(d) || !isString(d.command) || !d.command.trim()) continue;
+    const tool = isString(d.tool) && d.tool ? d.tool.slice(0, 64) : "Bash";
+    const command = d.command.trim().slice(0, TASK_LIMITS.denial);
+    if (out.some((x) => x.tool === tool && x.command === command)) continue;
+    out.push({ tool, command });
+    if (out.length >= TASK_LIMITS.denials) break;
+  }
+  return out;
+};
 
 /** `hello.executors`: only `claude` and `codex`, each with a short version line. */
 export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerInfo["executors"]> {
@@ -441,6 +482,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const lastLine = cut(f.lastLine, TASK_LIMITS.line);
       const files = fileList(f.files);
       const session = cut(f.session, 64);
+      const denials = denialList(f.denials);
       return {
         type: "task.done",
         taskId: f.taskId.slice(0, 64),
@@ -454,6 +496,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(f.timedOut === true ? { timedOut: true } : {}),
         ...(f.interrupted === true ? { interrupted: true } : {}),
         ...(session !== undefined ? { session } : {}),
+        ...(denials.length ? { denials } : {}),
       };
     }
     case "mcp.call": {
@@ -510,13 +553,34 @@ export interface MissionMcpTool {
   inputSchema: Record<string, unknown>;
 }
 
+const RULES_START =
+  "You work on an agentes.chat mission. Read the files in .agentes/ first (mission.md, decisions.md, notes.md). Use the agentes tools: keep the plan with update_plan, report milestones with report, ask decisions only with ask_decision, and ask for a review with request_review when you have something to show. Write plan items, reports, decisions and reviews in the language the people use in the thread (the language of the mission goal), short and plain.";
+const RULES_END =
+  "Write what you learn and the next steps in .agentes/notes.md. When a tool tells you to stop and wait, end your turn.";
+
+/**
+ * What a mission's executor is told on every task (ADR 0029) when its folder
+ * is a git repository: appended to Claude Code's system prompt
+ * (`--append-system-prompt`) and written in `.agentes/mission.md`. Plain
+ * characters only: the runner passes it as one shell argument (`cleanRules`).
+ */
+export const MISSION_RULES = `${RULES_START} Never merge, deploy or roll back directly: ask with request_approval and wait. Work on your own branch, commit work in progress after each step and push the branch now and then. ${RULES_END}`;
+
+/**
+ * The same rules for a mission folder that is not a git repository (images,
+ * documents, files for the Drive): no branches, commits, pull requests or
+ * pushes; results go to the people with upload_artifact or request_review.
+ * The runner picks this one when the task's folder isn't a repository.
+ */
+export const MISSION_RULES_NO_GIT = `${RULES_START} Never deploy or publish anything directly: ask with request_approval and wait. This mission folder is not a git repository and doesn't need one: don't create one. Work in your folder (an item started with start_task gets its own subfolder under work/), and deliver results with upload_artifact or request_review. ${RULES_END}`;
+
 const PLAN_STATUSES = ["todo", "doing", "waiting_you", "done", "dropped"];
 
 export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "report",
     description:
-      "Tell the people in the mission's thread where things stand: a milestone, what you found, what is next. One short paragraph in their language; no internal details (tool names, logs). Use it at milestones, not for every step. pr_url: a pull request you opened.",
+      "Tell the people in the mission's thread where things stand: a milestone, what you found, what is next. One short paragraph in the language the people use in the thread; no internal details (tool names, logs). Use it at milestones, not for every step. pr_url: a pull request you opened.",
     inputSchema: {
       type: "object",
       properties: {
@@ -531,7 +595,7 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "update_plan",
     description:
-      "Replace the mission's plan: the whole checklist, every time (keep each item's id stable). Statuses: todo, doing, waiting_you (needs a person), done, dropped. People see each change as one line in the thread.",
+      "Replace the mission's plan: the whole checklist, every time (keep each item's id stable). Statuses: todo, doing, waiting_you (needs a person), done, dropped. Write titles and notes in the language the people use in the thread, short (a title is at most 200 characters; details go in note). Keep an item's title unless what it means changed. People see each change as one line in the thread.",
     inputSchema: {
       type: "object",
       properties: {
@@ -559,7 +623,7 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "ask_decision",
     description:
-      "Ask the people a product or technical decision as a card with 2 to 4 options. blocking: true when you can't go on without it (then stop and wait; you are resumed with the answer). blocking: false to go on with your recommendation as a provisional decision they review later.",
+      "Ask the people a product or technical decision as a card with 2 to 4 options, in the language the people use in the thread. blocking: true when you can't go on without it (then stop and wait; you are resumed with the answer). blocking: false to go on with your recommendation as a provisional decision they review later.",
     inputSchema: {
       type: "object",
       properties: {
@@ -582,7 +646,7 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "request_review",
     description:
-      "Ask the people to look at something you can show (screens, a prototype, a PR). paths: files in your folder to attach (uploaded to the Drive). Then stop and wait: you are resumed with their answer (approved, or the changes they want).",
+      "Ask the people to look at something you can show (screens, files, a prototype, a PR), with the title and summary in the language the people use in the thread. paths: files in your folder to attach (uploaded to the Drive). Then stop and wait: you are resumed with their answer (approved, or the changes they want).",
     inputSchema: {
       type: "object",
       properties: {
@@ -638,7 +702,7 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
   {
     name: "start_task",
     description:
-      "Main session only: start one plan item as its own background session on a new git branch (it runs in parallel in its own worktree). You are told when it ends. Give it everything it needs in prompt.",
+      "Main session only: start one plan item as its own background session that runs in parallel. In a git repository it works on a new branch in its own worktree; otherwise in its own subfolder work/<branch>/ of the mission folder (branch is then just that subfolder's name). You are told when it ends. Give it everything it needs in prompt. Small work you can just do yourself.",
     inputSchema: {
       type: "object",
       properties: {
@@ -648,6 +712,21 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
       },
       required: ["title", "prompt", "branch"],
       additionalProperties: false,
+    },
+  },
+  {
+    name: "permission_prompt",
+    description:
+      "Internal: Claude Code calls this itself when a command needs a person's approval (--permission-prompt-tool). Never call it yourself.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tool_name: { type: "string", maxLength: 64 },
+        input: { type: "object" },
+        tool_use_id: { type: "string", maxLength: 128 },
+        /** The runner's follow-up: the state of a request it already made. */
+        request_id: { type: "string", maxLength: 64 },
+      },
     },
   },
 ];
@@ -664,3 +743,152 @@ export function findPullRequestUrl(text: string | null | undefined): string | nu
   );
   return m ? m[0].slice(0, TASK_LIMITS.prUrl) : null;
 }
+
+// ── Command approvals (Claude Code's permission prompts) ──────────────────────
+
+/** Our MCP tool Claude Code asks when a command needs a person (`--permission-prompt-tool`). */
+export const PERMISSION_TOOL = "permission_prompt";
+/** Its name as Claude Code knows it. */
+export const PERMISSION_PROMPT_TOOL = `mcp__agentes__${PERMISSION_TOOL}`;
+/** How long a command waits for a person before it is denied. */
+export const PERMISSION_WAIT_MS = 30 * 60_000;
+/** How often the runner asks the server whether someone answered. */
+export const PERMISSION_POLL_MS = 4000;
+/** Told to the executor when nobody answered in time. */
+export const PERMISSION_TIMEOUT_MESSAGE =
+  "The person was asked and didn't answer yet; continue with other work or stop and wait.";
+
+/** The words a command is made of: one per part of a pipeline or list (`a && b | c`). */
+export function commandParts(command: string): string[] {
+  return command
+    .split(/\|\||&&|[;|\n]/)
+    .map((p) => p.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+}
+
+/** What a tool call does, as one line for people (`git init`, `WebFetch https://…`). */
+export function commandOf(toolName: string, input: Record<string, unknown> | null | undefined): string {
+  const i = input ?? {};
+  const s = (k: string) => (typeof i[k] === "string" ? (i[k] as string) : "");
+  if (toolName === "Bash") return s("command").trim().replace(/\s+/g, " ").slice(0, 1000);
+  const what = s("url") || s("file_path") || s("path") || s("query") || s("pattern");
+  return `${toolName}${what ? ` ${what}` : ""}`.slice(0, 1000);
+}
+
+const globRe = (pattern: string) =>
+  new RegExp(
+    `^${pattern
+      .split("*")
+      .map((x) => x.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+      .join(".*")}$`,
+  );
+
+/** The `Bash(...)` pattern of a rule, or null for another tool's rule. */
+const bashPattern = (rule: string) => /^Bash\((.*)\)$/s.exec(rule.trim())?.[1] ?? null;
+
+/** One part of a command against one `Bash(...)` pattern (Claude Code's `*` matches anything; `x *` also matches `x`). */
+function partMatches(pattern: string, part: string) {
+  if (globRe(pattern).test(part)) return true;
+  return pattern.endsWith(" *") && part === pattern.slice(0, -2);
+}
+
+/**
+ * Does a permission rule cover this call? `Bash(...)` rules: a deny rule
+ * matches when any part of the command matches (`mode: "any"`), an allow
+ * rule set covers a command when every part matches one of them (see
+ * `allowedBy`). Other tools: the bare name, or `WebFetch(domain:host)`.
+ */
+export function ruleMatches(rule: string, toolName: string, input: Record<string, unknown> | null | undefined) {
+  const pattern = bashPattern(rule);
+  if (pattern !== null) {
+    if (toolName !== "Bash") return false;
+    return commandParts(commandOf("Bash", input)).some((part) => partMatches(pattern, part));
+  }
+  const r = rule.trim();
+  if (r === toolName) return true;
+  const domain = /^WebFetch\(domain:(.+)\)$/.exec(r)?.[1];
+  if (domain && toolName === "WebFetch") {
+    try {
+      return new URL(String(input?.url ?? "")).hostname === domain;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+/** Every part of the call is covered by one of these allow rules. */
+export function allowedBy(
+  rules: readonly string[],
+  toolName: string,
+  input: Record<string, unknown> | null | undefined,
+) {
+  if (toolName !== "Bash") return rules.some((r) => ruleMatches(r, toolName, input));
+  const parts = commandParts(commandOf("Bash", input));
+  if (parts.length === 0) return false;
+  return parts.every((part) =>
+    rules.some((r) => {
+      const pattern = bashPattern(r);
+      return pattern !== null && partMatches(pattern, part);
+    }),
+  );
+}
+
+/** Tools whose rules keep two words (`git init`, `npm run`): the rest keep one (`swift`, `python3`). */
+const TWO_WORD_COMMANDS = new Set([
+  "git",
+  "gh",
+  "npm",
+  "pnpm",
+  "yarn",
+  "bun",
+  "cargo",
+  "go",
+  "docker",
+  "kubectl",
+  "brew",
+  "pip",
+  "pip3",
+  "uv",
+  "xcrun",
+  "swift",
+  "eas",
+  "npx",
+]);
+
+/**
+ * "Aprovar sempre nesta missão": the rules that allow this call from now on,
+ * from the first word (or two) of each part (`swift build -c release` →
+ * `Bash(swift build *)`; `sips -Z 800 a.png` → `Bash(sips *)`); another
+ * tool: its name (WebFetch: its domain). At most 5.
+ */
+export function rulesFor(toolName: string, input: Record<string, unknown> | null | undefined): string[] {
+  if (toolName === "Bash") {
+    const out: string[] = [];
+    for (const part of commandParts(commandOf("Bash", input))) {
+      const words = part.split(" ").filter((w) => !/^[A-Z_][A-Z0-9_]*=/.test(w));
+      const first = words[0];
+      if (!first) continue;
+      const second = words[1];
+      const head = TWO_WORD_COMMANDS.has(first) && second && !second.startsWith("-") ? `${first} ${second}` : first;
+      const rule = `Bash(${head.replace(/[()*]/g, "")} *)`;
+      if (!out.includes(rule)) out.push(rule);
+      if (out.length >= 5) break;
+    }
+    return out;
+  }
+  if (toolName === "WebFetch") {
+    try {
+      return [`WebFetch(domain:${new URL(String(input?.url ?? "")).hostname})`];
+    } catch {
+      return ["WebFetch"];
+    }
+  }
+  return /^[A-Za-z_][\w]*$/.test(toolName) ? [toolName] : [];
+}
+
+/** A rule we accept from the server for a task's settings (no wildcards for whole tools, no odd characters). */
+export const isSafeRule = (rule: string) =>
+  /^Bash\([^()\n]{1,200}\)$/.test(rule) ||
+  /^WebFetch\(domain:[\w.-]{1,200}\)$/.test(rule) ||
+  /^(WebFetch|WebSearch)$/.test(rule);

@@ -19,11 +19,15 @@ import os from "node:os";
 import path from "node:path";
 import {
   type AgentScope,
+  commandOf,
   findPullRequestUrl,
   type MachineReplies,
+  MISSION_RULES_NO_GIT,
+  PERMISSION_WAIT_MS,
   type RunnerFrame,
   type RunnerTask,
   TASK_LIMITS,
+  type TaskDenial,
   type TaskDone,
   type TaskExecutor,
   type TaskStart,
@@ -94,7 +98,7 @@ const SESSION_ID = /^[a-zA-Z0-9-]{8,64}$/;
 
 /** The text Claude Code gets when the server resumes a task interrupted by the machine going away. */
 export const RESUME_NOTE =
-  "You were interrupted (the computer went offline). Check git status in your folder and continue where you stopped.";
+  "You were interrupted (the computer went offline). Look at your folder (git status when it is a git repository) and continue where you stopped.";
 
 interface Entry {
   taskId: string;
@@ -391,6 +395,8 @@ const EDIT_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
 
 /** What one line of output says: a human line, files touched, the final result, the session. */
 export interface ParsedLine {
+  /** Commands refused with nobody to approve them (Claude Code's `permission_denials`, Codex's declined). */
+  denials?: TaskDenial[];
   line?: string;
   files?: string[];
   result?: string;
@@ -401,6 +407,20 @@ export interface ParsedLine {
   thread?: string;
   /** Codex: the turn failed (`turn.failed`, `error`). */
   error?: string;
+}
+
+/** Claude Code's `result.permission_denials`: `{ tool_name, tool_input }` each, as what people read. */
+export function claudeDenials(v: unknown): TaskDenial[] {
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((d) => {
+    if (!d || typeof d !== "object") return [];
+    const x = d as { tool_name?: unknown; tool_input?: unknown };
+    const tool = typeof x.tool_name === "string" ? x.tool_name : "";
+    if (!tool || tool.startsWith("mcp__agentes__")) return [];
+    const input = x.tool_input && typeof x.tool_input === "object" ? (x.tool_input as Record<string, unknown>) : {};
+    const command = commandOf(tool, input).slice(0, TASK_LIMITS.denial);
+    return command ? [{ tool, command }] : [];
+  });
 }
 
 /** The text of a Claude Code tool result (a string, or text blocks). */
@@ -434,7 +454,14 @@ export function parseOutputLine(raw: string, executor: TaskExecutor, cwd: string
       if (ev.type === "result") {
         const result = typeof ev.result === "string" ? ev.result : "";
         const prUrl = findPullRequestUrl(result);
-        return { result, session, ...(result ? { line: first(result) } : {}), ...(prUrl ? { prUrl } : {}) };
+        const denials = claudeDenials(ev.permission_denials);
+        return {
+          result,
+          session,
+          ...(result ? { line: first(result) } : {}),
+          ...(prUrl ? { prUrl } : {}),
+          ...(denials.length ? { denials } : {}),
+        };
       }
       if (ev.type === "user") {
         // Tool results: only a pull request URL matters here (`gh pr create` prints it).
@@ -520,6 +547,10 @@ export function parseCodexEvent(
           const prUrl = findPullRequestUrl(output);
           const code = typeof item.exit_code === "number" ? item.exit_code : null;
           if (!done) return command ? { line: `Running: ${command}` } : {};
+          // Refused by its sandbox or approval policy: listed at the end ("Liberar e repetir").
+          if (item.status === "declined" && command) {
+            return { line: `Not allowed: ${command}`, denials: [{ tool: "Bash", command: command.slice(0, 300) }] };
+          }
           return {
             ...(code !== null && code !== 0 ? { line: `Command failed (exit ${code}): ${command}` } : {}),
             ...(prUrl ? { prUrl } : {}),
@@ -618,6 +649,8 @@ interface Watch {
   pendingLine?: string;
   /** A pull request URL not yet sent. */
   pendingPr?: string;
+  /** Refused commands seen so far (sent with `task.done`). */
+  denials: TaskDenial[];
   newFiles: string[];
   redact: (text: string) => string;
   missingSince?: number;
@@ -756,11 +789,21 @@ export class TaskManager {
     }
     const missionTask = typeof req.mission?.id === "string" && TASK_ID.test(req.mission.id);
     let branch: string | undefined;
+    // Where an item works, told first in its prompt (the server's prompt doesn't know whether there is git).
+    let where = "";
     if (typeof req.branch === "string" && req.branch.trim() !== "") {
-      branch = req.branch.trim();
       const repo = cwd;
-      cwd = createWorktree(cwd, folder, taskId, branch);
-      // A mission item in its own worktree still reads the mission's files (ADR 0029).
+      if (executor === "shell" || isGitRepo(cwd)) {
+        branch = req.branch.trim();
+        cwd = createWorktree(cwd, folder, taskId, branch);
+        if (missionTask) where = `Your branch: ${branch} (in its own worktree).`;
+      } else {
+        // No git (images, documents, files for the Drive): no branch, its own subfolder so parallel items never collide.
+        cwd = itemFolder(repo, req.branch, taskId);
+        const sub = path.relative(repo, cwd).split(path.sep).join("/");
+        where = `Your folder: ${sub}/ inside the mission folder (not a git repository: no branches, commits or pushes). The mission folder is ../../ and its files are in .agentes/. Put what you make in your folder and deliver it with upload_artifact or request_review.`;
+      }
+      // A mission item in its own worktree or subfolder still reads the mission's files (ADR 0029).
       if (missionTask) linkMissionFiles(repo, cwd);
     } else if (missionTask) {
       excludeLocally(cwd, ".agentes/");
@@ -783,14 +826,16 @@ export class TaskManager {
         : undefined;
     let extra: string[] = [];
     let mcpToken: string | undefined;
-    const input = prompt;
+    const input = where ? `${where}\n\n${prompt}` : prompt;
     const mode = req.mission?.mode === "plan" ? "plan" : "work";
     if (missionId && this.opts.mcp) {
       mcpToken = newMcpToken();
       writeFileSync(path.join(dir, MCP_TOKEN_FILE), mcpToken, { mode: 0o600 });
       const configFile = path.join(dir, "mcp.json");
       const settingsFile = path.join(dir, "settings.json");
-      const rules = typeof req.mission?.rules === "string" ? req.mission.rules : "";
+      // The rules for the folder it runs in: branches, commits and pushes only in a git repository.
+      const given = typeof req.mission?.rules === "string" ? req.mission.rules : "";
+      const rules = given && !isGitRepo(cwd) ? MISSION_RULES_NO_GIT : given;
       if (executor === "claude") {
         const config = claudeMcpConfig({
           command: this.opts.mcp.command,
@@ -801,7 +846,8 @@ export class TaskManager {
         writeFileSync(configFile, JSON.stringify(config), { mode: 0o600 });
         // What it may run without asking (protocol 7; older servers send no mode: work).
         const prefix = missionBranchPrefix(missionId, req.mission?.branchPrefix);
-        writeFileSync(settingsFile, JSON.stringify(claudePermissionSettings(mode, prefix)), { mode: 0o600 });
+        const allow = Array.isArray(req.mission?.allow) ? req.mission.allow.filter((r) => typeof r === "string") : [];
+        writeFileSync(settingsFile, JSON.stringify(claudePermissionSettings(mode, prefix, allow)), { mode: 0o600 });
       }
       extra = missionExecutorArgs(executor === "codex" ? "codex" : "claude", {
         configFile,
@@ -809,7 +855,7 @@ export class TaskManager {
         taskId,
         socketPath: this.opts.mcp.socketPath,
         rules,
-        ...(executor === "claude" ? { settingsFile } : { resumed: Boolean(codexThread) }),
+        ...(executor === "claude" ? { settingsFile, promptTool: mode === "work" } : { resumed: Boolean(codexThread) }),
       });
     } else if (missionId) {
       this.log(`task ${taskId} works for a mission, but this runner has no MCP endpoint`);
@@ -859,7 +905,10 @@ export class TaskManager {
               [CODEX_MCP_ENV[1]]: this.opts.mcp.socketPath,
               [CODEX_MCP_ENV[2]]: path.dirname(this.opts.root),
             }
-          : {};
+          : executor === "claude" && mcpToken
+            ? // A permission prompt waits for a person (up to PERMISSION_WAIT_MS): our tool call may take that long.
+              { MCP_TOOL_TIMEOUT: String(PERMISSION_WAIT_MS + 5 * 60_000) }
+            : {};
       child = spawn(this.opts.runtime ?? process.execPath, [wrapper, dir], {
         cwd: dir,
         // The agent's secrets (ADR 0027) through the environment only, never on disk here.
@@ -990,6 +1039,7 @@ export class TaskManager {
       partial: { stdout: "", stderr: "" },
       tail: [],
       lastSentAt: 0,
+      denials: [],
       newFiles: [],
       redact: clean,
     };
@@ -1080,6 +1130,12 @@ export class TaskManager {
     }
     if (parsed.session && !t.session) t.session = parsed.session;
     if (parsed.result !== undefined) w.result = parsed.result;
+    for (const d of parsed.denials ?? []) {
+      const command = w.redact(d.command);
+      if (w.denials.length < TASK_LIMITS.denials && !w.denials.some((x) => x.command === command)) {
+        w.denials.push({ tool: d.tool, command });
+      }
+    }
     if (parsed.line) {
       const line = w.redact(parsed.line).slice(0, TASK_LIMITS.line);
       w.pendingLine = line;
@@ -1226,6 +1282,7 @@ export class TaskManager {
       ...(exit?.reason === "timeout" ? { timedOut: true } : {}),
       ...(interrupted ? { interrupted: true } : {}),
       ...(t.session ? { session: t.session } : {}),
+      ...(w.denials.length ? { denials: w.denials } : {}),
     };
     t.delivered = false;
     this.save();
@@ -1282,6 +1339,30 @@ export class TaskManager {
   }
 }
 
+/** Whether `cwd` is inside a git work tree (false when git isn't installed). */
+export function isGitRepo(cwd: string): boolean {
+  const r = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd, encoding: "utf8", windowsHide: true });
+  return !r.error && r.status === 0 && r.stdout.trim() === "true";
+}
+
+/**
+ * A mission item's own folder when the mission folder isn't a git
+ * repository: `<repo>/work/<last part of the branch>/` (another one with the
+ * task id when that name is taken). Returns its path.
+ */
+export function itemFolder(repo: string, branch: string, taskId: string): string {
+  const last = branch.trim().split("/").filter(Boolean).pop() ?? "";
+  const slug =
+    last
+      .replace(/[^A-Za-z0-9._-]+/g, "-")
+      .replace(/^[-.]+|-+$/g, "")
+      .slice(0, 60) || "item";
+  let target = path.join(repo, "work", slug);
+  if (existsSync(target)) target = path.join(repo, "work", `${slug}-${taskId.replace(/[^a-zA-Z0-9]/g, "").slice(-8)}`);
+  mkdirSync(target, { recursive: true });
+  return target;
+}
+
 /** A branch name git accepts, or a clear refusal. */
 function checkBranch(cwd: string, branch: string) {
   if (branch.length > 200 || branch.startsWith("-"))
@@ -1299,7 +1380,10 @@ export function createWorktree(cwd: string, folder: string, taskId: string, bran
   const inside = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd, encoding: "utf8", windowsHide: true });
   if (inside.error) throw new RunnerError("bad_request", "git is not installed on this computer");
   if (inside.status !== 0 || inside.stdout.trim() !== "true") {
-    throw new RunnerError("bad_request", "A branch needs a git repository: the task's folder isn't one");
+    throw new RunnerError(
+      "bad_request",
+      "A shell task with a branch needs a git repository: the task's folder isn't one (start it without a branch)",
+    );
   }
   checkBranch(cwd, branch);
   const target = path.join(folder, ".worktrees", taskId);

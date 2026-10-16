@@ -155,10 +155,10 @@ test("missions API: session and same origin; create, read, start (owner only), l
   expect(counted.missions).toHaveLength(1);
   expect(((await (await api("/missions?q=nothing-like-it")).json()) as { missions: Mission[] }).missions).toEqual([]);
   const eligible = (await (await api("/missions/eligible-agents")).json()) as {
-    agents: { agentId: string; machine: { online: boolean } }[];
+    agents: { agentId: string; eligible: boolean; reason: string | null; machine: { online: boolean } | null }[];
   };
-  expect(eligible.agents).toEqual([
-    expect.objectContaining({ agentId, machine: expect.objectContaining({ online: true }) }),
+  expect(eligible.agents.filter((a) => a.eligible)).toEqual([
+    expect.objectContaining({ agentId, reason: null, machine: expect.objectContaining({ online: true }) }),
   ]);
 
   // "Ver saída": anyone who reads the thread.

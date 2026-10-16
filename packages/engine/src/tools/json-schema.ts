@@ -18,8 +18,10 @@ export function validateJson(schema: JsonSchema, value: unknown, path = "input")
     errors.push(`${path}: must be one of ${schema.enum.map((e) => JSON.stringify(e)).join(", ")}`);
   }
   if (typeof value === "string") {
-    if (typeof schema.minLength === "number" && value.length < schema.minLength) errors.push(`${path}: too short`);
-    if (typeof schema.maxLength === "number" && value.length > schema.maxLength) errors.push(`${path}: too long`);
+    if (typeof schema.minLength === "number" && value.length < schema.minLength)
+      errors.push(`${path}: too short (at least ${schema.minLength} characters)`);
+    if (typeof schema.maxLength === "number" && value.length > schema.maxLength)
+      errors.push(`${path}: too long (at most ${schema.maxLength} characters)`);
   }
   if (typeof value === "number") {
     if (typeof schema.minimum === "number" && value < schema.minimum) errors.push(`${path}: below ${schema.minimum}`);

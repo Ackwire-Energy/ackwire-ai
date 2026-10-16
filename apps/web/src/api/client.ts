@@ -56,6 +56,7 @@ import type {
   Memory,
   Message,
   Mission,
+  MissionCommand,
   MissionControl,
   MissionCreateInput,
   MissionDecision,
@@ -471,6 +472,21 @@ export interface ApiClient {
     /** Before Start, its owner switches who programs (the planning starts again). */
     setExecutor(orgId: string, missionId: string, executor: MissionExecutor): Promise<Mission>;
     decisions(orgId: string, missionId: string): Promise<MissionDecision[]>;
+    /** Commands the executor asked to run (its permission prompts), and the ones allowed for the whole mission. */
+    commands(orgId: string, missionId: string): Promise<{ commands: MissionCommand[]; rules: string[] }>;
+    /** Aprovar / Recusar / Aprovar sempre nesta missão. */
+    decideCommand(
+      orgId: string,
+      missionId: string,
+      commandId: string,
+      decision: "allow" | "deny" | "always",
+    ): Promise<MissionCommand>;
+    /** "Liberar e repetir": allow a command a task was refused, and resume it. */
+    retryCommand(
+      orgId: string,
+      missionId: string,
+      input: { taskId: string; command: string },
+    ): Promise<{ rules: string[]; delivered: boolean }>;
     choose(orgId: string, missionId: string, decisionId: string, option: string): Promise<MissionDecision>;
     opinion(orgId: string, missionId: string, decisionId: string, option: string): Promise<MissionDecision>;
     approveProvisional(orgId: string, missionId: string): Promise<MissionDecision[]>;

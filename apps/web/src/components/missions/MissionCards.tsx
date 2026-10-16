@@ -1,6 +1,6 @@
 import { Button, Chip, Icon, type IconName, RadioCard, RadioGroup, Select, Skeleton, Textarea } from "@agenteschat/ui";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -20,6 +20,7 @@ import type {
   Mission,
   MissionDecision,
   MissionExecutor,
+  MissionLinkMeta,
   MissionPlanMeta,
   MissionReportMeta,
   MissionSuggestionMeta,
@@ -34,6 +35,7 @@ import { formatTime } from "@/lib/format";
 import {
   executorName,
   formatSpan,
+  machineTaskOf,
   missionCardRef,
   missionPlanChangeOf,
   planChangeParts,
@@ -43,7 +45,8 @@ import {
   viaText,
 } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
-import { executorOptions, useMissionPanel } from "./MissionBits";
+import { executorOptions, MissionHead, MissionStatusChip, useMissionPanel } from "./MissionBits";
+import { BlockedCommands } from "./MissionCommandCard";
 import { SessionRows } from "./MissionSessions";
 
 /**
@@ -175,22 +178,23 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
           {t("missions.plan.adjusts", { executor })}
         </p>
       )}
-      <div className="mi-plan__meta">
-        <Icon name="computer" size={14} />
-        <span>
-          {t("missions.plan.on", {
-            computer,
-            state: m?.machine && !m.machine.online ? t("missions.offline") : t("missions.online"),
-          })}
-        </span>
-      </div>
-      {m && choices.length > 1 && (
+      <div className="mi-plan__metas">
         <div className="mi-plan__meta">
-          <Icon name="code" size={14} />
-          <span>{t("missions.new.who")}</span>
-          <div style={{ minWidth: 200 }}>
+          <Icon name="computer" size={14} />
+          <span>
+            {t("missions.plan.on", {
+              computer,
+              state: m?.machine && !m.machine.online ? t("missions.offline") : t("missions.online"),
+            })}
+          </span>
+        </div>
+        {m && choices.length > 1 && (
+          <div className="mi-plan__meta">
+            <Icon name="code" size={14} />
+            <span>{t("missions.new.who")}</span>
             <Select
               size="sm"
+              className="mi-plan__who"
               aria-label={t("missions.new.who")}
               value={current}
               disabled={switchExecutor.isPending}
@@ -206,8 +210,8 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
               options={executorOptions(t, choices, agentName)}
             />
           </div>
-        </div>
-      )}
+        )}
+      </div>
       <div className="mi-plan__foot">
         {m?.role === "owner" && (
           <Button variant="primary" size="sm" icon="check" loading={control.isPending} onClick={start}>
@@ -554,12 +558,14 @@ export function MissionPlanChangeLine({ message }: { message: Message }) {
     ...p.added.map((x) => `+ ${x}`),
     ...p.removed.map((x) => `− ${x}`),
     ...p.done.map((x) => t("missions.planChange.done", { title: x })),
-    ...p.renamed.map((x) => t("missions.planChange.renamed", { from: x.from, to: x.to })),
+    // Only the wording changed: the new title, marked edited (the old one in the tooltip).
+    ...p.renamed.map((x) => t("missions.planChange.renamed", { to: x.to })),
   ];
+  const before = p.renamed.map((x) => `${x.from} → ${x.to}`).join("\n");
   return (
     <div className="mi-evt" data-message-id={message.id}>
       <Icon name="edit" size={14} />
-      <span>
+      <span title={before || undefined}>
         <b>{t("missions.planChange.title")}</b>
         {parts.length > 0 ? `: ${parts.join(" · ")}` : ""}
       </span>
@@ -588,8 +594,11 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   if (!notice) return null;
   const p = notice.params;
   const seconds = Number(p.seconds ?? 0);
+  // Commands it was refused (Liberar e repetir).
+  const task = machineTaskOf(message.meta);
+  const blocked = task?.blocked ?? [];
   return (
-    <div className="mi-evt" data-message-id={message.id}>
+    <div className={blocked.length > 0 ? "mi-evt mi-evt--blocked" : "mi-evt"} data-message-id={message.id}>
       <Icon name={NOTICE_ICON[notice.code] ?? "computer"} size={14} />
       <span>
         {t(`missions.notice.${notice.code}`, {
@@ -600,6 +609,9 @@ export function TaskNoticeLine({ message }: { message: Message }) {
         })}{" "}
         · {formatTime(i18n.language, message.createdAt)}
       </span>
+      {blocked.length > 0 && task?.missionId && (
+        <BlockedCommands missionId={task.missionId} taskId={task.id} blocked={blocked} />
+      )}
     </div>
   );
 }
@@ -682,6 +694,78 @@ export function MissionStartLink({ message }: { message: Message }) {
       <Icon name="flag" size={14} />
       {t("missions.openThread")}
     </Link>
+  );
+}
+
+// ── The mission's link card, where it was asked ───────────────────────────────
+
+/**
+ * Under the agent's reply in the conversation where the person asked, when
+ * the mission lives in another thread (a flat DM): its title, its state
+ * (live via `mission.updated`), who works on which computer, and Abrir
+ * thread / Ver plano.
+ */
+export function MissionLinkCard({ link }: { link: MissionLinkMeta }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const navigate = useNavigate();
+  const panel = useMissionPanel();
+  const mission = useMission(org.id, link.missionId);
+  const m = mission.data;
+  const threadLink = {
+    to: "/org/$orgId/threads/$threadId" as const,
+    params: { orgId: org.id, threadId: link.threadId },
+  };
+  if (!m) {
+    return mission.isPending ? (
+      <div className="mi-card mi-linkcard" aria-hidden="true">
+        <Skeleton width="55%" height={18} />
+      </div>
+    ) : null;
+  }
+  const agentName = dir.agentById.get(m.agentId)?.name ?? "";
+  const offline = Boolean(m.machine && !m.machine.online);
+  // Before Start: still planning, or the plan is there and waits for the person who asked.
+  const proposed = m.status === "proposed" ? (m.plan.total > 0 ? "ready" : "planning") : null;
+  return (
+    <section className="mi-card mi-linkcard" aria-label={t("missions.link.label", { title: m.title })}>
+      <MissionHead
+        agentId={m.agentId}
+        agentName={agentName}
+        running={m.runningTasks > 0 && !offline}
+        title={<Link {...threadLink}>{m.title}</Link>}
+        meta={[viaText(t, m.executor, agentName, m.machine?.name)]}
+        right={
+          proposed ? (
+            <Chip
+              icon={proposed === "ready" ? "waiting" : "document"}
+              tone={proposed === "ready" && m.role === "owner" ? "waiting" : "neutral"}
+            >
+              {proposed === "planning"
+                ? t("missions.link.status.planning")
+                : m.role === "owner"
+                  ? t("missions.link.status.ready")
+                  : t("missions.link.status.readyOther")}
+            </Chip>
+          ) : (
+            <MissionStatusChip mission={m} />
+          )
+        }
+      />
+      <div className="mi-linkcard__foot">
+        <Button size="sm" variant="primary" icon="thread" onClick={() => void navigate(threadLink)}>
+          {t("missions.list.openThread")}
+        </Button>
+        <Button
+          size="sm"
+          icon="document"
+          onClick={() => (panel ? panel.openFiles(m.id, "mission.md") : void navigate(threadLink))}
+        >
+          {t("missions.plan.see")}
+        </Button>
+      </div>
+    </section>
   );
 }
 

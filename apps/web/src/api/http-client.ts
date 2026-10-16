@@ -45,6 +45,7 @@ import type {
   Memory,
   Message,
   Mission,
+  MissionCommand,
   MissionDecision,
   MissionEligibleAgent,
   MissionFiles,
@@ -527,6 +528,16 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
           request<Mission>(`${one(orgId, missionId)}/executor`, { method: "PUT", json: { executor } }),
         decisions: async (orgId, missionId) =>
           (await request<{ decisions: MissionDecision[] }>(`${one(orgId, missionId)}/decisions`)).decisions,
+        commands: (orgId, missionId) =>
+          request<{ commands: MissionCommand[]; rules: string[] }>(`${one(orgId, missionId)}/commands`),
+        decideCommand: (orgId, missionId, commandId, decision) =>
+          request<MissionCommand>(`${one(orgId, missionId)}/commands/${enc(commandId)}/decide`, {
+            json: { decision },
+          }),
+        retryCommand: (orgId, missionId, input) =>
+          request<{ rules: string[]; delivered: boolean }>(`${one(orgId, missionId)}/commands/retry`, {
+            json: input,
+          }),
         choose: (orgId, missionId, decisionId, option) =>
           request<MissionDecision>(`${one(orgId, missionId)}/decisions/${enc(decisionId)}/choose`, {
             json: { option },

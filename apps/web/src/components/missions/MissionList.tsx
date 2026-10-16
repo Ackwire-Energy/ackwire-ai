@@ -5,13 +5,12 @@ import { useTranslation } from "react-i18next";
 import { useMissionList } from "@/api/missions";
 import { useChannels } from "@/api/queries";
 import type { Mission } from "@/api/types";
-import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { formatShortDate, relativeTime } from "@/lib/format";
-import { isOpenMission, missionCells, waitingText } from "@/lib/missions";
-import { MachineChip, MissionStatusChip, MissionStrip } from "./MissionBits";
+import { isOpenMission, missionCells, missionCellTitles, waitingText } from "@/lib/missions";
+import { MachineChip, MissionHead, MissionStatusChip, MissionStrip } from "./MissionBits";
 import { CloseMissionDialog } from "./MissionDialogs";
 
 /**
@@ -107,7 +106,9 @@ function MissionCard({ mission: m }: { mission: Mission }) {
   const [closing, setClosing] = useState(false);
   const agent = dir.agentById.get(m.agentId);
   const channel = channels.data?.find((c) => c.id === m.channelId);
-  const where = channel ? t("missions.list.threadIn", { channel: channel.name }) : t("missions.list.threadInDm");
+  const where = channel
+    ? `#${channel.name}`
+    : t("missions.list.dmWith", { name: agent?.name ?? t("channel.unknownAgent") });
   const offline = Boolean(m.machine && !m.machine.online);
   const waiting = waitingText(t, m);
   const open = isOpenMission(m);
@@ -115,43 +116,39 @@ function MissionCard({ mission: m }: { mission: Mission }) {
   const more = t("missions.list.more", { title: m.title });
   return (
     <article className="mi-mc" aria-label={t("missions.list.card", { title: m.title })}>
-      <div className="mi-mc__head">
-        <AgentAvatar agentId={m.agentId} name={agent?.name ?? ""} size="md" running={m.runningTasks > 0 && !offline} />
-        <div className="mi-mc__t">
-          <h3>
-            <Link {...threadLink}>{m.title}</Link>
-          </h3>
-          <small>
-            <span>{agent?.name ?? t("channel.unknownAgent")}</span>
-            <span aria-hidden="true">·</span>
-            <Link {...threadLink} className="mi-lnk">
-              <Icon name="thread" size={14} />
-              {where}
-            </Link>
-            <span aria-hidden="true">·</span>
-            <span>
-              {t("missions.list.started", { date: formatShortDate(i18n.language, m.startedAt ?? m.createdAt) })}
-            </span>
-          </small>
-        </div>
-        <div className="mi-mc__r">
-          <MissionStatusChip mission={m} />
-          <Menu
-            align="end"
-            label={more}
-            trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={more} />}
-          >
-            <MenuItem icon="thread" onSelect={() => void navigate(threadLink)}>
-              {t("missions.list.openThread")}
-            </MenuItem>
-            {open && m.canManage && (
-              <MenuItem icon="check" onSelect={() => setClosing(true)}>
-                {t("missions.actions.close")}
+      <MissionHead
+        agentId={m.agentId}
+        agentName={agent?.name ?? ""}
+        running={m.runningTasks > 0 && !offline}
+        title={<Link {...threadLink}>{m.title}</Link>}
+        meta={[
+          agent?.name ?? t("channel.unknownAgent"),
+          <Link key="where" {...threadLink} className="mi-quiet">
+            <Icon name="thread" size={14} />
+            {where}
+          </Link>,
+          t("missions.list.started", { date: formatShortDate(i18n.language, m.startedAt ?? m.createdAt) }),
+        ]}
+        right={
+          <>
+            <MissionStatusChip mission={m} />
+            <Menu
+              align="end"
+              label={more}
+              trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={more} />}
+            >
+              <MenuItem icon="thread" onSelect={() => void navigate(threadLink)}>
+                {t("missions.list.openThread")}
               </MenuItem>
-            )}
-          </Menu>
-        </div>
-      </div>
+              {open && m.canManage && (
+                <MenuItem icon="check" onSelect={() => setClosing(true)}>
+                  {t("missions.actions.close")}
+                </MenuItem>
+              )}
+            </Menu>
+          </>
+        }
+      />
       <div className="mi-mc__strip">
         <b>
           {m.plan.total > 0
@@ -160,6 +157,7 @@ function MissionCard({ mission: m }: { mission: Mission }) {
         </b>
         <MissionStrip
           cells={missionCells(m, { offline })}
+          titles={missionCellTitles(m)}
           agentId={m.agentId}
           label={t("missions.itemsLabel", { done: m.plan.done, count: m.plan.total })}
         />

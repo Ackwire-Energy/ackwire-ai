@@ -94,6 +94,8 @@ export interface Transcript {
   memoryUpdates?: MemoryUpdate[];
   /** Artifacts created or changed by tools, not yet attached to a posted message (`meta.artifacts`). */
   artifacts?: { id: string; version: number }[];
+  /** A mission proposed with its home elsewhere (a flat DM's new thread): the reply carries its link card (`meta.missionLink`). */
+  missionLink?: { missionId: string; threadId: string } | null;
   /** Tool calls of the last assistant turn while some wait for approval or an answer. */
   pending?: {
     calls: {
@@ -731,6 +733,8 @@ async function executeRunInner(
           const data = outcome.type === "result" ? outcome.output.data : undefined;
           const artifact = data?.artifact as { id: string; version: number } | undefined;
           if (artifact) transcript.artifacts = [...(transcript.artifacts ?? []), artifact];
+          const link = data?.missionLink as { missionId: string; threadId: string } | undefined;
+          if (link?.missionId && link.threadId) transcript.missionLink = link;
           if (update) {
             transcript.memoryUpdates = [...(transcript.memoryUpdates ?? []), update];
             await publishChannelEvent(deps.pubsub, { type: "memory.updated", ...where, update });
@@ -1096,18 +1100,22 @@ function createDeltaPublisher(
 }
 
 /**
- * Moves pending memory updates and artifacts onto the message being posted
- * (the "memory updated" and file preview cards).
+ * Moves pending memory updates, artifacts and a proposed mission's link onto
+ * the message being posted (the "memory updated", file preview and mission
+ * link cards).
  */
 function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const updates = t.memoryUpdates ?? [];
   const files = t.artifacts ?? [];
-  if (updates.length === 0 && files.length === 0) return undefined;
+  const link = t.missionLink ?? null;
+  if (updates.length === 0 && files.length === 0 && !link) return undefined;
   t.memoryUpdates = [];
   t.artifacts = [];
+  t.missionLink = null;
   const meta: Record<string, unknown> = {};
   if (updates.length > 0) meta.memoryUpdates = updates;
   if (files.length > 0) meta.artifacts = files;
+  if (link) meta.missionLink = link;
   return meta;
 }
 

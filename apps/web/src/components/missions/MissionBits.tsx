@@ -3,10 +3,11 @@ import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Mission, MissionExecutor, MissionFileName } from "@/api/types";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
-import type { PlanCell } from "@/lib/missions";
+import { type PlanCell, tickFor } from "@/lib/missions";
 import { MissionFilesPanel } from "./MissionFiles";
 import "./missions.css";
 
@@ -40,12 +41,42 @@ export function useNow(active: boolean, ms = 1000) {
   return now;
 }
 
-/** "4 de 12 itens" as pixels, in the mission agent's own tones. */
-export function MissionStrip({ cells, agentId, label }: { cells: PlanCell[]; agentId: string; label: string }) {
+/** A clock for "há 58 s": every second at first, coarser as the time grows (`tickFor`). */
+export function useElapsedNow(since: string | null | undefined, active: boolean) {
+  const start = since ? Date.parse(since) : Number.NaN;
+  const [now, setNow] = useState(() => Date.now());
+  const ms = tickFor(Number.isFinite(start) ? (now - start) / 1000 : 0);
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(timer);
+  }, [active, ms]);
+  return now;
+}
+
+/** "4 de 12 itens" as pixels, in the mission agent's own tones; `titles` (the items') give each cell a tooltip. */
+export function MissionStrip({
+  cells,
+  agentId,
+  label,
+  titles,
+}: {
+  cells: PlanCell[];
+  agentId: string;
+  label: string;
+  titles?: string[];
+}) {
+  const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   if (cells.length === 0) return null;
-  return <PlanStrip cells={cells} color={colorOf(dir.agentById.get(agentId))} label={label} />;
+  const hints = cells.map((cell, i) => {
+    const status = t(`missions.strip.${cell}` as const);
+    const title = titles?.[i];
+    return title ? t("missions.strip.cell", { title, status }) : status;
+  });
+  return <PlanStrip cells={cells} color={colorOf(dir.agentById.get(agentId))} label={label} titles={hints} />;
 }
 
 export type MissionStatusKey = "needsYou" | "proposed" | "working" | "active" | "paused" | "done" | "canceled";
@@ -80,6 +111,55 @@ export function MissionStatusChip({
     <Chip icon={STATUS_ICON[key]} tone={key === "needsYou" ? "waiting" : "neutral"}>
       {t(`missions.status.${key}`)}
     </Chip>
+  );
+}
+
+/**
+ * A mission card's header (the Missões tab, the link card in a conversation):
+ * the agent's avatar | the title and, on the same left edge right under it,
+ * one quiet meta line; `right` (the status chip, a menu) at the end.
+ */
+export function MissionHead({
+  agentId,
+  agentName,
+  title,
+  meta,
+  right,
+  running,
+}: {
+  agentId: string;
+  agentName: string;
+  /** The title (a link, or plain text). */
+  title: ReactNode;
+  /** The meta line's parts, joined by a quiet "·". */
+  meta: ReactNode[];
+  right?: ReactNode;
+  running?: boolean;
+}) {
+  const parts = meta.filter(Boolean);
+  return (
+    <div className="mi-head">
+      <AgentAvatar agentId={agentId} name={agentName} size="md" running={running} />
+      <div className="mi-head__t">
+        <h3>{title}</h3>
+        {parts.length > 0 && (
+          <p className="mi-head__meta">
+            {parts.map((part, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: fixed parts in a fixed order
+              <span key={i} className="mi-head__part">
+                {i > 0 && (
+                  <span className="mi-head__dot" aria-hidden="true">
+                    ·
+                  </span>
+                )}
+                {part}
+              </span>
+            ))}
+          </p>
+        )}
+      </div>
+      {right && <div className="mi-head__r">{right}</div>}
+    </div>
   );
 }
 

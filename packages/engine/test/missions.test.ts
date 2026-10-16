@@ -1,15 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
-import { and, eq, isNull, schema } from "@agenteschat/db";
+import { MACHINE_PROTOCOL_VERSION, PERMISSION_TIMEOUT_MESSAGE, type ServerFrame } from "@agenteschat/adapters";
+import { and, eq, isNull, schema, sql } from "@agenteschat/db";
 import {
   addChannelMember,
   approveProvisionalDecisions,
   buildRunContext,
   chooseDecision,
   closeMission,
+  createAgent,
   createMachinePairing,
   createMission,
   decideApproval,
+  decideCommand,
   decideJoinRequest,
   decideReview,
   decideSuggestion,
@@ -20,6 +22,7 @@ import {
   getTaskOutput,
   grantScopes,
   listJoinRequests,
+  listMissionCommands,
   listMissions,
   type MachineHub,
   MISSION_RULES,
@@ -27,12 +30,14 @@ import {
   missionBranchPrefix,
   missionSummary,
   onMissionApprovalDecided,
+  openDm,
   opineDecision,
   pauseMission,
   postPersonMessage,
   redeemMachinePairing,
   requestFilesSync,
   requestToJoin,
+  retryBlockedCommand,
   START_PROMPT,
   sendMissionMessage,
   setAgentAudience,
@@ -182,6 +187,42 @@ async function proposed(options: { reply?: NonNullable<Parameters<typeof setup>[
 }
 
 describe("missions (ADR 0029)", () => {
+  test("proposed from a flat DM: its home is a new thread and the agent's reply in the DM carries the link card", async () => {
+    f = await setup({
+      machines: true,
+      missionTools: true,
+      reply: (_req, n) =>
+        n === 1
+          ? {
+              chunks: ["Planning it."],
+              toolUses: [{ name: "propose_mission", input: { title: "Photos", goal: "Make a contact sheet" } }],
+            }
+          : { chunks: ["Proposed the mission; the plan is coming."] },
+    });
+    const paired = await pairedMachine();
+    const runner = missionRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const ask = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dm.id, {
+      body: "make a contact sheet of my photos",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const mission = await missionRow();
+    expect(mission.threadRootId).not.toBe(ask.id);
+    const replies = await f.db
+      .select()
+      .from(schema.messages)
+      .where(and(eq(schema.messages.channelId, dm.id), eq(schema.messages.authorAgentId, f.agent.id)));
+    const linked = replies.filter((m) => m.meta.missionLink);
+    expect(linked).toHaveLength(1);
+    expect(linked[0]?.threadId).toBeNull();
+    expect(linked[0]?.meta.missionLink).toEqual({ missionId: mission.id, threadId: mission.threadRootId });
+    // The tool told the model not to name the app's buttons.
+    const toolResult = JSON.stringify(f.provider.calls.at(-1)?.request.messages ?? []);
+    expect(toolResult).toContain("don't name buttons");
+    expect(toolResult).not.toContain("press Start");
+  });
+
   test("the agent proposes (plan mode on the machine, plan card); only the owner starts; the start waits for the plan turn", async () => {
     f = await setup({
       machines: true,
@@ -740,18 +781,38 @@ describe("missions (ADR 0029)", () => {
     await expect(requestToJoin(md(), zed.id, f.org.id, view.id)).rejects.toMatchObject({ code: "mission.not_found" });
   });
 
-  test("eligible agents: a computer with commands (protocol 4+), the caller in the audience, and who can program there; offline still listed", async () => {
+  test("eligible agents: every agent, with a reason when it can't (no computer, cloud, commands off, old runner, audience); offline still eligible", async () => {
     f = await setup({ machines: true, missionTools: true });
-    expect(await eligibleMissionAgents(md(), f.owner.id, f.org.id)).toEqual([]);
-    const paired = await pairedMachine();
-    const runner = missionRunner(f.machineHub as MachineHub);
-    await runner.hello(paired.token);
-    const list = await eligibleMissionAgents(md(), f.owner.id, f.org.id);
-    expect(list).toEqual([
+    const elig = (userId = f.owner.id, opts: { cloud?: boolean } = {}) =>
+      eligibleMissionAgents(md(), userId, f.org.id, opts);
+    expect(await elig()).toEqual([
       {
         agentId: f.agent.id,
         handle: f.agent.handle,
         name: f.agent.name,
+        eligible: false,
+        reason: "no_computer",
+        canManage: true,
+        machine: null,
+        ready: false,
+        executors: [],
+        defaultExecutor: null,
+        codexTooOld: false,
+      },
+    ]);
+    // The server has cloud computers: missions there come later.
+    expect((await elig(f.owner.id, { cloud: true }))[0]?.reason).toBe("cloud_computer");
+    const paired = await pairedMachine();
+    const runner = missionRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    expect(await elig()).toEqual([
+      {
+        agentId: f.agent.id,
+        handle: f.agent.handle,
+        name: f.agent.name,
+        eligible: true,
+        reason: null,
+        canManage: true,
         machine: { id: paired.machineId, name: "MacBook", online: true },
         ready: true,
         // An older runner that doesn't report its CLIs: Claude Code is assumed.
@@ -760,25 +821,48 @@ describe("missions (ADR 0029)", () => {
         codexTooOld: false,
       },
     ]);
+    // A second agent on the same computer: both eligible, by name ("Ada" before "Dev").
+    const ada = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ada", handle: "ada", role: "Developer", instructions: "", credentialId: null },
+      { model: "claude-sonnet-5-5" },
+    );
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, ada.id, paired.machineId);
+    expect((await elig()).map((a) => [a.name, a.eligible, a.machine?.name])).toEqual([
+      ["Ada", true, "MacBook"],
+      ["Dev", true, "MacBook"],
+    ]);
+    // Ada back on the cloud computer: listed after the eligible ones.
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, ada.id, null);
+    expect((await elig(f.owner.id, { cloud: true })).map((a) => [a.name, a.reason])).toEqual([
+      ["Dev", null],
+      ["Ada", "cloud_computer"],
+    ]);
     const bia = await addMember(f.db, f.org.id, "member", "bia");
-    expect(await eligibleMissionAgents(md(), bia.id, f.org.id)).toHaveLength(1);
+    expect((await elig(bia.id)).find((a) => a.agentId === f.agent.id)).toMatchObject({
+      eligible: true,
+      canManage: false,
+    });
     await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "owner", userIds: [] });
-    expect(await eligibleMissionAgents(md(), bia.id, f.org.id)).toHaveLength(0);
+    expect((await elig(bia.id)).find((a) => a.agentId === f.agent.id)?.reason).toBe("not_in_audience");
     await runner.close();
-    expect((await eligibleMissionAgents(md(), f.owner.id, f.org.id))[0]?.machine.online).toBe(false);
+    const offline = (await elig()).find((a) => a.agentId === f.agent.id);
+    expect(offline).toMatchObject({ eligible: true, ready: false, machine: { online: false } });
     // Protocol 4: only the agent itself can program there (no mission tools for executors).
     await f.db.update(schema.machines).set({ protocol: 4 }).where(eq(schema.machines.id, paired.machineId));
-    expect((await eligibleMissionAgents(md(), f.owner.id, f.org.id))[0]).toMatchObject({
+    expect((await elig()).find((a) => a.agentId === f.agent.id)).toMatchObject({
       executors: ["agent"],
       defaultExecutor: "agent",
     });
     await f.db.update(schema.machines).set({ protocol: 3 }).where(eq(schema.machines.id, paired.machineId));
-    expect(await eligibleMissionAgents(md(), f.owner.id, f.org.id)).toHaveLength(0);
+    expect((await elig()).find((a) => a.agentId === f.agent.id)?.reason).toBe("runner_outdated");
     await f.db
       .update(schema.machines)
       .set({ protocol: 5, execAllowed: false })
       .where(eq(schema.machines.id, paired.machineId));
-    expect(await eligibleMissionAgents(md(), f.owner.id, f.org.id)).toHaveLength(0);
+    expect((await elig()).find((a) => a.agentId === f.agent.id)?.reason).toBe("exec_off");
   });
 
   test("list filters (status, conversation, agent, words) and counts (active, waiting for you, closed)", async () => {
@@ -940,5 +1024,113 @@ describe("missions (ADR 0029)", () => {
     });
     expect(view.executor).toBe("agent");
     expect(view.machine?.executors).toEqual(["agent"]);
+  });
+
+  describe("command approvals (Claude Code's permission prompts)", () => {
+    /** An active mission whose main session is running. */
+    async function working() {
+      const { view, runner, plan } = await proposed();
+      await startMission(md(), f.owner.id, f.org.id, view.id);
+      await runner.done(plan.taskId);
+      await drainOutbox(f.db, f.handlers);
+      const main = runner.started.at(-1) as TaskStartRequest;
+      const prompt = async (taskId: string, args: Record<string, unknown>) =>
+        JSON.parse(ok(await runner.mcp(taskId, "permission_prompt", args))) as {
+          behavior?: string;
+          message?: string;
+          status?: string;
+          request_id?: string;
+        };
+      return { view, runner, main, prompt };
+    }
+
+    test("a command off the allow list posts the card; Aprovar sempre allows it now, later and in the next tasks' settings", async () => {
+      const { view, runner, main, prompt } = await working();
+      const asked = await prompt(main.taskId, { tool_name: "Bash", input: { command: "swift build -c release" } });
+      expect(asked).toMatchObject({ status: "pending" });
+      const id = asked.request_id as string;
+      const card = (await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, view.threadId))).find(
+        (m) => m.meta.missionCommand,
+      );
+      expect(card?.meta.missionCommand).toMatchObject({ id, missionId: view.id, command: "swift build -c release" });
+      expect(card?.body).toContain("Claude Code wants to run");
+      // The runner asks again while it waits: still pending; the same command again is the same card.
+      expect(await prompt(main.taskId, { request_id: id })).toEqual({ status: "pending", request_id: id });
+      expect(
+        (await prompt(main.taskId, { tool_name: "Bash", input: { command: "swift build -c release" } })).request_id,
+      ).toBe(id);
+      // Only the owner or a decider answers.
+      const bia = await addMember(f.db, f.org.id, "member", "bia");
+      await expect(decideCommand(md(), bia.id, f.org.id, view.id, id, "allow")).rejects.toMatchObject({
+        code: "mission.not_allowed",
+      });
+      const decided = await decideCommand(md(), f.owner.id, f.org.id, view.id, id, "always");
+      expect(decided).toMatchObject({ state: "allowed", always: true, rules: ["Bash(swift build *)"] });
+      expect(await prompt(main.taskId, { request_id: id })).toEqual({ behavior: "allow" });
+      await expect(decideCommand(md(), f.owner.id, f.org.id, view.id, id, "deny")).rejects.toMatchObject({
+        code: "mission.command_decided",
+      });
+      // The rule covers the next one at once (no card).
+      expect(await prompt(main.taskId, { tool_name: "Bash", input: { command: "swift build" } })).toEqual({
+        behavior: "allow",
+      });
+      expect((await listMissionCommands(md(), f.owner.id, f.org.id, view.id)).rules).toEqual(["Bash(swift build *)"]);
+      // A new task's settings carry it.
+      ok(await runner.mcp(main.taskId, "start_task", { title: "Release", prompt: "Build it", branch: "release" }));
+      expect((runner.started.at(-1) as TaskStartRequest).mission?.allow).toEqual(["Bash(swift build *)"]);
+    });
+
+    test("Recusar denies; nobody answering in time denies with the wait message; prompts per task are limited", async () => {
+      const { view, main, prompt } = await working();
+      const a = (await prompt(main.taskId, { tool_name: "Bash", input: { command: "brew install imagemagick" } }))
+        .request_id as string;
+      await decideCommand(md(), f.owner.id, f.org.id, view.id, a, "deny");
+      expect(await prompt(main.taskId, { request_id: a })).toMatchObject({ behavior: "deny" });
+      const b = (await prompt(main.taskId, { tool_name: "WebFetch", input: { url: "https://example.com/x" } }))
+        .request_id as string;
+      await f.db.execute(sql`update mission_events set created_at = now() - interval '31 minutes'
+        where kind = 'command_prompt' and data->>'promptId' = ${b}`);
+      expect(await prompt(main.taskId, { request_id: b })).toEqual({
+        behavior: "deny",
+        message: PERMISSION_TIMEOUT_MESSAGE,
+      });
+      await expect(decideCommand(md(), f.owner.id, f.org.id, view.id, b, "allow")).rejects.toMatchObject({
+        code: "mission.command_expired",
+      });
+      // At most 10 in 10 minutes per task (a is one of them).
+      const answers = [];
+      for (let i = 0; i < 10; i++) {
+        answers.push(await prompt(main.taskId, { tool_name: "Bash", input: { command: `tool${i} --run` } }));
+      }
+      expect(answers.slice(0, 9).every((x) => x.status === "pending")).toBe(true);
+      expect(answers[9]).toMatchObject({ behavior: "deny" });
+      expect(answers[9]?.message).toContain("Too many");
+    });
+
+    test("refused commands reach the task's end notice; Liberar e repetir adds the rule and resumes the session", async () => {
+      const { view, runner, main } = await working();
+      ok(await runner.mcp(main.taskId, "start_task", { title: "Photos", prompt: "Resize them", branch: "photos" }));
+      const item = runner.started.at(-1) as TaskStartRequest;
+      const command = "python3 -c 'import PIL'";
+      await runner.done(item.taskId, { denials: [{ tool: "Bash", command }] });
+      await drainOutbox(f.db, f.handlers);
+      const notice = (
+        await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, view.threadId))
+      ).find((m) => (m.meta.machineTask as { id?: string } | undefined)?.id === item.taskId);
+      expect((notice?.meta.machineTask as { blocked?: unknown } | undefined)?.blocked).toEqual([
+        { tool: "Bash", command },
+      ]);
+      expect(notice?.body).toContain("Blocked:");
+      await expect(
+        retryBlockedCommand(md(), f.owner.id, f.org.id, view.id, { taskId: item.taskId, command: "ls" }),
+      ).rejects.toMatchObject({ code: "mission.command_not_found" });
+      const out = await retryBlockedCommand(md(), f.owner.id, f.org.id, view.id, { taskId: item.taskId, command });
+      expect(out.rules).toEqual(["Bash(python3 *)"]);
+      const resumed = runner.started.at(-1) as TaskStartRequest;
+      expect(resumed.session).toBe(item.session);
+      expect(resumed.resume).toBe(true);
+      expect(resumed.prompt).toContain("The command was allowed; retry it");
+      expect(resumed.mission?.allow).toEqual(["Bash(python3 *)"]);
+    });
   });
 });
