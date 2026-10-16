@@ -5,6 +5,8 @@ import { Button, type ButtonProps } from "./Button";
 export interface SegmentedOption<V extends string> {
   value: V;
   label: ReactNode;
+  /** A small neutral count chip after the label (e.g. Missões 1); hidden when 0 or absent. */
+  count?: number;
 }
 
 /**
@@ -32,11 +34,21 @@ export function Segmented<V extends string>({
     0,
     options.findIndex((o) => o.value === value),
   );
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the choice or the labels change
+  // Measured after every render (labels and counts change the width; same values keep the state),
+  // and again when the chosen item resizes (fonts loading, a count arriving).
   useLayoutEffect(() => {
     const el = refs.current[index];
-    if (el) setPill({ x: el.offsetLeft, w: el.offsetWidth });
-  }, [index, options.length]);
+    if (!el) return;
+    const measure = () =>
+      setPill((p) =>
+        p && p.x === el.offsetLeft && p.w === el.offsetWidth ? p : { x: el.offsetLeft, w: el.offsetWidth },
+      );
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
   const move = (step: number) => {
     const next = options[(index + step + options.length) % options.length];
     if (!next) return;
@@ -81,6 +93,7 @@ export function Segmented<V extends string>({
           onClick={() => onValueChange(o.value)}
         >
           {o.label}
+          {o.count ? <span className="ac-seg__count">{o.count}</span> : null}
         </button>
       ))}
     </div>

@@ -73,7 +73,7 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
     ...(query ? { q: query } : {}),
   };
   const list = useThreadList(org.id, filters, !missions);
-  // "Missões · N": the open missions I see (the server counts them).
+  // "Missões" + a count chip: the open missions I see (the server counts them).
   const missionCounts = useMissionList(org.id, { status: "open", limit: 1 }).data?.counts;
   const threads = useMemo(() => list.data?.pages.flatMap((p) => p.threads) ?? [], [list.data]);
   const controls = useThreadControls();
@@ -145,10 +145,8 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
             }}
             options={THREAD_TABS.map((v) => ({
               value: v,
-              label:
-                v === "missions" && missionCounts?.active
-                  ? t("missions.tabCount", { label: t("threads.tabs.missions"), count: missionCounts.active })
-                  : t(`threads.tabs.${v}`),
+              label: t(`threads.tabs.${v}`),
+              ...(v === "missions" && missionCounts?.active ? { count: missionCounts.active } : {}),
             }))}
           />
         </div>
