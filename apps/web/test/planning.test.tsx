@@ -53,6 +53,28 @@ describe("Issues (board and list)", () => {
     expect(column("Feito").textContent).toContain("2");
     // The route title link goes to the detail.
     expect(wa.getAttribute("href")).toBe(`/org/${ORG_ID}/issues/131`);
+    // An agent with a live run: "working now", its step on the card, criteria in pixels.
+    const now = screen().getByRole("region", { name: "Agentes trabalhando agora" });
+    expect(now.textContent).toContain("Timeout no agendamento em horários de pico");
+    expect(now.textContent).toContain("Atualizou uma issue · #129");
+    const timeout = screen().getByRole("link", { name: "#129 Timeout no agendamento em horários de pico" });
+    expect(within(timeout).getByRole("img", { name: "1 de 2 critérios de aceite" })).toBeTruthy();
+  });
+
+  test("a click opens the details beside the board; Escape closes them", async () => {
+    await go("issues");
+    await click(screen().getByRole("link", { name: "#131 Confirmação do agendamento por WhatsApp" }));
+    await settle(4);
+    const panel = screen().getByRole("region", { name: "Issue #131" });
+    expect(
+      within(panel).getByRole("heading", { level: 2, name: "Confirmação do agendamento por WhatsApp" }),
+    ).toBeTruthy();
+    expect(within(panel).getByRole("region", { name: "Pedir a um agente" })).toBeTruthy();
+    expect(within(panel).getByRole("link", { name: "Abrir página da issue" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/issues/131`,
+    );
+    await act(async () => fireEvent.keyDown(window, { key: "Escape" }));
+    expect(screen().queryByRole("region", { name: "Issue #131" })).toBeNull();
   });
 
   test("filters, search and the list view", async () => {
@@ -94,7 +116,8 @@ describe("Issues (board and list)", () => {
     await click(create);
     await settle(5);
     expect(screen().getByText("Issue #133 criada.")).toBeTruthy();
-    expect(cardTitles(column("A fazer"))[0]).toBe("Exportar agenda em PDF");
+    // An agent picked at creation starts right away ("Pedir"): in progress.
+    expect(cardTitles(column("Em andamento"))).toContain("Exportar agenda em PDF");
     const created = await api.issues.get(ORG_ID, 133);
     expect(created).toMatchObject({
       description: "Pedido de 18 reviews.",

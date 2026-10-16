@@ -874,12 +874,18 @@ export const useIssues = (orgId: string, q = "") => {
     queryKey: keys.issueList(orgId, q),
     queryFn: () => api.issues.list(orgId, q ? { q } : {}),
     placeholderData: (prev) => prev,
+    // While an agent works on an issue its steps change without an event: look again every 10 s.
+    refetchInterval: (query) => (query.state.data?.some((i) => i.work && i.work.state !== "stalled") ? 10_000 : false),
   });
 };
 
 export const useIssue = (orgId: string, number: number) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.issue(orgId, number), queryFn: () => api.issues.get(orgId, number) });
+  return useQuery({
+    queryKey: keys.issue(orgId, number),
+    queryFn: () => api.issues.get(orgId, number),
+    refetchInterval: (query) => (query.state.data?.work && query.state.data.work.state !== "stalled" ? 10_000 : false),
+  });
 };
 
 export const useIssueActivity = (orgId: string, id: string | undefined) => {

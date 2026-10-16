@@ -213,7 +213,7 @@ export function RoutinesPage() {
   // "N" opens "Nova rotina" (not while typing).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
+      const el = e.target instanceof Element ? e.target : null;
       if (e.metaKey || e.ctrlKey || e.altKey || e.key.toLowerCase() !== "n") return;
       if (el?.closest("input, textarea, [contenteditable], [role=dialog], [role=menu]")) return;
       e.preventDefault();
@@ -809,7 +809,8 @@ function RoutineDetails({
   const nexts = described.data?.ok ? described.data.nextRuns.slice(0, 4) : r.nextRunAt ? [r.nextRunAt] : [];
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !(e.target as HTMLElement | null)?.closest("[role=dialog], [role=menu]")) onClose();
+      if (e.key === "Escape" && !(e.target instanceof Element && e.target.closest("[role=dialog], [role=menu]")))
+        onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

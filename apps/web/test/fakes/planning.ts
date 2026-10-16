@@ -184,6 +184,18 @@ export function createMockPlanning(
         labels: ["bug"],
         dueDate: day(2),
         pullRequests: [{ number: 44, url: "https://github.com/acme/app/pull/44", openedBy: agent(0) }],
+        criteria: [
+          { id: mockId("crit"), text: "Responde em 2 s no pico", done: true, doneBy: agent(0) },
+          { id: mockId("crit"), text: "Teste de carga", done: false },
+        ],
+        // The agent is on it now (a live run): the board shows it under "Agentes trabalhando agora".
+        work: {
+          agentId: agent(0).id,
+          runId: null,
+          state: "running",
+          since: minutesAgo(now, 6),
+          steps: [{ tool: "update_issue", detail: "#129", at: minutesAgo(now, 2) }],
+        },
       }),
       issue({ title: "Revisar textos do onboarding", status: "in_progress", assignee: person(1), labels: ["produto"] }),
       issue({

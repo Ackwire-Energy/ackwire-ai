@@ -196,36 +196,6 @@
   }
 }
 
-/* Issues: the board scrolls sideways inside itself, one column at a time. */
-@media (max-width: 640px) {
-  .issues-page__header {
-    padding: 14px 16px 10px;
-  }
-  .issues-page__search {
-    flex: 1 1 100%;
-  }
-  .issues-page__pad {
-    padding-right: 16px;
-    padding-left: 16px;
-  }
-  .issue-board {
-    grid-template-columns: repeat(4, minmax(min(280px, 82vw), 1fr));
-    padding-right: 16px;
-    padding-left: 16px;
-    scroll-snap-type: x mandatory;
-    scroll-padding: 0 16px;
-  }
-  .issue-board__col {
-    scroll-snap-align: start;
-  }
-  .issue-list__row {
-    padding: 10px 12px;
-  }
-  .issue-list__who {
-    flex-basis: auto;
-  }
-}
-
 /* Calendar: the side panel goes under the grid when there's no room beside it. */
 @media (max-width: 900px) {
   .cal-page[data-panel] .cal-page__body {

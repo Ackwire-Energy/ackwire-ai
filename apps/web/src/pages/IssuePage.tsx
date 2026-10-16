@@ -1,22 +1,40 @@
-import { Alert, Button, Checkbox, Composer, Field, Icon, Message, MessageText, Select } from "@agenteschat/ui";
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Chip,
+  Composer,
+  CriteriaPixels,
+  cx,
+  Field,
+  Icon,
+  Message,
+  MessageText,
+  Select,
+  WorkSweep,
+} from "@agenteschat/ui";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
+import { keys } from "@/api/keys";
 import { useChannels, useIssue, useIssueAction, useIssueActivity } from "@/api/queries";
 import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "@/api/types";
-import { ActorAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { useArtifactViewer } from "@/components/artifacts/ArtifactViewer";
 import { useOrg } from "@/components/org-context";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
-import { dueLabel, whenAt } from "@/lib/format";
+import { dueLabel, relativeTime, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
+import { isOpen, PRIORITIES, STATUS_ICON, STATUSES, useAssigneeColor, useStepText } from "@/lib/issues";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
-import { PRIORITIES, STATUSES } from "./IssuesPage";
+import "./issues.css";
 
-/** One issue (telas/Issue.dc.html): criteria, "Pedir à Ada", activity and the details aside. */
+/** One issue as a page (`/issues/131`); the board opens the same details in its panel. */
 export function IssuePage({ number }: { number: number }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -28,18 +46,32 @@ export function IssuePage({ number }: { number: number }) {
         {t("issues.back")}
       </Link>
       {issue.isError && <Alert>{t("issues.notFound")}</Alert>}
-      {issue.data && <IssueBody issue={issue.data} />}
+      {issue.data && <IssueDetails issue={issue.data} variant="page" />}
     </div>
   );
 }
 
-function IssueBody({ issue: i }: { issue: Issue }) {
+/**
+ * An issue's details (telas/Issues.html): source, status and who, the agent's
+ * work (live steps, or "stalled" with "Pedir para continuar"), "Pedir a um
+ * agente", description, criteria (who checked them), links and activity.
+ */
+export function IssueDetails({
+  issue: i,
+  variant,
+  onClose,
+}: {
+  issue: Issue;
+  variant: "page" | "panel";
+  onClose?: () => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
   const wikiLink = useWikiLinkRenderer();
   const action = useIssueAction(org.id);
   const channels = useChannels(org.id);
+  const color = useAssigneeColor();
   const done = i.criteria.filter((c) => c.done).length;
   const source = () => {
     switch (i.source.type) {
@@ -67,62 +99,194 @@ function IssueBody({ issue: i }: { issue: Issue }) {
     }
   };
   const from = source();
-  return (
-    <div className="issue-layout">
-      <div className="issue-layout__main">
-        <header className="stack-4" style={{ gap: 6 }}>
-          <span className="small muted tabular">
-            {t("issues.createdBy", { number: i.number, name: actors.name(i.createdBy) })}
-            {from && <> {from}</>}
-          </span>
-          <h1 className="page-title">{i.title}</h1>
-        </header>
-        <section aria-label={t("issues.description")}>
-          {i.description ? (
-            <div className="issue-description">
-              <Markdown source={i.description} variant="message" wikiLink={wikiLink} />
-            </div>
-          ) : (
-            <p className="issue-description">
-              <span className="muted">{t("issues.noDescription")}</span>
-            </p>
+  const Title = variant === "page" ? "h1" : "h2";
+  const main = (
+    <>
+      <header className="issue-details__head">
+        {variant === "panel" && (
+          <div className="issue-details__bar">
+            <span className="tabular muted">#{i.number}</span>
+            <span className="issue-details__grow" />
+            <Link
+              to="/org/$orgId/issues/$number"
+              params={{ orgId: org.id, number: String(i.number) }}
+              className="ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon"
+              aria-label={t("issues.openPage")}
+              title={t("issues.openPage")}
+            >
+              <Icon name="external" size={16} />
+            </Link>
+            <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t("issues.close")} onClick={onClose} />
+          </div>
+        )}
+        <span className="small muted tabular">
+          {t("issues.createdBy", { number: i.number, name: actors.name(i.createdBy) })}
+          {from && <> {from}</>}
+        </span>
+        <Title className="issue-details__title">{i.title}</Title>
+      </header>
+      {variant === "panel" && <Details issue={i} />}
+      <WorkBox issue={i} />
+      {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
+      <section aria-label={t("issues.description")} className="issue-details__section">
+        <h3 className="ac-eyebrow">{t("issues.description")}</h3>
+        {i.description ? (
+          <div className="issue-description">
+            <Markdown source={i.description} variant="message" wikiLink={wikiLink} />
+          </div>
+        ) : (
+          <p className="small muted">{t("issues.noDescription")}</p>
+        )}
+      </section>
+      <section aria-label={t("issues.criteria")} className="issue-details__section">
+        <h3 className="ac-eyebrow issue-details__row">
+          {t("issues.criteria")}
+          {i.criteria.length > 0 && (
+            <span className="issue-details__count tabular">
+              {t("issues.criteriaCount", { done, total: i.criteria.length })}
+            </span>
           )}
-        </section>
-        <section aria-labelledby="crit" className="issue-panel">
-          <div className="row" style={{ alignItems: "center", gap: 8 }}>
-            <h2 id="crit" className="issue-panel__title">
-              {t("issues.criteria")}
-            </h2>
-            {i.criteria.length > 0 && (
-              <span className="small muted tabular">
-                {t("issues.criteriaCount", { done, total: i.criteria.length })}
+        </h3>
+        {i.criteria.length === 0 && <p className="small muted">{t("issues.noCriteria")}</p>}
+        {i.criteria.length > 0 && <CriteriaPixels done={i.criteria.map((c) => c.done)} color={color(i)} />}
+        {i.criteria.map((c) => (
+          <div key={c.id} className="issue-criterion" data-done={c.done || undefined}>
+            <Checkbox
+              id={`crit-${c.id}`}
+              checked={c.done}
+              onCheckedChange={(v) => action.mutate({ type: "criterion", id: i.id, criterionId: c.id, done: v })}
+            />
+            <label htmlFor={`crit-${c.id}`}>{c.text}</label>
+            {c.done && c.doneBy?.type === "agent" && (
+              <span className="issue-criterion__by" title={t("issues.checkedBy", { name: actors.name(c.doneBy) })}>
+                <ActorAvatar actor={c.doneBy} name={actors.name(c.doneBy)} size="xs" />
+                {actors.name(c.doneBy)}
               </span>
             )}
           </div>
-          {i.criteria.length === 0 && <p className="small muted">{t("issues.noCriteria")}</p>}
-          {i.criteria.map((c) => (
-            <div key={c.id} className="issue-criterion" data-done={c.done || undefined}>
-              <Checkbox
-                id={`crit-${c.id}`}
-                checked={c.done}
-                onCheckedChange={(v) => action.mutate({ type: "criterion", id: i.id, criterionId: c.id, done: v })}
-              />
-              <label htmlFor={`crit-${c.id}`}>{c.text}</label>
-            </div>
-          ))}
-        </section>
-        {i.assignee?.type !== "agent" && <AskAgent issue={i} />}
-        <Activity issue={i} />
-      </div>
-      <Details issue={i} />
+        ))}
+      </section>
+      {variant === "panel" && <Links issue={i} />}
+      <Activity issue={i} />
+    </>
+  );
+  if (variant === "panel") return <div className="issue-details issue-details--panel">{main}</div>;
+  return (
+    <div className="issue-layout">
+      <div className="issue-details issue-layout__main">{main}</div>
+      <aside aria-label={t("issues.details")} className="issue-aside">
+        <Details issue={i} bare />
+        <Links issue={i} />
+      </aside>
     </div>
   );
 }
 
-/** The agent offered by "Pedir à …": a developer when there is one. */
-function useSuggestedAgent() {
+/** The assigned agent's work: live steps (with Parar) or stalled (with "Pedir para continuar"). */
+function WorkBox({ issue: i }: { issue: Issue }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const actors = useActors();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const action = useIssueAction(org.id);
+  const color = useAssigneeColor();
+  const stepText = useStepText();
+  const stop = useMutation({
+    mutationFn: (runId: string) => api.agents.cancelRun(org.id, runId),
+    onSettled: () => void qc.invalidateQueries({ queryKey: keys.issues(org.id) }),
+  });
+  const w = i.work;
+  if (!w || !i.assignee || i.assignee.type !== "agent") return null;
+  const name = actors.name(i.assignee);
+  const g = agentGrammar(t, name);
+  const stalled = w.state === "stalled";
+  const waiting = w.state === "waiting_approval" || w.state === "waiting_input";
+  const when = relativeTime(t, i18n.language, w.since);
+  const last = w.steps.at(-1);
+  return (
+    <section className={cx("issue-work", stalled && "is-stalled")} aria-label={t("issues.work.label", g)}>
+      <div className="issue-work__head">
+        <AgentAvatar
+          agentId={i.assignee.id}
+          name={name}
+          size="sm"
+          running={w.state === "running"}
+          state={w.state === "running" ? "writing" : "idle"}
+          expression={stalled ? "closed" : undefined}
+        />
+        <span className="issue-work__text">
+          <b>
+            {stalled
+              ? t("issues.work.stalledTitle", { ...g, when })
+              : waiting
+                ? t("issues.work.waitingTitle", g)
+                : t("issues.work.runningTitle", g)}
+          </b>
+          <small>{stalled ? t("issues.work.stalledText", g) : t("issues.work.started", { when })}</small>
+        </span>
+        {w.state === "running" && w.runId && (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="stop"
+            loading={stop.isPending}
+            onClick={() => w.runId && stop.mutate(w.runId)}
+          >
+            {t("issues.work.stop")}
+          </Button>
+        )}
+      </div>
+      {stalled ? (
+        <>
+          {last && <p className="issue-work__last">{t("issues.work.lastStep", { step: stepText(last) })}</p>}
+          {w.reason && <p className="issue-work__last">{t(`issues.work.reason.${w.reason}`)}</p>}
+          <div className="issue-work__actions">
+            <Button
+              size="sm"
+              variant="primary"
+              icon="play"
+              loading={action.isPending}
+              onClick={() =>
+                action.mutate(
+                  { type: "ask", id: i.id, agentId: i.assignee?.id ?? "" },
+                  { onSuccess: () => toast.show(t("issues.work.resumed", g)) },
+                )
+              }
+            >
+              {t("issues.work.continue")}
+            </Button>
+          </div>
+        </>
+      ) : (
+        w.steps.length > 0 && (
+          <ol className="issue-work__steps">
+            {w.steps.map((s, k) => {
+              const current = k === w.steps.length - 1;
+              return (
+                <li key={`${s.at}-${s.tool}`} className={cx(current && "is-current")}>
+                  <span className="issue-work__dot" aria-hidden="true">
+                    <Icon name={current ? "play" : "check"} size={14} />
+                  </span>
+                  <span>{stepText(s)}</span>
+                  <time dateTime={s.at}>{whenAt(t, i18n.language, s.at)}</time>
+                </li>
+              );
+            })}
+          </ol>
+        )
+      )}
+      {!stalled && <WorkSweep color={color(i) ?? "sky"} waiting={waiting} />}
+    </section>
+  );
+}
+
+/** The agents offered by "Pedir a um agente": a developer first, then the others. */
+function useAgentChoices() {
   const { dir } = useActors();
-  return dir.agents.find((a) => /dev|engenh|program|cód/i.test(`${a.role} ${a.name}`)) ?? dir.agents[0];
+  const dev = dir.agents.find((a) => /dev|engenh|program|cód/i.test(`${a.role} ${a.name}`)) ?? dir.agents[0];
+  return dev ? [dev, ...dir.agents.filter((a) => a.id !== dev.id)] : [];
 }
 
 function AskAgent({ issue }: { issue: Issue }) {
@@ -131,30 +295,43 @@ function AskAgent({ issue }: { issue: Issue }) {
   const toast = useToast();
   const action = useIssueAction(org.id);
   const { avatar } = useActors();
-  const agent = useSuggestedAgent();
+  const [agent, ...others] = useAgentChoices();
   if (!agent) return null;
+  const ask = (a: { id: string; name: string }) => {
+    const g = agentGrammar(t, a.name);
+    action.mutate(
+      { type: "ask", id: issue.id, agentId: a.id },
+      { onSuccess: () => toast.show(t("issues.asked", { The: g.The, name: a.name })) },
+    );
+  };
   const g = agentGrammar(t, agent.name);
   return (
     <section aria-label={t("issues.askSection")} className="issue-ask">
-      {avatar({ type: "agent", id: agent.id }, "sm")}
-      <span className="issue-ask__text">
-        <b>{t("issues.askTitle", { to: g.to, name: agent.name })}</b>
-        <span className="small muted">{t("issues.askText", { The: g.The, name: agent.name })}</span>
-      </span>
-      <Button
-        variant="agent"
-        icon="agent"
-        disabled={action.isPending}
-        loading={action.isPending}
-        onClick={() =>
-          action.mutate(
-            { type: "ask", id: issue.id, agentId: agent.id },
-            { onSuccess: () => toast.show(t("issues.asked", { The: g.The, name: agent.name })) },
-          )
-        }
-      >
-        {t("issues.askButton", { to: g.to, name: agent.name })}
-      </Button>
+      <div className="issue-ask__row">
+        {avatar({ type: "agent", id: agent.id }, "sm")}
+        <span className="issue-ask__text">
+          <b>{t("issues.askTitle", { to: g.to, name: agent.name })}</b>
+          <span className="small muted">{t("issues.askText", { The: g.The, name: agent.name })}</span>
+        </span>
+      </div>
+      <div className="issue-ask__actions">
+        <Button
+          variant="agent"
+          icon="agent"
+          size="sm"
+          disabled={action.isPending}
+          loading={action.isPending}
+          onClick={() => ask(agent)}
+        >
+          {t("issues.askButton", { to: g.to, name: agent.name })}
+        </Button>
+        {others.slice(0, 3).map((a) => (
+          <button key={a.id} type="button" className="issue-ask__other" onClick={() => ask(a)}>
+            {avatar({ type: "agent", id: a.id }, "xs")}
+            {a.name}
+          </button>
+        ))}
+      </div>
     </section>
   );
 }
@@ -179,18 +356,21 @@ function Activity({ issue }: { issue: Issue }) {
   };
   const list = activity.data ?? [];
   return (
-    <section aria-labelledby="act" className="stack-4" style={{ gap: 4 }}>
-      <h2 id="act" className="issue-panel__title" style={{ marginBottom: 8 }}>
-        {t("issues.activity")}
-      </h2>
+    <section aria-label={t("issues.activity")} className="issue-details__section">
+      <h3 className="ac-eyebrow">{t("issues.activity")}</h3>
       {activity.isSuccess && list.length === 0 && <p className="small muted">{t("issues.noActivity")}</p>}
       {list.map((a) =>
         a.kind === "event" ? (
           <div key={a.id} className="issue-event small muted">
             <Icon name={a.event === "agent_asked" ? "agent" : "waiting"} size={16} />
             <span>
-              <b className="issue-event__who">{actors.name(a.author)}</b> {eventText(a)} ·{" "}
-              {whenAt(t, i18n.language, a.createdAt)}
+              <b className="issue-event__who">{actors.name(a.author)}</b> {eventText(a)}
+              {a.auto && (
+                <Chip icon="repeat" className="issue-event__auto" title={t("issues.autoHint")}>
+                  {t("issues.auto")}
+                </Chip>
+              )}{" "}
+              · {whenAt(t, i18n.language, a.createdAt)}
             </span>
           </div>
         ) : (
@@ -222,23 +402,27 @@ function Activity({ issue }: { issue: Issue }) {
   );
 }
 
-function Details({ issue: i }: { issue: Issue }) {
+/** Status, who, priority and due date (the page's aside; at the top of the panel). */
+function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
   const action = useIssueAction(org.id);
-  const viewer = useArtifactViewer();
-  return (
-    <aside aria-label={t("issues.details")} className="issue-aside">
-      <Field label={t("issues.statusLabel")} id="is-status">
+  const fields = (
+    <>
+      <Field label={t("issues.statusLabel")} id={`is-status-${i.id}`} help={t("issues.statusHint")}>
         <Select
           size="sm"
           value={i.status}
           onValueChange={(v) => action.mutate({ type: "update", id: i.id, patch: { status: v as IssueStatus } })}
-          options={STATUSES.map((s) => ({ value: s, label: t(`issues.status.${s}`) }))}
+          options={STATUSES.map((s) => ({
+            value: s,
+            label: t(`issues.status.${s}`),
+            leading: <Icon name={STATUS_ICON[s]} size={16} />,
+          }))}
         />
       </Field>
-      <Field label={t("issues.form.assignee")} id="is-who">
+      <Field label={t("issues.form.assignee")} id={`is-who-${i.id}`}>
         <Select
           size="sm"
           value={actorKey(i.assignee)}
@@ -246,7 +430,7 @@ function Details({ issue: i }: { issue: Issue }) {
           options={actors.options(true)}
         />
       </Field>
-      <Field label={t("issues.form.priority")} id="is-pri">
+      <Field label={t("issues.form.priority")} id={`is-pri-${i.id}`}>
         <Select
           size="sm"
           value={i.priority}
@@ -268,6 +452,22 @@ function Details({ issue: i }: { issue: Issue }) {
           <span className="small muted">{t("issues.noDue")}</span>
         )}
       </div>
+    </>
+  );
+  if (bare) return fields;
+  return (
+    <aside aria-label={t("issues.details")} className="issue-props">
+      {fields}
+    </aside>
+  );
+}
+
+function Links({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const actors = useActors();
+  const viewer = useArtifactViewer();
+  return (
+    <>
       <div className="issue-aside__item">
         <span className="ac-field__label">{t("issues.links")}</span>
         {i.pullRequests.length + i.artifacts.length === 0 && <span className="small muted">{t("issues.noLinks")}</span>}
@@ -298,6 +498,6 @@ function Details({ issue: i }: { issue: Issue }) {
           </span>
         </div>
       )}
-    </aside>
+    </>
   );
 }

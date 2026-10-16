@@ -1,6 +1,8 @@
 import {
   Button,
   Chip,
+  CriteriaPixels,
+  cx,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -11,40 +13,50 @@ import {
   Icon,
   Input,
   SearchInput,
+  Segmented,
   Select,
   Textarea,
+  WorkSweep,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useDeferredValue, useState } from "react";
+import { type DragEvent, type MouseEvent, useDeferredValue, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useIssueAction, useIssues } from "@/api/queries";
 import type { Issue, IssuePriority, IssueStatus } from "@/api/types";
-import { ActorLabel, actorFromKey, NO_ACTOR, useActors } from "@/components/actors";
+import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { actorFromKey, NO_ACTOR, useActors } from "@/components/actors";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { dueLabel, parseDayInput } from "@/lib/format";
+import { dueLabel, parseDayInput, relativeTime, toYmd } from "@/lib/format";
+import { agentGrammar } from "@/lib/grammar";
+import {
+  BOARD,
+  isOpen,
+  isStalled,
+  isWorking,
+  PRIORITIES,
+  STATUS_ICON,
+  STATUSES,
+  splitCriteria,
+  useAssigneeColor,
+  useStepText,
+} from "@/lib/issues";
 import { useToast } from "@/lib/toast";
+import { IssueDetails } from "./IssuePage";
+import "./issues.css";
 
-export const BOARD: IssueStatus[] = ["todo", "in_progress", "in_review", "done"];
-export const STATUSES: IssueStatus[] = [...BOARD, "canceled"];
-export const PRIORITIES: IssuePriority[] = ["low", "normal", "high"];
-type Filter = "all" | "agents" | "people" | "mine";
-const FILTERS: Filter[] = ["all", "agents", "people", "mine"];
+export { BOARD, PRIORITIES, STATUSES, splitCriteria } from "@/lib/issues";
 
-/** Description text → description + acceptance criteria (lines starting with "-", "*" or "[ ]"). */
-export function splitCriteria(text: string) {
-  const criteria: string[] = [];
-  const rest: string[] = [];
-  for (const line of text.split("\n")) {
-    const m = line.match(/^\s*(?:[-*]\s*(?:\[[ x]?\]\s*)?|\[[ x]?\]\s*)(.+)$/i);
-    if (m?.[1]?.trim()) criteria.push(m[1].trim());
-    else rest.push(line);
-  }
-  return { description: rest.join("\n").trim(), criteria };
+type Filter = "all" | "agents" | "people" | "mine" | "none";
+const FILTERS: Filter[] = ["all", "agents", "people", "mine", "none"];
+
+export function StatusChip({ status }: { status: IssueStatus }) {
+  const { t } = useTranslation();
+  return <Chip icon={STATUS_ICON[status]}>{t(`issues.status.${status}`)}</Chip>;
 }
 
-/** Issues (telas/Issues.dc.html): board by status or a list, search, filters and "Nova issue". */
+/** Issues (telas/Issues.html): agents working now, a board by status (drag between columns) or a list, a details panel. */
 export function IssuesPage() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -53,244 +65,544 @@ export function IssuesPage() {
   const [q, setQ] = useState("");
   const [assignees, setAssignees] = useState<string[]>([]);
   const [priority, setPriority] = useState<string[]>([]);
+  const [openNumber, setOpenNumber] = useState<number | null>(null);
   const actorOptions = useActorFilterOptions();
   const copy = useFilterCopy();
   const [creating, setCreating] = useState(false);
   const search = useDeferredValue(q.trim());
   const issues = useIssues(org.id, search);
   const all = issues.data ?? [];
-  const pass = (i: Issue) =>
-    filter === "all" ||
-    (filter === "agents" && i.assignee?.type === "agent") ||
-    (filter === "people" && i.assignee?.type === "person") ||
-    (filter === "mine" && i.assignee?.type === "person" && i.assignee.id === me.user.id);
+  const pass = (i: Issue, f: Filter) =>
+    f === "all" ||
+    (f === "agents" && i.assignee?.type === "agent") ||
+    (f === "people" && i.assignee?.type === "person") ||
+    (f === "mine" && i.assignee?.type === "person" && i.assignee.id === me.user.id) ||
+    (f === "none" && !i.assignee);
   const visible = all.filter(
     (i) =>
-      pass(i) &&
+      pass(i, filter) &&
       (assignees.length === 0 || (i.assignee !== null && assignees.includes(`${i.assignee.type}:${i.assignee.id}`))) &&
       (priority.length === 0 || priority.includes(i.priority)),
   );
-  const open = all.filter((i) => i.status !== "done" && i.status !== "canceled");
+  const open = all.filter(isOpen);
+  const opened = all.find((i) => i.number === openNumber) ?? null;
+  const toggle = (n: number) => setOpenNumber((o) => (o === n ? null : n));
+  // "N" opens "Nova issue", "/" the search, Escape closes the panel (not while typing or in a dialog).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (el?.closest("input, textarea, [contenteditable], [role=dialog], [role=menu], [role=listbox]")) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape") setOpenNumber(null);
+      else if (e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        setCreating(true);
+      } else if (e.key === "/") {
+        e.preventDefault();
+        document.querySelector<HTMLInputElement>(".issues-tools__search input")?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   return (
-    <div className="issues-page">
-      <header className="issues-page__header">
-        <div className="issues-page__title">
-          <h1 className="page-title">{t("issues.title")}</h1>
-          <span className="small muted">
-            {t("issues.summary", {
-              open: open.length,
-              agents: open.filter((i) => i.assignee?.type === "agent").length,
-            })}
-          </span>
-        </div>
-        <SearchInput
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder={t("issues.search")}
-          aria-label={t("issues.search")}
-          className="issues-page__search"
-        />
-        {/* biome-ignore lint/a11y/useSemanticElements: a segmented pair of toggle buttons */}
-        <div className="segmented" role="group" aria-label={t("issues.view")}>
-          {(["board", "list"] as const).map((v) => (
-            <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>
-              {t(`issues.${v}`)}
-            </button>
-          ))}
-        </div>
-        <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-          {t("issues.new")}
-        </Button>
-      </header>
-      {/* biome-ignore lint/a11y/useSemanticElements: filter pills */}
-      <div className="pills" role="group" aria-label={t("issues.filters")}>
-        {FILTERS.map((f) => (
-          <button key={f} type="button" className="pill" aria-pressed={filter === f} onClick={() => setFilter(f)}>
-            {t(`issues.filter.${f}`)}
-          </button>
-        ))}
-      </div>
-      <FilterBar
-        label={t("issues.moreFilters")}
-        clearText={copy.clearAll}
-        onClear={() => {
-          setAssignees([]);
-          setPriority([]);
-        }}
-        filters={[
-          {
-            key: "assignee",
-            active: assignees.length > 0,
-            node: (
-              <FilterChip
-                label={t("issues.assigneeFilter")}
-                icon="person"
-                multiple
-                options={actorOptions}
-                value={assignees}
-                onChange={setAssignees}
-                valueText={(o) => o.label}
-                countText={copy.people}
-                clearLabel={copy.clearOf(t("issues.assigneeFilter"))}
-                searchLabel={copy.searchLabel}
-                searchPlaceholder={copy.searchPlaceholder}
-                noResults={copy.noResults}
-              />
-            ),
-          },
-          {
-            key: "priority",
-            active: priority.length > 0,
-            node: (
-              <FilterChip
-                label={t("issues.priorityFilter")}
-                icon="alert"
-                options={(["high", "normal", "low"] as const).map((p) => ({
-                  value: p,
-                  label: t(`issues.priority.${p}`),
-                }))}
-                value={priority}
-                onChange={setPriority}
-                clearLabel={copy.clearOf(t("issues.priorityFilter"))}
-              />
-            ),
-          },
-        ]}
-      />
-      {issues.isLoading &&
-        (view === "board" ? (
-          <div className="issue-board">
-            {BOARD.map((status) => (
-              <section key={status} className="issue-board__col" aria-label={t(`issues.status.${status}`)}>
-                <div className="issue-board__head">
-                  <span className="ac-eyebrow">{t(`issues.status.${status}`)}</span>
-                </div>
-                <LoadingCards count={2} className="loading-cards loading-cards--tight" />
-              </section>
+    <div className={cx("page issues", opened && "issues--panel")}>
+      <div className="issues__main">
+        <header className="issues-head">
+          <div>
+            <h1>{t("issues.title")}</h1>
+            <p className="issues-head__sub">
+              <span>
+                {t("issues.summary", {
+                  open: open.length,
+                  agents: open.filter((i) => i.assignee?.type === "agent").length,
+                })}
+              </span>
+              {open.some((i) => !i.assignee) && (
+                <span> · {t("issues.unassigned", { count: open.filter((i) => !i.assignee).length })}</span>
+              )}
+            </p>
+          </div>
+          <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+            {t("issues.new")}
+          </Button>
+        </header>
+        <WorkingNow issues={all} onOpen={toggle} />
+        <div className="issues-tools">
+          <SearchInput
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t("issues.search")}
+            aria-label={t("issues.search")}
+            className="issues-tools__search"
+          />
+          {/* biome-ignore lint/a11y/useSemanticElements: filter pills */}
+          <div className="issues-pills" role="group" aria-label={t("issues.filters")}>
+            {FILTERS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                className="issues-pill"
+                aria-pressed={filter === f}
+                onClick={() => setFilter(f)}
+              >
+                {t(`issues.filter.${f}`)}
+                <span className="issues-pill__count" aria-hidden="true">
+                  {all.filter((i) => isOpen(i) && pass(i, f)).length}
+                </span>
+              </button>
             ))}
           </div>
-        ) : (
-          <div className="issues-page__pad">
-            <LoadingList count={5} avatar={false} trailing />
-          </div>
-        ))}
-      {issues.isError && !issues.data && (
-        <div className="issues-page__pad">
-          <ErrorState error={issues.error} onRetry={() => void issues.refetch()} />
+          <FilterBar
+            label={t("issues.moreFilters")}
+            clearText={copy.clearAll}
+            onClear={() => {
+              setAssignees([]);
+              setPriority([]);
+            }}
+            filters={[
+              {
+                key: "assignee",
+                active: assignees.length > 0,
+                node: (
+                  <FilterChip
+                    label={t("issues.assigneeFilter")}
+                    icon="person"
+                    multiple
+                    options={actorOptions}
+                    value={assignees}
+                    onChange={setAssignees}
+                    valueText={(o) => o.label}
+                    countText={copy.people}
+                    clearLabel={copy.clearOf(t("issues.assigneeFilter"))}
+                    searchLabel={copy.searchLabel}
+                    searchPlaceholder={copy.searchPlaceholder}
+                    noResults={copy.noResults}
+                  />
+                ),
+              },
+              {
+                key: "priority",
+                active: priority.length > 0,
+                node: (
+                  <FilterChip
+                    label={t("issues.priorityFilter")}
+                    icon="alert"
+                    options={(["high", "normal", "low"] as const).map((p) => ({
+                      value: p,
+                      label: t(`issues.priority.${p}`),
+                    }))}
+                    value={priority}
+                    onChange={setPriority}
+                    clearLabel={copy.clearOf(t("issues.priorityFilter"))}
+                  />
+                ),
+              },
+            ]}
+          />
+          <Segmented
+            label={t("issues.view")}
+            value={view}
+            onValueChange={setView}
+            options={[
+              {
+                value: "board",
+                label: (
+                  <>
+                    <Icon name="grid" size={16} />
+                    {t("issues.board")}
+                  </>
+                ),
+              },
+              {
+                value: "list",
+                label: (
+                  <>
+                    <Icon name="list" size={16} />
+                    {t("issues.list")}
+                  </>
+                ),
+              },
+            ]}
+          />
         </div>
-      )}
-      {issues.isSuccess && all.length === 0 && !search && (
-        <div className="issues-page__pad">
-          <EmptyState sky icon="issues">
+        {issues.isLoading &&
+          (view === "board" ? (
+            <div className="issues-board">
+              {BOARD.map((status) => (
+                <section key={status} className="issues-col" aria-label={t(`issues.status.${status}`)}>
+                  <div className="issues-col__head">
+                    <h2>{t(`issues.status.${status}`)}</h2>
+                  </div>
+                  <LoadingCards count={2} className="loading-cards loading-cards--tight" />
+                </section>
+              ))}
+            </div>
+          ) : (
+            <LoadingList count={5} avatar={false} trailing />
+          ))}
+        {issues.isError && !issues.data && <ErrorState error={issues.error} onRetry={() => void issues.refetch()} />}
+        {issues.isSuccess && all.length === 0 && !search && (
+          <EmptyState
+            sky
+            title={t("issues.emptyTitle")}
+            actions={
+              <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+                {t("issues.new")}
+              </Button>
+            }
+          >
             {t("issues.empty")}
           </EmptyState>
-        </div>
-      )}
-      {issues.isSuccess && visible.length === 0 && (all.length > 0 || search) && (
-        <div className="issues-page__pad">
+        )}
+        {issues.isSuccess && visible.length === 0 && (all.length > 0 || search) && (
           <EmptyState icon="search">{t("issues.noResults")}</EmptyState>
-        </div>
-      )}
-      {visible.length > 0 && view === "board" && (
-        <div className="issue-board">
-          {BOARD.map((status) => {
-            const items = visible.filter((i) => i.status === status);
-            return (
-              <section key={status} className="issue-board__col" aria-label={t(`issues.status.${status}`)}>
-                <div className="issue-board__head">
-                  <span className="ac-eyebrow">{t(`issues.status.${status}`)}</span>
-                  <span className="small muted tabular">{items.length}</span>
-                </div>
-                {items.map((i) => (
-                  <IssueCard key={i.id} issue={i} />
-                ))}
-              </section>
-            );
-          })}
-        </div>
-      )}
-      {visible.length > 0 && view === "list" && (
-        <div className="issues-page__pad">
-          <ul className="issue-list">
-            {visible.map((i) => (
-              <li key={i.id}>
-                <Link
-                  to="/org/$orgId/issues/$number"
-                  params={{ orgId: org.id, number: String(i.number) }}
-                  className="issue-list__row"
-                >
-                  <span className="issue-list__num small muted tabular">#{i.number}</span>
-                  <span className="issue-list__title">{i.title}</span>
-                  <StatusChip status={i.status} />
-                  <span className="issue-list__who small muted">
-                    {i.assignee ? <ActorLabel actor={i.assignee} /> : t("issues.noAssignee")}
-                  </span>
-                  <Due issue={i} />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
+        )}
+        {visible.length > 0 && view === "board" && <Board issues={visible} openNumber={openNumber} onOpen={toggle} />}
+        {visible.length > 0 && view === "list" && (
+          <IssueList issues={visible} openNumber={openNumber} onOpen={toggle} />
+        )}
+      </div>
+      {opened && (
+        <section className="issues-panel" aria-label={t("issues.panelLabel", { number: opened.number })}>
+          <IssueDetails issue={opened} variant="panel" onClose={() => setOpenNumber(null)} />
+        </section>
       )}
       <NewIssueDialog open={creating} onClose={() => setCreating(false)} />
     </div>
   );
 }
 
-const STATUS_ICON: Record<IssueStatus, "issues" | "waiting" | "checks" | "check" | "close"> = {
-  todo: "issues",
-  in_progress: "waiting",
-  in_review: "checks",
-  done: "check",
-  canceled: "close",
-};
-
-export function StatusChip({ status }: { status: IssueStatus }) {
-  const { t } = useTranslation();
-  return <Chip icon={STATUS_ICON[status]}>{t(`issues.status.${status}`)}</Chip>;
-}
-
-function Due({ issue }: { issue: Issue }) {
+/** The agents on issues right now (live runs), then the stalled ones (in progress, no run alive). */
+function WorkingNow({ issues, onOpen }: { issues: Issue[]; onOpen: (n: number) => void }) {
   const { t, i18n } = useTranslation();
+  const actors = useActors();
+  const color = useAssigneeColor();
+  const stepText = useStepText();
+  const working = issues.filter((i) => isOpen(i) && isWorking(i));
+  const stalled = issues.filter((i) => isOpen(i) && isStalled(i));
+  if (working.length + stalled.length === 0) return null;
   return (
-    <span className="issue-due small muted">{issue.dueDate ? dueLabel(t, i18n.language, issue.dueDate) : ""}</span>
+    <section className="issues-now" aria-label={t("issues.now.title")}>
+      <h2 className="issues-now__title">
+        {t("issues.now.title")}
+        <span>{working.length}</span>
+        {stalled.length > 0 && <span>· {t("issues.now.stalled", { count: stalled.length })}</span>}
+      </h2>
+      <div className="issues-now__list">
+        {[...working, ...stalled].map((i) => {
+          const w = i.work;
+          if (!w || !i.assignee) return null;
+          const name = actors.name(i.assignee);
+          const stall = w.state === "stalled";
+          const waiting = w.state === "waiting_approval" || w.state === "waiting_input";
+          const step = stepText(w.steps.at(-1));
+          return (
+            <button
+              key={i.id}
+              type="button"
+              className={cx("issues-now__card", stall && "is-stalled", waiting && "is-waiting")}
+              onClick={() => onOpen(i.number)}
+            >
+              <AgentAvatar
+                agentId={i.assignee.id}
+                name={name}
+                size="md"
+                state={stall ? "idle" : waiting ? "idle" : "writing"}
+                running={!stall && !waiting}
+                expression={stall ? "closed" : undefined}
+              />
+              <span className="issues-now__text">
+                <span className="issues-now__who">
+                  {name} · #{i.number} ·{" "}
+                  {stall
+                    ? t("issues.work.stalled", { when: relativeTime(t, i18n.language, w.since) })
+                    : relativeTime(t, i18n.language, w.since)}
+                </span>
+                <b>{i.title}</b>
+                <span className={cx("issues-now__step", !stall && !waiting && "is-live")}>
+                  {stall
+                    ? step
+                      ? t("issues.work.noRunStep", { step })
+                      : t("issues.work.noRun")
+                    : waiting
+                      ? t(w.state === "waiting_approval" ? "issues.work.waitingApproval" : "issues.work.waitingInput")
+                      : step || t("issues.work.starting")}
+                </span>
+                {stall && (
+                  <span className="issues-now__go">
+                    <Icon name="play" size={14} />
+                    {t("issues.work.continue")}
+                  </span>
+                )}
+              </span>
+              {!stall && <WorkSweep color={color(i) ?? "sky"} waiting={waiting} />}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
-function IssueCard({ issue: i }: { issue: Issue }) {
+/** A due date as a chip: late ones carry the attention tone (on an open issue). */
+function DueChip({ issue: i }: { issue: Issue }) {
+  const { t, i18n } = useTranslation();
+  if (!i.dueDate || !isOpen(i)) return null;
+  const late = i.dueDate < toYmd(new Date());
+  return (
+    <Chip icon="calendar" className={cx("issue-due", late && "is-late")}>
+      {dueLabel(t, i18n.language, i.dueDate)}
+    </Chip>
+  );
+}
+
+function PriorityChip({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  if (i.priority === "normal") return null;
+  return <Chip icon={i.priority === "high" ? "arrowUp" : "dash"}>{t(`issues.priority.${i.priority}`)}</Chip>;
+}
+
+function Criteria({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const color = useAssigneeColor();
+  if (i.criteria.length === 0) return null;
+  const done = i.criteria.filter((c) => c.done).length;
+  return (
+    <span className="issue-crit" role="img" aria-label={t("issues.criteriaLabel", { done, total: i.criteria.length })}>
+      <CriteriaPixels done={i.criteria.map((c) => c.done)} color={color(i)} />
+      <span aria-hidden="true">
+        {done}/{i.criteria.length}
+      </span>
+    </span>
+  );
+}
+
+/** Who has it, or what the agent is doing (the step, "Pede aprovação", "Parado há 2 dias"). */
+function WhoLine({ issue: i }: { issue: Issue }) {
+  const { t, i18n } = useTranslation();
+  const actors = useActors();
+  const stepText = useStepText();
+  if (!i.assignee) return <span className="issue-who__name muted">{t("issues.noAssignee")}</span>;
+  const w = i.work;
+  const name = actors.name(i.assignee);
+  const avatar =
+    i.assignee.type === "agent" ? (
+      <AgentAvatar
+        agentId={i.assignee.id}
+        name={name}
+        size="sm"
+        running={w?.state === "running"}
+        state={w?.state === "running" ? "writing" : undefined}
+        expression={isStalled(i) ? "closed" : undefined}
+      />
+    ) : (
+      <ActorAvatar actor={i.assignee} name={name} size="sm" />
+    );
+  if (w?.state === "stalled")
+    return (
+      <>
+        {avatar}
+        <Chip icon="waiting" className="issue-stall">
+          {t("issues.work.stalled", { when: relativeTime(t, i18n.language, w.since) })}
+        </Chip>
+      </>
+    );
+  if (w?.state === "waiting_approval" || w?.state === "waiting_input")
+    return (
+      <>
+        {avatar}
+        <Chip icon="shield" className="issue-needs">
+          {t(w.state === "waiting_approval" ? "issues.work.waitingApproval" : "issues.work.waitingInput")}
+        </Chip>
+      </>
+    );
+  return (
+    <>
+      {avatar}
+      <span className="issue-who__name">{w ? stepText(w.steps.at(-1)) || t("issues.work.starting") : name}</span>
+    </>
+  );
+}
+
+/** Opens the panel on a plain click; the link still goes to the issue's page (new tab, middle click). */
+const panelClick = (e: MouseEvent, open: () => void) => {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+  e.preventDefault();
+  open();
+};
+
+function Board({
+  issues,
+  openNumber,
+  onOpen,
+}: {
+  issues: Issue[];
+  openNumber: number | null;
+  onOpen: (n: number) => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const pr = i.pullRequests[0];
+  const toast = useToast();
+  const action = useIssueAction(org.id);
+  const [over, setOver] = useState<IssueStatus | null>(null);
+  const move = (number: number, status: IssueStatus) => {
+    const issue = issues.find((i) => i.number === number);
+    if (!issue || issue.status === status) return;
+    const was = issue.status;
+    action.mutate(
+      { type: "update", id: issue.id, patch: { status } },
+      {
+        onSuccess: () =>
+          toast.show(t("issues.moved", { number, status: t(`issues.status.${status}`) }), "info", {
+            label: t("issues.undo"),
+            run: () => action.mutate({ type: "update", id: issue.id, patch: { status: was } }),
+          }),
+      },
+    );
+  };
+  const onDrop = (status: IssueStatus) => (e: DragEvent) => {
+    e.preventDefault();
+    setOver(null);
+    const n = Number(e.dataTransfer.getData("text/plain"));
+    if (n) move(n, status);
+  };
+  return (
+    <div className="issues-board">
+      {BOARD.map((status) => {
+        const items = issues.filter((i) => i.status === status);
+        return (
+          <section
+            key={status}
+            className={cx("issues-col", over === status && "is-over")}
+            aria-label={t(`issues.status.${status}`)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setOver(status);
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(null);
+            }}
+            onDrop={onDrop(status)}
+          >
+            <div className="issues-col__head">
+              <Icon name={STATUS_ICON[status]} size={16} />
+              <h2>{t(`issues.status.${status}`)}</h2>
+              <span className="tabular">{items.length}</span>
+            </div>
+            <div className="issues-col__cards">
+              {items.map((i) => (
+                <IssueCard key={i.id} issue={i} selected={i.number === openNumber} onOpen={() => onOpen(i.number)} />
+              ))}
+              {items.length === 0 && <p className="issues-col__empty">{t("issues.dropHere")}</p>}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function IssueCard({ issue: i, selected, onOpen }: { issue: Issue; selected: boolean; onOpen: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const color = useAssigneeColor();
+  const pr = i.pullRequests.at(-1);
   return (
     <Link
       to="/org/$orgId/issues/$number"
       params={{ orgId: org.id, number: String(i.number) }}
-      className="issue-card"
+      className={cx("issue-card", selected && "is-on")}
       aria-label={t("issues.open", { number: i.number, title: i.title })}
+      aria-current={selected || undefined}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", String(i.number));
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onClick={(e) => panelClick(e, onOpen)}
+      data-status={i.status}
     >
-      <span className="issue-card__top small muted tabular">
-        #{i.number}
-        {pr && (
-          <span className="issue-card__pr">
-            <Icon name="pullRequest" size={16} />
-            {t("issues.pr", { number: pr.number })}
-          </span>
-        )}
-        <Due issue={i} />
+      <span className="issue-card__top tabular">
+        <span>#{i.number}</span>
+        {i.labels[0] && <span>· {i.labels[0]}</span>}
+        <span className="issue-card__grow" />
+        <PriorityChip issue={i} />
+        <DueChip issue={i} />
       </span>
       <span className="issue-card__title">{i.title}</span>
+      <Criteria issue={i} />
       <span className="issue-card__foot">
-        {i.priority === "high" && <Chip icon="arrowUp">{t("issues.priority.high")}</Chip>}
-        {i.labels.map((l) => (
-          <span key={l} className="ac-chip issue-label">
-            {l}
-          </span>
-        ))}
-        <span className="issue-card__who small muted">
-          {i.assignee ? <ActorLabel actor={i.assignee} /> : t("issues.noAssignee")}
-        </span>
+        <WhoLine issue={i} />
+        <span className="issue-card__grow" />
+        {pr && (
+          <Chip icon="pullRequest" className="issue-card__pr">
+            {t("issues.pr", { number: pr.number })}
+          </Chip>
+        )}
       </span>
+      {isWorking(i) && <WorkSweep color={color(i) ?? "sky"} waiting={i.work?.state !== "running"} />}
     </Link>
+  );
+}
+
+function IssueList({
+  issues,
+  openNumber,
+  onOpen,
+}: {
+  issues: Issue[];
+  openNumber: number | null;
+  onOpen: (n: number) => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const color = useAssigneeColor();
+  return (
+    <div className="issues-groups">
+      {STATUSES.map((status) => {
+        const items = issues.filter((i) => i.status === status);
+        if (items.length === 0) return null;
+        return (
+          <section key={status} className="issues-group" aria-label={t(`issues.status.${status}`)}>
+            <h2 className="issues-group__title">
+              <Icon name={STATUS_ICON[status]} size={16} />
+              {t(`issues.status.${status}`)}
+              <span>{items.length}</span>
+            </h2>
+            <ul className="issue-list">
+              {items.map((i) => (
+                <li key={i.id}>
+                  <Link
+                    to="/org/$orgId/issues/$number"
+                    params={{ orgId: org.id, number: String(i.number) }}
+                    className={cx("issue-list__row", i.number === openNumber && "is-on")}
+                    onClick={(e) => panelClick(e, () => onOpen(i.number))}
+                  >
+                    <span className="issue-list__num tabular">#{i.number}</span>
+                    <span className="issue-list__title">
+                      <b>{i.title}</b>
+                      <PriorityChip issue={i} />
+                    </span>
+                    <span className="issue-list__crit">
+                      <Criteria issue={i} />
+                    </span>
+                    <span className="issue-list__who">
+                      <WhoLine issue={i} />
+                    </span>
+                    <span className="issue-list__due">
+                      <DueChip issue={i} />
+                    </span>
+                    <span className="issue-sr">{t(`issues.status.${i.status}`)}</span>
+                    {isWorking(i) && <WorkSweep color={color(i) ?? "sky"} waiting={i.work?.state !== "running"} />}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
@@ -307,6 +619,9 @@ function NewIssueDialog({ open, onClose }: { open: boolean; onClose: () => void 
   const [due, setDue] = useState("");
   const dueDate = due.trim() ? parseDayInput(due) : null;
   const dueError = due.trim() !== "" && !dueDate;
+  const { criteria } = splitCriteria(text);
+  const chosen = actorFromKey(assignee);
+  const agent = chosen?.type === "agent" ? actors.dir.agentById.get(chosen.id) : undefined;
   const reset = () => {
     setTitle("");
     setText("");
@@ -321,6 +636,7 @@ function NewIssueDialog({ open, onClose }: { open: boolean; onClose: () => void 
         if (!o) onClose();
       }}
       title={t("issues.new")}
+      description={t("issues.form.intro")}
       closeLabel={t("common.close")}
       width={560}
     >
@@ -337,14 +653,24 @@ function NewIssueDialog({ open, onClose }: { open: boolean; onClose: () => void 
                 title: title.trim(),
                 description,
                 criteria,
-                assignee: actorFromKey(assignee),
+                assignee: chosen?.type === "person" ? chosen : null,
                 priority,
                 dueDate,
               },
             },
             {
               onSuccess: (created) => {
-                toast.show(t("issues.form.created", { number: (created as Issue).number }));
+                const issue = created as Issue;
+                // An agent picked here starts right away ("Pedir"): assigned, its run linked, in progress.
+                if (chosen?.type === "agent")
+                  action.mutate(
+                    { type: "ask", id: issue.id, agentId: chosen.id },
+                    {
+                      // Couldn't ask (not in a shared channel…): it stays assigned to the agent.
+                      onError: () => action.mutate({ type: "update", id: issue.id, patch: { assignee: chosen } }),
+                    },
+                  );
+                toast.show(t("issues.form.created", { number: issue.number }));
                 reset();
                 onClose();
               },
@@ -368,6 +694,16 @@ function NewIssueDialog({ open, onClose }: { open: boolean; onClose: () => void 
               placeholder={t("issues.form.descriptionPlaceholder")}
             />
           </Field>
+          {criteria.length > 0 && (
+            <div className="issue-critprev" aria-live="polite">
+              <span className="ac-eyebrow">{t("issues.form.criteriaFound", { count: criteria.length })}</span>
+              <ul>
+                {criteria.map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="grid-fields">
             <Field label={t("issues.form.assignee")} id="ni-who">
               <Select value={assignee} onValueChange={setAssignee} options={actors.options(true)} />
@@ -388,6 +724,12 @@ function NewIssueDialog({ open, onClose }: { open: boolean; onClose: () => void 
               <Input value={due} onChange={(e) => setDue(e.target.value)} inputMode="numeric" placeholder="24/10" />
             </Field>
           </div>
+          {agent && (
+            <p className="issue-agent-note">
+              <Icon name="shield" size={14} />
+              {t("issues.form.agentStarts", agentGrammar(t, agent.name))}
+            </p>
+          )}
         </DialogBody>
         <DialogFooter>
           <Button type="button" onClick={onClose}>

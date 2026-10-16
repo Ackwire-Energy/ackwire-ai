@@ -269,3 +269,98 @@ export function RunKey({ status }: { status: RunPixelStatus | "next" }) {
   }, false);
   return <canvas ref={ref} className="ac-run-key" width={3} height={5} />;
 }
+
+/**
+ * Acceptance criteria as pixel blocks (telas/Issues.html): one block per
+ * criterion, done ones dithered in the assignee's tones (an agent's color;
+ * a person or nobody: neutral ink), open ones a dotted outline.
+ */
+export function CriteriaPixels({
+  done,
+  color,
+  className,
+}: {
+  done: boolean[];
+  color?: AgentColor | null;
+  className?: string;
+}) {
+  const W = 5;
+  const H = 4;
+  const G = 1;
+  const width = Math.max(1, done.length * (W + G) - G);
+  const ref = useCanvas((ctx, canvas) => {
+    const raised = token(canvas, "--raised", "#ffffff");
+    const ink = token(canvas, "--ink", "#151514");
+    const tones = color ? bodyTones(color) : null;
+    const t = (i: number) => tones?.[i] ?? "#888888";
+    const pal = tones
+      ? [t(1), t(2), t(3)]
+      : [mixHex(ink, raised, 0.1), mixHex(ink, raised, 0.3), mixHex(ink, raised, 0.5)];
+    const dot = mixHex(ink, raised, 0.72);
+    ctx.clearRect(0, 0, width, H);
+    done.forEach((d, k) => {
+      const x0 = k * (W + G);
+      if (d) {
+        column(ctx, x0, W, H, H - 1, pal);
+        return;
+      }
+      for (let y = 0; y < H; y++)
+        for (let x = 0; x < W; x++)
+          if ((y === 0 || y === H - 1 || x === 0 || x === W - 1) && (x + y) % 2 === 0) {
+            ctx.fillStyle = dot;
+            ctx.fillRect(x0 + x, y, 1, 1);
+          }
+    });
+  }, false);
+  return (
+    <canvas
+      ref={ref}
+      className={cx("ac-crit-pixels", className)}
+      width={width}
+      height={H}
+      style={{ width: width * CELL, height: H * CELL }}
+    />
+  );
+}
+
+/**
+ * An agent at work: a thin dithered sweep along the bottom of whatever holds
+ * it (give the holder `position: relative`), in the agent's light tones.
+ * `waiting` holds still and dim (it waits on a person).
+ */
+export function WorkSweep({
+  color = "sky",
+  waiting = false,
+  className,
+}: {
+  color?: AgentColor;
+  waiting?: boolean;
+  className?: string;
+}) {
+  const ref = useCanvas((ctx, canvas, t) => {
+    const w = Math.max(8, Math.round(canvas.clientWidth / CELL) || 120);
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== 2) canvas.height = 2;
+    const surface = token(canvas, "--raised", "#ffffff");
+    const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+    const pal = [
+      surface,
+      mixHex(surface, top, 0.2),
+      mixHex(surface, top, 0.45),
+      mixHex(surface, bottom, 0.55),
+      mixHex(top, bottom, 0.5),
+    ];
+    const last = pal.length - 1;
+    const c = ((t * 0.45) % 1.6) - 0.3;
+    for (let y = 0; y < 2; y++)
+      for (let x = 0; x < w; x++) {
+        const u = x / w;
+        const f = waiting ? 0.2 + 0.08 * Math.sin(u * 30) : 0.1 + 0.85 * Math.exp(-((u - c) * (u - c)) / 0.02);
+        const s = Math.max(0, Math.min(1, f)) * last;
+        const b = Math.floor(s);
+        ctx.fillStyle = pal[Math.min(last, s - b > (BAYER[((y & 3) << 2) | (x & 3)] ?? 0.5) ? b + 1 : b)] ?? surface;
+        ctx.fillRect(x, y, 1, 1);
+      }
+  }, !waiting);
+  return <canvas ref={ref} className={cx("ac-work-sweep", className)} />;
+}

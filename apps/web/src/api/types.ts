@@ -929,6 +929,22 @@ export interface IssueCriterion {
   id: string;
   text: string;
   done: boolean;
+  /** Who checked it (an agent shows its face next to it). */
+  doneBy?: Actor | null;
+}
+
+/**
+ * The assigned agent's work on an issue, from its runs: live (`running`,
+ * waiting on a person) or `stalled` (in progress with the agent, no run alive).
+ */
+export interface IssueWork {
+  agentId: string;
+  runId: string | null;
+  state: "running" | "waiting_approval" | "waiting_input" | "stalled";
+  since: string;
+  /** The run's last tool calls, oldest first. */
+  steps: { tool: string; detail?: string; at: string }[];
+  reason?: "failed" | "canceled" | "budget";
 }
 
 export interface Issue {
@@ -956,6 +972,7 @@ export interface Issue {
   channelId: string | null;
   pullRequests: { number: number; url: string; openedBy: Actor | null }[];
   artifacts: { id: string; title: string; createdBy: Actor }[];
+  work?: IssueWork | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -971,6 +988,8 @@ export interface IssueActivity {
   /** The event in the app's words: `issues.event.{textCode}` with `textParams`. */
   textCode?: string;
   textParams?: Record<string, string>;
+  /** The system moved it on its own (the agent's runs, a linked PR). */
+  auto?: boolean;
   createdAt: string;
 }
 
