@@ -500,7 +500,13 @@ describe("tools on a connected machine", () => {
 
     await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
     const listed = await f.tools?.list(ctx);
-    expect(listed?.find((t) => t.name === "run_code")?.description).toContain('connected computer "Build box"');
+    const runCode = listed?.find((t) => t.name === "run_code");
+    expect(runCode?.description).toContain('connected computer "Build box"');
+    // Claude Code keeps one session per conversation, and connected computers allow an hour.
+    expect(runCode?.description).toContain(`claude -p --session-id ${ctx.threadRootId}`);
+    expect(runCode?.description).toContain(`claude -p --resume ${ctx.threadRootId}`);
+    expect(runCode?.description).toContain("at most 3600 s");
+    expect(runCode?.inputSchema).toMatchObject({ properties: { timeout_seconds: { maximum: 3600 } } });
 
     const out = await call(ctx, "run_code", { language: "python", code: "print(42)" });
     expect(out.isError).toBeFalsy();
@@ -549,6 +555,8 @@ describe("tools on a connected machine", () => {
     const out = await call(ctx, "run_code", { language: "bash", code: "ls" });
     expect(out).toMatchObject({ isError: true });
     expect(out.content).toContain("Commands are turned off on the computer Files only");
+    const listed = await f.tools?.list(ctx);
+    expect(listed?.find((t) => t.name === "run_code")?.description).not.toContain("claude -p");
     // Files still work.
     expect((await call(ctx, "write_file", { path: "a.txt", content: "x" })).isError).toBeFalsy();
   });

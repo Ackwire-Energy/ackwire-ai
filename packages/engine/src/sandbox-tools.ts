@@ -68,9 +68,22 @@ const actorOf = (ctx: ToolContext): ArtifactActor => ({
   runId: ctx.runId,
 });
 
-function timeoutOf(input: Record<string, unknown>, fallback: number) {
+function timeoutOf(input: Record<string, unknown>, fallback: number, max: number) {
   const asked = typeof input.timeout_seconds === "number" ? input.timeout_seconds : fallback;
-  return Math.max(1, Math.min(SANDBOX_LIMITS.maxTimeoutSeconds, Math.round(asked)));
+  return Math.max(1, Math.min(max, Math.round(asked)));
+}
+
+/** The longest command on this computer: an hour on a connected one, 10 min on ours. */
+const maxTimeoutOf = (info: ComputerInfo) =>
+  info.kind === "machine" ? SANDBOX_LIMITS.machineMaxTimeoutSeconds : SANDBOX_LIMITS.maxTimeoutSeconds;
+
+/**
+ * Claude Code on a connected computer, the way it keeps context: one session
+ * per conversation (the thread's id, a UUID), resumed on every follow-up.
+ * Sessions live per folder, and each agent has its own folder there.
+ */
+export function claudeCodeSentence(sessionId: string) {
+  return `If Claude Code (\`claude\`) is installed there and the work suits it, run it non-interactively from your workspace with one session per conversation, so it remembers earlier turns: the first time \`claude -p --session-id ${sessionId} "<task>"\`, afterwards \`claude -p --resume ${sessionId} "<follow-up>"\` (if it says there's no such conversation, start it with --session-id). Add \`--permission-mode acceptEdits\` so it can edit files; never add --dangerously-skip-permissions unless the person asks. Give it a long timeout_seconds (real tasks take minutes) and pass on what it reports.`;
 }
 
 /** DNS failures and refused or unreachable connections: what blocked network looks like. */
@@ -452,10 +465,12 @@ export function createSandboxToolSource(
     execTimeout: number,
     network: Network = { mode: "blocked", domains: [] },
     computerInfo: ComputerInfo = { kind: "cloud", available: true },
+    sessionId?: string,
+    maxTimeout = maxTimeoutOf(computerInfo),
   ): ToolDefinition[] => [
     {
       name: "run_code",
-      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo, network)} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${SANDBOX_LIMITS.maxTimeoutSeconds} s.`,
+      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo, network)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId)}` : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.`,
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
       inputSchema: {
@@ -463,7 +478,7 @@ export function createSandboxToolSource(
         properties: {
           language: { enum: Object.keys(RUNNERS) },
           code: { type: "string", minLength: 1, maxLength: SANDBOX_LIMITS.codeChars },
-          timeout_seconds: { type: "integer", minimum: 1, maximum: SANDBOX_LIMITS.maxTimeoutSeconds },
+          timeout_seconds: { type: "integer", minimum: 1, maximum: maxTimeout },
         },
         required: ["language", "code"],
         additionalProperties: false,
@@ -474,7 +489,7 @@ export function createSandboxToolSource(
           const lang = str(input.language) as Language;
           const runner = RUNNERS[lang];
           if (!runner) return { content: "language must be python, node or bash", isError: true };
-          const timeout = timeoutOf(input, execTimeout);
+          const timeout = timeoutOf(input, execTimeout, maxTimeout);
           const file = `.agentes/run-${Date.now()}.${runner.ext}`;
           const started = Date.now();
           const result = await run(ctx, timeout + 15, async (computer) => {
@@ -789,7 +804,7 @@ export function createSandboxToolSource(
           skill: { type: "string", minLength: 1, maxLength: 64 },
           path: { type: "string", minLength: 1, maxLength: 300 },
           args: { type: "array", items: { type: "string", maxLength: 500 }, maxItems: 20 },
-          timeout_seconds: { type: "integer", minimum: 1, maximum: SANDBOX_LIMITS.maxTimeoutSeconds },
+          timeout_seconds: { type: "integer", minimum: 1, maximum: maxTimeout },
         },
         required: ["skill", "path"],
         additionalProperties: false,
@@ -810,7 +825,7 @@ export function createSandboxToolSource(
           const ext = /\.([a-z0-9]+)$/i.exec(target.path)?.[1]?.toLowerCase() ?? "";
           const bin = SCRIPT_RUNNERS[ext];
           if (!bin) return { content: `Scripts .${ext} can't run here.`, isError: true };
-          const timeout = timeoutOf(input, execTimeout);
+          const timeout = timeoutOf(input, execTimeout, maxTimeout);
           const base = `.skills/${skill.name}`;
           const args = (Array.isArray(input.args) ? input.args : []).map((a) => quote(String(a))).join(" ");
           const started = Date.now();
@@ -860,7 +875,9 @@ export function createSandboxToolSource(
         computer.kind === "machine"
           ? { mode: "machine", domains: [] }
           : { mode: settings.network, domains: settings.allowDomains };
-      return withNotices(build(settings.requireApproval, settings.execTimeoutSeconds, network, computer));
+      return withNotices(
+        build(settings.requireApproval, settings.execTimeoutSeconds, network, computer, ctx.threadRootId),
+      );
     },
   };
 }

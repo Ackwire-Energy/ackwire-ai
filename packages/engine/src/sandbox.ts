@@ -38,6 +38,8 @@ export const SANDBOX_SCOPE = "sandbox:run";
 
 export const SANDBOX_LIMITS = {
   maxTimeoutSeconds: 600,
+  /** Connected computers cost us nothing and run long jobs (e.g. Claude Code): up to an hour. */
+  machineMaxTimeoutSeconds: 3600,
   stdoutChars: 20_000,
   stderrChars: 8_000,
   fileReadChars: 40_000,
