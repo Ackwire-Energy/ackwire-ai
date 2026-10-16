@@ -511,7 +511,7 @@ function EditSkill({ skill, onDone }: { skill: SkillDetail; onDone: () => void }
   );
 }
 
-/** Our checkboxes over the library, with search (agent profile dialog, Criar agente). */
+/** Our checkboxes over the library, with search (the agent profile's dialog). */
 export function SkillPicker({
   skills,
   selected,

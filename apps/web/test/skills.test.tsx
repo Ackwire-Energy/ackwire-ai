@@ -7,6 +7,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
 import { activityText, toolActivity } from "@/lib/activity";
 import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -174,13 +175,13 @@ describe("agent skills", () => {
     expect(screen().getByRole("region", { name: "Skills" }).textContent).toContain("Atendimento");
   });
 
-  test("Criar agente: an optional Skills step after where it works", async () => {
+  test("Criar agente: optional Skills under the tools, the ones on for new agents already checked", async () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/agents/new`, { api: createFakeApi(state) });
     await settle(8);
-    const step = document.querySelector('section[aria-labelledby="q-skills"]') as HTMLElement;
-    const order = Array.from(document.querySelectorAll("section.section h2")).map((h) => h.textContent);
-    expect(order.indexOf("Skills")).toBeGreaterThan(order.indexOf("Onde trabalha e com o quê"));
+    await startAs("QA");
+    await proceed(2);
+    const step = screen().getByRole("region", { name: /^Skills/ });
     // "Ligar em agentes novos" skills start checked.
     expect(
       within(step)
@@ -188,7 +189,8 @@ describe("agent skills", () => {
         .getAttribute("aria-checked"),
     ).toBe("true");
     await click(within(step).getByRole("checkbox", { name: /Atendimento/ }));
-    await type(screen().getByLabelText("Nome"), "Iris");
+    expect(screen().getByRole("complementary", { name: "Prévia do agente" }).textContent).toContain("Atendimento");
+    await proceed(3);
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
     const sent = state.calls.find((c) => c.method === "skills.setForAgent")?.args[2] as {

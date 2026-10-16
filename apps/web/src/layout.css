@@ -6294,6 +6294,1174 @@ button.live-call__head:hover {
   }
 }
 
+/* ---------- Criar agente (docs/design/telas/NovoAgente.html) ----------
+ * The onboarding's shell (`.onb`: the rail on the sidebar surface, its steps
+ * and horizon) with a live preview of the agent on the right. The page is the
+ * scroll container: the rail, the preview and the bar at the bottom stick. */
+.newag {
+  flex: 1 1 auto;
+  grid-template-columns: 260px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+}
+.newag__rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.newag__rail-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 4px;
+}
+.newag__rail-title b {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.newag__rail-title span {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.newag__work {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 316px;
+  gap: 28px;
+  width: 100%;
+  max-width: 1160px;
+  padding: 0 clamp(18px, 3.4vw, 40px);
+  box-sizing: border-box;
+}
+.newag__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100dvh;
+  padding-top: 38px;
+  box-sizing: border-box;
+}
+.newag__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 660px;
+  padding-bottom: 28px;
+}
+.newag__content > * {
+  animation: newag-in 0.32s var(--out) both;
+}
+@keyframes newag-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.newag .onb__head {
+  margin-bottom: 22px;
+}
+.newag__title:focus {
+  outline: none;
+}
+.newag__foot {
+  position: sticky;
+  bottom: 16px;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 660px;
+  margin: 0 0 16px;
+  padding: 10px 10px 10px 16px;
+  border-radius: 18px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  box-shadow: var(--e2), var(--top);
+  box-sizing: border-box;
+}
+.newag__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-right: auto;
+  color: var(--muted);
+  font-size: 13px;
+}
+.newag__hint[data-bad] {
+  color: var(--danger);
+}
+.newag__err {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--danger);
+  font-size: 12.5px;
+}
+.newag__card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+}
+.newag__sect {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 22px 0 10px;
+}
+.newag__sect--first {
+  margin-top: 0;
+}
+.newag__sect h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.newag__sect > .small {
+  text-align: right;
+}
+.newag__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.newag__opt-label {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 500;
+}
+.newag__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--plate);
+  color: var(--muted);
+  font-size: 13px;
+}
+.newag__note svg {
+  flex: none;
+  margin-top: 2px;
+}
+.newag__note b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.newag__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.newag__chip .connector-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  box-shadow: none;
+  background: transparent;
+  font-size: 8px;
+}
+.newag__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.newag__ib {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px 10px 10px 4px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink2);
+}
+/* Pressable cards: the role presets, the models, the look options. */
+.newag__roles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.newag__role,
+.newag__model,
+.newag__tip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 16px 14px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--spring),
+    box-shadow 0.2s;
+}
+.newag__role:hover,
+.newag__model:hover:not([aria-disabled="true"]),
+.newag__tip:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--e2), var(--top);
+}
+.newag__role[aria-pressed="true"],
+.newag__model[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 2px var(--ink),
+    var(--e2);
+}
+.newag__role:focus-visible,
+.newag__model:focus-visible,
+.newag__tip:focus-visible,
+.newag__opt:focus-visible,
+.newag__swatch:focus-visible,
+.newag__tog:focus-visible,
+.newag__addrow:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.newag__role-top {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  min-height: 58px;
+}
+.newag__role .newag__role-agent {
+  margin-top: 18px;
+}
+.newag__role-name {
+  display: flex;
+  flex-direction: column;
+}
+.newag__role-name b {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.newag__role-name span {
+  color: var(--faint);
+  font-size: 12.5px;
+}
+.newag__role-desc {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.newag__check {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity 0.25s var(--spring),
+    transform 0.25s var(--spring);
+}
+[aria-pressed="true"] > .newag__check {
+  opacity: 1;
+  transform: none;
+}
+.newag__role--blank {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+}
+.newag__role--blank[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.newag__role--blank .newag__role-name b {
+  font-size: 22px;
+}
+.newag__role--blank .newag__role-name span {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.newag__blank-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border: 1.5px dashed var(--line2);
+  border-radius: 15px 15px 15px 5px;
+  color: var(--muted);
+}
+/* Identity */
+.newag__grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.newag__big.ac-input,
+.newag__big.ac-input-affix {
+  height: 52px;
+  font-size: 18px;
+  font-weight: 500;
+}
+.newag__big.ac-input-affix input {
+  font-size: 18px;
+}
+.newag__look {
+  gap: 16px;
+}
+.newag__look-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.newag__swatches,
+.newag__opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.newag__swatch {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-agent);
+  background: linear-gradient(170deg, var(--a), var(--b));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: transform 0.2s var(--spring);
+}
+.newag__swatch:hover {
+  transform: translateY(-2px);
+}
+.newag__swatch[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 2px var(--raised),
+    0 0 0 4px var(--ink);
+}
+.newag__opts {
+  gap: 6px;
+}
+.newag__opts--acc {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+}
+.newag__opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  width: 72px;
+  height: 82px;
+  padding: 4px 4px 7px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.18s var(--spring),
+    background-color 0.15s;
+}
+.newag__opts--acc .newag__opt {
+  width: auto;
+}
+.newag__opt:hover {
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+.newag__opt[aria-pressed="true"] {
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow:
+    0 0 0 1.5px var(--ink),
+    var(--e1);
+}
+.newag__stage {
+  flex: 1;
+  display: grid;
+  place-items: end center;
+  width: 100%;
+  color: var(--faint);
+}
+/* Instructions */
+.newag__textarea.ac-input {
+  min-height: 230px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.newag__ta-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+.newag__origin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.newag__count {
+  font-family: var(--font-dot);
+  font-variation-settings: "ROND" 100;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.newag__tips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.newag__tip {
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+}
+.newag__tip b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+}
+.newag__tip span {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+/* Tools */
+.newag__list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.newag__quick {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+.newag__addrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1.5px dashed var(--line2);
+  border-radius: 16px;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.newag__addrow:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+.newag__addrow-aside {
+  margin-left: auto;
+  color: var(--faint);
+  font-weight: 500;
+}
+.newag__section {
+  display: flex;
+  flex-direction: column;
+}
+/* Pickers that look like the cards around them (owner, key) */
+.newag__sel .ac-select__trigger {
+  min-height: 60px;
+  height: auto;
+  padding: 10px 16px 10px 12px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+}
+.newag__card .newag__sel .ac-select__trigger {
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.newag__sel .ac-select__trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.newag__sel-value {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  text-align: left;
+}
+.newag__sel-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+.newag__sel-text b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.newag__sel-text span {
+  color: var(--muted);
+  font-size: 12px;
+}
+/* Model and budget */
+.newag__models {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.newag__model {
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+}
+.newag__model[aria-disabled="true"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+  opacity: 0.6;
+  cursor: default;
+}
+.newag__model-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.newag__model-head b {
+  font-size: 15px;
+}
+.newag__model-prov {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 12px;
+}
+.newag__model-desc {
+  color: var(--muted);
+  font-size: 13px;
+}
+.newag__cost {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.newag__meter {
+  display: inline-flex;
+  gap: 3px;
+}
+.newag__meter i {
+  width: 6px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--line2);
+}
+.newag__meter i[data-on] {
+  background: var(--ink);
+}
+.newag__money {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+.newag__money-field {
+  width: 170px;
+}
+.newag__money-field .ac-input-affix input {
+  font-size: 17px;
+  font-weight: 600;
+}
+.newag__tog {
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.18s var(--spring),
+    color 0.15s;
+}
+.newag__tog:hover {
+  color: var(--ink);
+}
+.newag__tog:active {
+  transform: scale(0.96);
+}
+.newag__tog[aria-pressed="true"] {
+  color: var(--ink);
+  box-shadow:
+    0 0 0 1.5px var(--ink),
+    var(--top);
+}
+/* Review */
+.newag__review {
+  gap: 0;
+  padding: 6px 18px;
+}
+.newag__rv {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.newag__rv:first-child {
+  border-top: 0;
+}
+.newag__rv-k {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.newag__rv-v {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.newag__quote {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--ink2);
+  font-size: 13.5px;
+  white-space: pre-line;
+}
+/* The preview: the agent, live */
+.newag__aside {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  height: 100dvh;
+  padding: 38px 0 16px;
+  box-sizing: border-box;
+}
+.newag__cap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.newag__pv {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--raised);
+  box-shadow: var(--e2), var(--top);
+}
+.newag__pv-cover {
+  position: relative;
+  flex: none;
+  height: 148px;
+  overflow: hidden;
+  isolation: isolate;
+  transition: height 0.45s var(--out);
+}
+.newag__pv[data-big] .newag__pv-cover {
+  height: 236px;
+}
+.newag__pv-cover .newag__pv-agent {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 74px;
+  height: 74px;
+  transform: translateX(-50%);
+}
+.newag__pv[data-big] .newag__pv-agent {
+  bottom: 4px;
+  width: 104px;
+  height: 104px;
+}
+.newag__pv-state {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--sky-glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 0 1px var(--sky-line);
+  color: var(--sky-ink);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+.newag__pv-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 14px 16px 16px;
+  overflow: auto;
+}
+.newag__pv-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.newag__pv-name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.newag__pv-name b {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.newag__pv-name b[data-placeholder] {
+  color: var(--faint);
+}
+.newag__pv-name > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.newag__pv-role {
+  display: none;
+}
+.newag__pv-toggle {
+  display: none;
+}
+.newag__pv-instr {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  color: var(--ink2);
+  font-size: 13px;
+}
+.newag__pv-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.newag__pv-label {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.newag__empty {
+  color: var(--faint);
+  font-size: 12.5px;
+}
+.newag__asks {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+/* The created moment: the agent on its own sky */
+.newag--done .newag__main {
+  width: 100%;
+  max-width: 900px;
+  padding: 38px clamp(18px, 3.4vw, 40px) 32px;
+}
+.newag__content--done {
+  max-width: none;
+}
+.newag__born {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 440px;
+  padding: 30px;
+  overflow: hidden;
+  border-radius: 26px;
+  color: var(--sky-ink);
+  isolation: isolate;
+}
+.newag__born-agent {
+  position: absolute;
+  top: 50%;
+  right: 9%;
+  transform: translateY(-58%);
+}
+.newag__born-agent .ac-avatar {
+  width: 150px;
+  height: 150px;
+}
+.newag__born-text {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: fit-content;
+  max-width: 52ch;
+}
+.newag__born-title {
+  margin: 0;
+  max-width: 12ch;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: clamp(34px, 4.4vw, 52px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+.newag__born-title:focus {
+  outline: none;
+}
+.newag__born-lead {
+  margin: 0;
+  max-width: 40ch;
+  color: var(--sky-ink2);
+  font-weight: 500;
+}
+.newag__born-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+.newag__on-sky.ac-btn {
+  background: var(--sky-glass);
+  color: var(--sky-ink);
+  box-shadow:
+    0 0 0 1px var(--sky-line),
+    0 8px 20px -10px rgba(4, 32, 63, 0.5);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.newag__on-sky.ac-btn--primary {
+  background: linear-gradient(180deg, #0b2d55, #04203f);
+  color: #eef7ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 8px 20px -8px rgba(4, 32, 63, 0.7);
+}
+.newag__nexts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.newag__next {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+}
+.newag__next b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+}
+.newag__next span {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+/* Under 1100px the preview is a compact card above the form (details on demand). */
+@media (max-width: 1100px) {
+  .newag__work {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .newag__aside {
+    position: relative;
+    order: -1;
+    height: auto;
+    max-width: 660px;
+    padding: 22px 0 0;
+  }
+  .newag__cap,
+  .newag__pv-state,
+  .newag__pv-wide {
+    display: none;
+  }
+  .newag__main {
+    min-height: 0;
+    padding-top: 20px;
+  }
+  .newag__pv {
+    flex-direction: row;
+    align-items: stretch;
+    border-radius: 20px;
+  }
+  .newag__pv-cover,
+  .newag__pv[data-big] .newag__pv-cover {
+    width: 120px;
+    height: auto;
+    min-height: 76px;
+  }
+  .newag__pv-cover .newag__pv-agent,
+  .newag__pv[data-big] .newag__pv-agent {
+    bottom: -7px;
+    width: 46px;
+    height: 46px;
+  }
+  .newag__pv-body {
+    flex: 1;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+  .newag__pv-body > .newag__pv-sec,
+  .newag__pv-body > .newag__pv-instr {
+    display: none;
+  }
+  .newag__pv[data-open] .newag__pv-body > .newag__pv-sec {
+    display: flex;
+  }
+  .newag__pv[data-open] .newag__pv-body > .newag__pv-instr {
+    display: -webkit-box;
+  }
+  .newag__pv-name b {
+    font-size: 22px;
+  }
+  .newag__pv-role,
+  .newag__pv-toggle {
+    display: inline;
+  }
+  .newag__pv-toggle.ac-btn {
+    display: inline-flex;
+  }
+}
+/* Under 820px the rail is a step bar on top (only the current step's name). */
+@media (max-width: 820px) {
+  .newag {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
+  .newag .onb__rail {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--sunken) 92%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+  .newag .onb__rail nav {
+    flex: 1;
+    min-width: 0;
+  }
+  .newag__rail-head {
+    order: 2;
+  }
+  .newag__rail-head .onb__brand,
+  .newag__rail-title,
+  .newag .onb__horizon {
+    display: none;
+  }
+  .newag .onb__steps {
+    flex-direction: row;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 2px;
+  }
+  .newag .onb__steps li {
+    flex: none;
+  }
+  .newag .onb__step {
+    width: auto;
+    gap: 6px;
+    padding: 5px;
+    border-radius: 10px;
+  }
+  .newag .onb__step:not([aria-current="step"]) .onb__step-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .newag .onb__step[aria-current="step"] {
+    padding-right: 10px;
+    font-size: 13px;
+  }
+  .newag .onb__step[aria-current="step"] .onb__step-name {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: nowrap;
+  }
+  .newag__work {
+    padding: 0 16px;
+  }
+  .newag__roles,
+  .newag__models,
+  .newag__grid2,
+  .newag__nexts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .newag__tips {
+    display: flex;
+    margin: 14px -16px 0;
+    padding: 2px 16px 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .newag__tip {
+    flex: none;
+    padding: 10px 14px;
+  }
+  .newag__tip span {
+    display: none;
+  }
+  .newag__rv {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .newag__rv-k {
+    grid-column: 1 / -1;
+    padding: 0;
+  }
+  .newag__rv-v {
+    grid-column: 1;
+  }
+  .newag__born {
+    min-height: 520px;
+    padding: 22px;
+  }
+  .newag__born-agent {
+    top: 26%;
+    left: 50%;
+    right: auto;
+    transform: translate(-50%, -50%);
+  }
+  .newag__born-agent .ac-avatar {
+    width: 108px;
+    height: 108px;
+  }
+  .newag__foot {
+    bottom: 10px;
+    margin-bottom: 10px;
+  }
+  .newag__hint {
+    display: none;
+  }
+  .newag__foot .ac-btn--primary {
+    flex: 1;
+  }
+  .newag__sect {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .newag__sect > .small {
+    flex-basis: 100%;
+    text-align: left;
+  }
+  .newag__money-field {
+    flex: 1 1 100%;
+    width: auto;
+  }
+  .newag .level-row__choice {
+    width: 100%;
+  }
+  .newag__pv-cover,
+  .newag__pv[data-big] .newag__pv-cover {
+    width: 92px;
+    min-height: 68px;
+  }
+  .newag--done .newag__main {
+    padding: 20px 16px 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .newag__content > *,
+  .newag__pv-cover,
+  .newag__role,
+  .newag__model,
+  .newag__tip,
+  .newag__opt,
+  .newag__swatch,
+  .newag__tog,
+  .newag__check {
+    animation: none;
+    transition: none;
+  }
+}
+
 /* Settings → Usage: one agent's spend against its budget (admins only). */
 .usage-agent__meter {
   flex: 0 0 160px;

@@ -1011,6 +1011,11 @@ textarea.ac-input {
   flex-direction: column;
   min-width: 0;
 }
+.ac-menu__leading {
+  flex: none;
+  display: inline-flex;
+  align-self: center;
+}
 .ac-menu__desc {
   font-size: 13px;
   line-height: 18px;

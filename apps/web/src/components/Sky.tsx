@@ -427,6 +427,53 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
   );
 }
 
+/* ---------- Criar agente ---------- */
+
+/** The live preview's cover: the draft agent's own sky, lighter right behind it so the body reads. */
+export function AgentPreviewSky({ color }: { color: AgentColor }) {
+  return (
+    <PixelSky
+      options={{
+        pixel: 4,
+        palette: agentTones(color),
+        body: spriteTone(color),
+        sprites: 4,
+        light: 0,
+        base: (u, v, tt) => {
+          const dx = (u - 0.5) * 1.6;
+          const dy = (v - 0.78) * 1.4;
+          return 0.86 - 0.28 * u - 0.5 * v + 0.42 * Math.exp(-(dx * dx + dy * dy) / 0.12) + 0.06 * S(u * 5 + tt * 0.4);
+        },
+      }}
+    />
+  );
+}
+
+/** The created moment: the new agent's sky, a halo where it stands (`at`, in 0..1) and calm behind the words. */
+export function AgentBornSky({
+  color,
+  at,
+  calm,
+}: {
+  color: AgentColor;
+  at: [number, number];
+  calm: () => (Element | null)[];
+}) {
+  return (
+    <PixelSky
+      options={{
+        pixel: 4,
+        palette: agentTones(color),
+        body: spriteTone(color),
+        sprites: { area: 1200, max: 18 },
+        calm,
+        base: (u, v, tt) => 0.72 - 0.2 * u - 0.42 * v + 0.05 * S(u * 6 + tt * 0.5) + 0.04 * C(v * 7 - tt * 0.3),
+        blobs: () => [[at[0], at[1], 0.06, 0.42]],
+      }}
+    />
+  );
+}
+
 /** The onboarding's last card: a small sky, calm behind its text. */
 export function WelcomeSky({ calm }: { calm: () => (Element | null)[] }) {
   return (

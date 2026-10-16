@@ -1,4 +1,15 @@
-import { Avatar, Button, Checkbox, Chip, RadioCard, RadioGroup, SearchInput, Token, TokenList } from "@agenteschat/ui";
+import {
+  Avatar,
+  Button,
+  Checkbox,
+  Chip,
+  RadioCard,
+  RadioGroup,
+  SearchInput,
+  Segmented,
+  Token,
+  TokenList,
+} from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUpdateAgent } from "@/api/queries";
@@ -28,6 +39,7 @@ export function AudienceChip({ agent, compact }: { agent: Agent; compact?: boole
 /**
  * The three choices (Todos do workspace / Só algumas pessoas / Só o
  * responsável), with the people picker under "Só algumas pessoas".
+ * `compact`: a segmented control and one line about the choice ("Criar agente").
  */
 export function AudienceChoice({
   value,
@@ -35,12 +47,14 @@ export function AudienceChoice({
   ownerUserId,
   agentName,
   idPrefix,
+  compact,
 }: {
   value: AgentAudience;
   onChange: (next: AgentAudience) => void;
   ownerUserId: string | null;
   agentName: string;
   idPrefix: string;
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -58,33 +72,47 @@ export function AudienceChoice({
     else next.delete(userId);
     onChange({ ...value, userIds: [...next] });
   };
+  const modeText = (mode: AudienceMode) =>
+    mode === "owner"
+      ? owner
+        ? t("audience.modeText.owner", { ...g, owner: owner.name })
+        : t("audience.modeText.noOwner")
+      : t(`audience.modeText.${mode}`, g);
   return (
     <div className="stack-4" style={{ gap: 12 }}>
-      <RadioGroup
-        value={value.mode}
-        onValueChange={(mode) => onChange({ mode: mode as AudienceMode, userIds: value.userIds })}
-        aria-label={t("audience.title", g)}
-        className="stack-4"
-        style={{ gap: 8 }}
-      >
-        {MODES.map((mode) => (
-          <RadioCard
-            key={mode}
-            value={mode}
-            id={`${idPrefix}-${mode}`}
-            checked={value.mode === mode}
-            disabled={mode === "owner" && !ownerUserId}
-            title={t(`audience.mode.${mode}`)}
-            description={
-              mode === "owner"
-                ? owner
-                  ? t("audience.modeText.owner", { ...g, owner: owner.name })
-                  : t("audience.modeText.noOwner")
-                : t(`audience.modeText.${mode}`, g)
-            }
+      {compact ? (
+        <>
+          <Segmented
+            label={t("audience.title", g)}
+            value={value.mode}
+            onValueChange={(mode) => onChange({ mode, userIds: value.userIds })}
+            options={MODES.map((mode) => ({ value: mode, label: t(`audience.mode.${mode}`) }))}
           />
-        ))}
-      </RadioGroup>
+          <span className="small muted">
+            {modeText(value.mode)} {t("audience.notListed")}
+          </span>
+        </>
+      ) : (
+        <RadioGroup
+          value={value.mode}
+          onValueChange={(mode) => onChange({ mode: mode as AudienceMode, userIds: value.userIds })}
+          aria-label={t("audience.title", g)}
+          className="stack-4"
+          style={{ gap: 8 }}
+        >
+          {MODES.map((mode) => (
+            <RadioCard
+              key={mode}
+              value={mode}
+              id={`${idPrefix}-${mode}`}
+              checked={value.mode === mode}
+              disabled={mode === "owner" && !ownerUserId}
+              title={t(`audience.mode.${mode}`)}
+              description={modeText(mode)}
+            />
+          ))}
+        </RadioGroup>
+      )}
       {value.mode === "people" && (
         <div className="people-picker">
           <span className="ac-field__label">{t("audience.people")}</span>

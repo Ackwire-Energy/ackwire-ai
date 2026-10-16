@@ -1,5 +1,5 @@
 import { Button, EmptyState } from "@agenteschat/ui";
-import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
@@ -11,6 +11,7 @@ import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
 import { membershipIn } from "@/lib/guards";
+import { can } from "@/lib/permissions";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { RealtimeProvider } from "@/realtime/context";
 
@@ -28,6 +29,9 @@ export const Route = createFileRoute("/org/$orgId")({
 function OrgLayout() {
   const { me, membership } = Route.useRouteContext();
   const { t } = useTranslation();
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  // "Criar agente" is a focused flow with its own rail: no sidebar while it's open (admins only; others see why not).
+  const focused = /\/agents\/new\/?$/.test(path) && can(membership?.role, "manage_agents");
   useEffect(() => {
     if (membership) storage.set(STORAGE_KEYS.lastOrg, membership.id);
   }, [membership]);
@@ -60,9 +64,13 @@ function OrgLayout() {
             <div className="shell">
               <RefetchBar />
               <CommandMenu />
-              <NavScrim />
-              <Sidebar />
-              <ShellBar />
+              {!focused && (
+                <>
+                  <NavScrim />
+                  <Sidebar />
+                  <ShellBar />
+                </>
+              )}
               <Outlet />
             </div>
           </NavDrawerProvider>

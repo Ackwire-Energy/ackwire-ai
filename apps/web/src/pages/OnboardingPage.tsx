@@ -27,6 +27,7 @@ import { CommandBlock, countdown, NO_EXEC_FLAG, osOf, PAIR_POLL_MS, useNow } fro
 import { type ImportChoice, OnboardingImport } from "@/components/OnboardingImport";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
 import { OnboardingHorizon, WelcomeSky } from "@/components/Sky";
+import { StepRail } from "@/components/StepRail";
 import { ZonePicker } from "@/components/ZoneSelect";
 import {
   IMPORT_MAX_BYTES,
@@ -453,34 +454,20 @@ export function OnboardingPage() {
         <span className="onb__brand">
           <Logo size={22} />
         </span>
-        <nav aria-label={t("onboarding.stepsLabel")}>
-          <ol className="onb__steps">
-            {ONBOARDING_STEPS.map((s, i) => {
-              const isDone = done.has(s.id) && i !== index;
-              const name = t(`onboarding.stepNames.${s.id}`);
-              return (
-                <li key={s.id} data-done={isDone || undefined}>
-                  <button
-                    type="button"
-                    className="onb__step"
-                    aria-current={i === index ? "step" : undefined}
-                    disabled={i > reached || busy || (created === null && i > 0)}
-                    onClick={() => go(i)}
-                  >
-                    <span className="onb__n" aria-hidden="true">
-                      {isDone ? <Icon name="check" size={14} /> : i + 1}
-                    </span>
-                    <span className="onb__step-name">
-                      {name}
-                      {isDone && <span className="ac-visually-hidden"> {t("onboarding.stepDone")}</span>}
-                    </span>
-                    {s.optional && <span className="onb__opt">{t("onboarding.optionalTag")}</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-        </nav>
+        <StepRail
+          label={t("onboarding.stepsLabel")}
+          current={index}
+          onGo={go}
+          doneLabel={t("onboarding.stepDone")}
+          optionalLabel={t("onboarding.optionalTag")}
+          steps={ONBOARDING_STEPS.map((s, i) => ({
+            id: s.id,
+            name: t(`onboarding.stepNames.${s.id}`),
+            done: done.has(s.id),
+            disabled: i > reached || busy || (created === null && i > 0),
+            optional: s.optional,
+          }))}
+        />
         <div className="onb__guide">
           <p className="onb__bubble" role="status" aria-live="polite">
             {t(`onboarding.guide.${step.id}`)}

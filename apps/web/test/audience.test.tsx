@@ -8,6 +8,7 @@ import type { Agent } from "@/api/types";
 import { createI18n } from "@/i18n";
 import { audienceNotice, audienceSummary, canEditAudience, canTalk } from "@/lib/audience";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -71,14 +72,17 @@ describe("Quem pode falar com a Ada", () => {
 
   test("Criar agente: everyone by default, sent with the new agent", async () => {
     const state = await go("agents/new");
-    const group = screen().getByRole("radiogroup", { name: "Quem pode falar com o agente" });
+    await startAs("PM");
+    await proceed(3);
+    const group = screen().getByRole("radiogroup", { name: "Quem pode falar com o Theo" });
     expect(
       within(group)
         .getByRole("radio", { name: /Todos do workspace/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
     await click(within(group).getByRole("radio", { name: /Só o responsável/ }));
-    await act(async () => fireEvent.change(screen().getByLabelText("Nome"), { target: { value: "Theo" } }));
+    expect(document.body.textContent).toContain("Só Walter fala com o Theo.");
+    await proceed(2);
     await click(screen().getByRole("button", { name: "Criar Theo" }));
     await settle(6);
     expect(

@@ -17,12 +17,12 @@ import {
 } from "@/lib/access-levels";
 import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { fakeAccessTree } from "./fakes/access";
+import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
-const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
 const conns = [
   {
     id: "conn-gh",
@@ -242,17 +242,28 @@ describe("Configurações → Agentes e acesso: the matrix", () => {
 });
 
 describe("Criar agente → connector levels", () => {
-  test("the levels chosen for the connectors survive creation (nothing written afterwards replaces them)", async () => {
-    const state = seedState();
+  /** Opens "Criar agente" as QA (reads GitHub) and goes to "Ferramentas e acesso". */
+  const toTools = async (state = seedState()) => {
     const api = createFakeApi(state);
     await renderApp(`/org/${ORG_ID}/agents/new`, { api });
     await settle(8);
-    const levels = screen().getByRole("list", { name: "Conectores e níveis" });
-    const github = within(levels).getByRole("radiogroup", { name: "Nível em GitHub" });
-    // Our connectors start at "Ler".
+    await startAs("QA");
+    await proceed(2);
+    return api;
+  };
+  const githubLevels = () =>
+    within(screen().getByRole("list", { name: "Conectores e níveis" })).getByRole("radiogroup", {
+      name: "Nível em GitHub",
+    });
+
+  test("the levels chosen for the connectors survive creation (nothing written afterwards replaces them)", async () => {
+    const state = seedState();
+    const api = await toTools(state);
+    const github = githubLevels();
+    // QA starts reading GitHub.
     expect(within(github).getByRole("radio", { name: "Ler" }).getAttribute("aria-checked")).toBe("true");
     await click(within(github).getByRole("radio", { name: "Ler e escrever" }));
-    await type(screen().getByLabelText("Nome"), "Iris");
+    await proceed(3);
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
     const created = state.calls.find((c) => c.method === "agents.create");
@@ -272,15 +283,12 @@ describe("Criar agente → connector levels", () => {
 
   test("a connector left at Sem acesso isn't granted", async () => {
     const state = seedState();
-    await renderApp(`/org/${ORG_ID}/agents/new`, { api: createFakeApi(state) });
-    await settle(8);
-    const github = within(screen().getByRole("list", { name: "Conectores e níveis" })).getByRole("radiogroup", {
-      name: "Nível em GitHub",
-    });
-    await click(within(github).getByRole("radio", { name: "Sem acesso" }));
-    await type(screen().getByLabelText("Nome"), "Iris");
+    await toTools(state);
+    await click(within(githubLevels()).getByRole("radio", { name: "Sem acesso" }));
+    await proceed(3);
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
+    expect(state.calls.some((c) => c.method === "agents.create")).toBe(true);
     expect(state.calls.some((c) => c.method === "access.set")).toBe(false);
   });
 });

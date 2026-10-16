@@ -1,6 +1,6 @@
 import { type HTMLAttributes, useLayoutEffect, useRef } from "react";
 import type { Expression } from "../agent/engine.js";
-import { addLiveAgent, type LiveAgent } from "../agent/live";
+import { addLiveAgent, drawLive, type LiveAgent } from "../agent/live";
 import { cx } from "../cx";
 import { type AgentAppearance, appearanceStyle } from "./AgentLook";
 
@@ -66,13 +66,25 @@ function AgentBody({
     expression,
     seed: seedOf(name),
   };
+  const live = useRef<LiveAgent | null>(null);
   useLayoutEffect(() => {
     // The box is the canvas's parent: a parent's ref is not attached yet when a child's layout effect runs.
     const el = canvas.current;
     const host = el?.parentElement;
     if (!el || !host) return;
-    return addLiveAgent({ canvas: el, box: host, look: () => look.current });
+    live.current = { canvas: el, box: host, look: () => look.current };
+    const stop = addLiveAgent(live.current);
+    return () => {
+      live.current = null;
+      stop();
+    };
   }, []);
+  // The loop stands still with reduced motion: a new look (or face) is drawn at once.
+  const { color, eyes, accessory } = look.current;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: redraw when what is drawn changes
+  useLayoutEffect(() => {
+    if (live.current) drawLive(live.current, typeof performance === "object" ? performance.now() / 1000 : 0);
+  }, [color, eyes, accessory, state, expression]);
   return <canvas className="ac-avatar__canvas" ref={canvas} />;
 }
 

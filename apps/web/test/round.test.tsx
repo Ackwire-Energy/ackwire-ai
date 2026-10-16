@@ -7,6 +7,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { channelNameError, toChannelName } from "@/components/NewChannelDialog";
 import { modelChoices, suggestModel } from "@/lib/providers";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -169,11 +170,14 @@ describe("Detalhes do canal: membros", () => {
 describe("agent owner is optional", () => {
   test("Criar agente: 'Sem responsável' sends ownerUserId null, with the help text", async () => {
     const { state } = await go("agents/new");
+    await startAs("QA");
+    await proceed(3);
     await pick(screen().getByRole("combobox", { name: "Responsável" }), /Sem responsável/);
     expect(document.body.textContent).toContain(
       "Sem responsável, os admins recebem os avisos e aprovam as ações sensíveis.",
     );
-    await type(screen().getByLabelText("Nome"), "Iris");
+    expect(screen().getByRole("combobox", { name: "Responsável" }).textContent).toContain("Sem responsável");
+    await proceed(2);
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "agents.create")?.args[1]).toMatchObject({ ownerUserId: null });
@@ -217,19 +221,21 @@ describe("models by provider and the default key", () => {
     expect(suggestModel(models, "openai")).toBe("gpt-5");
   });
 
-  test("Criar agente: models grouped by provider, OpenAI disabled without a key; key defaults to the workspace's", async () => {
+  test("Criar agente: model cards by provider, OpenAI disabled without a key; key defaults to the workspace's", async () => {
     await go("agents/new");
-    const model = screen().getByRole("combobox", { name: "Modelo" });
-    model.focus();
-    await act(async () => fireEvent.keyDown(model, { key: "Enter" }));
-    const listbox = screen().getByRole("listbox");
-    expect(listbox.textContent).toContain("Anthropic");
-    expect(listbox.textContent).toContain("OpenAI");
-    const gpt = within(listbox).getByRole("option", { name: /GPT-5/ });
+    await startAs("QA");
+    await proceed(4);
+    const models = screen().getByRole("group", { name: "Modelo" });
+    const cards = within(models).getAllByRole("button");
+    expect(cards.map((c) => c.querySelector(".newag__model-prov")?.textContent)).toEqual([
+      "Anthropic",
+      "Anthropic",
+      "Anthropic",
+      "OpenAI",
+    ]);
+    const gpt = within(models).getByRole("button", { name: /GPT-5/ });
     expect(gpt.getAttribute("aria-disabled")).toBe("true");
     expect(gpt.textContent).toContain("Adicione uma chave da OpenAI para usar");
-    await act(async () => fireEvent.keyDown(listbox, { key: "Escape" }));
-    await act(() => new Promise((r) => setTimeout(r, 0)));
     const key = screen().getByRole("combobox", { name: "Chave" });
     expect(key.textContent).toContain("Chave padrão do workspace");
   });

@@ -10,6 +10,8 @@ export interface SelectOption<V extends string = string> {
   disabled?: boolean;
   /** Consecutive options with the same group get a heading (e.g. the model provider). */
   group?: string;
+  /** Something before the label in the list (a person's avatar, an icon). */
+  leading?: ReactNode;
 }
 
 export interface SelectProps<V extends string = string> {
@@ -25,6 +27,8 @@ export interface SelectProps<V extends string = string> {
   className?: string;
   /** Accessible name of the listbox; defaults to `aria-label`. */
   listLabel?: string;
+  /** What the trigger shows for the chosen option (default: its label), e.g. a card with an avatar. */
+  renderValue?: (option: SelectOption<V>) => ReactNode;
 }
 
 function renderItem<V extends string>(o: SelectOption<V>) {
@@ -33,6 +37,11 @@ function renderItem<V extends string>(o: SelectOption<V>) {
       <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
         <path d="m5.5 10.5 3 3 6-7" />
       </svg>
+      {o.leading && (
+        <span className="ac-menu__leading" aria-hidden="true">
+          {o.leading}
+        </span>
+      )}
       <span className="ac-menu__label">
         <RSelect.ItemText>{o.label}</RSelect.ItemText>
         {o.description && <span className="ac-menu__desc">{o.description}</span>}
@@ -67,9 +76,11 @@ export function Select<V extends string = string>({
   disabled,
   className,
   listLabel,
+  renderValue,
   ...rest
 }: SelectProps<V>) {
   const wiring = useFieldControl({ id });
+  const chosen = renderValue ? options.find((o) => o.value === value) : undefined;
   return (
     <div className={cx("ac-select", size === "sm" && "ac-select--sm", className)}>
       <RSelect.Root value={value} onValueChange={(v) => onValueChange(v as V)} disabled={disabled}>
@@ -81,7 +92,9 @@ export function Select<V extends string = string>({
           aria-invalid={wiring["aria-invalid"]}
         >
           <span className="ac-select__value">
-            <RSelect.Value placeholder={placeholder} />
+            <RSelect.Value placeholder={placeholder}>
+              {chosen && renderValue ? renderValue(chosen) : undefined}
+            </RSelect.Value>
           </span>
           <svg className="ac-select__chev" viewBox="0 0 20 20" aria-hidden="true">
             <path d="m6 8 4 4 4-4" />

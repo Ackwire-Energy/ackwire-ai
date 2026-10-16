@@ -393,23 +393,24 @@ describe("Membros", () => {
 describe("Criar agente", () => {
   test("role presets, validation, and creation in the chosen channels", async () => {
     const { state } = await go("agents/new");
-    expect(screen().getByRole("heading", { level: 1, name: "Criar agente" })).toBeTruthy();
-    const create = () => screen().getByRole("button", { name: /^Criar (agente|Íris)$/ });
-    expect(create().textContent).toBe("Criar agente");
-    expect(create().hasAttribute("disabled")).toBe(true);
+    expect(screen().getByRole("heading", { level: 1, name: "Qual vai ser o papel?" })).toBeTruthy();
     await click(screen().getByRole("button", { name: /^Dev/ }));
-    expect((screen().getByLabelText("Instruções") as HTMLTextAreaElement).value).toBe(
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    // Dev starts as Ada, and @ada is taken: renamed here.
+    await type(screen().getByLabelText("Nome"), "Íris");
+    await type(screen().getByLabelText("No chat"), "iris");
+    expect(screen().getByText("Mencione @iris para chamar.")).toBeTruthy();
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    expect((screen().getByLabelText("Instruções") as HTMLTextAreaElement).value).toStartWith(
       "Programa em branches e abre PRs pequenos, com teste para cada correção.",
     );
-    await type(screen().getByLabelText("Nome"), "Íris");
-    expect(screen().getByText("Como o time vai chamar no chat: @iris")).toBeTruthy();
+    for (let i = 0; i < 3; i++) await click(screen().getByRole("button", { name: "Continuar" }));
     await type(screen().getByLabelText("Orçamento mensal (US$)"), "0");
-    expect(screen().getByText("Use um valor maior que zero.")).toBeTruthy();
-    expect(create().hasAttribute("disabled")).toBe(true);
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    expect(screen().getAllByText("Use um valor maior que zero.").length).toBeGreaterThan(0);
     await type(screen().getByLabelText("Orçamento mensal (US$)"), "25");
-    expect(screen().getByRole("checkbox", { name: "#eng" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen().getByRole("checkbox", { name: "#general" }).getAttribute("aria-checked")).toBe("false");
-    await click(create());
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    await click(screen().getByRole("button", { name: "Criar Íris" }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "agents.create")?.args[1]).toMatchObject({
       name: "Íris",
@@ -422,12 +423,12 @@ describe("Criar agente", () => {
       monthlyBudgetUsd: 25,
     });
     expect(state.calls.find((c) => c.method === "agents.setChannels")?.args[2]).toEqual([{ channelId: ENG_ID }]);
-    // The connectors at their chosen level (GitHub starts at "Ler"): one write, after creation.
+    // Dev writes on GitHub: one write, after creation.
     const access = state.calls.filter((c) => c.method === "access.set");
     expect(access).toHaveLength(1);
-    const body = access[0]?.args[2] as { scopes: { connectionId: string | null; scope: string }[] };
-    const scopes = body.scopes;
-    expect(scopes.filter((g) => g.connectionId === "conn-gh").map((g) => g.scope)).toEqual(["github:repo.read"]);
+    expect((access[0]?.args[2] as { connectors?: Record<string, boolean> } | undefined)?.connectors).toEqual({
+      "conn-gh": true,
+    });
     expect(screen().getByRole("heading", { name: "Íris entrou no time" })).toBeTruthy();
     expect(document.body.textContent).toContain("Já está em #eng. Mencione @iris numa conversa para começar.");
     expect(screen().getByRole("link", { name: "Ir para o #eng" })).toBeTruthy();

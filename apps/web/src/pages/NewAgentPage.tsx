@@ -1,21 +1,37 @@
 import {
+  AffixInput,
+  AGENT_ACCESSORIES,
+  AGENT_COLORS,
+  AGENT_EYES,
+  type AgentAppearance,
+  type AgentColor,
+  Avatar,
+  agentGradient,
   Button,
   Card,
   CheckboxPill,
   EmptyState,
+  type Expression,
   Field,
+  Icon,
+  type IconName,
   Input,
-  OptionCard,
+  Kbd,
+  Logo,
+  modKey,
+  prefersReducedMotion,
+  randomAppearance,
   Select,
   type SelectOption,
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import {
+  useAgents,
   useChannels,
   useCreateAgent,
   useCredentials,
@@ -27,24 +43,45 @@ import {
   useSkills,
 } from "@/api/queries";
 import type { Agent, AgentAudience, Credential, Model } from "@/api/types";
-import { LevelRow, ResourceIcon, useConnectedById } from "@/components/AccessLevels";
-import { AudienceChoice, audienceValid } from "@/components/AgentAudience";
+import { LevelRow, useConnectedById } from "@/components/AccessLevels";
+import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { useMediaQuery } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
-import { SkillPicker } from "@/components/Skills";
+import { AgentBornSky, AgentPreviewSky, OnboardingHorizon } from "@/components/Sky";
+import { StepRail } from "@/components/StepRail";
 import { LEVELS, type Level, saveLevels } from "@/lib/access-levels";
-import { itemName } from "@/lib/connected";
-import { formatUsd, joinNames } from "@/lib/format";
+import { type ConnectedItem, itemName } from "@/lib/connected";
+import { joinNames } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
+import {
+  BLANK_LOOK,
+  cleanHandle,
+  type DraftCheck,
+  type DraftError,
+  firstInvalidStep,
+  freeHandle,
+  handleForName,
+  handleProblem,
+  NEW_AGENT_STEPS,
+  type NewAgentStep,
+  presetChannels,
+  presetLevels,
+  presetModel,
+  QUICK_BUDGETS,
+  ROLE_IDS,
+  ROLE_PRESETS,
+  type RoleId,
+  readBudget,
+  stepErrors,
+} from "@/lib/new-agent";
 import { can } from "@/lib/permissions";
 import { modelChoices, providerLabel } from "@/lib/providers";
-import { handleFrom, parseAmount } from "@/lib/text";
+import { scopeText } from "@/lib/scopes";
 
 /** Select value for "Sem responsável" (the API takes `ownerUserId: null`). */
 export const NO_OWNER = "__none__";
-
-export const ROLE_IDS = ["dev", "ops", "qa", "pm", "custom"] as const;
-export type RoleId = (typeof ROLE_IDS)[number];
 
 /** Model descriptions of the approved screen, by model family. */
 export function modelDescription(t: TFunction, locale: string, model: Model) {
@@ -105,126 +142,258 @@ export function modelOptions(
   );
 }
 
-/**
- * Starting level of each connection on "Criar agente": "Ler" for the
- * organization's own connectors (Drive starts off), nothing for servers
- * connected by address. Sensitive actions ask for approval at any level.
- */
-export function defaultLevel(item: { custom: boolean; def: { id: string } | null }): Level {
-  if (item.custom) return "none";
-  return item.def?.id === "drive" ? "none" : "read";
+/** How long the preview keeps writing after a keystroke. */
+const TYPING_MS = 700;
+
+/** The preview agent's mood: dash eyes while you type, a passing face when something lands (none with reduced motion). */
+function useDraftMood() {
+  const [typing, setTyping] = useState(false);
+  const [face, setFace] = useState<Expression | undefined>(undefined);
+  const timers = useRef<{ typing?: ReturnType<typeof setTimeout>; face?: ReturnType<typeof setTimeout> }>({});
+  useEffect(() => {
+    const t = timers.current;
+    return () => {
+      clearTimeout(t.typing);
+      clearTimeout(t.face);
+    };
+  }, []);
+  return {
+    typing,
+    face,
+    onTyping: () => {
+      if (prefersReducedMotion()) return;
+      setTyping(true);
+      clearTimeout(timers.current.typing);
+      timers.current.typing = setTimeout(() => setTyping(false), TYPING_MS);
+    },
+    react: (expression: Expression, ms = 1200) => {
+      if (prefersReducedMotion()) return;
+      setTyping(false);
+      setFace(expression);
+      clearTimeout(timers.current.face);
+      timers.current.face = setTimeout(() => setFace(undefined), ms);
+    },
+  };
 }
 
-/** telas/NovoAgente.dc.html */
+/** "US$ 10", "US$ 12,50": whole amounts without cents. */
+const usd = (t: TFunction, locale: string, n: number) =>
+  t("format.usd", { value: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n) });
+
+/** 1–3 bars by price among the catalog's models (cheapest third = 1). */
+function priceTier(model: Model, models: Model[]) {
+  const prices = [...new Set(models.map((m) => m.outputUsdPerMTok))].sort((a, b) => a - b);
+  const rank = prices.indexOf(model.outputUsdPerMTok);
+  return prices.length <= 1 ? 2 : Math.min(3, 1 + Math.floor((3 * rank) / prices.length));
+}
+
+interface Created {
+  agent: Agent;
+  look: Required<AgentAppearance>;
+  channels: { id: string; name: string }[];
+  ownerName: string | null;
+}
+
+/** docs/design/telas/NovoAgente.html — the steps on a rail, a live preview of the agent on the right. */
 export function NewAgentPage() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const allowed = can(org.role, "manage_agents");
+  if (!allowed) {
+    return (
+      <main className="shell__main">
+        <div className="page page--narrow">
+          <header className="page__header">
+            <h1 className="page-title">{t("newAgent.title")}</h1>
+          </header>
+          <EmptyState icon="agent">{t("newAgent.adminsOnly", { org: org.name })}</EmptyState>
+        </div>
+      </main>
+    );
+  }
+  return <NewAgentFlow />;
+}
+
+function NewAgentFlow() {
   const { t, i18n } = useTranslation();
+  const locale = i18n.language;
   const { org, me } = useOrg();
   const api = useApi();
-  const allowed = can(org.role, "manage_agents");
   const members = useMembers(org.id);
+  const agents = useAgents(org.id);
   const models = useModels();
-  const credentials = useCredentials(org.id, allowed);
+  const credentials = useCredentials(org.id);
   const channels = useChannels(org.id);
   const dms = useDms(org.id);
-  const dmChannels = useMemo(() => new Set((dms.data ?? []).map((d) => d.channelId)), [dms.data]);
-  // What the agent can use: one level per connection (the same levels as the agent page).
-  const connected = useConnectedById();
-  const connectedList = useMemo(() => [...connected.values()], [connected]);
-  const [levels, setLevels] = useState<Record<string, Level>>({});
-  const create = useCreateAgent(org.id);
   const platform = usePlatformKey(org.id);
   const settings = useSettings(org.id);
+  const library = useSkills(org.id);
+  const create = useCreateAgent(org.id);
+  const connected = useConnectedById();
+  const connectedList = useMemo(() => [...connected.values()], [connected]);
+  const mood = useDraftMood();
+  const root = useRef<HTMLDivElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const phone = useMediaQuery("(max-width: 820px)");
 
-  const [role, setRole] = useState<RoleId>("qa");
+  // Navigation
+  const [index, setIndex] = useState(0);
+  const [reached, setReached] = useState(0);
+  const [tried, setTried] = useState<Set<NewAgentStep>>(new Set());
+  const [created, setCreated] = useState<Created | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  // The draft
+  const [role, setRole] = useState<RoleId | null>(null);
   const [name, setName] = useState("");
+  const [handle, setHandle] = useState("");
+  const [handleTouched, setHandleTouched] = useState(false);
+  const [look, setLook] = useState<Required<AgentAppearance>>(BLANK_LOOK);
+  const [instructions, setInstructions] = useState("");
+  const [levels, setLevels] = useState<Record<string, Level>>({});
+  const [skillIds, setSkillIds] = useState<Set<string> | null>(null);
+  const [channelIds, setChannelIds] = useState<Set<string>>(new Set());
   const [owner, setOwner] = useState(me.user.id);
   const [audience, setAudience] = useState<AgentAudience>({ mode: "everyone", userIds: [] });
-  const [instructions, setInstructions] = useState(t("newAgent.roles.qa.instructions"));
   const [model, setModel] = useState<string | undefined>(undefined);
-  const [key, setKey] = useState<string | undefined>(undefined);
+  const [key, setKey] = useState(DEFAULT_KEY);
   // Empty = the workspace default budget (every agent has one).
   const [budget, setBudget] = useState("");
-  const [on, setOn] = useState<Record<string, boolean>>({});
-  // "Skills" (optional): only when the library exists and has something.
-  const library = useSkills(org.id);
-  const [skillIds, setSkillIds] = useState<Set<string> | null>(null);
-  // Skills marked "Ligar em agentes novos" start checked.
-  useEffect(() => {
-    if (library.data && skillIds === null)
-      setSkillIds(new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)));
-  }, [library.data, skillIds]);
-  const [created, setCreated] = useState<{ agent: Agent; channels: { id: string; name: string }[] } | null>(null);
 
+  const step = NEW_AGENT_STEPS[index] ?? "role";
+  const total = NEW_AGENT_STEPS.length;
+  const dmChannels = useMemo(() => new Set((dms.data ?? []).map((d) => d.channelId)), [dms.data]);
   const myChannels = useMemo(
     () => (channels.data ?? []).filter((c) => c.isMember && !dmChannels.has(c.id)),
     [channels.data, dmChannels],
   );
+  const choices = useMemo(
+    () => modelChoices(models.data?.models ?? [], credentials.data ?? [], platform.data ?? false),
+    [models.data, credentials.data, platform.data],
+  );
+  const usable = useMemo(
+    () => new Set(choices.flatMap(([, list]) => list.filter((c) => c.available).map((c) => c.model.id))),
+    [choices],
+  );
+  const taken = useMemo(
+    () =>
+      new Set([
+        ...(agents.data ?? []).map((a) => a.handle.toLowerCase()),
+        ...(members.data ?? []).map((m) => m.handle?.toLowerCase()).filter((h): h is string => Boolean(h)),
+      ]),
+    [agents.data, members.data],
+  );
+
+  // Defaults once the data arrives: the deployment's usable model, the skills on for new agents, the levels.
   useEffect(() => {
     if (model || !models.data || !credentials.data) return;
-    // The deployment's default, unless the workspace has no key for its provider.
-    const usable = modelOptions(t, i18n.language, models.data.models, credentials.data, platform.data ?? false).filter(
-      (o) => !o.disabled,
-    );
-    setModel(
-      usable.find((o) => o.value === models.data.defaultModel)?.value ?? usable[0]?.value ?? models.data.defaultModel,
-    );
-  }, [model, models.data, credentials.data, platform.data, t, i18n.language]);
+    setModel(presetModel("sonnet", models.data.models, (m) => usable.has(m.id), models.data.defaultModel));
+  }, [model, models.data, credentials.data, usable]);
   useEffect(() => {
-    if (!key) setKey(DEFAULT_KEY);
-  }, [key]);
+    if (library.data && skillIds === null)
+      setSkillIds(new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)));
+  }, [library.data, skillIds]);
   useEffect(() => {
-    // Defaults like the screen: the channels you're in, and reading the connectors.
-    setOn((prev) => {
-      const next = { ...prev };
-      for (const c of myChannels) if (next[`ch:${c.id}`] === undefined) next[`ch:${c.id}`] = c.name !== "general";
-      return next;
-    });
     setLevels((prev) => {
-      const next = { ...prev };
-      for (const item of connectedList) next[item.id] ??= defaultLevel(item);
-      return next;
+      const missing = connectedList.filter((i) => prev[i.id] === undefined);
+      if (missing.length === 0) return prev;
+      return { ...prev, ...presetLevels(role ?? "custom", missing) };
     });
-  }, [myChannels, connectedList]);
+  }, [connectedList, role]);
 
-  if (!allowed) {
-    return (
-      <div className="page page--narrow">
-        <header className="page__header">
-          <h1 className="page-title">{t("newAgent.title")}</h1>
-        </header>
-        <EmptyState icon="agent">{t("newAgent.adminsOnly", { org: org.name })}</EmptyState>
-      </div>
-    );
-  }
-
+  const ownerId = owner === NO_OWNER ? null : owner;
+  const ownerMember = (members.data ?? []).find((m) => m.userId === ownerId);
+  const ownerFirst = ownerMember?.name.split(/\s+/)[0] ?? null;
   const displayName = name.trim() || t("newAgent.defaultName");
-  const handle = handleFrom(name.trim() || t("newAgent.defaultName"));
-  const amount = budget.trim() === "" ? null : parseAmount(budget);
-  const budgetInvalid = amount !== null && !(amount > 0);
-  const defaultBudget = settings.data?.defaultAgentBudgetUsd;
-  const cannotCreate = budgetInvalid || !name.trim() || create.isPending;
-
-  const pickRole = (id: RoleId) => {
-    setRole(id);
-    setInstructions(t(`newAgent.roles.${id}.instructions`));
+  const previewName = name.trim() || t("newAgent.previewName");
+  const g = agentGrammar(t, displayName);
+  const rolePreset = role ? ROLE_PRESETS[role] : null;
+  const roleName = role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : null;
+  const check: DraftCheck = {
+    role,
+    name,
+    handle,
+    taken,
+    ownerUserId: ownerId,
+    audience,
+    budget,
+    modelOk: Boolean(model && usable.has(model)),
   };
+  const errors = tried.has(step) ? stepErrors(step, check) : [];
+  const errorOf = (field: DraftError["field"]) => errors.find((e) => e.field === field);
+  // A taken or malformed @ shows while typing; a missing one only after trying to go on.
+  const liveHandle = handle ? handleProblem(handle, taken) : null;
+  const handleError = errorOf("handle") ?? (liveHandle ? { field: "handle" as const, code: liveHandle } : undefined);
+  const errorText = (e: DraftError): string => {
+    if (e.field === "role") return t("newAgent.errors.roleRequired");
+    if (e.field === "name") return t("newAgent.errors.nameRequired");
+    if (e.field === "handle") {
+      if (e.code === "taken")
+        return t("newAgent.errors.handleTaken", { handle, suggestion: freeHandle(handle, taken) });
+      return e.code === "empty" ? t("newAgent.errors.handleEmpty") : t("newAgent.errors.handleFormat");
+    }
+    if (e.field === "audience")
+      return e.code === "noOwner" ? t("audience.modeText.noOwner") : t("audience.pickSomeone");
+    if (e.field === "budget") return t("newAgent.budgetInvalid");
+    return t("newAgent.errors.modelUnavailable");
+  };
+  const { amount, invalid: budgetInvalid } = readBudget(budget);
+  const defaultBudget = settings.data?.defaultAgentBudgetUsd;
+  const budgetShown = amount ?? defaultBudget;
+  const modelInfo = (models.data?.models ?? []).find((m) => m.id === model);
+  const keys = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
+  const keyLabel = keys.find((k) => k.value === key)?.label ?? t("newAgent.defaultKey");
+  const granted = connectedList.filter((i) => (levels[i.id] ?? "none") !== "none");
+  const skills = (library.data ?? []).filter((s) => skillIds?.has(s.id));
+  const joined = myChannels.filter((c) => channelIds.has(c.id));
+  const asksOf = (item: ConnectedItem) =>
+    (item.def?.scopes ?? []).filter((s) => s.sensitive).map((s) => scopeText(t, s).label);
 
+  const scrollTop = () => {
+    try {
+      root.current?.scrollTo?.({ top: 0 });
+    } catch {
+      // happy-dom without scrolling.
+    }
+  };
+  const goTo = (i: number) => {
+    const next = Math.max(0, Math.min(total - 1, i));
+    setIndex(next);
+    setReached((r) => Math.max(r, next));
+    setPreviewOpen(false);
+    scrollTop();
+  };
+  // Moving between steps puts the focus on the new step's title (not on the first render).
+  const moved = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on step change only
+  useEffect(() => {
+    if (moved.current) heading.current?.focus();
+    moved.current = true;
+  }, [index, created]);
+
+  const fail = (s: NewAgentStep) => {
+    setTried((prev) => new Set(prev).add(s));
+    mood.react("surprised", 1100);
+  };
   const submit = async () => {
-    if (cannotCreate) return;
+    const bad = firstInvalidStep(check);
+    if (bad >= 0) {
+      const s = NEW_AGENT_STEPS[bad] ?? "role";
+      fail(s);
+      goTo(bad);
+      return;
+    }
     const agent = await create.mutateAsync({
       name: name.trim(),
       handle,
-      role: role === "custom" ? "" : t(`newAgent.roles.${role}.name`),
+      role: role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : "",
       instructions,
       model,
-      ownerUserId: owner === NO_OWNER ? null : owner,
-      audience: audienceValid(audience, owner === NO_OWNER ? null : owner)
-        ? { mode: audience.mode, userIds: audience.mode === "people" ? audience.userIds : [] }
-        : { mode: "everyone", userIds: [] },
-      credentialId: key && key !== DEFAULT_KEY ? key : null,
+      ownerUserId: ownerId,
+      audience: { mode: audience.mode, userIds: audience.mode === "people" ? audience.userIds : [] },
+      credentialId: key !== DEFAULT_KEY ? key : null,
       monthlyBudgetUsd: amount,
+      appearance: look,
     });
-    const joined = myChannels.filter((c) => on[`ch:${c.id}`]);
     if (joined.length > 0) {
       await api.agents.setChannels(
         org.id,
@@ -248,220 +417,1192 @@ export function NewAgentPage() {
         libraryList.map((s) => ({ skillId: s.id, enabled: skillIds?.has(s.id) ?? s.defaultForNewAgents })),
       );
     }
-    setCreated({ agent, channels: joined.map((c) => ({ id: c.id, name: c.name })) });
+    setCreated({
+      agent,
+      look,
+      channels: joined.map((c) => ({ id: c.id, name: c.name })),
+      ownerName: ownerFirst,
+    });
+    mood.react("happy", 2200);
+    scrollTop();
+  };
+  const next = () => {
+    if (created || create.isPending) return;
+    if (stepErrors(step, check).length > 0) {
+      fail(step);
+      setTimeout(() => root.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus());
+      return;
+    }
+    if (index === total - 1) {
+      void submit().catch(() => {});
+      return;
+    }
+    mood.react("happy", 900);
+    goTo(index + 1);
+  };
+  const back = () => {
+    if (created || index === 0) return;
+    goTo(index - 1);
+  };
+  const reset = () => {
+    setCreated(null);
+    setIndex(0);
+    setReached(0);
+    setTried(new Set());
+    setRole(null);
+    setName("");
+    setHandle("");
+    setHandleTouched(false);
+    setLook(BLANK_LOOK);
+    setInstructions("");
+    setLevels(presetLevels("custom", connectedList));
+    setSkillIds(library.data ? new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)) : null);
+    setChannelIds(new Set());
+    setOwner(me.user.id);
+    setAudience({ mode: "everyone", userIds: [] });
+    setModel(undefined);
+    setKey(DEFAULT_KEY);
+    setBudget("");
+    scrollTop();
   };
 
-  if (created) {
-    const first = created.channels[0];
-    const names = joinNames(
-      created.channels.map((c) => `#${c.name}`),
-      t("newAgent.and"),
-    );
+  // Keyboard: Enter goes on (⌘/Ctrl+Enter inside the instructions), Esc goes back (or leaves a field).
+  const keyboard = useRef({ next, back });
+  keyboard.current = { next, back };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing) return;
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      const inside = !target || target === document.body || Boolean(root.current?.contains(target));
+      if (!inside) return;
+      const tag = target?.tagName;
+      if (e.key === "Enter" && !e.shiftKey && !e.altKey) {
+        if (tag === "TEXTAREA" && !(e.metaKey || e.ctrlKey)) return;
+        // Buttons and links act on their own (Continuar too); so do radios, checkboxes and pickers.
+        if (tag === "BUTTON" || tag === "A") return;
+        if (tag === "INPUT" && (target as HTMLInputElement).type === "search") return;
+        if (target?.getAttribute("role") && tag !== "INPUT" && tag !== "TEXTAREA") return;
+        e.preventDefault();
+        keyboard.current.next();
+      } else if (e.key === "Escape") {
+        if (tag === "INPUT" || tag === "TEXTAREA") {
+          target?.blur();
+          return;
+        }
+        keyboard.current.back();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  /* ---------- Changes that also move the preview ---------- */
+
+  const pickRole = (id: RoleId) => {
+    const preset = ROLE_PRESETS[id];
+    const agentName = id === "custom" ? "" : t(`newAgent.roles.${id}.agent`);
+    setRole(id);
+    setName(agentName);
+    setHandle(handleForName(agentName));
+    setHandleTouched(false);
+    setLook({ ...preset.look });
+    setInstructions(t(`newAgent.roles.${id}.instructions`));
+    setLevels(presetLevels(id, connectedList));
+    setChannelIds(new Set(presetChannels(id, myChannels)));
+    if (models.data) setModel(presetModel(preset.model, models.data.models, (m) => usable.has(m.id), model));
+    setTried((prev) => {
+      const nextTried = new Set(prev);
+      nextTried.delete("role");
+      return nextTried;
+    });
+    if (id !== role) mood.react(id === "custom" ? "wink" : "happy", 1400);
+  };
+  const changeName = (value: string) => {
+    const had = Boolean(name.trim());
+    setName(value);
+    if (!handleTouched) setHandle(handleForName(value));
+    if (!had && value.trim()) mood.react("happy", 1200);
+    else mood.onTyping();
+  };
+  const setLevel = (id: string, level: Level) => {
+    setLevels((prev) => ({ ...prev, [id]: level }));
+    if (level === "write") mood.react("star", 900);
+  };
+  const toggle = (set: Set<string>, id: string, on: boolean) => {
+    const nextSet = new Set(set);
+    if (on) nextSet.add(id);
+    else nextSet.delete(id);
+    return nextSet;
+  };
+
+  /* ---------- The step's content ---------- */
+
+  const head = (title: string, lead: string) => (
+    <header className="onb__head">
+      <p className="onb__eyebrow">{t("newAgent.stepOf", { n: index + 1, total })}</p>
+      <h1 className="onb__title newag__title" ref={heading} tabIndex={-1}>
+        {title}
+      </h1>
+      <p className="onb__lead">{lead}</p>
+    </header>
+  );
+  const errorLine = (e: DraftError | undefined) =>
+    e ? (
+      <span className="newag__err" role="alert">
+        <Icon name="info" size={14} />
+        {errorText(e)}
+      </span>
+    ) : null;
+  const connectorChip = (item: ConnectedItem) => {
+    const n = itemName(t, item);
     return (
-      <div className="page page--narrow">
-        <Card padded as="div" style={{ alignItems: "flex-start", gap: 16 }}>
-          <AgentAvatar agent={created.agent} size="lg" name={created.agent.name} running />
-          <h1 className="page-title">{t("newAgent.createdTitle", { name: created.agent.name })}</h1>
-          <p className="page-sub" style={{ maxWidth: "60ch" }}>
-            {created.channels.length > 0
-              ? t("newAgent.createdText", { channels: names, handle: created.agent.handle })
-              : t("newAgent.createdTextNoChannels", { name: created.agent.name, handle: created.agent.handle })}
-          </p>
-          <div className="row">
-            {first ? (
-              <Button asChild variant="primary">
-                <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: first.id }}>
-                  {t("newAgent.goTo", { channel: first.name })}
-                </Link>
-              </Button>
-            ) : (
-              <Button asChild variant="primary">
-                <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: created.agent.id }}>
-                  {t("newAgent.openProfile")}
-                </Link>
-              </Button>
-            )}
-            <Button
-              onClick={() => {
-                setCreated(null);
-                setName("");
-              }}
+      <span key={item.id} className="ac-chip newag__chip">
+        <ConnectorIcon def={item.def} label={n} />
+        {t(levels[item.id] === "write" ? "newAgent.preview.readsWrites" : "newAgent.preview.reads", { name: n })}
+      </span>
+    );
+  };
+  const chip = (icon: IconName, text: string, k?: string) => (
+    <span key={k ?? text} className="ac-chip">
+      <Icon name={icon} />
+      {text}
+    </span>
+  );
+  const audienceText = () => {
+    if (audience.mode === "everyone") return t("audience.summary.everyone");
+    if (audience.mode === "owner")
+      return ownerFirst ? t("audience.summary.owner", { name: ownerFirst }) : t("audience.summary.nobody");
+    const names = (members.data ?? [])
+      .filter((m) => m.userId === ownerId || audience.userIds.includes(m.userId))
+      .map((m) => m.name.split(/\s+/)[0] ?? m.name);
+    return names.length ? joinNames(names, t("newAgent.and")) : t("audience.summary.nobody");
+  };
+
+  const views: Record<NewAgentStep, () => ReactNode> = {
+    role: () => (
+      <>
+        {head(t("newAgent.steps.role.title"), t("newAgent.steps.role.lead"))}
+        {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+        <div className="newag__roles" role="group" aria-label={t("newAgent.steps.role.name")}>
+          {ROLE_IDS.filter((id): id is Exclude<RoleId, "custom"> => id !== "custom").map((id) => {
+            const preset = ROLE_PRESETS[id];
+            const kit = connectedList.filter((i) => i.def && (preset.levels[i.def.id] ?? "none") !== "none");
+            const room = presetChannels(id, myChannels)
+              .map((cid) => myChannels.find((c) => c.id === cid)?.name)
+              .filter(Boolean)[0];
+            return (
+              <button
+                key={id}
+                type="button"
+                className="newag__role"
+                aria-pressed={role === id}
+                onClick={() => pickRole(id)}
+              >
+                <span className="newag__check" aria-hidden="true">
+                  <Icon name="check" size={14} />
+                </span>
+                <span className="newag__role-top">
+                  <AgentAvatar
+                    name={t(`newAgent.roles.${id}.agent`)}
+                    appearance={preset.look}
+                    size="lg"
+                    className="newag__role-agent"
+                  />
+                  <span className="newag__role-name">
+                    <b>{t(`newAgent.roles.${id}.name`)}</b>
+                    <span>{t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) })}</span>
+                  </span>
+                </span>
+                <span className="newag__role-desc">{t(`newAgent.roles.${id}.desc`)}</span>
+                {(kit.length > 0 || room) && (
+                  <span className="newag__chips">
+                    {kit.slice(0, 3).map((i) => (
+                      <span key={i.id} className="ac-chip newag__chip">
+                        <ConnectorIcon def={i.def} label={itemName(t, i)} />
+                        {itemName(t, i)}
+                      </span>
+                    ))}
+                    {room && chip("channel", room)}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className="newag__role newag__role--blank"
+            aria-pressed={role === "custom"}
+            onClick={() => pickRole("custom")}
+          >
+            <span className="newag__check" aria-hidden="true">
+              <Icon name="check" size={14} />
+            </span>
+            <span className="newag__blank-icon" aria-hidden="true">
+              <Icon name="plus" />
+            </span>
+            <span className="newag__role-name">
+              <b>{t("newAgent.roles.custom.name")}</b>
+              <span>{t("newAgent.roles.custom.desc")}</span>
+            </span>
+          </button>
+        </div>
+        {errorLine(errorOf("role"))}
+      </>
+    ),
+    identity: () => (
+      <>
+        {head(t("newAgent.steps.identity.title"), t("newAgent.steps.identity.lead"))}
+        <Card as="div" className="newag__card">
+          <div className="newag__grid2">
+            <Field
+              label={t("newAgent.name")}
+              id="ag-name"
+              error={errorOf("name") ? errorText(errorOf("name") as DraftError) : undefined}
             >
-              {t("newAgent.createAnother")}
-            </Button>
+              <Input
+                className="newag__big"
+                value={name}
+                maxLength={32}
+                autoComplete="off"
+                placeholder={t("newAgent.namePlaceholder")}
+                onChange={(e) => changeName(e.target.value)}
+              />
+            </Field>
+            <Field
+              label={t("newAgent.handle")}
+              id="ag-handle"
+              error={handleError ? errorText(handleError) : undefined}
+              help={handle ? t("newAgent.handleHelp", { handle }) : t("newAgent.handleEmpty")}
+            >
+              <AffixInput
+                className="newag__big"
+                prefix="@"
+                value={handle}
+                maxLength={32}
+                autoComplete="off"
+                placeholder={t("newAgent.handlePlaceholder")}
+                onChange={(e) => {
+                  setHandleTouched(true);
+                  setHandle(cleanHandle(e.target.value));
+                  mood.onTyping();
+                }}
+              />
+            </Field>
           </div>
         </Card>
+        <div className="newag__sect">
+          <h2>{t("newAgent.look")}</h2>
+          <Button
+            size="sm"
+            icon="shuffle"
+            onClick={() => {
+              setLook((l) => ({ ...BLANK_LOOK, ...randomAppearance(l) }) as Required<AgentAppearance>);
+              mood.react("dizzy", 1000);
+            }}
+          >
+            {t("newAgent.shuffle")}
+          </Button>
+        </div>
+        <Card as="div" className="newag__card newag__look">
+          <div className="newag__look-row">
+            <span className="newag__label">
+              {t("look.color")} <span className="newag__opt-label">{t(`look.colors.${look.color}`)}</span>
+            </span>
+            {/* biome-ignore lint/a11y/useSemanticElements: pressable swatches, not a native fieldset */}
+            <div className="newag__swatches" role="group" aria-label={t("look.color")}>
+              {AGENT_COLORS.map((c) => {
+                const [top, bottom] = agentGradient(c);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    className="newag__swatch"
+                    aria-label={t(`look.colors.${c}`)}
+                    aria-pressed={look.color === c}
+                    style={{ "--a": top, "--b": bottom } as CSSProperties}
+                    onClick={() => {
+                      setLook((l) => ({ ...l, color: c }));
+                      mood.react("happy", 1100);
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+          <div className="newag__look-row">
+            <span className="newag__label">{t("look.eyes")}</span>
+            {/* biome-ignore lint/a11y/useSemanticElements: pressable options, not a native fieldset */}
+            <div className="newag__opts" role="group" aria-label={t("look.eyes")}>
+              {AGENT_EYES.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  className="newag__opt"
+                  aria-pressed={look.eyes === e}
+                  onClick={() => {
+                    setLook((l) => ({ ...l, eyes: e }));
+                    mood.react("wink", 700);
+                  }}
+                >
+                  <span className="newag__stage">
+                    <AgentAvatar name={t(`look.eyesNames.${e}`)} appearance={{ ...look, eyes: e, accessory: "none" }} />
+                  </span>
+                  {t(`look.eyesNames.${e}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="newag__look-row">
+            <span className="newag__label">
+              {t("look.accessory")} <span className="newag__opt-label">{t("newAgent.optional")}</span>
+            </span>
+            {/* biome-ignore lint/a11y/useSemanticElements: pressable options, not a native fieldset */}
+            <div className="newag__opts newag__opts--acc" role="group" aria-label={t("look.accessory")}>
+              {AGENT_ACCESSORIES.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  className="newag__opt"
+                  aria-pressed={look.accessory === a}
+                  onClick={() => {
+                    setLook((l) => ({ ...l, accessory: a }));
+                    if (a !== "none") mood.react("happy", 900);
+                  }}
+                >
+                  <span className="newag__stage">
+                    {a === "none" ? (
+                      <Icon name="block" />
+                    ) : (
+                      <AgentAvatar size="sm" name={t(`look.accessories.${a}`)} appearance={{ ...look, accessory: a }} />
+                    )}
+                  </span>
+                  {t(`look.accessories.${a}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Card>
+      </>
+    ),
+    instructions: () => {
+      const original = role ? t(`newAgent.roles.${role}.instructions`) : "";
+      const changed = role !== null && role !== "custom" && instructions !== original;
+      return (
+        <>
+          {head(t("newAgent.steps.instructions.title", g), t("newAgent.steps.instructions.lead"))}
+          <Textarea
+            className="newag__textarea"
+            rows={9}
+            aria-label={t("newAgent.instructions")}
+            placeholder={t("newAgent.instructionsPlaceholder")}
+            value={instructions}
+            onChange={(e) => {
+              setInstructions(e.target.value);
+              mood.onTyping();
+            }}
+          />
+          <div className="newag__ta-meta">
+            <span className="newag__origin">
+              {role && role !== "custom" ? (
+                <>
+                  <Icon name={ROLE_PRESETS[role].icon} size={14} />
+                  {t("newAgent.startedFrom", { role: roleName })}
+                </>
+              ) : (
+                <>
+                  <Icon name="edit" size={14} />
+                  {t("newAgent.roles.custom.name")}
+                </>
+              )}
+              {changed && (
+                <Button size="sm" variant="ghost" icon="undo" onClick={() => setInstructions(original)}>
+                  {t("newAgent.restore")}
+                </Button>
+              )}
+            </span>
+            <span className="newag__count">
+              <span aria-hidden="true">{instructions.length}</span>
+              <span className="ac-visually-hidden">{t("newAgent.characters", { count: instructions.length })}</span>
+            </span>
+          </div>
+          <div className="newag__tips">
+            {(["do", "avoid", "help"] as const).map((tip) => (
+              <button
+                key={tip}
+                type="button"
+                className="newag__tip"
+                onClick={() => {
+                  const add = t(`newAgent.tips.${tip}.text`, { name: me.user.name.split(/\s+/)[0] });
+                  setInstructions((v) => (v.trim() ? `${v.replace(/\s+$/, "")}\n` : "") + add);
+                  setTimeout(() => {
+                    const ta = root.current?.querySelector<HTMLTextAreaElement>("textarea");
+                    ta?.focus();
+                    ta?.setSelectionRange?.(ta.value.length, ta.value.length);
+                  });
+                }}
+              >
+                <b>
+                  <Icon name="plus" size={14} />
+                  {t(`newAgent.tips.${tip}.title`)}
+                </b>
+                <span>{t(`newAgent.tips.${tip}.desc`)}</span>
+              </button>
+            ))}
+          </div>
+          <p className="newag__note">
+            <Icon name="info" size={16} />
+            <span>{t("newAgent.contextNote", { ...g, org: org.name })}</span>
+          </p>
+          {!instructions.trim() && <p className="small muted">{t("newAgent.noInstructions", g)}</p>}
+        </>
+      );
+    },
+    tools: () => (
+      <>
+        {head(t("newAgent.steps.tools.title"), t("newAgent.steps.tools.lead", { ...g, org: org.name }))}
+        <Card as="div" className="newag__card">
+          {connectedList.length > 0 ? (
+            <>
+              <div className="newag__list-head">
+                <span className="small muted">{t("newAgent.connectedCount", { count: connectedList.length })}</span>
+                <span className="newag__quick">
+                  {t("newAgent.all")}
+                  <Button size="sm" variant="ghost" onClick={() => setLevels(presetLevels("custom", connectedList))}>
+                    {t("access.level.none")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setLevels(Object.fromEntries(connectedList.map((i) => [i.id, "read" as Level])))}
+                  >
+                    {t("access.level.read")}
+                  </Button>
+                </span>
+              </div>
+              <ul className="level-list" aria-label={t("newAgent.connectorsLabel")}>
+                {connectedList.map((item) => {
+                  const n = itemName(t, item);
+                  const level = levels[item.id] ?? "none";
+                  return (
+                    <LevelRow
+                      key={item.id}
+                      icon={<ConnectorIcon def={item.def} label={n} />}
+                      name={n}
+                      description={item.account}
+                      asks={level === "write" ? asksOf(item) : []}
+                      levels={LEVELS}
+                      value={level}
+                      onChange={(l) => setLevel(item.id, l)}
+                    />
+                  );
+                })}
+              </ul>
+            </>
+          ) : (
+            <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>
+          )}
+          <Link
+            className="newag__addrow"
+            to="/org/$orgId/settings/$section"
+            params={{ orgId: org.id, section: "connectors" }}
+          >
+            <Icon name="plug" />
+            {t("newAgent.connectOther")}
+            <span className="newag__addrow-aside">{t("newAgent.opensConnectors")}</span>
+          </Link>
+        </Card>
+        <p className="newag__note">
+          <Icon name="shield" size={16} />
+          <span>
+            <b>{t("newAgent.approvalsNote")}</b>{" "}
+            {ownerFirst ? t("newAgent.approverOwner", { name: ownerFirst }) : t("newAgent.approverAdmins")}
+          </span>
+        </p>
+        {(library.data ?? []).length > 0 && (
+          <section className="newag__section" aria-labelledby="ag-skills">
+            <div className="newag__sect">
+              <h2 id="ag-skills">
+                <Icon name="book" />
+                {t("skills.step")} <span className="newag__opt-label">{t("newAgent.optional")}</span>
+              </h2>
+              <span className="small muted">{t("newAgent.skillsHelp", g)}</span>
+            </div>
+            <div className="newag__pills">
+              {(library.data ?? []).map((s) => (
+                <CheckboxPill
+                  key={s.id}
+                  id={`ag-skill-${s.id}`}
+                  checked={skillIds?.has(s.id) ?? false}
+                  onCheckedChange={(on) => setSkillIds((prev) => toggle(prev ?? new Set(), s.id, on))}
+                >
+                  {s.name}
+                </CheckboxPill>
+              ))}
+            </div>
+          </section>
+        )}
+      </>
+    ),
+    where: () => (
+      <>
+        {head(t("newAgent.steps.where.title"), t("newAgent.steps.where.lead", g))}
+        <div className="newag__sect newag__sect--first">
+          <h2>
+            <Icon name="channel" />
+            {t("newAgent.channels")}
+          </h2>
+          <span className="small muted">{t("newAgent.channelsHelp")}</span>
+        </div>
+        {myChannels.length > 0 ? (
+          <div className="newag__pills">
+            {myChannels.map((c) => (
+              <CheckboxPill
+                key={c.id}
+                id={`ag-ch-${c.id}`}
+                checked={channelIds.has(c.id)}
+                onCheckedChange={(on) => {
+                  setChannelIds((prev) => toggle(prev, c.id, on));
+                  if (on) mood.react("happy", 700);
+                }}
+              >
+                {`#${c.name}`}
+              </CheckboxPill>
+            ))}
+          </div>
+        ) : (
+          <p className="small muted">{t("newAgent.noChannels")}</p>
+        )}
+        <div className="newag__sect">
+          <h2>
+            <Icon name="person" />
+            {t("newAgent.owner")}
+          </h2>
+        </div>
+        <Card as="div" className="newag__card">
+          <Select
+            className="newag__sel"
+            aria-label={t("newAgent.owner")}
+            value={owner}
+            onValueChange={(v) => {
+              setOwner(v);
+              if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
+            }}
+            options={[
+              ...(members.data ?? []).map((m) => ({
+                value: m.userId,
+                label: m.userId === me.user.id ? t("newAgent.you", { name: m.name }) : m.name,
+                description: t(`roles.${m.role}`),
+                leading: <Avatar kind="person" size="sm" name={m.name} imageUrl={m.image} />,
+              })),
+              {
+                value: NO_OWNER,
+                label: t("newAgent.noOwnerOption"),
+                description: t("newAgent.noOwnerShort"),
+                leading: (
+                  <span className="newag__ib">
+                    <Icon name="members" size={16} />
+                  </span>
+                ),
+              },
+            ]}
+            renderValue={(o) => (
+              <span className="newag__sel-value">
+                {o.leading}
+                <span className="newag__sel-text">
+                  <b>{o.label}</b>
+                  <span>{o.description}</span>
+                </span>
+              </span>
+            )}
+          />
+          <span className="small muted">{ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
+        </Card>
+        <div className="newag__sect">
+          <h2>
+            <Icon name="message" />
+            {t("audience.title", g)}
+          </h2>
+        </div>
+        <Card as="div" className="newag__card">
+          <AudienceChoice
+            compact
+            value={audience}
+            onChange={setAudience}
+            ownerUserId={ownerId}
+            agentName={displayName}
+            idPrefix="ag-audience"
+          />
+          {errorLine(errorOf("audience"))}
+        </Card>
+      </>
+    ),
+    model: () => {
+      const all = models.data?.models ?? [];
+      return (
+        <>
+          {head(t("newAgent.steps.model.title"), t("newAgent.steps.model.lead"))}
+          {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+          <div className="newag__models" role="group" aria-label={t("newAgent.model")}>
+            {choices.flatMap(([provider, list]) =>
+              list.map(({ model: m, available }) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className="newag__model"
+                  aria-pressed={model === m.id}
+                  aria-disabled={!available || undefined}
+                  onClick={() => {
+                    if (!available) return;
+                    setModel(m.id);
+                    mood.react(m.id.toLowerCase().includes("opus") ? "star" : "happy", 800);
+                  }}
+                >
+                  <span className="newag__model-head">
+                    <b>{m.label}</b>
+                    <span className="newag__model-prov">{providerLabel(provider)}</span>
+                  </span>
+                  <span className="newag__model-desc">
+                    {available
+                      ? modelDescription(t, locale, m)
+                      : t("newAgent.modelNeedsKey", { provider: providerLabel(provider) })}
+                  </span>
+                  {available ? (
+                    <span className="newag__cost">
+                      <span className="newag__meter" aria-hidden="true">
+                        {[1, 2, 3].map((n) => (
+                          <i key={n} data-on={n <= priceTier(m, all) || undefined} />
+                        ))}
+                      </span>
+                      {t("newAgent.price", {
+                        input: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(m.inputUsdPerMTok),
+                        output: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(m.outputUsdPerMTok),
+                      })}
+                    </span>
+                  ) : (
+                    <span className="newag__cost">
+                      <Icon name="key" size={14} />
+                      {t("newAgent.noKeyFor", { provider: providerLabel(provider) })}
+                    </span>
+                  )}
+                </button>
+              )),
+            )}
+          </div>
+          {errorLine(errorOf("model"))}
+          <div className="newag__sect">
+            <h2>
+              <Icon name="key" />
+              {t("newAgent.key")}
+            </h2>
+          </div>
+          <Select
+            className="newag__sel"
+            aria-label={t("newAgent.key")}
+            value={key}
+            onValueChange={setKey}
+            placeholder={t("newAgent.noKeys")}
+            options={keys.map((k) => ({
+              ...k,
+              leading: (
+                <span className="newag__ib">
+                  <Icon name="key" size={16} />
+                </span>
+              ),
+            }))}
+            renderValue={(o) => (
+              <span className="newag__sel-value">
+                {o.leading}
+                <span className="newag__sel-text">
+                  <b>{o.label}</b>
+                  {o.description && <span>{o.description}</span>}
+                </span>
+              </span>
+            )}
+          />
+          <div className="newag__sect">
+            <h2>
+              <Icon name="wallet" />
+              {t("newAgent.budgetTitle")}
+            </h2>
+            <span className="small muted">{t("newAgent.budgetHelp", g)}</span>
+          </div>
+          <Card as="div" className="newag__card">
+            <div className="newag__money">
+              <Field
+                label={<span className="ac-visually-hidden">{t("newAgent.budget")}</span>}
+                id="ag-budget"
+                error={errorOf("budget") ? errorText(errorOf("budget") as DraftError) : undefined}
+                className="newag__money-field"
+              >
+                <AffixInput
+                  prefix="US$"
+                  inputMode="decimal"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  placeholder={
+                    defaultBudget === undefined ? undefined : new Intl.NumberFormat(locale).format(defaultBudget)
+                  }
+                />
+              </Field>
+              {QUICK_BUDGETS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  className="newag__tog"
+                  aria-pressed={amount === v}
+                  onClick={() => setBudget(String(v))}
+                >
+                  {usd(t, locale, v)}
+                </button>
+              ))}
+            </div>
+            {!errorOf("budget") && (
+              <span className="small muted">
+                {defaultBudget === undefined
+                  ? t("agent.budgetDefaultHelp")
+                  : t("agent.budgetDefaultHelpAmount", { amount: usd(t, locale, defaultBudget) })}{" "}
+                {ownerFirst ? t("newAgent.warnsOwner", { name: ownerFirst }) : t("newAgent.warnsAdmins")}
+              </span>
+            )}
+          </Card>
+        </>
+      );
+    },
+    review: () => {
+      const row = (to: NewAgentStep, icon: IconName, label: string, value: ReactNode) => (
+        <div className="newag__rv" key={label}>
+          <span className="newag__rv-k">
+            <Icon name={icon} size={16} />
+            {label}
+          </span>
+          <div className="newag__rv-v">{value}</div>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="edit"
+            aria-label={t("newAgent.editSection", { section: label })}
+            onClick={() => goTo(NEW_AGENT_STEPS.indexOf(to))}
+          >
+            {t("agent.edit")}
+          </Button>
+        </div>
+      );
+      const chips = (list: ReactNode[], empty: string) =>
+        list.length ? <span className="newag__chips">{list}</span> : <span className="muted">{empty}</span>;
+      return (
+        <>
+          {head(t("newAgent.steps.review.title", g), t("newAgent.steps.review.lead"))}
+          <Card as="div" className="newag__card newag__review">
+            {row(
+              "role",
+              rolePreset?.icon ?? "agent",
+              t("newAgent.steps.role.name"),
+              <span>
+                {role && role !== "custom"
+                  ? `${roleName} · ${t(`newAgent.roles.${role}.desc`)}`
+                  : t("newAgent.roles.custom.name")}
+              </span>,
+            )}
+            {row(
+              "identity",
+              "person",
+              t("newAgent.name"),
+              <>
+                <span>
+                  <b>{displayName}</b> <span className="muted">@{handle}</span>
+                </span>
+                <span className="small muted">
+                  {[
+                    t(`look.colors.${look.color}`),
+                    t(`look.eyesNames.${look.eyes}`),
+                    ...(look.accessory !== "none" ? [t(`look.accessories.${look.accessory}`)] : []),
+                  ].join(" · ")}
+                </span>
+              </>,
+            )}
+            {row(
+              "instructions",
+              "document",
+              t("newAgent.instructions"),
+              instructions.trim() ? (
+                <span className="newag__quote">{instructions.trim()}</span>
+              ) : (
+                <span className="muted">{t("newAgent.onlyContext")}</span>
+              ),
+            )}
+            {row(
+              "tools",
+              "plug",
+              t("newAgent.tools"),
+              chips(
+                [...granted.map(connectorChip), ...skills.map((s) => chip("book", s.name, s.id))],
+                t("newAgent.noTools"),
+              ),
+            )}
+            {row(
+              "where",
+              "channel",
+              t("newAgent.channels"),
+              chips(
+                joined.map((c) => chip("channel", c.name, c.id)),
+                t("newAgent.noChannelsReview"),
+              ),
+            )}
+            {row(
+              "where",
+              "members",
+              t("newAgent.answers"),
+              <span>
+                {ownerMember?.name ?? t("newAgent.noOwnerAdmins")}{" "}
+                <span className="muted">· {t("newAgent.talksTo", { who: audienceText() })}</span>
+              </span>,
+            )}
+            {row(
+              "model",
+              "bolt",
+              t("newAgent.modelAndCost"),
+              <span>
+                {modelInfo?.label ?? model}{" "}
+                <span className="muted">
+                  · {keyLabel}
+                  {budgetShown !== undefined && ` · ${t("newAgent.upTo", { amount: usd(t, locale, budgetShown) })}`}
+                </span>
+              </span>,
+            )}
+          </Card>
+          <p className="newag__note">
+            <Icon name="shield" size={16} />
+            <span>
+              {ownerFirst ? t("newAgent.reviewNoteOwner", { name: ownerFirst }) : t("newAgent.reviewNoteAdmins")}
+            </span>
+          </p>
+        </>
+      );
+    },
+  };
+
+  /* ---------- The created moment ---------- */
+
+  if (created) {
+    return (
+      <div className="onb newag newag--done" ref={root}>
+        <NewAgentRail index={total} reached={total} total={total} onGo={() => {}} done />
+        <main className="newag__main">
+          <div className="newag__content newag__content--done">
+            <CreatedMoment created={created} phone={phone} face={mood.face} onAgain={reset} heading={heading} />
+          </div>
+        </main>
       </div>
     );
   }
 
-  const ownerOptions: SelectOption[] = [
-    ...(members.data ?? []).map((m) => ({ value: m.userId, label: m.name, description: t(`roles.${m.role}`) })),
-    { value: NO_OWNER, label: t("newAgent.noOwnerOption"), description: t("newAgent.noOwnerHelp") },
-  ];
-  const modelSelect = modelOptions(
-    t,
-    i18n.language,
-    models.data?.models ?? [],
-    credentials.data ?? [],
-    platform.data ?? false,
-  );
-  const toggles = myChannels.map((c) => ({ id: `ch:${c.id}`, label: `#${c.name}` }));
+  /* ---------- The preview ---------- */
+
+  const last = index === total - 1;
+  const footErrors = errors.map(errorText);
+  const hint: Record<NewAgentStep, ReactNode> = {
+    role: role
+      ? role === "custom"
+        ? t("newAgent.roles.custom.name")
+        : t("newAgent.startsAs", { name: t(`newAgent.roles.${role}.agent`) })
+      : t("newAgent.hints.role"),
+    identity: handle ? t("newAgent.hints.identity", { handle }) : "",
+    instructions: (
+      <>
+        <Kbd>{modKey()}</Kbd>
+        <Kbd>↵</Kbd>
+        {t("newAgent.hints.instructions")}
+      </>
+    ),
+    tools: granted.length ? t("newAgent.hints.tools", { count: granted.length }) : t("newAgent.hints.noTools"),
+    where: joined.length ? t("newAgent.hints.where", { count: joined.length }) : t("newAgent.noChannelsYet"),
+    model: modelInfo?.label ?? "",
+    review: t("newAgent.hints.review"),
+  };
 
   return (
-    <div className="page page--narrow">
-      <header className="page__header">
-        <h1 className="page-title">{t("newAgent.title")}</h1>
-        <p className="page-sub">{t("newAgent.subtitle")}</p>
-      </header>
-
-      <section aria-labelledby="q-role" className="section">
-        <h2 id="q-role" className="section-title">
-          {t("newAgent.roleQuestion")}
-        </h2>
-        <div className="grid-options grid-options--sm">
-          {ROLE_IDS.map((id) => (
-            <OptionCard key={id} agent stacked pressed={role === id} onClick={() => pickRole(id)}>
-              <span className="ac-option__title">{t(`newAgent.roles.${id}.name`)}</span>
-              <span className="ac-option__desc">{t(`newAgent.roles.${id}.desc`)}</span>
-            </OptionCard>
-          ))}
-        </div>
-      </section>
-
-      <section aria-labelledby="q-who" className="section" style={{ gap: 16 }}>
-        <h2 id="q-who" className="section-title">
-          {t("newAgent.who")}
-        </h2>
-        <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-          <AgentAvatar size="lg" name={displayName} />
-          <div className="grid-fields" style={{ flex: 1 }}>
-            <Field label={t("newAgent.name")} id="ag-name" help={t("newAgent.nameHelp", { handle })}>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={t("newAgent.namePlaceholder")}
-              />
-            </Field>
-            <Field
-              label={t("newAgent.owner")}
-              id="ag-owner"
-              help={owner === NO_OWNER ? t("newAgent.noOwnerHelp") : t("newAgent.ownerHelp")}
-            >
-              <Select value={owner} onValueChange={setOwner} options={ownerOptions} />
-            </Field>
+    <div className="onb newag" ref={root}>
+      <NewAgentRail index={index} reached={reached} total={total} onGo={goTo} done={false} />
+      <div className="newag__work">
+        <main className="newag__main">
+          <div className="newag__content" key={step}>
+            {views[step]()}
           </div>
-        </div>
-        <div className="stack-4" style={{ gap: 8 }}>
-          <span className="ac-field__label">{t("audience.title", agentGrammar(t, displayName))}</span>
-          <AudienceChoice
-            value={audience}
-            onChange={setAudience}
-            ownerUserId={owner === NO_OWNER ? null : owner}
-            agentName={displayName}
-            idPrefix="ag-audience"
-          />
-        </div>
-        <Field label={t("newAgent.instructions")} id="ag-instr" help={t("newAgent.instructionsHelp")}>
-          <Textarea rows={4} value={instructions} onChange={(e) => setInstructions(e.target.value)} />
-        </Field>
-      </section>
-
-      <section aria-labelledby="q-model" className="section">
-        <h2 id="q-model" className="section-title">
-          {t("newAgent.modelAndCost")}
-        </h2>
-        <div className="grid-fields">
-          <Field label={t("newAgent.model")} id="ag-model">
-            <Select value={model} onValueChange={setModel} options={modelSelect} />
-          </Field>
-          <Field label={t("newAgent.key")} id="ag-key">
-            <Select
-              value={key}
-              onValueChange={setKey}
-              options={keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null)}
-              placeholder={t("newAgent.noKeys")}
-            />
-          </Field>
-          <Field
-            label={t("newAgent.budget")}
-            id="ag-budget"
-            error={budgetInvalid ? t("newAgent.budgetInvalid") : undefined}
-            help={[
-              defaultBudget === undefined
-                ? t("agent.budgetDefaultHelp")
-                : t("agent.budgetDefaultHelpAmount", { amount: formatUsd(t, i18n.language, defaultBudget) }),
-              t("newAgent.budgetHelp"),
-            ].join(" ")}
-          >
-            <Input
-              inputMode="decimal"
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
-              placeholder={
-                defaultBudget === undefined ? undefined : new Intl.NumberFormat(i18n.language).format(defaultBudget)
-              }
-            />
-          </Field>
-        </div>
-      </section>
-
-      <section aria-labelledby="q-where" className="section">
-        <h2 id="q-where" className="section-title">
-          {t("newAgent.where")}
-        </h2>
-        <div className="row">
-          {toggles.map((tg) => (
-            <CheckboxPill
-              key={tg.id}
-              id={`tg-${tg.id.replace(":", "-")}`}
-              checked={Boolean(on[tg.id])}
-              onCheckedChange={(v) => setOn((prev) => ({ ...prev, [tg.id]: v }))}
+          <div className="newag__foot">
+            <span className="newag__hint" data-bad={footErrors.length > 0 || undefined}>
+              {footErrors.length > 0 ? (
+                <>
+                  <Icon name="info" size={14} />
+                  {footErrors[0]}
+                </>
+              ) : (
+                hint[step]
+              )}
+            </span>
+            {index > 0 ? (
+              <Button variant="ghost" icon="chevronLeft" onClick={back}>
+                {t("common.back")}
+              </Button>
+            ) : (
+              <Button asChild variant="ghost">
+                <Link to="/org/$orgId" params={{ orgId: org.id }}>
+                  {t("common.cancel")}
+                </Link>
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              kbd={["↵"]}
+              loading={create.isPending}
+              aria-disabled={footErrors.length > 0 || undefined}
+              onClick={next}
             >
-              {tg.label}
-            </CheckboxPill>
-          ))}
-        </div>
-        {connectedList.length > 0 && (
-          <ul className="level-list" aria-label={t("newAgent.connectorsLabel")}>
-            {connectedList.map((item) => {
-              const name = itemName(t, item);
-              return (
-                <LevelRow
-                  key={item.id}
-                  icon={<ResourceIcon resource={{ connectionId: item.id, area: null }} items={connected} name={name} />}
-                  name={name}
-                  levels={LEVELS}
-                  value={levels[item.id] ?? "none"}
-                  onChange={(l) => setLevels((prev) => ({ ...prev, [item.id]: l }))}
+              {last ? t("newAgent.create", { name: displayName }) : t("common.continue")}
+            </Button>
+          </div>
+        </main>
+        <aside className="newag__aside" aria-label={t("newAgent.preview.label")}>
+          <div className="newag__cap">
+            <span className="onb__eyebrow">{t("newAgent.preview.title")}</span>
+            <span className="small muted">{t("newAgent.preview.hint")}</span>
+          </div>
+          <div className="newag__pv" data-big={step === "identity" || undefined} data-open={previewOpen || undefined}>
+            <div className="newag__pv-cover">
+              <AgentPreviewSky color={look.color as AgentColor} />
+              <span className="newag__pv-state">
+                <Icon name="edit" size={14} />
+                {t("newAgent.preview.draft")}
+              </span>
+              <AgentAvatar
+                name={previewName}
+                appearance={look}
+                size="xl"
+                className="newag__pv-agent"
+                state={mood.typing ? "writing" : undefined}
+                expression={mood.face}
+              />
+            </div>
+            <div className="newag__pv-body">
+              <div className="newag__pv-head">
+                <div className="newag__pv-name">
+                  <b data-placeholder={!name.trim() || undefined}>{previewName}</b>
+                  <span>
+                    {handle ? `@${handle}` : "@…"}
+                    {roleName && <span className="newag__pv-role"> · {roleName}</span>}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon={previewOpen ? "close" : "chevronDown"}
+                  className="newag__pv-toggle"
+                  aria-expanded={previewOpen}
+                  aria-label={previewOpen ? t("newAgent.preview.hide") : t("newAgent.preview.show")}
+                  onClick={() => setPreviewOpen((o) => !o)}
                 />
-              );
-            })}
-          </ul>
-        )}
-        <span className="small muted">{t("newAgent.whereNote")}</span>
-      </section>
-
-      {(library.data ?? []).length > 0 && (
-        <section aria-labelledby="q-skills" className="section">
-          <h2 id="q-skills" className="section-title">
-            {t("skills.step")}
-          </h2>
-          <span className="small muted">{t("skills.stepText")}</span>
-          <SkillPicker skills={library.data ?? []} selected={skillIds ?? new Set()} onChange={setSkillIds} />
-        </section>
-      )}
-
-      <div className="row" style={{ justifyContent: "flex-end", paddingTop: 8, borderTop: "1px solid var(--line)" }}>
-        <Button asChild>
-          <Link to="/org/$orgId" params={{ orgId: org.id }}>
-            {t("common.cancel")}
-          </Link>
-        </Button>
-        <Button variant="primary" disabled={cannotCreate} onClick={() => void submit().catch(() => {})}>
-          {t("newAgent.create", { name: displayName })}
-        </Button>
+              </div>
+              {roleName && rolePreset && (
+                <span className="newag__chips newag__pv-wide">{chip(rolePreset.icon, roleName)}</span>
+              )}
+              {instructions.trim() && <p className="newag__pv-instr">{instructions.trim().split("\n")[0]}</p>}
+              <PreviewSection label={t("newAgent.preview.uses")}>
+                {granted.length || skills.length ? (
+                  <>
+                    <span className="newag__chips">
+                      {granted.map(connectorChip)}
+                      {skills.map((s) => chip("book", s.name, s.id))}
+                    </span>
+                    {(() => {
+                      const asks = granted.filter((i) => levels[i.id] === "write").flatMap(asksOf);
+                      return asks.length ? (
+                        <span className="newag__asks">
+                          <Icon name="lock" size={14} />
+                          {t("newAgent.preview.asks", { actions: joinNames(asks, t("newAgent.and")) })}
+                        </span>
+                      ) : null;
+                    })()}
+                  </>
+                ) : (
+                  <span className="newag__empty">{t("newAgent.preview.onlyTalks")}</span>
+                )}
+              </PreviewSection>
+              <PreviewSection label={t("newAgent.preview.worksIn")}>
+                {joined.length ? (
+                  <span className="newag__chips">{joined.map((c) => chip("channel", c.name, c.id))}</span>
+                ) : (
+                  <span className="newag__empty">{t("newAgent.noChannelsYet")}</span>
+                )}
+              </PreviewSection>
+              <PreviewSection label={t("newAgent.preview.answers")}>
+                <span className="newag__chips">
+                  {chip("person", ownerFirst ?? t("newAgent.noOwnerOption"), "owner")}
+                  {chip("message", audienceText(), "audience")}
+                </span>
+              </PreviewSection>
+              <PreviewSection label={t("newAgent.modelAndCost")}>
+                <span className="newag__chips">
+                  {modelInfo && chip("bolt", modelInfo.label, "model")}
+                  {budgetShown !== undefined &&
+                    !budgetInvalid &&
+                    chip("wallet", t("newAgent.upTo", { amount: usd(t, locale, budgetShown) }), "budget")}
+                </span>
+              </PreviewSection>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
+  );
+}
+
+function PreviewSection({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="newag__pv-sec">
+      <span className="newag__pv-label">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+/** The rail: brand, title, the steps (visited ones clickable), leaving, and the horizon rising with progress. */
+function NewAgentRail({
+  index,
+  reached,
+  total,
+  onGo,
+  done,
+}: {
+  index: number;
+  reached: number;
+  total: number;
+  onGo: (i: number) => void;
+  done: boolean;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  return (
+    <aside className="onb__rail newag__rail">
+      <div className="newag__rail-head">
+        <span className="onb__brand">
+          <Logo size={22} />
+        </span>
+        <Button asChild variant="ghost" size="sm" iconOnly aria-label={t("newAgent.leave")}>
+          <Link to="/org/$orgId" params={{ orgId: org.id }} title={t("newAgent.leave")}>
+            <Icon name="close" />
+          </Link>
+        </Button>
+      </div>
+      <div className="newag__rail-title">
+        <b>{t("newAgent.railTitle")}</b>
+        <span>{t("newAgent.railOrg", { org: org.name, role: t(`roles.${org.role}Lower`) })}</span>
+      </div>
+      <StepRail
+        label={t("newAgent.stepsLabel")}
+        current={done ? -1 : index}
+        onGo={onGo}
+        doneLabel={t("onboarding.stepDone")}
+        steps={NEW_AGENT_STEPS.map((s, i) => ({
+          id: s,
+          name: t(`newAgent.steps.${s}.name`),
+          done: done || i < reached,
+          disabled: done || i > reached,
+        }))}
+      />
+      <OnboardingHorizon progress={done ? 1 : reached / (total - 1)} />
+    </aside>
+  );
+}
+
+/** The new agent on its own sky: where it is, and what to do next. */
+function CreatedMoment({
+  created,
+  phone,
+  face,
+  onAgain,
+  heading,
+}: {
+  created: Created;
+  phone: boolean;
+  face: Expression | undefined;
+  onAgain: () => void;
+  heading: RefObject<HTMLHeadingElement | null>;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const text = useRef<HTMLDivElement>(null);
+  const { agent, channels } = created;
+  const first = channels[0];
+  const names = joinNames(
+    channels.map((c) => `#${c.name}`),
+    t("newAgent.and"),
+  );
+  return (
+    <>
+      <section className="newag__born" aria-labelledby="ag-born">
+        <AgentBornSky color={created.look.color} at={phone ? [0.5, 0.26] : [0.8, 0.45]} calm={() => [text.current]} />
+        <span className="newag__born-agent">
+          <AgentAvatar name={agent.name} appearance={created.look} size="xl" expression={face} />
+        </span>
+        <div className="newag__born-text" ref={text}>
+          <p className="onb__eyebrow onb__eyebrow--sky">{t("newAgent.newOnTeam")}</p>
+          <h1 id="ag-born" className="newag__born-title" ref={heading} tabIndex={-1}>
+            {t("newAgent.createdTitle", { name: agent.name })}
+          </h1>
+          <p className="newag__born-lead">
+            {channels.length > 0
+              ? t("newAgent.createdText", { channels: names, handle: agent.handle })
+              : t("newAgent.createdTextNoChannels", { name: agent.name, handle: agent.handle })}
+          </p>
+          <div className="newag__born-actions">
+            {first && (
+              <Button asChild variant="primary" className="newag__on-sky">
+                <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: first.id }}>
+                  {t("newAgent.goTo", { channel: first.name })}
+                  <Icon name="arrowRight" size={16} />
+                </Link>
+              </Button>
+            )}
+            <Button asChild variant={first ? "default" : "primary"} className="newag__on-sky">
+              <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
+                {t("newAgent.openProfile")}
+              </Link>
+            </Button>
+            <Button icon="plus" className="newag__on-sky" onClick={onAgain}>
+              {t("newAgent.createAnother")}
+            </Button>
+          </div>
+        </div>
+      </section>
+      <div className="newag__nexts">
+        <Card as="div" className="newag__next">
+          <b>
+            <Icon name="message" size={16} />
+            {t("newAgent.next.hello.title")}
+          </b>
+          <span>
+            {first
+              ? t("newAgent.next.hello.inChannel", { handle: agent.handle, channel: first.name })
+              : t("newAgent.next.hello.text", { handle: agent.handle })}
+          </span>
+        </Card>
+        <Card as="div" className="newag__next">
+          <b>
+            <Icon name="bell" size={16} />
+            {created.ownerName
+              ? t("newAgent.next.alerts.owner", { name: created.ownerName })
+              : t("newAgent.next.alerts.admins")}
+          </b>
+          <span>{t("newAgent.next.alerts.text")}</span>
+        </Card>
+        <Card as="div" className="newag__next">
+          <b>
+            <Icon name="shield" size={16} />
+            {t("newAgent.next.profile.title")}
+          </b>
+          <span>{t("newAgent.next.profile.text")}</span>
+        </Card>
+      </div>
+    </>
   );
 }

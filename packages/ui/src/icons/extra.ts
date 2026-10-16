@@ -236,4 +236,28 @@ export const extraIcons = {
   ],
   /** Composer formatting: quote. */
   quote: [["path", { d: "M4.5 4.5v11M8.5 6.5H16M8.5 10H16M8.5 13.5h5" }]],
+  /** NovoAgente.html: the model key. */
+  key: [
+    ["circle", { cx: "7", cy: "12.5", r: "3.2" }],
+    ["path", { d: "m9.3 10.2 7-7M14 5.5l2.3 2.3M12.3 7.2l1.7 1.7" }],
+  ],
+  /** NovoAgente.html: the monthly budget. */
+  wallet: [
+    ["path", { d: "M3.5 6.5a2 2 0 0 1 2-2H15v3" }],
+    ["rect", { x: "3.5", y: "7.5", width: "13", height: "9", rx: "2" }],
+    ["path", { d: "M13.5 12h.01" }],
+  ],
+  /** NovoAgente.html: "Sortear" (a random look). */
+  shuffle: [
+    ["rect", { x: "3.5", y: "3.5", width: "13", height: "13", rx: "3.5" }],
+    ["path", { d: "M7.5 7.5h.01M12.5 12.5h.01M12.5 7.5h.01M7.5 12.5h.01" }],
+  ],
+  /** NovoAgente.html: sensitive actions always ask for approval. */
+  shield: [["path", { d: "M10 3 4 5.5v4.5c0 3.6 2.6 6.4 6 7 3.4-.6 6-3.4 6-7V5.5z" }]],
+  /** NovoAgente.html: "Conectar outro app". */
+  plug: [["path", { d: "M7.5 3v4M12.5 3v4M5 7h10v2.5a5 5 0 0 1-10 0zM10 14.5V17" }]],
+  /** NovoAgente.html: "Voltar ao original". */
+  undo: [["path", { d: "M7.5 11.5 3.5 7.5l4-4M3.5 7.5h8a5 5 0 0 1 0 10H9" }]],
+  /** NovoAgente.html: go somewhere (a channel). */
+  arrowRight: [["path", { d: "M4 10h12M11 5l5 5-5 5" }]],
 } satisfies Record<string, IconShape[]>;
