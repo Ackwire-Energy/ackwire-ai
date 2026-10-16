@@ -2136,6 +2136,8 @@ export const en: Translations = {
       title: "Plan updated",
       done: "✓ {{title}}",
       renamed: "{{to}} (edited)",
+      more_one: "+{{count}} edited item",
+      more_other: "+{{count}} edited items",
     },
     notice: {
       machine_offline_one: "{{computer}} went offline: “{{title}}” stopped until it's back. Nothing is lost.",

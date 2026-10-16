@@ -2147,6 +2147,8 @@ export const ptBR = {
       title: "Plano atualizado",
       done: "✓ {{title}}",
       renamed: "{{to}} (editado)",
+      more_one: "+{{count}} item editado",
+      more_other: "+{{count}} itens editados",
     },
     notice: {
       machine_offline_one: "{{computer}} ficou offline: “{{title}}” parou até ele voltar. Nada se perde.",

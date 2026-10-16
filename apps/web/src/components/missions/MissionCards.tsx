@@ -902,7 +902,10 @@ export function MissionDeliveryCard({ message }: { message: Message }) {
 
 // ── Lines in the thread ───────────────────────────────────────────────────────
 
-/** "Plano atualizado: + Notificações · − Drawer lateral · Ver plano". */
+/** A long change shows this many parts, then "+N itens editados" (the whole list is in the plan). */
+export const PLAN_CHANGE_SHOWN = 3;
+
+/** "Plano atualizado: + Notificações · − Drawer lateral · Ver plano" (the icon on the text's first line). */
 export function MissionPlanChangeLine({ message }: { message: Message }) {
   const { t } = useTranslation();
   const panel = useMissionPanel();
@@ -917,18 +920,26 @@ export function MissionPlanChangeLine({ message }: { message: Message }) {
     ...p.renamed.map((x) => t("missions.planChange.renamed", { to: x.to })),
   ];
   const before = p.renamed.map((x) => `${x.from} → ${x.to}`).join("\n");
+  const long = parts.length > PLAN_CHANGE_SHOWN;
+  const shown = long ? parts.slice(0, PLAN_CHANGE_SHOWN - 1) : parts;
+  const rest = parts.length - shown.length;
   return (
     <div className="mi-evt" data-message-id={message.id}>
       <Icon name="edit" size={14} />
-      <span title={before || undefined}>
+      <span className="mi-evt__text" title={before || (long ? parts.join("\n") : undefined)}>
         <b>{t("missions.planChange.title")}</b>
-        {parts.length > 0 ? `: ${parts.join(" · ")}` : ""}
+        {shown.length > 0 ? `: ${shown.join(" · ")}` : ""}
+        {long ? ` · ${t("missions.planChange.more", { count: rest })}` : ""}
+        {/* Inline after the text: when it wraps, it stays on the text's left edge. */}
+        {panel && (
+          <>
+            {" · "}
+            <button type="button" className="mi-link" onClick={() => panel.openFiles(change.missionId, "mission.md")}>
+              {t("missions.plan.see")}
+            </button>
+          </>
+        )}
       </span>
-      {panel && (
-        <button type="button" className="mi-link" onClick={() => panel.openFiles(change.missionId, "mission.md")}>
-          {t("missions.plan.see")}
-        </button>
-      )}
     </div>
   );
 }

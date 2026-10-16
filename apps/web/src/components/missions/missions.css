@@ -740,15 +740,28 @@ a.mi-pr:hover {
 }
 
 /* ── Lines in the thread (automatic, not a voice) ────────────────────────── */
+/* One quiet line: the icon on the first line of the text (never alone above it), the
+   text wraps in its own box, an action ("Ver plano") stays at the end. */
 .mi-evt {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
-  gap: 6px 8px;
+  gap: 4px 8px;
   margin: 4px 12px 4px var(--thread-indent, 56px);
   font-size: 12.5px;
+  line-height: 18px;
   color: var(--faint);
   animation: mi-fade 0.35s var(--out) both;
+}
+.mi-evt > .ac-icon {
+  flex: none;
+  margin-top: 2px;
+}
+/* Never wider than the room beside the icon (14px + the 8px gap): long text wraps here. */
+.mi-evt > span:first-of-type {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: calc(100% - 22px);
 }
 /* A command allowed without a card: quiet, the command in mono. */
 .mi-evt--auto code,
