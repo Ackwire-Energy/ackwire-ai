@@ -341,3 +341,11 @@
     font-size: 16px;
   }
 }
+/* Phones: a long composer placeholder ends in "…" instead of wrapping into a half-hidden second line. */
+@media (max-width: 640px) {
+  .ac-composer textarea::placeholder {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

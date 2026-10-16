@@ -4134,9 +4134,15 @@ a.ac-list__row:focus-visible {
   }
 }
 @media (max-width: 640px) {
+  /* The time sits mid-row: anchor its tooltip to the message row instead, so it never runs past the screen. */
+  .ac-msg__time--details,
+  .ac-msg__gutter-time {
+    position: static;
+  }
   .ac-msg__tip {
+    left: 12px;
     width: max-content;
-    max-width: calc(100vw - 96px);
+    max-width: calc(100% - 24px);
     white-space: normal;
   }
   .ac-suggest {
