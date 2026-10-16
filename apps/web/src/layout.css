@@ -374,9 +374,9 @@ p {
 .sidebar__user {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 10px;
   width: 100%;
-  padding: 4px;
+  padding: 4px 8px 4px 4px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -3462,10 +3462,19 @@ a.forum-card__title::after {
   line-height: 1.7;
   color: var(--ink2);
 }
+/* The search sits in a column here: its toolbar flex (grow, 260px basis) would make it 260px tall. */
+.wiki__left > .ac-search {
+  flex: none;
+}
+/* Rows keep their 8px inner padding but bleed out by it, so their text lines up with the search, labels and tags. */
 .wiki-nav {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  margin: 0 -8px;
+}
+.wiki-nav__section > .wiki-nav__recent {
+  margin: 0 -8px;
 }
 .wiki-nav__folder > summary {
   display: flex;
@@ -5085,6 +5094,7 @@ button.live-call__head:hover {
   .sidebar__me {
     flex-direction: column;
     gap: 6px;
+    padding: 0;
   }
   .sidebar__user {
     justify-content: center;
@@ -5552,6 +5562,7 @@ button.live-call__head:hover {
   pointer-events: none;
 }
 .sidebar__me {
+  padding: 6px 6px 6px 8px;
   border-radius: 12px;
   background: var(--glass-solid);
   box-shadow:
