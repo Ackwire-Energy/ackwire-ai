@@ -44,6 +44,7 @@ import {
 } from "./questions";
 import { type AgentRun, addRunStep, isTerminal, type RunStatus, runErrorDetail, transitionRun } from "./runs";
 import { SANDBOX_SCOPE } from "./sandbox";
+import { publishSecret, type SecretRequestRow, secretRequestView, secretResult, syncSecretMessage } from "./secrets";
 import { enabledSkills } from "./skills";
 import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
 import type { Approval, ToolGateway } from "./tools/gateway";
@@ -52,7 +53,7 @@ import type { ToolContext } from "./tools/types";
 import { retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentRuns, approvals, agentQuestions, users } = schema;
+const { agentRuns, approvals, agentQuestions, secretRequests, users } = schema;
 
 export interface RunExecutorDeps {
   db: Database;
@@ -100,6 +101,8 @@ export interface Transcript {
       approvalId?: string;
       /** `ask_user`: the question this call waits on. */
       questionId?: string;
+      /** `request_secret`: the request this call waits on (ADR 0027). */
+      secretRequestId?: string;
       result?: { content: string; isError: boolean };
     }[];
   };
@@ -185,7 +188,7 @@ async function executeRunInner(
     run = loaded;
     if (isTerminal(run.status) || run.status === "queued") return;
     if (run.status === "waiting_approval" || run.status === "waiting_input") {
-      const [stillPending, stillOpen] = await Promise.all([
+      const [stillPending, stillOpen, stillSecret] = await Promise.all([
         db
           .select({ id: approvals.id })
           .from(approvals)
@@ -194,9 +197,13 @@ async function executeRunInner(
           .select({ id: agentQuestions.id })
           .from(agentQuestions)
           .where(and(eq(agentQuestions.runId, run.id), eq(agentQuestions.status, "open"))),
+        db
+          .select({ id: secretRequests.id })
+          .from(secretRequests)
+          .where(and(eq(secretRequests.runId, run.id), eq(secretRequests.status, "pending"))),
       ]);
       // Resumes when the last decision or answer comes in.
-      if (stillPending.length > 0 || stillOpen.length > 0) return;
+      if (stillPending.length > 0 || stillOpen.length > 0 || stillSecret.length > 0) return;
       const resumed = await transitionRun(db, run.id, run.status, "running");
       if (!resumed) return;
       run = resumed;
@@ -402,7 +409,17 @@ async function executeRunInner(
     const blocks: ContentBlock[] = [];
     for (const call of transcript.pending.calls) {
       let result = call.result;
-      if (!result && call.questionId) {
+      if (!result && call.secretRequestId) {
+        const [request] = await db.select().from(secretRequests).where(eq(secretRequests.id, call.secretRequestId));
+        result = { isError: false, ...secretResult(request) };
+        await addRunStep(db, run, "tool_result", {
+          toolUseId: call.toolUseId,
+          name: call.name,
+          isError: result.isError,
+          content: result.content.slice(0, 4000),
+          data: { secretRequestId: call.secretRequestId },
+        });
+      } else if (!result && call.questionId) {
         const [question] = await db.select().from(agentQuestions).where(eq(agentQuestions.id, call.questionId));
         result = { isError: false, ...questionResult(question) };
         await addRunStep(db, run, "tool_result", {
@@ -637,6 +654,7 @@ async function executeRunInner(
         const calls: NonNullable<Transcript["pending"]>["calls"] = [];
         const waiting: Approval[] = [];
         const asks: { id: string; toolUseId: string; text: string; choices: string[] | null }[] = [];
+        const secretAsks: string[] = [];
         for (const use of toolUses) {
           // Canceled during a tool: the rest never run.
           if (signal.aborted) break;
@@ -675,6 +693,9 @@ async function executeRunInner(
           if (outcome.type === "approval") {
             calls.push({ toolUseId: use.id, name: use.name, approvalId: outcome.approval.id });
             waiting.push(outcome.approval);
+          } else if (outcome.type === "secret") {
+            calls.push({ toolUseId: use.id, name: use.name, secretRequestId: outcome.requestId });
+            secretAsks.push(outcome.requestId);
           } else if (outcome.type === "question") {
             const questionId = Bun.randomUUIDv7();
             calls.push({ toolUseId: use.id, name: use.name, questionId });
@@ -704,7 +725,7 @@ async function executeRunInner(
           await saveTranscript(db, transcript);
           return stopCanceled("");
         }
-        if (waiting.length === 0 && asks.length === 0) {
+        if (waiting.length === 0 && asks.length === 0 && secretAsks.length === 0) {
           transcript.messages.push({
             role: "user",
             content: calls.map((c) => ({
@@ -727,9 +748,33 @@ async function executeRunInner(
           const said = turnText;
           if (said) out.push(await postAgentMessage(tx, run, replyThreadId, said, takeMemoryUpdates(t)));
           t.postedUpTo = t.messages.length;
-          t.postedCount += out.length + waiting.length + asks.length;
+          t.postedCount += out.length + waiting.length + asks.length + secretAsks.length;
           const cards: Approval[] = [];
           const questions: AgentQuestionRow[] = [];
+          const secrets: SecretRequestRow[] = [];
+          for (const requestId of secretAsks) {
+            const [request] = await tx
+              .update(secretRequests)
+              .set({ threadId: replyThreadId })
+              .where(eq(secretRequests.id, requestId))
+              .returning();
+            if (!request) continue;
+            const message = await postAgentMessage(tx, run, replyThreadId, `Pedido de segredo: ${request.name}`, {
+              secretRequestId: request.id,
+              secretRequest: secretRequestView(request),
+            });
+            out.push(message);
+            const [linked] = await tx
+              .update(secretRequests)
+              .set({ messageId: message.id })
+              .where(eq(secretRequests.id, request.id))
+              .returning();
+            if (linked) {
+              await syncSecretMessage(tx, linked);
+              message.meta = { ...message.meta, secretRequest: secretRequestView(linked) };
+              secrets.push(linked);
+            }
+          }
           for (const ask of asks) {
             const id = ask.id;
             const [inserted] = await tx
@@ -782,17 +827,18 @@ async function executeRunInner(
             tx,
             run.id,
             "running",
-            asks.length > 0 ? "waiting_input" : "waiting_approval",
+            asks.length > 0 || secretAsks.length > 0 ? "waiting_input" : "waiting_approval",
           );
           if (!suspended) throw new PermanentJobError("run changed state while executing");
-          return { messages: out, cards, questions };
+          return { messages: out, cards, questions, secrets };
         });
         prof.mark("persist");
         for (const m of await withWikiLinks(db, run.orgId, posted.messages.map(messageView)))
           await publishMessageCreated(deps.pubsub, m);
         for (const card of posted.cards) await publishApproval(deps, card, "approval.created");
         for (const q of posted.questions) await publishQuestion(deps.pubsub, q, "question.asked");
-        const waitingFor = asks.length > 0 ? "waiting_input" : "waiting_approval";
+        for (const r of posted.secrets) await publishSecret(deps.pubsub, r, "secret.requested");
+        const waitingFor = asks.length > 0 || secretAsks.length > 0 ? "waiting_input" : "waiting_approval";
         await publishChannelEvent(deps.pubsub, event(waitingFor));
         await finished(waitingFor);
         return;

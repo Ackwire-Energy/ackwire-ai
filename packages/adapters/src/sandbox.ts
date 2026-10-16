@@ -1,11 +1,13 @@
 /**
  * Isolated environments where agents run code (D30). Core talks to this
  * interface only; Cloud uses Daytona (REST API), tests use the fake. Nothing
- * secret ever goes in: no environment variables are passed, at creation or
- * per command, and the network is blocked unless the org allows domains.
+ * secret of ours ever goes in: no environment variables are passed, at
+ * creation or per command, and the network is blocked unless the org allows
+ * domains. The only secrets a computer holds are those a person sealed to it
+ * (ADR 0027), which we relay without being able to read.
  */
 import { createHash } from "node:crypto";
-import type { MachineReplies } from "./machine-protocol";
+import type { MachineReplies, SecretRequest } from "./machine-protocol";
 
 export interface SandboxResources {
   cpu: number;
@@ -133,6 +135,11 @@ export interface ComputerChannel {
    * the file itself (`readFile`).
    */
   pushFile?(id: string, path: string, target: PushTarget): Promise<PushReceipt>;
+  /**
+   * Secrets for the agent (ADR 0027), kept by the computer itself. Channels
+   * without it (cloud computers) run the secrets helper through `exec`.
+   */
+  secret?(id: string, request: SecretRequest): Promise<{ publicKey?: string; size?: number }>;
 }
 
 export type SandboxProvider = ComputerLifecycle & ComputerChannel & { readonly id: string };

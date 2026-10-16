@@ -634,7 +634,7 @@ export interface AgentComputerView {
 }
 
 /** The agent's owner or an admin (`manage_agents`). */
-async function requireComputerManager(db: Database, actorId: string, orgId: string, agentId: string) {
+export async function requireComputerManager(db: Database, actorId: string, orgId: string, agentId: string) {
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");

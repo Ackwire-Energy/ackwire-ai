@@ -410,3 +410,61 @@ export const agentQuestions = pgTable(
     index().on(t.expiresAt).where(sql`${t.status} = 'open'`),
   ],
 );
+
+export const secretRequestStatusEnum = pgEnum("secret_request_status", [
+  "pending",
+  "delivered",
+  "declined",
+  "expired",
+  "canceled",
+]);
+
+/**
+ * An agent asked a person for a secret for its computer (ADR 0027). The value
+ * never comes here: the browser seals it to `publicKey` (made on the
+ * computer, which keeps the private key) and we only relay the box. No column
+ * holds the value or the box, on purpose.
+ */
+export const secretRequests = pgTable(
+  "secret_requests",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    runId: uuid()
+      .notNull()
+      .references(() => agentRuns.id, { onDelete: "cascade" }),
+    agentId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    /** Thread it was asked in; null = the main timeline (flat DMs). */
+    threadId: uuid(),
+    /** The chat message carrying the card. */
+    messageId: uuid(),
+    toolUseId: text().notNull(),
+    /** The only person who may answer: whoever started the run. */
+    requestedForUserId: text().notNull(),
+    /** `GITHUB_TOKEN`… */
+    name: text().notNull(),
+    purpose: text().notNull(),
+    targetKind: text().notNull().$type<"env" | "file">(),
+    targetPath: text(),
+    /** The connected machine holding the key; null = the agent's cloud computer. */
+    machineId: uuid(),
+    /** The computer's public key for this request (raw P-256, base64). */
+    publicKey: text().notNull(),
+    status: secretRequestStatusEnum().notNull().default("pending"),
+    deliveredAt: timestamp({ withTimezone: true }),
+    deliveredSize: integer(),
+    /** Removed from the computer (the row stays for the record). */
+    removedAt: timestamp({ withTimezone: true }),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    unique().on(t.runId, t.toolUseId),
+    index().on(t.agentId, t.status),
+    index().on(t.expiresAt).where(sql`${t.status} = 'pending'`),
+  ],
+);

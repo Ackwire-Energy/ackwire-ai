@@ -7478,3 +7478,35 @@ button.live-call__head:hover {
     flex-basis: 96px;
   }
 }
+
+/* Secrets (ADR 0027): the card's private field and the agent page's list. */
+.secret-card__form {
+  display: grid;
+  gap: var(--space-2);
+}
+.secret-card__form .ac-approval__actions {
+  align-items: center;
+}
+.agent-secrets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.agent-secrets__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.agent-secrets__row:first-child {
+  border-top: 0;
+}
+.agent-secrets__name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}

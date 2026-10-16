@@ -13,6 +13,7 @@ import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
 import { agentWorkspace, isInside, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
+import { agentSecrets, handleSecret } from "./secrets";
 
 export const MAX_CONCURRENT_REQUESTS = 8;
 export const MAX_LIST_ENTRIES = 5000;
@@ -25,6 +26,8 @@ export interface HandlerContext {
   /** The machine token (authenticates `push` uploads). */
   token: string;
   fetch?: FetchLike;
+  /** Where each agent's secrets live (ADR 0027); without it the machine keeps none. */
+  secretsDir?: string;
 }
 
 export interface RequestScope {
@@ -43,7 +46,14 @@ const requireString = (v: unknown, field: string): string => {
   return v;
 };
 
-async function doExec(ctx: HandlerContext, req: Extract<MachineRequest, { op: "exec" }>, scope: RequestScope) {
+type Secrets = Awaited<ReturnType<typeof agentSecrets>>;
+
+async function doExec(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "exec" }>,
+  scope: RequestScope,
+  secrets: Secrets,
+) {
   if (!ctx.exec) {
     throw new RunnerError(
       "exec_disabled",
@@ -64,7 +74,20 @@ async function doExec(ctx: HandlerContext, req: Extract<MachineRequest, { op: "e
     timeoutSeconds: clampInt(req.timeoutSeconds, 1, 24 * 3600, 60),
     signal: scope.signal,
     onOutput: req.stream === true ? scope.output : undefined,
+    ...(secrets ? { env: secrets.env, redact: secrets.redact } : {}),
   });
+}
+
+/** A file that holds a secret is only for programs on this machine, never sent out. */
+async function refuseSecretFile(ctx: HandlerContext, secrets: Secrets, requested: string) {
+  if (!secrets || secrets.files.length === 0) return;
+  const target = await resolveInWorkspace(ctx.workspaceReal, requested);
+  for (const file of secrets.files) {
+    const held = await resolveInWorkspace(ctx.workspaceReal, file).catch(() => null);
+    if (held && (held.abs === target.abs || isInside(target.abs, held.abs))) {
+      throw new RunnerError("bad_request", `${requested} holds a secret; it stays on this computer`);
+    }
+  }
 }
 
 async function doRead(
@@ -161,16 +184,23 @@ async function doList(
 export async function handleRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
   // Each agent works in its own folder: that folder is its workspace.
   if (req.agent) ctx = { ...ctx, workspaceReal: await agentWorkspace(ctx.workspaceReal, req.agent) };
+  if (req.op === "secret") {
+    if (!ctx.secretsDir) throw new RunnerError("bad_request", "This runner keeps no secrets");
+    return handleSecret(ctx.secretsDir, req.agent, ctx.workspaceReal, req);
+  }
+  const secrets = await agentSecrets(ctx.secretsDir, req.agent);
   switch (req.op) {
     case "exec":
-      return doExec(ctx, req, scope);
+      return doExec(ctx, req, scope, secrets);
     case "read":
+      await refuseSecretFile(ctx, secrets, requireString(req.path, "path"));
       return doRead(ctx, req);
     case "write":
       return doWrite(ctx, req);
     case "list":
       return doList(ctx, req);
     case "push":
+      await refuseSecretFile(ctx, secrets, requireString(req.path, "path"));
       return pushPath({
         workspaceReal: ctx.workspaceReal,
         token: ctx.token,
@@ -205,6 +235,9 @@ function describeOp(req: MachineRequest): string {
     case "list":
     case "push":
       return `${req.op} ${String(req.path ?? "") || "."}`;
+    case "secret":
+      // Never the value: the action and the name or request.
+      return `secret ${req.action} ${"name" in req ? req.name : req.requestId}`;
     default:
       return String((req as { op: unknown }).op);
   }

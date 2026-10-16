@@ -8,6 +8,7 @@ import type {
   AgentDetail,
   AgentInput,
   AgentQuestion,
+  AgentSecret,
   AgentSkill,
   AgentUsage,
   ApiRule,
@@ -76,6 +77,8 @@ import type {
   ScopeGrant,
   SearchHit,
   SearchKind,
+  SecretBox,
+  SecretRequest,
   SeriesScope,
   Skill,
   SkillDetail,
@@ -350,6 +353,14 @@ export interface ApiClient {
   questions: {
     /** Answers an agent's question with a choice or free text. */
     answer(orgId: string, questionId: string, input: { choice?: string; text?: string }): Promise<AgentQuestion>;
+  };
+  /** Secrets agents ask for (ADR 0027): only the person asked answers; the value goes sealed. */
+  secrets: {
+    deliver(orgId: string, requestId: string, box: SecretBox): Promise<SecretRequest>;
+    decline(orgId: string, requestId: string): Promise<SecretRequest>;
+    /** Names on the agent's computers (its owner or an admin). */
+    list(orgId: string, agentId: string): Promise<AgentSecret[]>;
+    remove(orgId: string, agentId: string, name: string, machineId: string | null): Promise<void>;
   };
   issues: {
     list(orgId: string, filters?: { q?: string }): Promise<Issue[]>;

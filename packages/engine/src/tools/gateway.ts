@@ -33,7 +33,9 @@ export type InvokeResult =
   | { type: "result"; output: ToolOutput }
   | { type: "approval"; approval: Approval }
   /** `ask_user`: the executor posts the question and suspends the run. */
-  | { type: "question"; text: string; choices: string[] | null };
+  | { type: "question"; text: string; choices: string[] | null }
+  /** `request_secret`: the executor posts the card and suspends the run. */
+  | { type: "secret"; requestId: string };
 
 /**
  * The only way an agent's tool call runs (D2, docs/adr/0015). For each call:
@@ -158,6 +160,9 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       const output = await run(tool, call.input, { ...ctx, toolUseId: call.toolUseId });
       if (builtIn && output.waitForAnswer?.text) {
         return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices };
+      }
+      if (!tool.connectionId && output.waitForSecret?.requestId) {
+        return { type: "secret", requestId: output.waitForSecret.requestId };
       }
       return finish(output);
     },

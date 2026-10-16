@@ -5,6 +5,7 @@
  */
 import { mkdirSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import { MACHINE_PROTOCOL_VERSION, type MachineOs, type RunnerInfo } from "@agenteschat/adapters/machine-protocol";
 import { configPath, connectUrl, expandHome, normalizeServerUrl, readConfig, runnerHome, writeConfig } from "./config";
 import { RunnerConnection } from "./connection";
@@ -180,7 +181,7 @@ async function start(): Promise<number> {
     url: connectUrl(config.server),
     token: config.token,
     info,
-    context: { workspaceReal, exec: config.exec, token: config.token },
+    context: { workspaceReal, exec: config.exec, token: config.token, secretsDir: path.join(runnerHome(), "secrets") },
     log,
   });
   const stop = () => connection.stop();

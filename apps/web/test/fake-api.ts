@@ -4,6 +4,7 @@ import type {
   ActiveRun,
   Agent,
   AgentQuestion,
+  AgentSecret,
   Approval,
   Channel,
   ChannelMember,
@@ -21,6 +22,7 @@ import type {
   Role,
   Run,
   ScopeGrant,
+  SecretRequest,
 } from "@/api/types";
 import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
@@ -47,6 +49,8 @@ export interface FakeState {
   me: Me | null;
   /** Questions someone else answered on the server (this tab still shows them open). */
   answeredElsewhere?: Set<string>;
+  /** Secrets on agents' computers, by agent id (`secrets.list`). */
+  agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
   agents: Agent[];
   channels: Channel[];
@@ -1225,6 +1229,37 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           input.choice && input.text ? `${input.choice} (${input.text})` : (input.choice ?? input.text ?? null);
         Object.assign(q, { status: "answered", answer, answeredByUserId: state.me?.user.id ?? null });
         return structuredClone(q);
+      },
+    },
+    secrets: {
+      // Like the server: only the person asked answers, once; the fake keeps the box to check it was sealed.
+      deliver: async (orgId, requestId, box) => {
+        log("secrets.deliver", orgId, requestId, box);
+        const msg = state.messages.find((m) => (m.meta?.secretRequest as SecretRequest | undefined)?.id === requestId);
+        const r = msg?.meta?.secretRequest as SecretRequest | undefined;
+        if (!r || r.requestedForUserId !== state.me?.user.id)
+          throw new ApiError(404, "not_found", "Secret request not found");
+        if (r.status !== "pending") throw new ApiError(409, "conflict", "This request was already answered or expired");
+        Object.assign(r, { status: "delivered", publicKey: null, deliveredAt: new Date().toISOString() });
+        return structuredClone(r);
+      },
+      decline: async (orgId, requestId) => {
+        log("secrets.decline", orgId, requestId);
+        const msg = state.messages.find((m) => (m.meta?.secretRequest as SecretRequest | undefined)?.id === requestId);
+        const r = msg?.meta?.secretRequest as SecretRequest | undefined;
+        if (!r) throw new ApiError(404, "not_found", "Secret request not found");
+        if (r.status !== "pending") throw new ApiError(409, "conflict", "This request was already answered or expired");
+        Object.assign(r, { status: "declined", publicKey: null });
+        return structuredClone(r);
+      },
+      list: async (orgId, agentId) => {
+        log("secrets.list", orgId, agentId);
+        return structuredClone(state.agentSecrets?.[agentId] ?? []);
+      },
+      remove: async (orgId, agentId, name, machineId) => {
+        log("secrets.remove", orgId, agentId, name, machineId);
+        const list = state.agentSecrets?.[agentId];
+        if (list) state.agentSecrets = { ...state.agentSecrets, [agentId]: list.filter((x) => x.name !== name) };
       },
     },
     proposals: {

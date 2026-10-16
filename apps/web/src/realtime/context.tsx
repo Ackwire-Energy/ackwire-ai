@@ -7,7 +7,16 @@ import { useApi } from "@/api/context";
 import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
 import { cacheApproval, cacheMessage } from "@/api/queries";
-import type { ActiveRun, Agent, AgentQuestion, BudgetEvent, ChannelEvent, MemoryUpdate, Message } from "@/api/types";
+import type {
+  ActiveRun,
+  Agent,
+  AgentQuestion,
+  BudgetEvent,
+  ChannelEvent,
+  MemoryUpdate,
+  Message,
+  SecretRequest,
+} from "@/api/types";
 import { formatPercent } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { type ConnectionStatus, RealtimeConnection, realtimeUrl, type SocketFactory } from "./connection";
@@ -38,6 +47,8 @@ export interface LiveState {
   typing: TypingState;
   /** Latest state of agent questions (answered elsewhere, or by us). */
   questions: Record<string, AgentQuestion>;
+  /** Latest state of secret requests (answered here or elsewhere; ADR 0027). */
+  secrets: Record<string, SecretRequest>;
   /** `memory.updated` cards per channel (live; they aren't in the message list). */
   memory: Record<string, LiveMemoryCard[]>;
   /** "O Theo só responde a Walter." per channel: only for me, never stored. */
@@ -97,6 +108,7 @@ export function createStreamsStore(
     typing: {},
     memory: {},
     questions: {},
+    secrets: {},
     notices: {},
     steered: {},
   };
@@ -108,6 +120,7 @@ export function createStreamsStore(
       next.typing === state.typing &&
       next.memory === state.memory &&
       next.questions === state.questions &&
+      next.secrets === state.secrets &&
       next.notices === state.notices &&
       next.steered === state.steered
     )
@@ -148,6 +161,10 @@ export function createStreamsStore(
         event.type === "question.asked" || event.type === "question.answered"
           ? { ...state.questions, [event.question.id]: event.question }
           : state.questions;
+      const secrets =
+        event.type === "secret.requested" || event.type === "secret.updated"
+          ? { ...state.secrets, [event.secretRequest.id]: event.secretRequest }
+          : state.secrets;
       const steeredRun =
         event.type === ("agent.run.steered" as string)
           ? state.streams.runs[(event as unknown as { runId: string }).runId]
@@ -159,6 +176,7 @@ export function createStreamsStore(
         ...state,
         steered,
         questions,
+        secrets,
         memory,
         streams: applyChannelEvent(state.streams, event, now()),
         receipts: applyReceiptEvent(
@@ -230,6 +248,8 @@ export function createStreamsStore(
     /** Our own answer, before (or instead of) the server's event. */
     answered: (question: AgentQuestion) =>
       set({ ...state, questions: { ...state.questions, [question.id]: question } }),
+    /** Our own delivery or refusal of a secret request, before the server's event. */
+    secretAnswered: (request: SecretRequest) => set({ ...state, secrets: { ...state.secrets, [request.id]: request } }),
     dismiss: (runId: string) => set({ ...state, streams: dismissRun(state.streams, runId) }),
     /** "Parar" pressed (optimistic) / the cancel failed. */
     stopping: (runId: string, byUserId: string) =>

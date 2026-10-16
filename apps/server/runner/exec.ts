@@ -74,6 +74,10 @@ export interface ExecOptions {
   onOutput?: (stream: "stdout" | "stderr", chunk: string) => void;
   /** Tests: shorter batching. */
   batchMs?: number;
+  /** Added to the runner's environment (the agent's secrets, ADR 0027). */
+  env?: Record<string, string>;
+  /** Applied to everything that leaves the machine: live chunks and the result. */
+  redact?: (text: string) => string;
 }
 
 /** The platform shell, the way Node's own `shell: true` does it. */
@@ -121,6 +125,7 @@ function exitCodeOf(code: number | null, signal: NodeJS.Signals | null): number 
 export function runCommand(opts: ExecOptions): Promise<ExecReply> {
   return new Promise<ExecReply>((resolve) => {
     const shell = shellCommand(opts.command);
+    const clean = opts.redact ?? ((text: string) => text);
     const stdout = new OutputBuffer();
     const stderr = new OutputBuffer();
     let timedOut = false;
@@ -141,7 +146,7 @@ export function runCommand(opts: ExecOptions): Promise<ExecReply> {
           const piece = chunk.length > room ? chunk.slice(0, room) : chunk;
           streamed += Buffer.byteLength(piece);
           try {
-            opts.onOutput(stream, piece);
+            opts.onOutput(stream, clean(piece));
           } catch {
             // the connection went away; the result still has it
           }
@@ -154,7 +159,7 @@ export function runCommand(opts: ExecOptions): Promise<ExecReply> {
     try {
       child = spawn(shell.file, shell.args, {
         cwd: opts.cwd,
-        env: process.env,
+        env: opts.env ? { ...process.env, ...opts.env } : process.env,
         stdio: ["ignore", "pipe", "pipe"],
         detached: process.platform !== "win32",
         windowsHide: true,
@@ -192,14 +197,14 @@ export function runCommand(opts: ExecOptions): Promise<ExecReply> {
       child.stdout?.destroy();
       child.stderr?.destroy();
       if (spawnError) {
-        resolve({ exitCode: 127, stdout: stdout.text(), stderr: spawnError.message, timedOut: false });
+        resolve({ exitCode: 127, stdout: clean(stdout.text()), stderr: spawnError.message, timedOut: false });
         return;
       }
       if (canceled) {
         resolve({
           exitCode: 130,
-          stdout: stdout.text(),
-          stderr: stderr.text(),
+          stdout: clean(stdout.text()),
+          stderr: clean(stderr.text()),
           timedOut: false,
           canceled: { killed: true },
         });
@@ -207,8 +212,8 @@ export function runCommand(opts: ExecOptions): Promise<ExecReply> {
       }
       resolve({
         exitCode: timedOut ? 124 : exitCodeOf(code, signal),
-        stdout: stdout.text(),
-        stderr: stderr.text(),
+        stdout: clean(stdout.text()),
+        stderr: clean(stderr.text()),
         timedOut,
       });
     };

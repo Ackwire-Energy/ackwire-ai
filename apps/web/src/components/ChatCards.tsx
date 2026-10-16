@@ -1,4 +1,4 @@
-import { Button, Chip, Diff, diffLines, Field, Textarea } from "@agenteschat/ui";
+import { Button, Chip, Diff, diffLines, Field, Input, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -6,9 +6,11 @@ import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useDecideProposal, useProposals } from "@/api/queries";
-import type { AgentQuestion, MemoryUpdate } from "@/api/types";
+import type { AgentQuestion, MemoryUpdate, SecretRequest } from "@/api/types";
 import { useDirectory } from "@/hooks/useDirectory";
+import { formatTime } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
+import { MAX_SECRET_BYTES, sealSecret, secretAad } from "@/lib/secret-box";
 import { useToast } from "@/lib/toast";
 import { useLive, useLiveStore } from "@/realtime/context";
 import { useChannelActions } from "./channel-actions";
@@ -246,6 +248,177 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         </div>
       )}
       {error && !done && (
+        <p className="small muted" role="alert" style={{ margin: 0 }}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * An agent asks for a secret for its computer (`request_secret`, ADR 0027).
+ * Only the person asked sees the field; the value is sealed here, in the
+ * browser, to the key the computer made, so it never reaches our server, the
+ * chat or the agent. Everyone else sees who was asked.
+ */
+export function SecretCard({ request }: { request: SecretRequest }) {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const api = useApi();
+  const dir = useDirectory(org.id);
+  const live = useLiveStore();
+  const current = useLive((s) => s.secrets[request.id]) ?? request;
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const agent = dir.agentById.get(request.agentId);
+  const agentName = agent?.name ?? t("channel.unknownAgent");
+  const mine = current.requestedForUserId === me.user.id;
+  const person = dir.memberById.get(current.requestedForUserId)?.name ?? t("channel.unknownPerson");
+  const pending = current.status === "pending" && new Date(current.expiresAt).getTime() > Date.now();
+  const failed = (err: unknown) => {
+    const status = (err as { status?: number }).status;
+    setError(status === 409 ? t("secret.alreadyAnswered") : t("secret.failed"));
+  };
+  const deliver = useMutation({
+    meta: { silent: true },
+    mutationFn: async (text: string) => {
+      if (!current.publicKey) throw Object.assign(new Error("closed"), { status: 409 });
+      const aad = secretAad({ requestId: current.id, orgId: org.id, name: current.name, target: current.target });
+      return api.secrets.deliver(org.id, current.id, await sealSecret(current.publicKey, text, aad));
+    },
+    onMutate: () => setError(null),
+    onSuccess: (res) => {
+      setValue("");
+      live.secretAnswered(res);
+    },
+    onError: failed,
+  });
+  const decline = useMutation({
+    meta: { silent: true },
+    mutationFn: () => api.secrets.decline(org.id, current.id),
+    onMutate: () => setError(null),
+    onSuccess: (res) => live.secretAnswered(res),
+    onError: failed,
+  });
+  const submit = () => {
+    if (!value) return setError(t("secret.empty"));
+    if (new TextEncoder().encode(value).byteLength > MAX_SECRET_BYTES) return setError(t("secret.tooLarge"));
+    deliver.mutate(value);
+  };
+  const closed: Record<Exclude<SecretRequest["status"], "pending">, { chip: string; line: string }> = {
+    delivered: {
+      chip: t("secret.chipDone"),
+      line: current.deliveredAt
+        ? mine
+          ? t("secret.deliveredByYou", { time: formatTime(i18n.language, current.deliveredAt) })
+          : t("secret.delivered", { person, time: formatTime(i18n.language, current.deliveredAt) })
+        : t("secret.chipDone"),
+    },
+    declined: { chip: t("secret.chipDeclined"), line: t("secret.declined") },
+    expired: { chip: t("secret.chipExpired"), line: t("secret.expired") },
+    canceled: { chip: t("secret.chipCanceled"), line: t("secret.canceled") },
+  };
+  const status = pending ? null : closed[current.status === "pending" ? "expired" : current.status];
+  const where =
+    current.target.kind === "file"
+      ? t("secret.targetFile", { path: current.target.path, agent: agentName })
+      : t("secret.targetEnv", { name: current.name, agent: agentName });
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
+    <div
+      className={pending ? "ac-approval secret-card" : "ac-approval ac-approval--done secret-card"}
+      role="group"
+      aria-label={t("secret.group", { agent: agentName })}
+    >
+      {pending && <CardSky color={colorOf(agent)} />}
+      <div className="ac-approval__head">
+        <span className="ac-approval__who">
+          {mine ? (
+            <Trans i18nKey="secret.asks" values={{ agent: agentName }} components={{ b: <b /> }} />
+          ) : (
+            <Trans i18nKey="secret.asksPerson" values={{ agent: agentName, person }} components={{ b: <b /> }} />
+          )}
+        </span>
+        {status ? (
+          <Chip
+            icon={current.status === "delivered" ? "check" : "close"}
+            tone={current.status === "delivered" ? "done" : "neutral"}
+          >
+            {status.chip}
+          </Chip>
+        ) : (
+          <Chip icon="lock" tone="waiting">
+            {t("secret.chip")}
+          </Chip>
+        )}
+      </div>
+      <p className="ac-approval__title">
+        <code>{current.name}</code> · {current.purpose}
+      </p>
+      <p className="small muted" style={{ margin: 0 }}>
+        {where}
+      </p>
+      {pending && mine && (
+        <form
+          className="secret-card__form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
+          <Field
+            label={t("secret.label", { name: current.name })}
+            help={t("secret.private")}
+            error={error ?? undefined}
+          >
+            <Input
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              data-1p-ignore
+            />
+          </Field>
+          <div className="ac-approval__actions">
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              icon="lock"
+              loading={deliver.isPending}
+              disabled={decline.isPending}
+            >
+              {t("secret.send")}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              loading={decline.isPending}
+              disabled={deliver.isPending}
+              onClick={() => decline.mutate()}
+            >
+              {t("secret.decline")}
+            </Button>
+            <span className="small muted">
+              {t("secret.until", { time: formatTime(i18n.language, current.expiresAt) })}
+            </span>
+          </div>
+        </form>
+      )}
+      {pending && !mine && (
+        <p className="small muted" style={{ margin: 0 }}>
+          {t("secret.waitingFor", { person })}
+        </p>
+      )}
+      {status && (
+        <p className="small muted" style={{ margin: 0 }}>
+          {status.line}
+        </p>
+      )}
+      {error && !pending && (
         <p className="small muted" role="alert" style={{ margin: 0 }}>
           {error}
         </p>

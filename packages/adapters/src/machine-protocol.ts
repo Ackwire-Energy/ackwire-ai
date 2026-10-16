@@ -6,10 +6,12 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 2;
+export const MACHINE_PROTOCOL_VERSION = 3;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
+/** From this protocol on, the runner keeps secrets for each agent (`op: "secret"`, ADR 0027). */
+export const SECRETS_PROTOCOL = 3;
 
 /** No valid `hello` within this time closes the socket. */
 export const HELLO_TIMEOUT_MS = 10_000;
@@ -21,6 +23,26 @@ export const MAX_FRAME_BYTES = 8 * 1024 * 1024;
 export const MAX_INLINE_FILE_BYTES = 5 * 1024 * 1024;
 
 export const MACHINE_TOKEN_PREFIX = "agm_";
+
+/** Same as `SecretBox` and `SecretTarget` in `secret-box.ts` (this file imports nothing). */
+export interface WireSecretBox {
+  v: number;
+  epk: string;
+  iv: string;
+  ct: string;
+}
+export type WireSecretTarget = { kind: "env" } | { kind: "file"; path: string };
+
+/**
+ * Secrets of the request's agent (ADR 0027): `keypair` makes the key for a
+ * request (the private key stays on the machine), `deliver` opens the box and
+ * stores the value, `discard` drops a request's key, `remove` forgets a secret.
+ */
+export type SecretRequest =
+  | { action: "keypair"; requestId: string }
+  | { action: "deliver"; requestId: string; name: string; target: WireSecretTarget; aad: string; box: WireSecretBox }
+  | { action: "discard"; requestId: string }
+  | { action: "remove"; name: string };
 
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
@@ -68,6 +90,7 @@ export type MachineRequest = (
   | { op: "read"; path: string; maxBytes: number }
   | { op: "write"; path: string; base64: string }
   | { op: "list"; path: string; depth: number }
+  | ({ op: "secret" } & SecretRequest)
   | {
       op: "push";
       path: string;
@@ -89,6 +112,8 @@ export interface MachineReplies {
   list: { entries: FileEntry[] };
   /** What was sent: the uploaded name (`report.pdf`, or `folder.zip`), bytes and SHA-256 (hex). */
   push: { name: string; size: number; sha256: string; contentType: string };
+  /** `keypair`: the public key (raw P-256, base64); `deliver`: the value's size in bytes. */
+  secret: { publicKey?: string; size?: number };
 }
 
 /** Error codes the runner reports; the message is for people. */
@@ -179,7 +204,7 @@ export function parseServerFrame(raw: string): ServerFrame | null {
   if (!isObject(f) || !isString(f.type)) return null;
   if (f.type === "request") {
     if (!isString(f.id) || !isString(f.op)) return null;
-    if (!["exec", "read", "write", "list", "push"].includes(f.op)) return null;
+    if (!["exec", "read", "write", "list", "push", "secret"].includes(f.op)) return null;
   }
   if ((f.type === "cancel" || f.type === "request") && !isString(f.id)) return null;
   if (!["welcome", "request", "cancel", "ping", "refused"].includes(f.type)) return null;

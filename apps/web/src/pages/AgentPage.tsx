@@ -37,6 +37,7 @@ import { AudienceChip, AudienceRow } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentComputerRow } from "@/components/AgentComputer";
 import { AgentCustomizer } from "@/components/AgentCustomizer";
+import { AgentSecretsRow } from "@/components/AgentSecrets";
 import { EditDialog } from "@/components/EditDialog";
 import { LoadingLine, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -261,6 +262,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
         </SummaryRow>
 
         <AgentComputerRow agent={agent} editable={editable} />
+        <AgentSecretsRow agent={agent} editable={editable} />
 
         <SummaryRow
           id="sec-budget"

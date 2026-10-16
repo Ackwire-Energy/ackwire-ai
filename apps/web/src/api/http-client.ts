@@ -8,6 +8,7 @@ import type {
   AgentComputer,
   AgentDetail,
   AgentQuestion,
+  AgentSecret,
   AgentSkill,
   AgentUsage,
   Approval,
@@ -59,6 +60,7 @@ import type {
   ScheduleParse,
   ScopeGrant,
   SearchHit,
+  SecretRequest,
   Skill,
   SkillDetail,
   StorageConfig,
@@ -510,6 +512,19 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
     questions: {
       answer: (orgId, questionId, input) =>
         request<AgentQuestion>(`${org(orgId)}/questions/${enc(questionId)}/answer`, { json: input }),
+    },
+    secrets: {
+      deliver: (orgId, requestId, box) =>
+        request<SecretRequest>(`${org(orgId)}/secret-requests/${enc(requestId)}/deliver`, { json: { box } }),
+      decline: (orgId, requestId) =>
+        request<SecretRequest>(`${org(orgId)}/secret-requests/${enc(requestId)}/decline`, { json: {} }),
+      list: async (orgId, agentId) =>
+        (await request<{ secrets: AgentSecret[] }>(`${org(orgId)}/agents/${enc(agentId)}/secrets`)).secrets,
+      remove: (orgId, agentId, name, machineId) =>
+        request<void>(
+          `${org(orgId)}/agents/${enc(agentId)}/secrets/${enc(name)}${machineId ? `?machineId=${enc(machineId)}` : ""}`,
+          { method: "DELETE" },
+        ),
     },
     proposals: {
       list: async (orgId) => (await request<{ proposals: Proposal[] }>(`${org(orgId)}/proposals`)).proposals,

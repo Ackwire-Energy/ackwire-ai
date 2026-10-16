@@ -19,6 +19,7 @@ export * from "./s3";
 export * from "./s3-fake";
 export * from "./sandbox";
 export * from "./search";
+export * from "./secret-box";
 
 /**
  * Infrastructure the core talks to through interfaces, so each edition can

@@ -6,6 +6,7 @@ import {
   type SandboxInfo,
   type SandboxProvider,
   SandboxProviderError,
+  SECRETS_PROTOCOL,
 } from "@agenteschat/adapters";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import { MachineOfflineError } from "./machines";
@@ -130,6 +131,23 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
     async listFiles(id, path, depth = 3) {
       const r = await guard(id, () => hub.call(id, { agent, op: "list", path, depth }), path);
       return r.entries;
+    },
+    async secret(id, request) {
+      const status = await hub.status(id);
+      if (status && status.protocol < SECRETS_PROTOCOL) {
+        throw new Error(
+          `The runner on the computer ${status.name} is too old to keep secrets. Tell the person: its owner should update it with \`agentes-runner update\`.`,
+        );
+      }
+      try {
+        return await hub.call(id, { agent, op: "secret", ...request });
+      } catch (error) {
+        // The runner's own words ("This request's key is gone…"), not the file-tool wording.
+        if (error instanceof MachineRequestError && error.code !== "timeout" && error.code !== "canceled") {
+          throw new Error(error.message);
+        }
+        throw error;
+      }
     },
     async pushFile(id, path, target) {
       return guard(

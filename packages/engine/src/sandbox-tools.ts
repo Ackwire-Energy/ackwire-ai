@@ -1,4 +1,5 @@
 import { type ExecRequest, type ExecResult, type NetworkMode, type PubSub, workspacePath } from "@agenteschat/adapters";
+import { and, eq, schema } from "@agenteschat/db";
 import {
   ARTIFACT_LIMITS,
   type ArtifactActor,
@@ -27,6 +28,16 @@ import {
   truncateOutput,
   withSandbox,
 } from "./sandbox";
+import {
+  hasCloudSecrets,
+  MAX_PENDING_SECRETS,
+  REQUEST_SECRET_TOOL,
+  requesterOfRun,
+  SECRET_TTL_MS,
+  secretFilePaths,
+  secretOnComputer,
+  withSecretsCommand,
+} from "./secrets";
 import { agentSkillByName, type SkillDeps, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
 import { grantedScopeKeys, grantKey, toolAllowScope } from "./tools/scopes";
@@ -267,8 +278,9 @@ const slug = (s: string) =>
  * `read_file`, `list_files`, `export_file` (text to a native Drive kind),
  * `upload_file` (any file or folder as is, ADR 0025), `import_file` (from
  * the Drive) and `run_skill_script`. One computer per agent, shared
- * by all its conversations, created on first use; no secrets or environment
- * variables ever go in.
+ * by all its conversations, created on first use; no secrets of ours or
+ * environment variables ever go in, only what a person seals to it with
+ * `request_secret` (ADR 0027).
  * Without a provider the source offers nothing.
  */
 export function createSandboxToolSource(
@@ -278,7 +290,12 @@ export function createSandboxToolSource(
    * Runs a command and, when the provider streams, sends what it prints as
    * `agent.tool.output` (every 250 ms at most, ≤ 64 KB per call, secrets masked).
    */
-  const execLive = async (ctx: ToolContext, computer: ComputerHandle, plain: ExecRequest) => {
+  const execLive = async (ctx: ToolContext, computer: ComputerHandle, given: ExecRequest) => {
+    // Secrets on a cloud computer: the helper gives commands their env and hides values from the output.
+    const plain =
+      !computer.machineId && (await hasCloudSecrets(ctx.db, ctx.orgId, ctx.agentId))
+        ? { ...given, command: withSecretsCommand(given.command) }
+        : given;
     // Canceling the run stops the command (killed when the provider can).
     const request: ExecRequest = ctx.signal ? { ...plain, signal: ctx.signal } : plain;
     const { id, provider } = computer;
@@ -340,6 +357,12 @@ export function createSandboxToolSource(
       },
     }));
   const skillDeps = (ctx: ToolContext): SkillDeps => ({ db: ctx.db, blobs: deps.skills.blobs });
+  /** A file that holds a secret (or a folder with one) never leaves the computer through the file tools. */
+  const refuseSecretPath = async (ctx: ToolContext, computer: ComputerHandle, path: string) => {
+    const held = await secretFilePaths(ctx.db, ctx.orgId, ctx.agentId, computer.machineId ?? null);
+    const hit = held.find((f) => f === path || path === "" || f.startsWith(`${path}/`));
+    if (hit) throw new Error(`${path || "The workspace"} holds a secret (${hit}); it stays on the computer.`);
+  };
 
   /**
    * `upload_file` on one computer: it pushes the file itself when its channel
@@ -552,6 +575,89 @@ export function createSandboxToolSource(
       },
     },
     {
+      name: REQUEST_SECRET_TOOL,
+      description:
+        "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it.",
+      scope: SANDBOX_SCOPE,
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" },
+          purpose: { type: "string", minLength: 1, maxLength: 300, description: "What it is for, shown to the person" },
+          target: { enum: ["env", "file"] },
+          path: { type: "string", maxLength: 300, description: "With target file: where it goes in your workspace" },
+        },
+        required: ["name", "purpose", "target"],
+        additionalProperties: false,
+      },
+      describe: (input) => ({ title: `Pedir o segredo ${str(input.name)}` }),
+      async execute(input, ctx) {
+        try {
+          const requester = await requesterOfRun(ctx);
+          if (!requester) {
+            return {
+              content: "Only a person's own request can ask them for a secret (not a routine or another agent).",
+              isError: true,
+            };
+          }
+          const name = str(input.name);
+          const file = input.target === "file";
+          const path = file ? workspacePath(str(input.path)) : "";
+          if (file && (!path || path === ".agentes" || path.startsWith(".agentes/"))) {
+            return { content: "With target file, give a path inside your workspace (e.g. .npmrc).", isError: true };
+          }
+          const open = await ctx.db
+            .select({ id: schema.secretRequests.id })
+            .from(schema.secretRequests)
+            .where(and(eq(schema.secretRequests.runId, ctx.runId), eq(schema.secretRequests.status, "pending")));
+          if (open.length >= MAX_PENDING_SECRETS) {
+            return { content: `At most ${MAX_PENDING_SECRETS} secret requests at a time.`, isError: true };
+          }
+          const row = await run(ctx, 60, async (computer) => {
+            const id = Bun.randomUUIDv7();
+            const { publicKey } = await secretOnComputer(computer, { action: "keypair", requestId: id });
+            if (!publicKey) throw new Error("the computer made no key");
+            const [inserted] = await ctx.db
+              .insert(schema.secretRequests)
+              .values({
+                id,
+                orgId: ctx.orgId,
+                runId: ctx.runId,
+                agentId: ctx.agentId,
+                channelId: ctx.channelId,
+                toolUseId: ctx.toolUseId ?? id,
+                requestedForUserId: requester,
+                name,
+                purpose: str(input.purpose).trim(),
+                targetKind: file ? "file" : "env",
+                targetPath: file ? path : null,
+                machineId: computer.machineId ?? null,
+                publicKey,
+                expiresAt: new Date(Date.now() + SECRET_TTL_MS),
+              })
+              .returning();
+            if (!inserted) throw new Error("the request was not saved");
+            await recordAudit(ctx.db, {
+              orgId: ctx.orgId,
+              actor: { type: "agent", id: ctx.agentId },
+              action: "secret.requested",
+              target: { type: "agent", id: ctx.agentId },
+              details: {
+                requestId: id,
+                name,
+                target: file ? { kind: "file", path } : { kind: "env" },
+                requestedFor: requester,
+              },
+            });
+            return inserted;
+          });
+          return { content: "", waitForSecret: { requestId: row.id } };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
       name: "computer_status",
       description: "Is your computer on? Which computer it is, disk used and its internet access.",
       scope: SANDBOX_SCOPE,
@@ -628,7 +734,10 @@ export function createSandboxToolSource(
       async execute(input, ctx) {
         try {
           const path = workspacePath(str(input.path));
-          const data = await run(ctx, 30, (c) => c.provider.readFile(c.id, path));
+          const data = await run(ctx, 30, async (c) => {
+            await refuseSecretPath(ctx, c, path);
+            return c.provider.readFile(c.id, path);
+          });
           if (!data) return { content: `No file ${path}.`, isError: true };
           const text = new TextDecoder().decode(data.slice(0, SANDBOX_LIMITS.maxFileBytes));
           const shown = truncateOutput(text, SANDBOX_LIMITS.fileReadChars);
@@ -682,7 +791,10 @@ export function createSandboxToolSource(
       async execute(input, ctx) {
         try {
           const path = workspacePath(str(input.path));
-          const data = await run(ctx, 30, (c) => c.provider.readFile(c.id, path));
+          const data = await run(ctx, 30, async (c) => {
+            await refuseSecretPath(ctx, c, path);
+            return c.provider.readFile(c.id, path);
+          });
           if (!data) return { content: `No file ${path}.`, isError: true };
           if (data.byteLength > SANDBOX_LIMITS.maxFileBytes) {
             return { content: "The file is too large (max 5 MB).", isError: true };
@@ -738,13 +850,14 @@ export function createSandboxToolSource(
               };
             }
           }
-          const row = await run(ctx, UPLOAD_TIMEOUT_SECONDS, (c) =>
-            uploadFrom(ctx, c, path, {
+          const row = await run(ctx, UPLOAD_TIMEOUT_SECONDS, async (c) => {
+            await refuseSecretPath(ctx, c, path);
+            return uploadFrom(ctx, c, path, {
               title: str(input.title) || null,
               note: str(input.note) || null,
               targetArtifactId,
-            }),
-          );
+            });
+          });
           const done = await uploadedFile(deps.db, row);
           if (!done) return { content: `Failed: ${row.error ?? "the upload did not finish"}`, isError: true };
           return {
@@ -866,6 +979,7 @@ export function createSandboxToolSource(
           "computer_start",
           "computer_stop",
           "computer_status",
+          REQUEST_SECRET_TOOL,
         ].some((n) => keys.has(grantKey(null, toolAllowScope(n))));
       if (!granted) return withNotices(build(false, 60));
       const settings = await getSandboxSettings(ctx.db, ctx.orgId);

@@ -6,6 +6,7 @@ import { publishChannelEvent } from "./events";
 import { onForumRunFinished } from "./forum";
 import { can, getMembership } from "./organizations";
 import { isTerminal, type RunStatus, transitionRun } from "./runs";
+import { cancelSecretRequests, publishSecret, type SecretRequestRow, syncSecretMessage } from "./secrets";
 
 const { agentRuns, agents, approvals, agentQuestions, outbox, messages, channels } = schema;
 
@@ -117,6 +118,7 @@ export async function cancelRun(
     if (isTerminal(run.status)) throw new ConflictError("This task already ended", "run_finished");
     previous = run.status;
     const status = run.status;
+    let closedSecrets: SecretRequestRow[] = [];
     const done = await db.transaction(async (tx) => {
       const moved = await transitionRun(tx, run.id, status, "canceled", { error: `canceled_by:${userId}` });
       if (!moved) return null;
@@ -129,6 +131,9 @@ export async function cancelRun(
         .update(agentQuestions)
         .set({ status: "canceled" })
         .where(and(eq(agentQuestions.runId, run.id), eq(agentQuestions.status, "open")));
+      // Its secret requests close too (the keys left on the computer are pruned there).
+      closedSecrets = await cancelSecretRequests(tx, run.id);
+      for (const r of closedSecrets) await syncSecretMessage(tx, r);
       // Jobs of this run that haven't started never will.
       await tx
         .delete(outbox)
@@ -150,6 +155,7 @@ export async function cancelRun(
     });
     if (done) {
       run = done;
+      for (const r of closedSecrets) await publishSecret(deps.pubsub, r, "secret.updated");
       break;
     }
     if (attempt >= 3) throw new ConflictError("This task changed state; try again", "run.state_changed");

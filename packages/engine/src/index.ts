@@ -76,6 +76,8 @@ export * from "./sandbox-tools";
 export * from "./schedule";
 export * from "./schedule-tools";
 export * from "./search";
+export * from "./secret-helper";
+export * from "./secrets";
 export * from "./skill-tools";
 export * from "./skills";
 export * from "./storage";

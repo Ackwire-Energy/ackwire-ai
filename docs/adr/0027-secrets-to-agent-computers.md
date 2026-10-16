@@ -1,6 +1,6 @@
 # 0027. Secrets delivered to an agent's computer, end to end
 
-- Status: Accepted (design; not built yet)
+- Status: Accepted (built 2026-10-16)
 - Date: 2026-10-16
 - Planning: D40
 
@@ -39,25 +39,25 @@ The person's browser and the agent's computer. Our server, database, logs, outbo
 ### 3. Crypto: an ephemeral key per request, generated on the computer
 
 1. On `request_secret`, the server asks the computer for a key pair for that request:
-   - Daytona: a helper we install in the computer (`~/.agentes/bin/secret`, written on first use like the git credential helper of ADR 0024), run through `exec`;
-   - connected machine: new runner ops `secret.keypair` and `secret.deliver` (runner protocol 3; older runners get "update the runner", as in protocol 2).
-   The private key is written to `~/.agentes/secrets/keys/<requestId>` (mode 600) and never leaves the computer. The public key is stored on the request.
+   - cloud computer: a dependency-free Node helper we install at `$HOME/.agentes-secrets/helper.mjs` (rewritten on each secret action, so a recreated computer gets it back; `packages/engine/src/secret-helper.ts`), run through `exec`;
+   - connected machine: runner op `secret` with actions `keypair`, `deliver`, `discard`, `remove` (runner protocol 3; older runners are told to run `agentes-runner update`). Each agent's secrets live in `<runner home>/secrets/<agent id8>/`.
+   The private key is written to `keys/<requestId>` (mode 600, folder 700) and never leaves the computer. The public key is stored on the request. Keys of requests nobody answered are pruned after an hour, the next time a key is made.
 2. The browser encrypts with WebCrypto: ephemeral ECDH P-256 against the computer's key, HKDF-SHA256, AES-256-GCM. The AAD binds the ciphertext to `requestId | orgId | name | target`, so it can't be replayed onto another request or target.
 3. `POST /api/app/secrets/{id}/deliver { epk, iv, ciphertext }` (cookie session + CSRF): the server checks requester, status, expiry and size (≤ 16 KB), forwards the payload to the computer in memory and stores nothing of it. The computer decrypts, writes the target, deletes the private key and answers `ok` (with the byte size only). Offline computer or failure: the request stays pending and the person can try again until it expires.
-4. Declined or expired: the server tells the computer to delete that private key.
+4. Declined: the server tells the computer to delete that private key. Expired or canceled: the key is pruned there (see 1).
 
 ### 4. Targets
 
 - **`env`**: one line in `~/.agentes/secrets/env` (mode 600). Commands the agent runs see it as an environment variable: on Daytona our exec wrapper sources that file; the runner adds it to the child's environment.
-- **`file`**: a path in the computer's home or workspace (e.g. `~/.npmrc`, `.env`), mode 600; paths outside are refused.
+- **`file`**: a path in the agent's workspace (e.g. `.npmrc`, `.env`), mode 600; paths outside it are refused.
 - **`stdin`** (later): the input of a process that is waiting (a CLI sign-in in a session kept by the computer). Until then, interactive sign-ins use the computer's terminal shown in the app, which talks to the computer directly (D38; Claude Code sign-in must complete through Anthropic's own flow).
 
 ### 5. Keeping the value away from the model afterwards
 
 The agent has a shell on its computer, so it can read a secret it was given. We reduce, not prevent:
 
-- **Redaction on the computer:** exact secret values are replaced with `[secret:NAME]` in command output before it leaves the computer (Daytona: the exec wrapper filters with the values in `~/.agentes/secrets`; runner: in its output buffer).
-- `read_file`, `list_files`, `export_file` and `upload_file` refuse `~/.agentes/secrets`.
+- **Redaction on the computer:** exact secret values (4+ characters) are replaced with `[secret:NAME]` in command output before it leaves the computer. Cloud computer: when the agent has secrets there, its commands run through the helper (`helper.mjs run`), which gives them the env values and filters stdout and stderr, holding back a tail so a value split across chunks is still caught; without the helper the command runs as is. Runner: in its output, live and final.
+- The secrets store sits outside the workspace, so the file tools never see it. Files that hold a secret can't be read, exported or uploaded (`read_file`, `export_file`, `upload_file`; the runner refuses `read` and `push` of them too).
 - Tool descriptions and the agent context say: never ask for passwords, tokens or codes in the chat; use `request_secret` and refer to secrets by name.
 
 ### 6. Lifecycle and audit

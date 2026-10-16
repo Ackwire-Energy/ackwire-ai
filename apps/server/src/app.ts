@@ -26,6 +26,7 @@ import { memoryRoutes } from "./routes/app/memory";
 import { questionRoutes } from "./routes/app/questions";
 import { routineRoutes } from "./routes/app/routines";
 import { sandboxRoutes } from "./routes/app/sandboxes";
+import { secretRoutes } from "./routes/app/secrets";
 import { skillRoutes } from "./routes/app/skills";
 import { storageRoutes } from "./routes/app/storage";
 import { wikiRoutes } from "./routes/app/wiki";
@@ -100,6 +101,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", memoryRoutes(deps));
     api.route("/app", dmRoutes(deps));
     api.route("/app", questionRoutes(deps));
+    api.route("/app", secretRoutes(deps));
     api.route("/app", inviteRoutes(deps));
     api.route("/app", storageRoutes(deps));
     api.route("/app", artifactRoutes(deps));

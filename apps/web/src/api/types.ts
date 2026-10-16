@@ -285,6 +285,13 @@ export type ChannelEvent =
       threadId: string | null;
       question: AgentQuestion;
     }
+  /** An agent asked a person for a secret, or the request closed (ADR 0027). */
+  | {
+      type: "secret.requested" | "secret.updated";
+      channelId: string;
+      threadId: string | null;
+      secretRequest: SecretRequest;
+    }
   /** An agent changed its memory because a person asked (with an undo), or proposed a change. */
   | {
       type: "memory.updated";
@@ -709,6 +716,52 @@ export interface AgentQuestion {
   status: "open" | "answered";
   answer: string | null;
   answeredByUserId: string | null;
+}
+
+/** Where a secret goes on the agent's computer (ADR 0027). */
+export type SecretTarget = { kind: "env" } | { kind: "file"; path: string };
+
+/**
+ * An agent asked a person for a secret for its computer (`request_secret`,
+ * ADR 0027): carried by `meta.secretRequest` and `secret.requested` /
+ * `secret.updated`. Never the value.
+ */
+export interface SecretRequest {
+  id: string;
+  agentId: string;
+  channelId: string;
+  threadId: string | null;
+  messageId: string | null;
+  /** The only person who can answer. */
+  requestedForUserId: string;
+  name: string;
+  purpose: string;
+  target: SecretTarget;
+  /** null = the agent's cloud computer. */
+  machineId: string | null;
+  /** The computer's key for this request; null once it is closed. */
+  publicKey: string | null;
+  status: "pending" | "delivered" | "declined" | "expired" | "canceled";
+  expiresAt: string;
+  deliveredAt: string | null;
+  removed: boolean;
+}
+
+/** A secret on an agent's computer, by name (the agent page). */
+export interface AgentSecret {
+  name: string;
+  target: SecretTarget;
+  machineId: string | null;
+  deliveredAt: string;
+  deliveredByUserId: string;
+}
+
+/** The value sealed in the browser to the request's key (`lib/secret-box.ts`). */
+export interface SecretBox {
+  v: 1;
+  epk: string;
+  iv: string;
+  ct: string;
 }
 
 // ── File storage (expected: `GET/PUT …/storage`, `POST …/storage/test`, `…/storage/migrate`) ──

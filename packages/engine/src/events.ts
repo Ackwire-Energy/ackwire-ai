@@ -24,6 +24,7 @@ export interface MemoryUpdate {
 
 import type { AgentQuestion } from "./questions";
 import type { RunStatus } from "./runs";
+import type { SecretRequestView } from "./secrets";
 
 /**
  * Real-time events sent to WebSocket clients subscribed to a channel. The
@@ -181,6 +182,13 @@ export type ChannelEvent =
       channelId: string;
       threadId: string | null;
       question: AgentQuestion;
+    }
+  /** An agent asked a person for a secret for its computer (ADR 0027), or the request closed. Never the value. */
+  | {
+      type: "secret.requested" | "secret.updated";
+      channelId: string;
+      threadId: string | null;
+      secretRequest: SecretRequestView;
     }
   /** An issue of this channel was created or changed, or got a comment. */
   | { type: "issue.created" | "issue.updated"; channelId: string; issue: IssueView }

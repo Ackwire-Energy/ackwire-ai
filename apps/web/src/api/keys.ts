@@ -43,6 +43,7 @@ export const keys = {
   computer: (orgId: string, agentId: string) => ["org", orgId, "sandbox", "computer", agentId] as const,
   /** Every agent's computer view (prefix of `computer`). */
   computers: (orgId: string) => ["org", orgId, "sandbox", "computer"] as const,
+  agentSecrets: (orgId: string, agentId: string) => ["org", orgId, "agent-secrets", agentId] as const,
   machines: (orgId: string) => ["org", orgId, "machines"] as const,
   artifactBlob: (orgId: string, id: string, version: number) =>
     ["org", orgId, "artifacts", "blob", id, version] as const,

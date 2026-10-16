@@ -58,6 +58,7 @@ import type {
   MemoryUpdate,
   Message as MessageType,
   ReplyRef,
+  SecretRequest,
 } from "@/api/types";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
@@ -66,7 +67,7 @@ import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
-import { InlineProposal, MemoryChangeCard, QuestionCard } from "@/components/ChatCards";
+import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { ForumMessageCard, forumTopicOfMessage } from "@/components/Forum";
 import { LiveCodeToggle, LiveWorkList } from "@/components/LiveCode";
@@ -1559,13 +1560,14 @@ const TimelineMessage = memo(function TimelineMessage({
     ? (meta.memoryUpdates as MemoryUpdate[]).filter(isMemoryUpdate)
     : [];
   const question = isQuestion(meta.question) ? meta.question : null;
+  const secretRequest = isSecretRequest(meta.secretRequest) ? meta.secretRequest : null;
   // Files an agent made, or a person attached.
   const artifacts = artifactRefs(meta);
   // "Responder": the message this one quotes.
   const quoted = useMemo(() => replyOf(m.meta), [m.meta]);
   // An agent opened a forum topic from here: the topic card with "Ver discussão".
   const forumTopicId = m.author.type === "agent" ? forumTopicOfMessage(meta) : null;
-  const card = approvalId || proposalId || memoryUpdates.length > 0 || question;
+  const card = approvalId || proposalId || memoryUpdates.length > 0 || question || secretRequest;
   const feedback = m.author.type === "agent" && !card && !m.local;
   // People see name, time and text; the date, model and tokens wait behind the time.
   const usage = m.author.type === "agent" ? messageUsage(m) : null;
@@ -1679,6 +1681,7 @@ const TimelineMessage = memo(function TimelineMessage({
       {agent &&
         memoryUpdates.map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
       {question && <QuestionCard question={question} />}
+      {secretRequest && <SecretCard request={secretRequest} />}
       {m.author.type === "agent" && m.agentRunId && !card && !m.local && (
         <MessageWork runId={m.agentRunId} meta={m.meta} agentName={agent?.name ?? name} />
       )}
@@ -1713,6 +1716,12 @@ const TimelineMessage = memo(function TimelineMessage({
     </Message>
   );
 });
+
+function isSecretRequest(v: unknown): v is SecretRequest {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.id === "string" && typeof o.name === "string" && typeof o.requestedForUserId === "string";
+}
 
 function isQuestion(v: unknown): v is AgentQuestion {
   if (!v || typeof v !== "object") return false;

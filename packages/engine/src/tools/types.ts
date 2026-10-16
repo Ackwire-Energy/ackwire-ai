@@ -27,6 +27,8 @@ export interface ToolOutput {
   outcome?: { kind: OutcomeKind; subject?: string; summary?: string; details?: Record<string, unknown> };
   /** Built-in `ask_user` only: suspend the run until a person answers this question. */
   waitForAnswer?: { text: string; choices: string[] | null };
+  /** `request_secret` only: suspend the run until the person answers this request (ADR 0027). */
+  waitForSecret?: { requestId: string };
 }
 
 /**

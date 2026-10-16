@@ -1,16 +1,28 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame } from "@agenteschat/adapters";
+import {
+  generateSecretKeyPair,
+  MACHINE_PROTOCOL_VERSION,
+  openSecret,
+  orgTopic,
+  type ServerFrame,
+  sealSecret,
+  secretAad,
+} from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   authenticateMachine,
   createMachineHub,
   createMachinePairing,
+  declineSecret,
   deleteMachine,
+  deliverSecret,
   drainOutbox,
+  expireSecretRequests,
   ForbiddenError,
   getAgentComputer,
   grantScopes,
+  listAgentSecrets,
   listMachines,
   type MachineHub,
   MachineOfflineError,
@@ -20,7 +32,9 @@ import {
   postPersonMessage,
   receiveMachineUpload,
   redeemMachinePairing,
+  removeAgentSecret,
   renameMachine,
+  type SecretRequestView,
   setAgentComputerTarget,
   startAgentComputer,
   type ToolContext,
@@ -73,6 +87,9 @@ function fakeRunner(
 ) {
   const sent: ServerFrame[] = [];
   const files = new Map<string, Uint8Array>();
+  /** Like the real runner: private keys per request, opened values per name. */
+  const keys = new Map<string, string>();
+  const secrets = new Map<string, string>();
   let closed: { code?: number; reason?: string } | null = null;
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
   const handle = async (req: Request) => {
@@ -80,6 +97,25 @@ function fakeRunner(
     const fail = (code: string, message: string) =>
       reply({ type: "result", id: req.id, ok: false, error: { code, message } });
     switch (req.op) {
+      case "secret": {
+        if (req.action === "keypair") {
+          const pair = await generateSecretKeyPair();
+          keys.set(req.requestId, pair.privateKey);
+          return ok({ publicKey: pair.publicKey });
+        }
+        if (req.action === "deliver") {
+          const key = keys.get(req.requestId);
+          if (!key) return fail("not_found", "This request's key is gone");
+          const value = await openSecret(key, req.box, req.aad).catch(() => null);
+          if (value === null) return fail("bad_request", "The secret couldn't be opened");
+          keys.delete(req.requestId);
+          secrets.set(req.name, value);
+          return ok({ size: Buffer.byteLength(value) });
+        }
+        if (req.action === "discard") keys.delete(req.requestId);
+        if (req.action === "remove") secrets.delete(req.name);
+        return ok({});
+      }
       case "exec": {
         if (options.execAllowed === false) return fail("exec_disabled", "commands are off");
         const r = options.exec?.(req, (stream, chunk) => void reply({ type: "output", id: req.id, stream, chunk })) ?? {
@@ -141,6 +177,8 @@ function fakeRunner(
     conn,
     sent,
     files,
+    keys,
+    secrets,
     closed: () => closed,
     hello: (token: string, extra: Record<string, unknown> = {}) =>
       hub.message(
@@ -573,5 +611,183 @@ describe("tools on a connected machine", () => {
     expect(out).toMatchObject({ isError: true });
     expect(out.content).toContain("agentes-runner update");
     expect(runner.sent.filter((s) => s.type === "request")).toEqual([]);
+  });
+});
+
+describe("secrets for a connected machine (ADR 0027)", () => {
+  const SANDBOX = [{ connectionId: null, scope: "sandbox:run" }];
+  const VALUE = "npm_s3cr3t_value_0123456789";
+
+  /** An agent that asks for NPM_TOKEN when told "publica", then says what it got. */
+  async function asking(target: { target: "env" } | { target: "file"; path: string } = { target: "env" }) {
+    f = await setup({
+      machines: true,
+      reply: (req) => {
+        const last = JSON.stringify(req.messages.at(-1)?.content);
+        if (last.includes("tool_result")) return { chunks: ["Pronto."] };
+        if (last.includes("publica")) {
+          return {
+            chunks: ["Preciso do token do npm."],
+            toolUses: [
+              { name: "request_secret", input: { name: "NPM_TOKEN", purpose: "publicar o pacote no npm", ...target } },
+            ],
+          };
+        }
+        return { chunks: ["ok"] };
+      },
+    });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    const paired = await pair();
+    const runner = fakeRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev publica o pacote",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const [row] = await f.db.select().from(schema.secretRequests);
+    if (!row) throw new Error("no secret request");
+    return { paired, runner, row };
+  }
+
+  const seal = async (view: {
+    id: string;
+    publicKey: string | null;
+    name: string;
+    target: SecretRequestView["target"];
+  }) =>
+    sealSecret(
+      view.publicKey as string,
+      VALUE,
+      secretAad({ requestId: view.id, orgId: f.org.id, name: view.name, target: view.target }),
+    );
+
+  test("the run waits on a card; only the person asked delivers; the value reaches the machine and nothing else", async () => {
+    const { runner, row, paired } = await asking();
+    const [run] = await f.db.select().from(schema.agentRuns);
+    expect(run?.status).toBe("waiting_input");
+    expect(row).toMatchObject({
+      status: "pending",
+      name: "NPM_TOKEN",
+      requestedForUserId: f.owner.id,
+      machineId: paired.machineId,
+    });
+    // The key was made on the machine, for this agent.
+    expect(runner.sent.find((x) => x.type === "request" && x.op === "secret")).toMatchObject({
+      action: "keypair",
+      requestId: row.id,
+      agent: { id: f.agent.id, handle: "dev" },
+    });
+    const [card] = await f.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, row.messageId as string));
+    expect((card?.meta as { secretRequest?: SecretRequestView } | undefined)?.secretRequest).toMatchObject({
+      status: "pending",
+      name: "NPM_TOKEN",
+      purpose: "publicar o pacote no npm",
+      publicKey: row.publicKey,
+    });
+
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    // Someone else in the channel: the request doesn't exist for them.
+    const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    await expect(deliverSecret(sandbox, bia.id, f.org.id, row.id, await seal(view))).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+    // A box sealed for another request doesn't open on the machine.
+    const wrong = await sealSecret(row.publicKey, VALUE, "agentes-secret|v1|other|org|NPM_TOKEN|env");
+    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, wrong)).rejects.toThrow("couldn't be opened");
+
+    const delivered = await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    expect(delivered).toMatchObject({ status: "delivered", publicKey: null });
+    expect(runner.secrets.get("NPM_TOKEN")).toBe(VALUE);
+    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
+      "already answered",
+    );
+
+    await drainOutbox(f.db, f.handlers);
+    const [done] = await f.db.select().from(schema.agentRuns);
+    expect(done?.status).toBe("done");
+    const steps = await f.db.select().from(schema.agentRunSteps);
+    const result = steps.find((x) => x.kind === "tool_result")?.data as { content: string };
+    expect(result.content).toContain("NPM_TOKEN was delivered to your computer");
+
+    // Nowhere in our database: messages, steps, transcript, audit, outbox.
+    const everything = JSON.stringify([
+      await f.db.select().from(schema.messages),
+      steps,
+      await f.db.select().from(schema.agentRuns),
+      await f.db.select().from(schema.auditLog),
+      await f.db.select().from(schema.outbox),
+      await f.db.select().from(schema.secretRequests),
+    ]);
+    expect(everything).not.toContain(VALUE);
+    const actions = (await f.db.select().from(schema.auditLog)).map((a) => a.action);
+    expect(actions).toEqual(expect.arrayContaining(["secret.requested", "secret.delivered"]));
+
+    // Listed by name for the owner; removed from the machine on request.
+    expect(await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([
+      expect.objectContaining({ name: "NPM_TOKEN", target: { kind: "env" }, machineId: paired.machineId }),
+    ]);
+    await removeAgentSecret(
+      f.sandboxDeps as NonNullable<typeof f.sandboxDeps>,
+      f.owner.id,
+      f.org.id,
+      f.agent.id,
+      "NPM_TOKEN",
+      paired.machineId,
+    );
+    expect(runner.secrets.has("NPM_TOKEN")).toBe(false);
+    expect(await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([]);
+  });
+
+  test("declined or expired: the run goes on without it, and the machine drops the key", async () => {
+    const { runner, row } = await asking();
+    await declineSecret({ db: f.db, pubsub: f.pubsub, sandbox: f.sandboxDeps }, f.owner.id, f.org.id, row.id);
+    expect(runner.keys.has(row.id)).toBe(false);
+    await drainOutbox(f.db, f.handlers);
+    const steps = await f.db.select().from(schema.agentRunSteps);
+    expect((steps.find((x) => x.kind === "tool_result")?.data as { content: string } | undefined)?.content).toContain(
+      "declined",
+    );
+
+    // A second request nobody answers: closed after 15 minutes.
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev publica de novo",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(await expireSecretRequests({ db: f.db, pubsub: f.pubsub }, new Date(Date.now() + 16 * 60_000))).toBe(1);
+    await drainOutbox(f.db, f.handlers);
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs.every((r) => r.status === "done")).toBe(true);
+  });
+
+  test("a runner older than protocol 3 is told to update", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    const paired = await pair();
+    const runner = fakeRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token, { protocol: 2 });
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
+    const msg = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev oi",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, msg.id));
+    const ctx: ToolContext = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run?.id as string,
+      channelId: f.general.id,
+      threadRootId: run?.threadRootId as string,
+      triggerMessageId: msg.id,
+    };
+    const ask = { name: "NPM_TOKEN", purpose: "publicar", target: "env" };
+    const old = await f.tools?.invoke(ctx, { toolUseId: "t1", name: "request_secret", input: ask });
+    expect(old).toMatchObject({ type: "result", output: { isError: true } });
+    expect(old?.type === "result" && old.output.content).toContain("agentes-runner update");
   });
 });

@@ -7,6 +7,7 @@ import {
   enqueueIdleReflections,
   expireApprovals,
   expireQuestions,
+  expireSecretRequests,
   fireDueRoutines,
   type JobHandlers,
   listenForRunCancels,
@@ -120,6 +121,11 @@ export function startWorkers(deps: WorkerDeps) {
   every("questions", WORKER_INTERVALS_MS.approvals, async () => {
     const expired = await expireQuestions({ db, pubsub: deps.pubsub });
     if (expired > 0) log.info("agent questions expired", { expired });
+  });
+
+  every("secrets", WORKER_INTERVALS_MS.approvals, async () => {
+    const expired = await expireSecretRequests({ db, pubsub: deps.pubsub });
+    if (expired > 0) log.info("secret requests expired", { expired });
   });
 
   every("recovery", WORKER_INTERVALS_MS.recovery, async () => {
