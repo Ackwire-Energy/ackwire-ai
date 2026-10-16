@@ -1,10 +1,10 @@
-import { and, type Database, eq, schema } from "@agenteschat/db";
+import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { openSecret, sealSecret } from "../crypto";
 import { ValidationError } from "../errors";
 import { assertPublicHttpsUrl, type ResolveHost } from "../net-guard";
 import type { ConnectorDeps } from "./connections";
 
-const { oauthClients } = schema;
+const { oauthClients, connectorConnections } = schema;
 
 /**
  * MCP-native OAuth (MCP authorization spec): discovery from the server's
@@ -132,8 +132,11 @@ const clientAad = (orgId: string, id: string) => `oauth-client|${orgId}|${id}`;
 
 /**
  * The client agentes.chat registered with this issuer for this org, or a new
- * one (Dynamic Client Registration). Null when the server doesn't offer
- * registration or PKCE S256.
+ * one (Dynamic Client Registration). A registration is reused only while an
+ * active connection uses it: once every connection to that server is gone,
+ * the server may have dropped the client (Supabase answered "Unrecognized
+ * client_id"), so we register again and replace the row. Null when the server
+ * doesn't offer registration or PKCE S256.
  */
 export async function ensureOAuthClient(
   deps: McpOAuthDeps,
@@ -146,7 +149,14 @@ export async function ensureOAuthClient(
     .select()
     .from(oauthClients)
     .where(and(eq(oauthClients.orgId, orgId), eq(oauthClients.issuer, issuer)));
-  if (existing) return existing;
+  if (existing) {
+    const [inUse] = await deps.db
+      .select({ id: connectorConnections.id })
+      .from(connectorConnections)
+      .where(and(eq(connectorConnections.oauthClientId, existing.id), isNull(connectorConnections.revokedAt)))
+      .limit(1);
+    if (inUse) return existing;
+  }
   const methods = meta.code_challenge_methods_supported;
   if (methods && !methods.includes("S256")) return null;
   if (!meta.registration_endpoint) return null;
@@ -167,10 +177,27 @@ export async function ensureOAuthClient(
   if (!res?.ok) return null;
   const body = (await res.json().catch(() => ({}))) as { client_id?: string; client_secret?: string };
   if (!body.client_id) return null;
-  const id = crypto.randomUUID();
+  // A new registration replaces the old one in place (same row id: old states and connections stay valid references).
+  const id = existing?.id ?? crypto.randomUUID();
   const wrapper = deps.keyWrappers[0];
   if (!wrapper) throw new Error("no key wrapper");
   const sealed = body.client_secret ? await sealSecret(wrapper, body.client_secret, clientAad(orgId, id)) : null;
+  if (existing) {
+    const [updated] = await deps.db
+      .update(oauthClients)
+      .set({
+        authorizationEndpoint: meta.authorization_endpoint,
+        tokenEndpoint: meta.token_endpoint,
+        clientId: body.client_id,
+        secretCiphertext: sealed?.ciphertext ?? null,
+        wrappedDataKey: sealed?.wrappedDataKey ?? null,
+        kekId: sealed?.kekId ?? null,
+        scope: input.scopes.length > 0 ? input.scopes.join(" ") : null,
+      })
+      .where(eq(oauthClients.id, existing.id))
+      .returning();
+    return updated ?? null;
+  }
   const [row] = await deps.db
     .insert(oauthClients)
     .values({

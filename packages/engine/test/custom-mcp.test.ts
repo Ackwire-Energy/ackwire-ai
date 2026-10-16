@@ -17,6 +17,7 @@ import {
   mcpSessionOver,
   postPersonMessage,
   refreshCustomServer,
+  revokeConnection,
   saveCustomTools,
   setAgentAccess,
   setAgentScopes,
@@ -328,6 +329,12 @@ describe("custom MCP servers", () => {
     expect(headers).toEqual({ authorization: "Bearer at-2" });
     expect(auth.seen.tokenForms.at(-1)?.get("grant_type")).toBe("refresh_token");
     expect(auth.seen.tokenForms.at(-1)?.get("client_id")).toBe("dcr-client-1");
+    // Every connection to that server gone: the server may have dropped the client ("Unrecognized
+    // client_id"), so the next connect registers again and replaces the row in place.
+    await revokeConnection(f.db, f.owner.id, f.org.id, connection.id);
+    await connectCustomServer(deps, f.owner.id, f.org.id, { serverUrl: SERVER });
+    expect(auth.seen.registrations).toBe(2);
+    expect(await f.db.select().from(schema.oauthClients)).toHaveLength(1);
   });
 
   test("without OAuth metadata the server needs a key; private addresses are refused", async () => {
