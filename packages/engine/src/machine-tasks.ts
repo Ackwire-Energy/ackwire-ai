@@ -17,6 +17,7 @@ import { createAgentRuns, eligibleChannelAgents, requesterOf } from "./dispatch"
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { getMachineById, machineOnline } from "./machines";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
+import { blockedOfTask, missionAllowRules, recordTaskDenials } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
 import { enqueue } from "./outbox";
 import type { ToolContext } from "./tools/types";
@@ -173,7 +174,14 @@ export interface StartTaskInput {
   /** Where it runs, relative to the agent's folder (a mission's repository, or the worktree of the session to resume). */
   cwd?: string | null;
   /** A mission's task (protocol 5): the runner gives its executor the `agentes` MCP server and these rules. */
-  mission?: { id: string; rules: string; mode?: "plan" | "work"; branchPrefix?: string } | null;
+  mission?: {
+    id: string;
+    rules: string;
+    mode?: "plan" | "work";
+    branchPrefix?: string;
+    /** Commands a person allowed for the whole mission (Claude Code rules). */
+    allow?: string[];
+  } | null;
   /** Tags the task as the mission's without the MCP server (our agent's own tasks in agent mode; protocol 4). */
   missionId?: string | null;
 }
@@ -469,6 +477,8 @@ export async function applyTaskDone(
       )
       .returning();
     if (!ended) return null;
+    // Commands it was refused with nobody to ask: its end notice lists them ("Liberar e repetir").
+    await recordTaskDenials(tx, ended, frame.denials);
     // A task the agent canceled itself wakes nobody; a mission's still gets its end handled (notes, inbox).
     if (!ended.canceledBy?.startsWith("agent:") || ended.missionId) await enqueueWake(tx, ended);
     return ended;
@@ -584,6 +594,7 @@ export async function settleInterruptedTask(
                     rules: MISSION_RULES,
                     mode: mission.status === "proposed" ? ("plan" as const) : ("work" as const),
                     branchPrefix: `agentes/${mission.id.replace(/-/g, "").slice(-8)}/`,
+                    allow: await missionAllowRules(deps.db, mission.id),
                   }
                 : null,
             }),
@@ -849,7 +860,11 @@ async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
         .from(schema.missions)
         .where(eq(schema.missions.id, row.missionId))
     : [];
-  const notice = mission?.executor !== "agent" && (row.status === "failed" || row.status === "interrupted");
+  // Commands it was refused: the people see them and can allow them ("Liberar e repetir").
+  const blocked =
+    row.missionId && mission?.executor !== "agent" ? await blockedOfTask(deps.db, row.missionId, row.id) : [];
+  const notice =
+    mission?.executor !== "agent" && (row.status === "failed" || row.status === "interrupted" || blocked.length > 0);
   const claimed = await deps.db.transaction(async (tx) => {
     const [won] = await tx
       .update(machineTasks)
@@ -863,7 +878,9 @@ async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
           channelId: row.channelId,
           threadId: row.threadRootId,
           author: { type: "agent", agentId: row.agentId, runId: null, hop: 0 },
-          body: endText(row, computer),
+          body: blocked.length
+            ? `${endText(row, computer)} Blocked: ${blocked.map((d) => `\`${d.command}\``).join(", ")}.`
+            : endText(row, computer),
           meta: {
             machineTask: {
               id: row.id,
@@ -876,6 +893,7 @@ async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
               missionId: row.missionId,
               ...(row.branch ? { branch: row.branch } : {}),
               ...(row.lastLine ? { lastLine: row.lastLine } : {}),
+              ...(blocked.length ? { blocked } : {}),
             },
             bodyCode: `machine_task_${row.status}`,
             bodyParams: {

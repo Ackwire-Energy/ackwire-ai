@@ -116,6 +116,12 @@ export interface TaskStart {
     mode?: "plan" | "work";
     /** Protocol 7: the mission's branches start with this (`agentes/<id>/`); only these may be pushed. */
     branchPrefix?: string;
+    /**
+     * Commands a person allowed for the whole mission ("Aprovar sempre nesta
+     * missão"), as Claude Code permission rules (`Bash(swift *)`); added to
+     * a work turn's allow list (the deny list still wins).
+     */
+    allow?: string[];
   };
 }
 
@@ -160,10 +166,27 @@ export interface TaskDone {
   interrupted?: boolean;
   /** Claude Code's session id, when it reported one. */
   session?: string;
+  /**
+   * Commands the executor wasn't allowed to run and nobody approved
+   * (Claude Code's `permission_denials`, Codex's declined commands): the
+   * task's end notice lists them ("Liberar e repetir").
+   */
+  denials?: TaskDenial[];
+}
+
+/** One command an executor was refused. */
+export interface TaskDenial {
+  /** Claude Code's tool name (`Bash`, `WebFetch`…); `Bash` for Codex commands. */
+  tool: string;
+  /** The command line, or what the tool would touch (a URL, a path). */
+  command: string;
 }
 
 /** Largest pieces of task frames (characters / entries); the runner cuts, the server cuts again. */
 export const TASK_LIMITS = {
+  /** Refused commands kept per task, and each one's length. */
+  denials: 10,
+  denial: 300,
   line: 500,
   files: 50,
   filePath: 300,
@@ -340,6 +363,20 @@ const fileList = (v: unknown) =>
         .map((p) => p.slice(0, TASK_LIMITS.filePath))
     : undefined;
 const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+/** `task.done.denials`: at most `TASK_LIMITS.denials`, each cut, duplicates dropped. */
+const denialList = (v: unknown): TaskDenial[] => {
+  if (!Array.isArray(v)) return [];
+  const out: TaskDenial[] = [];
+  for (const d of v) {
+    if (!isObject(d) || !isString(d.command) || !d.command.trim()) continue;
+    const tool = isString(d.tool) && d.tool ? d.tool.slice(0, 64) : "Bash";
+    const command = d.command.trim().slice(0, TASK_LIMITS.denial);
+    if (out.some((x) => x.tool === tool && x.command === command)) continue;
+    out.push({ tool, command });
+    if (out.length >= TASK_LIMITS.denials) break;
+  }
+  return out;
+};
 
 /** `hello.executors`: only `claude` and `codex`, each with a short version line. */
 export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerInfo["executors"]> {
@@ -445,6 +482,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const lastLine = cut(f.lastLine, TASK_LIMITS.line);
       const files = fileList(f.files);
       const session = cut(f.session, 64);
+      const denials = denialList(f.denials);
       return {
         type: "task.done",
         taskId: f.taskId.slice(0, 64),
@@ -458,6 +496,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(f.timedOut === true ? { timedOut: true } : {}),
         ...(f.interrupted === true ? { interrupted: true } : {}),
         ...(session !== undefined ? { session } : {}),
+        ...(denials.length ? { denials } : {}),
       };
     }
     case "mcp.call": {
@@ -675,6 +714,21 @@ export const MISSION_MCP_TOOLS: readonly MissionMcpTool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "permission_prompt",
+    description:
+      "Internal: Claude Code calls this itself when a command needs a person's approval (--permission-prompt-tool). Never call it yourself.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tool_name: { type: "string", maxLength: 64 },
+        input: { type: "object" },
+        tool_use_id: { type: "string", maxLength: 128 },
+        /** The runner's follow-up: the state of a request it already made. */
+        request_id: { type: "string", maxLength: 64 },
+      },
+    },
+  },
 ];
 
 /**
@@ -689,3 +743,152 @@ export function findPullRequestUrl(text: string | null | undefined): string | nu
   );
   return m ? m[0].slice(0, TASK_LIMITS.prUrl) : null;
 }
+
+// ── Command approvals (Claude Code's permission prompts) ──────────────────────
+
+/** Our MCP tool Claude Code asks when a command needs a person (`--permission-prompt-tool`). */
+export const PERMISSION_TOOL = "permission_prompt";
+/** Its name as Claude Code knows it. */
+export const PERMISSION_PROMPT_TOOL = `mcp__agentes__${PERMISSION_TOOL}`;
+/** How long a command waits for a person before it is denied. */
+export const PERMISSION_WAIT_MS = 30 * 60_000;
+/** How often the runner asks the server whether someone answered. */
+export const PERMISSION_POLL_MS = 4000;
+/** Told to the executor when nobody answered in time. */
+export const PERMISSION_TIMEOUT_MESSAGE =
+  "The person was asked and didn't answer yet; continue with other work or stop and wait.";
+
+/** The words a command is made of: one per part of a pipeline or list (`a && b | c`). */
+export function commandParts(command: string): string[] {
+  return command
+    .split(/\|\||&&|[;|\n]/)
+    .map((p) => p.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+}
+
+/** What a tool call does, as one line for people (`git init`, `WebFetch https://…`). */
+export function commandOf(toolName: string, input: Record<string, unknown> | null | undefined): string {
+  const i = input ?? {};
+  const s = (k: string) => (typeof i[k] === "string" ? (i[k] as string) : "");
+  if (toolName === "Bash") return s("command").trim().replace(/\s+/g, " ").slice(0, 1000);
+  const what = s("url") || s("file_path") || s("path") || s("query") || s("pattern");
+  return `${toolName}${what ? ` ${what}` : ""}`.slice(0, 1000);
+}
+
+const globRe = (pattern: string) =>
+  new RegExp(
+    `^${pattern
+      .split("*")
+      .map((x) => x.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+      .join(".*")}$`,
+  );
+
+/** The `Bash(...)` pattern of a rule, or null for another tool's rule. */
+const bashPattern = (rule: string) => /^Bash\((.*)\)$/s.exec(rule.trim())?.[1] ?? null;
+
+/** One part of a command against one `Bash(...)` pattern (Claude Code's `*` matches anything; `x *` also matches `x`). */
+function partMatches(pattern: string, part: string) {
+  if (globRe(pattern).test(part)) return true;
+  return pattern.endsWith(" *") && part === pattern.slice(0, -2);
+}
+
+/**
+ * Does a permission rule cover this call? `Bash(...)` rules: a deny rule
+ * matches when any part of the command matches (`mode: "any"`), an allow
+ * rule set covers a command when every part matches one of them (see
+ * `allowedBy`). Other tools: the bare name, or `WebFetch(domain:host)`.
+ */
+export function ruleMatches(rule: string, toolName: string, input: Record<string, unknown> | null | undefined) {
+  const pattern = bashPattern(rule);
+  if (pattern !== null) {
+    if (toolName !== "Bash") return false;
+    return commandParts(commandOf("Bash", input)).some((part) => partMatches(pattern, part));
+  }
+  const r = rule.trim();
+  if (r === toolName) return true;
+  const domain = /^WebFetch\(domain:(.+)\)$/.exec(r)?.[1];
+  if (domain && toolName === "WebFetch") {
+    try {
+      return new URL(String(input?.url ?? "")).hostname === domain;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+/** Every part of the call is covered by one of these allow rules. */
+export function allowedBy(
+  rules: readonly string[],
+  toolName: string,
+  input: Record<string, unknown> | null | undefined,
+) {
+  if (toolName !== "Bash") return rules.some((r) => ruleMatches(r, toolName, input));
+  const parts = commandParts(commandOf("Bash", input));
+  if (parts.length === 0) return false;
+  return parts.every((part) =>
+    rules.some((r) => {
+      const pattern = bashPattern(r);
+      return pattern !== null && partMatches(pattern, part);
+    }),
+  );
+}
+
+/** Tools whose rules keep two words (`git init`, `npm run`): the rest keep one (`swift`, `python3`). */
+const TWO_WORD_COMMANDS = new Set([
+  "git",
+  "gh",
+  "npm",
+  "pnpm",
+  "yarn",
+  "bun",
+  "cargo",
+  "go",
+  "docker",
+  "kubectl",
+  "brew",
+  "pip",
+  "pip3",
+  "uv",
+  "xcrun",
+  "swift",
+  "eas",
+  "npx",
+]);
+
+/**
+ * "Aprovar sempre nesta missão": the rules that allow this call from now on,
+ * from the first word (or two) of each part (`swift build -c release` →
+ * `Bash(swift build *)`; `sips -Z 800 a.png` → `Bash(sips *)`); another
+ * tool: its name (WebFetch: its domain). At most 5.
+ */
+export function rulesFor(toolName: string, input: Record<string, unknown> | null | undefined): string[] {
+  if (toolName === "Bash") {
+    const out: string[] = [];
+    for (const part of commandParts(commandOf("Bash", input))) {
+      const words = part.split(" ").filter((w) => !/^[A-Z_][A-Z0-9_]*=/.test(w));
+      const first = words[0];
+      if (!first) continue;
+      const second = words[1];
+      const head = TWO_WORD_COMMANDS.has(first) && second && !second.startsWith("-") ? `${first} ${second}` : first;
+      const rule = `Bash(${head.replace(/[()*]/g, "")} *)`;
+      if (!out.includes(rule)) out.push(rule);
+      if (out.length >= 5) break;
+    }
+    return out;
+  }
+  if (toolName === "WebFetch") {
+    try {
+      return [`WebFetch(domain:${new URL(String(input?.url ?? "")).hostname})`];
+    } catch {
+      return ["WebFetch"];
+    }
+  }
+  return /^[A-Za-z_][\w]*$/.test(toolName) ? [toolName] : [];
+}
+
+/** A rule we accept from the server for a task's settings (no wildcards for whole tools, no odd characters). */
+export const isSafeRule = (rule: string) =>
+  /^Bash\([^()\n]{1,200}\)$/.test(rule) ||
+  /^WebFetch\(domain:[\w.-]{1,200}\)$/.test(rule) ||
+  /^(WebFetch|WebSearch)$/.test(rule);

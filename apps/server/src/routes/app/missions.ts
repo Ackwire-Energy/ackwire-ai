@@ -3,6 +3,7 @@ import {
   chooseDecision,
   closeMission,
   createMission,
+  decideCommand,
   decideJoinRequest,
   decideReview,
   decideSuggestion,
@@ -14,6 +15,7 @@ import {
   getTaskOutput,
   listDecisions,
   listJoinRequests,
+  listMissionCommands,
   listMissions,
   listParticipants,
   listReviews,
@@ -26,6 +28,7 @@ import {
   removeParticipant,
   requestToJoin,
   resumeMission,
+  retryBlockedCommand,
   sendMissionMessage,
   setMissionExecutor,
   setMissionMachine,
@@ -754,6 +757,96 @@ export function missionRoutes(deps: AppDeps) {
       const { orgId, missionId } = c.req.valid("param");
       const decisions = await approveProvisionalDecisions(missions(), c.get("user").id, orgId, missionId);
       return c.json({ decisions }, 200);
+    },
+  );
+
+  const Command = z
+    .object({
+      id: z.uuid(),
+      missionId: z.uuid(),
+      taskId: z.string(),
+      tool: z.string(),
+      command: z.string(),
+      state: z.enum(["pending", "allowed", "denied", "expired"]),
+      rules: z.array(z.string()).openapi({ description: '"Aprovar sempre": the rules it adds (`Bash(swift *)`).' }),
+      decidedBy: z.string().nullable(),
+      decidedAt: z.string().nullable(),
+      always: z.boolean(),
+      createdAt: z.string(),
+      expiresAt: z.string(),
+    })
+    .openapi("MissionCommand");
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/missions/{missionId}/commands",
+      tags,
+      security,
+      summary:
+        "Commands the executor asked to run (Claude Code's permission prompts), newest first, and the commands allowed for the whole mission",
+      request: { params: MissionParams },
+      responses: {
+        200: json(z.object({ commands: z.array(Command), rules: z.array(z.string()) })),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      return c.json(await listMissionCommands(missions(), c.get("user").id, orgId, missionId), 200);
+    },
+  );
+
+  const CommandParams = MissionParams.extend({ commandId: z.uuid() });
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/missions/{missionId}/commands/{commandId}/decide",
+      tags,
+      security,
+      summary:
+        "Aprovar / Recusar / Aprovar sempre nesta missão (owner or deciders); the waiting executor gets the answer within seconds",
+      request: {
+        params: CommandParams,
+        body: body(z.object({ decision: z.enum(["allow", "deny", "always"]) })),
+      },
+      responses: { 200: json(Command), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId, commandId } = c.req.valid("param");
+      const out = await decideCommand(
+        missions(),
+        c.get("user").id,
+        orgId,
+        missionId,
+        commandId,
+        c.req.valid("json").decision,
+      );
+      return c.json(out, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/missions/{missionId}/commands/retry",
+      tags,
+      security,
+      summary:
+        '"Liberar e repetir": a command a task was refused becomes allowed for the mission and its session is resumed to retry it',
+      request: {
+        params: MissionParams,
+        body: body(z.object({ taskId: z.uuid(), command: z.string().min(1).max(1000) })),
+      },
+      responses: {
+        200: json(z.object({ rules: z.array(z.string()), delivered: z.boolean() })),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      const out = await retryBlockedCommand(missions(), c.get("user").id, orgId, missionId, c.req.valid("json"));
+      return c.json(after(out), 200);
     },
   );
 

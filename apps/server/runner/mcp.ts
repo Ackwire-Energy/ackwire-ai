@@ -5,9 +5,16 @@ import { createConnection, createServer, type Server, type Socket } from "node:n
 import path from "node:path";
 import { createInterface } from "node:readline";
 import {
+  isSafeRule,
   MCP_ARGS_MAX_CHARS,
   MISSION_MCP_TOOLS,
+  PERMISSION_POLL_MS,
+  PERMISSION_PROMPT_TOOL,
+  PERMISSION_TIMEOUT_MESSAGE,
+  PERMISSION_TOOL,
+  PERMISSION_WAIT_MS,
   type RunnerFrame,
+  ruleMatches,
   type ServerFrame,
 } from "@agenteschat/adapters/machine-protocol";
 import { RUNNER_VERSION } from "./errors";
@@ -371,6 +378,11 @@ export async function handleMcpMessage(message: unknown, call: ToolCaller): Prom
         typeof params.arguments === "object" && params.arguments !== null && !Array.isArray(params.arguments)
           ? (params.arguments as Record<string, unknown>)
           : {};
+      // Claude Code's permission prompt: always an answer it understands (allow or deny JSON), never an error.
+      if (name === PERMISSION_TOOL) {
+        const answer = await permissionPrompt(args, call);
+        return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(answer) }] } };
+      }
       const reply = await call(name, args);
       return {
         jsonrpc: "2.0",
@@ -383,6 +395,65 @@ export async function handleMcpMessage(message: unknown, call: ToolCaller): Prom
     }
     default:
       return rpcError(id, -32601, `Method not found: ${m.method}`);
+  }
+}
+
+/** What Claude Code's `--permission-prompt-tool` must answer. */
+export type PermissionAnswer =
+  | { behavior: "allow"; updatedInput: Record<string, unknown> }
+  | { behavior: "deny"; message: string };
+
+const NEVER_MESSAGE =
+  "This command is never allowed in a mission (merges, pushes to the default branch, deploys): ask with request_approval and wait.";
+
+/**
+ * Claude Code asks (`--permission-prompt-tool mcp__agentes__permission_prompt`)
+ * when a command isn't on the task's allow list. Deny-list commands are
+ * refused here at once (never shown to anyone); the rest go to the server,
+ * which allows it by a mission rule or posts the command card in the thread.
+ * Then we ask the server every `pollMs` (short calls; no request stays open)
+ * until someone answers or `waitMs` passes: then it is denied.
+ */
+export async function permissionPrompt(
+  args: Record<string, unknown>,
+  call: ToolCaller,
+  opts: { waitMs?: number; pollMs?: number; sleep?: (ms: number) => Promise<void>; now?: () => number } = {},
+): Promise<PermissionAnswer> {
+  const toolName = typeof args.tool_name === "string" ? args.tool_name : "";
+  const input =
+    typeof args.input === "object" && args.input !== null && !Array.isArray(args.input)
+      ? (args.input as Record<string, unknown>)
+      : {};
+  if (!toolName) return { behavior: "deny", message: "Unknown tool." };
+  if (DENY_RULES.some((rule) => ruleMatches(rule, toolName, input)))
+    return { behavior: "deny", message: NEVER_MESSAGE };
+  const now = opts.now ?? Date.now;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const deadline = now() + (opts.waitMs ?? PERMISSION_WAIT_MS);
+  const ask = async (a: Record<string, unknown>) => {
+    const reply = await call(PERMISSION_TOOL, a);
+    if (!reply.ok) return { error: reply.error };
+    try {
+      return JSON.parse(reply.text) as { behavior?: string; message?: string; status?: string; request_id?: string };
+    } catch {
+      return { error: "agentes.chat answered something unexpected." };
+    }
+  };
+  let out = await ask({
+    tool_name: toolName.slice(0, 64),
+    input,
+    ...(typeof args.tool_use_id === "string" ? { tool_use_id: args.tool_use_id.slice(0, 128) } : {}),
+  });
+  const requestId = "request_id" in out && typeof out.request_id === "string" ? out.request_id : "";
+  for (;;) {
+    if ("error" in out && out.error) return { behavior: "deny", message: `Not allowed: ${out.error}` };
+    if ("behavior" in out && out.behavior === "allow") return { behavior: "allow", updatedInput: input };
+    if ("behavior" in out && out.behavior === "deny") {
+      return { behavior: "deny", message: String(out.message ?? "A person said no.").slice(0, 500) };
+    }
+    if (!requestId || now() >= deadline) return { behavior: "deny", message: PERMISSION_TIMEOUT_MESSAGE };
+    await sleep(opts.pollMs ?? PERMISSION_POLL_MS);
+    out = await ask({ request_id: requestId });
   }
 }
 
@@ -540,7 +611,7 @@ const gitC = (rules: string[]) =>
   rules.flatMap((r) => (r.startsWith("Bash(git ") ? [r, r.replace("Bash(git ", "Bash(git -C * ")] : [r]));
 
 /** Never without a person's approval (`request_approval`): merges, pushes elsewhere, force pushes, deploys. */
-const DENY_RULES = [
+export const DENY_RULES = [
   "Bash(git merge)",
   "Bash(git merge *)",
   "Bash(git -C * merge *)",
@@ -608,7 +679,7 @@ const DENY_RULES = [
  * merges, other pushes and deploys are denied (they go through
  * `request_approval`). Deny rules win over allow rules.
  */
-export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: string) {
+export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: string, missionAllow: string[] = []) {
   if (mode === "plan") {
     return {
       permissions: {
@@ -643,6 +714,8 @@ export function claudePermissionSettings(mode: "plan" | "work", branchPrefix: st
         "Bash(gh pr diff *)",
         "Bash(gh pr status *)",
         ...BUILD_RULES,
+        // What a person allowed for the whole mission ("Aprovar sempre nesta missão").
+        ...missionAllow.filter(isSafeRule).slice(0, 100),
       ],
       deny: DENY_RULES,
     },
@@ -682,7 +755,9 @@ export function codexMcpOverrides(input: { command: string[]; taskId: string }) 
 /**
  * Extra arguments for a mission task's executor. Claude Code: our MCP
  * config (added to the person's own MCP servers: no `--strict-mcp-config`),
- * the permission profile (`--settings`, see `claudePermissionSettings`), our
+ * the permission profile (`--settings`, see `claudePermissionSettings`), in
+ * work turns our permission prompt tool (anything off the allow list asks a
+ * person in the thread; the deny list never reaches it), our
  * tools allowed without a prompt (`-p` can't ask), and the rules appended
  * to its system prompt. Codex: our server through repeatable `-c` overrides
  * (token and socket through the env), and on the first turn the rules as
@@ -700,6 +775,8 @@ export function missionExecutorArgs(
     settingsFile?: string;
     /** Codex: a resumed thread already has the rules. */
     resumed?: boolean;
+    /** Claude Code work turns: commands off the allow list ask a person through our tool. */
+    promptTool?: boolean;
   },
   platform: NodeJS.Platform = process.platform,
 ): string[] {
@@ -712,6 +789,7 @@ export function missionExecutorArgs(
       ...(input.settingsFile ? ["--settings", q(input.settingsFile)] : []),
       "--allowedTools",
       "mcp__agentes",
+      ...(input.promptTool ? ["--permission-prompt-tool", PERMISSION_PROMPT_TOOL] : []),
       ...(rules ? ["--append-system-prompt", q(rules)] : []),
     ];
   }

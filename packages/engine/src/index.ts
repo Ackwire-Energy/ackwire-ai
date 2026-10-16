@@ -63,6 +63,8 @@ export * from "./machines";
 export * from "./management";
 export * from "./messages";
 export * from "./mission-brief";
+export * from "./mission-command-rules";
+export * from "./mission-commands";
 export * from "./mission-context";
 export * from "./mission-mcp";
 export * from "./mission-rules";

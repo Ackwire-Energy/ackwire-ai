@@ -5,6 +5,7 @@ import { recordAudit } from "./audit";
 import { ValidationError } from "./errors";
 import type { MachineMissionHooks } from "./machine-hub";
 import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./machine-tasks";
+import { handlePermissionPrompt } from "./mission-commands";
 import { createMissionApproval, onMachineOnline } from "./mission-sync";
 import {
   askDecision,
@@ -138,15 +139,18 @@ export async function handleMissionMcpCall(
   // The runner masked the agent's secrets; anything that still looks like a key is masked here too.
   const args = masked(frame.args) as Record<string, unknown>;
   try {
-    await checkMissionToolRate(deps.db, mission, tool.name, task.id);
+    // Command prompts have their own limit (and the runner asks again while one waits).
+    if (tool.name !== "permission_prompt") await checkMissionToolRate(deps.db, mission, tool.name, task.id);
     const text = await run(deps, mission, task, tool.name, args, frame.callId);
-    await recordAudit(deps.db, {
-      orgId: mission.orgId,
-      actor: { type: "agent", id: mission.agentId },
-      action: `mission.tool_${tool.name}`,
-      target: { type: "mission", id: mission.id },
-      details: { taskId: task.id, machineId },
-    }).catch(() => undefined);
+    // The runner's follow-ups on a waiting command aren't new actions.
+    if (tool.name !== "permission_prompt" || !args.request_id)
+      await recordAudit(deps.db, {
+        orgId: mission.orgId,
+        actor: { type: "agent", id: mission.agentId },
+        action: `mission.tool_${tool.name}`,
+        target: { type: "mission", id: mission.id },
+        details: { taskId: task.id, machineId },
+      }).catch(() => undefined);
     return { ok: true, text };
   } catch (error) {
     const code = (error as { code?: unknown }).code;
@@ -267,6 +271,8 @@ async function run(
         ...hits.map((h) => `- [${h.kind}] ${h.title.slice(0, 120)}: ${h.snippet.replace(/\s+/g, " ").slice(0, 300)}`),
       ].join("\n");
     }
+    case "permission_prompt":
+      return handlePermissionPrompt(deps, mission, task, args);
     case "start_task": {
       if (!main) return "Only the mission's main session can start tasks. Report what you need instead.";
       if (mission.status === "paused") {

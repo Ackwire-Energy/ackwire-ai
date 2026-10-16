@@ -32,6 +32,7 @@ import {
 } from "./machine-tasks";
 import { MachineOfflineError, machineOnline } from "./machines";
 import { insertMessage, type Message, messageView } from "./messages";
+import { missionAllowRules } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
 import { enqueueRunJob } from "./mission-runs";
 import { can, requirePermission } from "./organizations";
@@ -259,7 +260,7 @@ export async function missionRole(db: Executor, mission: Pick<MissionRow, "id" |
 const mayAct = (role: MissionRole) => role === "owner" || role === "decide";
 
 /** The mission and the caller's place in it; whoever reads its home channel sees it. */
-async function requireMission(deps: MissionDeps, userId: string, orgId: string, missionId: string) {
+export async function requireMission(deps: MissionDeps, userId: string, orgId: string, missionId: string) {
   const mission = await getMissionRow(deps.db, missionId);
   if (!mission || mission.orgId !== orgId) throw new NotFoundError("Mission not found", "mission.not_found");
   const { membership } = await requireChannelAccess(deps.db, userId, orgId, mission.channelId).catch(() => {
@@ -269,13 +270,13 @@ async function requireMission(deps: MissionDeps, userId: string, orgId: string, 
   return { mission, role, isAdmin: can(membership.role, "manage_members") };
 }
 
-function requireAct(role: MissionRole, what = "do this") {
+export function requireAct(role: MissionRole, what = "do this") {
   if (!mayAct(role)) {
     throw new ForbiddenError(`Only the mission's owner or someone who can decide can ${what}`, "mission.not_allowed");
   }
 }
 
-function requireOpen(mission: MissionRow) {
+export function requireOpen(mission: MissionRow) {
   if (!OPEN.includes(mission.status)) throw new ConflictError("This mission is closed", "mission.closed");
 }
 
@@ -1063,6 +1064,8 @@ export async function startSessionTask(
         // Before Start the executor only reads; after it, it works on the mission's branches (runner protocol 7).
         mode: mission.status === "proposed" ? "plan" : "work",
         branchPrefix: missionBranchPrefix(mission.id),
+        // Commands a person allowed for the whole mission ("Aprovar sempre nesta missão").
+        allow: await missionAllowRules(deps.db, mission.id),
       },
     },
   );
