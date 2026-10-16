@@ -103,8 +103,16 @@ const RoutineRun = z
   .object({
     id: z.uuid(),
     at: z.string(),
-    status: z.enum(["ok", "failed", "skipped"]),
+    status: z
+      .enum(["ok", "silent", "failed", "skipped"])
+      .openapi({ description: "`silent`: nothing new, the agent stayed quiet (NO_REPLY)." }),
     summary: z.string(),
+    weight: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .openapi({ description: "Recent runs only: cost as a share of the priciest recent run (no money)." }),
   })
   .openapi("RoutineRun");
 const Routine = z
@@ -135,6 +143,7 @@ const Routine = z
     nextRunAt: z.string().nullable(),
     running: z.boolean(),
     lastRun: RoutineRun.nullable(),
+    recentRuns: z.array(RoutineRun).openapi({ description: "The last runs, newest first (at most 14)." }),
     budgetUsd: z
       .number()
       .nullable()

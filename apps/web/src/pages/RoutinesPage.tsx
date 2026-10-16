@@ -2,6 +2,7 @@ import {
   Button,
   Checkbox,
   Chip,
+  cx,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -10,14 +11,18 @@ import {
   FilterBar,
   FilterChip,
   Icon,
+  type IconName,
   Input,
-  List,
   Menu,
   MenuItem,
   RadioCard,
   RadioGroup,
   RecurrencePicker,
   type RecurrenceRule,
+  RunKey,
+  RunLane,
+  RunStrip,
+  SearchInput,
   Segmented,
   Select,
   Switch,
@@ -25,9 +30,10 @@ import {
   zonedInstant,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import { useDeferredValue, useEffect, useState } from "react";
+import { type CSSProperties, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  useCalendar,
   useChannels,
   useDms,
   useRoutineAction,
@@ -50,12 +56,14 @@ import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
-import { formatPercent, toYmd, whenAt } from "@/lib/format";
+import { formatPercent, relativeTime, toYmd, whenAt } from "@/lib/format";
 import { agentGrammar } from "@/lib/grammar";
+import { lookOf } from "@/lib/look";
 import { can } from "@/lib/permissions";
 import { defaultRule, fromApiRule, recurrenceLabels, ruleSentence, toApiRule, upcomingLabels } from "@/lib/recurrence";
 import { browserTimezone, onceParts, timezoneLabel, timezoneName } from "@/lib/routines";
 import { useToast } from "@/lib/toast";
+import "./routines.css";
 
 export const ROUTINE_EVENTS: RoutineEvent[] = [
   "sentry.issue_created",
@@ -79,6 +87,22 @@ const nextLabel = (locale: string, iso: string) =>
 
 /** A one-off that already fired (or was cancelled): shown muted, under "Concluídos". */
 export const isDoneOnce = (r: Routine) => r.trigger.type === "once" && !r.active;
+const isPaused = (r: Routine) => !isDoneOnce(r) && !r.active;
+
+/** The horizon: the last 4 hours and the next 20 (telas/Rotinas.html). */
+const HORIZON_BACK = 4 * 3_600_000;
+const HORIZON_AHEAD = 20 * 3_600_000;
+const RUN_SLOTS = 14;
+
+/** "now", ticking every minute ("próxima em 10 min" stays true). */
+function useNow() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
 
 function useTargetLabel() {
   const { t } = useTranslation();
@@ -103,97 +127,247 @@ function useTargetLabel() {
   };
 }
 
-/** Rotinas (telas/Rotinas.dc.html): scheduled and event-driven agent tasks. */
+const targetIcon = (target: RoutineTarget): IconName =>
+  target.type === "dm"
+    ? "message"
+    : target.type === "conversation"
+      ? target.threadId
+        ? "reply"
+        : "channel"
+      : target.type === "forum"
+        ? "members"
+        : target.type === "artifact"
+          ? "file"
+          : "channel";
+
+/** The agent's look for the pixel pieces (color and eyes). */
+function useLook() {
+  const actors = useActors();
+  return (agentId: string) => {
+    const look = lookOf(actors.dir.agentById.get(agentId));
+    return { color: look?.color ?? "sky", eyes: look?.eyes ?? "round" };
+  };
+}
+
+/** "Quando" in words, in the routine's zone (the zone shows only when it isn't mine). */
+function useWhen() {
+  const { t, i18n } = useTranslation();
+  const { me } = useOrg();
+  const actors = useActors();
+  const myZone = actors.dir.memberById.get(me.user.id)?.timezone || browserTimezone() || "UTC";
+  return (r: Routine) => {
+    const zone = r.trigger.type === "event" ? "" : r.trigger.timezone || "UTC";
+    const zoneNote = zone && zone !== myZone ? ` (${timezoneName(zone, i18n.language)})` : "";
+    if (r.trigger.type === "schedule")
+      return `${
+        r.trigger.rule
+          ? ruleSentence(t, i18n.language, fromApiRule(r.trigger.rule, toYmd(new Date())), new Date(), false)
+          : r.trigger.description
+      }${zoneNote}`;
+    if (r.trigger.type === "once")
+      return t("routines.once", { ...onceParts(i18n.language, r.trigger.at, zone), zone: zoneNote });
+    return t(`routines.event.${r.trigger.event}`);
+  };
+}
+
+/** Rotinas (telas/Rotinas.html): scheduled and event-driven agent tasks. */
 export function RoutinesPage() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const routines = useRoutines(org.id);
+  const now = useNow();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Routine | null>(null);
-  const [runsFor, setRunsFor] = useState<Routine | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const [status, setStatus] = useState<"all" | "active" | "paused" | "event">("all");
+  const [q, setQ] = useState("");
   const list = routines.data ?? [];
   const [agents, setAgents] = useState<string[]>([]);
   const copy = useFilterCopy();
   const agentOptions = useActorFilterOptions().filter((o) => o.value.startsWith("agent:"));
-  const byAgent = (r: Routine) => agents.length === 0 || agents.includes(`agent:${r.agentId}`);
-  const current = list.filter((r) => !isDoneOnce(r) && byAgent(r));
-  const done = list.filter((r) => isDoneOnce(r) && byAgent(r));
-  return (
-    <div className="page page--mid">
-      <header
-        className="page__header page__header--row"
-        style={{ alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}
-      >
-        <div className="stack-4" style={{ flex: "1 1 320px", gap: 4 }}>
-          <h1 className="page-title">{t("routines.title")}</h1>
-          <p className="muted" style={{ margin: 0, maxWidth: "64ch" }}>
-            {t("routines.subtitle")}
-          </p>
+  const when = useWhen();
+  const query = q.trim().toLowerCase();
+  const matches = (r: Routine) =>
+    (agents.length === 0 || agents.includes(`agent:${r.agentId}`)) &&
+    (!query || `${r.name} ${r.prompt} ${when(r)}`.toLowerCase().includes(query));
+  const shown = list.filter(matches);
+  const current = shown.filter((r) => !isDoneOnce(r));
+  const done = shown.filter(isDoneOnce);
+  const counts = {
+    all: current.length,
+    active: current.filter((r) => r.active).length,
+    paused: current.filter(isPaused).length,
+    event: current.filter((r) => r.trigger.type === "event").length,
+  };
+  const byStatus = (r: Routine) =>
+    status === "all" ||
+    (status === "active" && r.active) ||
+    (status === "paused" && isPaused(r)) ||
+    (status === "event" && r.trigger.type === "event");
+  const live = current.filter((r) => byStatus(r) && !isPaused(r));
+  const paused = current.filter((r) => byStatus(r) && isPaused(r));
+  const open = list.find((r) => r.id === openId) ?? null;
+  const toggleOpen = (id: string) => setOpenId((o) => (o === id ? null : id));
+  const filtered = agents.length > 0 || query.length > 0 || status !== "all";
+  // "N" opens "Nova rotina" (not while typing).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.key.toLowerCase() !== "n") return;
+      if (el?.closest("input, textarea, [contenteditable], [role=dialog], [role=menu]")) return;
+      e.preventDefault();
+      setCreating(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const group = (title: string, rows: Routine[]) =>
+    rows.length > 0 && (
+      <section className="routines-group" aria-label={title}>
+        <h2 className="routines-group__title">
+          {title}
+          <span>{rows.length}</span>
+        </h2>
+        <div className="routines-list">
+          {rows.map((r) => (
+            <RoutineRow
+              key={r.id}
+              routine={r}
+              now={now}
+              selected={r.id === openId}
+              onOpen={() => toggleOpen(r.id)}
+              onEdit={() => setEditing(r)}
+            />
+          ))}
         </div>
-        <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-          {t("routines.new")}
-        </Button>
-      </header>
-      {list.length > 0 && (
-        <FilterBar
-          label={t("routines.filters")}
-          clearText={copy.clearAll}
-          onClear={() => setAgents([])}
-          filters={[
-            {
-              key: "agents",
-              active: agents.length > 0,
-              node: (
-                <FilterChip
-                  label={t("routines.agentFilter")}
-                  icon="agent"
-                  multiple
-                  options={agentOptions}
-                  value={agents}
-                  onChange={setAgents}
-                  valueText={(o) => o.label}
-                  countText={copy.people}
-                  clearLabel={copy.clearOf(t("routines.agentFilter"))}
-                />
-              ),
-            },
-          ]}
-        />
-      )}
-      {routines.isLoading && <LoadingCards count={3} />}
-      {routines.isError && !routines.data && (
-        <ErrorState error={routines.error} onRetry={() => void routines.refetch()} />
-      )}
-      {routines.isSuccess && list.length === 0 && (
-        <EmptyState sky icon="routines">
-          {t("routines.empty")}
-        </EmptyState>
-      )}
-      <div className="stack-4" style={{ gap: 12 }}>
-        {current.map((r) => (
-          <RoutineCard key={r.id} routine={r} onRuns={() => setRunsFor(r)} onEdit={() => setEditing(r)} />
-        ))}
-      </div>
-      {done.length > 0 && (
-        <section className="routines-done" aria-label={t("routines.done")}>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-expanded={showDone}
-            aria-controls="routines-done-list"
-            onClick={() => setShowDone((v) => !v)}
-          >
-            {t("routines.doneToggle", { count: done.length })}
+      </section>
+    );
+  return (
+    <div className={cx("page routines", open && "routines--panel")}>
+      <div className="routines__main">
+        <header className="routines-head">
+          <div>
+            <h1>{t("routines.title")}</h1>
+            <p className="routines-head__sub">{t("routines.subtitle")}</p>
+            <p className="routines-head__guard">
+              <Icon name="shield" size={14} />
+              {t("routines.guard")}
+            </p>
+          </div>
+          <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+            {t("routines.new")}
           </Button>
-          {showDone && (
-            <div id="routines-done-list" className="stack-4" style={{ gap: 12 }}>
-              {done.map((r) => (
-                <RoutineCard key={r.id} routine={r} onRuns={() => setRunsFor(r)} onEdit={() => setEditing(r)} />
-              ))}
+        </header>
+        {routines.isLoading && <LoadingCards count={3} />}
+        {routines.isError && !routines.data && (
+          <ErrorState error={routines.error} onRetry={() => void routines.refetch()} />
+        )}
+        {routines.isSuccess && list.length === 0 && (
+          <EmptyState
+            sky
+            title={t("routines.emptyTitle")}
+            actions={
+              <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+                {t("routines.new")}
+              </Button>
+            }
+          >
+            {t("routines.empty")}
+          </EmptyState>
+        )}
+        {list.length > 0 && (
+          <>
+            <RoutineHorizon routines={list} now={now} onOpen={toggleOpen} />
+            <div className="routines-tools">
+              <SearchInput
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={t("routines.search")}
+                aria-label={t("routines.search")}
+                className="routines-tools__search"
+              />
+              <Segmented
+                label={t("routines.statusLabel")}
+                value={status}
+                onValueChange={setStatus}
+                options={(["all", "active", "paused", "event"] as const).map((v) => ({
+                  value: v,
+                  label: (
+                    <>
+                      {t(`routines.status.${v}`)}
+                      <span className="routines-tools__count">{counts[v]}</span>
+                    </>
+                  ),
+                }))}
+              />
+              <FilterBar
+                label={t("routines.filters")}
+                clearText={copy.clearAll}
+                onClear={() => {
+                  setAgents([]);
+                  setQ("");
+                  setStatus("all");
+                }}
+                filters={[
+                  {
+                    key: "agents",
+                    active: agents.length > 0,
+                    node: (
+                      <FilterChip
+                        label={t("routines.agentFilter")}
+                        icon="agent"
+                        multiple
+                        options={agentOptions}
+                        value={agents}
+                        onChange={setAgents}
+                        valueText={(o) => o.label}
+                        countText={copy.people}
+                        clearLabel={copy.clearOf(t("routines.agentFilter"))}
+                      />
+                    ),
+                  },
+                ]}
+              />
             </div>
-          )}
-        </section>
+            {group(status === "paused" ? t("routines.groupPaused") : t("routines.groupLive"), live)}
+            {group(t("routines.groupPaused"), paused)}
+            {live.length === 0 && paused.length === 0 && filtered && (
+              <EmptyState icon="search" title={t("routines.noResults")} />
+            )}
+            {done.length > 0 && status === "all" && (
+              <section className="routines-group" aria-label={t("routines.done")}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={showDone ? "chevronDown" : "chevronRight"}
+                  aria-expanded={showDone}
+                  aria-controls="routines-done-list"
+                  onClick={() => setShowDone((v) => !v)}
+                >
+                  {t("routines.doneToggle", { count: done.length })}
+                </Button>
+                {showDone && (
+                  <div id="routines-done-list" className="routines-list">
+                    {done.map((r) => (
+                      <RoutineRow
+                        key={r.id}
+                        routine={r}
+                        now={now}
+                        selected={r.id === openId}
+                        onOpen={() => toggleOpen(r.id)}
+                        onEdit={() => setEditing(r)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+          </>
+        )}
+      </div>
+      {open && (
+        <RoutineDetails routine={open} now={now} onClose={() => setOpenId(null)} onEdit={() => setEditing(open)} />
       )}
       <RoutineDialog open={creating} onClose={() => setCreating(false)} />
       <RoutineDialog
@@ -202,7 +376,6 @@ export function RoutinesPage() {
         routine={editing ?? undefined}
         onClose={() => setEditing(null)}
       />
-      <RunsDialog routine={runsFor} onClose={() => setRunsFor(null)} />
     </div>
   );
 }
@@ -217,153 +390,218 @@ export function routineTitle(r: Pick<Routine, "name" | "prompt">) {
   return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 40)).trimEnd()}…`;
 }
 
-function RoutineCard({ routine: r, onRuns, onEdit }: { routine: Routine; onRuns: () => void; onEdit: () => void }) {
+/** The runs as words, for the strip's label and the horizon's tooltips. */
+function useRunWords() {
   const { t, i18n } = useTranslation();
-  const { org, me } = useOrg();
+  return {
+    status: (s: RoutineRun["status"]) => t(`routines.statusWord.${s}`),
+    caption: (r: Routine, now: Date) => {
+      if (r.running) return t("routines.runningNow");
+      const runs = r.recentRuns ?? (r.lastRun ? [r.lastRun] : []);
+      const last = runs[0];
+      if (!last) return t("routines.neverRan");
+      const silent = runs.filter((x) => x.status === "silent").length;
+      if (last.status === "silent" && silent > 1) return t("routines.silentOf", { count: silent, total: runs.length });
+      return t(`routines.lastRun.${last.status}`, { when: relativeTime(t, i18n.language, last.at, now) });
+    },
+    label: (r: Routine) => {
+      const runs = (r.recentRuns ?? []).slice(0, RUN_SLOTS);
+      if (runs.length === 0) return t("routines.stripNone");
+      return t("routines.stripLabel", {
+        list: runs.map((x) => `${whenAt(t, i18n.language, x.at)}: ${t(`routines.statusWord.${x.status}`)}`).join("; "),
+      });
+    },
+  };
+}
+
+/** "Próxima em 10 min" (within a day), else "Próxima sex 16 out, 10:00". */
+function useNextText() {
+  const { t, i18n } = useTranslation();
+  return (r: Routine, now: Date) => {
+    if (r.running) return t("routines.runningNow");
+    if (isDoneOnce(r))
+      return r.lastRun
+        ? t("routines.firedAt", { when: whenAt(t, i18n.language, r.lastRun.at) })
+        : t("routines.canceled");
+    if (!r.active) return t("routines.paused");
+    if (r.trigger.type === "event") {
+      const week = (r.recentRuns ?? []).filter((x) => now.getTime() - new Date(x.at).getTime() < 7 * 86_400_000).length;
+      return week > 0 ? t("routines.eventThisWeek", { count: week }) : t("routines.waitingEvent");
+    }
+    if (!r.nextRunAt) return "";
+    const ms = new Date(r.nextRunAt).getTime() - now.getTime();
+    if (ms <= 60_000) return t("routines.nextSoon");
+    if (ms < 3_600_000)
+      return t("routines.nextIn", { when: t("format.inMinutes", { count: Math.floor(ms / 60_000) }) });
+    if (ms < 20 * 3_600_000) {
+      const h = Math.floor(ms / 3_600_000);
+      const m = Math.floor((ms % 3_600_000) / 60_000);
+      return t("routines.nextIn", {
+        when: m ? t("routines.hoursMinutes", { h, m }) : t("format.inHours", { count: h }),
+      });
+    }
+    return t("routines.next", { when: nextLabel(i18n.language, r.nextRunAt) });
+  };
+}
+
+function RoutineRow({
+  routine: r,
+  now,
+  selected,
+  onOpen,
+  onEdit,
+}: {
+  routine: Routine;
+  now: Date;
+  selected: boolean;
+  onOpen: () => void;
+  onEdit: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
   const actors = useActors();
   const toast = useToast();
   const action = useRoutineAction(org.id);
   const [deleting, setDeleting] = useState(false);
   const target = useTargetLabel();
+  const when = useWhen();
+  const nextText = useNextText();
+  const words = useRunWords();
+  const look = useLook()(r.agentId);
   const agent = { type: "agent" as const, id: r.agentId };
   const title = routineTitle(r);
-  const myZone = actors.dir.memberById.get(me.user.id)?.timezone || browserTimezone() || "UTC";
-  const zone = r.trigger.type === "event" ? "" : r.trigger.timezone || "UTC";
-  // The zone shows only when it isn't mine ("(UTC)" for a routine still read in UTC).
-  const zoneNote = zone && zone !== myZone ? ` (${timezoneName(zone, i18n.language)})` : "";
-  const when =
-    r.trigger.type === "schedule"
-      ? `${
-          r.trigger.rule
-            ? ruleSentence(t, i18n.language, fromApiRule(r.trigger.rule, toYmd(new Date())), new Date(), false)
-            : r.trigger.description
-        }${zoneNote}`
-      : r.trigger.type === "once"
-        ? t("routines.once", { ...onceParts(i18n.language, r.trigger.at, zone), zone: zoneNote })
-        : t(`routines.event.${r.trigger.event}`);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const done = isDoneOnce(r);
-  const paused = !done && !r.active;
-  const next = done
-    ? null
-    : !r.active
-      ? null
-      : r.trigger.type === "event"
-        ? t("routines.waitingEvent")
-        : r.nextRunAt
-          ? t("routines.next", { when: nextLabel(i18n.language, r.nextRunAt) })
-          : null;
+  const paused = isPaused(r);
   const more = t("routines.more", { name: title });
+  const setActive = (active: boolean) =>
+    action.mutate(
+      { type: "active", id: r.id, active },
+      { onSuccess: () => toast.show(t(active ? "routines.resumedToast" : "routines.pausedToast")) },
+    );
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: a mouse shortcut; the title is the keyboard way to the details
     <article
-      className="routine-card"
+      className={cx("routine-row", selected && "routine-row--on")}
       aria-label={title}
       data-active={r.active || undefined}
       data-paused={paused || undefined}
       data-done={done || undefined}
+      data-running={r.running || undefined}
+      onClick={(e) => {
+        // The row opens the details; its own controls don't.
+        if ((e.target as HTMLElement).closest("button, a, [role=switch], [role=menu]")) return;
+        onOpen();
+      }}
     >
-      <div className="routine-card__head">
-        {actors.avatar(agent, "sm")}
-        <div className="routine-card__main">
-          <span className="routine-card__name" title={r.name}>
-            {title}
-          </span>
-          <span className="small muted">
+      <span className="routine-row__who">{actors.avatar(agent, "sm")}</span>
+      <div className="routine-row__main">
+        <button type="button" className="routine-row__title" title={r.name} aria-expanded={selected} onClick={onOpen}>
+          {title}
+        </button>
+        <span className="routine-row__sub">
+          <Icon name={targetIcon(r.target)} size={14} />
+          <span>
             {r.target.type === "conversation"
               ? t("routines.deliversIn", { agent: actors.name(agent), place: target(r.target) })
               : t("routines.deliversTo", { agent: actors.name(agent), target: target(r.target) })}
           </span>
-        </div>
-        <div className="routine-card__aside">
-          <div className="routine-card__chips">
-            {reminder && <Chip icon="bell">{t("routines.reminder")}</Chip>}
-            <Chip icon={r.trigger.type === "event" ? "bolt" : "waiting"}>{when}</Chip>
-            {done ? (
-              <Chip icon="check">{r.lastRun ? t("routines.fired") : t("routines.canceled")}</Chip>
-            ) : (
-              <Chip icon={r.active ? "play" : "pause"}>{r.active ? t("routines.active") : t("routines.paused")}</Chip>
-            )}
-          </div>
-          <div className="routine-card__actions">
-            <Button
-              size="sm"
-              variant="ghost"
-              icon="edit"
-              onClick={onEdit}
-              aria-label={t("routines.editName", { name: title })}
-            >
-              {t("routines.edit")}
-            </Button>
-            {!done && !reminder && (
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon={r.running ? "spinner" : "play"}
-                title={r.running ? t("routines.running") : t("routines.runNow")}
-                aria-label={r.running ? t("routines.running") : t("routines.runNow")}
-                disabled={r.running || action.isPending}
-                onClick={() => action.mutate({ type: "run", id: r.id })}
-              />
-            )}
-            <Menu
-              align="end"
-              label={more}
-              trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={more} />}
-            >
-              {paused && (
-                <MenuItem icon="play" onSelect={() => action.mutate({ type: "active", id: r.id, active: true })}>
-                  {t("routines.resume")}
-                </MenuItem>
-              )}
-              <MenuItem icon="waiting" onSelect={onRuns}>
-                {t("routines.runs")}
-              </MenuItem>
-              <MenuItem
-                icon="copy"
-                onSelect={() =>
-                  action.mutate(
-                    { type: "duplicate", id: r.id, name: t("routines.copyName", { name: r.name }) },
-                    {
-                      onSuccess: (copy) =>
-                        toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
-                    },
-                  )
-                }
-              >
-                {t("routines.duplicate")}
-              </MenuItem>
-              {r.webhookUrl && (
-                <MenuItem
-                  icon="link"
-                  onSelect={async () => {
-                    await navigator.clipboard?.writeText(r.webhookUrl ?? "");
-                    toast.show(t("routines.webhookCopied"));
-                  }}
-                >
-                  {t("routines.copyWebhook")}
-                </MenuItem>
-              )}
-              <MenuItem icon="trash" onSelect={() => setDeleting(true)}>
-                {t("routines.delete")}
-              </MenuItem>
-            </Menu>
-          </div>
-        </div>
-      </div>
-      <p className="routine-card__foot">
-        <span>
-          {r.lastRun
-            ? t("routines.last", { when: whenAt(t, i18n.language, r.lastRun.at), summary: runSummary(t, r.lastRun) })
-            : t("routines.never")}
+          {reminder && (
+            <Chip icon="bell" className="routine-row__chip">
+              {t("routines.reminder")}
+            </Chip>
+          )}
         </span>
-        {next && <span>{next}</span>}
-        {r.budgetUsedPercent != null && (
-          <span className="tabular">
-            {t("routines.budgetUsed", { percent: formatPercent(i18n.language, r.budgetUsedPercent) })}
-          </span>
+      </div>
+      <div className="routine-row__when">
+        <span className="routine-row__when-icon" aria-hidden="true">
+          <Icon
+            name={
+              r.trigger.type === "event"
+                ? "bolt"
+                : r.trigger.type === "once"
+                  ? reminder
+                    ? "bell"
+                    : "calendar"
+                  : "repeat"
+            }
+            size={16}
+          />
+        </span>
+        <span className="routine-row__when-text">
+          <b>{when(r)}</b>
+          <small className={cx(r.running && "is-live")}>{nextText(r, now)}</small>
+        </span>
+      </div>
+      <div className="routine-row__runs" role="img" aria-label={words.label(r)}>
+        <RunStrip runs={r.recentRuns ?? []} color={look.color} slots={RUN_SLOTS} running={r.running} />
+        <small>{words.caption(r, now)}</small>
+      </div>
+      <div className="routine-row__actions">
+        {done ? (
+          <span className="routine-row__ph routine-row__ph--switch" aria-hidden="true" />
+        ) : (
+          <Switch
+            checked={r.active}
+            onCheckedChange={setActive}
+            aria-label={t("routines.activeLabel", { name: title })}
+          />
         )}
-      </p>
+        {!done && !reminder ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            iconOnly
+            icon={r.running ? "spinner" : "play"}
+            title={r.running ? t("routines.running") : t("routines.runNow")}
+            aria-label={r.running ? t("routines.running") : t("routines.runNow")}
+            disabled={r.running || action.isPending}
+            onClick={() => action.mutate({ type: "run", id: r.id })}
+          />
+        ) : (
+          <span className="routine-row__ph" aria-hidden="true" />
+        )}
+        <Menu
+          align="end"
+          label={more}
+          trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={more} />}
+        >
+          <MenuItem icon="edit" onSelect={onEdit}>
+            {t("routines.edit")}
+          </MenuItem>
+          <MenuItem icon="waiting" onSelect={() => !selected && onOpen()}>
+            {t("routines.runs")}
+          </MenuItem>
+          <MenuItem
+            icon="copy"
+            onSelect={() =>
+              action.mutate(
+                { type: "duplicate", id: r.id, name: t("routines.copyName", { name: r.name }) },
+                {
+                  onSuccess: (copy) =>
+                    toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
+                },
+              )
+            }
+          >
+            {t("routines.duplicate")}
+          </MenuItem>
+          {r.webhookUrl && (
+            <MenuItem
+              icon="link"
+              onSelect={async () => {
+                await navigator.clipboard?.writeText(r.webhookUrl ?? "");
+                toast.show(t("routines.webhookCopied"));
+              }}
+            >
+              {t("routines.copyWebhook")}
+            </MenuItem>
+          )}
+          <MenuItem icon="trash" onSelect={() => setDeleting(true)}>
+            {t("routines.delete")}
+          </MenuItem>
+        </Menu>
+      </div>
       <Dialog
         open={deleting}
         onOpenChange={(o) => !o && setDeleting(false)}
@@ -397,38 +635,351 @@ function RoutineCard({ routine: r, onRuns, onEdit }: { routine: Routine; onRuns:
   );
 }
 
-function RunsDialog({ routine, onClose }: { routine: Routine | null; onClose: () => void }) {
+/**
+ * The next hours as a horizon: one lane per scheduled routine, its recent runs
+ * as pixel columns, the next run as the agent's sprite on the line, "agora" as
+ * a dotted pixel line. Future slots come from the calendar range (the server's
+ * schedule math).
+ */
+function RoutineHorizon({ routines, now, onOpen }: { routines: Routine[]; now: Date; onOpen: (id: string) => void }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const runs = useRoutineRuns(org.id, routine?.id ?? null);
+  const look = useLook();
+  const words = useRunWords();
+  // The window moves with the minute; the slots are asked once per hour (the calendar caches by start).
+  const hour = Math.floor(now.getTime() / 3_600_000);
+  const range = useMemo(() => {
+    const start = new Date(hour * 3_600_000);
+    return { from: start.toISOString(), to: new Date(start.getTime() + HORIZON_AHEAD + 3_600_000).toISOString() };
+  }, [hour]);
+  const slots = useCalendar(org.id, range.from, range.to);
+  const from = new Date(now.getTime() - HORIZON_BACK);
+  const to = new Date(now.getTime() + HORIZON_AHEAD);
+  const lanes = routines.filter((r) => r.active && !isDoneOnce(r) && r.trigger.type !== "event");
+  if (lanes.length === 0) return null;
+  const futureOf = (r: Routine) => {
+    const at = (slots.data?.routines ?? [])
+      .filter((s) => s.routineId === r.id && new Date(s.at) > now && new Date(s.at) <= to)
+      .map((s) => s.at);
+    // Before the calendar answers, the next run alone.
+    if (at.length === 0 && r.nextRunAt && new Date(r.nextRunAt) <= to) return [r.nextRunAt];
+    return at.sort();
+  };
+  const pos = (d: Date) => ((d.getTime() - from.getTime()) / (to.getTime() - from.getTime())) * 100;
+  const scale: { at: Date; label: string; day: boolean }[] = [];
+  const first = new Date(from);
+  first.setMinutes(0, 0, 0);
+  first.setHours(Math.ceil(first.getHours() / 3) * 3);
+  for (let d = new Date(first); d <= to; d = new Date(d.getTime() + 3 * 3_600_000)) {
+    const p = pos(d);
+    if (p < 3 || p > 97 || Math.abs(d.getTime() - now.getTime()) < 1.2 * 3_600_000) continue;
+    const midnight = d.getHours() === 0;
+    scale.push({
+      at: d,
+      day: midnight,
+      label: midnight
+        ? new Intl.DateTimeFormat(i18n.language, { weekday: "short" }).format(d).replace(/\./g, "")
+        : new Intl.DateTimeFormat(i18n.language, { hour: "2-digit", minute: "2-digit" }).format(d),
+    });
+  }
+  const timeOf = (iso: string) =>
+    new Intl.DateTimeFormat(i18n.language, { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  const later = lanes.filter((r) => futureOf(r).length === 0).length;
+  const nowAt = pos(now);
   return (
-    <Dialog
-      open={Boolean(routine)}
-      onOpenChange={(o) => !o && onClose()}
-      title={t("routines.runsTitle", { name: routine?.name ?? "" })}
-      closeLabel={t("routines.close")}
-    >
-      <div className="ac-dialog__list">
-        {runs.isLoading && <LoadingList count={3} avatar={false} />}
-        {runs.isSuccess && runs.data.length === 0 && <p className="small muted">{t("routines.noRuns")}</p>}
-        <List>
-          {(runs.data ?? []).map((x) => (
-            <div key={x.id} className="ac-list__row">
-              <span className="small muted tabular" style={{ flex: "0 0 96px" }}>
-                {whenAt(t, i18n.language, x.at)}
-              </span>
-              <span style={{ flex: 1 }}>{runSummary(t, x)}</span>
-              <Chip icon={x.status === "ok" ? "check" : "alert"}>{t(`routines.runStatus.${x.status}`)}</Chip>
-            </div>
+    <section className="routines-horizon" aria-label={t("routines.horizon.label")}>
+      <div className="routines-horizon__head">
+        <h2>{t("routines.horizon.title", { count: HORIZON_AHEAD / 3_600_000 })}</h2>
+        <span className="routines-horizon__sub">
+          {t("routines.horizon.lanes", { count: lanes.length })}
+          {later > 0 && ` · ${t("routines.horizon.later", { count: later })}`}
+        </span>
+        <span className="routines-horizon__legend" aria-hidden="true">
+          {(["ok", "silent", "failed", "next"] as const).map((k) => (
+            <span key={k}>
+              <RunKey status={k} />
+              {t(`routines.horizon.legend.${k}`)}
+            </span>
           ))}
-        </List>
+        </span>
       </div>
-      <DialogFooter>
-        <Button onClick={onClose}>{t("routines.close")}</Button>
-      </DialogFooter>
-    </Dialog>
+      <div className="routines-horizon__body" style={{ "--now-k": nowAt / 100 } as CSSProperties}>
+        <span />
+        <div className="routines-horizon__scale" aria-hidden="true">
+          {scale.map((s) => (
+            <span key={s.at.getTime()} style={{ left: `${pos(s.at)}%` }} className={cx(s.day && "is-day")}>
+              {s.label}
+            </span>
+          ))}
+        </div>
+        {lanes.map((r) => {
+          const future = futureOf(r);
+          const next = future[0];
+          const soon = next && new Date(next).getTime() - now.getTime() < 3_600_000;
+          const hourly = r.trigger.type === "schedule" && r.trigger.rule?.freq === "hourly";
+          const { color, eyes } = look(r.agentId);
+          const title = routineTitle(r);
+          return (
+            <div className="routines-horizon__lane" key={r.id}>
+              <button type="button" className="routines-horizon__label" title={title} onClick={() => onOpen(r.id)}>
+                <AgentFace agentId={r.agentId} />
+                <b>{title}</b>
+              </button>
+              <div
+                className="routines-horizon__track"
+                role="img"
+                aria-label={
+                  next
+                    ? t("routines.horizon.lane", { name: title, when: whenAt(t, i18n.language, next) })
+                    : t("routines.horizon.laneNone", { name: title })
+                }
+                title={words.label(r)}
+              >
+                <RunLane
+                  from={from}
+                  to={to}
+                  now={now}
+                  color={color}
+                  eyes={eyes}
+                  running={r.running}
+                  past={(r.recentRuns ?? []).filter((x) => new Date(x.at) >= from && new Date(x.at) <= now)}
+                  future={future}
+                />
+                {next && !r.running && (!hourly || soon) && (
+                  <span
+                    className={cx("routines-horizon__next", soon && "is-soon")}
+                    style={{ left: `max(${pos(new Date(next))}%, calc(${nowAt}% + 12px))` }}
+                  >
+                    {soon
+                      ? t("format.inMinutes", {
+                          count: Math.max(1, Math.floor((new Date(next).getTime() - now.getTime()) / 60_000)),
+                        })
+                      : timeOf(next)}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        <span className="routines-horizon__past" aria-hidden="true" />
+        <span className="routines-horizon__now" aria-hidden="true">
+          <span>{t("routines.horizon.now")}</span>
+        </span>
+      </div>
+    </section>
   );
 }
+
+function AgentFace({ agentId }: { agentId: string }) {
+  const actors = useActors();
+  return actors.avatar({ type: "agent", id: agentId }, "xs");
+}
+
+/** The routine's details: what it does, when, where it delivers, budget and the run history. */
+function RoutineDetails({
+  routine: r,
+  now,
+  onClose,
+  onEdit,
+}: {
+  routine: Routine;
+  now: Date;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const actors = useActors();
+  const action = useRoutineAction(org.id);
+  const runs = useRoutineRuns(org.id, r.id);
+  const target = useTargetLabel();
+  const when = useWhen();
+  const nextText = useNextText();
+  const toast = useToast();
+  const agent = { type: "agent" as const, id: r.agentId };
+  const name = actors.name(agent);
+  const title = routineTitle(r);
+  const done = isDoneOnce(r);
+  const paused = isPaused(r);
+  const reminder = r.target.type === "conversation" && r.target.reminder === true;
+  const described = useRuleDescribe(
+    org.id,
+    r.active && r.trigger.type === "schedule" && r.trigger.rule ? r.trigger.rule : null,
+  );
+  const nexts = described.data?.ok ? described.data.nextRuns.slice(0, 4) : r.nextRunAt ? [r.nextRunAt] : [];
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !(e.target as HTMLElement | null)?.closest("[role=dialog], [role=menu]")) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const state = r.running ? "running" : done ? "done" : paused ? "paused" : "live";
+  const whereHint =
+    r.target.type === "conversation"
+      ? r.target.threadId
+        ? "thread"
+        : "channel"
+      : r.target.type === "dm"
+        ? "dm"
+        : r.target.type;
+  return (
+    <aside className="routine-details" aria-label={t("routines.panel.label", { name: title })}>
+      <div className="routine-details__head">
+        {actors.avatar(agent, "sm")}
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          icon="close"
+          aria-label={t("routines.panel.close")}
+          onClick={onClose}
+        />
+      </div>
+      <div>
+        <h2 className="routine-details__title">{title}</h2>
+        <p className="routine-details__facts">
+          <span>{name}</span>
+          <Chip
+            icon={state === "running" ? "play" : state === "paused" ? "pause" : state === "done" ? "check" : "repeat"}
+          >
+            {t(`routines.panel.state.${state}`)}
+          </Chip>
+        </p>
+      </div>
+      <div className="routine-details__actions">
+        <Button size="sm" icon="edit" onClick={onEdit}>
+          {t("routines.edit")}
+        </Button>
+        {!done && !reminder && (
+          <Button
+            size="sm"
+            icon="play"
+            disabled={r.running || action.isPending}
+            onClick={() => action.mutate({ type: "run", id: r.id })}
+          >
+            {r.running ? t("routines.running") : t("routines.runNow")}
+          </Button>
+        )}
+        {!done && (
+          <Button
+            size="sm"
+            icon={r.active ? "pause" : "play"}
+            onClick={() =>
+              action.mutate(
+                { type: "active", id: r.id, active: !r.active },
+                { onSuccess: () => toast.show(t(r.active ? "routines.pausedToast" : "routines.resumedToast")) },
+              )
+            }
+          >
+            {r.active ? t("routines.panel.pause") : t("routines.resume")}
+          </Button>
+        )}
+      </div>
+      <section className="routine-details__section">
+        <h3 className="ac-eyebrow">{t("routines.panel.what", agentGrammar(t, name))}</h3>
+        <p className="routine-details__prompt">{r.prompt}</p>
+      </section>
+      <section className="routine-details__section">
+        <h3 className="ac-eyebrow">{t("routines.panel.when")}</h3>
+        <p className="routine-details__sentence">{when(r)}</p>
+        {r.trigger.type === "event" ? (
+          <p className="small muted">{t("routines.panel.eventEvery")}</p>
+        ) : (
+          nexts.length > 0 &&
+          !done && (
+            <div className="routine-details__nexts">
+              {nexts.map((iso) => (
+                <span key={iso}>{nextLabel(i18n.language, iso)}</span>
+              ))}
+            </div>
+          )
+        )}
+        {!done && <p className="small muted">{nextText(r, now)}</p>}
+      </section>
+      <section className="routine-details__section">
+        <h3 className="ac-eyebrow">{t("routines.panel.where")}</h3>
+        <div className="routine-details__where">
+          <span className="routine-details__where-icon">
+            <Icon name={targetIcon(r.target)} size={16} />
+          </span>
+          <span>
+            <b>{target(r.target)}</b>
+            <small>{t(`routines.panel.whereHint.${whereHint}`)}</small>
+          </span>
+        </div>
+      </section>
+      {r.budgetUsedPercent != null && (
+        <section className="routine-details__section">
+          <h3 className="ac-eyebrow">{t("routines.panel.budget")}</h3>
+          <p className="routine-details__meter-row">
+            <span>{t("routines.budgetUsed", { percent: formatPercent(i18n.language, r.budgetUsedPercent) })}</span>
+          </p>
+          <span className="routine-details__meter" aria-hidden="true">
+            <i style={{ width: `${Math.min(100, r.budgetUsedPercent * 100)}%` }} />
+          </span>
+        </section>
+      )}
+      <section className="routine-details__section">
+        <h3 className="ac-eyebrow">{t("routines.panel.runs")}</h3>
+        {runs.isLoading && <LoadingList count={3} avatar={false} />}
+        {(r.running || (runs.data?.length ?? 0) > 0) && (
+          <ol className="routine-runs">
+            {r.running && (
+              <li className="routine-runs__item">
+                <span className="routine-runs__node routine-runs__node--running">
+                  <Icon name="play" size={14} />
+                </span>
+                <span>
+                  <b>{t("routines.runningNow")}</b>
+                  <small>{t("routines.panel.runningBy", agentGrammar(t, name))}</small>
+                </span>
+                <time>{t("common.now")}</time>
+              </li>
+            )}
+            {(runs.data ?? []).slice(0, 30).map((x) => (
+              <li key={x.id} className="routine-runs__item">
+                <span className={`routine-runs__node routine-runs__node--${x.status}`}>
+                  <Icon
+                    name={
+                      x.status === "ok"
+                        ? "check"
+                        : x.status === "failed"
+                          ? "close"
+                          : x.status === "silent"
+                            ? "dash"
+                            : "wallet"
+                    }
+                    size={14}
+                  />
+                </span>
+                <span>
+                  <b>{runSummary(t, x)}</b>
+                  <small>{t(`routines.statusWord.${x.status}`)}</small>
+                </span>
+                <time dateTime={x.at}>{whenAt(t, i18n.language, x.at)}</time>
+              </li>
+            ))}
+          </ol>
+        )}
+        {runs.isSuccess && runs.data.length === 0 && !r.running && (
+          <p className="small muted">
+            {t("routines.noRuns")}
+            {nexts[0] && !done && ` ${t("routines.panel.firstRun", { when: nextLabel(i18n.language, nexts[0]) })}`}
+          </p>
+        )}
+      </section>
+    </aside>
+  );
+}
+
+/** Starting points for "Nova rotina" (the words come from i18n; the phrase is read by the server). */
+const PRESETS = [
+  { key: "digest", icon: "file", kind: "schedule" },
+  { key: "errors", icon: "alert", kind: "schedule" },
+  { key: "prs", icon: "bolt", kind: "event", event: "github.pr_opened" },
+  { key: "week", icon: "calendar", kind: "schedule" },
+] as const satisfies readonly { key: string; icon: IconName; kind: "schedule" | "event"; event?: RoutineEvent }[];
 
 const TARGET_DM = "dm";
 const TARGET_ARTIFACT = "artifact";
@@ -623,6 +1174,14 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
       timezone: timezoneLabel(rule.timezone, undefined, i18n.language),
     });
   };
+  /** A starting point: what to do, a name and when (the phrase is read by the server, like a typed one). */
+  const applyPreset = (p: (typeof PRESETS)[number]) => {
+    setPrompt(t(`routines.presets.${p.key}.prompt`));
+    setName(t(`routines.presets.${p.key}.name`));
+    setKind(p.kind);
+    if (p.kind === "event") setEvent(p.event);
+    else typePhrase(t(`routines.presets.${p.key}.phrase`));
+  };
   const submit = () => {
     setTouched(true);
     if (!prompt.trim() || !agentId || !scheduleOk || !budgetOk) return;
@@ -689,6 +1248,24 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
       >
         <DialogBody>
           {agents.length === 0 && <p className="small muted">{t("routines.form.noAgents")}</p>}
+          {!editing && !prompt.trim() && (
+            <fieldset className="routine-presets">
+              <legend className="ac-eyebrow">{t("routines.presets.title")}</legend>
+              <div className="routine-presets__list">
+                {PRESETS.map((p) => (
+                  <button key={p.key} type="button" className="routine-preset" onClick={() => applyPreset(p)}>
+                    <span className="routine-preset__icon" aria-hidden="true">
+                      <Icon name={p.icon} size={16} />
+                    </span>
+                    <span>
+                      <b>{t(`routines.presets.${p.key}.name`)}</b>
+                      <small>{t(`routines.presets.${p.key}.text`)}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <div className="grid-fields">
             <Field label={t("routines.form.agent")} id="nr-agent">
               <Select

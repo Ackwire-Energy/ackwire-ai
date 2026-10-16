@@ -4307,3 +4307,23 @@ a.ac-list__row:focus-visible {
     transform: none;
   }
 }
+
+/* Routine runs in pixels (RunPixels.tsx): 2px cells, never smoothed. */
+.ac-run-strip,
+.ac-run-key {
+  display: block;
+  image-rendering: pixelated;
+}
+.ac-run-key {
+  display: inline-block;
+  width: 6px;
+  height: 10px;
+  vertical-align: -1px;
+}
+.ac-run-lane {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}

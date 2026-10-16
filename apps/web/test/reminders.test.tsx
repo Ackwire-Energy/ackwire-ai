@@ -79,8 +79,8 @@ describe("Rotinas: reminders and one-offs from the chat", () => {
     const thread = screen().getByRole("article", { name: "Resumo do deploy" });
     expect(thread.textContent).toContain("no #general (thread)");
     expect(thread.textContent).not.toContain("Lembrete");
-    // Active shows as a chip; pausing is in Editar.
-    expect(within(thread).getByText("Ativa")).toBeTruthy();
+    // Active is a switch on the row.
+    expect(within(thread).getByRole("switch", { name: "Ativa: Resumo do deploy" })).toBeTruthy();
   });
 
   test("fired one-offs are muted under 'Concluídos'", async () => {
@@ -91,7 +91,8 @@ describe("Rotinas: reminders and one-offs from the chat", () => {
     await act(async () => fireEvent.click(toggle));
     const done = screen().getByRole("article", { name: "Lembrete: revisar o PR" });
     expect(done.hasAttribute("data-done")).toBe(true);
-    expect(done.textContent).toContain("Disparado");
+    expect(done.textContent).toContain("Rodou");
+    expect(within(done).queryByRole("switch")).toBeNull();
     expect(within(done).queryByRole("checkbox")).toBeNull();
   });
 

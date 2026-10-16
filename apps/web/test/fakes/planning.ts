@@ -233,6 +233,7 @@ export function createMockPlanning(
         nextRunAt: null,
         running: false,
         lastRun: null,
+        recentRuns: [],
         budgetUsedPercent: null,
         createdAt: minutesAgo(now, 20000),
         ...over,
@@ -293,7 +294,10 @@ export function createMockPlanning(
     s.runs.set(errors.id, [run(1440, "Abriu 1 issue")]);
     s.runs.set(pr.id, [run(180, "Revisou o PR #42")]);
     s.runs.set(monthly.id, [run(13 * 1440, "Relatório no Drive")]);
-    for (const r of s.routines) r.lastRun = s.runs.get(r.id)?.[0] ?? null;
+    for (const r of s.routines) {
+      r.lastRun = s.runs.get(r.id)?.[0] ?? null;
+      r.recentRuns = (s.runs.get(r.id) ?? []).slice(0, 14).map((x, i) => ({ ...x, weight: i % 2 ? 0.5 : 1 }));
+    }
 
     const monday = startOfWeek(now);
     const at = (dayOffset: number, h: number, m = 0) =>
@@ -480,6 +484,7 @@ export function createMockPlanning(
           nextRunAt: trigger.type === "schedule" ? (nextCronRun(trigger.cron, ctx.now())?.toISOString() ?? null) : null,
           running: false,
           lastRun: null,
+          recentRuns: [],
           budgetUsd: input.budgetUsd ?? null,
           budgetUsedPercent: input.budgetUsd == null ? null : 0,
           createdAt: ctx.now().toISOString(),
@@ -528,6 +533,7 @@ export function createMockPlanning(
           nextRunAt: null,
           running: false,
           lastRun: null,
+          recentRuns: [],
           createdAt: ctx.now().toISOString(),
         };
         (await store(orgId)).routines.push(copy);

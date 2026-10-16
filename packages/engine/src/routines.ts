@@ -81,12 +81,18 @@ export type RoutineTrigger =
 export interface RoutineRunView {
   id: string;
   at: string;
-  status: "ok" | "failed" | "skipped";
+  /** `silent`: the agent found nothing new and stayed quiet (NO_REPLY). */
+  status: "ok" | "silent" | "failed" | "skipped";
   /** Fallback text (English); the app shows `summaryCode` with `t()`. */
   summary: string;
   summaryCode: string | null;
   summaryParams?: Record<string, string>;
+  /** Recent runs only: this run's cost relative to the priciest of them (0–1). A share, never money. */
+  weight?: number;
 }
+
+/** How many recent runs each routine carries in the list (its run strip). */
+export const RECENT_RUNS = 14;
 
 export interface RoutineView {
   id: string;
@@ -99,6 +105,8 @@ export interface RoutineView {
   nextRunAt: string | null;
   running: boolean;
   lastRun: RoutineRunView | null;
+  /** The last runs, newest first (at most RECENT_RUNS). */
+  recentRuns: RoutineRunView[];
   /** Spend cap of this routine per calendar month; null = only the agent's own budget. Routes send it to admins only. */
   budgetUsd: number | null;
   /** This month's share of `budgetUsd` used; null without a routine budget. No money for members. */
@@ -199,6 +207,7 @@ function runView(
           : `${FAILED_PREFIX}${agentRun.error ?? "error"}`;
     } else if (agentRun.status === "done" && !agentRun.replyMessageId) {
       // The agent answered NO_REPLY: its instructions said to stay quiet without news.
+      status = "silent";
       summary = RUN_SUMMARY["routine_run.nothing_new"];
     } else if (agentRun.status !== "done") {
       summary =
@@ -315,29 +324,51 @@ async function runDetails(db: Database, runs: RunRow[]) {
   };
 }
 
+/** A routine's recent runs, each with its cost as a share of the priciest of them (for the run strip). */
+function recentViews(runs: RunRow[], details: Awaited<ReturnType<typeof runDetails>>): RoutineRunView[] {
+  const cost = (r: RunRow) => details.costById.get(r.agentRunId ?? "") ?? 0;
+  const max = Math.max(0, ...runs.map(cost));
+  return runs.map((r) => ({
+    ...runView(r, r.agentRunId ? details.agentRunsById.get(r.agentRunId) : undefined),
+    weight: max > 0 ? Math.round((cost(r) / max) * 100) / 100 : 0,
+  }));
+}
+
 async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const monthStart = monthStartUtc(new Date());
-  const runs = await db
-    .select()
-    .from(routineRuns)
-    .where(and(inArray(routineRuns.routineId, ids), gte(routineRuns.createdAt, monthStart)))
-    .orderBy(desc(routineRuns.createdAt));
-  const latest = new Map<string, RunRow>();
-  for (const r of runs) if (!latest.has(r.routineId)) latest.set(r.routineId, r);
-  // Older last runs (before this month) still show.
-  const missing = ids.filter((id) => !latest.has(id));
-  if (missing.length > 0) {
-    const older = await db
+  const [runs, recentIds] = await Promise.all([
+    db
       .select()
       .from(routineRuns)
-      .where(inArray(routineRuns.routineId, missing))
-      .orderBy(desc(routineRuns.createdAt))
-      .limit(missing.length * 5);
-    for (const r of older) if (!latest.has(r.routineId)) latest.set(r.routineId, r);
-  }
-  const details = await runDetails(db, [...runs, ...latest.values()]);
+      .where(and(inArray(routineRuns.routineId, ids), gte(routineRuns.createdAt, monthStart)))
+      .orderBy(desc(routineRuns.createdAt)),
+    // The last RECENT_RUNS of each routine, whatever the month (one query, ranked per routine).
+    db.execute(sql`
+      select id from (
+        select ${routineRuns.id} as id,
+          row_number() over (partition by ${routineRuns.routineId} order by ${routineRuns.createdAt} desc) as n
+        from ${routineRuns}
+        where ${inArray(routineRuns.routineId, ids)}
+      ) ranked
+      where n <= ${RECENT_RUNS}`),
+  ]);
+  const recentRunIds = rowsOf<{ id: string }>(recentIds).map((r) => r.id);
+  const recentRows =
+    recentRunIds.length === 0
+      ? []
+      : await db
+          .select()
+          .from(routineRuns)
+          .where(inArray(routineRuns.id, recentRunIds))
+          .orderBy(desc(routineRuns.createdAt));
+  const recent = new Map<string, RunRow[]>();
+  for (const r of recentRows) recent.set(r.routineId, [...(recent.get(r.routineId) ?? []), r]);
+  // The last run is the newest recent one (older months included).
+  const latest = new Map<string, RunRow>();
+  for (const [id, list] of recent) if (list[0]) latest.set(id, list[0]);
+  const details = await runDetails(db, [...runs, ...recentRows]);
   return rows.map((r) => {
     const last = latest.get(r.id);
     const agentRun = last?.agentRunId ? details.agentRunsById.get(last.agentRunId) : undefined;
@@ -358,6 +389,7 @@ async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
       nextRunAt: r.active && r.nextRunAt ? r.nextRunAt.toISOString() : null,
       running,
       lastRun: last ? runView(last, agentRun) : null,
+      recentRuns: recentViews(recent.get(r.id) ?? [], details),
       budgetUsd: r.monthlyBudgetNanoUsd === null ? null : r.monthlyBudgetNanoUsd / 1e9,
       budgetUsedPercent: r.monthlyBudgetNanoUsd === null ? null : budgetPercent(monthCost, r.monthlyBudgetNanoUsd),
       createdAt: r.createdAt.toISOString(),

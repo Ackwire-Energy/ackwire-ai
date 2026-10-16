@@ -1056,6 +1056,8 @@ export interface Routine {
   nextRunAt: string | null;
   running: boolean;
   lastRun: RoutineRun | null;
+  /** The last runs, newest first (at most 14): the row's pixel strip and the horizon. */
+  recentRuns?: RoutineRun[];
   /** Admins only: monthly cap for this routine (US$); null/absent = only the agent's own budget. */
   budgetUsd?: number | null;
   /** This month's share of the routine's cap used; null without a cap. */
@@ -1068,12 +1070,15 @@ export interface Routine {
 export interface RoutineRun {
   id: string;
   at: string;
-  status: "ok" | "failed" | "skipped";
+  /** `silent`: nothing new, the agent stayed quiet (NO_REPLY). */
+  status: "ok" | "silent" | "failed" | "skipped";
   /** "Resumo postado no #geral", "Orçamento do mês esgotado" (the server's pt-BR words). */
   summary: string;
   /** The same as a code ("routine_run.paused") and its values: shown in the UI language. */
   summaryCode?: string | null;
   summaryParams?: Record<string, string>;
+  /** Recent runs only: cost as a share (0–1) of the priciest recent run; never money. */
+  weight?: number;
 }
 
 export interface RoutineInput {

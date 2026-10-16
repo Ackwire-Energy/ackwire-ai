@@ -38,8 +38,7 @@ const menu = async (name: string, item: string) => {
 describe("Rotinas: editar, duplicar, apagar", () => {
   test("Editar opens the form filled in; Salvar sends only what changed and shows the next run", async () => {
     const { state } = await open();
-    await click(within(card("Resumo da semana")).getByRole("button", { name: "Editar Resumo da semana" }));
-    await settle(4);
+    await menu("Resumo da semana", "Editar");
     const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
     expect((within(dialog).getByLabelText("O que fazer") as HTMLTextAreaElement).value).toContain("Resuma o que");
     expect((within(dialog).getByLabelText("Título") as HTMLInputElement).value).toBe("Resumo da semana");
@@ -70,8 +69,7 @@ describe("Rotinas: editar, duplicar, apagar", () => {
 
   test("nothing changed: Salvar just closes", async () => {
     const { state } = await open();
-    await click(within(card("Resumo da semana")).getByRole("button", { name: "Editar Resumo da semana" }));
-    await settle(4);
+    await menu("Resumo da semana", "Editar");
     await click(
       within(screen().getByRole("dialog", { name: "Editar rotina" })).getByRole("button", { name: "Salvar" }),
     );
@@ -91,8 +89,7 @@ describe("Rotinas: editar, duplicar, apagar", () => {
       }),
     );
     expect(card("Antiga em UTC").textContent).toContain("(UTC)");
-    await click(within(card("Antiga em UTC")).getByRole("button", { name: "Editar Antiga em UTC" }));
-    await settle(4);
+    await menu("Antiga em UTC", "Editar");
     const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
     expect(dialog.textContent).toContain("Esta rotina está em UTC; quer usar o horário de Brasília?");
     expect(within(dialog).getByRole("combobox", { name: "Fuso horário" }).textContent).toContain(
@@ -118,8 +115,7 @@ describe("Rotinas: editar, duplicar, apagar", () => {
         trigger: { type: "schedule", phrase: "toda segunda às 9h", timezone: "UTC" },
       }),
     );
-    await click(within(card("Antiga em UTC")).getByRole("button", { name: "Editar Antiga em UTC" }));
-    await settle(4);
+    await menu("Antiga em UTC", "Editar");
     const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
     await click(within(dialog).getByRole("button", { name: "Manter em UTC" }));
     await settle(3);

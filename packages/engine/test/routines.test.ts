@@ -276,7 +276,12 @@ describe("routines", () => {
     await drainOutbox(f.db, f.handlers);
     expect(await agentMessages()).toHaveLength(1);
     const [last] = await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id);
-    expect(last).toMatchObject({ status: "ok", summaryCode: "routine_run.nothing_new" });
+    expect(last).toMatchObject({ status: "silent", summaryCode: "routine_run.nothing_new" });
+    // The list carries the recent runs (newest first) with a cost share, never money.
+    const [listed] = await listRoutines(f.db, f.owner.id, f.org.id);
+    expect(listed?.recentRuns.map((r) => r.status)).toEqual(["silent", "ok"]);
+    for (const r of listed?.recentRuns ?? []) expect(r.weight).toBeGreaterThanOrEqual(0);
+    expect(listed?.recentRuns[0]?.id).toBe(listed?.lastRun?.id);
     const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, f.agent.id));
     expect(runs.map((r) => r.status)).toEqual(["done", "done"]);
   });

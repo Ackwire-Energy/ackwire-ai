@@ -107,6 +107,7 @@ export {
   RecurrencePicker,
   type RecurrencePickerProps,
 } from "./components/RecurrencePicker";
+export { RunKey, RunLane, type RunPixel, type RunPixelStatus, RunStrip } from "./components/RunPixels";
 export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";
 export { Select, type SelectOption, type SelectProps } from "./components/Select";
 export { Sheet, type SheetProps } from "./components/Sheet";

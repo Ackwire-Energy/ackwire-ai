@@ -160,62 +160,58 @@ describe("Issue detail", () => {
 });
 
 describe("Rotinas", () => {
-  test("cards with agent, target, schedule, next and last run, budget use", async () => {
+  test("rows with agent, target, schedule, next and last run; no money", async () => {
     await go("routines");
     const weekly = screen().getByRole("article", { name: "Resumo da semana" });
     expect(weekly.textContent).toContain("entrega em #eng");
     expect(weekly.textContent).toContain("Toda semana, seg, às 09:00");
-    expect(weekly.textContent).toMatch(/Próxima: /);
-    // No money on the cards; a routine without its own cap shows no percentage either.
+    expect(weekly.textContent).toMatch(/Próxima/);
+    // No money on the rows (the routine's budget lives in its details).
     expect(weekly.textContent).not.toContain("US$");
+    // The last runs as a pixel strip, said in words.
+    expect(within(weekly).getByRole("img", { name: /^(Últimas execuções|Nenhuma execução)/ })).toBeTruthy();
     const pr = screen().getByRole("article", { name: "Revisar PR aberto" });
     expect(pr.textContent).toContain("PR aberto no GitHub");
-    expect(pr.textContent).toContain("Espera o próximo evento");
-    // My own zone isn't repeated on the card.
+    expect(pr.textContent).toMatch(/Espera/);
+    // My own zone isn't repeated on the row.
     expect(weekly.textContent).not.toContain("Brasília");
-    expect(within(weekly).getByText("Ativa").closest(".ac-chip")?.querySelector("svg")).not.toBeNull();
+    expect(within(weekly).getByRole("switch", { name: "Ativa: Resumo da semana" }).getAttribute("aria-checked")).toBe(
+      "true",
+    );
     const monthly = screen().getByRole("article", { name: "Relatório mensal de reviews" });
     expect(monthly.getAttribute("data-paused")).toBe("true");
     expect(within(monthly).getByText("Pausada")).toBeTruthy();
-    // No checkbox on the card: active/paused lives in Editar.
     expect(within(monthly).queryByRole("checkbox")).toBeNull();
+    // The horizon: one lane per scheduled, active routine.
+    expect(screen().getByRole("region", { name: "Próximas horas" })).toBeTruthy();
   });
 
-  test("pause, run now and see runs", async () => {
+  test("pause with the switch, run now and see runs in the details", async () => {
     await go("routines");
     const weekly = () => screen().getByRole("article", { name: "Resumo da semana" });
-    await click(within(weekly()).getByRole("button", { name: "Editar Resumo da semana" }));
-    await settle(4);
-    const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
-    await click(within(dialog).getByRole("switch", { name: "Ativa: dispara nos horários" }));
-    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await click(within(weekly()).getByRole("switch", { name: "Ativa: Resumo da semana" }));
     await settle(5);
     expect(weekly().getAttribute("data-paused")).toBe("true");
     expect(within(weekly()).getByText("Pausada")).toBeTruthy();
-    // Paused: "Retomar" in the "…" menu.
-    const menu = async (item: string) => {
-      const trigger = within(weekly()).getByRole("button", { name: "Mais ações: Resumo da semana" });
-      trigger.focus();
-      await act(async () => {
-        fireEvent.keyDown(trigger, { key: "Enter" });
-        fireEvent.keyUp(trigger, { key: "Enter" });
-      });
-      await settle(1);
-      await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: item }));
-      await settle(4);
-    };
-    await menu("Retomar");
+    expect(screen().getByText(/Rotina pausada\./)).toBeTruthy();
+    await click(within(weekly()).getByRole("switch", { name: "Ativa: Resumo da semana" }));
+    await settle(5);
     expect(weekly().hasAttribute("data-paused")).toBe(false);
     const run = within(weekly()).getByRole("button", { name: "Rodar agora" });
     expect(run.getAttribute("title")).toBe("Rodar agora");
     await click(run);
     await settle(4);
     expect(within(weekly()).getByRole("button", { name: "Rodando…" }).hasAttribute("disabled")).toBe(true);
-    await menu("Ver execuções");
-    const runs = screen().getByRole("dialog", { name: "Execuções: Resumo da semana" });
-    expect(runs.textContent).toContain("Orçamento do mês esgotado");
-    expect(runs.textContent).toContain("não rodou");
-    expect(runs.textContent).toContain("Resumo postado no canal");
+    // The title opens the details: what it does, when, where, and the run history.
+    await click(within(weekly()).getByRole("button", { name: "Resumo da semana" }));
+    await settle(4);
+    const details = screen().getByRole("complementary", { name: "Detalhes: Resumo da semana" });
+    expect(details.textContent).toContain("Resuma o que");
+    expect(details.textContent).toContain("Orçamento do mês esgotado");
+    expect(details.textContent).toContain("não rodou");
+    expect(details.textContent).toContain("Resumo postado no canal");
+    await click(within(details).getByRole("button", { name: "Fechar detalhes" }));
+    expect(screen().queryByRole("complementary", { name: "Detalhes: Resumo da semana" })).toBeNull();
   });
 
   test("Nova rotina: natural-language schedule is parsed before creating", async () => {
@@ -243,7 +239,7 @@ describe("Rotinas", () => {
     await settle(5);
     const card = screen().getByRole("article", { name: "PRs parados" });
     expect(card.textContent).toContain("De segunda a sexta, às 08:30");
-    expect(card.textContent).toContain("Última: nunca rodou");
+    expect(card.textContent).toContain("Ainda não rodou");
   });
 
   test("an event-driven routine", async () => {
