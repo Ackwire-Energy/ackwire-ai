@@ -534,7 +534,11 @@ describe("Drive", () => {
     await click(card("Organograma do time"));
     await settle(4);
     const details = screen().getByRole("dialog", { name: "Organograma do time" });
-    await click(within(details).getByRole("button", { name: "Abrir" }));
+    // Two "Abrir": the dialog header's icon (open in its own page) and the file action with a text label.
+    const openAction = within(details)
+      .getAllByRole("button", { name: "Abrir" })
+      .find((b) => b.textContent?.trim() === "Abrir");
+    await click(openAction as HTMLElement);
     await settle(4);
     expect(screen().getByRole("dialog", { name: "Organograma do time" })).toBeTruthy();
   });
