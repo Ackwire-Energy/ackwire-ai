@@ -263,15 +263,19 @@ export function useAddChannelMember(orgId: string) {
   });
 }
 
-/** Puts a message in the right cache: the channel list, or its thread. Replaces the optimistic copy (same `clientId`). */
+/**
+ * Puts a message in the right cache: the channel list, or its thread.
+ * Replaces the optimistic copy (same `clientId`), which always waits in the
+ * channel list (a thread may not be loaded yet): a reply's copy is removed
+ * from there too, or it would stay "sending…" next to the real one.
+ */
 export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: string, message: Message) {
-  const key = message.threadId
-    ? keys.thread(orgId, message.channelId, message.threadId)
-    : keys.messages(orgId, message.channelId);
-  qc.setQueryData<Message[]>(key, (list) => {
-    const rest = message.clientId ? list?.filter((m) => !(m.local && m.clientId === message.clientId)) : list;
-    return upsertMessage(rest, message);
-  });
+  const channelKey = keys.messages(orgId, message.channelId);
+  const key = message.threadId ? keys.thread(orgId, message.channelId, message.threadId) : channelKey;
+  const withoutLocal = (list: Message[] | undefined) =>
+    message.clientId ? list?.filter((m) => !(m.local && m.clientId === message.clientId)) : list;
+  if (message.threadId && message.clientId) qc.setQueryData<Message[]>(channelKey, withoutLocal);
+  qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list), message));
 }
 
 const newClientId = () =>
