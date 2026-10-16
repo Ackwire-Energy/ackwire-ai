@@ -33,9 +33,9 @@ describe("fields are v2 (no black borders)", () => {
       expect(body(selector)).toContain("border: 1px solid var(--field-line)");
     }
     expect(body(".ac-input:focus")).toContain("var(--field-ring)");
-    // Radio cards: chosen = raised + a 1.5px ink ring, never a gray fill.
+    // Radio cards: chosen = raised + a 2px ink ring (a faint tint at most), never a gray fill.
     const chosen = rules(css).find(([s]) => s.includes('.ac-option[data-state="checked"]') && !s.includes(":has"))?.[1];
-    expect(chosen).toContain("0 0 0 1.5px var(--ink)");
+    expect(chosen).toContain("0 0 0 2px var(--ink)");
     expect(chosen).toContain("background: var(--raised)");
   });
 });
