@@ -3753,10 +3753,13 @@ a.ac-list__row:focus-visible {
 .ac-tz__menu.ac-menu {
   width: max(320px, var(--radix-popover-trigger-width, 320px));
   max-width: 92vw;
+  max-height: min(420px, var(--radix-popover-content-available-height, 420px));
   padding: 0;
   overflow: hidden;
 }
 .ac-tz__searchrow {
+  /* The menu is a capped column: the long list scrolls, the search row never gets squeezed. */
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3780,6 +3783,8 @@ a.ac-list__row:focus-visible {
   color: var(--faint);
 }
 .ac-tz__list {
+  flex: 1 1 auto;
+  min-height: 0;
   max-height: 360px;
   overflow-y: auto;
   overscroll-behavior: contain;
