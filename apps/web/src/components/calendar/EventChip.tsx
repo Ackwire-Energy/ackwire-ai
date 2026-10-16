@@ -7,7 +7,7 @@ import type { RoutineTarget } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import { useOrg } from "@/components/org-context";
-import { type CalItem, runOffset } from "@/lib/calendar";
+import type { CalItem } from "@/lib/calendar";
 import { formatTime } from "@/lib/format";
 import { lookOf } from "@/lib/look";
 
@@ -50,9 +50,8 @@ export const dayLabel = (locale: string, d: Date) =>
 
 /**
  * One item on the calendar: a neutral card with a left color by source, the
- * recurrence icon and the agent's avatar. A routine that runs often is one
- * band: its cadence, and each run as a pixel in the agent's color (past runs
- * faded, the next one larger). A click opens its details in a popover.
+ * recurrence icon and the agent's avatar (a routine band shows its cadence
+ * instead of a time). A click opens its details in a popover.
  */
 export function EventChip({
   item,
@@ -63,7 +62,6 @@ export function EventChip({
   details,
   onPointerDown,
   resizeHandle,
-  now,
 }: {
   item: CalItem;
   /** `block` in the hour grid, `bar` for all-day/multi-day, `line` in the month and lists. */
@@ -74,8 +72,6 @@ export function EventChip({
   details: ReactNode;
   onPointerDown?: (e: ReactPointerEvent<HTMLButtonElement>) => void;
   resizeHandle?: ReactNode;
-  /** Splits a band's runs into past and next (the view's wall clock). */
-  now?: Date;
 }) {
   const { t, i18n } = useTranslation();
   const accent = useAccent(item);
@@ -88,7 +84,6 @@ export function EventChip({
     !band && (item.allDay || item.kind === "deadline")
       ? t("calendar.allDayAria", { title })
       : t("calendar.eventAria", { title: item.title, time });
-  const next = now ? item.runs?.find((r) => r > now) : undefined;
   return (
     <Popover
       open={open}
@@ -104,7 +99,6 @@ export function EventChip({
           data-source={item.source}
           data-kind={item.kind}
           data-recurring={item.recurring || undefined}
-          data-band={band || undefined}
           style={{ ...accent, ...style }}
           aria-label={label}
           aria-pressed={open}
@@ -115,9 +109,7 @@ export function EventChip({
           )}
           <span className="cal-chip__text">
             <span className="cal-chip__title">{title}</span>
-            {(variant === "block" || (band && variant === "bar")) && (
-              <span className="cal-chip__time tabular">{time}</span>
-            )}
+            {variant === "block" && <span className="cal-chip__time tabular">{time}</span>}
             {variant === "line" && (band || !item.allDay) && (
               <span className="cal-chip__time tabular">
                 {band ? time : formatTime(i18n.language, item.start.toISOString())}
@@ -125,18 +117,6 @@ export function EventChip({
             )}
           </span>
           {item.recurring && !band && <Icon name="repeat" size={14} className="cal-chip__repeat" aria-hidden="true" />}
-          {band && variant === "bar" && (
-            <span className="cal-chip__ticks" aria-hidden="true">
-              {item.runs?.map((r) => (
-                <i
-                  key={r.getTime()}
-                  style={{ left: `${runOffset(item, r) * 100}%` }}
-                  data-past={(now && r <= now) || undefined}
-                  data-next={r === next || undefined}
-                />
-              ))}
-            </span>
-          )}
           {resizeHandle}
         </button>
       }

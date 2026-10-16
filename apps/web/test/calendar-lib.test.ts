@@ -8,7 +8,6 @@ import {
   layoutBars,
   layoutDay,
   rangeLabel,
-  runOffset,
   upcomingItems,
   viewDays,
 } from "@/lib/calendar";
@@ -122,8 +121,6 @@ describe("routines on the calendar", () => {
     // Sparse runs and events stay as they are.
     expect(out.map((it) => it.key)).toContain(sparse.key);
     expect(out.map((it) => it.key)).toContain("meet");
-    // A run lines up with its day column.
-    expect(runOffset(band, at(12, 0, week[3] as Date))).toBeCloseTo((3 + 0.5) / 7);
   });
 
   test("a band only spans days that follow each other; a light day breaks it", () => {

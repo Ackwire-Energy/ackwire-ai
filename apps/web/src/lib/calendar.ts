@@ -33,6 +33,9 @@ export interface CalItem {
   /** A routine band: every run it stands for, and their spacing in minutes when regular. */
   runs?: Date[];
   every?: number | null;
+  /** A band's recent runs as they went (from the routine), and whether one is running now. */
+  pastRuns?: { at: Date; status: "ok" | "silent" | "failed" | "skipped"; weight?: number }[];
+  running?: boolean;
 }
 
 // ── Dates (local days) ──────────────────────────────────────────────────────
@@ -246,13 +249,6 @@ function spacing(runs: Date[]): number | null {
   const gaps = sorted.slice(1).map((d, i) => Math.round((d.getTime() - (sorted[i] as Date).getTime()) / 60_000));
   const g = gaps[0];
   return g !== undefined && g > 0 && gaps.every((x) => x === g) ? g : null;
-}
-
-/** Where a run sits along a band, 0–1 (by day and time of day, so it lines up with the columns). */
-export function runOffset(band: CalItem, run: Date) {
-  const spanDays = Math.max(1, Math.round((band.end.getTime() - band.start.getTime()) / 86_400_000));
-  const day = Math.round((startOfDay(run).getTime() - band.start.getTime()) / 86_400_000);
-  return (day + minutesOfDay(run) / 1440) / spanDays;
 }
 
 // ── Layout ──────────────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ import {
 } from "@agenteschat/ui";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { useCalendar, useCalendarAction } from "@/api/queries";
+import { useCalendar, useCalendarAction, useRoutines } from "@/api/queries";
 import type { CalendarEvent, CalendarRange, SeriesScope } from "@/api/types";
 import { useActors } from "@/components/actors";
 import { AgendaView } from "@/components/calendar/AgendaView";
@@ -113,11 +113,22 @@ export function CalendarPage({ today: todayProp }: { today?: Date }) {
     list.map((it) => (it.allDay ? it : { ...it, start: toView(it.start), end: toView(it.end) }));
   // biome-ignore lint/correctness/useExhaustiveDependencies: toView only depends on the zone
   const all = useMemo(() => shiftItems(toItems(range.data)), [range.data, viewZone]);
-  // A routine that runs often is one band, not a chip per run.
+  // A routine that runs often is one band, not a chip per run; its lane shows how the recent runs went.
+  const routines = useRoutines(org.id);
+  const routineById = useMemo(() => new Map((routines.data ?? []).map((r) => [r.id, r])), [routines.data]);
   const items = collapseRoutines(
     all.filter((it) => filters[it.source]),
     days,
-  );
+  ).map((it) => {
+    const r = it.runs && it.routineId ? routineById.get(it.routineId) : undefined;
+    if (!r) return it;
+    const pastRuns = (r.recentRuns ?? []).map((x) => ({
+      at: toView(new Date(x.at)),
+      status: x.status,
+      weight: x.weight,
+    }));
+    return { ...it, pastRuns, running: r.running };
+  });
   const counts = Object.fromEntries(
     SOURCES.map(({ source }) => [source, all.filter((it) => it.source === source).length]),
   );

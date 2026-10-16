@@ -27,6 +27,7 @@ import {
 } from "@/lib/calendar";
 import { toYmd } from "@/lib/format";
 import { EventChip } from "./EventChip";
+import { RoutineBand } from "./RoutineBand";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 /** Movement before a press on a chip becomes a drag (px). */
@@ -263,15 +264,14 @@ export function TimeGrid({
       )}
       {bandLanes > 0 && (
         <div className="cal-week__bars cal-week__bars--routines">
-          <div className="cal-week__gutter muted" title={t("calendar.filter.routine")}>
+          <div className="cal-week__gutter cal-week__gutter--top muted" title={t("calendar.filter.routine")}>
             <Icon name="routines" size={14} label={t("calendar.filter.routine")} />
           </div>
           <div className="cal-week__barlane">
             {bands.map((b) => (
-              <EventChip
+              <RoutineBand
                 key={b.item.key}
                 item={b.item}
-                variant="bar"
                 now={now}
                 style={{
                   gridColumn: `${b.from + 1} / span ${b.span}`,
