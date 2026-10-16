@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, eq, inArray, lt, ne, or, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, lt, ne, or, schema, sql } from "@agenteschat/db";
 import { learnFromRefusal } from "./context/feedback";
 import type { MemoryJudging } from "./context/items";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
@@ -12,7 +12,9 @@ const { approvals, organizationMembers, channelMembers, agents } = schema;
 
 export interface ApprovalView {
   id: string;
-  runId: string;
+  /** Null for an approval a mission's executor asked (`missionId`). */
+  runId: string | null;
+  missionId: string | null;
   agentId: string;
   channelId: string;
   threadId: string;
@@ -48,6 +50,7 @@ export function scalarParams(params: Record<string, unknown>) {
 export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
   id: a.id,
   runId: a.runId,
+  missionId: a.missionId ?? null,
   agentId: a.agentId,
   channelId: a.channelId,
   threadId: a.threadRootId,
@@ -95,6 +98,30 @@ export async function publishApproval(
   await publishChannelEvent(deps.pubsub, { type, channelId: approval.channelId, approval: view });
   for (const userId of await approverIds(deps.db, approval)) {
     await publishUserEvent(deps.pubsub, approval.orgId, userId, { type, approval: { ...view, canDecide: true } });
+  }
+}
+
+/**
+ * What a decision wakes: the run that asked, or, for an approval asked by a
+ * mission's executor (ADR 0029, no run), the task's session on the machine.
+ */
+async function enqueueResume(tx: Executor, row: Pick<Approval, "id" | "orgId" | "runId" | "missionId">) {
+  if (row.runId) {
+    await enqueue(tx, {
+      orgId: row.orgId,
+      kind: "agent_run.execute",
+      payload: { runId: row.runId },
+      dedupeKey: `agent_run.execute:${row.runId}:approval:${row.id}`,
+      maxAttempts: 4,
+    });
+  } else if (row.missionId) {
+    await enqueue(tx, {
+      orgId: row.orgId,
+      kind: "mission.approval_decided",
+      payload: { approvalId: row.id },
+      dedupeKey: `mission.approval_decided:${row.id}`,
+      maxAttempts: 4,
+    });
   }
 }
 
@@ -146,13 +173,7 @@ export async function decideApproval(
       )
       .where(eq(approvals.id, approvalId))
       .returning();
-    await enqueue(tx, {
-      orgId,
-      kind: "agent_run.execute",
-      payload: { runId: row.runId },
-      dedupeKey: `agent_run.execute:${row.runId}:approval:${row.id}`,
-      maxAttempts: 4,
-    });
+    await enqueueResume(tx, row);
     return expired ? { error: "This request has expired" as const, row: updated } : { row: updated };
   });
   if (outcome.row) await publishApproval(deps, outcome.row, "approval.decided");
@@ -170,15 +191,7 @@ export async function expireApprovals(deps: { db: Database; pubsub: PubSub }, no
       .set({ status: "expired" })
       .where(and(eq(approvals.status, "pending"), lt(approvals.expiresAt, now)))
       .returning();
-    for (const row of rows) {
-      await enqueue(tx, {
-        orgId: row.orgId,
-        kind: "agent_run.execute",
-        payload: { runId: row.runId },
-        dedupeKey: `agent_run.execute:${row.runId}:approval:${row.id}`,
-        maxAttempts: 4,
-      });
-    }
+    for (const row of rows) await enqueueResume(tx, row);
     return rows;
   });
   for (const row of expired) await publishApproval(deps, row, "approval.decided");

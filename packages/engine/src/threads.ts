@@ -40,7 +40,7 @@ export type ThreadChange =
   | "archived"
   | "unarchived"
   | "deleted";
-export type ThreadTab = "all" | "working" | "closed" | "archived";
+export type ThreadTab = "all" | "working" | "missions" | "closed" | "archived";
 
 /** The most messages a context range may hold (after exclusions). */
 export const MAX_CONTEXT_MESSAGES = 500;
@@ -97,7 +97,18 @@ export interface ThreadInfo {
   needsYou: boolean;
   /** Whether the actor may close, archive, rename or change the context. */
   canManage: boolean;
+  /** The thread's mission (ADR 0029), in short: details at `GET …/threads/{id}/mission`. */
+  mission: ThreadMissionSummary | null;
   createdAt: string;
+}
+
+export interface ThreadMissionSummary {
+  id: string;
+  status: "proposed" | "active" | "paused" | "done" | "canceled";
+  planDone: number;
+  planTotal: number;
+  /** Plan items waiting for people, pending decisions and pending reviews. */
+  waitingYou: number;
 }
 
 /** `meta.threadStart` of a root written by `createThreadFromRange` (the web's context marker and stub). */
@@ -811,6 +822,11 @@ interface ThreadSqlRow {
   context_count: number | string | null;
   working: boolean;
   needs_you: boolean;
+  mission_id?: string | null;
+  mission_status?: ThreadMissionSummary["status"] | null;
+  mission_plan_done?: number | string | null;
+  mission_plan_total?: number | string | null;
+  mission_waiting?: number | string | null;
   /** `last_at` with microseconds, for the cursor. */
   cursor_at: string;
 }
@@ -869,7 +885,9 @@ async function queryThreads(
         ? sql`l.state = 'archived'`
         : tab === "working"
           ? sql`l.state <> 'archived' and l.working`
-          : sql`l.state <> 'archived'`;
+          : tab === "missions"
+            ? sql`l.state <> 'archived' and l.mission_id is not null`
+            : sql`l.state <> 'archived'`;
   // The agent wrote the root or a reply, or ran in the thread.
   const agentFilter = input.agentId
     ? sql`and (l.author_agent_id = ${input.agentId}::uuid
@@ -923,12 +941,19 @@ async function queryThreads(
               and ap.status = 'pending' and ap.thread_root_id = root.id
               and (${isAdmin}::boolean or ap.owner_user_id = ${userId}))
           ) as needs_you,
-          ${participated} as participated
+          ${participated} as participated,
+          mi.id as mission_id, mi.status as mission_status, mi.plan_done as mission_plan_done,
+          mi.plan_total as mission_plan_total,
+          case when mi.id is null then null else mi.plan_waiting
+            + (select count(*)::int from ${schema.missionDecisions} md where md.mission_id = mi.id and md.status = 'pending')
+            + (select count(*)::int from ${schema.missionReviews} mr where mr.mission_id = mi.id and mr.status = 'pending')
+          end as mission_waiting
         from candidates c
         join ${messages} root on root.id = c.root_id and root.org_id = ${orgId}::uuid
         join visible v on v.id = root.channel_id
         left join replies r on r.root_id = root.id
         left join ${threads} t on t.org_id = ${orgId}::uuid and t.root_message_id = root.id
+        left join ${schema.missions} mi on mi.org_id = ${orgId}::uuid and mi.thread_root_id = root.id
         where root.thread_id is null and root.deleted_at is null
       )
       select l.*, to_char(l.last_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_at
@@ -1032,6 +1057,16 @@ function toView(
     working: r.working === true,
     needsYou: r.needs_you === true,
     canManage: r.created_by === userId || (r.author_type === "person" && r.author_user_id === userId) || isAdmin,
+    mission:
+      r.mission_id && r.mission_status
+        ? {
+            id: r.mission_id,
+            status: r.mission_status,
+            planDone: Number(r.mission_plan_done ?? 0),
+            planTotal: Number(r.mission_plan_total ?? 0),
+            waitingYou: Number(r.mission_waiting ?? 0),
+          }
+        : null,
     createdAt: toDate(r.created_at).toISOString(),
   };
 }
@@ -1111,8 +1146,12 @@ export async function getThread(db: Database, actorId: string, orgId: string, ro
 
 // ── Run context ───────────────────────────────────────────────────────────────
 
-/** A thread's context range for the run's context builder (one indexed read by root; no cache: ranges change). */
-export async function threadContextOf(db: Database, orgId: string, rootId: string) {
+/**
+ * What the run's context builder needs from a thread's row, in one indexed
+ * read by root (no cache: ranges change): its context range, and its mission
+ * (ADR 0029: a mission's thread always has a row).
+ */
+export async function threadRunInfo(db: Database, orgId: string, rootId: string) {
   const [row] = await db
     .select({
       contextChannelId: threads.contextChannelId,
@@ -1120,15 +1159,28 @@ export async function threadContextOf(db: Database, orgId: string, rootId: strin
       contextLastAt: threads.contextLastAt,
       contextExcludedMessageIds: threads.contextExcludedMessageIds,
       title: threads.title,
+      missionId: schema.missions.id,
     })
     .from(threads)
+    .leftJoin(
+      schema.missions,
+      and(eq(schema.missions.orgId, threads.orgId), eq(schema.missions.threadRootId, threads.rootMessageId)),
+    )
     .where(and(eq(threads.orgId, orgId), eq(threads.rootMessageId, rootId)));
-  if (!row?.contextChannelId || !row.contextFirstAt || !row.contextLastAt) return null;
-  return {
-    channelId: row.contextChannelId,
-    firstAt: row.contextFirstAt,
-    lastAt: row.contextLastAt,
-    excluded: row.contextExcludedMessageIds,
-    title: row.title,
-  };
+  const range =
+    row?.contextChannelId && row.contextFirstAt && row.contextLastAt
+      ? {
+          channelId: row.contextChannelId,
+          firstAt: row.contextFirstAt,
+          lastAt: row.contextLastAt,
+          excluded: row.contextExcludedMessageIds,
+          title: row.title,
+        }
+      : null;
+  return { range, missionId: row?.missionId ?? null };
+}
+
+/** A thread's context range for the run's context builder (see `threadRunInfo`). */
+export async function threadContextOf(db: Database, orgId: string, rootId: string) {
+  return (await threadRunInfo(db, orgId, rootId)).range;
 }

@@ -18,8 +18,9 @@ import type { Agent } from "./agents";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import type { Message } from "./messages";
+import { missionBrief } from "./mission-brief";
 import type { AgentRun } from "./runs";
-import { threadContextOf } from "./threads";
+import { threadRunInfo } from "./threads";
 
 const { messages, users, agents, channels, channelMembers, organizations, agentScopes } = schema;
 
@@ -96,7 +97,7 @@ export async function buildRunContext(
   // Independent lookups go out together (the database may be remote); org,
   // channel and members come from the per-process cache when enabled.
   const scope = and(eq(messages.orgId, run.orgId), eq(messages.channelId, run.channelId), isNull(messages.deletedAt));
-  const [org, channel, triggerRows, range] = await Promise.all([
+  const [org, channel, triggerRows, threadInfo] = await Promise.all([
     getOrgCached(db, run.orgId),
     getChannelCached(db, run.orgId, run.channelId),
     options.trigger
@@ -107,8 +108,12 @@ export async function buildRunContext(
           .where(and(eq(messages.id, run.triggerMessageId), eq(messages.orgId, run.orgId))),
     // A thread made from a range of a conversation (ADR 0029): that range is its context.
     // A run started by the root itself (a new top-level message) can't have one yet: no query.
-    run.threadRootId === run.triggerMessageId ? null : threadContextOf(db, run.orgId, run.threadRootId),
+    // Its mission (ADR 0029) comes from the same read.
+    run.threadRootId === run.triggerMessageId ? null : threadRunInfo(db, run.orgId, run.threadRootId),
   ]);
+  const range = threadInfo?.range ?? null;
+  // A mission's thread: a compact brief instead of making the agent dig (only there; one lookup above decided).
+  const briefing = threadInfo?.missionId ? missionBrief(db, threadInfo.missionId).catch(() => null) : null;
   const trigger = triggerRows[0];
   if (!org || !channel || !trigger) throw new Error("run context is incomplete (org, channel or trigger missing)");
 
@@ -388,6 +393,7 @@ export async function buildRunContext(
           },
         ]
       : []),
+    ...(briefing ? await briefing.then((text) => (text ? [{ text }] : [])) : []),
     ...(trigger.meta.routine
       ? [
           {

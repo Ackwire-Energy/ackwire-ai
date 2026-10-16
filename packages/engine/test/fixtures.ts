@@ -32,6 +32,8 @@ import {
   createJobHandlers,
   createLocalKeyWrapper,
   createMachineHub,
+  createMissionHooks,
+  createMissionToolSource,
   createModelGateway,
   createOrganization,
   createSandboxToolSource,
@@ -135,6 +137,8 @@ export async function setup(
     sandbox?: SandboxProvider;
     /** Add the sandbox tools with connected machines (a machine hub on this db; with or without `sandbox`). */
     machines?: boolean;
+    /** With `machines`: the mission tools (propose_mission, send_to_mission). The hub's mission hooks are always set. */
+    missionTools?: boolean;
     /** Answers of the fake judge (judge.ts): by judgment kind and question id. Default: every Noul 0. */
     judge?: Parameters<typeof createFakeJudge>[0];
     /** The fake schedule reader's table (phrase → answer), on top of `TEST_SCHEDULES`. */
@@ -221,7 +225,16 @@ export async function setup(
           ...(machineHub ? { publicUrl: "http://localhost:3000" } : {}),
         }
       : null;
+  const missionDeps = {
+    pubsub,
+    hub: machineHub,
+    artifacts: artifactDeps,
+    search: context,
+    publicUrl: "http://localhost:3000",
+  };
+  machineHub?.setMissionHooks(createMissionHooks({ db, ...missionDeps }));
   const sources = [
+    ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
     ...(options.askUser ? [createAskUserToolSource()] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
@@ -295,6 +308,7 @@ export async function setup(
     artifactDeps,
     sandboxDeps,
     machineHub,
+    missionDeps: { db, ...missionDeps },
   };
 }
 

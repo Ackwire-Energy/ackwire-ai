@@ -271,6 +271,15 @@ export async function insertMessageWithRuns(
         select 1 from ${threads} th
         where ${person}::boolean and ${threadId}::uuid is not null and th.org_id = ${input.orgId}::uuid
           and th.root_message_id = ${threadId}::uuid and th.state = 'archived'
+      ), muted as (
+        -- A mission's thread (ADR 0029): only its owner and those who can decide make its agent act.
+        -- Anyone else addressing it starts nothing: the message becomes a suggestion.
+        select mi.id as mission_id, mi.agent_id from ${schema.missions} mi
+        where ${person}::boolean and ${threadId}::uuid is not null and mi.org_id = ${input.orgId}::uuid
+          and mi.thread_root_id = ${threadId}::uuid and mi.status in ('proposed', 'active', 'paused')
+          and mi.owner_id is distinct from ${userId}
+          and not exists (select 1 from ${schema.missionParticipants} mp
+            where mp.mission_id = mi.id and mp.user_id = ${userId} and mp.role = 'decide')
       ), mentioned as (
         select a.id from ${agents} a
         join ${channelMembers} cm on cm.agent_id = a.id and cm.channel_id = ${input.channelId}::uuid
@@ -293,6 +302,7 @@ export async function insertMessageWithRuns(
               and oq.thread_id is not distinct from ${threadId}::uuid
             order by oq.created_at desc limit 1)
           and (not exists (select 1 from mentioned) or q.agent_id in (select id from mentioned))
+          and q.agent_id not in (select agent_id from muted)
           and exists (select 1 from ${agents} qa where qa.id = q.agent_id and ${audienceSql("qa", sql`${userId}::text`)})
           and (${threadId}::uuid is null or exists (
             select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
@@ -310,7 +320,7 @@ export async function insertMessageWithRuns(
               select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')))
       ), answering as (
         -- Who can talk to the agent (D31): the others get no run, only a notice for the sender.
-        select agent_id, trig from addressed where allowed
+        select agent_id, trig from addressed where allowed and agent_id not in (select agent_id from muted)
       ), active as (
         -- One active run per agent and conversation: a new message goes to it instead of a second run.
         -- Addressed agents (mention, DM) with a run in this conversation, and, for a reply in a
@@ -320,6 +330,7 @@ export async function insertMessageWithRuns(
         where ${person}::boolean and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
           and r.status in ('queued', 'running', 'waiting_approval', 'waiting_input')
           and r.agent_id not in (select agent_id from answered)
+          and r.agent_id not in (select agent_id from muted)
           and (
             (r.agent_id in (select agent_id from answering)
               and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid) or exists (
@@ -340,6 +351,10 @@ export async function insertMessageWithRuns(
             -- Delivered to a task in progress: nobody routes it again (no second run).
             || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(ac.id)) from active ac
                 having count(*) > 0), '{}'::jsonb)
+            -- Addressed the mission's agent without the right to: a suggestion the owner decides.
+            || coalesce((select jsonb_build_object('missionSuggestion',
+                  jsonb_build_object('status', 'pending', 'missionId', mu.mission_id))
+                from muted mu where mu.agent_id in (select agent_id from addressed) limit 1), '{}'::jsonb)
         where (${threadId}::uuid is null or exists (
           select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
             and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))

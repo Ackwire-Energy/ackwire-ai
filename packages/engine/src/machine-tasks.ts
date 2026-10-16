@@ -1,6 +1,7 @@
 import {
   type MachineReplies,
   type MachineRequest,
+  MISSION_PROTOCOL,
   type PubSub,
   type RunnerFrame,
   type RunnerTask,
@@ -15,6 +16,7 @@ import { createAgentRuns, eligibleChannelAgents, requesterOf } from "./dispatch"
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { getMachineById, machineOnline } from "./machines";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
+import { MISSION_RULES } from "./mission-rules";
 import { enqueue } from "./outbox";
 import type { ToolContext } from "./tools/types";
 
@@ -51,6 +53,8 @@ export interface MachineTaskView {
   machineId: string;
   channelId: string;
   threadId: string | null;
+  /** The mission it works for (ADR 0029), or null. */
+  missionId: string | null;
   title: string;
   executor: string;
   status: MachineTaskStatus;
@@ -75,6 +79,7 @@ export function machineTaskView(row: MachineTaskRow): MachineTaskView {
     machineId: row.machineId,
     channelId: row.channelId,
     threadId: row.threadRootId,
+    missionId: row.missionId,
     title: row.title,
     executor: row.executor,
     status: row.status,
@@ -159,13 +164,22 @@ export interface StartTaskInput {
   resumeCount?: number;
   /** `claude`: resume the session (a hint; the runner checks its disk). */
   resume?: boolean;
+  /** Where it runs, relative to the agent's folder (a mission's repository, or the worktree of the session to resume). */
+  cwd?: string | null;
+  /** A mission's task (protocol 5): the runner gives its executor the `agentes` MCP server and these rules. */
+  mission?: { id: string; rules: string } | null;
 }
 
 /** A runner older than protocol 4 can't run background tasks: the person has to update it. */
 export class RunnerOutdatedError extends Error {
-  constructor(readonly machineName: string) {
+  constructor(
+    readonly machineName: string,
+    missions = false,
+  ) {
     super(
-      `The runner on the computer ${machineName} is too old for background tasks. Tell the person: its owner should update it with \`agentes-runner update\` (until then use run_code).`,
+      missions
+        ? `The runner on the computer ${machineName} is too old for missions. Its owner should update it: run agentes-runner update.`
+        : `The runner on the computer ${machineName} is too old for background tasks. Tell the person: its owner should update it with \`agentes-runner update\` (until then use run_code).`,
     );
     this.name = "RunnerOutdatedError";
   }
@@ -177,6 +191,7 @@ export class RunnerOutdatedError extends Error {
  */
 export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, input: StartTaskInput) {
   if (input.protocol < TASKS_PROTOCOL) throw new RunnerOutdatedError(input.machineName);
+  if (input.mission && input.protocol < MISSION_PROTOCOL) throw new RunnerOutdatedError(input.machineName, true);
   const now = new Date();
   const [row] = await deps.db
     .insert(machineTasks)
@@ -188,6 +203,7 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
       threadRootId: input.threadRootId,
       runId: input.runId,
       requestedByUserId: input.requestedByUserId,
+      missionId: input.mission?.id ?? null,
       title: plainTitle(input.title),
       executor: input.executor,
       command: (input.command ?? "").slice(0, TASK_TEXT_LIMITS.command),
@@ -213,6 +229,8 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
       ...(input.resume ? { resume: true } : {}),
       ...(input.branch ? { branch: input.branch } : {}),
       ...(input.maxSeconds ? { maxSeconds: input.maxSeconds } : {}),
+      ...(input.cwd ? { cwd: input.cwd } : {}),
+      ...(input.mission ? { mission: input.mission } : {}),
     });
     const at = new Date(started.startedAt);
     const [running] = await deps.db
@@ -407,7 +425,18 @@ export async function settleInterruptedTask(
     .returning();
   if (!claimed) return null;
   const machine = await getMachineById(deps.db, claimed.machineId);
+  // A mission's task resumes when the mission says so and still runs (ADR 0029).
+  const [mission] = claimed.missionId
+    ? await deps.db
+        .select({ id: schema.missions.id, status: schema.missions.status, resumeTasks: schema.missions.resumeTasks })
+        .from(schema.missions)
+        .where(eq(schema.missions.id, claimed.missionId))
+    : [];
+  const missionAllows =
+    !claimed.missionId ||
+    (mission?.resumeTasks === true && (mission.status === "active" || mission.status === "proposed"));
   const resumable =
+    missionAllows &&
     claimed.executor === "claude" &&
     Boolean(claimed.sessionId) &&
     machine?.resumeTasks !== false &&
@@ -438,6 +467,9 @@ export async function settleInterruptedTask(
         resume: true,
         resumedFromId: claimed.id,
         resumeCount: claimed.resumeCount + 1,
+        // The session lives in its folder (a worktree for a branch): resume it there.
+        cwd: claimed.cwd || null,
+        mission: mission ? { id: mission.id, rules: MISSION_RULES } : null,
       });
       const [linked] = await deps.db
         .update(machineTasks)
@@ -590,6 +622,7 @@ function endText(row: MachineTaskRow, computer: string) {
 export async function wakeConversationForTask(deps: TaskDeps, taskId: string, options: { maxHops: number }) {
   const row = await getTask(deps.db, taskId);
   if (!row || row.wokeAt || !row.endedAt) return null;
+  if (row.missionId) return claimMissionTaskEnd(deps, row);
   const machine = await getMachineById(deps.db, row.machineId);
   const computer = machine?.name ?? "the computer";
   const [origin] = row.runId
@@ -658,6 +691,61 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
     });
   }
   return result;
+}
+
+/**
+ * A mission's task ended (ADR 0029): no agent run (the executor reported
+ * through the `agentes` tools, and the mission tells its main session). Only
+ * a failure or an interruption the executor couldn't report gets a notice in
+ * the thread. Returns `{ missionTask }` once (the caller then runs the
+ * mission's own follow-up: notes, the main session, queued messages).
+ */
+async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
+  const machine = await getMachineById(deps.db, row.machineId);
+  const computer = machine?.name ?? "the computer";
+  const notice = row.status === "failed" || row.status === "interrupted";
+  const claimed = await deps.db.transaction(async (tx) => {
+    const [won] = await tx
+      .update(machineTasks)
+      .set({ wokeAt: new Date() })
+      .where(and(eq(machineTasks.id, row.id), isNull(machineTasks.wokeAt)))
+      .returning({ id: machineTasks.id });
+    if (!won) return null;
+    const message = notice
+      ? await insertMessage(tx, {
+          orgId: row.orgId,
+          channelId: row.channelId,
+          threadId: row.threadRootId,
+          author: { type: "agent", agentId: row.agentId, runId: null, hop: 0 },
+          body: endText(row, computer),
+          meta: {
+            machineTask: {
+              id: row.id,
+              title: row.title,
+              status: row.status,
+              exitCode: row.exitCode,
+              seconds: taskSeconds(row),
+              computer,
+              executor: row.executor,
+              missionId: row.missionId,
+              ...(row.branch ? { branch: row.branch } : {}),
+              ...(row.lastLine ? { lastLine: row.lastLine } : {}),
+            },
+            bodyCode: `machine_task_${row.status}`,
+            bodyParams: {
+              title: row.title,
+              computer,
+              seconds: String(taskSeconds(row)),
+              exitCode: String(row.exitCode ?? ""),
+            },
+          },
+        })
+      : null;
+    return { message };
+  });
+  if (!claimed) return null;
+  if (claimed.message && deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(claimed.message));
+  return { message: claimed.message, runs: [], missionTask: { taskId: row.id, missionId: row.missionId } };
 }
 
 /**

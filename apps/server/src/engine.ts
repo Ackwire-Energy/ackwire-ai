@@ -18,6 +18,8 @@ import {
   createJobHandlers,
   createLlmJudge,
   createMachineHub,
+  createMissionHooks,
+  createMissionToolSource,
   createModelGateway,
   createSandboxToolSource,
   createScheduleToolSource,
@@ -163,6 +165,15 @@ export function buildEngine(o: EngineOptions) {
     git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET },
     publicUrl: config.PUBLIC_URL,
   };
+  // Missions (ADR 0029): their executors' MCP calls and reconnects come through the hub.
+  const missionDeps = {
+    pubsub: adapters.pubsub,
+    hub: machineHub,
+    artifacts,
+    search: context,
+    publicUrl: config.PUBLIC_URL,
+  };
+  machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps }));
   const githubApp =
     config.GITHUB_APP_ID && config.GITHUB_APP_PRIVATE_KEY
       ? { appId: config.GITHUB_APP_ID, privateKey: config.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, "\n") }
@@ -187,6 +198,7 @@ export function buildEngine(o: EngineOptions) {
       createWikiToolSource({ pubsub: adapters.pubsub, search: context, artifacts }),
       createContextToolSource(context),
       createConnectorToolSource(connectorDeps),
+      createMissionToolSource(missionDeps),
       createSandboxToolSource({
         ...sandbox,
         artifacts,

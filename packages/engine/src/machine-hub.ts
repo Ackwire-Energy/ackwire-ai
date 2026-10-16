@@ -158,6 +158,15 @@ type RpcReply = { ok: true; data: unknown } | { ok: false; error: { code: string
 /** `machine_rpc` rows older than this are deleted (opportunistically). */
 export const MACHINE_RPC_KEEP_MS = 60 * 60_000;
 
+/** What missions plug into the hub (ADR 0029): the `agentes` MCP calls of their tasks, and a machine coming back. */
+export interface MachineMissionHooks {
+  mcp?(
+    machineId: string,
+    frame: Extract<RunnerFrame, { type: "mcp.call" }>,
+  ): Promise<{ ok: true; text: string } | { ok: false; error: { code: string; message: string } }>;
+  online?(machineId: string): Promise<void>;
+}
+
 export function createMachineHub(deps: MachineHubDeps) {
   const { db, pubsub } = deps;
   const replicaId = deps.replicaId ?? crypto.randomUUID();
@@ -171,6 +180,7 @@ export function createMachineHub(deps: MachineHubDeps) {
   const running = new Map<string, AbortController>();
   let lastCleanup = 0;
   const subscriptions: Unsubscribe[] = [];
+  let hooks: MachineMissionHooks = {};
 
   const send = (conn: MachineConnection, frame: ServerFrame) => {
     if (conn.closed) return;
@@ -295,6 +305,40 @@ export function createMachineHub(deps: MachineHubDeps) {
         (error) => deps.log?.warn("task reconcile failed", { machineId: machine.id, error: String(error) }),
       );
     }
+    // Missions on this machine: queued messages and `.agentes/` files go out now (not in this frame's path).
+    if (hooks.online) {
+      const online = hooks.online;
+      queueMicrotask(
+        () =>
+          void online(machine.id).catch((error) =>
+            deps.log?.warn("mission reconnect failed", { machineId: machine.id, error: String(error) }),
+          ),
+      );
+    }
+  }
+
+  /** `mcp.call` (protocol 5): run by the missions hook, answered with `mcp.result`; never blocks other frames. */
+  function mcpCall(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "mcp.call" }>) {
+    const machineId = conn.machineId as string;
+    const run = hooks.mcp
+      ? hooks.mcp(machineId, frame)
+      : Promise.resolve({
+          ok: false as const,
+          error: { code: "mission.unavailable", message: "Missions are not available on this server." },
+        });
+    void run
+      .catch((error: unknown) => ({
+        ok: false as const,
+        error: { code: "internal", message: error instanceof Error ? error.message : String(error) },
+      }))
+      .then((out) =>
+        send(
+          conn,
+          out.ok
+            ? { type: "mcp.result", callId: frame.callId, ok: true, text: out.text.slice(0, 50_000) }
+            : { type: "mcp.result", callId: frame.callId, ok: false, error: out.error },
+        ),
+      );
   }
 
   async function touch(conn: MachineConnection) {
@@ -542,6 +586,8 @@ export function createMachineHub(deps: MachineHubDeps) {
       else if (frame.type === "pong") await touch(conn);
       else if (frame.type === "task.event") {
         await applyTaskEvent({ db, pubsub }, conn.machineId, frame).catch(() => undefined);
+      } else if (frame.type === "mcp.call") {
+        mcpCall(conn, frame);
       } else if (frame.type === "task.done") {
         // Not acknowledged on failure: the runner sends it again after its next reconnect.
         await taskDone(conn, frame).catch((error) =>
@@ -583,6 +629,11 @@ export function createMachineHub(deps: MachineHubDeps) {
         os: row.os,
         protocol: row.protocol,
       };
+    },
+
+    /** Missions plug in their MCP tools and their reconnect follow-up (set once the engine is built). */
+    setMissionHooks(next: MachineMissionHooks) {
+      hooks = next;
     },
 
     /** Whether this replica holds the machine's socket. */

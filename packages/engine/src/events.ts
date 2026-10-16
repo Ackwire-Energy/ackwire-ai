@@ -239,7 +239,23 @@ export type ChannelEvent =
    * (last line, files, elapsed), ended, was interrupted or resumed (ADR 0029).
    * `task` is its whole view (replace, don't merge); `threadId` null = main timeline.
    */
-  | { type: "machine.task"; channelId: string; threadId: string | null; task: MachineTaskView };
+  | { type: "machine.task"; channelId: string; threadId: string | null; task: MachineTaskView }
+  /**
+   * A mission changed (ADR 0029): status, plan, participants, owner,
+   * computer, a decision, a review, a suggestion, a task, a file edited on
+   * the machine. `change` says what; small details ride along (`decision`,
+   * `review`, `messageId`…); clients refetch `GET …/missions/{missionId}` for
+   * the rest. `threadId` is the mission's home thread.
+   */
+  | {
+      type: "mission.updated";
+      channelId: string;
+      threadId: string;
+      missionId: string;
+      status: "proposed" | "active" | "paused" | "done" | "canceled";
+      change: string;
+      [key: string]: unknown;
+    };
 
 const INLINE_LIMIT = 6000;
 

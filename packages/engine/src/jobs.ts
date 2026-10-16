@@ -14,6 +14,8 @@ import { advanceForumTopic } from "./forum";
 import { mentionHandoffs } from "./judge";
 import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
 import { getMessage } from "./messages";
+import { onMissionApprovalDecided, onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
+import { type MissionDeps, missionOfThread, missionRole } from "./missions";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import {
   createLlmRouterStrategy,
@@ -183,6 +185,15 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     return allowed;
   }
 
+  const missions: MissionDeps = {
+    db: deps.db,
+    pubsub: deps.pubsub,
+    hub: deps.sandbox?.machines?.hub ?? null,
+    artifacts: deps.artifacts,
+    search: deps.context,
+    publicUrl: deps.sandbox?.publicUrl,
+  };
+
   return {
     "message.posted": async (job, ctx) => {
       const input = { orgId: orgOf(job), messageId: String(job.payload.messageId) };
@@ -218,6 +229,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       const where = await getChannelCached(deps.db, message.orgId, message.channelId);
       // The forum moves by its own turns (D33): no mentions, router or DMs there.
       if (where?.kind === "forum") return;
+      // Addressed a mission's agent without the right to act there (ADR 0029): a suggestion, no run.
+      if (message.meta.missionSuggestion) return routed("none", message.mentionedAgentIds, [], "mission_suggestion");
       if (message.authorType !== "person") {
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
@@ -246,6 +259,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         return;
       }
       if (!router.enabled) return routed("none", [], []);
+      // In a mission's thread only its owner and deciders make the agent work (the router included).
+      if (message.threadId && message.authorUserId) {
+        const mission = await missionOfThread(deps.db, message.orgId, message.threadId);
+        if (mission && ["proposed", "active", "paused"].includes(mission.status)) {
+          const role = await missionRole(deps.db, mission, message.authorUserId);
+          if (role !== "owner" && role !== "decide") return routed("none", [], [], "mission_read_only");
+        }
+      }
       const res = await routeMessage({ db: deps.db, strategy, policy }, input, ctx);
       if (res.skipped === "already_routed") return;
       await routed(res.seenBy ? "router" : "none", res.seenBy ?? [], res.runs, res.reason);
@@ -318,9 +339,19 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     // A background task on a connected computer ended: its conversation wakes (ADR 0029).
     "machine.task_done": async (job) => {
-      await wakeConversationForTask({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.taskId), {
+      const woke = await wakeConversationForTask({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.taskId), {
         maxHops: deps.maxHops,
       });
+      // A mission's task: its notes come back, its main session hears, queued messages go out.
+      if (woke && "missionTask" in woke) await onMissionTaskEnded(missions, String(job.payload.taskId));
+    },
+    // The `.agentes/` files of a mission changed (debounced): written to its machine.
+    "mission.sync_files": async (job) => {
+      await syncMissionFiles(missions, String(job.payload.missionId));
+    },
+    // An approval asked by a mission's executor was decided or expired: its session is resumed.
+    "mission.approval_decided": async (job) => {
+      await onMissionApprovalDecided(missions, String(job.payload.approvalId));
     },
     // A machine went offline a grace ago: if still offline, its running tasks are interrupted (one notice per thread).
     "machine.tasks_offline": async (job) => {
