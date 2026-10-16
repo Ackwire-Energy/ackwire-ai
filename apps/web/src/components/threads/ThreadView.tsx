@@ -2,7 +2,7 @@ import { Button, Chip, cx, Icon, Menu, MenuItem, MenuSeparator } from "@agentesc
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useChannels, useThreadMutation, useThreadRange } from "@/api/queries";
+import { useChannels, useDms, useThreadMutation, useThreadRange } from "@/api/queries";
 import type { ThreadInfo } from "@/api/types";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { NavToggle } from "@/components/NavDrawer";
@@ -23,7 +23,27 @@ import "./threads.css";
  * the channel's (ChannelPage in thread mode).
  */
 
-/** "thread em #produto · Walter, Ana e Dev". */
+/**
+ * Where a thread lives, in people's words: "#produto", or "DM com Theo"
+ * (the DM's other side; never "thread numa mensagem direta").
+ */
+export function useThreadWhere(thread: ThreadInfo) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dms = useDms(org.id);
+  const dir = useDirectory(org.id);
+  if (thread.channelKind !== "dm") return `#${thread.channelName}`;
+  const dm = dms.data?.find((d) => d.channelId === thread.channelId);
+  const others = thread.participants.flatMap((p) =>
+    p.id && !(p.type === "person" && p.id === me.user.id)
+      ? [dir.authorName({ type: p.type, id: p.id } as Parameters<typeof dir.authorName>[0])]
+      : [],
+  );
+  const name = dm?.with.name ?? joinNames(others.slice(0, 3), t("newAgent.and"));
+  return name ? t("threads.view.dmWith", { name }) : t("threads.dm");
+}
+
+/** "#produto · Walter, Ana e Dev". */
 function useWho(thread: ThreadInfo) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -115,8 +135,7 @@ export function ThreadHeader({ thread }: { thread: ThreadInfo }) {
   const navigate = useNavigate();
   const who = useWho(thread);
   const channelParams = { orgId: org.id, channelId: thread.channelId };
-  const where =
-    thread.channelKind === "dm" ? t("threads.view.inDm") : t("threads.view.in", { channel: thread.channelName });
+  const where = useThreadWhere(thread);
   const archived = thread.state === "archived";
   const more = t("threads.view.more");
   return (
@@ -127,7 +146,8 @@ export function ThreadHeader({ thread }: { thread: ThreadInfo }) {
         variant="ghost"
         iconOnly
         icon="chevronLeft"
-        aria-label={t("threads.view.back", { channel: thread.channelName })}
+        aria-label={t("threads.view.backTo", { where })}
+        title={t("threads.view.backTo", { where })}
         onClick={() => void navigate({ to: "/org/$orgId/c/$channelId", params: channelParams })}
       />
       <div className="thread-head__text">
@@ -135,7 +155,7 @@ export function ThreadHeader({ thread }: { thread: ThreadInfo }) {
           <Icon name="thread" size={18} />
           <ThreadTitle thread={thread} />
         </h1>
-        <span className="channel__topic">{who ? `${where} · ${who}` : where}</span>
+        <span className="channel__topic">{who && thread.channelKind !== "dm" ? `${where} · ${who}` : where}</span>
       </div>
       {thread.state !== "open" && <ThreadStatusChip thread={thread} />}
       <Menu

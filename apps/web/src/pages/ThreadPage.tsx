@@ -6,7 +6,7 @@ import { useThreadMission } from "@/api/missions";
 import { useThreadInfo } from "@/api/queries";
 import { ErrorState } from "@/components/Loading";
 import { Main } from "@/components/Main";
-import { MissionJoinNote, MissionPinned } from "@/components/missions/MissionPinned";
+import { MissionJoinNote, MissionThreadHeader } from "@/components/missions/MissionHeader";
 import { useOrg } from "@/components/org-context";
 import { ArchivedNote, ContextBlock, ThreadHeader, ThreadOrigin } from "@/components/threads/ThreadView";
 import { isOpenMission } from "@/lib/missions";
@@ -16,7 +16,7 @@ import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
  * A thread (ThreadContexto.html): its header, where it came from and its
  * context block on top, then its conversation with the channel's own rows,
  * live runs and composer (ChannelPage in thread mode). Archived: read only.
- * A mission's thread has the mission pinned on top (ThreadContexto.html, "App mobile").
+ * A mission's thread has the mission as its header (plan strip, what runs, sessions).
  */
 export function ThreadPage({
   threadId,
@@ -32,7 +32,7 @@ export function ThreadPage({
   const { org } = useOrg();
   const info = useThreadInfo(org.id, threadId);
   const thread = info.data;
-  // A thread with a mission (ADR 0029): the mission pinned on top; who only reads gets a note.
+  // A thread with a mission (ADR 0029): the mission header; who only reads gets a note.
   const mission = useThreadMission(org.id, threadId).data ?? null;
   const channelId = thread?.channelId;
   // "Responder" on a closed thread's line: straight to the composer.
@@ -76,10 +76,10 @@ export function ThreadPage({
         createdAt: thread.createdAt,
       }}
       chrome={{
-        header: <ThreadHeader thread={thread} />,
+        // A mission's thread: its header is the mission's (no card floating over the messages).
+        header: mission ? <MissionThreadHeader thread={thread} mission={mission} /> : <ThreadHeader thread={thread} />,
         top: (
           <>
-            {mission && <MissionPinned mission={mission} />}
             <ThreadOrigin thread={thread} />
             <ContextBlock thread={thread} />
           </>

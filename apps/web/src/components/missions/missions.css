@@ -310,76 +310,136 @@ button.mi-pill--need:hover {
   height: 32px;
 }
 
-/* ── Pinned card ─────────────────────────────────────────────────────────── */
-.mi-pinned {
-  position: sticky;
-  top: -8px;
-  z-index: 6;
-  margin: 0 12px 8px;
-  padding: 12px 14px 0;
-  border-radius: 18px;
-  background: var(--raised);
-  box-shadow: var(--e2), var(--top);
-  animation: mi-pop 0.32s var(--spring) both;
+/* ── The mission header (a mission's thread: the thread header is the mission's) ─
+   One grid: the lead (back, the agent), the text column, the folded strip and
+   the controls; the strip and the computer note sit under the text column, so
+   every block starts on the title's left edge. Part of the layout, above the
+   messages (never floating over them). */
+.mh.channel__header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 8px;
 }
-.mi-pinned__head {
+.mh__row {
+  display: contents;
+}
+.mh__lead {
+  grid-column: 1;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.mi-pinned__title {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
 }
-.mi-pinned__title b {
+.mh__text {
+  grid-column: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mh__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.mh__title.channel__title {
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14.5px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
 }
-.mi-pinned__lab {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--faint);
+.mh__line > .ac-chip,
+.mh__exec {
+  flex: none;
 }
-.mi-pinned__strip {
+.mh__mini {
+  grid-column: 3;
+  display: none;
+}
+.mh__end {
+  grid-column: 4;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
+}
+.mh__strip,
+.mh__note {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  margin-top: 10px;
+}
+.mh__note {
   font-size: 13px;
   color: var(--ink2);
 }
-.mi-pinned__strip b {
+.mh__items {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-right: 4px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.mh__items b {
   font-weight: 650;
   white-space: nowrap;
 }
-.mi-pinned__pills {
-  padding: 8px 0 12px;
+.mh__sessions {
+  cursor: pointer;
 }
-.mi-pinned__sessions {
-  margin: 0 -14px;
-  border-top: 1px solid var(--line);
+.mh__sessions .ac-icon {
+  margin-right: -2px;
 }
-.mi-pinned__sessions .mi-sessions {
-  margin: 0;
-  max-width: none;
-  border-radius: 0 0 18px 18px;
-  box-shadow: none;
+/* Reading back: one compact row (title, state, strip). */
+.mh[data-compact] {
+  row-gap: 0;
+}
+.mh[data-compact] .mh__meta,
+.mh[data-compact] .mh__exec,
+.mh[data-compact] .mh__strip,
+.mh[data-compact] .mh__note {
+  display: none;
+}
+.mh[data-compact] .mh__mini {
+  display: flex;
+}
+@media (max-width: 760px) {
+  .mh.channel__header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 8px 12px;
+  }
+  .mh__end {
+    grid-column: 3;
+  }
+  .mh__mini,
+  .mh[data-compact] .mh__mini,
+  .mh__exec,
+  .mh__files-label {
+    display: none;
+  }
+  .mh__strip {
+    grid-column: 1 / -1;
+  }
 }
 
 /* ── Sessions: one row per session (status, title, one human line, time, PR) ─ */
+/* In the sessions dialog: the rows fill the dialog's reading width. */
+.mi-sessions.mi-sessions--flat {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mi-sessions--flat > li:first-child > .mi-session {
+  border-top: 0;
+}
 .mi-sessions {
   max-width: 640px;
   margin-top: 10px;
@@ -1181,11 +1241,6 @@ a.mi-pr:hover {
 }
 
 @media (max-width: 760px) {
-  .mi-pinned {
-    position: relative;
-    top: 0;
-    margin: 0 4px 8px;
-  }
   .mi-card {
     padding: 14px;
   }
@@ -1232,7 +1287,6 @@ a.mi-pr:hover {
 
 @media (prefers-reduced-motion: reduce) {
   .mi-card,
-  .mi-pinned,
   .mi-evt,
   .mi-mc,
   .mi-md__l[data-fresh],

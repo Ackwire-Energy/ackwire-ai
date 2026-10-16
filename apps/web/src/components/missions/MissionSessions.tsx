@@ -1,8 +1,8 @@
-import { Button, Icon, type IconName } from "@agenteschat/ui";
+import { Button, DetailsDialog, Icon, type IconName, Segmented } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useTaskOutput } from "@/api/missions";
-import type { MachineTask } from "@/api/types";
+import type { MachineTask, Mission } from "@/api/types";
 import { AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { formatTime } from "@/lib/format";
@@ -69,6 +69,75 @@ export function SessionRows({
         </div>
       )}
     </div>
+  );
+}
+
+type SessionFilter = "all" | "running" | "done" | "failed";
+const FILTERS: SessionFilter[] = ["all", "running", "done", "failed"];
+const inFilter = (task: MachineTask, f: SessionFilter) =>
+  f === "all" ||
+  (f === "running" && (task.status === "running" || task.status === "queued")) ||
+  (f === "done" && task.status === "done") ||
+  (f === "failed" && (task.status === "failed" || task.status === "interrupted" || task.status === "canceled"));
+
+/**
+ * "N sessões ›" from the mission header: every executor session in the
+ * shared details dialog, filtered Todas / Rodando / Concluídas / Falharam
+ * (with counts); a session opens in place ("O que mudou", "Ver saída" with
+ * the live log).
+ */
+export function SessionsDialog({
+  mission,
+  tasks,
+  onClose,
+}: {
+  mission: Pick<Mission, "title" | "machine">;
+  tasks: MachineTask[];
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [filter, setFilter] = useState<SessionFilter>("all");
+  const running = tasks.filter((x) => x.status === "running").length;
+  const now = useNow(running > 0);
+  const shown = tasks.filter((x) => inFilter(x, filter));
+  return (
+    <DetailsDialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      closeLabel={t("common.close")}
+      className="mi-sessions-dialog"
+      eyebrow={t("missions.sessions.eyebrow", { title: mission.title })}
+      title={t("missions.sessions.title")}
+      subtitle={
+        <span>
+          {t("missions.sessions.count", { count: tasks.length })}
+          {mission.machine && ` · ${mission.machine.name}`}
+        </span>
+      }
+    >
+      <Segmented
+        size="sm"
+        label={t("missions.sessions.filterLabel")}
+        value={filter}
+        onValueChange={setFilter}
+        options={FILTERS.map((f) => ({
+          value: f,
+          label: t(`missions.sessions.filter.${f}`),
+          count: f === "all" ? undefined : tasks.filter((x) => inFilter(x, f)).length,
+        }))}
+      />
+      {shown.length === 0 ? (
+        <p className="mi-session__none">{t("missions.sessions.noneHere")}</p>
+      ) : (
+        <ul className="mi-sessions mi-sessions--flat" aria-label={t("missions.sessions.title")}>
+          {shown.map((task) => (
+            <li key={task.id}>
+              <SessionRow task={task} now={now} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </DetailsDialog>
   );
 }
 

@@ -135,6 +135,11 @@ export function useMissionCommands(orgId: string, missionId: string | null | und
   const api = useApi();
   return useMissionPart(orgId, missionId, "commands", () => api.missions.commands(orgId, missionId ?? ""));
 }
+/** The delivery cards (`complete_mission`, or the automatic "Tudo pronto"), newest first. */
+export function useMissionDeliveries(orgId: string, missionId: string | null | undefined) {
+  const api = useApi();
+  return useMissionPart(orgId, missionId, "deliveries", () => api.missions.deliveries(orgId, missionId ?? ""));
+}
 export function useMissionReviews(orgId: string, missionId: string | null | undefined) {
   const api = useApi();
   return useMissionPart(orgId, missionId, "reviews", () => api.missions.reviews(orgId, missionId ?? ""));

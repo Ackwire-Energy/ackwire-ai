@@ -153,12 +153,23 @@ export function MissionStrip({
   return <PlanStrip cells={cells} color={colorOf(dir.agentById.get(agentId))} label={label} titles={hints} />;
 }
 
-export type MissionStatusKey = "needsYou" | "proposed" | "working" | "active" | "paused" | "done" | "canceled";
+export type MissionStatusKey =
+  | "needsYou"
+  | "proposed"
+  | "working"
+  | "active"
+  | "paused"
+  | "awaitingClose"
+  | "readyToClose"
+  | "done"
+  | "canceled";
 
 export function missionStatusKey(m: Pick<Mission, "status" | "runningTasks" | "pending" | "canAct">): MissionStatusKey {
   if (m.status === "done" || m.status === "canceled" || m.status === "proposed" || m.status === "paused") {
     return m.status;
   }
+  // Everything done, nothing runs: on whoever concludes it (the others read "Pronta para concluir").
+  if (m.status === "awaiting_close") return m.canAct ? "awaitingClose" : "readyToClose";
   const waiting = m.canAct && m.pending.decisions + m.pending.reviews + m.pending.provisional + m.pending.commands > 0;
   if (waiting) return "needsYou";
   return m.runningTasks > 0 ? "working" : "active";
@@ -169,6 +180,7 @@ export function missionSummaryStatusKey(m: Pick<ThreadMissionSummary, "status" |
   if (m.status === "done" || m.status === "canceled" || m.status === "proposed" || m.status === "paused") {
     return m.status;
   }
+  if (m.status === "awaiting_close") return m.waitingYou > 0 ? "awaitingClose" : "readyToClose";
   if (m.waitingYou > 0) return "needsYou";
   return working ? "working" : "active";
 }
@@ -179,6 +191,8 @@ const STATUS_ICON: Record<MissionStatusKey, IconName> = {
   working: "spinner",
   active: "play",
   paused: "pause",
+  awaitingClose: "flag",
+  readyToClose: "flag",
   done: "check",
   canceled: "close",
 };
@@ -201,7 +215,7 @@ export function MissionStatusChip({
     <Chip
       icon={STATUS_ICON[key]}
       lead={key === "working" && who ? <AgentSpinner agentId={who} /> : undefined}
-      tone={key === "needsYou" ? "waiting" : "neutral"}
+      tone={key === "needsYou" || key === "awaitingClose" ? "waiting" : "neutral"}
     >
       {t(`missions.status.${key}`)}
     </Chip>
