@@ -35,6 +35,29 @@ export type ActivityKind =
   | "updatingRoutine"
   | "openingForumTopic"
   | "postingInForum"
+  | "proposingMission"
+  | "messagingMission"
+  | "updatingPlan"
+  | "reportingProgress"
+  | "askingDecision"
+  | "requestingReview"
+  | "requestingApproval"
+  | "startingTask"
+  | "listingTasks"
+  | "checkingTask"
+  | "cancelingTask"
+  | "uploadingArtifact"
+  | "gettingContext"
+  | "cancelingReminder"
+  | "listingReminders"
+  | "listingRoutines"
+  | "startingComputer"
+  | "stoppingComputer"
+  | "checkingComputer"
+  | "writingWiki"
+  | "readingWiki"
+  | "linkingWiki"
+  | "readingForum"
   | "usingTool";
 
 export interface Activity {
@@ -81,6 +104,33 @@ const BUILTIN: Record<string, ActivityKind> = {
   // The forum.
   open_forum_topic: "openingForumTopic",
   post_in_forum: "postingInForum",
+  read_forum_topic: "readingForum",
+  read_skill_file: "consultingSkill",
+  // Missions (the agent's tools and the executor's MCP tools).
+  propose_mission: "proposingMission",
+  send_to_mission: "messagingMission",
+  update_plan: "updatingPlan",
+  report: "reportingProgress",
+  ask_decision: "askingDecision",
+  request_review: "requestingReview",
+  request_approval: "requestingApproval",
+  start_task: "startingTask",
+  list_tasks: "listingTasks",
+  task_status: "checkingTask",
+  cancel_task: "cancelingTask",
+  upload_artifact: "uploadingArtifact",
+  get_context: "gettingContext",
+  cancel_reminder: "cancelingReminder",
+  list_reminders: "listingReminders",
+  list_routines: "listingRoutines",
+  computer_start: "startingComputer",
+  computer_stop: "stoppingComputer",
+  computer_status: "checkingComputer",
+  create_wiki_page: "writingWiki",
+  update_wiki_page: "writingWiki",
+  read_wiki_page: "readingWiki",
+  search_wiki: "readingWiki",
+  link_to_wiki: "linkingWiki",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */
@@ -133,8 +183,15 @@ export function toolActivity(
   connector?: string | null,
   detail?: string | null,
 ): Activity {
-  const name = (tool ?? "").trim().toLowerCase();
+  let name = (tool ?? "").trim().toLowerCase();
   if (!name) return { kind: "thinking" };
+  // An executor's MCP tool (`mcp__agentes__update_plan`): ours by its own name; another server's is that app.
+  const mcp = /^mcp__([^_]+(?:_[^_]+)*)__(.+)$/.exec(name);
+  if (mcp) {
+    const [, server = "", rest = ""] = mcp;
+    if (server !== "agentes" && !BUILTIN[rest]) return { kind: "consulting", app: CONNECTORS[server] ?? server };
+    name = rest;
+  }
   // "Theo está abrindo a skill Revisão de PR…", or "consultando uma skill" without the name.
   if (name === "run_skill_script") {
     return detail?.trim() ? { kind: "runningSkillScript", app: detail.trim() } : { kind: "runningSkillScriptAny" };
