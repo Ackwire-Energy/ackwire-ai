@@ -1801,6 +1801,9 @@ export interface PlanItem {
   note?: string;
 }
 
+/** Who programs a mission: Claude Code, Codex (experimental) or the agent itself with its own tools. */
+export type MissionExecutor = "claude" | "codex" | "agent";
+
 export interface Mission {
   id: string;
   /** The home thread (root message id). */
@@ -1808,7 +1811,7 @@ export interface Mission {
   channelId: string;
   agentId: string;
   ownerId: string | null;
-  /** "claude" | "codex". */
+  /** "claude" | "codex" | "agent". */
   executor: string;
   title: string;
   goal: string;
@@ -1836,7 +1839,16 @@ export interface Mission {
   /** You asked to join and nobody answered yet. */
   joinRequested: boolean;
   runningTasks: number;
-  machine: { id: string; name: string; online: boolean; lentBy: string | null } | null;
+  machine: {
+    id: string;
+    name: string;
+    online: boolean;
+    lentBy: string | null;
+    /** Who can program on that computer (the plan card switches before Start). */
+    executors: MissionExecutor[];
+    /** Codex is installed but too old for missions. */
+    codexTooOld: boolean;
+  } | null;
   /** Handed over without a computer: the owner sets one. */
   needsComputer: boolean;
   /** Your role in it. */
@@ -1897,6 +1909,10 @@ export interface MissionEligibleAgent {
   name: string;
   machine: { id: string; name: string; online: boolean };
   ready: boolean;
+  /** Who can program on its computer ("Quem programa"), and the default. */
+  executors: MissionExecutor[];
+  defaultExecutor: MissionExecutor;
+  codexTooOld: boolean;
 }
 
 /** "Ver saída": the last lines of a task, from the computer or what the server kept. */
@@ -1918,6 +1934,8 @@ export interface MissionCreateInput {
   threadId?: string;
   /** The repository on the computer, relative to the agent's folder. */
   folder?: string;
+  /** Default: Claude Code when the computer has it, else the agent itself. */
+  executor?: MissionExecutor;
 }
 
 export interface MissionDecision {

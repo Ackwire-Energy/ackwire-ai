@@ -7,6 +7,7 @@ import type {
   Mission,
   MissionControl,
   MissionCreateInput,
+  MissionExecutor,
   MissionListQuery,
   MissionParticipantRole,
 } from "./types";
@@ -208,6 +209,21 @@ export function useCreateMission(orgId: string) {
     meta: { silent: true },
     mutationFn: (input: MissionCreateInput) => api.missions.create(orgId, input),
     onSuccess: (mission) => cacheMission(qc, orgId, mission),
+  });
+}
+
+/** "Quem programa", before Start (the owner's). */
+export function useSetMissionExecutor(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: ({ missionId, executor }: { missionId: string; executor: MissionExecutor }) =>
+      api.missions.setExecutor(orgId, missionId, executor),
+    onSuccess: (mission) => {
+      cacheMission(qc, orgId, mission);
+      void qc.invalidateQueries({ queryKey: keys.threadTasks(orgId, mission.threadId) });
+    },
   });
 }
 

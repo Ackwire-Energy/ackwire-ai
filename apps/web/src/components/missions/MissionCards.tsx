@@ -1,4 +1,4 @@
-import { Button, Chip, Icon, type IconName, RadioCard, RadioGroup, Skeleton, Textarea } from "@agenteschat/ui";
+import { Button, Chip, Icon, type IconName, RadioCard, RadioGroup, Select, Skeleton, Textarea } from "@agenteschat/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -12,12 +12,14 @@ import {
   useMissionDecisions,
   useMissionPlan,
   useMissionReviews,
+  useSetMissionExecutor,
   useThreadTasks,
 } from "@/api/missions";
 import type {
   Message,
   Mission,
   MissionDecision,
+  MissionExecutor,
   MissionPlanMeta,
   MissionReportMeta,
   MissionSuggestionMeta,
@@ -38,9 +40,10 @@ import {
   planCounts,
   summaryParts,
   taskNoticeOf,
+  viaText,
 } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
-import { useMissionPanel } from "./MissionBits";
+import { executorOptions, useMissionPanel } from "./MissionBits";
 import { SessionRows } from "./MissionSessions";
 
 /**
@@ -89,9 +92,14 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
   const mission = useMission(org.id, meta.missionId);
   const plan = useMissionPlan(org.id, meta.missionId);
   const control = useMissionControl(org.id);
+  const switchExecutor = useSetMissionExecutor(org.id);
   const stamp = useStamp();
   const m = mission.data;
-  const executor = executorName(meta.executor);
+  const agentName = dir.agentById.get(m?.agentId ?? "")?.name ?? "";
+  const current = m?.executor ?? meta.executor;
+  const executor = executorName(current, agentName);
+  // Before Start the owner may switch who programs, among those the computer can run.
+  const choices = m?.role === "owner" && m.status === "proposed" ? (m.machine?.executors ?? []) : [];
   const items = (plan.data?.current?.items ?? []).filter((i) => i.status !== "dropped");
   const computer = m?.machine?.name ?? meta.computer;
   const seePlan = () => panel?.openFiles(meta.missionId, "mission.md");
@@ -176,6 +184,30 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
           })}
         </span>
       </div>
+      {m && choices.length > 1 && (
+        <div className="mi-plan__meta">
+          <Icon name="code" size={14} />
+          <span>{t("missions.new.who")}</span>
+          <div style={{ minWidth: 200 }}>
+            <Select
+              size="sm"
+              aria-label={t("missions.new.who")}
+              value={current}
+              disabled={switchExecutor.isPending}
+              onValueChange={(v) =>
+                switchExecutor.mutate(
+                  { missionId: m.id, executor: v as MissionExecutor },
+                  {
+                    onSuccess: () => toast.show(t("missions.plan.switched", { executor: executorName(v, agentName) })),
+                    onError: (error) => toast.show(errorText(t, error), "error"),
+                  },
+                )
+              }
+              options={executorOptions(t, choices, agentName)}
+            />
+          </div>
+        </div>
+      )}
       <div className="mi-plan__foot">
         {m?.role === "owner" && (
           <Button variant="primary" size="sm" icon="check" loading={control.isPending} onClick={start}>
@@ -231,7 +263,7 @@ function DecisionBody({ decision: d, mission: m }: { decision: MissionDecision; 
   const choose = useMissionAct(org.id, m.id, (option: string) => api.missions.choose(org.id, m.id, d.id, option));
   const opine = useMissionAct(org.id, m.id, (option: string) => api.missions.opinion(org.id, m.id, d.id, option));
   const name = (id: string | null) => (id ? (dir.memberById.get(id)?.name ?? t("missions.someone")) : "");
-  const executor = executorName(m.executor);
+  const agentName = dir.agentById.get(m.agentId)?.name ?? "";
   if (d.status === "taken") {
     return (
       <div className="mi-card">
@@ -293,11 +325,7 @@ function DecisionBody({ decision: d, mission: m }: { decision: MissionDecision; 
         ) : (
           <Chip icon="clock">{t("missions.decision.provisional", { option: d.chosen ?? "" })}</Chip>
         )}
-        <Chip icon="code">
-          {m.machine
-            ? t("missions.via", { executor, computer: m.machine.name })
-            : t("missions.viaNoComputer", { executor })}
-        </Chip>
+        <Chip icon="code">{viaText(t, m.executor, agentName, m.machine?.name)}</Chip>
       </div>
       <div className="mi-q">
         <h3>{d.question}</h3>
@@ -582,14 +610,14 @@ export function MissionReportExtras({ report, message }: { report: MissionReport
   const { org } = useOrg();
   const tasks = useThreadTasks(org.id, message.threadId);
   const task = report.main ? undefined : tasks.data?.find((x) => x.id === report.taskId);
-  const executor = executorName(report.executor);
+  const dir = useDirectory(org.id);
+  const agentName =
+    message.author.type === "agent" && message.author.id ? (dir.agentById.get(message.author.id)?.name ?? "") : "";
   return (
     <>
       <span className="mi-tag">
         <Icon name="code" size={14} />
-        {report.computer
-          ? t("missions.via", { executor, computer: report.computer })
-          : t("missions.viaNoComputer", { executor })}
+        {viaText(t, report.executor, agentName, report.computer)}
       </span>
       {task && <SessionRows tasks={[task]} defaultOpen />}
     </>

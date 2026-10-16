@@ -1,7 +1,8 @@
 import { Chip, Icon, type IconName, PlanStrip } from "@agenteschat/ui";
+import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Mission, MissionFileName } from "@/api/types";
+import type { Mission, MissionExecutor, MissionFileName } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -14,6 +15,18 @@ import "./missions.css";
  * the state chip (an icon and a word, never a dot), the computer chip, a
  * ticking clock, and the files panel any card can open.
  */
+
+/**
+ * "Quem programa": Claude Code, Codex (experimental) or the agent itself,
+ * only those its computer can run, each with one line on what it means.
+ */
+export function executorOptions(t: TFunction, executors: MissionExecutor[], agentName: string) {
+  return executors.map((e) => ({
+    value: e,
+    label: t(`missions.executor.${e}` as const, { name: agentName }),
+    description: t(`missions.executor.${e}Text` as const, { name: agentName }),
+  }));
+}
 
 /** Re-renders every `ms` while `active` (live durations). */
 export function useNow(active: boolean, ms = 1000) {

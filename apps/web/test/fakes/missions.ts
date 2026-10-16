@@ -107,6 +107,9 @@ export function createFakeMissions(
         name: a.name,
         machine: { id: "machine_1", name: "MacBook", online: true },
         ready: true,
+        executors: ["claude", "codex", "agent"] as ("claude" | "codex" | "agent")[],
+        defaultExecutor: "claude" as const,
+        codexTooOld: false,
       })),
     taskOutput: async (orgId, taskId) => {
       const s = await store(orgId);
@@ -175,7 +178,7 @@ export function createFakeMissions(
         channelId: input.channelId ?? (await ctx.lookup.channels(orgId))[0]?.id ?? "",
         agentId: input.agentId,
         ownerId: me?.user.id ?? null,
-        executor: "claude",
+        executor: input.executor ?? "claude",
         title: input.title ?? input.goal.slice(0, 60),
         goal: input.goal,
         status: "proposed",
@@ -185,7 +188,14 @@ export function createFakeMissions(
         pending: { decisions: 0, provisional: 0, reviews: 0, suggestions: 0, joinRequests: 0 },
         joinRequested: false,
         runningTasks: 1,
-        machine: { id: "machine_1", name: "MacBook", online: true, lentBy: null },
+        machine: {
+          id: "machine_1",
+          name: "MacBook",
+          online: true,
+          lentBy: null,
+          executors: ["claude", "codex", "agent"],
+          codexTooOld: false,
+        },
         needsComputer: false,
         role: "owner",
         canAct: true,
@@ -263,10 +273,28 @@ export function createFakeMissions(
       touch(m, { ownerId: input.userId, role: "decide", canManage: false });
       return clone(m);
     },
+    setExecutor: async (orgId, missionId, executor) => {
+      log("missions.setExecutor", orgId, missionId, executor);
+      const m = await find(orgId, missionId);
+      if (m.status !== "proposed")
+        throw new ApiError(409, "mission.wrong_status", "Who programs is chosen before Start");
+      touch(m, { executor });
+      return clone(m);
+    },
     setMachine: async (orgId, missionId, machineId) => {
       log("missions.setMachine", orgId, missionId, machineId);
       const m = await find(orgId, missionId);
-      touch(m, { machine: { id: machineId, name: "Computer", online: true, lentBy: null }, needsComputer: false });
+      touch(m, {
+        machine: {
+          id: machineId,
+          name: "Computer",
+          online: true,
+          lentBy: null,
+          executors: ["claude", "agent"],
+          codexTooOld: false,
+        },
+        needsComputer: false,
+      });
       return clone(m);
     },
     decisions: async (orgId, missionId) =>

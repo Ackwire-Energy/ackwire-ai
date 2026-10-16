@@ -290,8 +290,21 @@ export function taskNoticeOf(meta: Message["meta"]): { code: string; params: Rec
   return { code, params: Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v ?? "")])) };
 }
 
-/** An executor's name for people ("Claude Code", "Codex"): a product, not jargon. */
-export const executorName = (executor: string) => (executor === "codex" ? "Codex" : "Claude Code");
+/**
+ * Who programs, for people: "Claude Code", "Codex" (products, not jargon),
+ * or the agent's own name when it does the work itself.
+ */
+export const executorName = (executor: string, agentName = "") =>
+  executor === "codex" ? "Codex" : executor === "agent" ? agentName : "Claude Code";
+
+/** "via Claude Code no MacBook", or "Dev no MacBook" when the agent itself works there. */
+export function viaText(t: TFunction, executor: string, agentName: string, computer: string | null | undefined) {
+  if (executor === "agent") {
+    return computer ? t("missions.byAgent", { agent: agentName, computer }) : agentName;
+  }
+  const name = executorName(executor);
+  return computer ? t("missions.via", { executor: name, computer }) : t("missions.viaNoComputer", { executor: name });
+}
 
 // ── The `.agentes/` files, as the panel draws them ───────────────────────────
 

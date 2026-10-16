@@ -32,7 +32,7 @@ import {
   useMissionParticipants,
 } from "@/api/missions";
 import { useChannels } from "@/api/queries";
-import type { Mission, MissionParticipantRole } from "@/api/types";
+import type { Mission, MissionExecutor, MissionParticipantRole } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -40,6 +40,7 @@ import { canTalk } from "@/lib/audience";
 import { errorText } from "@/lib/errors";
 import { executorName } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
+import { executorOptions } from "./MissionBits";
 import "./missions.css";
 
 /**
@@ -80,7 +81,17 @@ export function NewMissionDialog({
   const ready = eligible.data ?? [];
   const agents = ready.flatMap((e) => {
     const a = dir.agentById.get(e.agentId);
-    return a ? [{ ...a, machine: e.machine }] : [];
+    return a
+      ? [
+          {
+            ...a,
+            machine: e.machine,
+            executors: e.executors ?? [],
+            defaultExecutor: e.defaultExecutor,
+            codexTooOld: e.codexTooOld,
+          },
+        ]
+      : [];
   });
   const [goal, setGoal] = useState(initialGoal);
   const [agentId, setAgentId] = useState(initialAgentId ?? "");
@@ -90,6 +101,10 @@ export function NewMissionDialog({
   const [error, setError] = useState<string | null>(null);
   const agent = agents.find((a) => a.id === agentId) ?? agents[0];
   const machine = agent?.machine ?? null;
+  // "Quem programa": only who can work on that computer; default Claude Code when it's there, else the agent.
+  const [picked, setPicked] = useState<MissionExecutor | null>(null);
+  const executor: MissionExecutor | undefined =
+    agent && picked && agent.executors.includes(picked) ? picked : agent?.defaultExecutor;
   // Nobody can run one yet: where to connect a computer (an agent I can talk to).
   const setupAgent = dir.agents.find((a) => canTalk(a));
   const none = eligible.isSuccess && agents.length === 0;
@@ -107,7 +122,7 @@ export function NewMissionDialog({
       }
     }
     create.mutate(
-      { agentId: agent.id, goal: goal.trim(), channelId: where },
+      { agentId: agent.id, goal: goal.trim(), channelId: where, ...(executor ? { executor } : {}) },
       {
         onSuccess: (mission) => {
           onOpenChange(false);
@@ -191,6 +206,23 @@ export function NewMissionDialog({
                 {machine && <small>{machine.online ? t("missions.online") : t("missions.offline")}</small>}
               </span>
             </div>
+          </div>
+        )}
+        {agent && agent.executors.length > 0 && (
+          <div className="mi-field">
+            <span className="mi-field__label">{t("missions.new.who")}</span>
+            <Select
+              aria-label={t("missions.new.who")}
+              value={executor}
+              onValueChange={(v) => setPicked(v as MissionExecutor)}
+              options={executorOptions(t, agent.executors, agent.name)}
+            />
+            {agent.codexTooOld && (
+              <span className="mi-hint">
+                <Icon name="info" size={14} />
+                {t("missions.new.codexOld", { computer: agent.machine.name })}
+              </span>
+            )}
           </div>
         )}
         <div className="mi-field">
@@ -590,7 +622,7 @@ export function ShareMissionDialog({
         width={480}
         title={t("missions.share.handTitle", { name: handing?.name ?? "" })}
         description={t("missions.share.handText", {
-          executor: executorName(mission.executor),
+          executor: executorName(mission.executor, dir.agentById.get(mission.agentId)?.name ?? ""),
           name: handing?.name ?? "",
         })}
         closeLabel={t("common.cancel")}

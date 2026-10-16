@@ -60,6 +60,7 @@ import type {
   MissionCreateInput,
   MissionDecision,
   MissionEligibleAgent,
+  MissionExecutor,
   MissionFiles,
   MissionJoinRequest,
   MissionList,
@@ -467,6 +468,8 @@ export interface ApiClient {
     ): Promise<Mission & { code?: string }>;
     /** Its owner points it at a computer they paired (new sessions start from the mission files). */
     setMachine(orgId: string, missionId: string, machineId: string, repoDir?: string): Promise<Mission>;
+    /** Before Start, its owner switches who programs (the planning starts again). */
+    setExecutor(orgId: string, missionId: string, executor: MissionExecutor): Promise<Mission>;
     decisions(orgId: string, missionId: string): Promise<MissionDecision[]>;
     choose(orgId: string, missionId: string, decisionId: string, option: string): Promise<MissionDecision>;
     opinion(orgId: string, missionId: string, decisionId: string, option: string): Promise<MissionDecision>;

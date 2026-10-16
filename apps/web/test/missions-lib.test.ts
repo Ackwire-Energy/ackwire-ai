@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { MachineTask, Message, Mission } from "@/api/types";
 import { threadRootsToLoad } from "@/chat/timeline";
+import { executorOptions } from "@/components/missions/MissionBits";
 import { createI18n } from "@/i18n";
 import {
   appendOutputLine,
   cellsFromCounts,
   editDiff,
+  executorName,
   formatSpan,
   isOpenMission,
   machineTaskOf,
@@ -28,6 +30,7 @@ import {
   taskNoticeOf,
   taskPr,
   taskSeconds,
+  viaText,
   waitingParts,
   waitingText,
 } from "@/lib/missions";
@@ -53,7 +56,14 @@ const mission = (over: Partial<Mission> = {}): Mission => ({
   pending: { decisions: 2, provisional: 0, reviews: 1, suggestions: 0, joinRequests: 0 },
   joinRequested: false,
   runningTasks: 2,
-  machine: { id: "mac", name: "MacBook do Walter", online: true, lentBy: null },
+  machine: {
+    id: "mac",
+    name: "MacBook do Walter",
+    online: true,
+    lentBy: null,
+    executors: ["claude", "agent"],
+    codexTooOld: false,
+  },
   needsComputer: false,
   role: "owner",
   canAct: true,
@@ -386,5 +396,20 @@ describe("the .agentes/ files", () => {
       { kind: "add", text: "## Zustand para o estado local" },
     ]);
     expect(editDiff(undefined)).toEqual([]);
+  });
+});
+
+describe("who programs (ADR 0029, executor agent)", () => {
+  test("labels: via Claude Code / Codex on a computer, or the agent itself on it; options only for what the computer has", () => {
+    expect(executorName("claude")).toBe("Claude Code");
+    expect(executorName("codex")).toBe("Codex");
+    expect(executorName("agent", "Dev")).toBe("Dev");
+    expect(viaText(t, "claude", "Dev", "MacBook")).toBe("via Claude Code no MacBook");
+    expect(viaText(t, "agent", "Dev", "MacBook")).toBe("Dev no MacBook");
+    expect(viaText(te, "agent", "Dev", "MacBook")).toBe("Dev on MacBook");
+    expect(viaText(t, "codex", "Dev", null)).toBe("via Codex");
+    const options = executorOptions(t, ["codex", "agent"], "Dev");
+    expect(options.map((o) => o.label)).toEqual(["Codex (experimental)", "Dev (o próprio agente)"]);
+    expect(executorOptions(te, ["claude"], "Dev")[0]?.description).toContain("Claude Code plans and codes");
   });
 });

@@ -5,6 +5,7 @@ import { useMission, useMissionFiles } from "@/api/missions";
 import type { MissionFileName } from "@/api/types";
 import { ErrorState } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useDirectory } from "@/hooks/useDirectory";
 import { formatTime, relativeTime } from "@/lib/format";
 import { editDiff, executorName, type MdLine, mdLines, newLineIndexes } from "@/lib/missions";
 
@@ -43,7 +44,11 @@ export function MissionFilesPanel({
   useEffect(() => setShowDiff(Boolean(diffOpen)), [diffOpen]);
   const file = files.data?.files.find((f) => f.name === tab);
   const edit = files.data?.editedOnMachine.find((e) => e.name === tab);
-  const executor = executorName(mission.data?.executor ?? "claude");
+  const dir = useDirectory(org.id);
+  const executor = executorName(
+    mission.data?.executor ?? "claude",
+    dir.agentById.get(mission.data?.agentId ?? "")?.name ?? "",
+  );
   const content = file?.content ?? "";
   const key = `${missionId}:${tab}`;
   // The lines new since we last drew this file, and when they came.

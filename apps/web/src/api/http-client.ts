@@ -523,6 +523,8 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
             method: "PUT",
             json: { machineId, ...(repoDir ? { repoDir } : {}) },
           }),
+        setExecutor: (orgId, missionId, executor) =>
+          request<Mission>(`${one(orgId, missionId)}/executor`, { method: "PUT", json: { executor } }),
         decisions: async (orgId, missionId) =>
           (await request<{ decisions: MissionDecision[] }>(`${one(orgId, missionId)}/decisions`)).decisions,
         choose: (orgId, missionId, decisionId, option) =>
