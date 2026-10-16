@@ -311,4 +311,6 @@ export const extraIcons = {
     ["rect", { x: "3", y: "3.75", width: "14", height: "3.3", rx: "1" }],
     ["path", { d: "M4.2 7v8.2a.8.8 0 0 0 .8.8h10a.8.8 0 0 0 .8-.8V7M10 14v-4.2M7.9 11.9 10 9.8l2.1 2.1" }],
   ],
+  /** Threads.html: Missões (a flag on a pole). */
+  flag: [["path", { d: "M5 17V3.5M5 3.5h9l-1.7 3.3L14 10H5" }]],
 } satisfies Record<string, IconShape[]>;
