@@ -177,13 +177,14 @@ if (action === "keypair") {
   const pipe = (from, to) => {
     let carry = "";
     from.setEncoding("utf8");
+    // Redact first, then hold back a tail shorter than the longest secret: a value cut
+    // between two chunks is caught whole with the next one, and never leaves in pieces.
+    const keep = Math.max(0, ...secrets.map((s) => s.value.length - 1));
     from.on("data", (chunk) => {
-      // Hold back a tail as long as the longest secret, so a value split across chunks is still caught.
-      const text = carry + chunk;
-      const keep = Math.max(0, ...secrets.map((s) => s.value.length - 1));
-      const cut = Math.max(0, text.length - keep);
-      to.write(redact(text.slice(0, cut), secrets));
-      carry = text.slice(cut);
+      const out = redact(carry + chunk, secrets);
+      const cut = Math.max(0, out.length - keep);
+      to.write(out.slice(0, cut));
+      carry = out.slice(cut);
     });
     from.on("end", () => to.write(redact(carry, secrets)));
   };

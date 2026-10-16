@@ -74,7 +74,7 @@ async function doExec(
     timeoutSeconds: clampInt(req.timeoutSeconds, 1, 24 * 3600, 60),
     signal: scope.signal,
     onOutput: req.stream === true ? scope.output : undefined,
-    ...(secrets ? { env: secrets.env, redact: secrets.redact } : {}),
+    ...(secrets ? { env: secrets.env, redact: secrets.redact, redactHold: secrets.hold } : {}),
   });
 }
 

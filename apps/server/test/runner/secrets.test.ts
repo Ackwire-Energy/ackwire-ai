@@ -129,3 +129,25 @@ test("the log line names the action, never the value", () => {
   });
   expect(line).toBe("[dev] secret deliver AGENTES_DEMO_TOKEN");
 });
+
+test("live output never shows a value split between two chunks", async () => {
+  const { ctx, give } = setup();
+  await (await give(dev, "req-0005-eeee", "AGENTES_DEMO_TOKEN", { kind: "env" })).deliver();
+  const live: string[] = [];
+  const half = VALUE.length / 2;
+  const reply = (await handleRequest(
+    ctx,
+    {
+      agent: dev,
+      op: "exec",
+      command: `printf 'a=${VALUE.slice(0, half)}'; sleep 0.6; printf '${VALUE.slice(half)}\\n'`,
+      timeoutSeconds: 10,
+      stream: true,
+    },
+    { signal: new AbortController().signal, output: (_s, chunk) => live.push(chunk) },
+  )) as { stdout: string };
+  expect(live.length).toBeGreaterThan(0);
+  expect(live.join("")).toBe("a=[secret:AGENTES_DEMO_TOKEN]\n");
+  expect(live.join("")).not.toContain(VALUE.slice(0, half));
+  expect(reply.stdout).toBe("a=[secret:AGENTES_DEMO_TOKEN]\n");
+});

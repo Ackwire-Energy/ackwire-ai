@@ -160,6 +160,7 @@ export async function agentSecrets(root: string | undefined, agent: AgentScope |
   return {
     env,
     files: secrets.flatMap((s) => (s.target.kind === "file" ? [s.target.path] : [])),
+    hold: Math.max(0, ...secrets.map((s) => s.value.length - 1)),
     redact: (text: string) => redactSecrets(text, secrets),
   };
 }

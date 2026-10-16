@@ -78,6 +78,8 @@ export interface ExecOptions {
   env?: Record<string, string>;
   /** Applied to everything that leaves the machine: live chunks and the result. */
   redact?: (text: string) => string;
+  /** Live output holds back this many characters (the longest secret − 1), so a value split between chunks never leaves in pieces. */
+  redactHold?: number;
 }
 
 /** The platform shell, the way Node's own `shell: true` does it. */
@@ -136,17 +138,26 @@ export function runCommand(opts: ExecOptions): Promise<ExecReply> {
     const decoders = { stdout: new StringDecoder("utf8"), stderr: new StringDecoder("utf8") };
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    const flush = () => {
+    const held = { stdout: "", stderr: "" };
+    const hold = opts.redact ? Math.max(0, opts.redactHold ?? 0) : 0;
+    const flush = (final = false) => {
       if (!opts.onOutput) return;
       for (const stream of ["stdout", "stderr"] as const) {
-        const chunk = pending[stream];
+        // Redacted before cutting: the tail kept for next time can't split a value that was caught.
+        let chunk = pending[stream];
         pending[stream] = "";
+        if (opts.redact) {
+          const out = clean(held[stream] + chunk);
+          const cut = final ? out.length : Math.max(0, out.length - hold);
+          held[stream] = out.slice(cut);
+          chunk = out.slice(0, cut);
+        }
         if (chunk && streamed < MAX_STREAMED_BYTES) {
           const room = MAX_STREAMED_BYTES - streamed;
           const piece = chunk.length > room ? chunk.slice(0, room) : chunk;
           streamed += Buffer.byteLength(piece);
           try {
-            opts.onOutput(stream, clean(piece));
+            opts.onOutput(stream, piece);
           } catch {
             // the connection went away; the result still has it
           }
@@ -191,7 +202,7 @@ export function runCommand(opts: ExecOptions): Promise<ExecReply> {
       opts.signal?.removeEventListener("abort", onAbort);
       if (opts.onOutput) {
         for (const stream of ["stdout", "stderr"] as const) pending[stream] += decoders[stream].end();
-        flush();
+        flush(true);
       }
       // A background process may hold the pipes open; don't wait for it.
       child.stdout?.destroy();
