@@ -368,6 +368,9 @@ export function WorkSweep({
 export const STRIP_CELL = 7;
 export const STRIP_GAP = 2;
 
+/** A plan item's cell in the strip: done, doing, waiting for a person, stopped with the computer, dropped, to do. */
+export type PlanStripCell = "done" | "doing" | "waiting" | "stopped" | "dropped" | "todo";
+
 /**
  * One pixel of a plan cell (`null`: left empty), in the agent's tones
  * (`bodyTones`: 0 deep … 4 lightest). `t` in seconds, or null when still.

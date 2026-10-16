@@ -2697,6 +2697,32 @@ a.ac-list__row:focus-visible {
   color: var(--muted);
   cursor: pointer;
   transition: color 0.2s;
+  flex: none;
+  white-space: nowrap;
+}
+/* A count inside a segment ("Missões 1"): neutral chip, the segment grows to fit. */
+.ac-seg__count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ac-seg__item[data-on] .ac-seg__count {
+  color: var(--ink2);
+}
+.ac-seg--sm .ac-seg__count {
+  min-width: 16px;
+  height: 16px;
+  font-size: 11px;
 }
 .ac-seg--sm .ac-seg__item {
   height: 26px;
@@ -4315,10 +4341,21 @@ a.ac-list__row:focus-visible {
 
 /* A mission's plan in pixels (PlanStrip): one cell per item, scaled down whole when long. */
 .ac-plan-strip {
+  position: relative;
   display: inline-flex;
   min-width: 0;
   max-width: 100%;
   flex: none;
+}
+/* One hover area per cell (its tooltip), laid over the canvas. */
+.ac-plan-strip__hits {
+  position: absolute;
+  inset: 0;
+}
+.ac-plan-strip__hits > span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
 }
 .ac-plan-strip canvas {
   display: block;
