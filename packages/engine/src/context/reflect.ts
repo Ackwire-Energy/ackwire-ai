@@ -18,6 +18,7 @@ import {
   isTrustedMessage,
   judgeOf,
   loadThread,
+  memoryJudging,
   resolveSummaryModel,
 } from "./summaries";
 
@@ -245,21 +246,25 @@ export async function reflectThread(
       }
     }
     try {
-      const res = await consolidateItem(db, {
-        orgId: input.orgId,
-        kind: item.kind,
-        scopeType: aboutAgent ? "agent" : item.scope === "org" ? "org" : "channel",
-        scopeId: aboutAgent ?? (item.scope === "org" ? input.orgId : thread.root.channelId),
-        agentId: aboutAgent,
-        subject: item.subject,
-        content: item.content,
-        sourceIds,
-        channelIds,
-        trust: trusted ? "high" : "low",
-        evidence,
-        confidence: item.confidence,
-        createdByKind: "job",
-      });
+      const res = await consolidateItem(
+        db,
+        {
+          orgId: input.orgId,
+          kind: item.kind,
+          scopeType: aboutAgent ? "agent" : item.scope === "org" ? "org" : "channel",
+          scopeId: aboutAgent ?? (item.scope === "org" ? input.orgId : thread.root.channelId),
+          agentId: aboutAgent,
+          subject: item.subject,
+          content: item.content,
+          sourceIds,
+          channelIds,
+          trust: trusted ? "high" : "low",
+          evidence,
+          confidence: item.confidence,
+          createdByKind: "job",
+        },
+        memoryJudging(deps, input.orgId),
+      );
       out.results.push(res);
       const proposal = await proposeFromItem(deps, res.item);
       if (proposal) out.proposals.push(proposal.id);

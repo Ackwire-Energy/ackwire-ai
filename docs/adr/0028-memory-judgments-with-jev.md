@@ -24,12 +24,13 @@ Most of the missing pieces are **judgments**, not generation: is A the same as B
 
 **Memory decisions go to Jev. Text (extraction, summaries, profiles) stays with the summary LLM. Code keeps policy, visibility and trust.** Jev never sees a permission and its answer never grants one; it only picks between options code already allows.
 
-### 0. One Jev client
+### 0. The judge
 
-- Extract the HTTP call, answer types, timeout and usage recording from `router-jev.ts` into a shared `packages/engine/src/jev.ts` (`createJevClient`), used by the router, the mention classifier and memory.
-- Usage: `gateway.recordExternalUsage` accepts a new kind `memory` (new migration adding the `usage_kind` value; committed migrations stay untouched), provider `typesafe`, no agent unless the judgment is for an agent's run, billed to the platform like the router.
-- Platform key only (`TYPESAFE_API_KEY`), never per org, never sent to clients.
-- **Fallback when Jev is off, times out or errors:** each point below names its fallback, which is today's behavior. Memory never blocks on Jev and a run never fails because of it.
+- Memory uses the shared `Judge` (`packages/engine/src/judge.ts`, `ContextDeps.judge`, `judgeOf`): Jev when `TYPESAFE_API_KEY` is set, and the org's cheap model through the Model Gateway when Jev errors or times out, the same fallback the router uses. No second Jev client.
+- Usage is recorded like the judge's other calls (kind `router`, provider `typesafe`, billed to the platform). A separate `memory` kind is a follow-up once usage is shown per kind.
+- Platform key only, never per org, never sent to clients.
+- **Per organization:** `MEMORY_JUDGE_ORGS` (org ids separated by commas, or `*`) turns the judgments on. It starts with our own workspace only.
+- **If the judge is off or both judges fail,** each point falls back to today's behavior. Memory never blocks on the judge and a run never fails because of it.
 - Questions are in English; state carries the original text.
 
 ### 1. Semantic consolidation (first to build)
@@ -105,7 +106,7 @@ On every write through `consolidateItem` (people, agents, reflection) and in the
 
 ## Order of attack
 
-1. **0 + 1 + the first part of 7:** shared Jev client, `memory` usage kind, semantic consolidation, CI cases, and the first labeled set for consolidation.
+1. **0 + 1 + the first part of 7:** the per-org switch, semantic consolidation on the shared judge, CI cases, and the first labeled set for consolidation (synthetic cases in the repo; anonymized real cases only in a local file that git ignores).
 2. **1b:** conflicts in the app (API plus the UI next to proposals).
 3. **5:** choosing what goes into the prompt.
 4. **6:** capture on signal.

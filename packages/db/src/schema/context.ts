@@ -123,6 +123,10 @@ export const contextItems = pgTable(
     recurrence: integer().notNull().default(1),
     lastUsedAt: timestamp({ withTimezone: true }),
     pinned: boolean().notNull().default(false),
+    /** Items the judge found on the same topic but kept apart (related, or in conflict) (ADR 0028). */
+    relatedIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** Another item contradicts this one; shown to models as disputed until a person resolves it. */
+    disputed: boolean().notNull().default(false),
     status: contextStatusEnum().notNull().default("active"),
     supersededBy: uuid(),
     version: integer().notNull().default(1),

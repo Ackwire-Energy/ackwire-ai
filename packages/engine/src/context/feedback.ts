@@ -7,7 +7,13 @@ import type { Judge } from "../judge";
 import { getMessage } from "../messages";
 import { enqueue } from "../outbox";
 import type { Approval } from "../tools/gateway";
-import { type ConsolidateResult, changesPermissions, consolidateItem, looksLikeSecret } from "./items";
+import {
+  type ConsolidateResult,
+  changesPermissions,
+  consolidateItem,
+  looksLikeSecret,
+  type MemoryJudging,
+} from "./items";
 import { recordOutcome } from "./outcomes";
 import { proposeFromItem } from "./proposals";
 
@@ -20,7 +26,7 @@ const excerpt = (t: string, n = 120) => (t.length > n ? `${t.slice(0, n - 1)}…
  * an outcome. Verified: a person decided. Called after the decision commits.
  */
 export async function learnFromRefusal(
-  deps: { db: Database; pubsub?: PubSub; judge?: Judge },
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge; memory?: MemoryJudging },
   approval: Approval,
 ): Promise<ConsolidateResult | null> {
   if (approval.status !== "refused") return null;
@@ -39,25 +45,29 @@ export async function learnFromRefusal(
   if (reason && (looksLikeSecret(reason) || (await changesPermissions(deps.judge, approval.orgId, reason))))
     return null;
   const at = new Date().toISOString();
-  const res = await consolidateItem(deps.db, {
-    orgId: approval.orgId,
-    kind: "lesson",
-    scopeType: "agent",
-    scopeId: approval.agentId,
-    agentId: approval.agentId,
-    subject: `refused ${approval.tool} ${reason ?? ""}`,
-    content: reason
-      ? `"${excerpt(approval.title)}" was refused: ${excerpt(reason, 300)}`
-      : `"${excerpt(approval.title)}" was refused by a person.`,
-    sourceIds: [approval.id, outcome.id],
-    channelIds: [approval.channelId],
-    trust: "high",
-    evidence: [
-      { type: "human", ref: approval.id, at },
-      { type: "outcome", ref: outcome.id, at },
-    ],
-    confidence: 0.9,
-  });
+  const res = await consolidateItem(
+    deps.db,
+    {
+      orgId: approval.orgId,
+      kind: "lesson",
+      scopeType: "agent",
+      scopeId: approval.agentId,
+      agentId: approval.agentId,
+      subject: `refused ${approval.tool} ${reason ?? ""}`,
+      content: reason
+        ? `"${excerpt(approval.title)}" was refused: ${excerpt(reason, 300)}`
+        : `"${excerpt(approval.title)}" was refused by a person.`,
+      sourceIds: [approval.id, outcome.id],
+      channelIds: [approval.channelId],
+      trust: "high",
+      evidence: [
+        { type: "human", ref: approval.id, at },
+        { type: "outcome", ref: outcome.id, at },
+      ],
+      confidence: 0.9,
+    },
+    deps.memory ?? { judge: deps.judge },
+  );
   await proposeFromItem(deps, res.item);
   return res;
 }
@@ -68,7 +78,7 @@ export async function learnFromRefusal(
  * sources.
  */
 export async function correctAgentMessage(
-  deps: { db: Database; pubsub?: PubSub; judge?: Judge },
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge; memory?: MemoryJudging },
   userId: string,
   orgId: string,
   messageId: string,
@@ -99,7 +109,7 @@ export async function correctAgentMessage(
       createdByKind: "person",
       createdById: userId,
     },
-    deps.judge,
+    deps.memory ?? { judge: deps.judge },
   );
   await proposeFromItem(deps, res.item);
   return res;

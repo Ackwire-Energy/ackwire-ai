@@ -5,7 +5,8 @@ import { createLlmJudge, type Judge } from "../judge";
 import type { Message } from "../messages";
 import { cheapModelForOrg } from "../router";
 import { createLlmScheduleReader, type ScheduleReader } from "../schedule-reader";
-import { type ContextItem, insertContextItem, supersede } from "./items";
+import { type ContextItem, insertContextItem, type MemoryJudging, supersede } from "./items";
+import { memoryJudgeEnabled } from "./judgments";
 
 const { messages, users, agents, contextItems, organizationSettings } = schema;
 
@@ -19,10 +20,17 @@ export interface ContextDeps {
   cheapModels?: Record<string, string>;
   pubsub?: PubSub;
   reflect?: { maxPerThread?: number; everyMessages?: number; idleMinutes?: number };
+  /** `MEMORY_JUDGE_ORGS`: orgs whose memory writes are judged by meaning (ADR 0028); empty = none. */
+  memoryJudgeOrgs?: string;
   /** Semantic yes/no and choice judgments (judge.ts); default: the org's cheap model. Tests pass a fake. */
   judge?: Judge;
   /** Reads schedules and moments people write (schedule-reader.ts); default: the org's cheap model. Tests pass a fake. */
   schedules?: ScheduleReader;
+}
+
+/** How memory writes of `orgId` are judged: the judge always (permissions), by meaning when the org is switched on. */
+export function memoryJudging(deps: ContextDeps, orgId: string): MemoryJudging {
+  return { judge: judgeOf(deps), semantic: memoryJudgeEnabled(deps.memoryJudgeOrgs, orgId) };
 }
 
 /** The judge of these deps: the configured one (Jev with fallback), else the org's cheap model. */

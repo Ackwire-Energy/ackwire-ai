@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, inArray, lt, ne, or, schema, sql } from "@agenteschat/db";
 import { learnFromRefusal } from "./context/feedback";
+import type { MemoryJudging } from "./context/items";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent, publishUserEvent } from "./events";
 import { can, requirePermission } from "./organizations";
@@ -109,7 +110,8 @@ async function mayDecide(db: Database, actorId: string, approval: Approval) {
  * refused (with the reason).
  */
 export async function decideApproval(
-  deps: { db: Database; pubsub: PubSub; now?: () => Date },
+  /** `memory`: how the lesson from a refusal is judged (context/items.ts `MemoryJudging`). */
+  deps: { db: Database; pubsub: PubSub; now?: () => Date; memory?: MemoryJudging },
   actorId: string,
   orgId: string,
   approvalId: string,

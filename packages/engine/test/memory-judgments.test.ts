@@ -1,0 +1,215 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { eq, schema } from "@agenteschat/db";
+import { consolidateItem, createFakeJudge, insertContextItem, itemLabel, type NewContextItem } from "../src";
+import {
+  decide,
+  findCandidates,
+  type Judged,
+  judgeRelations,
+  memoryJudgeEnabled,
+  overlap,
+  planConsolidation,
+} from "../src/context/judgments";
+import { type Fixture, setup } from "./fixtures";
+
+let f: Fixture;
+afterEach(async () => {
+  await f?.close();
+});
+
+const fact = (fx: Fixture, content: string, extra: Partial<NewContextItem> = {}): NewContextItem => ({
+  orgId: fx.org.id,
+  kind: "fact",
+  scopeType: "channel",
+  scopeId: fx.general.id,
+  channelIds: [fx.general.id],
+  content,
+  ...extra,
+});
+
+const human = (ref: string) => ({ type: "human" as const, ref, at: new Date().toISOString() });
+const agentClaim = (ref: string) => ({ type: "agent" as const, ref, at: new Date().toISOString() });
+
+describe("memory judgments: switch and words", () => {
+  test("MEMORY_JUDGE_ORGS lists org ids or *", () => {
+    expect(memoryJudgeEnabled("", "o1")).toBe(false);
+    expect(memoryJudgeEnabled(" o1 , o2", "o2")).toBe(true);
+    expect(memoryJudgeEnabled("o1", "o3")).toBe(false);
+    expect(memoryJudgeEnabled("*", "o3")).toBe(true);
+  });
+
+  test("paraphrases keep their nouns, so they become candidates", () => {
+    expect(overlap("Deploy é no Railway", "Hospedamos o app no Railway")).toBeGreaterThan(0);
+    expect(overlap("Deploy é no Railway", "Reunião às quintas")).toBe(0);
+  });
+});
+
+describe("memory judgments: candidates", () => {
+  test("same scope and kind family, ranked by shared words; other agents' lessons and unrelated items stay out", async () => {
+    f = await setup();
+    const railway = await insertContextItem(f.db, fact(f, "We host the app on Railway."));
+    const decision = await insertContextItem(
+      f.db,
+      fact(f, "Decided: deploys go through Railway.", { kind: "decision" }),
+    );
+    await insertContextItem(f.db, fact(f, "Standup is at 10am."));
+    await insertContextItem(f.db, {
+      ...fact(f, "Railway deploys need the CI green."),
+      kind: "lesson",
+      agentId: f.agent.id,
+    });
+    const found = await findCandidates(f.db, fact(f, "Deploy is on Railway"));
+    expect(found.map((c) => c.id).sort()).toEqual([railway.id, decision.id].sort());
+  });
+});
+
+describe("memory judgments: the judge's question", () => {
+  test("one Choice per candidate in one request; an answer outside the set counts as unrelated", async () => {
+    f = await setup();
+    const a = await insertContextItem(f.db, fact(f, "We host the app on Railway."));
+    const b = await insertContextItem(f.db, fact(f, "Railway bills monthly."));
+    const judge = createFakeJudge((kind, id) =>
+      kind === "memory_relation" ? (id === "rel_0" ? "same" : "bogus") : undefined,
+    );
+    const judged = await judgeRelations(judge, fact(f, "Deploy is on Railway"), [a, b]);
+    expect(judge.calls).toHaveLength(1);
+    expect(Object.keys(judge.calls[0]?.questions ?? {})).toEqual(["rel_0", "rel_1"]);
+    expect(judge.calls[0]?.state.existing_items).toHaveLength(2);
+    expect(judged.map((j) => [j.relation, j.p])).toEqual([
+      ["same", 1],
+      ["unrelated", 0],
+    ]);
+  });
+
+  test("when the judge fails, there is no plan (the caller falls back to words)", async () => {
+    f = await setup();
+    await insertContextItem(f.db, fact(f, "We host the app on Railway."));
+    const failing = { name: "down", ask: async () => Promise.reject(new Error("timeout")) };
+    expect(await planConsolidation(f.db, failing, fact(f, "Deploy is on Railway"))).toBeNull();
+    expect(await planConsolidation(f.db, failing, fact(f, "Standup is at 10am"))).toEqual({
+      action: "create",
+      related: [],
+    });
+  });
+});
+
+describe("memory judgments: policy", () => {
+  test("merge, supersede, or just link when confidence is low", async () => {
+    f = await setup();
+    const old = await insertContextItem(f.db, fact(f, "We host the app on Railway."));
+    const j = (relation: Judged["relation"], p: number): Judged[] => [{ candidate: old, relation, p }];
+    const next = fact(f, "Deploy is on Railway");
+    expect(decide(next, j("same", 0.9))).toMatchObject({ action: "merge", target: { id: old.id } });
+    expect(decide(next, j("updates", 0.8))).toMatchObject({ action: "supersede", relation: "updates" });
+    expect(decide(next, j("refines", 0.8))).toMatchObject({ action: "supersede", relation: "refines" });
+    // Low confidence never merges or archives: both stay, linked.
+    expect(decide(next, j("same", 0.6))).toEqual({ action: "create", related: [old.id] });
+    expect(decide(next, j("related", 0.7))).toEqual({ action: "create", related: [old.id] });
+    expect(decide(next, j("unrelated", 0.99))).toEqual({ action: "create", related: [] });
+  });
+
+  test("a contradiction keeps both; who is disputed depends on the evidence", async () => {
+    f = await setup();
+    const verified = await insertContextItem(f.db, fact(f, "Deploys are on Fridays.", { evidence: [human("m1")] }));
+    const j: Judged[] = [{ candidate: verified, relation: "contradicts", p: 0.9 }];
+    // Two verified, trusted items: a person decides (both labeled).
+    expect(decide(fact(f, "Never deploy on Fridays.", { evidence: [human("m2")] }), j)).toMatchObject({
+      action: "conflict",
+      disputed: "both",
+    });
+    // An agent's claim against a person's word: the claim is the disputed one.
+    expect(decide(fact(f, "Never deploy on Fridays.", { evidence: [agentClaim("m3")] }), j)).toMatchObject({
+      action: "conflict",
+      disputed: "new",
+    });
+    const claim = await insertContextItem(f.db, fact(f, "Deploys are on Mondays.", { evidence: [agentClaim("m4")] }));
+    expect(
+      decide(fact(f, "Deploys are on Tuesdays.", { evidence: [human("m5")] }), [
+        { candidate: claim, relation: "contradicts", p: 0.9 },
+      ]),
+    ).toMatchObject({ action: "conflict", disputed: "old" });
+  });
+
+  test("across channels nothing merges or archives: items are only linked", async () => {
+    f = await setup();
+    const publicItem = await insertContextItem(f.db, fact(f, "We host the app on Railway.", { channelIds: [] }));
+    const judged: Judged[] = [{ candidate: publicItem, relation: "same", p: 0.95 }];
+    expect(decide(fact(f, "Deploy is on Railway"), judged)).toEqual({ action: "create", related: [publicItem.id] });
+    expect(decide(fact(f, "Deploy is on Railway"), [{ candidate: publicItem, relation: "updates", p: 0.95 }])).toEqual({
+      action: "create",
+      related: [publicItem.id],
+    });
+  });
+
+  test("the strongest answer wins among several candidates", async () => {
+    f = await setup();
+    const a = await insertContextItem(f.db, fact(f, "We host on Railway."));
+    const b = await insertContextItem(f.db, fact(f, "The app runs on Railway."));
+    const plan = decide(fact(f, "Deploy is on Railway"), [
+      { candidate: a, relation: "same", p: 0.8 },
+      { candidate: b, relation: "same", p: 0.95 },
+    ]);
+    expect(plan).toMatchObject({ action: "merge", target: { id: b.id } });
+  });
+});
+
+describe("memory judgments: consolidateItem carries out the plan", () => {
+  /** The judge hears the answer for each existing item by its content. */
+  const judgeBy = (byContent: Record<string, string>) =>
+    createFakeJudge((kind, id, state) => {
+      if (kind !== "memory_relation") return undefined;
+      const existing = (state.existing_items as { content: string }[])[Number(id.slice(4))];
+      return byContent[existing?.content ?? ""] ?? "unrelated";
+    });
+
+  test("a paraphrase in another language merges when the org is on; with the org off, words keep both", async () => {
+    f = await setup();
+    const old = await consolidateItem(f.db, fact(f, "We host the app on Railway."));
+    const judge = judgeBy({ "We host the app on Railway.": "same" });
+    const off = await consolidateItem(f.db, fact(f, "O deploy é no Railway."), { judge, semantic: false });
+    expect(off.action).toBe("created");
+    const on = await consolidateItem(f.db, fact(f, "Hospedamos a aplicação no Railway."), { judge, semantic: true });
+    expect(on).toMatchObject({ action: "merged", item: { id: old.item.id, recurrence: 2 } });
+  });
+
+  test("an update supersedes the old item (kept as history)", async () => {
+    f = await setup();
+    const old = await consolidateItem(f.db, fact(f, "Standup is at 10am."));
+    const judge = judgeBy({ "Standup is at 10am.": "updates" });
+    const next = await consolidateItem(f.db, fact(f, "From now on standup is at 9:30."), { judge, semantic: true });
+    expect(next).toMatchObject({ action: "superseded", previous: { id: old.item.id } });
+    const [archived] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, old.item.id));
+    expect(archived).toMatchObject({ status: "archived", supersededBy: next.item.id });
+  });
+
+  test("a contradiction keeps both, linked both ways, disputed as the evidence says; the prompt says so", async () => {
+    f = await setup();
+    const old = await consolidateItem(f.db, fact(f, "Deploys are on Fridays.", { evidence: [human("m1")] }));
+    const judge = judgeBy({ "Deploys are on Fridays.": "contradicts" });
+    const next = await consolidateItem(f.db, fact(f, "Never deploy on Fridays.", { evidence: [human("m2")] }), {
+      judge,
+      semantic: true,
+    });
+    expect(next).toMatchObject({ action: "conflicted", item: { disputed: true, relatedIds: [old.item.id] } });
+    const [before] = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.id, old.item.id));
+    expect(before).toMatchObject({ status: "active", disputed: true, relatedIds: [next.item.id] });
+    expect(itemLabel(next.item)).toContain("disputed");
+    expect(itemLabel({ kind: "fact", verified: true, trust: "high" })).toBe("[fact]");
+  });
+
+  test("related items are linked; a failing judge falls back to words", async () => {
+    f = await setup();
+    const old = await consolidateItem(f.db, fact(f, "Railway bills us monthly."));
+    const related = await consolidateItem(f.db, fact(f, "We host the app on Railway."), {
+      judge: judgeBy({ "Railway bills us monthly.": "related" }),
+      semantic: true,
+    });
+    expect(related).toMatchObject({ action: "created", item: { relatedIds: [old.item.id] } });
+    const failing = { name: "down", ask: async () => Promise.reject(new Error("timeout")) };
+    const fallback = await consolidateItem(f.db, fact(f, "We host the app on Railway."), {
+      judge: failing,
+      semantic: true,
+    });
+    expect(fallback).toMatchObject({ action: "merged", item: { id: related.item.id } });
+  });
+});

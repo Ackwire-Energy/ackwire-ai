@@ -1,4 +1,4 @@
-import { decideApproval, getApproval, listApprovals } from "@agenteschat/engine";
+import { decideApproval, getApproval, listApprovals, memoryJudging } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
 
@@ -93,10 +93,20 @@ export function approvalRoutes(deps: AppDeps) {
       }),
       async (c) => {
         const { orgId, approvalId } = c.req.valid("param");
-        const view = await decideApproval({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, approvalId, {
-          decision,
-          reason: c.req.valid("json").reason,
-        });
+        const view = await decideApproval(
+          {
+            db,
+            pubsub: adapters.pubsub,
+            memory: deps.extras?.context ? memoryJudging(deps.extras.context, orgId) : undefined,
+          },
+          c.get("user").id,
+          orgId,
+          approvalId,
+          {
+            decision,
+            reason: c.req.valid("json").reason,
+          },
+        );
         deps.wakeWorkers?.();
         return c.json(view, 200);
       },

@@ -17,6 +17,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { type Judge, triesToChangePermissions } from "../judge";
 import { can, requirePermission } from "../organizations";
 import { enqueueIndex, userVisibleChannels } from "../search";
+import { type Plan, planConsolidation } from "./judgments";
 
 const { contextItems } = schema;
 
@@ -140,6 +141,10 @@ export interface NewContextItem {
   coversUntil?: Date | null;
   createdByKind?: "job" | "agent" | "person";
   createdById?: string | null;
+  /** Items on the same topic kept apart (related, or in conflict) (ADR 0028). */
+  relatedIds?: string[];
+  /** Contradicted by another item, until a person resolves it. */
+  disputed?: boolean;
 }
 
 /** Inserts an item (content checked) and enqueues its indexing, in the caller's transaction. */
@@ -169,6 +174,8 @@ export async function insertContextItem(tx: Executor, input: NewContextItem): Pr
       coversUntil: input.coversUntil ?? null,
       createdByKind: input.createdByKind ?? "job",
       createdById: input.createdById ?? null,
+      relatedIds: input.relatedIds ?? [],
+      disputed: input.disputed ?? false,
     })
     .returning();
   if (!row) throw new Error("context item insert returned nothing");
@@ -193,10 +200,21 @@ export async function supersede(tx: Executor, old: ContextItem, next: NewContext
 }
 
 export type ConsolidateResult = {
-  action: "created" | "merged" | "superseded";
+  /** `conflicted`: kept apart from an item it contradicts; both linked, one or both disputed (ADR 0028). */
+  action: "created" | "merged" | "superseded" | "conflicted";
   item: ContextItem;
   previous?: ContextItem;
 };
+
+/**
+ * How a write is judged: `judge` keeps permission-bending text out; with
+ * `semantic` (the org is in `MEMORY_JUDGE_ORGS`) the judge also says how the
+ * item relates to what exists (judgments.ts), else words decide (today's rule).
+ */
+export interface MemoryJudging {
+  judge?: Judge;
+  semantic?: boolean;
+}
 
 /**
  * Adds a fact, decision, preference or lesson, consolidating with what
@@ -206,9 +224,21 @@ export type ConsolidateResult = {
  *   (a contradiction keeps history; nothing is deleted silently);
  * - otherwise → created.
  */
-/** `judge`: keeps text that tries to change permissions out (see `checkPermissionText`). */
-export async function consolidateItem(db: Database, input: NewContextItem, judge?: Judge): Promise<ConsolidateResult> {
+export async function consolidateItem(
+  db: Database,
+  input: NewContextItem,
+  judging: MemoryJudging = {},
+): Promise<ConsolidateResult> {
+  const { judge } = judging;
   await checkPermissionText(judge, input.orgId, `${input.title ?? ""}\n${input.content}`);
+  // By meaning first (outside the transaction: the judge is a network call); words when it can't.
+  if (judge && judging.semantic) {
+    const plan = await planConsolidation(db, judge, input);
+    if (plan) {
+      const done = await db.transaction((tx) => applyPlan(tx, input, plan));
+      if (done) return done;
+    }
+  }
   const subjectKey = normalizeSubject(input.subject ?? input.title ?? input.content.slice(0, 120));
   return db.transaction(async (tx) => {
     const existing = await tx
@@ -232,30 +262,81 @@ export async function consolidateItem(db: Database, input: NewContextItem, judge
     if (!old) return { action: "created", item: await insertContextItem(tx, input) };
 
     if (similarity(old.content, input.content) >= SAME_ITEM_SIMILARITY) {
-      checkContent(input.content);
-      const evidence = mergeEvidence(old.evidence, input.evidence ?? []);
-      const [merged] = await tx
-        .update(contextItems)
-        .set({
-          evidence,
-          verified: old.kind === "note" || evidence.length === 0 ? old.verified : isVerified(evidence),
-          recurrence: old.recurrence + 1,
-          confidence: Math.max(old.confidence, input.confidence ?? 0),
-          // Low trust is sticky: one untrusted source taints the item.
-          trust: old.trust === "low" || input.trust === "low" ? "low" : "high",
-          sourceIds: [...new Set([...old.sourceIds, ...(input.sourceIds ?? [])])],
-          channelIds: [...new Set([...old.channelIds, ...(input.channelIds ?? [])])],
-          updatedAt: new Date(),
-        })
-        .where(eq(contextItems.id, old.id))
-        .returning();
-      if (!merged) throw new Error("merge returned nothing");
-      await enqueueIndex(tx, { orgId: old.orgId, kind: "context_item", sourceId: old.id });
-      return { action: "merged", item: merged };
+      return { action: "merged", item: await mergeInto(tx, old, input) };
     }
     const item = await supersede(tx, old, { ...input, subject: input.subject ?? old.subjectKey });
     return { action: "superseded", item, previous: old };
   });
+}
+
+/** The same item again: evidence united, recurrence +1, confidence max; low trust is sticky. */
+async function mergeInto(tx: Executor, old: ContextItem, input: NewContextItem) {
+  checkContent(input.content);
+  const evidence = mergeEvidence(old.evidence, input.evidence ?? []);
+  const [merged] = await tx
+    .update(contextItems)
+    .set({
+      evidence,
+      verified: old.kind === "note" || evidence.length === 0 ? old.verified : isVerified(evidence),
+      recurrence: old.recurrence + 1,
+      confidence: Math.max(old.confidence, input.confidence ?? 0),
+      // Low trust is sticky: one untrusted source taints the item.
+      trust: old.trust === "low" || input.trust === "low" ? "low" : "high",
+      sourceIds: [...new Set([...old.sourceIds, ...(input.sourceIds ?? [])])],
+      channelIds: [...new Set([...old.channelIds, ...(input.channelIds ?? [])])],
+      updatedAt: new Date(),
+    })
+    .where(eq(contextItems.id, old.id))
+    .returning();
+  if (!merged) throw new Error("merge returned nothing");
+  await enqueueIndex(tx, { orgId: old.orgId, kind: "context_item", sourceId: old.id });
+  return merged;
+}
+
+/** Links `ids` back to `itemId` (both directions), optionally marking them disputed. */
+async function linkBack(tx: Executor, ids: string[], itemId: string, disputed = false) {
+  if (ids.length === 0) return;
+  await tx
+    .update(contextItems)
+    .set({
+      relatedIds: sql`array_append(array_remove(${contextItems.relatedIds}, ${itemId}::uuid), ${itemId}::uuid)`,
+      ...(disputed ? { disputed: true } : {}),
+      updatedAt: new Date(),
+    })
+    .where(inArray(contextItems.id, ids));
+}
+
+/**
+ * Carries out the judge's plan. The target is read again under a row lock:
+ * if it changed meanwhile (archived, superseded), returns null and the caller
+ * falls back to words.
+ */
+async function applyPlan(tx: Executor, input: NewContextItem, plan: Plan): Promise<ConsolidateResult | null> {
+  if (plan.action === "create") {
+    const item = await insertContextItem(tx, { ...input, relatedIds: plan.related });
+    await linkBack(tx, plan.related, item.id);
+    return { action: "created", item };
+  }
+  const [target] = await tx
+    .select()
+    .from(contextItems)
+    .where(
+      and(eq(contextItems.id, plan.target.id), eq(contextItems.status, "active"), isNull(contextItems.supersededBy)),
+    )
+    .for("update");
+  if (!target) return null;
+  if (plan.action === "merge") return { action: "merged", item: await mergeInto(tx, target, input) };
+  if (plan.action === "supersede") {
+    const item = await supersede(tx, target, { ...input, subject: input.subject ?? target.subjectKey });
+    return { action: "superseded", item, previous: target };
+  }
+  const item = await insertContextItem(tx, {
+    ...input,
+    relatedIds: [target.id],
+    disputed: plan.disputed !== "old",
+  });
+  await linkBack(tx, [target.id], item.id, plan.disputed !== "new");
+  return { action: "conflicted", item, previous: target };
 }
 
 // ── Reading and editing (APIs: "What Ada knows") ────────────────────────────

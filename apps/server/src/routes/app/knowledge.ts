@@ -13,6 +13,7 @@ import {
   getAgent,
   listContextItems,
   listReactions,
+  memoryJudging,
   removeReaction,
   requirePermission,
   searchForUser,
@@ -430,7 +431,11 @@ export function knowledgeRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, messageId } = c.req.valid("param");
       const res = await correctAgentMessage(
-        { db, pubsub: adapters.pubsub },
+        {
+          db,
+          pubsub: adapters.pubsub,
+          memory: deps.extras?.context ? memoryJudging(deps.extras.context, orgId) : undefined,
+        },
         c.get("user").id,
         orgId,
         messageId,
