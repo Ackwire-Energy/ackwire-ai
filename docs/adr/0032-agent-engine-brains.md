@@ -1,0 +1,91 @@
+# 0032. One agent engine, swappable brains (model, Claude Code, Codex)
+
+- Status: Accepted (to build)
+- Date: 2026-10-17
+- Planning: D38 (revision of 2026-10-17)
+- Extends: ADR 0008 (agent runs), ADR 0015 (Tool Gateway and approvals), ADR 0025 (connected computers and the runner), ADR 0029 (missions), ADR 0030 (runner isolation)
+
+## Context
+
+Agents think through the Model Gateway with an API key. People who pay for Claude Code or Codex want their agents to think with that instead, on their own computer, and missions already drive Claude Code and Codex through the runner (ADR 0029).
+
+Today the pieces don't share a spine:
+
+- `executor.ts` does everything for a model run: builds the context, owns the run states, calls the model, executes tools through the Tool Gateway, keeps the transcript, streams deltas, pauses on approvals and records usage.
+- Missions have their own path: runner tasks, an `agentes` MCP server with mission-only tools, resumes by session id, an inbox, their own approval and decision plumbing.
+
+Adding "an agent whose brain is Claude Code" as a third path would copy the run lifecycle, the tool layer and the approval flow again. Every rule (a new tool, a scope, an audit entry, a budget check, a streaming tweak) would have to land in three places, and they would drift.
+
+## Decision
+
+**One engine runs every agent turn. What changes is only the brain that thinks. Everything else — context, run states, tools, approvals, transcript, streaming, usage, events — lives in the engine and is the same for every brain. Missions run on the same engine.**
+
+### 1. The brain interface
+
+A brain receives a turn and returns a stream of neutral events; it never touches the database, tools or approvals directly.
+
+```ts
+interface Brain {
+  kind: "model" | "claude_code" | "codex";
+  /** One turn: context in, events out. Resumable from a transcript or a session. */
+  run(turn: BrainTurn, io: BrainIO): AsyncIterable<BrainEvent>;
+}
+type BrainEvent =
+  | { type: "text_delta"; text: string }
+  | { type: "tool_call"; id: string; name: string; input: unknown }   // engine executes it
+  | { type: "usage"; input: number; output: number; source: "api" | "plan" }
+  | { type: "limit"; resetsAt?: string }                              // plan limit hit
+  | { type: "done"; text: string }
+  | { type: "error"; code: string; message: string };
+```
+
+- **Model brain**: today's gateway loop, unchanged in behaviour (budget check before the call, usage with cost).
+- **Claude Code / Codex brains**: a session on the agent's computer through the runner (`--resume <session>`), stream-json parsed into `BrainEvent`s; usage recorded with source `plan` and cost zero.
+
+### 2. Tools exist in one place
+
+The Tool Gateway is the only source of tools, scopes, levels (consult / alter / approval / off, ADR 0016 addendum), approvals and audit.
+
+- Model brain: the engine passes the gateway's tool list to the model and executes calls directly, as today.
+- Computer brains: the runner's `agentes` MCP server becomes a **bridge** with no tools of its own. `tools/list` asks the engine for the tools this run may use; `tools/call` is executed by the engine through the same Tool Gateway with the run's identity. The mission tools (`update_plan`, `ask_decision`, `request_review`, `complete_mission`…) become ordinary gateway tools available when the run is in a mission thread.
+- Connectors (GitHub, Linear, Sentry, Drive, org MCPs) are reached the same way: the executor never receives a connector token (ADR 0007). Plain `git` on a connected computer uses the runner's credential helper with a short-lived, branch-scoped token (ADR 0030); on cloud computers, the git proxy (ADR 0024).
+- Claude Code's permission prompts (`--permission-prompt-tool`) and command policy (deny list, low-risk auto-approval, mission rules) are engine features shared by every computer brain, not mission-only code.
+
+### 3. Approvals and pauses work the same
+
+A gated tool call pauses the run (`waiting_approval` / `waiting_input`), whatever the brain. On the decision the engine resumes:
+
+- model brain: calls the model again with the transcript (today);
+- computer brains: resumes the session with the tool result ("approved: …" / "refused: …").
+
+Blocking decisions and reviews in missions use the same pause/resume.
+
+### 4. Context is built once
+
+`context.ts` builds the run context for every brain. The model brain receives it as system/messages; computer brains receive it at session start (`--append-system-prompt` / first message) and fetch the rest through the same retrieval tools the gateway already exposes (search context, summaries, wiki, memory). The mission brief (ADR 0029) is part of this builder.
+
+### 5. Choosing the brain
+
+- Per agent: **Modelo (API)** (default), **Claude Code no <computador>**, **Codex no <computador>**, each with a model (`--model opus|sonnet|…`, `-m <model>`; `--fallback-model` for Claude Code). Only what the computer has is offered (runner detection, protocol 7). A mission can override the agent's brain and model.
+- The agent keeps its audience (D31). Choosing a plan brain shows a clear warning that the subscription is personal and that answering other people with it may go against the provider's terms; the person confirms and owns the risk. We don't block it.
+- **Fallback**: when the computer is offline, the executor isn't logged in, or the plan limit is hit, the turn runs on the model brain and the reply carries a quiet note ("respondi pela API: o Claude Code no mac está offline"). That turn counts against the agent's budget.
+- **Speed**: computer brains keep one process per active thread (`--input-format stream-json`), closed after ~10 idle minutes and resumed with `--resume`.
+
+### 6. Missions run on the engine
+
+A mission's main session is simply the agent's run in the mission thread with the mission's brain; item work is runs/tasks of the same engine in their own branches or subfolders. The mission-specific runner path (its own MCP tool set, resume plumbing, inbox delivery as a special case) is replaced by engine features. Missions keep their data and UI (plan, decisions, reviews, deliveries, `.agentes/`); only the execution spine is shared.
+
+## Order
+
+1. Extract the engine and the `Brain` interface from `executor.ts`; the model brain is today's behaviour (existing tests guard it).
+2. Runner MCP bridge → Tool Gateway (tool list and calls per run identity); mission tools become gateway tools.
+3. Claude Code brain (session, streaming, permission prompts, command policy), the per-agent brain + model setting, the warning, the fallback to the model brain.
+4. Missions move onto the engine; delete the mission-only execution path.
+5. Persistent process per thread; Codex brain.
+
+## Consequences
+
+- One place for tools, approvals, audit, streaming and usage: a new tool or rule works for every brain and for missions at once.
+- Missions lose their parallel execution path; the code gets smaller.
+- People can run their agents on their own plans, at their own risk, with the model brain as a safety net.
+- The engine extraction is a large refactor of `executor.ts`; it lands behind the existing tests with no behaviour change before any new brain is added.
