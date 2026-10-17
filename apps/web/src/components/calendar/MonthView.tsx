@@ -1,14 +1,18 @@
 import { Popover } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { type CalItem, onDay, sameDay } from "@/lib/calendar";
+import { type CalItem, dayRuns, onDay, sameDay } from "@/lib/calendar";
 import { toYmd } from "@/lib/format";
 import { dayLabel, EventChip } from "./EventChip";
+import { dayRunsLabel, MAX_DAY_MARKS, RunMarks } from "./RunMarks";
 
 /** Chips shown per day before "+N mais". */
 const PER_DAY = 3;
 
-/** Mês: 6 weeks; each day lists its first items and "+N mais" opens the rest in a popover. */
+/**
+ * Mês: 6 weeks; each day lists its first events and "+N mais" opens the rest
+ * in a popover; the day's routine runs are one row of pixel marks under them.
+ */
 export function MonthView({
   days,
   month,
@@ -43,11 +47,14 @@ export function MonthView({
       </div>
       <div className="cal-month__grid">
         {days.map((d) => {
+          // Routines are pixel marks under the events, not chips.
           const list = items
-            .filter((it) => onDay(it, d))
+            .filter((it) => it.kind !== "routine" && onDay(it, d))
             .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.getTime() - b.start.getTime());
           const shown = list.slice(0, PER_DAY);
           const rest = list.length - shown.length;
+          const runs = dayRuns(items, d);
+          const runsKey = `runs-${toYmd(d)}`;
           return (
             <div
               key={toYmd(d)}
@@ -76,6 +83,18 @@ export function MonthView({
                   details={details(it)}
                 />
               ))}
+              {runs.length > 0 && (
+                <RunMarks
+                  runs={runs}
+                  heading={t("calendar.runsOn", { day: dayLabel(i18n.language, d) })}
+                  label={dayRunsLabel(t, runs, dayLabel(i18n.language, d))}
+                  max={MAX_DAY_MARKS}
+                  side="bottom"
+                  className="cal-month__marks"
+                  open={openKey === runsKey}
+                  onOpenChange={(o) => onOpenKey(o ? runsKey : null)}
+                />
+              )}
               {rest > 0 && (
                 <Popover
                   label={dayLabel(i18n.language, d)}

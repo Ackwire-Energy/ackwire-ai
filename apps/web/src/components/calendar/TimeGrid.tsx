@@ -30,7 +30,7 @@ import {
 import { toYmd } from "@/lib/format";
 import { EventChip } from "./EventChip";
 import { RoutineBand } from "./RoutineBand";
-import { RunMarks } from "./RunMarks";
+import { MARK_LANE_PX, RunMarks } from "./RunMarks";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 /** Movement before a press on a chip becomes a drag (px). */
@@ -305,6 +305,8 @@ export function TimeGrid({
               d,
             );
             const slots = runSlots(items, d);
+            // Run marks keep a narrow lane on the column's right; events never sit under them.
+            const lane = slots.length > 0 ? MARK_LANE_PX : 0;
             const isToday = sameDay(d, today);
             const ghost =
               gesture?.kind === "create" && gesture.dayIndex === i
@@ -317,6 +319,7 @@ export function TimeGrid({
                 data-day={toYmd(d)}
                 data-col-index={i}
                 data-today={isToday || undefined}
+                data-marks={lane > 0 || undefined}
                 onPointerDown={(e) => startCreate(e, i)}
               >
                 {loading && i % 2 === 1 && (
@@ -338,8 +341,8 @@ export function TimeGrid({
                       style={{
                         top: (top / 60) * HOUR_PX + 1,
                         height: Math.max(20, (height / 60) * HOUR_PX - 2),
-                        left: `calc(${(p.col / p.cols) * 100}% + 2px)`,
-                        width: `calc(${100 / p.cols}% - 4px)`,
+                        left: `calc(${(p.col / p.cols) * 100}% - ${(p.col / p.cols) * lane}px + 2px)`,
+                        width: `calc(${100 / p.cols}% - ${lane / p.cols + 4}px)`,
                         ...(g?.kind === "move" && g.dDay
                           ? { transform: `translateX(calc(${g.dDay * 100}% * ${p.cols}))` }
                           : {}),
@@ -369,7 +372,8 @@ export function TimeGrid({
                 {slots.map((slot) => (
                   <RunMarks
                     key={slot.key}
-                    slot={slot}
+                    runs={slot.runs}
+                    className="cal-week__marks"
                     style={{ top: (slot.top / 60) * HOUR_PX + 2 }}
                     open={openKey === slot.key && !gesture}
                     onOpenChange={(o) => onOpenKey(o ? slot.key : null)}

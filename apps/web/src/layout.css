@@ -4685,15 +4685,13 @@ button.live-call__head:hover {
   height: 6px;
   cursor: ns-resize;
 }
-/* Single routine runs: pixel marks at their time (RunMarks), on the column's right edge */
+/* Routine runs as pixel marks (RunMarks): a quiet button, in the flow by default */
 .cal-marks {
-  position: absolute;
-  right: 3px;
-  z-index: 2;
+  align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  height: 12px;
+  gap: 8px;
+  min-width: 0;
   padding: 2px;
   border: 0;
   border-radius: var(--radius-sm);
@@ -4701,6 +4699,16 @@ button.live-call__head:hover {
   color: var(--muted);
   font: inherit;
   cursor: pointer;
+}
+.cal-marks__pixels {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+.cal-marks__text {
+  font-size: 12px;
+  color: var(--muted);
 }
 .cal-marks:hover,
 .cal-marks[aria-pressed="true"] {
@@ -4714,6 +4722,28 @@ button.live-call__head:hover {
   font-size: 10px;
   line-height: 1;
   font-weight: 600;
+}
+/* In the day/week grid: their own lane on the column's right (events end before it), stacked down from the run's time */
+.cal-week__marks {
+  position: absolute;
+  right: 0;
+  z-index: 2;
+  width: 16px;
+  justify-content: center;
+}
+.cal-week__marks .cal-marks__pixels {
+  flex-direction: column;
+}
+/* In a month cell: one row under the events */
+.cal-month__marks {
+  padding: 3px 4px;
+}
+.cal-month__marks .cal-marks__pixels {
+  flex-wrap: nowrap;
+}
+/* In the agenda: one quiet line among the events */
+.cal-agenda__marks {
+  padding: 4px 6px;
 }
 .cal-runs {
   list-style: none;

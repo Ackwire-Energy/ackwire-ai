@@ -315,32 +315,76 @@ export function layoutDay(items: CalItem[], day: Date): Placed[] {
 /** A single routine run (not a band): drawn as a pixel mark in the grid, not a chip. */
 export const isRunMark = (it: CalItem) => it.kind === "routine" && !it.runs && !isBarItem(it);
 
+/**
+ * A routine's mark: one single run, or (in the month and agenda views) a
+ * frequent routine's runs on one day, as one mark with their count.
+ */
+export interface RunEntry {
+  key: string;
+  item: CalItem;
+  /** When it runs (the first of the day's runs for a frequent routine). */
+  at: Date;
+  /** How many runs it stands for (1 for a single run). */
+  count: number;
+  /** How it went, when it already ran (a frequent routine: failed if any run that day failed). */
+  status?: RunStatus;
+}
+
 export interface RunSlot {
   key: string;
   /** Minutes from midnight of the slot's first run. */
   top: number;
-  runs: CalItem[];
+  runs: RunEntry[];
 }
+
+const byTime = (a: RunEntry, b: RunEntry) =>
+  a.at.getTime() - b.at.getTime() || a.item.title.localeCompare(b.item.title);
+const single = (it: CalItem): RunEntry => ({ key: it.key, item: it, at: it.start, count: 1, status: it.result });
 
 /** One day's single routine runs grouped by the hour they start in (a slot per hour), earliest first. */
 export function runSlots(items: CalItem[], day: Date): RunSlot[] {
-  const byHour = new Map<number, CalItem[]>();
+  const byHour = new Map<number, RunEntry[]>();
   for (const it of items) {
     if (!isRunMark(it) || !sameDay(it.start, day)) continue;
     const h = it.start.getHours();
-    byHour.set(h, [...(byHour.get(h) ?? []), it]);
+    byHour.set(h, [...(byHour.get(h) ?? []), single(it)]);
   }
   return [...byHour.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([h, list]) => {
-      const runs = [...list].sort((a, b) => a.start.getTime() - b.start.getTime() || a.title.localeCompare(b.title));
+      const runs = [...list].sort(byTime);
       return {
         key: `${startOfDay(day).getTime()}-${h}`,
-        top: minutesOfDay((runs[0] as CalItem).start),
+        top: minutesOfDay((runs[0] as RunEntry).at),
         runs,
       };
     });
 }
+
+/**
+ * Everything routines do on one day (month and agenda views), time-ordered:
+ * a mark per single run, and one per frequent routine (a band) carrying how
+ * many times it runs that day, not a mark per run.
+ */
+export function dayRuns(items: CalItem[], day: Date): RunEntry[] {
+  const out: RunEntry[] = [];
+  for (const it of items) {
+    if (it.kind !== "routine") continue;
+    if (!it.runs) {
+      if (sameDay(it.start, day)) out.push(single(it));
+      continue;
+    }
+    const runs = it.runs.filter((r) => sameDay(r, day));
+    const first = runs[0];
+    if (!first) continue;
+    const past = (it.pastRuns ?? []).filter((r) => sameDay(r.at, day)).sort((a, b) => b.at.getTime() - a.at.getTime());
+    const status = past.some((r) => r.status === "failed") ? "failed" : past[0]?.status;
+    out.push({ key: `${it.key}@${toYmdLocal(day)}`, item: it, at: first, count: runs.length, status });
+  }
+  return out.sort(byTime);
+}
+
+const toYmdLocal = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
 export interface Bar {
   item: CalItem;

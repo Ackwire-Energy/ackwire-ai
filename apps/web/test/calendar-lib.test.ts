@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   type CalItem,
   collapseRoutines,
+  dayRuns,
   dragRange,
   HOUR_PX,
   initialScrollMinutes,
@@ -53,6 +54,42 @@ describe("calendar layout", () => {
       [9 * 60 + 10, ["a", "b", "c", "d"]],
       [18 * 60, ["e"]],
     ]);
+  });
+
+  test("a day's routine runs: a mark per single run, one per frequent routine with its count; time-ordered", () => {
+    const run = (key: string, start: Date): CalItem => ({
+      ...item(key, start, new Date(start.getTime() + 15 * 60_000)),
+      kind: "routine",
+      source: "routine",
+      routineId: key,
+    });
+    const next = new Date(2026, 9, 15);
+    const band: CalItem = {
+      ...run("band", at(0)),
+      allDay: true,
+      end: at(0, 0, new Date(2026, 9, 16)),
+      runs: [...Array.from({ length: 24 }, (_, h) => at(h, 30)), at(1, 30, next), at(2, 30, next)],
+      pastRuns: [
+        { at: at(3, 30), status: "ok" },
+        { at: at(2, 30), status: "failed" },
+      ],
+    };
+    const entries = dayRuns(
+      [
+        run("late", at(18)),
+        { ...run("early", at(0, 10)), result: "ok" },
+        run("tomorrow", at(9, 0, next)),
+        item("event", at(9), at(10)),
+        band,
+      ],
+      day,
+    );
+    expect(entries.map((e) => [e.item.key, e.count, e.status])).toEqual([
+      ["early", 1, "ok"],
+      ["band", 24, "failed"],
+      ["late", 1, undefined],
+    ]);
+    expect(dayRuns([band], next).map((e) => [e.count, e.status])).toEqual([[2, undefined]]);
   });
 
   test("overlapping events sit side by side; a later one gets the full width again", () => {
