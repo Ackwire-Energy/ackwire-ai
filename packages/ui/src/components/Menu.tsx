@@ -43,6 +43,7 @@ export function MenuItem({
   disabled,
   children,
   description,
+  hint,
 }: {
   onSelect?: () => void;
   icon?: IconName;
@@ -50,6 +51,8 @@ export function MenuItem({
   disabled?: boolean;
   children: ReactNode;
   description?: ReactNode;
+  /** Quiet text on the right: the current value of what it opens ("Só o que é arriscado"). */
+  hint?: ReactNode;
 }) {
   return (
     <DropdownMenu.Item
@@ -62,6 +65,7 @@ export function MenuItem({
         {children}
         {description && <span className="ac-menu__desc">{description}</span>}
       </span>
+      {hint && <span className="ac-menu__hint">{hint}</span>}
     </DropdownMenu.Item>
   );
 }

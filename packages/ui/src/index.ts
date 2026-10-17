@@ -41,6 +41,7 @@ export {
   randomAppearance,
 } from "./components/AgentLook";
 export { ApprovalCard, type ApprovalCardProps, type ApprovalStatus } from "./components/ApprovalCard";
+export { type AutonomyKind, AutonomyPixels, drawAutonomy } from "./components/AutonomyPixels";
 export {
   type AgentState,
   Avatar,
@@ -117,6 +118,7 @@ export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { Mention } from "./components/Mention";
 export { Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "./components/Menu";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
+export { OptionList, type OptionListItem, type OptionListProps } from "./components/OptionList";
 export { glowOptions, PixelSky, SkyGlow } from "./components/PixelSky";
 export {
   ORBIT_RING,
@@ -152,6 +154,7 @@ export {
 } from "./components/RunPixels";
 export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";
 export { Select, type SelectOption, type SelectProps } from "./components/Select";
+export { SettingNote, SettingRow, SettingsMore, SettingsSection } from "./components/Settings";
 export {
   SKELETON_DELAY_MS,
   Skeleton,
