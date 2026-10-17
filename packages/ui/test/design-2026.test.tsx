@@ -121,13 +121,16 @@ describe("the count chip", () => {
       "align-items: center",
       "justify-content: center",
       "line-height: 1",
-      "font-variant-numeric: tabular-nums",
       "align-self: center",
       "height: var(--count-h)",
       "min-width: var(--count-h)",
     ]) {
       expect(rule).toContain(decl);
     }
+    // Digits come from the shared count rule: Doto, tabular.
+    const counts = /\.ac-num,[^{]*\.ac-countchip,[^{]*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(counts).toContain("font-family: var(--font-dot");
+    expect(counts).toContain("font-variant-numeric: tabular-nums");
   });
 });
 

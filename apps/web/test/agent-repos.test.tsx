@@ -127,7 +127,10 @@ describe("agent page: GitHub repositories", () => {
     await click(within(dialog).getByRole("button", { name: "Usar estes" }));
     // The one that no longer exists stays until someone removes it.
     expect(row.textContent).toContain("acme/legacy não existe mais");
-    expect(row.textContent).not.toContain("acme/app");
+    // "Antes: acme/app e acme/legacy" still names it; the chips don't.
+    const chips = row.querySelector(".agp-chips") as HTMLElement;
+    expect(chips.textContent).toContain("acme/legacy");
+    expect(chips.textContent).not.toContain("acme/app");
   });
 
   test("a refused repository in Atividade: Liberar opens the picker with it checked", async () => {
