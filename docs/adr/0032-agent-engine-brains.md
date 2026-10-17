@@ -68,8 +68,24 @@ Blocking decisions and reviews in missions use the same pause/resume.
 
 - Per agent: **Modelo (API)** (default), **Claude Code no <computador>**, **Codex no <computador>**, each with a model (`--model opus|sonnet|…`, `-m <model>`; `--fallback-model` for Claude Code). Only what the computer has is offered (runner detection, protocol 7). A mission can override the agent's brain and model.
 - The agent keeps its audience (D31). Choosing a plan brain shows a clear warning that the subscription is personal and that answering other people with it may go against the provider's terms; the person confirms and owns the risk. We don't block it.
-- **Fallback**: when the computer is offline, the executor isn't logged in, or the plan limit is hit, the turn runs on the model brain and the reply carries a quiet note ("respondi pela API: o Claude Code no mac está offline"). That turn counts against the agent's budget.
+- **Fallback, by what exists**: when the computer is offline, the executor isn't logged in, or the plan limit is hit:
+  - if a model credential exists (the platform key on the Cloud, or an org/default key), the turn runs on the model brain and the reply carries a quiet note ("respondi pela API: o Claude Code no mac está offline"); that turn counts against the agent's budget;
+  - if no model credential exists (a self-hosted install running only on plans), the agent says it is unavailable ("o Claude Code no mac está offline; respondo quando ele voltar") and the message waits in the run queue until the computer is back.
 - **Speed**: computer brains keep one process per active thread (`--input-format stream-json`), closed after ~10 idle minutes and resumed with `--resume`.
+
+### 5a. The rest of the system also needs a model
+
+Besides an agent's turn, several parts call a model in the background: the router (who answers), thread summaries, reflection and memory consolidation, the judge (low-risk command approval, connector tool classification, mention checks), thread titles, date parsing. On the Cloud they run on our key (and the fast judge) and are invisible.
+
+For installs where only plans exist:
+
+- **Default: a small model key for system tasks.** The self-hosted setup asks for one cheap model credential used only by these tasks (cents a month); plans do the agents' heavy work.
+- **Graceful degradation when there is no key at all.** An explicit @mention always answers (no router); without summaries the context uses recent messages only; without the judge, "Só o que é arriscado" behaves as "Pergunta sempre" and connector tools default to "Pede aprovação"; titles fall back to the first message. Everything works, with less automation, and the UI says which automatic features are off.
+- **Optional, later: system tasks on the executor** (short runs on Claude Code/Codex). No key needed, but slow and it spends plan limits, so it is opt-in.
+
+### Editions
+
+The engine is the same in both editions; only defaults differ: the Cloud encourages the model brain (usage through our gateway, budgets, no dependency on a person's computer, no plan-sharing risk) and offers computer brains as an advanced option with the warning; a self-hosted install with Claude Code or Codex on its computers can suggest them first. This is an edition default (ADR 0002 modules), not separate code.
 
 ### 6. Missions run on the engine
 
