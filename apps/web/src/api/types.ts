@@ -2079,7 +2079,7 @@ export interface Mission {
   status: MissionStatus;
   repoDir: string;
   resumeTasks: boolean;
-  /** "Pedir aprovação de comandos". */
+  /** Autonomia: when the mission stops to ask a person before a command. */
   commandApproval: CommandApproval;
   plan: {
     version: number;
@@ -2193,6 +2193,28 @@ export interface MissionEligibleAgent {
   executors: MissionExecutor[];
   defaultExecutor: MissionExecutor | null;
   codexTooOld: boolean;
+  /** The autonomy its new missions start with ("Usar como padrão"); absent on older servers. */
+  commandApproval?: CommandApproval;
+}
+
+/** A command allowed for the whole mission ("Aprovar sempre"), in "O que já foi liberado". */
+export interface MissionCommandRule {
+  id: string;
+  /** `Bash(swift build *)`. */
+  rule: string;
+  /** Who allowed it (user id). */
+  by: string | null;
+  createdAt: string;
+}
+
+/** "Configurações da missão": what the dialog reads besides the mission itself. */
+export interface MissionSettings {
+  missionId: string;
+  rules: MissionCommandRule[];
+  /** "Nesta missão: N liberados automaticamente · N perguntados · N bloqueados". */
+  stats: { auto: number; asked: number; blocked: number };
+  /** "Próximas missões do <agente>". */
+  agentDefault: { commandApproval: CommandApproval; canSet: boolean; ownerId: string | null };
 }
 
 /** "Ver saída": the last lines of a task, from the computer or what the server kept. */
@@ -2204,7 +2226,7 @@ export interface TaskOutput {
   truncated: boolean;
 }
 
-/** "Pedir aprovação de comandos": every command, only the risky ones (low-risk ones allowed automatically), or never (but the blocked ones). */
+/** Autonomia ("Pergunta sempre", "Só o que é arriscado", "Não pergunta"): every command, only the risky ones (low-risk ones allowed automatically), or never (but the blocked ones). */
 export type CommandApproval = "always" | "low_risk_auto" | "never";
 
 /** `meta.missionAutoApproved`: a command allowed without a card (one quiet line, Revogar). */

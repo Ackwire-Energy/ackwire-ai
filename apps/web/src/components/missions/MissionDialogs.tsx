@@ -92,6 +92,7 @@ export function NewMissionDialog({
         executors: e.executors ?? [],
         defaultExecutor: e.defaultExecutor,
         codexTooOld: e.codexTooOld,
+        commandApproval: e.commandApproval,
       },
     ];
   });
@@ -103,10 +104,12 @@ export function NewMissionDialog({
   const [home, setHome] = useState<"channel" | "dm">(initialChannelId || memberChannels.length ? "channel" : "dm");
   const [channelId, setChannelId] = useState(initialChannelId ?? memberChannels[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
-  const [approval, setApproval] = useState<CommandApproval>("low_risk_auto");
+  // Autonomia: the agent's default for new missions until the person picks one.
+  const [pickedApproval, setApproval] = useState<CommandApproval | null>(null);
   // The one asked for when it can run a mission, else the first that can.
   const agent = agents.find((a) => a.id === agentId) ?? agents[0];
   const machine = agent?.machine ?? null;
+  const approval: CommandApproval = pickedApproval ?? agent?.commandApproval ?? "low_risk_auto";
   // "Quem programa": only who can work on that computer; default Claude Code when it's there, else the agent.
   const [picked, setPicked] = useState<MissionExecutor | null>(null);
   const executor: MissionExecutor | undefined =
@@ -133,7 +136,7 @@ export function NewMissionDialog({
         agentId: agent.id,
         goal: goal.trim(),
         channelId: where,
-        commandApproval: approval,
+        ...(pickedApproval ? { commandApproval: pickedApproval } : {}),
         ...(executor ? { executor } : {}),
       },
       {

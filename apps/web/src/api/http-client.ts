@@ -48,6 +48,7 @@ import type {
   Message,
   Mission,
   MissionCommand,
+  MissionCommandRule,
   MissionDecision,
   MissionDelivery,
   MissionEligibleAgent,
@@ -57,6 +58,7 @@ import type {
   MissionParticipants,
   MissionPlan,
   MissionReview,
+  MissionSettings,
   MissionSummary,
   Model,
   Organization,
@@ -534,6 +536,18 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
             method: "PUT",
             json: { commandApproval },
           }),
+        settings: (orgId, missionId) => request<MissionSettings>(`${one(orgId, missionId)}/settings`),
+        removeCommandRule: (orgId, missionId, ruleId) =>
+          request<{ rules: MissionCommandRule[] }>(`${one(orgId, missionId)}/command-rules/${enc(ruleId)}`, {
+            method: "DELETE",
+          }),
+        setResumeTasks: (orgId, missionId, resumeTasks) =>
+          request<Mission>(one(orgId, missionId), { method: "PATCH", json: { resumeTasks } }),
+        setAgentDefault: (orgId, agentId, commandApproval) =>
+          request<{ commandApproval: CommandApproval }>(
+            `${org(orgId)}/agents/${enc(agentId)}/mission-command-approval`,
+            { method: "PUT", json: { commandApproval } },
+          ),
         decisions: async (orgId, missionId) =>
           (await request<{ decisions: MissionDecision[] }>(`${one(orgId, missionId)}/decisions`)).decisions,
         commands: (orgId, missionId) =>

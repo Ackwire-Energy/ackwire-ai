@@ -1589,3 +1589,40 @@ a.mi-pr:hover {
     flex-basis: 100%;
   }
 }
+
+/* ---------- Configurações da missão (MissionSettings.tsx; telas/MissaoConfig.html) ---------- */
+.mi-cfg__sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.mi-cfg__body {
+  padding-bottom: 8px;
+}
+.mi-cfg__computer {
+  margin-top: 8px;
+}
+.mi-cfg__foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.mi-cfg__saved {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--faint);
+}
+.mi-cfg__saved[data-saved] {
+  animation: ac-fade-up 0.3s var(--out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mi-cfg__saved[data-saved] {
+    animation: none;
+  }
+}

@@ -67,8 +67,8 @@ export function executorOptions(t: TFunction, executors: MissionExecutor[], agen
   }));
 }
 
-/** "Pedir aprovação de comandos", in the order people read them (the default first). */
-export const COMMAND_APPROVALS: readonly CommandApproval[] = ["low_risk_auto", "always", "never"];
+/** Autonomia, from asking the most to asking nothing (telas/MissaoConfig.html); the middle one is recommended. */
+export const COMMAND_APPROVALS: readonly CommandApproval[] = ["always", "low_risk_auto", "never"];
 
 export function commandApprovalOptions(t: TFunction) {
   return COMMAND_APPROVALS.map((v) => ({
@@ -78,7 +78,7 @@ export function commandApprovalOptions(t: TFunction) {
   }));
 }
 
-/** The same choice everywhere (Nova missão, the plan card): a select with one line on each option. */
+/** The same choice in Nova missão and on the plan card: a select with one line on each option. */
 export function CommandApprovalSelect({
   value,
   onChange,

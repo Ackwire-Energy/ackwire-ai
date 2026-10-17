@@ -10,6 +10,8 @@ export interface Toast {
   id: number;
   tone: "error" | "info";
   text: string;
+  /** A second, smaller line ("Salvo" → "Autonomia: Pergunta sempre"). */
+  detail?: string;
   /** Quick actions ("Ajustar", "Desfazer"); usually one. */
   actions?: ToastAction[];
 }
@@ -20,7 +22,7 @@ export interface ToastAction {
 }
 
 interface ToastApi {
-  show: (text: string, tone?: Toast["tone"], action?: ToastAction | ToastAction[]) => void;
+  show: (text: string, tone?: Toast["tone"], action?: ToastAction | ToastAction[], detail?: string) => void;
 }
 
 const ToastContext = createContext<ToastApi>({ show: () => {} });
@@ -35,9 +37,16 @@ export function createToastStore() {
     for (const l of listeners) l();
   };
   return {
-    show(text: string, tone: Toast["tone"] = "info", action?: ToastAction | ToastAction[]) {
+    show(text: string, tone: Toast["tone"] = "info", action?: ToastAction | ToastAction[], detail?: string) {
       const actions = action ? (Array.isArray(action) ? action : [action]) : [];
-      const toast = { id: nextId++, tone, text, ...(actions.length > 0 ? { actions } : {}) };
+      const toast = {
+        id: nextId++,
+        tone,
+        text,
+        ...(detail ? { detail } : {}),
+        ...(actions.length > 0 ? { actions } : {}),
+      };
+      // The same words replace the older one ("Salvo" after "Salvo": the newest detail and Desfazer).
       toasts = [...toasts.filter((t) => t.text !== text), toast].slice(-3);
       emit();
       setTimeout(() => {
@@ -71,7 +80,8 @@ export function ToastProvider({
 }) {
   const toasts = useSyncExternalStore(store.subscribe, store.get, store.get);
   const show = useCallback(
-    (text: string, tone?: Toast["tone"], action?: ToastAction | ToastAction[]) => store.show(text, tone, action),
+    (text: string, tone?: Toast["tone"], action?: ToastAction | ToastAction[], detail?: string) =>
+      store.show(text, tone, action, detail),
     [store],
   );
   return (
@@ -85,7 +95,16 @@ export function ToastProvider({
             role={toast.tone === "error" ? "alert" : "status"}
           >
             <Icon name={toast.tone === "error" ? "alert" : "check"} />
-            <span className="ac-toast__text">{toast.text}</span>
+            <span className="ac-toast__text">
+              {toast.detail ? (
+                <>
+                  <b className="ac-toast__title">{toast.text}</b>
+                  <small className="ac-toast__detail">{toast.detail}</small>
+                </>
+              ) : (
+                toast.text
+              )}
+            </span>
             {toast.actions?.map((action) => (
               <button
                 key={action.label}

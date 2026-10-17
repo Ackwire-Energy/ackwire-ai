@@ -239,7 +239,7 @@ export function useSetMissionExecutor(orgId: string) {
   });
 }
 
-/** "Pedir aprovação de comandos" (and Revogar on an automatic approval: back to always). */
+/** Autonomia (and Revogar on an automatic approval: back to always). The mission shows the new value at once. */
 export function useSetCommandApproval(orgId: string, missionId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -247,7 +247,61 @@ export function useSetCommandApproval(orgId: string, missionId: string) {
     meta: { silent: true },
     mutationFn: (commandApproval: CommandApproval) =>
       api.missions.setCommandApproval(orgId, missionId, commandApproval),
-    onSuccess: () => refreshMission(qc, orgId, missionId, []),
+    onSuccess: (out) => {
+      patchMission(qc, orgId, missionId, { commandApproval: out.commandApproval });
+      refreshMission(qc, orgId, missionId, ["settings"]);
+    },
+  });
+}
+
+/** A field changed: the cached mission (by id and by thread) shows it before the refetch. */
+function patchMission(qc: QC, orgId: string, missionId: string, patch: Partial<Mission>) {
+  const one = qc.getQueryData<Mission>(keys.mission(orgId, missionId));
+  if (one) qc.setQueryData(keys.mission(orgId, missionId), { ...one, ...patch });
+  for (const [key, value] of qc.getQueriesData<Mission | null>({ queryKey: [...keys.missions(orgId), "thread"] })) {
+    if (value && value.id === missionId) qc.setQueryData(key, { ...value, ...patch });
+  }
+}
+
+/** "Configurações da missão": the allowed rules, what happened to its commands, the agent's default. */
+export function useMissionSettings(orgId: string, missionId: string | null | undefined, enabled = true) {
+  const api = useApi();
+  return useMissionPart(orgId, missionId, "settings", () => api.missions.settings(orgId, missionId ?? ""), enabled);
+}
+
+/** The × in "O que já foi liberado". */
+export function useRemoveCommandRule(orgId: string, missionId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (ruleId: string) => api.missions.removeCommandRule(orgId, missionId, ruleId),
+    onSuccess: () => refreshMission(qc, orgId, missionId, ["settings", "commands"]),
+  });
+}
+
+/** "Retomar sozinho quando ele voltar". */
+export function useSetResumeTasks(orgId: string, missionId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (resumeTasks: boolean) => api.missions.setResumeTasks(orgId, missionId, resumeTasks),
+    onSuccess: (mission) => cacheMission(qc, orgId, mission),
+  });
+}
+
+/** "Usar como padrão" for the agent's next missions. */
+export function useSetAgentMissionDefault(orgId: string, missionId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (commandApproval: CommandApproval) => api.missions.setAgentDefault(orgId, agentId, commandApproval),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.missionPart(orgId, missionId, "settings") });
+      void qc.invalidateQueries({ queryKey: [...keys.missions(orgId), "eligible"] });
+    },
   });
 }
 

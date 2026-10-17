@@ -61,6 +61,7 @@ import type {
   Message,
   Mission,
   MissionCommand,
+  MissionCommandRule,
   MissionControl,
   MissionCreateInput,
   MissionDecision,
@@ -75,6 +76,7 @@ import type {
   MissionParticipants,
   MissionPlan,
   MissionReview,
+  MissionSettings,
   MissionSummary,
   Model,
   Organization,
@@ -476,10 +478,22 @@ export interface ApiClient {
     setMachine(orgId: string, missionId: string, machineId: string, repoDir?: string): Promise<Mission>;
     /** Before Start, its owner switches who programs (the planning starts again). */
     setExecutor(orgId: string, missionId: string, executor: MissionExecutor): Promise<Mission>;
-    /** "Pedir aprovação de comandos" (owner or deciders; Revogar sets always). */
+    /** Autonomia (owner or deciders; Revogar sets always). */
     setCommandApproval(
       orgId: string,
       missionId: string,
+      commandApproval: CommandApproval,
+    ): Promise<{ commandApproval: CommandApproval }>;
+    /** "Configurações da missão": the allowed rules, the command stats, the agent's default. */
+    settings(orgId: string, missionId: string): Promise<MissionSettings>;
+    /** The × in "O que já foi liberado" (owner or deciders). */
+    removeCommandRule(orgId: string, missionId: string, ruleId: string): Promise<{ rules: MissionCommandRule[] }>;
+    /** "Retomar sozinho quando ele voltar" (owner or deciders). */
+    setResumeTasks(orgId: string, missionId: string, resumeTasks: boolean): Promise<Mission>;
+    /** "Usar como padrão": the autonomy the agent's next missions start with (its owner or an admin). */
+    setAgentDefault(
+      orgId: string,
+      agentId: string,
       commandApproval: CommandApproval,
     ): Promise<{ commandApproval: CommandApproval }>;
     decisions(orgId: string, missionId: string): Promise<MissionDecision[]>;

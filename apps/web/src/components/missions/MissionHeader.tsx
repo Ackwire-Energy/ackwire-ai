@@ -1,4 +1,4 @@
-import { AvatarStack, Button, Icon, Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "@agenteschat/ui";
+import { AvatarStack, Button, Icon, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -11,11 +11,10 @@ import {
   useMissionParticipants,
   useMissionPlan,
   useRequestJoin,
-  useSetCommandApproval,
   useThreadTasks,
 } from "@/api/missions";
 import { useMachines } from "@/api/queries";
-import type { CommandApproval, Mission, MissionControl, ThreadInfo } from "@/api/types";
+import type { Mission, MissionControl, ThreadInfo } from "@/api/types";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
@@ -33,7 +32,6 @@ import {
 } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
 import {
-  COMMAND_APPROVALS,
   ExecutorChip,
   MachineChip,
   MissionStatusChip,
@@ -43,13 +41,14 @@ import {
 } from "./MissionBits";
 import { CloseMissionDialog, ShareMissionDialog } from "./MissionDialogs";
 import { SessionsDialog } from "./MissionSessions";
+import { MissionSettingsDialog } from "./MissionSettings";
 
 /**
  * A mission's thread: the thread header IS the mission header (ADR 0029 §13).
  * Row 1: back, the agent, the title once, the state, who programs and where,
  * "Missão · DM com Theo" / "Missão · #canal", then who takes part, Arquivos
- * and ⋯ (Pausar / Retomar, Parar, Compartilhar, Pedir aprovação de comandos,
- * Fechar missão). Row 2: the plan strip ("4 de 12 itens"), what runs (the
+ * and ⋯ (actions only: Pausar / Retomar, Parar agora, Compartilhar, Fechar
+ * missão; then "Configurações da missão…" with the autonomy on the right). Row 2: the plan strip ("4 de 12 itens"), what runs (the
  * pixel orbit; nothing when nothing runs), what waits for you, how long, and
  * "N sessões ›" (the sessions dialog). Reading back through the conversation
  * folds it into one compact row (title, state, strip). It is the column's
@@ -67,10 +66,9 @@ export function MissionThreadHeader({ thread, mission: m }: { thread: ThreadInfo
   const tasks = useThreadTasks(org.id, m.threadId);
   const people = useMissionParticipants(org.id, m.id);
   const control = useMissionControl(org.id);
-  const setApproval = useSetCommandApproval(org.id, m.id);
   const api = useApi();
   const approveAll = useMissionAct(org.id, m.id, () => api.missions.approveProvisional(org.id, m.id));
-  const [dialog, setDialog] = useState<"share" | "close" | "sessions" | null>(null);
+  const [dialog, setDialog] = useState<"share" | "close" | "sessions" | "settings" | null>(null);
   const compact = useCompactOnScroll();
   const open = isOpenMission(m);
   const offline = Boolean(m.machine && !m.machine.online);
@@ -183,61 +181,49 @@ export function MissionThreadHeader({ thread, mission: m }: { thread: ThreadInfo
           )}
           <Menu
             align="end"
-            label={t("missions.pinned.more")}
+            label={t("missions.menu.label")}
             trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("missions.pinned.more")} />}
           >
+            {/* Actions only, each saying what it does; the settings are in their own dialog (telas/MissaoConfig.html). */}
             {menu && m.canAct && (m.status === "active" || m.status === "awaiting_close") && (
-              <MenuItem icon="pause" description={t("missions.actions.pauseHint")} onSelect={() => act("pause")}>
-                {t("missions.actions.pause")}
+              <MenuItem icon="pause" description={t("missions.menu.pauseHint")} onSelect={() => act("pause")}>
+                {t("missions.menu.pause")}
               </MenuItem>
             )}
             {menu && m.canAct && m.status === "paused" && (
-              <MenuItem icon="play" onSelect={() => act("resume")}>
-                {t("missions.actions.resume")}
+              <MenuItem icon="play" description={t("missions.menu.resumeHint")} onSelect={() => act("resume")}>
+                {t("missions.menu.resume")}
               </MenuItem>
             )}
             {menu && m.canAct && m.status !== "proposed" && (
-              <MenuItem icon="stop" description={t("missions.actions.stopHint")} onSelect={() => act("stop")}>
-                {t("missions.actions.stop")}
+              <MenuItem icon="stop" description={t("missions.menu.stopHint")} onSelect={() => act("stop")}>
+                {t("missions.menu.stop")}
               </MenuItem>
             )}
-            {menu && m.canAct && (
-              <>
-                <MenuSeparator />
-                <MenuRadioGroup
-                  label={t("missions.commandApproval.label")}
-                  value={m.commandApproval}
-                  onValueChange={(raw) => {
-                    const v = raw as CommandApproval;
-                    setApproval.mutate(v, {
-                      onSuccess: () =>
-                        toast.show(
-                          t("missions.commandApproval.changed", { value: t(`missions.commandApproval.${v}` as const) }),
-                        ),
-                      onError: (error) => toast.show(errorText(t, error), "error"),
-                    });
-                  }}
-                  options={COMMAND_APPROVALS.map((v) => ({ value: v, label: t(`missions.commandApproval.${v}`) }))}
-                />
-              </>
-            )}
-            <MenuSeparator />
-            <MenuItem icon="members" onSelect={() => setDialog("share")}>
-              {t("missions.actions.share")}
-            </MenuItem>
-            <MenuItem
-              icon="link"
-              onSelect={async () => {
-                await navigator.clipboard?.writeText(`${window.location.origin}/org/${org.id}/threads/${thread.id}`);
-                toast.show(t("channel.linkCopied"));
-              }}
-            >
-              {t("channel.copyLink")}
+            <MenuItem icon="members" description={t("missions.menu.shareHint")} onSelect={() => setDialog("share")}>
+              {t("missions.menu.share")}
             </MenuItem>
             {open && m.canManage && (
-              <MenuItem icon="check" onSelect={() => setDialog("close")}>
-                {t("missions.actions.close")}
+              <MenuItem
+                icon="archive"
+                danger
+                description={t("missions.menu.closeHint")}
+                onSelect={() => setDialog("close")}
+              >
+                {t("missions.menu.close")}
               </MenuItem>
+            )}
+            {open && (
+              <>
+                <MenuSeparator />
+                <MenuItem
+                  icon="settings"
+                  hint={t(`missions.commandApproval.${m.commandApproval}` as const)}
+                  onSelect={() => setDialog("settings")}
+                >
+                  {t("missions.menu.settings")}
+                </MenuItem>
+              </>
             )}
           </Menu>
         </div>
@@ -309,6 +295,11 @@ export function MissionThreadHeader({ thread, mission: m }: { thread: ThreadInfo
         <CloseMissionDialog mission={m} open={dialog === "close"} onOpenChange={(o) => setDialog(o ? "close" : null)} />
       )}
       {dialog === "sessions" && <SessionsDialog mission={m} tasks={sessions} onClose={() => setDialog(null)} />}
+      <MissionSettingsDialog
+        mission={m}
+        open={dialog === "settings"}
+        onOpenChange={(o) => setDialog(o ? "settings" : null)}
+      />
     </header>
   );
 }

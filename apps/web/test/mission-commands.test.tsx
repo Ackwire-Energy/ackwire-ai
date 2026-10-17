@@ -221,15 +221,15 @@ describe("command approvals", () => {
     ]);
   });
 
-  test("Pedir aprovação de comandos: the three options, the default first", () => {
+  test("Autonomia: the three options, from asking the most to asking nothing, in plain words", () => {
     expect(commandApprovalOptions(createI18n("pt-BR").t).map((o) => o.label)).toEqual([
-      "Só os arriscados",
-      "Sempre",
-      "Nunca (exceto os bloqueados)",
+      "Pergunta sempre",
+      "Só o que é arriscado",
+      "Não pergunta",
     ]);
     expect(commandApprovalOptions(createI18n("en").t).map((o) => o.value)).toEqual([
-      "low_risk_auto",
       "always",
+      "low_risk_auto",
       "never",
     ]);
   });

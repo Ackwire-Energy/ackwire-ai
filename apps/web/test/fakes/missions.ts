@@ -7,6 +7,7 @@
 import type { ApiClient } from "@/api/client";
 import { ApiError } from "@/api/http";
 import type {
+  CommandApproval,
   MachineTask,
   Mission,
   MissionCommand,
@@ -16,6 +17,7 @@ import type {
   MissionParticipants,
   MissionPlanVersion,
   MissionReview,
+  MissionSettings,
 } from "@/api/types";
 import { clone, type MockContext, mockId, perOrg } from "./context";
 
@@ -33,6 +35,10 @@ interface Store {
   commands: MissionCommand[];
   rules: Map<string, string[]>;
   deliveries: MissionDelivery[];
+  /** "Nesta missão: …" per mission (zeros unless a test sets them). */
+  stats: Map<string, MissionSettings["stats"]>;
+  /** "Usar como padrão" per agent. */
+  agentDefaults: Map<string, CommandApproval>;
 }
 
 export function createFakeMissions(
@@ -53,6 +59,8 @@ export function createFakeMissions(
       commands: [],
       rules: new Map(),
       deliveries: [],
+      stats: new Map(),
+      agentDefaults: new Map(),
     }),
   );
   const find = async (orgId: string, missionId: string) => {
@@ -109,8 +117,9 @@ export function createFakeMissions(
         },
       });
     },
-    eligibleAgents: async (orgId) =>
-      (await ctx.lookup.agents(orgId)).map((a) => ({
+    eligibleAgents: async (orgId) => {
+      const defaults = (await store(orgId)).agentDefaults;
+      return (await ctx.lookup.agents(orgId)).map((a) => ({
         agentId: a.id,
         handle: a.handle,
         name: a.name,
@@ -122,7 +131,9 @@ export function createFakeMissions(
         executors: ["claude", "codex", "agent"] as ("claude" | "codex" | "agent")[],
         defaultExecutor: "claude" as const,
         codexTooOld: false,
-      })),
+        commandApproval: defaults.get(a.id) ?? ("low_risk_auto" as const),
+      }));
+    },
     taskOutput: async (orgId, taskId) => {
       const s = await store(orgId);
       const task = s.tasks.find((x) => x.id === taskId);
@@ -196,7 +207,8 @@ export function createFakeMissions(
         status: "proposed",
         repoDir: input.folder ?? "",
         resumeTasks: true,
-        commandApproval: input.commandApproval ?? "low_risk_auto",
+        commandApproval:
+          input.commandApproval ?? (await store(orgId)).agentDefaults.get(input.agentId) ?? "low_risk_auto",
         plan: { version: 0, done: 0, total: 0, waiting: 0, doing: 0, items: [] },
         pending: { decisions: 0, provisional: 0, reviews: 0, suggestions: 0, joinRequests: 0, commands: 0 },
         joinRequested: false,
@@ -316,6 +328,60 @@ export function createFakeMissions(
         needsComputer: false,
       });
       return clone(m);
+    },
+    settings: async (orgId, missionId) => {
+      const m = await find(orgId, missionId);
+      const s = await store(orgId);
+      const me = await ctx.lookup.me();
+      return clone({
+        missionId,
+        rules: (s.rules.get(missionId) ?? []).map((rule) => ({
+          id: `rule:${rule}`,
+          rule,
+          by: me?.user.id ?? null,
+          createdAt: ctx.now().toISOString(),
+        })),
+        stats: s.stats.get(missionId) ?? { auto: 0, asked: 0, blocked: 0 },
+        agentDefault: {
+          commandApproval: s.agentDefaults.get(m.agentId) ?? "low_risk_auto",
+          canSet: true,
+          ownerId: me?.user.id ?? null,
+        },
+      });
+    },
+    removeCommandRule: async (orgId, missionId, ruleId) => {
+      log("missions.removeCommandRule", orgId, missionId, ruleId);
+      const m = await find(orgId, missionId);
+      if (!m.canAct) throw new ApiError(403, "mission.not_allowed", "Only the owner or a decider");
+      const s = await store(orgId);
+      const list = s.rules.get(missionId) ?? [];
+      const rule = ruleId.replace(/^rule:/, "");
+      if (!list.includes(rule)) throw new ApiError(404, "mission.rule_not_found", "Not allowed in this mission");
+      s.rules.set(
+        missionId,
+        list.filter((r) => r !== rule),
+      );
+      const me = await ctx.lookup.me();
+      return clone({
+        rules: (s.rules.get(missionId) ?? []).map((r) => ({
+          id: `rule:${r}`,
+          rule: r,
+          by: me?.user.id ?? null,
+          createdAt: ctx.now().toISOString(),
+        })),
+      });
+    },
+    setResumeTasks: async (orgId, missionId, resumeTasks) => {
+      log("missions.setResumeTasks", orgId, missionId, resumeTasks);
+      const m = await find(orgId, missionId);
+      if (!m.canAct) throw new ApiError(403, "mission.not_allowed", "Only the owner or a decider");
+      touch(m, { resumeTasks });
+      return clone(m);
+    },
+    setAgentDefault: async (orgId, agentId, commandApproval) => {
+      log("missions.setAgentDefault", orgId, agentId, commandApproval);
+      (await store(orgId)).agentDefaults.set(agentId, commandApproval);
+      return { commandApproval };
     },
     decisions: async (orgId, missionId) =>
       clone((await store(orgId)).decisions.filter((d) => d.missionId === missionId)),

@@ -265,7 +265,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
   );
 }
 
-/** "Pedir aprovação de comandos" on the plan card (and the same choice in Nova missão and ⋯). */
+/** Autonomia on the plan card (the same choice as Nova missão and Configurações da missão). */
 function PlanApprovalSelect({ mission }: { mission: Mission }) {
   const { t } = useTranslation();
   const { org } = useOrg();

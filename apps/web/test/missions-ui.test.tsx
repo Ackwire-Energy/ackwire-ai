@@ -142,7 +142,7 @@ describe("Missões (Threads.html)", () => {
     expect(atlas.textContent).toContain("No mac");
   });
 
-  test("Nova missão: Pedir aprovação de comandos starts at 'Só os arriscados' (low-risk ones allowed automatically)", async () => {
+  test("Nova missão: Autonomia starts at 'Só o que é arriscado' (low-risk ones allowed automatically)", async () => {
     const api = createFakeApi(seedState());
     api.missions.eligibleAgents = async () => [pick(ADA_ID, "Ada")];
     await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
@@ -150,8 +150,20 @@ describe("Missões (Threads.html)", () => {
     await act(async () => fireEvent.click(screen().getAllByRole("button", { name: /Nova missão/ })[0] as HTMLElement));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Nova missão" });
-    const select = within(dialog).getByRole("combobox", { name: "Pedir aprovação de comandos" });
-    expect(select.textContent).toContain("Só os arriscados");
+    const select = within(dialog).getByRole("combobox", { name: "Autonomia" });
+    expect(select.textContent).toContain("Só o que é arriscado");
+  });
+
+  test("Nova missão: Autonomia starts at the agent's default for new missions", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    api.missions.eligibleAgents = async () => [{ ...pick(ADA_ID, "Ada"), commandApproval: "always" }];
+    await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
+    await settle(6);
+    await act(async () => fireEvent.click(screen().getAllByRole("button", { name: /Nova missão/ })[0] as HTMLElement));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Nova missão" });
+    expect(within(dialog).getByRole("combobox", { name: "Autonomia" }).textContent).toContain("Pergunta sempre");
   });
 
   test("Nova missão: an agent that can't run one is listed disabled with the reason, and a link for its owner", async () => {
