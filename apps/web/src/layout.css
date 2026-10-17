@@ -5592,6 +5592,20 @@ button.live-call__head:hover {
   padding: 0;
   gap: 0;
 }
+/* The bell's badge bumps when a notification arrives (telas/Notificacoes.html). */
+.sidebar__bump {
+  animation: sidebar-bump 0.5s var(--spring);
+}
+@keyframes sidebar-bump {
+  40% {
+    transform: scale(1.35);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar__bump {
+    animation: none;
+  }
+}
 .sidebar[data-rail="true"] .sidebar__unread,
 .sidebar[data-rail="true"] .sidebar__count,
 .sidebar[data-rail="true"] .sidebar__item .ac-count {

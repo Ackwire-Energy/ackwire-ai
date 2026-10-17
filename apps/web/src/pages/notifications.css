@@ -1,0 +1,997 @@
+/*
+ * Notificações (telas/Notificacoes.html): "Esperando você" on top (the
+ * agents look up while they wait), then the rest by day, grouped by
+ * conversation. Inline actions float on hover / focus (a row on phones),
+ * the mini composer opens in place. Pixel pieces from @agenteschat/ui:
+ * ExpiryFuse (approvals), PlanStrip (mission and routine steps), SkyGlow
+ * (all caught up).
+ */
+.nt {
+  gap: 0;
+  padding: 26px 28px 120px;
+}
+.nt-grow {
+  flex: 1;
+}
+
+/* Avatars at the prototype's sizes (the engine draws to the box). */
+.nt-av40 {
+  width: 40px;
+  height: 40px;
+}
+.nt-av32 {
+  width: 32px;
+  height: 32px;
+}
+.nt-av30 {
+  width: 30px;
+  height: 30px;
+}
+.nt-av22 {
+  width: 22px;
+  height: 22px;
+}
+.nt-av20 {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+.nt-av17 {
+  width: 17px;
+  height: 17px;
+  font-size: 8px;
+}
+
+/* ── Header and toolbar ─────────────────────────────────────────────────── */
+.nt-hd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.nt-hd h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: clamp(30px, 4vw, 40px);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+.nt-hd p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  max-width: 60ch;
+}
+.nt-hd__acts {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.nt-tb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.nt-segwrap {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px;
+  margin: -2px;
+}
+.nt-segwrap::-webkit-scrollbar {
+  display: none;
+}
+.nt-keys {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.nt-keys__sep {
+  width: 10px;
+}
+
+/* ── Section heads ──────────────────────────────────────────────────────── */
+.nt-sh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 10px;
+}
+.nt-sh h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink2);
+}
+.nt-n {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--faint);
+}
+
+/* ── "Esperando você": what blocks an agent or a decision ───────────────── */
+.nt-wait {
+  position: relative;
+  border-radius: 20px;
+  background: var(--raised);
+  box-shadow: var(--e2), var(--top);
+  margin-bottom: 28px;
+}
+.nt-wh {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 13px;
+}
+.nt-faces {
+  display: flex;
+  flex: none;
+}
+.nt-faces > * {
+  margin-left: -6px;
+  transition: transform 0.2s var(--spring);
+}
+.nt-faces > *:first-child {
+  margin-left: 0;
+}
+.nt-faces > *:hover {
+  transform: translateY(-3px);
+}
+.nt-wh__t {
+  flex: 1;
+  min-width: 0;
+}
+.nt-wh h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nt-wh small {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+}
+.nt-wi {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 2px 14px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--line);
+  outline: none;
+  overflow: hidden;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.nt-wi:last-child {
+  border-radius: 0 0 20px 20px;
+}
+.nt-wi:hover {
+  background: color-mix(in srgb, var(--sunken) 35%, transparent);
+}
+.nt-wi.is-cur {
+  background: color-mix(in srgb, var(--sunken) 70%, transparent);
+}
+.nt-wi:focus-visible,
+.nt-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+.nt-wi.is-unread::before,
+.nt-item.is-unread::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 16px;
+  width: 3px;
+  height: 20px;
+  border-radius: 3px;
+  background: var(--ink);
+}
+.nt-face {
+  grid-row: 1 / span 3;
+  padding-top: 2px;
+}
+.nt-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--faint);
+  min-width: 0;
+}
+.nt-meta b {
+  color: var(--ink2);
+  font-weight: 600;
+}
+.nt-wi h3 {
+  margin: 3px 0 0;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+}
+.nt-ctx {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.nt-body {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  min-width: 0;
+}
+.nt-wacts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.nt-sug {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.nt-sug button {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--sunken);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.18s var(--spring);
+}
+.nt-sug button:hover {
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.nt-sug button:active {
+  transform: scale(0.96);
+}
+.nt-sug button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* Forum seats */
+.nt-seats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.nt-seat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 4px;
+  border-radius: 999px;
+  background: var(--sunken);
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.nt-seat b {
+  font-weight: 600;
+  color: var(--ink2);
+}
+.nt-seat--me {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+  color: var(--ink);
+}
+.nt-ok {
+  color: var(--ok);
+}
+.nt-quote {
+  display: flex;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--ink2);
+  line-height: 1.5;
+  min-width: 0;
+}
+.nt-quote::before {
+  content: "";
+  width: 3px;
+  border-radius: 3px;
+  background: var(--line2);
+  flex: none;
+}
+.nt-quote span {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nt-wi .ap-exact {
+  border-radius: 14px;
+}
+.nt-resolved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  animation: nt-fi 0.25s var(--out);
+}
+
+/* ── Day groups and items ───────────────────────────────────────────────── */
+.nt-day {
+  margin-bottom: 22px;
+}
+.nt-list {
+  border-radius: 20px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+}
+.nt-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 0 12px;
+  padding: 12px 16px 13px;
+  border-top: 1px solid var(--line);
+  outline: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.nt-item:first-child {
+  border-top: 0;
+  border-radius: 20px 20px 0 0;
+}
+.nt-item:last-child {
+  border-radius: 0 0 20px 20px;
+}
+.nt-item:only-child {
+  border-radius: 20px;
+}
+.nt-item:hover {
+  background: color-mix(in srgb, var(--sunken) 40%, transparent);
+}
+.nt-item.is-cur {
+  background: color-mix(in srgb, var(--sunken) 75%, transparent);
+}
+.nt-who {
+  padding-top: 1px;
+}
+.nt-c {
+  min-width: 0;
+}
+.nt-l1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.nt-what {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nt-what b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.nt-item:not(.is-unread) .nt-what b {
+  font-weight: 550;
+}
+.nt-tm {
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+  flex: none;
+}
+.nt-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+.nt-chip-ink {
+  color: var(--ink2);
+}
+.nt-chip-ok .ac-icon {
+  color: var(--ok);
+}
+.nt-chip-warn .ac-icon {
+  color: var(--warn);
+}
+.nt-snip {
+  margin: 3px 0 0;
+  font-size: 14px;
+  color: var(--ink2);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nt-item:not(.is-unread) .nt-snip {
+  color: var(--muted);
+}
+.nt-snip b {
+  font-weight: 600;
+  color: var(--ink2);
+}
+.nt-replied {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  min-width: 0;
+}
+.nt-replied .ac-icon {
+  color: var(--ok);
+  flex: none;
+}
+.nt-replied span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nt-replied--quiet {
+  color: var(--faint);
+}
+/* A group: two stacked faces. */
+.nt-stk {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+.nt-stk > *:first-child {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.nt-stk > *:nth-child(2) {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  box-shadow: 0 0 0 2px var(--raised);
+}
+.nt-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  height: 26px;
+  padding: 0 8px 0 6px;
+  margin-left: -6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink2);
+  cursor: pointer;
+}
+.nt-more:hover {
+  background: rgba(127, 127, 127, 0.12);
+}
+.nt-more:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.nt-more .ac-icon {
+  transition: transform 0.25s var(--spring);
+}
+.nt-more[aria-expanded="true"] .ac-icon {
+  transform: rotate(180deg);
+}
+.nt-reps {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: var(--sunken);
+  animation: nt-fi 0.25s var(--out);
+}
+.nt-rep {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 0 10px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--line);
+}
+.nt-rep:first-child {
+  border-top: 0;
+}
+.nt-rep__head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.nt-rep__head b {
+  font-weight: 600;
+}
+.nt-rep__head small {
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.nt-rep p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink2);
+  line-height: 1.5;
+}
+/* Reactions: quieter. */
+.nt-item--rx {
+  padding-top: 10px;
+  padding-bottom: 11px;
+}
+.nt-item--rx .nt-l1 {
+  font-size: 13px;
+}
+.nt-item--rx .nt-what b {
+  font-weight: 550;
+}
+.nt-emo {
+  position: relative;
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+.nt-emo span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--sunken);
+  box-shadow: 0 0 0 2px var(--raised);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+}
+.nt-emo span:nth-child(2) {
+  left: 10px;
+  top: 10px;
+}
+.nt-item--rx .nt-quote {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.nt-item--rx .nt-quote span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Mission and routine steps as a pixel strip. */
+.nt-steprow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ── Inline actions: on hover / focus (a floating bar), a row on phones ──── */
+.nt-acts {
+  position: absolute;
+  right: 10px;
+  top: 7px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow: var(--e2), var(--top);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(3px);
+  transition:
+    opacity 0.15s,
+    transform 0.2s var(--spring);
+  z-index: 2;
+}
+.nt-item:hover .nt-acts,
+.nt-item:focus-within .nt-acts,
+.nt-item.is-cur .nt-acts,
+.nt-item:has([data-state="open"]) .nt-acts {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+.nt-item.is-replying .nt-acts {
+  opacity: 0;
+  pointer-events: none;
+}
+.nt-nb {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    transform 0.18s var(--spring);
+}
+.nt-nb:hover {
+  background: rgba(127, 127, 127, 0.12);
+  color: var(--ink);
+}
+.nt-nb:active {
+  transform: scale(0.92);
+}
+.nt-nb:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.nt-nb__label {
+  display: none;
+}
+.nt-nb[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--bg);
+  background: var(--ink);
+  box-shadow: var(--e2);
+  pointer-events: none;
+  animation: nt-fi 0.15s var(--out);
+  z-index: 5;
+}
+
+/* ── The mini composer, opened in place ─────────────────────────────────── */
+.nt-cmp {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+  animation: nt-fi 0.22s var(--out);
+  cursor: auto;
+}
+.nt-cmp:focus-within {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+.nt-cmp textarea {
+  all: unset;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  max-height: 180px;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 2px 4px;
+  white-space: pre-wrap;
+  overflow-y: auto;
+  color: var(--ink);
+}
+.nt-cmp textarea::placeholder {
+  color: var(--faint);
+}
+.nt-cmp__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nt-cmp__hint {
+  font-size: 12px;
+  color: var(--faint);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Exit and entrance ──────────────────────────────────────────────────── */
+.is-leaving {
+  animation: nt-leave 0.26s var(--out) both;
+  pointer-events: none;
+}
+.nt-item.is-new,
+.nt-wi.is-new {
+  animation: nt-landed 0.8s var(--spring) both;
+}
+.nt-item.is-new::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+  opacity: 0;
+  animation: nt-ring 2.4s var(--out) 0.2s;
+}
+.nt-item.is-pulse {
+  animation: nt-pulse 0.7s var(--spring);
+}
+@keyframes nt-leave {
+  to {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+@keyframes nt-ring {
+  15% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes nt-landed {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes nt-pulse {
+  40% {
+    transform: scale(1.01);
+    background: color-mix(in srgb, var(--sunken) 70%, transparent);
+  }
+}
+@keyframes nt-fi {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Empty: everything done ─────────────────────────────────────────────── */
+.nt-calm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 0 18px 26px;
+  border-radius: 20px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  margin-bottom: 22px;
+  animation: nt-fi 0.4s var(--out);
+}
+.nt-calm__glow {
+  position: relative;
+  width: calc(100% + 36px);
+  margin: 0 -18px -4px;
+  height: 160px;
+}
+.nt-calm__glow .ac-sky-glow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.nt-calm > b {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+.nt-calm > p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 46ch;
+  font-size: 14px;
+}
+.nt-nores {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 36px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  border-radius: 20px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  margin-bottom: 22px;
+}
+.nt-more-pages {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.nt-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--faint);
+  padding: 8px 0;
+}
+
+/* ── Phones ─────────────────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .nt {
+    padding: 18px 16px 120px;
+  }
+  .nt-hd {
+    align-items: flex-start;
+  }
+  .nt-hd__acts {
+    width: 100%;
+  }
+  .nt-keys {
+    display: none;
+  }
+  .nt-tb {
+    margin-bottom: 14px;
+  }
+  .nt-segwrap {
+    width: 100%;
+    -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+    mask-image: linear-gradient(90deg, #000 85%, transparent);
+  }
+  .nt-wh {
+    padding: 12px 14px;
+  }
+  .nt-wi {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 2px 10px;
+    padding: 14px 14px 16px;
+  }
+  .nt-av40 {
+    width: 32px;
+    height: 32px;
+  }
+  .nt-body {
+    grid-column: 1 / -1;
+  }
+  .nt-wacts {
+    gap: 6px;
+  }
+  .nt-wacts .nt-grow {
+    display: none;
+  }
+  .nt-l1 {
+    align-items: flex-start;
+  }
+  .nt-what {
+    white-space: normal;
+  }
+  .nt-tm {
+    padding-top: 1px;
+  }
+  .nt-item {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 0 10px;
+    padding: 12px 14px;
+  }
+  .nt-av32 {
+    width: 28px;
+    height: 28px;
+  }
+  .nt-stk,
+  .nt-emo {
+    width: 28px;
+    height: 28px;
+  }
+  /* The actions: a row under the tapped item. */
+  .nt-acts {
+    position: static;
+    grid-column: 1 / -1;
+    display: none;
+    margin-top: 10px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .nt-item.is-cur .nt-acts {
+    display: flex;
+  }
+  .nt-item.is-replying .nt-acts {
+    display: none;
+  }
+  .nt-nb {
+    width: auto;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 10px;
+    background: var(--raised);
+    box-shadow: var(--e1), var(--top);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink2);
+  }
+  .nt-nb__label {
+    display: inline;
+  }
+  .nt-nb[data-act="open"] {
+    width: 32px;
+    padding: 0;
+  }
+  .nt-nb[data-act="open"] .nt-nb__label {
+    display: none;
+  }
+  .nt-nb[data-tip]:hover::after {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nt-item,
+  .nt-wi,
+  .nt-item::after,
+  .nt-acts,
+  .nt-nb,
+  .nt-nb::after,
+  .nt-cmp,
+  .nt-reps,
+  .nt-resolved,
+  .nt-calm,
+  .nt-more .ac-icon,
+  .nt-faces > *,
+  .nt-sug button {
+    animation: none;
+    transition: none;
+  }
+}

@@ -432,7 +432,7 @@ function ConnectorLine({ approval }: { approval: Approval }) {
 }
 
 /** The exact action: connector, then its values (names are the tool's own identifiers, shown as code). */
-function ExactAction({ approval, max }: { approval: Approval; max?: number }) {
+export function ExactAction({ approval, max }: { approval: Approval; max?: number }) {
   const values = scalars(approval.params);
   const shown = max ? values.slice(0, max) : values;
   return (

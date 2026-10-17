@@ -27,7 +27,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useMissionList } from "@/api/missions";
-import { useChannels, useDms, useOverview, usePrefetchMessages } from "@/api/queries";
+import { useChannels, useDms, useNotificationCount, useOverview, usePrefetchMessages } from "@/api/queries";
 import type { Agent } from "@/api/types";
 import { useAuth } from "@/auth/context";
 import { ZoneSelect } from "@/components/ZoneSelect";
@@ -81,6 +81,14 @@ export function Sidebar() {
   const overview = useOverview(orgId);
   const [creatingChannel, setCreatingChannel] = useState(false);
   const pending = overview.data?.approvalsWaitingForMe ?? 0;
+  // The bell: unread notifications (live through `notification.counts`); the badge bumps when one arrives.
+  const unreadNotifications = useNotificationCount(orgId).data?.unread ?? 0;
+  const lastUnread = useRef(unreadNotifications);
+  const [bumps, setBumps] = useState(0);
+  useEffect(() => {
+    if (unreadNotifications > lastUnread.current) setBumps((b) => b + 1);
+    lastUnread.current = unreadNotifications;
+  }, [unreadNotifications]);
   // Threads: how many open missions wait for me (the server counts: a decision, a review, a suggestion…).
   const missionList = useMissionList(orgId, { status: "waiting_you", limit: 1 });
   const missionsWaiting = missionList.data?.counts.waitingYou ?? 0;
@@ -228,6 +236,24 @@ export function Sidebar() {
         )}
 
         <div className="sidebar__group">
+          <Link
+            to="/org/$orgId/notifications"
+            params={{ orgId }}
+            className="sidebar__item"
+            title={t("shell.notifications")}
+          >
+            <Icon name="bell" />
+            <span className="sidebar__item-label">{t("shell.notifications")}</span>
+            {unreadNotifications > 0 && (
+              <CountBadge
+                key={bumps}
+                className={bumps > 0 ? "sidebar__bump" : undefined}
+                aria-label={t("shell.unreadNotifications", { count: unreadNotifications })}
+              >
+                {unreadNotifications}
+              </CountBadge>
+            )}
+          </Link>
           <Link to="/org/$orgId/approvals" params={{ orgId }} className="sidebar__item" title={t("shell.approvals")}>
             <Icon name="waiting" />
             <span className="sidebar__item-label">{t("shell.approvals")}</span>
