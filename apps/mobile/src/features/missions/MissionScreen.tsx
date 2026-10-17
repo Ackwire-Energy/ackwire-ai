@@ -1,0 +1,304 @@
+import { useMission, useMissionDecisions, useMissionReviews, useThreadInfo, useThreadTasks } from "@agenteschat/client";
+import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
+import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Button, Card, Chip, Count, fonts, Icon, IconButton, PixelOrbit, PlanTrack, Section, Text } from "@/ui";
+import { ThreadOptions } from "../chat/sheets";
+import { chatHref } from "../links/logic";
+import { AgentFace } from "../shared/Face";
+import { useColors, useDirectory, useNow, useOrgId, useWhen } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
+import { MONO, PushedHeader, Tile } from "../shared/parts";
+import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { DecisionCardView, ReviewCardView } from "./cards";
+import {
+  hoursSince,
+  liveSessions,
+  missionTrack,
+  planProgress,
+  planRows,
+  sessionMinutes,
+  takenDecisions,
+  waitingCards,
+} from "./logic";
+
+/**
+ * A mission (ADR 0029): what it is for, how far it got (the plan as pixel
+ * cells), its conversation, what waits on you, who works on the computer
+ * now, the plan and the decisions taken.
+ */
+export function MissionScreen({ id }: { id: string }) {
+  return (
+    <SheetHostProvider>
+      <Mission id={id} />
+    </SheetHostProvider>
+  );
+}
+
+function Mission({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const dir = useDirectory();
+  const c = useColors();
+  const sheet = useSheet();
+  const when = useWhen();
+  const now = useNow(60_000);
+  const insets = useSafeAreaInsets();
+  const mission = useMission(orgId, id);
+  const m = mission.data;
+  const thread = useThreadInfo(orgId, m?.threadId);
+  const tasks = useThreadTasks(orgId, m?.threadId);
+  const reviews = useMissionReviews(orgId, id);
+  const decisions = useMissionDecisions(orgId, id);
+
+  if (!m) {
+    return (
+      <View style={[styles.screen, { backgroundColor: c.bg }]}>
+        <PushedHeader title="" />
+        <View style={styles.center}>
+          {mission.isError ? (
+            <Text tone="muted">{t("mobile.mission.notFound")}</Text>
+          ) : (
+            <ActivityIndicator color={c.muted} />
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  const agent = dir.agentById.get(m.agentId);
+  const color = agentLook(agent).color;
+  const { done, total } = planProgress(m);
+  const hours = hoursSince(m.startedAt, now);
+  const sessions = liveSessions(tasks.data, m.id);
+  const waiting = m.canAct ? waitingCards(reviews.data, decisions.data) : { reviews: [], decisions: [] };
+  const waitingN = waiting.reviews.length + waiting.decisions.length;
+  const rows = planRows(m.plan.items);
+  const taken = takenDecisions(decisions.data);
+  const channelName = thread.data?.channelName ?? "";
+
+  return (
+    <View style={[styles.screen, { backgroundColor: c.bg }]}>
+      <PushedHeader
+        title={m.title}
+        right={
+          thread.data ? (
+            <IconButton
+              icon="more"
+              label={t("mobile.chat.options")}
+              onPress={() => {
+                const info = thread.data;
+                if (info) sheet.open(<ThreadOptions thread={info} mission={m} />);
+              }}
+            />
+          ) : null
+        }
+      />
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}>
+        <View style={styles.head}>
+          <View style={styles.row}>
+            <Icon name="target" size={15} color={c.muted} />
+            <Text variant="small" tone="muted" style={styles.bold}>
+              {channelName ? t("mobile.mission.in", { channel: channelName }) : t("mobile.mission.kind")}
+            </Text>
+          </View>
+          <Text variant="display" style={styles.title}>
+            {m.title}
+          </Text>
+          <Text variant="body" tone="muted">
+            {[
+              agent ? t("mobile.mission.owner", { name: agent.name }) : null,
+              m.startedAt ? t("mobile.mission.since", { when: when.short(m.startedAt) }) : null,
+              hours !== null && hours > 0 ? t("mobile.mission.hours", { count: hours }) : null,
+              m.status !== "active" ? t(`mobile.mission.status.${m.status}`) : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </Text>
+        </View>
+
+        <Card style={styles.progCard}>
+          <View style={styles.prog}>
+            <View style={styles.progHead}>
+              <Count value={done} size={22} />
+              <Text variant="small" tone="muted" style={styles.grow}>
+                {t("mobile.mission.itemsDone", { total })}
+              </Text>
+              <AgentFace agentId={m.agentId} size={30} mode={m.status === "active" ? "run" : "idle"} />
+            </View>
+            <PlanTrack color={color} items={missionTrack(m)} />
+            <View style={styles.chips}>
+              {m.machine ? (
+                <Chip
+                  icon="laptop"
+                  label={t(m.machine.online ? "mobile.mission.computerOn" : "mobile.mission.computerOff", {
+                    name: m.machine.name,
+                  })}
+                />
+              ) : null}
+              {m.runningTasks > 0 ? (
+                <Chip
+                  leading={<PixelOrbit color={color} size={10} />}
+                  label={t("mobile.mission.running", { count: m.runningTasks })}
+                />
+              ) : null}
+            </View>
+          </View>
+        </Card>
+
+        <View style={styles.btn}>
+          <Button
+            variant="primary"
+            wide
+            icon="chat"
+            label={t("mobile.mission.conversation")}
+            onPress={() => router.push(chatHref(m.channelId, m.threadId))}
+          />
+        </View>
+
+        {waitingN > 0 ? (
+          <Section title={t("mobile.home.waiting")} count={waitingN}>
+            <View style={styles.stack}>
+              {waiting.reviews.map((r) => (
+                <ReviewCardView key={r.id} review={r} mission={m} />
+              ))}
+              {waiting.decisions.map((d) => (
+                <DecisionCardView key={d.id} decision={d} mission={m} />
+              ))}
+            </View>
+          </Section>
+        ) : null}
+
+        {sessions.length > 0 ? (
+          <Section title={t("mobile.mission.onComputer")}>
+            <Card>
+              {sessions.map((s, i) => (
+                <View
+                  key={s.id}
+                  style={[styles.sess, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}
+                >
+                  <Tile icon="laptop" />
+                  <View style={styles.grow}>
+                    <Text variant="body" style={styles.bold} numberOfLines={2}>
+                      {s.title}
+                    </Text>
+                    {s.lastLine ? (
+                      <View style={styles.row}>
+                        <Text variant="small" tone="muted" numberOfLines={1} style={styles.shrink}>
+                          {s.lastLine}
+                        </Text>
+                        <View style={[styles.caret, { backgroundColor: c.agent }]} />
+                      </View>
+                    ) : null}
+                  </View>
+                  <View style={styles.meta}>
+                    <Text variant="caption" tone="faint">
+                      {t("mobile.mission.minutes", { count: sessionMinutes(s, now) })}
+                    </Text>
+                    {s.branch ? (
+                      <Text style={[styles.mono, { color: c.faint }]} numberOfLines={1}>
+                        {s.branch}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </Card>
+          </Section>
+        ) : null}
+
+        {rows.length > 0 ? (
+          <Section title={t("mobile.mission.plan.section")} count={rows.length}>
+            <Card>
+              {rows.map((it, i) => (
+                <View
+                  key={it.id}
+                  style={[
+                    styles.planRow,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+                  ]}
+                >
+                  <View style={styles.st}>
+                    {it.status === "done" ? (
+                      <Icon name="check" size={18} color={c.ok} />
+                    ) : it.status === "doing" ? (
+                      <PixelOrbit color={color} size={14} />
+                    ) : it.status === "waiting_you" ? (
+                      <Icon name="clock" size={18} color={c.muted} />
+                    ) : (
+                      <Icon name="circle" size={18} color={c.faint} />
+                    )}
+                  </View>
+                  <View style={styles.grow}>
+                    <Text
+                      variant="body"
+                      tone={it.status === "done" ? "muted" : it.status === "todo" ? "ink2" : "ink"}
+                      style={it.status === "doing" || it.status === "waiting_you" ? styles.bold : undefined}
+                    >
+                      {it.title}
+                    </Text>
+                    {it.status === "doing" || it.status === "waiting_you" ? (
+                      <Text variant="small" tone="muted">
+                        {t(it.status === "doing" ? "mobile.mission.plan.doing" : "mobile.mission.plan.waiting")}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </Card>
+          </Section>
+        ) : null}
+
+        {taken.length > 0 ? (
+          <Section title={t("mobile.mission.decisions")} count={taken.length}>
+            <Card>
+              {taken.map((d, i) => (
+                <View
+                  key={d.id}
+                  style={[styles.dec, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}
+                >
+                  <Tile icon="flag" />
+                  <View style={styles.grow}>
+                    <Text variant="body" style={styles.decText}>
+                      {d.chosen}
+                    </Text>
+                    <Text variant="small" tone="muted">
+                      {[d.question, d.chosenAt ? when.short(d.chosenAt) : null].filter(Boolean).join(" · ")}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </Card>
+          </Section>
+        ) : null}
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  scroll: { paddingTop: 4 },
+  head: { paddingHorizontal: 20, gap: 4 },
+  progCard: { marginHorizontal: 16, marginTop: 16 },
+  row: { flexDirection: "row", alignItems: "center", gap: 8 },
+  title: { marginTop: 4 },
+  bold: { fontFamily: fonts.semibold },
+  grow: { flex: 1 },
+  shrink: { flexShrink: 1 },
+  prog: { padding: 14, gap: 10 },
+  progHead: { flexDirection: "row", alignItems: "baseline", gap: 8 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 2 },
+  btn: { flexDirection: "row", paddingHorizontal: 16, marginTop: 16 },
+  stack: { gap: 8 },
+  sess: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  caret: { width: 2, height: 12 },
+  meta: { alignItems: "flex-end", gap: 4, maxWidth: 110 },
+  mono: { fontFamily: MONO, fontSize: 12 },
+  planRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  st: { width: 22, alignItems: "center" },
+  dec: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  decText: { fontFamily: fonts.medium },
+});
