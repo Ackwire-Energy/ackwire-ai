@@ -234,7 +234,7 @@ async function readPrompts(db: Executor, missionId: string, promptId?: string): 
       continue;
     }
     const p = byId.get(id);
-    if (!p || p.state !== "pending") continue;
+    if (p?.state !== "pending") continue;
     const decision = str(d.decision);
     p.state = decision === "expired" ? "expired" : decision === "deny" ? "denied" : "allowed";
     p.always = decision === "always";

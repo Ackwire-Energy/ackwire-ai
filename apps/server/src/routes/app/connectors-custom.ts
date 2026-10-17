@@ -45,12 +45,9 @@ const CustomServer = z
         suggestedAccess: Access.nullable().openapi({ description: "Our suggestion until an admin decides." }),
         access: Decision.nullable().openapi({ description: "Null = not classified yet: hidden from agents." }),
         level: Decision.openapi({ description: "The decision, else the suggestion." }),
-        suggestionSource: z
-          .enum(["annotation", "verb", "preset", "judge", "judge_failed"])
-          .nullable()
-          .openapi({
-            description: "Where the suggestion came from: the server's hints, the name's verb, or the judge.",
-          }),
+        suggestionSource: z.enum(["annotation", "verb", "preset", "judge", "judge_failed"]).nullable().openapi({
+          description: "Where the suggestion came from: the server's hints, the name's verb, or the judge.",
+        }),
         suggestionReason: z
           .string()
           .nullable()

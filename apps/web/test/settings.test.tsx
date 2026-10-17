@@ -73,7 +73,14 @@ describe("Configurações da organização", () => {
       serverUrl: undefined,
     });
     const tools = screen().getByRole("dialog", { name: "O que Sentry faz" });
-    expect(within(tools).getByRole("region", { name: "Lê" }).textContent).toContain("search_issues");
+    // Built-in connector: the tools read-only, grouped by subject, readable names first.
+    const issues = within(tools).getByRole("region", { name: "Issues" });
+    expect(issues.textContent).toContain("1 ferramenta");
+    // The technical name only shows up when searched for.
+    await type(within(tools).getByRole("searchbox", { name: "Buscar ferramenta" }), "search_issues");
+    const hit = within(tools).getByRole("region", { name: "Issues" });
+    expect(hit.textContent).toContain("Buscar issues");
+    expect(hit.textContent).toContain("search_issues");
     await click(within(tools).getByRole("button", { name: "Cancelar" }));
     await settle(2);
     expect(screen().getByRole("region", { name: "Conectores" }).textContent).toContain("Sentry");
