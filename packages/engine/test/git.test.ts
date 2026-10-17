@@ -21,6 +21,7 @@ import {
   readPack,
   refRule,
   revokeComputerGitCredentials,
+  setAgentRepositories,
   setAgentScopes,
   type ToolContext,
   verifyGitToken,
@@ -323,9 +324,16 @@ describe("git proxy", () => {
   });
 
   test("policy: scope, repository list, revoked or foreign credentials, size limit", async () => {
-    const w = await world(["github:git.read", "github:git.repo:acme/app"]);
+    const w = await world(["github:git.read"]);
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
     expect((await w.call("acme/app.git/info/refs", { query: "?service=git-upload-pack" })).status).toBe(200);
-    expect((await w.call("acme/other.git/info/refs", { query: "?service=git-upload-pack" })).status).toBe(403);
+    const outside = await w.call("acme/other.git/info/refs", { query: "?service=git-upload-pack" });
+    expect(outside.status).toBe(403);
+    expect(await outside.text()).toContain("acme/other isn't one of");
+    // A whole account: every repository of it.
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/*"]);
+    expect((await w.call("acme/other.git/info/refs", { query: "?service=git-upload-pack" })).status).toBe(200);
+    expect((await w.call("beta/other.git/info/refs", { query: "?service=git-upload-pack" })).status).toBe(403);
     expect((await w.call("acme/app.git/info/refs", { query: "?service=git-receive-pack" })).status).toBe(403);
 
     const big = await handleGitProxy(

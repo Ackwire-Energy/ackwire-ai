@@ -119,6 +119,10 @@ export interface ToolSideEffects {
   missionLink?: { missionId: string; threadId: string } | null;
   /** The agent reacted (`react`) instead of replying. */
   reacted?: boolean;
+  /** The GitHub repository the run last worked in (`owner/name`), for "Trabalhando em" and Atividade. */
+  repo?: string;
+  /** A GitHub repository the run was refused (not in the agent's list): Atividade offers to add it. */
+  deniedRepo?: string;
 }
 
 /**
@@ -132,6 +136,8 @@ export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown>
   const link = data.missionLink as { missionId: string; threadId: string } | undefined;
   if (link?.missionId && link.threadId) t.missionLink = link;
   if (data.reacted) t.reacted = true;
+  if (typeof data.repo === "string") t.repo = data.repo;
+  if (typeof data.deniedRepo === "string") t.deniedRepo = data.deniedRepo;
   const update = data.memoryUpdate as MemoryUpdate | undefined;
   if (update) t.memoryUpdates = [...(t.memoryUpdates ?? []), update];
   return update ?? null;
@@ -144,10 +150,12 @@ export function mergeToolEffects(t: ToolSideEffects, e: ToolSideEffects | null |
   if (e.memoryUpdates?.length) t.memoryUpdates = [...(t.memoryUpdates ?? []), ...e.memoryUpdates];
   if (e.missionLink) t.missionLink = e.missionLink;
   if (e.reacted) t.reacted = true;
+  if (e.repo) t.repo = e.repo;
+  if (e.deniedRepo) t.deniedRepo = e.deniedRepo;
 }
 
 const hasEffects = (e: ToolSideEffects) =>
-  Boolean(e.artifacts?.length || e.memoryUpdates?.length || e.missionLink || e.reacted);
+  Boolean(e.artifacts?.length || e.memoryUpdates?.length || e.missionLink || e.reacted || e.repo || e.deniedRepo);
 
 /** The transcript key where the bridge leaves a computer-brain turn's side effects for the engine. */
 const BRIDGE_EFFECTS = "bridgeEffects";

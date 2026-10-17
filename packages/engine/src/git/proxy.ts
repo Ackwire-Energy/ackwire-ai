@@ -7,14 +7,13 @@ import { CONNECTOR_ALL, freshGrantedKeys, grantKey } from "../tools/scopes";
 import { verifyGitToken } from "./credential";
 import { appTokenForRepo, type GitHubAppConfig } from "./github-app";
 import { parseReceivePackRequest, pkt, type RefCommand, readPack, walkToOld, ZERO_OID } from "./pack";
+import { agentRepositoryList, repoInList } from "./repos";
 
 const { sandboxes, agents, connectorConnections } = schema;
 
 export const GIT_SCOPES = {
   read: connectorScope("github", "git.read"),
   write: connectorScope("github", "git.write"),
-  /** `github:git.repo:owner/name` (or `owner/*`): when an agent has any, only those repositories. */
-  repoPrefix: connectorScope("github", "git.repo:"),
 };
 
 export const GIT_LIMITS = {
@@ -61,14 +60,6 @@ export function gitAccess(keys: Set<string>, connectionId: string) {
   const all = keys.has(grantKey(connectionId, CONNECTOR_ALL));
   const write = all || keys.has(grantKey(connectionId, GIT_SCOPES.write));
   return { read: write || keys.has(grantKey(connectionId, GIT_SCOPES.read)), write };
-}
-
-function repoAllowed(keys: Set<string>, connectionId: string, owner: string, repo: string) {
-  const prefix = grantKey(connectionId, GIT_SCOPES.repoPrefix);
-  const listed = [...keys].filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length).toLowerCase());
-  if (listed.length === 0) return true;
-  const full = `${owner}/${repo}`.toLowerCase();
-  return listed.some((p) => p === full || (p.endsWith("/*") && p.slice(0, -2) === owner.toLowerCase()));
 }
 
 /** Why a push command is refused, or null. Only `agentes/{handle}/*` branches, no tags, no deletes. */
@@ -204,8 +195,12 @@ export async function handleGitProxy(
   const { read: canRead, write: canWrite } = gitAccess(keys, connection.id);
   const repoName = `${parsed.owner}/${parsed.repo}`;
   if (!canRead) return text(403, `agentes: ${agent.handle} has no git access to GitHub (scope github:git.read)`);
-  if (!repoAllowed(keys, connection.id, parsed.owner, parsed.repo)) {
-    return text(403, `agentes: ${agent.handle} may not use ${repoName}`);
+  // The agent's repositories (`agent_repositories`): none = all; reads count too.
+  if (!repoInList(await agentRepositoryList(deps.db, claims.orgId, claims.agentId), parsed.owner, parsed.repo)) {
+    return text(
+      403,
+      `agentes: ${repoName} isn't one of ${agent.handle}'s repositories (ask whoever can edit it to add it)`,
+    );
   }
   if (service === "git-receive-pack" && !canWrite) {
     return text(403, `agentes: ${agent.handle} can't push (scope github:git.write)`);

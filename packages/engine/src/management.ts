@@ -385,6 +385,10 @@ export interface RunSummary {
   costNanoUsd: number;
   createdAt: Date;
   finishedAt: Date | null;
+  /** The GitHub repository it worked in (`owner/name`), if any. */
+  repo: string | null;
+  /** A GitHub repository it was refused (not in the agent's list), if any. */
+  deniedRepo: string | null;
 }
 
 /** Run history, newest first, with tokens and cost from the usage records of each run. */
@@ -454,6 +458,8 @@ export async function listRuns(
       costNanoUsd: Number(u?.cost ?? 0),
       createdAt: r.createdAt,
       finishedAt: r.finishedAt,
+      repo: typeof r.transcript?.repo === "string" ? r.transcript.repo : null,
+      deniedRepo: typeof r.transcript?.deniedRepo === "string" ? r.transcript.deniedRepo : null,
     };
   });
 }

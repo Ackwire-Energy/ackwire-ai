@@ -41,6 +41,7 @@ import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationE
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
+import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
 import { mirrorReplyToIssue } from "./issues";
 import type { MachineStatus } from "./machine-hub";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
@@ -157,6 +158,10 @@ export interface Transcript {
   waitingForBrain?: { kind: BrainKind; machineId: string; code: string; waitId?: string };
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
   brainNotice?: string;
+  /** The GitHub repository this run last worked in (`owner/name`), for "Trabalhando em" and Atividade. */
+  repo?: string;
+  /** A GitHub repository the run was refused (not in the agent's list): Atividade offers to add it. */
+  deniedRepo?: string;
   /** Tool calls of the last assistant turn while some wait for approval or an answer. */
   pending?: {
     calls: {
@@ -488,13 +493,17 @@ async function executeRunInner(
     // Skills: only names and descriptions here; the body loads with `load_skill` (progressive disclosure).
     const skillList = tools.some((t) => t.name === "load_skill") ? await enabledSkills(db, run.orgId, agent.id) : [];
     const readsWiki = tools.some((t) => t.name === "read_wiki_page");
+    // Limited to some GitHub repositories: which ones, and where to start.
+    const repositories = tools.some((t) => t.scope.startsWith("github:"))
+      ? repositoriesPrompt(await agentRepositoryList(db, run.orgId, agent.id).catch(() => []))
+      : "";
     const [context, memory, wikiPages] = await Promise.all([
       buildRunContext(db, run, agent, {
         maxMessages: deps.contextMessages,
         toolsAvailable: tools.length > 0,
         askUser: tools.some((t) => t.name === ASK_USER_TOOL),
         react: tools.some((t) => t.name === REACT_TOOL),
-        capabilities: describeCapabilities(tools, pending),
+        capabilities: [describeCapabilities(tools, pending), repositories].filter(Boolean).join("\n\n"),
         skills: skillList,
         trigger,
       }),

@@ -1,6 +1,7 @@
 import { and, eq, schema, sql } from "@agenteschat/db";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
+import { checkGithubCall } from "../git/repos";
 import { addRunStep } from "../runs";
 import { canonicalJson, validateJson } from "./json-schema";
 import { freshGrantedKeys, grantedScopeKeys, isAllowed, toolAccess } from "./scopes";
@@ -10,6 +11,9 @@ const { approvals, agents } = schema;
 
 /** Merge, deploy and rollback always need a person, whatever a connector says. */
 export const ALWAYS_SENSITIVE = /(^|[^a-z])(merge|deploy|rollback|revert_deploy|promote)([^a-z]|$)/i;
+
+/** A GitHub tool (catalog MCP or our git tools): checked against the agent's repositories. */
+const isGithubTool = (tool: Pick<ToolDefinition, "scope">) => tool.scope.startsWith("github:");
 
 export const isSensitive = (tool: Pick<ToolDefinition, "name" | "scope" | "sensitive">) =>
   tool.sensitive === true || ALWAYS_SENSITIVE.test(tool.name) || ALWAYS_SENSITIVE.test(tool.scope);
@@ -122,6 +126,13 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       }
       const problems = validateJson(tool.inputSchema, call.input);
       if (problems.length > 0) return finish({ content: `Invalid input: ${problems.join("; ")}`, isError: true });
+      // GitHub: only the agent's repositories, before running or asking anyone.
+      const github = isGithubTool(tool) ? await checkGithubCall(ctx.db, ctx.orgId, ctx.agentId, call.input) : null;
+      if (github && !github.ok) {
+        return finish({ content: github.message, isError: true, data: github.repo ? { deniedRepo: github.repo } : {} });
+      }
+      const withRepo = (output: ToolOutput): ToolOutput =>
+        github?.repo ? { ...output, data: { ...output.data, repo: github.repo } } : output;
 
       if (isSensitive(tool)) {
         const owner = await ownerOf(ctx);
@@ -161,7 +172,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         await record(ctx.db, step, "approval", { approvalId: row.id, toolUseId: call.toolUseId, title: row.title });
         return { type: "approval", approval: row };
       }
-      const output = await run(tool, call.input, { ...ctx, toolUseId: call.toolUseId });
+      const output = withRepo(await run(tool, call.input, { ...ctx, toolUseId: call.toolUseId }));
       if (builtIn && output.waitForAnswer?.text) {
         return { type: "question", text: output.waitForAnswer.text, choices: output.waitForAnswer.choices };
       }
@@ -194,6 +205,8 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         output = { content: `The tool ${approval.tool} is no longer available`, isError: true };
       else if (!isAllowed(toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool)))
         output = { content: `Not allowed: this agent lost the scope ${tool.scope}`, isError: true };
+      else if (isGithubTool(tool) && !(await checkGithubCall(ctx.db, ctx.orgId, ctx.agentId, approval.params)).ok)
+        output = { content: "Not allowed: this repository was removed from the agent's repositories", isError: true };
       else {
         // Claim the execution first: a retried job never runs the action twice.
         const claimed = await ctx.db
