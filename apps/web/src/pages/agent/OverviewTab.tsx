@@ -12,14 +12,14 @@ import {
   useSettings,
   useUsage,
 } from "@/api/queries";
-import { ResourceIcon, resourceName, toolLabel, useConnectedById } from "@/components/AccessLevels";
+import { ResourceIcon, resourceName, useConnectedById } from "@/components/AccessLevels";
 import { usd } from "@/components/AgentFields";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { asksAt } from "@/lib/access-levels";
 import { audienceSummary } from "@/lib/audience";
-import { formatMonth, formatPercent, formatUsd, joinNames, whenAt } from "@/lib/format";
+import { formatMonth, formatPercent, formatUsd, whenAt } from "@/lib/format";
 import { proposalTitle } from "@/pages/ProposalsPage";
+import { AgentAsksLine, agentConnectorTools } from "./AgentTools";
 import { CardHead, useAgentEdit } from "./context";
 import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
 
@@ -49,7 +49,7 @@ export function OverviewTab() {
   const using = resources.filter((r) => (levels[r.id] ?? "none") !== "none");
   const connectors = using.filter((r) => r.kind === "connector");
   const builtins = using.filter((r) => r.kind === "builtin");
-  const asks = connectors.flatMap((r) => asksAt(r, levels[r.id] ?? "none").map((x) => toolLabel(t, r, x)));
+  const connectorTools = agentConnectorTools(t, connectors, levels, items);
   const enabledSkills = (skills.data ?? []).filter((s) => s.enabled);
   const mine = (routines.data ?? []).filter((r) => r.agentId === agent.id);
   const recent = (runs.data ?? []).slice(0, 4);
@@ -198,9 +198,14 @@ export function OverviewTab() {
                       return (
                         <span key={r.id} className="ac-chip agp-res">
                           <ResourceIcon resource={r} items={items} name={n} />
-                          {t(levels[r.id] === "write" ? "newAgent.preview.readsWrites" : "newAgent.preview.reads", {
-                            name: n,
-                          })}
+                          {t(
+                            levels[r.id] === "write"
+                              ? "agentPage.overview.levelWrite"
+                              : levels[r.id] === "custom"
+                                ? "agentPage.overview.levelCustom"
+                                : "agentPage.overview.levelRead",
+                            { name: n },
+                          )}
                         </span>
                       );
                     })}
@@ -241,15 +246,13 @@ export function OverviewTab() {
                 </div>
               )}
             </div>
-            {asks.length > 0 && (
-              <p className="small muted agp-inline">
-                <Icon name="lock" size={14} />
-                {t("agentPage.overview.asks", {
-                  actions: joinNames([...new Set(asks)], t("newAgent.and")),
-                  who: ownerFirst ?? t("roles.adminLower"),
-                })}
-              </p>
-            )}
+            <AgentAsksLine
+              agentName={agent.name}
+              groups={connectorTools}
+              items={items}
+              canChange={can("levels")}
+              onChange={() => goTo("access")}
+            />
           </Card>
         </div>
 

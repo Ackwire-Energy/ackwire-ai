@@ -57,7 +57,7 @@ export function ConnectorIcon({
     );
   }
   return (
-    <span className={`${cls} connector-icon--mono`} aria-hidden="true">
+    <span className={`${cls} connector-icon--mono connector-icon--initial`} aria-hidden="true">
       {initialsOf(label)}
     </span>
   );

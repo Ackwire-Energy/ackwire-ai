@@ -1,23 +1,12 @@
-import {
-  Alert,
-  Button,
-  Chip,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  Field,
-  Icon,
-  Input,
-  Segmented,
-  Switch,
-} from "@agenteschat/ui";
+import { Alert, Button, Dialog, DialogBody, DialogFooter, Field, Icon, Input, Segmented } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useState } from "react";
+import type { TFunction } from "i18next";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import { useAgents, useCatalog, useConnectWithKey, useCustomServerAction, useStartOAuth } from "@/api/queries";
-import type { ConnectorDef, CustomServer, ToolAccess } from "@/api/types";
+import type { ConnectorDef, CustomServer } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList, useStepText } from "@/components/Loading";
@@ -25,10 +14,12 @@ import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
 import { catalogToolClass, LEVELS, type Level, type LevelState, levelIn, saveLevels } from "@/lib/access-levels";
 import { type ConnectedItem, fromConnection, fromServer, itemName } from "@/lib/connected";
-import { decisionsOf, draftFrom, humanize, isHttpsUrl, type ToolDraft } from "@/lib/custom-tools";
+import { humanize, isHttpsUrl } from "@/lib/custom-tools";
 import { navigateAway } from "@/lib/navigate";
 import { connectorDescription, connectorName } from "@/lib/scopes";
 import { useToast } from "@/lib/toast";
+import { partsOf, type ReviewTool, reviewDecisions, reviewToolsOf, toolName } from "@/lib/tool-review";
+import { reviewNote, ToolLevelsView, ToolReview, type ToolReviewState } from "./ToolReview";
 
 /**
  * Connecting a service, in one dialog and three steps: (1) connect (OAuth
@@ -39,8 +30,6 @@ import { useToast } from "@/lib/toast";
 export type FlowState =
   /** Step 1: a catalog entry, or `null` for any MCP server by address. */
   { step: 0; def: ConnectorDef | null } | { step: 1 | 2; item: ConnectedItem };
-
-const CLASSES: ToolAccess[] = ["read", "write", "approval"];
 
 /** Back from OAuth the app lands here; the server adds `?connected=…`. */
 const returnPath = (orgId: string) => `/org/${orgId}/settings/connectors`;
@@ -64,7 +53,9 @@ export function ConnectFlow({
         ? t("connectFlow.connectTitle", { name })
         : t("connectFlow.customTitle")
       : flow.step === 1
-        ? t("connectFlow.toolsTitle", { name })
+        ? flow.item.server
+          ? t("toolReview.title")
+          : t("connectFlow.toolsTitle", { name })
         : t("connectFlow.whoTitle", { name });
   return (
     <Dialog
@@ -294,23 +285,32 @@ function ConnectStep({
   );
 }
 
-/** A group of tools under "Lê", "Escreve" or "Pede aprovação sempre". */
-function ToolGroup({ access, count, children }: { access: ToolAccess; count: number; children: ReactNode }) {
-  const { t } = useTranslation();
-  if (count === 0) return null;
-  return (
-    <section className="cflow-group" aria-label={t(`connectFlow.group.${access}`)}>
-      <h3 className="cflow-group__title">
-        {access === "approval" && <Icon name="lock" />}
-        {t(`connectFlow.group.${access}`)}
-        <span className="cflow-group__count">{count}</span>
-      </h3>
-      {children}
-    </section>
-  );
+/** A catalog connector's tools for the read-only review (classified by our scopes). */
+function catalogReviewTools(t: TFunction, item: ConnectedItem): ReviewTool[] {
+  const prefix = item.def ? item.def.id : null;
+  return (item.def?.tools ?? []).map((tool) => {
+    const parts = partsOf(tool.name, prefix);
+    const level = catalogToolClass(tool);
+    return {
+      name: tool.name,
+      label: toolName(t, parts, tool.name),
+      description: "",
+      subject: parts.subject,
+      level,
+      suggested: level,
+      reason: null,
+      sensitive: tool.sensitive,
+      pending: false,
+      savedLabel: humanize(tool.name),
+    };
+  });
 }
 
-/** Step 2: what it does. Custom servers: each tool on/off and its class. Ours: read-only, by scope. */
+/**
+ * Step 2: "Revise o que o agente pode fazer sozinho" (telas/ConectorFerramentas.html).
+ * Servers by address: every tool comes classified; the person settles the
+ * ones the name can't decide and changes what they want. Ours: read-only, by scope.
+ */
 function ToolsStep({
   item,
   onNext,
@@ -322,40 +322,22 @@ function ToolsStep({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const toast = useToast();
   const catalog = useCatalog();
   const { save, refresh } = useCustomServerAction(org.id);
-  const [drafts, setDrafts] = useState<ToolDraft[]>(() => (item.server ? draftFrom(item.server) : []));
-  const server = item.server;
-  const update = (name: string, patch: Partial<ToolDraft>) =>
-    setDrafts((list) => list.map((d) => (d.name === name ? { ...d, ...patch } : d)));
-  const options = CLASSES.map((v) => ({ value: v, label: t(`connectFlow.class.${v}`) }));
-  const on = drafts.filter((d) => d.on).length;
+  const [server, setServer] = useState(item.server);
+  const tools = server ? reviewToolsOf(t, server) : [];
+  const [state, setState] = useState<ToolReviewState>({ levels: {}, decided: new Set() });
   const next = (saved?: CustomServer) => onNext(saved ? fromServer(saved, catalog.data?.connectors ?? []) : item);
+  const name = itemName(t, item);
 
   if (!server) {
-    const tools = (item.def?.tools ?? []).map((tool) => ({ ...tool, access: catalogToolClass(tool) }));
+    const list = catalogReviewTools(t, item);
     return (
       <>
         <DialogBody className="cflow__body">
-          <p className="muted cflow__text">{t("connectFlow.catalogToolsText", { name: itemName(t, item) })}</p>
-          {tools.length === 0 && <p className="muted">{t("connectFlow.noTools")}</p>}
-          {CLASSES.map((access) => {
-            const list = tools.filter((x) => x.access === access);
-            return (
-              <ToolGroup key={access} access={access} count={list.length}>
-                <ul className="cflow-tools">
-                  {list.map((x) => (
-                    <li key={x.name} className="cflow-tool">
-                      <span className="cflow-tool__text">
-                        <span className="cflow-tool__name">{humanize(x.name)}</span>
-                        <code className="cflow-tool__code">{x.name}</code>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </ToolGroup>
-            );
-          })}
+          <p className="muted cflow__text">{t("toolReview.catalogLead", { name })}</p>
+          {list.length === 0 ? <p className="muted">{t("toolReview.noTools")}</p> : <ToolLevelsView tools={list} />}
         </DialogBody>
         <DialogFooter bar>
           <Button onClick={onClose}>{t("common.cancel")}</Button>
@@ -369,68 +351,27 @@ function ToolsStep({
 
   return (
     <>
-      <DialogBody className="cflow__body">
+      <DialogBody className="cflow__body tr-body">
         <div className="cflow__lead">
-          <p className="muted cflow__text">{t("connectFlow.toolsText")}</p>
+          <p className="muted cflow__text">{t("toolReview.lead", { count: tools.length, name })}</p>
           <Button
             size="sm"
             variant="ghost"
             icon="repeat"
             disabled={refresh.isPending}
             loading={refresh.isPending}
-            onClick={() =>
-              refresh.mutate(server.id, {
-                onSuccess: (fresh) => {
-                  // Keep what was already changed here; new tools come with their suggestion.
-                  setDrafts((list) => draftFrom(fresh).map((d) => list.find((x) => x.name === d.name) ?? d));
-                },
-              })
-            }
+            onClick={() => refresh.mutate(server.id, { onSuccess: (fresh) => setServer(fresh) })}
           >
-            {t("connectFlow.refresh")}
+            {t("toolReview.refresh")}
           </Button>
         </div>
-        {drafts.length === 0 && <p className="muted">{t("connectFlow.noTools")}</p>}
-        {CLASSES.map((access) => {
-          const list = drafts.filter((d) => d.access === access);
-          return (
-            <ToolGroup key={access} access={access} count={list.length}>
-              <ul className="cflow-tools">
-                {list.map((d) => (
-                  <li key={d.name} className="cflow-tool" data-off={!d.on || undefined}>
-                    <Switch
-                      checked={d.on}
-                      onCheckedChange={(value) => update(d.name, { on: value })}
-                      aria-label={t("connectFlow.useTool", { name: d.label })}
-                    />
-                    <span className="cflow-tool__text">
-                      <span className="cflow-tool__name">
-                        {d.label}
-                        {d.isNew && (
-                          <Chip icon="waiting" tone="waiting">
-                            {t("connectFlow.newTool")}
-                          </Chip>
-                        )}
-                      </span>
-                      <code className="cflow-tool__code">{d.name}</code>
-                      {d.description && <span className="cflow-tool__desc">{d.description}</span>}
-                    </span>
-                    <Segmented
-                      size="sm"
-                      className="cflow-tool__class"
-                      label={t("connectFlow.toolClass", { name: d.label })}
-                      value={d.access}
-                      onValueChange={(value) => update(d.name, { access: value })}
-                      options={options}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </ToolGroup>
-          );
-        })}
+        {tools.length === 0 ? (
+          <p className="muted">{t("toolReview.noTools")}</p>
+        ) : (
+          <ToolReview name={name} tools={tools} state={state} onChange={setState} onMoved={(m) => toast.show(m)} />
+        )}
       </DialogBody>
-      <DialogFooter bar note={t("connectFlow.toolsOn", { on, total: drafts.length })}>
+      <DialogFooter bar note={reviewNote(t, tools, state)}>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
           variant="primary"
@@ -438,7 +379,7 @@ function ToolsStep({
           loading={save.isPending}
           onClick={() =>
             save.mutate(
-              { id: server.id, label: server.label, tools: decisionsOf(drafts) },
+              { id: server.id, label: server.label, tools: reviewDecisions(tools, state.levels, state.decided) },
               { onSuccess: (saved) => next(saved) },
             )
           }
@@ -476,8 +417,8 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
     ...(current(agentId) === "custom" ? [{ value: "custom" as LevelState, label: levelLabel("custom") }] : []),
   ];
   const asks = item.server
-    ? item.server.tools.filter((x) => x.access === "approval").map((x) => x.label || humanize(x.name))
-    : (item.def?.tools ?? []).filter((x) => x.sensitive).map((x) => humanize(x.name));
+    ? item.server.tools.filter((x) => x.access === "approval").length
+    : (item.def?.tools ?? []).filter((x) => x.sensitive).length;
 
   const grant = useMutation({
     mutationFn: async () => {
@@ -545,9 +486,7 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
         )}
         <p className="small muted cflow__asks">
           <Icon name="lock" />
-          {asks.length > 0
-            ? t("connectFlow.asks", { tools: asks.slice(0, 4).join(", ") })
-            : t("connectFlow.asksDefault")}
+          {asks > 0 ? t("connectFlow.asksCount", { count: asks }) : t("connectFlow.asksDefault")}
         </p>
       </DialogBody>
       <DialogFooter bar>

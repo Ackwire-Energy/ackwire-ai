@@ -689,6 +689,21 @@ export interface CustomTool {
   /** Our suggestion until an admin decides (read-only → read, destructive/write-like → approval, else write). */
   suggestedAccess?: ToolAccess | null;
   access: ToolDecision | null;
+  /** The decision, else the suggestion. */
+  level?: ToolDecision;
+  /** Where the suggestion came from: the server's hints, the name's verb, or the judge (ambiguous names). */
+  suggestionSource?: "annotation" | "verb" | "preset" | "judge" | "judge_failed" | null;
+  /** Why we suggest it, as a code (`spends_money`, `unknown`…): `toolReview.reason.*`. */
+  suggestionReason?: string | null;
+  /** Deletes, sends, pays…: only "Pede aprovação" or "Desligada". */
+  sensitive?: boolean;
+  /** The name couldn't decide it and no one confirmed the suggestion yet ("Precisam da sua decisão"). */
+  pending?: boolean;
+  off?: boolean;
+  /** The readable name's parts (English words; the web says them in the person's language). */
+  nameParts?: { verb: string | null; words: string[] };
+  /** The resource it is about (`campaign`): tools are grouped by it. */
+  subject?: string;
   /** Shown to people (approval cards, permissions), in pt-BR. */
   label: string;
   firstSeenAt: string;

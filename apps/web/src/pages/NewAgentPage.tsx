@@ -1157,7 +1157,7 @@ function NewAgentFlow() {
                       return asks.length ? (
                         <span className="newag__asks">
                           <Icon name="lock" size={14} />
-                          {t("newAgent.preview.asks", { actions: joinNames(asks, t("newAgent.and")) })}
+                          {t("toolReview.asks", { count: new Set(asks).size })}
                         </span>
                       ) : null;
                     })()}

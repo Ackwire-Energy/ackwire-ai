@@ -3305,6 +3305,373 @@ button.drive-where:focus-visible {
   height: 15px;
 }
 
+/* Connector tool review (telas/ConectorFerramentas.html): one grouped list, pending decisions first. */
+.tr-body {
+  gap: 24px;
+}
+.tr {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+.tr-all {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tr-all__h {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.tr-search {
+  margin-bottom: 12px;
+}
+.tr-subjects {
+  border-radius: 18px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+}
+.tr-subj + .tr-subj {
+  border-top: 1px solid var(--line);
+}
+.tr-subj__h {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 196px 16px;
+  align-items: center;
+  column-gap: 16px;
+  padding: 14px 16px;
+  transition: background 0.12s;
+}
+.tr-subj:first-child .tr-subj__h {
+  border-radius: 18px 18px 0 0;
+}
+.tr-subj:last-child:not([data-open]) .tr-subj__h {
+  border-radius: 0 0 18px 18px;
+}
+.tr-subj:only-child:not([data-open]) .tr-subj__h {
+  border-radius: 18px;
+}
+.tr-subj__h:hover {
+  background: var(--plate-soft);
+}
+.tr-subj__h:focus-visible,
+.tr-link:focus-visible,
+.tr-ok:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.tr-subj__h b,
+.tr-decide__t b {
+  display: block;
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.tr-subj__h small,
+.tr-decide__t small {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.tr-subj__strip {
+  width: 196px;
+  justify-self: end;
+}
+.tr-subj__chev {
+  color: var(--faint);
+  transition: transform 0.25s var(--out);
+}
+.tr-subj[data-open] .tr-subj__chev {
+  transform: rotate(90deg);
+}
+.tr-subj__b {
+  padding: 2px 8px 10px;
+  animation: tr-fade 0.22s var(--out) both;
+}
+@keyframes tr-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tr-decide {
+  background: color-mix(in srgb, var(--sunken) 35%, var(--raised));
+}
+.tr-decide:first-child {
+  border-radius: 18px 18px 0 0;
+}
+.tr-decide:only-child {
+  border-radius: 18px;
+}
+.tr-decide__h {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px 10px;
+}
+.tr-decide__t {
+  flex: 1;
+  min-width: 0;
+}
+.tr-decide .tr-row__nm {
+  white-space: normal;
+}
+.tr-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 5px 8px;
+  border-radius: 12px;
+  transition: background 0.12s;
+}
+.tr-row:hover {
+  background: var(--plate-soft);
+}
+.tr-row__t {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tr-row__nm {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tr-row[data-off] .tr-row__nm {
+  color: var(--faint);
+}
+.tr-row__tech {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--faint);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The mark sits on the first line (centered on its 18px line box), so wrapped text never pushes it down. */
+.tr-row__why {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--muted);
+  margin-top: 1px;
+  min-width: 0;
+}
+.tr-row__why .ac-toolpx-spark {
+  margin-top: 4px;
+}
+.tr-row__why span {
+  min-width: 0;
+}
+.tr-row__why b {
+  color: var(--ink2);
+  font-weight: 600;
+}
+.tr-row__ctl {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+.tr-ok {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 9px;
+  font-weight: 600;
+  font-size: 12.5px;
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: var(--e1), var(--top);
+  transition:
+    transform 0.18s var(--spring),
+    box-shadow 0.18s var(--out);
+}
+.tr-ok:hover {
+  box-shadow: var(--e2), var(--top);
+}
+.tr-ok:active {
+  transform: scale(0.96);
+}
+.tr-link {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  flex: none;
+}
+.tr-link:hover {
+  color: var(--ink);
+}
+.tr-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tr-empty {
+  padding: 28px 16px;
+  color: var(--muted);
+  font-size: 13.5px;
+  text-align: center;
+}
+.tr-done {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 20px;
+  align-items: center;
+  border-radius: 20px;
+  background: var(--raised);
+  box-shadow: var(--e2), var(--top);
+  padding: 24px;
+  overflow: hidden;
+  animation: tr-fade 0.3s var(--out) both;
+}
+.tr-done__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 30px;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+}
+.tr-done__sub {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.tr-done__bar {
+  grid-column: 1 / -1;
+  margin-top: 22px;
+}
+.tr-legend {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin-top: 12px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.tr-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.tr-legend b {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.tr-legend [data-level="off"] {
+  color: var(--faint);
+}
+.tr-done .tr-link {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin-top: 18px;
+}
+@media (max-width: 640px) {
+  .tr-done {
+    padding: 18px;
+    column-gap: 14px;
+  }
+  .tr-done .ac-toolpx-agent {
+    width: 52px;
+    height: 52px;
+  }
+  .tr-done__title {
+    font-size: 25px;
+  }
+  .tr-legend {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .tr-decide__h {
+    flex-wrap: wrap;
+    padding: 14px 14px 8px;
+  }
+  .tr-decide__t {
+    flex-basis: calc(100% - 58px);
+  }
+  .tr-decide__h .tr-link {
+    margin-left: 52px;
+  }
+  .tr-decide .tr-row__ctl {
+    gap: 8px;
+  }
+  .tr-decide .tr-seg .ac-toolpx-swatch {
+    display: none;
+  }
+  .tr-decide .tr-seg .ac-seg__item {
+    padding: 0 8px;
+  }
+  .tr-subj__h {
+    grid-template-columns: minmax(0, 1fr) 16px;
+    row-gap: 10px;
+    padding: 14px;
+  }
+  .tr-subj__strip {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-self: start;
+    width: 100%;
+  }
+  .tr-subj__b {
+    padding: 2px 4px 8px;
+  }
+  .tr-row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    padding: 8px 10px;
+  }
+  .tr-row__t {
+    flex-basis: 100%;
+  }
+  .tr-row__ctl {
+    width: 100%;
+  }
+  .tr-seg .ac-seg__item {
+    padding: 0 7px;
+    gap: 5px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tr-subj__b,
+  .tr-done {
+    animation: none;
+  }
+}
+
 /* Loading placeholders that keep the page layout. */
 .loading-page {
   display: flex;
@@ -8144,6 +8511,64 @@ button.live-call__head:hover {
   gap: 6px;
   margin: 0;
 }
+/* "N ações pedem sua aprovação antes · Ver": one line, the lock on the first line of text. */
+.agp-asks {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  line-height: 20px;
+}
+.agp-asks .ac-icon {
+  flex: none;
+  margin-top: 3px;
+}
+.agp-asks__t {
+  min-width: 0;
+}
+.agp-asks__see {
+  all: unset;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink2);
+  border-radius: 6px;
+}
+.agp-asks__see:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+.agp-asks__see:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.agp-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.agp-tools__h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 650;
+}
+.agp-tools__h .connector-icon {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  line-height: 1;
+}
+.agp-tools__n {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.agp-tools .tr {
+  gap: 0;
+}
+
 .agp-row {
   display: flex;
   flex-wrap: wrap;
@@ -8271,6 +8696,15 @@ button.live-call__head:hover {
   box-shadow: none;
   background: transparent;
   font-size: 8px;
+  line-height: 1;
+}
+/* A connector without a brand icon: a neutral square tile with its initial, centered on the chip's line. */
+.agp-res .connector-icon--initial {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line2);
+  color: var(--ink2);
+  line-height: 1;
+  font-size: 8.5px;
 }
 .agp-res .connector-icon .ac-icon {
   width: 12px;

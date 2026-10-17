@@ -372,7 +372,7 @@ export interface ApiClient {
     saveTools(
       orgId: string,
       serverId: string,
-      input: { label: string; tools: { name: string; access: ToolDecision; label: string }[] },
+      input: { label: string; tools: { name: string; access: ToolDecision; label: string; confirmed?: boolean }[] },
     ): Promise<CustomServer>;
     disconnect(orgId: string, serverId: string): Promise<void>;
   };

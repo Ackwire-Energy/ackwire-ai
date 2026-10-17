@@ -91,8 +91,10 @@ describe("Adicionar conector: one catalog", () => {
   });
 });
 
+const REVIEW = "Revise o que o agente pode fazer sozinho";
+
 describe("the connect flow: conectar → o que faz → quem pode usar", () => {
-  test("a one-click server that asks for a key; tools on/off and their kind; a level per agent", async () => {
+  test("a one-click server that asks for a key; tools reviewed by subject; a level per agent", async () => {
     const { state, dialog } = await open();
     await click(within(dialog).getByRole("button", { name: "Conectar Linear" }));
     const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
@@ -116,31 +118,51 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await click(within(flow()).getByRole("button", { name: "Conectar com a chave" }));
     await settle(4);
 
-    // Step 2: grouped by what each tool does, prefilled; nothing saved yet.
-    expect(screen().getByRole("dialog", { name: "O que Linear faz" })).toBeTruthy();
-    expect(within(flow()).getByRole("region", { name: "Lê" }).textContent).toContain("list_tickets");
-    const approval = within(flow()).getByRole("region", { name: "Pede aprovação sempre" });
-    expect(approval.textContent).toContain("delete_customer");
-    await click(within(flow()).getByRole("switch", { name: "Usar Delete customer" }));
-    await click(
-      within(within(flow()).getByRole("radiogroup", { name: "Tipo de Create ticket" })).getByRole("radio", {
-        name: "Escreve",
-      }),
-    );
-    expect(within(flow()).getByRole("region", { name: "Escreve" }).textContent).toContain("create_ticket");
-    expect(flow().textContent).toContain("4 de 5 ferramentas ligadas");
+    // Step 2: everything comes classified; only the ambiguous tool waits for a decision.
+    expect(screen().getByRole("dialog", { name: REVIEW })).toBeTruthy();
+    expect(flow().textContent).toContain("Classificamos as 5 ferramentas do Linear.");
+    const decide = within(flow()).getByRole("region", { name: "Precisam da sua decisão · 1" });
+    expect(decide.textContent).toContain("Fechar chamado");
+    expect(decide.textContent).toContain("Sugestão: muda coisas — muda coisas, mas não apaga nada nem gasta dinheiro");
+    expect(flow().textContent).toContain("Falta 1 decisão. Se continuar, vale a sugestão.");
+    expect(within(flow()).queryByRole("region", { name: "Pronto. Tudo revisado." })).toBeNull();
+    await click(within(decide).getByRole("button", { name: "Aceitar as sugestões" }));
+    expect(within(flow()).queryByRole("region", { name: /Precisam da sua decisão/ })).toBeNull();
+    const done = within(flow()).getByRole("region", { name: "Pronto. Tudo revisado." });
+    expect(done.textContent).toContain("2 só consultam");
+    expect(done.textContent).toContain("1 pede sua aprovação");
+    expect(flow().textContent).toContain("Dá para mudar tudo isso depois.");
+
+    // Sensitive: only "Aprovação" or "Desligada".
+    await click(within(flow()).getByRole("button", { name: /^Clientes/ }));
+    const del = within(flow()).getByRole("radiogroup", { name: "Nível de Apagar cliente" });
+    expect(
+      within(del)
+        .getAllByRole("radio")
+        .map((r) => r.textContent),
+    ).toEqual(["Aprovação", "Desligada"]);
+    await click(within(del).getByRole("radio", { name: "Desligada" }));
+    await click(within(flow()).getByRole("button", { name: /^Chamados/ }));
+    const create = within(flow()).getByRole("radiogroup", { name: "Nível de Criar chamado" });
+    expect(
+      within(create)
+        .getAllByRole("radio")
+        .map((r) => r.textContent),
+    ).toEqual(["Consulta", "Muda", "Aprovação", "Desligada"]);
+    await click(within(create).getByRole("radio", { name: "Aprovação" }));
     await click(within(flow()).getByRole("button", { name: "Continuar" }));
     await settle(4);
     const saved = state.calls.find((c) => c.method === "customConnectors.saveTools")?.args[2] as {
-      tools: { name: string; access: string }[];
+      tools: { name: string; access: string; confirmed: boolean }[];
     };
     expect(Object.fromEntries(saved.tools.map((x) => [x.name, x.access]))).toEqual({
       list_tickets: "read",
       get_ticket: "read",
-      create_ticket: "write",
-      close_ticket: "approval",
+      create_ticket: "approval",
+      close_ticket: "write",
       delete_customer: "off",
     });
+    expect(saved.tools.every((x) => x.confirmed)).toBe(true);
 
     // Step 3: one level per agent, with shortcuts for everyone.
     expect(screen().getByRole("dialog", { name: "Quem pode usar Linear" })).toBeTruthy();
@@ -150,7 +172,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
         name: "Ler e escrever",
       }),
     );
-    expect(flow().textContent).toContain("Close ticket sempre pedem aprovação no chat.");
+    expect(flow().textContent).toContain("1 ação sempre pede aprovação no chat.");
     await click(within(flow()).getByRole("button", { name: "Liberar" }));
     await settle(8);
     const serverId = state.calls.find((c) => c.method === "customConnectors.saveTools")?.args[1] as string;
@@ -198,13 +220,13 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await settle(8);
     const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
     expect(screen().getByRole("dialog", { name: "O que GitHub faz" })).toBeTruthy();
-    expect(within(flow()).getByRole("region", { name: "Lê" }).textContent).toContain("get_file_contents");
-    expect(within(flow()).getByRole("region", { name: "Escreve" }).textContent).toContain("create_pull_request");
-    expect(within(flow()).getByRole("region", { name: "Pede aprovação sempre" }).textContent).toContain(
-      "merge_pull_request",
-    );
-    // Ours are classified by scope: nothing to switch.
-    expect(within(flow()).queryByRole("switch")).toBeNull();
+    // Ours are classified by scope: read-only, by subject; each tool shows its level.
+    await type(within(flow()).getByRole("searchbox", { name: "Buscar ferramenta" }), "merge");
+    const merge = flow().querySelector('[data-row="merge_pull_request"]') as HTMLElement;
+    expect(merge.textContent).toContain("Pede sua aprovação");
+    expect(merge.getAttribute("title")).toContain("merge_pull_request");
+    expect(within(flow()).queryByRole("radiogroup")).toBeNull();
+    await type(within(flow()).getByRole("searchbox", { name: "Buscar ferramenta" }), "");
     await click(within(flow()).getByRole("button", { name: "Continuar" }));
     await settle(4);
     await click(
@@ -237,7 +259,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
       serverUrl: "https://oauth.suporte.example.com",
       label: "Suporte",
     });
-    expect(screen().getByRole("dialog", { name: "O que Suporte faz" })).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: REVIEW }).textContent).toContain("ferramentas do Suporte");
     cleanup();
 
     const api = createFakeApi(seedState());
@@ -249,7 +271,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     if (res.status !== "connected") throw new Error("expected connected");
     await renderApp(`/org/${ORG_ID}/settings?connected=custom:${res.server.id}`, { api });
     await settle(8);
-    expect(screen().getByRole("dialog", { name: "O que himetrica faz" })).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: REVIEW }).textContent).toContain("ferramentas do himetrica");
   });
 
   test("new tools on a reviewed server: the row asks for review; disconnecting always asks first", async () => {
@@ -263,7 +285,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     if (res.status !== "connected") throw new Error("expected connected");
     await api.customConnectors.saveTools(ORG_ID, res.server.id, {
       label: "Suporte",
-      tools: res.server.tools.map((x) => ({ name: x.name, access: "read", label: x.name })),
+      tools: res.server.tools.map((x) => ({ name: x.name, access: x.sensitive ? "off" : "read", label: x.name })),
     });
     await api.customConnectors.refresh(ORG_ID, res.server.id);
     await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
@@ -271,9 +293,11 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     const section = () => screen().getByRole("region", { name: "Conectores" });
     expect(section().textContent).toContain("1 ferramenta nova para revisar");
     await click(within(section()).getByRole("button", { name: "Revisar Suporte" }));
-    const review = screen().getByRole("dialog", { name: "O que Suporte faz" });
-    const fresh = within(review).getByText("export_tickets").closest("li") as HTMLElement;
-    expect(fresh.textContent).toContain("Nova");
+    const review = screen().getByRole("dialog", { name: REVIEW });
+    // The new tool comes classified (the server says it only reads), in its subject.
+    await type(within(review).getByRole("searchbox", { name: "Buscar ferramenta" }), "exportar");
+    const fresh = review.querySelector('[data-row="export_tickets"]') as HTMLElement;
+    expect(fresh.textContent).toContain("Exportar chamados");
     await click(within(review).getByRole("button", { name: "Cancelar" }));
     await settle(2);
 

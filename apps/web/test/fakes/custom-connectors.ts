@@ -5,15 +5,18 @@
  * - POST   /api/app/organizations/{orgId}/connectors/custom { serverUrl, apiKey?, label?, returnTo }
  *          → { status: "connected", server } | { status: "oauth", authorizeUrl } | { status: "needs_key" }
  * - POST   /api/app/organizations/{orgId}/connectors/custom/{id}/refresh (re-list tools)
- * - PUT    /api/app/organizations/{orgId}/connectors/custom/{id}/tools { label, tools: [{ name, access, label }] }
- *          (`access`: read | write | approval | off)
+ * - PUT    /api/app/organizations/{orgId}/connectors/custom/{id}/tools { label, tools: [{ name, access, label, confirmed? }] }
+ *          (`access`: read | write | approval | off; sensitive tools only approval | off)
  * - DELETE /api/app/organizations/{orgId}/connectors/custom/{id}
  * The mock never talks to the URL: it pretends the server offers a ticket
  * tool set, needs an API key unless the URL contains "oauth", and gains one
- * new tool on the first refresh.
+ * new tool on the first refresh. Tools come classified as the backend does
+ * (annotations, the verb; `close_ticket` is ambiguous: the judge suggests
+ * "write" and it waits for a decision; `delete_customer` is sensitive).
  */
 import type { ApiClient } from "@/api/client";
-import type { CustomServer, CustomTool } from "@/api/types";
+import type { CustomServer, CustomTool, ToolAccess } from "@/api/types";
+import { partsOf } from "@/lib/tool-review";
 import { clone, type MockContext, MockNotFoundError, mockId } from "./context";
 
 const TOOLS: [name: string, description: string, readOnly: boolean | null][] = [
@@ -25,14 +28,37 @@ const TOOLS: [name: string, description: string, readOnly: boolean | null][] = [
 ];
 const LATER: [string, string, boolean | null] = ["export_tickets", "Export tickets as CSV.", true];
 
-const tool = ([name, description, readOnly]: [string, string, boolean | null], now: Date): CustomTool => ({
-  name,
-  description,
-  readOnlyHint: readOnly,
-  access: null,
-  label: "",
-  firstSeenAt: now.toISOString(),
-});
+/** How the backend classifies each (classify.ts): level, source, reason, sensitive. */
+const CLASS: Record<string, [ToolAccess, NonNullable<CustomTool["suggestionSource"]>, string, boolean]> = {
+  list_tickets: ["read", "annotation", "read_only_hint", false],
+  get_ticket: ["read", "annotation", "read_only_hint", false],
+  create_ticket: ["write", "verb", "verb_write", false],
+  close_ticket: ["write", "judge", "changes_undoable", false],
+  delete_customer: ["approval", "verb", "verb_sensitive", true],
+  export_tickets: ["read", "annotation", "read_only_hint", false],
+};
+
+const tool = ([name, description, readOnly]: [string, string, boolean | null], now: Date): CustomTool => {
+  const [level, source, reason, sensitive] = CLASS[name] ?? ["approval", "judge_failed", "unknown", false];
+  const { subject, ...nameParts } = partsOf(name);
+  return {
+    name,
+    description,
+    readOnlyHint: readOnly,
+    suggestedAccess: level,
+    access: null,
+    level,
+    suggestionSource: source,
+    suggestionReason: reason,
+    sensitive,
+    pending: source === "judge" || source === "judge_failed",
+    off: false,
+    nameParts,
+    subject,
+    label: "",
+    firstSeenAt: now.toISOString(),
+  };
+};
 
 export function createMockCustomConnectors(
   ctx: MockContext,
@@ -89,8 +115,14 @@ export function createMockCustomConnectors(
       for (const t of input.tools) {
         const existing = s.tools.find((x) => x.name === t.name);
         if (existing) {
+          if (existing.sensitive && (t.access === "read" || t.access === "write")) {
+            throw new Error(`${t.name} is sensitive: it can only ask for approval or be off`);
+          }
           existing.access = t.access;
+          existing.level = t.access;
+          existing.off = t.access === "off";
           existing.label = t.label;
+          if (t.confirmed !== false) existing.pending = false;
         }
       }
       s.reviewedAt = ctx.now().toISOString();
