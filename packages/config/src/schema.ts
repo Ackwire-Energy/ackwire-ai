@@ -27,6 +27,7 @@ export interface EnvVarDefinition {
     | "Storage"
     | "Sandbox"
     | "Email"
+    | "Push"
     | "Observability";
   /** Example value for docs. Never a real secret. */
   example?: string;
@@ -130,6 +131,45 @@ export const envVars = {
     description: "OAuth client secret for GitHub sign-in.",
     section: "Sign-in",
     secret: true,
+  },
+  APPLE_CLIENT_ID: {
+    schema: z.string().optional(),
+    description:
+      "Services ID for “Sign in with Apple” (e.g. `chat.agentes.signin`). Enabled when set together with `APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY`. Return URL: `{PUBLIC_URL}/api/auth/callback/apple`.",
+    section: "Sign-in",
+  },
+  APPLE_TEAM_ID: {
+    schema: z.string().optional(),
+    description: "Apple Developer team id (10 characters) for Sign in with Apple.",
+    section: "Sign-in",
+  },
+  APPLE_KEY_ID: {
+    schema: z.string().optional(),
+    description: "Key id of the Sign in with Apple private key.",
+    section: "Sign-in",
+  },
+  APPLE_PRIVATE_KEY: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value, ctx) => {
+        if (value === undefined) return value;
+        try {
+          return parsePemKey(value);
+        } catch (error) {
+          ctx.addIssue({ code: "custom", message: (error as Error).message });
+          return z.NEVER;
+        }
+      }),
+    description:
+      "Sign in with Apple private key (.p8): PEM, PEM with `\\n`, or base64 of the PEM file. The server signs Apple's client secret with it at boot (valid 150 days: restart at least that often).",
+    section: "Sign-in",
+    secret: true,
+  },
+  APPLE_APP_BUNDLE_ID: {
+    schema: z.string().optional(),
+    description: "Bundle id of the iOS app (e.g. `chat.agentes.app`), so it can sign in with Apple natively.",
+    section: "Sign-in",
   },
   AGENT_DEFAULT_MODEL: {
     schema: modelId.default("claude-sonnet-5-5"),
@@ -379,6 +419,13 @@ export const envVars = {
     schema: z.coerce.number().min(0.25).max(23).default(4),
     description: "Email approvers a digest of requests still waiting after this many hours (requests expire at 24 h).",
     section: "Email",
+  },
+  EXPO_ACCESS_TOKEN: {
+    schema: z.string().optional(),
+    description:
+      "Expo access token for push notifications to the phone app (only needed when “enhanced push security” is on in the Expo project). Pushes are sent through the Expo Push API either way.",
+    section: "Push",
+    secret: true,
   },
   S3_ENDPOINT: {
     schema: z.url().optional(),

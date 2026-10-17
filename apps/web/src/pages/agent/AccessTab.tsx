@@ -1,8 +1,9 @@
+import { useAgentSkills } from "@agenteschat/client";
+import { type AccessResource, asksAt, type Level } from "@agenteschat/client/lib/access-levels";
 import { Button, Card, CheckboxPill, Chip, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useAgentSkills } from "@/api/queries";
 import {
   LevelRow,
   levelText,
@@ -13,7 +14,6 @@ import {
 } from "@/components/AccessLevels";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { type AccessResource, asksAt, type Level } from "@/lib/access-levels";
 import { CardHead, ChangedTag, useAgentEdit, WasLine } from "./context";
 import { ReadOnlyNote } from "./pieces";
 import { ReposBlock } from "./Repos";

@@ -1,14 +1,14 @@
+import type { AccessTool } from "@agenteschat/client";
+import { type AccessResource, type LevelState, toolsAt } from "@agenteschat/client/lib/access-levels";
+import type { ConnectedItem } from "@agenteschat/client/lib/connected";
+import { humanize } from "@agenteschat/client/lib/custom-tools";
+import { partsOf, type ReviewTool, reviewTool, toolName } from "@agenteschat/client/lib/tool-review";
 import { Button, DetailsDialog, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AccessTool } from "@/api/types";
 import { ResourceIcon, resourceName } from "@/components/AccessLevels";
 import { ToolLevelsView } from "@/components/ToolReview";
-import { type AccessResource, type LevelState, toolsAt } from "@/lib/access-levels";
-import type { ConnectedItem } from "@/lib/connected";
-import { humanize } from "@/lib/custom-tools";
-import { partsOf, type ReviewTool, reviewTool, toolName } from "@/lib/tool-review";
 
 /**
  * What an agent can use, per connector, in the tool review's read-only view

@@ -17,6 +17,7 @@ import {
 import { NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { requirePermission } from "./organizations";
+import { enqueuePush } from "./push";
 
 const { notifications, organizationMembers } = schema;
 
@@ -33,6 +34,8 @@ const { notifications, organizationMembers } = schema;
  *   `notification.upserted`, `notification.removed`, `notification.counts`.
  * - Auto-resolve: the source closed (question answered, approval decided,
  *   forum turn over, issue unassigned) sets `done_at` and emits `removed`.
+ * - Push (ADR 0035): the first event of a group of a pushing kind enqueues
+ *   `push.send` for the person's phones (`push.ts`).
  */
 
 export const NOTIFICATION_KINDS = [
@@ -232,6 +235,8 @@ export async function notify(deps: NotificationDeps, input: NotifyInput): Promis
     if (!snoozed)
       await publishUserEvent(deps.pubsub, input.orgId, userId, { type: "notification.upserted", notification: view });
     await publishCounts(deps, input.orgId, userId);
+    // Their phone too (ADR 0035), through the outbox; never undoes the notification.
+    await enqueuePush(deps.db, row, nowOf(deps)).catch(() => false);
   }
   return out;
 }

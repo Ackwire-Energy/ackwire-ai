@@ -1,3 +1,16 @@
+import type { GitHubRepositories } from "@agenteschat/client";
+import { useGitHubApp, useGitHubRepos, useInstallGitHubApp } from "@agenteschat/client";
+import { can as orgCan } from "@agenteschat/client/lib/permissions";
+import {
+  applyPick,
+  covers,
+  isAccount,
+  makeFirst,
+  type RepoChoice,
+  repoExists,
+  repoName,
+  toggleRepo,
+} from "@agenteschat/client/lib/repos";
 import {
   Button,
   Checkbox,
@@ -13,22 +26,9 @@ import {
 } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useGitHubApp, useGitHubRepos, useInstallGitHubApp } from "@/api/queries";
-import type { GitHubRepositories } from "@/api/types";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { navigateAway } from "@/lib/navigate";
-import { can as orgCan } from "@/lib/permissions";
-import {
-  applyPick,
-  covers,
-  isAccount,
-  makeFirst,
-  type RepoChoice,
-  repoExists,
-  repoName,
-  toggleRepo,
-} from "@/lib/repos";
 import { ChangedTag, useAgentEdit, WasLine } from "./context";
 
 /*

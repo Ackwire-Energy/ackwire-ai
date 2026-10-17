@@ -1,26 +1,15 @@
-import { AvatarStack, Button, Icon, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
-import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useApi } from "@/api/context";
+import type { Mission, MissionControl, ThreadInfo } from "@agenteschat/client";
 import {
   cacheMission,
+  useMachines,
   useMissionAct,
   useMissionControl,
   useMissionParticipants,
   useMissionPlan,
   useRequestJoin,
   useThreadTasks,
-} from "@/api/missions";
-import { useMachines } from "@/api/queries";
-import type { Mission, MissionControl, ThreadInfo } from "@/api/types";
-import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
-import { NavToggle } from "@/components/NavDrawer";
-import { useOrg } from "@/components/org-context";
-import { useThreadWhere } from "@/components/threads/ThreadView";
-import { useDirectory } from "@/hooks/useDirectory";
-import { errorText } from "@/lib/errors";
+} from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import {
   formatSpan,
   isOpenMission,
@@ -29,7 +18,18 @@ import {
   missionTasks,
   planCells,
   planCellTitles,
-} from "@/lib/missions";
+} from "@agenteschat/client/lib/missions";
+import { AvatarStack, Button, Icon, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
+import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
+import { NavToggle } from "@/components/NavDrawer";
+import { useOrg } from "@/components/org-context";
+import { useThreadWhere } from "@/components/threads/ThreadView";
+import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import {
   ExecutorChip,

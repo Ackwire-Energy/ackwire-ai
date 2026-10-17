@@ -1,13 +1,13 @@
+import type { ArtifactAuthor, ArtifactContent, ArtifactDetail } from "@agenteschat/client";
+import { useArtifact, useArtifactVersions, useChannels, useSaveArtifact } from "@agenteschat/client";
+import { KIND_ICON } from "@agenteschat/client/lib/artifacts";
+import { fileIcon } from "@agenteschat/client/lib/files";
+import { relativeTime } from "@agenteschat/client/lib/format";
 import { Alert, Button, Chip, DetailsDialog, Field, Icon, Input, Menu, MenuItem, Textarea } from "@agenteschat/ui";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useArtifact, useArtifactVersions, useChannels, useSaveArtifact } from "@/api/queries";
-import type { ArtifactAuthor, ArtifactContent, ArtifactDetail } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { KIND_ICON } from "@/lib/artifacts";
-import { fileIcon } from "@/lib/files";
-import { relativeTime } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { ArtifactMoreMenu, type DownloadFormat, useArtifactDownload, useDeleteArtifact } from "./ArtifactActions";
 import { fileSaver } from "./fileSaver";

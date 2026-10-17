@@ -1,3 +1,32 @@
+import type { AppNotification, NotificationActor, NotificationFilter } from "@agenteschat/client";
+import {
+  dropNotification,
+  useApproval,
+  useChannels,
+  useForumAction,
+  useForumTopic,
+  useIssueActivity,
+  useNotificationAction,
+  useNotificationCount,
+  useNotificationReply,
+  useNotifications,
+  useThreadMessages,
+} from "@agenteschat/client";
+import { daysBetween, formatShortDate, formatTime, joinNames, timeLeft } from "@agenteschat/client/lib/format";
+import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
+import {
+  allItems,
+  channelOf,
+  groupByDay,
+  isExpandable,
+  MENTION_RE,
+  NOTIFICATION_FILTERS,
+  openTarget,
+  replyTarget,
+  snoozeTimes,
+  sortWaiting,
+  stepCells,
+} from "@agenteschat/client/lib/notifications";
 import {
   Button,
   Chip,
@@ -22,41 +51,12 @@ import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { Fragment, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import {
-  dropNotification,
-  useApproval,
-  useChannels,
-  useForumAction,
-  useForumTopic,
-  useIssueActivity,
-  useNotificationAction,
-  useNotificationCount,
-  useNotificationReply,
-  useNotifications,
-  useThreadMessages,
-} from "@/api/queries";
-import type { AppNotification, NotificationActor, NotificationFilter } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { approvalAction } from "@/components/ApprovalItem";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
-import { daysBetween, formatShortDate, formatTime, joinNames, timeLeft } from "@/lib/format";
-import { agentGrammar, isFeminineName } from "@/lib/grammar";
-import {
-  allItems,
-  channelOf,
-  groupByDay,
-  isExpandable,
-  MENTION_RE,
-  NOTIFICATION_FILTERS,
-  openTarget,
-  replyTarget,
-  snoozeTimes,
-  sortWaiting,
-  stepCells,
-} from "@/lib/notifications";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
 import { ExactAction } from "./ApprovalsPage";

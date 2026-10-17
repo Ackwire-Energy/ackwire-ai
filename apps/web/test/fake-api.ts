@@ -1,11 +1,10 @@
-import type { ApiClient, HttpApi } from "@/api/client";
-import { ApiError } from "@/api/http";
 import type {
   ActiveRun,
   Agent,
   AgentBrain,
   AgentQuestion,
   AgentSecret,
+  ApiClient,
   AppNotification,
   Approval,
   Channel,
@@ -16,6 +15,7 @@ import type {
   Credential,
   GitHubAppInstallation,
   GitHubRepositories,
+  HttpApi,
   InvitationWithStatus,
   Me,
   Member,
@@ -27,7 +27,8 @@ import type {
   Run,
   ScopeGrant,
   SecretRequest,
-} from "@/api/types";
+} from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
 import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
 import type { MockContext } from "./fakes/context";

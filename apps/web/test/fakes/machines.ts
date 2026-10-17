@@ -7,8 +7,7 @@
  * Tests add machines with `pair()` (what the runner's `pair` does on the server).
  * No machines by default.
  */
-import type { ApiClient } from "@/api/client";
-import type { Machine } from "@/api/types";
+import type { ApiClient, Machine } from "@agenteschat/client";
 import { clone, type MockContext, MockNotFoundError } from "./context";
 
 export interface FakeMachines {

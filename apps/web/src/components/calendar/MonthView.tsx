@@ -1,8 +1,8 @@
+import { type CalItem, dayRuns, onDay, sameDay } from "@agenteschat/client/lib/calendar";
+import { toYmd } from "@agenteschat/client/lib/format";
 import { Popover } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { type CalItem, dayRuns, onDay, sameDay } from "@/lib/calendar";
-import { toYmd } from "@/lib/format";
 import { dayLabel, EventChip } from "./EventChip";
 import { dayRunsLabel, MAX_DAY_MARKS, RunMarks } from "./RunMarks";
 

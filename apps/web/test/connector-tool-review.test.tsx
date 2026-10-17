@@ -3,16 +3,23 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { CustomServer, CustomTool } from "@agenteschat/client";
+import type { AccessResource } from "@agenteschat/client/lib/access-levels";
+import type { ConnectedItem } from "@agenteschat/client/lib/connected";
+import {
+  matchTool,
+  partsOf,
+  reviewDecisions,
+  reviewToolsOf,
+  subjectLabel,
+  toolName,
+} from "@agenteschat/client/lib/tool-review";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { CustomServer, CustomTool } from "@/api/types";
 import { ToolReview, type ToolReviewState } from "@/components/ToolReview";
 import { createI18n } from "@/i18n";
-import type { AccessResource } from "@/lib/access-levels";
-import type { ConnectedItem } from "@/lib/connected";
-import { matchTool, partsOf, reviewDecisions, reviewToolsOf, subjectLabel, toolName } from "@/lib/tool-review";
 import { AgentAsksLine, agentConnectorTools } from "@/pages/agent/AgentTools";
 import { createFakeApi, seedState } from "./fake-api";
 import { renderPage, screen } from "./render";

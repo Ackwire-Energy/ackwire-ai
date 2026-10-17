@@ -1,6 +1,6 @@
+import { channelsQuery } from "@agenteschat/client";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { channelsQuery } from "@/api/queries";
 import { EmptyPage } from "@/components/EmptyPage";
 import { Main } from "@/components/Main";
 

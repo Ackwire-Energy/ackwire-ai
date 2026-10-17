@@ -1,14 +1,13 @@
+import type { ApiClient, SocketFactory } from "@agenteschat/client";
 import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { i18n as I18n } from "i18next";
 import type { ReactNode } from "react";
 import { I18nextProvider } from "react-i18next";
-import type { ApiClient } from "@/api/client";
 import { ApiProvider } from "@/api/context";
 import type { AuthClient } from "@/auth/client";
 import { AuthProvider } from "@/auth/context";
 import { ThemeProvider } from "@/lib/theme";
 import { ToastProvider, type ToastStore } from "@/lib/toast";
-import type { SocketFactory } from "@/realtime/connection";
 import { SocketFactoryContext } from "@/realtime/context";
 
 export interface AppServices {

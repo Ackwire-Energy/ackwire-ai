@@ -1,3 +1,89 @@
+import type {
+  Agent,
+  AgentQuestion,
+  Approval,
+  ArtifactRef,
+  Channel,
+  Member,
+  MemoryUpdate,
+  Message as MessageType,
+  ReplyRef,
+  SecretRequest,
+  ThreadInfo,
+} from "@agenteschat/client";
+import {
+  agentStateOfRun,
+  consultsIn,
+  isQuiet,
+  keys,
+  type LiveRun,
+  MESSAGES_PAGE,
+  narrationOf,
+  runsInChannel,
+  type StreamsState,
+  sendHelpers,
+  typingIn,
+  useAddChannelMember,
+  useApproval,
+  useApprovals,
+  useChannelMembers,
+  useChannels,
+  useChannelThreads,
+  useCreateMission,
+  useCreateThread,
+  useJoinChannel,
+  useMessages,
+  useMissionControl,
+  useModels,
+  usePostMessage,
+  useRoster,
+  useThreadInfo,
+  useThreadMessages,
+  useThreadMission,
+  useThreads,
+  useUpdateChannel,
+  useWikiTree,
+} from "@agenteschat/client";
+import { activityText, activityVerb, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
+import { artifactRefs } from "@agenteschat/client/lib/artifacts";
+import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
+import {
+  entersWithMotion,
+  greetingSuggestions,
+  messageUsage,
+  nearBottom,
+  usageLine,
+} from "@agenteschat/client/lib/chat";
+import { consultationsOf } from "@agenteschat/client/lib/consultations";
+import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
+import { errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
+import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { serverBody } from "@agenteschat/client/lib/message-body";
+import {
+  isOpenMission,
+  missionCommandOf,
+  missionLinkOf,
+  missionPlanChangeOf,
+  missionPlanOf,
+  missionReportOf,
+  missionSuggestionOf,
+  parseMissionCommand,
+  taskNoticeOf,
+} from "@agenteschat/client/lib/missions";
+import { can } from "@agenteschat/client/lib/permissions";
+import { localMeta, quoteExcerpt, replyOf } from "@agenteschat/client/lib/reply";
+import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
+import {
+  contextMarks,
+  hiddenByThreads,
+  rangeCandidates,
+  suggestRange,
+  threadStartOf,
+} from "@agenteschat/client/lib/threads";
+import { buildTimeline, mergeTimeline, type TimelineItem, threadRootsToLoad } from "@agenteschat/client/lib/timeline";
+import { splitCanceled } from "@agenteschat/client/lib/work";
 import {
   Avatar,
   Button,
@@ -31,45 +117,8 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Fragment, memo, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useCreateMission, useMissionControl, useThreadMission } from "@/api/missions";
-import {
-  MESSAGES_PAGE,
-  sendHelpers,
-  useAddChannelMember,
-  useApproval,
-  useApprovals,
-  useChannelMembers,
-  useChannels,
-  useChannelThreads,
-  useCreateThread,
-  useJoinChannel,
-  useMessages,
-  useModels,
-  usePostMessage,
-  useRoster,
-  useThreadInfo,
-  useThreadMessages,
-  useThreads,
-  useUpdateChannel,
-  useWikiTree,
-} from "@/api/queries";
-import type {
-  Agent,
-  AgentQuestion,
-  Approval,
-  ArtifactRef,
-  Channel,
-  Member,
-  MemoryUpdate,
-  Message as MessageType,
-  ReplyRef,
-  SecretRequest,
-  ThreadInfo,
-} from "@/api/types";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
-import { buildTimeline, mergeTimeline, type TimelineItem, threadRootsToLoad } from "@/chat/timeline";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
@@ -128,36 +177,8 @@ import { ConsultClock, WorkingStack, WorkingWords } from "@/components/WorkingLi
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
-import { activityText, activityVerb, barEntries, isWriting, toolActivity } from "@/lib/activity";
-import { artifactRefs } from "@/lib/artifacts";
-import { audienceNotice, canTalk } from "@/lib/audience";
-import { entersWithMotion, greetingSuggestions, messageUsage, nearBottom, usageLine } from "@/lib/chat";
-import { consultationsOf } from "@/lib/consultations";
-import { clearDraft, peekDraft } from "@/lib/drafts";
-import { errorCode, errorText } from "@/lib/errors";
-import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@/lib/files";
-import { dayLabel, formatFullDate, formatTime, joinNames } from "@/lib/format";
-import { agentGrammar } from "@/lib/grammar";
-import { serverBody } from "@/lib/message-body";
-import {
-  isOpenMission,
-  missionCommandOf,
-  missionLinkOf,
-  missionPlanChangeOf,
-  missionPlanOf,
-  missionReportOf,
-  missionSuggestionOf,
-  parseMissionCommand,
-  taskNoticeOf,
-} from "@/lib/missions";
 import { reportPainted } from "@/lib/perf";
-import { can } from "@/lib/permissions";
-import { localMeta, quoteExcerpt, replyOf } from "@/lib/reply";
-import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@/lib/routines";
-import { contextMarks, hiddenByThreads, rangeCandidates, suggestRange, threadStartOf } from "@/lib/threads";
 import { useToast } from "@/lib/toast";
-import { splitCanceled } from "@/lib/work";
-import { consultsIn } from "@/realtime/consults";
 import {
   reconcileChannelRuns,
   useChannelRealtime,
@@ -168,15 +189,6 @@ import {
   useStreams,
   useTypingSender,
 } from "@/realtime/context";
-import {
-  agentStateOfRun,
-  isQuiet,
-  type LiveRun,
-  narrationOf,
-  runsInChannel,
-  type StreamsState,
-} from "@/realtime/streams";
-import { typingIn } from "@/realtime/typing";
 
 /** Header and empty state of a channel, or of a DM (same layout). */
 export interface ChannelChrome {

@@ -1,26 +1,8 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
-import type { TFunction } from "i18next";
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import type { ApiClient } from "@/api/client";
-import { useApi } from "@/api/context";
-import { ApiError } from "@/api/http";
-import { keys } from "@/api/keys";
-import { cacheTask, refreshMission } from "@/api/missions";
-import {
-  applyNotificationEvent,
-  applyReactions,
-  cacheApproval,
-  cacheForumSuggestion,
-  cacheMessage,
-  cacheMessageMemories,
-  isNotificationEvent,
-} from "@/api/queries";
 import type {
   ActiveRun,
   Agent,
   AgentQuestion,
+  ApiClient,
   BudgetEvent,
   ChannelEvent,
   ForumUserEvent,
@@ -29,30 +11,59 @@ import type {
   Message,
   SecretRequest,
   ThreadInfo,
-} from "@/api/types";
-import { formatPercent } from "@/lib/format";
-import { useToast } from "@/lib/toast";
-import { type ConnectionStatus, RealtimeConnection, realtimeUrl, type SocketFactory } from "./connection";
-import { applyConsultEvent, type ConsultsState } from "./consults";
-import { applyComputerEvent, applyMachineEvent } from "./machines";
-import { applyReceiptEvent, guessReceipt, type ReceiptsState, seedReceipt } from "./receipts";
+} from "@agenteschat/client";
 import {
+  ApiError,
   applyChannelEvent,
+  applyComputerEvent,
+  applyConsultEvent,
+  applyMachineEvent,
+  applyNotificationEvent,
+  applyReactions,
+  applyReceiptEvent,
+  applyTyping,
+  type ConnectionStatus,
+  type ConsultsState,
+  cacheApproval,
+  cacheForumSuggestion,
+  cacheMessage,
+  cacheMessageMemories,
+  cacheTask,
   dismissRun,
   dropProvisional,
   emptyStreams,
   expectReply,
+  guessReceipt,
   isActiveStatus,
+  isNotificationEvent,
+  keys,
   type LiveRun,
   markStopping,
+  RealtimeConnection,
+  type ReceiptsState,
+  realtimeUrl,
   reconcileRuns,
+  refreshMission,
   runsInChannel,
+  type SocketFactory,
   type StreamsState,
+  seedReceipt,
   staleProvisional,
+  stopTyping,
+  type TypingState,
   touchRun,
+  typingThrottle,
   unmarkStopping,
-} from "./streams";
-import { applyTyping, stopTyping, type TypingState, typingThrottle } from "./typing";
+} from "@agenteschat/client";
+import { formatPercent } from "@agenteschat/client/lib/format";
+import { playAgentReaction } from "@agenteschat/ui";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
+import { useToast } from "@/lib/toast";
 
 /** Live state shared by the channel and the sidebar: runs, receipts and who is typing. */
 export interface LiveState {
@@ -596,7 +607,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if (event.suggestion.topicId) void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
       }
       // Someone reacted: the pills under that message change for everyone.
-      if (event.type === "message.reactions") applyReactions(qc, orgId, event.messageId, event.reactions);
+      if (event.type === "message.reactions")
+        applyReactions(qc, orgId, event.messageId, event.reactions, playAgentReaction);
       // An agent saved something from a person's message: the memory mark appears (or goes) live.
       if (event.type === "message.memories")
         cacheMessageMemories(qc, orgId, event.channelId, event.messageId, event.memories);

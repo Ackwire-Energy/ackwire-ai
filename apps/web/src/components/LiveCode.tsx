@@ -1,11 +1,11 @@
+import type { LiveCode, LiveOutput, LiveWork } from "@agenteschat/client";
+import { activityVerb, toolActivity } from "@agenteschat/client/lib/activity";
+import { nearBottom } from "@agenteschat/client/lib/chat";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Button, Icon, Spinner } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { activityVerb, toolActivity } from "@/lib/activity";
-import { nearBottom } from "@/lib/chat";
-import { agentGrammar } from "@/lib/grammar";
 import { useToast } from "@/lib/toast";
-import type { LiveCode, LiveOutput, LiveWork } from "@/realtime/streams";
 
 const KEYWORDS = new Set([
   // Python

@@ -9,9 +9,15 @@
  * - channel events `artifact.created` / `artifact.updated` `{ artifact }`, and `meta.artifacts: [{ id, version }]` on agent messages.
  * Seeded in development only; lost on reload.
  */
-import type { ApiClient } from "@/api/client";
-import { ApiError } from "@/api/http";
-import type { Artifact, ArtifactAuthor, ArtifactContent, ArtifactDetail, ArtifactVersion } from "@/api/types";
+import type {
+  ApiClient,
+  Artifact,
+  ArtifactAuthor,
+  ArtifactContent,
+  ArtifactDetail,
+  ArtifactVersion,
+} from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
 import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg } from "./context";
 
 interface Stored {

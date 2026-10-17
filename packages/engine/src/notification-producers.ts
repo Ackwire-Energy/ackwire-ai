@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
+import { threadFollowChoices } from "./follows";
 import {
   type NotificationActor,
   type NotificationDeps,
@@ -179,7 +180,11 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
       ),
     );
   const starter = root && !root.meta.routine && !root.meta.forum ? root.authorUserId : null;
-  const inThread = [starter, ...people.map((p) => p.userId)].filter((u): u is string => !!u && !done.has(u));
+  // Explicit choices win: following adds someone, muting drops them even where they wrote.
+  const choices = await threadFollowChoices(db, orgId, message.threadId);
+  const inThread = [starter, ...people.map((p) => p.userId), ...choices.followers].filter(
+    (u): u is string => !!u && !done.has(u) && !choices.muted.has(u),
+  );
   const to = await inChannel(deps, message.channelId, inThread);
   if (to.length === 0) return;
   await notify(deps, {

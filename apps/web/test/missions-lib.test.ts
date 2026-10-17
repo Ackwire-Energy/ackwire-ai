@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { bodyTones, iconNames, type PlanStripCell, planCellPixel, STRIP_CELL } from "@agenteschat/ui";
-import type { TFunction } from "i18next";
-import type { MachineTask, Message, Mission } from "@/api/types";
-import { threadRootsToLoad } from "@/chat/timeline";
-import { executorOptions } from "@/components/missions/MissionBits";
-import { createI18n } from "@/i18n";
+import type { MachineTask, Message, Mission } from "@agenteschat/client";
 import {
   appendOutputLine,
   cellsFromCounts,
@@ -39,7 +34,12 @@ import {
   viaText,
   waitingParts,
   waitingText,
-} from "@/lib/missions";
+} from "@agenteschat/client/lib/missions";
+import { threadRootsToLoad } from "@agenteschat/client/lib/timeline";
+import { bodyTones, iconNames, type PlanStripCell, planCellPixel, STRIP_CELL } from "@agenteschat/ui";
+import type { TFunction } from "i18next";
+import { executorOptions } from "@/components/missions/MissionBits";
+import { createI18n } from "@/i18n";
 
 const pt = createI18n("pt-BR");
 const t = pt.t.bind(pt) as TFunction;

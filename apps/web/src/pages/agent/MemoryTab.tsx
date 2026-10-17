@@ -1,3 +1,6 @@
+import type { Proposal } from "@agenteschat/client";
+import { ApiError, keys, useDecideProposal, useMemory, useProposals } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   Alert,
   Button,
@@ -16,13 +19,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/http";
-import { keys } from "@/api/keys";
-import { useDecideProposal, useMemory, useProposals } from "@/api/queries";
-import type { Proposal } from "@/api/types";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { agentGrammar } from "@/lib/grammar";
 import { useToast } from "@/lib/toast";
 import { filterMemories, KIND_ICON, type MemoryTab as Kind, memorySource, usageLabel } from "@/pages/MemoryPage";
 import { proposalTitle } from "@/pages/ProposalsPage";

@@ -1,8 +1,8 @@
+import type { ArtifactContent, ArtifactDiffFile } from "@agenteschat/client";
+import { parsePatch, patchCounts, sideBySide, sortRows } from "@agenteschat/client/lib/artifacts";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ArtifactContent, ArtifactDiffFile } from "@/api/types";
-import { parsePatch, patchCounts, sideBySide, sortRows } from "@/lib/artifacts";
 import { Markdown } from "@/lib/markdown";
 import { FileSummary, FileView } from "./FileView";
 import { HtmlFrame } from "./HtmlFrame";

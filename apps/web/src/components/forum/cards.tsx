@@ -1,13 +1,13 @@
+import type { ForumSuggestion, ForumTopicDetail, ForumTopicInput, Message } from "@agenteschat/client";
+import { cacheForumSuggestion, useForumAction, useForumTopic } from "@agenteschat/client";
+import { isEnded } from "@agenteschat/client/lib/forum";
 import { Button, Icon } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { cacheForumSuggestion, useForumAction, useForumTopic } from "@/api/queries";
-import type { ForumSuggestion, ForumTopicDetail, ForumTopicInput, Message } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
-import { isEnded } from "@/lib/forum";
 import { useToast } from "@/lib/toast";
 import { NewTopicDialog } from "./NewTopicDialog";
 import { ForumStatusChip, TopicTrack, useForumWho } from "./pieces";

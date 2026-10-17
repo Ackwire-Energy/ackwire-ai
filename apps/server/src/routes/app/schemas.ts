@@ -131,6 +131,24 @@ export const Channel = z
       .optional()
       .openapi({ description: "The channel's creator: may manage its members, like admins." }),
     createdAt: z.string(),
+    unreadCount: z.number().int().optional().openapi({
+      description:
+        "Channel list only: messages since you last read it (since you joined, if never), not yours; a thread reply counts only in a thread you follow. At most 100; 0 when you're not a member.",
+    }),
+    lastMessage: z
+      .object({
+        id: z.uuid(),
+        authorType: z.enum(["person", "agent"]),
+        authorId: z.string().nullable(),
+        authorName: z.string().nullable().openapi({ description: "Null when the author was deleted." }),
+        preview: z.string().openapi({ description: "Plain text, at most 140 characters." }),
+        createdAt: z.string(),
+      })
+      .nullable()
+      .optional()
+      .openapi({
+        description: "Channel list only: the latest top-level message; null when empty or you're not a member.",
+      }),
   })
   .openapi("Channel");
 
@@ -194,6 +212,10 @@ const MessageBase = z.object({
       description:
         "People's messages: what agents saved to memory from them (the memory mark); live via `message.memories`.",
     }),
+  pinned: z.boolean().optional().openapi({
+    description:
+      "In lists: true when pinned in its channel (absent: not pinned); live via `message.pinned`/`message.unpinned`.",
+  }),
   createdAt: z.string(),
 });
 

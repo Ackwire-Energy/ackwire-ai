@@ -8,6 +8,7 @@ import type {
   SandboxDeps,
   StorageDeps,
 } from "@agenteschat/engine";
+import type { AppleTokenRevoker } from "../../auth";
 
 /**
  * Backend services the app API needs beyond the core deps (owned by the
@@ -32,4 +33,6 @@ export interface AppExtras {
   sandbox?: SandboxDeps | null;
   /** The git proxy for agents' computers (D35); absent = off. */
   gitProxy?: GitProxyDeps;
+  /** Revokes Apple tokens when an account is deleted (ADR 0035); absent/null = Apple sign-in off. */
+  appleRevoke?: AppleTokenRevoker | null;
 }

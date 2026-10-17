@@ -252,11 +252,23 @@ export type ChannelEvent =
       threadId: string;
       change: ThreadChange;
       state?: ThreadState;
-      thread?: ThreadInfo;
+      /** Without `following` (each person reads their own from the API). */
+      thread?: Omit<ThreadInfo, "following">;
       messageIds?: string[];
     }
   /** Someone reacted or took a reaction back: the message's reactions now (replace, don't merge). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
+  /** A message was pinned in this channel (`GET …/channels/{id}/pins` lists them, newest first). */
+  | {
+      type: "message.pinned";
+      channelId: string;
+      messageId: string;
+      threadId: string | null;
+      pinnedByUserId: string;
+      pinnedAt: string;
+    }
+  /** A message was unpinned. */
+  | { type: "message.unpinned"; channelId: string; messageId: string }
   /** An agent saved something to memory from this person's message: its current memory marks. */
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
   /**

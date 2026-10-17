@@ -1,3 +1,5 @@
+import type { CalItem, RunEntry, RunStatus } from "@agenteschat/client/lib/calendar";
+import { formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { Chip, type IconName, Popover, RunMark } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -6,8 +8,6 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import { useOrg } from "@/components/org-context";
-import type { CalItem, RunEntry, RunStatus } from "@/lib/calendar";
-import { formatTime, joinNames } from "@/lib/format";
 import { lookOf } from "@/lib/look";
 
 /** Marks drawn side by side in one hour slot of the day/week grid; past that, "+N". */

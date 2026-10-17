@@ -1,13 +1,13 @@
+import { useArtifactTrash } from "@agenteschat/client";
+import { daysLeft } from "@agenteschat/client/lib/drive";
+import { relativeTime } from "@agenteschat/client/lib/format";
 import { Button, Chip, EmptyState, Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
-import { useArtifactTrash } from "@/api/queries";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { useDeleteArtifact } from "@/components/artifacts/ArtifactActions";
 import { useAuthorName } from "@/components/artifacts/ArtifactViewer";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { daysLeft } from "@/lib/drive";
-import { relativeTime } from "@/lib/format";
 import { itemIcon } from "./DriveItems";
 
 /** Few days left: the chip turns to attention. */

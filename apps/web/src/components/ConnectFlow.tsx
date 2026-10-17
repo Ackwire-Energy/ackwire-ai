@@ -1,24 +1,43 @@
+import type { ConnectorDef, CustomServer } from "@agenteschat/client";
+import {
+  keys,
+  useAgents,
+  useCatalog,
+  useConnectWithKey,
+  useCustomServerAction,
+  useStartOAuth,
+} from "@agenteschat/client";
+import {
+  catalogToolClass,
+  LEVELS,
+  type Level,
+  type LevelState,
+  levelIn,
+  saveLevels,
+} from "@agenteschat/client/lib/access-levels";
+import { type ConnectedItem, fromConnection, fromServer, itemName } from "@agenteschat/client/lib/connected";
+import { humanize, isHttpsUrl } from "@agenteschat/client/lib/custom-tools";
+import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
+import {
+  partsOf,
+  type ReviewTool,
+  reviewDecisions,
+  reviewToolsOf,
+  toolName,
+} from "@agenteschat/client/lib/tool-review";
 import { Alert, Button, Dialog, DialogBody, DialogFooter, Field, Icon, Input, Segmented } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useAgents, useCatalog, useConnectWithKey, useCustomServerAction, useStartOAuth } from "@/api/queries";
-import type { ConnectorDef, CustomServer } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
-import { catalogToolClass, LEVELS, type Level, type LevelState, levelIn, saveLevels } from "@/lib/access-levels";
-import { type ConnectedItem, fromConnection, fromServer, itemName } from "@/lib/connected";
-import { humanize, isHttpsUrl } from "@/lib/custom-tools";
 import { navigateAway } from "@/lib/navigate";
-import { connectorDescription, connectorName } from "@/lib/scopes";
 import { useToast } from "@/lib/toast";
-import { partsOf, type ReviewTool, reviewDecisions, reviewToolsOf, toolName } from "@/lib/tool-review";
 import { reviewNote, ToolLevelsView, ToolReview, type ToolReviewState } from "./ToolReview";
 
 /**

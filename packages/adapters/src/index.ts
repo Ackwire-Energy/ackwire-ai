@@ -3,6 +3,7 @@ import type { EmailSender } from "./email";
 import type { KeyWrapper, PlatformCredentials } from "./keys";
 import type { Presence } from "./presence";
 import type { PubSub } from "./pubsub";
+import type { PushSender } from "./push";
 import type { RateLimiter } from "./rate-limiter";
 import type { SandboxProvider } from "./sandbox";
 import type { SearchIndexResolver } from "./search";
@@ -15,6 +16,7 @@ export * from "./keys";
 export * from "./machine-protocol";
 export * from "./presence";
 export * from "./pubsub";
+export * from "./push";
 export * from "./rate-limiter";
 export * from "./s3";
 export * from "./s3-fake";
@@ -45,4 +47,6 @@ export interface Adapters {
   platformBlobs: BlobStore;
   /** Where agents run code (D30): Daytona in the Cloud; null/absent = the sandbox tools are off. */
   sandbox?: SandboxProvider | null;
+  /** Push to the phone app (`push.send` outbox job, ADR 0035); null/absent = no push. */
+  push?: PushSender | null;
 }

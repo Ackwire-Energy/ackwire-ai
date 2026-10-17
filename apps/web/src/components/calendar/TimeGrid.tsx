@@ -1,14 +1,3 @@
-import { Icon, Skeleton } from "@agenteschat/ui";
-import {
-  type CSSProperties,
-  type ReactNode,
-  type PointerEvent as ReactPointerEvent,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { useTranslation } from "react-i18next";
 import {
   addMinutes,
   type CalItem,
@@ -26,8 +15,19 @@ import {
   shiftDays,
   uses12h,
   yToMinutes,
-} from "@/lib/calendar";
-import { toYmd } from "@/lib/format";
+} from "@agenteschat/client/lib/calendar";
+import { toYmd } from "@agenteschat/client/lib/format";
+import { Icon, Skeleton } from "@agenteschat/ui";
+import {
+  type CSSProperties,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { useTranslation } from "react-i18next";
 import { EventChip } from "./EventChip";
 import { RoutineBand } from "./RoutineBand";
 import { MARK_LANE_PX, RunMarks } from "./RunMarks";

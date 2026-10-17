@@ -3,8 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { MissionCommand, MissionDecision } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { MissionCommand, MissionDecision } from "@/api/types";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

@@ -1,6 +1,6 @@
+import { useAuthConfig } from "@agenteschat/client";
 import { Button } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
-import { useAuthConfig } from "@/api/queries";
 import { useAuth } from "@/auth/context";
 
 /** "Continuar com Google/GitHub", only for providers the server has configured. */

@@ -1,11 +1,13 @@
+import type { DmTarget } from "@agenteschat/client";
+import { keys, useModels } from "@agenteschat/client";
+import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
+import { greetingSuggestions } from "@agenteschat/client/lib/chat";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Avatar, Button, Icon } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useModels } from "@/api/queries";
-import type { DmTarget } from "@/api/types";
 import { AudienceChip } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { agentBrainLine } from "@/components/AgentBrain";
@@ -13,9 +15,6 @@ import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { audienceNotice, canTalk } from "@/lib/audience";
-import { greetingSuggestions } from "@/lib/chat";
-import { agentGrammar } from "@/lib/grammar";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
 /** A direct message with an agent or a person: the channel layout with its own header and empty state. */

@@ -43,7 +43,7 @@ describe("dispatchMentions", () => {
     ]);
   });
 
-  test("a person's message without mentions goes to the router; an agent's does not", async () => {
+  test("a message without mentions goes to the router; an agent's only below the chime-in hop (D49)", async () => {
     const message = await post("hello everyone");
     const posted = async () =>
       (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "message.posted").map((j) => j.payload);
@@ -56,7 +56,18 @@ describe("dispatchMentions", () => {
         body: "just saying",
       }),
     );
-    expect(await posted()).toHaveLength(1);
+    // An agent's answer may bring in one more agent.
+    expect(await posted()).toHaveLength(2);
+    await f.db.transaction((tx) =>
+      insertMessage(tx, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "agent", agentId: f.agent.id, runId: crypto.randomUUID(), hop: 2 },
+        body: "an answer to an answer",
+      }),
+    );
+    // An answer to an answer brings in nobody.
+    expect(await posted()).toHaveLength(2);
   });
 
   test("creates one run per agent and is idempotent", async () => {

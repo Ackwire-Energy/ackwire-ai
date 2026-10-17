@@ -1,14 +1,14 @@
+import type { RoutineTarget } from "@agenteschat/client";
+import { useChannels } from "@agenteschat/client";
+import type { CalItem } from "@agenteschat/client/lib/calendar";
+import { formatTime } from "@agenteschat/client/lib/format";
 import { appearanceStyle, Button, Icon, Popover } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode, PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { useChannels } from "@/api/queries";
-import type { RoutineTarget } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import { useOrg } from "@/components/org-context";
-import type { CalItem } from "@/lib/calendar";
-import { formatTime } from "@/lib/format";
 import { lookOf } from "@/lib/look";
 
 /** The chip's left color: only by source (person, the agent's own color, routine, due date). */

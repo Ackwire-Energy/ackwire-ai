@@ -1,6 +1,3 @@
-import { Avatar, Button, Card, Chip, Icon, Meter } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
 import {
   useAgentDetail,
   useAgentSkills,
@@ -11,14 +8,17 @@ import {
   useRuns,
   useSettings,
   useUsage,
-} from "@/api/queries";
+} from "@agenteschat/client";
+import { audienceSummary } from "@agenteschat/client/lib/audience";
+import { formatMonth, formatPercent, formatUsd, whenAt } from "@agenteschat/client/lib/format";
+import { Avatar, Button, Card, Chip, Icon, Meter } from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { ResourceIcon, resourceName, useConnectedById } from "@/components/AccessLevels";
 import { agentBrainLine } from "@/components/AgentBrain";
 import { usd } from "@/components/AgentFields";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { audienceSummary } from "@/lib/audience";
-import { formatMonth, formatPercent, formatUsd, whenAt } from "@/lib/format";
 import { proposalTitle } from "@/pages/ProposalsPage";
 import { AgentAsksLine, agentConnectorTools } from "./AgentTools";
 import { CardHead, useAgentEdit } from "./context";

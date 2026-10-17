@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { layoutTrack, roundLabelBoxes, trackItemAt } from "@agenteschat/ui";
-import type { ForumPost, ForumTopic, ForumTopicDetail, ForumTrack } from "@/api/types";
+import type { ForumPost, ForumTopic, ForumTopicDetail, ForumTrack } from "@agenteschat/client";
 import {
   addAgentSeat,
   convergence,
@@ -22,7 +21,8 @@ import {
   toggleSeat,
   trackGroups,
   turnNow,
-} from "@/lib/forum";
+} from "@agenteschat/client/lib/forum";
+import { layoutTrack, roundLabelBoxes, trackItemAt } from "@agenteschat/ui";
 
 const ME = "me";
 const A = (id: string) => ({ type: "agent" as const, id });

@@ -1,7 +1,7 @@
+import { joinNames } from "@agenteschat/client/lib/format";
 import { Button, Icon, modKey, Popover } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { joinNames } from "@/lib/format";
 import { type Change, useAgentEdit } from "./context";
 
 /**

@@ -20,7 +20,7 @@ import {
 } from "@agenteschat/engine";
 import { type Auth, type SessionUser, sessionUser } from "../auth";
 import type { Logger } from "../logger";
-import { allowedOrigins } from "../routes/app/context";
+import { allowedOrigins, requestOriginAllowed } from "../routes/app/context";
 import type { MachineSocketData, MachineSockets } from "./machines";
 
 /**
@@ -156,8 +156,10 @@ export function createRealtime(deps: RealtimeDeps) {
     },
 
     async upgrade(req: Request, server: Bun.Server<SocketData>): Promise<Response | undefined> {
-      const origin = req.headers.get("origin");
-      if (!origin || !origins.has(origin)) return new Response("Cross-origin WebSocket refused", { status: 403 });
+      // Our origin, or the phone app without one (ADR 0035); the session comes from the cookie either way.
+      if (!requestOriginAllowed(origins, req.headers)) {
+        return new Response("Cross-origin WebSocket refused", { status: 403 });
+      }
       const orgId = new URL(req.url).searchParams.get("orgId") ?? "";
       if (!UUID.test(orgId)) return new Response("orgId is required", { status: 400 });
       const user = await sessionUser(deps.auth, req.headers);

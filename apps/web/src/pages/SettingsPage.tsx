@@ -1,3 +1,24 @@
+import type { Credential, Role } from "@agenteschat/client";
+import {
+  useAddCredential,
+  useCredentials,
+  usePlatformKey,
+  useRemoveCredential,
+  useRotateCredential,
+  useSettings,
+  useUpdateSettings,
+  useUsageReport,
+} from "@agenteschat/client";
+import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
+import {
+  isProviderId,
+  keyLooksValid,
+  PROVIDERS,
+  type ProviderId,
+  providerLabel,
+} from "@agenteschat/client/lib/providers";
+import { parseAmount } from "@agenteschat/client/lib/text";
 import {
   Button,
   Card,
@@ -17,17 +38,6 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  useAddCredential,
-  useCredentials,
-  usePlatformKey,
-  useRemoveCredential,
-  useRotateCredential,
-  useSettings,
-  useUpdateSettings,
-  useUsageReport,
-} from "@/api/queries";
-import type { Credential, Role } from "@/api/types";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { SandboxSection } from "@/components/AgentComputer";
@@ -39,10 +49,6 @@ import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
-import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@/lib/format";
-import { can } from "@/lib/permissions";
-import { isProviderId, keyLooksValid, PROVIDERS, type ProviderId, providerLabel } from "@/lib/providers";
-import { parseAmount } from "@/lib/text";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
 

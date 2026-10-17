@@ -1,13 +1,13 @@
+import { useChannels, useForumTopics, useWikiTree } from "@agenteschat/client";
+import { canTalk } from "@agenteschat/client/lib/audience";
+import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { Avatar, CommandPalette, Icon, type PaletteItem } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useChannels, useForumTopics, useWikiTree } from "@/api/queries";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { canTalk } from "@/lib/audience";
-import { setDraftFor } from "@/lib/drafts";
 import { SETTINGS_SECTIONS } from "@/pages/SettingsPage";
 
 /** ⌘K / Ctrl+K anywhere in the workspace (also when typing): opens the palette. */

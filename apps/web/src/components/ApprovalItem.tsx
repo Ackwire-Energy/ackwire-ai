@@ -1,10 +1,10 @@
+import type { Agent, Approval, Member } from "@agenteschat/client";
+import { useDecideApproval } from "@agenteschat/client";
+import { timeLeft, whenAt } from "@agenteschat/client/lib/format";
 import { ApprovalCard, Button } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
-import { useDecideApproval } from "@/api/queries";
-import type { Agent, Approval, Member } from "@/api/types";
 import { CardSky, colorOf, prepareBurst } from "@/components/Sky";
-import { timeLeft, whenAt } from "@/lib/format";
 import { useOrg } from "./org-context";
 
 export type ApprovalAction = "merge" | "deploy" | "rollback" | "publish" | "delete" | "send" | "other";

@@ -40,14 +40,14 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          bun test packages/adapters packages/config packages/db packages/engine packages/modules packages/providers apps/server 2>&1 | tee test.log
+          bun test packages/adapters packages/config packages/db packages/engine packages/modules packages/providers packages/client packages/i18n packages/tokens apps/server 2>&1 | tee test.log
       - name: Test (web and design system)
         if: success() || failure()
         timeout-minutes: 10
         shell: bash
         run: |
           set -o pipefail
-          bun test apps/web packages/ui 2>&1 | tee -a test.log
+          bun test apps/web packages/ui apps/mobile/test 2>&1 | tee -a test.log
       # GitHub's log storage sometimes loses logs; keep the errors as an artifact and in the summary.
       - name: Keep errors
         if: always()

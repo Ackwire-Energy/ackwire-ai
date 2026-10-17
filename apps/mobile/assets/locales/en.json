@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "To send pictures in your conversations.",
+    "NSCameraUsageDescription": "To take pictures and send them in your conversations."
+  }
+}

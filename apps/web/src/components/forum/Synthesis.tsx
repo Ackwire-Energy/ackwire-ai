@@ -1,21 +1,21 @@
-import { Button, Checkbox, Icon } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useForumAction } from "@/api/queries";
 import type {
   ForumDecisionCards,
   ForumOwner,
   ForumPlanCards,
   ForumSynthesisCards,
   ForumTopicDetail,
-} from "@/api/types";
+} from "@agenteschat/client";
+import { useForumAction } from "@agenteschat/client";
+import { issuesWithState, ownerOf } from "@agenteschat/client/lib/forum";
+import { Button, Checkbox, Icon } from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { useOrg } from "@/components/org-context";
 import { SaveToWikiDialog } from "@/components/SaveToWiki";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
-import { issuesWithState, ownerOf } from "@/lib/forum";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import { OriginLink, SeatAvatar, useForumWho } from "./pieces";

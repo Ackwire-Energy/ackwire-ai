@@ -1,13 +1,5 @@
-import { Button, Card, Chip, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
-import type { TFunction } from "i18next";
-import { useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useAgentDetail, useChannels, useRoutines, useRuns, useUsage } from "@/api/queries";
-import type { Run } from "@/api/types";
-import { usd } from "@/components/AgentFields";
-import { LoadingList } from "@/components/Loading";
-import { useOrg } from "@/components/org-context";
-import { groupByDay, isRoutineRun, type RunFilter, runMatches, thisMonth } from "@/lib/agent-edit";
+import type { Run } from "@agenteschat/client";
+import { useAgentDetail, useChannels, useRoutines, useRuns, useUsage } from "@agenteschat/client";
 import {
   dayLabel,
   formatInt,
@@ -16,8 +8,16 @@ import {
   formatTime,
   formatTokensShort,
   formatUsd,
-} from "@/lib/format";
-import { covers } from "@/lib/repos";
+} from "@agenteschat/client/lib/format";
+import { covers } from "@agenteschat/client/lib/repos";
+import { Button, Card, Chip, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
+import type { TFunction } from "i18next";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { usd } from "@/components/AgentFields";
+import { LoadingList } from "@/components/Loading";
+import { useOrg } from "@/components/org-context";
+import { groupByDay, isRoutineRun, type RunFilter, runMatches, thisMonth } from "@/lib/agent-edit";
 import { useAgentEdit } from "./context";
 import { RunChip, runWhere } from "./pieces";
 

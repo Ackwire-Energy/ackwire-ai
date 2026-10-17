@@ -1,13 +1,19 @@
+import type {
+  CommandApproval,
+  Mission,
+  MissionExecutor,
+  MissionFileName,
+  ThreadMissionSummary,
+} from "@agenteschat/client";
+import { executorIcon, executorOnText, type PlanCell, tickFor } from "@agenteschat/client/lib/missions";
 import { Chip, Icon, type IconName, PlanStrip, Select } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { CommandApproval, Mission, MissionExecutor, MissionFileName, ThreadMissionSummary } from "@/api/types";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
-import { executorIcon, executorOnText, type PlanCell, tickFor } from "@/lib/missions";
 import { MissionFilesPanel } from "./MissionFiles";
 import "./missions.css";
 

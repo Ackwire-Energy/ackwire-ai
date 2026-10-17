@@ -1,5 +1,5 @@
+import type { Me, OrgSummary } from "@agenteschat/client";
 import { createContext, type ReactNode, useContext } from "react";
-import type { Me, OrgSummary } from "@/api/types";
 
 interface OrgContextValue {
   org: OrgSummary;

@@ -479,8 +479,15 @@ function rangeRoot(root: Message, fromRange: boolean): Message {
 
 async function authorNames(db: Database, history: Message[]) {
   const userIds = [...new Set(history.flatMap((m) => (m.authorUserId ? [m.authorUserId] : [])))];
-  const agentIds = [...new Set(history.flatMap((m) => (m.authorAgentId ? [m.authorAgentId] : [])))];
   const names = new Map<string, string>();
+  // Agents usually sit in the per-process cache (the running agent always does): read only the misses.
+  const agentIds: string[] = [];
+  for (const m of history) {
+    if (!m.authorAgentId || names.has(m.authorAgentId) || agentIds.includes(m.authorAgentId)) continue;
+    const cached = caches.agents.get(`${m.orgId}:${m.authorAgentId}`) as Agent | null | undefined;
+    if (cached) names.set(cached.id, `${cached.name} (@${cached.handle})`);
+    else agentIds.push(m.authorAgentId);
+  }
   const [userRows, agentRows] = await Promise.all([
     userIds.length > 0
       ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, userIds))

@@ -3,8 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { AgentInput } from "@agenteschat/client";
 import { cleanup, within } from "@testing-library/react";
-import type { AgentInput } from "@/api/types";
 import {
   freeHandle,
   handleProblem,

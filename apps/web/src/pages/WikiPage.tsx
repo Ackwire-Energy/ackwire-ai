@@ -1,3 +1,7 @@
+import type { WikiPageSummary } from "@agenteschat/client";
+import { keys, useWikiReads, useWikiTree } from "@agenteschat/client";
+import { relativeTime } from "@agenteschat/client/lib/format";
+import { type WikiFolder, wikiSlug, wikiTree } from "@agenteschat/client/lib/wiki";
 import { Button, EmptyState, Icon, Kbd, SearchField } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -5,9 +9,6 @@ import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useWikiReads, useWikiTree } from "@/api/queries";
-import type { WikiPageSummary } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -16,10 +17,8 @@ import { ObsidianMark } from "@/components/wiki/ObsidianMark";
 import { useVaultDrop, VaultDropOverlay, WikiImportDialog } from "@/components/wiki/WikiImport";
 import { AuthorAvatar, typingIn, WikiReader } from "@/components/wiki/WikiReader";
 import { useDirectory } from "@/hooks/useDirectory";
-import { relativeTime } from "@/lib/format";
 import type { VaultFile } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
-import { type WikiFolder, wikiSlug, wikiTree } from "@/lib/wiki";
 import "./wiki.css";
 
 /** The suggested start (Visão geral, Processos/Como trabalhamos, Glossário), in the UI language. */

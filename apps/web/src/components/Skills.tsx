@@ -1,3 +1,7 @@
+import type { Skill, SkillDetail, SkillFile } from "@agenteschat/client";
+import { useSkill, useSkillAction, useSkills, useSkillUsage } from "@agenteschat/client";
+import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   Alert,
   Button,
@@ -20,13 +24,9 @@ import {
 } from "@agenteschat/ui";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSkill, useSkillAction, useSkills, useSkillUsage } from "@/api/queries";
-import type { Skill, SkillDetail, SkillFile } from "@/api/types";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { joinNames, relativeTime } from "@/lib/format";
 import { Markdown } from "@/lib/markdown";
-import { can } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
 
 /** How many skills the settings card lists before "Ver todas" (the search dialog). */

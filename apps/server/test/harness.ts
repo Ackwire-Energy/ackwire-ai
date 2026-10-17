@@ -1,6 +1,7 @@
 import {
   type Adapters,
   createFakeEmailSender,
+  createFakePushSender,
   createMemoryBlobStore,
   createMemoryPresence,
   createMemoryPubSub,
@@ -24,7 +25,7 @@ import {
 } from "@agenteschat/engine";
 import { createFakeEmbeddings, createFakeProvider } from "@agenteschat/providers/testing";
 import { createApp } from "../src/app";
-import { createAuth } from "../src/auth";
+import { type AppleTokenRevoker, createAuth } from "../src/auth";
 import { buildEngine } from "../src/engine";
 import { createLogger } from "../src/logger";
 import { createMachineSockets } from "../src/realtime/machines";
@@ -67,6 +68,8 @@ export async function createTestServer(
     judge?: Parameters<typeof createFakeJudge>[0];
     /** The fake schedule reader's table (phrase → answer), on top of `TEST_SCHEDULES`. */
     schedules?: FakeScheduleAnswers;
+    /** Fake Apple token revocation (account deletion). */
+    appleRevoke?: AppleTokenRevoker;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -79,6 +82,7 @@ export async function createTestServer(
   });
   const log = createLogger("error");
   const email = createFakeEmailSender();
+  const push = createFakePushSender();
   const platformBlobs = createMemoryBlobStore();
   const adapters: Adapters = {
     search: createPostgresSearchResolver(db),
@@ -90,6 +94,7 @@ export async function createTestServer(
     platformCredentials: noPlatformCredentials,
     email,
     platformBlobs,
+    push,
   };
   const provider = createFakeProvider(options.reply);
   const embeddings = createFakeEmbeddings();
@@ -132,6 +137,7 @@ export async function createTestServer(
         context: engine.context,
         sandbox: engine.sandbox,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
+        appleRevoke: options.appleRevoke,
       },
     },
     log,
@@ -155,6 +161,7 @@ export async function createTestServer(
     provider,
     embeddings,
     email,
+    push,
     platformBlobs,
     engine,
     app,

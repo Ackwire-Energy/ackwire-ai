@@ -1,3 +1,7 @@
+import type { ThreadActor, ThreadInfo, ThreadTab } from "@agenteschat/client";
+import { useChannels, useMissionList, useThreadList } from "@agenteschat/client";
+import { formatFullDate, relativeTime } from "@agenteschat/client/lib/format";
+import { threadMessageCount, threadTitle } from "@agenteschat/client/lib/threads";
 import {
   AvatarStack,
   Button,
@@ -20,9 +24,6 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useMissionList } from "@/api/missions";
-import { useChannels, useThreadList } from "@/api/queries";
-import type { ThreadActor, ThreadInfo, ThreadTab } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
@@ -32,9 +33,7 @@ import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { MissionsTab } from "@/components/missions/MissionList";
 import { useOrg } from "@/components/org-context";
 import { ThreadStatusChip, useThreadControls } from "@/components/threads/ThreadBits";
-import { formatFullDate, relativeTime } from "@/lib/format";
 import { useOpenParam } from "@/lib/open-param";
-import { threadMessageCount, threadTitle } from "@/lib/threads";
 import "./threads.css";
 
 /**

@@ -1,3 +1,17 @@
+import type { CommandApproval, Mission, MissionExecutor } from "@agenteschat/client";
+import {
+  keys,
+  useMissionBrain,
+  useMissionSettings,
+  useRemoveCommandRule,
+  useSetAgentMissionDefault,
+  useSetCommandApproval,
+  useSetMissionBrain,
+  useSetMissionExecutor,
+  useSetResumeTasks,
+} from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { whenAt } from "@agenteschat/client/lib/format";
 import {
   AutonomyPixels,
   Button,
@@ -16,24 +30,10 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { keys } from "@/api/keys";
-import {
-  useMissionBrain,
-  useMissionSettings,
-  useRemoveCommandRule,
-  useSetAgentMissionDefault,
-  useSetCommandApproval,
-  useSetMissionBrain,
-  useSetMissionExecutor,
-  useSetResumeTasks,
-} from "@/api/missions";
-import type { CommandApproval, Mission, MissionExecutor } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { brainModelLabel } from "@/components/AgentBrain";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { errorText } from "@/lib/errors";
-import { whenAt } from "@/lib/format";
 import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
 import { COMMAND_APPROVALS, ExecutorMark } from "./MissionBits";

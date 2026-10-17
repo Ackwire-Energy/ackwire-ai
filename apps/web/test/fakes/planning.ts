@@ -11,10 +11,10 @@
  *   `POST …/calendar/events`, `POST …/calendar/proposals/{id}/confirm|dismiss`.
  * Nothing runs: "Rodar agora" and "Pedir à Ada" only change local state. Seeded in development only.
  */
-import { nextOccurrences } from "@agenteschat/ui";
-import type { ApiClient } from "@/api/client";
+
 import type {
   Actor,
+  ApiClient,
   ApiRule,
   CalendarEvent,
   CalendarProposal,
@@ -24,7 +24,8 @@ import type {
   RoutineRun,
   RuleInfo,
   ScheduleParse,
-} from "@/api/types";
+} from "@agenteschat/client";
+import { nextOccurrences } from "@agenteschat/ui";
 import { fromApiRule } from "@/lib/recurrence";
 import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg } from "./context";
 

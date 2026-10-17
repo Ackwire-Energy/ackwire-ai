@@ -1,9 +1,9 @@
+import type { ReactionCount } from "@agenteschat/client";
+import { useCorrectMessage } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Textarea } from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useCorrectMessage } from "@/api/queries";
-import type { ReactionCount } from "@/api/types";
-import { agentGrammar } from "@/lib/grammar";
 import { useToast } from "@/lib/toast";
 import { useOrg } from "./org-context";
 import { DOWN, ReactButton, reactionOf, reactionState, UP, useMessageReactions } from "./Reactions";

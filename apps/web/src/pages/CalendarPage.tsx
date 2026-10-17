@@ -1,33 +1,5 @@
-import {
-  ApprovalCard,
-  Button,
-  FilterToggle,
-  Icon,
-  type IconName,
-  Kbd,
-  ListRow,
-  offsetMinutes,
-  Popover,
-  Segmented,
-  Toolbar,
-  useDelayed,
-} from "@agenteschat/ui";
-import { useEffect, useMemo, useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
-import { useCalendar, useCalendarAction, useRoutines } from "@/api/queries";
-import type { CalendarEvent, CalendarRange, SeriesScope } from "@/api/types";
-import { AgentAvatar } from "@/components/AgentAvatar";
-import { useActors } from "@/components/actors";
-import { AgendaView } from "@/components/calendar/AgendaView";
-import { dayLabel, ItemDetails } from "@/components/calendar/EventChip";
-import { EventDialog, type EventDraft, type EventSave } from "@/components/calendar/EventDialog";
-import { MiniMonth } from "@/components/calendar/MiniMonth";
-import { MonthView } from "@/components/calendar/MonthView";
-import { SeriesPrompt } from "@/components/calendar/SeriesPrompt";
-import { TimeGrid } from "@/components/calendar/TimeGrid";
-import { ErrorState } from "@/components/Loading";
-import { useOrg } from "@/components/org-context";
-import { ZoneSelect } from "@/components/ZoneSelect";
+import type { CalendarEvent, CalendarRange, SeriesScope } from "@agenteschat/client";
+import { useCalendar, useCalendarAction, useRoutines } from "@agenteschat/client";
 import {
   addDays,
   addMinutes,
@@ -45,12 +17,40 @@ import {
   upcomingItems,
   viewDays,
   viewRange,
-} from "@/lib/calendar";
-import { formatTime, joinNames, toYmd } from "@/lib/format";
-import { browserTimezone } from "@/lib/routines";
+} from "@agenteschat/client/lib/calendar";
+import { formatTime, joinNames, toYmd } from "@agenteschat/client/lib/format";
+import { browserTimezone } from "@agenteschat/client/lib/routines";
+import {
+  ApprovalCard,
+  Button,
+  FilterToggle,
+  Icon,
+  type IconName,
+  Kbd,
+  ListRow,
+  offsetMinutes,
+  Popover,
+  Segmented,
+  Toolbar,
+  useDelayed,
+} from "@agenteschat/ui";
+import { useEffect, useMemo, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
+import { AgentAvatar } from "@/components/AgentAvatar";
+import { useActors } from "@/components/actors";
+import { AgendaView } from "@/components/calendar/AgendaView";
+import { dayLabel, ItemDetails } from "@/components/calendar/EventChip";
+import { EventDialog, type EventDraft, type EventSave } from "@/components/calendar/EventDialog";
+import { MiniMonth } from "@/components/calendar/MiniMonth";
+import { MonthView } from "@/components/calendar/MonthView";
+import { SeriesPrompt } from "@/components/calendar/SeriesPrompt";
+import { TimeGrid } from "@/components/calendar/TimeGrid";
+import { ErrorState } from "@/components/Loading";
+import { useOrg } from "@/components/org-context";
+import { ZoneSelect } from "@/components/ZoneSelect";
 import { useToast } from "@/lib/toast";
 
-export { mondayOf } from "@/lib/calendar";
+export { mondayOf } from "@agenteschat/client/lib/calendar";
 
 const VIEWS: CalendarView[] = ["day", "week", "month", "agenda"];
 const SOURCES: { source: ItemSource; icon: IconName }[] = [

@@ -268,6 +268,7 @@ export function buildEngine(o: EngineOptions) {
     context,
     search: adapters.search,
     email: adapters.email,
+    push: adapters.push,
     storage,
     artifacts,
     sandbox,

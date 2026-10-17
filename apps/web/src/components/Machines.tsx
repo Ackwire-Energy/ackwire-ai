@@ -1,3 +1,8 @@
+import type { Machine, MachineOs, MachinePairing } from "@agenteschat/client";
+import { useCreatePairing, useMachineAction, useMachines } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
   Card,
@@ -17,13 +22,8 @@ import {
 } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useCreatePairing, useMachineAction, useMachines } from "@/api/queries";
-import type { Machine, MachineOs, MachinePairing } from "@/api/types";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { errorText } from "@/lib/errors";
-import { joinNames, relativeTime } from "@/lib/format";
-import { can } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
 
 const OSES: MachineOs[] = ["linux", "darwin", "windows", "other"];

@@ -1,14 +1,14 @@
+import { useAuthConfig } from "@agenteschat/client";
+import { isEmail, passwordState } from "@agenteschat/client/lib/text";
 import { Alert, Button, Field, Input } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useAuthConfig } from "@/api/queries";
 import { useAuth } from "@/auth/context";
 import { AuthLayout } from "@/components/AuthLayout";
 import { SocialButtons, useHasSocial } from "@/components/SocialButtons";
-import { isEmail, passwordState } from "@/lib/text";
 
 /** Help text under the password, live (telas/Cadastro). */
 export function passwordHelp(t: TFunction, password: string) {

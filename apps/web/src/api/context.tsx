@@ -1,14 +1,14 @@
-import { createContext, type ReactNode, useContext } from "react";
-import type { ApiClient } from "./client";
+import { type ApiClient, ApiProvider as SharedApiProvider } from "@agenteschat/client";
+import { playAgentReaction } from "@agenteschat/ui";
+import type { ReactNode } from "react";
 
-const ApiContext = createContext<ApiClient | null>(null);
+export { useApi } from "@agenteschat/client";
 
+/** The shared provider with the web's effects (an agent's face on 👍/👎). */
 export function ApiProvider({ client, children }: { client: ApiClient; children: ReactNode }) {
-  return <ApiContext.Provider value={client}>{children}</ApiContext.Provider>;
-}
-
-export function useApi(): ApiClient {
-  const client = useContext(ApiContext);
-  if (!client) throw new Error("useApi must be used inside ApiProvider");
-  return client;
+  return (
+    <SharedApiProvider client={client} onAgentReaction={playAgentReaction}>
+      {children}
+    </SharedApiProvider>
+  );
 }

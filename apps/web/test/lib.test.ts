@@ -1,8 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import type { TFunction } from "i18next";
-import { createI18n } from "@/i18n";
-import { en } from "@/i18n/locales/en";
-import { ptBR } from "@/i18n/locales/pt-BR";
 import {
   dayLabel,
   formatInt,
@@ -14,12 +10,15 @@ import {
   shortModel,
   timeLeft,
   whenAt,
-} from "@/lib/format";
-import { agentGrammar, isFeminineName } from "@/lib/grammar";
-import { landingFor, membershipIn, safeRedirect } from "@/lib/guards";
-import { addInvites, ONBOARDING_STEPS, splitEmails, validInvites } from "@/lib/onboarding";
-import { can } from "@/lib/permissions";
-import { handleFrom, isEmail, parseAmount, parseEmails, passwordState, slugify } from "@/lib/text";
+} from "@agenteschat/client/lib/format";
+import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
+import { landingFor, membershipIn, safeRedirect } from "@agenteschat/client/lib/guards";
+import { addInvites, ONBOARDING_STEPS, splitEmails, validInvites } from "@agenteschat/client/lib/onboarding";
+import { can } from "@agenteschat/client/lib/permissions";
+import { handleFrom, isEmail, parseAmount, parseEmails, passwordState, slugify } from "@agenteschat/client/lib/text";
+import { en, ptBR } from "@agenteschat/i18n";
+import type { TFunction } from "i18next";
+import { createI18n } from "@/i18n";
 
 const i18n = createI18n("pt-BR");
 const t = i18n.t.bind(i18n) as TFunction;

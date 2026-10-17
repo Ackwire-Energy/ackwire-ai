@@ -1,18 +1,18 @@
+import type { Actor, Agent } from "@agenteschat/client";
+import { useAgentDetail, useAgentScopes, useModels, usePeople, useSettings } from "@agenteschat/client";
+import { audienceNotice, audienceSummary, canTalk, modeOf } from "@agenteschat/client/lib/audience";
+import { formatPercent, relativeTime, shortModel } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
+import { scopeSummary } from "@agenteschat/client/lib/scopes";
 import { Avatar, Button, Icon, Meter, Popover } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useAgentDetail, useAgentScopes, useModels, usePeople, useSettings } from "@/api/queries";
-import type { Actor, Agent } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { agentBrainLine } from "@/components/AgentBrain";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useScopeGroups } from "@/hooks/useScopeGroups";
-import { audienceNotice, audienceSummary, canTalk, modeOf } from "@/lib/audience";
-import { formatPercent, relativeTime, shortModel } from "@/lib/format";
-import { can } from "@/lib/permissions";
-import { scopeSummary } from "@/lib/scopes";
 
 /** Hover delay before the card opens (mouse and pen only; touch opens on tap). */
 export const HOVER_OPEN_MS = 400;

@@ -1,8 +1,8 @@
+import type { CalItem } from "@agenteschat/client/lib/calendar";
 import { Popover, RunLane } from "@agenteschat/ui";
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useActors } from "@/components/actors";
-import type { CalItem } from "@/lib/calendar";
 import { lookOf } from "@/lib/look";
 import { useCadence } from "./EventChip";
 

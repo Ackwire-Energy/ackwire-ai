@@ -1,3 +1,5 @@
+import { membershipIn } from "@agenteschat/client/lib/guards";
+import { can } from "@agenteschat/client/lib/permissions";
 import { Button, EmptyState } from "@agenteschat/ui";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
@@ -10,8 +12,6 @@ import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
-import { membershipIn } from "@/lib/guards";
-import { can } from "@/lib/permissions";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { RealtimeProvider } from "@/realtime/context";
 

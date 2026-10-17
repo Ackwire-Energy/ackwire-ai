@@ -1,14 +1,13 @@
+import { keys, useMe } from "@agenteschat/client";
+import { passwordState } from "@agenteschat/client/lib/text";
 import { Alert, Button, Card, Field, Input } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useMe } from "@/api/queries";
 import { useAuth } from "@/auth/context";
 import { CenteredLayout } from "@/components/AuthLayout";
-import { passwordState } from "@/lib/text";
 
 /** telas/Convite.dc.html — valid and expired states. */
 export function InvitePage({ token }: { token: string }) {

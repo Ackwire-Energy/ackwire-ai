@@ -29,9 +29,29 @@ export function allowedOrigins(config: Config): Set<string> {
 }
 
 /**
- * The app API (`/api/app/*`) is private to our own web app: cookie session,
- * CSRF protection, free to change between versions. Documented in the
- * OpenAPI document so the web app can generate a typed client.
+ * Header the phone app sends instead of an `Origin` (ADR 0035). A browser
+ * can't send it cross-site without a CORS preflight, and we never allow one
+ * (no CORS headers anywhere), so it can't be forged by a web page.
+ */
+export const APP_CLIENT_HEADER = "x-agentes-client";
+export const MOBILE_CLIENT = "mobile";
+
+/**
+ * CSRF rule for state-changing requests and WebSocket upgrades: with an
+ * `Origin`, it must be one of ours; without one, only the phone app
+ * (`X-Agentes-Client: mobile`) gets through. Either way the session still
+ * comes from the cookie.
+ */
+export function requestOriginAllowed(origins: Set<string>, headers: Headers): boolean {
+  const origin = headers.get("origin");
+  if (origin) return origins.has(origin);
+  return headers.get(APP_CLIENT_HEADER) === MOBILE_CLIENT;
+}
+
+/**
+ * The app API (`/api/app/*`) is private to our own web and phone apps:
+ * cookie session, CSRF protection, free to change between versions.
+ * Documented in the OpenAPI document so the apps can generate a typed client.
  */
 /**
  * POSTs to these paths may also be `multipart/form-data` (file uploads); the origin check still applies.
@@ -44,11 +64,13 @@ export function createAppRouter(deps: AppDeps) {
   const origins = allowedOrigins(deps.config);
 
   // CSRF: cookies ride along on cross-site requests, so every state-changing
-  // request must come from our own origin and be JSON (a plain HTML form can't send it).
+  // request must come from our own origin (or the phone app, see
+  // `requestOriginAllowed`) and be JSON (a plain HTML form can't send it).
   app.use("*", async (c, next) => {
     if (c.req.method === "GET" || c.req.method === "HEAD") return next();
-    const origin = c.req.header("origin");
-    if (!origin || !origins.has(origin)) return apiError(c, 403, "bad_origin", "Cross-origin request refused");
+    if (!requestOriginAllowed(origins, c.req.raw.headers)) {
+      return apiError(c, 403, "bad_origin", "Cross-origin request refused");
+    }
     const type = c.req.header("content-type") ?? "";
     const upload =
       c.req.method === "POST" &&

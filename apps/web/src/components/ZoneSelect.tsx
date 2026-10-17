@@ -1,10 +1,10 @@
+import { useSettings } from "@agenteschat/client";
+import { browserTimezone, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import { TimezoneSelect } from "@agenteschat/ui";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useSettings } from "@/api/queries";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { browserTimezone, zoneDisplayName } from "@/lib/routines";
 
 /**
  * Every place a time zone is chosen: our `TimezoneSelect` with the friendly

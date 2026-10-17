@@ -1,17 +1,5 @@
-import { Card, Chip, Icon, type IconName, Segmented } from "@agenteschat/ui";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { TFunction } from "i18next";
-import { type ReactNode, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useAgents, useCatalog, useConnections, useCustomServers } from "@/api/queries";
-import type { AccessTool, Agent } from "@/api/types";
-import { AgentAvatar } from "@/components/AgentAvatar";
-import { ConnectorIcon } from "@/components/ConnectorCatalog";
-import { LoadingList } from "@/components/Loading";
-import { useOrg } from "@/components/org-context";
-import { useAgentsAccess } from "@/hooks/useAgentsAccess";
+import type { AccessTool, Agent } from "@agenteschat/client";
+import { keys, useAgents, useCatalog, useConnections, useCustomServers } from "@agenteschat/client";
 import {
   type AccessResource,
   asksAt,
@@ -22,11 +10,22 @@ import {
   resourcesOf,
   saveLevels,
   toolsAt,
-} from "@/lib/access-levels";
-import { type ConnectedItem, connectedItems, itemName } from "@/lib/connected";
-import { humanize } from "@/lib/custom-tools";
-import { can } from "@/lib/permissions";
-import { builtinToolText } from "@/lib/scopes";
+} from "@agenteschat/client/lib/access-levels";
+import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { humanize } from "@agenteschat/client/lib/custom-tools";
+import { can } from "@agenteschat/client/lib/permissions";
+import { builtinToolText } from "@agenteschat/client/lib/scopes";
+import { Card, Chip, Icon, type IconName, Segmented } from "@agenteschat/ui";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { TFunction } from "i18next";
+import { type ReactNode, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
+import { AgentAvatar } from "@/components/AgentAvatar";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { LoadingList } from "@/components/Loading";
+import { useOrg } from "@/components/org-context";
+import { useAgentsAccess } from "@/hooks/useAgentsAccess";
 
 type TT = (key: string, options: { defaultValue: string }) => string;
 

@@ -1,7 +1,7 @@
+import { useWikiAction, useWikiTree } from "@agenteschat/client";
 import { Button, Dialog, DialogBody, DialogFooter, Icon, SearchField } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useWikiAction, useWikiTree } from "@/api/queries";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 

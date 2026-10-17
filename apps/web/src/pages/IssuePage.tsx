@@ -1,3 +1,7 @@
+import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "@agenteschat/client";
+import { keys, useChannels, useIssue, useIssueAction, useIssueActivity, useWikiTree } from "@agenteschat/client";
+import { dueLabel, relativeTime, whenAt } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   Alert,
   Button,
@@ -23,9 +27,6 @@ import { Link } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useChannels, useIssue, useIssueAction, useIssueActivity, useWikiTree } from "@/api/queries";
-import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { useArtifactViewer } from "@/components/artifacts/ArtifactViewer";
@@ -35,8 +36,6 @@ import { useEmojiLabels } from "@/components/Reactions";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useComposerFiles } from "@/hooks/useComposerFiles";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
-import { dueLabel, relativeTime, whenAt } from "@/lib/format";
-import { agentGrammar } from "@/lib/grammar";
 import { isOpen, PRIORITIES, STATUS_ICON, STATUSES, useAssigneeColor, useStepText } from "@/lib/issues";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";

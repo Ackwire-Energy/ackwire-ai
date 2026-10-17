@@ -3,11 +3,11 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { SecretBox } from "@agenteschat/client";
+import { secretAad } from "@agenteschat/client/lib/secret-box";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { SecretBox } from "@/api/types";
 // The computer's side, from the server code: what the card seals must open there.
 import { generateSecretKeyPair, openSecret } from "../../../packages/adapters/src/secret-box";
-import { secretAad } from "../src/lib/secret-box";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

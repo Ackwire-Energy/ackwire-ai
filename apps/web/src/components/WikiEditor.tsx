@@ -1,7 +1,7 @@
+import type { WikiPageSummary } from "@agenteschat/client";
 import { Button, Kbd, modKey, Segmented } from "@agenteschat/ui";
 import { type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { WikiPageSummary } from "@/api/types";
 import { Markdown } from "@/lib/markdown";
 import { useWikiLinkRenderer } from "./WikiLinks";
 

@@ -1,3 +1,4 @@
+import type { ApiClient, SocketFactory } from "@agenteschat/client";
 import { domWindow } from "@agenteschat/ui/testing/dom";
 import {
   createMemoryHistory,
@@ -9,7 +10,6 @@ import {
 } from "@tanstack/react-router";
 import { act, render, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import type { ApiClient } from "@/api/client";
 import { AppProviders, type AppServices } from "@/app/providers";
 import { createQueryClient } from "@/app/query-client";
 import type { RouterContext } from "@/app/router-context";
@@ -17,7 +17,6 @@ import type { AuthClient } from "@/auth/client";
 import { OrgProvider } from "@/components/org-context";
 import { createI18n } from "@/i18n";
 import { createToastStore } from "@/lib/toast";
-import type { SocketFactory } from "@/realtime/connection";
 import { RealtimeProvider } from "@/realtime/context";
 import { routeTree } from "@/routeTree.gen";
 import { createFakeAuth } from "./fake-auth";

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   type Adapters,
   createDaytonaSandboxProvider,
+  createExpoPushSender,
   createLogEmailSender,
   createMemoryPresence,
   createMemoryRateLimiter,
@@ -21,7 +22,7 @@ import { createLocalKeyWrapper, drainLocalRuns, enableCaches } from "@agentescha
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/providers";
 import { createApp } from "./app";
-import { createAuth } from "./auth";
+import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
 import { createLogger } from "./logger";
 import { createMachineSockets } from "./realtime/machines";
@@ -100,6 +101,8 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
           snapshot: config.SANDBOX_SNAPSHOT,
         })
       : null,
+    // Phone app push (ADR 0035): only devices that registered get anything.
+    push: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });
@@ -151,6 +154,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
         context: engine.context,
         sandbox: engine.sandbox,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
+        appleRevoke: appleTokenRevoker(config),
       },
     },
     log,

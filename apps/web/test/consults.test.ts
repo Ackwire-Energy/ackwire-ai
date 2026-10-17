@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { TFunction } from "i18next";
-import type { ChannelEvent, Message } from "@/api/types";
-import { createI18n } from "@/i18n";
-import { type ActivityEntry, activitySentence, activityText, barEntries, listNames } from "@/lib/activity";
-import { consultationsOf, previewOf } from "@/lib/consultations";
+import type { ChannelEvent, LiveRun, Message } from "@agenteschat/client";
 import {
   applyConsultEvent,
   CONSULT_ASKING_MAX_MS,
@@ -11,8 +7,17 @@ import {
   type ConsultsState,
   consultsIn,
   elapsedClock,
-} from "@/realtime/consults";
-import type { LiveRun } from "@/realtime/streams";
+} from "@agenteschat/client";
+import {
+  type ActivityEntry,
+  activitySentence,
+  activityText,
+  barEntries,
+  listNames,
+} from "@agenteschat/client/lib/activity";
+import { consultationsOf, previewOf } from "@agenteschat/client/lib/consultations";
+import type { TFunction } from "i18next";
+import { createI18n } from "@/i18n";
 
 const pt = createI18n("pt-BR");
 const t = pt.t.bind(pt) as TFunction;
@@ -153,10 +158,10 @@ describe("the working line's sentence", () => {
     expect(activityText(t, entries("expired"))).toBe("Dev está escrevendo…");
     expect(activityText(t, entries("failed"))).toBe("Dev está escrevendo…");
     // Feminine names take "à".
-    const toIris = barEntries([], [], nameOf, () => undefined, [
-      { ...asking, consultedAgentId: "iris", status: "asking" as const },
+    const toNina = barEntries([], [], nameOf, () => undefined, [
+      { ...asking, consultedAgentId: "nina", status: "asking" as const },
     ]);
-    expect(activityText(t, toIris)).toBe("Dev está perguntando à Iris…");
+    expect(activityText(t, toNina)).toBe("Dev está perguntando à Nina…");
     // Its resumed run doesn't add a second "Dev está trabalhando"; others still group.
     expect(activityText(t, entries("answered", [run("dev", "r-dev"), run("theo"), run("nina")]))).toBe(
       "Bento respondeu. Dev está escrevendo · Theo e Nina estão trabalhando…",

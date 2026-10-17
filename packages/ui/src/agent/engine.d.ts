@@ -48,7 +48,8 @@ export interface DrawAgentOptions {
   after?: (ctx: Ctx2D, s: number, frame: BodyFrame) => void;
 }
 
-type Ctx2D = Pick<
+/** The 2D context subset the engine draws with (the phone app adapts React Native Skia to it). */
+export type Ctx2D = Pick<
   CanvasRenderingContext2D,
   | "save"
   | "restore"

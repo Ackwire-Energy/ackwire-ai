@@ -1,8 +1,8 @@
+import { fileIcon } from "@agenteschat/client/lib/files";
 import { Button, Icon, Spinner } from "@agenteschat/ui";
 import { type DragEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { UploadItem } from "@/components/artifacts/Upload";
-import { fileIcon } from "@/lib/files";
 
 /**
  * Drag files from the computer onto the Drive. `over` while something is

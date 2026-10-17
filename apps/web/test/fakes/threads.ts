@@ -3,9 +3,8 @@
  * list of `ThreadInfo` per organization, empty unless a test creates one.
  * Lists are not logged (channels read them on every open); changes are.
  */
-import type { ApiClient } from "@/api/client";
-import { ApiError } from "@/api/http";
-import type { ThreadFilters, ThreadInfo } from "@/api/types";
+import type { ApiClient, ThreadFilters, ThreadInfo } from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
 import { clone, type MockContext, mockId, perOrg } from "./context";
 
 export function createFakeThreads(

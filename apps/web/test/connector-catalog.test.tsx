@@ -3,8 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { AccessInput } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { AccessInput } from "@/api/types";
 import { authKind, searchCatalog } from "@/components/ConnectorCatalog";
 import { setNavigateAway } from "@/lib/navigate";
 import { ADA_ID, ATLAS_ID, CATALOG, createFakeApi, ORG_ID, seedState } from "./fake-api";

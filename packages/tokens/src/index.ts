@@ -1,0 +1,239 @@
+/**
+ * @agenteschat/tokens: the design system's values for platforms without CSS
+ * (the phone app). `docs/design/design-system/tokens.css` is the source of
+ * truth; a test keeps these equal to it. Names are the CSS custom properties
+ * in camelCase (`--line2` → `line2`, `--raised-2` → `raised2`).
+ */
+
+export interface ThemeColors {
+  bg: string;
+  raised: string;
+  raised2: string;
+  sunken: string;
+  bookPage: string;
+  bookLine: string;
+  glass: string;
+  glassSolid: string;
+  line: string;
+  line2: string;
+  lineStrong: string;
+  ink: string;
+  ink2: string;
+  muted: string;
+  faint: string;
+  agent: string;
+  agent2: string;
+  agentSoft: string;
+  onAgent: string;
+  ok: string;
+  warn: string;
+  warnSoft: string;
+  onWarn: string;
+  danger: string;
+  plate: string;
+  plateSoft: string;
+  scrim: string;
+  /** Names from v1 (aliases that follow the theme). */
+  surface: string;
+  surfaceRaised: string;
+  surfaceSunken: string;
+  inkMuted: string;
+  action: string;
+  onAction: string;
+  attention: string;
+  onAttention: string;
+  attentionSoft: string;
+  success: string;
+}
+
+export const light: ThemeColors = {
+  bg: "#f4f4f1",
+  raised: "#ffffff",
+  raised2: "#ffffff",
+  sunken: "#ebebe7",
+  bookPage: "#fffdf6",
+  bookLine: "#cfc8b6",
+  glass: "rgba(255, 255, 255, 0.72)",
+  glassSolid: "#fbfbf9",
+  line: "rgba(23, 23, 22, 0.08)",
+  line2: "rgba(23, 23, 22, 0.14)",
+  lineStrong: "#82827d",
+  ink: "#151514",
+  ink2: "#2a2a28",
+  muted: "#5c5c58",
+  faint: "#6f6f6a",
+  agent: "#0063d1",
+  agent2: "#3d8bff",
+  agentSoft: "#e3eefd",
+  onAgent: "#ffffff",
+  ok: "#1f7a45",
+  warn: "#9a5b00",
+  warnSoft: "#fbeed5",
+  onWarn: "#ffffff",
+  danger: "#b42a20",
+  plate: "rgba(127, 127, 127, 0.1)",
+  plateSoft: "rgba(127, 127, 127, 0.06)",
+  scrim: "rgba(10, 10, 10, 0.32)",
+  surface: "#f4f4f1",
+  surfaceRaised: "#ffffff",
+  surfaceSunken: "#ebebe7",
+  inkMuted: "#5c5c58",
+  action: "#151514",
+  onAction: "#f4f4f1",
+  attention: "#9a5b00",
+  onAttention: "#ffffff",
+  attentionSoft: "#fbeed5",
+  success: "#151514",
+};
+
+export const dark: ThemeColors = {
+  bg: "#0f0f0e",
+  raised: "#1c1c1b",
+  raised2: "#242423",
+  sunken: "#0a0a09",
+  bookPage: "#ebe6d8",
+  bookLine: "#a59e8c",
+  glass: "rgba(30, 30, 28, 0.66)",
+  glassSolid: "#1e1e1c",
+  line: "rgba(255, 255, 255, 0.1)",
+  line2: "rgba(255, 255, 255, 0.15)",
+  lineStrong: "#71716c",
+  ink: "#efefec",
+  ink2: "#d6d6d2",
+  muted: "#a3a39e",
+  faint: "#8f8f89",
+  agent: "#5aa8ff",
+  agent2: "#8cc3ff",
+  agentSoft: "#11253f",
+  onAgent: "#00203f",
+  ok: "#5fc48a",
+  warn: "#e0a84a",
+  warnSoft: "#33260e",
+  onWarn: "#2a1c00",
+  danger: "#f08a80",
+  plate: "rgba(127, 127, 127, 0.14)",
+  plateSoft: "rgba(127, 127, 127, 0.08)",
+  scrim: "rgba(0, 0, 0, 0.5)",
+  surface: "#0f0f0e",
+  surfaceRaised: "#1c1c1b",
+  surfaceSunken: "#0a0a09",
+  inkMuted: "#a3a39e",
+  action: "#efefec",
+  onAction: "#0f0f0e",
+  attention: "#e0a84a",
+  onAttention: "#2a1c00",
+  attentionSoft: "#33260e",
+  success: "#efefec",
+};
+
+export const themes = { light, dark } as const;
+export type ThemeName = keyof typeof themes;
+
+/** One layer of a CSS `box-shadow` (px). */
+export interface ShadowLayer {
+  x: number;
+  y: number;
+  blur: number;
+  spread: number;
+  color: string;
+  inset?: boolean;
+}
+
+export type ShadowName = "e1" | "e2" | "e3" | "top";
+
+/** Elevations (`--e1`…`--e3`) and the raised top edge (`--top`), per theme, as layer lists. */
+export const shadows: Record<ThemeName, Record<ShadowName, ShadowLayer[]>> = {
+  light: {
+    e1: [
+      { x: 0, y: 1, blur: 1, spread: 0, color: "rgba(23, 23, 22, 0.04)" },
+      { x: 0, y: 2, blur: 4, spread: -1, color: "rgba(23, 23, 22, 0.05)" },
+      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(23, 23, 22, 0.08)" },
+    ],
+    e2: [
+      { x: 0, y: 1, blur: 1, spread: 0, color: "rgba(23, 23, 22, 0.04)" },
+      { x: 0, y: 6, blur: 16, spread: -4, color: "rgba(23, 23, 22, 0.1)" },
+      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(23, 23, 22, 0.08)" },
+    ],
+    e3: [
+      { x: 0, y: 2, blur: 4, spread: 0, color: "rgba(23, 23, 22, 0.04)" },
+      { x: 0, y: 24, blur: 56, spread: -16, color: "rgba(23, 23, 22, 0.3)" },
+      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(23, 23, 22, 0.14)" },
+    ],
+    top: [{ x: 0, y: 1, blur: 0, spread: 0, color: "rgba(255, 255, 255, 0.9)", inset: true }],
+  },
+  dark: {
+    e1: [
+      { x: 0, y: 1, blur: 2, spread: 0, color: "rgba(0, 0, 0, 0.5)" },
+      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(255, 255, 255, 0.1)" },
+    ],
+    e2: [
+      { x: 0, y: 8, blur: 20, spread: -6, color: "rgba(0, 0, 0, 0.6)" },
+      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(255, 255, 255, 0.1)" },
+    ],
+    e3: [
+      { x: 0, y: 28, blur: 64, spread: -16, color: "rgba(0, 0, 0, 0.8)" },
+      { x: 0, y: 0, blur: 0, spread: 1, color: "rgba(255, 255, 255, 0.15)" },
+    ],
+    top: [{ x: 0, y: 1, blur: 0, spread: 0, color: "rgba(255, 255, 255, 0.08)", inset: true }],
+  },
+};
+
+/** Corner radii (px). */
+export const radius = {
+  sm: 6,
+  item: 10,
+  md: 10,
+  btn: 12,
+  lg: 14,
+  xl: 18,
+  section: 20,
+  cut: 2,
+  full: 999,
+} as const;
+
+/** The agent symbol's corners (`--radius-agent`), as fractions of its size: top-left, top-right, bottom-right, bottom-left. */
+export const agentRadius = [0.3, 0.3, 0.3, 0.09] as const;
+
+/** Spacing steps (px), by `--space-N`. */
+export const space = {
+  1: 4,
+  2: 8,
+  3: 12,
+  4: 16,
+  6: 24,
+  8: 32,
+} as const;
+
+/** Type sizes (px). */
+export const text = {
+  xs: 12,
+  sm: 13,
+  md: 14.5,
+  base: 15,
+  lg: 16,
+  h3: 17,
+  h2: 20,
+  h1: 28,
+  display: 32,
+} as const;
+
+/** Letter spacing (em). */
+export const tracking = {
+  tight: -0.025,
+  tighter: -0.035,
+} as const;
+
+/** Font families (the first family of each CSS stack; display and dot come from the brand pages). */
+export const fonts = {
+  sans: "Onest",
+  display: "Funnel Display",
+  dot: "Doto",
+  mono: "Martian Mono",
+} as const;
+
+/** Cubic bezier curves `[x1, y1, x2, y2]`: `spring` and `out` from the tokens; `ios` for sheets. */
+export const motion = {
+  spring: [0.34, 1.4, 0.5, 1],
+  out: [0.2, 0.8, 0.2, 1],
+  ios: [0.32, 0.72, 0, 1],
+} as const satisfies Record<string, readonly [number, number, number, number]>;

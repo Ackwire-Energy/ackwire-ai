@@ -1,0 +1,106 @@
+import { type Agent, type Member, type RealtimeConnection, useAgents, useMe, useMembers } from "@agenteschat/client";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useOrg } from "@/providers/org";
+import { useRealtime } from "@/providers/realtime";
+import { rememberAgentLooks, useTheme } from "@/ui";
+import { agentLook, daysAgo, whenKind } from "./logic";
+
+/** The current organization's id. */
+export function useOrgId(): string {
+  return useOrg().orgId;
+}
+
+/** The signed-in person's id (null while it loads). */
+export function useMeId(): string | null {
+  return useMe().data?.user.id ?? null;
+}
+
+export interface Directory {
+  agents: Agent[];
+  agentById: Map<string, Agent>;
+  memberById: Map<string, Member>;
+  loading: boolean;
+  /** A person's or an agent's name ("" when unknown). */
+  nameOf: (who: { type: string; id: string | null } | null | undefined) => string;
+}
+
+/** Agents and people of the organization, by id. */
+export function useDirectory(): Directory {
+  const orgId = useOrgId();
+  const agents = useAgents(orgId);
+  const members = useMembers(orgId);
+  return useMemo(() => {
+    const agentById = new Map((agents.data ?? []).map((a) => [a.id, a]));
+    const memberById = new Map((members.data ?? []).map((m) => [m.userId, m]));
+    return {
+      agents: agents.data ?? [],
+      agentById,
+      memberById,
+      loading: agents.isLoading || members.isLoading,
+      nameOf: (who) => {
+        if (!who?.id) return "";
+        return who.type === "agent" ? (agentById.get(who.id)?.name ?? "") : (memberById.get(who.id)?.name ?? "");
+      },
+    };
+  }, [agents.data, members.data, agents.isLoading, members.isLoading]);
+}
+
+/** Toasts and other places that only know an agent's id draw it from these looks (once, at the app's root). */
+export function useRememberAgentLooks() {
+  const agents = useAgents(useOrgId());
+  useEffect(() => {
+    if (agents.data) rememberAgentLooks(agents.data.map((a) => ({ id: a.id, ...agentLook(a) })));
+  }, [agents.data]);
+}
+
+/** The organization's WebSocket (null until it opens). */
+export function useConnection(): RealtimeConnection | null {
+  return useRealtime().connection;
+}
+
+/** Theme colors by token name (`bg`, `raised`, `sunken`, `line`, `ink`, `muted`, `faint`, `agent`, `danger`…). */
+export function useColors() {
+  return useTheme().colors;
+}
+
+/** Times as the lists say them: "9:41" today, "Ontem", "seg", "12 out". */
+export function useWhen() {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language || "pt-BR";
+  return useMemo(() => {
+    const time = (iso: string) =>
+      new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+    const short = (iso: string) => {
+      switch (whenKind(iso)) {
+        case "time":
+          return time(iso);
+        case "yesterday":
+          return t("mobile.time.yesterday");
+        case "weekday":
+          return new Intl.DateTimeFormat(locale, { weekday: "short" }).format(new Date(iso)).replace(".", "");
+        case "date":
+          return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" })
+            .format(new Date(iso))
+            .replace(".", "");
+      }
+    };
+    const day = (iso: string) => {
+      const d = daysAgo(iso);
+      if (d <= 0) return t("mobile.time.today");
+      if (d === 1) return t("mobile.time.yesterday");
+      return new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long" }).format(new Date(iso));
+    };
+    return { time, short, day, locale };
+  }, [t, locale]);
+}
+
+/** The current time, refreshed every `ms` (fuses, "expira em", clocks). */
+export function useNow(ms = 30_000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(timer);
+  }, [ms]);
+  return now;
+}

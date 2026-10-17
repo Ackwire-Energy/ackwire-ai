@@ -3,11 +3,11 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { Run, RunStep } from "@agenteschat/client";
+import { appendOutput, applyChannelEvent, emptyStreams, runsInChannel } from "@agenteschat/client";
+import { workFromSteps } from "@agenteschat/client/lib/work";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { Run, RunStep } from "@/api/types";
 import { tokenizeCode } from "@/components/LiveCode";
-import { workFromSteps } from "@/lib/work";
-import { appendOutput, applyChannelEvent, emptyStreams, runsInChannel } from "@/realtime/streams";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

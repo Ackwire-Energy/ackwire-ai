@@ -3,9 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { localMeta, quoteExcerpt, replyOf } from "@agenteschat/client/lib/reply";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { objectUrls } from "@/components/artifacts/FileView";
-import { localMeta, quoteExcerpt, replyOf } from "@/lib/reply";
 import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

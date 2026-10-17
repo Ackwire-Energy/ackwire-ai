@@ -1,8 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import type { ChannelEvent, Message } from "@/api/types";
-import { applyReceiptEvent, receiptView, seedReceipt } from "@/realtime/receipts";
-import { applyChannelEvent, emptyStreams, expectReply, runsInChannel } from "@/realtime/streams";
-import { applyTyping, stopTyping, TYPING_TTL_MS, typingIn, typingThrottle } from "@/realtime/typing";
+import type { ChannelEvent, Message } from "@agenteschat/client";
+import {
+  applyChannelEvent,
+  applyReceiptEvent,
+  applyTyping,
+  emptyStreams,
+  expectReply,
+  receiptView,
+  runsInChannel,
+  seedReceipt,
+  stopTyping,
+  TYPING_TTL_MS,
+  typingIn,
+  typingThrottle,
+} from "@agenteschat/client";
 
 const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "ada" };
 
@@ -103,7 +114,7 @@ describe("receipts", () => {
 
 describe("server confirmation and the safety timeout", () => {
   test("message.routed is authoritative: a guessed 'picked' falls back to 'seen' and the provisional row goes", async () => {
-    const { guessReceipt } = await import("@/realtime/receipts");
+    const { guessReceipt } = await import("@agenteschat/client");
     let r = guessReceipt({}, "m1", ["theo"]);
     expect(receiptView(r.m1).status?.kind).toBe("picked");
     expect(r.m1?.confirmed).toBe(false);

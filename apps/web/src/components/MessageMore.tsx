@@ -1,10 +1,10 @@
+import type { Message } from "@agenteschat/client";
+import { threadStartOf } from "@agenteschat/client/lib/threads";
 import { Button, Menu, MenuItem } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Message } from "@/api/types";
 import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
-import { threadStartOf } from "@/lib/threads";
 import { useToast } from "@/lib/toast";
 import { ReactButton, reactionOf, useMessageReactions } from "./Reactions";
 import { SaveToWikiDialog } from "./SaveToWiki";

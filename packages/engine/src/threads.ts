@@ -4,7 +4,8 @@ import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { type Channel, requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent, publishMessageCreated } from "./events";
+import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
+import { followsThreadSql } from "./follows";
 import { type Message, messageView, replyExcerpt } from "./messages";
 import { pendingCommandsSql } from "./mission-command-rules";
 import { can, type Membership, requirePermission } from "./organizations";
@@ -99,6 +100,12 @@ export interface ThreadInfo {
   needsYou: boolean;
   /** Whether the actor may close, archive, rename or change the context. */
   canManage: boolean;
+  /**
+   * The actor follows it: notified of its replies, which count as unread in
+   * the channel. By default whoever started it or wrote in it; `PUT`/`DELETE
+   * …/threads/{id}/follow` choose explicitly.
+   */
+  following: boolean;
   /** The thread's mission (ADR 0029), in short: details at `GET …/threads/{id}/mission`. */
   mission: ThreadMissionSummary | null;
   createdAt: string;
@@ -842,7 +849,10 @@ async function publishThread(
     state: view.state,
     // `canManage` is the actor's own: everyone else reads theirs from the API. A large view
     // (many exclusions or participants) is left out: clients fetch it.
-    ...(Buffer.byteLength(JSON.stringify(view)) <= 4000 ? { thread: { ...view, canManage: false } } : {}),
+    // `following` is the actor's own too: left out.
+    ...(Buffer.byteLength(JSON.stringify(view)) <= 4000
+      ? { thread: { ...withoutFollowing(view), canManage: false } }
+      : {}),
     // Pub/sub payloads stay small (NOTIFY < 8 KB): a long list is left out and clients refetch.
     ...(options.messageIds && options.messageIds.length <= MAX_EVENT_IDS ? { messageIds: options.messageIds } : {}),
   };
@@ -897,6 +907,7 @@ interface ThreadSqlRow {
   context_count: number | string | null;
   working: boolean;
   needs_you: boolean;
+  following?: boolean | null;
   mission_id?: string | null;
   mission_agent_id?: string | null;
   mission_status?: ThreadMissionSummary["status"] | null;
@@ -1018,6 +1029,7 @@ async function queryThreads(
               and (${isAdmin}::boolean or ap.owner_user_id = ${userId}))
           ) as needs_you,
           ${participated} as participated,
+          ${followsThreadSql(orgId, userId, sql`root.id`)} as following,
           mi.id as mission_id, mi.agent_id as mission_agent_id, mi.status as mission_status, mi.plan_done as mission_plan_done,
           mi.plan_total as mission_plan_total,
           case when mi.id is null then null else mi.plan_waiting
@@ -1136,6 +1148,7 @@ function toView(
     working: r.working === true,
     needsYou: r.needs_you === true,
     canManage: r.created_by === userId || (r.author_type === "person" && r.author_user_id === userId) || isAdmin,
+    following: r.following === true,
     mission:
       r.mission_id && r.mission_status
         ? {
@@ -1217,11 +1230,52 @@ export async function getThread(db: Database, actorId: string, orgId: string, ro
       context_count: null,
       working: false,
       needs_you: false,
+      following: await followsRoot(db, orgId, actorId, root.id),
       cursor_at: root.createdAt.toISOString(),
     };
     return toView(r, await threadExtras(db, orgId, [r]), actorId, isAdmin);
   }
   return toView(found, await threadExtras(db, orgId, rows), actorId, isAdmin);
+}
+
+const withoutFollowing = ({ following: _, ...view }: ThreadInfo): Omit<ThreadInfo, "following"> => view;
+
+async function followsRoot(db: Database, orgId: string, userId: string, rootId: string) {
+  const [row] = rowsOf<{ following: boolean | null }>(
+    await db.execute(sql`select ${followsThreadSql(orgId, userId, sql`${rootId}::uuid`)} as following`),
+  );
+  return row?.following === true;
+}
+
+// ── Following ─────────────────────────────────────────────────────────────────
+
+/**
+ * Follows (`true`) or mutes (`false`) a thread for the actor, explicitly
+ * (whoever reads its channel). Following: notified of its replies, which
+ * count as unread in the channel list. Muting wins over having written
+ * there; a mention still notifies. The actor's other devices hear
+ * `thread.follow` on their own topic.
+ */
+export async function setThreadFollow(
+  deps: ThreadDeps,
+  actorId: string,
+  orgId: string,
+  rootId: string,
+  following: boolean,
+): Promise<{ threadId: string; channelId: string; following: boolean }> {
+  if (!UUID.test(rootId)) throw new NotFoundError("Thread not found");
+  const { root } = await requireThread(deps.db, actorId, orgId, rootId);
+  const now = new Date();
+  await deps.db
+    .insert(schema.threadFollows)
+    .values({ orgId, channelId: root.channelId, rootMessageId: root.id, userId: actorId, following, updatedAt: now })
+    .onConflictDoUpdate({
+      target: [schema.threadFollows.rootMessageId, schema.threadFollows.userId],
+      set: { following, updatedAt: now },
+    });
+  const result = { threadId: root.id, channelId: root.channelId, following };
+  await publishUserEvent(deps.pubsub, orgId, actorId, { type: "thread.follow", ...result });
+  return result;
 }
 
 // ── Run context ───────────────────────────────────────────────────────────────

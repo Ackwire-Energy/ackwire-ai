@@ -1,10 +1,23 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentAccess, Connection, CustomServer, ToolDecision } from "@/api/types";
+import type { AgentAccess, Connection, CustomServer, ToolDecision } from "@agenteschat/client";
+import {
+  catalogToolClass,
+  inputFromAccess,
+  inputWithLevels,
+  levelIn,
+  resourcesOf,
+} from "@agenteschat/client/lib/access-levels";
+import { connectedIds, connectedItems } from "@agenteschat/client/lib/connected";
+import {
+  decisionsOf,
+  defaultAccess,
+  draftFrom,
+  exposedTools,
+  humanize,
+  toolsToReview,
+} from "@agenteschat/client/lib/custom-tools";
+import { connectorName } from "@agenteschat/client/lib/scopes";
 import { createI18n } from "@/i18n";
-import { catalogToolClass, inputFromAccess, inputWithLevels, levelIn, resourcesOf } from "@/lib/access-levels";
-import { connectedIds, connectedItems } from "@/lib/connected";
-import { decisionsOf, defaultAccess, draftFrom, exposedTools, humanize, toolsToReview } from "@/lib/custom-tools";
-import { connectorName } from "@/lib/scopes";
 import { CATALOG } from "./fake-api";
 
 const server = (reviewedAt: string | null, accesses: (ToolDecision | null)[]): CustomServer => ({

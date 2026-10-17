@@ -59,6 +59,8 @@ export interface MessageView {
   reactions?: ReactionCount[];
   /** People's messages: what agents saved to memory from them (the memory mark). */
   memories?: MessageMemory[];
+  /** In message lists: `true` when pinned in its channel (absent: not pinned); live via `message.pinned`/`message.unpinned`. */
+  pinned?: boolean;
   createdAt: string;
 }
 
@@ -186,6 +188,9 @@ export function parseMentionHandles(body: string): string[] {
   }
   return [...found];
 }
+
+/** An agent's message may bring in one more agent only up to this hop (D49); `router.ts` enforces it too. */
+export const AGENT_CHIME_IN_MAX_HOP = 2;
 
 export type MessageAuthor =
   | { type: "person"; userId: string }
@@ -421,7 +426,9 @@ export async function insertMessageWithRuns(
         union all
         select gen_random_uuid(), ${input.orgId}::uuid, 'message.posted', jsonb_build_object('messageId', m.id),
           'message.posted:' || m.id, 8 from m
+          -- An agent's message without a mention goes to the router too: another agent may chime in (D49).
           where m.author_type = 'person' or cardinality(m.mentioned_agent_ids) > 0
+            or m.hop < ${AGENT_CHIME_IN_MAX_HOP}
         union all
         -- In-app notifications (D46): people mentioned, a reply in a thread, a person's DM.
         select gen_random_uuid(), ${input.orgId}::uuid, 'notifications.message', jsonb_build_object('messageId', m.id),
@@ -803,8 +810,31 @@ async function usageFor(db: Database, orgId: string, list: Message[]) {
   return out;
 }
 
+/** Which of these messages are pinned (one indexed read per channel of the list). */
+async function pinnedOf(db: Database, orgId: string, list: Message[]): Promise<Set<string>> {
+  if (list.length === 0) return new Set();
+  const p = schema.messagePins;
+  const rows = await db
+    .select({ messageId: p.messageId })
+    .from(p)
+    .where(
+      and(
+        eq(p.orgId, orgId),
+        inArray(p.channelId, [...new Set(list.map((m) => m.channelId))]),
+        inArray(
+          p.messageId,
+          list.map((m) => m.id),
+        ),
+      ),
+    );
+  return new Set(rows.map((r) => r.messageId));
+}
+
+/** Message views with what lists carry: receipts, usage, reactions, memory marks, pins, wiki links. */
+export const withMessageDetails = (db: Database, orgId: string, list: Message[]) => withReceipts(db, orgId, list);
+
 async function withReceipts(db: Database, orgId: string, list: Message[]): Promise<MessageView[]> {
-  const [receipts, usage, reactions, memories] = await Promise.all([
+  const [receipts, usage, reactions, memories, pinned] = await Promise.all([
     receiptsFor(
       db,
       orgId,
@@ -817,6 +847,7 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
       list.map((m) => m.id),
     ),
     memoriesFor(db, orgId, list),
+    pinnedOf(db, orgId, list),
   ]);
   const views = list.map((m) => {
     const runUsage = m.agentRunId ? usage.get(m.agentRunId) : undefined;
@@ -827,6 +858,7 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
       ...(runUsage ? { usage: runUsage } : {}),
       ...(reacted ? { reactions: reacted } : {}),
       ...(memories.has(m.id) ? { memories: memories.get(m.id) } : {}),
+      ...(pinned.has(m.id) ? { pinned: true } : {}),
     };
   });
   return withDeletedArtifacts(db, orgId, await withWikiLinks(db, orgId, views));

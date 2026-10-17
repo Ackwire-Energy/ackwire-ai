@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { zoneDisplayName } from "@agenteschat/client/lib/routines";
 import { filterZones, offsetLabel, parseOffsetQuery, zoneOption, zoneOptions } from "@agenteschat/ui";
-import { zoneDisplayName } from "@/lib/routines";
 
 const at = new Date("2026-10-15T12:00:00Z");
 const ZONES = ["UTC", "America/Sao_Paulo", "America/New_York", "Europe/Lisbon", "Asia/Kolkata", "Asia/Tokyo"];

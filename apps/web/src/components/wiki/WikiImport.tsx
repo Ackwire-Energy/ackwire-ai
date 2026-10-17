@@ -1,3 +1,5 @@
+import { keys, useWikiTree } from "@agenteschat/client";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { Button, Checkbox, Dialog, DialogBody, DialogFooter, Icon, Input, Segmented } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -5,13 +7,10 @@ import type { TFunction } from "i18next";
 import { type DragEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useWikiTree } from "@/api/queries";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { WikiSky } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
-import { joinNames } from "@/lib/format";
 import {
   filesFromDrop,
   filesFromList,

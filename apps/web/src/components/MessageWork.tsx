@@ -1,11 +1,11 @@
+import { useRun } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { formatDuration, stepLabel, workFromSteps, workHeader, workMeta } from "@agenteschat/client/lib/work";
 import { WorkSummary } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useRun } from "@/api/queries";
 import { CodePanel } from "@/components/LiveCode";
 import { useOrg } from "@/components/org-context";
-import { agentGrammar } from "@/lib/grammar";
-import { formatDuration, stepLabel, workFromSteps, workHeader, workMeta } from "@/lib/work";
 
 /**
  * "4 passos · himetrica, Drive · 12 s" under an agent's message. The header

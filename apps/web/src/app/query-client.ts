@@ -1,5 +1,5 @@
+import { ApiError } from "@agenteschat/client";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
-import { ApiError } from "@/api/http";
 
 /**
  * Same policy as Tierbird's dashboard: queries show their errors inline; a

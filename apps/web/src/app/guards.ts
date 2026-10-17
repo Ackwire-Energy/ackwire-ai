@@ -1,6 +1,6 @@
+import type { Me } from "@agenteschat/client";
+import { meQuery } from "@agenteschat/client";
 import { redirect } from "@tanstack/react-router";
-import { meQuery } from "@/api/queries";
-import type { Me } from "@/api/types";
 import type { RouterContext } from "./router-context";
 
 /** Route guard: the signed-in person, or a redirect to /login that comes back afterwards. */

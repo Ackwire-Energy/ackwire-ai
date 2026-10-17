@@ -1,3 +1,7 @@
+import type { Agent, Memory, MemoryKind } from "@agenteschat/client";
+import { useMemory, useMemoryAction, useProposals } from "@agenteschat/client";
+import { daysBetween, relativeTime } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   Button,
   Chip,
@@ -18,13 +22,9 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useMemory, useMemoryAction, useProposals } from "@/api/queries";
-import type { Agent, Memory, MemoryKind } from "@/api/types";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { daysBetween, relativeTime } from "@/lib/format";
-import { agentGrammar } from "@/lib/grammar";
 
 export type MemoryTab = "known" | "lessons" | "archived";
 

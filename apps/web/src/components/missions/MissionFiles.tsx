@@ -1,13 +1,13 @@
+import type { MissionFileName } from "@agenteschat/client";
+import { useMission, useMissionFiles } from "@agenteschat/client";
+import { formatTime, relativeTime } from "@agenteschat/client/lib/format";
+import { editDiff, executorName, type MdLine, mdLines, newLineIndexes } from "@agenteschat/client/lib/missions";
 import { DetailsDialog, Diff, Icon, Segmented, Skeleton } from "@agenteschat/ui";
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useMission, useMissionFiles } from "@/api/missions";
-import type { MissionFileName } from "@/api/types";
 import { ErrorState } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { formatTime, relativeTime } from "@/lib/format";
-import { editDiff, executorName, type MdLine, mdLines, newLineIndexes } from "@/lib/missions";
 
 /**
  * "Arquivos da missão" (ThreadContexto.html, A3/A6): mission.md (plan and
