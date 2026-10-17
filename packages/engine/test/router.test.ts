@@ -247,6 +247,39 @@ describe("LLM strategy (end to end through the outbox)", () => {
     expect(decision?.usageRecordId).toBe(usage.find((u) => u.kind === "router")?.id ?? "");
   });
 
+  test("after an agent answers, another agent may join on its own; its reply says nobody called it", async () => {
+    f = await setup({
+      reply: (req) => {
+        if (!req.outputSchema)
+          return { chunks: [JSON.stringify(req.messages).includes("cache") ? "Ok." : "The cache is cold."] };
+        const prompt = textOf(req.messages[0]?.content ?? "");
+        // The person's message goes to @dev; @dev's answer brings in @qa.
+        return prompt.includes("[@dev]:")
+          ? { chunks: ['{"needs_agent":0.3,"scores":[{"handle":"qa","score":0.9}],"reason":"qa owns tests"}'] }
+          : { chunks: ['{"needs_agent":0.9,"scores":[{"handle":"dev","score":0.9}],"reason":"dev"}'] };
+      },
+    });
+    const qa = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "QA", handle: "qa", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: qa.id });
+    const handlers = createJobHandlers({ ...f.jobDeps, router: { enabled: true, model: "claude-haiku-5-5" } });
+    const question = await post("why are the tests slow?");
+    await drainOutbox(f.db, handlers);
+
+    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+    const byDev = thread.find((m) => m.author.id === f.agent.id);
+    const byQa = thread.find((m) => m.author.id === qa.id);
+    expect(byDev?.meta.joined).toBeUndefined();
+    expect(byQa?.meta.joined).toBe(true);
+    // QA's answer to an answer brings in nobody else.
+    expect(thread.filter((m) => m.author.type === "agent")).toHaveLength(2);
+  });
+
   test("an org can override the router model; the router is off when disabled", async () => {
     f = await setup({ reply: () => ({ chunks: ['{"needs_agent":0,"scores":[],"reason":"chit-chat"}'] }) });
     await f.db.insert(schema.organizationSettings).values({ orgId: f.org.id, routerModel: "claude-sonnet-5-5" });

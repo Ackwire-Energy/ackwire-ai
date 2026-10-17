@@ -153,7 +153,7 @@ export interface Transcript {
   /** A mission proposed with its home elsewhere (a flat DM's new thread): the reply carries its link card (`meta.missionLink`). */
   missionLink?: { missionId: string; threadId: string } | null;
   /** Agents it consulted (`ask_agent`, ADR 0034), not yet shown on a posted message (`meta.consulted`). */
-  consulted?: { agentId: string; consultationId: string; status: string }[];
+  consulted?: { agentId: string; consultationId: string; status: string; question?: string; answer?: string | null }[];
   /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
   reacted?: boolean;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
@@ -465,15 +465,21 @@ async function executeRunInner(
 
   // Started by a routine: its answer carries the routine (the app shows a small tag on the
   // agent's message, since the routine's own call isn't shown), and it may end in silence.
-  const routineCall = (trigger ?? topTrigger ?? (await getMessage(db, run.orgId, run.triggerMessageId)))?.meta
-    .routine as { id?: unknown; name?: unknown } | undefined;
+  const triggerMessage = trigger ?? topTrigger ?? (await getMessage(db, run.orgId, run.triggerMessageId));
+  const routineCall = triggerMessage?.meta.routine as { id?: unknown; name?: unknown } | undefined;
+  // Brought in by the router after another agent spoke (D49): nobody called it, its replies say so (`meta.joined`).
+  const joined = run.trigger === "router" && triggerMessage?.authorType === "agent";
   const viaRoutine =
     routineCall && typeof routineCall.id === "string" && typeof routineCall.name === "string"
       ? { id: routineCall.id, name: routineCall.name }
       : null;
   routineOfRun = viaRoutine;
   const post = (tx: Executor, threadId: string | null, body: string, meta?: Record<string, unknown>) =>
-    postAgentMessage(tx, run, threadId, body, viaRoutine ? { ...meta, viaRoutine } : meta);
+    postAgentMessage(tx, run, threadId, body, {
+      ...meta,
+      ...(viaRoutine ? { viaRoutine } : {}),
+      ...(joined ? { joined: true } : {}),
+    });
 
   const saveTranscript = (tx: Executor, t: Transcript) =>
     tx

@@ -84,6 +84,15 @@ export type ChannelEvent =
    * before the run exists.
    */
   | { type: "agent.thinking"; channelId: string; threadId: string | null; agentId: string; runId: string | null }
+  /** An agent asked another agent (`ask_agent`, ADR 0034) and waits for it: "Dev is asking Infra…". */
+  | {
+      type: "agent.consulting";
+      channelId: string;
+      threadId: string | null;
+      runId: string;
+      agentId: string;
+      consultedAgentId: string;
+    }
   /**
    * An agent's question to another agent (`ask_agent`, ADR 0034) came back:
    * `status` answered, expired or failed. The asking run resumes.

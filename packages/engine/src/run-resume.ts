@@ -10,7 +10,7 @@ interface StoredTranscript {
     calls: { toolUseId: string; name: string; waitId?: string; result?: { content: string; isError: boolean } }[];
   };
   waitingForBrain?: { kind: string; machineId: string; code: string; waitId?: string };
-  consulted?: { agentId: string; consultationId: string; status: string }[];
+  consulted?: { agentId: string; consultationId: string; status: string; question?: string; answer?: string | null }[];
   [key: string]: unknown;
 }
 
@@ -29,7 +29,7 @@ export async function resumeRunWithResult(
     waitId: string;
     result: ToolResult;
     /** An agent it consulted (`ask_agent`): its reply's `meta.consulted` card. */
-    consulted?: { agentId: string; consultationId: string; status: string };
+    consulted?: { agentId: string; consultationId: string; status: string; question?: string; answer?: string | null };
   },
 ): Promise<{ runId: string } | null> {
   const resumed = await db.transaction(async (tx) => {

@@ -96,8 +96,19 @@ describe("ask_agent", () => {
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
     const reply = thread.at(-1);
     expect(reply?.body).toContain("deploy.sh");
-    expect(reply?.meta.consulted).toEqual([{ agentId: infra.id, consultationId: c?.id, status: "answered" }]);
+    expect(reply?.meta.consulted).toEqual([
+      {
+        agentId: infra.id,
+        consultationId: c?.id,
+        status: "answered",
+        question: "How is staging deployed?",
+        answer: "Staging deploys with deploy.sh",
+      },
+    ]);
     await Bun.sleep(5);
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "agent.consulting", agentId: f.agent.id, consultedAgentId: infra.id }),
+    );
     expect(events).toContainEqual(
       expect.objectContaining({ type: "agent.consulted", agentId: f.agent.id, consultedAgentId: infra.id }),
     );

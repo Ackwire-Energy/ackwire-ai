@@ -242,7 +242,7 @@ export async function setup(
   const sources = [
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
     ...(options.askUser ? [createAskUserToolSource()] : []),
-    ...(options.askAgent ? [createAskAgentToolSource()] : []),
+    ...(options.askAgent ? [createAskAgentToolSource({ pubsub })] : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),

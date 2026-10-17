@@ -195,7 +195,7 @@ export function buildEngine(o: EngineOptions) {
   const tools = createToolGateway({
     sources: [
       createAskUserToolSource(),
-      createAskAgentToolSource(),
+      createAskAgentToolSource({ pubsub: adapters.pubsub }),
       createReactToolSource({ pubsub: adapters.pubsub }),
       createArtifactToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),

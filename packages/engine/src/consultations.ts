@@ -31,7 +31,7 @@ const refuse = (content: string): ToolOutput => ({ content, isError: true });
  * one the person behind the run can talk to (D31), and not already in this
  * chain (no cycles, at most `MAX_CONSULTATION_CHAIN` agents deep).
  */
-export function createAskAgentToolSource(): ToolSource {
+export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSource {
   const tool: ToolDefinition = {
     name: ASK_AGENT_TOOL,
     description:
@@ -115,6 +115,14 @@ export function createAskAgentToolSource(): ToolSource {
         return row;
       });
       if (!created) return refuse(`Could not reach @${handle}. Go on without it.`);
+      await publishChannelEvent(deps.pubsub, {
+        type: "agent.consulting",
+        channelId: ctx.channelId,
+        threadId: ctx.threadRootId,
+        runId: ctx.runId,
+        agentId: ctx.agentId,
+        consultedAgentId: target.id,
+      });
       return {
         content: "",
         data: { pause: { kind: "input", id: waitId }, consultation: { id: created.id, agentId: target.id } },
@@ -160,7 +168,14 @@ async function closeConsultation(
     runId: closed.askerRunId,
     waitId: closed.waitId,
     result: consultationResult(closed, handle),
-    consulted: { agentId: closed.targetAgentId, consultationId: closed.id, status },
+    // The card on the asker's next reply shows the exchange (the agents' DM itself stays private).
+    consulted: {
+      agentId: closed.targetAgentId,
+      consultationId: closed.id,
+      status,
+      question: closed.question.slice(0, 2000),
+      answer: status === "answered" ? (closed.answer?.slice(0, 4000) ?? null) : null,
+    },
   });
   if (resumed) {
     const [asker] = await deps.db
