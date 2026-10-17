@@ -25,7 +25,6 @@ import {
   notePlanLimit,
   postPersonMessage,
   redeemMachinePairing,
-  restatesReaction,
   resumeRunsWaitingForMachine,
   runWhere,
   type ToolSource,
@@ -522,12 +521,6 @@ test("a bridged react followed by the emoji as text posts nothing (no 👍 messa
   await drainOutbox(f.db, handlers);
   const other = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: second.id });
   expect(other.map((m) => m.body)).toEqual(["@dev valeu, e o deploy?", "Valeu! Qualquer coisa me chama."]);
-});
-
-test("restatesReaction: empty, NO_REPLY or only emoji and punctuation; any letter or digit is a reply", () => {
-  for (const t of ["", "  ", "👍", "👍🏽", "🙌!", "✅ ✅", "❤️", "NO_REPLY", "👍👍👍👍👍👍👍👍"])
-    expect(restatesReaction(t)).toBe(true);
-  for (const t of ["ok", "👍 feito", "Pronto!", "42", "valeu"]) expect(restatesReaction(t)).toBe(false);
 });
 
 test("a computer brain with the react tool is told to end with an empty reply after reacting", async () => {

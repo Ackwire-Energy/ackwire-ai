@@ -27,6 +27,7 @@ import {
   postPersonMessage,
   recordPlanUsage,
   redeemMachinePairing,
+  restatesReaction,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
@@ -428,4 +429,11 @@ test("live text end to end: the runner's partial deltas reach the channel as age
   );
   const thread = await listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id, { threadId: question.id });
   expect(thread.map((m) => m.body)).toEqual(["@dev oi", "Olá, tudo certo."]);
+});
+
+// A pure check (no fixture): what counts as restating a reaction after `react`.
+test("restatesReaction: empty, NO_REPLY or only emoji and punctuation; any letter or digit is a reply", () => {
+  for (const t of ["", "  ", "👍", "👍🏽", "🙌!", "✅ ✅", "❤️", "NO_REPLY", "👍👍👍👍👍👍👍👍"])
+    expect(restatesReaction(t)).toBe(true);
+  for (const t of ["ok", "👍 feito", "Pronto!", "42", "valeu"]) expect(restatesReaction(t)).toBe(false);
 });
