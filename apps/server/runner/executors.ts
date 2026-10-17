@@ -22,6 +22,30 @@ const defaultRun: Run = (command, args) => {
   return { status: r.status, stdout: `${r.stdout ?? ""}`, error: r.error };
 };
 
+/**
+ * Protocol 8: whether Claude Code is logged in (`claude auth status --json`:
+ * `loggedIn`, `authMethod`, `subscriptionType`). Only these three leave the
+ * machine (never the email or the organization). Unknown on any failure.
+ */
+export function claudeAuth(run: Run = defaultRun): { loggedIn?: boolean; authMethod?: string; plan?: string } {
+  try {
+    const r = run("claude", ["auth", "status", "--json"]);
+    if (r.error) return {};
+    const json = JSON.parse(r.stdout.trim() || "null") as Record<string, unknown> | null;
+    if (!json || typeof json !== "object") return r.status !== 0 ? { loggedIn: false } : {};
+    const word = (v: unknown) => (typeof v === "string" && /^[\w.-]{1,40}$/.test(v) ? v : undefined);
+    const authMethod = word(json.authMethod);
+    const plan = word(json.subscriptionType);
+    return {
+      ...(typeof json.loggedIn === "boolean" ? { loggedIn: json.loggedIn } : {}),
+      ...(authMethod ? { authMethod } : {}),
+      ...(plan ? { plan } : {}),
+    };
+  } catch {
+    return {};
+  }
+}
+
 export function detectExecutors(run: Run = defaultRun): NonNullable<RunnerInfo["executors"]> {
   const out: NonNullable<RunnerInfo["executors"]> = {};
   for (const name of ["claude", "codex"] as const) {
@@ -29,7 +53,7 @@ export function detectExecutors(run: Run = defaultRun): NonNullable<RunnerInfo["
       const r = run(name, ["--version"]);
       if (r.error || r.status !== 0) continue;
       const version = r.stdout.trim().split("\n")[0]?.trim().slice(0, 80) ?? "";
-      if (version) out[name] = { version };
+      if (version) out[name] = { version, ...(name === "claude" ? claudeAuth(run) : {}) };
     } catch {
       // not installed
     }

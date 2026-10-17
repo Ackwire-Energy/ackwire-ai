@@ -64,6 +64,13 @@ export interface McpTaskInfo {
    * 0032). With it the bridge relays any tool and asks the server for the list.
    */
   serverToken?: string;
+  /**
+   * Brain turns (protocol 8, ADR 0032): the MCP server belongs to a Claude Code
+   * process that lives across turns; its calls are relayed for the run it works
+   * for now (`mcp.call.taskId` = this run id), with that run's `serverToken`
+   * from `brain.turn`.
+   */
+  runId?: string;
 }
 
 /** Every string inside `value` through `redact` (keys kept). */
@@ -297,7 +304,12 @@ export class McpBridge {
       // An older server gave no token: the fixed mission tools.
       if (!info.serverToken) return { ok: true, text: "", tools: [...MISSION_MCP_TOOLS] };
       const callId = randomBytes(12).toString("hex");
-      return this.relayAndWait(callId, LIST, { type: "mcp.list", callId, taskId, token: info.serverToken });
+      return this.relayAndWait(callId, LIST, {
+        type: "mcp.list",
+        callId,
+        taskId: info.runId ?? taskId,
+        token: info.serverToken,
+      });
     }
     const tool = typeof req.tool === "string" ? req.tool.slice(0, 64) : "";
     // A bridge (server token): any tool the server lists; the server decides. Else the fixed mission tools.
@@ -329,7 +341,7 @@ export class McpBridge {
     const frame: RunnerFrame = {
       type: "mcp.call",
       callId,
-      taskId,
+      taskId: info.runId ?? taskId,
       tool,
       args,
       ...(info.serverToken ? { token: info.serverToken } : {}),

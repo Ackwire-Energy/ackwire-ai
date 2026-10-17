@@ -8,6 +8,7 @@ export * from "./artifacts";
 export * from "./audience";
 export * from "./audit";
 export * from "./avatars";
+export * from "./brains/claude-code";
 export * from "./brains/model";
 export * from "./brains/select";
 export * from "./brains/types";

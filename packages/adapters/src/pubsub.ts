@@ -36,6 +36,9 @@ export const machineRpcTopic = (replicaId: string) => `machine-rpc:${replicaId}`
 /** Server-side: the reply to one `machine_rpc` row is written. */
 export const machineRpcReplyTopic = (rpcId: string) => `machine-rpc-reply:${rpcId}`;
 
+/** Server-side: the `brain.event` frames of one run's brain turn on a connected computer (ADR 0032). */
+export const brainTopic = (runId: string) => `brain:${runId}`;
+
 function deliver(handlers: Set<(event: RealtimeEvent) => void> | undefined, event: RealtimeEvent) {
   for (const handler of handlers ?? []) {
     try {
