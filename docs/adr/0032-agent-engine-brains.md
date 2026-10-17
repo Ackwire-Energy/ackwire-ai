@@ -105,3 +105,12 @@ A mission's main session is simply the agent's run in the mission thread with th
 - Missions lose their parallel execution path; the code gets smaller.
 - People can run their agents on their own plans, at their own risk, with the model brain as a safety net.
 - The engine extraction is a large refactor of `executor.ts`; it lands behind the existing tests with no behaviour change before any new brain is added.
+
+## Block 1 as built (2026-10-17)
+
+- `packages/engine/src/brains/types.ts` holds the shared contract (`Brain`, `BrainTurn`, `BrainIO`, `BrainEvent`, `ToolResult`, `BrainTool`, `BrainSession`). `brains/model.ts` is `ModelBrain`; `brains/select.ts` is `brainFor` (always `"model"` for now).
+- The engine stays in `executor.ts` (no rename: `executeRun`, the job and every import keep working). Its deps type is `EngineDeps` (`RunExecutorDeps` is an alias) and takes optional `brains` factories by kind, where block 3 registers the computer brains.
+- One `run()` is one turn. The model brain yields `tool_call` without `executed`; the engine executes it through the Tool Gateway, appends the result and calls `run()` again, so the loop, limits, steering, pauses and cancel stay in the engine. A `tool_call` with `executed` (bridge) is only recorded.
+- The model brain needs the exact transcript blocks (cache breakpoints, opaque thinking blocks, tool results), which `BrainTurn`'s text fields can't carry: it reads the transcript through its constructor and leaves the full gateway result in `ModelBrain.last` for the transcript and the `model_call` step. Other brains get `BrainTurn.system` / `.messages` as text (computed lazily; tool calls and results inline).
+- Model failures still throw (same classification and retries). A brain's `error` event becomes `BrainFailure` (`retryable` retries the job, else the run fails with `code`); `limit` fails with `plan_limit` until the fallback lands (block 3).
+- `toolsForRun(deps, RunIdentity)` and `executeToolForRun(deps, RunIdentity, call)` share `listRunTools` / `invokeRunTool` with the loop. `executeToolForRun` returns `pause` for gated calls but does not post the card or move the run to `waiting_*`: that suspend lives in the engine loop and block 2 must route bridge pauses through it.
