@@ -22,8 +22,10 @@ export const tracingLogger = {
     const store = queryTrace.getStore();
     if (store) store.count++;
     // TEMP diagnostics (CI only): remove once the budget test is understood.
-    if (store && (globalThis as { __AGENTES_QLOG?: boolean }).__AGENTES_QLOG)
-      (store.log ??= []).push(query.replace(/\s+/g, " ").slice(0, 200));
+    if (store && (globalThis as { __AGENTES_QLOG?: boolean }).__AGENTES_QLOG) {
+      store.log ??= [];
+      store.log.push(query.replace(/\s+/g, " ").slice(0, 200));
+    }
   },
 };
 
