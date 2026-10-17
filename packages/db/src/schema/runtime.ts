@@ -383,6 +383,30 @@ export const agentScopes = pgTable(
   ],
 );
 
+/**
+ * The GitHub repositories an agent may use (`owner/name`, or `owner/*` for a
+ * whole account), in order: the first is where it starts when nobody names
+ * one. No rows = every repository the organization's GitHub reaches. The git
+ * proxy and the Tool Gateway check it on every call (reads included).
+ */
+export const agentRepositories = pgTable(
+  "agent_repositories",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    agentId: uuid().notNull(),
+    repo: text().notNull(),
+    position: integer().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    unique().on(t.agentId, t.repo),
+  ],
+);
+
 export const agentQuestionStatusEnum = pgEnum("agent_question_status", [
   "open",
   "answered",
