@@ -578,3 +578,36 @@ export const machineTasks = pgTable(
       .where(sql`${t.missionId} is not null and ${t.sessionId} is not null and ${t.endedAt} is null`),
   ],
 );
+
+/**
+ * Tokens of the runner's `agentes` MCP bridge (ADR 0032): issued when a
+ * computer-brain run or a mission task starts, bound to the org, agent,
+ * machine and that run (or task). The runner sends it with every tool call;
+ * the server checks the hash, the machine, the expiry and that the run (or
+ * task) is still live. Stored as SHA-256 only.
+ */
+export const runToolTokens = pgTable(
+  "run_tool_tokens",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    agentId: uuid().notNull(),
+    machineId: uuid()
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    /** The run it acts for (a computer-brain turn); null for a mission task started by the server. */
+    runId: uuid().references(() => agentRuns.id, { onDelete: "cascade" }),
+    /** The mission task it acts for (its tools are the mission's); null for a run. */
+    taskId: uuid().references(() => machineTasks.id, { onDelete: "cascade" }),
+    /** SHA-256 (hex) of `agr_…`. */
+    tokenHash: text().notNull().unique(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    revokedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.runId), index().on(t.taskId)],
+);

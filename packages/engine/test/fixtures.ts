@@ -236,7 +236,6 @@ export async function setup(
     publicUrl: "http://localhost:3000",
     judge: context.judge,
   };
-  machineHub?.setMissionHooks(createMissionHooks({ db, ...missionDeps }));
   const sources = [
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
     ...(options.askUser ? [createAskUserToolSource()] : []),
@@ -263,6 +262,7 @@ export async function setup(
     ...(options.toolSources ?? []),
   ];
   const tools = sources.length > 0 ? createToolGateway({ sources }) : undefined;
+  machineHub?.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
   const jobDeps = {
     db,
     gateway,

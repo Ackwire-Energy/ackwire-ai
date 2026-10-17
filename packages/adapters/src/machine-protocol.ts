@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 7;
+export const MACHINE_PROTOCOL_VERSION = 8;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -34,6 +34,18 @@ export const TASK_OUTPUT_PROTOCOL = 6;
  * `--settings` file with what it may run without asking (ADR 0029).
  */
 export const EXECUTORS_PROTOCOL = 7;
+/**
+ * From this protocol on, the `agentes` MCP server is a bridge (ADR 0032): a
+ * mission task (or a computer-brain run) carries a server-issued token
+ * (`mission.mcpToken`), the runner sends it with every `mcp.call`, and
+ * `tools/list` is asked from the server (`mcp.list` / `mcp.tools`): the
+ * tools are the run's Tool Gateway tools, not a fixed list.
+ */
+export const BRIDGE_PROTOCOL = 8;
+/** Server-issued run tool tokens (ADR 0032): `agr_` + 32 random bytes in base64url. */
+export const RUN_TOOL_TOKEN_PREFIX = "agr_";
+export const isRunToolToken = (v: unknown): v is string =>
+  typeof v === "string" && v.length <= 100 && /^agr_[A-Za-z0-9_-]{20,96}$/.test(v);
 
 /** No valid `hello` within this time closes the socket. */
 export const HELLO_TIMEOUT_MS = 10_000;
@@ -122,6 +134,12 @@ export interface TaskStart {
      * a work turn's allow list (the deny list still wins).
      */
     allow?: string[];
+    /**
+     * Protocol 8: the server's token for this task's tools (ADR 0032). The
+     * runner sends it with each `mcp.call` and `mcp.list`; the server checks
+     * it is this machine's, for this task, and still live.
+     */
+    mcpToken?: string;
   };
 }
 
@@ -320,6 +338,9 @@ export type ServerFrame =
   /** Protocol 5: the answer to an `mcp.call` (the text the executor's tool call returns). */
   | { type: "mcp.result"; callId: string; ok: true; text: string }
   | { type: "mcp.result"; callId: string; ok: false; error: { code: string; message: string } }
+  /** Protocol 8: the answer to an `mcp.list`: the tools this run may use (JSON Schemas simplified for the CLIs). */
+  | { type: "mcp.tools"; callId: string; ok: true; tools: McpToolInfo[] }
+  | { type: "mcp.tools"; callId: string; ok: false; error: { code: string; message: string } }
   /** The server closes after sending this (bad token, revoked, outdated runner). */
   | { type: "refused"; reason: "invalid_token" | "revoked" | "outdated" | "replaced"; message: string };
 
@@ -347,7 +368,27 @@ export type RunnerFrame =
    * `agentes` MCP server. The server checks the task belongs to this machine
    * and to a mission, runs the tool and answers `mcp.result`.
    */
-  | { type: "mcp.call"; callId: string; taskId: string; tool: string; args: Record<string, unknown> };
+  | {
+      type: "mcp.call";
+      callId: string;
+      taskId: string;
+      tool: string;
+      args: Record<string, unknown>;
+      /** Protocol 8: the server-issued token of the task or run (ADR 0032); without it, the legacy mission path. */
+      token?: string;
+    }
+  /** Protocol 8: the bridge asks which tools this run may use (`tools/list`); answered with `mcp.tools`. */
+  | { type: "mcp.list"; callId: string; taskId: string; token: string };
+
+/** A tool as `mcp.tools` lists it (what MCP `tools/list` returns). */
+export interface McpToolInfo {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+/** Most tools one `mcp.tools` frame carries. */
+export const MCP_TOOLS_MAX = 200;
 
 /** Largest `mcp.call` arguments (JSON characters). */
 export const MCP_ARGS_MAX_CHARS = 64 * 1024;
@@ -509,8 +550,12 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         taskId: f.taskId.slice(0, 64),
         tool: f.tool.slice(0, 64),
         args,
+        ...(isRunToolToken(f.token) ? { token: f.token } : {}),
       };
     }
+    case "mcp.list":
+      if (!isString(f.callId) || !isString(f.taskId) || !isRunToolToken(f.token)) return null;
+      return { type: "mcp.list", callId: f.callId.slice(0, 64), taskId: f.taskId.slice(0, 64), token: f.token };
     default:
       return null;
   }
@@ -532,8 +577,10 @@ export function parseServerFrame(raw: string): ServerFrame | null {
   }
   if ((f.type === "cancel" || f.type === "request") && !isString(f.id)) return null;
   if (f.type === "task.ack" && !isString(f.taskId)) return null;
-  if (f.type === "mcp.result" && !isString(f.callId)) return null;
-  if (!["welcome", "request", "cancel", "ping", "refused", "task.ack", "mcp.result"].includes(f.type)) return null;
+  if ((f.type === "mcp.result" || f.type === "mcp.tools") && !isString(f.callId)) return null;
+  if (f.type === "mcp.tools" && f.ok === true && !Array.isArray(f.tools)) return null;
+  if (!["welcome", "request", "cancel", "ping", "refused", "task.ack", "mcp.result", "mcp.tools"].includes(f.type))
+    return null;
   return f as ServerFrame;
 }
 

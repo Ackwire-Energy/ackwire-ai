@@ -98,7 +98,7 @@ export interface ConnectionOptions {
    */
   tasks?: Pick<NonNullable<HandlerContext["tasks"]>, "list" | "attach" | "detach" | "ack">;
   /** Protocol 5: the local MCP endpoint of mission tasks; its calls go out while connected. */
-  mcp?: Pick<McpBridge, "attach" | "detach" | "result">;
+  mcp?: Pick<McpBridge, "attach" | "detach" | "result"> & Partial<Pick<McpBridge, "tools">>;
   /** Protocol 7: the coding CLIs on the machine, looked up for each `hello` (cached by the caller). */
   executors?: () => RunnerInfo["executors"];
   /** Called after each `welcome`. */
@@ -220,6 +220,9 @@ export class RunnerConnection {
           }
           case "mcp.result":
             opts.mcp?.result(frame);
+            return;
+          case "mcp.tools":
+            opts.mcp?.tools?.(frame);
             return;
           case "task.ack":
             tasks?.ack(frame.taskId);

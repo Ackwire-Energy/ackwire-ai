@@ -5,6 +5,7 @@ import {
   type MachineOp,
   type MachineReplies,
   type MachineRequest,
+  type McpToolInfo,
   MIN_RUNNER_PROTOCOL,
   machineRpcReplyTopic,
   machineRpcTopic,
@@ -166,6 +167,11 @@ export interface MachineMissionHooks {
     machineId: string,
     frame: Extract<RunnerFrame, { type: "mcp.call" }>,
   ): Promise<{ ok: true; text: string } | { ok: false; error: { code: string; message: string } }>;
+  /** `mcp.list` (protocol 8, ADR 0032): the tools of the token's run or task. */
+  mcpList?(
+    machineId: string,
+    frame: Extract<RunnerFrame, { type: "mcp.list" }>,
+  ): Promise<{ ok: true; tools: McpToolInfo[] } | { ok: false; error: { code: string; message: string } }>;
   online?(machineId: string): Promise<void>;
 }
 
@@ -341,6 +347,30 @@ export function createMachineHub(deps: MachineHubDeps) {
           out.ok
             ? { type: "mcp.result", callId: frame.callId, ok: true, text: out.text.slice(0, 50_000) }
             : { type: "mcp.result", callId: frame.callId, ok: false, error: out.error },
+        ),
+      );
+  }
+
+  /** `mcp.list` (protocol 8): answered with `mcp.tools`; never blocks other frames. */
+  function mcpList(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "mcp.list" }>) {
+    const machineId = conn.machineId as string;
+    const run = hooks.mcpList
+      ? hooks.mcpList(machineId, frame)
+      : Promise.resolve({
+          ok: false as const,
+          error: { code: "bridge.unavailable", message: "Tools are not available on this server." },
+        });
+    void run
+      .catch((error: unknown) => ({
+        ok: false as const,
+        error: { code: "internal", message: error instanceof Error ? error.message : String(error) },
+      }))
+      .then((out) =>
+        send(
+          conn,
+          out.ok
+            ? { type: "mcp.tools", callId: frame.callId, ok: true, tools: out.tools }
+            : { type: "mcp.tools", callId: frame.callId, ok: false, error: out.error },
         ),
       );
   }
@@ -592,6 +622,8 @@ export function createMachineHub(deps: MachineHubDeps) {
         await applyTaskEvent({ db, pubsub }, conn.machineId, frame).catch(() => undefined);
       } else if (frame.type === "mcp.call") {
         mcpCall(conn, frame);
+      } else if (frame.type === "mcp.list") {
+        mcpList(conn, frame);
       } else if (frame.type === "task.done") {
         // Not acknowledged on failure: the runner sends it again after its next reconnect.
         await taskDone(conn, frame).catch((error) =>

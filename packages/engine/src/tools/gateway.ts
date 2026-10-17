@@ -96,9 +96,12 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
 
     async invoke(ctx: ToolContext, call: ToolCall): Promise<InvokeResult> {
       const step = { id: ctx.runId, orgId: ctx.orgId };
-      await addRunStep(ctx.db, step, "tool_call", { toolUseId: call.toolUseId, name: call.name, input: call.input });
+      // A mission task's call through the bridge has no run (ADR 0032): nothing to record steps on.
+      const record: typeof addRunStep = (db, run, kind, data) =>
+        ctx.runId ? addRunStep(db, run, kind, data) : Promise.resolve();
+      await record(ctx.db, step, "tool_call", { toolUseId: call.toolUseId, name: call.name, input: call.input });
       const finish = async (output: ToolOutput) => {
-        await addRunStep(ctx.db, step, "tool_result", {
+        await record(ctx.db, step, "tool_result", {
           toolUseId: call.toolUseId,
           name: call.name,
           isError: output.isError === true,
@@ -155,7 +158,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
               .where(and(eq(approvals.runId, ctx.runId), eq(approvals.toolUseId, call.toolUseId)))
           )[0];
         if (!row) throw new Error("approval insert returned nothing");
-        await addRunStep(ctx.db, step, "approval", { approvalId: row.id, toolUseId: call.toolUseId, title: row.title });
+        await record(ctx.db, step, "approval", { approvalId: row.id, toolUseId: call.toolUseId, title: row.title });
         return { type: "approval", approval: row };
       }
       const output = await run(tool, call.input, { ...ctx, toolUseId: call.toolUseId });

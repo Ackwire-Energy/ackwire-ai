@@ -48,6 +48,7 @@ import {
   questionView,
   syncQuestionMessage,
 } from "./questions";
+import { suspendRunForTool } from "./run-tools";
 import { type AgentRun, addRunStep, isTerminal, type RunStatus, runErrorDetail, transitionRun } from "./runs";
 import { SANDBOX_SCOPE } from "./sandbox";
 import { publishSecret, type SecretRequestRow, secretRequestView, secretResult, syncSecretMessage } from "./secrets";
@@ -129,6 +130,8 @@ export interface Transcript {
       questionId?: string;
       /** `request_secret`: the request this call waits on (ADR 0027). */
       secretRequestId?: string;
+      /** Made by a computer brain through the runner bridge (`suspendRunForTool`): resumed as text. */
+      bridged?: boolean;
       result?: { content: string; isError: boolean };
     }[];
   };
@@ -1286,6 +1289,8 @@ async function runToolContext(deps: EngineDeps, id: RunIdentity) {
     channelId: run.channelId,
     threadRootId: run.threadRootId,
     triggerMessageId: run.triggerMessageId,
+    // A call through the runner bridge: computer-brain tools (mission tools in a mission thread) apply.
+    ...(id.machineId ? { bridge: { machineId: id.machineId } } : {}),
   };
   return { run, ctx };
 }
@@ -1305,12 +1310,10 @@ export async function toolsForRun(deps: EngineDeps, id: RunIdentity): Promise<Br
 /**
  * Executes one tool call for the run through the Tool Gateway (levels,
  * approvals, audit, live tool chip), the same path the engine loop uses
- * (`invokeRunTool`). A gated call returns `pause`.
- *
- * Block 2 seam: marking the run waiting (approval / question card, state
- * `waiting_approval` / `waiting_input`) is still done by the engine loop when
- * the call came from a brain's `tool_call`; the bridge must hand pauses back
- * to the engine's suspend path rather than persisting cards here.
+ * (`invokeRunTool`). A gated call suspends the run like the loop does
+ * (`suspendRunForTool`: the card is posted, the call joins the transcript's
+ * pending calls, the run moves to `waiting_*`) and returns `pause`; the
+ * engine loop sees the state after the brain's turn and stops there.
  */
 export async function executeToolForRun(
   deps: EngineDeps,
@@ -1333,7 +1336,8 @@ export async function executeToolForRun(
     runId: run.id,
   };
   const outcome = await invokeRunTool({ deps, tools, ctx, where, turnTools }, call);
-  return toolResultOf(outcome);
+  if (outcome.type === "result") return toolResultOf(outcome);
+  return suspendRunForTool(deps, run, { id: call.id, name: call.name }, outcome);
 }
 
 /**

@@ -424,8 +424,11 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           if (available.length > 0) out.push(proposeTool(status.name, available));
         }
       }
-      if (mission && mission.executor !== "agent") out.push(sendTool);
-      if (mission && mission.executor === "agent") {
+      // A computer brain (through the runner bridge, ADR 0032) is the mission's executor in its thread:
+      // it gets the mission tools as gateway tools, like agent mode.
+      const executes = mission && (mission.executor === "agent" || Boolean(ctx.bridge && !ctx.bridge.taskId));
+      if (mission && !executes) out.push(sendTool);
+      if (mission && executes) {
         const status = mission.machineId ? await deps.hub.status(mission.machineId) : null;
         out.push(...agentTools(mission, status?.name ?? "the computer"));
       }
