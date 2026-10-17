@@ -48,6 +48,12 @@ token whose audience is the bundle id `chat.agentes.app` (the server's Apple pro
   (`useRealtime` → `{ connection, status }`), push (`usePush().ask()`), fonts.
 - `src/lib`: auth client (session cookie in SecureStore), API client, WebSocket factory, push registration.
 - `src/ui`: the design system for React Native (`import { … } from "@/ui"`).
+- `src/features`: the screens and their pure logic (`logic.ts`, tested in `test/features`). Everything comes from the
+  API through `@agenteschat/client` hooks, with no workarounds: unread counts and last lines from `GET …/channels` (and
+  `useMarkChannelRead` on open), "Trabalhando agora" from `GET …/active-runs` (everyone, not only admins), "Seguir" in a
+  thread (`useFollowThread`, live via the `thread.follow` person event), "Fixar" and "Fixadas" (`usePinMessage`,
+  `usePins`, live via `message.pinned`/`message.unpinned`), "Lembrar" (`useReminderAction`, time with the device's
+  offset and time zone) and "Copiar" (`expo-clipboard`).
 - `src/agent`: agents drawn by the single engine (`@agenteschat/ui/agent/engine`) through a recorder + Skia
   replay (`recorder.ts`, `skia-ctx.ts`); one shared ~25 fps clock.
 - `src/sky`: sky, fuse, spend bar and plan track as Skia shaders; `math.ts` mirrors the shader and is tested

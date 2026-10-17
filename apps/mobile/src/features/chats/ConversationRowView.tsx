@@ -6,11 +6,12 @@ import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";
 import { useDirectory, useWhen } from "../shared/hooks";
 import { Tile } from "../shared/parts";
-import type { ConversationRow } from "./logic";
+import type { ConversationRow, LastLine } from "./logic";
 
 /**
- * One conversation in a list: channels with #, DMs with the face, threads
- * with the reply tile ("#canal · last"), missions with the target tile.
+ * One conversation in a list: channels with # ("Nome: last", else the
+ * topic), DMs with the face, threads with the reply tile ("#canal · last"),
+ * missions with the target tile; unread as a Doto badge.
  * Faces are still frames (long list).
  */
 export const ConversationRowView = memo(function ConversationRowView({
@@ -24,9 +25,9 @@ export const ConversationRowView = memo(function ConversationRowView({
   const { t } = useTranslation();
   const dir = useDirectory();
   const when = useWhen();
-  const lastText = (last: { author: { type: string; id: string | null } | null; text: string } | null) => {
+  const lastText = (last: LastLine | null) => {
     if (!last) return "";
-    const who = last.author ? dir.nameOf(last.author) : "";
+    const who = last.name || (last.author ? dir.nameOf(last.author) : "");
     return who ? `${who}: ${last.text}` : last.text;
   };
   const leading =
@@ -38,7 +39,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   const title = r.kind === "channel" ? `#${r.name}` : r.kind === "dm" ? r.with.name : r.title;
   const subtitle =
     r.kind === "channel"
-      ? r.topic
+      ? lastText(r.last) || r.topic
       : r.kind === "dm"
         ? lastText(r.last)
         : [
@@ -60,7 +61,7 @@ export const ConversationRowView = memo(function ConversationRowView({
             {when.short(r.at)}
           </Text>
         ) : null}
-        {r.unread > 0 ? <Count value={r.unread} inverted /> : null}
+        {r.unread > 0 ? <Count value={r.unread} max={99} inverted /> : null}
       </>
     ) : undefined;
   return (

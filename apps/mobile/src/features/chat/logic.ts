@@ -1,10 +1,10 @@
-import type { Message, MessageConsultation, ReactionCount } from "@agenteschat/client";
+import type { Message, MessageConsultation, MessagePin, ReactionCount } from "@agenteschat/client";
 import { previewOf } from "../shared/logic";
 
 /**
  * The conversation screen's pure rules: which messages it shows and how they
  * group, what each message carries (cards from `meta`), the working line,
- * reactions, the slash commands and a small Markdown reader.
+ * reactions, pins, the slash commands and a small Markdown reader.
  */
 
 // ── Timeline ─────────────────────────────────────────────────────────────────
@@ -249,6 +249,34 @@ export function toggleReaction(
   return next.count === 0 && (next.agentIds?.length ?? 0) === 0
     ? list.filter((r) => r.reaction !== reaction)
     : list.map((r) => (r.reaction === reaction ? next : r));
+}
+
+// ── Pins ─────────────────────────────────────────────────────────────────────
+
+/** "Fixadas": one entry per message, the latest pin first (the server's order, kept even if events raced). */
+export function orderPins(pins: MessagePin[]): MessagePin[] {
+  const latest = new Map<string, MessagePin>();
+  for (const p of pins) {
+    const had = latest.get(p.messageId);
+    if (!had || had.pinnedAt < p.pinnedAt) latest.set(p.messageId, p);
+  }
+  return [...latest.values()].sort((a, b) =>
+    a.pinnedAt === b.pinnedAt
+      ? b.message.createdAt.localeCompare(a.message.createdAt)
+      : b.pinnedAt.localeCompare(a.pinnedAt),
+  );
+}
+
+/**
+ * Tapping a pin: scroll to it when it is a row on screen, else open its
+ * thread (a top-level message opens as the start of its own thread).
+ */
+export function pinTarget(
+  pin: Pick<MessagePin, "messageId" | "threadId">,
+  onScreen: ReadonlySet<string>,
+): { kind: "scroll"; messageId: string } | { kind: "open"; threadId: string } {
+  if (onScreen.has(pin.messageId)) return { kind: "scroll", messageId: pin.messageId };
+  return { kind: "open", threadId: pin.threadId ?? pin.messageId };
 }
 
 // ── Composer ─────────────────────────────────────────────────────────────────

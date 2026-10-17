@@ -11,6 +11,8 @@ export const CHAT_FILTERS: ChatFilter[] = ["all", "unread", "threads", "dm"];
 
 export interface LastLine {
   author: ThreadActor | null;
+  /** The author's name as the server sent it (channels), else looked up from `author`. */
+  name?: string | null;
   text: string;
 }
 
@@ -21,6 +23,7 @@ export type ConversationRow =
       channelId: string;
       name: string;
       topic: string;
+      last: LastLine | null;
       at: string | null;
       unread: number;
     }
@@ -125,14 +128,22 @@ export function buildConversations(input: {
   }
   for (const c of input.channels) {
     if (!c.isMember) continue;
+    const last = c.lastMessage ?? null;
     rows.push({
       kind: "channel",
       key: `c:${c.id}`,
       channelId: c.id,
       name: c.name,
       topic: c.topic,
-      at: null,
-      unread: 0,
+      last: last
+        ? {
+            author: { type: last.authorType, id: last.authorId },
+            name: last.authorName,
+            text: previewOf(last.preview),
+          }
+        : null,
+      at: last?.createdAt ?? null,
+      unread: Math.max(0, c.unreadCount ?? 0),
     });
   }
   return rows.sort((a, b) => {
@@ -159,8 +170,21 @@ export function filterConversations(rows: ConversationRow[], filter: ChatFilter)
   }
 }
 
-/** The tab badge and the "Não lidas" count: conversations with something unread. */
+/** The "Não lidas" count: conversations with something unread. */
 export const unreadConversations = (rows: ConversationRow[]) => rows.filter((r) => r.unread > 0).length;
+
+/**
+ * The badge of Conversas, straight from the two lists (no thread list
+ * needed): joined channels and DMs with something unread.
+ */
+export function unreadConversationCount(input: {
+  channels: Pick<Channel, "isMember" | "unreadCount">[];
+  dms: Pick<DirectMessage, "unread">[];
+}): number {
+  const channels = input.channels.filter((c) => c.isMember && (c.unreadCount ?? 0) > 0).length;
+  const dms = input.dms.filter((d) => d.unread > 0).length;
+  return channels + dms;
+}
 
 /** Counts per filter (only "Não lidas" shows one). */
 export function filterCounts(rows: ConversationRow[]): Record<ChatFilter, number> {

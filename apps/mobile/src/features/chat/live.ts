@@ -79,6 +79,20 @@ function cacheReactions(
   });
 }
 
+/**
+ * A message was pinned or unpinned: its mark in every loaded list of the
+ * channel (the pins list itself is refetched). Also used optimistically by
+ * "Fixar" / "Desafixar".
+ */
+export function cachePinned(qc: QueryClient, orgId: string, channelId: string, messageId: string, pinned: boolean) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === messageId)) return data;
+    return list.map((m) => (m.id === messageId ? { ...m, pinned } : m));
+  });
+}
+
 /** What each event changes in the caches (the run rows are the reducer's). */
 function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: ChannelEvent) {
   switch (event.type) {
@@ -88,7 +102,19 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       // A new top-level message may get agent replies in its thread: start that list.
       if (event.message && !event.message.threadId)
         qc.setQueryData(keys.thread(orgId, channelId, event.message.id), (list: unknown) => list ?? []);
+      // The conversation list's last line and unread.
       void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+      break;
+    case "message.pinned":
+    case "message.unpinned":
+      cachePinned(qc, orgId, channelId, event.messageId, event.type === "message.pinned");
+      void qc.invalidateQueries({ queryKey: keys.pins(orgId, channelId) });
+      break;
+    case "agent.run":
+    case "run.finished":
+      // "Trabalhando agora" on Início.
+      void qc.invalidateQueries({ queryKey: keys.working(orgId) });
       break;
     case "message.reactions":
       cacheReactions(qc, orgId, channelId, event.messageId, event.reactions);

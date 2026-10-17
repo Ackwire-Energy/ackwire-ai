@@ -5,6 +5,8 @@ import {
   isNotificationEvent,
   keys,
   refreshMission,
+  type ThreadFollowEvent,
+  type ThreadInfo,
 } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
@@ -13,7 +15,8 @@ import { useConnection, useOrgId } from "./hooks";
 /**
  * Events for the signed-in person, whatever screen is open: requests they
  * can decide, the inbox and its badge (D46), missions waiting on them. Keeps
- * Início, Atividade and the tab badges live.
+ * Início, Atividade and the tab badges live, and "Seguir" in step across
+ * devices.
  */
 export function useUserEvents() {
   const connection = useConnection();
@@ -26,7 +29,22 @@ export function useUserEvents() {
         cacheApproval(qc, orgId, event.approval as Approval);
         void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
       }
-      if (isNotificationEvent(event)) applyNotificationEvent(qc, orgId, event);
+      if (isNotificationEvent(event)) {
+        applyNotificationEvent(qc, orgId, event);
+        // Something new reached you somewhere: the conversation list's unread and last lines.
+        if (event.type === "notification.upserted") {
+          void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+          void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
+        }
+      }
+      // "Seguir" changed on one of your devices.
+      if (event.type === "thread.follow" && "threadId" in event) {
+        const follow = event as ThreadFollowEvent;
+        qc.setQueryData<ThreadInfo>(keys.threadInfo(orgId, follow.threadId), (t) =>
+          t ? { ...t, following: follow.following } : t,
+        );
+        void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+      }
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string")
         refreshMission(qc, orgId, event.missionId);
     });

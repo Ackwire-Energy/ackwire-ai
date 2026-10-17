@@ -1,15 +1,16 @@
+import * as Clipboard from "expo-clipboard";
 import { router, useIsFocused } from "expo-router";
 import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, Share, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Card, fonts, haptics, Icon, IconButton, type IconName, LivePause, Text, useTheme } from "@/ui";
+import { Card, fonts, haptics, Icon, IconButton, type IconName, LivePause, Text, ToggleSwitch, useTheme } from "@/ui";
 import { useColors } from "./hooks";
 
 /**
  * Small pieces the screens share that the design system doesn't have as
  * primitives: the icon tile, the action list of sheets, the bar of a pushed
- * screen, haptics and the share sheet.
+ * screen, haptics and the clipboard.
  */
 
 /** The rounded square with an icon (channels, threads, missions, sheet actions). */
@@ -36,6 +37,8 @@ export interface ActionItem {
   /** A slash command shown on the right (`/mission`), in mono: it is code. */
   code?: string;
   trailing?: ReactNode;
+  /** A switch on the right ("Seguir"): the row reads as one, checked or not. */
+  checked?: boolean;
   danger?: boolean;
   disabled?: boolean;
   onPress?: () => void;
@@ -51,7 +54,8 @@ export function ActionList({ items }: { items: ActionItem[] }) {
           key={it.key}
           onPress={it.onPress}
           disabled={it.disabled || !it.onPress}
-          accessibilityRole="button"
+          accessibilityRole={it.checked === undefined ? "button" : "switch"}
+          {...(it.checked === undefined ? {} : { accessibilityState: { checked: it.checked } })}
           accessibilityLabel={it.hint ? `${it.label}. ${it.hint}` : it.label}
           style={({ pressed }) => [
             styles.action,
@@ -73,6 +77,7 @@ export function ActionList({ items }: { items: ActionItem[] }) {
           </View>
           {it.code ? <Text style={[styles.mono, { color: c.faint }]}>{it.code}</Text> : null}
           {it.trailing}
+          {it.checked === undefined ? null : <ToggleSwitch value={it.checked} />}
         </Pressable>
       ))}
     </Card>
@@ -141,9 +146,12 @@ export const tapHaptic = () => haptics.light();
 /** Done: approved, sent. */
 export const successHaptic = () => haptics.success();
 
-/** The system share sheet with a text (it has "Copy"). */
-export function shareText(text: string) {
-  void Share.share({ message: text }).catch(() => {});
+/** Puts a text on the clipboard; resolves false when the system refused. */
+export function copyText(text: string): Promise<boolean> {
+  return Clipboard.setStringAsync(text).then(
+    (ok) => ok !== false,
+    () => false,
+  );
 }
 
 /** Code only (branches, commands). */

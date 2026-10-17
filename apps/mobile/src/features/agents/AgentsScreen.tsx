@@ -1,4 +1,4 @@
-import { useCreateAgent } from "@agenteschat/client";
+import { useCreateAgent, useWorkingRuns } from "@agenteschat/client";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -21,7 +21,7 @@ import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { successHaptic, Tile } from "../shared/parts";
-import { useActiveRuns, useWorkingNow } from "../shared/queries";
+import { useWorkingNow } from "../shared/queries";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 import { busyAgents } from "./logic";
@@ -40,7 +40,7 @@ function Agents() {
   const dir = useDirectory();
   const c = useColors();
   const sheet = useSheet();
-  const runs = useActiveRuns();
+  const runs = useWorkingRuns(useOrgId());
   const busy = busyAgents(useWorkingNow());
   const agents = [...dir.agents].sort((a, b) => a.name.localeCompare(b.name));
   const working = agents.filter((a) => busy.has(a.id)).length;

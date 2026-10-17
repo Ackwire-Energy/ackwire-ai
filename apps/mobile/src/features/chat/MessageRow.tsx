@@ -4,7 +4,7 @@ import { splitCanceled } from "@agenteschat/client/lib/work";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Count, fonts, Text } from "@/ui";
+import { Count, fonts, Icon, Text } from "@/ui";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard } from "../missions/cards";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
@@ -24,8 +24,8 @@ import {
 import { MessageText } from "./MessageText";
 
 /**
- * One message: the face and name (dropped when grouped), what it consulted,
- * its text, the cards it carries and the reactions. Long press opens its
+ * One message: the face and name (dropped when grouped), a pin mark when
+ * pinned, what it consulted, its text, the cards it carries and the reactions. Long press opens its
  * actions (the screen's sheet).
  */
 export const MessageRow = memo(function MessageRow({
@@ -88,8 +88,17 @@ export const MessageRow = memo(function MessageRow({
             <Text variant="caption" tone="faint">
               {when.time(m.createdAt)}
             </Text>
+            {m.pinned ? <PinMark /> : null}
           </View>
         )}
+        {grouped && m.pinned ? (
+          <View style={styles.pinLine}>
+            <PinMark />
+            <Text variant="caption" tone="faint">
+              {t("mobile.pins.mark")}
+            </Text>
+          </View>
+        ) : null}
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
@@ -127,6 +136,17 @@ export const MessageRow = memo(function MessageRow({
     </Pressable>
   );
 });
+
+/** Pinned: a small neutral pin (no colored dot). */
+function PinMark() {
+  const { t } = useTranslation();
+  const c = useColors();
+  return (
+    <View style={styles.pin} accessible accessibilityLabel={t("mobile.pins.mark")}>
+      <Icon name="pin" size={12} color={c.faint} />
+    </View>
+  );
+}
 
 /** People's pills show a count (mine outlined); an agent that reacted shows its face. */
 function Reactions({ message: m, meId }: { message: Message; meId: string | null }) {
@@ -186,6 +206,8 @@ const styles = StyleSheet.create({
   who: { flexDirection: "row", alignItems: "baseline", gap: 7 },
   name: { fontFamily: fonts.bold },
   shrink: { flexShrink: 1 },
+  pin: { alignSelf: "center" },
+  pinLine: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 },
   reacts: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
   react: { height: 30, paddingHorizontal: 10, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 6 },
   emoji: { fontSize: 15 },

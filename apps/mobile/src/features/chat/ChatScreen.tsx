@@ -1,9 +1,11 @@
 import {
   type ArtifactDetail,
+  type DirectMessage,
   keys,
   type LiveRun,
   MESSAGES_PAGE,
   type Message,
+  type MessagePin,
   sendHelpers,
   useApi,
   useChannels,
@@ -11,6 +13,7 @@ import {
   useCreateMission,
   useDms,
   useJoinChannel,
+  useMarkChannelRead,
   useMessages,
   useMissionControl,
   usePostMessage,
@@ -20,7 +23,7 @@ import {
   useThreadMission,
   useThreads,
 } from "@agenteschat/client";
-import { FlashList } from "@shopify/flash-list";
+import { FlashList, type FlashListRef } from "@shopify/flash-list";
 import { useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -34,16 +37,18 @@ import { isListedThread, threadTitle } from "../chats/logic";
 import { chatHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
 import { isOpenMission } from "../missions/logic";
+import { RemindSheet } from "../reminders/RemindSheet";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
-import { PromptForm } from "../shared/PromptForm";
-import { PushedHeader } from "../shared/parts";
+import { PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { StreamingRow, WorkingLine, writingRuns } from "./LiveRows";
 import { useChatLive } from "./live";
-import { buildRows, type ChatRow, mergeTimeline, parseSlash, threadRootsToLoad } from "./logic";
+import { buildRows, type ChatRow, mergeTimeline, parseSlash, pinTarget, threadRootsToLoad } from "./logic";
 import { MessageRow } from "./MessageRow";
+import { PinsSheet } from "./PinsSheet";
 import {
+  ChannelOptions,
   MessageActions,
   MissionSummaryView,
   NewMissionForm,
@@ -177,14 +182,16 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   }, [isThread, threadId, list, thread.data, channel?.name, runs, linkThreads, collapsed, t]);
 
   // ── Read ──
+  // Seen up to the latest message: the list's badges (channel and DM) clear at once.
+  const markRead = useMarkChannelRead(orgId).mutate;
   const lastId = list.at(-1)?.id;
   useEffect(() => {
     if (!member || !lastId || lastId.startsWith("local-")) return;
-    api.dms
-      .markRead(orgId, channelId)
-      .then(() => qc.invalidateQueries({ queryKey: keys.dms(orgId) }))
-      .catch(() => {});
-  }, [api, qc, orgId, channelId, member, lastId]);
+    qc.setQueryData<DirectMessage[]>(keys.dms(orgId), (dmList) =>
+      dmList?.map((d) => (d.channelId === channelId ? { ...d, unread: 0 } : d)),
+    );
+    markRead(channelId);
+  }, [markRead, qc, orgId, channelId, member, lastId]);
 
   // ── Older pages (channel view) ──
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -235,18 +242,13 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         currentThreadId={threadId}
       />,
     );
-  const sendRemind = (text: string) => send(t("mobile.chat.remindMessage", { text }), threadId);
-  const openRemind = () =>
+  const openRemind = (input: { text?: string; message?: Message } = {}) =>
     sheet.open(
-      <PromptForm
-        title={t("mobile.plus.remindTitle")}
-        placeholder={t("mobile.plus.remindPlaceholder")}
-        submitLabel={t("mobile.app.send")}
-        icon="clock"
-        onSubmit={(text) => {
-          sheet.close();
-          sendRemind(text);
-        }}
+      <RemindSheet
+        channelId={channelId}
+        threadId={threadId}
+        {...(input.message ? { message: input.message } : {})}
+        {...(input.text ? { initialText: input.text } : {})}
       />,
     );
   const summarize = () => {
@@ -284,8 +286,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         summarize();
         return;
       case "remind":
-        if (cmd.arg) sendRemind(cmd.arg);
-        else openRemind();
+        openRemind({ text: cmd.arg });
         return;
       case "plan":
         if (mission) router.push(`/mission/${mission.id}`);
@@ -363,7 +364,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         summarize();
         return;
       case "remind":
-        setTimeout(openRemind, 250);
+        setTimeout(() => openRemind(), 250);
         return;
     }
   };
@@ -380,10 +381,27 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           inThread={isThread}
           thread={linkThreads.get(m.threadId ?? m.id)}
           onMission={(goal, rootId) => openNewMission(goal, rootId)}
+          onRemind={(message) => openRemind({ message })}
         />,
       ),
     [sheet, canMission, isThread, linkThreads],
   );
+
+  // ── Pins ──
+  const listRef = useRef<FlashListRef<Row>>(null);
+  const rowsRef = useRef<Row[]>([]);
+  const goToPin = (pin: MessagePin) => {
+    sheet.close();
+    const shown = rowsRef.current;
+    const target = pinTarget(pin, new Set(shown.flatMap((r) => (r.kind === "message" ? [r.message.id] : []))));
+    if (target.kind === "scroll") {
+      const index = shown.findIndex((r) => r.kind === "message" && r.message.id === target.messageId);
+      if (index >= 0) void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
+      return;
+    }
+    if (target.threadId !== threadId) router.push(chatHref(channelId, target.threadId));
+  };
+  const openPins = () => sheet.open(<PinsSheet channelId={channelId} onPick={goToPin} />);
 
   // ── Header ──
   const info = thread.data;
@@ -413,26 +431,55 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         icon="more"
         label={t("mobile.chat.options")}
         onPress={() =>
-          sheet.open(<ThreadOptions thread={info} mission={mission} onMission={() => openNewMission("", info.id)} />)
+          sheet.open(
+            <ThreadOptions
+              thread={info}
+              mission={mission}
+              onMission={() => openNewMission("", info.id)}
+              onPins={openPins}
+            />,
+          )
         }
       />
     ) : null
-  ) : dmAgentId ? (
-    <Pressable
-      onPress={() => router.push(`/agent/${dmAgentId}`)}
-      accessibilityRole="button"
-      accessibilityLabel={t("mobile.chat.profile")}
-      hitSlop={8}
-    >
-      <AgentFace agentId={dmAgentId} size={28} />
-    </Pressable>
-  ) : channel && roster.data ? (
-    <View style={styles.faces} accessible accessibilityLabel={subtitle}>
-      {roster.data.slice(0, 3).map((r, i) => (
-        <View key={`${r.type}:${r.id}`} style={i > 0 ? styles.overlap : undefined}>
-          <Face who={r} size={22} live={false} />
+  ) : dm || channel ? (
+    <View style={styles.side}>
+      {dmAgentId ? (
+        <Pressable
+          onPress={() => router.push(`/agent/${dmAgentId}`)}
+          accessibilityRole="button"
+          accessibilityLabel={t("mobile.chat.profile")}
+          hitSlop={8}
+        >
+          <AgentFace agentId={dmAgentId} size={28} />
+        </Pressable>
+      ) : channel && roster.data ? (
+        <View style={styles.faces} accessible accessibilityLabel={subtitle}>
+          {roster.data.slice(0, 3).map((r, i) => (
+            <View key={`${r.type}:${r.id}`} style={i > 0 ? styles.overlap : undefined}>
+              <Face who={r} size={22} live={false} />
+            </View>
+          ))}
         </View>
-      ))}
+      ) : null}
+      <IconButton
+        icon="more"
+        label={t("mobile.chat.options")}
+        onPress={() =>
+          sheet.open(
+            <ChannelOptions
+              channelId={channelId}
+              title={title}
+              {...(subtitle ? { subtitle } : {})}
+              leading={
+                dm ? <Face who={{ type: dm.with.type, id: dm.with.id }} size={36} live={false} /> : <Tile icon="hash" />
+              }
+              agentId={dmAgentId}
+              onPins={openPins}
+            />,
+          )
+        }
+      />
     </View>
   ) : null;
 
@@ -456,6 +503,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             ]
           : []
       : [];
+  rowsRef.current = rows;
   const pinned = mission && isOpenMission(mission) ? mission : null;
   const loading = isThread ? threadMessages.isLoading : top.isLoading;
 
@@ -513,6 +561,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           </View>
         ) : (
           <FlashList
+            ref={listRef}
             data={rows}
             keyExtractor={(r) => r.key}
             getItemType={(r) => r.kind}
@@ -558,6 +607,7 @@ const styles = StyleSheet.create({
   day: { alignSelf: "center", textAlign: "center", marginTop: 10, marginBottom: 4, fontFamily: fonts.semibold },
   listPad: { paddingTop: 8, paddingBottom: 8 },
   composer: { paddingHorizontal: 10, paddingTop: 6 },
+  side: { flexDirection: "row", alignItems: "center", gap: 2 },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -6 },
 });

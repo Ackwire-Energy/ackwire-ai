@@ -27,6 +27,7 @@ import { PushedHeader, Tile } from "../shared/parts";
 import { useWorkingNow } from "../shared/queries";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { canUse, spendOf } from "./logic";
+import { workTitle } from "./work";
 
 /**
  * An agent's profile: its sky and living body, Conversar / Tarefa, what it is
@@ -155,10 +156,12 @@ function Profile({ id }: { id: string }) {
                       <PixelOrbit color={look.color} size={16} />
                     </Tile>
                   }
-                  title={w.kind === "mission" ? t("mobile.home.missionTitle", { title: w.what }) : w.what}
+                  title={workTitle(t, w)}
                   chevron
                   onPress={() =>
-                    w.missionId ? router.push(`/mission/${w.missionId}`) : router.push(chatHref(w.channelId))
+                    w.missionId
+                      ? router.push(`/mission/${w.missionId}`)
+                      : router.push(chatHref(w.channelId, w.threadId))
                   }
                 />
               ))

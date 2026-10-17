@@ -1,4 +1,4 @@
-import type { Agent, AgentAccess, AgentUsage, Mission, Run } from "@agenteschat/client";
+import type { Agent, AgentAccess, AgentUsage, Mission, WorkingRun } from "@agenteschat/client";
 
 /**
  * Who is working now (runs in progress and active missions), the crew on
@@ -12,18 +12,26 @@ export interface WorkItem {
   key: string;
   agentId: string;
   kind: "run" | "mission";
-  /** Run: the start of the message it answers. Mission: its title. */
-  what: string;
+  /** Mission: its title. Run: the thread's title or the start of its first message (null: say where instead). */
+  what: string | null;
   channelId: string;
-  threadId: string;
+  /** Null: the main timeline (DMs are flat). */
+  threadId: string | null;
+  /** Where, for a run without a label: a channel's name, or a DM (no name). */
+  where: { kind: "channel" | "dm"; name: string | null };
   missionId: string | null;
   plan: { done: number; total: number } | null;
 }
 
-/** Active missions first (they are long work), then runs in progress, one per agent and thread. */
-export function workingNow(runs: Run[] | undefined, missions: Mission[] | undefined): WorkItem[] {
+/**
+ * Active missions first (they are long work), then runs in progress (`GET
+ * …/active-runs`, everyone's view of the conversations they are in), newest
+ * first, one per agent and conversation.
+ */
+export function workingNow(runs: WorkingRun[] | undefined, missions: Mission[] | undefined): WorkItem[] {
   const out: WorkItem[] = [];
   const seen = new Set<string>();
+  const spot = (agentId: string, channelId: string, threadId: string | null) => `${agentId}:${threadId ?? channelId}`;
   for (const m of missions ?? []) {
     if (m.status !== "active") continue;
     out.push({
@@ -33,21 +41,25 @@ export function workingNow(runs: Run[] | undefined, missions: Mission[] | undefi
       what: m.title,
       channelId: m.channelId,
       threadId: m.threadId,
+      where: { kind: "channel", name: null },
       missionId: m.id,
       plan: { done: m.plan.done, total: m.plan.total },
     });
-    seen.add(`${m.agentId}:${m.threadId}`);
+    seen.add(spot(m.agentId, m.channelId, m.threadId));
   }
-  for (const r of [...(runs ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt))) {
-    if (!ACTIVE.has(r.status) || seen.has(`${r.agentId}:${r.threadId}`)) continue;
-    seen.add(`${r.agentId}:${r.threadId}`);
+  const newest = (r: WorkingRun) => r.startedAt ?? r.createdAt;
+  for (const r of [...(runs ?? [])].sort((a, b) => newest(b).localeCompare(newest(a)))) {
+    const at = spot(r.agentId, r.channelId, r.threadId);
+    if (!ACTIVE.has(r.status) || seen.has(at)) continue;
+    seen.add(at);
     out.push({
-      key: `r:${r.id}`,
+      key: `r:${r.runId}`,
       agentId: r.agentId,
       kind: "run",
-      what: r.what,
+      what: r.label?.trim() || null,
       channelId: r.channelId,
       threadId: r.threadId,
+      where: { kind: r.channelKind, name: r.channelName },
       missionId: null,
       plan: null,
     });

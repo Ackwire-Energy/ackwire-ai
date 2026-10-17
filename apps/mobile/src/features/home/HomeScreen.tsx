@@ -1,19 +1,23 @@
 import {
   type AppNotification,
+  keys,
   type Mission,
   useMe,
   useMissionDecisions,
   useMissionList,
   useMissionReviews,
   useNotifications,
+  useWorkingRuns,
 } from "@agenteschat/client";
-import { router } from "expo-router";
-import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { router, useIsFocused } from "expo-router";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar, Button, Card, fonts, IconButton, PersonAvatar, PixelOrbit, Row, Section, Sky, Text } from "@/ui";
 import { crewOf } from "../agents/logic";
+import { workTitle, workWhere } from "../agents/work";
 import { ApprovalAsk } from "../approvals/ApprovalAsk";
 import { ConversationRowView } from "../chats/ConversationRowView";
 import { chatHref, notificationHref } from "../links/logic";
@@ -39,8 +43,17 @@ export function HomeScreen() {
   const waitingMissions = useMissionList(orgId, { status: "waiting_you" });
   const questions = useNotifications(orgId, "waiting");
   const work = useWorkingNow();
+  const runs = useWorkingRuns(orgId);
   const conversations = useConversations();
   const [refreshing, setRefreshing] = useState(false);
+  const qc = useQueryClient();
+  const focused = useIsFocused();
+  // Runs start and finish in conversations this screen doesn't follow live: look again while it shows.
+  useEffect(() => {
+    if (!focused) return;
+    const timer = setInterval(() => void qc.invalidateQueries({ queryKey: keys.working(orgId) }), WORKING_POLL_MS);
+    return () => clearInterval(timer);
+  }, [focused, qc, orgId]);
 
   const missions = (waitingMissions.data?.missions ?? []).filter((m) => m.canAct);
   const missionItems = missions.reduce((n, m) => n + m.pending.reviews + m.pending.decisions, 0);
@@ -54,7 +67,7 @@ export function HomeScreen() {
 
   const refresh = async () => {
     setRefreshing(true);
-    await Promise.allSettled([waitingMissions.refetch(), questions.refetch(), conversations.refetch()]);
+    await Promise.allSettled([waitingMissions.refetch(), questions.refetch(), conversations.refetch(), runs.refetch()]);
     setRefreshing(false);
   };
 
@@ -123,32 +136,34 @@ export function HomeScreen() {
         {work.length > 0 ? (
           <Section title={t("mobile.home.workingNow")} count={busy.size}>
             <Card>
-              {work.slice(0, 6).map((w) => {
+              {work.slice(0, 6).map((w, i) => {
                 const agent = dir.agentById.get(w.agentId);
+                const name = agent?.name ?? "";
                 return (
                   <Row
                     key={w.key}
                     leading={
                       <View>
-                        <AgentFace agentId={w.agentId} size={34} mode="run" />
+                        {/* Only the first few move (a long list stays light). */}
+                        <AgentFace agentId={w.agentId} size={34} mode="run" live={i < LIVE_ROWS} />
                         <View style={[styles.orb, { backgroundColor: c.raised }]}>
                           <PixelOrbit color={agentLook(agent).color} size={12} />
                         </View>
                       </View>
                     }
-                    title={w.kind === "mission" ? t("mobile.home.missionTitle", { title: w.what }) : w.what}
+                    title={workTitle(t, w)}
                     subtitle={
                       w.plan
-                        ? t("mobile.home.missionProgress", {
-                            name: agent?.name ?? "",
-                            done: w.plan.done,
-                            total: w.plan.total,
-                          })
-                        : (agent?.name ?? "")
+                        ? t("mobile.home.missionProgress", { name, done: w.plan.done, total: w.plan.total })
+                        : w.what
+                          ? [name, workWhere(t, w)].filter(Boolean).join(" · ")
+                          : name
                     }
                     chevron
                     onPress={() =>
-                      w.missionId ? router.push(`/mission/${w.missionId}`) : router.push(chatHref(w.channelId, null))
+                      w.missionId
+                        ? router.push(`/mission/${w.missionId}`)
+                        : router.push(chatHref(w.channelId, w.threadId))
                     }
                   />
                 );
@@ -173,6 +188,11 @@ export function HomeScreen() {
     </View>
   );
 }
+
+/** Rows of "Trabalhando agora" whose agent moves. */
+const LIVE_ROWS = 3;
+/** How often "Trabalhando agora" looks again while Início shows. */
+const WORKING_POLL_MS = 20_000;
 
 /** A mission's review and decisions waiting on you, as blocks of the card. */
 function MissionAsks({ mission: m, divider }: { mission: Mission; divider: boolean }) {

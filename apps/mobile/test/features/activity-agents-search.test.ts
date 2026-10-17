@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentAccess, Run } from "@agenteschat/client";
+import type { AgentAccess, WorkingRun } from "@agenteschat/client";
 import { activitySections, dayGroupOf, emojisOf, subtitleOf, whoOf } from "../../src/features/activity/logic";
 import { busyAgents, canUse, crewOf, spendOf, workingNow } from "../../src/features/agents/logic";
 import { fold, isEmpty, matches, searchResults } from "../../src/features/search/logic";
@@ -76,21 +76,62 @@ describe("Atividade", () => {
 });
 
 describe("who is working", () => {
-  const run = (id: string, agentId: string, status: string, threadId: string, createdAt = ago(1)) =>
-    ({ id, agentId, status, threadId, channelId: "c1", what: "Cruzando as vendas", createdAt }) as Run;
+  const run = (
+    runId: string,
+    agentId: string,
+    status: WorkingRun["status"],
+    threadId: string | null,
+    createdAt = ago(1),
+    over: Partial<WorkingRun> = {},
+  ): WorkingRun => ({
+    runId,
+    agentId,
+    status,
+    threadId,
+    channelId: "c1",
+    channelKind: "channel",
+    channelName: "vendas",
+    label: "Cruzando as vendas",
+    startedAt: null,
+    createdAt,
+    ...over,
+  });
 
-  test("active missions first, then runs in progress (one per agent and thread)", () => {
+  test("active missions first, then runs in progress (newest first, one per agent and conversation)", () => {
     const work = workingNow(
       [
         run("r1", "nina", "running", "t9"),
         run("r2", "nina", "queued", "t9", ago(2)),
         run("r3", "dev", "running", "t1"),
-        run("r4", "theo", "done", "t5"),
+        run("r5", "theo", "waiting_approval", null, ago(3), { channelId: "d1", channelKind: "dm", channelName: null }),
       ],
       [mission({ id: "m1", agentId: "dev", threadId: "t1" }), mission({ id: "m2", status: "paused", agentId: "iris" })],
     );
-    expect(work.map((w) => w.key)).toEqual(["m:m1", "r:r1"]);
-    expect([...busyAgents(work)]).toEqual(["dev", "nina"]);
+    expect(work.map((w) => w.key)).toEqual(["m:m1", "r:r1", "r:r5"]);
+    expect([...busyAgents(work)]).toEqual(["dev", "nina", "theo"]);
+  });
+
+  test("a run says what it works on, else where it is", () => {
+    const [labeled, bare, dm] = workingNow(
+      [
+        run("r1", "nina", "running", "t9", ago(1)),
+        run("r2", "dev", "running", null, ago(2), { label: "  " }),
+        run("r3", "theo", "running", null, ago(3), {
+          channelId: "d1",
+          channelKind: "dm",
+          channelName: null,
+          label: null,
+        }),
+      ],
+      [],
+    );
+    expect(labeled).toMatchObject({
+      what: "Cruzando as vendas",
+      threadId: "t9",
+      where: { kind: "channel", name: "vendas" },
+    });
+    expect(bare).toMatchObject({ what: null, threadId: null, where: { kind: "channel", name: "vendas" } });
+    expect(dm).toMatchObject({ what: null, channelId: "d1", where: { kind: "dm", name: null } });
   });
 
   test("the crew: working ones first, then by name", () => {

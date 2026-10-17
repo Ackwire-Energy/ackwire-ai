@@ -35,7 +35,7 @@ export { Segmented, type SegmentedProps } from "./Segmented";
 export { Sheet, type SheetProps } from "./Sheet";
 export { Text, type TextProps, type TextTone, type TextVariant } from "./Text";
 export { ToastHost, type ToastInput, useToast } from "./Toast";
-export { Toggle, type ToggleProps } from "./Toggle";
+export { Toggle, type ToggleProps, ToggleSwitch } from "./Toggle";
 export {
   boxShadow,
   fonts,

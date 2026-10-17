@@ -1,4 +1,5 @@
 import {
+  ApiError,
   keys,
   type Message,
   type Mission,
@@ -8,26 +9,31 @@ import {
   useCloseMission,
   useCreateMission,
   useEligibleAgents,
+  useFollowThread,
   useMissionControl,
+  usePinMessage,
+  usePins,
   useReactions,
+  useThreadInfo,
   useThreadMutation,
   useToggleReaction,
 } from "@agenteschat/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { TFunction } from "i18next";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Button, fonts, Icon, Text, useToast } from "@/ui";
+import { Button, Count, fonts, Icon, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
-import { ActionList, shareText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
+import { ActionList, copyText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
+import { cachePinned } from "./live";
 import { QUICK_REACTIONS, reactionName, reactionPills } from "./logic";
 
 // ── Long press on a message ──────────────────────────────────────────────────
@@ -38,6 +44,7 @@ export function MessageActions({
   inThread,
   thread,
   onMission,
+  onRemind,
 }: {
   message: Message;
   /** "Transformar em missão" is offered (a channel or a DM, not a mission thread). */
@@ -46,6 +53,8 @@ export function MessageActions({
   inThread: boolean;
   thread: ThreadInfo | undefined;
   onMission: (goal: string, threadId: string) => void;
+  /** "Lembrar disso": the screen opens the reminder sheet for this message. */
+  onRemind: (m: Message) => void;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -53,8 +62,29 @@ export function MessageActions({
   const dir = useDirectory();
   const surface = useSurface();
   const sheet = useSheet();
+  const toast = useToast();
+  const qc = useQueryClient();
   const cached = useReactions(orgId, m.id, false);
   const toggle = useToggleReaction(orgId, m.id);
+  const pin = usePinMessage(orgId);
+  const pinned = Boolean(m.pinned);
+  const togglePin = () => {
+    sheet.close();
+    const next = !pinned;
+    // The mark shows at once; the server's answer (or its event) confirms it.
+    cachePinned(qc, orgId, m.channelId, m.id, next);
+    pin.mutate(
+      { channelId: m.channelId, messageId: m.id, pinned: next },
+      {
+        onSuccess: () => toast({ title: t(next ? "mobile.pins.pinned" : "mobile.pins.unpinned"), icon: "pin" }),
+        onError: (e) => {
+          cachePinned(qc, orgId, m.channelId, m.id, pinned);
+          const full = e instanceof ApiError && e.code === "pins.limit";
+          toast({ title: t(full ? "mobile.pins.full" : "mobile.app.failed"), icon: "x" });
+        },
+      },
+    );
+  };
   const pills = reactionPills(cached.data ?? m.reactions, meId);
   const agentName = m.author.type === "agent" ? dir.nameOf(m.author) : "";
   const rootId = m.threadId ?? m.id;
@@ -117,13 +147,35 @@ export function MessageActions({
           ...(text
             ? [
                 {
-                  key: "share",
+                  key: "copy",
                   icon: "copy" as const,
-                  label: t("mobile.chat.shareText"),
+                  label: t("mobile.chat.copy"),
                   onPress: () => {
                     sheet.close();
-                    shareText(m.body);
+                    void copyText(m.body).then((ok) =>
+                      toast(
+                        ok
+                          ? { title: t("mobile.chat.copied"), icon: "copy" }
+                          : { title: t("mobile.app.failed"), icon: "x" },
+                      ),
+                    );
                   },
+                },
+              ]
+            : []),
+          ...(!m.local
+            ? [
+                {
+                  key: "pin",
+                  icon: "pin" as const,
+                  label: pinned ? t("mobile.pins.unpin") : t("mobile.pins.pin"),
+                  onPress: togglePin,
+                },
+                {
+                  key: "remind",
+                  icon: "clock" as const,
+                  label: t("mobile.remind.aboutThis"),
+                  onPress: () => onRemind(m),
                 },
               ]
             : []),
@@ -217,18 +269,41 @@ export function ThreadOptions({
   thread,
   mission,
   onMission,
+  onPins,
 }: {
   thread: ThreadInfo;
   mission: Mission | null;
   /** "Transformar em missão" (a plain thread). */
   onMission?: () => void;
+  /** "Fixadas" of the conversation. */
+  onPins?: () => void;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
   const toast = useToast();
   const sheet = useSheet();
+  const qc = useQueryClient();
   const mutate = useThreadMutation(orgId);
+  const follow = useFollowThread(orgId);
+  // The sheet keeps the thread it opened with: "Seguir" reads the live view.
+  const live = useThreadInfo(orgId, thread.id);
+  const following = Boolean(live.data?.following ?? thread.following);
+  const setFollowing = (next: boolean) => {
+    const key = keys.threadInfo(orgId, thread.id);
+    const put = (value: boolean) =>
+      qc.setQueryData<ThreadInfo>(key, (cur) => (cur ? { ...cur, following: value } : cur));
+    put(next);
+    follow.mutate(
+      { threadId: thread.id, following: next },
+      {
+        onError: () => {
+          put(!next);
+          fail();
+        },
+      },
+    );
+  };
   const control = useMissionControl(orgId);
   const close = useCloseMission(orgId);
   const title = thread.title?.trim() || previewOf(thread.rootText);
@@ -269,12 +344,21 @@ export function ThreadOptions({
         }
       />
       <ActionList
-        items={
-          mission
+        items={[
+          {
+            key: "follow",
+            icon: "bell" as const,
+            label: t("mobile.thread.follow"),
+            hint: t("mobile.thread.followHint"),
+            checked: following,
+            onPress: () => setFollowing(!following),
+          },
+          ...(onPins ? [{ key: "pins", icon: "pin" as const, label: t("mobile.pins.title"), onPress: onPins }] : []),
+          ...(mission
             ? [
                 {
                   key: "plan",
-                  icon: "list",
+                  icon: "list" as const,
                   label: t("mobile.thread.seePlan"),
                   onPress: () => {
                     sheet.close();
@@ -327,14 +411,14 @@ export function ThreadOptions({
               ? [
                   {
                     key: "mission",
-                    icon: "target",
+                    icon: "target" as const,
                     label: t("mobile.chat.toMission"),
                     hint: t("mobile.thread.toMissionHint"),
                     onPress: onMission,
                   },
                 ]
-              : []
-        }
+              : []),
+        ]}
       />
       <ActionList
         items={[
@@ -387,6 +471,61 @@ export function ThreadOptions({
                   label: t("mobile.thread.archive"),
                   hint: t("mobile.thread.archiveHint"),
                   onPress: () => act("archive"),
+                },
+              ]
+            : []),
+        ]}
+      />
+    </>
+  );
+}
+
+// ── ⋯ of a channel or a DM ───────────────────────────────────────────────────
+
+export function ChannelOptions({
+  channelId,
+  title,
+  subtitle,
+  leading,
+  agentId,
+  onPins,
+}: {
+  channelId: string;
+  title: string;
+  subtitle?: string;
+  leading: ReactNode;
+  /** An agent's DM: "Perfil". */
+  agentId?: string | null;
+  onPins: () => void;
+}) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const sheet = useSheet();
+  const pins = usePins(orgId, channelId);
+  const count = pins.data?.length ?? 0;
+  return (
+    <>
+      <SheetTitle leading={leading} title={title} {...(subtitle ? { subtitle } : {})} />
+      <ActionList
+        items={[
+          {
+            key: "pins",
+            icon: "pin",
+            label: t("mobile.pins.title"),
+            ...(pins.isSuccess && count === 0 ? { hint: t("mobile.pins.none") } : {}),
+            ...(count > 0 ? { trailing: <Count value={count} max={99} /> } : {}),
+            onPress: onPins,
+          },
+          ...(agentId
+            ? [
+                {
+                  key: "profile",
+                  leading: <AgentFace agentId={agentId} size={20} live={false} />,
+                  label: t("mobile.chat.profile"),
+                  onPress: () => {
+                    sheet.close();
+                    router.push(`/agent/${agentId}`);
+                  },
                 },
               ]
             : []),

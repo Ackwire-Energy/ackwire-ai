@@ -5,17 +5,19 @@ import {
   filterConversations,
   filterCounts,
   isListedThread,
+  unreadConversationCount,
   unreadConversations,
 } from "../../src/features/chats/logic";
 import { at, thread } from "./fixtures";
 
-const channel = (id: string, name: string, isMember = true): Channel => ({
+const channel = (id: string, name: string, isMember = true, over: Partial<Channel> = {}): Channel => ({
   id,
   name,
   topic: "",
   visibility: "public",
   isMember,
   createdAt: at(1000),
+  ...over,
 });
 
 const dm = (channelId: string, name: string, unread: number, minutesAgo: number | null): DirectMessage => ({
@@ -93,5 +95,62 @@ describe("the list", () => {
     expect(filterConversations(rows, "all")).toHaveLength(5);
     expect(filterCounts(rows)).toEqual({ all: 5, unread: 1, threads: 1, dm: 2 });
     expect(unreadConversations(rows)).toBe(1);
+  });
+});
+
+describe("channels with their last message and unread", () => {
+  const rows = buildConversations({
+    channels: [
+      channel("c1", "geral", true, {
+        unreadCount: 3,
+        lastMessage: {
+          id: "m1",
+          authorType: "person",
+          authorId: "u2",
+          authorName: "Ana",
+          preview: "**Subiu** a página nova",
+          createdAt: at(2),
+        },
+      }),
+      channel("c2", "marketing", true, { unreadCount: 0, lastMessage: null }),
+      channel("c3", "secreto", false, { unreadCount: 7 }),
+    ],
+    dms: [dm("d1", "Dev", 1, 10), dm("d2", "Iris", 0, 20)],
+    threads: [],
+  });
+
+  test("a channel sorts by its last message and says who wrote it", () => {
+    expect(rows.map((r) => r.key)).toEqual(["c:c1", "d:d1", "d:d2", "c:c2"]);
+    const geral = rows[0];
+    expect(geral?.kind === "channel" ? geral.last : null).toEqual({
+      author: { type: "person", id: "u2" },
+      name: "Ana",
+      text: "Subiu a página nova",
+    });
+    expect(geral?.unread).toBe(3);
+  });
+
+  test("Não lidas and the tab badge count channels and DMs with something unread", () => {
+    expect(filterConversations(rows, "unread").map((r) => r.key)).toEqual(["c:c1", "d:d1"]);
+    expect(filterCounts(rows).unread).toBe(2);
+    expect(
+      unreadConversationCount({
+        channels: [
+          channel("c1", "geral", true, { unreadCount: 3 }),
+          channel("c2", "marketing", true),
+          channel("c3", "secreto", false, { unreadCount: 7 }),
+        ],
+        dms: [dm("d1", "Dev", 1, 10), dm("d2", "Iris", 0, 20)],
+      }),
+    ).toBe(2);
+  });
+
+  test("after reading a channel its row has nothing unread", () => {
+    const read = buildConversations({
+      channels: [channel("c1", "geral", true, { unreadCount: 0 })],
+      dms: [],
+      threads: [],
+    });
+    expect(unreadConversations(read)).toBe(0);
   });
 });
