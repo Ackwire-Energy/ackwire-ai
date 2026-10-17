@@ -1,4 +1,11 @@
-import { accessMatrix, getAgentAccess, setAgentAccess } from "@agenteschat/engine";
+import {
+  accessMatrix,
+  getAgentAccess,
+  getAgentRepositories,
+  MAX_AGENT_REPOSITORIES,
+  setAgentAccess,
+  setAgentRepositories,
+} from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
 
@@ -85,6 +92,57 @@ export function accessRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
       return c.json(await setAgentAccess(db, c.get("user").id, orgId, agentId, c.req.valid("json")), 200);
+    },
+  );
+
+  const Repositories = z
+    .object({
+      repositories: z.array(z.string()).openapi({
+        description:
+          "owner/name or owner/* (a whole account), in order: the first is where the agent starts. Empty = every repository.",
+      }),
+    })
+    .openapi("AgentRepositories");
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agents/{agentId}/repositories",
+      tags,
+      security,
+      summary: "The GitHub repositories the agent may use, in order (empty = every repository)",
+      request: { params: AgentParams },
+      responses: { 200: json(Repositories), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      return c.json({ repositories: await getAgentRepositories(db, c.get("user").id, orgId, agentId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/agents/{agentId}/repositories",
+      tags,
+      security,
+      summary: "Replace the agent's GitHub repositories (admins or its owner); audited",
+      request: {
+        params: AgentParams,
+        body: body(z.object({ repositories: z.array(z.string().max(220)).max(MAX_AGENT_REPOSITORIES) })),
+      },
+      responses: { 200: json(Repositories), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      const repositories = await setAgentRepositories(
+        db,
+        c.get("user").id,
+        orgId,
+        agentId,
+        c.req.valid("json").repositories,
+      );
+      return c.json({ repositories }, 200);
     },
   );
 

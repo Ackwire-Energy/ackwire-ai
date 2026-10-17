@@ -106,3 +106,28 @@ export async function appTokenForRepo(
   });
   return body.token;
 }
+
+/**
+ * A read-only token for a whole installation of this organization (lists
+ * its repositories). Null when the installation isn't bound to the org.
+ */
+export async function installationReadToken(
+  app: GitHubAppConfig,
+  http: GitHubHttp,
+  tenant: { db: Database; orgId: string },
+  installationId: number,
+): Promise<string | null> {
+  if (!(await boundToOrg(tenant.db, tenant.orgId, installationId))) return null;
+  const res = await http.fetch(`${http.apiUrl}/app/installations/${installationId}/access_tokens`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${appJwt(app)}`,
+      accept: "application/vnd.github+json",
+      "content-type": "application/json",
+      "user-agent": "agentes.chat",
+    },
+    body: JSON.stringify({ permissions: { metadata: "read" } }),
+  });
+  if (!res.ok) return null;
+  return ((await res.json()) as { token?: string }).token ?? null;
+}

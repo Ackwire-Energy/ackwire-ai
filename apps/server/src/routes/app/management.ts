@@ -139,6 +139,11 @@ const Run = z
     outputTokens: z.number(),
     createdAt: z.string(),
     finishedAt: z.string().nullable(),
+    repo: z.string().nullable().openapi({ description: "GitHub repository it worked in (owner/name)." }),
+    deniedRepo: z
+      .string()
+      .nullable()
+      .openapi({ description: "GitHub repository it was refused (not in the agent's repositories)." }),
   })
   .openapi("Run");
 

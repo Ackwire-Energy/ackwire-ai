@@ -58,6 +58,8 @@ export * from "./git/github-app-installs";
 export * from "./git/inflate";
 export * from "./git/pack";
 export * from "./git/proxy";
+export * from "./git/repo-listing";
+export * from "./git/repos";
 export * from "./git/tools";
 export * from "./invite-requests";
 export * from "./issue-tools";

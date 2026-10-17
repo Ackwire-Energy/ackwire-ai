@@ -1,10 +1,12 @@
-import { githubAppConfig } from "@agenteschat/config";
+import { connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import {
   completeGitHubAppInstall,
+  forgetOrgRepositories,
   type GitHubAppInstallDeps,
   githubAppInstallationView,
   handleGitHubAppWebhook,
   listGitHubAppInstallations,
+  listOrgRepositories,
   removeGitHubAppInstallation,
   startGitHubAppInstall,
   validGitHubAppSignature,
@@ -123,8 +125,54 @@ export function githubAppRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, installationId } = c.req.valid("param");
       await removeGitHubAppInstallation(deps.db, c.get("user").id, orgId, installationId);
+      forgetOrgRepositories(orgId);
       return c.body(null, 204);
     },
+  );
+
+  const Repository = z.object({
+    fullName: z.string(),
+    owner: z.string(),
+    name: z.string(),
+    private: z.boolean(),
+    updatedAt: z.string().nullable(),
+  });
+  const listing = {
+    db: deps.db,
+    connectors: {
+      db: deps.db,
+      keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers],
+      oauthApps: connectorOAuthApps(deps.config),
+      publicUrl: deps.config.PUBLIC_URL,
+      http: deps.extras?.http,
+    },
+    app: install.app,
+    github: install.http,
+  };
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/github/repositories",
+      tags,
+      security,
+      summary:
+        "Repositories the organization's GitHub reaches (its connection and the app's installations), by account",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z
+            .object({
+              connected: z.boolean(),
+              accounts: z.array(z.object({ login: z.string(), type: z.string(), repositories: z.array(Repository) })),
+              truncated: z.boolean(),
+            })
+            .openapi("GitHubRepositories"),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => c.json(await listOrgRepositories(listing, c.get("user").id, c.req.valid("param").orgId), 200),
   );
 
   app.openapi(
@@ -154,11 +202,12 @@ export function githubAppRoutes(deps: AppDeps) {
       if (q.setup_action === "request") return fail("requested");
       if (q.error || !q.state || !q.code || !q.installation_id) return fail(q.error ?? "missing_installation");
       try {
-        const { returnTo } = await completeGitHubAppInstall(install, c.get("user"), {
+        const { installation, returnTo } = await completeGitHubAppInstall(install, c.get("user"), {
           state: q.state,
           code: q.code,
           installationId: q.installation_id,
         });
+        forgetOrgRepositories(installation.orgId);
         const sep = returnTo.includes("?") ? "&" : "?";
         return c.redirect(`${base}${returnTo}${sep}github_app=installed`, 302);
       } catch (error) {
