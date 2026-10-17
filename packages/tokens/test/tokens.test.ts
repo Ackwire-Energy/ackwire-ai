@@ -116,7 +116,9 @@ describe("@agenteschat/tokens equals tokens.css", () => {
     for (const [key, value] of Object.entries(radius)) expect<unknown>(value).toBe(px(`radius-${key}`));
     const cssRadii = [...sharedVars.keys()].filter((k) => k.startsWith("radius-") && k !== "radius-agent");
     expect<unknown>(cssRadii.map((k) => k.slice("radius-".length)).sort()).toEqual(Object.keys(radius).sort());
-    expect<unknown>(agentRadius.map((v) => `${Math.round(v * 100)}%`).join(" ")).toBe(sharedVars.get("radius-agent") ?? "");
+    expect<unknown>(agentRadius.map((v) => `${Math.round(v * 100)}%`).join(" ")).toBe(
+      sharedVars.get("radius-agent") ?? "",
+    );
     for (const [key, value] of Object.entries(space)) expect<unknown>(value).toBe(px(`space-${key}`));
     for (const [key, value] of Object.entries(text)) expect<unknown>(value).toBe(px(`text-${key}`));
     for (const [key, value] of Object.entries(tracking)) expect<unknown>(value).toBe(px(`track-${key}`));
