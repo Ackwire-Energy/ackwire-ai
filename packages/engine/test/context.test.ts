@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
-import { buildRunContext, type Message, postPersonMessage, toTurns } from "../src";
+import { buildRunContext, insertMessage, type Message, postPersonMessage, toTurns } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 const msg = (over: Partial<Message>): Message =>
@@ -71,6 +71,27 @@ test("system prompt carries org context, agent instructions and channel; history
     },
   ]);
   expect(ctx.stats.historyMessages).toBe(3);
+});
+
+test("a new top-level message reads the replies shown under earlier messages, not only the top level", async () => {
+  const post = (body: string) =>
+    postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body });
+  const earlier = await post("@dev clone the repo");
+  await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    threadId: earlier.id,
+    author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+    body: "The clone hung.",
+  });
+  const trigger = await post("@dev why did it hang?");
+  const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+  const ctx = await buildRunContext(f.db, runs[0] as NonNullable<(typeof runs)[0]>, f.agent, { maxMessages: 10 });
+  expect(ctx.messages).toEqual([
+    { role: "user", content: "[ana]: @dev clone the repo" },
+    { role: "assistant", content: "The clone hung." },
+    { role: "user", content: "[ana]: @dev why did it hang?" },
+  ]);
 });
 
 test("history is capped at maxMessages, keeping the most recent", async () => {

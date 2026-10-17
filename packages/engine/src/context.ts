@@ -179,13 +179,15 @@ export async function buildRunContext(
           )
           .orderBy(desc(messages.createdAt), desc(messages.id))
           .limit(Math.max(1, options.maxMessages - 1))
-      : db
+      : // The channel as people see it: top-level messages and the replies shown under them
+        // (agents answer in a thread per message), minus this thread (read above).
+        db
           .select()
           .from(messages)
           .where(
             and(
               scope,
-              isNull(messages.threadId),
+              sql`${messages.threadId} is distinct from ${run.threadRootId}::uuid`,
               sql`${messages.createdAt} <= ${rootTime}`,
               ne(messages.id, run.threadRootId),
             ),
@@ -236,6 +238,9 @@ export async function buildRunContext(
   // One statement, two parts: what agents already did in this thread (or DM),
   // and this agent's own work in other conversations the requester is in.
   const requester = trigger.authorUserId;
+  // A quote reply ("why did the clone hang?"): what the run behind the quoted message did counts as here.
+  const quoted = (trigger.meta?.replyTo as { messageId?: unknown } | undefined)?.messageId;
+  const quotedId = typeof quoted === "string" ? quoted : null;
   const actionRows = rowsOf<ActionRow>(
     await db.execute(sql`(select s.data, s.created_at, a.handle, false as elsewhere, c.kind, c.name
         from agent_run_steps s
@@ -243,7 +248,14 @@ export async function buildRunContext(
         join agents a on a.id = r.agent_id
         join channels c on c.id = r.channel_id
         where r.org_id = ${run.orgId}::uuid and r.channel_id = ${run.channelId}::uuid
-          ${channel.kind !== "channel" ? sql`` : sql`and r.thread_root_id = ${run.threadRootId}::uuid`}
+          ${
+            channel.kind !== "channel"
+              ? sql``
+              : quotedId
+                ? sql`and (r.thread_root_id = ${run.threadRootId}::uuid or r.id = (select q.agent_run_id from messages q
+                    where q.id = ${quotedId}::uuid and q.org_id = ${run.orgId}::uuid))`
+                : sql`and r.thread_root_id = ${run.threadRootId}::uuid`
+          }
           and r.id <> ${run.id}::uuid and s.kind = 'tool_result'
         order by s.created_at desc limit 12)
       union all
