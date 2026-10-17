@@ -22,7 +22,7 @@ import { createLocalKeyWrapper, drainLocalRuns, enableCaches } from "@agentescha
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/providers";
 import { createApp } from "./app";
-import { createAuth } from "./auth";
+import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
 import { createLogger } from "./logger";
 import { createMachineSockets } from "./realtime/machines";
@@ -154,6 +154,7 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
         context: engine.context,
         sandbox: engine.sandbox,
         gitProxy: engine.sandbox.provider ? engine.gitProxy : undefined,
+        appleRevoke: appleTokenRevoker(config),
       },
     },
     log,

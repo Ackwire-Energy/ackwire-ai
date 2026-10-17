@@ -21,7 +21,7 @@ import { type MissionDeps, missionOfThread, missionRole, reactivateMission } fro
 import type { MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
-import { deliverPush } from "./push";
+import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import {
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
@@ -406,6 +406,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A notification for a person's phones (ADR 0035): skipped if read, done or snoozed meanwhile.
     "push.send": async (job) => {
       await deliverPush({ db: deps.db, push: deps.push }, String(job.payload.notificationId));
+    },
+    // Receipts of a push ~15 min later: tokens whose device is gone are deleted.
+    "push.receipts": async (job) => {
+      await checkPushReceipts({ db: deps.db, push: deps.push }, pushTicketsOf(job.payload.tickets));
     },
     "context.consolidate": async (job) => {
       if (!deps.context) return;

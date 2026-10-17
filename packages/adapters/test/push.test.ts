@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { createExpoPushSender, createFakePushSender, EXPO_PUSH_URL, PushError, type PushMessage } from "../src";
+import {
+  createExpoPushSender,
+  createFakePushSender,
+  EXPO_PUSH_URL,
+  EXPO_RECEIPTS_URL,
+  PushError,
+  type PushMessage,
+} from "../src";
 
 const msg = (n: number): PushMessage => ({
   to: `ExponentPushToken[t${n}]`,
@@ -43,7 +50,7 @@ describe("Expo push sender", () => {
       priority: "default",
     });
     expect(results.length).toBe(150);
-    expect(results[0]).toEqual({ token: "ExponentPushToken[t0]", ok: true, unregistered: false });
+    expect(results[0]).toEqual({ token: "ExponentPushToken[t0]", ok: true, unregistered: false, ticketId: "x" });
     expect(results[3]).toMatchObject({ ok: false, unregistered: true });
     expect(results[4]).toMatchObject({ ok: false, unregistered: false, error: "too big" });
   });
@@ -80,7 +87,60 @@ describe("Expo push sender", () => {
   });
 });
 
+describe("Expo push receipts", () => {
+  test("asks in batches of 1000; DeviceNotRegistered marks unregistered; missing receipts are left out", async () => {
+    const calls: { url: string; ids: string[] }[] = [];
+    const sender = createExpoPushSender({
+      fetch: (async (url: string, init: RequestInit) => {
+        const { ids } = JSON.parse(String(init.body)) as { ids: string[] };
+        calls.push({ url, ids });
+        const data: Record<string, unknown> = {};
+        for (const id of ids) {
+          if (id === "gone") data[id] = { status: "error", message: "gone", details: { error: "DeviceNotRegistered" } };
+          else if (id === "big")
+            data[id] = { status: "error", message: "too big", details: { error: "MessageTooBig" } };
+          else if (id !== "pending") data[id] = { status: "ok" };
+        }
+        return Response.json({ data });
+      }) as unknown as typeof fetch,
+    });
+    const ids = [...Array.from({ length: 1000 }, (_, i) => `t${i}`), "gone", "big", "pending"];
+    const receipts = await sender.receipts?.(ids);
+    expect(calls.map((c) => [c.url, c.ids.length])).toEqual([
+      [EXPO_RECEIPTS_URL, 1000],
+      [EXPO_RECEIPTS_URL, 3],
+    ]);
+    expect(receipts?.length).toBe(1002);
+    expect(receipts?.find((r) => r.ticketId === "gone")).toEqual({
+      ticketId: "gone",
+      ok: false,
+      unregistered: true,
+      error: "gone",
+    });
+    expect(receipts?.find((r) => r.ticketId === "big")).toMatchObject({ ok: false, unregistered: false });
+    expect(receipts?.some((r) => r.ticketId === "pending")).toBe(false);
+  });
+
+  test("a refused receipts request throws; 5xx retries", async () => {
+    const sender = createExpoPushSender({
+      fetch: (async () => Response.json({ errors: [{ message: "down" }] }, { status: 503 })) as unknown as typeof fetch,
+    });
+    const error = await sender.receipts?.(["a"]).catch((e) => e);
+    expect(error).toBeInstanceOf(PushError);
+    expect((error as PushError).retryable).toBe(true);
+  });
+});
+
 describe("fake push sender", () => {
+  test("tickets of accepted messages; goneLater tokens come back unregistered in receipts", async () => {
+    const fake = createFakePushSender({ goneLater: ["ExponentPushToken[t2]"] });
+    const results = await fake.send([msg(1), msg(2)]);
+    const ids = results.map((r) => r.ticketId ?? "");
+    expect(ids.every(Boolean)).toBe(true);
+    const receipts = await fake.receipts(ids);
+    expect(receipts.map((r) => r.unregistered)).toEqual([false, true]);
+  });
+
   test("records messages and reports unregistered tokens", async () => {
     const fake = createFakePushSender({ unregistered: ["ExponentPushToken[t2]"] });
     const results = await fake.send([msg(1), msg(2)]);

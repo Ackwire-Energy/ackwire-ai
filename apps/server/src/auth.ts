@@ -261,3 +261,39 @@ export function appleClientSecret(input: {
   });
   return `${signingInput}.${signature.toString("base64url")}`;
 }
+
+export const APPLE_REVOKE_URL = "https://appleid.apple.com/auth/revoke";
+
+/** Revokes one Apple token (best effort; throws on failure, callers swallow it). */
+export type AppleTokenRevoker = (token: { value: string; hint: "refresh_token" | "access_token" }) => Promise<void>;
+
+/**
+ * Apple's token revocation (required when an account that signed in with
+ * Apple is deleted), with the same client secret as sign-in, signed fresh
+ * for each call. Null when Sign in with Apple isn't configured. Tests
+ * inject a fake instead (`AppExtras.appleRevoke`).
+ */
+export function appleTokenRevoker(config: Config, http: typeof fetch = fetch): AppleTokenRevoker | null {
+  if (!appleConfigured(config)) return null;
+  const clientId = config.APPLE_CLIENT_ID as string;
+  return async (token) => {
+    const body = new URLSearchParams({
+      client_id: clientId,
+      client_secret: appleClientSecret({
+        clientId,
+        teamId: config.APPLE_TEAM_ID as string,
+        keyId: config.APPLE_KEY_ID as string,
+        privateKey: config.APPLE_PRIVATE_KEY as string,
+      }),
+      token: token.value,
+      token_type_hint: token.hint,
+    });
+    const res = await http(APPLE_REVOKE_URL, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body,
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) throw new Error(`Apple refused the token revocation (${res.status})`);
+  };
+}

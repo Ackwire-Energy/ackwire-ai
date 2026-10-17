@@ -1,9 +1,12 @@
 import {
   archiveChannel,
   channelMembersDetail,
+  listPins,
+  pinMessage,
   removeChannelMember,
   requireChannelAccess,
   setChannelAgentAutoReply,
+  unpinMessage,
   updateChannel,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -18,10 +21,21 @@ import {
   requireSession,
   security,
 } from "./context";
-import { Channel } from "./schemas";
+import { Channel, Message } from "./schemas";
 
 const tags = ["Channels"];
 const ChannelParams = OrgParams.extend({ channelId: z.uuid() });
+const PinParams = ChannelParams.extend({ messageId: z.uuid() });
+const Pin = z
+  .object({
+    messageId: z.uuid(),
+    channelId: z.uuid(),
+    threadId: z.uuid().nullable().openapi({ description: "The message's thread (null: the main timeline)." }),
+    pinnedByUserId: z.string().nullable().openapi({ description: "Null when that person was deleted." }),
+    pinnedAt: z.string(),
+    message: Message,
+  })
+  .openapi("Pin");
 
 /** Channel management beyond chat (`chat.ts`): membership removal; open subscriptions are revoked at once. */
 export function channelRoutes(deps: AppDeps) {
@@ -218,6 +232,58 @@ export function channelRoutes(deps: AppDeps) {
         },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/pins",
+      tags,
+      security,
+      summary: "Pinned messages of a channel or DM, newest pin first",
+      request: { params: ChannelParams },
+      responses: { 200: json(z.object({ pins: z.array(Pin) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      return c.json({ pins: await listPins(db, c.get("user").id, orgId, channelId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/channels/{channelId}/pins/{messageId}",
+      tags,
+      security,
+      summary: "Pin a message (anyone who can post here; pinning again keeps the first pin)",
+      description:
+        "Members of the channel or DM see `message.pinned`. At most 100 pins per conversation (`pins.limit`).",
+      request: { params: PinParams },
+      responses: { 200: json(Pin), ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId, messageId } = c.req.valid("param");
+      return c.json(await pinMessage({ db, pubsub: opts.pubsub }, c.get("user").id, orgId, channelId, messageId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/channels/{channelId}/pins/{messageId}",
+      tags,
+      security,
+      summary: "Unpin a message (anyone who can post here)",
+      description: "Members see `message.unpinned`. Not pinned: nothing changes.",
+      request: { params: PinParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId, messageId } = c.req.valid("param");
+      await unpinMessage({ db, pubsub: opts.pubsub }, c.get("user").id, orgId, channelId, messageId);
+      return c.body(null, 204);
     },
   );
 

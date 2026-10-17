@@ -50,6 +50,7 @@ import type {
   Member,
   Memory,
   Message,
+  MessagePin,
   Mission,
   MissionBrain,
   MissionCommand,
@@ -74,6 +75,7 @@ import type {
   Person,
   Proposal,
   ReactionCount,
+  Reminder,
   RosterMember,
   Routine,
   RoutineRun,
@@ -92,6 +94,7 @@ import type {
   StorageTestResult,
   TaskOutput,
   ThreadFilters,
+  ThreadFollow,
   ThreadInfo,
   ThreadPage,
   TrashedArtifact,
@@ -102,6 +105,7 @@ import type {
   WikiPageSummary,
   WikiTopRead,
   WikiVersion,
+  WorkingRun,
 } from "./types";
 
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
@@ -139,6 +143,29 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
   };
 
   return {
+    pins: {
+      list: async (orgId, channelId) =>
+        (await request<{ pins: MessagePin[] }>(`${org(orgId)}/channels/${enc(channelId)}/pins`)).pins,
+      pin: (orgId, channelId, messageId) =>
+        request<MessagePin>(`${org(orgId)}/channels/${enc(channelId)}/pins/${enc(messageId)}`, { json: {} }),
+      unpin: (orgId, channelId, messageId) =>
+        request<void>(`${org(orgId)}/channels/${enc(channelId)}/pins/${enc(messageId)}`, { method: "DELETE" }),
+    },
+    threadFollows: {
+      follow: (orgId, threadId) =>
+        request<ThreadFollow>(`${org(orgId)}/threads/${enc(threadId)}/follow`, { method: "PUT" }),
+      unfollow: (orgId, threadId) =>
+        request<ThreadFollow>(`${org(orgId)}/threads/${enc(threadId)}/follow`, { method: "DELETE" }),
+    },
+    working: {
+      list: async (orgId) => (await request<{ runs: WorkingRun[] }>(`${org(orgId)}/active-runs`)).runs,
+    },
+    reminders: {
+      create: (orgId, input) => request<Reminder>(`${org(orgId)}/reminders`, { json: input }),
+      list: async (orgId) => (await request<{ reminders: Reminder[] }>(`${org(orgId)}/reminders`)).reminders,
+      cancel: (orgId, reminderId) =>
+        request<Reminder>(`${org(orgId)}/reminders/${enc(reminderId)}`, { method: "DELETE" }),
+    },
     system: {
       health: async () => {
         try {

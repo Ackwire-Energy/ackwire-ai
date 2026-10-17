@@ -1,5 +1,6 @@
 import {
   acceptInvitation,
+  appleSignInTokens,
   avatarFile,
   changeMemberRole,
   countUsers,
@@ -167,7 +168,12 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const user = c.get("user");
+      // Read before the account goes (its sign-in rows are deleted with it).
+      const revoke = deps.extras?.appleRevoke;
+      const appleTokens = revoke ? await appleSignInTokens(db, user.id) : [];
       await deleteAccount(db, user.id, { pubsub: deps.adapters.pubsub });
+      // Apple wants its tokens revoked when the account is deleted (best effort: the account is already gone).
+      if (revoke) await Promise.all(appleTokens.map((token) => revoke(token).catch(() => undefined)));
       // Their photo files (best effort: the account is already gone).
       const blobs = deps.adapters.platformBlobs;
       const photos = await blobs.list(`avatars/${user.id}/`).catch(() => [] as string[]);

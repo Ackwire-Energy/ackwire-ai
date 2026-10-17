@@ -465,3 +465,48 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     expect(calls.every((c) => c.init.method === "GET" || c.init.body !== undefined)).toBe(true);
   });
 });
+
+describe("phone app endpoints", () => {
+  test("pins, thread follows, working runs and reminders hit their routes", async () => {
+    const o = "/api/app/organizations/o1";
+    const pin = { messageId: "m1", channelId: "c1", threadId: null, pinnedByUserId: "u1", pinnedAt: "t", message: {} };
+    const reminder = { id: "r1", message: "x", at: "t", timezone: "UTC", description: "", forUserId: "u1" };
+    const { fetch, calls } = fakeFetch({
+      [`GET ${o}/channels/c1/pins`]: { status: 200, body: { pins: [pin] } },
+      [`POST ${o}/channels/c1/pins/m1`]: { status: 200, body: pin },
+      [`DELETE ${o}/channels/c1/pins/m1`]: { status: 204 },
+      [`PUT ${o}/threads/t1/follow`]: { status: 200, body: { threadId: "t1", channelId: "c1", following: true } },
+      [`DELETE ${o}/threads/t1/follow`]: { status: 200, body: { threadId: "t1", channelId: "c1", following: false } },
+      [`GET ${o}/active-runs`]: { status: 200, body: { runs: [{ runId: "r" }] } },
+      [`POST ${o}/reminders`]: { status: 201, body: reminder },
+      [`GET ${o}/reminders`]: { status: 200, body: { reminders: [reminder] } },
+      [`DELETE ${o}/reminders/r1`]: { status: 200, body: { ...reminder, done: true } },
+    });
+    const api = createHttpApi({ fetch });
+    expect(await api.pins?.list("o1", "c1")).toEqual([pin] as never);
+    expect((await api.pins?.pin("o1", "c1", "m1"))?.messageId).toBe("m1");
+    await api.pins?.unpin("o1", "c1", "m1");
+    expect((await api.threadFollows?.follow("o1", "t1"))?.following).toBe(true);
+    expect((await api.threadFollows?.unfollow("o1", "t1"))?.following).toBe(false);
+    expect((await api.working?.list("o1"))?.map((r) => r.runId)).toEqual(["r"]);
+    await api.reminders?.create("o1", { channelId: "c1", messageId: "m1", at: "2030-01-01T09:00:00Z" });
+    expect(JSON.parse(String(calls.at(-1)?.init.body))).toEqual({
+      channelId: "c1",
+      messageId: "m1",
+      at: "2030-01-01T09:00:00Z",
+    });
+    expect((await api.reminders?.list("o1"))?.length).toBe(1);
+    expect((await api.reminders?.cancel("o1", "r1"))?.done).toBe(true);
+    expect(calls.map((c) => c.init.method)).toEqual([
+      "GET",
+      "POST",
+      "DELETE",
+      "PUT",
+      "DELETE",
+      "GET",
+      "POST",
+      "GET",
+      "DELETE",
+    ]);
+  });
+});

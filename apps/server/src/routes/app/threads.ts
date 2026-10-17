@@ -8,6 +8,7 @@ import {
   moveContextIntoThread,
   reopenThread,
   returnContextToChannel,
+  setThreadFollow,
   type ThreadDeps,
   unarchiveThread,
   updateThread,
@@ -63,6 +64,10 @@ const Thread = z
     working: z.boolean().openapi({ description: "An agent run is in progress (or waiting) in this thread." }),
     needsYou: z.boolean(),
     canManage: z.boolean().openapi({ description: "You may close, archive, rename or change the context." }),
+    following: z.boolean().openapi({
+      description:
+        "You follow it: notified of its replies, which count as unread in the channel. By default whoever started it or wrote in it; `PUT`/`DELETE …/follow` choose. Left out of `thread.updated` events.",
+    }),
     mission: z
       .object({
         id: z.uuid(),
@@ -255,6 +260,31 @@ export function threadRoutes(deps: AppDeps) {
       async (c) => {
         const { orgId, threadId } = c.req.valid("param");
         return c.json(await run(threads(), c.get("user").id, orgId, threadId), 200);
+      },
+    );
+  }
+
+  const Follow = z.object({ threadId: z.uuid(), channelId: z.uuid(), following: z.boolean() }).openapi("ThreadFollow");
+  for (const [method, following] of [
+    ["put", true],
+    ["delete", false],
+  ] as const) {
+    app.openapi(
+      createRoute({
+        method,
+        path: "/organizations/{orgId}/threads/{threadId}/follow",
+        tags,
+        security,
+        summary: following
+          ? "Follow a thread: be notified of its replies, which count as unread in the channel"
+          : "Unfollow a thread: no reply notifications nor unread from it, even where you wrote (mentions still notify)",
+        description: "Whoever reads the thread's channel. Your other devices hear `thread.follow` on your own topic.",
+        request: { params: ThreadParams },
+        responses: { 200: json(Follow), ...errors },
+      }),
+      async (c) => {
+        const { orgId, threadId } = c.req.valid("param");
+        return c.json(await setThreadFollow(threads(), c.get("user").id, orgId, threadId, following), 200);
       },
     );
   }

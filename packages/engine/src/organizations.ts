@@ -437,6 +437,28 @@ export async function deleteAccount(
   return { deletedOrgIds: deleted };
 }
 
+/**
+ * The Apple tokens of a person's "Sign in with Apple" accounts, to revoke
+ * when the account is deleted (read before `deleteAccount`, which deletes
+ * them). The refresh token when Better Auth kept one, else the access token.
+ */
+export async function appleSignInTokens(
+  db: Database,
+  userId: string,
+): Promise<{ value: string; hint: "refresh_token" | "access_token" }[]> {
+  const rows = await db
+    .select({ refreshToken: schema.accounts.refreshToken, accessToken: schema.accounts.accessToken })
+    .from(schema.accounts)
+    .where(and(eq(schema.accounts.userId, userId), eq(schema.accounts.providerId, "apple")));
+  return rows.flatMap((r) =>
+    r.refreshToken
+      ? [{ value: r.refreshToken, hint: "refresh_token" as const }]
+      : r.accessToken
+        ? [{ value: r.accessToken, hint: "access_token" as const }]
+        : [],
+  );
+}
+
 // ── Invitations ──────────────────────────────────────────────────────────────
 
 export const INVITATION_TTL_DAYS = 7;

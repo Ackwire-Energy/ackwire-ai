@@ -45,7 +45,10 @@ The approved flows and look are in `docs/design/telas/Mobile.html`.
 - Sign in with Apple is a social provider when `APPLE_CLIENT_ID`/`APPLE_TEAM_ID`/`APPLE_KEY_ID`/`APPLE_PRIVATE_KEY` are set, and `authConfig` lists it (App Store 4.8, required because we offer Google).
 - The app sells nothing. Plans are bought on the web.
 
-**Known gaps (follow-ups):** Expo push receipts are not read yet (only immediate tickets remove dead tokens); deleting an account that signed in with Apple does not revoke the Apple token yet; the Apple client secret is signed at boot and lasts 150 days, so the server must restart within that window.
+- Push receipts: each send that got tickets schedules a `push.receipts` job about 15 minutes later; it asks Expo (`/--/api/v2/push/getReceipts`) and deletes the tokens whose receipt says `DeviceNotRegistered`.
+- Deleting an account that signed in with Apple revokes its Apple token (`https://appleid.apple.com/auth/revoke`, the refresh token when Better Auth kept one, else the access token), best effort, after the account is gone, with a client secret signed for the call.
+
+**Known gaps (follow-ups):** the Apple client secret used for sign-in is signed at boot and lasts 150 days, so the server must restart within that window. A native iOS sign-in (id token only) stores no Apple token, so there is nothing to revoke for it.
 
 ## Consequences
 

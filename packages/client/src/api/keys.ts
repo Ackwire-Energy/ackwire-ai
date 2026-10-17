@@ -100,4 +100,7 @@ export const keys = {
   wikiHistory: (orgId: string, slug: string) => ["org", orgId, "wiki", "history", slug] as const,
   wikiGraph: (orgId: string) => ["org", orgId, "wiki", "graph"] as const,
   wikiReads: (orgId: string) => ["org", orgId, "wiki", "reads"] as const,
+  pins: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "pins"] as const,
+  working: (orgId: string) => ["org", orgId, "working"] as const,
+  reminders: (orgId: string) => ["org", orgId, "reminders"] as const,
 };

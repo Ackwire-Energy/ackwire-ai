@@ -33,6 +33,7 @@ import type {
   ArtifactFilters,
   CalendarEventInput,
   CalendarEventPatch,
+  Channel,
   ForumParticipantsInput,
   ForumPostInput,
   ForumSuggestedIssue,
@@ -50,6 +51,7 @@ import type {
   NotificationFilter,
   OrgSettings,
   ReactionCount,
+  ReminderInput,
   Role,
   RoutineInput,
   RoutinePatch,
@@ -1954,6 +1956,124 @@ export function useNotificationReply(orgId: string) {
           void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
           return { kind: "forum" as const };
       }
+    },
+  });
+}
+
+// ── Phone app: read state, pins, following, working now, reminders ─────────────
+
+/** The optional parts of the client (`ApiClient.pins`…): throws when this client lacks one. */
+function part<K extends "pins" | "threadFollows" | "working" | "reminders">(
+  api: ApiClient,
+  name: K,
+): NonNullable<ApiClient[K]> {
+  const value = api[name];
+  if (!value) throw new Error(`This API client has no ${name}`);
+  return value as NonNullable<ApiClient[K]>;
+}
+
+/** Marks a channel or DM read now; the channel list shows it with no unread at once. */
+export function useMarkChannelRead(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (channelId: string) => api.dms.markRead(orgId, channelId),
+    onMutate: (channelId) => {
+      qc.setQueryData<Channel[]>(keys.channels(orgId), (list) =>
+        list?.map((c) => (c.id === channelId ? { ...c, unreadCount: 0 } : c)),
+      );
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
+    },
+  });
+}
+
+/** A channel's pinned messages, newest pin first (live: `message.pinned` / `message.unpinned`). */
+export function usePins(orgId: string, channelId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.pins(orgId, channelId),
+    queryFn: () => part(api, "pins").list(orgId, channelId),
+    enabled: enabled && Boolean(api.pins),
+    staleTime: 30_000,
+  });
+}
+
+/** Pin or unpin a message; refreshes the pins and the conversation (its `pinned` marks). */
+export function usePinMessage(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ channelId, messageId, pinned }: { channelId: string; messageId: string; pinned: boolean }) => {
+      const pins = part(api, "pins");
+      if (pinned) await pins.pin(orgId, channelId, messageId);
+      else await pins.unpin(orgId, channelId, messageId);
+    },
+    onSuccess: (_v, { channelId }) => {
+      void qc.invalidateQueries({ queryKey: keys.pins(orgId, channelId) });
+      void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
+      void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId, "thread"] });
+    },
+  });
+}
+
+/** Follow or unfollow a thread; the thread views and the channel list (unread) follow. */
+export function useFollowThread(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ threadId, following }: { threadId: string; following: boolean }) => {
+      const follows = part(api, "threadFollows");
+      return following ? follows.follow(orgId, threadId) : follows.unfollow(orgId, threadId);
+    },
+    onSuccess: (result) => {
+      qc.setQueryData<ThreadInfo>(keys.threadInfo(orgId, result.threadId), (t) =>
+        t ? { ...t, following: result.following } : t,
+      );
+      void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
+      void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+    },
+  });
+}
+
+/** "Trabalhando agora": agent runs in progress where you are (refetch on `agent.run` / `run.finished`). */
+export function useWorkingRuns(orgId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.working(orgId),
+    queryFn: () => part(api, "working").list(orgId),
+    enabled: enabled && Boolean(api.working),
+    staleTime: 10_000,
+  });
+}
+
+/** Your pending reminders, soonest first. */
+export function useReminders(orgId: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.reminders(orgId),
+    queryFn: () => part(api, "reminders").list(orgId),
+    enabled: enabled && Boolean(api.reminders),
+    staleTime: 30_000,
+  });
+}
+
+/** "Lembrar" (create) and cancel. Errors are the caller's to say (translated by code). */
+export function useReminderAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (action: { type: "create"; input: ReminderInput } | { type: "cancel"; id: string }) => {
+      const reminders = part(api, "reminders");
+      return action.type === "create" ? reminders.create(orgId, action.input) : reminders.cancel(orgId, action.id);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.reminders(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
     },
   });
 }

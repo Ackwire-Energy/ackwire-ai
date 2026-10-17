@@ -195,3 +195,50 @@ export const threads = pgTable(
     index().on(t.orgId, t.channelId, t.state),
   ],
 );
+
+/**
+ * A person's explicit choice about a thread (the phone app's "Seguir"). No
+ * row: they follow the threads they started or wrote in (D46). `following`
+ * true adds them (notified of replies, replies count as unread in the
+ * channel); false mutes them even where they wrote. Keyed by the root
+ * message (no foreign key to the partitioned `messages`).
+ */
+export const threadFollows = pgTable(
+  "thread_follows",
+  {
+    orgId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    rootMessageId: uuid().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    following: boolean().notNull(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.rootMessageId, t.userId] }),
+    foreignKey({ columns: [t.orgId, t.channelId], foreignColumns: [channels.orgId, channels.id] }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * Messages pinned in a channel (anyone who can post there pins). The
+ * message's `created_at` (its partition key) is kept for a direct lookup;
+ * no foreign key to the partitioned `messages`.
+ */
+export const messagePins = pgTable(
+  "message_pins",
+  {
+    orgId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    messageId: uuid().notNull(),
+    messageCreatedAt: timestamp({ withTimezone: true }).notNull(),
+    pinnedByUserId: text().references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.channelId, t.messageId] }),
+    foreignKey({ columns: [t.orgId, t.channelId], foreignColumns: [channels.orgId, channels.id] }).onDelete("cascade"),
+    index().on(t.channelId, t.createdAt),
+  ],
+);

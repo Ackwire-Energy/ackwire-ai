@@ -1,10 +1,13 @@
 import {
+  cancelReminder,
   canViewCost,
+  createReminderFromApp,
   createRoutine,
   deleteRoutine,
   describeRule,
   describeWhen,
   duplicateRoutine,
+  listMyReminders,
   listRoutineRuns,
   listRoutines,
   localDateTimeOf,
@@ -37,6 +40,19 @@ import {
 
 const tags = ["Routines"];
 const Event = z.enum(ROUTINE_EVENTS);
+const Reminder = z
+  .object({
+    id: z.uuid().openapi({ description: "A one-off routine: also listed in Routines." }),
+    message: z.string(),
+    at: z.string().nullable().openapi({ description: "When it fires; null once done." }),
+    timezone: z.string(),
+    description: z.string().openapi({ description: 'When, in English ("tomorrow, Oct 16, at 09:00 (…)").' }),
+    forUserId: z.string(),
+    channelId: z.uuid(),
+    threadId: z.uuid().nullable(),
+    done: z.boolean(),
+  })
+  .openapi("Reminder");
 const Target = z.union([
   z.object({ type: z.literal("channel"), channelId: z.uuid() }),
   z.object({ type: z.literal("dm") }),
@@ -553,6 +569,76 @@ export function routineRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, routineId } = c.req.valid("param");
       return c.json({ runs: await listRoutineRuns(db, c.get("user").id, orgId, routineId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/reminders",
+      tags,
+      security,
+      summary: '"Remind me": a one-off reminder about a message or a conversation',
+      description:
+        "Like an agent's reminder (D32): at `at` an agent of the conversation posts \"@you Reminder: …\" where the message is (its thread; in a DM, the DM), which notifies you. The agent: `agentId`, else the message's author when it is an agent, else the first agent there you can talk to (`reminder.no_agent` when none). Text: `text`, else the message's first line. Refused: `when.past`, `when.too_far` (over a year).",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            channelId: z.uuid(),
+            threadId: z.uuid().nullable().optional().openapi({ description: "Post in this thread (its root id)." }),
+            messageId: z.uuid().nullable().optional().openapi({ description: "The message to be reminded of." }),
+            agentId: z.uuid().nullable().optional(),
+            at: z.iso.datetime({ offset: true }),
+            text: z.string().max(2000).nullable().optional(),
+            timezone: z.string().max(64).nullable().optional().openapi({
+              description: "How the time is described; default: yours, else the workspace's.",
+            }),
+          }),
+        ),
+      },
+      responses: { 201: json(Reminder, "Created"), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      const reminder = await createReminderFromApp(routines, c.get("user").id, orgId, {
+        ...input,
+        at: new Date(input.at),
+      });
+      return c.json(reminder, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/reminders",
+      tags,
+      security,
+      summary: "Your pending reminders in conversations, soonest first",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ reminders: z.array(Reminder) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ reminders: await listMyReminders(db, c.get("user").id, orgId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/reminders/{reminderId}",
+      tags,
+      security,
+      summary: "Cancel one of your reminders (someone else's is not found)",
+      request: { params: OrgParams.extend({ reminderId: z.uuid() }) },
+      responses: { 200: json(Reminder), ...errors },
+    }),
+    async (c) => {
+      const { orgId, reminderId } = c.req.valid("param");
+      return c.json(await cancelReminder(db, c.get("user").id, orgId, reminderId), 200);
     },
   );
 

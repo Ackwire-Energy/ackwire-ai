@@ -65,6 +65,7 @@ import type {
   Member,
   Memory,
   Message,
+  MessagePin,
   Mission,
   MissionBrain,
   MissionCommand,
@@ -95,6 +96,8 @@ import type {
   Person,
   Proposal,
   ReactionCount,
+  Reminder,
+  ReminderInput,
   Role,
   RosterMember,
   Routine,
@@ -125,6 +128,7 @@ import type {
   ThreadAction,
   ThreadCreateInput,
   ThreadFilters,
+  ThreadFollow,
   ThreadInfo,
   ThreadPage,
   ThreadPatch,
@@ -140,6 +144,7 @@ import type {
   WikiTopRead,
   WikiUpdateInput,
   WikiVersion,
+  WorkingRun,
 } from "./types";
 
 /**
@@ -761,6 +766,34 @@ export interface ApiClient {
     createLink(orgId: string): Promise<{ url: string; expiresAt: string }>;
     /** Expired invitation: ask the inviter for a new one. */
     requestNew(token: string): Promise<void>;
+  };
+  /**
+   * Phone app additions. Optional so older fakes and clients still type-check;
+   * `createHttpApi` has them all (hooks throw when a client lacks one).
+   */
+  /** Pinned messages of a channel or DM (anyone who can post there pins). */
+  pins?: {
+    /** Newest pin first. */
+    list(orgId: string, channelId: string): Promise<MessagePin[]>;
+    /** Pinning again keeps the first pin. `pins.limit` past 100. */
+    pin(orgId: string, channelId: string, messageId: string): Promise<MessagePin>;
+    unpin(orgId: string, channelId: string, messageId: string): Promise<void>;
+  };
+  /** Follow or mute a thread (replies notify and count as unread only while you follow). */
+  threadFollows?: {
+    follow(orgId: string, threadId: string): Promise<ThreadFollow>;
+    unfollow(orgId: string, threadId: string): Promise<ThreadFollow>;
+  };
+  /** "Trabalhando agora": agent runs in progress in the conversations you are in (any member). */
+  working?: {
+    list(orgId: string): Promise<WorkingRun[]>;
+  };
+  /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
+  reminders?: {
+    create(orgId: string, input: ReminderInput): Promise<Reminder>;
+    /** Your pending ones, soonest first. */
+    list(orgId: string): Promise<Reminder[]>;
+    cancel(orgId: string, reminderId: string): Promise<Reminder>;
   };
   /** Public waiting list (`POST /api/waitlist`, outside `/api/app`): same answer whether or not the email was there. */
   waitlist: {

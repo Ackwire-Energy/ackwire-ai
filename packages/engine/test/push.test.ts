@@ -4,6 +4,7 @@ import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
   approvalIsHighRisk,
+  checkPushReceipts,
   createJobHandlers,
   deleteAccount,
   drainOutbox,
@@ -12,8 +13,10 @@ import {
   markNotificationRead,
   notify,
   openDm,
+  PUSH_RECEIPTS_DELAY_MS,
   postPersonMessage,
   pushLocale,
+  pushTicketsOf,
   registerPushDevice,
   renderPush,
   unregisterPushDevice,
@@ -32,12 +35,12 @@ const TOKEN_BIA = "ExponentPushToken[bia-phone-0001]";
 const TOKEN_BIA_EN = "ExponentPushToken[bia-tablet-0001]";
 
 /** Bia in #general with a phone (pt-BR), and the fake sender wired into the job handlers. */
-async function withPhone(options: { unregistered?: string[] } = {}) {
+async function withPhone(options: { unregistered?: string[]; goneLater?: string[] } = {}) {
   const bia = await addMember(f.db, f.org.id, "member", "bia");
   await listMembers(f.db, f.org.id); // assigns handles
   await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
   await registerPushDevice(f.db, bia.id, { token: TOKEN_BIA, platform: "ios", locale: "pt-BR" });
-  const push = createFakePushSender({ unregistered: options.unregistered });
+  const push = createFakePushSender({ unregistered: options.unregistered, goneLater: options.goneLater });
   const handlers = createJobHandlers({ ...f.jobDeps, push });
   const drain = () => drainOutbox(f.db, handlers);
   return { bia, push, drain };
@@ -168,6 +171,37 @@ describe("push delivery", () => {
     await drain();
     expect(push.sent).toHaveLength(0);
     expect(await listPushDevices(f.db, bia.id)).toEqual([]);
+  });
+
+  test("receipts ~15 min later: a device gone since is deleted, a working one stays", async () => {
+    f = await setup();
+    const { bia, push, drain } = await withPhone({ goneLater: [TOKEN_BIA] });
+    await registerPushDevice(f.db, bia.id, { token: TOKEN_BIA_EN, platform: "android", locale: "en" });
+    await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@bia oi" });
+    await drain();
+    expect(push.sent).toHaveLength(2);
+    const [job] = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "push.receipts"));
+    expect(job?.nextAttemptAt.getTime()).toBeGreaterThan(Date.now() + PUSH_RECEIPTS_DELAY_MS - 60_000);
+    // Not due yet: nothing asked.
+    await drain();
+    expect(push.receiptRequests).toEqual([]);
+    expect((await listPushDevices(f.db, bia.id)).length).toBe(2);
+
+    const later = new Date(Date.now() + PUSH_RECEIPTS_DELAY_MS + 60_000);
+    await drainOutbox(f.db, createJobHandlers({ ...f.jobDeps, push }), { now: later });
+    expect(push.receiptRequests).toHaveLength(1);
+    expect((await listPushDevices(f.db, bia.id)).map((d) => d.token)).toEqual([TOKEN_BIA_EN]);
+  });
+
+  test("checkPushReceipts ignores malformed tickets and senders without receipts", async () => {
+    f = await setup();
+    expect(pushTicketsOf([{ id: "a", token: "t" }, { id: 1 }, null, "x"])).toEqual([{ id: "a", token: "t" }]);
+    expect(pushTicketsOf(undefined)).toEqual([]);
+    const noReceipts = { id: "x", send: async () => [] };
+    expect(await checkPushReceipts({ db: f.db, push: noReceipts }, [{ id: "a", token: "t" }])).toEqual({
+      checked: 0,
+      removed: 0,
+    });
   });
 
   test("no phone, no job", async () => {

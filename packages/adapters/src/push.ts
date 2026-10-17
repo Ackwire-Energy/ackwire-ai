@@ -19,6 +19,17 @@ export interface PushResult {
   ok: boolean;
   /** The token no longer reaches a device (app uninstalled, notifications off): delete it. */
   unregistered: boolean;
+  /** Accepted: the ticket to ask about later (`receipts`), when the service gives one. */
+  ticketId?: string;
+  error?: string;
+}
+
+/** What happened to a sent message, asked some minutes later (Expo push receipts). */
+export interface PushReceipt {
+  ticketId: string;
+  ok: boolean;
+  /** The device is gone (`DeviceNotRegistered`): delete its token. */
+  unregistered: boolean;
   error?: string;
 }
 
@@ -26,6 +37,12 @@ export interface PushSender {
   readonly id: string;
   /** One result per message, in order. Throws `PushError` when the whole request failed. */
   send(messages: PushMessage[]): Promise<PushResult[]>;
+  /**
+   * Receipts of earlier tickets (job `push.receipts`, ~15 min after sending).
+   * Tickets without a receipt yet (or anymore) are left out. Throws
+   * `PushError` when the request failed. Absent: the sender has none.
+   */
+  receipts?(ticketIds: string[]): Promise<PushReceipt[]>;
 }
 
 /** A request failure; `retryable` drives the outbox retry. */
@@ -43,8 +60,12 @@ export class PushError extends Error {
 /** Expo accepts at most 100 messages per request. */
 export const EXPO_PUSH_BATCH = 100;
 export const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+export const EXPO_RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
+/** Expo accepts at most 1000 ticket ids per receipts request. */
+export const EXPO_RECEIPTS_BATCH = 1000;
 
 type ExpoTicket = { status: "ok"; id?: string } | { status: "error"; message?: string; details?: { error?: string } };
+type ExpoReceipt = { status: "ok" } | { status: "error"; message?: string; details?: { error?: string } };
 
 /**
  * Expo Push API (`POST /--/api/v2/push/send`, JSON array, ≤100 per request).
@@ -52,9 +73,17 @@ type ExpoTicket = { status: "ok"; id?: string } | { status: "error"; message?: s
  * security on. 429 and 5xx retry; other 4xx don't. A ticket with
  * `DeviceNotRegistered` marks its token unregistered.
  */
-export function createExpoPushSender(options: { accessToken?: string; url?: string; fetch?: typeof fetch } = {}) {
+export function createExpoPushSender(
+  options: { accessToken?: string; url?: string; receiptsUrl?: string; fetch?: typeof fetch } = {},
+) {
   const http = options.fetch ?? fetch;
   const url = options.url ?? EXPO_PUSH_URL;
+  const receiptsUrl = options.receiptsUrl ?? EXPO_RECEIPTS_URL;
+  const headers = {
+    accept: "application/json",
+    "content-type": "application/json",
+    ...(options.accessToken ? { authorization: `Bearer ${options.accessToken}` } : {}),
+  };
   const sender: PushSender = {
     id: "expo",
     async send(messages) {
@@ -65,11 +94,7 @@ export function createExpoPushSender(options: { accessToken?: string; url?: stri
         try {
           res = await http(url, {
             method: "POST",
-            headers: {
-              accept: "application/json",
-              "content-type": "application/json",
-              ...(options.accessToken ? { authorization: `Bearer ${options.accessToken}` } : {}),
-            },
+            headers,
             body: JSON.stringify(
               batch.map((m) => ({
                 to: m.to,
@@ -98,7 +123,8 @@ export function createExpoPushSender(options: { accessToken?: string; url?: stri
         }
         batch.forEach((m, n) => {
           const ticket = payload.data?.[n];
-          if (ticket?.status === "ok") results.push({ token: m.to, ok: true, unregistered: false });
+          if (ticket?.status === "ok")
+            results.push({ token: m.to, ok: true, unregistered: false, ...(ticket.id ? { ticketId: ticket.id } : {}) });
           else
             results.push({
               token: m.to,
@@ -110,23 +136,90 @@ export function createExpoPushSender(options: { accessToken?: string; url?: stri
       }
       return results;
     },
+    async receipts(ticketIds) {
+      const out: PushReceipt[] = [];
+      for (let i = 0; i < ticketIds.length; i += EXPO_RECEIPTS_BATCH) {
+        const ids = ticketIds.slice(i, i + EXPO_RECEIPTS_BATCH);
+        let res: Response;
+        try {
+          res = await http(receiptsUrl, { method: "POST", headers, body: JSON.stringify({ ids }) });
+        } catch (error) {
+          throw new PushError(`could not reach Expo push receipts: ${String(error)}`, true);
+        }
+        const payload = (await res.json().catch(() => ({}))) as {
+          data?: Record<string, ExpoReceipt>;
+          errors?: { code?: string; message?: string }[];
+        };
+        if (!res.ok || !payload.data || typeof payload.data !== "object") {
+          const why = payload.errors?.map((e) => e.message ?? e.code).join("; ") ?? "";
+          throw new PushError(
+            `Expo push receipts refused the request (${res.status}): ${why}`.trim(),
+            res.status === 429 || res.status >= 500,
+            res.status,
+          );
+        }
+        for (const id of ids) {
+          const receipt = payload.data[id];
+          if (!receipt) continue;
+          if (receipt.status === "ok") out.push({ ticketId: id, ok: true, unregistered: false });
+          else
+            out.push({
+              ticketId: id,
+              ok: false,
+              unregistered: receipt.details?.error === "DeviceNotRegistered",
+              error: receipt.message ?? receipt.details?.error ?? "error",
+            });
+        }
+      }
+      return out;
+    },
   };
   return sender;
 }
 
-/** Test sender: records every message, never sends. Tokens in `unregistered` come back unregistered. */
-export function createFakePushSender(options: { unregistered?: Iterable<string> } = {}) {
+/**
+ * Test sender: records every message, never sends. Tokens in `unregistered`
+ * come back unregistered at once; tokens in `goneLater` are accepted (a
+ * ticket) and their receipts say `DeviceNotRegistered`.
+ */
+export function createFakePushSender(options: { unregistered?: Iterable<string>; goneLater?: Iterable<string> } = {}) {
   const sent: PushMessage[] = [];
   const unregistered = new Set(options.unregistered ?? []);
-  const sender: PushSender & { sent: PushMessage[]; unregistered: Set<string> } = {
+  const goneLater = new Set(options.goneLater ?? []);
+  /** Ticket id → token. */
+  const tickets = new Map<string, string>();
+  const receiptRequests: string[][] = [];
+  const sender: PushSender & {
+    sent: PushMessage[];
+    unregistered: Set<string>;
+    goneLater: Set<string>;
+    tickets: Map<string, string>;
+    receiptRequests: string[][];
+    receipts(ticketIds: string[]): Promise<PushReceipt[]>;
+  } = {
     id: "fake",
     sent,
     unregistered,
+    goneLater,
+    tickets,
+    receiptRequests,
     async send(messages) {
       return messages.map((m) => {
         if (unregistered.has(m.to)) return { token: m.to, ok: false, unregistered: true, error: "DeviceNotRegistered" };
         sent.push(m);
-        return { token: m.to, ok: true, unregistered: false };
+        const ticketId = `fake-ticket-${tickets.size + 1}`;
+        tickets.set(ticketId, m.to);
+        return { token: m.to, ok: true, unregistered: false, ticketId };
+      });
+    },
+    async receipts(ticketIds) {
+      receiptRequests.push([...ticketIds]);
+      return ticketIds.flatMap((ticketId) => {
+        const token = tickets.get(ticketId);
+        if (!token) return [];
+        return goneLater.has(token)
+          ? [{ ticketId, ok: false, unregistered: true, error: "DeviceNotRegistered" }]
+          : [{ ticketId, ok: true, unregistered: false }];
       });
     },
   };

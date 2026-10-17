@@ -1,8 +1,10 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, isNull, or, schema } from "@agenteschat/db";
+import { and, type Database, eq, isNull, rowsOf, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
+import { followsThreadSql } from "./follows";
+import { notificationSnippet } from "./notifications";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 
 const { channels, channelMembers, agents, organizationMembers, organizations } = schema;
@@ -45,27 +47,124 @@ export async function createChannel(
   }
 }
 
-/** Channels the user can see: every public channel plus private ones they belong to. */
-export async function listChannels(db: Database, userId: string, orgId: string) {
+/** The most unread messages counted per channel (clients show "99+"). */
+export const MAX_CHANNEL_UNREAD = 100;
+/** Length of a channel's last-message preview (plain text). */
+export const CHANNEL_PREVIEW_LENGTH = 140;
+
+export interface ChannelLastMessage {
+  id: string;
+  authorType: "person" | "agent";
+  authorId: string | null;
+  /** Null when the author was deleted. */
+  authorName: string | null;
+  /** Plain text, at most `CHANNEL_PREVIEW_LENGTH` chars. */
+  preview: string;
+  createdAt: Date;
+}
+
+export interface ChannelListItem {
+  id: string;
+  orgId: string;
+  name: string;
+  topic: string;
+  visibility: "public" | "private";
+  createdByUserId: string | null;
+  createdAt: Date;
+  isMember: boolean;
+  /**
+   * Messages since I last read it (from when I joined, if never), not mine;
+   * a thread reply counts only in a thread I follow. At most
+   * `MAX_CHANNEL_UNREAD`; 0 when I'm not a member.
+   */
+  unreadCount: number;
+  /** The latest top-level message; null when I'm not a member (I can't read it) or it's empty. */
+  lastMessage: ChannelLastMessage | null;
+}
+
+interface ChannelListRow {
+  id: string;
+  org_id: string;
+  name: string;
+  topic: string;
+  visibility: "public" | "private";
+  created_by_user_id: string | null;
+  created_at: Date | string;
+  is_member: boolean;
+  unread_count: number | string | null;
+  last_id: string | null;
+  last_body: string | null;
+  last_at: Date | string | null;
+  last_author_type: "person" | "agent" | null;
+  last_user_id: string | null;
+  last_agent_id: string | null;
+  last_author_name: string | null;
+}
+
+const asDate = (v: Date | string) => (v instanceof Date ? v : new Date(v));
+
+/**
+ * Channels the user can see: every public channel plus private ones they
+ * belong to, by name, with their unread count and last message, in one
+ * query (a lateral read per channel on `(channel_id, created_at)`).
+ */
+export async function listChannels(db: Database, userId: string, orgId: string): Promise<ChannelListItem[]> {
   await requirePermission(db, userId, orgId, "read");
-  const mine = db
-    .select({ channelId: channelMembers.channelId })
-    .from(channelMembers)
-    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, userId)));
-  const rows = await db
-    .select()
-    .from(channels)
-    .where(
-      and(
-        eq(channels.orgId, orgId),
-        isNull(channels.archivedAt),
-        eq(channels.kind, "channel"),
-        or(eq(channels.visibility, "public"), inArray(channels.id, mine)),
-      ),
-    )
-    .orderBy(asc(channels.name));
-  const memberOf = new Set((await mine).map((r) => r.channelId));
-  return rows.map((c) => ({ ...c, isMember: memberOf.has(c.id) }));
+  const rows = rowsOf<ChannelListRow>(
+    await db.execute(sql`select c.id, c.org_id, c.name, c.topic, c.visibility, c.created_by_user_id, c.created_at,
+        (cm.id is not null) as is_member, coalesce(un.n, 0) as unread_count,
+        lm.id as last_id, lm.body as last_body, lm.created_at as last_at, lm.author_type as last_author_type,
+        lm.author_user_id as last_user_id, lm.author_agent_id as last_agent_id,
+        coalesce(lu.name, la.name) as last_author_name
+      from ${channels} c
+      left join ${channelMembers} cm on cm.org_id = c.org_id and cm.channel_id = c.id and cm.user_id = ${userId}
+      left join ${schema.channelReads} cr on cr.channel_id = c.id and cr.user_id = ${userId}
+      left join lateral (
+        select m.id, m.body, m.created_at, m.author_type, m.author_user_id, m.author_agent_id
+        from ${schema.messages} m
+        where cm.id is not null and m.org_id = ${orgId}::uuid and m.channel_id = c.id
+          and m.thread_id is null and m.deleted_at is null
+        order by m.created_at desc, m.id desc
+        limit 1
+      ) lm on true
+      left join ${schema.users} lu on lu.id = lm.author_user_id
+      left join ${agents} la on la.id = lm.author_agent_id
+      left join lateral (
+        select count(*)::int as n from (
+          select 1 from ${schema.messages} u
+          where cm.id is not null and u.org_id = ${orgId}::uuid and u.channel_id = c.id and u.deleted_at is null
+            and u.created_at > coalesce(cr.last_read_at, cm.created_at)
+            and (u.author_user_id is null or u.author_user_id <> ${userId})
+            and (u.thread_id is null or ${followsThreadSql(orgId, userId, sql`u.thread_id`)})
+          limit ${MAX_CHANNEL_UNREAD}
+        ) unread
+      ) un on true
+      where c.org_id = ${orgId}::uuid and c.archived_at is null and c.kind = 'channel'
+        and (c.visibility = 'public' or cm.id is not null)
+      order by c.name asc`),
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    orgId: r.org_id,
+    name: r.name,
+    topic: r.topic,
+    visibility: r.visibility,
+    createdByUserId: r.created_by_user_id,
+    createdAt: asDate(r.created_at),
+    isMember: r.is_member === true,
+    unreadCount: Number(r.unread_count ?? 0),
+    lastMessage:
+      r.last_id && r.last_at && r.last_author_type
+        ? {
+            id: r.last_id,
+            authorType: r.last_author_type,
+            authorId: r.last_author_type === "person" ? r.last_user_id : r.last_agent_id,
+            authorName: r.last_author_name,
+            preview: notificationSnippet(r.last_body, CHANNEL_PREVIEW_LENGTH),
+            createdAt: asDate(r.last_at),
+          }
+        : null,
+  }));
 }
 
 export async function isChannelMember(db: Database, orgId: string, channelId: string, userId: string) {

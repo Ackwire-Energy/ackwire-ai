@@ -28,6 +28,9 @@ export const PUSH_KINDS: ReadonlySet<string> = new Set([
   "routine_failed",
 ]);
 
+/** Expo keeps receipts for a day and has most ready within 15 minutes: ask then. */
+export const PUSH_RECEIPTS_DELAY_MS = 15 * 60_000;
+
 /** Devices kept per person (the oldest beyond this are dropped when a new one registers). */
 export const MAX_PUSH_DEVICES = 10;
 
@@ -148,7 +151,9 @@ async function actorName(db: Database, orgId: string, actor: NotificationActor |
 /**
  * Sends the push of one notification to every phone of its person, unless it
  * was read, done or snoozed meanwhile. Tokens Expo reports as unregistered
- * are deleted. Without a sender (push off) it does nothing.
+ * are deleted. Accepted tickets are checked again later: a `push.receipts`
+ * job ~15 min after (`checkPushReceipts`). Without a sender (push off) it
+ * does nothing.
  */
 export async function deliverPush(deps: PushDeps, notificationId: string): Promise<{ sent: number; removed: number }> {
   const none = { sent: 0, removed: 0 };
@@ -195,5 +200,58 @@ export async function deliverPush(deps: PushDeps, notificationId: string): Promi
   if (gone.length > 0) {
     await db.delete(pushDevices).where(and(eq(pushDevices.userId, row.userId), inArray(pushDevices.token, gone)));
   }
+  const tickets = results.flatMap((r) => (r.ok && r.ticketId ? [{ id: r.ticketId, token: r.token }] : []));
+  if (tickets.length > 0 && deps.push.receipts) {
+    const now = deps.now?.() ?? new Date();
+    await enqueue(db, {
+      orgId: row.orgId,
+      kind: "push.receipts",
+      payload: { tickets },
+      dedupeKey: `push.receipts:${row.id}`,
+      runAt: new Date(now.getTime() + PUSH_RECEIPTS_DELAY_MS),
+      maxAttempts: 4,
+    });
+  }
   return { sent: results.filter((r) => r.ok).length, removed: gone.length };
+}
+
+export interface PushTicket {
+  id: string;
+  token: string;
+}
+
+/** A job payload's tickets, keeping only well-formed ones. */
+export function pushTicketsOf(value: unknown): PushTicket[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((t) =>
+    t && typeof t === "object" && typeof t.id === "string" && typeof t.token === "string"
+      ? [{ id: t.id, token: t.token }]
+      : [],
+  );
+}
+
+/**
+ * Job `push.receipts`: asks the push service what happened to earlier
+ * tickets and deletes the tokens whose device is gone
+ * (`DeviceNotRegistered`), whoever holds them now. Tickets without a
+ * receipt are left alone.
+ */
+export async function checkPushReceipts(
+  deps: PushDeps,
+  tickets: PushTicket[],
+): Promise<{ checked: number; removed: number }> {
+  if (!deps.push?.receipts || tickets.length === 0) return { checked: 0, removed: 0 };
+  const receipts = await deps.push.receipts(tickets.map((t) => t.id));
+  const tokenOf = new Map(tickets.map((t) => [t.id, t.token]));
+  const gone = [
+    ...new Set(
+      receipts.flatMap((r) => (r.unregistered && tokenOf.has(r.ticketId) ? [tokenOf.get(r.ticketId) as string] : [])),
+    ),
+  ];
+  if (gone.length === 0) return { checked: receipts.length, removed: 0 };
+  const removed = await deps.db
+    .delete(pushDevices)
+    .where(inArray(pushDevices.token, gone))
+    .returning({ id: pushDevices.id });
+  return { checked: receipts.length, removed: removed.length };
 }

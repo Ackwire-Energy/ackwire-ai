@@ -6,6 +6,7 @@ import {
   listChannelMembers,
   listChannels,
   listMessages,
+  listWorkingRuns,
   postPersonMessage,
   requireChannelAccess,
 } from "@agenteschat/engine";
@@ -39,7 +40,7 @@ export function chatRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/channels",
       tags,
       security,
-      summary: "Public channels and the private ones you belong to",
+      summary: "Public channels and the private ones you belong to, with your unread count and the last message",
       request: { params: OrgParams },
       responses: { 200: json(z.object({ channels: z.array(Channel) })), ...errors },
     }),
@@ -55,10 +56,55 @@ export function chatRoutes(deps: AppDeps) {
             isMember: r.isMember,
             createdByUserId: r.createdByUserId,
             createdAt: r.createdAt.toISOString(),
+            unreadCount: r.unreadCount,
+            lastMessage: r.lastMessage ? { ...r.lastMessage, createdAt: r.lastMessage.createdAt.toISOString() } : null,
           })),
         },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/active-runs",
+      tags,
+      security,
+      summary: "Agents working now in the conversations you are in (any member)",
+      description:
+        "Agent runs queued, running or waiting (approval or an answer) in the channels and DMs you are a member of, newest first (at most 100). Never another person's DM or a private channel you're not in. No cost.",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            runs: z.array(
+              z
+                .object({
+                  runId: z.uuid(),
+                  agentId: z.uuid(),
+                  channelId: z.uuid(),
+                  channelKind: z.enum(["channel", "dm"]),
+                  channelName: z.string().nullable().openapi({ description: "Null for a DM." }),
+                  threadId: z.uuid().nullable().openapi({ description: "Null: the main timeline (DMs are flat)." }),
+                  status: z.enum(["queued", "running", "waiting_approval", "waiting_input"]),
+                  startedAt: z.string().nullable(),
+                  createdAt: z.string(),
+                  label: z
+                    .string()
+                    .nullable()
+                    .openapi({ description: "What it works on: the thread's title, else its first message (≤ 80)." }),
+                })
+                .openapi("WorkingRun"),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const runs = await listWorkingRuns(db, c.get("user").id, c.req.valid("param").orgId);
+      return c.json({ runs }, 200);
     },
   );
 

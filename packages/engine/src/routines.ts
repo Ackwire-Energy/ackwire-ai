@@ -17,6 +17,7 @@ import { getAgent } from "./agents";
 import type { ArtifactDeps } from "./artifacts";
 import { audienceError, audienceNotice, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
+import { requireChannelAccess } from "./channels";
 import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { nextCronTime, zonedTime } from "./cron";
 import { openDm } from "./dms";
@@ -24,7 +25,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishUserEvent } from "./events";
 import { createForumTopic } from "./forum";
 import { getOrgSettings } from "./management";
-import { insertMessageWithRuns, messageView, postPersonMessage } from "./messages";
+import { getMessage, insertMessageWithRuns, messageView, postPersonMessage, replyExcerpt } from "./messages";
 import { notifyRoutineRun } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -1253,4 +1254,122 @@ export async function cancelReminder(db: Database, requesterId: string, orgId: s
     target: { type: "routine", id },
   });
   return reminderView(row);
+}
+
+// ── Reminders from the app ("Lembrar") ───────────────────────────────────────
+
+/** How far ahead the app may set a reminder. */
+export const MAX_REMINDER_AHEAD_MS = 365 * 24 * 3600_000;
+
+/**
+ * "Lembrar" in the app: a one-off reminder about a message or a
+ * conversation at a set time, the same thing an agent's `schedule_reminder`
+ * makes (a routine with `trigger: once`, in Rotinas, cancellable by whoever
+ * asked). At that time the agent posts "@you Reminder: …" where the message
+ * is: its thread (a top-level channel message gets one), or the DM. That
+ * mention notifies the person (and their phone).
+ *
+ * The agent that reminds: `agentId` when given, else the message's author
+ * when it is an agent, else the first agent of the conversation this person
+ * can talk to. It must be in the conversation. The text: `text`, else the
+ * message's first line.
+ */
+export async function createReminderFromApp(
+  deps: RoutineDeps,
+  requesterId: string,
+  orgId: string,
+  input: {
+    channelId: string;
+    threadId?: string | null;
+    messageId?: string | null;
+    agentId?: string | null;
+    at: Date;
+    text?: string | null;
+    timezone?: string | null;
+  },
+  now = new Date(),
+): Promise<ReminderView> {
+  const { db } = deps;
+  const { channel, membership } = await requireChannelAccess(db, requesterId, orgId, input.channelId);
+  if (channel.kind === "forum") throw new NotFoundError("Channel not found");
+  if (!can(membership.role, "post")) throw new ForbiddenError();
+  if (Number.isNaN(input.at.getTime()) || input.at.getTime() <= now.getTime()) {
+    throw new ValidationError("That time has already passed.", "when.past");
+  }
+  if (input.at.getTime() - now.getTime() > MAX_REMINDER_AHEAD_MS) {
+    throw new ValidationError("At most a year ahead", "when.too_far");
+  }
+  const inChannel = async (id: string) => {
+    const m = await getMessage(db, orgId, id);
+    if (!m || m.channelId !== channel.id || m.deletedAt) throw new NotFoundError("Message not found");
+    return m;
+  };
+  const message = input.messageId ? await inChannel(input.messageId) : null;
+  let threadId: string | null = null;
+  if (input.threadId) {
+    const root = await inChannel(input.threadId);
+    if (root.threadId) throw new NotFoundError("Thread not found");
+    threadId = root.id;
+  } else if (message && channel.kind !== "dm") {
+    threadId = message.threadId ?? message.id;
+  }
+  const text = (input.text ?? "").trim() || (message ? replyExcerpt(message.body) : "");
+  if (!text) throw new ValidationError("Say what to remind", "reminder.text_required");
+
+  const members = await db
+    .select({ agentId: channelMembers.agentId })
+    .from(channelMembers)
+    .where(
+      and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channel.id), isNotNull(channelMembers.agentId)),
+    );
+  const here = members.flatMap((m) => (m.agentId ? [m.agentId] : []));
+  let agentId: string | null = null;
+  if (input.agentId) {
+    if (!here.includes(input.agentId)) {
+      throw new ValidationError("That agent isn't in this conversation", "reminder.agent_not_here");
+    }
+    agentId = input.agentId;
+  } else if (message?.authorType === "agent" && message.authorAgentId && here.includes(message.authorAgentId)) {
+    agentId = message.authorAgentId;
+  } else {
+    for (const id of here) {
+      const agent = await getAgent(db, orgId, id);
+      if (agent && !agent.archivedAt && canTalkTo(agent, requesterId)) {
+        agentId = agent.id;
+        break;
+      }
+    }
+  }
+  if (!agentId) throw new ValidationError("No agent in this conversation can remind you", "reminder.no_agent");
+
+  const timezone = await routineTimezone(db, requesterId, orgId, input.timezone);
+  return createReminder(deps, requesterId, orgId, {
+    agentId,
+    channelId: channel.id,
+    threadId,
+    at: input.at,
+    timezone,
+    description: describeWhen(input.at, timezone, now),
+    message: text,
+  });
+}
+
+/** The person's pending reminders in conversations (from the app or asked to an agent), soonest first. */
+export async function listMyReminders(db: Database, requesterId: string, orgId: string): Promise<ReminderView[]> {
+  await requirePermission(db, requesterId, orgId, "read");
+  const rows = await db
+    .select()
+    .from(routines)
+    .where(
+      and(
+        eq(routines.orgId, orgId),
+        eq(routines.createdByUserId, requesterId),
+        eq(routines.triggerType, "once"),
+        eq(routines.active, true),
+        sql`${routines.target}->>'type' = 'conversation'`,
+      ),
+    )
+    .orderBy(routines.nextRunAt)
+    .limit(100);
+  return rows.map(reminderView);
 }

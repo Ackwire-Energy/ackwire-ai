@@ -167,6 +167,26 @@ export interface Channel {
   visibility: "public" | "private";
   isMember: boolean;
   createdAt: string;
+  /**
+   * Channel list only (`chat.channels`): messages since you last read it
+   * (since you joined, if never), not yours; a thread reply counts only in a
+   * thread you follow. At most 100 (show "99+"); 0 when not a member.
+   */
+  unreadCount?: number;
+  /** Channel list only: the latest top-level message; null when empty or not a member. */
+  lastMessage?: ChannelLastMessage | null;
+}
+
+/** A channel's latest top-level message, for the conversation list. */
+export interface ChannelLastMessage {
+  id: string;
+  authorType: "person" | "agent";
+  authorId: string | null;
+  /** Null when the author was deleted. */
+  authorName: string | null;
+  /** Plain text, at most 140 characters. */
+  preview: string;
+  createdAt: string;
 }
 
 export type AuthorType = "person" | "agent";
@@ -194,6 +214,8 @@ export interface Message {
   reactions?: ReactionCount[];
   /** People's messages: what agents saved to memory from them (the memory mark); live via `message.memories`. */
   memories?: MessageMemory[];
+  /** In lists: true when pinned in its channel (absent: not pinned); live via `message.pinned` / `message.unpinned`. */
+  pinned?: boolean;
   /** Client only: an optimistic message waiting for the server, or one that failed to send. */
   local?: "pending" | "failed";
   createdAt: string;
@@ -242,6 +264,17 @@ export type ChannelEvent =
   /** Someone reacted or took it back: the message's reactions now (replace). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
+  /** A message was pinned here (`pins.list` has them all, newest first). */
+  | {
+      type: "message.pinned";
+      channelId: string;
+      messageId: string;
+      threadId: string | null;
+      pinnedByUserId: string;
+      pinnedAt: string;
+    }
+  /** A message was unpinned. */
+  | { type: "message.unpinned"; channelId: string; messageId: string }
   /**
    * A thread's state, title or context changed (ADR 0029). `thread` is the fresh view when the
    * server had it (its `canManage` is always false: read yours from the API). `messageIds`: messages
@@ -385,11 +418,15 @@ export type ChannelEvent =
       file?: string;
     };
 
+/** You followed or unfollowed a thread (on any of your devices). */
+export type ThreadFollowEvent = { type: "thread.follow" } & ThreadFollow;
+
 /** Events for one person (`{ type: "event", scope: "user" }` frames), e.g. approvals they can decide. */
 export type UserEvent =
   | { type: "approval.created" | "approval.decided"; approval: Approval }
   | BudgetEvent
   | NotificationEvent
+  | ThreadFollowEvent
   | { type: string };
 
 // ── Approvals, connectors, scopes ─────────────────────────────────────────────
@@ -2091,6 +2128,12 @@ export interface ThreadInfo {
   needsYou: boolean;
   /** You may close, archive, rename or change the context. */
   canManage: boolean;
+  /**
+   * You follow it: notified of its replies, which count as unread in the
+   * channel. By default whoever started it or wrote in it. Always sent by the
+   * API; absent in `thread.updated` events (it is per person).
+   */
+  following?: boolean;
   /** The thread's mission, in short (details: `GET …/threads/{id}/mission`). */
   mission?: ThreadMissionSummary | null;
   createdAt: string;
@@ -2770,3 +2813,72 @@ export type NotificationEvent =
   | { type: "notification.upserted"; notification: AppNotification }
   | { type: "notification.removed"; id: string }
   | ({ type: "notification.counts" } & NotificationCount);
+
+// ── Phone app: pins, following threads, working now, reminders ─────────────────
+
+/** Your explicit choice about a thread (`threadFollows.follow` / `unfollow`). */
+export interface ThreadFollow {
+  threadId: string;
+  channelId: string;
+  following: boolean;
+}
+
+/** A pinned message (`GET …/channels/{id}/pins`, newest pin first). */
+export interface MessagePin {
+  messageId: string;
+  channelId: string;
+  /** The message's thread (null: the main timeline). */
+  threadId: string | null;
+  /** Null when that person was deleted. */
+  pinnedByUserId: string | null;
+  pinnedAt: string;
+  message: Message;
+}
+
+/** "Trabalhando agora": an agent run in progress in a conversation you are in (`GET …/active-runs`). */
+export interface WorkingRun {
+  runId: string;
+  agentId: string;
+  channelId: string;
+  channelKind: "channel" | "dm";
+  /** Null for a DM. */
+  channelName: string | null;
+  /** Null: the main timeline (DMs are flat). */
+  threadId: string | null;
+  status: "queued" | "running" | "waiting_approval" | "waiting_input";
+  startedAt: string | null;
+  createdAt: string;
+  /** What it works on: the thread's title, else its first message (≤ 80 chars). */
+  label: string | null;
+}
+
+/** A one-off reminder in a conversation (`reminders.*`; also a routine in Rotinas). */
+export interface Reminder {
+  id: string;
+  message: string;
+  /** When it fires; null once done. */
+  at: string | null;
+  timezone: string;
+  /** When, in English ("tomorrow, Oct 16, at 09:00 (…)"): show `at` in the app's words instead. */
+  description: string;
+  forUserId: string;
+  channelId: string;
+  threadId: string | null;
+  done: boolean;
+}
+
+/**
+ * "Lembrar": at `at` (ISO with offset) an agent of the conversation posts
+ * "@you Reminder: …" where the message is. Agent: `agentId`, else the
+ * message's agent author, else the first agent there you can talk to
+ * (`reminder.no_agent` when none). Errors: `when.past`, `when.too_far`.
+ */
+export interface ReminderInput {
+  channelId: string;
+  threadId?: string | null;
+  messageId?: string | null;
+  agentId?: string | null;
+  at: string;
+  text?: string | null;
+  timezone?: string | null;
+}
