@@ -1240,10 +1240,20 @@ async function executeRunInner(
             }
           }
           for (const approval of waiting) {
-            const card = await post(tx, replyThreadId, `Approval request: ${approval.title}`, {
-              ...bodyCode("approval_request", { title: approval.title }),
-              approvalId: approval.id,
-            });
+            const cardMeta = { ...bodyCode("approval_request", { title: approval.title }), approvalId: approval.id };
+            const cardText = `Approval request: ${approval.title}`;
+            // A consulted agent's request goes to the conversation of whoever asked (ADR 0034).
+            const card =
+              approval.channelId === run.channelId
+                ? await post(tx, replyThreadId, cardText, cardMeta)
+                : await insertMessage(tx, {
+                    orgId: run.orgId,
+                    channelId: approval.channelId,
+                    threadId: approval.threadRootId,
+                    author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
+                    body: cardText,
+                    meta: cardMeta,
+                  });
             out.push(card);
             const [linked] = await tx
               .update(approvals)

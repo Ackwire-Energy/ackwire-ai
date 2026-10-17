@@ -7,12 +7,14 @@ import {
   createAgent,
   drainOutbox,
   expireConsultations,
+  grantScopes,
   type JobHandlers,
   listDms,
   listMessages,
   postPersonMessage,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
+import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
 let f: Fixture;
 afterEach(() => f?.close());
@@ -112,6 +114,36 @@ describe("ask_agent", () => {
     expect(events).toContainEqual(
       expect.objectContaining({ type: "agent.consulted", agentId: f.agent.id, consultedAgentId: infra.id }),
     );
+  });
+
+  test("a consulted agent's approval shows where the person asked, not in the agents' DM", async () => {
+    const github = fakeGithub();
+    f = await setup({
+      askAgent: true,
+      toolSources: [github.source],
+      reply: consultReply((req) =>
+        lastText(req).includes("tool_result")
+          ? answer("Merged.")
+          : { chunks: [], toolUses: [{ name: "github_merge_pr", input: { repo: "acme/app", pr: 7 } }] },
+      ),
+    });
+    const infra = await addInfra();
+    await grantScopes(f.db, f.org.id, infra.id, ALL_GITHUB_SCOPES);
+    const ask = await post("@dev deploy the fix");
+    await drainOutbox(f.db, f.handlers);
+
+    const [approval] = await f.db.select().from(schema.approvals);
+    expect(approval).toMatchObject({
+      agentId: infra.id,
+      channelId: f.general.id,
+      threadRootId: ask.id,
+      status: "pending",
+    });
+    const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ask.id });
+    const card = thread.find((m) => m.meta.approvalId === approval?.id);
+    expect(card?.author).toMatchObject({ type: "agent", id: infra.id });
+    expect(github.executed).toHaveLength(0);
+    expect((await consultations())[0]?.status).toBe("open");
   });
 
   test("no cycles: the consulted agent can't ask back the one asking it", async () => {

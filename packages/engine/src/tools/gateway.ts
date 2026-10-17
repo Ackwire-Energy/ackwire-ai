@@ -1,4 +1,5 @@
 import { and, eq, schema, sql } from "@agenteschat/db";
+import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { checkGithubCall } from "../git/repos";
@@ -136,6 +137,8 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
 
       if (isSensitive(tool)) {
         const owner = await ownerOf(ctx);
+        // Asked by another agent (ADR 0034): the request shows where the person is, not in the agents' DM.
+        const origin = ctx.runId ? await consultationOrigin(ctx.db, ctx.orgId, ctx.runId) : null;
         const described = tool.describe?.(call.input) ?? { title: `${tool.name}`, detail: canonicalJson(call.input) };
         const connectionId = tool.connectionId ?? null;
         const [approval] = await ctx.db
@@ -145,8 +148,8 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
             runId: ctx.runId,
             missionId: tool.missionId ?? null,
             agentId: ctx.agentId,
-            channelId: ctx.channelId,
-            threadRootId: ctx.threadRootId,
+            channelId: origin?.channelId ?? ctx.channelId,
+            threadRootId: origin?.threadRootId ?? ctx.threadRootId,
             toolUseId: call.toolUseId,
             tool: tool.name,
             scope: tool.scope,

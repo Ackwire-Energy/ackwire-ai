@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, isNull, lt, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, isNull, lt, schema } from "@agenteschat/db";
 import { canTalkTo } from "./audience";
 import { createAgentRuns, requesterOf } from "./dispatch";
 import { openAgentDm } from "./dms";
@@ -242,4 +242,33 @@ export async function expireConsultations(deps: { db: Database; pubsub?: PubSub 
   let closed = 0;
   for (const row of rows) if (await closeConsultation(deps, row, "expired", null)) closed++;
   return closed;
+}
+
+/**
+ * Where people see a consulted run's cards: the conversation of the run that
+ * started the chain of consultations (the agents' DM has no person in it).
+ * Null when the run isn't answering a consultation.
+ */
+export async function consultationOrigin(
+  db: Executor,
+  orgId: string,
+  runId: string,
+): Promise<{ channelId: string; threadRootId: string } | null> {
+  let current = runId;
+  let origin: { channelId: string; threadRootId: string } | null = null;
+  for (let depth = 0; depth <= MAX_CONSULTATION_CHAIN; depth++) {
+    const [row] = await db
+      .select({ askerRunId: agentConsultations.askerRunId })
+      .from(agentConsultations)
+      .where(and(eq(agentConsultations.orgId, orgId), eq(agentConsultations.targetRunId, current)));
+    if (!row) break;
+    const [asker] = await db
+      .select({ channelId: agentRuns.channelId, threadRootId: agentRuns.threadRootId })
+      .from(agentRuns)
+      .where(eq(agentRuns.id, row.askerRunId));
+    if (!asker) break;
+    origin = asker;
+    current = row.askerRunId;
+  }
+  return origin;
 }
