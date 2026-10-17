@@ -419,21 +419,28 @@
       "idx": 59,
       "version": "7",
       "when": 1792290000000,
-      "tag": "0059_run_tool_tokens",
+      "tag": "0059_github_app_installations",
       "breakpoints": true
     },
     {
       "idx": 60,
       "version": "7",
       "when": 1792300000000,
-      "tag": "0060_agent_brain",
+      "tag": "0060_run_tool_tokens",
       "breakpoints": true
     },
     {
       "idx": 61,
       "version": "7",
       "when": 1792310000000,
-      "tag": "0061_run_waiting_machine",
+      "tag": "0061_agent_brain",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1792320000000,
+      "tag": "0062_run_waiting_machine",
       "breakpoints": true
     }
   ]

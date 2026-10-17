@@ -1,5 +1,5 @@
 import type { Adapters, S3Fetch, SandboxProvider } from "@agenteschat/adapters";
-import { type Config, connectorOAuthApps } from "@agenteschat/config";
+import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
   type ArtifactDeps,
@@ -183,10 +183,7 @@ export function buildEngine(o: EngineOptions) {
     publicUrl: config.PUBLIC_URL,
     judge: context.judge,
   };
-  const githubApp =
-    config.GITHUB_APP_ID && config.GITHUB_APP_PRIVATE_KEY
-      ? { appId: config.GITHUB_APP_ID, privateKey: config.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, "\n") }
-      : null;
+  const githubApp = githubAppConfig(config);
   const gitProxy: GitProxyDeps = {
     db,
     secret: config.AGENTES_SECRET,

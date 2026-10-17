@@ -1,6 +1,6 @@
 {
-  "id": "09f46b7c-6d5c-4341-a263-d42cfd4447c7",
-  "prevId": "88e2fba8-85bb-4b10-b6d9-ce5554fd9eb9",
+  "id": "88e2fba8-85bb-4b10-b6d9-ce5554fd9eb9",
+  "prevId": "a9ddbf20-835f-46e8-8cef-42e64cf98877",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2289,6 +2289,134 @@
           "nullsNotDistinct": false,
           "columns": [
             "state_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.github_app_installations": {
+      "name": "github_app_installations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "installation_id": {
+          "name": "installation_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_login": {
+          "name": "account_login",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_type": {
+          "name": "account_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repository_selection": {
+          "name": "repository_selection",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'selected'"
+        },
+        "suspended_at": {
+          "name": "suspended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "github_app_installations_org_id_index": {
+          "name": "github_app_installations_org_id_index",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "github_app_installations_org_id_organizations_id_fk": {
+          "name": "github_app_installations_org_id_organizations_id_fk",
+          "tableFrom": "github_app_installations",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "org_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "github_app_installations_created_by_user_id_users_id_fk": {
+          "name": "github_app_installations_created_by_user_id_users_id_fk",
+          "tableFrom": "github_app_installations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "github_app_installations_installationId_unique": {
+          "name": "github_app_installations_installationId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "installation_id"
           ]
         }
       },
@@ -6417,12 +6545,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "waiting_machine_id": {
-          "name": "waiting_machine_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -6531,22 +6653,6 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "agent_runs_waiting_machine_idx": {
-          "name": "agent_runs_waiting_machine_idx",
-          "columns": [
-            {
-              "expression": "waiting_machine_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"agent_runs\".\"waiting_machine_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

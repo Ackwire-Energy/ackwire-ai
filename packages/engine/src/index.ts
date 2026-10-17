@@ -54,6 +54,7 @@ export * from "./forum-tools";
 export * from "./gateway";
 export * from "./git/credential";
 export * from "./git/github-app";
+export * from "./git/github-app-installs";
 export * from "./git/inflate";
 export * from "./git/pack";
 export * from "./git/proxy";

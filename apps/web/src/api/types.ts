@@ -454,6 +454,18 @@ export interface Connection {
   revokedAt: string | null;
 }
 
+/** An installation of our GitHub App bound to the organization (repository access for git and PRs). */
+export interface GitHubAppInstallation {
+  id: string;
+  installationId: number;
+  accountLogin: string;
+  accountType: string;
+  /** `all` or `selected` repositories. */
+  repositorySelection: string;
+  suspended: boolean;
+  createdAt: string;
+}
+
 /** One permission of an agent: a built-in scope (`connectionId: null`) or a connection's scope. */
 export interface ScopeGrant {
   connectionId: string | null;

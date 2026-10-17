@@ -15,6 +15,7 @@ import type { Agent } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorCatalogDialog, ConnectorIcon } from "@/components/ConnectorCatalog";
+import { GitHubAppPanel } from "@/components/GitHubAppPanel";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
@@ -102,6 +103,7 @@ export function ConnectorsSection({ connected, review }: { connected?: string; r
           ))}
         </List>
       )}
+      <GitHubAppPanel />
 
       <ConnectorCatalogDialog
         open={adding}

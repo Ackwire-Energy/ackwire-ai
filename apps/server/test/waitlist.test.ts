@@ -89,7 +89,9 @@ test("an unknown, malformed or expired link is refused with a stable code", asyn
 });
 
 test("joining again resends the link at most every 2 minutes and 5 times; only the latest link works", async () => {
-  const at = (minutes: number) => new Date(Date.UTC(2026, 9, 15, 12, minutes));
+  // Relative to now: confirming checks the 48 h link age against the real clock.
+  const start = Date.now() - 3600_000;
+  const at = (minutes: number) => new Date(start + minutes * 60_000);
   const input = { email: "ana@acme.com", publicUrl: ORIGIN };
   expect(await joinWaitlist(t.db, input, at(0))).toEqual({ sent: true });
   await t.drain();

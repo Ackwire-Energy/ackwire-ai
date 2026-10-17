@@ -14,6 +14,7 @@ import type {
   ConnectorCatalog,
   ConnectorDef,
   Credential,
+  GitHubAppInstallation,
   InvitationWithStatus,
   Me,
   Member,
@@ -65,6 +66,8 @@ export interface FakeState {
   credentials: Credential[];
   approvals: Approval[];
   connections: Connection[];
+  /** GitHub App installations bound to the org (`githubApp.info`); undefined = none, app not installable. */
+  githubApp?: { installable: boolean; installations: GitHubAppInstallation[] };
   scopes: Record<string, ScopeGrant[]>;
   runs: Run[];
   /** `GET …/channels/{id}/active-runs`; unset = the endpoint doesn't exist yet (404). */
@@ -1190,6 +1193,18 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.connections = state.connections.filter((c) => c.id !== connectionId);
         for (const k of Object.keys(state.scopes))
           state.scopes[k] = (state.scopes[k] ?? []).filter((g) => g.connectionId !== connectionId);
+      },
+    },
+    githubApp: {
+      info: async () => structuredClone(state.githubApp ?? { installable: false, installations: [] }),
+      install: async (orgId, returnTo) => {
+        log("githubApp.install", orgId, returnTo);
+        return "https://github.com/apps/agentes-chat/installations/new?state=s";
+      },
+      remove: async (orgId, installId) => {
+        log("githubApp.remove", orgId, installId);
+        if (state.githubApp)
+          state.githubApp.installations = state.githubApp.installations.filter((i) => i.id !== installId);
       },
     },
     search: {

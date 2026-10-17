@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parsePemKey } from "./pem";
 
 /**
  * Every environment variable agentes.chat reads is declared here, exactly once.
@@ -275,12 +276,48 @@ export const envVars = {
   GITHUB_APP_ID: {
     schema: z.string().optional(),
     description:
-      "Id of a GitHub App for agents' git and pull requests. With `GITHUB_APP_PRIVATE_KEY`, the git proxy uses short installation tokens scoped to one repository (1 hour) where the app is installed, and the org's GitHub connection elsewhere.",
+      "Id of a GitHub App for agents' git and pull requests. With `GITHUB_APP_PRIVATE_KEY`, the git proxy uses short installation tokens scoped to one repository (1 hour) where the organization installed the app from agentes.chat, and the org's GitHub connection elsewhere.",
     section: "Connectors",
   },
   GITHUB_APP_PRIVATE_KEY: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value, ctx) => {
+        if (value === undefined) return value;
+        try {
+          return parsePemKey(value);
+        } catch (error) {
+          ctx.addIssue({ code: "custom", message: (error as Error).message });
+          return z.NEVER;
+        }
+      }),
+    description: "Private key of that GitHub App: PEM, PEM with `\\n`, or base64 of the PEM file.",
+    section: "Connectors",
+    secret: true,
+  },
+  GITHUB_APP_SLUG: {
     schema: z.string().optional(),
-    description: "Private key (PEM) of that GitHub App. Newlines may be written as `\\n`.",
+    description:
+      "URL name of that GitHub App (`github.com/apps/{slug}`). Organizations install it from the app; only installations made that way are used.",
+    section: "Connectors",
+  },
+  GITHUB_APP_CLIENT_ID: {
+    schema: z.string().optional(),
+    description:
+      "Client id of that GitHub App (user authorization during installation must be on). Callback URL: `{PUBLIC_URL}/api/app/github-app/callback`. Used to check that the person installing can see the installation.",
+    section: "Connectors",
+  },
+  GITHUB_APP_CLIENT_SECRET: {
+    schema: z.string().optional(),
+    description: "Client secret of that GitHub App.",
+    section: "Connectors",
+    secret: true,
+  },
+  GITHUB_APP_WEBHOOK_SECRET: {
+    schema: z.string().optional(),
+    description:
+      "Webhook secret of that GitHub App. Webhook URL: `{PUBLIC_URL}/api/github-app/webhook` (uninstalls, suspensions and repository changes).",
     section: "Connectors",
     secret: true,
   },

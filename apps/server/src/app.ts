@@ -34,6 +34,7 @@ import { storageRoutes } from "./routes/app/storage";
 import { threadRoutes } from "./routes/app/threads";
 import { wikiRoutes } from "./routes/app/wiki";
 import { registerGitProxy } from "./routes/git";
+import { githubAppRoutes, registerGitHubAppWebhook } from "./routes/github-app";
 import { registerHealth } from "./routes/health";
 import { machineAppRoutes, registerMachinePublicRoutes } from "./routes/machines";
 import { registerWaitlist } from "./routes/waitlist";
@@ -63,6 +64,7 @@ export interface AppOptions {
  * - `/api/auth/*`         Better Auth (sign-up, sign-in, sessions, OAuth callbacks)
  * - `/api/app/*`          private API of the web app (cookie session + CSRF)
  * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
+ * - `/api/github-app/webhook` our GitHub App's events (installs, suspensions), signature-checked
  * - `/api/git/*`          git proxy for agents' computers (their own credential, D35)
  * - `/api/machines/*`     connected computers' runner: pair, uploads, install.sh (ADR 0025)
  * - `/api/waitlist`       public: join the waiting list and confirm the email (landing page)
@@ -121,7 +123,9 @@ export function createApp(options: AppOptions) {
     api.route("/app", sandboxRoutes(deps));
     api.route("/app", machineAppRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
+    api.route("/app", githubAppRoutes(deps));
     registerWebhookReceiver(api, deps);
+    registerGitHubAppWebhook(api, deps);
     registerMachinePublicRoutes(api, deps);
     registerWaitlist(api, deps);
     if (deps.extras?.gitProxy) registerGitProxy(api, deps.extras.gitProxy);

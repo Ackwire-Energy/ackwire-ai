@@ -48,6 +48,7 @@ import type {
   ForumTopic,
   ForumTopicDetail,
   ForumTopicInput,
+  GitHubAppInstallation,
   Health,
   Invitation,
   InvitationPreview,
@@ -302,6 +303,14 @@ export interface ApiClient {
     /** Returns the provider URL to open; the server redirects back to `returnTo`. */
     startOAuth(orgId: string, connector: string, input: { returnTo: string; serverUrl?: string }): Promise<string>;
     disconnect(orgId: string, connectionId: string): Promise<void>;
+  };
+  githubApp: {
+    /** Whether this server can install the GitHub App, and the organization's installations. */
+    info(orgId: string): Promise<{ installable: boolean; installations: GitHubAppInstallation[] }>;
+    /** Returns GitHub's install URL; GitHub sends the person back to `returnTo`. */
+    install(orgId: string, returnTo: string): Promise<string>;
+    /** Unbinds an installation (it stays installed on GitHub). */
+    remove(orgId: string, id: string): Promise<void>;
   };
   search: {
     query(orgId: string, input: { q: string; kinds?: SearchKind[]; limit?: number }): Promise<SearchHit[]>;

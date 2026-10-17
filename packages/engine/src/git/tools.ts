@@ -133,7 +133,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
               if (!repo) return { content: "repo must be owner/name", isError: true };
               const token =
                 (deps.app
-                  ? await appTokenForRepo(deps.app, github, repo.owner, repo.repo, {
+                  ? await appTokenForRepo(deps.app, github, { db: ctx.db, orgId: ctx.orgId }, repo.owner, repo.repo, {
                       pull_requests: "write",
                       contents: "read",
                     }).catch(() => null)
