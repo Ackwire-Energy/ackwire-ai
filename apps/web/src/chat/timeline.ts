@@ -1,4 +1,5 @@
-import type { Approval, Message } from "@/api/types";
+import type { Approval, Message, ReplyRef } from "@/api/types";
+import { quoteExcerpt } from "@/lib/reply";
 import { isRoutineCall, routineOfMessage } from "@/lib/routines";
 import { threadStartOf } from "@/lib/threads";
 import type { LiveRun } from "@/realtime/streams";
@@ -39,7 +40,14 @@ export function threadRootsToLoad(topLevel: Message[], max = 20): string[] {
 
 export type TimelineItem =
   | { kind: "day"; key: string; iso: string }
-  | { kind: "message"; key: string; message: Message; grouped: boolean }
+  | {
+      kind: "message";
+      key: string;
+      message: Message;
+      grouped: boolean;
+      /** A reply shown away from the message it answers (others came in between): that message, quoted. */
+      context?: ReplyRef;
+    }
   | { kind: "approval"; key: string; approval: Approval }
   | { kind: "run"; key: string; run: LiveRun };
 
@@ -89,6 +97,9 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
   const out: TimelineItem[] = [];
   let lastDay = "";
   let prev: Message | null = null;
+  const byId = new Map(messages.map((m) => [m.id, m]));
+  // The last message shown, across day dividers and cards (to tell a reply that lands far from its root).
+  let lastShown: Message | null = null;
   for (const entry of entries) {
     const day = dayKey(entry.at);
     if (day !== lastDay) {
@@ -103,8 +114,26 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
       // A routine's message always shows its own header, and nothing groups under it.
       const routine = Boolean(routineOfMessage(m.meta));
       const prevRoutine = Boolean(prev && routineOfMessage(prev.meta));
-      out.push({ ...entry.item, grouped: !routine && !prevRoutine && groupsWith(prev, m.author, m.createdAt) });
+      const root = m.threadId ? byId.get(m.threadId) : undefined;
+      const away =
+        root && lastShown && lastShown.id !== root.id && lastShown.threadId !== root.id && !replyQuotes(m, root.id);
+      const context: ReplyRef | undefined = away
+        ? {
+            messageId: root.id,
+            threadId: null,
+            author: root.author,
+            authorName: "",
+            excerpt: quoteExcerpt(root.body),
+          }
+        : undefined;
+      out.push({
+        ...entry.item,
+        // A reply that quotes its root starts its own block.
+        grouped: !context && !routine && !prevRoutine && groupsWith(prev, m.author, m.createdAt),
+        ...(context ? { context } : {}),
+      });
       prev = m;
+      lastShown = m;
     } else {
       out.push(entry.item);
       prev = null;
@@ -112,4 +141,10 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
   }
   for (const run of runs) out.push({ kind: "run", key: `run-${run.runId}`, run });
   return out;
+}
+
+/** The message already quotes that one itself (a person's "Responder"). */
+function replyQuotes(m: Message, id: string) {
+  const r = m.meta?.replyTo as { messageId?: unknown } | undefined;
+  return r?.messageId === id;
 }

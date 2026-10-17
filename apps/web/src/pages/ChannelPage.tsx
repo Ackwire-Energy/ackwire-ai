@@ -1525,6 +1525,7 @@ const Timeline = memo(function Timeline({
                 entering={initial !== null && entersWithMotion(item.key, item.message.createdAt, initial, mountedAt)}
                 modelLabels={modelLabels}
                 contextMark={threadsView?.marks.has(item.message.id)}
+                replyContext={item.context}
               />
             ))
           ) : null;
@@ -1960,6 +1961,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   entering,
   modelLabels,
   contextMark,
+  replyContext,
 }: {
   message: MessageType;
   grouped: boolean;
@@ -1967,6 +1969,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   modelLabels: Map<string, string>;
   /** Part of a thread's context (still in the channel): the quiet mark in the gutter. */
   contextMark?: boolean;
+  /** Shown away from the message it answers: that message, quoted above (`buildTimeline`). */
+  replyContext?: ReplyRef;
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -2039,7 +2043,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   // Files an agent made, or a person attached.
   const artifacts = artifactRefs(meta);
   // "Responder": the message this one quotes.
-  const quoted = useMemo(() => replyOf(m.meta), [m.meta]);
+  const quoted = useMemo(() => replyOf(m.meta) ?? replyContext ?? null, [m.meta, replyContext]);
   // An agent opened a forum topic from here: the topic card with "Ver discussão".
   const forumTopicId = m.author.type === "agent" ? forumTopicOfMessage(meta) : null;
   // A mission's cards (ADR 0029): the plan, a decision, a review; a report says where it ran.

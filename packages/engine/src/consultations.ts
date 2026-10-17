@@ -137,7 +137,7 @@ export function consultationResult(c: Pick<AgentConsultationRow, "status" | "ans
   if (c.status === "answered" && c.answer) return { content: `@${handle} answered:\n\n${c.answer}` };
   if (c.status === "expired")
     return {
-      content: `@${handle} didn't answer within ${CONSULTATION_TTL_MS / 60_000} minutes. Go on with what you know, and say what is still missing.`,
+      content: `@${handle} didn't answer within ${CONSULTATION_TTL_MS / 60_000} minutes. Go on with what you know, and say what is still missing. Its answer won't reach you later: don't promise to pass it on; offer to ask again instead.`,
     };
   return { content: `@${handle} couldn't answer (${c.answer ?? "its run failed"}). Go on with what you know.` };
 }

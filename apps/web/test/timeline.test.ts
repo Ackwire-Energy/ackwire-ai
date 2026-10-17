@@ -34,6 +34,22 @@ describe("message body", () => {
 });
 
 describe("timeline", () => {
+  test("a reply that lands after other messages quotes the message it answers", () => {
+    const atlas = { type: "agent" as const, id: "atlas" };
+    const ask = msg("ask", 1, joao); // "@Ada pergunta pro Atlas…" (Ada takes 15 min)
+    const room = msg("room", 10, joao);
+    const items = buildTimeline(
+      [ask, room, msg("r1", 11, ada, "room"), msg("r2", 11, atlas, "room"), msg("late", 16, ada, "ask")],
+      [],
+      [],
+    ).flatMap((i) => (i.kind === "message" ? [i] : []));
+    const byId = new Map(items.map((i) => [i.message.id, i]));
+    expect(byId.get("r1")?.context).toBeUndefined(); // right under its question
+    expect(byId.get("r2")?.context).toBeUndefined(); // same conversation as the reply above
+    expect(byId.get("late")?.context).toMatchObject({ messageId: "ask", author: joao, excerpt: "ask" });
+    expect(byId.get("late")?.grouped).toBe(false);
+  });
+
   test("upsert keeps order and replaces duplicates (HTTP response + WebSocket event)", () => {
     const a = msg("a", 1, joao);
     const b = msg("b", 2, joao);
