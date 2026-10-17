@@ -29,6 +29,7 @@ import {
   scheduleDoneCheck,
   tellSession,
 } from "./missions";
+import { notifyMissionEnded } from "./notification-producers";
 
 const { missions, missionDeliveries, missionDecisions, missionReviews, machineTasks } = schema;
 
@@ -192,6 +193,10 @@ async function createDelivery(
   if (out.mission) await publishMissionEvent(deps, now, "status", { reason: "delivered" });
   await publishMissionEvent(deps, now, "delivery", { deliveryId: out.delivery.id });
   await notifyDelivery(deps, now, out.delivery.id);
+  // The inbox (D46): the agent finished; the owner concludes or asks for changes.
+  await notifyMissionEnded(deps, now, "mission_finished", { type: "agent", id: now.agentId }, input.summary).catch(
+    () => {},
+  );
   await requestFilesSync(deps.db, now);
   return out.delivery;
 }

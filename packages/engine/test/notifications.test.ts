@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { type RealtimeEvent, userTopic } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  addAgentReaction,
   addChannelMember,
   addReaction,
   commentIssue,
@@ -141,6 +142,13 @@ test("reactions to my message merge (also within 30 min after reading); my own r
   n = list[0];
   expect(n).toMatchObject({ count: 3, readAt: null });
   expect(n?.latest.emojis).toContain("🚀");
+
+  // An agent's reaction (the `react` tool) reaches the author too, with the agent as actor.
+  await addAgentReaction(f.db, { orgId: f.org.id, agentId: f.agent.id, messageId: mine.id, reaction: "🙌" }, f.pubsub);
+  const [after] = (await inbox(f.owner.id, "reactions")).items;
+  expect(after).toMatchObject({ count: 4 });
+  expect(after?.actors[0]).toEqual({ type: "agent", id: f.agent.id });
+  expect(after?.latest.emojis).toContain("🙌");
 });
 
 test("one-off notifications are idempotent; done, undo, read-all and the cursor", async () => {

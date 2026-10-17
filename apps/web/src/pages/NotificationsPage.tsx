@@ -1215,14 +1215,11 @@ export function NotificationsPage() {
       t("notifications.toast.done"),
       "info",
       { label: t("notifications.toast.undo"), run: () => action.mutate({ type: "done", item: n, done: false }) },
-      {
-        detail:
-          n.kind === "agent_question"
-            ? t("notifications.toast.doneQuestion", { name })
-            : n.kind === "approval"
-              ? t("notifications.toast.doneApproval")
-              : t("notifications.toast.doneOther"),
-      },
+      n.kind === "agent_question"
+        ? t("notifications.toast.doneQuestion", { name })
+        : n.kind === "approval"
+          ? t("notifications.toast.doneApproval")
+          : t("notifications.toast.doneOther"),
     );
   };
 
@@ -1239,7 +1236,7 @@ export function NotificationsPage() {
       title,
       "info",
       { label: t("notifications.toast.undo"), run: () => action.mutate({ type: "snooze", item: n, until: null }) },
-      { detail: n.latest.title ?? n.latest.text ?? n.latest.quote ?? "" },
+      n.latest.title ?? n.latest.text ?? n.latest.quote ?? "",
     );
   };
 
@@ -1271,9 +1268,7 @@ export function NotificationsPage() {
   const startReply = (n: AppNotification) => {
     if (!replyTarget(n)) {
       if (n.kind === "approval")
-        toast.show(t("notifications.toast.decideThere"), "info", undefined, {
-          detail: t("notifications.toast.decideThereDetail"),
-        });
+        toast.show(t("notifications.toast.decideThere"), "info", undefined, t("notifications.toast.decideThereDetail"));
       return;
     }
     setReplying(n.id);
@@ -1316,10 +1311,10 @@ export function NotificationsPage() {
           const name = nameOf(t, dir, n.actors[0]);
           if (res.kind === "question") {
             live.answered({ ...res.question, answer: res.question.answer ?? body });
-            toast.show(t("notifications.toast.answered", { name }), "info", undefined, { detail: body });
+            toast.show(t("notifications.toast.answered", { name }), "info", undefined, body);
             resolve(n);
           } else if (res.kind === "forum") {
-            toast.show(t("notifications.toast.spoke"), "info", undefined, { detail: body });
+            toast.show(t("notifications.toast.spoke"), "info", undefined, body);
             resolve(n);
           } else {
             setReplied((r) => ({ ...r, [n.id]: body }));
@@ -1327,7 +1322,7 @@ export function NotificationsPage() {
               t("notifications.toast.sent"),
               "info",
               { label: t("notifications.toast.see"), run: () => openItem(n) },
-              { detail: body },
+              body,
             );
           }
         },
@@ -1344,9 +1339,7 @@ export function NotificationsPage() {
       {
         onSuccess: () => {
           leave(n, () => dropNotification(qc, org.id, n.id));
-          toast.show(t("notifications.toast.passed"), "info", undefined, {
-            detail: t("notifications.toast.passedDetail"),
-          });
+          toast.show(t("notifications.toast.passed"), "info", undefined, t("notifications.toast.passedDetail"));
         },
         onSettled: () => setPassing(null),
       },
@@ -1367,7 +1360,7 @@ export function NotificationsPage() {
               label: t("notifications.toast.undo"),
               run: () => action.mutate({ type: "unreadMany", ids: res.ids }),
             },
-            { detail: t("notifications.toast.readAllDetail") },
+            t("notifications.toast.readAllDetail"),
           ),
       },
     );
