@@ -4951,9 +4951,6 @@ a.ac-list__row:focus-visible {
 .ac-setnote--quiet {
   color: var(--faint);
 }
-.ac-setnote--live {
-  animation: ac-fade-up 0.25s var(--out) both;
-}
 @keyframes ac-fade-up {
   from {
     opacity: 0;
@@ -5102,9 +5099,6 @@ label.ac-setrow__title {
 .ac-setmore__toggle[aria-expanded="true"] .ac-setmore__chev {
   transform: rotate(180deg);
 }
-.ac-setmore__body {
-  animation: ac-fade-up 0.25s var(--out) both;
-}
 .ac-setmore__body > .ac-setsec:first-child {
   border-top: 0;
   padding-top: 24px;
@@ -5117,13 +5111,17 @@ label.ac-setrow__title {
     align-items: flex-start;
   }
 }
+/* Enter motion for the live note and the expanded "more" body: only without reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .ac-setnote--live,
+  .ac-setmore__body {
+    animation: ac-fade-up 200ms var(--out) both;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .ac-optrow,
   .ac-optrow__lead,
-  .ac-setnote--live,
-  .ac-setmore__body,
   .ac-setmore__chev {
-    animation: none;
     transition: none;
   }
 }
