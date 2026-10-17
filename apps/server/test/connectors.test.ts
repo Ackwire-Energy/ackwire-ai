@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
+import type { McpConnect } from "@agenteschat/engine";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -138,4 +139,66 @@ test("catalog: with its OAuth app configured, our Linear connector replaces the 
   const linear = connectors.filter((c) => c.id === "linear");
   expect(linear).toHaveLength(1);
   expect(linear[0]).toMatchObject({ kind: "catalog", category: "product", iconUrl: "/connectors/linear.svg" });
+});
+
+test("connector tools API: classified on listing (judge for ambiguous names), sensitive ones can't be freed", async () => {
+  const tools = [
+    { name: "campaign_list", inputSchema: { type: "object" } },
+    { name: "campaign_delete", inputSchema: { type: "object" } },
+    { name: "pixel_track", description: "Send a web event to a pixel.", inputSchema: { type: "object" } },
+  ];
+  const mcpConnect: McpConnect = async () => ({
+    listTools: async () => tools,
+    callTool: async () => ({ content: "ok", isError: false }),
+    close: async () => {},
+  });
+  t = await createTestServer({
+    mcpConnect,
+    resolveHost: async () => ["93.184.216.34"],
+    judge: (kind, id) =>
+      kind === "connector_tool_level" ? (id.startsWith("level_") ? "write" : "changes_undoable") : undefined,
+  });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const res = await owner(`/api/app/organizations/${orgId}/connectors/custom`, {
+    json: { serverUrl: "https://ads.example.com/mcp", apiKey: "ads_secret_12345", label: "Ads" },
+  });
+  expect(res.status).toBe(200);
+  const started = (await res.json()) as {
+    status: string;
+    server: {
+      id: string;
+      tools: {
+        name: string;
+        level: string;
+        sensitive: boolean;
+        pending: boolean;
+        suggestionReason: string | null;
+        subject: string;
+        nameParts: { verb: string | null; words: string[] };
+      }[];
+    };
+  };
+  expect(started.status).toBe("connected");
+  const by = Object.fromEntries(started.server.tools.map((x) => [x.name, x]));
+  expect(by.campaign_list).toMatchObject({ level: "read", sensitive: false, pending: false, subject: "campaign" });
+  expect(by.campaign_delete).toMatchObject({ level: "approval", sensitive: true, pending: false });
+  expect(by.pixel_track).toMatchObject({
+    level: "write",
+    pending: true,
+    suggestionReason: "changes_undoable",
+    nameParts: { verb: "track", words: ["pixel"] },
+  });
+
+  const save = (access: string, name = "campaign_delete") =>
+    owner(`/api/app/organizations/${orgId}/connectors/custom/${started.server.id}/tools`, {
+      method: "PUT",
+      json: { label: "Ads", tools: [{ name, access, label: name }] },
+    });
+  expect((await save("read")).status).toBe(400);
+  expect((await save("write")).status).toBe(400);
+  expect((await save("off")).status).toBe(200);
+  const ok = (await (await save("approval", "pixel_track")).json()) as { tools: { name: string; pending: boolean }[] };
+  expect(ok.tools.find((x) => x.name === "pixel_track")?.pending).toBe(false);
 });

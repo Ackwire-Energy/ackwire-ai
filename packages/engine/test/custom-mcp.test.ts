@@ -150,7 +150,8 @@ function depsOf(fx: Fixture, extra: Partial<CustomDeps> = {}): CustomDeps {
 describe("custom MCP servers", () => {
   test("Supabase (read-only): its execute_sql is suggested as read; other tools keep our usual suggestion", async () => {
     expect(suggestFor({ name: "execute_sql" }, ["execute_sql"])).toBe("read");
-    expect(suggestFor({ name: "execute_sql" })).toBe("write");
+    // An ambiguous name: the judge decides when listing; by the rules alone, ask first.
+    expect(suggestFor({ name: "execute_sql" })).toBe("approval");
     expect(suggestFor({ name: "apply_migration" }, ["execute_sql"])).toBe("write");
     expect(suggestFor({ name: "delete_branch" }, ["execute_sql"])).toBe("approval");
   });

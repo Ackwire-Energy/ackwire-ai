@@ -393,6 +393,13 @@
       "when": 1792250000000,
       "tag": "0055_agent_mission_default",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1792260000000,
+      "tag": "0056_connector_tool_review",
+      "breakpoints": true
     }
   ]
 }

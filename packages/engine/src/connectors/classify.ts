@@ -1,0 +1,346 @@
+import type { Judge, JudgeQuestion } from "../judge";
+
+/**
+ * How a connector's tools come classified before a person looks at them
+ * (telas/ConectorFerramentas.html). Most people just click Continuar, so the
+ * suggestion must be right on its own:
+ *
+ * 1. The server's annotations: `readOnlyHint` → read; `destructiveHint` →
+ *    approval (and sensitive).
+ * 2. The verb in the tool's name: get/list/search… → read;
+ *    create/update/add… → write; delete/remove/send/pay… → approval (and
+ *    sensitive: such a tool may only ask for approval or be off).
+ * 3. Anything else is ambiguous: the shared Judge suggests a level and a
+ *    short reason (a code the web says in the person's language), in batches;
+ *    the answer is kept per connection and tool name. When the judge fails:
+ *    approval, "couldn't tell".
+ *
+ * Code owns the policy: the judge only suggests, a person confirms, and
+ * sensitive tools never run without approval whatever anyone answers.
+ */
+export type ToolLevel = "read" | "write" | "approval";
+export type SuggestionSource = "annotation" | "verb" | "preset" | "judge" | "judge_failed";
+
+/** Reasons the judge may give for an ambiguous tool (the web translates each). */
+export const JUDGE_REASONS = [
+  "reads_only",
+  "changes_undoable",
+  "replaces_data",
+  "copies_only",
+  "spends_money",
+  "shares_outside",
+  "reaches_people",
+  "deletes_data",
+] as const;
+export type JudgeReason = (typeof JUDGE_REASONS)[number];
+export type ReasonCode =
+  | "read_only_hint"
+  | "destructive_hint"
+  | "verb_read"
+  | "verb_write"
+  | "verb_sensitive"
+  | "preset_read"
+  | "unknown"
+  | JudgeReason;
+
+export interface ToolClass {
+  level: ToolLevel;
+  source: SuggestionSource;
+  reason: ReasonCode;
+  /** May only ask for approval or be off. */
+  sensitive: boolean;
+}
+
+export interface ToolToClassify {
+  name: string;
+  description?: string | null;
+  readOnlyHint?: boolean | null;
+  destructiveHint?: boolean | null;
+}
+
+const READ_VERBS = new Set([
+  "get",
+  "list",
+  "search",
+  "read",
+  "describe",
+  "query",
+  "check",
+  "estimate",
+  "fetch",
+  "find",
+  "view",
+  "show",
+  "count",
+  "preview",
+  "download",
+  "lookup",
+]);
+const WRITE_VERBS = new Set([
+  "create",
+  "update",
+  "add",
+  "set",
+  "upload",
+  "bind",
+  "copy",
+  "edit",
+  "patch",
+  "insert",
+  "rename",
+  "assign",
+  "apply",
+  "duplicate",
+]);
+/** Sensitive: they delete, send, spend or publish. Merge, deploy and rollback always ask (ADR 0015). */
+const SENSITIVE_VERBS = new Set([
+  "delete",
+  "remove",
+  "send",
+  "pay",
+  "publish",
+  "transfer",
+  "refund",
+  "unbind",
+  "share",
+  "merge",
+  "deploy",
+  "rollback",
+  "destroy",
+  "drop",
+  "purge",
+]);
+/** Verbs a readable name starts with, whatever their level (the web translates them). */
+const OTHER_VERBS = new Set([
+  "track",
+  "sync",
+  "refresh",
+  "run",
+  "export",
+  "import",
+  "enable",
+  "disable",
+  "pause",
+  "resume",
+  "cancel",
+  "close",
+  "open",
+  "start",
+  "stop",
+  "archive",
+  "restore",
+  "revoke",
+  "invite",
+  "approve",
+  "reject",
+  "move",
+  "execute",
+  "write",
+  "post",
+  "reply",
+  "trigger",
+]);
+const isVerb = (w: string) => READ_VERBS.has(w) || WRITE_VERBS.has(w) || SENSITIVE_VERBS.has(w) || OTHER_VERBS.has(w);
+
+/** `campaignBudget_get` → ["campaign", "budget", "get"]. */
+export function nameWords(name: string): string[] {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+/**
+ * The verb of a tool name: the last word when it is one (`ad_get`), else the
+ * first (`list_tickets`), else the first verb in the middle (`github_create_issue`).
+ */
+export function verbIndex(words: string[], known: (w: string) => boolean = isVerb): number {
+  if (words.length === 0) return -1;
+  if (known(words[words.length - 1] ?? "")) return words.length - 1;
+  if (known(words[0] ?? "")) return 0;
+  return words.findIndex(known);
+}
+
+const ruleVerb = (w: string) => READ_VERBS.has(w) || WRITE_VERBS.has(w) || SENSITIVE_VERBS.has(w);
+
+/** Annotations, a preset's read-only list, then the verb. Null = ambiguous (the judge decides). */
+export function classifyByRules(tool: ToolToClassify, readTools: readonly string[] = []): ToolClass | null {
+  if (tool.readOnlyHint === true)
+    return { level: "read", source: "annotation", reason: "read_only_hint", sensitive: false };
+  if (tool.destructiveHint === true)
+    return { level: "approval", source: "annotation", reason: "destructive_hint", sensitive: true };
+  if (readTools.includes(tool.name))
+    return { level: "read", source: "preset", reason: "preset_read", sensitive: false };
+  const words = nameWords(tool.name);
+  const verb = words[verbIndex(words, ruleVerb)];
+  if (!verb) return null;
+  if (SENSITIVE_VERBS.has(verb))
+    return { level: "approval", source: "verb", reason: "verb_sensitive", sensitive: true };
+  if (WRITE_VERBS.has(verb)) return { level: "write", source: "verb", reason: "verb_write", sensitive: false };
+  return { level: "read", source: "verb", reason: "verb_read", sensitive: false };
+}
+
+/** What we suggest when the judge can't answer: ask first. */
+export const UNKNOWN_CLASS: ToolClass = {
+  level: "approval",
+  source: "judge_failed",
+  reason: "unknown",
+  sensitive: false,
+};
+
+const BATCH = 20;
+const LEVEL_CRITERIA: Record<ToolLevel, string> = {
+  read: "It only looks at data: it changes nothing anywhere.",
+  write: "It creates or changes data in the service, but doesn't spend money, delete things, or reach other people.",
+  approval:
+    "A person should approve each call first: it can spend money, delete or overwrite data, share data with other accounts, or reach customers or the public.",
+};
+const REASON_CRITERIA: Record<JudgeReason, string> = {
+  reads_only: "It only reads or computes numbers; nothing changes.",
+  changes_undoable: "It changes data, but nothing is lost and money isn't spent.",
+  replaces_data: "It replaces or overwrites data that already exists.",
+  copies_only: "It copies or syncs data without deleting anything.",
+  spends_money: "It can make the account spend money (or spend it again).",
+  shares_outside: "It shares data with another account, company or person.",
+  reaches_people: "Customers, the public or other people see or receive what it does.",
+  deletes_data: "It can delete data or switch things off for good.",
+};
+
+/**
+ * Asks the judge about ambiguous tools, a batch per request: a level and a
+ * reason for each. Tools it doesn't answer (or every tool, when it fails)
+ * get `UNKNOWN_CLASS`.
+ */
+export async function judgeTools(
+  judge: Judge | undefined,
+  input: { orgId: string; server: string; tools: ToolToClassify[] },
+): Promise<Map<string, ToolClass>> {
+  const out = new Map<string, ToolClass>();
+  for (let start = 0; start < input.tools.length; start += BATCH) {
+    const batch = input.tools.slice(start, start + BATCH);
+    let answers: Awaited<ReturnType<Judge["ask"]>> = {};
+    if (judge) {
+      const questions: Record<string, JudgeQuestion> = {};
+      batch.forEach((t, i) => {
+        const about = { tool: `t${i}`, name: t.name };
+        questions[`level_${i}`] = {
+          type: "choice",
+          instructions: {
+            ...about,
+            question:
+              "An AI agent may call this tool of the `server` on its own. How much freedom should it have? Use the tool's name and description.",
+          },
+          criteria: LEVEL_CRITERIA,
+        };
+        questions[`reason_${i}`] = {
+          type: "choice",
+          instructions: { ...about, question: "Which phrase best says what calling this tool does?" },
+          criteria: REASON_CRITERIA,
+        };
+      });
+      try {
+        answers = await judge.ask({
+          orgId: input.orgId,
+          kind: "connector_tool_level",
+          state: {
+            server: input.server,
+            tools: batch.map((t, i) => ({
+              id: `t${i}`,
+              name: t.name,
+              description: (t.description ?? "").slice(0, 600),
+            })),
+          },
+          questions,
+        });
+      } catch {
+        answers = {};
+      }
+    }
+    batch.forEach((t, i) => {
+      const level = answers[`level_${i}`]?.choice;
+      const reason = answers[`reason_${i}`]?.choice;
+      if (level === "read" || level === "write" || level === "approval") {
+        out.set(t.name, {
+          level,
+          source: "judge",
+          reason: JUDGE_REASONS.includes(reason as JudgeReason) ? (reason as JudgeReason) : "unknown",
+          sensitive: false,
+        });
+      } else out.set(t.name, UNKNOWN_CLASS);
+    });
+  }
+  return out;
+}
+
+/**
+ * Every tool of a server, classified: rules first, then the judge for the
+ * ambiguous ones (skipping those `cached` already answered).
+ */
+export async function classifyTools(
+  tools: ToolToClassify[],
+  options: {
+    orgId: string;
+    server: string;
+    judge?: Judge;
+    readTools?: readonly string[];
+    /** Earlier judge answers for this connection, by tool name. */
+    cached?: Map<string, ToolClass>;
+  },
+): Promise<Map<string, ToolClass>> {
+  const out = new Map<string, ToolClass>();
+  const ask: ToolToClassify[] = [];
+  for (const tool of tools) {
+    const byRules = classifyByRules(tool, options.readTools);
+    const hit = options.cached?.get(tool.name);
+    if (byRules) out.set(tool.name, byRules);
+    else if (hit && hit.source === "judge") out.set(tool.name, hit);
+    else ask.push(tool);
+  }
+  if (ask.length > 0) {
+    const judged = await judgeTools(options.judge, { orgId: options.orgId, server: options.server, tools: ask });
+    for (const [name, c] of judged) out.set(name, c);
+  }
+  return out;
+}
+
+// ── Readable names and subjects ───────────────────────────────────────────────
+
+/**
+ * What the web needs to say a tool's name in the person's language: the verb
+ * (`get`, `create`…, or null) and the other words in order. The technical
+ * name is shown only on hover or when a search matches it.
+ */
+export interface ToolNameParts {
+  verb: string | null;
+  words: string[];
+}
+
+/** The first word every tool of a server shares (`github` in `github_create_issue`), when it isn't a verb. */
+export function sharedPrefix(names: string[]): string | null {
+  if (names.length < 2) return null;
+  const firsts = names.map((n) => nameWords(n));
+  const first = firsts[0]?.[0];
+  if (!first || isVerb(first)) return null;
+  return firsts.every((w) => w[0] === first && w.length > 1) ? first : null;
+}
+
+const singular = (w: string) =>
+  w.endsWith("ies") && w.length > 4
+    ? `${w.slice(0, -3)}y`
+    : /(ss|us|is|data|info|news|status|analytics)$/.test(w)
+      ? w
+      : w.endsWith("s") && w.length > 3
+        ? w.slice(0, -1)
+        : w;
+
+/** Readable parts and the subject (the resource the tool is about: `campaign`, `ticket`; `other` when none). */
+export function describeToolName(name: string, prefix: string | null = null): ToolNameParts & { subject: string } {
+  let words = nameWords(name);
+  if (prefix && words[0] === prefix && words.length > 1) words = words.slice(1);
+  const v = verbIndex(words);
+  const verb = v >= 0 ? (words[v] ?? null) : null;
+  const rest = v >= 0 ? words.filter((_, i) => i !== v) : words;
+  const head = rest[0];
+  return { verb, words: rest, subject: head ? singular(head) : "other" };
+}

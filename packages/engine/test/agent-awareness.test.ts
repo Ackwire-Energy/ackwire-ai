@@ -98,7 +98,7 @@ describe("connectors the agent can't use yet", () => {
     expect(suggestAccess({ name: "list_events", readOnlyHint: true })).toBe("read");
     expect(suggestAccess({ name: "delete_report", readOnlyHint: null })).toBe("approval");
     expect(suggestAccess({ name: "wipe", destructiveHint: true })).toBe("approval");
-    expect(suggestAccess({ name: "get_pull_request" })).toBe("write");
+    expect(suggestAccess({ name: "get_pull_request" })).toBe("read");
     const mcp = fakeGithubMcp();
     f = await setup();
     const deps = {

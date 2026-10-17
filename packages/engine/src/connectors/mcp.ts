@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { recordAudit } from "../audit";
 import type { ToolDefinition, ToolSource } from "../tools/types";
 import { CONNECTOR_CATALOG, connectorScope, fillTitle } from "./catalog";
 import { activeConnections, type ConnectorConnection, type ConnectorDeps, connectionHeaders } from "./connections";
@@ -108,7 +109,11 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
     return tools;
   }
 
-  /** A custom server's tools that an admin classified (hidden until then). */
+  /**
+   * A custom server's tools that an admin classified (hidden until then; `off`
+   * never shows). `approval` and sensitive tools ask a person for every call;
+   * `write` tools run on their own and each call goes to the audit log.
+   */
   async function customToolsOf(connection: ConnectorConnection): Promise<ToolDefinition[]> {
     const classified = await classifiedTools(deps.db, connection.id);
     if (classified.length === 0) return [];
@@ -137,15 +142,25 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
           scope: customScope(connection.id, access),
           connectionId: connection.id,
           connectorLabel: connection.label,
-          sensitive: access === "approval",
+          // A sensitive tool never runs without approval, whatever is stored.
+          sensitive: access === "approval" || row.sensitive,
           describe: (input) => ({
             title: `${connection.label}: ${row.label}`,
             detail: `${tool.name} · ${Object.entries(input)
               .map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
               .join(" · ")}`,
           }),
-          execute: async (input) => {
+          execute: async (input, ctx) => {
             const result = await withSession(connection, (s) => s.callTool(tool.name, input));
+            if (access === "write" && !row.sensitive) {
+              await recordAudit(ctx.db, {
+                orgId: ctx.orgId,
+                actor: { type: "agent", id: ctx.agentId },
+                action: "connector.tool_changed",
+                target: { type: "connector_connection", id: connection.id },
+                details: { tool: tool.name, runId: ctx.runId, isError: result.isError },
+              }).catch(() => {});
+            }
             return {
               content: result.content,
               isError: result.isError,

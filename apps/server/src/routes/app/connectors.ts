@@ -248,7 +248,8 @@ export function connectorRoutes(deps: AppDeps) {
         });
         if (isCustom(connection)) {
           const connect = deps.extras?.mcpConnect ?? connectOverHttp;
-          await syncCustomTools({ ...connectorDeps, connect }, connection).catch(() => {});
+          const judge = deps.extras?.context?.judge;
+          await syncCustomTools({ ...connectorDeps, connect, judge }, connection).catch(() => {});
           // A one-click connector: its tools get our suggested classification right away.
           if (presetForServer(connection.serverUrl)) {
             await acceptCustomSuggestion(

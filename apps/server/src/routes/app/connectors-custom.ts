@@ -44,6 +44,26 @@ const CustomServer = z
         readOnlyHint: z.boolean().nullable(),
         suggestedAccess: Access.nullable().openapi({ description: "Our suggestion until an admin decides." }),
         access: Decision.nullable().openapi({ description: "Null = not classified yet: hidden from agents." }),
+        level: Decision.openapi({ description: "The decision, else the suggestion." }),
+        suggestionSource: z
+          .enum(["annotation", "verb", "preset", "judge", "judge_failed"])
+          .nullable()
+          .openapi({
+            description: "Where the suggestion came from: the server's hints, the name's verb, or the judge.",
+          }),
+        suggestionReason: z
+          .string()
+          .nullable()
+          .openapi({ description: "Why, as a code the web translates (`spends_money`, `unknown`…)." }),
+        sensitive: z.boolean().openapi({ description: "May only ask for approval or be off." }),
+        pending: z
+          .boolean()
+          .openapi({ description: "The name couldn't decide it and no one confirmed the suggestion yet." }),
+        off: z.boolean(),
+        nameParts: z
+          .object({ verb: z.string().nullable(), words: z.array(z.string()) })
+          .openapi({ description: "The readable name's parts (verb and words, English); the web localizes them." }),
+        subject: z.string().openapi({ description: "The resource it is about (from the name): tools group by it." }),
         label: z.string(),
         firstSeenAt: z.string(),
       }),
@@ -73,6 +93,7 @@ export function customConnectorRoutes(deps: AppDeps) {
     http: deps.extras?.http,
     resolveHost: deps.extras?.resolveHost,
     connect: deps.extras?.mcpConnect ?? connectOverHttp,
+    judge: deps.extras?.context?.judge,
   };
 
   app.openapi(
@@ -207,12 +228,23 @@ export function customConnectorRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Save the label and the classification of each tool",
+      description:
+        "Sensitive tools may only be `approval` or `off` (400 otherwise). `confirmed: false` applies a suggestion but leaves an ambiguous tool waiting for a decision.",
       request: {
         params: ServerParams,
         body: body(
           z.object({
             label: z.string().max(80),
-            tools: z.array(z.object({ name: z.string(), access: Decision, label: z.string().max(120) })).max(500),
+            tools: z
+              .array(
+                z.object({
+                  name: z.string(),
+                  access: Decision,
+                  label: z.string().max(120),
+                  confirmed: z.boolean().optional(),
+                }),
+              )
+              .max(1000),
           }),
         ),
       },

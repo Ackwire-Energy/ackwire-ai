@@ -133,6 +133,19 @@ export const customTools = pgTable(
     firstSeenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     /** The server stopped listing it. */
     removedAt: timestamp({ withTimezone: true }),
+    /**
+     * Where the suggestion came from: `annotation` (the server's hints), `verb`
+     * (the tool's name), `preset` (a one-click server's read-only list),
+     * `judge` (the name was ambiguous; the judge's answer, kept as a cache) or
+     * `judge_failed` (asked again on the next listing).
+     */
+    suggestionSource: text(),
+    /** A short reason code for the suggestion (the web says it in the person's language). */
+    suggestionReason: text(),
+    /** Deletes, sends, pays, publishes…: may only ask for approval or be off. */
+    sensitive: boolean().notNull().default(false),
+    /** A person confirmed the level of an ambiguous tool (until then it waits in "needs your decision"). */
+    confirmedAt: timestamp({ withTimezone: true }),
   },
   (t) => [unique().on(t.connectionId, t.name), index().on(t.orgId)],
 );
