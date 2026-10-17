@@ -110,8 +110,6 @@ export interface EngineDeps {
   brains?: Partial<Record<BrainKind, BrainFactory>>;
   /** Computers' status (machine hub): a computer brain's availability is checked before its turn. */
   machines?: { status(machineId: string): Promise<MachineStatus | null> };
-  /** `MISSIONS_ON_ENGINE` (ADR 0032 §6): a run in a mission thread is its main session, with the mission's brain. */
-  missionsOnEngine?: boolean;
 }
 
 /**
@@ -492,7 +490,6 @@ async function executeRunInner(
         capabilities: describeCapabilities(tools, pending),
         skills: skillList,
         trigger,
-        missionsOnEngine: deps.missionsOnEngine === true,
       }),
       contextDeps
         ? retrieveForRun(contextDeps, {

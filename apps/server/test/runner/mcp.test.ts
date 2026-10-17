@@ -579,14 +579,14 @@ test.skipIf(!posix)("a mission task started with the server's token keeps it for
     taskId: TASK,
     executor: "claude",
     prompt: "Plan it",
-    mission: { id: "0193aaaa-0000-7000-8000-0000000000bb", rules: "Rules.", mode: "plan", mcpToken: SERVER_TOKEN },
+    mission: { id: "0193aaaa-0000-7000-8000-0000000000bb", rules: "Rules.", mcpToken: SERVER_TOKEN },
   });
   expect(tasks.mcpTask(TASK)).toMatchObject({ serverToken: SERVER_TOKEN });
   await tasks.start(AGENT, {
     taskId: "0193aaaa-0000-7000-8000-000000000043",
     executor: "claude",
     prompt: "Plan it",
-    mission: { id: "0193aaaa-0000-7000-8000-0000000000bb", rules: "Rules.", mode: "plan", mcpToken: "not-a-token" },
+    mission: { id: "0193aaaa-0000-7000-8000-0000000000bb", rules: "Rules.", mcpToken: "not-a-token" },
   });
   expect(tasks.mcpTask("0193aaaa-0000-7000-8000-000000000043")?.serverToken).toBeUndefined();
 });

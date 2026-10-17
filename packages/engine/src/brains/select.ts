@@ -167,7 +167,7 @@ async function sessionUsed(db: Executor, run: AgentRun, kind: BrainKind, convers
 
 /**
  * The brain, model and session of a run: the mission's when the run is its
- * main session (only with `MISSIONS_ON_ENGINE`), else the agent's; for a
+ * main session, else the agent's; for a
  * computer brain, its availability on the agent's computer (checked when
  * `machines` is given; the brains check again). `conversation`: the thread
  * the run answers in, or the channel for a flat DM.
@@ -175,16 +175,13 @@ async function sessionUsed(db: Executor, run: AgentRun, kind: BrainKind, convers
 export async function resolveBrain(
   deps: {
     db: Executor;
-    missionsOnEngine?: boolean;
     machines?: { status(machineId: string): Promise<MachineStatus | null> };
   },
   agent: Agent,
   run: AgentRun,
   conversation: string,
 ): Promise<BrainPlan> {
-  const mission: MissionTurn | null = deps.missionsOnEngine
-    ? await missionTurnFor(deps.db, run).catch(() => null)
-    : null;
+  const mission: MissionTurn | null = await missionTurnFor(deps.db, run).catch(() => null);
   const kind = brainFor(agent, run, mission);
   const base = mission ? { missionId: mission.missionId } : {};
   if (kind === "model") return { kind, ...base };

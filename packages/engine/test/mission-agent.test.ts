@@ -23,9 +23,9 @@ import {
   setParticipant,
   startMachineTask,
   startMission,
+  tellMainSession,
   transferMission,
   updatePlan,
-  wakeMissionAgent,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { missionRunner, pairedMachine, type TaskStartRequest } from "./mission-helpers";
@@ -206,7 +206,7 @@ describe("missions with executor agent (ADR 0029)", () => {
     const { view } = await agentMission();
     await startMission(md(), f.owner.id, f.org.id, view.id);
     for (let i = 0; i < MISSION_STUCK.idleWakeups - 1; i++) {
-      await wakeMissionAgent(md(), await missionRow(), `nudge ${i}`, { kind: "system" });
+      await tellMainSession(md(), await missionRow(), `nudge ${i}`, { kind: "system" });
     }
     // A moving plan starts the count over.
     await updatePlan(md(), await missionRow(), {
@@ -215,9 +215,9 @@ describe("missions with executor agent (ADR 0029)", () => {
     });
     expect((await missionRow()).idleWakeups).toBe(0);
     for (let i = 0; i < MISSION_STUCK.idleWakeups; i++) {
-      expect((await wakeMissionAgent(md(), await missionRow(), `again ${i}`, { kind: "system" })).delivered).toBe(true);
+      expect((await tellMainSession(md(), await missionRow(), `again ${i}`, { kind: "system" })).delivered).toBe(true);
     }
-    const stuck = await wakeMissionAgent(md(), await missionRow(), "one more", { kind: "system" });
+    const stuck = await tellMainSession(md(), await missionRow(), "one more", { kind: "system" });
     expect(stuck.delivered).toBe(false);
     const row = await missionRow();
     expect(row.status).toBe("paused");
@@ -443,7 +443,12 @@ describe("missions with executor agent (ADR 0029)", () => {
     await again.hello(paired.token);
     const switched = await setMissionExecutor(md(), f.owner.id, f.org.id, view.id, "claude");
     expect(switched.executor).toBe("claude");
-    expect(again.started.at(-1)).toMatchObject({ executor: "claude", mission: { mode: "plan" } });
+    // A new main session plans again: a notice for the agent's run (with the new brain), no task on the computer.
+    expect(again.started).toHaveLength(0);
+    const plans = (await threadMessages(view.threadId)).filter((m) =>
+      String((m.meta.missionInbox as { text?: string } | undefined)?.text ?? "").includes("PLAN MODE"),
+    );
+    expect(plans).toHaveLength(2);
 
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });

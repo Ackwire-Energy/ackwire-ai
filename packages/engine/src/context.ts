@@ -95,8 +95,6 @@ export async function buildRunContext(
     /** Skills enabled for the agent (name and description; the body loads on demand). */
     skills?: { name: string; description: string }[];
     trigger?: Message;
-    /** `MISSIONS_ON_ENGINE` (ADR 0032 §6): the run in a mission thread is its main session, whatever its brain. */
-    missionsOnEngine?: boolean;
   },
 ): Promise<RunContext> {
   // Independent lookups go out together (the database may be remote); org,
@@ -125,9 +123,7 @@ export async function buildRunContext(
         : null
       : rawRange;
   // A mission's thread: a compact brief instead of making the agent dig (only there; one lookup above decided).
-  const briefing = threadInfo?.missionId
-    ? missionBrief(db, threadInfo.missionId, { onEngine: options.missionsOnEngine === true }).catch(() => null)
-    : null;
+  const briefing = threadInfo?.missionId ? missionBrief(db, threadInfo.missionId).catch(() => null) : null;
   const trigger = triggerRows[0];
   if (!org || !channel || !trigger) throw new Error("run context is incomplete (org, channel or trigger missing)");
 

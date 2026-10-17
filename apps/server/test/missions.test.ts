@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
-import { completeMission, getMissionRow } from "@agenteschat/engine";
+import { completeMission, getMissionRow, startSessionTask } from "@agenteschat/engine";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -92,6 +92,14 @@ test("missions API: session and same origin; create, read, start (owner only), l
   expect(created.status).toBe(201);
   const mission = (await created.json()) as Mission;
   expect(mission).toMatchObject({ status: "proposed", role: "owner", canAct: true });
+  // The planning is the main session's run in the thread (ADR 0032 §6): nothing starts on the computer.
+  expect(runner.started).toHaveLength(0);
+  // An item session of the mission on the computer (what the main session's start_task starts).
+  await startSessionTask(
+    { db: t.db, hub: t.engine.machineHub },
+    (await getMissionRow(t.db, mission.id)) as NonNullable<Awaited<ReturnType<typeof getMissionRow>>>,
+    { title: "Explore", prompt: "Map the repo", sessionId: crypto.randomUUID(), cwd: "", resume: false },
+  );
   expect(runner.started).toHaveLength(1);
   expect(runner.started[0]?.mission?.id).toBe(mission.id);
 
@@ -244,8 +252,8 @@ test("missions API: who programs: eligible agents list it, POST takes it, the ow
   const switched = await api(`/missions/${mission.id}/executor`, { method: "PUT", json: { executor: "claude" } });
   expect(switched.status).toBe(200);
   expect(((await switched.json()) as { executor: string }).executor).toBe("claude");
-  expect(runner.started).toHaveLength(1);
-  expect(runner.started[0]?.mission).toMatchObject({ id: mission.id, mode: "plan" });
+  // A new main session plans with the new brain: still nothing started on the computer by itself.
+  expect(runner.started).toHaveLength(0);
 
   await api(`/missions/${mission.id}/start`, { json: {} });
   const late = await api(`/missions/${mission.id}/executor`, { method: "PUT", json: { executor: "agent" } });

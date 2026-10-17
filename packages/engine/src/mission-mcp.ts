@@ -15,7 +15,7 @@ import type { MachineMissionHooks } from "./machine-hub";
 import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./machine-tasks";
 import { handlePermissionPrompt, runPermissionPrompt } from "./mission-commands";
 import { completeMission } from "./mission-delivery";
-import { createMissionApproval, onMachineOnline } from "./mission-sync";
+import { onMachineOnline } from "./mission-sync";
 import {
   askDecision,
   checkMissionToolRate,
@@ -34,7 +34,7 @@ import {
   startSessionTask,
   updatePlan,
 } from "./missions";
-import { missionBrain, missionsOnEngine } from "./missions-engine";
+import { missionBrain } from "./missions-engine";
 import { resumeRunsWaitingForMachine } from "./run-resume";
 import { type BridgeIdentity, verifyRunToolToken } from "./run-tool-tokens";
 import { bridgeToolsFor, invokeToolForRun } from "./run-tools";
@@ -151,7 +151,6 @@ async function runTaskTool(
   taskId: string,
   tool: string,
   input: Record<string, unknown>,
-  callId: string,
 ): Promise<ToolOutput> {
   const task = await getTask(deps.db, taskId);
   if (!task || task.machineId !== machineId || !task.missionId) {
@@ -168,7 +167,7 @@ async function runTaskTool(
   try {
     // Command prompts have their own limit (and the runner asks again while one waits).
     if (tool !== PERMISSION_TOOL) await checkMissionToolRate(deps.db, mission, tool, task.id);
-    const text = await run(deps, mission, task, tool, args, callId);
+    const text = await run(deps, mission, task, tool, args);
     // The runner's follow-ups on a waiting command aren't new actions.
     if (tool !== PERMISSION_TOOL || !args.request_id)
       await recordAudit(deps.db, {
@@ -194,7 +193,8 @@ const OPEN = ["proposed", "active", "paused", "awaiting_close"];
  * The mission tools of a task's executor as an ordinary tool source (ADR
  * 0032): only for a call that came through the runner bridge for a mission
  * task (`ctx.bridge.taskId`); `permission_prompt` exists only there (it is
- * Claude Code's prompt tool: computer brains only). The gateway looks each
+ * Claude Code's prompt tool: computer brains only); `request_approval` is
+ * not one of them (approvals are the main session's). The gateway looks each
  * one up, validates its input against the same JSON Schema the executor
  * sees, then runs it bound to that task's mission.
  */
@@ -205,15 +205,15 @@ export function createMissionBridgeToolSource(deps: Omit<MissionDeps, "db">): To
       const bridge = ctx.bridge;
       const taskId = bridge?.taskId;
       if (!bridge || !taskId) return [];
-      return MISSION_MCP_TOOLS.map(
+      // Approvals (merge, deploy, rollback) are the main session's: its run asks through the Tool Gateway.
+      return MISSION_MCP_TOOLS.filter((tool) => tool.name !== "request_approval").map(
         (tool): ToolDefinition => ({
           name: tool.name,
           description: tool.description,
           inputSchema: tool.inputSchema,
           // The mission's own tools: the mission authorizes them, not the agent's scopes.
           scope: "",
-          execute: (input, c) =>
-            runTaskTool({ ...deps, db: c.db }, bridge.machineId, taskId, tool.name, input, c.toolUseId ?? ""),
+          execute: (input, c) => runTaskTool({ ...deps, db: c.db }, bridge.machineId, taskId, tool.name, input),
         }),
       );
     },
@@ -232,20 +232,14 @@ const RUN_MISSION_TOOLS = ["get_context", "upload_artifact", "start_task"] as co
  *   card flow, keyed by the run (no task); elsewhere `runPermissionPrompt`
  *   (deny list, reads, and what code allows when the agent may run commands).
  * - In the agent's open mission thread, `get_context`, `upload_artifact` and
- *   `start_task` (the main session's machine tools), so a mission on the
- *   engine works with every brain. Listed before the sandbox tools: these win
- *   a name clash for bridge calls.
- *
- * The mission side (those tools and the mission's command card flow) exists
- * only with `MISSIONS_ON_ENGINE`, like the engine's mission permissions: with
- * the flag off a run in a mission thread is an ordinary run (the mission's
- * main session is its executor task).
+ *   `start_task` (the main session's machine tools), so a mission works
+ *   with every brain. Listed before the sandbox tools: these win a name clash
+ *   for bridge calls.
  */
 export function createMissionRunToolSource(deps: Omit<MissionDeps, "db">): ToolSource {
-  const onEngine = missionsOnEngine(deps);
-  /** The agent's open mission in this thread, when missions run on the engine. */
+  /** The agent's open mission in this thread (the run is its main session). */
   const missionOfRun = async (c: { db: MissionDeps["db"]; orgId: string; agentId: string; threadRootId: string }) => {
-    if (!onEngine || !c.threadRootId) return null;
+    if (!c.threadRootId) return null;
     const m = await missionOfThread(c.db, c.orgId, c.threadRootId);
     return m && m.agentId === c.agentId && OPEN.includes(m.status) ? m : null;
   };
@@ -278,14 +272,7 @@ export function createMissionRunToolSource(deps: Omit<MissionDeps, "db">): ToolS
           }
           if (!live) return refused("mission.not_allowed", "This conversation has no open mission.");
           return {
-            content: await run(
-              d,
-              live,
-              asTask(live),
-              tool,
-              masked(input) as Record<string, unknown>,
-              c.toolUseId ?? "",
-            ),
+            content: await run(d, live, asTask(live), tool, masked(input) as Record<string, unknown>),
           };
         } catch (error) {
           const code = (error as { code?: unknown }).code;
@@ -419,7 +406,6 @@ async function run(
   task: MachineTaskRow,
   tool: string,
   args: Record<string, unknown>,
-  callId: string,
 ): Promise<string> {
   const main = task.sessionId === mission.mainSessionId;
   switch (tool) {
@@ -514,17 +500,14 @@ async function run(
         failed.length ? `; not uploaded: ${failed.join(", ")}` : ""
       }. Stop now and wait for the person to check it.`;
     }
-    case "request_approval": {
-      const action = str(args.action) as "merge" | "deploy" | "rollback";
-      const approval = await createMissionApproval(deps, mission, task, {
-        action,
-        target: noMentions(str(args.target).trim()).slice(0, 300),
-        detail: noMentions(str(args.detail).trim()).slice(0, 1000),
-        callId,
-      });
-      await markWaiting(deps, task.id, "approval");
-      return `Approval requested (${approval.id}); you'll be resumed with the outcome. Stop now and wait.`;
-    }
+    case "request_approval":
+      // Merges, deploys and rollbacks are the main session's (its run asks through the Tool Gateway, ADR 0015).
+      throw Object.assign(
+        new Error(
+          "Item tasks don't merge, deploy or roll back: report what is ready (branch, PR) and stop; the mission's main session asks for approval.",
+        ),
+        { code: "mission.not_allowed" },
+      );
     case "upload_artifact": {
       const done = await uploadFromTask(deps, mission, task, str(args.path), str(args.title).trim() || null);
       await recordMissionEvent(deps.db, mission, "artifact_uploaded", { artifactId: done.id, taskId: task.id });
@@ -586,7 +569,7 @@ async function run(
 }
 
 /** A blocking ask: the task's end means "waiting for people", not "done" (ADR 0029). */
-async function markWaiting(deps: MissionDeps, taskId: string, what: "decision" | "review" | "approval") {
+async function markWaiting(deps: MissionDeps, taskId: string, what: "decision" | "review") {
   await deps.db
     .update(machineTasks)
     .set({ waitingFor: what, updatedAt: new Date() })

@@ -11,6 +11,7 @@ import {
   postPersonMessage,
   redeemMachinePairing,
   revokeRunToolTokens,
+  startSessionTask,
   type ToolSource,
   verifyRunToolToken,
 } from "../src";
@@ -247,6 +248,16 @@ describe("mission tools through the bridge", () => {
       title: "Mobile app",
       repoDir: "app",
     });
+    // An item session of the mission (the main session is the agent's run in the thread).
+    const [mission] = await f.db.select().from(schema.missions);
+    if (!mission) throw new Error("no mission");
+    await startSessionTask(f.missionDeps, mission, {
+      title: "Explore",
+      prompt: "Map the repo",
+      sessionId: crypto.randomUUID(),
+      cwd: mission.repoDir,
+      resume: false,
+    });
     const plan = runner.started[0] as TaskStartRequest;
     return { view, runner, plan, paired };
   }
@@ -266,7 +277,7 @@ describe("mission tools through the bridge", () => {
     expect(outside).not.toContain("report");
   });
 
-  test("a computer-brain run's machine mission tools (start_task, upload_artifact, get_context) only with MISSIONS_ON_ENGINE", async () => {
+  test("a computer-brain run's machine mission tools (start_task, upload_artifact, get_context) only in its mission's thread", async () => {
     const { view, paired } = await proposed();
     const run = await runningRun(view.threadId as string);
     const ctx = {
@@ -280,18 +291,29 @@ describe("mission tools through the bridge", () => {
       bridge: { machineId: paired.machineId },
     };
     const { db: _db, ...deps } = f.missionDeps;
-    const off = await createMissionRunToolSource({ ...deps, missionsOnEngine: false }).tools(ctx);
-    // Flag off: the mission's main session is its executor task; the run is an ordinary run.
-    expect(off.map((t) => t.name)).toEqual(["permission_prompt"]);
-    const prompt = off[0];
-    // Code's own rules decide (`runPermissionPrompt`), not the mission's command flow.
+    const source = createMissionRunToolSource(deps);
     const npm = { tool_name: "Bash", input: { command: "npm install" } };
-    expect((await prompt?.execute(npm, ctx))?.content).not.toContain("plan isn't approved");
-    const on = await createMissionRunToolSource({ ...deps, missionsOnEngine: true }).tools(ctx);
-    expect(on.map((t) => t.name).sort()).toEqual(["get_context", "permission_prompt", "start_task", "upload_artifact"]);
-    // Flag on: the mission's command flow (a proposed mission only reads).
-    const onPrompt = on.find((t) => t.name === "permission_prompt");
-    expect((await onPrompt?.execute(npm, ctx))?.content).toContain("plan isn't approved");
+    const there = await source.tools(ctx);
+    expect(there.map((t) => t.name).sort()).toEqual([
+      "get_context",
+      "permission_prompt",
+      "start_task",
+      "upload_artifact",
+    ]);
+    // The mission's command flow (a proposed mission only reads).
+    const prompt = there.find((t) => t.name === "permission_prompt");
+    expect((await prompt?.execute(npm, ctx))?.content).toContain("plan isn't approved");
+    // Elsewhere the run is an ordinary run: code's own rules decide (`runPermissionPrompt`).
+    const other = await runningRun();
+    const elsewhere = {
+      ...ctx,
+      runId: other.id,
+      threadRootId: other.threadRootId,
+      triggerMessageId: other.triggerMessageId,
+    };
+    const outside = await source.tools(elsewhere);
+    expect(outside.map((t) => t.name)).toEqual(["permission_prompt"]);
+    expect((await outside[0]?.execute(npm, elsewhere))?.content).not.toContain("plan isn't approved");
   });
 
   test("a mission task's token: its own tools (permission_prompt included), bound to that task and machine", async () => {
@@ -299,7 +321,12 @@ describe("mission tools through the bridge", () => {
     const token = plan.mission?.mcpToken as string;
     expect(token).toMatch(/^agr_/);
     const listed = await runner.list(token, plan.taskId);
-    expect(names(listed)).toEqual(MISSION_MCP_TOOLS.map((t) => t.name).sort());
+    // The mission's tools but approvals (those are the main session's).
+    expect(names(listed)).toEqual(
+      MISSION_MCP_TOOLS.map((t) => t.name)
+        .filter((n) => n !== "request_approval")
+        .sort(),
+    );
 
     const reported = await runner.call(token, "report", { summary: "Mapped the repo" }, plan.taskId);
     expect(reported).toMatchObject({ ok: true });

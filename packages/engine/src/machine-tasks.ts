@@ -148,8 +148,6 @@ export type TaskCall = <Op extends "task.start" | "task.status" | "task.cancel">
 export interface TaskDeps {
   db: Database;
   pubsub?: PubSub;
-  /** `MISSIONS_ON_ENGINE` (ADR 0032 §6): a mission's main session is a run, so the agent's own tasks end through the mission. */
-  missionsOnEngine?: boolean;
 }
 
 export interface StartTaskInput {
@@ -554,7 +552,6 @@ export async function settleInterruptedTask(
           id: schema.missions.id,
           status: schema.missions.status,
           resumeTasks: schema.missions.resumeTasks,
-          executor: schema.missions.executor,
         })
         .from(schema.missions)
         .where(eq(schema.missions.id, claimed.missionId))
@@ -596,15 +593,14 @@ export async function settleInterruptedTask(
         resumeCount: claimed.resumeCount + 1,
         // The session lives in its folder (a worktree for a branch): resume it there.
         cwd: claimed.cwd || null,
-        // Agent mode: the agent's own task, only tagged; otherwise the executor gets the mission's tools again.
-        ...(mission && (mission.executor === "agent" || isAgentTask(claimed))
+        // The main session's own task: only tagged; an item session gets the mission's tools again.
+        ...(mission && isAgentTask(claimed)
           ? { missionId: mission.id }
           : {
               mission: mission
                 ? {
                     id: mission.id,
                     rules: MISSION_RULES,
-                    mode: mission.status === "proposed" ? ("plan" as const) : ("work" as const),
                     branchPrefix: `agentes/${mission.id.replace(/-/g, "").slice(-8)}/`,
                     allow: await missionAllowRules(deps.db, mission.id),
                   }
@@ -792,17 +788,8 @@ export function taskEndNotice(row: MachineTaskRow, computer: string) {
 export async function wakeConversationForTask(deps: TaskDeps, taskId: string, options: { maxHops: number }) {
   const row = await getTask(deps.db, taskId);
   if (!row || row.wokeAt || !row.endedAt) return null;
-  if (row.missionId) {
-    // The agent's own task in a Claude Code or Codex mission's thread wakes the agent like any task;
-    // the executor's sessions (and everything in agent mode) end through the mission.
-    const [mission] = await deps.db
-      .select({ executor: schema.missions.executor })
-      .from(schema.missions)
-      .where(eq(schema.missions.id, row.missionId));
-    if (mission?.executor === "agent" || deps.missionsOnEngine || !isAgentTask(row)) {
-      return claimMissionTaskEnd(deps, row);
-    }
-  }
+  // A mission's task (the main session's own, or an item session's) ends through the mission.
+  if (row.missionId) return claimMissionTaskEnd(deps, row);
   // A task the agent canceled itself wakes nobody.
   if (row.canceledBy?.startsWith("agent:")) {
     await deps.db.update(machineTasks).set({ wokeAt: new Date() }).where(eq(machineTasks.id, row.id));
@@ -867,15 +854,8 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
 async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
   const machine = await getMachineById(deps.db, row.machineId);
   const computer = machine?.name ?? "the computer";
-  // Agent mode: the mission posts the end itself, as the notice that wakes the agent.
-  const [mission] = row.missionId
-    ? await deps.db
-        .select({ executor: schema.missions.executor })
-        .from(schema.missions)
-        .where(eq(schema.missions.id, row.missionId))
-    : [];
-  // On the engine the agent's own task (its run's start_task) ends like agent mode: the mission's wake-up is the notice.
-  const agentLike = mission?.executor === "agent" || (deps.missionsOnEngine === true && isAgentTask(row));
+  // The main session's own task (its run's start_task): the mission posts the end itself, as the notice that wakes it.
+  const agentLike = isAgentTask(row);
   // Commands it was refused: the people see them and can allow them ("Liberar e repetir").
   const blocked = row.missionId && !agentLike ? await blockedOfTask(deps.db, row.missionId, row.id) : [];
   const notice = !agentLike && (row.status === "failed" || row.status === "interrupted" || blocked.length > 0);
@@ -935,7 +915,7 @@ export async function taskRequester(ctx: ToolContext): Promise<string | null> {
   if (!trigger) return null;
   const woke = trigger.meta?.machineTask as { id?: unknown } | undefined;
   if (typeof woke?.id === "string") return (await getTask(ctx.db, woke.id))?.requestedByUserId ?? null;
-  // Woken by its mission (agent mode): the person the mission said it works for.
+  // Woken by its mission: the person the mission said it works for.
   const inbox = trigger.meta?.missionInbox as { requestedBy?: unknown } | undefined;
   if (inbox && trigger.authorAgentId === ctx.agentId)
     return typeof inbox.requestedBy === "string" ? inbox.requestedBy : null;

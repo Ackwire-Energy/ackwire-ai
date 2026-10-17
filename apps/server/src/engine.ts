@@ -182,8 +182,6 @@ export function buildEngine(o: EngineOptions) {
     search: context,
     publicUrl: config.PUBLIC_URL,
     judge: context.judge,
-    // ADR 0032 §6: missions' main sessions as engine runs (`createMissionEngine`), behind the flag.
-    missionsOnEngine: config.MISSIONS_ON_ENGINE,
   };
   const githubApp =
     config.GITHUB_APP_ID && config.GITHUB_APP_PRIVATE_KEY
@@ -242,7 +240,7 @@ export function buildEngine(o: EngineOptions) {
   const brainLink = hubBrainLink({ hub: machineHub, pubsub: adapters.pubsub });
   /** A mission run's command policy (plan before Start, work after; its branches and allowed commands). */
   const missionPermissions = async (turn: { orgId: string; agentId: string; threadRootId: string | null }) => {
-    if (!config.MISSIONS_ON_ENGINE || !turn.threadRootId) return undefined;
+    if (!turn.threadRootId) return undefined;
     const mission = await missionOfThread(db, turn.orgId, turn.threadRootId).catch(() => null);
     if (!mission || mission.agentId !== turn.agentId) return undefined;
     return {
@@ -275,7 +273,6 @@ export function buildEngine(o: EngineOptions) {
     artifacts,
     sandbox,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
-    missionsOnEngine: config.MISSIONS_ON_ENGINE,
     brains,
     machines: machineHub,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,

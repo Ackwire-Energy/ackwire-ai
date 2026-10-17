@@ -15,8 +15,6 @@ import {
   createMissionEngine,
   decideApproval,
   drainOutbox,
-  engineMigrateDedupeKey,
-  enqueue,
   executeToolForRun,
   grantScopes,
   invokeToolForRun,
@@ -666,14 +664,4 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   const [third] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.toolUseId, "m-3"));
   expect(third?.status).toBe("canceled");
   expect(gh.executed).toEqual([]);
-});
-
-test("the missions' boot migration is enqueued once per version, however many replicas boot", async () => {
-  f = await setup();
-  const job = { orgId: null, kind: "mission.engine_migrate", payload: {}, maxAttempts: 3 };
-  await enqueue(f.db, { ...job, dedupeKey: engineMigrateDedupeKey("1.2.3") });
-  await enqueue(f.db, { ...job, dedupeKey: engineMigrateDedupeKey("1.2.3") });
-  await enqueue(f.db, { ...job, dedupeKey: engineMigrateDedupeKey("1.2.4") });
-  const jobs = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "mission.engine_migrate"));
-  expect(jobs.map((j) => j.dedupeKey).sort()).toEqual(["mission.engine_migrate:1.2.3", "mission.engine_migrate:1.2.4"]);
 });

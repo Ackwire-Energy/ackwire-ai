@@ -9,7 +9,6 @@ import { enqueueRunJob } from "./mission-runs";
 import {
   agentAnswers,
   getMissionRow,
-  isLiveTask,
   MISSION_LIMITS,
   MISSION_STUCK,
   type MissionDeps,
@@ -21,14 +20,13 @@ import {
   queueForSession,
   reactivateMission,
   recordMissionEvent,
-  sessionTask,
   type WakeKind,
 } from "./missions";
 import { resumeRunWithResult } from "./run-resume";
 import { revokeRunToolTokens } from "./run-tool-tokens";
 import { isTerminal, type RunStatus, transitionRun } from "./runs";
 
-const { missions, machineTasks, missionEvents, agentRuns, approvals, agentQuestions, outbox } = schema;
+const { missions, missionEvents, agentRuns, approvals, agentQuestions, outbox } = schema;
 
 /**
  * Missions on the agent engine (ADR 0032 §6, block 4).
@@ -36,17 +34,15 @@ const { missions, machineTasks, missionEvents, agentRuns, approvals, agentQuesti
  * A mission's main session is the agent's run in the mission's home thread
  * with the mission's brain: `model` (the API, what "executor agent" was),
  * `claude_code` or `codex` (a session on the mission's computer, resumed by
- * `missions.main_session_id`). Everything that used to resume the executor's
- * main session — a person's word, Start, accepted suggestions, decisions,
- * reviews, approval outcomes, an item's end, the inbox — is a notice in the
- * thread (`meta.missionInbox` / `meta.machineTask`) that starts a run of the
+ * `missions.main_session_id`). Everything that wakes the main session — a
+ * person's word, Start, accepted suggestions, decisions, reviews, an item's
+ * end, the inbox — is a notice in the thread (`meta.missionInbox` / `meta.machineTask`) that starts a run of the
  * engine (`MissionEngine.startRun`), joins the run already working there, or
  * resumes a run paused on that very decision (`MissionEngine.resumeRun`).
  * Item work stays machine tasks (their own branch and session), started by the
  * run with the gateway tool `start_task`.
  *
- * Behind `MISSIONS_ON_ENGINE` (config, default off): `deps.missionsOnEngine`.
- * Off, missions.ts keeps the old path (executor tasks + MCP tools).
+ * This is the only path: the main session is never a machine task.
  */
 
 // ── The engine, as the mission side needs it ─────────────────────────────────
@@ -105,9 +101,6 @@ export interface MissionEngine {
   }): Promise<string[]>;
 }
 
-/** Whether this mission side runs on the engine (`MISSIONS_ON_ENGINE`). */
-export const missionsOnEngine = (deps: Pick<MissionDeps, "missionsOnEngine">) => deps.missionsOnEngine === true;
-
 export const engineOf = (deps: MissionDeps): MissionEngine => deps.missionEngine ?? createMissionEngine(deps);
 
 // ── Which brain, which session ───────────────────────────────────────────────
@@ -134,22 +127,16 @@ export function missionBrain(mission: Pick<MissionRow, "executor"> & BrainOverri
 
 /** Marks the first engine turn of a session (so later turns resume it). */
 const SESSION_EVENT = "engine_session";
-/** An open mission moved onto the engine (`migrateMissionToEngine`). */
-const MIGRATED_EVENT = "engine_migrated";
 
 /**
- * Whether the session already exists on the machine: an executor task ran it
- * (the old path, or before the switch), or an earlier engine turn started it.
- * `exceptRunId`: the run asking (its own start doesn't count).
+ * Whether the session already exists on the machine: an earlier engine turn
+ * started it. `exceptRunId`: the run asking (its own start doesn't count).
  */
 export async function sessionStarted(db: Executor, missionId: string, sessionId: string, exceptRunId?: string | null) {
   const rows = rowsOf<{ yes: boolean | string }>(
-    await db.execute(sql`select (
-        exists (select 1 from ${machineTasks} t where t.mission_id = ${missionId}::uuid and t.session_id = ${sessionId})
-        or exists (select 1 from ${missionEvents} e where e.mission_id = ${missionId}::uuid
-          and e.kind = ${SESSION_EVENT} and e.data->>'sessionId' = ${sessionId}
-          and coalesce(e.data->>'runId', '') <> ${exceptRunId ?? ""})
-      ) as yes`),
+    await db.execute(sql`select exists (select 1 from ${missionEvents} e where e.mission_id = ${missionId}::uuid
+        and e.kind = ${SESSION_EVENT} and e.data->>'sessionId' = ${sessionId}
+        and coalesce(e.data->>'runId', '') <> ${exceptRunId ?? ""}) as yes`),
   );
   const yes = rows[0]?.yes;
   return yes === true || yes === "t";
@@ -226,14 +213,15 @@ async function waitingRun(db: Executor, mission: MissionRow) {
 }
 
 /**
- * Tells the mission's main session something, on the engine: a run paused on
- * this very answer resumes; otherwise a notice in the home thread starts a run
- * with the mission's brain (or joins the one working there). Paused, closed,
- * without a computer, or while a pre-switch executor task still holds the
- * session: the text waits in the inbox (delivered by `deliverInboxOnEngine`).
- * The stuck-loop guard counts the mission's own wake-ups for every brain.
+ * Tells the mission's main session something: a run paused on this very
+ * answer resumes; otherwise a notice in the home thread starts a run with the
+ * mission's brain (or joins the one working there). These wake-ups are hop 0:
+ * inside a mission its own notices don't count toward the agent-to-agent
+ * limit; the budget is the brake, plus the stuck-loop guard (wake-ups in a row
+ * with no plan item moving pause the mission). Paused, closed or without a
+ * computer: the text waits in the inbox (delivered by `deliverMissionInbox`).
  */
-export async function tellMainOnEngine(
+export async function tellMainSession(
   deps: MissionDeps,
   mission: MissionRow,
   text: string,
@@ -252,11 +240,6 @@ export async function tellMainOnEngine(
     return { delivered: false };
   }
   const choice = missionBrain(fresh as MissionRow & BrainOverride);
-  // A session an executor task (from before the switch) still runs: one process per session, so it waits.
-  if (choice.brain !== "model" && isLiveTask(await sessionTask(deps.db, fresh.id, fresh.mainSessionId))) {
-    await queueForSession(deps.db, fresh, entry);
-    return { delivered: false };
-  }
   const engine = engineOf(deps);
   if (options.resume) {
     const waiting = await waitingRun(deps.db, fresh);
@@ -351,11 +334,11 @@ export async function tellMainOnEngine(
 }
 
 /**
- * The inbox on the engine: what waits for the main session goes out at once
- * (one notice, one run or join); what waits for item sessions still resumes
- * them as machine tasks (`deliverItemInbox`, the old per-session path).
+ * The inbox: what waits for the main session goes out at once (one notice,
+ * one run or join); what waits for item sessions resumes them as machine
+ * tasks (`deliverItemInbox`).
  */
-export async function deliverInboxOnEngine(
+export async function deliverMissionInbox(
   deps: MissionDeps,
   missionId: string,
   deliverItemInbox: (deps: MissionDeps, mission: MissionRow, except: string) => Promise<number>,
@@ -363,18 +346,15 @@ export async function deliverInboxOnEngine(
   const mission = await getMissionRow(deps.db, missionId);
   if (!mission || mission.inbox.length === 0) return 0;
   let sent = 0;
-  const main = mission.inbox.filter((e) => e.sessionId === mission.mainSessionId || mission.executor === "agent");
-  const choice = missionBrain(mission as MissionRow & BrainOverride);
-  const held = choice.brain !== "model" && isLiveTask(await sessionTask(deps.db, mission.id, mission.mainSessionId));
-  if (main.length > 0 && canWork(mission) && !held) {
+  const main = mission.inbox.filter((e) => e.sessionId === mission.mainSessionId);
+  if (main.length > 0 && canWork(mission)) {
     const ats = main.map((e) => e.at);
-    const all = mission.executor === "agent";
     // Claim these entries first (another delivery may run at the same time).
     const [claimed] = await deps.db
       .update(missions)
       .set({
         inbox: sql`coalesce((select jsonb_agg(x.value) from jsonb_array_elements(${missions.inbox}) x
-          where not ((${all}::boolean or x.value->>'sessionId' = ${mission.mainSessionId})
+          where not (x.value->>'sessionId' = ${mission.mainSessionId}
             and x.value->>'at' = any(${`{${ats.join(",")}}`}::text[]))), '[]'::jsonb)`,
       })
       .where(
@@ -386,7 +366,7 @@ export async function deliverInboxOnEngine(
       .returning({ id: missions.id });
     if (claimed) {
       const text = main.map((e) => e.text).join("\n\n");
-      const out = await tellMainOnEngine(deps, mission, text, { from: "the mission", kind: "system" }).catch(
+      const out = await tellMainSession(deps, mission, text, { from: "the mission", kind: "system" }).catch(
         async () => {
           for (const e of main) await queueForSession(deps.db, mission, e);
           return { delivered: false };
@@ -395,7 +375,7 @@ export async function deliverInboxOnEngine(
       if (out.delivered) sent++;
     }
   }
-  if (mission.executor !== "agent") sent += await deliverItemInbox(deps, mission, mission.mainSessionId);
+  sent += await deliverItemInbox(deps, mission, mission.mainSessionId);
   return sent;
 }
 
@@ -411,121 +391,6 @@ export async function cancelMainRuns(deps: MissionDeps, mission: MissionRow, act
   });
   if (ids.length > 0) await recordMissionEvent(deps.db, mission, "engine_runs_canceled", { runIds: ids, reason });
   return ids;
-}
-
-// ── Open missions at switch time ─────────────────────────────────────────────
-
-export interface MissionMigration {
-  missionId: string;
-  status: "migrated" | "already" | "closed" | "missing";
-  brain?: BrainKind;
-  /** A pre-switch executor task still runs the main session: the inbox waits for its end. */
-  waitingOnTaskId?: string | null;
-  /** Item tasks still running (they stay machine tasks; their end reaches the engine run). */
-  liveItems?: number;
-  /** Texts for the main session that were waiting in the inbox and went out as one engine turn. */
-  deliveredInbox?: number;
-}
-
-/**
- * The boot job's dedupe key (`mission.engine_migrate`, enqueued while
- * `MISSIONS_ON_ENGINE` is on): one job per deployed version, however many
- * replicas boot. Turning the flag off and on again within the same version
- * doesn't run it again (the next deploy does).
- */
-export const engineMigrateDedupeKey = (version: string) => `mission.engine_migrate:${version}`;
-
-/**
- * Moves one open mission onto the engine (idempotent: a `engine_migrated`
- * event marks it, taken under the mission's row lock):
- *
- * - its `main_session_id` stays: the brain resumes that session (executor tasks
- *   ran it, so `sessionStarted` is already true); agent mode is already runs;
- * - a main-session task still running finishes as it is; texts for the main
- *   session wait in the inbox until it ends (`onMissionTaskEnded` →
- *   `deliverInbox`, now on the engine);
- * - otherwise what waits in the inbox for the main session goes out now, as
- *   one engine turn; item sessions keep their inbox (they stay machine tasks);
- * - pending decisions, reviews and approvals need nothing: their answer goes
- *   through `tellSession`, which resumes a paused run or starts a turn.
- */
-export async function migrateMissionToEngine(
-  deps: MissionDeps,
-  missionId: string,
-  deliverItemInbox: (deps: MissionDeps, mission: MissionRow, except: string) => Promise<number>,
-): Promise<MissionMigration> {
-  const marked = await deps.db.transaction(async (tx) => {
-    const [row] = await tx.select().from(missions).where(eq(missions.id, missionId)).for("update");
-    if (!row) return { status: "missing" as const };
-    if (!OPEN_MISSION_STATUSES.includes(row.status)) return { status: "closed" as const, row };
-    const [done] = await tx
-      .select({ data: missionEvents.data })
-      .from(missionEvents)
-      .where(and(eq(missionEvents.missionId, row.id), eq(missionEvents.kind, MIGRATED_EVENT)))
-      .limit(1);
-    if (done) return { status: "already" as const, row, data: done.data };
-    const { brain } = missionBrain(row as MissionRow & BrainOverride);
-    const main = await sessionTask(tx, row.id, row.mainSessionId);
-    const live = rowsOf<{ n: number | string }>(
-      await tx.execute(sql`select count(*) as n from ${machineTasks} t where t.mission_id = ${row.id}::uuid
-        and t.session_id is distinct from ${row.mainSessionId}
-        and t.status in ('queued', 'running', 'interrupted') and t.ended_at is null`),
-    );
-    const data = {
-      brain,
-      sessionId: row.mainSessionId,
-      waitingOnTaskId: isLiveTask(main) ? (main?.id ?? null) : null,
-      liveItems: Number(live[0]?.n ?? 0),
-      inbox: row.inbox.length,
-    };
-    await recordMissionEvent(tx, row, MIGRATED_EVENT, data);
-    return { status: "migrated" as const, row, data };
-  });
-  if (marked.status === "missing") return { missionId, status: "missing" };
-  if (marked.status === "closed") return { missionId, status: "closed" };
-  const data = marked.data as { brain?: BrainKind; waitingOnTaskId?: string | null; liveItems?: number };
-  if (marked.status === "already") {
-    return { missionId, status: "already", ...(data.brain ? { brain: data.brain } : {}) };
-  }
-  let deliveredInbox = 0;
-  if (!data.waitingOnTaskId && marked.row.inbox.length > 0) {
-    const before = marked.row.inbox.filter(
-      (e) => e.sessionId === marked.row.mainSessionId || marked.row.executor === "agent",
-    ).length;
-    const engineDeps = { ...deps, missionsOnEngine: true };
-    await deliverInboxOnEngine(engineDeps, missionId, deliverItemInbox).catch(() => 0);
-    const after = (await getMissionRow(deps.db, missionId))?.inbox ?? [];
-    const left = after.filter((e) => e.sessionId === marked.row.mainSessionId || marked.row.executor === "agent");
-    deliveredInbox = Math.max(0, before - left.length);
-  }
-  return {
-    missionId,
-    status: "migrated",
-    ...(data.brain ? { brain: data.brain } : {}),
-    waitingOnTaskId: data.waitingOnTaskId ?? null,
-    liveItems: data.liveItems ?? 0,
-    deliveredInbox,
-  };
-}
-
-/** Every open mission, all orgs (run once when `MISSIONS_ON_ENGINE` is turned on; safe to run again). */
-export async function migrateOpenMissions(
-  deps: MissionDeps,
-  deliverItemInbox: (deps: MissionDeps, mission: MissionRow, except: string) => Promise<number>,
-) {
-  const rows = await deps.db
-    .select({ id: missions.id })
-    .from(missions)
-    .where(inArray(missions.status, OPEN_MISSION_STATUSES));
-  const out: MissionMigration[] = [];
-  for (const r of rows) {
-    out.push(
-      await migrateMissionToEngine(deps, r.id, deliverItemInbox).catch(
-        (): MissionMigration => ({ missionId: r.id, status: "missing" }),
-      ),
-    );
-  }
-  return out;
 }
 
 // ── The engine missions use ──────────────────────────────────────────────────

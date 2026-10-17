@@ -6,14 +6,11 @@ import {
   closeMission,
   createMission,
   deliverInbox,
-  deliverSessionsInbox,
   type MachineHub,
   type MissionDeps,
   type MissionEngine,
   type MissionRunResume,
   type MissionRunStart,
-  migrateMissionToEngine,
-  migrateOpenMissions,
   missionBrain,
   missionTurnFor,
   pauseMission,
@@ -59,14 +56,14 @@ function fakeEngine() {
 
 const missionRow = async () => (await f.db.select().from(schema.missions))[0] as typeof schema.missions.$inferSelect;
 
-/** A Claude Code mission (`/mission` from the web) with the flag on: its planning is an engine run. */
+/** A Claude Code mission (`/mission` from the web): its planning is an engine run. */
 async function onEngine(options: { executors?: Record<string, unknown> } = {}) {
   f = await setup({ machines: true, missionTools: true, reply: () => ({ chunks: ["ok"] }) });
   const paired = await pairedMachine(f);
   const runner = missionRunner(f.machineHub as MachineHub, options.executors ? { executors: options.executors } : {});
   await runner.hello(paired.token);
   const fake = fakeEngine();
-  const md = (): MissionDeps => ({ ...f.missionDeps, missionsOnEngine: true, missionEngine: fake.engine });
+  const md = (): MissionDeps => ({ ...f.missionDeps, missionEngine: fake.engine });
   const view = await createMission(md(), f.owner.id, f.org.id, {
     agentId: f.agent.id,
     channelId: f.general.id,
@@ -266,117 +263,5 @@ describe("missions on the engine (ADR 0032 §6)", () => {
     expect(fake.starts[0]?.brain).toBe("model");
     expect(fake.starts[0]?.session).toBeUndefined();
     expect(fake.starts[0]?.trigger).toContain("PLAN MODE");
-  });
-
-  test("an open mission at switch time: its main session waits for the running executor task, then resumes on the engine", async () => {
-    f = await setup({ machines: true, missionTools: true, reply: () => ({ chunks: ["ok"] }) });
-    const paired = await pairedMachine(f);
-    const runner = missionRunner(f.machineHub as MachineHub);
-    await runner.hello(paired.token);
-    // Before the switch: the old path (the plan is an executor task on the computer).
-    await createMission(f.missionDeps, f.owner.id, f.org.id, {
-      agentId: f.agent.id,
-      channelId: f.general.id,
-      goal: "Build our mobile app",
-      title: "Mobile app",
-      repoDir: "app",
-    });
-    const plan = runner.started[0] as TaskStartRequest;
-    let mission = await missionRow();
-    expect(plan.session).toBe(mission.mainSessionId);
-    // Start while the planning task still runs: the old path queues it for the main session.
-    await startMission(f.missionDeps, f.owner.id, f.org.id, mission.id);
-    mission = await missionRow();
-    expect(mission.inbox).toHaveLength(1);
-
-    const fake = fakeEngine();
-    const md = (): MissionDeps => ({ ...f.missionDeps, missionsOnEngine: true, missionEngine: fake.engine });
-    const first = await migrateMissionToEngine(md(), mission.id, deliverSessionsInbox);
-    expect(first).toMatchObject({
-      missionId: mission.id,
-      status: "migrated",
-      brain: "claude_code",
-      waitingOnTaskId: plan.taskId,
-      liveItems: 0,
-      deliveredInbox: 0,
-    });
-    expect(fake.starts).toHaveLength(0);
-    expect((await missionRow()).inbox).toHaveLength(1);
-    // Idempotent.
-    expect(await migrateMissionToEngine(md(), mission.id, deliverSessionsInbox)).toMatchObject({ status: "already" });
-    expect(
-      (await f.db.select().from(schema.missionEvents).where(eq(schema.missionEvents.missionId, mission.id))).filter(
-        (e) => e.kind === "engine_migrated",
-      ),
-    ).toHaveLength(1);
-    // While the executor task holds the session, a person's message waits too (one process per session).
-    expect((await sendMissionMessage(md(), f.owner.id, f.org.id, mission.id, "And dark mode")).delivered).toBe(false);
-
-    // The planning task ends: the inbox goes out as one engine turn that resumes the same session.
-    await runner.done(plan.taskId, { result: "Planned." });
-    await deliverInbox(md(), mission.id);
-    expect(fake.starts).toHaveLength(1);
-    expect(fake.starts[0]).toMatchObject({
-      brain: "claude_code",
-      session: { id: mission.mainSessionId, resume: true, machineId: paired.machineId, cwd: "app" },
-    });
-    expect(fake.starts[0]?.trigger).toContain("The person approved the plan");
-    expect(fake.starts[0]?.trigger).toContain("And dark mode");
-    expect((await missionRow()).inbox).toHaveLength(0);
-  });
-
-  test("an open mission with texts waiting and nothing running: they go out at migration; running it again does nothing", async () => {
-    f = await setup({ machines: true, missionTools: true, reply: () => ({ chunks: ["ok"] }) });
-    const paired = await pairedMachine(f);
-    const runner = missionRunner(f.machineHub as MachineHub);
-    await runner.hello(paired.token);
-    await createMission(f.missionDeps, f.owner.id, f.org.id, {
-      agentId: f.agent.id,
-      channelId: f.general.id,
-      goal: "Build our mobile app",
-      title: "Mobile app",
-      repoDir: "app",
-    });
-    const plan = runner.started[0] as TaskStartRequest;
-    await runner.done(plan.taskId, { result: "Planned." });
-    const mission = await missionRow();
-    await f.db
-      .update(schema.missions)
-      .set({
-        inbox: [
-          {
-            sessionId: mission.mainSessionId,
-            cwd: "app",
-            text: "Queued before the switch",
-            at: new Date().toISOString(),
-          },
-        ],
-      })
-      .where(eq(schema.missions.id, mission.id));
-
-    const fake = fakeEngine();
-    const md = (): MissionDeps => ({ ...f.missionDeps, missionsOnEngine: true, missionEngine: fake.engine });
-    const all = await migrateOpenMissions(md(), deliverSessionsInbox);
-    expect(all).toEqual([
-      {
-        missionId: mission.id,
-        status: "migrated",
-        brain: "claude_code",
-        waitingOnTaskId: null,
-        liveItems: 0,
-        deliveredInbox: 1,
-      },
-    ]);
-    expect(fake.starts).toHaveLength(1);
-    expect(fake.starts[0]?.trigger).toContain("Queued before the switch");
-    expect(fake.starts[0]?.session).toMatchObject({
-      id: mission.mainSessionId,
-      resume: true,
-      machineId: paired.machineId,
-    });
-    expect(await migrateOpenMissions(md(), deliverSessionsInbox)).toEqual([
-      { missionId: mission.id, status: "already", brain: "claude_code" },
-    ]);
-    expect(fake.starts).toHaveLength(1);
   });
 });

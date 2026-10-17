@@ -122,18 +122,14 @@ export interface TaskStart {
   /** Killed (the whole process group) after this long; default and cap are the runner's. */
   maxSeconds?: number;
   /**
-   * Protocol 5: the task works for a mission. The runner gives the executor
-   * the local `agentes` MCP server (bound to this task) and the mission's rules.
+   * Protocol 5: the task works for a mission (an item session: it works on
+   * the mission's branches; merges, pushes to other branches and deploys are
+   * denied). The runner gives the executor the local `agentes` MCP server
+   * (bound to this task) and the mission's rules.
    */
   mission?: {
     id: string;
     rules?: string;
-    /**
-     * Protocol 7: `plan` (read only, before the people press Start) or `work`
-     * (edits, git on the mission's branches, tests and builds; merges, pushes
-     * to other branches and deploys denied: they go through `request_approval`).
-     */
-    mode?: "plan" | "work";
     /** Protocol 7: the mission's branches start with this (`agentes/<id>/`); only these may be pushed. */
     branchPrefix?: string;
     /**
