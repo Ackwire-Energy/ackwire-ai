@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversa entre agentes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&family=Doto:ROND,wght@100,600&display=swap">
+<script>
+  { const q = new URLSearchParams(location.search).get("theme");
+    document.documentElement.dataset.theme = q || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); }
+</script>
+<style>
+/*
+  Prototype: agents that feel alive in the room (sibling of ReacoesAgente.html: same tokens, messages,
+  reaction pills and the shared agent engine). Backend already shipped: one message can wake up to 4
+  agents (no @ needed); an agent can privately ask another agent and continue with the answer
+  (meta.consulted: answered | expired | failed); after a reply, one other agent may chime in on its own.
+  Each scenario in the prototype bar resets the conversation and plays once (Repetir replays).
+  1  Vários agentes na sala (#marketing): Walter asks the room to congratulate Theo. One grouped working
+     line under the message: the working agents' live mini bodies stacked + "Theo, Iris e mais 2 estão
+     trabalhando…" (names in ink). Nina only reacts 🎉 (agent pill), Theo explains the campaign, Bento
+     has nothing to add and just leaves the line, Iris replies short. The line shrinks to nothing.
+  2  Um agente consulta outro (#produto): "@Dev sobe o fix do login em staging". The working line shows
+     the consultation live: Dev → Infra (Infra thinking) "Dev está perguntando ao Infra…" with a Doto
+     clock. Two variants (A/B in the bar):
+     A  Grokbot style: a small centered "Mensagem de [Infra] Infra" above Dev's reply.
+     B  A neutral one-line card at the top of Dev's reply, "Infra respondeu", that opens to show what Dev
+        asked and Infra's full answer ("Conversa só entre o Dev e o Infra").
+  3  Agente entra na conversa sozinho (thread in #marketing): Theo answers Ana; Iris, not called, adds one
+     useful point. Cue: her working line first, then a faint "entrou na conversa" next to the time, with
+     a tooltip that says why (no internal names).
+  4  Sem resposta a tempo: like 2, but Infra does not answer in 15 min (the clock runs fast). Dev says so
+     and asks how to go on. A: centered icon chip "O Infra não respondeu a tempo". B: the same card, calm,
+     with a clock icon, opening to the question Dev asked.
+  URL params for QA: ?s=1..4&v=a|b&theme=light|dark&fast=1 (fast jumps to the end state).
+  Rules: neutral cards (raised + hairline), icon chips without dots, blue only for agent identity, names
+  in ink, counts in Doto (ROND 100), no jargon. Agents only via packages/ui/src/agent/engine.js (serve
+  the repo root over http). The working cue is the 3×3 pixel orbit from Carregando.html (direction A).
+  prefers-reduced-motion: everything static (no orbit walk, no hop, no fade).
+*/
+:root{
+  --bg:#f4f4f1;--raised:#ffffff;--sunken:#ebebe7;--paper:#ffffff;--glass:rgba(255,255,255,.72);
+  --line:rgba(23,23,22,.08);--line2:rgba(23,23,22,.14);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#76766f;
+  --agent:#0063d1;--agent2:#3d8bff;
+  --ok:#1f7a45;--warn:#9a5b00;--danger:#b42a20;
+  --plate:rgba(127,127,127,.1);
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.10),0 0 0 1px var(--line);
+  --e3:0 2px 4px rgba(23,23,22,.04),0 24px 56px -16px rgba(23,23,22,.30),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  --sans:"Onest","Segoe UI",system-ui,sans-serif;--display:"Funnel Display",var(--sans);--dot:"Doto",var(--sans);
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0f0f0e;--raised:#191918;--sunken:#0a0a09;--paper:#1f1f1d;--glass:rgba(30,30,28,.66);
+  --line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8b8b85;
+  --agent:#5aa8ff;--agent2:#8cc3ff;
+  --ok:#5fc48a;--warn:#e0a84a;--danger:#f08a80;
+  --plate:rgba(127,127,127,.14);
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);--e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --e3:0 28px 64px -16px rgba(0,0,0,.8),0 0 0 1px var(--line2);--top:inset 0 1px 0 rgba(255,255,255,.06);
+  color-scheme:dark}
+*{box-sizing:border-box}
+html,body{overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"ss01","tnum";display:flex;flex-direction:column;height:100vh;height:100dvh}
+h1,h2,h3,p{margin:0}
+button,input{font:inherit;color:inherit}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.emo{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-size:14px;line-height:1}
+.num{font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:0}
+
+/* ---------- design system bits (verbatim from ReacoesAgente.html / Componentes.dc.html) ---------- */
+.b{font:inherit;font-size:14px;font-weight:600;letter-spacing:-.005em;height:40px;padding:0 16px;border-radius:12px;border:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .18s var(--spring),box-shadow .18s var(--out),background .15s,color .15s,filter .15s;white-space:nowrap;color:var(--ink);background:transparent}
+.b:active{transform:scale(.97) translateY(.5px)}
+.b:focus-visible,.ib:focus-visible,.seg button:focus-visible,.react:focus-visible,.send:focus-visible,.stp:focus-visible,.sb-item:focus-visible,.cs-h:focus-visible,.joined:focus-visible{outline:none;box-shadow:0 0 0 2px var(--raised),0 0 0 4px var(--ink)}
+.b2{background:var(--raised);box-shadow:var(--e1),var(--top)}
+.b2:hover{box-shadow:var(--e2),var(--top)}
+.bg{color:var(--muted)}
+.bg:hover{background:rgba(127,127,127,.1);color:var(--ink)}
+.ib{width:34px;height:34px;border-radius:10px;border:0;background:transparent;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:none;transition:background .15s,color .15s,transform .18s var(--spring)}
+.ib:hover{background:rgba(127,127,127,.12);color:var(--ink)}
+.seg{display:inline-flex;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 1px 2px rgba(0,0,0,.06);position:relative;flex:none;max-width:100%}
+.seg button{position:relative;z-index:1;font-size:13px;font-weight:600;height:30px;padding:0 12px;border:0;border-radius:9px;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.seg button[aria-pressed="true"]{color:var(--ink);background:var(--raised);box-shadow:var(--e1),var(--top)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--sunken);color:var(--muted);white-space:nowrap;flex:none}
+.chip svg.i{width:12px;height:12px}
+.glass{background:var(--glass);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);box-shadow:var(--e3)}
+@keyframes popin{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes pop{0%{opacity:0;transform:scale(.4)}60%{opacity:1;transform:scale(1.12)}100%{transform:none}}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+/* Agents: the engine's body (canvas). People: a circle with the initial. */
+.agw{position:relative;display:inline-flex;flex:none}
+canvas.av{display:block}
+canvas.orb{display:block;flex:none;image-rendering:pixelated}
+.pp{--s:20px;width:var(--s);height:var(--s);border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;font-weight:650;font-size:calc(var(--s) * .42);background:linear-gradient(160deg,#e9e9e5,#d4d4cf);color:#2a2a28;line-height:1}
+:root[data-theme="dark"] .pp{background:linear-gradient(160deg,#3a3a37,#2a2a28);color:#efefec}
+
+/* ---------- prototype bar (not product) ---------- */
+.proto{position:relative;z-index:75;background:var(--bg);display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:9px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);flex:none}
+.proto b{color:var(--ink);font-weight:650}
+.proto .seg button{height:26px;font-size:12px;padding:0 10px}
+.steps{display:flex;gap:3px;flex-wrap:wrap}
+.stp{height:26px;min-width:26px;padding:0 8px;border-radius:8px;border:0;background:var(--sunken);color:var(--muted);font-size:12px;font-weight:650;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .15s,color .15s,transform .18s var(--spring)}
+.stp:hover{color:var(--ink)}
+.stp:active{transform:scale(.95)}
+.stp[aria-current="step"]{background:var(--ink);color:var(--bg)}
+.proto .acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.proto .acts .b{height:26px;font-size:12px;padding:0 9px;border-radius:8px}
+.proto .now{flex-basis:100%;color:var(--ink2);font-weight:500;font-size:12.5px}
+.proto .grow{flex:1}
+.proto [hidden]{display:none}
+
+/* ---------- app frame ---------- */
+.app{flex:1;min-height:0;display:grid;grid-template-columns:248px minmax(0,1fr)}
+.apane{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
+.phd{display:flex;align-items:center;gap:10px;padding:10px 14px 10px 18px;border-bottom:1px solid var(--line);min-height:58px;flex:none}
+.phd .t{flex:1;min-width:0}
+.phd h1{font-size:16px;font-weight:650;letter-spacing:-.015em;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.phd h1 svg.i{color:var(--faint)}
+.phd small{display:block;color:var(--faint);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 10px 18px;min-height:0}
+.thread{max-width:760px;margin:0 auto}
+
+/* ---------- sidebar ---------- */
+.sb{background:var(--sunken);display:flex;flex-direction:column;gap:16px;padding:14px 12px;overflow-y:auto;border-right:1px solid var(--line);min-height:0}
+.org-in{display:flex;align-items:center;gap:10px;padding:4px 6px}
+.org-in .lg{width:30px;height:30px;border-radius:10px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.org-in b{display:block;font-weight:700;font-size:14.5px;letter-spacing:-.01em}
+.org-in small{display:block;color:var(--muted);font-size:12px}
+.sb-group{display:flex;flex-direction:column;gap:1px}
+.sb-label{font-size:12px;font-weight:650;color:var(--faint);padding:0 8px 4px}
+.sb-item{display:flex;align-items:center;gap:10px;min-height:34px;padding:4px 8px;border-radius:10px;color:var(--ink2);font-size:14.5px;border:0;background:transparent;width:100%;text-align:left;cursor:pointer}
+.sb-item:hover{background:var(--plate)}
+.sb-item.on{background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--ink)}
+.sb-item svg.i{color:var(--faint)}
+.sb-item small{margin-left:auto;font-size:12px;color:var(--faint)}
+
+/* ---------- messages (ReacoesAgente.html) ---------- */
+.day{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:650;color:var(--faint);margin:14px 12px 6px}
+.day::before,.day::after{content:"";flex:1;height:1px;background:var(--line)}
+.msg{position:relative;display:flex;gap:12px;padding:10px 12px;border-radius:14px;transition:background .15s}
+.msg.in{animation:fi .3s var(--out) both}
+.msg:hover{background:rgba(127,127,127,.05)}
+.av-col{width:34px;flex:none;display:flex;justify-content:center;align-items:flex-start}
+.msg .body{flex:1;min-width:0}
+.mhdr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:20px}
+.mn{font-weight:650;font-size:14.5px;letter-spacing:-.01em}
+.mt{font-size:12px;color:var(--faint)}
+.mx{font-size:14.5px;line-height:1.6;margin-top:2px;color:var(--ink2);overflow-wrap:anywhere}
+.mx p+p{margin-top:6px}
+.mx b{color:var(--ink);font-weight:650}
+.mention{display:inline;white-space:nowrap;font-weight:600;color:var(--ink);background:var(--sunken);padding:1px 6px 1px 3px;border-radius:7px}
+.mention .agw{display:inline-flex;vertical-align:-3px;margin-right:4px}
+.plan{margin-top:8px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;padding:10px 12px;border-radius:12px;background:var(--sunken);font-size:13.5px;max-width:460px}
+.plan span{color:var(--faint);font-weight:600}
+.plan div{color:var(--ink2)}
+.plan b{color:var(--ink);font-weight:650}
+
+/* ---------- reactions (one pill for everybody; an agent's has its mini body where the count goes) ---------- */
+.reacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+.react{height:26px;padding:0 9px;border-radius:999px;border:0;background:var(--sunken);font:inherit;font-size:12.5px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:transform .2s var(--spring),background .15s,box-shadow .15s}
+.react:hover{transform:translateY(-1px)}
+.react .num{font-size:13px;color:var(--ink2)}
+.react.fresh{animation:pop .45s var(--spring) both}
+.react.ag{padding:0 8px 0 9px;gap:5px}
+.react.ag .agw{margin-right:-1px}
+
+/* ---------- the working line: who is on it right now (one line for the whole room) ---------- */
+.work{display:flex;gap:12px;align-items:center;padding:4px 12px 6px;min-height:34px;animation:fi .3s var(--out) both}
+.work .av-col{align-items:center;height:22px}
+.wk{flex:1;min-width:0;display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted)}
+.wk b{color:var(--ink);font-weight:650}
+.wk .wt{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk .num{font-size:13px;color:var(--muted);flex:none}
+/* Stacked mini bodies: each sits on a plate of the page color, so overlaps stay readable. */
+.stack{display:inline-flex;align-items:center;flex:none}
+.stack .tok{display:inline-flex;padding:1.5px;border-radius:7px;background:var(--bg);position:relative}
+.stack .tok+.tok{margin-left:-5px}
+.stack .tok.in{animation:pop .4s var(--spring) both}
+.stack .to{display:inline-flex;color:var(--faint);margin:0 1px}
+.stack .to svg.i{width:12px;height:12px;stroke-width:2}
+
+/* ---------- variant A: a small centered label above the reply (Grokbot style) ---------- */
+.from{display:flex;justify-content:center;align-items:center;gap:6px;margin:12px 12px 0;font-size:12.5px;color:var(--faint);animation:fi .3s var(--out) both}
+.from b{color:var(--ink2);font-weight:650}
+.from .agw{margin:0 -1px}
+.from.chip{height:26px;padding:0 10px;width:max-content;max-width:calc(100% - 24px);margin:12px auto 0;font-size:12.5px;color:var(--muted)}
+.from.chip svg.i{width:13px;height:13px}
+.from.chip span{overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- variant B: what the other agent said, folded into one line at the top of the reply ---------- */
+.cs{margin:6px 0 8px;max-width:520px;border-radius:12px;background:var(--raised);box-shadow:var(--e1),var(--top);overflow:hidden}
+.cs-h{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:6px 8px 6px 10px;border:0;background:transparent;cursor:pointer;text-align:left;font-size:13px;color:var(--ink2);border-radius:12px}
+.cs-h:hover{background:rgba(127,127,127,.05)}
+.cs-h b{font-weight:650;color:var(--ink);flex:none}
+.cs-h .pv{flex:1;min-width:0;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs-h .chev{color:var(--faint);transition:transform .2s var(--out)}
+.cs.open .chev{transform:rotate(180deg)}
+.cs.open .pv{visibility:hidden}
+.cs-h .ic{width:20px;height:20px;border-radius:7px;background:var(--sunken);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.cs-h .ic svg.i{width:13px;height:13px}
+.cs-b{padding:2px 12px 12px 38px;font-size:13.5px;line-height:1.55;animation:fi .22s var(--out) both}
+.cs-b small{display:block;font-size:12px;font-weight:600;color:var(--faint);margin-top:8px}
+.cs-b small:first-child{margin-top:0}
+.cs-b p{color:var(--ink2);margin-top:1px}
+.cs-b .q{color:var(--muted)}
+.cs-b .foot{display:flex;align-items:center;gap:5px;margin-top:10px;font-size:12px;color:var(--faint)}
+.cs-b .foot svg.i{width:12px;height:12px}
+
+/* ---------- scenario 3: a faint word next to the time, a glass tip on hover/focus says why ---------- */
+.joined{position:relative;font-size:12px;color:var(--faint);border-bottom:1px dotted var(--line2);cursor:default}
+.joined .tipx{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);width:max-content;max-width:min(260px,70vw);border-radius:12px;padding:7px 11px;font-size:12.5px;line-height:1.45;color:var(--ink2);display:none;z-index:20}
+.joined:hover .tipx,.joined:focus .tipx{display:block;animation:popin .18s var(--spring) both}
+
+/* ---------- composer ---------- */
+.cmpw{padding:0 14px 14px;flex:none}
+.composer{max-width:760px;margin:0 auto;border-radius:18px;background:var(--raised);box-shadow:var(--e2),var(--top);display:flex;align-items:center;gap:8px;padding:8px 8px 8px 16px}
+.composer:focus-within{box-shadow:var(--e3),var(--top)}
+.composer input{all:unset;flex:1;min-width:0;font-size:15px;color:var(--ink);height:34px}
+.composer input::placeholder{color:var(--faint)}
+.send{height:34px;width:34px;border-radius:11px;border:0;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:none;background:var(--sunken);color:var(--faint);transition:all .25s var(--spring)}
+.send.on{color:var(--bg);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--bg)) 0%,var(--ink) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)}
+
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+@media (max-width:760px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .sb{display:none}
+  .phd{padding:8px 10px 8px 16px}
+  .scroll{padding:6px 4px 16px}
+  .msg{gap:10px;padding:10px 12px}
+  .work{gap:10px}
+  .av-col{width:28px}
+  .cmpw{padding:0 12px 12px}
+  .cs-b{padding-left:12px}
+  .proto .stp .l{display:none}
+  .proto .stp[aria-current="step"] .l{display:inline}
+}
+</style>
+</head>
+<body>
+<div class="proto" role="region" aria-label="Barra do protótipo">
+  <b>Conversa entre agentes</b>
+  <div class="steps" id="steps"></div>
+  <div class="acts">
+    <div class="seg" id="variant" role="group" aria-label="Variante">
+      <button type="button" data-v="a">A · Rótulo</button><button type="button" data-v="b">B · Cartão</button>
+    </div>
+    <button class="b bg" type="button" id="replay"></button>
+  </div>
+  <span class="grow"></span>
+  <div class="seg" id="theme" role="group" aria-label="Tema">
+    <button type="button" data-th="light">Claro</button><button type="button" data-th="dark">Escuro</button>
+  </div>
+  <div class="now" id="now"></div>
+</div>
+<div class="app">
+  <nav class="sb" aria-label="Navegação">
+    <div class="org-in"><span class="lg">A</span><div><b>Acme</b><small>8 pessoas · 6 agentes</small></div></div>
+    <div class="sb-group"><div class="sb-label">Canais</div><div id="sbChans"></div></div>
+    <div class="sb-group"><div class="sb-label">Agentes</div><div id="sbAgents"></div></div>
+  </nav>
+  <main class="apane">
+    <header class="phd">
+      <div class="t"><h1 id="thTitle"></h1><small id="thSub"></small></div>
+    </header>
+    <div class="scroll" id="scroll"><div class="thread" id="thread"></div></div>
+    <div class="cmpw">
+      <form class="composer" id="composer" autocomplete="off">
+        <input id="cmpIn" aria-label="Escrever mensagem">
+        <button class="send" id="send" type="submit" aria-label="Enviar"></button>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { drawAgent, idlePose, drawAccessory, bodyTones, mixHex } from "../../../packages/ui/src/agent/engine.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const Q = new URLSearchParams(location.search);
+const FAST = Q.get("fast") === "1";
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+/* ---------- icons ---------- */
+const sv = (d) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const I = {
+  hash: sv('<path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/>'),
+  thread: sv('<path d="M4 5h16v9H11l-4 3.5V14H4Z"/><path d="M9 9h6"/>'),
+  send: sv('<path d="M12 19V5M6 11l6-6 6 6"/>'),
+  undo: sv('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),
+  clock: sv('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  chev: sv('<path d="m6 9 6 6 6-6"/>'),
+  to: sv('<path d="M5 12h13M13 7l5 5-5 5"/>'),
+  eyeoff: sv('<path d="M4 4l16 16"/><path d="M9.9 5.2A9.6 9.6 0 0 1 12 5c5 0 8.5 4.5 9 7a10.8 10.8 0 0 1-2.4 3.6M6.4 6.6C4.3 8 3.2 10.1 3 12c.5 2.5 4 7 9 7a9.3 9.3 0 0 0 4.2-1"/><path d="M10 10.2a2.6 2.6 0 0 0 3.7 3.7"/>'),
+};
+
+/* ---------- people and agents (each agent: its own color, eyes and accessory, all from the engine) ---------- */
+const AGENTS = {
+  theo: { name: "Theo", role: "Marketing", color: "amber", eyes: "round", acc: "cap", art: "o" },
+  iris: { name: "Iris", role: "Conteúdo", color: "rose", eyes: "round", acc: "flower", art: "a" },
+  nina: { name: "Nina", role: "Dados", color: "green", eyes: "dots", acc: "bow", art: "a" },
+  bento: { name: "Bento", role: "Design", color: "violet", eyes: "wide", acc: "headphones", art: "o" },
+  dev: { name: "Dev", role: "Engenharia", color: "sky", eyes: "round", acc: "headset", art: "o" },
+  infra: { name: "Infra", role: "Servidores", color: "teal", eyes: "dots", acc: "antenna", art: "o" },
+};
+const PEOPLE = { walter: "Walter", ana: "Ana" };
+const nameOf = (id) => AGENTS[id]?.name || PEOPLE[id];
+
+/* ---------- timeline ---------- */
+const timers = new Set();
+const later = (ms, fn) => { const h = setTimeout(() => { timers.delete(h); fn(); }, FAST ? 0 : ms); timers.add(h); return h; };
+const clearTimers = () => { for (const h of timers) clearTimeout(h); timers.clear(); };
+
+/* ---------- live agents: the engine, drawn every frame ---------- */
+const live = [];
+let varCache = {};
+const cssVar = (n) => varCache[n] || (varCache[n] = getComputedStyle(document.documentElement).getPropertyValue(n).trim());
+const avHTML = (id, size = 20, mode = "idle") => `<span class="avs" data-a="${id}" data-s="${size}" data-m="${mode}"></span>`;
+const ppHTML = (id, size = 20) => `<span class="pp" style="--s:${size}px" role="img" aria-label="${esc(nameOf(id))}">${esc(nameOf(id)[0])}</span>`;
+const mentionHTML = (id) => `<span class="mention">${avHTML(id, 16)}${AGENTS[id].name}</span>`;
+const orbHTML = (color, size = 14) => `<canvas class="orb" data-c="${color}" data-s="${size}" aria-hidden="true"></canvas>`;
+function makeAgent(id, size, mode) {
+  const a = AGENTS[id], w = document.createElement("span");
+  w.className = "agw";
+  const cv = document.createElement("canvas"), dpr = Math.min(2, devicePixelRatio || 1);
+  cv.className = "av"; cv.width = cv.height = Math.round(size * dpr); cv.style.width = cv.style.height = size + "px";
+  cv.setAttribute("role", "img");
+  cv.setAttribute("aria-label", `${a.name}, agente${mode === "run" ? ", trabalhando" : ""}`);
+  w.append(cv);
+  live.push({ cv, a, size, mode, seed: [...id].reduce((s, c) => s + c.charCodeAt(0), 0) % 7 + Math.random() });
+  return w;
+}
+const orbs = [];
+function hydrate(root = document) {
+  for (const el of $$(".avs", root)) el.replaceWith(makeAgent(el.dataset.a, +el.dataset.s, el.dataset.m));
+  for (const cv of $$("canvas.orb:not([data-on])", root)) {
+    cv.dataset.on = "1";
+    const s = +cv.dataset.s, dpr = Math.min(2, devicePixelRatio || 1);
+    cv.style.width = cv.style.height = s + "px"; cv.width = cv.height = Math.round(s * dpr);
+    orbs.push(cv);
+  }
+}
+function poseFor(it, t) {
+  // run: eyes as dashes (writing); think: looking up and aside (waiting on an answer); late: eyes closed.
+  if (it.mode === "run") { const p = idlePose(t, it.seed, { active: true, expressions: [] }); p.writing = true; return p; }
+  if (it.mode === "think") { const p = idlePose(t, it.seed, { every: 99, expressions: [] }); const g = Math.sin(t * .6 + it.seed); p.turn = [g * .45, -.3]; p.look = [g * .12, -.14]; return p; }
+  if (it.mode === "late") return { expression: "closed", turn: [0, .15], squash: REDUCED ? 0 : Math.sin(t * 1.1 + it.seed) * .3 };
+  return idlePose(t, it.seed, { every: 15, expressions: ["happy", "wink"] });
+}
+function drawLive(t) {
+  for (let i = live.length - 1; i >= 0; i--) {
+    const it = live[i];
+    if (!it.cv.isConnected) { live.splice(i, 1); continue; }
+    const ctx = it.cv.getContext("2d"), s = it.cv.width;
+    ctx.clearRect(0, 0, s, s);
+    const withAcc = it.size >= 26 && it.a.acc, inner = s * (withAcc ? 0.74 : 0.86);
+    drawAgent(ctx, (s - inner) / 2, s - inner, inner, { color: it.a.color, eyes: it.a.eyes, cells: it.size <= 18 ? 9 : it.size <= 32 ? 12 : undefined, pose: poseFor(it, t),
+      after: withAcc ? (g, side, frame) => drawAccessory(g, side, it.a.acc, frame, t, it.mode === "run") : undefined });
+  }
+}
+/* The 3×3 pixel orbit (Carregando.html, direction A), in the agent's own tones. */
+const RING = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]];
+function drawOrbs(now) {
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const c = orbs[i]; if (!c.isConnected) { orbs.splice(i, 1); continue; }
+    const ctx = c.getContext("2d"), cell = c.width / 3, gap = Math.max(1, Math.round(cell * .14));
+    const tn = bodyTones(c.dataset.c), faint = mixHex(tn.at(-1), cssVar("--bg"), .55);
+    ctx.clearRect(0, 0, c.width, c.height);
+    const head = REDUCED ? 0 : Math.floor(now / 110) % 8;
+    RING.forEach(([x, y], k) => {
+      const age = (head - k + 8) % 8;
+      ctx.fillStyle = age === 0 ? tn[0] : age === 1 ? tn[1] : age === 2 ? tn[2] : faint;
+      ctx.globalAlpha = age <= 2 ? 1 : .5;
+      ctx.fillRect(x * cell + gap / 2, y * cell + gap / 2, cell - gap, cell - gap);
+    });
+    ctx.globalAlpha = 1;
+  }
+}
+let lastT = 0;
+(function loop(now) {
+  if (now - lastT > 40) { lastT = now; drawLive(REDUCED ? 2 : now / 1000); drawOrbs(now); }
+  requestAnimationFrame(loop);
+})(0);
+
+/* ---------- state ---------- */
+const S = { scn: 1, v: Q.get("v") === "b" ? "b" : "a", msgs: [], work: null, open: new Set() };
+
+/* ---------- render ---------- */
+function reactsHTML(m) {
+  if (!m.reacts?.length) return "";
+  const pills = m.reacts.map((r) => r.agent
+    ? `<button class="react ag${r.fresh ? " fresh" : ""}" type="button" aria-label="${AGENTS[r.agent].name} reagiu com ${r.e}" title="${AGENTS[r.agent].name} reagiu"><span class="emo">${r.e}</span>${avHTML(r.agent, 16)}</button>`
+    : `<button class="react${r.fresh ? " fresh" : ""}" type="button" aria-label="${r.e} ${r.by.length}, ${esc(r.by.map(nameOf).join(", "))}" title="${esc(r.by.map(nameOf).join(", "))}"><span class="emo">${r.e}</span><span class="num">${r.by.length}</span></button>`);
+  return `<div class="reacts">${pills.join("")}</div>`;
+}
+/* What the agent heard from the other one (meta.consulted). A = label above, B = card inside. */
+function consultAbove(m) {
+  const c = m.consulted; if (!c || S.v !== "a") return "";
+  const a = AGENTS[c.agent];
+  if (c.status === "answered") return `<div class="from" title="${a.name} respondeu ao ${AGENTS[m.who].name} numa conversa só entre eles">Mensagem de ${avHTML(c.agent, 16)}<b>${a.name}</b></div>`;
+  return `<div class="from chip">${I.clock}<span>${a.art === "a" ? "A" : "O"} ${a.name} não respondeu a tempo</span></div>`;
+}
+function consultCard(m) {
+  const c = m.consulted; if (!c || S.v !== "b") return "";
+  const a = AGENTS[c.agent], me = AGENTS[m.who], open = S.open.has(m.id), ok = c.status === "answered";
+  const head = ok
+    ? `${avHTML(c.agent, 18)}<b>${a.name} respondeu</b><span class="pv">${esc(c.answer)}</span>`
+    : `<span class="ic">${I.clock}</span><b>${a.art === "a" ? "A" : "O"} ${a.name} não respondeu a tempo</b><span class="pv">Esperou 15 min</span>`;
+  const body = open ? `<div class="cs-b" id="cs-${m.id}">
+      <small>${me.name} perguntou</small><p class="q">${esc(c.question)}</p>
+      ${ok ? `<small>Resposta ${a.art === "a" ? "da" : "do"} ${a.name}</small><p>${esc(c.answer)}</p>` : `<small>Resposta</small><p class="q">Sem resposta em 15 min. ${me.art === "a" ? "A" : "O"} ${me.name} respondeu sem ela.</p>`}
+      <div class="foot">${I.eyeoff}Conversa só entre ${me.art === "a" ? "a" : "o"} ${me.name} e ${a.art === "a" ? "a" : "o"} ${a.name}</div>
+    </div>` : "";
+  return `<div class="cs${open ? " open" : ""}"><button class="cs-h" type="button" data-cs="${m.id}" aria-expanded="${open}" aria-controls="cs-${m.id}">${head}<span class="chev">${I.chev}</span></button>${body}</div>`;
+}
+function msgHTML(m) {
+  const ag = !!AGENTS[m.who];
+  const av = ag ? avHTML(m.who, 32) : ppHTML(m.who, 32);
+  const joined = m.joined ? `<span class="joined" tabindex="0">entrou na conversa<span class="tipx glass" role="tooltip">Ninguém chamou ${AGENTS[m.who].art === "a" ? "a" : "o"} ${AGENTS[m.who].name}. ${m.joined}</span></span>` : "";
+  const plan = m.plan ? `<div class="plan">${m.plan.map(([k, v]) => `<span>${k}</span><div>${v}</div>`).join("")}</div>` : "";
+  const el = `${consultAbove(m)}<div class="msg${m.fresh ? " in" : ""}" id="msg-${m.id}"><div class="av-col">${av}</div><div class="body"><div class="mhdr"><span class="mn">${nameOf(m.who)}</span>${ag ? `<span class="chip">${AGENTS[m.who].role}</span>` : ""}<span class="mt">${m.at}</span>${joined}</div>${consultCard(m)}<div class="mx">${m.html}</div>${plan}${reactsHTML(m)}</div></div>`;
+  return el;
+}
+const listNames = (ids) => {
+  const n = ids.map((id) => `<b>${AGENTS[id].name}</b>`);
+  if (n.length === 1) return n[0];
+  if (n.length === 2) return `${n[0]} e ${n[1]}`;
+  return `${n[0]}, ${n[1]} e mais ${n.length - 2}`;
+};
+function workHTML() {
+  const w = S.work; if (!w) return "";
+  const tok = (id, mode, fresh) => `<span class="tok${fresh ? " in" : ""}">${avHTML(id, 18, mode)}</span>`;
+  let stack, text, color, clock = "";
+  if (w.kind === "group") {
+    color = AGENTS[w.ids[0]].color;
+    stack = w.ids.map((id) => tok(id, "run")).join("");
+    text = `${listNames(w.ids)} ${w.ids.length > 1 ? "estão" : "está"} trabalhando…`;
+  } else {
+    const from = AGENTS[w.from], to = AGENTS[w.to];
+    color = from.color;
+    if (w.phase === "ask") {
+      stack = tok(w.from, "idle") + `<span class="to">${I.to}</span>` + tok(w.to, "think", true);
+      text = `<b>${from.name}</b> está perguntando ${to.art === "a" ? "à" : "ao"} <b>${to.name}</b>…`;
+      clock = `<span class="num" id="wclock">${fmt(w.secs || 0)}</span>`;
+    } else if (w.phase === "back") {
+      stack = tok(w.from, "run");
+      text = w.ok ? `<b>${to.name}</b> respondeu. <b>${from.name}</b> está escrevendo…` : `<b>${from.name}</b> está escrevendo…`;
+    } else { stack = tok(w.from, "run"); text = `<b>${from.name}</b> está trabalhando…`; }
+  }
+  return `<div class="work" role="status" aria-live="polite"><div class="av-col">${orbHTML(color, 15)}</div><div class="wk"><span class="stack">${stack}</span><span class="wt">${text}</span>${clock}</div></div>`;
+}
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+function render() {
+  $("#thread").innerHTML = `<div class="day">Hoje</div>` + S.msgs.map(msgHTML).join("") + workHTML();
+  hydrate($("#thread"));
+  for (const m of S.msgs) { delete m.fresh; m.reacts?.forEach((r) => delete r.fresh); }
+}
+const toBottom = () => requestAnimationFrame(() => { const s = $("#scroll"); s.scrollTo({ top: s.scrollHeight, behavior: REDUCED || FAST ? "auto" : "smooth" }); });
+const push = (m) => { m.fresh = true; m.reacts ||= []; S.msgs.push(m); };
+const setWork = (w) => { S.work = w; render(); toBottom(); };
+
+/* ---------- composer ---------- */
+const syncSend = () => { $("#send").className = "send" + ($("#cmpIn").value.trim() ? " on" : ""); };
+function typeInto(text, done) {
+  const i = $("#cmpIn"); i.value = ""; syncSend();
+  if (REDUCED || FAST) { i.value = text; syncSend(); return later(300, done); }
+  [...text].forEach((c, k) => later(32 * k, () => { i.value += c; syncSend(); }));
+  later(32 * text.length + 350, done);
+}
+const clearComposer = () => { $("#cmpIn").value = ""; syncSend(); };
+$("#cmpIn").addEventListener("input", syncSend);
+$("#send").innerHTML = I.send;
+$("#composer").addEventListener("submit", (e) => e.preventDefault());
+
+/* ---------- scenarios ---------- */
+const SCN = [
+  { id: 1, l: "Vários agentes na sala", now: "Uma mensagem para a sala acorda mais de um agente, sem precisar de @. Uma linha só mostra quem está trabalhando e encolhe conforme cada um termina: um responde, outro só reage, outro não tem nada a acrescentar." },
+  { id: 2, l: "Um agente consulta outro", now: "O Dev pergunta ao Infra em particular e espera. Ao vivo, a linha mostra a consulta; na resposta, A mostra um rótulo acima e B um cartão que abre o que o Infra disse." },
+  { id: 3, l: "Agente entra sozinho", now: "O Theo responde a Ana. Logo depois, a Iris, que ninguém chamou, entra com um ponto útil. Um aviso discreto ao lado do horário explica por quê." },
+  { id: 4, l: "Sem resposta a tempo", now: "O Infra não responde em 15 minutos (aqui o relógio corre rápido). O Dev avisa e pergunta como seguir. A e B mostram o mesmo estado, calmo." },
+];
+const CH = {
+  1: { title: `${I.hash}marketing`, sub: "Ana, Walter e 4 agentes", ph: "Escrever em #marketing…" },
+  2: { title: `${I.hash}produto`, sub: "Ana, Walter, Dev e Infra", ph: "Escrever em #produto…" },
+  3: { title: `${I.thread}Campanha de Natal`, sub: "Thread em #marketing · Ana, Theo e você", ph: "Responder na thread…" },
+  4: { title: `${I.hash}produto`, sub: "Ana, Walter, Dev e Infra", ph: "Escrever em #produto…" },
+};
+
+function play1() {
+  S.msgs = [{ id: "a1", who: "ana", at: "10:02", html: "<p>Bom dia, gente! Fechei o relatório de outubro, está no Drive.</p>", reacts: [] }];
+  render();
+  later(500, () => typeInto("Gente, deem os parabéns pro Theo, a campanha do TikTok bateu a meta. Conta pra eles, Theo.", () => {
+    clearComposer();
+    push({ id: "w1", who: "walter", at: "10:20", html: "<p>Gente, deem os parabéns pro Theo, a campanha do TikTok bateu a meta. Conta pra eles, Theo.</p>", reacts: [] });
+    render(); toBottom();
+    later(700, () => setWork({ kind: "group", ids: ["theo", "iris", "nina", "bento"] }));
+    later(2300, () => { // Nina has nothing to say: a reaction is enough.
+      const w = S.msgs.find((m) => m.id === "w1");
+      w.reacts.push({ e: "🎉", agent: "nina", fresh: true });
+      S.work.ids = S.work.ids.filter((x) => x !== "nina"); render();
+    });
+    later(3400, () => { const w = S.msgs.find((m) => m.id === "w1"); w.reacts.unshift({ e: "👏", by: ["ana"], fresh: true }); render(); });
+    later(4600, () => {
+      push({ id: "t1", who: "theo", at: "10:21", html: "<p>Valeu, Walter! E valeu, time. A campanha em números:</p>",
+        plan: [["Meta", "50 mil visualizações no mês"], ["Resultado", "<b>68 mil</b>, 36% acima da meta"], ["O que puxou", "Vídeos curtos dos bastidores da cozinha"], ["Próximo passo", "Repetir o formato em novembro"]] });
+      S.work.ids = S.work.ids.filter((x) => x !== "theo"); render(); toBottom();
+    });
+    later(6000, () => { S.work.ids = S.work.ids.filter((x) => x !== "bento"); render(); }); // Bento: nothing to add, he just leaves.
+    later(7200, () => {
+      push({ id: "i1", who: "iris", at: "10:21", html: `<p>Parabéns, Theo! <span class="emo">👏</span> O vídeo do forno foi o melhor roteiro do ano.</p>` });
+      S.work = null; render(); toBottom();
+    });
+    later(8400, () => { const t = S.msgs.find((m) => m.id === "t1"); t.reacts.push({ e: "❤️", by: ["walter", "ana"], fresh: true }); render(); });
+  }));
+}
+
+const Q2 = "Como subo um fix em staging hoje? Mudou alguma coisa?";
+const A2 = "Staging sobe sozinho quando o PR entra na branch de staging. Hoje o banco de staging está em manutenção até as 14h, então use a fila reserva até lá. Depois de subir, confira a página de saúde do staging.";
+function playAsk(ok) {
+  S.msgs = [
+    { id: "a1", who: "ana", at: "09:40", html: "<p>O login com Google voltou a falhar pra alguns clientes.</p>", reacts: [] },
+    { id: "d0", who: "dev", at: "09:46", html: "<p>Achei: a sessão expirava antes da hora. O fix está pronto no PR #482.</p>", reacts: [{ e: "🙌", by: ["ana"] }] },
+  ];
+  render();
+  later(500, () => typeInto("sobe o fix do login em staging", () => {
+    clearComposer();
+    push({ id: "w2", who: "walter", at: "10:30", html: `<p>${mentionHTML("dev")} sobe o fix do login em staging</p>` });
+    render(); toBottom();
+    later(600, () => setWork({ kind: "ask", from: "dev", to: "infra", phase: "work" }));
+    later(1900, () => setWork({ kind: "ask", from: "dev", to: "infra", phase: "ask", secs: 0 }));
+    // The clock: real seconds when Infra answers; fast-forward to 15 min when it never does.
+    const dur = ok ? 3600 : 4200, t0 = performance.now();
+    const tick = () => {
+      if (!S.work || S.work.phase !== "ask") return;
+      const e = (performance.now() - t0) / dur;
+      S.work.secs = ok ? Math.min(41, 2 + e * 39) : Math.min(900, e * e * 900);
+      const el = $("#wclock"); if (el) el.textContent = fmt(S.work.secs);
+      later(ok ? 250 : 60, tick);
+    };
+    later(1950, tick);
+    later(1900 + dur, () => setWork({ kind: "ask", from: "dev", to: "infra", phase: "back", ok }));
+    later(1900 + dur + 1600, () => {
+      push(ok
+        ? { id: "d1", who: "dev", at: "10:31", consulted: { agent: "infra", status: "answered", question: Q2, answer: A2 },
+            html: "<p>O Infra me passou como o staging sobe hoje: o banco está em manutenção até as 14h, então usei a fila reserva.</p><p>Já subi o fix do login, <b>está no ar em staging</b>. Testei entrar com e-mail e com Google, os dois funcionam.</p>" }
+        : { id: "d1", who: "dev", at: "10:46", consulted: { agent: "infra", status: "expired", question: Q2 },
+            html: "<p>Perguntei ao Infra como o staging sobe hoje, mas ele não respondeu em 15 minutos.</p><p>O fix está pronto. <b>Quer que eu suba do jeito de sempre</b> ou prefere esperar o Infra?</p>" });
+      S.work = null; render(); toBottom();
+    });
+  }));
+}
+
+function play3() {
+  S.msgs = [];
+  render();
+  later(400, () => { push({ id: "a1", who: "ana", at: "15:02", html: `<p>${mentionHTML("theo")} qual o melhor dia pra soltar a campanha de Natal?</p>` }); render(); });
+  later(1100, () => setWork({ kind: "group", ids: ["theo"] }));
+  later(3000, () => {
+    push({ id: "t1", who: "theo", at: "15:03", html: "<p>Sugiro <b>sexta, 28/11</b>, junto com a Black Friday: é quando mais gente procura presente. Se você topar, já deixo os posts agendados.</p>" });
+    S.work = null; render(); toBottom();
+  });
+  later(4300, () => setWork({ kind: "group", ids: ["iris"] }));
+  later(6000, () => {
+    push({ id: "i1", who: "iris", at: "15:03", joined: "Ela entrou porque cuida do vídeo da campanha.",
+      html: "<p>Só um ponto: o vídeo principal fica pronto no dia 26. Dá tempo pro dia 28, mas sem folga.</p>" });
+    S.work = null; render(); toBottom();
+  });
+  later(7400, () => { const t = S.msgs.find((m) => m.id === "i1"); t.reacts.push({ e: "👍", by: ["ana"], fresh: true }); render(); });
+}
+
+function goScn(n) {
+  clearTimers();
+  S.scn = n; S.work = null; S.open.clear(); S.msgs = [];
+  clearComposer();
+  $("#steps").innerHTML = SCN.map((s) => `<button class="stp" type="button" data-scn="${s.id}" ${s.id === n ? 'aria-current="step"' : ""}>${s.id}<span class="l">${s.l}</span></button>`).join("");
+  $("#variant").hidden = !(n === 2 || n === 4);
+  $("#now").textContent = SCN[n - 1].now;
+  $("#thTitle").innerHTML = CH[n].title; $("#thSub").textContent = CH[n].sub; $("#cmpIn").placeholder = CH[n].ph;
+  sidebar(n);
+  if (n === 1) play1(); else if (n === 2) playAsk(true); else if (n === 3) play3(); else playAsk(false);
+  $("#scroll").scrollTop = 0;
+}
+function setVariant(v) {
+  S.v = v; S.open.clear();
+  $$("#variant button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+  render();
+}
+function setTheme(th) {
+  document.documentElement.dataset.theme = th; varCache = {};
+  $$("#theme button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.th === th)));
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", (ev) => {
+  const t = ev.target;
+  const st = t.closest("[data-scn]"); if (st) return goScn(+st.dataset.scn);
+  const v = t.closest("[data-v]"); if (v) return setVariant(v.dataset.v);
+  const th = t.closest("[data-th]"); if (th) return setTheme(th.dataset.th);
+  if (t.closest("#replay")) return goScn(S.scn);
+  const cs = t.closest("[data-cs]"); if (cs) { const id = cs.dataset.cs; S.open.has(id) ? S.open.delete(id) : S.open.add(id); render(); $(`[data-cs="${id}"]`)?.focus({ preventScroll: true }); }
+});
+
+/* ---------- chrome ---------- */
+function sidebar(n) {
+  const on = n === 1 || n === 3 ? "marketing" : "produto";
+  $("#sbChans").innerHTML = ["geral", "marketing", "produto"].map((c) => `<button class="sb-item${c === on ? " on" : ""}" type="button">${I.hash}<span>${c}</span>${c === on && n === 3 ? "<small>1 thread</small>" : ""}</button>`).join("");
+  $("#sbAgents").innerHTML = Object.entries(AGENTS).map(([id, a]) => `<button class="sb-item" type="button">${avHTML(id, 20)}<span>${a.name}</span><small>${a.role}</small></button>`).join("");
+  hydrate($(".sb"));
+}
+$("#replay").innerHTML = `${I.undo} Repetir`;
+setTheme(document.documentElement.dataset.theme);
+setVariant(S.v);
+goScn(Math.min(4, Math.max(1, +Q.get("s") || 1)));
+</script>
+</body>
+</html>
