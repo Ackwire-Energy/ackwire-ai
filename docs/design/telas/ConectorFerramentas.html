@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ferramentas do conector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&family=Martian+Mono:wght@400&display=swap">
+<style>
+/*
+  Prototype: the "Ferramentas" step of the connector setup dialog, for servers with hundreds of tools
+  (TikTok Ads: 382). Fourth version: no step card; one grouped list.
+  Principle: easy for non-technical people. Sensible defaults, so most people just click Continuar.
+  1. Everything comes classified already (by the verb in the tool's name and by the server's own hints).
+  2. The tools the name can't decide (6) sit in a first group at the top of the list, "Precisam da sua
+     decisão", open by default, with a pixel illustration (the agent + "?" bubble, family of
+     MissaoConfig.html) and a quiet "Aceitar as sugestões" on its header. Same row component as every
+     subject, plus a short reason under the name ("Sugestão: pede aprovação — compartilha dados com
+     outra conta", pixel sparkle mark, no model or vendor name) and an "OK". Choosing any option, or OK,
+     decides it: the row leaves the group and goes to its subject. When the group is empty it goes away
+     and the done card shows instead.
+  3. Done: the agent (shared engine, happy, alive), title in the display face, a pixel/dither proportion
+     bar of the three levels with the counts as its legend, and a quiet "Rever as sugestões" link.
+  4. Level tones (bar, strips, swatches): the agent's own body tones. Light = só consulta, deep = muda
+     coisas, ink dither = pede aprovação, empty outlined square = desligada. No traffic-light colors.
+  5. Subjects (resource prefixes, pt-BR names): name, "N ferramentas", a pixel strip (one square per
+     tool, in its level's tone) and a short summary. Expanding shows its tools: readable name (technical
+     name only as a hover title, or shown when a search matches it) + one segmented control
+     Consulta · Muda · Aprovação · Desligada. One click; strip and summary update live. Sensitive tools
+     (delete, remove, send, pay, publish, transfer, refund, or destructiveHint) offer only
+     Aprovação · Desligada (product rule). One search field filters across groups and opens matches.
+  Tokens: Conectores.html + Componentes.dc.html (design system v2). Neutral cards, neutral (ink)
+  selection, mono only for technical names, display face (Funnel Display 300) for the done title.
+  Phone: bottom sheet, no x-scroll. Serve the repo root over http (the agent comes from
+  packages/ui/src/agent/engine.js).
+*/
+:root{
+  --bg:#f4f4f1;--raised:#fff;--sunken:#ebebe7;--glass:rgba(255,255,255,.72);--line:rgba(23,23,22,.08);--line2:rgba(23,23,22,.14);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#76766f;--plate:rgba(127,127,127,.1);--plate-soft:rgba(127,127,127,.06);
+  --agent:#0063d1;--agent2:#3d8bff;--agent-soft:#e3eefd;
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.10),0 0 0 1px var(--line);
+  --e3:0 2px 4px rgba(23,23,22,.04),0 24px 56px -16px rgba(23,23,22,.30),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --scrim:rgba(20,20,18,.32);
+  --field-bg:var(--sunken);--field-ring:0 0 0 3px rgba(127,127,127,.18);
+  --focus-ring:0 0 0 2px var(--raised),0 0 0 4px var(--ink);
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  --sans:"Onest",system-ui,sans-serif;--display:"Funnel Display",var(--sans);--mono:"Martian Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0f0f0e;--raised:#191918;--sunken:#0a0a09;--glass:rgba(30,30,28,.66);--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8b8b85;--plate:rgba(127,127,127,.14);--plate-soft:rgba(127,127,127,.08);
+  --agent:#5aa8ff;--agent2:#8cc3ff;--agent-soft:#11253f;
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);--e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --e3:0 28px 64px -16px rgba(0,0,0,.8),0 0 0 1px var(--line2);--top:inset 0 1px 0 rgba(255,255,255,.06);
+  --scrim:rgba(0,0,0,.55);color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"ss01","tnum";overflow:hidden}
+h1,h2,h3,h4,p{margin:0}
+button{font:inherit;color:inherit}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tech{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:-.01em}
+canvas.px{image-rendering:pixelated;display:block}
+
+/* The app behind the dialog (dimmed, not interactive). */
+.app{position:fixed;inset:0;display:grid;grid-template-columns:240px 1fr}
+.side{background:var(--sunken);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:6px}
+.side .ws{font-weight:700;padding:4px 8px 12px}
+.side .it{display:flex;align-items:center;gap:8px;height:30px;padding:0 8px;border-radius:9px;color:var(--muted);font-size:13.5px}
+.side .it.on{background:var(--raised);color:var(--ink);box-shadow:var(--e1)}
+.main{padding:28px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.main h1{font-size:24px;font-weight:650;letter-spacing:-.02em}
+.ph{height:64px;border-radius:18px;background:var(--raised);box-shadow:var(--e1)}
+@media (max-width:760px){.app{grid-template-columns:1fr}.side{display:none}.main{padding:20px 16px}}
+
+.themebtn{position:fixed;top:12px;right:12px;z-index:40}
+.seg{display:inline-flex;gap:2px;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 1px 2px rgba(0,0,0,.06)}
+.seg button{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 11px;border-radius:9px;font-weight:600;font-size:12.5px;color:var(--muted);white-space:nowrap;transition:color .15s,background .15s}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"],.seg button[aria-checked="true"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1),var(--top)}
+.seg.sm{padding:2px;border-radius:10px}
+.seg.sm button{height:26px;padding:0 9px;border-radius:8px;font-size:12px}
+
+:is(.seg button,.b,.x,.link,.subj-h):focus-visible{outline:none;box-shadow:var(--focus-ring)}
+
+/* Buttons (design system v2: tactile) */
+.b{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 18px;border-radius:12px;font-weight:600;font-size:14px;white-space:nowrap;transition:transform .18s var(--spring),box-shadow .18s var(--out),background .15s,color .15s,filter .15s}
+.b:active{transform:scale(.97) translateY(.5px)}
+.b1{color:var(--bg);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--bg)) 0%,var(--ink) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)}
+.b1:hover{filter:brightness(1.08)}
+.bg{background:transparent;color:var(--muted)}
+.bg:hover{background:var(--plate);color:var(--ink)}
+.x{all:unset;cursor:pointer;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;color:var(--muted);flex:none}
+.x:hover{background:var(--plate);color:var(--ink)}
+.link{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:var(--muted);border-radius:8px;padding:4px 6px;margin:-4px -6px}
+.link:hover{color:var(--ink)}
+.link svg.i{width:14px;height:14px}
+
+
+/* Dialog */
+.scrim{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.dialog{position:relative;width:min(720px,100%);height:min(880px,calc(100vh - 32px));display:flex;flex-direction:column;border-radius:22px;background:var(--raised);box-shadow:var(--e3),var(--top);overflow:hidden}
+.dh{display:flex;gap:14px;align-items:flex-start;padding:24px 24px 18px;border-bottom:1px solid var(--line)}
+.dh .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.eyebrow{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.logo{width:22px;height:22px;border-radius:7px 7px 7px 3px;display:grid;place-items:center;font-weight:700;font-size:9.5px;background:var(--sunken);color:var(--ink2);box-shadow:inset 0 0 0 1px var(--line)}
+.dh h2{font-size:20px;font-weight:650;letter-spacing:-.02em;line-height:1.25;margin-top:4px}
+.dh .s{color:var(--muted);font-size:14px}
+.dh .x{margin:-4px -6px 0 0}
+
+.db{flex:1;overflow-y:auto;overflow-x:hidden;padding:24px 24px 40px;overscroll-behavior:contain;display:flex;flex-direction:column;gap:32px}
+.sec-h{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.sec-h h3{font-size:15px;font-weight:650;letter-spacing:-.01em;flex:1;min-width:0}
+.sec-h .step{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.card{border-radius:20px;background:var(--raised);box-shadow:var(--e2),var(--top);padding:24px;overflow:hidden;animation:fade .3s var(--out) both}
+canvas.ill{width:44px;height:44px;flex:none;image-rendering:pixelated}
+canvas.spark{width:10px;height:10px;flex:none}
+
+/* The "needs you" group: first in the list, same rows plus a reason and an OK. */
+.dec-h{display:flex;align-items:center;gap:14px;padding:14px 16px 10px}
+.dec-h .t{flex:1;min-width:0}
+.dec-h b{display:block;font-weight:600;font-size:14.5px}
+.dec-h small{display:block;color:var(--muted);font-size:12.5px;line-height:1.45}
+.dec-h .link{flex:none;margin-right:0}
+.subj.decide{background:color-mix(in srgb,var(--sunken) 35%,var(--raised))}
+.subj.decide:first-child{border-radius:18px 18px 0 0}
+.subj.decide:only-child{border-radius:18px}
+.decide .row .nm{white-space:normal}
+.row .why{display:flex;align-items:flex-start;gap:7px;font-size:12.5px;line-height:18px;color:var(--muted);margin-top:1px;min-width:0}
+/* The mark sits on the first line (centered on its 18px line box), so wrapped text never pushes it down. */
+.row .why canvas.spark{margin-top:4px}
+.row .why span{min-width:0}
+.row .why b{color:var(--ink2);font-weight:600}
+.okb{all:unset;box-sizing:border-box;cursor:pointer;height:28px;padding:0 12px;border-radius:9px;font-weight:600;font-size:12.5px;background:var(--raised);color:var(--ink);box-shadow:var(--e1),var(--top);transition:transform .18s var(--spring),box-shadow .18s var(--out)}
+.okb:hover{box-shadow:var(--e2),var(--top)}
+.okb:active{transform:scale(.96)}
+.okb:focus-visible{outline:none;box-shadow:var(--focus-ring)}
+.row.leaving{animation:leave .26s var(--out) forwards;pointer-events:none}
+@keyframes leave{to{opacity:0;transform:translateX(14px)}}
+
+/* Done: the agent, the display title, the dither proportion bar and its legend. */
+.done{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:20px;align-items:center}
+.done canvas.agent{width:64px;height:64px;display:block}
+.done h4{font-family:var(--display);font-weight:300;font-size:30px;letter-spacing:-.03em;line-height:1.08;outline:none}
+.done .sub{color:var(--muted);font-size:14px;margin-top:4px}
+.done .bar{grid-column:1 / -1;margin-top:22px;width:100%;height:18px;border-radius:4px}
+.legend{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:12px;font-size:13.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:8px}
+.legend b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.legend .off{color:var(--faint)}
+.done .link{grid-column:1 / -1;justify-self:start;margin-top:18px}
+canvas.swatch{width:12px;height:12px;border-radius:2px;flex:none}
+
+/* Subjects */
+.searchfield{position:relative;height:40px;border-radius:999px;background:var(--field-bg);box-shadow:inset 0 0 0 1px var(--line);display:flex;align-items:center;transition:background .15s,box-shadow .15s;margin-bottom:12px}
+.searchfield:hover{background:var(--plate-soft)}
+.searchfield:focus-within{background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2),var(--field-ring)}
+.searchfield > svg{position:absolute;left:14px;color:var(--faint);pointer-events:none}
+.searchfield input{flex:1;min-width:0;height:100%;padding:0 38px 0 40px;border:0;border-radius:inherit;background:transparent;color:var(--ink);font:inherit;font-size:14px;outline:none}
+.searchfield input::placeholder{color:var(--faint)}
+.searchfield input::-webkit-search-cancel-button{display:none}
+.searchfield .x{position:absolute;right:4px;width:32px;height:32px;border-radius:999px}
+.subjects{border-radius:18px;background:var(--raised);box-shadow:var(--e1),var(--top)}
+.subj + .subj{border-top:1px solid var(--line)}
+.subj-h{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:minmax(0,1fr) 196px 16px;align-items:center;column-gap:16px;padding:14px 16px;transition:background .12s}
+.subj:first-child .subj-h{border-radius:18px 18px 0 0}
+.subj:last-child:not([data-open]) .subj-h{border-radius:0 0 18px 18px}
+.subj:only-child:not([data-open]) .subj-h{border-radius:18px}
+.subj-h:hover{background:var(--plate-soft)}
+.subj-h b{display:block;font-weight:600;font-size:14.5px}
+.subj-h small{display:block;color:var(--muted);font-size:12.5px;line-height:1.45}
+.subj-h canvas.strip{width:196px;justify-self:end}
+.subj-h .chev{color:var(--faint);transition:transform .25s var(--out)}
+.subj[data-open] .subj-h .chev{transform:rotate(90deg)}
+.subj-b{padding:2px 8px 10px}
+.subj-b.anim{animation:fade .22s var(--out) both}
+@keyframes fade{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.row{display:flex;align-items:center;gap:12px;min-height:46px;padding:5px 8px;border-radius:12px;transition:background .12s}
+.row:hover{background:var(--plate-soft)}
+.row .t{flex:1;min-width:0;display:flex;flex-direction:column}
+.row .nm{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .tech{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .ctl{display:flex;align-items:center;gap:12px;flex:none}
+.row[data-off] .nm{color:var(--faint)}
+.seg.lv button canvas.swatch{width:8px;height:8px;border-radius:1.5px}
+.seg.lv button[aria-checked="false"] canvas.swatch{opacity:.55}
+.empty{padding:28px 16px;color:var(--muted);font-size:13.5px;text-align:center}
+
+/* Footer */
+.df{display:flex;gap:8px;align-items:center;padding:14px 24px 18px;border-top:1px solid var(--line);background:var(--raised)}
+.df .note{margin-right:auto;color:var(--muted);font-size:13px;min-width:0}
+
+/* Toast (glass) */
+.toast{position:absolute;left:50%;bottom:88px;width:max-content;max-width:calc(100% - 32px);transform:translateX(-50%) translateY(10px);opacity:0;pointer-events:none;display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:16px;background:var(--glass);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);box-shadow:var(--e3);font-size:13.5px;font-weight:500;transition:opacity .2s,transform .25s var(--spring);z-index:7}
+.toast[data-on]{opacity:1;transform:translateX(-50%)}
+
+@media (max-width:640px){
+  .scrim{align-items:flex-end;padding:0}
+  .dialog{width:100%;height:calc(100dvh - 52px);border-radius:22px 22px 0 0}
+  .dh{padding:20px 16px 16px}
+  .dh h2{font-size:18px}
+  .dh .s{font-size:13.5px}
+  .db{padding:20px 16px 32px;gap:28px}
+  .card{padding:18px}
+  .dec-h{flex-wrap:wrap;padding:14px 14px 8px}
+  .dec-h .t{flex-basis:calc(100% - 58px)}
+  .dec-h .link{margin-left:58px}
+  .row .why{align-items:flex-start}
+  .decide .row .ctl{gap:8px}
+  .decide .seg.lv canvas.swatch{display:none}
+  .decide .seg.sm.lv button{padding:0 8px}
+  .row .why canvas{margin-top:4px}
+  .done{column-gap:14px}
+  .done canvas.agent{width:52px;height:52px}
+  .done h4{font-size:25px}
+  .legend{flex-direction:column;gap:6px}
+  .subj-h{grid-template-columns:minmax(0,1fr) 16px;row-gap:10px;padding:14px}
+  .subj-h canvas.strip{grid-row:2;grid-column:1 / -1;justify-self:start;width:100%}
+  .subj-b{padding:2px 4px 8px}
+  .row{flex-wrap:wrap;row-gap:6px;padding:8px 10px}
+  .row .t{flex-basis:100%}
+  .row .ctl{width:100%}
+  .seg.sm.lv button{padding:0 7px;gap:5px}
+  .df{padding:12px 16px calc(14px + env(safe-area-inset-bottom));flex-wrap:wrap}
+  .df .note{flex-basis:100%;margin:0 0 4px}
+  .df .b{flex:1}
+  .toast{bottom:124px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+</head>
+<body>
+<div class="app" aria-hidden="true">
+  <aside class="side">
+    <div class="ws">Acme</div>
+    <div class="it">Início</div><div class="it">Canais</div><div class="it">Agentes</div><div class="it">Drive</div><div class="it">Rotinas</div>
+    <div class="it on">Conectores</div><div class="it">Configurações</div>
+  </aside>
+  <div class="main">
+    <h1>Conectores</h1>
+    <div class="ph"></div><div class="ph"></div><div class="ph"></div><div class="ph" style="opacity:.6"></div>
+  </div>
+</div>
+
+<div class="themebtn seg" id="theme" role="group" aria-label="Tema"><button data-v="light">Claro</button><button data-v="dark">Escuro</button></div>
+
+<div class="scrim">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dt">
+    <div class="dh">
+      <div class="t">
+        <div class="eyebrow"><span class="logo" aria-hidden="true">TT</span>TikTok Ads · Passo 2 de 3</div>
+        <h2 id="dt">Revise o que o agente pode fazer sozinho</h2>
+        <p class="s" id="lead"></p>
+      </div>
+      <button class="x" aria-label="Fechar" data-act="close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="db" id="db">
+      <section id="doneSec" aria-label="Resumo" hidden><div class="card" id="doneCard"></div></section>
+      <section aria-labelledby="allH">
+        <div class="sec-h"><h3 id="allH"></h3></div>
+        <label class="searchfield">
+          <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" type="search" placeholder="Buscar ferramenta" aria-label="Buscar ferramenta" autocomplete="off">
+          <button class="x" id="qx" aria-label="Limpar busca" hidden><svg class="i" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+        </label>
+        <div class="subjects" id="subjects"></div>
+      </section>
+    </div>
+    <div class="df">
+      <div class="note" id="note"></div>
+      <button class="b bg" data-act="close">Cancelar</button>
+      <button class="b b1" data-act="continue">Continuar</button>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+  </div>
+</div>
+
+<script type="module">
+import { drawAgent, idlePose, bodyTones, mixHex } from "../../../packages/ui/src/agent/engine.js";
+
+/* ---------- Icons ---------- */
+const I = {
+  read: '<svg class="i" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>',
+  write: '<svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>',
+  approval: '<svg class="i" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.4 3.2 8.2 7.5 9 4.3-.8 7.5-4.6 7.5-9V6L12 3Z"/><path d="m9 12 2.2 2.2L15 10.5"/></svg>',
+  chev: '<svg class="i chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>',
+  back: '<svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
+  sparkle: '<svg class="i" viewBox="0 0 24 24"><path d="M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9L12 18.5l-1.9-5.6L4.5 11l5.6-1.9Z"/><path d="M19 17v4M17 19h4"/></svg>',
+};
+/* The three levels, in plain words. */
+const LV = {
+  read: { choice: "Só consulta", help: "Vê dados, não muda nada", short: "Consulta", one: "consulta", many: "consultam", legend: "só consultam", legendOne: "só consulta", icon: I.read },
+  write: { choice: "Muda coisas", help: "Cria e altera sem perguntar", short: "Muda", one: "muda", many: "mudam", legend: "mudam coisas", legendOne: "muda coisas", icon: I.write },
+  approval: { choice: "Pede sua aprovação", help: "Pergunta no chat antes", short: "Aprovação", one: "pede aprovação", many: "pedem aprovação", legend: "pedem sua aprovação", legendOne: "pede aprovação", icon: I.approval },
+};
+LV.off = { short: "Desligada" };
+const BUCKETS = ["read", "write", "approval"];
+const ORDER = ["read", "write", "approval", "off"];
+/* Subjects: the servers' resource prefixes, in pt-BR. */
+const SUBJECT = { ad: "Anúncios", adgroup: "Grupos de anúncio", campaign: "Campanhas", creative: "Criativos", report: "Relatórios", audience: "Públicos", pixel: "Pixel", catalog: "Catálogo", bc: "Business Center", advertiser: "Conta", identity: "Identidade", comment: "Comentários", tool: "Utilitários" };
+/* The agent this connector is being set up for. */
+const AGENT = { color: "sky", eyes: "round" };
+
+/* ---------- Fake server: TikTok Ads (tool names and descriptions as the server ships them, English) ---------- */
+const GROUPS = [
+  { p: "ad", label: "Anúncios", noun: "ad", spec: ":get,list,create,update,delete,copy;status:update;aco:get,list,create,update;aco_material:list,update,add;review_info:get;appeal:create;material:list,get,update;tag:list,set;url_param:get,set;comment_setting:get,update;schedule:get,set;partner:list,add;playable:get,list,upload;instant_page:get,list,create,update;dpa_template:list,get,create,update" },
+  { p: "adgroup", label: "Grupos de anúncios", noun: "ad group", spec: ":get,list,create,update,delete,copy;budget:get,update;bid:get,update;targeting:get,update,set;schedule:get,update;review_info:get;placement:list,update;frequency_cap:get,set;audience:list,add,set;exclusion:set;location:list,set;pacing:get,set;deep_bid:get,update;dayparting:get,set" },
+  { p: "campaign", label: "Campanhas", noun: "campaign", spec: ":get,list,create,update,delete,copy;status:update;budget:get,update,set;spc:get,create,update,copy;gmv_max:get,list,create,update,copy;gmv_max_session:list,create;label:list,set;budget_optimization:get,set;rf:get,list,create" },
+  { p: "creative", label: "Criativos", noun: "creative", spec: "video:get,list,search,upload,update;video_cover:set,upload;image:get,list,upload,update,delete;music:list,search;portfolio:get,list,create,update;ai_video:create,get;template:list,get,create,update;carousel:get,list,create,update;title:list,check;library:search;quick_optimization:get,apply;asset_tag:list,set" },
+  { p: "report", label: "Relatórios", noun: "report", spec: "integrated:get;audience:get;video_insight:get;task:create,check,download,run;basic:get;auction:get;gmv_max:get;lead:list,get;lead_task:download;dimension:list;metric:list;filter:list;schedule:list,create,update;template:list,get,create;attribution:get;brand_lift:get,list;conversion_lift:get,list;creative_insight:get" },
+  { p: "audience", label: "Públicos", noun: "audience", spec: ":list,get,create,update,delete,share;custom:upload,create,list,get,update,add;lookalike:create,update,list,get;rule:create,update,get,set;saved:list,get,create,delete;segment:list,get,create,update;estimate:get;insight:get;file:upload,get;engagement:create,list" },
+  { p: "pixel", label: "Pixel e eventos", noun: "pixel", spec: ":list,get,create,update,track;event:list,get,create,update,delete;event_stats:get;health:get;domain:list,add,check,set;offline_set:list,get,create,update,bind,unbind;offline_event:upload,list;capi_token:get,create,update;test_event:create" },
+  { p: "catalog", label: "Catálogos", noun: "catalog", spec: ":list,get,create,update,delete;product:list,get,upload,update,delete,add,set;feed:list,get,create,update,refresh;feed_log:list;set:list,get,create,update,delete;video:list,get,upload,update;lexicon:list,get,create,update;diagnostic:get;overview:get;location:list,get,update;event_source:get,bind;available_country:get;template:list,create" },
+  { p: "bc", label: "Business Center", noun: "Business Center", spec: ":get,list;member:list,get,add,update,remove;asset:list,get,assign,remove,sync;asset_group:list,get,create,update,assign;partner:list,add,update;billing:get;invoice:list,get,download,pay;balance:get,transfer;transaction:list;advertiser:create,list;account_budget:get,update;changelog:list,download" },
+  { p: "advertiser", label: "Anunciantes", noun: "advertiser", spec: "info:get,update;:list;balance:get;fund:get,transfer;budget:get,update;qualification:get,list,create;transaction:list;payment_portfolio:get;setting:get,update;user:list,add" },
+  { p: "identity", label: "Identidades e Spark Ads", noun: "identity", spec: ":list,get,create;video:list,get,upload,update,publish;spark_auth:list,get,bind,unbind,remove;post:get,list,bind;info:get;music:list" },
+  { p: "comment", label: "Comentários", noun: "comment", spec: ":list,get,delete;reply:list,create,update;reference:get;task:create,check;blocked_word:list,add,update,set;status:update;export:create" },
+  { p: "tool", label: "Segmentação e utilitários", noun: "", spec: "region:get,list;language:list;interest_category:list,get;interest_keyword:search,get;action_category:list;hashtag:search,list;device_model:list;targeting:search;targeting_info:get;contextual_tag:list,get;bid_recommend:get;timezone:list;currency:list;open_url:get;vbo_status:check;brand_safety_partner:list;postal_code:search;pangle_block:get,update;app:list,get,create,update;music_copyright:check;search_keyword:get,list;audience_size:estimate" },
+];
+const VERBS = {
+  read: ["get", "list", "search", "read", "describe", "query", "check", "estimate", "preview", "download"],
+  write: ["create", "update", "add", "set", "upload", "copy", "bind", "unbind", "assign", "apply"],
+  approval: ["delete", "remove", "send", "pay", "publish", "transfer", "refund"],
+};
+/* Hints the server declares: they win over the name. */
+const ANN = {
+  campaign_status_update: { hint: "destructiveHint", lvl: "approval" },
+  report_task_create: { hint: "readOnlyHint", lvl: "read" },
+  comment_export_create: { hint: "readOnlyHint", lvl: "read" },
+};
+/* Names the verb doesn't decide: a suggestion with a plain reason, and a pt-BR name and sentence. */
+const REVIEW = {
+  audience_share: { lvl: "approval", name: "Compartilhar público com outra conta", say: "Envia um público que você criou para a conta de outro anunciante ou outro Business Center.", why: "compartilha dados com outra conta", desc: "Share custom audiences with other advertiser accounts or Business Centers." },
+  ad_status_update: { lvl: "approval", name: "Ligar, pausar ou apagar anúncios", say: "Muda vários anúncios de uma vez: liga, pausa ou apaga.", why: "religar um anúncio volta a gastar dinheiro", desc: "Enable, disable or delete ads in bulk by changing their operation status (ENABLE, DISABLE, DELETE)." },
+  pixel_track: { lvl: "write", name: "Registrar uma venda ou visita no pixel", say: "Avisa o TikTok que alguém comprou ou colocou algo no carrinho, para medir os resultados.", why: "muda os números da conta, mas não gasta dinheiro", desc: "Send a web event (e.g. CompletePayment, AddToCart) to a pixel through the Events API." },
+  catalog_feed_refresh: { lvl: "write", name: "Atualizar os produtos do catálogo agora", say: "Busca de novo a lista de produtos da sua loja e substitui a que está no catálogo.", why: "troca os produtos, mas não apaga o catálogo", desc: "Trigger an immediate refresh of a catalog feed from its source URL." },
+  bc_asset_sync: { lvl: "write", name: "Copiar recursos entre contas", say: "Copia pixels, catálogos e perfis entre as contas da sua empresa no TikTok.", why: "copia sem apagar nada", desc: "Synchronize assets (pixels, catalogs, identities) between Business Center accounts." },
+  report_task_run: { lvl: "read", name: "Gerar um relatório já configurado", say: "Roda um relatório que já existe e traz os números quando ficar pronto.", why: "só consulta números, não muda nada", desc: "Run an existing asynchronous report task and return its task_id for polling." },
+};
+const NICE = { aco: "ACO", spc: "Smart+", gmv_max: "GMV Max", gmv_max_session: "GMV Max session", capi_token: "Events API token", dpa_template: "DPA template", rf: "Reach & Frequency", vbo_status: "VBO status", bc: "Business Center", url_param: "URL parameters", ai_video: "AI video", spark_auth: "Spark Ads authorization", offline_set: "offline event set", offline_event: "offline events", pangle_block: "Pangle block list", open_url: "open URL", info: "info" };
+const hum = (s) => NICE[s] || s.replace(/_/g, " ");
+const plural = (s) => /(s|info|data)$/.test(s) ? s : /[^aeiou]y$/.test(s) ? s.slice(0, -1) + "ies" : s + "s";
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+let seed = 7;
+const pick = (arr) => arr[(seed = (seed * 9301 + 49297) % 233280) % arr.length];
+function describe(verb, thing, things) {
+  const T = {
+    get: [`Get ${thing} details by ID. Returns fields such as id, status and create_time.`, `Retrieve the ${thing} for the given advertiser_id, including its current configuration.`],
+    list: [`List ${things} under the advertiser account. Supports filtering and pagination (page, page_size).`, `Return a paginated list of ${things}, optionally filtered by status or creation date.`],
+    search: [`Search ${things} by keyword and filters. Results are paginated and ordered by relevance.`],
+    check: [`Check ${thing} and return validation results with warnings and suggestions.`],
+    estimate: [`Estimate ${thing} for the given targeting settings, without saving anything.`],
+    download: [`Download ${thing} as a file. Returns a temporary download URL valid for 1 hour.`],
+    create: [`Create a new ${thing}. Returns the id of the created object. Requires advertiser_id.`, `Create ${thing} with the provided settings and return its id.`],
+    update: [`Update an existing ${thing}. Only the fields provided are changed.`, `Modify ${thing} settings. Fields left out keep their current values.`],
+    add: [`Add ${things} to the specified entity.`],
+    set: [`Set ${thing} for the specified entity, replacing the current value.`],
+    upload: [`Upload a ${thing} file and return its id for later use.`],
+    copy: [`Copy an existing ${thing} into a new one with the same settings, paused by default.`],
+    bind: [`Bind ${thing} to the advertiser account.`], unbind: [`Unbind ${thing} from the advertiser account.`],
+    assign: [`Assign ${things} to members or partners with the given role.`],
+    apply: [`Apply ${thing} suggestions to the selected ads.`],
+    delete: [`Permanently delete one or more ${things}. This action cannot be undone.`],
+    remove: [`Remove ${things} from the Business Center. Access is revoked immediately.`],
+    pay: [`Pay an outstanding invoice with the Business Center's default payment method.`],
+    transfer: [`Transfer balance between the Business Center and an advertiser account.`],
+    publish: [`Publish a video to the linked TikTok account as an organic post.`],
+  };
+  return pick(T[verb] || [`${cap(verb)} ${thing}.`]);
+}
+
+/* ---------- Readable pt-BR names (the UI never leads with the technical name) ---------- */
+const VPT = { get: "Ver", list: "Listar", search: "Buscar", check: "Verificar", estimate: "Estimar", download: "Baixar", create: "Criar", update: "Alterar", add: "Adicionar", set: "Definir", upload: "Enviar", copy: "Duplicar", bind: "Vincular", unbind: "Desvincular", assign: "Atribuir", apply: "Aplicar", delete: "Apagar", remove: "Remover", pay: "Pagar", transfer: "Transferir", publish: "Publicar", track: "Registrar", share: "Compartilhar", sync: "Sincronizar", refresh: "Atualizar", run: "Gerar" };
+/* "singular|plural"; group-scoped keys ("report.audience") win over plain ones. */
+const PT = {
+  status: "status|status", aco: "versão automática|versões automáticas", aco_material: "material da versão automática|materiais da versão automática", review_info: "resultado da revisão|resultados da revisão", appeal: "recurso da revisão|recursos da revisão", material: "material|materiais", tag: "etiqueta|etiquetas", url_param: "parâmetros do link|parâmetros do link", comment_setting: "ajuste de comentários|ajustes de comentários", schedule: "programação|programações", partner: "parceiro|parceiros", playable: "anúncio jogável|anúncios jogáveis", instant_page: "página instantânea|páginas instantâneas", dpa_template: "modelo de anúncio de produto|modelos de anúncio de produto",
+  budget: "orçamento|orçamentos", bid: "lance|lances", targeting: "público-alvo|públicos-alvo", placement: "posicionamento|posicionamentos", frequency_cap: "limite de frequência|limites de frequência", audience: "público|públicos", exclusion: "exclusões|exclusões", location: "localização|localizações", pacing: "ritmo de entrega|ritmos de entrega", deep_bid: "lance de conversão|lances de conversão", dayparting: "horários de exibição|horários de exibição",
+  spc: "campanha Smart+|campanhas Smart+", gmv_max: "campanha GMV Max|campanhas GMV Max", gmv_max_session: "sessão GMV Max|sessões GMV Max", label: "rótulo|rótulos", budget_optimization: "otimização de orçamento|otimizações de orçamento", rf: "campanha de alcance|campanhas de alcance",
+  video: "vídeo|vídeos", video_cover: "capa de vídeo|capas de vídeo", image: "imagem|imagens", music: "música|músicas", portfolio: "portfólio|portfólios", ai_video: "vídeo feito com IA|vídeos feitos com IA", template: "modelo|modelos", carousel: "carrossel|carrosséis", title: "título|títulos", library: "biblioteca de criativos|bibliotecas de criativos", quick_optimization: "melhoria rápida|melhorias rápidas", asset_tag: "etiqueta de arquivo|etiquetas de arquivo",
+  "creative.template": "modelo de criativo|modelos de criativo",
+  "report.integrated": "relatório completo|relatórios completos", "report.audience": "relatório de público|relatórios de público", "report.video_insight": "análise de vídeos|análises de vídeos", "report.task": "relatório em segundo plano|relatórios em segundo plano", "report.basic": "relatório básico|relatórios básicos", "report.auction": "relatório de leilão|relatórios de leilão", "report.gmv_max": "relatório GMV Max|relatórios GMV Max", "report.lead": "contato captado|contatos captados", "report.lead_task": "lista de contatos captados|listas de contatos captados", "report.dimension": "dimensão|dimensões", "report.metric": "métrica|métricas", "report.filter": "filtro|filtros", "report.schedule": "relatório agendado|relatórios agendados", "report.template": "modelo de relatório|modelos de relatório", "report.attribution": "relatório de atribuição|relatórios de atribuição", "report.brand_lift": "estudo de lembrança de marca|estudos de lembrança de marca", "report.conversion_lift": "estudo de conversões|estudos de conversões", "report.creative_insight": "análise de criativos|análises de criativos",
+  "audience.custom": "público personalizado|públicos personalizados", "audience.lookalike": "público semelhante|públicos semelhantes", "audience.rule": "regra de público|regras de público", "audience.saved": "público salvo|públicos salvos", "audience.segment": "segmento de público|segmentos de público", "audience.estimate": "estimativa de público|estimativas de público", "audience.insight": "análise de público|análises de público", "audience.file": "arquivo de público|arquivos de público", "audience.engagement": "público de engajamento|públicos de engajamento",
+  event: "evento|eventos", event_stats: "estatísticas de eventos|estatísticas de eventos", health: "saúde|saúde", domain: "domínio|domínios", offline_set: "grupo de eventos de loja física|grupos de eventos de loja física", offline_event: "evento de loja física|eventos de loja física", capi_token: "chave de envio de eventos|chaves de envio de eventos", test_event: "evento de teste|eventos de teste",
+  product: "produto|produtos", feed: "fonte de produtos|fontes de produtos", feed_log: "histórico de importação|históricos de importação", set: "coleção de produtos|coleções de produtos", lexicon: "dicionário|dicionários", diagnostic: "diagnóstico|diagnósticos", overview: "resumo|resumos", event_source: "fonte de eventos|fontes de eventos", available_country: "países disponíveis|países disponíveis", "catalog.template": "modelo de vitrine|modelos de vitrine",
+  member: "membro|membros", asset: "recurso|recursos", asset_group: "grupo de recursos|grupos de recursos", billing: "cobrança|cobranças", invoice: "fatura|faturas", balance: "saldo|saldos", transaction: "transação|transações", advertiser: "conta de anunciante|contas de anunciante", account_budget: "orçamento da conta|orçamentos da conta", changelog: "histórico de mudanças|históricos de mudanças",
+  info: "dados|dados", fund: "fundos|fundos", qualification: "documento de verificação|documentos de verificação", payment_portfolio: "forma de pagamento|formas de pagamento", setting: "configuração|configurações", user: "usuário|usuários",
+  spark_auth: "autorização de post|autorizações de post", post: "post|posts",
+  reply: "resposta|respostas", reference: "post de origem|posts de origem", task: "tarefa|tarefas", blocked_word: "palavra bloqueada|palavras bloqueadas", export: "exportação|exportações",
+  region: "região|regiões", language: "idioma|idiomas", interest_category: "categoria de interesse|categorias de interesse", interest_keyword: "interesse|interesses", action_category: "categoria de comportamento|categorias de comportamento", hashtag: "hashtag|hashtags", device_model: "modelo de celular|modelos de celular", "tool.targeting": "opção de público-alvo|opções de público-alvo", targeting_info: "detalhes do público-alvo|detalhes do público-alvo", contextual_tag: "tema de conteúdo|temas de conteúdo", bid_recommend: "lance recomendado|lances recomendados", timezone: "fuso horário|fusos horários", currency: "moeda|moedas", open_url: "link de abertura|links de abertura", vbo_status: "status da otimização por valor|status da otimização por valor", brand_safety_partner: "parceiro de segurança de marca|parceiros de segurança de marca", postal_code: "CEP|CEPs", pangle_block: "bloqueios do Pangle|bloqueios do Pangle", app: "app|apps", music_copyright: "direitos de música|direitos de música", search_keyword: "palavra de busca|palavras de busca", audience_size: "tamanho do público|tamanhos do público",
+};
+const GPT = { ad: ["anúncio", "anúncios", "do anúncio"], adgroup: ["grupo de anúncios", "grupos de anúncios", "do grupo de anúncios"], campaign: ["campanha", "campanhas", "da campanha"], audience: ["público", "públicos", null], pixel: ["pixel", "pixels", "do pixel"], catalog: ["catálogo", "catálogos", "do catálogo"], bc: ["conta da empresa", "contas da empresa", "da empresa"], advertiser: ["conta de anunciante", "contas de anunciante", "do anunciante"], identity: ["perfil", "perfis", "do perfil"], comment: ["comentário", "comentários", "dos comentários"], creative: [null, null, null], report: [null, null, null], tool: [null, null, null] };
+const MANY = new Set(["list", "search", "add", "assign"]);
+function ptName(g, obj, verb) {
+  const many = MANY.has(verb);
+  const [gs, gpl, gof] = GPT[g];
+  let noun;
+  if (!obj) noun = many ? gpl : gs;
+  else {
+    const [s, p] = (PT[`${g}.${obj}`] || PT[obj] || `${hum(obj)}|${hum(obj)}`).split("|");
+    noun = (many ? p : s) + (gof ? ` ${gof}` : "");
+  }
+  return `${VPT[verb] || cap(verb)} ${noun}`;
+}
+
+const TOOLS = [];
+for (const g of GROUPS) {
+  for (const part of g.spec.split(";")) {
+    const [obj, verbs] = part.split(":");
+    for (const verb of verbs.split(",")) {
+      const tech = [g.p, obj, verb].filter(Boolean).join("_");
+      const thing = [g.noun, obj ? hum(obj) : ""].filter(Boolean).join(" ") || hum(obj);
+      const things = plural(thing);
+      const r = REVIEW[tech];
+      let sug;
+      if (ANN[tech]) sug = ANN[tech].lvl;
+      else if (r) sug = r.lvl;
+      else sug = ORDER.find((l) => VERBS[l]?.includes(verb));
+      /* Sensitive: approval by the verb or by destructiveHint. Never offered "Só consulta"/"Muda coisas". */
+      const sensitive = sug === "approval" && !r;
+      TOOLS.push({ id: tech, tech, name: r?.name || ptName(g.p, obj, verb), desc: r?.desc || describe(verb, thing, things), group: g.p, sug, sensitive, review: !!r, level: sug });
+    }
+  }
+}
+const byId = new Map(TOOLS.map((t) => [t.id, t]));
+/* Review order: the ones that ask for approval first. */
+const QUEUE = Object.keys(REVIEW);
+
+/* ---------- State ---------- */
+const S = { decided: {}, open: new Set(), q: "", justOpened: null };
+let toastTimer = 0;
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const fmt = (n) => n.toLocaleString("pt-BR");
+const countOf = (list) => { const c = { read: 0, write: 0, approval: 0, off: 0 }; for (const t of list) c[t.level]++; return c; };
+const isPending = (t) => t.review && !(t.id in S.decided);
+const pending = () => QUEUE.filter((id) => !(id in S.decided)).length;
+const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ---------- Level tones (the agent's own body tones; approval in ink) ---------- */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+let TONE = {};
+function computeTones() {
+  const T = bodyTones(AGENT.color), ink = cssVar("--ink"), raised = cssVar("--raised");
+  const dark = document.documentElement.dataset.theme === "dark"; // one step lighter on dark, so the deep tone still reads
+  TONE = {
+    read: dark ? [T[3], T[4]] : [T[2], T[3]],
+    write: dark ? [T[1], T[2]] : [T[0], T[1]],
+    approval: [ink, mixHex(ink, raised, 0.42)],
+    off: [cssVar("--faint"), raised],
+  };
+}
+/* A dithered block: deep tone at the bottom, light tone at the top, Bayer-mixed (canvas pixels = cells). */
+function ditherRect(ctx, x0, y0, w, h, tones) {
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const k = 0.78 - 0.56 * (h > 1 ? y / (h - 1) : 0.5);
+    ctx.fillStyle = k > BAYER[((x0 + x) & 3) + (((y0 + y) & 3) << 2)] ? tones[1] : tones[0];
+    ctx.fillRect(x0 + x, y0 + y, 1, 1);
+  }
+}
+function drawSwatch(cv) {
+  const lvl = cv.dataset.lvl, n = 4;
+  cv.width = n; cv.height = n;
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, n, n);
+  if (lvl === "off") { ctx.fillStyle = TONE.off[0]; ctx.fillRect(0, 0, n, 1); ctx.fillRect(0, n - 1, n, 1); ctx.fillRect(0, 0, 1, n); ctx.fillRect(n - 1, 0, 1, n); return; }
+  ditherRect(ctx, 0, 0, n, n, TONE[lvl]);
+}
+/* Proportion bar: one cell = 3 css px; a one-cell gap between levels. */
+function drawBar(cv) {
+  const c = countOf(TOOLS), on = BUCKETS.map((l) => [l, c[l]]).filter(([, n]) => n);
+  const W = Math.max(30, Math.floor(cv.clientWidth / 3)), H = 6;
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, W, H);
+  const total = on.reduce((a, [, n]) => a + n, 0) || 1, usable = W - (on.length - 1);
+  let x = 0;
+  on.forEach(([l, n], i) => {
+    const w = i === on.length - 1 ? W - x : Math.max(2, Math.round((n / total) * usable));
+    ditherRect(ctx, x, 0, w, H, TONE[l]);
+    x += w + 1;
+  });
+}
+/* Subject strip: one square (6 px) per tool, 2 px gap, sorted by level, wrapping to rows. */
+function drawStrip(cv) {
+  const list = TOOLS.filter((t) => t.group === cv.dataset.g && !isPending(t)).sort((a, b) => ORDER.indexOf(a.level) - ORDER.indexOf(b.level));
+  const sq = 6, gap = 2, pitch = sq + gap;
+  const cols = Math.max(1, Math.floor((cv.clientWidth + gap) / pitch)), rows = Math.ceil(list.length / cols);
+  const W = cols * pitch - gap, H = rows * pitch - gap;
+  cv.width = W; cv.height = H; cv.style.height = H + "px";
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, W, H);
+  list.forEach((t, i) => {
+    const x = (i % cols) * pitch, y = Math.floor(i / cols) * pitch;
+    if (t.level === "off") {
+      ctx.fillStyle = TONE.off[0];
+      ctx.globalAlpha = 0.6;
+      ctx.fillRect(x, y, sq, 1); ctx.fillRect(x, y + sq - 1, sq, 1); ctx.fillRect(x, y, 1, sq); ctx.fillRect(x + sq - 1, y, 1, sq);
+      ctx.globalAlpha = 1;
+    } else ditherRect(ctx, x, y, sq, sq, TONE[t.level]);
+  });
+}
+
+/* The suggestion mark: a small pixel sparkle in the agent's tones. */
+const SPARK = ["..x..", "..x..", "xxlxx", "..x..", "..x.."];
+function drawSpark(cv) {
+  if (!cv) return;
+  cv.width = cv.height = 5;
+  const ctx = cv.getContext("2d"), T = bodyTones(AGENT.color);
+  ctx.clearRect(0, 0, 5, 5);
+  SPARK.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === ".") return; ctx.fillStyle = ch === "l" ? T[4] : T[1]; ctx.fillRect(x, y, 1, 1); }));
+}
+
+/* ---------- Group illustration (22x22 pixel grid, 2 css px per cell; MissaoConfig.html's family) ----------
+   The agent bottom-left + the "?" bubble top-right, in its tones; alive (blink, bubble bobs). */
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const ASK = [".xxxxxxx.", "xxxwwwxxx", "xxwxxxwxx", "xxxxxwwxx", "xxxxwxxxx", "xxxxxxxxx", "xxxxwxxxx", ".xxxxxxx.", "..xx.....", "..x......"];
+function drawIll(cv, tt) {
+  const dpr = Math.min(2, devicePixelRatio || 1), P = Math.round(2 * dpr), N = 22, W = N * P;
+  if (cv.width !== W) { cv.width = cv.height = W; }
+  const ctx = cv.getContext("2d"); ctx.clearRect(0, 0, W, W); ctx.imageSmoothingEnabled = false;
+  const t = REDUCED ? 2 : tt, tn = bodyTones(AGENT.color), as = 14;
+  const cell = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(x * P, y * P, P, P); };
+  const pose = idlePose(t, 3, { every: 7, expressions: ["happy"] });
+  if (REDUCED) { pose.blink = false; pose.expression = undefined; }
+  drawAgent(ctx, 0, (N - as) * P, as * P, { color: AGENT.color, eyes: AGENT.eyes, cells: 12, pose });
+  const gy = REDUCED ? 0 : Math.round((Math.sin(t * 3) + 1) / 2);
+  ASK.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === "x") cell(12 + x, gy + y, y < 4 ? tn[3] : tn[2]); else if (ch === "w") cell(12 + x, gy + y, "#ffffff"); }));
+}
+let lastIll = 0;
+(function illLoop(now) {
+  if (now - lastIll > 45) { lastIll = now; document.querySelectorAll("canvas.ill").forEach((cv) => drawIll(cv, now / 1000)); }
+  requestAnimationFrame(illLoop);
+})(0);
+
+/* ---------- The agent (done state): happy, idle, alive ---------- */
+let agentRAF = 0;
+function animateAgent() {
+  cancelAnimationFrame(agentRAF);
+  const t0 = performance.now();
+  const tick = (now) => {
+    const cv = document.querySelector("canvas.agent");
+    if (!cv) return;
+    const dpr = Math.min(2, devicePixelRatio || 1), s = Math.round(cv.clientWidth * dpr);
+    if (cv.width !== s) { cv.width = s; cv.height = s; }
+    const ctx = cv.getContext("2d");
+    ctx.clearRect(0, 0, s, s);
+    const t = (now - t0) / 1000;
+    const pose = idlePose(t, 3, { expressions: [] });
+    pose.expression = "happy";
+    pose.blink = false;
+    const inner = s * 0.82;
+    drawAgent(ctx, (s - inner) / 2, s - inner - s * 0.04, inner, { color: AGENT.color, eyes: AGENT.eyes, pose, cells: 16 });
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) agentRAF = requestAnimationFrame(tick);
+  };
+  agentRAF = requestAnimationFrame(tick);
+}
+
+/* ---------- Done card (only when nothing is pending) ---------- */
+function renderDone() {
+  const sec = $("#doneSec");
+  if (pending()) { sec.hidden = true; cancelAnimationFrame(agentRAF); return; }
+  const wasHidden = sec.hidden;
+  sec.hidden = false;
+  const c = countOf(TOOLS);
+  $("#doneCard").innerHTML = `<div class="done">
+    <canvas class="agent" aria-hidden="true"></canvas>
+    <div><h4>Pronto. Tudo revisado.</h4><p class="sub">O agente já sabe o que pode fazer sozinho no TikTok Ads.</p></div>
+    <canvas class="px bar" id="bar" role="img" aria-label="${c.read} só consultam, ${c.write} mudam coisas, ${c.approval} pedem sua aprovação"></canvas>
+    <div class="legend">${BUCKETS.map((l) => `<span><canvas class="px swatch" data-lvl="${l}"></canvas><b>${fmt(c[l])}</b> ${LV[l].legend}</span>`).join("")}${c.off ? `<span class="off"><canvas class="px swatch" data-lvl="off"></canvas><b>${fmt(c.off)}</b> ${c.off === 1 ? "desligada" : "desligadas"}</span>` : ""}</div>
+    <button class="link" data-act="review">Rever as ${QUEUE.length} sugestões</button>
+  </div>`;
+  drawBar($("#bar"));
+  $("#doneCard").querySelectorAll("canvas.swatch").forEach(drawSwatch);
+  if (wasHidden) { animateAgent(); $("#db").scrollTo({ top: 0, behavior: REDUCED ? "auto" : "smooth" }); }
+  else animateAgent();
+}
+function setLevel(t, lvl) {
+  t.level = lvl;
+  if (t.review) S.decided[t.id] = lvl;
+}
+/* Decide a pending tool: the row slides out, then the tool lives in its subject. */
+function decide(t, lvl) {
+  const row = document.querySelector(`.decide [data-row="${CSS.escape(t.id)}"]`);
+  const finish = () => {
+    setLevel(t, lvl);
+    render();
+    toast(`“${t.name}” foi para ${SUBJECT[t.group]}`);
+  };
+  if (!row || REDUCED) return finish();
+  row.classList.add("leaving");
+  setTimeout(finish, 240);
+}
+
+/* ---------- Subjects ---------- */
+function matchesQ(t, q) {
+  if (!q) return { ok: true };
+  if (norm(t.name).includes(q)) return { ok: true };
+  if (t.tech.includes(q.replace(/\s+/g, "_"))) return { ok: true, tech: true };
+  return { ok: false };
+}
+function summary(c, n) {
+  const parts = BUCKETS.filter((l) => c[l]).map((l) => `${fmt(c[l])} ${c[l] === 1 ? LV[l].one : LV[l].many}`);
+  if (c.off) parts.push(`${fmt(c.off)} ${c.off === 1 ? "desligada" : "desligadas"}`);
+  return parts.join(" · ");
+}
+function rowHTML(t, showTech) {
+  const off = t.level === "off", dec = isPending(t), r = REVIEW[t.id];
+  const opts = t.sensitive ? ["approval", "off"] : ORDER;
+  const seg = `<div class="seg sm lv" role="radiogroup" aria-label="Nível de ${esc(t.name)}">${opts.map((l) => `<button role="radio" aria-checked="${t.level === l}" data-set="${t.id}" data-l="${l}" data-fk="set:${t.id}:${l}"><canvas class="px swatch" data-lvl="${l}"></canvas>${LV[l].short}</button>`).join("")}</div>`;
+  const why = dec ? `<span class="why"><canvas class="px spark" aria-hidden="true"></canvas><span>Sugestão: <b>${LV[t.sug].legendOne}</b> — ${esc(r.why)}</span></span>` : "";
+  return `<div class="row" data-row="${t.id}"${off ? " data-off" : ""} title="${dec ? esc(r.say) + "\n" : ""}${t.tech}">
+    <span class="t"><span class="nm">${esc(t.name)}</span>${why}${showTech ? `<span class="tech">${t.tech}</span>` : ""}</span>
+    <span class="ctl">${seg}${dec ? `<button class="okb" data-ok="${t.id}" data-fk="ok:${t.id}" aria-label="Confirmar ${esc(t.name)}">OK</button>` : ""}</span>
+  </div>`;
+}
+function renderSubjects() {
+  const fk = document.activeElement?.dataset?.fk;
+  const q = norm(S.q.trim());
+  const scroll = $("#db").scrollTop;
+  let html = "";
+  const dec = TOOLS.filter(isPending);
+  if (dec.length) {
+    const hits = dec.map((t) => [t, matchesQ(t, q)]).filter(([, m]) => m.ok);
+    if (hits.length) html += `<section class="subj decide" data-open aria-label="Precisam da sua decisão">
+      <div class="dec-h"><canvas class="ill" aria-hidden="true"></canvas><span class="t"><b>Precisam da sua decisão · ${dec.length}</b><small>O nome não diz o que fazem. Confirme a sugestão ou escolha outra.</small></span>${q ? "" : `<button class="link" data-act="acceptAll">Aceitar as sugestões</button>`}</div>
+      <div class="subj-b">${hits.map(([t, m]) => rowHTML(t, m.tech)).join("")}</div>
+    </section>`;
+  }
+  for (const g of GROUPS) {
+    const all = TOOLS.filter((t) => t.group === g.p && !isPending(t));
+    const hits = all.map((t) => [t, matchesQ(t, q)]).filter(([, m]) => m.ok);
+    if (!hits.length) continue;
+    const open = q ? true : S.open.has(g.p);
+    const c = countOf(all);
+    html += `<section class="subj"${open ? " data-open" : ""}>
+      <button class="subj-h" data-subj="${g.p}" data-fk="subj:${g.p}" aria-expanded="${open}">
+        <span><b>${SUBJECT[g.p]}</b><small>${q ? `${hits.length} de ${all.length} ferramentas` : `${all.length} ferramentas`} · ${summary(c)}</small></span>
+        <canvas class="px strip" data-g="${g.p}" role="img" aria-label="${summary(c)}"></canvas>
+        ${I.chev}
+      </button>
+      ${open ? `<div class="subj-b${S.justOpened === g.p ? " anim" : ""}">${hits.map(([t, m]) => rowHTML(t, m.tech)).join("")}</div>` : ""}
+    </section>`;
+  }
+  S.justOpened = null;
+  $("#subjects").innerHTML = html || `<div class="empty">Nada encontrado para “${esc(S.q.trim())}”.</div>`;
+  $("#subjects").querySelectorAll("canvas.strip").forEach(drawStrip);
+  $("#subjects").querySelectorAll("canvas.swatch").forEach(drawSwatch);
+  $("#subjects").querySelectorAll("canvas.spark").forEach(drawSpark);
+  $("#subjects").querySelectorAll("canvas.ill").forEach((cv) => drawIll(cv, performance.now() / 1000));
+  $("#db").scrollTop = scroll;
+  $("#lead").textContent = `Classificamos as ${fmt(TOOLS.length)} ferramentas do TikTok Ads. Confira só o que precisa de você.`;
+  $("#allH").textContent = `Todas as ${fmt(TOOLS.length)} ferramentas, por assunto`;
+  const p = pending();
+  $("#note").textContent = p ? `Faltam ${p} ${p === 1 ? "decisão" : "decisões"}. Se continuar, valem as sugestões.` : "Dá para mudar tudo isso depois.";
+  if (fk) document.querySelector(`[data-fk="${CSS.escape(fk)}"]`)?.focus({ preventScroll: true });
+}
+function render() { renderSubjects(); renderDone(); }
+function toast(text) {
+  const el = $("#toast");
+  el.textContent = text;
+  el.setAttribute("data-on", "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.removeAttribute("data-on"), 2400);
+}
+
+/* ---------- Events ---------- */
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("button");
+  if (!el) return;
+  const d = el.dataset;
+  if (el.closest("#theme") && d.v) return setTheme(d.v);
+  if (d.subj) {
+    if (S.q.trim()) return;
+    if (S.open.has(d.subj)) S.open.delete(d.subj); else { S.open.add(d.subj); S.justOpened = d.subj; }
+    return renderSubjects();
+  }
+  if (d.set) {
+    const t = byId.get(d.set);
+    if (isPending(t)) return decide(t, d.l);
+    if (t.level === d.l) return;
+    setLevel(t, d.l); return render();
+  }
+  if (d.ok) { const t = byId.get(d.ok); return decide(t, t.level); }
+  if (el.id === "qx") { $("#q").value = ""; S.q = ""; el.hidden = true; renderSubjects(); return $("#q").focus(); }
+  switch (d.act) {
+    case "acceptAll": { const n = pending(); TOOLS.filter(isPending).forEach((t) => setLevel(t, t.level)); render(); return toast(`${n} ${n === 1 ? "sugestão aceita" : "sugestões aceitas"}`); }
+    case "review": S.decided = {}; render(); return $("#db").scrollTo({ top: 0, behavior: REDUCED ? "auto" : "smooth" });
+    case "close": return toast("Fechar descarta as mudanças (protótipo)");
+    case "continue": { const p = pending(); return toast(p ? `As ${p} que faltam seguem a sugestão · próximo: quem usa` : "Próximo passo: quem usa o TikTok Ads"); }
+  }
+});
+let qTimer = 0;
+$("#q").addEventListener("input", (e) => {
+  $("#qx").hidden = !e.target.value;
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => { S.q = e.target.value; renderSubjects(); }, 120);
+});
+let rz = 0;
+addEventListener("resize", () => {
+  clearTimeout(rz);
+  rz = setTimeout(() => { document.querySelectorAll("canvas.strip").forEach(drawStrip); const b = $("#bar"); if (b) drawBar(b); }, 80);
+});
+
+function setTheme(v) {
+  document.documentElement.dataset.theme = v;
+  document.querySelectorAll("#theme button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+  computeTones();
+  document.querySelectorAll("canvas.spark").forEach(drawSpark);
+  document.querySelectorAll("canvas.strip").forEach(drawStrip);
+  document.querySelectorAll("canvas.swatch").forEach(drawSwatch);
+  const b = $("#bar"); if (b) drawBar(b);
+}
+setTheme(matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+render();
+window.__tools = TOOLS;
+</script>
+</body>
+</html>
