@@ -7,6 +7,7 @@ import { mkdirSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { MACHINE_PROTOCOL_VERSION, type MachineOs, type RunnerInfo } from "@agenteschat/adapters/machine-protocol";
+import { BrainManager } from "./brain";
 import { configPath, connectUrl, expandHome, normalizeServerUrl, readConfig, runnerHome, writeConfig } from "./config";
 import { RunnerConnection } from "./connection";
 import { RUNNER_VERSION } from "./errors";
@@ -36,7 +37,8 @@ Usage:
   agentes-runner --help | --version
 
 Config: $AGENTES_RUNNER_HOME or ~/.agentes-runner (config.json, mode 600; optional
-"maxConcurrentTasks" (default 3) and "taskMaxSeconds" (default 14400) for background tasks).
+"maxConcurrentTasks" (default 3) and "taskMaxSeconds" (default 14400) for background tasks;
+"brainIdleMinutes" (default 10) and "brainMaxProcesses" (default 3) for agents thinking with Claude Code).
 Background tasks keep running when the runner restarts; their logs are in tasks/.
 Commands run as the user that runs the runner; consider a dedicated OS user.`;
 
@@ -202,8 +204,20 @@ async function start(): Promise<number> {
     secrets: (agent) => agentSecrets(secretsDir, agent),
   });
   await tasks.init();
-  // The local endpoint of mission tasks' MCP servers (protocol 5).
-  const mcp = new McpBridge({ socketPath, task: (taskId) => tasks.mcpTask(taskId), log });
+  // Brain turns (protocol 8, ADR 0032): one Claude Code process per thread, kept alive between turns.
+  const brains = new BrainManager({
+    root: path.join(runnerHome(), "brains"),
+    mcp: { socketPath, command: [process.execPath, script] },
+    ...(config.brainIdleMinutes ? { idleMs: config.brainIdleMinutes * 60_000 } : {}),
+    ...(config.brainMaxProcesses ? { maxProcesses: config.brainMaxProcesses } : {}),
+    log,
+  });
+  // The local endpoint of mission tasks' and brain processes' MCP servers (protocol 5).
+  const mcp = new McpBridge({
+    socketPath,
+    task: (taskId) => tasks.mcpTask(taskId) ?? brains.mcpTask(taskId),
+    log,
+  });
   await mcp
     .listen()
     .catch((err: unknown) => log(`mission tools unavailable: ${err instanceof Error ? err.message : String(err)}`));
@@ -215,11 +229,12 @@ async function start(): Promise<number> {
     url: connectUrl(config.server),
     token: config.token,
     info,
-    context: { workspaceReal, exec: config.exec, token: config.token, secretsDir, tasks },
+    context: { workspaceReal, exec: config.exec, token: config.token, secretsDir, tasks, brains },
     log,
   });
   const stop = () => {
     tasks.close();
+    brains.close();
     void mcp.close();
     connection.stop();
   };

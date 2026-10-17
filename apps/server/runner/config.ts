@@ -17,6 +17,10 @@ export interface RunnerConfig {
   maxConcurrentTasks?: number;
   /** A background task is stopped after this many seconds (default 4 h). */
   taskMaxSeconds?: number;
+  /** Brain turns (protocol 8): a Claude Code process with no turn this long is closed (default 10). */
+  brainIdleMinutes?: number;
+  /** Brain turns: at most this many Claude Code processes kept alive (default 3). */
+  brainMaxProcesses?: number;
 }
 
 /** `AGENTES_RUNNER_HOME`, or `~/.agentes-runner`. */
@@ -79,6 +83,8 @@ export function readConfig(home = runnerHome()): RunnerConfig | null {
     exec: raw.exec !== false,
     ...(positive(raw.maxConcurrentTasks) ? { maxConcurrentTasks: positive(raw.maxConcurrentTasks) } : {}),
     ...(positive(raw.taskMaxSeconds) ? { taskMaxSeconds: positive(raw.taskMaxSeconds) } : {}),
+    ...(positive(raw.brainIdleMinutes) ? { brainIdleMinutes: positive(raw.brainIdleMinutes) } : {}),
+    ...(positive(raw.brainMaxProcesses) ? { brainMaxProcesses: positive(raw.brainMaxProcesses) } : {}),
   };
 }
 

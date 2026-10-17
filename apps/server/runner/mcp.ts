@@ -52,6 +52,13 @@ export interface McpTaskInfo {
   folder?: string;
   /** The agent's secrets masked (ADR 0027): nothing the executor sends leaves the machine with them. */
   redact?: (text: string) => string;
+  /**
+   * Brain turns (protocol 8, ADR 0032): the MCP server belongs to a Claude Code
+   * process that lives across turns; its calls are relayed for the run it works
+   * for now (`mcp.call.taskId` = this run id) with the run's token from `brain.turn`.
+   */
+  runId?: string;
+  runToken?: string;
 }
 
 /** Every string inside `value` through `redact` (keys kept). */
@@ -269,7 +276,7 @@ export class McpBridge {
     // Not connected right now (the runner restarting, a reconnect): the call waits for the
     // connection, bounded by its own timeout, instead of being refused.
     const callId = randomBytes(12).toString("hex");
-    const frame: RunnerFrame = { type: "mcp.call", callId, taskId, tool, args };
+    const frame: RunnerFrame = { type: "mcp.call", callId, taskId: info.runId ?? taskId, tool, args };
     return new Promise<IpcReply>((resolve) => {
       const timer = setTimeout(() => {
         const waited = this.waiting.has(callId);

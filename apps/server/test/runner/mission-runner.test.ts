@@ -77,10 +77,11 @@ test("protocol 7: hello carries the coding CLIs found; detection is best effort 
   const cached = cachedExecutors(() => now, run);
   cached();
   cached();
-  expect(calls.filter((c) => c === "claude")).toHaveLength(2);
+  // `claude --version` and (protocol 8) `claude auth status` per look.
+  expect(calls.filter((c) => c === "claude")).toHaveLength(4);
   now = 11 * 60_000;
   cached();
-  expect(calls.filter((c) => c === "claude")).toHaveLength(3);
+  expect(calls.filter((c) => c === "claude")).toHaveLength(6);
 });
 
 test("permission profile: work allows git, tests and pushes to the mission's branches; merges, other pushes and deploys are denied", () => {

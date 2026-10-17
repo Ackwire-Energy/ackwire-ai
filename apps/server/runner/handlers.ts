@@ -9,6 +9,7 @@ import {
   type MachineRequest,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
+import type { BrainManager } from "./brain";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
 import { agentWorkspace, isInside, resolveInWorkspace } from "./paths";
@@ -31,12 +32,16 @@ export interface HandlerContext {
   secretsDir?: string;
   /** Background tasks (protocol 4); without it the runner refuses `task.*`. */
   tasks?: TaskManager;
+  /** Brain turns (protocol 8); without it the runner refuses `brain.turn`. */
+  brains?: BrainManager;
 }
 
 export interface RequestScope {
   signal: AbortSignal;
   /** Sends an `output` frame (exec with `stream: true`). */
   output: (stream: "stdout" | "stderr", chunk: string) => void;
+  /** Sends any frame while the request runs (`brain.event`, `brain.done`). */
+  emit?: (frame: RunnerFrame) => void;
 }
 
 const clampInt = (n: unknown, min: number, max: number, fallback: number) => {
@@ -196,6 +201,8 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   }
   const secrets = await agentSecrets(ctx.secretsDir, req.agent);
   switch (req.op) {
+    case "brain.turn":
+      return doBrainTurn(ctx, req, scope, secrets);
     case "exec":
       return doExec(ctx, req, scope, secrets);
     case "read":
@@ -220,6 +227,36 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
     default:
       throw new RunnerError("bad_request", `Unknown op ${(req as { op: string }).op}`);
   }
+}
+
+/**
+ * `brain.turn` (protocol 8, ADR 0032): streams `brain.event` frames, the
+ * final one included, then `brain.done`; the result repeats the final event.
+ */
+async function doBrainTurn(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "brain.turn" }>,
+  scope: RequestScope,
+  secrets: Secrets,
+): Promise<MachineReplies["brain.turn"]> {
+  if (!ctx.exec) {
+    throw new RunnerError(
+      "exec_disabled",
+      "Commands are turned off on this computer (the runner was paired with --no-exec)",
+    );
+  }
+  if (!ctx.brains) throw new RunnerError("bad_request", "This runner runs no brain turns");
+  if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
+  const runId = requireString(req.runId, "runId");
+  const final = await ctx.brains.turn(req, {
+    agent: req.agent,
+    folder: ctx.workspaceReal,
+    secrets: secrets ? { env: secrets.env, redact: secrets.redact } : null,
+    signal: scope.signal,
+    emit: (event) => scope.emit?.({ type: "brain.event", runId, event }),
+  });
+  scope.emit?.({ type: "brain.done", runId });
+  return { runId, final };
 }
 
 /** Background tasks: the manager finds each agent's folder itself (and keeps it for the task's life). */
@@ -278,6 +315,8 @@ function describeOp(req: MachineRequest): string {
       return `task.cancel ${String(req.taskId ?? "")}`;
     case "task.output":
       return `task.output ${String(req.taskId ?? "")}`;
+    case "brain.turn":
+      return `brain.turn ${String(req.runId ?? "")} (${String(req.kind ?? "")}${req.model ? `, ${String(req.model)}` : ""})`;
     default:
       return String((req as { op: unknown }).op);
   }
@@ -321,6 +360,14 @@ export class RequestRunner {
       signal: controller.signal,
       output: (stream, chunk) => {
         if (!this.closed && chunk) this.send({ type: "output", id, stream, chunk });
+      },
+      emit: (frame) => {
+        if (this.closed) return;
+        try {
+          this.send(frame);
+        } catch {
+          // socket gone
+        }
       },
     };
     return this.handler(this.ctx, req, scope)
