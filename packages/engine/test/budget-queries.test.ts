@@ -17,9 +17,10 @@ afterEach(async () => {
 test("claim → model request stays within 11 statements; a whole mention run within 20", async () => {
   let beforeModel = -1;
   f = await setup({
-    reply: () => {
-      beforeModel = currentQueryCount();
-      return { chunks: ["ok"] };
+    reply: (req) => {
+      // The agent's call only: the router's (structured output) may run after an agent's answer (D49).
+      if (!req.outputSchema) beforeModel = currentQueryCount();
+      return { chunks: [req.outputSchema ? '{"needs_agent":0,"scores":[],"reason":"none"}' : "ok"] };
     },
   });
   enableCaches();
