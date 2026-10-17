@@ -7,8 +7,6 @@ import { AsyncLocalStorage } from "node:async_hooks";
  */
 export interface QueryTrace {
   count: number;
-  /** TEMP diagnostics: statement texts when `globalThis.__AGENTES_QLOG` is set. */
-  log?: string[];
 }
 
 export const queryTrace = new AsyncLocalStorage<QueryTrace>();
@@ -17,15 +15,10 @@ export const queryTrace = new AsyncLocalStorage<QueryTrace>();
 export const queryTotals = { count: 0 };
 
 export const tracingLogger = {
-  logQuery(query: string) {
+  logQuery() {
     queryTotals.count++;
     const store = queryTrace.getStore();
     if (store) store.count++;
-    // TEMP diagnostics (CI only): remove once the budget test is understood.
-    if (store && (globalThis as { __AGENTES_QLOG?: boolean }).__AGENTES_QLOG) {
-      store.log ??= [];
-      store.log.push(query.replace(/\s+/g, " ").slice(0, 200));
-    }
   },
 };
 

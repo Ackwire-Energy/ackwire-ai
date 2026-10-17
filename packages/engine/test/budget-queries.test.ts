@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { currentQueryCount, queryTrace } from "@agenteschat/db";
+import { currentQueryCount } from "@agenteschat/db";
 import { createJobHandlers, drainOutbox, enableCaches, postPersonMessage, type StageTiming } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
@@ -19,12 +19,7 @@ test("claim → model request stays within 11 statements; a whole mention run wi
   f = await setup({
     reply: (req) => {
       // The agent's call only: the router's (structured output) may run after an agent's answer (D49).
-      if (!req.outputSchema) {
-        beforeModel = currentQueryCount();
-        // TEMP diagnostics (CI only).
-        if ((globalThis as { __AGENTES_QLOG?: boolean }).__AGENTES_QLOG)
-          console.log("QLOG", JSON.stringify(queryTrace.getStore()?.log ?? []));
-      }
+      if (!req.outputSchema) beforeModel = currentQueryCount();
       return { chunks: [req.outputSchema ? '{"needs_agent":0,"scores":[],"reason":"none"}' : "ok"] };
     },
   });
@@ -40,7 +35,6 @@ test("claim → model request stays within 11 statements; a whole mention run wi
   await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev warm up" });
   await drainOutbox(f.db, handlers);
 
-  (globalThis as { __AGENTES_QLOG?: boolean }).__AGENTES_QLOG = true;
   await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev hi" });
   await drainOutbox(f.db, handlers);
   expect(beforeModel).toBeGreaterThan(0);

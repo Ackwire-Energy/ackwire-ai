@@ -18,7 +18,7 @@ Por enquanto: código fechado, só Cloud (D25 em docs/planejamento.md). Open sou
 ## Ambiente e testes
 - Nunca rodar Docker, Colima ou Postgres local nesta máquina. Credenciais de Postgres e outros serviços vêm depois no `.env` (fornecidas pelo usuário).
 - Testes unitários obrigatórios; rodam em PGlite em memória + fakes, sem `.env`, sem rede.
-- Nunca rodar bun localmente (testes, typecheck, build, dev): a máquina é fraca. Verificação só no CI do GitHub.
+- A máquina é fraca: nada de suíte completa de testes, build ou dev local; a verificação completa é no CI do GitHub. Pode rodar localmente um arquivo de teste por vez (`bun test caminho/do/arquivo.test.ts`) para corrigir uma falha, e lint/typecheck um de cada vez.
 - Desenvolvimento local usa um `DATABASE_URL` próprio, nunca o de produção.
 - Migrations commitadas são imutáveis; qualquer mudança vai numa migration nova.
 
