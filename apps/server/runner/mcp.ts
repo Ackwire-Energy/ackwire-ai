@@ -13,6 +13,7 @@ import {
 import {
   isSafeRule,
   MCP_ARGS_MAX_CHARS,
+  type McpToolInfo,
   MISSION_MCP_TOOLS,
   PERMISSION_POLL_MS,
   PERMISSION_PROMPT_TOOL,
@@ -40,6 +41,12 @@ import { RUNNER_VERSION } from "./errors";
  *   server's `mcp.result` comes back the same way.
  * - The server decides everything (the task must be this machine's and the
  *   mission's); the runner only checks the token.
+ * - Protocol 8 (ADR 0032): a bridge with no tools of its own. The server
+ *   gives the task (or a computer-brain run) its own token; the daemon sends
+ *   it with every call, `tools/list` is asked from the server (cached per
+ *   run in the MCP process, refreshed in the background: a change tells the
+ *   executor `notifications/tools/list_changed`), and any tool the server
+ *   listed can be called. Without a server token: the fixed mission tools.
  */
 
 /** Daemon side: what a task needs to call through the bridge. */
@@ -52,6 +59,11 @@ export interface McpTaskInfo {
   folder?: string;
   /** The agent's secrets masked (ADR 0027): nothing the executor sends leaves the machine with them. */
   redact?: (text: string) => string;
+  /**
+   * Protocol 8: the server's token for this task's (or run's) tools (ADR
+   * 0032). With it the bridge relays any tool and asks the server for the list.
+   */
+  serverToken?: string;
 }
 
 /** Every string inside `value` through `redact` (keys kept). */
@@ -104,10 +116,34 @@ export interface IpcRequest {
   token: string;
   tool: string;
   args: Record<string, unknown>;
+  /** `list`: the tools this task (or run) may use (`tool` and `args` unused). Default: a call. */
+  kind?: "call" | "list";
 }
 
-/** `transient`: the link to the runner or to agentes.chat was down; asking again later may work. */
-export type IpcReply = { ok: true; text: string } | { ok: false; error: string; transient?: boolean };
+/** `transient`: the link to the runner or to agentes.chat was down; asking again later may work. `tools`: a list's answer. */
+export type IpcReply =
+  | { ok: true; text: string; tools?: McpToolInfo[] }
+  | { ok: false; error: string; transient?: boolean };
+
+/** What a tool name may look like (the Tool Gateway's rule). */
+const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
+
+/** The pseudo tool name of a list request (in pending and resend bookkeeping). */
+const LIST = "tools/list";
+
+/** A listed tool as the server sent it (anything else is dropped). */
+function isToolInfo(v: unknown): v is McpToolInfo {
+  if (typeof v !== "object" || v === null) return false;
+  const t = v as Record<string, unknown>;
+  return (
+    typeof t.name === "string" &&
+    TOOL_NAME.test(t.name) &&
+    typeof t.description === "string" &&
+    typeof t.inputSchema === "object" &&
+    t.inputSchema !== null &&
+    !Array.isArray(t.inputSchema)
+  );
+}
 
 /** Where the daemon listens: `<runner home>/mcp.sock`, or a named pipe on Windows. */
 export function mcpSocketPath(home: string, platform: NodeJS.Platform = process.platform) {
@@ -129,7 +165,7 @@ const sameToken = (a: string, b: string) => {
 };
 
 /** Calls the bridge may send again after a reconnect (the server answers them the same way twice). */
-const RESEND_SAFE = new Set<string>([PERMISSION_TOOL, "get_context"]);
+const RESEND_SAFE = new Set<string>([PERMISSION_TOOL, "get_context", LIST]);
 
 /** How long a relayed call may take (an upload of a large file takes minutes). */
 export const MCP_CALL_TIMEOUT_MS = 6 * 60_000;
@@ -236,6 +272,19 @@ export class McpBridge {
     p.resolve(frame.ok ? { ok: true, text: String(frame.text ?? "") } : { ok: false, error: frame.error.message });
   }
 
+  /** The server's answer to a list (protocol 8). */
+  tools(frame: Extract<ServerFrame, { type: "mcp.tools" }>) {
+    const p = this.pending.get(frame.callId);
+    if (!p) return;
+    clearTimeout(p.timer);
+    this.pending.delete(frame.callId);
+    p.resolve(
+      frame.ok
+        ? { ok: true, text: "", tools: (Array.isArray(frame.tools) ? frame.tools : []).filter(isToolInfo) }
+        : { ok: false, error: frame.error.message },
+    );
+  }
+
   /** One call from an MCP process: token checked, relayed, answered. */
   async handle(req: IpcRequest): Promise<IpcReply> {
     const taskId = typeof req.taskId === "string" ? req.taskId : "";
@@ -244,8 +293,16 @@ export class McpBridge {
       return { ok: false, error: "Not allowed: this task has no agentes tools." };
     }
     if (!info.running) return { ok: false, error: "This task has ended." };
+    if (req.kind === "list") {
+      // An older server gave no token: the fixed mission tools.
+      if (!info.serverToken) return { ok: true, text: "", tools: [...MISSION_MCP_TOOLS] };
+      const callId = randomBytes(12).toString("hex");
+      return this.relayAndWait(callId, LIST, { type: "mcp.list", callId, taskId, token: info.serverToken });
+    }
     const tool = typeof req.tool === "string" ? req.tool.slice(0, 64) : "";
-    if (!MISSION_MCP_TOOLS.some((t) => t.name === tool)) return { ok: false, error: `Unknown tool ${tool}` };
+    // A bridge (server token): any tool the server lists; the server decides. Else the fixed mission tools.
+    const known = info.serverToken ? TOOL_NAME.test(tool) : MISSION_MCP_TOOLS.some((t) => t.name === tool);
+    if (!known) return { ok: false, error: `Unknown tool ${tool}` };
     const given = req.args && typeof req.args === "object" && !Array.isArray(req.args) ? req.args : {};
     if (JSON.stringify(given).length > MCP_ARGS_MAX_CHARS) return { ok: false, error: "The arguments are too large." };
     // Secrets never leave the machine through our tools (the server masks again).
@@ -269,7 +326,18 @@ export class McpBridge {
     // Not connected right now (the runner restarting, a reconnect): the call waits for the
     // connection, bounded by its own timeout, instead of being refused.
     const callId = randomBytes(12).toString("hex");
-    const frame: RunnerFrame = { type: "mcp.call", callId, taskId, tool, args };
+    const frame: RunnerFrame = {
+      type: "mcp.call",
+      callId,
+      taskId,
+      tool,
+      args,
+      ...(info.serverToken ? { token: info.serverToken } : {}),
+    };
+    return this.relayAndWait(callId, tool, frame);
+  }
+
+  private relayAndWait(callId: string, tool: string, frame: RunnerFrame) {
     return new Promise<IpcReply>((resolve) => {
       const timer = setTimeout(() => {
         const waited = this.waiting.has(callId);
@@ -380,6 +448,53 @@ const READ_ONLY_TOOLS = new Set(["get_context"]);
 
 type JsonRpcId = string | number | null;
 export type ToolCaller = (tool: string, args: Record<string, unknown>) => Promise<IpcReply>;
+/** The run's tools as the bridge knows them now (protocol 8). */
+export type ToolLister = () => Promise<readonly McpToolInfo[]>;
+
+/** How long the MCP process trusts its list before asking again (a `tools/list` within this is answered locally). */
+export const TOOLS_CACHE_MS = 30_000;
+/** How often the MCP process re-reads the list in the background (a change notifies the executor). */
+export const TOOLS_REFRESH_MS = 60_000;
+
+/**
+ * The run's tool list in the MCP process (one process per task or run, so
+ * the cache is per run). `get` answers from the cache while fresh; `refresh`
+ * asks the server and says whether the list changed. A failed ask keeps the
+ * last list (or, never loaded, the fixed mission tools).
+ */
+export class McpToolCache {
+  private list: readonly McpToolInfo[] | null = null;
+  private loadedAt = 0;
+  private key = "";
+
+  constructor(
+    private readonly fetch: () => Promise<IpcReply>,
+    private readonly opts: { ttlMs?: number; now?: () => number } = {},
+  ) {}
+
+  get loaded() {
+    return this.list !== null;
+  }
+
+  async get(): Promise<readonly McpToolInfo[]> {
+    const now = (this.opts.now ?? Date.now)();
+    if (this.list && now - this.loadedAt < (this.opts.ttlMs ?? TOOLS_CACHE_MS)) return this.list;
+    await this.refresh();
+    return this.list ?? MISSION_MCP_TOOLS;
+  }
+
+  /** Asks the server; true when the list differs from the one before (not on the first load). */
+  async refresh(): Promise<boolean> {
+    const reply = await this.fetch().catch(() => null);
+    if (!reply?.ok || !reply.tools) return false;
+    const key = JSON.stringify(reply.tools);
+    const changed = this.list !== null && key !== this.key;
+    this.list = reply.tools;
+    this.key = key;
+    this.loadedAt = (this.opts.now ?? Date.now)();
+    return changed;
+  }
+}
 
 const rpcError = (id: JsonRpcId, code: number, message: string) => ({
   jsonrpc: "2.0" as const,
@@ -395,6 +510,8 @@ export async function handleMcpMessage(
   message: unknown,
   call: ToolCaller,
   scope?: CommandScope,
+  /** Protocol 8: the run's tools from the server (cached); without it, the fixed mission tools. */
+  list?: ToolLister,
 ): Promise<Record<string, unknown> | null> {
   if (typeof message !== "object" || message === null || Array.isArray(message)) {
     return rpcError(null, -32600, "Invalid request");
@@ -414,10 +531,11 @@ export async function handleMcpMessage(
         id,
         result: {
           protocolVersion: typeof params.protocolVersion === "string" ? params.protocolVersion : MCP_PROTOCOL_VERSION,
-          capabilities: { tools: { listChanged: false } },
+          capabilities: { tools: { listChanged: Boolean(list) } },
           serverInfo: { name: "agentes", version: RUNNER_VERSION },
-          instructions:
-            "Tools of agentes.chat for this mission: keep the plan with update_plan, report milestones, ask decisions with ask_decision, ask for a review when you have something to show, and ask approval before any merge, deploy or rollback.",
+          instructions: list
+            ? "Tools of agentes.chat for this agent: its connectors, context, Drive and, in a mission, the mission tools (keep the plan with update_plan, report milestones, ask decisions with ask_decision, ask approval before any merge, deploy or rollback). When a tool says to stop and wait, end your turn."
+            : "Tools of agentes.chat for this mission: keep the plan with update_plan, report milestones, ask decisions with ask_decision, ask for a review when you have something to show, and ask approval before any merge, deploy or rollback.",
         },
       };
     case "ping":
@@ -428,14 +546,15 @@ export async function handleMcpMessage(
         id,
         result: {
           // Read-only tools say so (Codex runs them without an approval even when told to ask).
-          tools: MISSION_MCP_TOOLS.map((tool) =>
+          tools: (list ? await list() : MISSION_MCP_TOOLS).map((tool) =>
             READ_ONLY_TOOLS.has(tool.name) ? { ...tool, annotations: { readOnlyHint: true } } : tool,
           ),
         },
       };
     case "tools/call": {
       const name = typeof params.name === "string" ? params.name : "";
-      if (!MISSION_MCP_TOOLS.some((t) => t.name === name)) return rpcError(id, -32602, `Unknown tool: ${name}`);
+      const tools = list ? await list() : MISSION_MCP_TOOLS;
+      if (!tools.some((t) => t.name === name)) return rpcError(id, -32602, `Unknown tool: ${name}`);
       const args =
         typeof params.arguments === "object" && params.arguments !== null && !Array.isArray(params.arguments)
           ? (params.arguments as Record<string, unknown>)
@@ -547,6 +666,7 @@ export async function runMcpServer(options: {
   input?: NodeJS.ReadableStream;
   output?: NodeJS.WritableStream;
   scope?: CommandScope;
+  refreshMs?: number;
 }): Promise<number> {
   const token =
     options.token ??
@@ -560,6 +680,19 @@ export async function runMcpServer(options: {
   const out = options.output ?? process.stdout;
   const write = (msg: unknown) => out.write(`${JSON.stringify(msg)}\n`);
   const call: ToolCaller = (tool, args) => ipcCall(options.socketPath, { taskId: options.taskId, token, tool, args });
+  // The run's tools, asked from the server through the daemon (cached here: one process per task or run).
+  const cache = new McpToolCache(() =>
+    ipcCall(options.socketPath, { taskId: options.taskId, token, tool: "", args: {}, kind: "list" }),
+  );
+  const list: ToolLister = () => cache.get();
+  // A list that changed (a scope granted, a connector added, a mission thread): the executor re-reads it.
+  const refresher = setInterval(() => {
+    if (!cache.loaded) return;
+    void cache.refresh().then((changed) => {
+      if (changed) write({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
+    });
+  }, options.refreshMs ?? TOOLS_REFRESH_MS);
+  refresher.unref?.();
   const scope = options.scope ?? mcpScopeFromEnv(process.env);
   const rl = createInterface({ input: options.input ?? process.stdin, crlfDelay: Number.POSITIVE_INFINITY });
   const inflight = new Set<Promise<void>>();
@@ -572,7 +705,7 @@ export async function runMcpServer(options: {
       write(rpcError(null, -32700, "Parse error"));
       continue;
     }
-    const p = handleMcpMessage(message, call, scope)
+    const p = handleMcpMessage(message, call, scope, list)
       .then((res) => {
         if (res) write(res);
       })
@@ -581,6 +714,7 @@ export async function runMcpServer(options: {
     inflight.add(p);
   }
   await Promise.all(inflight);
+  clearInterval(refresher);
   return 0;
 }
 

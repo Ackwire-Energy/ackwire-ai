@@ -21,6 +21,7 @@ import {
   type AgentScope,
   commandOf,
   findPullRequestUrl,
+  isRunToolToken,
   type MachineReplies,
   MISSION_RULES_NO_GIT,
   PERMISSION_WAIT_MS,
@@ -131,6 +132,8 @@ interface Entry {
   /** Protocol 5: the mission this task works for, and its token for the local `agentes` MCP server. */
   missionId?: string;
   mcpToken?: string;
+  /** Protocol 8: the server's token for its tools (ADR 0032), sent with each relayed call. */
+  serverToken?: string;
   /** Set by `task.cancel` (a canceled task that vanished is canceled, not interrupted). */
   canceling?: boolean;
   done?: TaskDone;
@@ -957,6 +960,7 @@ export class TaskManager {
       ...(session ? { session } : {}),
       ...(missionId ? { missionId } : {}),
       ...(mcpToken ? { mcpToken } : {}),
+      ...(mcpToken && isRunToolToken(req.mission?.mcpToken) ? { serverToken: req.mission.mcpToken } : {}),
       status: "running",
       pid,
       startedAt: new Date(this.now()).toISOString(),
@@ -980,6 +984,7 @@ export class TaskManager {
       missionId: t.missionId,
       running: t.status === "running",
       cwd: t.cwd,
+      ...(t.serverToken ? { serverToken: t.serverToken } : {}),
       ...(t.folder ? { folder: t.folder } : {}),
       ...(this.watches.get(t.taskId)?.redact ? { redact: this.watches.get(t.taskId)?.redact } : {}),
     };

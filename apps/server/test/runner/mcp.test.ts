@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import {
+  BRIDGE_PROTOCOL,
   MISSION_MCP_TOOLS,
   MISSION_PROTOCOL,
   MISSION_RULES_NO_GIT,
@@ -19,6 +20,7 @@ import {
   ipcCall,
   McpBridge,
   type McpTaskInfo,
+  McpToolCache,
   missionExecutorArgs,
   missionFolderRules,
   runMcpServer,
@@ -406,4 +408,185 @@ test("an item away from the mission folder may use it (--add-dir, Read/Edit/Writ
       "darwin",
     ),
   ).not.toContain("--add-dir");
+});
+
+// ── Protocol 8: the bridge (ADR 0032) ───────────────────────────────────────
+
+const SERVER_TOKEN = `agr_${"a".repeat(43)}`;
+
+test("protocol 8: mcp.call carries the server token; mcp.list and mcp.tools parse; bad tokens are dropped", () => {
+  expect(BRIDGE_PROTOCOL).toBe(8);
+  expect(
+    parseRunnerFrame(
+      JSON.stringify({ type: "mcp.call", callId: "c1", taskId: TASK, tool: "x", args: {}, token: SERVER_TOKEN }),
+    ),
+  ).toMatchObject({ type: "mcp.call", token: SERVER_TOKEN });
+  expect(
+    parseRunnerFrame(
+      JSON.stringify({ type: "mcp.call", callId: "c1", taskId: TASK, tool: "x", args: {}, token: "nope" }),
+    ),
+  ).not.toHaveProperty("token");
+  expect(
+    parseRunnerFrame(JSON.stringify({ type: "mcp.list", callId: "l1", taskId: TASK, token: SERVER_TOKEN })),
+  ).toEqual({ type: "mcp.list", callId: "l1", taskId: TASK, token: SERVER_TOKEN });
+  expect(parseRunnerFrame(JSON.stringify({ type: "mcp.list", callId: "l1", taskId: TASK }))).toBeNull();
+  expect(
+    parseServerFrame(JSON.stringify({ type: "mcp.tools", callId: "l1", ok: true, tools: [{ name: "a" }] })),
+  ).toMatchObject({ type: "mcp.tools", ok: true });
+  expect(parseServerFrame(JSON.stringify({ type: "mcp.tools", callId: "l1", ok: true }))).toBeNull();
+});
+
+test("with a server token the bridge asks the server for the list and relays any tool, token attached", async () => {
+  const { b, frames } = bridge({
+    token: "secret-token-1",
+    missionId: "m1",
+    running: true,
+    serverToken: SERVER_TOKEN,
+    cwd: "/w/dev-1/app",
+    folder: "/w/dev-1",
+    redact: (s) => s.replaceAll("tok_1", "[secret]"),
+  });
+  b.attach((f) => frames.push(f));
+  const listing = b.handle({ taskId: TASK, token: "secret-token-1", tool: "", args: {}, kind: "list" });
+  await waitFor(() => frames.length === 1);
+  const list = frames[0] as Extract<RunnerFrame, { type: "mcp.list" }>;
+  expect(list).toMatchObject({ type: "mcp.list", taskId: TASK, token: SERVER_TOKEN });
+  const tool = { name: "github_get_pr", description: "Read a PR", inputSchema: { type: "object", properties: {} } };
+  b.tools({ type: "mcp.tools", callId: list.callId, ok: true, tools: [tool, { name: "bad name!" } as never] });
+  expect(await listing).toEqual({ ok: true, text: "", tools: [tool] });
+
+  const call = b.handle({ taskId: TASK, token: "secret-token-1", tool: "github_get_pr", args: { q: "tok_1" } });
+  await waitFor(() => frames.length === 2);
+  const sent = frames[1] as Extract<RunnerFrame, { type: "mcp.call" }>;
+  expect(sent).toMatchObject({ tool: "github_get_pr", args: { q: "[secret]" }, token: SERVER_TOKEN });
+  b.result({ type: "mcp.result", callId: sent.callId, ok: true, text: "PR #3" });
+  expect(await call).toEqual({ ok: true, text: "PR #3" });
+  // Paths of our upload tools are still resolved on the machine.
+  const upload = b.handle({
+    taskId: TASK,
+    token: "secret-token-1",
+    tool: "upload_artifact",
+    args: { path: "/w/dev-1/app/out.png" },
+  });
+  await waitFor(() => frames.length === 3);
+  expect(frames[2]).toMatchObject({ tool: "upload_artifact", args: { path: "out.png" } });
+  b.result({ type: "mcp.result", callId: (frames[2] as { callId: string }).callId, ok: true, text: "ok" });
+  await upload;
+  expect(await b.handle({ taskId: TASK, token: "secret-token-1", tool: "no spaces", args: {} })).toMatchObject({
+    ok: false,
+    error: "Unknown tool no spaces",
+  });
+});
+
+test("without a server token (an older server) the list is the fixed mission tools", async () => {
+  const { b } = bridge({ token: "secret-token-1", missionId: "m1", running: true });
+  const out = await b.handle({ taskId: TASK, token: "secret-token-1", tool: "", args: {}, kind: "list" });
+  expect(out.ok && out.tools?.map((t) => t.name)).toEqual(MISSION_MCP_TOOLS.map((t) => t.name));
+  expect(await b.handle({ taskId: TASK, token: "secret-token-1", tool: "github_get_pr", args: {} })).toMatchObject({
+    ok: false,
+    error: "Unknown tool github_get_pr",
+  });
+});
+
+test("the MCP process caches the run's list, refreshes it and notices a change; a failed ask keeps the last list", async () => {
+  let now = 0;
+  let served = [{ name: "a", description: "A", inputSchema: { type: "object" } }];
+  let fail = false;
+  let asked = 0;
+  const cache = new McpToolCache(
+    async () => {
+      asked++;
+      return fail ? { ok: false, error: "down", transient: true } : { ok: true, text: "", tools: served };
+    },
+    { ttlMs: 1000, now: () => now },
+  );
+  expect((await cache.get()).map((t) => t.name)).toEqual(["a"]);
+  await cache.get();
+  expect(asked).toBe(1);
+  now = 2000;
+  served = [...served, { name: "b", description: "B", inputSchema: { type: "object" } }];
+  expect((await cache.get()).map((t) => t.name)).toEqual(["a", "b"]);
+  expect(await cache.refresh()).toBe(false);
+  served = [served[0] as (typeof served)[number]];
+  expect(await cache.refresh()).toBe(true);
+  fail = true;
+  expect(await cache.refresh()).toBe(false);
+  now = 10_000;
+  expect((await cache.get()).map((t) => t.name)).toEqual(["a"]);
+  // Never loaded and the server is unreachable: the fixed mission tools.
+  const empty = new McpToolCache(async () => ({ ok: false, error: "down" }));
+  expect((await empty.get()).map((t) => t.name)).toEqual(MISSION_MCP_TOOLS.map((t) => t.name));
+});
+
+test("MCP JSON-RPC with the bridge's list: tools/list is the run's; only listed tools can be called", async () => {
+  const calls: string[] = [];
+  const call = async (tool: string) => {
+    calls.push(tool);
+    return { ok: true as const, text: `ran ${tool}` };
+  };
+  const tools = [
+    { name: "github_get_pr", description: "Read a PR", inputSchema: { type: "object", properties: {} } },
+    { name: "get_context", description: "Search", inputSchema: { type: "object", properties: {} } },
+  ];
+  const list = async () => tools;
+  const init = await handleMcpMessage(
+    { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+    call,
+    undefined,
+    list,
+  );
+  expect(init).toMatchObject({ result: { capabilities: { tools: { listChanged: true } } } });
+  const listed = (await handleMcpMessage({ jsonrpc: "2.0", id: 2, method: "tools/list" }, call, undefined, list)) as {
+    result: { tools: { name: string; annotations?: unknown }[] };
+  };
+  expect(listed.result.tools.map((t) => t.name)).toEqual(["github_get_pr", "get_context"]);
+  expect(listed.result.tools[1]?.annotations).toEqual({ readOnlyHint: true });
+  const ran = await handleMcpMessage(
+    { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "github_get_pr", arguments: {} } },
+    call,
+    undefined,
+    list,
+  );
+  expect(ran).toMatchObject({ result: { content: [{ type: "text", text: "ran github_get_pr" }], isError: false } });
+  expect(
+    await handleMcpMessage(
+      { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "update_plan", arguments: {} } },
+      call,
+      undefined,
+      list,
+    ),
+  ).toMatchObject({ error: { code: -32602 } });
+  expect(calls).toEqual(["github_get_pr"]);
+});
+
+test.skipIf(!posix)("a mission task started with the server's token keeps it for the bridge", async () => {
+  const ws = tempDir("ws-");
+  const home = tempDir("home-");
+  dirs.push(ws, home);
+  const tasks = new TaskManager({
+    root: path.join(home, "tasks"),
+    workspaceReal: ws,
+    agentFolder: (agent) => agentWorkspace(ws, agent),
+    watchMs: 20,
+    eventEveryMs: 0,
+    claudeHome: path.join(home, "claude"),
+    caffeinate: false,
+    mcp: { socketPath: path.join(home, "mcp.sock"), command: [process.execPath, "/opt/agentes-runner.mjs"] },
+  });
+  closers.push(() => tasks.close());
+  await tasks.init();
+  await tasks.start(AGENT, {
+    taskId: TASK,
+    executor: "claude",
+    prompt: "Plan it",
+    mission: { id: "0193aaaa-0000-7000-8000-0000000000bb", rules: "Rules.", mode: "plan", mcpToken: SERVER_TOKEN },
+  });
+  expect(tasks.mcpTask(TASK)).toMatchObject({ serverToken: SERVER_TOKEN });
+  await tasks.start(AGENT, {
+    taskId: "0193aaaa-0000-7000-8000-000000000043",
+    executor: "claude",
+    prompt: "Plan it",
+    mission: { id: "0193aaaa-0000-7000-8000-0000000000bb", rules: "Rules.", mode: "plan", mcpToken: "not-a-token" },
+  });
+  expect(tasks.mcpTask("0193aaaa-0000-7000-8000-000000000043")?.serverToken).toBeUndefined();
 });

@@ -105,3 +105,11 @@ A mission's main session is simply the agent's run in the mission thread with th
 - Missions lose their parallel execution path; the code gets smaller.
 - People can run their agents on their own plans, at their own risk, with the model brain as a safety net.
 - The engine extraction is a large refactor of `executor.ts`; it lands behind the existing tests with no behaviour change before any new brain is added.
+
+## Block 2 as built (2026-10-17): the runner MCP bridge
+
+- Identity: `run_tool_tokens` (migration 0059) holds SHA-256 of `agr_…` tokens bound to org, agent, machine and a run (computer-brain turn) or a mission task. `issueRunToolToken` / `verifyRunToolToken` / `revokeRunToolTokens` in `run-tool-tokens.ts`. Verification checks the hash, the machine holding the socket, expiry, and that the run is `running` (refusing `waiting_*` and ended runs) or the task has not ended. Mission tasks get one at `startMachineTask` (`TaskStart.mission.mcpToken`).
+- Protocol 8 (`BRIDGE_PROTOCOL`): `mcp.call` carries `token`; `mcp.list` → `mcp.tools` answers `tools/list`. Without a token (runners up to protocol 7) the server keeps the legacy path: the task named by the frame, its own checks.
+- `run-tools.ts`: `toolsForRun` / `executeToolForRun` with the contract signatures on the Tool Gateway, plus `invokeToolForRun` (error codes for the bridge) and `suspendRunForTool` (a gated call through the bridge posts the approval / question / secret card, joins the transcript's pending calls when there is a transcript, and moves the run to `waiting_*`, like the model path).
+- Mission tools are gateway tools: a task's (`createMissionBridgeToolSource`, only for `ctx.bridge.taskId`, `permission_prompt` included) on their own gateway, so a task's executor never gets the agent's other tools; a computer-brain run in a mission thread (`ctx.bridge` without a task) gets the agent-mode mission tools from `createMissionToolSource`. Same behaviour, codes, rate limits and masking as before.
+- The runner relays: `tools/list` asks the server (cached per run in the MCP process, refreshed every minute, `notifications/tools/list_changed` on a change), any listed tool can be called; path resolution, secret masking and reconnect queueing stay. `toBrainSchema` (`tools/schema-compat.ts`) inlines `$ref` and flattens top-level `oneOf`/`anyOf`/`allOf` for the CLIs.

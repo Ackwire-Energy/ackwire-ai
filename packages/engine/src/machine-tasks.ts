@@ -20,6 +20,7 @@ import { getMessage, insertMessage, type Message, messageView } from "./messages
 import { blockedOfTask, missionAllowRules, recordTaskDenials } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
 import { enqueue } from "./outbox";
+import { issueRunToolToken } from "./run-tool-tokens";
 import type { ToolContext } from "./tools/types";
 
 const { machineTasks, agentRuns } = schema;
@@ -234,6 +235,15 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
     .returning();
   if (!row) throw new Error("machine_tasks insert returned nothing");
   try {
+    // The mission tools' token (ADR 0032): the runner sends it with each of the executor's calls.
+    const mcpToken = input.mission
+      ? await issueRunToolToken(deps.db, {
+          orgId: input.orgId,
+          agentId: input.agent.id,
+          machineId: input.machineId,
+          taskId: row.id,
+        })
+      : null;
     const started = await deps.call<"task.start">(input.machineId, {
       agent: input.agent,
       op: "task.start",
@@ -246,7 +256,7 @@ export async function startMachineTask(deps: TaskDeps & { call: TaskCall }, inpu
       ...(input.branch ? { branch: input.branch } : {}),
       ...(input.maxSeconds ? { maxSeconds: input.maxSeconds } : {}),
       ...(input.cwd ? { cwd: input.cwd } : {}),
-      ...(input.mission ? { mission: input.mission } : {}),
+      ...(input.mission ? { mission: { ...input.mission, ...(mcpToken ? { mcpToken } : {}) } } : {}),
     });
     const at = new Date(started.startedAt);
     const [running] = await deps.db

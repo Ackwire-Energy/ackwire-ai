@@ -175,7 +175,6 @@ export function buildEngine(o: EngineOptions) {
     publicUrl: config.PUBLIC_URL,
     judge: context.judge,
   };
-  machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps }));
   const githubApp =
     config.GITHUB_APP_ID && config.GITHUB_APP_PRIVATE_KEY
       ? { appId: config.GITHUB_APP_ID, privateKey: config.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, "\n") }
@@ -222,6 +221,8 @@ export function buildEngine(o: EngineOptions) {
       ...(o.toolSources ?? []),
     ],
   });
+  // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
+  machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
   const handlers = createJobHandlers({
     db,
     gateway,
