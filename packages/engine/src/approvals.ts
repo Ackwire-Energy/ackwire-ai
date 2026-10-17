@@ -4,6 +4,7 @@ import { learnFromRefusal } from "./context/feedback";
 import type { MemoryJudging } from "./context/items";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent, publishUserEvent } from "./events";
+import { notifyApproval, resolveApprovalNotifications } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import type { Approval } from "./tools/gateway";
@@ -221,8 +222,15 @@ export async function publishApproval(
 ) {
   const [view = approvalView(approval)] = await viewsOf(deps.db, [approval], () => false);
   await publishChannelEvent(deps.pubsub, { type, channelId: approval.channelId, approval: view });
-  for (const userId of await approverIds(deps.db, approval)) {
+  const deciders = await approverIds(deps.db, approval);
+  for (const userId of deciders) {
     await publishUserEvent(deps.pubsub, approval.orgId, userId, { type, approval: { ...view, canDecide: true } });
+  }
+  // The inbox (D46): waiting for whoever may decide; out of it once decided or expired.
+  if (type === "approval.created" && approval.status === "pending") {
+    await notifyApproval(deps, approval, deciders).catch(() => {});
+  } else if (type === "approval.decided") {
+    await resolveApprovalNotifications(deps, approval.orgId, approval.id).catch(() => {});
   }
 }
 

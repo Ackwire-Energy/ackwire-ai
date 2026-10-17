@@ -36,6 +36,7 @@ import { insertMessage, type Message, messageView } from "./messages";
 import { missionAllowRules, pendingCommandCounts, pendingCommandsSql } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
 import { enqueueRunJob } from "./mission-runs";
+import { notifyMissionEnded } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import type { SearchDeps } from "./search";
@@ -1406,6 +1407,7 @@ export async function pauseStuck(
     },
   });
   await publishMissionEvent(deps, row, "paused", { code: "mission.paused_stuck", reason });
+  await notifyMissionEnded(deps, row, "mission_stopped", { type: "agent", id: row.agentId }, why).catch(() => {});
   if (row.ownerId) {
     await publishUserEvent(deps.pubsub, row.orgId, row.ownerId, {
       type: "mission.needs_you",
@@ -1699,6 +1701,7 @@ export async function stopMission(deps: MissionDeps, userId: string, orgId: stri
     });
   }
   await publishMissionEvent(deps, row, "stopped", { canceled });
+  await notifyMissionEnded(deps, row, "mission_stopped", { type: "user", id: userId }).catch(() => {});
   return { ...(await viewFor(deps, row, userId, isAdmin)), canceledTasks: canceled };
 }
 
@@ -1775,6 +1778,13 @@ export async function concludeMission(
   }
   await requestFilesSync(deps.db, row);
   await publishMissionEvent(deps, row, "closed", { outcome: input.outcome });
+  await notifyMissionEnded(
+    deps,
+    row,
+    input.outcome === "done" ? "mission_finished" : "mission_stopped",
+    { type: "user", id: userId },
+    note,
+  ).catch(() => {});
   return viewFor(deps, row, userId, isAdmin);
 }
 

@@ -1,0 +1,601 @@
+import type { PubSub } from "@agenteschat/adapters";
+import {
+  and,
+  type Database,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  like,
+  lte,
+  or,
+  type SQL,
+  schema,
+  sql,
+} from "@agenteschat/db";
+import { NotFoundError, ValidationError } from "./errors";
+import { publishUserEvent } from "./events";
+import { requirePermission } from "./organizations";
+
+const { notifications, organizationMembers } = schema;
+
+/**
+ * In-app notifications (D46): one inbox per person per organization.
+ *
+ * - People only: agents are never recipients, and nobody is notified of
+ *   their own action.
+ * - Grouping: while an unread, not-done row of the same `(user, groupKey)`
+ *   exists, a new event of a merging kind (thread replies, issue comments,
+ *   reactions) merges into it. Other kinds are one row per event, and the
+ *   same `groupKey` twice is a no-op (jobs may run more than once).
+ * - Realtime goes to the recipient only (`userTopic`, cross-replica):
+ *   `notification.upserted`, `notification.removed`, `notification.counts`.
+ * - Auto-resolve: the source closed (question answered, approval decided,
+ *   forum turn over, issue unassigned) sets `done_at` and emits `removed`.
+ */
+
+export const NOTIFICATION_KINDS = [
+  "mention",
+  "thread_reply",
+  "dm",
+  "agent_question",
+  "issue_assigned",
+  "issue_comment",
+  "issue_status",
+  "forum_turn",
+  "forum_synthesis",
+  "approval",
+  "mission_finished",
+  "mission_stopped",
+  "routine_finished",
+  "routine_failed",
+  "reaction",
+] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+export const NOTIFICATION_FILTERS = ["all", "mentions", "waiting", "unread", "reactions"] as const;
+export type NotificationFilter = (typeof NOTIFICATION_FILTERS)[number];
+
+export interface NotificationActor {
+  type: "user" | "agent";
+  id: string;
+}
+
+export interface NotificationSource {
+  channelId?: string;
+  threadId?: string;
+  messageId?: string;
+  dmId?: string;
+  issueId?: string;
+  issueNumber?: number;
+  topicId?: string;
+  approvalId?: string;
+  questionId?: string;
+  missionId?: string;
+  routineId?: string;
+  /** Channel name, thread title, issue title, topic title, mission or routine name. */
+  label?: string;
+}
+
+export interface NotificationLatest {
+  /** Snippet of the latest message, comment, question or summary (plain text, ≤ 280 chars). */
+  text?: string;
+  title?: string;
+  emojis?: string[];
+  quote?: string;
+  statusFrom?: string;
+  statusTo?: string;
+  steps?: { done: number; total: number; failedAt?: number };
+  suggestions?: string[];
+  expiresAt?: string;
+  round?: number;
+  rounds?: number;
+}
+
+export interface NotificationView {
+  id: string;
+  kind: NotificationKind;
+  waiting: boolean;
+  actors: NotificationActor[];
+  count: number;
+  source: NotificationSource;
+  latest: NotificationLatest;
+  readAt: string | null;
+  doneAt: string | null;
+  snoozedUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationCounts {
+  all: number;
+  mentions: number;
+  waiting: number;
+  unread: number;
+  reactions: number;
+}
+
+export interface NotificationDeps {
+  db: Database;
+  pubsub?: PubSub;
+  now?: () => Date;
+}
+
+type Row = typeof notifications.$inferSelect;
+
+/** Kinds whose events merge into one open row of their group. */
+const MERGING: ReadonlySet<NotificationKind> = new Set(["thread_reply", "issue_comment", "reaction"]);
+/** "Menções" in the inbox: what was said to me. */
+const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_question"];
+/** A read reaction row still takes new reactions for this long (the "9 min" span on the card). */
+export const REACTION_MERGE_MS = 30 * 60_000;
+export const MAX_ACTORS = 10;
+export const SNIPPET_LENGTH = 280;
+export const MAX_PAGE = 100;
+/** How far ahead a notification can be snoozed. */
+export const MAX_SNOOZE_MS = 365 * 24 * 3600_000;
+
+const nowOf = (deps: { now?: () => Date }) => deps.now?.() ?? new Date();
+
+/**
+ * Plain text for a card: code fences, markdown marks and links reduced to
+ * their words, whitespace collapsed, at most `max` chars. `@mentions` stay.
+ */
+export function notificationSnippet(text: string | null | undefined, max = SNIPPET_LENGTH): string {
+  if (!text) return "";
+  const plain = text
+    .replace(/```[\w+-]*/g, " ")
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\[\[([^\]|]+)(\|[^\]]*)?\]\]/g, "$1")
+    .replace(/(^|\s)#{1,6}\s+/g, "$1")
+    .replace(/(\*\*|__|~~|`)/g, "")
+    .replace(/(^|\s)[>*-]\s+/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  return plain.length > max ? `${plain.slice(0, max - 1).trimEnd()}…` : plain;
+}
+
+export function notificationView(r: Row): NotificationView {
+  return {
+    id: r.id,
+    kind: r.kind as NotificationKind,
+    waiting: r.waiting,
+    actors: r.actors,
+    count: r.count,
+    source: r.source as NotificationSource,
+    latest: r.latest as NotificationLatest,
+    readAt: r.readAt?.toISOString() ?? null,
+    doneAt: r.doneAt?.toISOString() ?? null,
+    snoozedUntil: r.snoozedUntil?.toISOString() ?? null,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  };
+}
+
+const sameActor = (a: NotificationActor, b: NotificationActor) => a.type === b.type && a.id === b.id;
+
+/** The newest actor first, no duplicates, at most `MAX_ACTORS`. */
+export function mergeActors(newest: NotificationActor | null | undefined, before: NotificationActor[]) {
+  const list = newest ? [newest, ...before.filter((a) => !sameActor(a, newest))] : before;
+  return list.slice(0, MAX_ACTORS);
+}
+
+/** Drops empty values so the stored JSON holds only what is set. */
+function compact<T extends object>(value: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (v === undefined || v === null || v === "") continue;
+    if (Array.isArray(v) && v.length === 0) continue;
+    out[k] = v;
+  }
+  return out as T;
+}
+
+// ── Writing ───────────────────────────────────────────────────────────────────
+
+export interface NotifyInput {
+  orgId: string;
+  /** Recipients (people). Empty values, the actor and non-members are dropped. */
+  userIds: Iterable<string | null | undefined>;
+  kind: NotificationKind;
+  groupKey: string;
+  waiting?: boolean;
+  /** Who did it (newest actor); a person is never notified of their own action. */
+  actor?: NotificationActor | null;
+  source: NotificationSource;
+  latest?: NotificationLatest;
+}
+
+/**
+ * Creates or merges a notification for each recipient and tells them. Best
+ * effort for callers: wrap in `.catch` where a failure must not undo the
+ * action that caused it.
+ */
+export async function notify(deps: NotificationDeps, input: NotifyInput): Promise<NotificationView[]> {
+  const actorUser = input.actor?.type === "user" ? input.actor.id : null;
+  const wanted = [...new Set([...input.userIds].filter((u): u is string => !!u && u !== actorUser))];
+  if (wanted.length === 0) return [];
+  // People of this organization only (an agent's id never matches a member).
+  const members = await deps.db
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, input.orgId), inArray(organizationMembers.userId, wanted)));
+  const out: NotificationView[] = [];
+  for (const { userId } of members) {
+    const row = await upsertOne(deps, input, userId);
+    if (!row) continue;
+    const view = notificationView(row);
+    out.push(view);
+    const snoozed = row.snoozedUntil && row.snoozedUntil.getTime() > nowOf(deps).getTime();
+    if (!snoozed)
+      await publishUserEvent(deps.pubsub, input.orgId, userId, { type: "notification.upserted", notification: view });
+    await publishCounts(deps, input.orgId, userId);
+  }
+  return out;
+}
+
+async function upsertOne(deps: NotificationDeps, input: NotifyInput, userId: string): Promise<Row | null> {
+  const { db } = deps;
+  const now = nowOf(deps);
+  const source = compact(input.source) as Record<string, unknown>;
+  const latest = compact(input.latest ?? {}) as Record<string, unknown>;
+  const fresh = () =>
+    db
+      .insert(notifications)
+      .values({
+        orgId: input.orgId,
+        userId,
+        kind: input.kind,
+        waiting: input.waiting ?? false,
+        groupKey: input.groupKey,
+        actors: mergeActors(input.actor, []),
+        count: 1,
+        source,
+        latest,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoNothing()
+      .returning();
+  const sameGroup = and(
+    eq(notifications.orgId, input.orgId),
+    eq(notifications.groupKey, input.groupKey),
+    eq(notifications.userId, userId),
+  );
+
+  if (!MERGING.has(input.kind)) {
+    // One row per event: the same key again (a retried job) changes nothing.
+    const [seen] = await db.select({ id: notifications.id }).from(notifications).where(sameGroup).limit(1);
+    if (seen) return null;
+    const [row] = await fresh();
+    return row ?? null;
+  }
+
+  const reaction = input.kind === "reaction";
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const [open] = await db
+      .select()
+      .from(notifications)
+      .where(
+        and(
+          sameGroup,
+          isNull(notifications.doneAt),
+          reaction
+            ? or(isNull(notifications.readAt), gt(notifications.updatedAt, new Date(now.getTime() - REACTION_MERGE_MS)))
+            : isNull(notifications.readAt),
+        ),
+      )
+      .orderBy(sql`${notifications.readAt} is not null`, desc(notifications.updatedAt))
+      .limit(1);
+    if (open) {
+      try {
+        // Optimistic: only if nobody merged into it meanwhile (else read it again).
+        const [row] = await db
+          .update(notifications)
+          .set({
+            actors: mergeActors(input.actor, open.actors),
+            count: sql`${notifications.count} + 1`,
+            latest: Object.keys(latest).length ? latest : open.latest,
+            source: { ...open.source, ...source },
+            readAt: null,
+            updatedAt: now,
+          })
+          .where(and(eq(notifications.id, open.id), eq(notifications.updatedAt, open.updatedAt)))
+          .returning();
+        if (row) return row;
+      } catch {
+        // A concurrent unread row of the same group appeared: read again.
+      }
+      continue;
+    }
+    const [row] = await fresh();
+    if (row) return row;
+  }
+  return null;
+}
+
+/**
+ * Auto-resolve: the open notifications of a group (or of every group with
+ * this prefix) are done, for everyone or for some people. Emits `removed`.
+ */
+export async function resolveNotifications(
+  deps: NotificationDeps,
+  orgId: string,
+  match: { groupKey?: string; groupKeyPrefix?: string; userIds?: string[]; kind?: NotificationKind },
+): Promise<number> {
+  if (!match.groupKey && !match.groupKeyPrefix) return 0;
+  if (match.userIds && match.userIds.length === 0) return 0;
+  const rows = await deps.db
+    .update(notifications)
+    .set({ doneAt: nowOf(deps) })
+    .where(
+      and(
+        eq(notifications.orgId, orgId),
+        isNull(notifications.doneAt),
+        match.groupKey ? eq(notifications.groupKey, match.groupKey) : undefined,
+        match.groupKeyPrefix ? like(notifications.groupKey, `${escapeLike(match.groupKeyPrefix)}%`) : undefined,
+        match.userIds ? inArray(notifications.userId, match.userIds) : undefined,
+        match.kind ? eq(notifications.kind, match.kind) : undefined,
+      ),
+    )
+    .returning({ id: notifications.id, userId: notifications.userId });
+  const users = new Set<string>();
+  for (const r of rows) {
+    users.add(r.userId);
+    await publishUserEvent(deps.pubsub, orgId, r.userId, { type: "notification.removed", id: r.id });
+  }
+  for (const userId of users) await publishCounts(deps, orgId, userId);
+  return rows.length;
+}
+
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+/** Snoozed notifications whose time came: back in the inbox, on top (worker, every 30 s). */
+export async function wakeSnoozedNotifications(deps: NotificationDeps): Promise<number> {
+  const now = nowOf(deps);
+  const rows = await deps.db
+    .update(notifications)
+    .set({ snoozedUntil: null, updatedAt: now })
+    .where(and(lte(notifications.snoozedUntil, now), isNull(notifications.doneAt)))
+    .returning();
+  const users = new Map<string, string>();
+  for (const r of rows) {
+    users.set(`${r.orgId}:${r.userId}`, r.orgId);
+    await publishUserEvent(deps.pubsub, r.orgId, r.userId, {
+      type: "notification.upserted",
+      notification: notificationView(r),
+    });
+  }
+  for (const [key, orgId] of users) await publishCounts(deps, orgId, key.slice(orgId.length + 1));
+  return rows.length;
+}
+
+// ── Reading ───────────────────────────────────────────────────────────────────
+
+/** Not done, and not snoozed into the future. */
+function visible(orgId: string, userId: string, now: Date): SQL {
+  return and(
+    eq(notifications.orgId, orgId),
+    eq(notifications.userId, userId),
+    isNull(notifications.doneAt),
+    or(isNull(notifications.snoozedUntil), lte(notifications.snoozedUntil, now)),
+  ) as SQL;
+}
+
+function filterSql(filter: NotificationFilter): SQL | undefined {
+  switch (filter) {
+    case "mentions":
+      return inArray(notifications.kind, MENTION_KINDS);
+    case "waiting":
+      return eq(notifications.waiting, true);
+    case "unread":
+      return isNull(notifications.readAt);
+    case "reactions":
+      return eq(notifications.kind, "reaction");
+    default:
+      return undefined;
+  }
+}
+
+/** Opaque keyset cursor over `(waiting desc, updated_at desc, id desc)`. */
+function encodeCursor(r: Row) {
+  return Buffer.from(JSON.stringify([r.waiting ? 1 : 0, r.updatedAt.toISOString(), r.id])).toString("base64url");
+}
+
+function decodeCursor(cursor: string): [number, Date, string] {
+  try {
+    const [w, u, id] = JSON.parse(Buffer.from(cursor, "base64url").toString()) as [unknown, unknown, unknown];
+    const at = new Date(String(u));
+    if ((w !== 0 && w !== 1) || Number.isNaN(at.getTime()) || typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id))
+      throw new Error("bad cursor");
+    return [w, at, id];
+  } catch {
+    throw new ValidationError("Invalid cursor", "notifications.bad_cursor");
+  }
+}
+
+async function countsOf(db: Database, orgId: string, userId: string, now: Date): Promise<NotificationCounts> {
+  const [row] = await db
+    .select({
+      all: sql<number>`count(*)::int`,
+      mentions: sql<number>`(count(*) filter (where ${inArray(notifications.kind, MENTION_KINDS)}))::int`,
+      waiting: sql<number>`(count(*) filter (where ${notifications.waiting}))::int`,
+      unread: sql<number>`(count(*) filter (where ${notifications.readAt} is null))::int`,
+      reactions: sql<number>`(count(*) filter (where ${notifications.kind} = 'reaction'))::int`,
+    })
+    .from(notifications)
+    .where(visible(orgId, userId, now));
+  return {
+    all: Number(row?.all ?? 0),
+    mentions: Number(row?.mentions ?? 0),
+    waiting: Number(row?.waiting ?? 0),
+    unread: Number(row?.unread ?? 0),
+    reactions: Number(row?.reactions ?? 0),
+  };
+}
+
+/** The inbox: waiting first, then newest; with the counts of every filter (the same visible set). */
+export async function listNotifications(
+  deps: NotificationDeps,
+  userId: string,
+  orgId: string,
+  options: { filter?: NotificationFilter; cursor?: string | null; limit?: number } = {},
+): Promise<{ items: NotificationView[]; counts: NotificationCounts; nextCursor: string | null }> {
+  const { db } = deps;
+  await requirePermission(db, userId, orgId, "read");
+  const now = nowOf(deps);
+  const filter = options.filter ?? "all";
+  if (!NOTIFICATION_FILTERS.includes(filter)) throw new ValidationError("Unknown filter");
+  const limit = Math.max(1, Math.min(options.limit ?? 50, MAX_PAGE));
+  const after = options.cursor ? decodeCursor(options.cursor) : null;
+  const [rows, counts] = await Promise.all([
+    db
+      .select()
+      .from(notifications)
+      .where(
+        and(
+          visible(orgId, userId, now),
+          filterSql(filter),
+          after
+            ? sql`(${notifications.waiting}::int, ${notifications.updatedAt}, ${notifications.id}) < (${after[0]}::int, ${after[1].toISOString()}::timestamptz, ${after[2]}::uuid)`
+            : undefined,
+        ),
+      )
+      .orderBy(desc(notifications.waiting), desc(notifications.updatedAt), desc(notifications.id))
+      .limit(limit + 1),
+    countsOf(db, orgId, userId, now),
+  ]);
+  const page = rows.slice(0, limit);
+  const last = page.at(-1);
+  return {
+    items: page.map(notificationView),
+    counts,
+    nextCursor: rows.length > limit && last ? encodeCursor(last) : null,
+  };
+}
+
+/** The badge: unread and waiting, over the visible inbox. */
+export async function notificationCounts(deps: NotificationDeps, userId: string, orgId: string) {
+  await requirePermission(deps.db, userId, orgId, "read");
+  const c = await countsOf(deps.db, orgId, userId, nowOf(deps));
+  return { unread: c.unread, waiting: c.waiting };
+}
+
+async function publishCounts(deps: NotificationDeps, orgId: string, userId: string) {
+  if (!deps.pubsub) return;
+  const c = await countsOf(deps.db, orgId, userId, nowOf(deps)).catch(() => null);
+  if (c)
+    await publishUserEvent(deps.pubsub, orgId, userId, {
+      type: "notification.counts",
+      unread: c.unread,
+      waiting: c.waiting,
+    });
+}
+
+// ── The person's actions ──────────────────────────────────────────────────────
+
+async function mine(deps: NotificationDeps, userId: string, orgId: string, id: string) {
+  await requirePermission(deps.db, userId, orgId, "read");
+  const [row] = await deps.db
+    .select()
+    .from(notifications)
+    .where(and(eq(notifications.id, id), eq(notifications.orgId, orgId), eq(notifications.userId, userId)));
+  if (!row) throw new NotFoundError("Notification not found");
+  return row;
+}
+
+/**
+ * Applies a change to one of the person's notifications. Bringing a row back
+ * to "unread, not done" while another open row of its group exists would
+ * break the one-open-row rule: then nothing changes.
+ */
+async function change(deps: NotificationDeps, row: Row, set: Partial<typeof notifications.$inferInsert>) {
+  try {
+    const [updated] = await deps.db.update(notifications).set(set).where(eq(notifications.id, row.id)).returning();
+    return updated ?? row;
+  } catch {
+    return row;
+  }
+}
+
+export async function markNotificationRead(
+  deps: NotificationDeps,
+  userId: string,
+  orgId: string,
+  id: string,
+  read: boolean,
+): Promise<NotificationView> {
+  const row = await mine(deps, userId, orgId, id);
+  const updated = await change(deps, row, { readAt: read ? (row.readAt ?? nowOf(deps)) : null });
+  const view = notificationView(updated);
+  if (!updated.doneAt) {
+    await publishUserEvent(deps.pubsub, orgId, userId, { type: "notification.upserted", notification: view });
+  }
+  await publishCounts(deps, orgId, userId);
+  return view;
+}
+
+/** "Concluir" (out of the inbox) or its undo. */
+export async function markNotificationDone(
+  deps: NotificationDeps,
+  userId: string,
+  orgId: string,
+  id: string,
+  done: boolean,
+): Promise<NotificationView> {
+  const row = await mine(deps, userId, orgId, id);
+  const updated = await change(deps, row, { doneAt: done ? (row.doneAt ?? nowOf(deps)) : null });
+  const view = notificationView(updated);
+  await publishUserEvent(
+    deps.pubsub,
+    orgId,
+    userId,
+    updated.doneAt
+      ? { type: "notification.removed", id: row.id }
+      : { type: "notification.upserted", notification: view },
+  );
+  await publishCounts(deps, orgId, userId);
+  return view;
+}
+
+/** "Lembrar depois": hidden until `until`, then back on top (`notification.upserted`). */
+export async function snoozeNotification(
+  deps: NotificationDeps,
+  userId: string,
+  orgId: string,
+  id: string,
+  until: Date,
+): Promise<NotificationView> {
+  if (Number.isNaN(until.getTime())) throw new ValidationError("Invalid date", "notifications.bad_snooze");
+  const now = nowOf(deps);
+  if (until.getTime() <= now.getTime())
+    throw new ValidationError("Pick a time in the future", "notifications.snooze_in_past");
+  if (until.getTime() - now.getTime() > MAX_SNOOZE_MS)
+    throw new ValidationError("At most a year ahead", "notifications.snooze_too_far");
+  const row = await mine(deps, userId, orgId, id);
+  const updated = await change(deps, row, { snoozedUntil: until });
+  await publishUserEvent(deps.pubsub, orgId, userId, { type: "notification.removed", id: row.id });
+  await publishCounts(deps, orgId, userId);
+  return notificationView(updated);
+}
+
+/** "Marcar tudo como lido" (in a filter): the ids changed, for the undo. */
+export async function markAllNotificationsRead(
+  deps: NotificationDeps,
+  userId: string,
+  orgId: string,
+  filter: NotificationFilter = "all",
+): Promise<{ ids: string[] }> {
+  await requirePermission(deps.db, userId, orgId, "read");
+  if (!NOTIFICATION_FILTERS.includes(filter)) throw new ValidationError("Unknown filter");
+  const now = nowOf(deps);
+  const rows = await deps.db
+    .update(notifications)
+    .set({ readAt: now })
+    .where(and(visible(orgId, userId, now), filterSql(filter), isNull(notifications.readAt)))
+    .returning({ id: notifications.id });
+  if (rows.length > 0) await publishCounts(deps, orgId, userId);
+  return { ids: rows.map((r) => r.id) };
+}

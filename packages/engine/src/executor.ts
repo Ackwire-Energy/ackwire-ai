@@ -33,6 +33,7 @@ import type { ModelGateway } from "./gateway";
 import { mirrorReplyToIssue } from "./issues";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { notifyMissionApproval } from "./mission-tools";
+import { notifyQuestion, notifyRoutineRun, routineReplyText } from "./notification-producers";
 import { PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
 import {
@@ -239,6 +240,8 @@ async function executeRunInner(
     agentId: run.agentId,
     runId: run.id,
   });
+  /** Set once the trigger is read: the routine that started this run (its creator hears how it ended). */
+  let routineOfRun: { id: string; name: string } | null = null;
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
   const finished = async (
     status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
@@ -264,6 +267,23 @@ async function executeRunInner(
     // (`waiting_input`) doesn't hold the discussion either (D45).
     if (channelRow?.kind === "forum" && status !== "waiting_approval") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
+    }
+    // A routine's run ended: its creator hears it (D46).
+    if (routineOfRun && (status === "done" || status === "failed")) {
+      const routine = routineOfRun;
+      const notifyDeps = { db, pubsub: deps.pubsub };
+      await routineReplyText(notifyDeps, run.orgId, run.id)
+        .then((text) =>
+          notifyRoutineRun(notifyDeps, {
+            orgId: run.orgId,
+            routineId: routine.id,
+            agentId: run.agentId,
+            ok: status === "done",
+            runKey: run.id,
+            text: status === "done" ? text : (error ?? text),
+          }),
+        )
+        .catch(() => {});
     }
   };
 
@@ -353,6 +373,7 @@ async function executeRunInner(
     routineCall && typeof routineCall.id === "string" && typeof routineCall.name === "string"
       ? { id: routineCall.id, name: routineCall.name }
       : null;
+  routineOfRun = viaRoutine;
   const post = (tx: Executor, threadId: string | null, body: string, meta?: Record<string, unknown>) =>
     postAgentMessage(tx, run, threadId, body, viaRoutine ? { ...meta, viaRoutine } : meta);
 
@@ -900,7 +921,10 @@ async function executeRunInner(
           // A mission's approval (agent mode): its owner hears it waits.
           if (card.missionId) await notifyMissionApproval({ db, pubsub: deps.pubsub }, card).catch(() => undefined);
         }
-        for (const q of posted.questions) await publishQuestion(deps.pubsub, q, "question.asked");
+        for (const q of posted.questions) {
+          await publishQuestion(deps.pubsub, q, "question.asked");
+          await notifyQuestion({ db, pubsub: deps.pubsub }, q).catch(() => {});
+        }
         for (const r of posted.secrets) await publishSecret(deps.pubsub, r, "secret.requested");
         const waitingFor = asks.length > 0 || secretAsks.length > 0 ? "waiting_input" : "waiting_approval";
         await publishChannelEvent(deps.pubsub, event(waitingFor));

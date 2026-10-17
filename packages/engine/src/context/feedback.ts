@@ -5,6 +5,7 @@ import { NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent } from "../events";
 import type { Judge } from "../judge";
 import { getMessage, groupReactions } from "../messages";
+import { notifyReaction } from "../notification-producers";
 import { enqueue } from "../outbox";
 import type { Approval } from "../tools/gateway";
 import {
@@ -140,7 +141,7 @@ export async function addReaction(
   if (!message || message.deletedAt) throw new NotFoundError("Message not found");
   await requireChannelAccess(db, userId, orgId, message.channelId);
   if (!isValidReaction(reaction)) throw new ValidationError("reaction must be +1, -1 or an emoji");
-  await db.transaction(async (tx) => {
+  const added = await db.transaction(async (tx) => {
     const inserted = await tx
       .insert(messageReactions)
       .values({ orgId, messageId, userId, reaction })
@@ -149,9 +150,14 @@ export async function addReaction(
     if (inserted.length > 0 && message.authorType === "agent" && (reaction === "+1" || reaction === "-1")) {
       await enqueue(tx, { orgId, kind: "context.feedback", payload: { messageId, reaction } });
     }
+    return inserted.length > 0;
   });
   const reactions = await listReactions(db, orgId, messageId);
   await publishChannelEvent(pubsub, { type: "message.reactions", channelId: message.channelId, messageId, reactions });
+  // The author of a person's message hears it (D46); never of their own reaction.
+  if (added && message.authorType === "person" && message.authorUserId !== userId) {
+    await notifyReaction({ db, pubsub }, { orgId, messageId, userId }).catch(() => {});
+  }
   return reactions;
 }
 
@@ -202,10 +208,11 @@ export async function addAgentReaction(
   const message = await getMessage(db, input.orgId, input.messageId);
   if (!message || message.deletedAt) throw new NotFoundError("Message not found");
   if (!isValidReaction(input.reaction)) throw new ValidationError("reaction must be one emoji");
-  await db
+  const inserted = await db
     .insert(messageReactions)
     .values({ orgId: input.orgId, messageId: input.messageId, agentId: input.agentId, reaction: input.reaction })
-    .onConflictDoNothing();
+    .onConflictDoNothing()
+    .returning({ messageId: messageReactions.messageId });
   const reactions = await listReactions(db, input.orgId, input.messageId);
   await publishChannelEvent(pubsub, {
     type: "message.reactions",
@@ -213,6 +220,13 @@ export async function addAgentReaction(
     messageId: input.messageId,
     reactions,
   });
+  // A person's message: its author hears the agent reacted (D46).
+  if (inserted.length > 0 && message.authorType === "person") {
+    await notifyReaction(
+      { db, pubsub },
+      { orgId: input.orgId, messageId: input.messageId, agentId: input.agentId },
+    ).catch(() => {});
+  }
   return { message, reactions };
 }
 

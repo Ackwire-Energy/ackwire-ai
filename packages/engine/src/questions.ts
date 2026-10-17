@@ -3,6 +3,7 @@ import { and, type Database, type Executor, eq, lt, schema, sql } from "@agentes
 import { requireChannelAccess } from "./channels";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
+import { resolveQuestionNotifications } from "./notification-producers";
 import { enqueue } from "./outbox";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 
@@ -155,6 +156,7 @@ export async function answerQuestion(
   });
   if (!answered) throw new ConflictError("This question was already answered or expired");
   await publishQuestion(deps.pubsub, answered, "question.answered");
+  await resolveQuestionNotifications(deps, orgId, answered.id).catch(() => {});
   return questionView(answered);
 }
 
@@ -170,6 +172,7 @@ export async function afterReplyAnswered(deps: { db: Database; pubsub?: PubSub }
   if (!row) return;
   await syncQuestionMessage(deps.db, row);
   await publishQuestion(deps.pubsub, row, "question.answered");
+  await resolveQuestionNotifications(deps, orgId, row.id).catch(() => {});
 }
 
 /** Closes questions past their deadline and resumes their runs (worker, every minute). */
@@ -186,7 +189,10 @@ export async function expireQuestions(deps: { db: Database; pubsub?: PubSub }, n
     }
     return rows;
   });
-  for (const row of expired) await publishQuestion(deps.pubsub, row, "question.answered");
+  for (const row of expired) {
+    await publishQuestion(deps.pubsub, row, "question.answered");
+    await resolveQuestionNotifications(deps, row.orgId, row.id).catch(() => {});
+  }
   return expired.length;
 }
 

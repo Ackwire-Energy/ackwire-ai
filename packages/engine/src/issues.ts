@@ -5,6 +5,7 @@ import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishOrgEvent } from "./events";
 import { getMessage, postPersonMessage } from "./messages";
+import { notifyIssueChanged, notifyIssueComment } from "./notification-producers";
 import { can, getMembership } from "./organizations";
 import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
@@ -453,6 +454,7 @@ export async function createIssue(
   });
   const view = await one(db, row);
   await announce(deps.pubsub, orgId, view, "issue.created");
+  if (row.assigneeType === "person") await notifyIssueChanged(deps, author, null, row).catch(() => {});
   await fireRoutineEvent(deps, orgId, "issue.created", {
     summary: `New issue #${view.number}: ${view.title}`,
     issueId: view.id,
@@ -693,6 +695,10 @@ export async function updateIssue(
   await linkRun(deps, actor, row);
   const view = await one(db, (await reload(db, row)) ?? row);
   await announce(deps.pubsub, orgId, view, "issue.updated");
+  // The inbox (D46): a new assignee, a status change for whoever follows it.
+  if (patch.assignee !== undefined || row.status !== current.status) {
+    await notifyIssueChanged(deps, author, current, row).catch(() => {});
+  }
   return view;
 }
 
@@ -834,6 +840,7 @@ export async function commentIssue(
   const event = { type: "issue.comment" as const, issueId: issue.id, activity: view };
   if (issue.channelId) await publishChannelEvent(deps.pubsub, { ...event, channelId: issue.channelId });
   else await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event });
+  if (body) await notifyIssueComment(deps, actorOf(actor), issue.id, row.id, body).catch(() => {});
   return view;
 }
 

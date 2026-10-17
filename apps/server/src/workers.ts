@@ -15,6 +15,7 @@ import {
   purgeDeletedArtifacts,
   queueApprovalDigests,
   recoverStaleRuns,
+  wakeSnoozedNotifications,
 } from "@agenteschat/engine";
 import type { Logger } from "./logger";
 
@@ -44,6 +45,8 @@ export const WORKER_INTERVALS_MS = {
   reflections: 10 * 60_000,
   consolidation: 24 * 3600_000,
   routines: 30_000,
+  /** Snoozed notifications whose time came back to the inbox. */
+  notifications: 30_000,
   /** Runs whose worker died (deploy, crash): also once at boot. */
   recovery: 60_000,
   /** Deleted files past 30 days lose their contents. */
@@ -140,6 +143,11 @@ export function startWorkers(deps: WorkerDeps) {
       if (purged > 0) log.info("deleted files purged", { versions: purged });
     });
   }
+
+  every("notifications", WORKER_INTERVALS_MS.notifications, async () => {
+    const woke = await wakeSnoozedNotifications({ db, pubsub: deps.pubsub });
+    if (woke > 0) log.info("snoozed notifications back", { woke });
+  });
 
   every("routines", WORKER_INTERVALS_MS.routines, async () => {
     const fired = await fireDueRoutines({ db, pubsub: deps.pubsub });

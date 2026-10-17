@@ -17,6 +17,7 @@ import { getMessage } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
 import { onMissionApprovalDecided, onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
+import { notifyMessage } from "./notification-producers";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import {
   createLlmRouterStrategy,
@@ -383,6 +384,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A machine went offline a grace ago: if still offline, its running tasks are interrupted (one notice per thread).
     "machine.tasks_offline": async (job) => {
       await interruptOfflineMachineTasks({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.machineId));
+    },
+    // In-app notifications of a message (D46): mentions, thread replies, DMs.
+    "notifications.message": async (job) => {
+      await notifyMessage({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
     },
     "context.consolidate": async (job) => {
       if (!deps.context) return;

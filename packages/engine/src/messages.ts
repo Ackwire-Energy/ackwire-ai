@@ -422,6 +422,13 @@ export async function insertMessageWithRuns(
         select gen_random_uuid(), ${input.orgId}::uuid, 'message.posted', jsonb_build_object('messageId', m.id),
           'message.posted:' || m.id, 8 from m
           where m.author_type = 'person' or cardinality(m.mentioned_agent_ids) > 0
+        union all
+        -- In-app notifications (D46): people mentioned, a reply in a thread, a person's DM.
+        select gen_random_uuid(), ${input.orgId}::uuid, 'notifications.message', jsonb_build_object('messageId', m.id),
+          'notifications.message:' || m.id, 4 from m
+          where cardinality(m.mentioned_user_ids) > 0 or m.thread_id is not null
+            or (m.author_type = 'person' and exists (
+              select 1 from ${channels} dc where dc.id = ${input.channelId}::uuid and dc.kind = 'dm'))
         on conflict do nothing
         returning id
       )

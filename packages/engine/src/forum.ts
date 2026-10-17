@@ -36,6 +36,7 @@ import {
 import { agentBudgetState } from "./gateway";
 import { createIssue, getIssue, recordIssueForumEvent } from "./issues";
 import { getMessage, insertMessageWithRuns, type Message, messageView } from "./messages";
+import { notifyForumSynthesis, notifyForumTurn, resolveForumTurns } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { agentSpendThisMonth, effectiveAgentBudget } from "./usage";
@@ -1000,6 +1001,7 @@ export async function postInForumAsPerson(
       return true;
     });
     if (took) {
+      await resolveForumTurns(deps, orgId, topicId, [userId]).catch(() => {});
       await enqueue(db, {
         orgId,
         kind: "forum.advance",
@@ -1186,6 +1188,7 @@ export async function passForumTurn(deps: ForumDeps, userId: string, orgId: stri
     return true;
   });
   if (!passed) throw new ValidationError("It isn't your turn", "forum.not_your_turn");
+  await resolveForumTurns(deps, orgId, topicId, [userId]).catch(() => {});
   await enqueue(db, {
     orgId,
     kind: "forum.advance",
@@ -1268,6 +1271,7 @@ export async function cancelForumTopic(deps: ForumDeps, userId: string, orgId: s
     action: "forum.topic_canceled",
     target: { type: "forum_topic", id: topicId },
   });
+  await resolveForumTurns(deps, orgId, topicId).catch(() => {});
   await topicEvent(deps, orgId, { type: "forum.topic.updated", topicId, status: "canceled", round: topic.round });
   return getForumTopic(deps.db, userId, orgId, topicId);
 }
@@ -1665,10 +1669,13 @@ export async function advanceForumTopic(deps: ForumDeps, topicId: string, now = 
 
   if (outcome.kind === "none") return outcome.kind;
   if (outcome.kind === "finalize") {
+    await resolveForumTurns(deps, outcome.topic.orgId, outcome.topic.id).catch(() => {});
     await finalizeSynthesis(deps, outcome.topic, outcome.runId);
     return outcome.kind;
   }
   const { topic } = outcome;
+  // The inbox (D46): a seated person's turn is over once the table moves on.
+  await resolveForumTurns(deps, topic.orgId, topic.id).catch(() => {});
   if (outcome.kind === "stalled" || outcome.kind === "done") {
     await topicEvent(deps, topic.orgId, {
       type: "forum.topic.updated",
@@ -1679,6 +1686,7 @@ export async function advanceForumTopic(deps: ForumDeps, topicId: string, now = 
     return outcome.kind;
   }
   if (outcome.kind === "waiting") {
+    await notifyForumTurn(deps, topic, outcome.userId, outcome.round).catch(() => {});
     await publishUserEvent(deps.pubsub, topic.orgId, outcome.userId, {
       type: "forum.your_turn",
       topicId: topic.id,
@@ -1873,6 +1881,11 @@ async function finalizeSynthesis(deps: ForumDeps, topic: TopicRow, runId: string
       },
     ).catch(() => null);
   }
+  await notifyForumSynthesis(deps, topic, {
+    agentId: run?.agentId ?? null,
+    revision,
+    summary: synthesisSummary(structured),
+  }).catch(() => {});
   const requestedBy = topic.requestedByUserId;
   for (const userId of new Set([topic.requesterUserId, requestedBy].filter((u): u is string => !!u))) {
     await publishUserEvent(deps.pubsub, topic.orgId, userId, {

@@ -25,6 +25,7 @@ import { publishMessageCreated, publishUserEvent } from "./events";
 import { createForumTopic } from "./forum";
 import { getOrgSettings } from "./management";
 import { insertMessageWithRuns, messageView, postPersonMessage } from "./messages";
+import { notifyRoutineRun } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import {
@@ -942,7 +943,18 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
   const creator = routine.createdByUserId;
   if (!creator) return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.creator_left"]);
   const agent = await getAgent(db, routine.orgId, routine.agentId);
-  if (!agent || agent.archivedAt) return finishRun(db, run.id, "failed", RUN_SUMMARY["routine_run.agent_archived"]);
+  if (!agent || agent.archivedAt) {
+    await finishRun(db, run.id, "failed", RUN_SUMMARY["routine_run.agent_archived"]);
+    await notifyRoutineRun(deps, {
+      orgId: routine.orgId,
+      routineId: routine.id,
+      agentId: routine.agentId,
+      ok: false,
+      runKey: run.id,
+      text: RUN_SUMMARY["routine_run.agent_archived"],
+    }).catch(() => {});
+    return;
+  }
   if (!canTalkTo(agent, creator)) {
     // Its creator can no longer talk to the agent (D31): the routine pauses, with the reason in its last run.
     await db
@@ -1088,7 +1100,15 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     await finishOnce().catch(() => {});
-    return finishRun(db, run.id, "failed", reason.slice(0, 300));
+    await finishRun(db, run.id, "failed", reason.slice(0, 300));
+    await notifyRoutineRun(deps, {
+      orgId: routine.orgId,
+      routineId: routine.id,
+      agentId: agent.id,
+      ok: false,
+      runKey: run.id,
+      text: reason,
+    }).catch(() => {});
   }
 }
 
