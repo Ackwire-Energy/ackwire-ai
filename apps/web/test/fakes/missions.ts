@@ -7,9 +7,12 @@
 import type { ApiClient } from "@/api/client";
 import { ApiError } from "@/api/http";
 import type {
+  BrainKind,
+  BrainOption,
   CommandApproval,
   MachineTask,
   Mission,
+  MissionBrain,
   MissionCommand,
   MissionDecision,
   MissionDelivery,
@@ -39,6 +42,8 @@ interface Store {
   stats: Map<string, MissionSettings["stats"]>;
   /** "Usar como padrão" per agent. */
   agentDefaults: Map<string, CommandApproval>;
+  /** "Quem faz o trabalho": the brain override and its model, per mission. */
+  brains: Map<string, { brain: BrainKind | null; model: string | null }>;
 }
 
 export function createFakeMissions(
@@ -61,6 +66,7 @@ export function createFakeMissions(
       deliveries: [],
       stats: new Map(),
       agentDefaults: new Map(),
+      brains: new Map(),
     }),
   );
   const find = async (orgId: string, missionId: string) => {
@@ -304,6 +310,9 @@ export function createFakeMissions(
       if (m.status !== "proposed")
         throw new ApiError(409, "mission.wrong_status", "Who programs is chosen before Start");
       touch(m, { executor });
+      const brains = (await store(orgId)).brains;
+      const b = brains.get(missionId);
+      if (b) brains.set(missionId, { ...b, model: null });
       return clone(m);
     },
     setCommandApproval: async (orgId, missionId, commandApproval) => {
@@ -348,6 +357,19 @@ export function createFakeMissions(
           ownerId: me?.user.id ?? null,
         },
       });
+    },
+    brain: async (orgId, missionId) => brainView(await find(orgId, missionId), await store(orgId)),
+    setBrain: async (orgId, missionId, input) => {
+      log("missions.setBrain", orgId, missionId, input);
+      const m = await find(orgId, missionId);
+      if (!m.canAct) throw new ApiError(403, "mission.not_allowed", "Only the owner or a decider");
+      const s = await store(orgId);
+      const cur = s.brains.get(missionId) ?? { brain: null, model: null };
+      const brain = input.brain === undefined ? cur.brain : input.brain;
+      if (brain !== cur.brain && m.status !== "proposed")
+        throw new ApiError(409, "mission.wrong_status", "Chosen before Start");
+      s.brains.set(missionId, { brain, model: input.model !== undefined ? input.model : cur.model });
+      return brainView(m, s);
     },
     removeCommandRule: async (orgId, missionId, ruleId) => {
       log("missions.removeCommandRule", orgId, missionId, ruleId);
@@ -540,4 +562,46 @@ export function createFakeMissions(
       return { missionId, current: history[0] ?? null, history };
     },
   };
+}
+
+const FAKE_BRAIN_OPTIONS: BrainOption[] = [
+  { kind: "model", available: true, experimental: false, models: [], defaultModel: null },
+  {
+    kind: "claude_code",
+    available: true,
+    experimental: false,
+    models: [
+      { value: "opus", label: "Opus" },
+      { value: "sonnet", label: "Sonnet", recommended: true },
+      { value: "haiku", label: "Haiku" },
+    ],
+    defaultModel: "sonnet",
+  },
+  {
+    kind: "codex",
+    available: true,
+    experimental: true,
+    models: [
+      { value: "gpt-6-sol", label: "GPT-6 Sol", recommended: true },
+      { value: "gpt-6-luna", label: "GPT-6 Luna" },
+    ],
+    defaultModel: "gpt-6-sol",
+  },
+];
+
+function brainView(m: Mission, s: Store): MissionBrain {
+  const cur = s.brains.get(m.id) ?? { brain: null, model: null };
+  const effectiveBrain: BrainKind =
+    cur.brain ?? (m.executor === "codex" ? "codex" : m.executor === "agent" ? "model" : "claude_code");
+  const option = FAKE_BRAIN_OPTIONS.find((o) => o.kind === effectiveBrain);
+  return clone({
+    missionId: m.id,
+    brain: cur.brain,
+    model: cur.model,
+    effectiveBrain,
+    effectiveModel: effectiveBrain === "model" ? null : (cur.model ?? option?.defaultModel ?? null),
+    options: FAKE_BRAIN_OPTIONS,
+    canSetBrain: m.canAct && m.status === "proposed",
+    canSetModel: m.canAct,
+  });
 }

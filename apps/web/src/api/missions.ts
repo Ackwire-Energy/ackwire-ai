@@ -3,6 +3,7 @@ import { useApi } from "./context";
 import { ApiError } from "./http";
 import { keys } from "./keys";
 import type {
+  BrainKind,
   CommandApproval,
   MachineTask,
   Mission,
@@ -267,6 +268,24 @@ function patchMission(qc: QC, orgId: string, missionId: string, patch: Partial<M
 export function useMissionSettings(orgId: string, missionId: string | null | undefined, enabled = true) {
   const api = useApi();
   return useMissionPart(orgId, missionId, "settings", () => api.missions.settings(orgId, missionId ?? ""), enabled);
+}
+
+/** "Quem faz o trabalho": the brain and its model (the dialog's model select). */
+export function useMissionBrain(orgId: string, missionId: string | null | undefined, enabled = true) {
+  const api = useApi();
+  return useMissionPart(orgId, missionId, "brain", () => api.missions.brain(orgId, missionId ?? ""), enabled);
+}
+
+/** The model of who does the work (any time while open); the brain only before Start. */
+export function useSetMissionBrain(orgId: string, missionId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (input: { brain?: BrainKind | null; model?: string | null }) =>
+      api.missions.setBrain(orgId, missionId, input),
+    onSuccess: (brain) => qc.setQueryData(keys.missionPart(orgId, missionId, "brain"), brain),
+  });
 }
 
 /** The × in "O que já foi liberado". */

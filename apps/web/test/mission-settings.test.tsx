@@ -226,6 +226,25 @@ describe("Configurações da missão", () => {
     expect(dialog.textContent).toContain("Só quem cuida do Ada ou um admin muda o padrão.");
   });
 
+  test("Quem faz o trabalho: the executor's model, changeable after start; saves at once", async () => {
+    const { api, state } = await missionThread();
+    await render(api);
+    const dialog = await openSettings();
+    await click(within(dialog).getByRole("button", { name: /Mais opções/ }));
+    await settle(4);
+    const trigger = within(dialog).getByRole("combobox", { name: "Modelo" });
+    expect(trigger.textContent).toContain("Sonnet");
+    expect(trigger.hasAttribute("disabled")).toBe(false);
+    expect(dialog.textContent).toContain("Dá para trocar a qualquer momento");
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    await click(screen().getByRole("option", { name: /^Opus/ }));
+    await settle(4);
+    expect(calls(state, "missions.setBrain").map((a) => a[2])).toEqual([{ model: "opus" }]);
+    expect(within(dialog).getByRole("combobox", { name: "Modelo" }).textContent).toContain("Opus");
+    expect(document.body.textContent).toContain("Modelo: Opus");
+  });
+
   test("Retomar sozinho: the switch saves resumeTasks", async () => {
     const { api, state } = await missionThread();
     await render(api);

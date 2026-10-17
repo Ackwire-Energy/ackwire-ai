@@ -11,6 +11,7 @@ import {
   decideSuggestion,
   eligibleMissionAgents,
   getMission,
+  getMissionBrain,
   getMissionByThread,
   getMissionFiles,
   getMissionPlan,
@@ -38,6 +39,7 @@ import {
   sendMissionMessage,
   setAgentMissionApproval,
   setCommandApproval,
+  setMissionBrain,
   setMissionExecutor,
   setMissionMachine,
   setMissionResumeTasks,
@@ -58,6 +60,7 @@ import {
   requireSession,
   security,
 } from "./context";
+import { BrainKind, MissionBrain } from "./schemas";
 
 const tags = ["Missions"];
 const Status = z.enum(["proposed", "active", "paused", "done", "canceled", "awaiting_close"]).openapi({
@@ -988,6 +991,48 @@ export function missionRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, missionId } = c.req.valid("param");
       return c.json(await getMissionSettings(missions(), c.get("user").id, orgId, missionId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/missions/{missionId}/brain",
+      tags,
+      security,
+      summary:
+        "Who does the work (ADR 0032): the mission's brain and model (its override, or what its executor and the agent use) and what its computer offers",
+      request: { params: MissionParams },
+      responses: { 200: json(MissionBrain), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      return c.json(await getMissionBrain(missions(), c.get("user").id, orgId, missionId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/missions/{missionId}/brain",
+      tags,
+      security,
+      summary:
+        "Override the brain (before Start) or its model (any time while open); the owner or someone who decides; audited",
+      request: {
+        params: MissionParams,
+        body: body(
+          z.object({
+            brain: BrainKind.nullable().optional().openapi({ description: "Null = from the executor." }),
+            model: z.string().max(80).nullable().optional().openapi({ description: "Null = the default." }),
+          }),
+        ),
+      },
+      responses: { 200: json(MissionBrain), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      return c.json(await setMissionBrain(missions(), c.get("user").id, orgId, missionId, c.req.valid("json")), 200);
     },
   );
 

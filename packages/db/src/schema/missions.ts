@@ -98,6 +98,10 @@ export const missions = pgTable(
      * allows) or `never` (everything but the deny list); validated in code.
      */
     commandApproval: text().notNull().default("low_risk_auto"),
+    /** Overrides the agent's brain (ADR 0032; null = from `executor`); chosen before Start. */
+    brain: text(),
+    /** Overrides the brain's model (null = the agent's, or the brain's default); may change any time. */
+    brainModel: text(),
     /**
      * Agent mode: the agent's wake-ups in a row with no plan item changing
      * state (the stuck-loop guard pauses the mission at 5).

@@ -3,6 +3,7 @@ import { ApiError } from "@/api/http";
 import type {
   ActiveRun,
   Agent,
+  AgentBrain,
   AgentQuestion,
   AgentSecret,
   AppNotification,
@@ -595,6 +596,16 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     if (!state.me) throw new ApiError(401, "unauthorized", "Sign in to continue");
     return state.me;
   };
+  // "Quem pensa": every agent starts on the API, with a MacBook that has Claude Code and Codex.
+  const brains = new Map<string, AgentBrain>();
+  const brainOf = (agentId: string): AgentBrain => {
+    let b = brains.get(agentId);
+    if (!b) {
+      b = fakeAgentBrain(agentId);
+      brains.set(agentId, b);
+    }
+    return b;
+  };
   // Budgets like the backend: every agent has one (its own or the default); members see only percentages.
   const seesCost = () => state.me?.organizations[0]?.role !== "member";
   const spentOf = (agentId: string) => (agentId === ADA_ID ? 12.3 : agentId === ATLAS_ID ? 3.1 : 0);
@@ -930,6 +941,32 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           if (c.autoReply !== undefined) state.autoReply[`${agentId}:${c.channelId}`] = c.autoReply;
         }
         return channels.map((c) => ({ id: c.channelId, name: "", autoReply: c.autoReply ?? true }));
+      },
+      brain: async (_orgId, agentId) => {
+        const me = requireMe();
+        const agent = state.agents.find((a) => a.id === agentId);
+        if (me.organizations[0]?.role === "member" && agent?.ownerUserId !== me.user.id)
+          throw new ApiError(403, "agent.not_owner", "Only an admin or the agent's owner");
+        return structuredClone(brainOf(agentId));
+      },
+      setBrain: async (orgId, agentId, input) => {
+        log("agents.setBrain", orgId, agentId, input);
+        const b = brainOf(agentId);
+        const brain = input.brain ?? b.brain;
+        if (brain !== b.brain && brain !== "model" && !input.acceptPlanTerms)
+          throw new ApiError(400, "brain.terms_required", "Confirm the warning");
+        const changed = brain !== b.brain;
+        const model = brain === "model" ? null : input.model !== undefined ? input.model : changed ? null : b.model;
+        const option = b.options.find((o) => o.kind === brain);
+        const next: AgentBrain = {
+          ...b,
+          brain,
+          model,
+          effectiveModel: brain === "model" ? null : (model ?? option?.defaultModel ?? null),
+          fallback: input.fallback ?? b.fallback,
+        };
+        brains.set(agentId, next);
+        return structuredClone(next);
       },
       runs: async (_orgId, filter = {}) => state.runs.filter((r) => !filter.agentId || r.agentId === filter.agentId),
       cancelRun: async (orgId, runId) => {
@@ -1417,4 +1454,42 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   };
   fakeMachinesOf.set(client, machines);
   return client;
+}
+
+/** The brain view the fake starts every agent with (tests may replace `api.agents.brain`). */
+export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {}): AgentBrain {
+  return {
+    agentId,
+    brain: "model",
+    model: null,
+    effectiveModel: null,
+    fallback: true,
+    computer: { machineId: "machine_1", name: "MacBook", online: true },
+    options: [
+      { kind: "model", available: true, experimental: false, models: [], defaultModel: null },
+      {
+        kind: "claude_code",
+        available: true,
+        experimental: false,
+        models: [
+          { value: "opus", label: "Opus", modelId: "claude-opus-5-5" },
+          { value: "sonnet", label: "Sonnet", modelId: "claude-sonnet-5-5", recommended: true },
+          { value: "haiku", label: "Haiku", modelId: "claude-haiku-5-5" },
+        ],
+        defaultModel: "sonnet",
+      },
+      {
+        kind: "codex",
+        available: true,
+        experimental: true,
+        models: [
+          { value: "gpt-6-sol", label: "GPT-6 Sol", modelId: "gpt-6-sol", recommended: true },
+          { value: "gpt-6-luna", label: "GPT-6 Luna", modelId: "gpt-6-luna" },
+        ],
+        defaultModel: "gpt-6-sol",
+      },
+    ],
+    canEdit: true,
+    ...patch,
+  };
 }

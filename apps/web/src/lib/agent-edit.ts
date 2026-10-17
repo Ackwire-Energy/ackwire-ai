@@ -1,5 +1,5 @@
 import type { AgentAppearance } from "@agenteschat/ui";
-import type { AgentAudience, Run } from "@/api/types";
+import type { AgentAudience, BrainKind, Run } from "@/api/types";
 import type { Level, LevelState } from "./access-levels";
 import { readBudget } from "./new-agent";
 
@@ -18,6 +18,7 @@ export const isAgentTab = (v: unknown): v is AgentTab => AGENT_TABS.includes(v a
 export const AGENT_SECTIONS = [
   "identity",
   "model",
+  "brain",
   "budget",
   "owner",
   "audience",
@@ -37,6 +38,17 @@ export function agentSearch(search: Record<string, unknown>): { tab?: AgentTab; 
 }
 
 export type Look = Required<AgentAppearance>;
+
+/** "Quem pensa": the brain, its model (null = the brain's default) and the fallback to the API. */
+export interface BrainChoice {
+  brain: BrainKind;
+  model: string | null;
+  fallback: boolean;
+}
+export const sameBrain = (a: BrainChoice, b: BrainChoice) =>
+  a.brain === b.brain && (a.brain === "model" || a.model === b.model) && a.fallback === b.fallback;
+/** Choosing Claude Code or Codex anew needs the warning confirmed (the plan is personal). */
+export const needsPlanWarning = (saved: BrainKind | undefined, next: BrainKind) => next !== "model" && next !== saved;
 
 /** What can be edited, as the server has it now. Parts not loaded yet are absent. */
 export interface Saved {
@@ -60,6 +72,8 @@ export interface Saved {
   channels?: string[];
   /** `"cloud"` or a machine id. */
   machine?: string;
+  /** Who thinks (owner and admins only; absent until loaded). */
+  brain?: BrainChoice;
 }
 
 /** What the person changed. `budget` is the text typed; `levels` only the resources touched. */
@@ -77,13 +91,14 @@ export interface Edits {
   skills?: string[];
   channels?: string[];
   machine?: string;
+  brain?: BrainChoice;
 }
 
 export type Field = Exclude<keyof Edits, "levels"> | "levels";
 
-/** Who edits what (the server's rules): admins everything; the agent's owner its look, access, audience and computer. */
+/** Who edits what (the server's rules): admins everything; the agent's owner its look, access, audience, computer and who thinks. */
 export type Viewer = "admin" | "owner" | "member";
-export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>(["look", "levels", "audience", "machine"]);
+export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>(["look", "levels", "audience", "machine", "brain"]);
 export const canEdit = (viewer: Viewer, field: Field) =>
   viewer === "admin" || (viewer === "owner" && OWNER_EDITS.has(field));
 
@@ -102,6 +117,7 @@ export const FIELD_PLACE: Record<Field, { tab: AgentTab; sec?: AgentSection }> =
   audience: { tab: "settings", sec: "audience" },
   channels: { tab: "settings", sec: "channels" },
   machine: { tab: "settings", sec: "computer" },
+  brain: { tab: "settings", sec: "brain" },
 };
 
 const sorted = (list: string[]) => [...list].sort();
@@ -147,6 +163,7 @@ export function changedKeys(saved: Saved, edits: Edits): ChangeKey[] {
   if (edits.audience && !sameAudience(edits.audience, saved.audience)) add("audience");
   if (edits.channels && saved.channels && !sameList(edits.channels, saved.channels)) add("channels");
   if (edits.machine !== undefined && saved.machine !== undefined && edits.machine !== saved.machine) add("machine");
+  if (edits.brain && saved.brain && !sameBrain(edits.brain, saved.brain)) add("brain");
   return out;
 }
 
