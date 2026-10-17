@@ -97,7 +97,8 @@ test("MCP bridge overrides: stdio by run with the token through env_vars, or HTT
     `${key}.bearer_token_env_var="AGENTES_MCP_TOKEN"`,
   ]);
   expect(http).toContain(`${key}.default_tools_approval_mode="approve"`);
-  expect(JSON.stringify(http)).not.toContain("tok");
+  // The token itself is never on the command line (only the name of the env var that holds it).
+  expect(JSON.stringify(http)).not.toContain("agr_");
 });
 
 test("events: commands and edits are executed tool calls, our bridge's calls aren't repeated, the last message wins", () => {
