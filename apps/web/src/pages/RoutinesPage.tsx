@@ -19,7 +19,6 @@ import {
 } from "@agenteschat/client";
 import { relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { can } from "@agenteschat/client/lib/permissions";
 import { browserTimezone, onceParts, timezoneLabel, timezoneName } from "@agenteschat/client/lib/routines";
 import {
   Button,
