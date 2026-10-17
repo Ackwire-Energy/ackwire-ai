@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 8;
+export const MACHINE_PROTOCOL_VERSION = 10;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -54,6 +54,26 @@ export const isRunToolToken = (v: unknown): v is string =>
  * server never sends `brain.turn` to an older runner.
  */
 export const BRAIN_PROTOCOL = 8;
+/**
+ * From this protocol on (ADR 0036): requests carry the agent's display name
+ * (`agent.name`, for the runner's local activity log), and the owner can
+ * pause the computer. `hello.paused` and `runner.state` say whether it is
+ * paused and until when; the server sends no new work to a paused machine
+ * (it refuses with `machine_paused`), and the runner refuses new work with
+ * `paused` too, as a guard. Work already running finishes.
+ */
+export const PAUSE_PROTOCOL = 9;
+/**
+ * From this protocol on (ADR 0036, v0.2): access lives on the machine. The
+ * runner reports which folders outside the agents' own folders are allowed,
+ * for which agents, and which tools are on (`hello.access`, `access.changed`).
+ * Request paths may be absolute when they fall inside a folder allowed for
+ * that agent. An agent asks for a folder with `access.request`; the person
+ * decides on the machine and the runner sends `access.decided`. The server
+ * can never widen access; it only shows it and asks the runner to reduce it
+ * (`access.reduce`).
+ */
+export const ACCESS_PROTOCOL = 10;
 
 /** No valid `hello` within this time closes the socket. */
 export const HELLO_TIMEOUT_MS = 10_000;
@@ -281,6 +301,53 @@ export const TASK_LIMITS = {
   prUrl: 500,
 } as const;
 
+/** An agent that uses this machine, as the `agents` frame lists it (protocol 9). */
+export interface MachineAgent {
+  id: string;
+  handle: string;
+  name: string;
+  look?: { color?: string; eyes?: string; accessory?: string };
+}
+
+/** The pause state (protocol 9). `until` null: paused until the owner resumes. */
+export interface RunnerPause {
+  paused: boolean;
+  /** ISO time; absent or null with `paused: true` means "until resumed". */
+  until?: string | null;
+}
+
+/** The tools a person turns on or off on the machine (protocol 10). */
+export interface RunnerTools {
+  claude: boolean;
+  codex: boolean;
+  /** Shell commands (`exec`, `shell` tasks). The same as `exec` in `hello` once protocol 10 is in use. */
+  commands: boolean;
+}
+
+/** A folder allowed on the machine beyond the agents' own folders, and which agents use it (protocol 10). */
+export interface RunnerFolderGrant {
+  /** Absolute, normalized path on the machine. */
+  path: string;
+  /** Agent ids that may use it; empty = allowed on the machine but no agent uses it yet. */
+  agents: string[];
+}
+
+/** What the machine allows (protocol 10). */
+export interface RunnerAccess {
+  folders: RunnerFolderGrant[];
+  tools: RunnerTools;
+}
+
+/** Largest pieces of access frames. */
+export const ACCESS_LIMITS = {
+  folders: 100,
+  path: 1024,
+  agentsPerFolder: 100,
+  reason: 500,
+  /** An `access.request` the person hasn't answered expires after this long. */
+  requestTtlMs: 24 * 60 * 60 * 1000,
+} as const;
+
 export interface RunnerInfo {
   /** Protocol 4: the tasks in the runner's journal (running, and finished ones not yet acknowledged). */
   tasks?: RunnerTask[];
@@ -296,6 +363,10 @@ export interface RunnerInfo {
   exec: boolean;
   /** Protocol 7: the coding CLIs found on the machine's PATH (best effort, cached by the runner). */
   executors?: { claude?: RunnerExecutorInfo; codex?: RunnerExecutorInfo };
+  /** Protocol 9: whether the owner paused this computer. */
+  paused?: RunnerPause;
+  /** Protocol 10: folders and tools allowed on the machine. */
+  access?: RunnerAccess;
 }
 
 export interface FileEntry {
@@ -313,6 +384,8 @@ export interface FileEntry {
 export interface AgentScope {
   id: string;
   handle: string;
+  /** Protocol 9: the agent's display name, for the machine's activity log. */
+  name?: string;
 }
 
 /** What the server asks. Paths are always relative to the workspace (the agent's folder when `agent` is set). */
@@ -338,6 +411,19 @@ export type MachineRequest = (
   | { op: "task.output"; taskId: string; tail: number }
   /** Protocol 8: one brain turn (ADR 0032); streams `brain.event` frames while it runs. */
   | ({ op: "brain.turn" } & BrainTurnRequest)
+  /**
+   * Protocol 10: the request's agent asks for a folder outside its own. The
+   * runner shows it to the person and answers right away (`pending`, or
+   * `granted` when that folder is already allowed for this agent); the
+   * decision comes later as `access.decided`.
+   */
+  | { op: "access.request"; requestId: string; path: string; reason: string }
+  /** Protocol 10: the site removed a folder (for everyone, or for one agent) or turned a tool off. Never widens. */
+  | {
+      op: "access.reduce";
+      removeFolder?: { path: string; agentId?: string };
+      disableTool?: keyof RunnerTools;
+    }
   | {
       op: "push";
       path: string;
@@ -362,6 +448,8 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "task.cancel",
   "task.output",
   "brain.turn",
+  "access.request",
+  "access.reduce",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -384,6 +472,8 @@ export interface MachineReplies {
   "task.output": { lines: string[]; truncated: boolean };
   /** `final`: the turn's last event (`done` or `error`), also streamed. */
   "brain.turn": { runId: string; final: WireBrainEvent };
+  "access.request": { requestId: string; status: "pending" | "granted" };
+  "access.reduce": { access: RunnerAccess };
 }
 
 /** Error codes the runner reports; the message is for people. */
@@ -395,6 +485,10 @@ export type MachineErrorCode =
   | "upload_failed"
   /** `task.start` beyond the runner's concurrent tasks (`maxConcurrentTasks`). */
   | "no_slot"
+  /** Protocol 9: the owner paused this computer; nothing new starts until it resumes. */
+  | "paused"
+  /** Protocol 10: the path is outside every folder this agent may use, or the tool is off on the machine. */
+  | "not_allowed"
   | "bad_request"
   | "internal";
 
@@ -412,6 +506,12 @@ export type ServerFrame =
   /** Protocol 8: the answer to an `mcp.list`: the tools this run may use (JSON Schemas simplified for the CLIs). */
   | { type: "mcp.tools"; callId: string; ok: true; tools: McpToolInfo[] }
   | { type: "mcp.tools"; callId: string; ok: false; error: { code: string; message: string } }
+  /**
+   * Protocol 9: the agents of the organization that use this machine (pointed
+   * at it), sent after `welcome` and again whenever the list or a name/look
+   * changes. The runner shows them in the desktop app.
+   */
+  | { type: "agents"; agents: MachineAgent[] }
   /** The server closes after sending this (bad token, revoked, outdated runner). */
   | { type: "refused"; reason: "invalid_token" | "revoked" | "outdated" | "replaced"; message: string };
 
@@ -453,7 +553,22 @@ export type RunnerFrame =
   /** Protocol 8: one event of a running `brain.turn`. */
   | { type: "brain.event"; runId: string; event: WireBrainEvent }
   /** Protocol 8: a `brain.turn` sent its last event. */
-  | { type: "brain.done"; runId: string };
+  | { type: "brain.done"; runId: string }
+  /** Protocol 9: the pause state changed on the machine (paused, resumed, new `until`). */
+  | { type: "runner.state"; paused: RunnerPause }
+  /** Protocol 10: what the machine allows changed (the person granted, removed, or turned a tool on or off). */
+  | { type: "access.changed"; access: RunnerAccess }
+  /**
+   * Protocol 10: the person answered an `access.request` on the machine (or it
+   * expired). `granted` also comes with an `access.changed`.
+   */
+  | {
+      type: "access.decided";
+      requestId: string;
+      decision: "granted" | "denied" | "expired";
+      /** Granted for this agent only, or for every agent of the organization on this machine. */
+      scope?: "agent" | "all";
+    };
 
 /** A tool as `mcp.tools` lists it (what MCP `tools/list` returns). */
 export interface McpToolInfo {
@@ -1109,3 +1224,25 @@ export const isSafeRule = (rule: string) =>
   /^Bash\([^()\n]{1,200}\)$/.test(rule) ||
   /^WebFetch\(domain:[\w.-]{1,200}\)$/.test(rule) ||
   /^(WebFetch|WebSearch)$/.test(rule);
+
+/** `hello.paused` / `runner.state.paused`, checked. */
+export function parsePause(v: unknown): RunnerPause | undefined {
+  if (!isObject(v) || typeof v.paused !== "boolean") return undefined;
+  const until = isString(v.until) && !Number.isNaN(Date.parse(v.until)) ? new Date(v.until).toISOString() : null;
+  return v.paused ? { paused: true, until } : { paused: false };
+}
+
+/** `hello.access` / `access.changed.access`, checked and cut. */
+export function parseAccess(v: unknown): RunnerAccess | undefined {
+  if (!isObject(v) || !isObject(v.tools) || !Array.isArray(v.folders)) return undefined;
+  const t = v.tools;
+  const folders: RunnerFolderGrant[] = [];
+  for (const f of v.folders.slice(0, ACCESS_LIMITS.folders)) {
+    if (!isObject(f) || !isString(f.path) || !f.path) continue;
+    const agents = Array.isArray(f.agents)
+      ? f.agents.filter(isString).slice(0, ACCESS_LIMITS.agentsPerFolder).map((a) => a.slice(0, 64))
+      : [];
+    folders.push({ path: f.path.slice(0, ACCESS_LIMITS.path), agents });
+  }
+  return { folders, tools: { claude: t.claude === true, codex: t.codex === true, commands: t.commands === true } };
+}

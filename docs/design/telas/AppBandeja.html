@@ -1,0 +1,1095 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App da bandeja</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&family=Doto:ROND,wght@100,600&family=Martian+Mono:wght@400&display=swap">
+<script>{const q=new URLSearchParams(location.hash.slice(1));document.documentElement.dataset.theme=q.get("theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");}</script>
+<style>
+/*
+  Prototype: the desktop app for a connected computer (today `agentes-runner`, a terminal tool).
+  It lives in the macOS menu bar / Windows tray. The runner keeps being the same code: the app runs it as a
+  bundled single binary (no Node or Bun needed), shows what the agents are doing on this computer, pauses them,
+  installs updates, and is THE place where access is granted. "Permissions only widen on the machine" holds:
+  a click in this app is a click on the machine. The terminal command stays for servers without a screen.
+  Several organizations on one computer (ADR 0036): one runner per organization, each with its own folders,
+  tasks and token; the popover groups "Agora" by organization, Preferences lists them (add, leave), Folders and
+  Activity switch by organization; pause and tools are for the whole computer.
+  No internal names in the UI: never "runner", "MCP", "protocol"; the app is just "agentes".
+
+  Views (prototype bar on top; every state is a deep link):
+    #view=tray       the menu bar popover   &state=working|idle|paused|offline|update   &os=mac|win
+    #view=ask        an agent asks for a folder: system notification + the request in the popover
+                     &state=ask|done
+    #view=welcome    first run: sign in (code confirmed in the browser), folders, tools, done
+                     &state=hello|code|folders|tools|done|org (org = connecting another organization)
+    #view=prefs      Preferences window   &tab=geral|pastas|ferramentas|atualizacoes|atividade|avancado
+                     &state=update (an update is waiting)
+    Everywhere: &theme=light|dark   &os=mac|win
+  Agents come only from packages/ui/src/agent/engine.js (serve the repo root over http).
+  Base: PastasComputador.html (tokens, folders, tools), Carregando.html (pixel orbit), OnboardingV2.html (sky as horizon).
+  Mono only for commands and paths.
+*/
+:root{
+  --bg:#f4f4f1;--raised:#fff;--sunken:#ebebe7;--glass:rgba(255,255,255,.74);--line:rgba(23,23,22,.08);--line2:rgba(23,23,22,.14);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#76766f;--plate:rgba(127,127,127,.1);
+  --ok:#1f7a45;--ok-soft:#e3f2e8;--warn:#9a5b00;--warn-soft:#fbeed5;--danger:#b4352b;--danger-soft:#fbe6e3;
+  --agent:#0063d1;--agent-soft:#e3eefd;
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 8px 20px -6px rgba(23,23,22,.12),0 0 0 1px var(--line);
+  --e3:0 2px 4px rgba(23,23,22,.04),0 24px 56px -16px rgba(23,23,22,.30),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  --mbar:rgba(246,246,243,.62);--mbar-ink:#151514;
+  --sans:"Onest",system-ui,sans-serif;--display:"Funnel Display",var(--sans);--dot:"Doto",monospace;--mono:"Martian Mono",ui-monospace,monospace;color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0f0f0e;--raised:#191918;--sunken:#0a0a09;--glass:rgba(28,28,26,.74);--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8b8b85;--plate:rgba(127,127,127,.14);
+  --ok:#5fc48a;--ok-soft:#14281c;--warn:#e0a84a;--warn-soft:#33260e;--danger:#ef7c70;--danger-soft:#3a1714;
+  --agent:#5aa8ff;--agent-soft:#11253f;
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);--e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --e3:0 28px 64px -16px rgba(0,0,0,.8),0 0 0 1px var(--line2);--top:inset 0 1px 0 rgba(255,255,255,.06);
+  --mbar:rgba(20,20,19,.55);--mbar-ink:#efefec;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{margin:0;color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum";overflow-x:hidden}
+h1,h2,h3,p{margin:0}
+button,input{font:inherit;color:inherit}
+a{color:var(--ink);font-weight:600;text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+a:hover{text-decoration-color:currentColor}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+svg.i.sm{width:14px;height:14px}
+canvas.av{display:block;flex:none}
+canvas.orbit{display:inline-block;flex:none;image-rendering:pixelated;vertical-align:middle}
+:focus-visible{outline:2px solid #3d8bff;outline-offset:2px}
+@keyframes popin{from{opacity:0;transform:translateY(-4px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes popup{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes slidein{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}}
+@keyframes look{0%,40%{transform:translateX(0)}50%,90%{transform:translateX(1.2px)}}
+@keyframes shim{to{background-position:-200% 0}}
+
+/* ---------- Prototype bar (not product) ---------- */
+.pbar{position:sticky;top:0;z-index:90;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.pbar .lbl{font-size:11.5px;font-weight:600;color:var(--faint);letter-spacing:.04em;text-transform:uppercase}
+.pbar .grow{flex:1}
+.views{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;min-width:0;max-width:100%}
+.views::-webkit-scrollbar{display:none}
+.stp{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 6px;border-radius:999px;color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;flex:none}
+.stp .n{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;background:var(--sunken);color:var(--faint)}
+.stp:hover{background:var(--plate);color:var(--ink)}
+.stp[aria-current="step"]{background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--ink)}
+.stp[aria-current="step"] .n{background:var(--ink);color:var(--bg)}
+.pbar .ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ---------- Controls (design system v2) ---------- */
+.btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;padding:0 15px;border-radius:12px;font-weight:600;font-size:13.5px;letter-spacing:-.005em;background:var(--raised);box-shadow:var(--e1),var(--top);white-space:nowrap;transition:transform .18s var(--spring),box-shadow .18s var(--out),filter .15s,background .15s,color .15s,opacity .15s}
+.btn:hover{box-shadow:var(--e2),var(--top)}
+.btn:active{transform:scale(.97) translateY(.5px)}
+.btn.primary{color:var(--bg);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--bg)),var(--ink));box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;box-shadow:none;color:var(--muted)}
+.btn.ghost:hover{background:var(--plate);color:var(--ink)}
+.btn.danger{color:var(--danger)}
+.btn.danger.solid{color:#fff;background:linear-gradient(180deg,#c9473c,#a8322a);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 6px 14px -6px rgba(168,50,42,.6)}
+.btn.sm{height:30px;padding:0 10px;font-size:12.5px;border-radius:9px;gap:6px}
+.btn.xs{height:26px;padding:0 9px;font-size:12px;border-radius:8px;gap:5px}
+.btn.lg{height:44px;padding:0 20px;font-size:14.5px;border-radius:14px}
+.btn[aria-disabled="true"]{opacity:.45;cursor:default;transform:none;filter:none}
+.iconbtn{all:unset;box-sizing:border-box;cursor:pointer;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:var(--muted);transition:background .15s,color .15s,transform .18s var(--spring)}
+.iconbtn:hover{background:var(--plate);color:var(--ink)}
+.iconbtn:active{transform:scale(.94)}
+.kbd{font-family:var(--sans);font-size:11px;font-weight:600;min-width:18px;height:18px;padding:0 5px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:rgba(127,127,127,.18);color:var(--faint);box-shadow:inset 0 -1px 0 rgba(0,0,0,.1)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--sunken);color:var(--muted);white-space:nowrap;max-width:100%}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.line{background:transparent;box-shadow:inset 0 0 0 1px var(--line2)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.help{color:var(--muted);font-size:12.5px}
+.faint{color:var(--faint)}
+.n-dot{font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600}
+/* Switch (custom, never native). */
+.sw{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:40px;height:24px;border-radius:999px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line2),inset 0 1px 2px rgba(0,0,0,.08);position:relative;transition:background .2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--raised);box-shadow:0 1px 2px rgba(0,0,0,.25),0 0 0 .5px rgba(0,0,0,.06);transition:transform .3s var(--spring)}
+.sw[aria-checked="true"]{background:var(--ink);box-shadow:none}
+.sw[aria-checked="true"]::after{transform:translateX(16px);background:var(--bg)}
+.sw[aria-disabled="true"]{opacity:.4;cursor:default}
+/* Checkbox row (custom). */
+.ck{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:14px;transition:background .15s}
+.ck:hover{background:var(--plate)}
+.ck .box{width:18px;height:18px;border-radius:6px;display:grid;place-items:center;box-shadow:inset 0 0 0 1.5px var(--line2);flex:none;transition:background .15s}
+.ck .box svg{width:12px;height:12px;stroke-width:2.6;opacity:0;transform:scale(.6);transition:opacity .15s,transform .25s var(--spring)}
+.ck[aria-checked="true"] .box{background:var(--ink);color:var(--bg);box-shadow:none}
+.ck[aria-checked="true"] .box svg{opacity:1;transform:none}
+.ck .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.ck .t b{font-weight:600}
+.ck .t small{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 1px 2px rgba(0,0,0,.06);position:relative;flex:none;max-width:100%}
+.seg button{all:unset;position:relative;z-index:1;cursor:pointer;height:28px;padding:0 11px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;transition:color .2s}
+.seg button[aria-pressed="true"]{color:var(--ink)}
+.seg button:hover{color:var(--ink)}
+.seg .pill{position:absolute;top:0;left:0;height:28px;border-radius:9px;background:var(--raised);box-shadow:var(--e1),var(--top);transition:transform .32s var(--spring),width .32s var(--spring)}
+.seg.xs button{height:24px;padding:0 9px;font-size:12px}
+.seg.xs .pill{height:24px}
+.stepper{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 1px 2px rgba(0,0,0,.06)}
+.stepper button{all:unset;cursor:pointer;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;color:var(--muted)}
+.stepper button:hover{background:var(--raised);color:var(--ink);box-shadow:var(--e1)}
+.stepper output{min-width:28px;text-align:center;font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:15px}
+.input{display:flex;align-items:center;gap:6px;height:38px;padding:0 12px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line);transition:box-shadow .15s;min-width:0}
+.input:focus-within{box-shadow:inset 0 0 0 1px var(--line2),0 0 0 3px color-mix(in srgb,var(--ink) 10%,transparent)}
+.input input{all:unset;flex:1;min-width:0;height:100%}
+code,.path{font-family:var(--mono);font-size:11px;color:var(--ink2)}
+code{padding:1px 5px;border-radius:6px;background:var(--sunken);white-space:nowrap}
+.path{overflow-wrap:anywhere}
+.note{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:14px;background:var(--plate);color:var(--muted);font-size:12.5px}
+.note b{color:var(--ink);font-weight:600}
+.note svg{margin-top:2px}
+.honest{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--ink2)}
+.honest svg{color:var(--warn);margin-top:2px}
+.logo{width:34px;height:34px;border-radius:11px 11px 11px 4px;display:grid;place-items:center;flex:none;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2);color:var(--ink2)}
+.logo.soft{background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line)}
+.org{width:20px;height:20px;border-radius:6px 6px 6px 2px;flex:none;display:inline-grid;place-items:center;font-weight:700;font-size:10.5px;background:var(--ink);color:var(--bg);letter-spacing:-.02em}
+.org.md{width:30px;height:30px;font-size:13px;border-radius:9px 9px 9px 3px}
+.org.sm{width:16px;height:16px;font-size:9px;border-radius:5px 5px 5px 2px}
+.ohead{display:flex;align-items:center;gap:8px;padding:6px 8px 2px;font-size:12.5px;font-weight:650;color:var(--ink2)}
+.ohead .n-dot{font-size:12px;color:var(--muted)}
+.ohead .r{margin-left:auto;font-size:12px;font-weight:500;color:var(--faint)}
+.pa{width:28px;height:28px;border-radius:50%;flex:none;display:inline-grid;place-items:center;font-weight:650;font-size:11.5px;background:linear-gradient(160deg,#e9e9e5,#d9d9d4);color:#2a2a28}
+:root[data-theme="dark"] .pa{background:linear-gradient(160deg,#3a3a37,#2a2a28);color:#efefec}
+
+/* ---------- Desktop (fake OS around the app) ---------- */
+.desk{position:relative;height:calc(100vh - 45px);min-height:640px;overflow:hidden;isolation:isolate}
+.desk canvas.wall{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;z-index:-1}
+.mbar{position:absolute;top:0;left:0;right:0;height:28px;display:flex;align-items:center;gap:16px;padding:0 10px 0 16px;background:var(--mbar);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);color:var(--mbar-ink);font-size:13px;font-weight:500;z-index:5}
+.mbar .app{font-weight:700}
+.mbar .menus{display:flex;gap:16px;opacity:.85}
+.mbar .grow{flex:1}
+.mbar .sys{display:flex;align-items:center;gap:4px}
+.mbar .sys > span{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 6px;border-radius:5px;white-space:nowrap}
+.tray{all:unset;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;height:22px;min-width:30px;padding:0 6px;border-radius:5px;color:var(--mbar-ink);position:relative}
+.tray:hover,.tray[aria-expanded="true"]{background:rgba(127,127,127,.24)}
+.tray svg{width:18px;height:18px}
+.tray .eyes{animation:none}
+.tray.working .eyes{animation:look 2.4s ease-in-out infinite}
+/* Windows: taskbar at the bottom. */
+.tbar{position:absolute;left:0;right:0;bottom:0;height:48px;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--mbar);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);color:var(--mbar-ink);z-index:5;box-shadow:0 -1px 0 var(--line)}
+.tbar .ap{width:36px;height:36px;border-radius:8px;display:grid;place-items:center}
+.tbar .ap i{width:20px;height:20px;border-radius:5px;background:rgba(127,127,127,.35)}
+.tbar .ap.start i{background:none;display:grid;grid-template-columns:1fr 1fr;gap:2px}
+.tbar .ap.start i b{background:#3d8bff;border-radius:1px}
+.tbar .sys{position:absolute;right:8px;top:0;bottom:0;display:flex;align-items:center;gap:2px;font-size:12px}
+.tbar .sys .clock{display:flex;flex-direction:column;align-items:flex-end;line-height:1.25;padding:0 8px}
+.tbar .tray{height:36px;min-width:34px}
+.stage{position:absolute;inset:28px 0 0 0;display:grid;place-items:center;padding:24px 16px}
+.os-win .stage{inset:0 0 48px 0}
+
+/* ---------- Popover (the app in the menu bar) ---------- */
+.pop{position:absolute;top:34px;width:360px;max-width:calc(100% - 16px);border-radius:18px;padding:6px;background:var(--glass);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);box-shadow:var(--e3),var(--top);animation:popin .25s var(--spring) both;z-index:10;max-height:calc(100% - 48px);overflow-y:auto;scrollbar-width:none}
+.pop::-webkit-scrollbar{display:none}
+.os-win .pop{top:auto;bottom:56px;animation-name:popup}
+.ph{display:flex;align-items:center;gap:10px;padding:8px 8px 10px}
+.ph .t{flex:1;min-width:0;display:flex;flex-direction:column}
+.ph .t b{font-weight:650;font-size:14px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph .t small{color:var(--muted);font-size:12px}
+.psec{padding:4px 2px}
+.psec + .psec{border-top:1px solid var(--line);margin-top:2px;padding-top:6px}
+.pcap{display:flex;align-items:center;gap:6px;padding:4px 8px 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.pcap .n-dot{font-size:12px;letter-spacing:0;color:var(--muted)}
+.pcap .r{margin-left:auto;text-transform:none;letter-spacing:0;font-size:12px}
+.job{display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;cursor:pointer;position:relative;min-width:0}
+.job:hover{background:rgba(127,127,127,.12)}
+.job .avw{width:28px;display:flex;justify-content:center;flex:none}
+.job .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.job .t b{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px;min-width:0}
+.job .t b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.job .t small{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap;overflow:hidden}
+.job .t small code{font-size:10.5px;padding:0 4px;background:var(--plate)}
+.job .end{display:flex;align-items:center;gap:4px;flex:none;color:var(--faint);font-size:12px}
+.job .stop{display:none}
+.job:hover .stop{display:grid}
+.job:hover .since{display:none}
+.mi{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;min-height:34px;padding:5px 8px;border-radius:10px;font-size:13.5px;font-weight:500}
+.mi:hover{background:rgba(127,127,127,.13)}
+.mi svg{color:var(--muted)}
+.mi .r{margin-left:auto;display:flex;gap:6px;align-items:center;color:var(--faint);font-size:12px}
+.mi.danger{color:var(--danger)}
+.mi.danger svg{color:var(--danger)}
+.sub{margin:2px 0 4px 26px;display:flex;flex-direction:column;animation:fi .2s var(--out) both}
+.sub .mi{font-size:13px;min-height:30px}
+.empty{display:flex;align-items:center;gap:12px;padding:10px 8px 12px}
+.empty .t{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted)}
+.empty .t b{color:var(--ink);font-weight:600}
+.banner{margin:2px 2px 6px;padding:12px;border-radius:14px;background:var(--raised);box-shadow:var(--e1),var(--top);display:flex;flex-direction:column;gap:10px;animation:fi .25s var(--out) both}
+.banner .bh{display:flex;gap:10px;align-items:flex-start}
+.banner .bh .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.banner .bh b{font-weight:650;font-size:13.5px}
+.banner .bh small{font-size:12.5px;color:var(--muted)}
+.banner .acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.banner .acts .help{margin-left:auto}
+.bar{height:6px;border-radius:999px;background:var(--sunken);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:inherit;background:var(--ink);transition:width .3s var(--out)}
+.req .who{display:flex;align-items:center;gap:10px}
+.req .quote{font-size:13px;color:var(--ink2);padding:8px 10px;border-radius:10px;background:var(--plate)}
+.req .fold{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;box-shadow:inset 0 0 0 1px var(--line)}
+.req .fold .t{flex:1;min-width:0;display:flex;flex-direction:column}
+.req .fold b{font-weight:600;font-size:13.5px}
+.req .for{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.undo{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--muted);padding:2px 6px;border-radius:7px}
+.undo:hover{background:var(--plate);color:var(--ink)}
+
+/* System notification (macOS top right, Windows bottom right). */
+.notif{position:absolute;top:38px;right:12px;width:350px;max-width:calc(100% - 24px);border-radius:18px;padding:12px;background:var(--glass);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);box-shadow:var(--e3),var(--top);display:flex;gap:10px;animation:slidein .4s var(--spring) both;z-index:9}
+.os-win .notif{top:auto;bottom:60px}
+.notif .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;font-size:13px}
+.notif .t .app{font-size:11.5px;color:var(--faint);font-weight:600;display:flex;gap:6px}
+.notif .t b{font-weight:650}
+.notif .t span{color:var(--muted)}
+.notif .acts{display:flex;gap:6px;margin-top:8px}
+
+/* ---------- Windows (welcome, preferences) ---------- */
+.win{width:min(860px,100%);height:min(600px,100%);border-radius:16px;background:var(--bg);box-shadow:0 0 0 1px var(--line2),0 40px 90px -24px rgba(0,0,0,.5),0 12px 30px -12px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden;animation:popin .3s var(--spring) both;position:relative;isolation:isolate}
+.win.sm{width:min(680px,100%);height:min(560px,100%)}
+.wt{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;flex:none;font-size:12.5px;font-weight:600;color:var(--muted);position:relative}
+.wt .lights{display:inline-flex;gap:8px}
+.wt .lights i{width:12px;height:12px;border-radius:50%;background:#ff5f57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)}
+.wt .lights i:nth-child(2){background:#febc2e}
+.wt .lights i:nth-child(3){background:#28c840}
+.wt .ttl{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap}
+.wt .wctl{display:none;margin-left:auto;gap:0}
+.wt .wctl span{width:40px;height:40px;display:grid;place-items:center;color:var(--muted)}
+.os-win .wt .lights{display:none}
+.os-win .wt .wctl{display:flex;margin-right:-14px}
+.os-win .wt .ttl{position:static;transform:none;display:flex;align-items:center;gap:8px}
+
+/* Welcome */
+.wel{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+.wel canvas.hz{position:absolute;left:0;right:0;bottom:0;width:100%;height:120px;image-rendering:pixelated;z-index:-1;pointer-events:none}
+.wel .body{flex:1;min-height:0;overflow-y:auto;padding:12px 44px 24px;display:flex;flex-direction:column;animation:fi .3s var(--out) both}
+.wel .steps{display:flex;gap:6px;margin-bottom:22px}
+.wel .steps i{height:4px;flex:1;max-width:48px;border-radius:999px;background:var(--line2);transition:background .3s}
+.wel .steps i.on{background:var(--ink)}
+.wel h1{font-family:var(--display);font-weight:300;font-size:38px;letter-spacing:-.03em;line-height:1.05;max-width:20ch}
+.wel .lead{margin-top:10px;color:var(--muted);font-size:14.5px;max-width:52ch}
+.wel .foot{border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:14px 44px 18px;flex:none}
+.wel .foot .help{margin-right:auto}
+.hello{flex:1;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:0;padding-bottom:70px}
+.hello .mark{margin-bottom:22px}
+.hello .acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:26px}
+.code{display:flex;align-items:center;gap:14px;margin-top:26px;flex-wrap:wrap}
+.code .digits{font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:46px;letter-spacing:.08em;line-height:1;padding:14px 20px;border-radius:18px;background:var(--raised);box-shadow:var(--e2),var(--top)}
+.code .digits span{color:var(--faint)}
+.waitline{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--muted)}
+.shimmer{background:linear-gradient(90deg,var(--faint) 0%,var(--ink2) 50%,var(--faint) 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shim 1.6s linear infinite}
+.picklist{margin-top:18px;display:flex;flex-direction:column;gap:2px;border-radius:18px;background:var(--raised);box-shadow:var(--e1),var(--top);padding:6px}
+.picklist .grp{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:8px 12px 2px}
+.tl{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:14px}
+.tl + .tl{border-top:1px solid var(--line);border-radius:0}
+.tl .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.tl .t b{font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tl .t small{font-size:12.5px;color:var(--muted)}
+.tl .sw{margin-top:5px}
+.tl .logo{margin-top:1px}
+.mini{position:relative;margin-top:22px;width:min(420px,100%);height:100px;border-radius:16px;overflow:hidden;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line)}
+.mini .mb{position:absolute;top:0;left:0;right:0;height:30px;display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:0 12px;background:var(--mbar);font-size:12.5px;font-weight:500;color:var(--mbar-ink)}
+.mini .mb .tray{background:rgba(127,127,127,.24)}
+.mini .arrow{position:absolute;top:30px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;font-weight:600;color:var(--ink2)}
+.mini .arrow svg{width:22px;height:22px;transform:rotate(-90deg)}
+
+/* Preferences */
+.prefs{flex:1;min-height:0;display:grid;grid-template-columns:200px minmax(0,1fr)}
+.pnav{padding:6px 10px 14px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--line);background:var(--sunken);overflow-y:auto}
+.pnav .who{display:flex;align-items:center;gap:9px;padding:8px 8px 14px}
+.pnav .who .t{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.pnav .who b{font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pnav .who small{font-size:11.5px;color:var(--muted)}
+.pnav button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:9px;height:32px;padding:0 9px;border-radius:10px;color:var(--muted);font-weight:500;font-size:13.5px;white-space:nowrap}
+.pnav button:hover{background:var(--plate);color:var(--ink)}
+.pnav button[aria-current="true"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1),var(--top);font-weight:600}
+.pnav button .n-dot{margin-left:auto;font-size:12px;color:var(--muted)}
+.pnav .badge{margin-left:auto;display:inline-flex;color:var(--ink2)}
+.pbody{min-width:0;overflow-y:auto;padding:18px 26px 28px;animation:fi .25s var(--out) both}
+.pbody h2{font-family:var(--display);font-weight:300;font-size:28px;letter-spacing:-.02em;line-height:1.1}
+.pbody .lead{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:58ch}
+.pbody .head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.pbody .head > div{flex:1 1 280px;min-width:0}
+.card{background:var(--raised);border-radius:18px;box-shadow:var(--e1),var(--top);padding:4px 16px;min-width:0}
+.card + .card{margin-top:12px}
+.card.pad{padding:14px 16px}
+.ctitle{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:18px 4px 8px}
+.ctitle:first-of-type{margin-top:4px}
+.crow{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line);flex-wrap:wrap;min-width:0}
+.crow:first-child{border-top:0}
+.crow .t{flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.crow .t b{font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.crow .t small{color:var(--muted);font-size:12.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.crow .end{display:flex;gap:6px;align-items:center;margin-left:auto;position:relative}
+.crow.top{align-items:flex-start}
+.crow .under{flex-basis:100%;padding-left:46px;display:flex;flex-direction:column;gap:8px}
+.crow.fresh{animation:fi .35s var(--out) both}
+.avs{display:inline-flex;align-items:center;gap:4px}
+.drop{position:absolute;right:0;top:calc(100% + 6px);z-index:20;width:230px;border-radius:16px;padding:6px;background:color-mix(in srgb,var(--raised) 94%,transparent);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);box-shadow:var(--e3);animation:popin .2s var(--spring) both}
+.drop .cap{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:6px 10px 4px}
+.drop .ck{padding:7px 10px;border-radius:10px;gap:10px}
+.act{display:flex;flex-direction:column}
+.act .day{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:14px 4px 6px}
+.act .day:first-child{margin-top:0}
+.ev{display:flex;gap:12px;align-items:flex-start;padding:9px 4px;border-radius:12px}
+.ev .tm{width:40px;flex:none;font-size:12px;color:var(--faint);padding-top:3px}
+.ev .avw{width:22px;flex:none;display:flex;justify-content:center;padding-top:2px}
+.ev .tx{flex:1;min-width:0;font-size:13.5px;color:var(--ink2)}
+.ev .tx b{color:var(--ink);font-weight:600}
+.ev .tx small{display:block;color:var(--muted);font-size:12px}
+.ev .st{flex:none;padding-top:1px}
+.ver{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 0}
+.ver .big{font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:34px;letter-spacing:.02em;line-height:1}
+.ver .t{flex:1 1 200px;display:flex;flex-direction:column;gap:4px}
+.changes{margin:0;padding:0 0 4px 18px;color:var(--ink2);font-size:13px;display:flex;flex-direction:column;gap:4px}
+
+/* Dialog, toast */
+.scrim{position:fixed;inset:0;z-index:70;background:rgba(10,10,9,.45);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:grid;place-items:center;padding:16px;animation:fade .2s both}
+.dialog{width:min(440px,100%);border-radius:22px;background:var(--raised);box-shadow:var(--e3),var(--top);padding:20px;display:flex;flex-direction:column;gap:12px;animation:popin .25s var(--spring) both}
+.dialog h2{font-family:var(--display);font-weight:300;font-size:24px;letter-spacing:-.02em;line-height:1.15}
+.dialog p{color:var(--muted);font-size:13.5px}
+.dialog .foot{display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--line);flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:64px;transform:translate(-50%,20px);opacity:0;z-index:80;display:flex;gap:8px;align-items:center;padding:10px 14px;border-radius:14px;background:var(--ink);color:var(--bg);font-weight:600;font-size:13.5px;box-shadow:var(--e3);transition:transform .35s var(--spring),opacity .2s;pointer-events:none;max-width:calc(100vw - 24px)}
+.toast.on{transform:translate(-50%,0);opacity:1}
+
+/* ---------- Responsive ---------- */
+@media (max-width:760px){
+  .mbar .menus{display:none}
+  .wel .body{padding:8px 20px 20px}
+  .wel .foot{padding:12px 20px 16px}
+  .wel h1{font-size:30px}
+  .code .digits{font-size:34px;padding:12px 16px}
+  .prefs{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .pnav{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:6px 10px;scrollbar-width:none}
+  .pnav::-webkit-scrollbar{display:none}
+  .pnav .who{display:none}
+  .pnav button{flex:none}
+  .pbody{padding:16px 16px 24px}
+  .crow .under{padding-left:0}
+  .stage{padding:12px 8px}
+  .win,.win.sm{height:100%}
+}
+@media (max-width:640px){
+  .pbar{padding:8px 12px;gap:6px 8px}
+  .pbar .lbl{display:none}
+  .mbar{gap:8px;padding:0 6px 0 10px}
+  .mbar .sys .hide-s{display:none}
+  .tbar .ap:not(.start){display:none}
+  .tbar{justify-content:flex-start;padding-left:8px}
+  .notif{right:8px;left:8px;width:auto;max-width:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+</head>
+<body>
+<div class="pbar" id="pbar" aria-label="Controles do protótipo"></div>
+<div class="desk" id="desk">
+  <canvas class="wall" id="wall" aria-hidden="true"></canvas>
+  <div id="osbar"></div>
+  <div class="stage" id="stage"></div>
+  <div id="float"></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="layer"></div>
+
+<script type="module">
+import { drawAgent, idlePose, drawAccessory, bodyTones, ACCESSORY_REACH, AGENT_GRADIENTS, mixHex } from "../../../packages/ui/src/agent/engine.js";
+
+/* ================= Data ================= */
+const MACHINE = { name: "MacBook do Walter", winName: "PC do Walter", person: "Walter", version: "0.9.3", next: "0.10.0" };
+/* One runner per organization (ADR 0036): each has its own home (~/.agentes-runner/orgs/<org>) and agent folders. */
+const ORGS = {
+  acme: { name: "Acme", dir: "~/agentes/acme" },
+  himetrica: { name: "Himetrica", dir: "~/agentes/himetrica" },
+};
+const AGENTS = {
+  dev: { name: "Dev", org: "acme", look: { color: "indigo", eyes: "wide", accessory: "headphones" } },
+  bento: { name: "Bento", org: "acme", look: { color: "amber", eyes: "round", accessory: "cap" } },
+  ada: { name: "Ada", org: "acme", look: { color: "green", eyes: "happy", accessory: "none" } },
+  lia: { name: "Lia", org: "himetrica", look: { color: "rose", eyes: "round", accessory: "flower" } },
+  nino: { name: "Nino", org: "himetrica", look: { color: "teal", eyes: "dots", accessory: "beanie" } },
+};
+const NOW = [
+  { id: "j1", agent: "dev", what: "Rodando os testes", where: "viajolo-v5", cmd: "bun test", since: "2 min" },
+  { id: "j2", agent: "bento", what: "Escrevendo o roteiro", where: "Roteiros", since: "agora" },
+  { id: "j3", agent: "lia", what: "Build do site", where: "site", since: "12 min", bg: true },
+];
+const FOLDERS0 = [
+  { id: "viajolo", org: "acme", name: "viajolo-v5", path: "~/Projects/Personal/viajolo-v5", agents: ["dev"] },
+  { id: "roteiros", org: "acme", name: "Roteiros", path: "~/Documents/Roteiros", agents: ["bento"] },
+  { id: "site", org: "himetrica", name: "site", path: "~/Projects/Himetrica/site", agents: ["lia", "nino"] },
+];
+const DETECTED = [
+  { group: "Projetos" },
+  { id: "viajolo", name: "viajolo-v5", path: "~/Projects/Personal/viajolo-v5", meta: "mudou hoje" },
+  { id: "colmeia", name: "colmeia", path: "~/Projects/Personal/colmeia", meta: "mudou ontem" },
+  { id: "site", name: "site", path: "~/Projects/Himetrica/site", meta: "há 3 dias" },
+  { group: "Documentos" },
+  { id: "roteiros", name: "Roteiros", path: "~/Documents/Roteiros", meta: "48 arquivos" },
+  { id: "notas", name: "Notas", path: "~/Documents/Notas", meta: "210 arquivos" },
+];
+const ACTIVITY = [
+  { day: "Hoje" },
+  { tm: "15:22", agent: "dev", tx: "Rodando os testes no <b>viajolo-v5</b>", cmd: "bun test", st: "run" },
+  { tm: "15:20", agent: "bento", tx: "Escrevendo <b>roteiro-curitiba.md</b> em Roteiros", st: "run" },
+  { tm: "15:10", agent: "lia", tx: "Começou o build do <b>site</b> em segundo plano", cmd: "bun run build", st: "run" },
+  { tm: "14:41", person: true, org: "acme", tx: "Você liberou <b>Roteiros</b> para o Bento" },
+  { tm: "14:02", agent: "ada", tx: "Revisou a branch <b>feat/checkout</b> no viajolo-v5", cmd: "git diff main…feat/checkout", st: "ok" },
+  { tm: "11:30", person: true, tx: "Atualizado para a versão <b>0.9.3</b>" },
+  { day: "Ontem" },
+  { tm: "18:55", agent: "nino", tx: "Testes do <b>site</b> falharam: 2 de 148", cmd: "bun test", st: "fail" },
+  { tm: "17:12", agent: "bento", tx: "Pediu a pasta <b>Notas</b>. Você recusou.", st: "no" },
+  { tm: "16:40", person: true, org: "himetrica", tx: "Você conectou este Mac à <b>Himetrica</b>" },
+];
+
+/* ================= State ================= */
+const VIEWS = [["tray", "Bandeja"], ["ask", "Pedido de pasta"], ["welcome", "Primeira vez"], ["prefs", "Preferências"]];
+const STATES = {
+  tray: [["working", "Trabalhando"], ["idle", "Calmo"], ["paused", "Pausado"], ["offline", "Sem internet"], ["update", "Atualização"]],
+  ask: [["ask", "Pedindo"], ["done", "Liberado"]],
+  welcome: [["hello", "Entrar"], ["code", "Código"], ["folders", "Pastas"], ["tools", "Ferramentas"], ["done", "Pronto"], ["org", "Outra organização"]],
+  prefs: [["", "Normal"], ["update", "Com atualização"]],
+};
+const TABS = [["geral", "Geral", "settings"], ["pastas", "Pastas", "folder"], ["ferramentas", "Ferramentas", "terminal"], ["atualizacoes", "Atualizações", "download"], ["atividade", "Atividade", "pulse"], ["avancado", "Avançado", "sliders"]];
+const S = {
+  view: "tray", state: "working", os: "mac", tab: "geral",
+  open: true, pauseMenu: false, stopped: new Set(), installing: 0, askFor: "one", notif: true,
+  picks: new Set(), tools: { claude: true, codex: false, commands: false },
+  folders: [], dropFor: null, autoUpdate: true, launch: true, notify: true, sound: false, protectedMode: false,
+  maxTasks: 3, taskMax: "4h", brainMax: 3, brainIdle: "10", actFilter: "all", actOrg: "all", prefOrg: "acme", name: "", orgs: ["acme", "himetrica"],
+};
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const listNames = (arr) => (arr.length <= 1 ? arr.join("") : arr.slice(0, -1).join(", ") + " e " + arr.at(-1));
+const isWin = () => S.os === "win";
+const machineName = () => S.name || (isWin() ? MACHINE.winName : MACHINE.name);
+const osWord = () => (isWin() ? "PC" : "Mac");
+
+function readHash() {
+  const q = new URLSearchParams(location.hash.slice(1));
+  S.view = VIEWS.some(([v]) => v === q.get("view")) ? q.get("view") : "tray";
+  const st = STATES[S.view].map(([v]) => v);
+  S.state = st.includes(q.get("state") ?? "") ? q.get("state") ?? "" : st[0];
+  S.os = q.get("os") === "win" ? "win" : "mac";
+  S.tab = TABS.some(([t]) => t === q.get("tab")) ? q.get("tab") : "geral";
+}
+function writeHash() {
+  const q = new URLSearchParams({ view: S.view });
+  if (S.state) q.set("state", S.state);
+  if (S.view === "prefs") q.set("tab", S.tab);
+  if (S.os === "win") q.set("os", "win");
+  q.set("theme", document.documentElement.dataset.theme);
+  history.replaceState(null, "", "#" + q.toString());
+}
+function resetFor(view) {
+  S.open = true; S.pauseMenu = false; S.stopped = new Set(); S.installing = 0; S.notif = true; S.askFor = "one"; S.dropFor = null;
+  S.folders = FOLDERS0.map((f) => ({ ...f, agents: [...f.agents] })); S.orgs = ["acme", "himetrica"];
+  if (view === "welcome") { S.picks = new Set(); S.tools = { claude: true, codex: false, commands: false }; }
+}
+
+/* ================= Icons ================= */
+const P = {
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>', right: '<path d="M9 6l6 6-6 6"/>', left: '<path d="M15 6l-6 6 6 6"/>', down: '<path d="m6 9 6 6 6-6"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>', plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>',
+  folder: '<path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/>',
+  terminal: '<rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="m7.5 10 2.5 2-2.5 2M12.5 14.5h4"/>',
+  computer: '<rect x="3.5" y="4.5" width="17" height="11.5" rx="2.5"/><path d="M8.5 20h7M12 16v4"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  sliders: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+  download: '<path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/>',
+  pulse: '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+  pause: '<rect x="7" y="5.5" width="3.5" height="13" rx="1"/><rect x="13.5" y="5.5" width="3.5" height="13" rx="1"/>',
+  play: '<path d="M8 5.5v13l10-6.5Z"/>',
+  stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="2.5"/>',
+  external: '<path d="M14 5h5v5M19 5l-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 18V7.5A1.5 1.5 0 0 1 6.5 6H10"/>',
+  power: '<path d="M12 3.5v8"/><path d="M7.2 6.5a7.5 7.5 0 1 0 9.6 0"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
+  alert: '<path d="M12 4 2.8 19.5h18.4Z"/><path d="M12 10v4M12 17h.01"/>',
+  wifiOff: '<path d="M3 3l18 18"/><path d="M8.5 16a5 5 0 0 1 6.6-.6M5 12.5a10 10 0 0 1 4.5-2.4M12 19.5h.01M16 10.5a10 10 0 0 1 3 2"/>',
+  wifi: '<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01"/>',
+  battery: '<rect x="3" y="7.5" width="16" height="9" rx="2.5"/><path d="M21 11v2"/><rect x="5" y="9.5" width="9" height="5" rx="1" fill="currentColor" stroke="none"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  users: '<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.7-3 2.8-4.6 5.5-4.6s4.8 1.6 5.5 4.6"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.6c1.6.6 2.6 2.1 3 4.4"/>',
+  shield: '<path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6l-8-3Z"/>',
+  asterisk: '<path d="M12 4v16M5.1 8l13.8 8M18.9 8 5.1 16"/>',
+  hex: '<path d="M12 3.5 19.5 7.8v8.4L12 20.5l-7.5-4.3V7.8Z"/><path d="M9 10.5 11 12l-2 1.5M13 14h2.5"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  ok: '<circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.3 2.4 2.4 4.6-5"/>',
+  fail: '<circle cx="12" cy="12" r="8.5"/><path d="m9.5 9.5 5 5M14.5 9.5l-5 5"/>',
+  dash: '<path d="M7 12h10"/>',
+  user: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  chat: '<path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17H10l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5Z"/>',
+  winmin: '<path d="M6 12h12"/>', winmax: '<rect x="6" y="6" width="12" height="12" rx="1"/>',
+};
+const I = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
+
+/* The tray icon: a monochrome template of the agent symbol (cut corner, two eyes), like every menu bar icon.
+   Working: the eyes look around. Paused: the eyes are dashes. Offline: outline only. Update: a small arrow. */
+function trayGlyph(state) {
+  const body = "M4.2 2.5h9.6a1.7 1.7 0 0 1 1.7 1.7v9.6a1.7 1.7 0 0 1-1.7 1.7H4.2L2.5 13.8V4.2a1.7 1.7 0 0 1 1.7-1.7Z";
+  const bg = "var(--mbar-hole, #e9e9e6)";
+  const eyes = state === "paused"
+    ? `<g class="eyes"><rect x="5.6" y="8.3" width="2.4" height="1.4" rx=".7" fill="${bg}"/><rect x="10" y="8.3" width="2.4" height="1.4" rx=".7" fill="${bg}"/></g>`
+    : `<g class="eyes"><rect x="6.1" y="6.6" width="1.6" height="3.6" rx=".8" fill="${state === "offline" ? "currentColor" : bg}"/><rect x="10.3" y="6.6" width="1.6" height="3.6" rx=".8" fill="${state === "offline" ? "currentColor" : bg}"/></g>`;
+  const shape = state === "offline" ? `<path d="${body}" fill="none" stroke="currentColor" stroke-width="1.3"/>` : `<path d="${body}" fill="currentColor"/>`;
+  const badge = state === "update" ? `<g transform="translate(11.2 10.6)"><circle cx="3.4" cy="3.4" r="3.6" fill="var(--mbar-solid)"/><path d="M3.4 1.4v3.6M1.9 3.6l1.5 1.5 1.5-1.5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>` : "";
+  return `<svg viewBox="0 0 18 18" aria-hidden="true">${shape}${eyes}${badge}</svg>`;
+}
+
+/* ================= Agents (only from the engine) ================= */
+const DPR = Math.min(2, devicePixelRatio || 1);
+const RCH = ACCESSORY_REACH;
+const live = [];
+function avatar(look, size, seed, opts = {}) {
+  const cv = document.createElement("canvas");
+  cv.className = "av";
+  const w = size * (1 + RCH.left + RCH.right), h = size * (1 + RCH.top + RCH.bottom);
+  cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  cv.style.width = w + "px"; cv.style.height = h + "px";
+  cv.style.margin = `${-size * RCH.top}px ${-size * RCH.right}px ${-size * RCH.bottom}px ${-size * RCH.left}px`;
+  live.push({ cv, look, size, seed, opts });
+  return cv;
+}
+function drawOne(a, t, pose) {
+  const c = a.cv.getContext("2d"), s = a.size * DPR, L = a.look;
+  c.clearRect(0, 0, a.cv.width, a.cv.height);
+  drawAgent(c, RCH.left * s, RCH.top * s, s, {
+    color: L.color, eyes: L.eyes, cells: a.size <= 28 ? 10 : a.size <= 60 ? 16 : 22, pose,
+    after: L.accessory && L.accessory !== "none" ? (cx, side, frame) => drawAccessory(cx, side, L.accessory, frame, t, a.opts.mode === "writing") : undefined,
+  });
+}
+function poseFor(a, t) {
+  const m = a.opts.mode;
+  if (m === "writing") return { writing: true, turn: [0.3 + 0.08 * Math.sin(t * 0.7 + a.seed), 0.18], squash: Math.sin(t * 5 + a.seed) * 0.1 };
+  if (m === "waiting") { const p = idlePose(t, a.seed, { every: 7, expressions: ["closed"] }); p.turn = [-0.5, -0.3]; return p; }
+  if (m === "sleep") return { expression: "closed", turn: [0, 0.15] };
+  if (m === "happy") return { expression: "happy", turn: [0.2, 0] };
+  return idlePose(t, a.seed, { every: 11, expressions: ["happy", "wink"] });
+}
+function hydrate(root) {
+  for (const el of $$("[data-av]", root)) {
+    const id = el.dataset.av, size = Number(el.dataset.size || 20);
+    const look = id === "brand" ? { color: "sky", eyes: "round" } : AGENTS[id].look;
+    el.replaceWith(avatar(look, size, Math.random() * 5, { mode: el.dataset.mode }));
+  }
+  for (const cv of $$("canvas.orbit", root)) {
+    const size = Number(cv.dataset.size || 14);
+    cv.style.width = cv.style.height = size + "px"; cv.width = cv.height = Math.round(size * DPR);
+  }
+}
+const av = (id, size = 20, mode = "") => `<span data-av="${id}" data-size="${size}" ${mode ? `data-mode="${mode}"` : ""}></span>`;
+const orbit = (color = "sky", size = 14) => `<canvas class="orbit" data-color="${color}" data-size="${size}" aria-hidden="true"></canvas>`;
+const RING = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]];
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function drawOrbit(cv, now) {
+  const ctx = cv.getContext("2d"), cell = cv.width / 3, gap = Math.max(1, Math.round(cell * 0.14));
+  const tn0 = bodyTones(cv.dataset.color), tn = Array.isArray(tn0) ? tn0 : Object.values(tn0);
+  const dark = document.documentElement.dataset.theme === "dark";
+  const faint = mixHex(tn[tn.length - 1] ?? "#999999", dark ? "#000000" : "#ffffff", dark ? 0.55 : 0.45);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const head = reduce ? 0 : Math.floor(now / 110) % 8;
+  RING.forEach(([x, y], i) => {
+    const age = (head - i + 8) % 8;
+    ctx.fillStyle = age === 0 ? tn[0] : age === 1 ? tn[Math.min(1, tn.length - 1)] : age === 2 ? tn[Math.min(2, tn.length - 1)] : faint;
+    ctx.globalAlpha = age <= 2 ? 1 : dark ? 0.5 : 0.9;
+    ctx.fillRect(x * cell + gap / 2, y * cell + gap / 2, cell - gap, cell - gap);
+  });
+  ctx.globalAlpha = 1;
+}
+
+/* ================= Skies: the desktop wallpaper and the welcome horizon ================= */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+const rgb = (h) => { const n = parseInt(h.slice(1, 7), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+function ramp(c) {
+  const [top, bot] = AGENT_GRADIENTS[c] ?? AGENT_GRADIENTS.sky, deep = mixHex(bot, "#000000", 0.42);
+  return [deep, mixHex(deep, bot, 0.5), bot, mixHex(bot, top, 0.5), top, mixHex(top, "#ffffff", 0.4), mixHex(top, "#ffffff", 0.7), mixHex(top, "#ffffff", 0.9)];
+}
+function paintSky(cv, t, o) {
+  const r = cv.getBoundingClientRect(); if (!r.width || !r.height) return;
+  const PX = o.px || 4, W = Math.ceil(r.width / PX), H = Math.ceil(r.height / PX);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; cv._img = null; }
+  const c = cv.getContext("2d");
+  const img = cv._img || (cv._img = c.createImageData(W, H)), d = img.data;
+  const pal = o.palette.map((p) => (Array.isArray(p) ? p : rgb(p))), n = pal.length - 1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let f = o.base(x / W, y / H, t);
+    f = f < 0 ? 0 : f > 1 ? 1 : f;
+    const k = f * n, lo = Math.floor(k), col = pal[Math.min(n, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))];
+    const i = (y * W + x) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
+  }
+  c.putImageData(img, 0, 0);
+}
+function wall(t) {
+  const cv = $("#wall"); if (!cv) return;
+  const dark = document.documentElement.dataset.theme === "dark";
+  const pal = dark ? ramp("sky").slice(0, 5) : ramp("sky");
+  paintSky(cv, t, { px: 6, palette: pal, base: (u, v, t2) => {
+    const dx = (u - 0.3) * 1.4, dy = (v - 1.05) * 1.1;
+    return (dark ? 0.15 : 0.95) - (dark ? 0 : 0.5) * v + 0.5 * Math.exp(-(dx * dx + dy * dy) / 0.22) + 0.05 * Math.sin(u * 4 + t2 * 0.3) - 0.12 * u;
+  } });
+}
+function horizon(t) {
+  const cv = $("#hz"); if (!cv || !cv.offsetParent) return;
+  const surface = getComputedStyle($(".win")).backgroundColor.match(/\d+/g).slice(0, 3).map(Number);
+  const sky = ["#a6cfff", "#78b4ff", "#4b93ff", "#2b74e6"].map(rgb);
+  const tones = [surface, ...[0.18, 0.4, 0.65].map((k) => surface.map((v, i) => Math.round(v + (sky[0][i] - v) * k))), ...sky];
+  paintSky(cv, t, { palette: tones, base: (u, v, t2) => {
+    const top = 1 - 0.7 * (0.8 + 0.2 * Math.sin(u * 4 + t2 * 0.4));
+    const e = Math.max(0, Math.min(1, (v - top) / (1 - top)));
+    return e * e * (3 - 2 * e) * 0.95;
+  } });
+}
+let lastF = 0, lastW = 0;
+function frame(now) {
+  if (now - lastF > 40) {
+    lastF = now;
+    const t = now / 1000;
+    for (let i = live.length - 1; i >= 0; i--) {
+      const a = live[i];
+      if (!a.cv.isConnected) { live.splice(i, 1); continue; }
+      drawOne(a, t, poseFor(a, t));
+    }
+    for (const cv of $$("canvas.orbit")) drawOrbit(cv, now);
+    horizon(t);
+    if (now - lastW > 160) { lastW = now; wall(t); }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ================= Shared pieces ================= */
+const seg = (name, opts, value, attrs = "", cls = "") => `<div class="seg ${cls}" role="group" ${attrs}>${opts.map(([v, label]) => `<button data-${name}="${v}" aria-pressed="${v === value}">${label}</button>`).join("")}</div>`;
+function placePills(root = document) {
+  for (const sg of $$(".seg", root)) {
+    let pill = $(".pill", sg);
+    if (!pill) { pill = document.createElement("span"); pill.className = "pill"; sg.prepend(pill); }
+    const on = $('button[aria-pressed="true"]', sg);
+    if (!on) { pill.style.opacity = 0; continue; }
+    pill.style.opacity = 1; pill.style.width = on.offsetWidth + "px"; pill.style.height = on.offsetHeight + "px";
+    pill.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
+  }
+}
+const sw = (key, on, label, disabled = false) => `<button class="sw" role="switch" aria-checked="${on}" aria-label="${esc(label)}" data-sw="${key}" ${disabled ? 'aria-disabled="true"' : ""}></button>`;
+const orgTile = (id, cls = "") => `<span class="org ${cls}" aria-hidden="true">${esc(ORGS[id].name[0])}</span>`;
+const orgsLabel = () => (S.orgs.length === 1 ? ORGS[S.orgs[0]].name : `${S.orgs.length} organizações`);
+const agentChips = (ids) => ids.length
+  ? `<span class="avs">${ids.map((id) => av(id, 14)).join("")}</span>${esc(listNames(ids.map((id) => AGENTS[id].name)))}`
+  : `<span class="faint">Nenhum agente usa ainda</span>`;
+function toast(msg, icon = "check") {
+  const t = $("#toast"); t.innerHTML = I(icon, "sm") + esc(msg); t.classList.add("on");
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("on"), 2600);
+}
+
+/* ================= Prototype bar ================= */
+function renderBar() {
+  const st = STATES[S.view];
+  $("#pbar").innerHTML = `<span class="lbl">Protótipo</span>
+    <div class="views">${VIEWS.map(([v, t], i) => `<button class="stp" data-view="${v}" ${v === S.view ? 'aria-current="step"' : ""}><span class="n">${i + 1}</span>${t}</button>`).join("")}</div>
+    <span class="grow"></span>
+    <div class="ctl">
+      ${st.length > 1 ? seg("state", st, S.state, 'aria-label="Estado"', "xs") : ""}
+      ${seg("os", [["mac", "Mac"], ["win", "Windows"]], S.os, 'aria-label="Sistema"', "xs")}
+      <button class="iconbtn" id="themeBtn" aria-label="Trocar tema" style="width:28px;height:28px">${I(document.documentElement.dataset.theme === "dark" ? "sun" : "moon", "sm")}</button>
+    </div>`;
+}
+
+/* ================= OS chrome ================= */
+function trayState() {
+  if (S.view === "ask") return S.state === "ask" ? "working" : "working";
+  if (S.view !== "tray") return "idle";
+  if (S.installing) return "working";
+  return S.state;
+}
+function renderOS() {
+  const ts = trayState();
+  const expanded = (S.view === "tray" || S.view === "ask") && S.open;
+  const icon = `<button class="tray ${ts}" id="trayIcon" aria-label="agentes" aria-expanded="${expanded}" data-act="toggle">${trayGlyph(ts)}</button>`;
+  $("#desk").className = "desk" + (isWin() ? " os-win" : "");
+  if (isWin()) {
+    $("#osbar").innerHTML = `<div class="tbar">
+      <span class="ap start"><i><b></b><b></b><b></b><b></b></i></span><span class="ap"><i></i></span><span class="ap"><i></i></span><span class="ap"><i></i></span><span class="ap"><i></i></span>
+      <div class="sys">${icon}<span class="tray" aria-hidden="true">${I("wifi", "sm")}</span><span class="clock"><span>15:24</span><span>17/10/2026</span></span></div>
+    </div>`;
+  } else {
+    $("#osbar").innerHTML = `<div class="mbar">
+      <span class="app">${S.view === "prefs" || S.view === "welcome" ? "agentes" : "Finder"}</span>
+      <span class="menus">${S.view === "prefs" || S.view === "welcome" ? "<span>Editar</span><span>Janela</span><span>Ajuda</span>" : "<span>Arquivo</span><span>Editar</span><span>Visualizar</span><span>Ir</span><span>Janela</span>"}</span>
+      <span class="grow"></span>
+      <span class="sys">${icon}<span class="hide-s">${I("battery")}</span><span class="hide-s">${I("wifi", "sm")}</span><span>${I("search", "sm")}</span><span>sex 17 out 15:24</span></span>
+    </div>`;
+  }
+  const dark = document.documentElement.dataset.theme === "dark";
+  $("#desk").style.setProperty("--mbar-hole", dark ? "#232321" : "#e9e9e6");
+  $("#desk").style.setProperty("--mbar-solid", dark ? "#232321" : "#e9e9e6");
+}
+function placePop() {
+  const pop = $(".pop"), icon = $("#trayIcon"); if (!pop || !icon) return;
+  const desk = $("#desk").getBoundingClientRect(), r = icon.getBoundingClientRect();
+  const w = pop.offsetWidth;
+  let left = r.left + r.width / 2 - desk.left - (isWin() ? w / 2 : w - 40);
+  left = Math.max(8, Math.min(left, desk.width - w - 8));
+  pop.style.left = left + "px";
+}
+
+/* ================= View 1 + 2: the popover ================= */
+function jobRow(j) {
+  const a = AGENTS[j.agent];
+  return `<div class="job" data-act="openchat" title="Ver no chat">
+    <span class="avw">${av(j.agent, 22, "writing")}</span>
+    <span class="t"><b><span>${a.name} · ${esc(j.what)}</span></b>
+      <small>${orbit(a.look.color, 12)}${j.bg ? "Em segundo plano · " : ""}${esc(j.where)}${j.cmd ? ` · <code>${esc(j.cmd)}</code>` : ""}</small></span>
+    <span class="end"><span class="since">${esc(j.since)}</span><button class="iconbtn stop" data-stop="${j.id}" aria-label="Parar" title="Parar">${I("stop", "sm")}</button></span>
+  </div>`;
+}
+function popHeader() {
+  const st = trayState();
+  const chip = S.view === "tray" && S.state === "offline" ? `<span class="chip warn">${I("wifiOff", "sm")}Sem conexão</span>`
+    : S.view === "tray" && S.state === "paused" ? `<span class="chip">${I("pause", "sm")}Pausado</span>`
+    : `<span class="chip ok">${I("check", "sm")}Conectado</span>`;
+  return `<div class="ph">${av("brand", 26, st === "paused" ? "sleep" : "")}<span class="t"><b>${esc(machineName())}</b><small>${orgsLabel()} · ${MACHINE.person}</small></span>${chip}</div>`;
+}
+function updateBanner() {
+  if (S.installing === 1) return `<div class="banner"><div class="bh"><span class="logo soft">${orbit("sky", 16)}</span><span class="t"><b class="shimmer">Instalando a versão ${MACHINE.next}…</b><small>Os agentes esperam alguns segundos e continuam de onde pararam.</small></span></div><div class="bar"><i style="width:${S.progress}%"></i></div></div>`;
+  return `<div class="banner"><div class="bh"><span class="logo soft">${I("download")}</span><span class="t"><b>Versão ${MACHINE.next} pronta</b><small>Leva segundos. O que estiver rodando espera e continua depois.</small></span></div>
+    <div class="acts"><button class="btn sm primary" data-act="install">Instalar agora</button><button class="btn sm ghost" data-act="later">Esta noite</button><button class="undo" style="margin-left:auto" data-act="changes">O que mudou</button></div></div>`;
+}
+function requestCard() {
+  if (S.state === "done") return `<div class="banner req"><div class="bh"><span class="logo soft" style="color:var(--ok)">${I("check")}</span><span class="t"><b>viajolo-v5 liberada ${S.askFor === "all" ? "para todos os agentes" : "para o Bento"}</b><small>O Bento já continuou o trabalho.</small></span><button class="undo" data-act="undoAsk">${I("undo", "sm")}Desfazer</button></div></div>`;
+  return `<div class="banner req">
+    <div class="who">${av("bento", 26, "waiting")}<span class="t" style="flex:1;min-width:0;display:flex;flex-direction:column"><b style="font-size:13.5px;font-weight:650">Bento quer usar uma pasta</b><small class="help" style="display:flex;align-items:center;gap:6px">${orgTile("acme", "sm")}Acme · #conteudo · há 1 min</small></span></div>
+    <div class="quote">“Preciso dos roteiros que estão no viajolo-v5 para montar o vídeo de Curitiba.”</div>
+    <div class="fold"><span class="logo soft">${I("folder")}</span><span class="t"><b>viajolo-v5</b><span class="path">~/Projects/Personal/viajolo-v5</span></span></div>
+    <div class="for">Liberar para ${seg("askfor", [["one", "Só o Bento"], ["all", "Todos os agentes"]], S.askFor, 'aria-label="Para quem"', "xs")}</div>
+    <div class="acts"><button class="btn sm primary" data-act="allow">${I("check", "sm")}Liberar</button><button class="btn sm ghost" data-act="deny">Agora não</button><button class="undo" style="margin-left:auto" data-act="otherfolder">Outra pasta…</button></div>
+  </div>`;
+}
+function popBody() {
+  const st = S.view === "ask" ? "working" : S.state;
+  const jobs = NOW.filter((j) => !S.stopped.has(j.id));
+  let top = "";
+  if (S.view === "ask") top = `<div class="psec"><div class="pcap">Pedidos${S.state === "ask" ? ' <span class="n-dot">1</span>' : ""}</div>${requestCard()}</div>`;
+  if (S.view === "tray" && (st === "update" || S.installing)) top = updateBanner();
+  if (st === "offline") top = `<div class="banner"><div class="bh"><span class="logo soft">${orbit("sky", 16)}</span><span class="t"><b>Sem internet. Tentando de novo…</b><small>O que já começou continua rodando aqui e manda o resultado quando a conexão voltar. Nada novo começa até lá.</small></span></div></div>`;
+  if (st === "paused") top = `<div class="banner"><div class="bh"><span class="logo soft">${I("pause")}</span><span class="t"><b>Pausado até 16:24</b><small>Nenhum agente, de nenhuma organização, começa nada novo neste ${osWord()}. Se alguém pedir, o agente avisa no chat que você pausou.</small></span></div><div class="acts"><button class="btn sm primary" data-act="resume">${I("play", "sm")}Retomar agora</button><button class="btn sm ghost" data-act="plus1">+1 hora</button></div></div>`;
+
+  let now;
+  if (st === "idle" || st === "paused" || (st !== "offline" && !jobs.length)) {
+    now = st === "paused"
+      ? `<div class="empty">${av("dev", 26, "sleep")}<span class="t"><b>Tudo parado</b><span>O build do site terminou antes da pausa.</span></span></div>`
+      : `<div class="empty">${av("ada", 26)}<span class="t"><b>Tudo calmo por aqui</b><span>Os agentes da ${S.orgs.map((o) => ORGS[o].name).join(" e da ")} usam este ${osWord()} quando precisam. Último uso: Dev, há 40 min.</span></span></div>`;
+  } else {
+    const list = st === "offline" ? jobs.filter((j) => j.bg) : jobs;
+    /* Grouped by organization: each one is its own runner on this computer. */
+    now = S.orgs.map((o) => {
+      const mine = list.filter((j) => AGENTS[j.agent].org === o);
+      return `<div class="ohead">${orgTile(o, "sm")}${ORGS[o].name}${mine.length ? ` <span class="n-dot">${mine.length}</span>` : ""}${mine.length ? "" : `<span class="r">${st === "offline" ? "Esperando a conexão" : "Nada agora"}</span>`}</div>${mine.map(jobRow).join("")}`;
+    }).join("");
+  }
+  const count = st === "idle" || st === "paused" ? 0 : st === "offline" ? jobs.filter((j) => j.bg).length : jobs.length;
+  const pauseItem = st === "paused"
+    ? `<button class="mi" data-act="resume">${I("play", "sm")}Retomar os agentes</button>`
+    : `<button class="mi" data-act="pausemenu" aria-expanded="${S.pauseMenu}">${I("pause", "sm")}Pausar os agentes<span class="r">${I(S.pauseMenu ? "down" : "right", "sm")}</span></button>
+       ${S.pauseMenu ? `<div class="sub"><button class="mi" data-pause="1h">Por 1 hora</button><button class="mi" data-pause="tomorrow">Até amanhã às 9h</button><button class="mi" data-pause="manual">Até eu retomar</button><span class="help" style="padding:4px 8px 2px">O que já está rodando termina normalmente.</span></div>` : ""}`;
+
+  return `${top}
+    <div class="psec"><div class="pcap">Agora${count ? ` <span class="n-dot">${count}</span>` : ""}<span class="r">${count ? `<button class="undo" data-act="openchat">Ver tudo ${I("external", "sm")}</button>` : ""}</span></div>${now}</div>
+    <div class="psec">
+      ${pauseItem}
+      <button class="mi" data-act="addorg">${I("plus", "sm")}Adicionar organização</button>
+      <button class="mi" data-act="openweb">${I("external", "sm")}Abrir agentes.chat<span class="r"><span class="kbd">${isWin() ? "Ctrl" : "⌘"}</span><span class="kbd">O</span></span></button>
+      <button class="mi" data-act="prefs">${I("settings", "sm")}Preferências…<span class="r">${S.view === "tray" && S.state === "update" ? I("download", "sm") : ""}<span class="kbd">${isWin() ? "Ctrl" : "⌘"}</span><span class="kbd">,</span></span></button>
+    </div>
+    <div class="psec"><button class="mi" data-act="quit">${I("power", "sm")}Sair do agentes<span class="r"><span class="kbd">${isWin() ? "Alt" : "⌘"}</span><span class="kbd">${isWin() ? "F4" : "Q"}</span></span></button></div>`;
+}
+function viewPop() {
+  const notif = S.view === "ask" && S.state === "ask" && S.notif
+    ? `<div class="notif" role="alert">${av("bento", 24, "waiting")}<div class="t"><span class="app">agentes · Acme · agora</span><b>Bento quer usar a pasta viajolo-v5</b><span>Para montar o vídeo de Curitiba.</span><div class="acts"><button class="btn xs primary" data-act="allow">Liberar</button><button class="btn xs" data-act="opentray">Ver</button></div></div><button class="iconbtn" style="width:24px;height:24px" data-act="closenotif" aria-label="Fechar aviso">${I("x", "sm")}</button></div>`
+    : "";
+  $("#stage").innerHTML = "";
+  $("#float").innerHTML = notif + (S.open && !notif ? `<div class="pop" role="dialog" aria-label="agentes">${popHeader()}${popBody()}</div>` : "");
+}
+
+/* ================= View 3: first run ================= */
+const WSTEPS = ["hello", "code", "folders", "tools", "done"];
+function winChrome(title, inner, cls = "") {
+  return `<div class="win ${cls}" role="dialog" aria-label="${esc(title)}">
+    <div class="wt"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">${isWin() ? av("brand", 14) : ""}${esc(title)}</span><span class="wctl" aria-hidden="true"><span>${I("winmin", "sm")}</span><span>${I("winmax", "sm")}</span><span>${I("x", "sm")}</span></span></div>
+    ${inner}</div>`;
+}
+function viewWelcome() {
+  const st = S.state, idx = WSTEPS.indexOf(st);
+  const steps = idx > 0 ? `<div class="steps" aria-label="Passo ${idx} de 4">${[1, 2, 3, 4].map((i) => `<i class="${i <= idx ? "on" : ""}"></i>`).join("")}</div>` : "";
+  let body = "", foot = "";
+  if (st === "hello") {
+    body = `<div class="hello">
+      <span class="mark">${av("brand", 56)}</span>
+      <h1>Deixe seus agentes trabalharem neste ${osWord()}</h1>
+      <p class="lead">Eles só usam as pastas que você liberar. Você acompanha tudo pelo ícone lá em cima e pode pausar quando quiser.</p>
+      <div class="acts"><button class="btn lg primary" data-act="signin">Entrar com agentes.chat ${I("arrow", "sm")}</button><span class="help">Ainda não tem conta? <a href="#" data-act="openweb">Criar em agentes.chat</a></span></div>
+    </div>`;
+  } else if (st === "code") {
+    body = `${steps}<h1>Confirme no navegador</h1>
+      <p class="lead">Abrimos o agentes.chat. Veja se o código lá é o mesmo daqui, escolha a organização e clique em Conectar.</p>
+      <div class="code"><span class="digits" aria-label="Código K 7 Q 4 Z P">K7Q<span>·</span>4ZP</span></div>
+      <p class="waitline" style="margin-top:22px">${orbit("sky", 14)}<span class="shimmer">Esperando você confirmar…</span></p>`;
+    foot = `<span class="help">Não abriu? <a href="#" data-act="openweb">Abrir de novo</a></span><button class="btn ghost" data-step="hello">Voltar</button>`;
+  } else if (st === "org") {
+    body = `<h1>Conecte outra organização</h1>
+      <p class="lead">Abrimos o agentes.chat. Confira o código, escolha a organização e clique em Conectar. Ela ganha a própria pasta neste ${osWord()}, separada das outras.</p>
+      <div class="code"><span class="digits" aria-label="Código R2M 8TX">R2M<span>·</span>8TX</span></div>
+      <p class="waitline" style="margin-top:22px">${orbit("sky", 14)}<span class="shimmer">Esperando você confirmar…</span></p>
+      <div class="note" style="margin-top:22px;max-width:52ch">${I("info", "sm")}<span>Já neste ${osWord()}: ${S.orgs.map((o) => `<b>${ORGS[o].name}</b>`).join(" e ")}. Os agentes de uma organização não veem as pastas nem as tarefas da outra.</span></div>`;
+    foot = `<span class="help">Não abriu? <a href="#" data-act="openweb">Abrir de novo</a></span><button class="btn ghost" data-act="cancelorg">Cancelar</button>`;
+  } else if (st === "folders") {
+    const n = S.picks.size;
+    body = `${steps}<h1>Quais pastas eles podem usar?</h1>
+      <p class="lead">Cada agente já tem a própria pasta. Marque só o que eles precisam ver; dá para mudar depois.</p>
+      <div class="picklist">${DETECTED.map((d) => d.group ? `<div class="grp">${d.group}</div>` : `<button class="ck" role="checkbox" aria-checked="${S.picks.has(d.id)}" data-pick="${d.id}"><span class="box">${I("check")}</span><span class="logo soft" style="width:30px;height:30px">${I("folder", "sm")}</span><span class="t"><b>${d.name}</b><small><span class="path">${d.path}</span> · ${d.meta}</small></span></button>`).join("")}
+        <button class="ck" data-act="otherfolder"><span class="box" style="box-shadow:none">${I("plus")}</span><span class="t"><b>Escolher outra pasta…</b></span></button></div>`;
+    foot = `<span class="help">${n ? `<span class="n-dot">${n}</span> ${n === 1 ? "pasta marcada" : "pastas marcadas"}` : "Nenhuma pasta extra: tudo bem também"}</span><button class="btn ghost" data-step="tools">Pular</button><button class="btn primary" data-step="tools">Continuar</button>`;
+  } else if (st === "tools") {
+    const row = (id, icon, name, desc, extra = "", disabled = false) => `<div class="tl"><span class="logo">${I(icon)}</span><span class="t"><b>${name}${extra}</b><small>${desc}</small></span>${sw("tool:" + id, S.tools[id], name, disabled)}</div>`;
+    body = `${steps}<h1>O que eles podem fazer aqui?</h1>
+      <p class="lead">Achamos isto neste ${osWord()}. Sem nada ligado, eles ainda leem e escrevem arquivos nas pastas liberadas.</p>
+      <div class="picklist" style="padding:2px 4px">
+        ${row("claude", "asterisk", "Claude Code", "Escreve e muda código nas pastas liberadas, com a sua conta do Claude.", ` <span class="chip ok">${I("check", "sm")}Encontrado</span>`)}
+        ${row("codex", "hex", "Codex", "Não está instalado neste " + osWord() + ". Se instalar depois, ele aparece nas Preferências.", ` <span class="chip line">${I("dash", "sm")}Não encontrado</span>`, true)}
+        ${row("commands", "terminal", "Comandos", "Rodar testes, builds e outros comandos do Terminal.")}
+        ${S.tools.commands ? `<div class="tl" style="padding-top:0;border-top:0"><span style="width:34px;flex:none"></span><span class="honest">${I("alert", "sm")}<span>Comandos podem chegar a outras partes do ${osWord()}, não só às pastas liberadas. Você vê cada um em Atividade.</span></span></div>` : ""}
+      </div>`;
+    foot = `<button class="btn ghost" data-step="folders">Voltar</button><button class="btn primary" data-step="done">Continuar</button>`;
+  } else {
+    body = `${steps}<h1>Pronto. Fico aqui em cima.</h1>
+      <p class="lead">Clique no ícone para ver o que os agentes estão fazendo, pausar ou mudar o que eles usam. Quando um agente precisar de algo novo, eu te aviso.</p>
+      <div class="mini" aria-hidden="true"><div class="mb"><span class="tray" style="position:relative">${trayGlyph("idle")}<span class="arrow">${I("arrow")}<span>agentes</span></span></span>${I("wifi", "sm")}<span>15:24</span></div></div>
+      <div class="picklist" style="margin-top:18px;padding:2px 4px"><div class="tl"><span class="t"><b>Abrir quando o ${osWord()} ligar</b><small>Assim os agentes conseguem usar o ${osWord()} sem você lembrar de abrir o app.</small></span>${sw("launch", S.launch, "Abrir ao ligar")}</div></div>`;
+    foot = `<span class="help"></span><button class="btn" data-act="openweb">${I("external", "sm")}Abrir agentes.chat</button><button class="btn primary" data-act="finish">Fechar</button>`;
+  }
+  $("#float").innerHTML = "";
+  $("#stage").innerHTML = winChrome(st === "org" ? "Adicionar organização" : "Bem-vindo", `<div class="wel"><div class="body" ${st === "hello" ? "" : ""}>${body}</div>${foot ? `<div class="foot">${foot}</div>` : ""}${st === "hello" ? '<canvas class="hz" id="hz" aria-hidden="true"></canvas>' : ""}</div>`, "sm");
+}
+
+/* ================= View 4: preferences ================= */
+function tabGeral() {
+  const orgRow = (o) => {
+    const agents = Object.entries(AGENTS).filter(([, a]) => a.org === o).map(([k]) => k);
+    return `<div class="crow">${orgTile(o, "md")}<span class="t"><b>${ORGS[o].name} <span class="chip ok" style="height:20px;font-size:11px;padding:0 7px">${I("check", "sm")}Conectada</span></b><small><span class="avs">${agents.map((k) => av(k, 14)).join("")}</span>${agents.length} agentes podem usar · <span class="path">${ORGS[o].dir}</span></small></span><span class="end"><button class="btn sm ghost" data-act="openweb">Abrir</button><button class="btn sm ghost danger" data-act="leaveorg" data-org="${o}">Sair</button></span></div>`;
+  };
+  return `<div class="head"><div><h2>Geral</h2><p class="lead">Este ${osWord()} e as organizações que podem usá-lo.</p></div></div>
+    <div class="ctitle">Este ${osWord()}</div>
+    <div class="card">
+      <div class="crow"><span class="t"><b>Nome</b><small>Como ele aparece para as equipes.</small></span><label class="input" style="width:min(260px,100%)"><input id="nameIn" value="${esc(machineName())}" aria-label="Nome do computador"></label></div>
+      <div class="crow"><span class="pa">W</span><span class="t"><b>${MACHINE.person}</b><small>Só você libera pastas e ferramentas neste ${osWord()}, para qualquer organização.</small></span></div>
+    </div>
+    <div class="ctitle">Organizações</div>
+    <div class="card">${S.orgs.length ? S.orgs.map(orgRow).join("") : `<div class="crow"><span class="t"><b>Nenhuma organização</b><small>Conecte uma para os agentes usarem este ${osWord()}.</small></span></div>`}
+      <div class="crow"><button class="btn sm" data-act="addorg">${I("plus", "sm")}Adicionar organização</button><span class="help">Cada uma tem as próprias pastas e tarefas, separadas das outras.</span></div></div>
+    <div class="ctitle">Comportamento</div>
+    <div class="card">
+      <div class="crow"><span class="t"><b>Abrir quando o ${osWord()} ligar</b><small>Os agentes só usam este ${osWord()} com o app aberto.</small></span>${sw("launch", S.launch, "Abrir ao ligar")}</div>
+      <div class="crow"><span class="t"><b>Avisar quando um agente pedir algo</b><small>Pastas novas, ferramentas e aprovações.</small></span>${sw("notify", S.notify, "Avisos")}</div>
+      <div class="crow"><span class="t"><b>Som nos avisos</b></span>${sw("sound", S.sound, "Som")}</div>
+    </div>`;
+}
+function tabPastas() {
+  const row = (f) => `<div class="crow top ${f.fresh ? "fresh" : ""}">
+      <span class="logo soft">${I("folder")}</span>
+      <span class="t"><b>${esc(f.name)}</b><small><span class="path">${esc(f.path)}</span></small><small style="margin-top:4px">${agentChips(f.agents)}</small></span>
+      <span class="end"><button class="btn sm" data-drop="${f.id}" aria-expanded="${S.dropFor === f.id}">${I("users", "sm")}Agentes</button><button class="iconbtn" data-rmfolder="${f.id}" aria-label="Remover ${esc(f.name)}" title="Remover">${I("x", "sm")}</button>
+      ${S.dropFor === f.id ? `<div class="drop" role="menu"><div class="cap">Quem usa ${esc(f.name)}</div>${Object.entries(AGENTS).filter(([, a]) => a.org === f.org).map(([id, a]) => `<button class="ck" role="menuitemcheckbox" aria-checked="${f.agents.includes(id)}" data-fa="${f.id}:${id}"><span class="box">${I("check")}</span>${av(id, 16)}<span class="t"><b>${a.name}</b></span></button>`).join("")}</div>` : ""}</span>
+    </div>`;
+  const o = S.orgs.includes(S.prefOrg) ? S.prefOrg : S.orgs[0];
+  const mine = S.folders.filter((f) => f.org === o);
+  return `<div class="head"><div><h2>Pastas</h2><p class="lead">O que os agentes podem ver e mudar neste ${osWord()}. Liberar só acontece aqui, nunca pelo site.</p></div><button class="btn primary" data-act="addfolder">${I("plus", "sm")}Adicionar pasta</button></div>
+    ${S.orgs.length > 1 ? `<div style="margin-bottom:12px">${seg("porg", S.orgs.map((x) => [x, `${orgTile(x, "sm")}${ORGS[x].name}`]), o, 'aria-label="Organização"', "")}</div>` : ""}
+    <div class="card">${mine.length ? mine.map(row).join("") : `<div class="crow"><span class="t"><b>Nenhuma pasta extra na ${ORGS[o].name}</b><small>Os agentes dela usam só as próprias pastas.</small></span></div>`}</div>
+    <div class="note" style="margin-top:12px">${I("info", "sm")}<span>Cada organização libera as próprias pastas: o que está aqui vale só para os agentes da ${ORGS[o].name}. Cada agente sempre tem a própria pasta em <span class="path">${ORGS[o].dir}</span>. Remover não apaga nada, só tira o acesso.</span></div>`;
+}
+function tabFerramentas() {
+  const row = (id, icon, name, desc, status, opts = {}) => `<div class="crow top"><span class="logo">${I(icon)}</span><span class="t"><b>${name} ${status}</b><small>${desc}</small></span><span class="end">${opts.action ?? sw("tool:" + id, S.tools[id], name)}</span>
+    ${opts.under ? `<div class="under">${opts.under}</div>` : ""}</div>`;
+  return `<div class="head"><div><h2>Ferramentas</h2><p class="lead">O que os agentes de todas as organizações podem rodar neste ${osWord()}, sempre dentro das pastas liberadas.</p></div></div>
+    <div class="card">
+      ${row("claude", "asterisk", "Claude Code", "Escreve e muda código. Usa a sua conta do Claude neste " + osWord() + ".", `<span class="chip ok">${I("check", "sm")}Conectado</span>`)}
+      ${row("codex", "hex", "Codex", "Não está instalado neste " + osWord() + ".", `<span class="chip line">${I("dash", "sm")}Não encontrado</span>`, { action: `<button class="btn sm" data-act="howcodex">Como instalar</button>` })}
+      ${row("commands", "terminal", "Comandos", "Testes, builds e outros comandos do Terminal.", "", { under: `<span class="honest">${I("alert", "sm")}<span>Comandos podem chegar a outras partes do ${osWord()}, não só às pastas liberadas, inclusive às pastas de outra organização. O modo protegido evita isso. Cada comando fica em Atividade.</span></span>` })}
+    </div>
+    <div class="ctitle">Proteção</div>
+    <div class="card"><div class="crow top"><span class="logo">${I("shield")}</span><span class="t"><b>Modo protegido</b><small>Comandos só escrevem nas pastas liberadas e não leem o resto do ${osWord()}. Algumas ferramentas podem ficar mais lentas.</small></span><span class="end">${sw("protectedMode", S.protectedMode, "Modo protegido")}</span></div></div>`;
+}
+function tabUpdates() {
+  const pending = S.state === "update" && S.installing !== 2;
+  return `<div class="head"><div><h2>Atualizações</h2><p class="lead">O app se atualiza sozinho. Os agentes nem percebem.</p></div></div>
+    ${pending ? `<div style="margin-bottom:12px">${updateBanner()}</div>` : ""}
+    <div class="card">
+      <div class="ver"><span class="big">${S.installing === 2 ? MACHINE.next : MACHINE.version}</span><span class="t"><b>${S.installing === 2 || !pending ? `<span class="chip ok">${I("check", "sm")}Em dia</span>` : `<span class="chip">${I("download", "sm")}Versão nova pronta</span>`}</b><small class="help">Última busca: hoje, 15:02</small></span><button class="btn sm" data-act="checknow">Procurar agora</button></div>
+      <div class="crow"><span class="t"><b>Atualizar sozinho</b><small>Só quando nenhum agente estiver usando o ${osWord()}, ou de madrugada.</small></span>${sw("autoUpdate", S.autoUpdate, "Atualizar sozinho")}</div>
+    </div>
+    <div class="ctitle">O que mudou na ${S.installing === 2 || pending ? MACHINE.next : MACHINE.version}</div>
+    <div class="card pad"><ul class="changes"><li>Os agentes abrem um navegador próprio, sem os seus logins.</li><li>Pedidos de pasta aparecem aqui e no aviso do ${osWord()}.</li><li>Tarefas longas continuam depois de reiniciar.</li></ul></div>`;
+}
+function tabAtividade() {
+  const orgOf = (e) => (e.agent ? AGENTS[e.agent].org : e.org);
+  const opts = [["all", "Todas"], ...S.orgs.map((o) => [o, `${orgTile(o, "sm")}${ORGS[o].name}`])];
+  const rows = ACTIVITY.filter((e) => e.day || S.actOrg === "all" || orgOf(e) === S.actOrg || (e.person && !e.org));
+  const clean = rows.filter((e, i) => !(e.day && (!rows[i + 1] || rows[i + 1].day)));
+  const st = (s) => s === "run" ? orbit("sky", 12) : s === "ok" ? `<span style="color:var(--ok)">${I("ok", "sm")}</span>` : s === "fail" ? `<span style="color:var(--danger)">${I("fail", "sm")}</span>` : s === "no" ? `<span class="faint">${I("dash", "sm")}</span>` : "";
+  return `<div class="head"><div><h2>Atividade</h2><p class="lead">Tudo o que os agentes fizeram neste ${osWord()}.</p></div><button class="btn sm" data-act="diag">${I("copy", "sm")}Copiar diagnóstico</button></div>
+    <div style="margin-bottom:12px;overflow-x:auto;scrollbar-width:none">${seg("aorg", opts, S.actOrg, 'aria-label="Organização"', "xs")}</div>
+    <div class="card pad"><div class="act">${clean.map((e) => e.day ? `<div class="day">${e.day}</div>` : `<div class="ev"><span class="tm">${e.tm}</span><span class="avw">${e.person ? `<span class="pa" style="width:20px;height:20px;font-size:9.5px">W</span>` : av(e.agent, 18)}</span><span class="tx">${e.tx}${S.actOrg === "all" && orgOf(e) ? `<small>${ORGS[orgOf(e)].name}</small>` : ""}${e.cmd ? `<small><code>${esc(e.cmd)}</code></small>` : ""}</span><span class="st">${st(e.st)}</span></div>`).join("")}</div></div>`;
+}
+function tabAvancado() {
+  const step = (key, v, label) => `<span class="stepper" role="group" aria-label="${label}"><button data-step-dec="${key}" aria-label="Menos">${I("minus", "sm")}</button><output>${v}</output><button data-step-inc="${key}" aria-label="Mais">${I("plus", "sm")}</button></span>`;
+  return `<div class="head"><div><h2>Avançado</h2><p class="lead">Só mexa se o ${osWord()} estiver lento ou pesado. O padrão serve para quase todo mundo. Os limites valem para cada organização.</p></div><button class="btn sm ghost" data-act="defaults">Voltar ao padrão</button></div>
+    <div class="ctitle">Trabalhos longos</div>
+    <div class="card">
+      <div class="crow"><span class="t"><b>Ao mesmo tempo</b><small>Quantos trabalhos longos rodam juntos, como builds e testes.</small></span>${step("maxTasks", S.maxTasks, "Trabalhos ao mesmo tempo")}</div>
+      <div class="crow"><span class="t"><b>Tempo máximo de cada um</b><small>Depois disso o trabalho para e o agente avisa.</small></span>${seg("taskmax", [["1h", "1 h"], ["4h", "4 h"], ["8h", "8 h"]], S.taskMax, 'aria-label="Tempo máximo"', "xs")}</div>
+    </div>
+    <div class="ctitle">Claude Code</div>
+    <div class="card">
+      <div class="crow"><span class="t"><b>Conversas abertas</b><small>Mais conversas abertas respondem mais rápido e usam mais memória.</small></span>${step("brainMax", S.brainMax, "Conversas abertas")}</div>
+      <div class="crow"><span class="t"><b>Fechar conversa parada depois de</b></span>${seg("idle", [["5", "5 min"], ["10", "10 min"], ["30", "30 min"]], S.brainIdle, 'aria-label="Fechar depois de"', "xs")}</div>
+    </div>
+    <div class="ctitle">Pasta dos agentes</div>
+    <div class="card"><div class="crow"><span class="logo soft">${I("folder")}</span><span class="t"><b>agentes</b><small><span class="path">~/agentes</span> · uma pasta por organização dentro dela</small></span><button class="btn sm" data-act="movefolder">Mudar…</button></div></div>`;
+}
+function viewPrefs() {
+  const body = { geral: tabGeral, pastas: tabPastas, ferramentas: tabFerramentas, atualizacoes: tabUpdates, atividade: tabAtividade, avancado: tabAvancado }[S.tab]();
+  const updDot = S.state === "update" && S.installing !== 2;
+  const nav = TABS.map(([id, t, ic]) => `<button data-tab="${id}" aria-current="${S.tab === id}">${I(ic, "sm")}${t}${id === "pastas" ? `<span class="n-dot">${S.folders.length}</span>` : id === "atualizacoes" && updDot ? `<span class="badge" title="Versão nova">${I("download", "sm")}</span>` : ""}</button>`).join("");
+  $("#float").innerHTML = "";
+  $("#stage").innerHTML = winChrome("Preferências", `<div class="prefs"><nav class="pnav" aria-label="Seções"><div class="who">${av("brand", 26)}<span class="t"><b>${esc(machineName())}</b><small>${orgsLabel()}</small></span></div>${nav}</nav><div class="pbody" id="pbody">${body}</div></div>`);
+}
+
+/* ================= Render ================= */
+function render() {
+  renderBar(); renderOS();
+  if (S.view === "tray" || S.view === "ask") viewPop();
+  else if (S.view === "welcome") viewWelcome();
+  else viewPrefs();
+  hydrate(document.body);
+  placePills(); placePop();
+  writeHash();
+}
+function dialog(html) { $("#layer").innerHTML = `<div class="scrim" data-scrim><div class="dialog" role="dialog" aria-modal="true">${html}</div></div>`; hydrate($("#layer")); }
+const closeDialog = () => { $("#layer").innerHTML = ""; };
+
+/* ================= Interaction ================= */
+let codeTimer = 0;
+function go(view, state) {
+  S.view = view; resetFor(view);
+  S.state = state ?? STATES[view][0][0];
+  render();
+}
+function setStep(st) {
+  S.state = st; clearTimeout(codeTimer);
+  if (st === "org") codeTimer = setTimeout(() => { if (S.view === "welcome" && S.state === "org") { go("tray", "working"); toast("Conectado. Agora são 3 organizações neste " + osWord()); } }, 3600);
+  if (st === "code") codeTimer = setTimeout(() => { if (S.view === "welcome" && S.state === "code") { toast("Conectado à Acme"); setStep("folders"); } }, 3200);
+  render();
+}
+function install() {
+  S.installing = 1; S.progress = 8; render();
+  const tick = () => {
+    S.progress = Math.min(100, S.progress + 23);
+    const bar = $(".bar i"); if (bar) bar.style.width = S.progress + "%";
+    if (S.progress < 100) setTimeout(tick, 420);
+    else setTimeout(() => { S.installing = 2; if (S.view === "tray") S.state = "working"; render(); toast("Atualizado para a " + MACHINE.next); }, 350);
+  };
+  setTimeout(tick, 420);
+}
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("button, a, [data-act], [data-scrim]");
+  if (!el) { if (S.dropFor && !e.target.closest(".drop")) { S.dropFor = null; render(); } return; }
+  const d = el.dataset;
+  if (el.tagName === "A") e.preventDefault();
+  if (d.scrim !== undefined && e.target === el) return closeDialog();
+  if (d.view) return go(d.view);
+  if (d.state !== undefined && el.closest(".pbar")) { S.view === "welcome" ? setStep(d.state) : (resetFor(S.view), S.state = d.state, render()); return; }
+  if (d.os) { S.os = d.os; render(); return; }
+  if (el.id === "themeBtn") { const r = document.documentElement; r.dataset.theme = r.dataset.theme === "dark" ? "light" : "dark"; render(); return; }
+  if (d.step) return setStep(d.step);
+  if (d.tab) { S.tab = d.tab; S.dropFor = null; render(); $("#pbody")?.scrollTo(0, 0); return; }
+  if (d.sw) {
+    if (d.sw === "tool:codex") return;
+    const [k, sub] = d.sw.split(":");
+    if (sub) S.tools[sub] = !S.tools[sub]; else S[k] = !S[k];
+    if (d.sw === "tool:commands" && S.tools.commands && S.view === "prefs") toast("Comandos ligados");
+    render(); return;
+  }
+  if (d.pick) { S.picks.has(d.pick) ? S.picks.delete(d.pick) : S.picks.add(d.pick); render(); return; }
+  if (d.askfor) { S.askFor = d.askfor; render(); return; }
+  if (d.aorg) { S.actOrg = d.aorg; render(); return; }
+  if (d.porg) { S.prefOrg = d.porg; S.dropFor = null; render(); return; }
+  if (d.leaveok) { const o = d.leaveok; S.orgs = S.orgs.filter((x) => x !== o); S.folders = S.folders.filter((f) => f.org !== o); if (S.actOrg === o) S.actOrg = "all"; closeDialog(); render(); toast("Saiu da " + ORGS[o].name); return; }
+  if (!d.act) {
+    if (d.pause) { S.state = "paused"; S.pauseMenu = false; render(); toast(d.pause === "1h" ? "Pausado por 1 hora" : d.pause === "tomorrow" ? "Pausado até amanhã às 9h" : "Pausado até você retomar", "pause"); return; }
+    if (d.stop) { S.stopped.add(d.stop); render(); toast("Parado. O agente avisa no chat.", "stop"); return; }
+    if (d.drop) { S.dropFor = S.dropFor === d.drop ? null : d.drop; render(); return; }
+    if (d.fa) { const [fid, aid] = d.fa.split(":"); const f = S.folders.find((x) => x.id === fid); f.agents = f.agents.includes(aid) ? f.agents.filter((x) => x !== aid) : [...f.agents, aid]; render(); return; }
+    if (d.rmfolder) { const f = S.folders.find((x) => x.id === d.rmfolder); dialog(`<h2>Remover ${esc(f.name)}?</h2><p>${f.agents.length ? esc(listNames(f.agents.map((a) => AGENTS[a].name))) + " deixa" + (f.agents.length > 1 ? "m" : "") + " de usar esta pasta na hora." : "Nenhum agente usa esta pasta."} Nada é apagado.</p><div class="foot"><button class="btn ghost" data-close>Cancelar</button><button class="btn danger solid" data-rmok="${f.id}">Remover</button></div>`); return; }
+    if (d.rmok) { S.folders = S.folders.filter((x) => x.id !== d.rmok); closeDialog(); render(); toast("Pasta removida"); return; }
+    if (d.close !== undefined) return closeDialog();
+    if (d.stepInc || d.stepDec) { const k = d.stepInc || d.stepDec; S[k] = Math.max(1, Math.min(8, S[k] + (d.stepInc ? 1 : -1))); render(); return; }
+    if (d.taskmax) { S.taskMax = d.taskmax; render(); return; }
+    if (d.idle) { S.brainIdle = d.idle; render(); return; }
+    return;
+  }
+  switch (d.act) {
+    case "toggle": if (S.view === "tray" || S.view === "ask") { S.open = S.notif && S.view === "ask" && S.state === "ask" ? true : !S.open; S.notif = false; S.pauseMenu = false; render(); } else go("tray"); break;
+    case "pausemenu": S.pauseMenu = !S.pauseMenu; render(); break;
+    case "resume": S.state = "working"; render(); toast("Agentes de volta", "play"); break;
+    case "plus1": toast("Pausado até 17:24", "pause"); break;
+    case "install": install(); break;
+    case "later": S.state = "working"; render(); toast("Instala hoje à noite, se nada estiver rodando", "clock"); break;
+    case "changes": S.view = "prefs"; S.tab = "atualizacoes"; S.state = "update"; render(); break;
+    case "openchat": toast("Abrindo a conversa no navegador…", "external"); break;
+    case "openweb": toast("Abrindo agentes.chat…", "external"); break;
+    case "prefs": { const upd = S.view === "tray" && S.state === "update"; S.view = "prefs"; S.state = upd ? "update" : ""; S.tab = upd ? "atualizacoes" : "geral"; resetFor("prefs"); render(); break; }
+    case "quit": dialog(`<h2>Sair do agentes?</h2><p>Os agentes não conseguem usar este ${osWord()} com o app fechado. O que já está rodando termina e manda o resultado quando você abrir de novo.</p><div class="foot"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" data-close>Sair</button></div>`); break;
+    case "allow": S.view = "ask"; S.state = "done"; S.notif = false; S.open = true; render(); toast(S.askFor === "all" ? "Liberada para todos os agentes" : "Liberada para o Bento"); break;
+    case "deny": S.notif = false; S.open = false; render(); toast("Recusado. O Bento avisa no chat.", "x"); break;
+    case "undoAsk": S.state = "ask"; S.notif = false; render(); break;
+    case "opentray": S.notif = false; S.open = true; render(); break;
+    case "closenotif": S.notif = false; render(); break;
+    case "otherfolder": toast("Abre o seletor de pastas do sistema", "folder"); if (S.view === "welcome") { S.picks.add("notas"); render(); } break;
+    case "signin": setStep("code"); break;
+    case "addorg": S.view = "welcome"; setStep("org"); break;
+    case "cancelorg": go("tray", "working"); break;
+    case "leaveorg": { const o = d.org; dialog(`<h2>Sair da ${ORGS[o].name} neste ${osWord()}?</h2><p>Os agentes da ${ORGS[o].name} param de usar este ${osWord()} na hora. As pastas em <span class="path">${ORGS[o].dir}</span> ficam no disco. As outras organizações continuam.</p><div class="foot"><button class="btn ghost" data-close>Cancelar</button><button class="btn danger solid" data-leaveok="${o}">Sair da ${ORGS[o].name}</button></div>`); break; }
+    case "finish": go("tray", "idle"); toast("O agentes está na barra de menus"); break;
+    case "addfolder": if (!S.folders.some((f) => f.id === "notas")) { S.folders.push({ id: "notas", org: S.orgs.includes(S.prefOrg) ? S.prefOrg : S.orgs[0], name: "Notas", path: "~/Documents/Notas", agents: [], fresh: true }); S.dropFor = "notas"; render(); toast("Escolha quais agentes usam Notas", "folder"); } break;
+    case "disconnect": dialog(`<h2>Desconectar este ${osWord()}?</h2><p>Os agentes param de usá-lo na hora e o que estiver rodando é interrompido. Suas pastas e arquivos ficam. Para voltar, entre de novo.</p><div class="foot"><button class="btn ghost" data-close>Cancelar</button><button class="btn danger solid" data-close>Desconectar</button></div>`); break;
+    case "howcodex": toast("Abre o guia de instalação do Codex", "external"); break;
+    case "checknow": toast(S.state === "update" ? "Versão " + MACHINE.next + " pronta para instalar" : "Você já está na versão mais nova", S.state === "update" ? "download" : "check"); break;
+    case "diag": toast("Diagnóstico copiado, sem senhas nem arquivos"); break;
+    case "defaults": Object.assign(S, { maxTasks: 3, taskMax: "4h", brainMax: 3, brainIdle: "10" }); render(); toast("Padrão de volta"); break;
+    case "movefolder": toast("Abre o seletor de pastas do sistema", "folder"); break;
+  }
+});
+document.addEventListener("input", (e) => { if (e.target.id === "nameIn") S.name = e.target.value; });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if ($("#layer").innerHTML) closeDialog(); else if (S.dropFor) { S.dropFor = null; render(); } else if (S.pauseMenu) { S.pauseMenu = false; render(); } } });
+addEventListener("resize", () => { placePills(); placePop(); });
+addEventListener("hashchange", () => { const th = new URLSearchParams(location.hash.slice(1)).get("theme"); if (th) document.documentElement.dataset.theme = th; readHash(); resetFor(S.view); render(); });
+
+readHash(); resetFor(S.view);
+if (S.view === "ask" && S.state === "done") S.notif = false;
+render();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
