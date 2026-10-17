@@ -158,10 +158,10 @@ describe("the working line's sentence", () => {
     expect(activityText(t, entries("expired"))).toBe("Dev está escrevendo…");
     expect(activityText(t, entries("failed"))).toBe("Dev está escrevendo…");
     // Feminine names take "à".
-    const toIris = barEntries([], [], nameOf, () => undefined, [
-      { ...asking, consultedAgentId: "iris", status: "asking" as const },
+    const toNina = barEntries([], [], nameOf, () => undefined, [
+      { ...asking, consultedAgentId: "nina", status: "asking" as const },
     ]);
-    expect(activityText(t, toIris)).toBe("Dev está perguntando à Iris…");
+    expect(activityText(t, toNina)).toBe("Dev está perguntando à Nina…");
     // Its resumed run doesn't add a second "Dev está trabalhando"; others still group.
     expect(activityText(t, entries("answered", [run("dev", "r-dev"), run("theo"), run("nina")]))).toBe(
       "Bento respondeu. Dev está escrevendo · Theo e Nina estão trabalhando…",
