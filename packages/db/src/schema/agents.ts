@@ -84,6 +84,11 @@ export const agents = pgTable(
     appearance: jsonb().$type<{ color: string; eyes: string; accessory: string }>(),
     /** Its computer (ADR 0025): null = the cloud computer (Daytona); set = that connected machine. */
     machineId: uuid(),
+    /**
+     * The autonomy its new missions start with (`always | low_risk_auto |
+     * never`, validated in code; "Usar como padrão"). Null = `low_risk_auto`.
+     */
+    missionCommandApproval: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),

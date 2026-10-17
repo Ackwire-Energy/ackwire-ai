@@ -811,6 +811,7 @@ describe("missions (ADR 0029)", () => {
         executors: [],
         defaultExecutor: null,
         codexTooOld: false,
+        commandApproval: "low_risk_auto",
       },
     ]);
     // The server has cloud computers: missions there come later.
@@ -832,6 +833,7 @@ describe("missions (ADR 0029)", () => {
         executors: ["claude", "agent"],
         defaultExecutor: "claude",
         codexTooOld: false,
+        commandApproval: "low_risk_auto",
       },
     ]);
     // A second agent on the same computer: both eligible, by name ("Ada" before "Dev").

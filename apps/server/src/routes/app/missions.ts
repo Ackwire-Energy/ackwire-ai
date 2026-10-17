@@ -14,6 +14,7 @@ import {
   getMissionByThread,
   getMissionFiles,
   getMissionPlan,
+  getMissionSettings,
   getTaskOutput,
   listDecisions,
   listDeliveries,
@@ -28,15 +29,18 @@ import {
   missionSummary,
   opineDecision,
   pauseMission,
+  removeCommandRule,
   removeParticipant,
   requestDeliveryChanges,
   requestToJoin,
   resumeMission,
   retryBlockedCommand,
   sendMissionMessage,
+  setAgentMissionApproval,
   setCommandApproval,
   setMissionExecutor,
   setMissionMachine,
+  setMissionResumeTasks,
   setParticipant,
   startMission,
   stopMission,
@@ -271,6 +275,9 @@ const EligibleAgent = z
     executors: z.array(Executor).openapi({ description: 'Who can program on its computer ("Quem programa").' }),
     defaultExecutor: Executor.nullable(),
     codexTooOld: z.boolean().openapi({ description: "Codex is installed but too old for missions." }),
+    commandApproval: CommandApproval.openapi({
+      description: 'The autonomy its new missions start with ("Usar como padrão"; default low_risk_auto).',
+    }),
   })
   .openapi("MissionEligibleAgent");
 
@@ -937,6 +944,118 @@ export function missionRoutes(deps: AppDeps) {
         c.req.valid("json").commandApproval,
       );
       return c.json(after(out), 200);
+    },
+  );
+
+  // ── Configurações da missão ─────────────────────────────────────────────────
+
+  const Rule = z
+    .object({
+      id: z.uuid().openapi({ description: "The rule's id (remove it with DELETE …/command-rules/{ruleId})." }),
+      rule: z.string().openapi({ description: "`Bash(swift build *)`." }),
+      by: z.string().nullable().openapi({ description: "Who allowed it (user id)." }),
+      createdAt: z.string(),
+    })
+    .openapi("MissionCommandRule");
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/missions/{missionId}/settings",
+      tags,
+      security,
+      summary:
+        '"Configurações da missão": the rules allowed for the whole mission, what happened to its commands (allowed automatically, asked, blocked) and the agent\'s default autonomy for new missions',
+      request: { params: MissionParams },
+      responses: {
+        200: json(
+          z
+            .object({
+              missionId: z.uuid(),
+              rules: z.array(Rule),
+              stats: z.object({ auto: z.number(), asked: z.number(), blocked: z.number() }),
+              agentDefault: z.object({
+                commandApproval: CommandApproval,
+                canSet: z.boolean().openapi({ description: "You can change it (an admin or the agent's owner)." }),
+                ownerId: z.string().nullable(),
+              }),
+            })
+            .openapi("MissionSettings"),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      return c.json(await getMissionSettings(missions(), c.get("user").id, orgId, missionId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/missions/{missionId}/command-rules/{ruleId}",
+      tags,
+      security,
+      summary:
+        "Take back a command allowed for the whole mission (owner or deciders): it asks again; the computer gets the new list with its next task. Audited.",
+      request: { params: MissionParams.extend({ ruleId: z.uuid() }) },
+      responses: { 200: json(z.object({ rules: z.array(Rule) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId, ruleId } = c.req.valid("param");
+      return c.json(await removeCommandRule(missions(), c.get("user").id, orgId, missionId, ruleId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/missions/{missionId}",
+      tags,
+      security,
+      summary:
+        '"Se o computador desligar": resumeTasks (interrupted tasks start again by themselves when it comes back). Owner or deciders; audited.',
+      request: { params: MissionParams, body: body(z.object({ resumeTasks: z.boolean() })) },
+      responses: { 200: json(Mission), ...errors },
+    }),
+    async (c) => {
+      const { orgId, missionId } = c.req.valid("param");
+      const view = await setMissionResumeTasks(
+        missions(),
+        c.get("user").id,
+        orgId,
+        missionId,
+        c.req.valid("json").resumeTasks,
+      );
+      return c.json(view, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/agents/{agentId}/mission-command-approval",
+      tags,
+      security,
+      summary:
+        "\"Usar como padrão\": the autonomy the agent's next missions start with (current ones don't change). An admin or the agent's owner; audited.",
+      request: {
+        params: OrgParams.extend({ agentId: z.uuid() }),
+        body: body(z.object({ commandApproval: CommandApproval })),
+      },
+      responses: { 200: json(z.object({ commandApproval: CommandApproval })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      const out = await setAgentMissionApproval(
+        missions(),
+        c.get("user").id,
+        orgId,
+        agentId,
+        c.req.valid("json").commandApproval,
+      );
+      return c.json(out, 200);
     },
   );
 

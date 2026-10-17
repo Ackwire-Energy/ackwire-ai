@@ -70,6 +70,7 @@ export * from "./mission-delivery";
 export * from "./mission-mcp";
 export * from "./mission-rules";
 export * from "./mission-runs";
+export * from "./mission-settings";
 export * from "./mission-sync";
 export * from "./mission-tools";
 export * from "./missions";

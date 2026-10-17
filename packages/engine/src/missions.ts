@@ -110,6 +110,13 @@ export const COMMAND_APPROVALS: readonly CommandApproval[] = ["always", "low_ris
 export const isCommandApproval = (v: unknown): v is CommandApproval =>
   typeof v === "string" && (COMMAND_APPROVALS as readonly string[]).includes(v);
 export const commandApprovalOf = (v: unknown): CommandApproval => (isCommandApproval(v) ? v : "always");
+/** New missions of an agent without a default of its own ("Usar como padrão") start here. */
+export const DEFAULT_MISSION_COMMAND_APPROVAL: CommandApproval = "low_risk_auto";
+/** The autonomy an agent's new missions start with (`agents.mission_command_approval`). */
+export function agentMissionApproval(agent: { missionCommandApproval?: string | null } | null | undefined) {
+  const v = agent?.missionCommandApproval;
+  return isCommandApproval(v) ? v : DEFAULT_MISSION_COMMAND_APPROVAL;
+}
 
 /**
  * Codex needs `exec --json`, `exec … resume <id>` and no `--full-auto` (ADR
@@ -869,7 +876,7 @@ export interface ProposeInput {
   repoDir?: string | null;
   /** Who programs: default Claude Code when the computer has it, else our agent. */
   executor?: MissionExecutor | null;
-  /** Default `low_risk_auto`. */
+  /** Default: the agent's (`agents.mission_command_approval`), else `low_risk_auto`. */
   commandApproval?: CommandApproval | null;
   runId?: string | null;
 }
@@ -929,7 +936,8 @@ export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
         goal,
         mainSessionId: crypto.randomUUID(),
         repoDir,
-        ...(input.commandApproval ? { commandApproval: input.commandApproval } : {}),
+        // Asked for, else the agent's default for new missions.
+        commandApproval: input.commandApproval ?? agentMissionApproval(agent),
         createdBy: input.ownerId,
       })
       .onConflictDoNothing()
@@ -3154,6 +3162,8 @@ export interface EligibleAgent {
   defaultExecutor: MissionExecutor | null;
   /** Codex is there but too old (`CODEX_MIN_VERSION`). */
   codexTooOld: boolean;
+  /** The autonomy its new missions start with ("Usar como padrão"). */
+  commandApproval: CommandApproval;
 }
 
 /**
@@ -3176,6 +3186,7 @@ export async function eligibleMissionAgents(
     handle: string;
     name: string;
     owner_user_id: string | null;
+    mission_command_approval: string | null;
     can_talk: boolean;
     machine_id: string | null;
     machine_name: string | null;
@@ -3186,6 +3197,7 @@ export async function eligibleMissionAgents(
     executors: schema.MachineExecutors | string | null;
   }>(
     await deps.db.execute(sql`select agents.id, agents.handle, agents.name, agents.owner_user_id,
+        agents.mission_command_approval,
         ${audienceSql("agents", sql`${userId}::text`)} as can_talk,
         mc.id as machine_id, mc.name as machine_name, mc.online, mc.last_seen_at, mc.protocol,
         mc.exec_allowed, mc.executors
@@ -3219,7 +3231,14 @@ export async function eligibleMissionAgents(
           : protocol < TASKS_PROTOCOL
             ? "runner_outdated"
             : null;
-    const base = { agentId: r.id, handle: r.handle, name: r.name, canManage, machine };
+    const base = {
+      agentId: r.id,
+      handle: r.handle,
+      name: r.name,
+      canManage,
+      machine,
+      commandApproval: agentMissionApproval({ missionCommandApproval: r.mission_command_approval }),
+    };
     if (reason) {
       return {
         ...base,
