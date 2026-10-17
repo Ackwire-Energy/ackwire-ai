@@ -1,0 +1,1372 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pastas no computador</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&family=Doto:ROND,wght@100,600&family=Martian+Mono:wght@400&display=swap">
+<script>{const q=new URLSearchParams(location.hash.slice(1));document.documentElement.dataset.theme=q.get("theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");}</script>
+<style>
+/*
+  Prototype: which folders of a connected computer the agents may use, and which tools run there.
+  The rule (approved): permissions live ON THE MACHINE. The site only SHOWS what is allowed and REDUCES it
+  (remove a folder, turn a tool off). To GRANT more (a folder, Claude Code, Codex, commands) the site shows the
+  exact command to run on that computer, with a copy button. Only the person who connected the computer can
+  grant; the server can never widen access. Two layers, like connectors: (1) the computer: folders + tools;
+  (2) per agent: which of those folders it uses. Default = nothing extra: each agent only has its own folder
+  (~/agentes/<agent>-<id>). An agent that needs a folder posts a card in chat with the prefilled command; when
+  the computer reports the new access, the card turns into "Liberado" and the work continues by itself.
+
+  The CLI on the computer (commands and flags in English; the interactive picker speaks the person's language):
+    agentes-runner folders                                   interactive picker (arrows, space, enter)
+    agentes-runner folders list                              what is allowed and which agents use it
+    agentes-runner folders allow <path> [--agent <handle>]…  allow a folder (optionally for agents right away)
+    agentes-runner folders remove <path> [--agent <handle>]  remove it (for everyone, or for one agent)
+    agentes-runner tools                                     interactive on/off for the tools
+    agentes-runner tools list | enable <tool> | disable <tool>   tool = claude | codex | commands
+  `agentes-runner pair …` ends with the same folder picker (enter with nothing ticked = skip).
+
+  Views (prototype bar on top; every state is a deep link):
+    #view=computer   Configurações → Computadores → MacBook do Walter
+                     &role=owner|admin (admin = Marina, not the one who connected: read-only)
+                     &dialog=change|remove   &codex=on   &removed=1
+    #view=pair       after "Conectar um computador": the folder question mirrored live from the Terminal
+                     &state=waiting|picking|done
+    #view=agent      agent page (Bento) → Ferramentas e acesso → "Pastas no computador"
+                     &role=admin|member   &state=saved|dirty|pending   &dialog=other
+    #view=chat       #conteudo: Bento needs viajolo-v5
+                     &state=ask|waiting|done|inapp   &role=owner|other   &scope=project|folder
+    #view=terminal   the interactive `agentes-runner folders` (keyboard works: ↑ ↓ space enter esc)
+                     &state=folders|agents|done
+    Everywhere: &theme=light|dark
+  Agents come only from packages/ui/src/agent/engine.js (serve the repo root over http).
+  Base: AgentePerfil.html / RepositoriosAgente.html (tokens and components), TarefaLonga.html (chat), Carregando.html
+  (pixel orbit). Mono only for commands and paths.
+*/
+:root{
+  --bg:#f4f4f1;--raised:#fff;--sunken:#ebebe7;--glass:rgba(255,255,255,.72);--line:rgba(23,23,22,.08);--line2:rgba(23,23,22,.14);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#76766f;--plate:rgba(127,127,127,.1);
+  --ok:#1f7a45;--ok-soft:#e3f2e8;--warn:#9a5b00;--warn-soft:#fbeed5;--danger:#b4352b;--danger-soft:#fbe6e3;
+  --agent:#0063d1;--agent-soft:#e3eefd;
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 8px 20px -6px rgba(23,23,22,.12),0 0 0 1px var(--line);
+  --e3:0 2px 4px rgba(23,23,22,.04),0 24px 56px -16px rgba(23,23,22,.30),0 0 0 1px var(--line2);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  --sky-ink:#04203f;--sky-ink2:rgba(4,32,63,.74);--sky-glass:rgba(241,248,255,.76);--sky-line:rgba(4,32,63,.12);
+  --term:#141413;--term-ink:#d6d6d2;--term-dim:#8b8b85;--term-ok:#5fc48a;--term-sel:rgba(255,255,255,.08);
+  --sans:"Onest",system-ui,sans-serif;--display:"Funnel Display",var(--sans);--dot:"Doto",monospace;--mono:"Martian Mono",ui-monospace,monospace;color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0f0f0e;--raised:#191918;--sunken:#0a0a09;--glass:rgba(30,30,28,.72);--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8b8b85;--plate:rgba(127,127,127,.14);
+  --ok:#5fc48a;--ok-soft:#14281c;--warn:#e0a84a;--warn-soft:#33260e;--danger:#ef7c70;--danger-soft:#3a1714;
+  --agent:#5aa8ff;--agent-soft:#11253f;
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);--e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --e3:0 28px 64px -16px rgba(0,0,0,.8),0 0 0 1px var(--line2);--top:inset 0 1px 0 rgba(255,255,255,.06);
+  --term:#080807;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{margin:0;color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum";overflow-x:hidden}
+h1,h2,h3,p{margin:0}
+button,input,textarea{font:inherit;color:inherit}
+a{color:inherit}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+svg.i.sm{width:14px;height:14px}
+canvas.av{display:block;flex:none}
+canvas.orbit{display:inline-block;flex:none;image-rendering:pixelated;vertical-align:middle}
+:focus-visible{outline:2px solid #3d8bff;outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@keyframes popin{from{opacity:0;transform:translateY(-4px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}}
+@keyframes blinkc{50%{opacity:0}}
+@keyframes shim{to{background-position:-200% 0}}
+
+/* ---------- Prototype bar (not product) ---------- */
+.pbar{position:sticky;top:0;z-index:30;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.pbar .lbl{font-size:11.5px;font-weight:600;color:var(--faint);letter-spacing:.04em;text-transform:uppercase}
+.pbar .grow{flex:1}
+.views{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;min-width:0;max-width:100%}
+.views::-webkit-scrollbar{display:none}
+.stp{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 6px;border-radius:999px;color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;flex:none;transition:background .15s,color .15s}
+.stp .n{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;background:var(--sunken);color:var(--faint)}
+.stp:hover{background:var(--plate);color:var(--ink)}
+.stp[aria-current="step"]{background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--ink)}
+.stp[aria-current="step"] .n{background:var(--ink);color:var(--bg)}
+.pbar .ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ---------- Shell: sidebar | page ---------- */
+.app{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:calc(100vh - 45px)}
+.app.bare{grid-template-columns:minmax(0,1fr)}
+.app.bare .side{display:none}
+.side{position:sticky;top:45px;height:calc(100vh - 45px);overflow:hidden;padding:18px 12px;display:flex;flex-direction:column;gap:14px;background:var(--sunken);border-right:1px solid var(--line);isolation:isolate}
+.side canvas.sky{position:absolute;inset:auto 0 0 0;width:100%;height:22%;image-rendering:pixelated;pointer-events:none;z-index:-1}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:300;font-size:20px;letter-spacing:-.02em;padding:0 6px}
+.brand i{font-style:normal;font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:.62em;color:var(--muted)}
+.find{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border-radius:11px;background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--faint);font-size:13px}
+.find .kbd{margin-left:auto}
+.nav{display:flex;flex-direction:column;gap:1px}
+.nav .cap{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:10px 8px 4px}
+.nav a{display:flex;align-items:center;gap:9px;height:32px;padding:0 8px;border-radius:10px;color:var(--muted);text-decoration:none;font-weight:500;font-size:13.5px}
+.nav a:hover{background:var(--plate);color:var(--ink)}
+.nav a[aria-current="page"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1),var(--top);font-weight:600}
+.nav a .n{margin-left:auto;font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:12px;color:var(--muted)}
+.nav .agent-slot{width:18px;height:18px;display:grid;place-items:center;flex:none}
+.page{min-width:0;display:flex;flex-direction:column;align-items:center;padding:0 clamp(16px,3vw,36px) 120px}
+.wrap{width:100%;max-width:1080px}
+.topbar{display:flex;align-items:center;gap:10px;height:58px}
+.crumbs{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13.5px;min-width:0;flex-wrap:nowrap;overflow:hidden}
+.crumbs a{text-decoration:none;white-space:nowrap}
+.crumbs a:hover{color:var(--ink)}
+.crumbs b{color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{all:unset;box-sizing:border-box;cursor:pointer;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;color:var(--muted);transition:background .15s,color .15s,transform .18s var(--spring)}
+.iconbtn:hover{background:var(--plate);color:var(--ink)}
+.iconbtn:active{transform:scale(.94)}
+
+/* ---------- Controls (design system v2, from AgentePerfil) ---------- */
+.btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:12px;font-weight:600;font-size:14px;letter-spacing:-.005em;background:var(--raised);box-shadow:var(--e1),var(--top);white-space:nowrap;transition:transform .18s var(--spring),box-shadow .18s var(--out),filter .15s,background .15s,color .15s,opacity .15s}
+.btn:hover{box-shadow:var(--e2),var(--top)}
+.btn:active{transform:scale(.97) translateY(.5px)}
+.btn.primary{color:var(--bg);background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 82%,var(--bg)),var(--ink));box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn[aria-disabled="true"]{opacity:.45;cursor:default;transform:none;filter:none}
+.btn.ghost{background:transparent;box-shadow:none;color:var(--muted)}
+.btn.ghost:hover{background:var(--plate);color:var(--ink)}
+.btn.danger{color:var(--danger)}
+.btn.danger.solid{color:#fff;background:linear-gradient(180deg,#c9473c,#a8322a);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 6px 14px -6px rgba(168,50,42,.6)}
+.btn.sm{height:30px;padding:0 10px;font-size:12.5px;border-radius:9px;gap:6px}
+.btn.icon{width:40px;padding:0}
+.kbd{font-family:var(--sans);font-size:11px;font-weight:600;min-width:18px;height:18px;padding:0 5px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:rgba(127,127,127,.22);opacity:.8;box-shadow:inset 0 -1px 0 rgba(0,0,0,.14)}
+.card{background:var(--raised);border-radius:20px;box-shadow:var(--e1),var(--top);padding:18px;min-width:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.label{font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px}
+.help{color:var(--muted);font-size:12.5px}
+.faint{color:var(--faint)}
+.input{display:flex;align-items:center;gap:6px;height:42px;padding:0 12px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line);transition:box-shadow .15s}
+.input:focus-within{box-shadow:inset 0 0 0 1px var(--line2),0 0 0 3px color-mix(in srgb,var(--ink) 10%,transparent)}
+.input input{all:unset;flex:1;min-width:0;height:100%}
+.input.mono input{font-family:var(--mono);font-size:12px}
+.chip{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--sunken);color:var(--muted);white-space:nowrap;max-width:100%}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.busy{background:var(--agent-soft);color:var(--agent)}
+.chip.line{background:transparent;box-shadow:inset 0 0 0 1px var(--line2)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tog{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px 0 10px;border-radius:999px;font-weight:600;font-size:13px;background:var(--raised);color:var(--muted);box-shadow:var(--e1),var(--top);transition:transform .18s var(--spring),background .15s,color .15s,box-shadow .15s;flex:none}
+.tog:hover{color:var(--ink)}
+.tog:active{transform:scale(.96)}
+.tog .box{width:16px;height:16px;border-radius:5px;display:grid;place-items:center;box-shadow:inset 0 0 0 1.5px var(--line2);transition:background .15s}
+.tog .box svg{width:11px;height:11px;stroke-width:2.6;opacity:0}
+.tog[aria-pressed="true"]{color:var(--ink);box-shadow:0 0 0 1.5px var(--ink),var(--top)}
+.tog[aria-pressed="true"] .box{background:var(--ink);color:var(--bg);box-shadow:none}
+.tog[aria-pressed="true"] .box svg{opacity:1}
+.tog.sm{height:30px;font-size:12.5px;padding:0 11px 0 8px}
+.seg{display:inline-flex;padding:3px;border-radius:12px;background:var(--sunken);box-shadow:inset 0 1px 2px rgba(0,0,0,.06);position:relative;flex:none;max-width:100%}
+.seg button{all:unset;position:relative;z-index:1;cursor:pointer;height:30px;padding:0 12px;border-radius:9px;font-size:13px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;transition:color .2s}
+.seg button[aria-pressed="true"]{color:var(--ink)}
+.seg button:hover{color:var(--ink)}
+.seg .pill{position:absolute;top:0;left:0;height:30px;border-radius:9px;background:var(--raised);box-shadow:var(--e1),var(--top);transition:transform .32s var(--spring),width .32s var(--spring)}
+.seg.sm button{height:26px;padding:0 10px;font-size:12.5px}
+.seg.sm .pill{height:26px}
+.seg.xs button{height:24px;padding:0 9px;font-size:12px}
+.seg.xs .pill{height:24px}
+.menu{position:fixed;z-index:60;min-width:220px;border-radius:16px;padding:6px;background:color-mix(in srgb,var(--raised) 92%,transparent);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);box-shadow:var(--e3);animation:popin .22s var(--spring) both}
+.mi{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;min-height:38px;padding:6px 10px;border-radius:10px}
+.mi:hover{background:rgba(127,127,127,.13)}
+.mi.danger{color:var(--danger)}
+.msep{height:1px;margin:6px 8px;background:var(--line)}
+.pa{width:30px;height:30px;border-radius:50%;flex:none;display:inline-grid;place-items:center;font-weight:650;font-size:12px;background:linear-gradient(160deg,#e9e9e5,#d9d9d4);color:#2a2a28}
+:root[data-theme="dark"] .pa{background:linear-gradient(160deg,#3a3a37,#2a2a28);color:#efefec}
+.pa.sm{width:22px;height:22px;font-size:10px}
+.ib{width:30px;height:30px;border-radius:10px 10px 10px 4px;display:grid;place-items:center;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line);color:var(--ink2);flex:none}
+.note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--plate);color:var(--muted);font-size:13px}
+.note b{color:var(--ink);font-weight:600}
+.note svg{margin-top:2px}
+.logo{width:36px;height:36px;border-radius:11px 11px 11px 4px;display:grid;place-items:center;flex:none;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line2);color:var(--ink2)}
+.logo.soft{background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line)}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.ch{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.ch h2{font-size:15px;font-weight:650;letter-spacing:-.01em;display:flex;gap:8px;align-items:center;min-width:0}
+.ch .act{margin-left:auto;display:flex;gap:6px;align-items:center}
+.ch .help{margin-left:auto}
+.eyebrow{font-family:var(--dot);font-variation-settings:"ROND" 100;font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lead{color:var(--muted);max-width:62ch}
+.lock{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--faint);white-space:nowrap}
+.readonly{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--line);color:var(--muted);font-size:13px;margin-bottom:14px}
+.readonly svg{margin-top:2px}
+.readonly b{color:var(--ink);font-weight:600}
+.crow{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line);flex-wrap:wrap;min-width:0}
+.crow:first-child{border-top:0;padding-top:2px}
+.crow:last-child{padding-bottom:2px}
+.crow .t{flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.crow .n{font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.crow .d{color:var(--muted);font-size:12.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.crow .end{display:flex;gap:6px;align-items:center;margin-left:auto}
+.crow.nw{flex-wrap:nowrap}
+.crow.nw .t{flex:1 1 auto}
+.crow .under{flex-basis:100%;padding-left:48px;display:flex;flex-direction:column;gap:8px}
+.crow.changed{margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:12px;background:var(--plate);border-top-color:transparent}
+.crow.changed + .crow{border-top-color:transparent}
+.crow.gone{opacity:.55}
+.more{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:var(--muted);margin-top:12px}
+.more:hover{color:var(--ink)}
+.kv{display:flex;flex-direction:column;gap:12px}
+.kv > div{display:flex;flex-direction:column;gap:3px}
+.kv .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.kv .v{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kv .v span{font-weight:500;color:var(--muted)}
+.tag{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:650;background:var(--ink);color:var(--bg);white-space:nowrap}
+.tag svg{width:11px;height:11px;stroke-width:2.2}
+.undo{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--muted);padding:2px 6px;border-radius:7px}
+.undo:hover{background:var(--plate);color:var(--ink)}
+.who{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.who .avs{display:inline-flex;align-items:center}
+.who .avs{gap:3px}
+
+/* ---------- Paths and commands (the only mono on the page) ---------- */
+.path{all:unset;cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--ink2);overflow-wrap:anywhere;border-radius:6px;padding:1px 4px;margin:0 -4px;transition:background .15s}
+.path:hover{background:var(--plate)}
+code{font-family:var(--mono);font-size:11px;padding:1px 5px;border-radius:6px;background:var(--sunken);color:var(--ink2);white-space:nowrap}
+code.wrap{white-space:normal;overflow-wrap:anywhere}
+.cmd{display:flex;align-items:flex-start;gap:10px;padding:10px 10px 10px 14px;border-radius:14px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line);min-width:0}
+.cmd .tx{flex:1;min-width:0;font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere;padding-top:3px}
+.cmd .tx .pr{color:var(--faint);user-select:none}
+.cmd .tx .arg{color:var(--muted);white-space:nowrap}
+.cmd .btn{flex:none}
+.cmd.copied .btn{color:var(--ok)}
+.cmdlbl{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.cmdlbl svg{color:var(--faint)}
+
+/* ---------- Computer page ---------- */
+.cfg{display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;align-items:start}
+.subnav{position:sticky;top:110px;display:flex;flex-direction:column;gap:2px}
+.subnav a{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;color:var(--muted);text-decoration:none;font-weight:500;font-size:13.5px}
+.subnav a:hover{background:var(--plate);color:var(--ink)}
+.subnav a[aria-current="true"]{background:var(--raised);color:var(--ink);box-shadow:var(--e1),var(--top);font-weight:600}
+.mhead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.mhead .big{width:56px;height:56px;border-radius:17px 17px 17px 6px;display:grid;place-items:center;background:var(--raised);box-shadow:var(--e2),var(--top);color:var(--ink2);flex:none}
+.mhead .big svg{width:26px;height:26px;stroke-width:1.5}
+.mhead .t{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.mhead h1{font-family:var(--display);font-weight:300;font-size:40px;letter-spacing:-.03em;line-height:1}
+.mhead .acts{display:flex;gap:8px;align-items:center}
+.tools .crow .logo svg{width:18px;height:18px}
+.honest{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--ink2)}
+.honest svg{color:var(--warn);margin-top:2px}
+
+/* ---------- Agent page (from AgentePerfil, trimmed) ---------- */
+.cover{position:relative;height:190px;border-radius:24px;overflow:hidden;isolation:isolate;box-shadow:var(--e1)}
+.cover canvas.sky{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;z-index:-1}
+.state{position:absolute;top:14px;left:14px;display:inline-flex;align-items:center;gap:7px;min-height:28px;padding:4px 11px 4px 9px;border-radius:999px;font-size:12.5px;font-weight:650;color:var(--sky-ink);background:var(--sky-glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 0 0 1px var(--sky-line);max-width:calc(100% - 28px)}
+.state .sub{font-weight:500;color:var(--sky-ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ident{display:flex;align-items:flex-end;gap:16px;padding:16px 4px 4px;flex-wrap:wrap}
+.ident .whoami{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:6px}
+.ident h1{font-family:var(--display);font-weight:300;font-size:44px;letter-spacing:-.03em;line-height:1;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.ident h1 .handle{font-family:var(--sans);font-size:15px;font-weight:500;letter-spacing:0;color:var(--muted)}
+.ident .acts{display:flex;gap:8px;align-items:center}
+.tabsbar{position:sticky;top:45px;z-index:20;margin:14px -8px 0;padding:0 8px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
+.tabs::-webkit-scrollbar{display:none}
+.tab{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:7px;height:48px;padding:0 12px;font-weight:600;font-size:14px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .15s}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.view{padding-top:22px;animation:fi .3s var(--out) both}
+.pend{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:var(--sunken);margin-top:4px}
+.waitline{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.shimmer{background:linear-gradient(90deg,var(--faint) 0%,var(--ink2) 50%,var(--faint) 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shim 1.6s linear infinite}
+
+/* ---------- Pairing step ---------- */
+.pair{max-width:980px;margin:0 auto;padding-top:8px}
+.prog{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:22px}
+.prog .ps{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px 0 7px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--faint)}
+.prog .ps .n{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;background:var(--sunken);color:var(--faint)}
+.prog .ps.done{color:var(--muted)}
+.prog .ps.done .n{background:var(--ok-soft);color:var(--ok)}
+.prog .ps.on{background:var(--raised);box-shadow:var(--e1),var(--top);color:var(--ink)}
+.prog .ps.on .n{background:var(--ink);color:var(--bg)}
+.prog .sep{width:14px;height:1px;background:var(--line2)}
+.pair h1{font-family:var(--display);font-weight:300;font-size:46px;letter-spacing:-.03em;line-height:1.05;max-width:22ch}
+.pair .lead{margin-top:10px;font-size:15px}
+.pgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px;margin-top:24px;align-items:start}
+.mirror .crow .logo{width:32px;height:32px}
+.mempty{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:26px 12px 22px;color:var(--muted);font-size:13.5px}
+.mempty b{color:var(--ink);font-weight:600}
+.pfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
+.pfoot .help{margin-right:auto}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--faint)}
+
+/* ---------- Terminal (real CLI: mono is right here) ---------- */
+.term{border-radius:16px;background:var(--term);box-shadow:0 0 0 1px rgba(255,255,255,.06),0 24px 56px -18px rgba(0,0,0,.55);overflow:hidden;color:var(--term-ink);min-width:0}
+.term .bar{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-bottom:1px solid rgba(255,255,255,.06);font-family:var(--sans);font-size:12px;font-weight:600;color:var(--term-dim)}
+.term .bar .lights{display:inline-flex;gap:6px}
+.term .bar .lights i{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.14)}
+.term .bar .ttl{flex:1;text-align:center;margin-right:42px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.term .scr{font-family:var(--mono);font-size:12px;line-height:1.85;padding:14px 16px 16px;white-space:pre-wrap;overflow-wrap:anywhere;outline:none;min-height:340px}
+.term .scr:focus-visible{box-shadow:inset 0 0 0 2px rgba(61,139,255,.6)}
+.term .ln{display:block;min-height:1.85em}
+.term .dim{color:var(--term-dim)}
+.term .b{color:#fff}
+.term .ok{color:var(--term-ok)}
+.term .q{color:#fff}
+.term .it{display:flex;gap:10px;margin:0 -8px;padding:0 8px;border-radius:6px}
+.term .it.here{background:var(--term-sel)}
+.term .it .ptr{width:1ch;flex:none;color:#fff}
+.term .it .bx{flex:none}
+.term .it .bx.on{color:var(--term-ok)}
+.term .it .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.term .it.here .nm{color:#fff}
+.term .it .mt{color:var(--term-dim);flex:none}
+.term .grp{color:var(--term-dim);margin-top:4px}
+.term .caret{display:inline-block;width:.6em;height:1.1em;background:var(--term-ink);vertical-align:-.2em;animation:blinkc 1s steps(1) infinite}
+.term.compact .scr{font-size:11.5px;min-height:300px;padding:12px 14px}
+.tpage{max-width:1080px;margin:0 auto;padding:28px 0 0}
+.tpage .tgrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start;margin-top:22px}
+.tpage h1{font-family:var(--display);font-weight:300;font-size:40px;letter-spacing:-.03em;line-height:1.05}
+.cli{display:flex;flex-direction:column}
+.cli .c{display:flex;flex-direction:column;gap:3px;padding:11px 0;border-top:1px solid var(--line)}
+.cli .c:first-child{border-top:0;padding-top:0}
+.cli .c:last-child{padding-bottom:0}
+.cli .c code{align-self:flex-start;background:transparent;padding:0;font-size:11px;color:var(--ink);white-space:normal;overflow-wrap:anywhere}
+.cli .c span{font-size:12.5px;color:var(--muted)}
+
+/* ---------- Chat (from TarefaLonga / Componentes) ---------- */
+.thread{min-width:0;display:flex;flex-direction:column;min-height:calc(100vh - 45px)}
+.th{position:sticky;top:45px;z-index:10;padding:14px 24px 12px;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(16px) saturate(1.5);-webkit-backdrop-filter:blur(16px) saturate(1.5);border-bottom:1px solid var(--line)}
+.th-in{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:10px}
+.th h1{font-family:var(--display);font-weight:300;font-size:26px;letter-spacing:-.03em;line-height:1.1;display:flex;align-items:center;gap:6px}
+.th h1 .hs{color:var(--faint)}
+.th .help{margin-left:auto}
+.feed{flex:1;width:100%;max-width:860px;margin:0 auto;padding:16px 24px 24px;display:flex;flex-direction:column;gap:2px}
+.msg{display:flex;gap:14px;padding:10px 12px;border-radius:14px;transition:background .15s;animation:fi .3s var(--out) both;min-width:0}
+.msg:hover{background:rgba(127,127,127,.05)}
+.msg .mav{width:34px;flex:none;display:flex;justify-content:center;padding-top:2px}
+.msg .pa{width:34px;height:34px;font-size:13px}
+.mb{flex:1;min-width:0}
+.mh{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.mn{font-weight:650;font-size:14.5px;letter-spacing:-.01em}
+.mr{font-size:12px;color:var(--faint)}
+.mx{font-size:15px;line-height:1.62;margin-top:2px;color:var(--ink2);overflow-wrap:anywhere}
+.mx b{color:var(--ink);font-weight:650}
+.mx .at{font-weight:600;color:var(--ink)}
+.gap{display:flex;align-items:center;gap:10px;margin:12px 12px;font-size:12px;color:var(--faint);font-weight:600}
+.gap::before,.gap::after{content:"";flex:1;height:1px;background:var(--line)}
+.ask{margin-top:10px;border-radius:20px;background:var(--raised);box-shadow:var(--e1),var(--top);max-width:620px;overflow:hidden;animation:popin .3s var(--spring) both}
+.ask-h{display:flex;align-items:center;gap:12px;padding:14px 14px 0 14px}
+.ask-h .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.ask-h b{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.ask-h small{color:var(--muted);font-size:12.5px;display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.ask-b{display:flex;flex-direction:column;gap:10px;padding:12px 14px 0}
+.ask-f{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 14px 14px;margin-top:12px;border-top:1px solid var(--line)}
+.ask-f .hint{font-size:12.5px;color:var(--muted);display:inline-flex;align-items:center;gap:8px;margin-right:auto;min-width:0}
+.ask.done .ask-b{display:none}
+.ask.done .ask-f{margin-top:12px}
+.wk-last{display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--sunken);min-width:0;max-width:620px}
+.wk-last .tx{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2);min-width:0}
+.cur{display:inline-block;width:7px;height:13px;background:var(--agent);vertical-align:-2px;animation:blinkc 1s steps(1) infinite;flex:none}
+.composer{max-width:812px;width:calc(100% - 48px);margin:0 auto 18px;border-radius:18px;background:var(--raised);box-shadow:var(--e2),var(--top);display:flex;align-items:center;gap:8px;padding:8px 8px 8px 18px;color:var(--faint);position:sticky;bottom:14px}
+.composer span{flex:1}
+
+/* ---------- Dialog, toast, savebar ---------- */
+.scrim{position:fixed;inset:0;z-index:70;background:rgba(10,10,9,.45);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:grid;place-items:center;padding:16px;animation:fade .2s both;overflow-y:auto}
+.dialog{width:min(520px,100%);border-radius:22px;background:var(--raised);box-shadow:var(--e3),var(--top);padding:20px;display:flex;flex-direction:column;gap:14px;animation:popin .25s var(--spring) both;max-height:calc(100vh - 32px);overflow-y:auto}
+.dialog.sm{width:min(440px,100%)}
+.dialog h2{font-family:var(--display);font-weight:300;font-size:26px;letter-spacing:-.02em;line-height:1.15}
+.dialog p{color:var(--muted)}
+.dialog .foot{display:flex;align-items:center;gap:8px;padding-top:14px;border-top:1px solid var(--line);flex-wrap:wrap;justify-content:flex-end}
+.dialog .foot .help{margin-right:auto;display:inline-flex;gap:8px;align-items:center}
+.dialog .dh{display:flex;align-items:flex-start;gap:12px}
+.dialog .dh .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.toast{position:fixed;left:50%;top:58px;transform:translate(-50%,-20px);opacity:0;z-index:80;display:flex;gap:8px;align-items:center;padding:10px 14px;border-radius:14px;background:var(--ink);color:var(--bg);font-weight:600;font-size:13.5px;box-shadow:var(--e3);transition:transform .35s var(--spring),opacity .2s;pointer-events:none;max-width:calc(100vw - 24px)}
+.toast.on{transform:translate(-50%,0);opacity:1}
+.savebar{position:fixed;left:calc(236px + (100vw - 236px) / 2);bottom:18px;transform:translate(-50%,24px);opacity:0;pointer-events:none;z-index:40;width:min(640px,calc(100vw - 236px - 40px));display:flex;gap:8px;align-items:center;padding:10px 10px 10px 16px;border-radius:18px;background:var(--glass);backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5);box-shadow:var(--e3),var(--top);transition:transform .35s var(--spring),opacity .2s}
+.savebar.on{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+.savebar .hint{margin-right:auto;display:flex;align-items:center;gap:8px;min-width:0;font-size:13.5px}
+.savebar .hint b{font-weight:600;white-space:nowrap}
+.savebar .hint span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.opt3{display:flex;flex-direction:column;gap:10px}
+.agpick{display:flex;gap:6px;flex-wrap:wrap}
+
+/* ---------- Responsive ---------- */
+@media (max-width:1100px){
+  .app{grid-template-columns:1fr}
+  .side{display:none}
+  .savebar{left:50%;width:min(640px,calc(100vw - 32px))}
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .tpage .tgrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:900px){
+  .cfg{grid-template-columns:1fr;gap:14px}
+  .subnav{position:static;flex-direction:row;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px 4px}
+  .subnav::-webkit-scrollbar{display:none}
+  .subnav a{flex:none;white-space:nowrap}
+  .pgrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  .pbar{padding:8px 12px;gap:6px 8px}
+  .pbar .lbl{display:none}
+  .page{padding:0 16px 120px}
+  .topbar{height:52px}
+  .crumbs .full{display:none}
+  .card{padding:16px;border-radius:18px}
+  .mhead h1{font-size:32px}
+  .mhead .big{width:48px;height:48px}
+  .mhead .acts{width:100%}
+  .mhead .acts .btn.primary{flex:1}
+  .crow .under{padding-left:0}
+  .crow .t{flex-basis:160px}
+  .cover{height:140px;border-radius:20px}
+  .state .sub{display:none}
+  .ident{padding-top:12px;gap:12px}
+  .ident h1{font-size:34px;gap:8px}
+  .ident .acts{width:100%}
+  .ident .acts .btn.primary{flex:1}
+  .tabsbar{margin:12px -16px 0;padding:0 8px}
+  .tab{height:44px;padding:0 10px;font-size:13.5px}
+  .pair h1{font-size:34px}
+  .pfoot .help{flex-basis:100%}
+  .pfoot .btn{flex:1}
+  .term .scr{font-size:11px;padding:12px;min-height:0}
+  .term .it .mt{display:none}
+  .tpage{padding-top:18px}
+  .tpage h1{font-size:30px}
+  .th{padding:12px 16px 10px}
+  .th .help{display:none}
+  .feed{padding:12px 4px 20px}
+  .msg{gap:10px;padding:10px 8px}
+  .msg .mav{width:30px}
+  .msg .pa{width:30px;height:30px}
+  .composer{width:calc(100% - 32px)}
+  .ask-f .hint{flex-basis:100%;margin-right:0}
+  .ask-h small svg{display:none}
+  .savebar{bottom:10px;width:calc(100vw - 20px);padding:8px 8px 8px 12px}
+  .savebar .hint span{display:none}
+  .savebar .btn.primary{flex:1}
+  .dialog{padding:18px 16px}
+  .dialog .foot .help{flex-basis:100%}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+</head>
+<body>
+<div class="pbar" id="pbar" aria-label="Controles do protótipo"></div>
+<div class="app" id="app">
+  <aside class="side" aria-label="Navegação">
+    <div class="brand"><canvas class="av" id="brandMark" width="52" height="52" style="width:26px;height:26px"></canvas><span>agentes<i>.chat</i></span></div>
+    <div class="find" aria-hidden="true"><span id="findIcon"></span>Buscar<span class="kbd">⌘K</span></div>
+    <nav class="nav" id="sideNav"></nav>
+    <canvas class="sky" id="sideSky" aria-hidden="true"></canvas>
+  </aside>
+  <main id="main" style="min-width:0"></main>
+</div>
+<div class="savebar" id="savebar" role="region" aria-label="Alterações não salvas"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="layer"></div>
+
+<script type="module">
+import { drawAgent, idlePose, drawAccessory, spriteGrid, spriteBody, bodyTones, ACCESSORY_REACH, AGENT_GRADIENTS, mixHex } from "../../../packages/ui/src/agent/engine.js";
+
+/* ================= Data ================= */
+const HOME = "/Users/walter";
+const MACHINE = { name: "MacBook do Walter", os: "macOS 15 · Apple M2", by: "Walter", since: "12 out", version: "0.9.3" };
+const AGENTS = {
+  bento: { name: "Bento", handle: "bento", role: "Conteúdo", dir: "~/agentes/bento-7f3a", look: { color: "amber", eyes: "round", accessory: "cap" } },
+  dev: { name: "Dev", handle: "dev", role: "Engenharia", dir: "~/agentes/dev-21c9", look: { color: "indigo", eyes: "wide", accessory: "headphones" } },
+  ada: { name: "Ada", handle: "ada", role: "Revisão", dir: "~/agentes/ada-90d4", look: { color: "green", eyes: "happy", accessory: "none" } },
+};
+/* Folders the computer allows (layer 1) and which agents use each (layer 2). */
+const FOLDERS0 = [
+  { id: "viajolo", path: `${HOME}/Projects/Personal/viajolo-v5`, agents: ["bento", "dev"], kind: "Projeto" },
+  { id: "site", path: `${HOME}/Projects/Himetrica/site`, agents: ["dev"], kind: "Projeto" },
+  { id: "roteiros", path: `${HOME}/Documents/Roteiros`, agents: [], kind: "Pasta" },
+];
+const TOOLS = [
+  { id: "claude", name: "Claude Code", icon: "asterisk", d: "Escreve e muda arquivos, só nas pastas liberadas. Usa a conta do Claude do Walter." },
+  { id: "codex", name: "Codex", icon: "hex", d: "Como o Claude Code, com a conta da OpenAI do Walter. Também só nas pastas liberadas." },
+  { id: "commands", name: "Comandos", icon: "terminal", d: "Roda comandos do Terminal, como testes e builds.", honest: "Comandos podem chegar a outras partes do computador, não só às pastas liberadas." },
+];
+/* What the picker finds on the Mac: git folders in ~/Projects and folders in ~/Documents. */
+const DETECTED = [
+  { group: "~/Projects/Personal" },
+  { name: "viajolo-v5", path: "~/Projects/Personal/viajolo-v5", meta: "git · mudou hoje" },
+  { name: "colmeia", path: "~/Projects/Personal/colmeia", meta: "git · mudou ontem" },
+  { name: "dotfiles", path: "~/Projects/Personal/dotfiles", meta: "git · agosto" },
+  { group: "~/Projects/Himetrica" },
+  { name: "site", path: "~/Projects/Himetrica/site", meta: "git · há 3 dias" },
+  { name: "dashboard", path: "~/Projects/Himetrica/dashboard", meta: "git · setembro" },
+  { group: "~/Documents" },
+  { name: "Roteiros", path: "~/Documents/Roteiros", meta: "48 arquivos" },
+  { name: "Notas", path: "~/Documents/Notas", meta: "210 arquivos" },
+  { other: true, name: "Outra pasta…", meta: "digite o caminho" },
+];
+const PICKABLE = DETECTED.filter((x) => !x.group);
+const TASK_DIR = `${HOME}/Projects/Personal/viajolo-v5/design/tiktok-roteiro-dias-curitiba`;
+
+/* ================= State ================= */
+const VIEWS = [["computer", "Computador"], ["pair", "Conectar"], ["agent", "Agente"], ["chat", "Chat"], ["terminal", "Terminal"]];
+const S = {
+  view: "computer", role: "owner", state: "", dialog: null, scope: "project",
+  folders: [], tools: {}, removing: null,
+  agentUses: [], agentSaved: [], pending: false, otherPath: "~/Documents/Notas",
+  change: "pick", allowPath: "~/Projects/Personal/viajolo-v5", allowAgents: ["bento"],
+  chat: "ask", full: new Set(), copied: null,
+  term: null,
+};
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const listNames = (arr) => (arr.length <= 1 ? arr.join("") : arr.slice(0, -1).join(", ") + " e " + arr.at(-1));
+const tilde = (p) => (p.startsWith(HOME) ? "~" + p.slice(HOME.length) : p);
+/* Short form for the UI: ~/Projects/…/viajolo-v5. The full path is one click away (and in the tooltip). */
+const short = (p) => { const t = tilde(p).split("/"); return t.length > 3 ? `${t[0]}/${t[1]}/…/${t.at(-1)}` : t.join("/"); };
+const base = (p) => p.split("/").filter(Boolean).at(-1);
+const isOwner = () => S.role === "owner";
+
+/* ================= Icons ================= */
+const P = {
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>', down: '<path d="m6 9 6 6 6-6"/>', right: '<path d="M9 6l6 6-6 6"/>', left: '<path d="M15 6l-6 6 6 6"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  hash: '<path d="M9 4 7 20M17 4l-2 16M4 9h16M3.5 15h16"/>',
+  user: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  users: '<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.7-3 2.8-4.6 5.5-4.6s4.8 1.6 5.5 4.6"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.6c1.6.6 2.6 2.1 3 4.4"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>',
+  pen: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
+  shield: '<path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6l-8-3Z"/>',
+  code: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>',
+  pulse: '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+  chip: '<rect x="6" y="6" width="12" height="12" rx="3"/><path d="M9 2.5V6M15 2.5V6M9 18v3.5M15 18v3.5M2.5 9H6M2.5 15H6M18 9h3.5M18 15h3.5"/>',
+  wallet: '<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v4"/><rect x="4" y="9" width="16" height="11" rx="2.5"/><path d="M16 14.5h.01"/>',
+  book: '<path d="M5 4.5h9a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3V4.5Z"/><path d="M5 17a3 3 0 0 1 3-3h9"/>',
+  plug: '<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0V8ZM12 17v4"/>',
+  chat: '<path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17H10l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5Z"/>',
+  sparkle: '<path d="M12 3.5 13.8 9 19.5 11 13.8 13 12 18.5 10.2 13 4.5 11 10.2 9Z"/>',
+  folder: '<path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/>',
+  folderLock: '<path d="M11 19.5H5.5a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1.5"/><rect x="13.5" y="15" width="7" height="5.5" rx="1.3"/><path d="M15 15v-1.3a2 2 0 0 1 4 0V15"/>',
+  issue: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.2"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  terminal: '<rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="m7.5 10 2.5 2-2.5 2M12.5 14.5h4"/>',
+  computer: '<rect x="3.5" y="4.5" width="17" height="11.5" rx="2.5"/><path d="M8.5 20h7M12 16v4"/>',
+  more: '<circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  alert: '<path d="M12 4 2.8 19.5h18.4Z"/><path d="M12 10v4M12 17h.01"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  power: '<path d="M12 3.5v8"/><path d="M7.2 6.5a7.5 7.5 0 1 0 9.6 0"/>',
+  trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
+  home: '<path d="M4 11 12 4l8 7v8.5a.5.5 0 0 1-.5.5H15v-6H9v6H4.5a.5.5 0 0 1-.5-.5Z"/>',
+  inbox: '<path d="M4 13.5 6.5 5h11l2.5 8.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z"/><path d="M4 13.5h4.5l1 2h5l1-2H20"/>',
+  routine: '<path d="M20 11a8 8 0 0 0-14.3-4.9M4 13a8 8 0 0 0 14.3 4.9"/><path d="M4 4v4h4M20 20v-4h-4"/>',
+  ok: '<circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.3 2.4 2.4 4.6-5"/>',
+  dash: '<path d="M7 12h10"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M15 8l2 2"/>',
+  cloud: '<path d="M7 18.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7 9.5a4.5 4.5 0 0 0 0 9Z"/>',
+  asterisk: '<path d="M12 4v16M5.1 8l13.8 8M18.9 8 5.1 16"/>',
+  hex: '<path d="M12 3.5 19.5 7.8v8.4L12 20.5l-7.5-4.3V7.8Z"/><path d="M9 10.5 11 12l-2 1.5M13 14h2.5"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  keyboard: '<rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M7 10h.01M10.5 10h.01M14 10h.01M17.5 10h.01M8 14h8"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/>',
+};
+const I = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
+
+/* ================= Agents (only from the engine) ================= */
+const DPR = Math.min(2, devicePixelRatio || 1);
+const RCH = ACCESSORY_REACH;
+const live = [];
+function avatar(look, size, seed = Math.random() * 5, opts = {}) {
+  const cv = document.createElement("canvas");
+  cv.className = "av";
+  const w = size * (1 + RCH.left + RCH.right), h = size * (1 + RCH.top + RCH.bottom);
+  cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  cv.style.width = w + "px"; cv.style.height = h + "px";
+  if (opts.tight !== false) cv.style.margin = `${-size * RCH.top}px ${-size * RCH.right}px ${-size * RCH.bottom}px ${-size * RCH.left}px`;
+  live.push({ cv, look, size, seed, opts });
+  return cv;
+}
+function drawOne(a, t, pose, extra = {}) {
+  const c = a.cv.getContext("2d"), s = a.size * DPR, L = a.look;
+  c.clearRect(0, 0, a.cv.width, a.cv.height);
+  const lift = (extra.lift ?? 0) * s;
+  drawAgent(c, RCH.left * s, RCH.top * s - lift, s, {
+    color: L.color, eyes: L.eyes, cells: a.size <= 28 ? 10 : a.size <= 60 ? 16 : 22, pose,
+    after: L.accessory && L.accessory !== "none" ? (cx, side, frame) => drawAccessory(cx, side, L.accessory, frame, t, extra.active) : undefined,
+  });
+}
+/* The agent asking for a folder looks toward the card while it waits; writes once it continues. */
+function poseFor(a, t) {
+  const mode = a.opts.mode;
+  if (mode === "writing") return { writing: true, turn: [0.3 + 0.08 * Math.sin(t * 0.7), 0.18], squash: Math.sin(t * 5) * 0.12 };
+  if (mode === "waiting") { const p = idlePose(t, a.seed, { every: 7, expressions: ["closed"] }); p.turn = [-0.5, -0.35]; return p; }
+  if (a.opts.still) return { turn: [0.15, 0.05] };
+  return idlePose(t, a.seed, { every: 11, expressions: ["happy", "wink"] });
+}
+function hydrate(root) {
+  for (const el of $$("[data-av]", root)) {
+    const id = el.dataset.av, size = Number(el.dataset.size || 20);
+    el.replaceWith(avatar(AGENTS[id].look, size, Math.random() * 5, { tight: el.dataset.tight !== "0", mode: el.dataset.mode, still: el.dataset.still === "1" }));
+  }
+  for (const cv of $$("canvas.orbit", root)) {
+    const size = Number(cv.dataset.size || 14);
+    cv.style.width = cv.style.height = size + "px"; cv.width = cv.height = Math.round(size * DPR);
+  }
+}
+const av = (id, size = 18, extra = "") => `<span data-av="${id}" data-size="${size}" ${extra}></span>`;
+/* Loading: the 3×3 pixel orbit from Carregando.html (direction A), in the agent's own tones. */
+const orbit = (color = "amber", size = 14) => `<canvas class="orbit" data-color="${color}" data-size="${size}" aria-hidden="true"></canvas>`;
+const RING = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]];
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function drawOrbit(cv, now) {
+  const ctx = cv.getContext("2d"), cell = cv.width / 3, gap = Math.max(1, Math.round(cell * 0.14));
+  const tn0 = bodyTones(cv.dataset.color), tn = Array.isArray(tn0) ? tn0 : Object.values(tn0);
+  const dark = document.documentElement.dataset.theme === "dark";
+  const faint = mixHex(tn[tn.length - 1] ?? "#999999", dark ? "#000000" : "#ffffff", dark ? 0.55 : 0.45);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const head = reduce ? 0 : Math.floor(now / 110) % 8;
+  RING.forEach(([x, y], i) => {
+    const age = (head - i + 8) % 8;
+    ctx.fillStyle = age === 0 ? tn[0] : age === 1 ? tn[Math.min(1, tn.length - 1)] : age === 2 ? tn[Math.min(2, tn.length - 1)] : faint;
+    ctx.globalAlpha = age <= 2 ? 1 : dark ? 0.5 : 0.9;
+    ctx.fillRect(x * cell + gap / 2, y * cell + gap / 2, cell - gap, cell - gap);
+  });
+  ctx.globalAlpha = 1;
+}
+
+/* ================= Skies (agent page cover; sidebar horizon) ================= */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+const rgb = (h) => { const n = parseInt(h.slice(1, 7), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+function ramp(c) {
+  const [top, bot] = AGENT_GRADIENTS[c] ?? AGENT_GRADIENTS.sky, deep = mixHex(bot, "#000000", 0.42);
+  return [deep, mixHex(deep, bot, 0.5), bot, mixHex(bot, top, 0.5), top, mixHex(top, "#ffffff", 0.4), mixHex(top, "#ffffff", 0.7), mixHex(top, "#ffffff", 0.9)];
+}
+const SPR = spriteGrid(9);
+function paintSky(cv, t, o) {
+  const r = cv.getBoundingClientRect(); if (!r.width || !r.height) return;
+  const PX = 4, W = Math.ceil(r.width / PX), H = Math.ceil(r.height / PX);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; cv._img = null; }
+  const c = cv.getContext("2d");
+  const img = cv._img || (cv._img = c.createImageData(W, H)), d = img.data;
+  const pal = o.palette.map((p) => (Array.isArray(p) ? p : rgb(p))), n = pal.length - 1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let f = o.base(x / W, y / H, t);
+    f = f < 0 ? 0 : f > 1 ? 1 : f;
+    const k = f * n, lo = Math.floor(k), col = pal[Math.min(n, lo + (k - lo > BAYER[(x & 3) + (y & 3) * 4] ? 1 : 0))];
+    const i = (y * W + x) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
+  }
+  if (o.sprites) {
+    cv._sp ??= [];
+    while (cv._sp.length < o.sprites) cv._sp.push({ x: Math.random(), y: o.minY + Math.random() * (1 - o.minY), v: 0.012 + Math.random() * 0.02, b: Math.random() * 5 });
+    const body = rgb(o.spriteBody || "#04203f");
+    for (const sp of cv._sp) {
+      sp.y -= sp.v * 0.04 * (o.speed || 1); if (sp.y < o.minY) { sp.y = 1.05; sp.x = Math.random(); }
+      if (o.avoid && Math.abs((sp.x * (W - 9) + 4.5) / W - o.avoid[0]) < o.avoid[2]) continue;
+      const ox = Math.round(sp.x * (W - 9)), oy = Math.round(sp.y * H), blink = (t + sp.b) % 4 < 0.12;
+      for (let j = 0; j < 9; j++) for (let i2 = 0; i2 < 9; i2++) {
+        const ch = SPR[j][i2]; if (ch === ".") continue;
+        const X = ox + i2, Y = oy + j; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+        const o2 = (Y * W + X) * 4, col = ch === "o" && !blink ? [255, 255, 255] : body;
+        d[o2] = col[0]; d[o2 + 1] = col[1]; d[o2 + 2] = col[2];
+      }
+    }
+  }
+  c.putImageData(img, 0, 0);
+}
+function coverSky(t) {
+  const cv = $("#coverSky"); if (!cv || !cv.offsetParent) return;
+  const r = cv.getBoundingClientRect(), ag = $("#heroAgent")?.getBoundingClientRect();
+  const ax = ag ? (ag.left + ag.width / 2 - r.left) / r.width : 0.1, color = AGENTS.bento.look.color;
+  paintSky(cv, t, { palette: ramp(color), sprites: 5, speed: 1, minY: 0.05, spriteBody: spriteBody(color), avoid: [ax, 0, 0.09], base: (u, v, t2) => {
+    const dx = (u - ax) * 2.2 * (r.width / 900), dy = (v - 0.84) * 1.3;
+    return 0.86 - 0.22 * u - 0.46 * v + 0.42 * Math.exp(-(dx * dx + dy * dy) / 0.14) + 0.06 * Math.sin(u * 5 + t2 * 0.6);
+  } });
+}
+function sideSky(t) {
+  const cv = $("#sideSky"); if (!cv || !cv.offsetParent) return;
+  const surface = getComputedStyle($(".side")).backgroundColor.match(/\d+/g).slice(0, 3).map(Number);
+  const sky = ["#a6cfff", "#78b4ff", "#4b93ff", "#2b74e6"].map(rgb);
+  const tones = [surface, ...[0.18, 0.4, 0.65].map((k) => surface.map((v, i) => Math.round(v + (sky[0][i] - v) * k))), ...sky];
+  paintSky(cv, t, { palette: tones, sprites: 2, minY: 0.5, spriteBody: "#04203f", base: (u, v, t2) => {
+    const top = 1 - 0.62 * (0.82 + 0.18 * Math.sin(u * 4 + t2 * 0.5));
+    const e = Math.max(0, Math.min(1, (v - top) / (1 - top)));
+    return e * e * (3 - 2 * e) * 0.9;
+  } });
+}
+let lastF = 0;
+function frame(now) {
+  if (now - lastF > 40) {
+    lastF = now;
+    const t = now / 1000;
+    for (let i = live.length - 1; i >= 0; i--) {
+      const a = live[i];
+      if (!a.cv.isConnected) { live.splice(i, 1); continue; }
+      drawOne(a, t, poseFor(a, t), { active: a.opts.mode === "writing" });
+    }
+    for (const cv of $$("canvas.orbit")) drawOrbit(cv, now);
+    coverSky(t); sideSky(t);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+drawAgent($("#brandMark").getContext("2d"), 0, 0, 52, { color: "sky", cells: 10 });
+
+/* ================= Shared pieces ================= */
+const seg = (name, opts, value, attrs = "", cls = "") => `<div class="seg ${cls}" role="group" ${attrs}>${opts.map(([v, label]) => `<button data-${name}="${v}" aria-pressed="${v === value}">${label}</button>`).join("")}</div>`;
+function placePills(root = document) {
+  for (const sg of $$(".seg", root)) {
+    let pill = $(".pill", sg);
+    if (!pill) { pill = document.createElement("span"); pill.className = "pill"; sg.prepend(pill); }
+    const on = $('button[aria-pressed="true"]', sg);
+    if (!on) { pill.style.opacity = 0; continue; }
+    pill.style.opacity = 1; pill.style.width = on.offsetWidth + "px"; pill.style.height = on.offsetHeight + "px";
+    pill.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
+  }
+}
+/* A path: short by default, full on click (and always in the tooltip). */
+const pathEl = (p) => { const full = tilde(p); const open = S.full.has(full); return `<button class="path" data-path="${esc(full)}" title="${esc(full)}" aria-label="Caminho: ${esc(full)}">${esc(open ? full : short(p))}</button>`; };
+/* A command to run on the computer, with a copy button. */
+let cmdSeq = 0;
+function cmdBlock(text, opts = {}) {
+  const id = "c" + ++cmdSeq;
+  const html = esc(text).replace(/(--[a-z-]+)/g, '<span class="arg">$1</span>');
+  const copied = S.copied === text;
+  return `<div class="cmd ${copied ? "copied" : ""}" data-cmd="${esc(text)}" ${opts.after ? `data-after="${opts.after}"` : ""}><span class="tx" id="${id}"><span class="pr">$ </span>${html}</span><button class="btn sm" data-copy aria-describedby="${id}">${copied ? I("check", "sm") + "Copiado" : I("copy", "sm") + "Copiar"}</button></div>`;
+}
+const agentChips = (ids, size = 16) => ids.length
+  ? `<span class="who"><span class="avs">${ids.map((id) => av(id, size)).join("")}</span><span>${esc(listNames(ids.map((id) => AGENTS[id].name)))}</span></span>`
+  : `<span class="faint">Nenhum agente usa ainda</span>`;
+const allowCmd = (path, agents) => `agentes-runner folders allow ${path}${agents.map((a) => ` --agent ${a}`).join("")}`;
+function toast(msg) {
+  const t = $("#toast"); t.innerHTML = I("check", "sm") + esc(msg); t.classList.add("on");
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("on"), 2600);
+}
+
+/* ================= Prototype bar ================= */
+const STATES = {
+  computer: null,
+  pair: [["waiting", "Esperando"], ["picking", "Marcando"], ["done", "Confirmado"]],
+  agent: [["saved", "Salvo"], ["dirty", "Mudando"], ["pending", "Pasta nova"]],
+  chat: [["ask", "Pede"], ["waiting", "Esperando"], ["done", "Liberado"], ["inapp", "Já liberada"]],
+  terminal: [["folders", "Pastas"], ["agents", "Agentes"], ["done", "Pronto"]],
+};
+const ROLES = {
+  computer: [["owner", "Walter (conectou)"], ["admin", "Marina (admin)"]],
+  agent: [["admin", "Admin"], ["member", "Membro"]],
+  chat: [["owner", "Walter"], ["other", "Marina"]],
+};
+function renderBar() {
+  const st = STATES[S.view], ro = ROLES[S.view];
+  $("#pbar").innerHTML = `<span class="lbl">Protótipo</span>
+    <div class="views">${VIEWS.map(([v, t], i) => `<button class="stp" data-view="${v}" ${v === S.view ? 'aria-current="step"' : ""}><span class="n">${i + 1}</span>${t}</button>`).join("")}</div>
+    <span class="grow"></span>
+    <div class="ctl">
+      ${st ? seg("state", st, S.state, 'aria-label="Estado"', "xs") : ""}
+      ${ro ? seg("role", ro, S.role, 'aria-label="Ver como"', "xs") : ""}
+      <button class="iconbtn" id="themeBtn" aria-label="Trocar tema" style="width:28px;height:28px">${I(document.documentElement.dataset.theme === "dark" ? "sun" : "moon", "sm")}</button>
+    </div>`;
+}
+
+/* ================= Sidebar ================= */
+function renderSide() {
+  const cur = S.view === "chat" ? "conteudo" : S.view === "agent" ? "bento" : "settings";
+  const a = (icon, t, n = "", on = false) => `<a href="#" data-noop ${on ? 'aria-current="page"' : ""}>${icon}${t}${n ? `<span class="n">${n}</span>` : ""}</a>`;
+  $("#sideNav").innerHTML = a(I("home", "sm"), "Início") + a(I("inbox", "sm"), "Aprovações", "1") + a(I("issue", "sm"), "Issues") + a(I("folder", "sm"), "Drive") + a(I("routine", "sm"), "Rotinas")
+    + `<span class="cap">Canais</span>` + ["conteudo", "engenharia", "produto"].map((c) => a(I("hash", "sm"), c, "", cur === c)).join("")
+    + `<span class="cap">Agentes</span>` + Object.entries(AGENTS).map(([k, o]) => `<a href="#" data-noop ${cur === k ? 'aria-current="page"' : ""}><span class="agent-slot">${av(k, 16)}</span>${o.name}</a>`).join("")
+    + `<span class="cap">Workspace</span>` + a(I("settings", "sm"), "Configurações", "", cur === "settings");
+  hydrate($("#sideNav"));
+  $("#findIcon").innerHTML = I("search", "sm");
+}
+
+/* ================= View 1: the computer (Configurações → Computadores) ================= */
+const SUBNAV = [["Geral", "settings"], ["Membros e convites", "users"], ["Agentes e acesso", "shield"], ["Conectores", "plug"], ["Chaves de API", "key"], ["Sandbox", "cloud"], ["Computadores", "computer"], ["Orçamento e uso", "wallet"]];
+function viewComputer() {
+  const own = isOwner();
+  const folderRow = (f) => `<div class="crow">
+      <span class="logo soft">${I("folder")}</span>
+      <div class="t"><div class="n">${esc(base(f.path))}</div>
+        <div class="d">${pathEl(f.path)}</div>
+        <div class="d">${agentChips(f.agents)}</div></div>
+      ${own ? `<div class="end"><button class="btn ghost sm danger" data-remove="${f.id}">${I("x", "sm")}Remover</button></div>` : ""}
+    </div>`;
+  const toolRow = (tl) => {
+    const on = S.tools[tl.id];
+    const cmd = `agentes-runner tools enable ${tl.id}`;
+    return `<div class="crow">
+      <span class="logo">${I(tl.icon)}</span>
+      <div class="t"><div class="n">${tl.name}</div><div class="d">${tl.d}</div></div>
+      <div class="end">${on ? `<span class="chip ok">${I("check", "sm")}Ligado</span>${own ? `<button class="btn ghost sm" data-tooloff="${tl.id}">${I("power", "sm")}Desligar</button>` : ""}` : `<span class="chip line">${I("dash", "sm")}Desligado</span>`}</div>
+      ${tl.honest || (!on && own) ? `<div class="under">
+        ${!on && own ? `<span class="cmdlbl">${I("computer", "sm")}Para ligar, rode no seu Mac:</span>${cmdBlock(cmd)}` : ""}
+        ${!on && !own ? `<span class="help">Só Walter liga, no Mac dele.</span>` : ""}
+        ${tl.honest ? `<span class="honest">${I("alert", "sm")}<span>${tl.honest}</span></span>` : ""}
+      </div>` : !on ? `<div class="under"><span class="help">Só Walter liga, no Mac dele.</span></div>` : ""}
+    </div>`;
+  };
+  const usedBy = Object.keys(AGENTS).filter((id) => id !== "ada");
+  return `<div class="page"><div class="wrap">
+    <div class="topbar"><nav class="crumbs" aria-label="Caminho"><a href="#" data-noop class="full">Configurações</a><span class="full" aria-hidden="true">/</span><a href="#" data-noop>Computadores</a><span aria-hidden="true">/</span><b>${MACHINE.name}</b></nav></div>
+    <div class="cfg">
+      <nav class="subnav" aria-label="Seções das configurações">${SUBNAV.map(([t, ic]) => `<a href="#" data-noop ${t === "Computadores" ? 'aria-current="true"' : ""}>${I(ic, "sm")}${t}</a>`).join("")}</nav>
+      <div style="min-width:0">
+        <header class="mhead">
+          <span class="big">${I("computer")}</span>
+          <div class="t">
+            <h1>${MACHINE.name}</h1>
+            <div class="chips"><span class="chip ok">${I("check", "sm")}Online</span><span class="chip">${I("user", "sm")}Conectado por ${MACHINE.by}</span><span class="chip">${I("users", "sm")}${usedBy.length} agentes usam</span></div>
+          </div>
+          <div class="acts">
+            ${own ? `<button class="btn primary" data-dialog="change">${I("pen", "sm")}Mudar o que está liberado</button>` : ""}
+            <button class="btn icon" data-noop aria-label="Mais ações">${I("more")}</button>
+          </div>
+        </header>
+        ${own ? "" : `<div class="readonly">${I("lock", "sm")}<span><b>Só Walter muda o que este computador libera</b>, no próprio Mac. Daqui você vê o que está liberado; se precisar de algo, peça para ele.</span></div>`}
+        <div class="cols">
+          <div class="col">
+            <section class="card">
+              <div class="ch"><h2>${I("folder", "sm")}Pastas liberadas</h2><span class="help">${S.folders.length + 1} no total</span></div>
+              <p class="help" style="margin:-6px 0 12px">Os agentes só mexem nestas pastas. Cada um escolhe as suas na própria página.</p>
+              <div class="list">
+                <div class="crow">
+                  <span class="logo soft">${I("folderLock")}</span>
+                  <div class="t"><div class="n">Pasta de cada agente</div><div class="d">${pathEl(HOME + "/agentes")}<span class="faint">· um agente não vê a do outro</span></div></div>
+                  <div class="end"><span class="chip">${I("lock", "sm")}Sempre</span></div>
+                </div>
+                ${S.folders.map(folderRow).join("")}
+              </div>
+              ${own ? `<button class="more" data-dialog="change">${I("plus", "sm")}Liberar outra pasta<span class="faint" style="font-weight:500">· no seu Mac</span></button>` : ""}
+            </section>
+            <section class="card tools">
+              <div class="ch"><h2>${I("terminal", "sm")}Ferramentas</h2><span class="help">O que os agentes rodam aqui</span></div>
+              <div class="list">${TOOLS.map(toolRow).join("")}</div>
+            </section>
+          </div>
+          <div class="col">
+            <div class="note">${I("shield", "sm")}<span><b>Quem libera é o Mac, não o site.</b> Daqui dá para ver e tirar acesso. Liberar mais é só no Mac, por quem conectou: nem um admin consegue pelo site.</span></div>
+            <section class="card">
+              <div class="ch"><h2>${I("info", "sm")}Situação</h2></div>
+              <div class="kv">
+                <div><span class="k">Agora</span><span class="v">Online <span>· visto agora</span></span></div>
+                <div><span class="k">Sistema</span><span class="v">${MACHINE.os}</span></div>
+                <div><span class="k">Conectado</span><span class="v">Por ${MACHINE.by} <span>· em ${MACHINE.since}</span></span></div>
+                <div><span class="k">App agentes no Mac</span><span class="v">Versão ${MACHINE.version} <span>· atualizado</span></span></div>
+              </div>
+            </section>
+            <section class="card">
+              <div class="ch"><h2>${I("users", "sm")}Agentes neste computador</h2></div>
+              <div class="list">${usedBy.map((id) => { const n = S.folders.filter((f) => f.agents.includes(id)).length; return `<div class="crow nw">${av(id, 26)}<div class="t"><div class="n">${AGENTS[id].name}</div><div class="d">${n ? `Própria pasta + ${n} ${n === 1 ? "pasta" : "pastas"}` : "Só a própria pasta"}</div></div><button class="btn ghost sm" data-view="agent">Ver</button></div>`; }).join("")}</div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>`;
+}
+/* "Mudar o que está liberado": granting happens on the Mac, so this only shows the command(s). */
+function dialogChange() {
+  const tab = S.change;
+  const body = tab === "pick"
+    ? `<div class="opt3">
+        <span class="cmdlbl">${I("keyboard", "sm")}Abra o Terminal no seu Mac e rode:</span>
+        ${cmdBlock("agentes-runner folders")}
+        <p class="help">Aparece a lista dos seus projetos. Marque com <span class="kbd">espaço</span>, confirme com <span class="kbd">enter</span> e escolha quais agentes usam cada pasta.</p>
+        <button class="more" style="margin-top:0" data-view="terminal">${I("eye", "sm")}Ver como fica no Terminal</button>
+      </div>`
+    : tab === "one"
+    ? `<div class="opt3">
+        <label class="label" for="allowPath">Qual pasta</label>
+        <label class="input mono">${I("folder", "sm")}<input id="allowPath" value="${esc(S.allowPath)}" spellcheck="false" autocomplete="off"></label>
+        <span class="label">Para quais agentes <span class="help" style="font-weight:500">opcional; dá para escolher depois</span></span>
+        <div class="agpick">${Object.entries(AGENTS).map(([k, a]) => `<button class="tog sm" data-allowagent="${k}" aria-pressed="${S.allowAgents.includes(k)}"><span class="box">${I("check")}</span>${a.name}</button>`).join("")}</div>
+        <span class="cmdlbl">${I("computer", "sm")}Rode no seu Mac:</span>
+        <div id="allowCmd">${cmdBlock(allowCmd(S.allowPath || "~/caminho/da/pasta", S.allowAgents))}</div>
+      </div>`
+    : `<div class="opt3">
+        <p class="help">Ligar uma ferramenta também é no Mac. Desligar dá para fazer daqui.</p>
+        ${TOOLS.map((tl) => `<div class="row" style="gap:8px"><span class="label" style="min-width:110px">${I(tl.icon, "sm")}${tl.name}</span>${S.tools[tl.id] ? `<span class="chip ok">${I("check", "sm")}Ligado</span>` : ""}</div>${S.tools[tl.id] ? "" : cmdBlock(`agentes-runner tools enable ${tl.id}`)}`).join("")}
+        <span class="honest">${I("alert", "sm")}<span>${TOOLS[2].honest}</span></span>
+      </div>`;
+  return `<div class="scrim" data-close><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgT">
+    <div class="dh"><div class="t"><h2 id="dlgT">Mudar o que está liberado</h2><p>Liberar é sempre no seu Mac, para ninguém liberar por você. Esta página atualiza sozinha.</p></div><button class="iconbtn" data-close aria-label="Fechar">${I("x")}</button></div>
+    ${seg("change", [["pick", "Escolher na lista"], ["one", "Uma pasta"], ["tools", "Ferramentas"]], tab, 'aria-label="Como liberar"', "sm")}
+    ${body}
+    <div class="foot"><span class="help">${orbit("sky", 12)}Esperando o Mac avisar…</span><button class="btn" data-close>Fechar</button></div>
+  </div></div>`;
+}
+function dialogRemove() {
+  const f = S.folders.find((x) => x.id === S.removing) ?? S.folders[0];
+  if (!f) return "";
+  const who = f.agents.map((a) => AGENTS[a].name);
+  return `<div class="scrim" data-close><div class="dialog sm" role="alertdialog" aria-modal="true" aria-labelledby="dlgT">
+    <h2 id="dlgT">Remover ${esc(base(f.path))}?</h2>
+    <p>${who.length ? `${esc(listNames(who))} ${who.length > 1 ? "param" : "para"} de usar esta pasta na hora.` : "Nenhum agente usa esta pasta."} Os arquivos continuam no Mac; nada é apagado.</p>
+    <p class="help">Para liberar de novo, é no Mac: <code>agentes-runner folders allow ${esc(tilde(f.path))}</code></p>
+    <div class="foot"><button class="btn" data-close>Cancelar</button><button class="btn danger solid" data-confirmremove="${f.id}">${I("x", "sm")}Remover</button></div>
+  </div></div>`;
+}
+
+/* ================= View 2: pairing, "Quais pastas os agentes podem usar?" ================= */
+function viewPair() {
+  const T = S.term, done = T.step === "done";
+  const picked = PICKABLE.filter((x) => T.picked.has(x.path));
+  const rows = picked.map((x) => `<div class="crow" style="animation:fi .3s var(--out) both">
+      <span class="logo soft">${I("folder")}</span>
+      <div class="t"><div class="n">${esc(x.name)}${done ? `<span class="chip ok">${I("check", "sm")}Liberada</span>` : ""}</div><div class="d"><span class="path" style="cursor:default">${esc(short(x.path))}</span></div>
+      ${T.assign[x.path]?.size ? `<div class="d">${agentChips([...T.assign[x.path]])}</div>` : ""}</div>
+    </div>`).join("");
+  return `<div class="page"><div class="wrap">
+    <div class="topbar"><nav class="crumbs" aria-label="Caminho"><a href="#" data-noop class="full">Configurações</a><span class="full" aria-hidden="true">/</span><a href="#" data-noop>Computadores</a><span aria-hidden="true">/</span><b>Conectar um computador</b></nav></div>
+    <div class="pair">
+      <div class="prog" aria-label="Passos">
+        <span class="ps done"><span class="n">${I("check", "sm")}</span>Conectar</span><span class="sep"></span>
+        <span class="ps on" aria-current="step"><span class="n">2</span>Pastas</span><span class="sep"></span>
+        <span class="ps"><span class="n">3</span>Ferramentas</span><span class="sep"></span>
+        <span class="ps"><span class="n">4</span>Pronto</span>
+      </div>
+      <span class="chip ok" style="margin-bottom:12px">${I("check", "sm")}${MACHINE.name} conectou</span>
+      <h1>Quais pastas os agentes podem usar?</h1>
+      <p class="lead">Escolha no Terminal do seu Mac, com as setas e o espaço. Esta tela acompanha sozinha, e o site só fica sabendo das pastas que você marcar.</p>
+      <div class="pgrid">
+        <section class="card mirror">
+          <div class="ch"><h2>${I("folder", "sm")}Liberadas neste Mac</h2><span class="act">${done ? `<span class="chip ok">${I("check", "sm")}Confirmado no Mac</span>` : `<span class="live">${orbit("sky", 12)}Ao vivo</span>`}</span></div>
+          <div class="list">
+            <div class="crow"><span class="logo soft">${I("folderLock")}</span><div class="t"><div class="n">Pasta de cada agente</div><div class="d">Sempre. Um agente não vê a do outro.</div></div><span class="chip">${I("lock", "sm")}Sempre</span></div>
+            ${rows}
+          </div>
+          ${picked.length ? "" : `<div class="mempty">${orbit("sky", 24)}<b>Esperando você marcar no Terminal</b><span>Nada marcado ainda. Sem marcar nada, cada agente fica só com a própria pasta.</span></div>`}
+        </section>
+        <div class="col">
+          ${termWindow(true)}
+          <span class="help" style="display:flex;gap:6px;align-items:center">${I("keyboard", "sm")}Clique no Terminal acima e use ↑ ↓, espaço e enter para testar.</span>
+        </div>
+      </div>
+      <div class="pfoot">
+        <span class="help">${done ? "Pronto no Mac. Dá para mudar depois em Configurações → Computadores." : "Confirme no Terminal com enter."}</span>
+        <button class="btn ghost" data-skip>Pular — só a pasta de cada agente</button>
+        <button class="btn primary" ${done ? "" : 'aria-disabled="true"'} data-continue>Continuar${I("arrow", "sm")}</button>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+/* ================= View 3: agent page → Ferramentas e acesso → Pastas no computador ================= */
+/* Picking among folders the computer ALREADY allows happens here in the app. That is not widening the machine's
+   access: the computer's own list (layer 1) is the ceiling and only the Mac can raise it; the runner rejects any
+   folder for an agent that is not on that list. The app only chooses a subset for this agent (layer 2). */
+function viewAgent() {
+  const ed = S.role === "admin", a = AGENTS.bento;
+  const dirty = JSON.stringify([...S.agentUses].sort()) !== JSON.stringify([...S.agentSaved].sort());
+  const fRow = (f) => {
+    const on = S.agentUses.includes(f.id), was = S.agentSaved.includes(f.id), ch = on !== was;
+    const others = f.agents.filter((x) => x !== "bento");
+    return `<div class="crow ${ch ? "changed" : ""}">
+      <span class="logo soft">${I("folder")}</span>
+      <div class="t"><div class="n">${esc(base(f.path))}${ch ? `<span class="tag">${I("pen")}Alterado</span>` : ""}</div>
+        <div class="d">${pathEl(f.path)}${others.length ? `<span class="faint">· também ${esc(listNames(others.map((x) => AGENTS[x].name)))}</span>` : ""}</div></div>
+      <div class="end">${ed ? `<button class="tog sm" data-use="${f.id}" aria-pressed="${on}"><span class="box">${I("check")}</span>${on ? "Usa" : "Usar"}</button>` : on ? `<span class="chip">${I("check", "sm")}Usa</span>` : `<span class="chip line">${I("dash", "sm")}Não usa</span>`}</div>
+    </div>`;
+  };
+  const pendingPath = S.otherPath.trim() || "~/caminho/da/pasta";
+  return `<div class="page"><div class="wrap">
+    <div class="topbar"><nav class="crumbs" aria-label="Caminho"><a href="#" data-noop class="full">Agentes</a><span class="full" aria-hidden="true">/</span><b>${a.name}</b></nav></div>
+    <header>
+      <div class="cover" id="cover">
+        <canvas class="sky" id="coverSky" aria-hidden="true"></canvas>
+        <span class="state"><span>${I("check", "sm")}</span>Disponível<span class="sub">· Responde quando chamam por @${a.handle}</span></span>
+        <span id="heroAgent" style="position:absolute;left:${innerWidth <= 640 ? 20 : 44}px;bottom:0"></span>
+      </div>
+      <div class="ident">
+        <div class="whoami">
+          <h1>${a.name}<span class="handle">@${a.handle} · ${a.role}</span></h1>
+          <div class="chips"><span class="chip">${I("user", "sm")}Responde a Walter Caldas</span><span class="chip">${I("chip", "sm")}Claude Sonnet</span><span class="chip">${I("computer", "sm")}${MACHINE.name}</span><span class="chip">${I("hash", "sm")}conteudo</span></div>
+        </div>
+        <div class="acts"><button class="btn primary" data-view="chat">${I("chat", "sm")}Conversar</button><button class="btn icon" data-noop aria-label="Mais ações">${I("more")}</button></div>
+      </div>
+    </header>
+    <div class="tabsbar"><div class="tabs" role="tablist">${["Visão geral", "Instruções", "Ferramentas e acesso", "Memória", "Atividade", "Configurações"].map((t) => `<button class="tab" role="tab" data-noop aria-selected="${t === "Ferramentas e acesso"}">${t}</button>`).join("")}</div></div>
+    <section class="view">
+      ${ed ? "" : `<div class="readonly">${I("lock", "sm")}<span><b>Só admins e Walter mudam as pastas do Bento.</b> Você vê o que ele usa.</span></div>`}
+      <div class="cols">
+        <div class="col">
+          <section class="card ${dirty ? "" : ""}">
+            <div class="ch"><h2>${I("folder", "sm")}Pastas no computador</h2><span class="act"><span class="chip">${I("computer", "sm")}${MACHINE.name}</span></span></div>
+            <p class="help" style="margin:-6px 0 12px">Onde o Bento lê e escreve arquivos. Ele só enxerga estas pastas.</p>
+            <div class="list">
+              <div class="crow">
+                <span class="logo soft">${I("folderLock")}</span>
+                <div class="t"><div class="n">Pasta do Bento</div><div class="d">${pathEl(HOME + a.dir.slice(1))}<span class="faint">· só dele</span></div></div>
+                <div class="end"><span class="chip">${I("lock", "sm")}Sempre</span></div>
+              </div>
+              ${S.folders.map(fRow).join("")}
+              ${S.pending ? `<div class="crow">
+                <span class="logo soft">${I("folder")}</span>
+                <div class="t"><div class="n">${esc(base(pendingPath))}<span class="chip warn">${I("clock", "sm")}Falta liberar no Mac</span></div><div class="d"><span class="path" style="cursor:default">${esc(pendingPath)}</span></div></div>
+                <div class="end"><button class="btn ghost sm" data-cancelpending aria-label="Cancelar pedido">${I("x", "sm")}</button></div>
+                <div class="under"><div class="pend">
+                  <span class="cmdlbl">${I("computer", "sm")}Walter roda no Mac dele:</span>
+                  ${cmdBlock(allowCmd(pendingPath, ["bento"]))}
+                  <span class="waitline">${orbit(a.look.color, 12)}<span class="shimmer">Esperando o Mac liberar. Aparece aqui sozinho.</span></span>
+                </div></div>
+              </div>` : ""}
+            </div>
+            ${ed && !S.pending ? `<button class="more" data-dialog="other">${I("plus", "sm")}Usar uma pasta que ainda não está liberada</button>` : ""}
+          </section>
+          <section class="card">
+            <div class="ch"><h2>${I("plug", "sm")}Conectores da Acme</h2><span class="help">Um nível por app</span></div>
+            <div class="list">
+              ${[["Google Drive", "Lê, cria e edita arquivos.", "Ler e escrever"], ["Notion", "Lê páginas e bancos.", "Ler"], ["GitHub", "Sem acesso.", "Sem acesso"]].map(([n, d, l]) => `<div class="crow"><span class="logo">${I("plug", "sm")}</span><div class="t"><div class="n">${n}</div><div class="d">${d}</div></div><span class="chip ${l === "Sem acesso" ? "line" : ""}">${I(l === "Sem acesso" ? "dash" : "check", "sm")}${l}</span></div>`).join("")}
+            </div>
+          </section>
+        </div>
+        <div class="col">
+          <section class="card">
+            <div class="ch"><h2>${I("terminal", "sm")}No ${MACHINE.name}</h2></div>
+            <div class="list">${TOOLS.map((tl) => `<div class="crow nw"><span class="logo">${I(tl.icon, "sm")}</span><div class="t"><div class="n">${tl.name}</div></div>${S.tools[tl.id] ? `<span class="chip ok">${I("check", "sm")}Ligado</span>` : `<span class="chip line">${I("dash", "sm")}Desligado</span>`}</div>`).join("")}</div>
+            <button class="more" data-view="computer">${I("computer", "sm")}Ver o computador</button>
+          </section>
+          <div class="note">${I("shield", "sm")}<span><b>Claude Code e Codex só enxergam as pastas ao lado.</b> Comandos podem chegar a outras partes do computador.</span></div>
+          <div class="note">${I("info", "sm")}<span>Escolher entre as pastas já liberadas é aqui. Liberar uma pasta nova é só no Mac, por Walter.</span></div>
+        </div>
+      </div>
+    </section>
+  </div></div>`;
+}
+/* A path the computer already allows needs no command: it is picked on this page (layer 2). */
+const grantedAt = (p) => { const t = p.trim().replace(/\/+$/, ""); return S.folders.find((f) => tilde(f.path) === t || f.path === t); };
+function otherCmd() {
+  const g = grantedAt(S.otherPath);
+  if (g) return `<div class="note">${I("check", "sm")}<span><b>${esc(base(g.path))} já está liberada neste Mac.</b> Feche e marque “Usar” na lista, sem comando.</span></div>`;
+  return `<span class="cmdlbl">${I("computer", "sm")}Rode no Mac:</span>${cmdBlock(allowCmd(S.otherPath.trim() || "~/caminho/da/pasta", ["bento"]))}`;
+}
+function dialogOther() {
+  return `<div class="scrim" data-close><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgT">
+    <div class="dh"><div class="t"><h2 id="dlgT">Usar uma pasta nova</h2><p>Esta pasta ainda não está liberada no ${MACHINE.name}. Quem libera é o Walter, no Mac dele.</p></div><button class="iconbtn" data-close aria-label="Fechar">${I("x")}</button></div>
+    <label class="label" for="otherPath">Qual pasta</label>
+    <label class="input mono">${I("folder", "sm")}<input id="otherPath" value="${esc(S.otherPath)}" spellcheck="false" autocomplete="off"></label>
+    <div id="otherCmd" style="display:flex;flex-direction:column;gap:8px">${otherCmd()}</div>
+    <p class="help">Ou rode <code>agentes-runner folders</code> e escolha na lista.</p>
+    <div class="foot"><span class="help">${I("bell", "sm")}Avisamos o Walter se não for você.</span><button class="btn" data-close>Cancelar</button><button class="btn primary" data-pending>${I("clock", "sm")}Pedir e esperar</button></div>
+  </div></div>`;
+}
+
+/* ================= View 4: chat, the agent asks for a folder ================= */
+function viewChat() {
+  const owner = S.role === "owner", scope = S.scope, st = S.chat, a = AGENTS.bento;
+  const target = scope === "project" ? `${HOME}/Projects/Personal/viajolo-v5` : TASK_DIR;
+  const cmd = allowCmd(tilde(target), ["bento"]);
+  const name = base(target);
+  let card;
+  if (st === "inapp") {
+    card = `<div class="ask">
+      <div class="ask-h"><span class="logo soft">${I("folder")}</span><div class="t"><b>Usar viajolo-v5</b><small>${I("computer", "sm")}Já liberada no ${MACHINE.name} · o Dev usa</small></div></div>
+      <div class="ask-b"><p class="help">A pasta já está liberada neste Mac. Falta deixar o Bento usar, o que dá para fazer aqui mesmo.</p></div>
+      <div class="ask-f"><span class="hint">${orbit(a.look.color, 12)}Continuo sozinho quando liberar.</span>${owner ? `<button class="btn primary sm" data-letuse>${I("check", "sm")}Deixar o Bento usar</button>` : `<span class="help">Walter ou um admin decide.</span>`}</div>
+    </div>`;
+  } else if (st === "done") {
+    card = `<div class="ask done">
+      <div class="ask-h"><span class="logo soft">${I("folder")}</span><div class="t"><b>${esc(name)}</b><small>${I("computer", "sm")}${MACHINE.name} · só para o Bento</small></div><span class="chip ok">${I("check", "sm")}Liberado</span></div>
+      <div class="ask-f"><span class="hint">${orbit(a.look.color, 12)}Continuando a tarefa</span><span class="help">liberado por Walter · 10:04</span></div>
+    </div>
+    <div class="wk-last"><span class="tx">Lendo 6 rascunhos em <code>tiktok-roteiro-dias-curitiba</code></span><span class="cur"></span></div>`;
+  } else {
+    const waiting = st === "waiting";
+    card = `<div class="ask">
+      <div class="ask-h"><span class="logo soft">${I("folder")}</span><div class="t"><b>Liberar ${esc(name)} para o Bento</b><small>${I("computer", "sm")}${MACHINE.name} · ${owner ? "você conectou este Mac" : "conectado por Walter"}</small></div></div>
+      <div class="ask-b">
+        ${seg("scope", [["project", "Projeto viajolo-v5"], ["folder", "Só a pasta do roteiro"]], scope, 'aria-label="O que liberar"', "sm")}
+        ${owner ? cmdBlock(cmd, { after: "waiting" }) : `<div class="note">${I("lock", "sm")}<span><b>Só Walter libera pastas neste Mac.</b> Avisei ele com o comando pronto.</span></div>`}
+        ${owner ? `<p class="help">Libera só esta pasta, só para o Bento. Prefere escolher na lista? Rode <code>agentes-runner folders</code>.</p>` : ""}
+      </div>
+      <div class="ask-f">${waiting
+        ? `<span class="hint">${orbit(a.look.color, 14)}<span class="shimmer">Esperando o Mac liberar…</span></span>`
+        : `<span class="hint">${I("clock", "sm")}Continuo sozinho quando liberar.</span>`}
+        <button class="btn ghost sm" data-noop>Fazer sem a pasta</button></div>
+    </div>`;
+  }
+  const waitingPose = st === "ask" || st === "waiting" || st === "inapp";
+  return `<div class="thread">
+    <div class="th"><div class="th-in"><h1><span class="hs">#</span>conteudo</h1><span class="help">Roteiros, posts e vídeos</span></div></div>
+    <div class="feed">
+      <div class="gap">Hoje</div>
+      <div class="msg"><div class="mav"><span class="pa">WC</span></div><div class="mb"><div class="mh"><span class="mn">Walter Caldas</span><span class="mr">10:02</span></div>
+        <div class="mx"><span class="at">@bento</span> monta o roteiro de TikTok dos 3 dias em Curitiba. Os rascunhos estão em <code class="wrap">${esc(tilde(TASK_DIR))}</code></div></div></div>
+      <div class="msg"><div class="mav">${av("bento", 30, `data-mode="${waitingPose ? "waiting" : "writing"}"`)}</div><div class="mb"><div class="mh"><span class="mn">Bento</span><span class="mr">agente · 10:02</span></div>
+        <div class="mx">Os rascunhos estão numa pasta que eu ainda não posso abrir. ${st === "inapp" ? "Ela já está liberada no Mac, só falta me deixar usar:" : owner ? `Para eu usar <b>${esc(name)}</b>, rode no seu Mac:` : `Para eu usar <b>${esc(name)}</b>, o Walter precisa liberar no Mac dele.`}</div>
+        ${card}
+      </div></div>
+    </div>
+    <div class="composer"><span>Mensagem em #conteudo</span><button class="btn sm icon" data-noop aria-label="Enviar" style="width:30px">${I("arrow", "sm")}</button></div>
+  </div>`;
+}
+
+/* ================= View 5: the terminal picker (agentes-runner folders) ================= */
+function newTerm(step = "folders") {
+  return { step, cur: 0, picked: new Set(), assign: {}, fi: 0, acur: 0, cmd: "agentes-runner folders" };
+}
+function presetTerm(state, forPair = false) {
+  const T = newTerm();
+  if (forPair) T.cmd = "agentes-runner pair --code K7P-42X";
+  if (state === "waiting") return T;
+  T.picked.add("~/Projects/Personal/viajolo-v5"); T.picked.add("~/Projects/Himetrica/site"); T.cur = 3;
+  if (state === "folders" || state === "picking") return T;
+  T.step = "agents"; T.fi = 0; T.assign["~/Projects/Personal/viajolo-v5"] = new Set(["bento"]);
+  if (state === "agents") return T;
+  T.assign["~/Projects/Himetrica/site"] = new Set(["dev"]); T.step = "done";
+  return T;
+}
+const tPicked = (T) => PICKABLE.filter((x) => T.picked.has(x.path));
+function termLines(T, compact) {
+  const L = [];
+  L.push(`<span class="ln"><span class="dim">walter@MacBook ~ %</span> <span class="b">${esc(T.cmd)}</span></span>`);
+  if (T.cmd.includes("pair")) L.push(`<span class="ln"><span class="ok">✓</span> Conectado à Acme como <span class="b">${MACHINE.name}</span></span>`);
+  else L.push(`<span class="ln dim">agentes · ${MACHINE.name} · Acme</span>`);
+  L.push(`<span class="ln"></span>`);
+  if (T.step === "folders") {
+    L.push(`<span class="ln q">Quais pastas os agentes podem usar?</span>`);
+    L.push(`<span class="ln dim">Achei estes projetos no seu Mac. Cada agente já tem a própria pasta.</span>`);
+    let idx = -1;
+    for (const x of DETECTED) {
+      if (x.group) { L.push(`<span class="ln grp">${esc(x.group)}</span>`); continue; }
+      idx++;
+      const cur = idx === T.cur, on = T.picked.has(x.path);
+      L.push(`<span class="ln it ${cur ? "here" : ""}"><span class="ptr">${cur ? "›" : " "}</span><span class="bx ${on ? "on" : ""}">${x.other ? "[+]" : on ? "[x]" : "[ ]"}</span><span class="nm">${esc(x.name)}</span><span class="mt">${esc(x.meta)}</span></span>`);
+    }
+    L.push(`<span class="ln"></span>`);
+    L.push(`<span class="ln dim">↑↓ mover · espaço marcar · enter ${T.picked.size ? "continuar" : "pular"} · esc sair</span>`);
+  } else if (T.step === "agents") {
+    const list = tPicked(T), f = list[T.fi];
+    L.push(`<span class="ln"><span class="ok">✓</span> ${list.length} ${list.length === 1 ? "pasta marcada" : "pastas marcadas"}</span>`);
+    L.push(`<span class="ln"></span>`);
+    L.push(`<span class="ln q">Quais agentes usam ${esc(f.name)}? <span class="dim">(${T.fi + 1} de ${list.length})</span></span>`);
+    L.push(`<span class="ln dim">Sem marcar nenhum, fica liberada e você escolhe depois no site.</span>`);
+    const sel = T.assign[f.path] ?? new Set();
+    Object.entries(AGENTS).forEach(([k, a], i) => {
+      const cur = i === T.acur, on = sel.has(k);
+      L.push(`<span class="ln it ${cur ? "here" : ""}"><span class="ptr">${cur ? "›" : " "}</span><span class="bx ${on ? "on" : ""}">${on ? "[x]" : "[ ]"}</span><span class="nm">${a.name}</span><span class="mt">@${a.handle} · ${a.role}</span></span>`);
+    });
+    L.push(`<span class="ln"></span>`);
+    L.push(`<span class="ln dim">↑↓ mover · espaço marcar · enter ${T.fi + 1 < list.length ? "próxima pasta" : "terminar"} · esc voltar</span>`);
+  } else {
+    const list = tPicked(T);
+    if (!list.length) {
+      L.push(`<span class="ln"><span class="ok">✓</span> Nada a mais. Cada agente fica só com a própria pasta.</span>`);
+    } else {
+      L.push(`<span class="ln"><span class="ok">✓</span> <span class="b">Liberado.</span> O site já mostra.</span>`);
+      L.push(`<span class="ln"></span>`);
+      for (const x of list) { const ag = [...(T.assign[x.path] ?? [])].map((k) => AGENTS[k].name); L.push(`<span class="ln it"><span class="ptr"> </span><span class="nm">${esc(x.name).padEnd(12, " ")}</span><span class="dim">${ag.length ? esc(ag.join(", ")) : "escolher no site"}</span></span>`); }
+      L.push(`<span class="ln"></span>`);
+      const first = list[0], ag = [...(T.assign[first.path] ?? [])];
+      if (!compact) {
+        L.push(`<span class="ln dim">Da próxima vez, direto:</span>`);
+        L.push(`<span class="ln">${esc(allowCmd(first.path, ag))}</span>`);
+      }
+    }
+    L.push(`<span class="ln"></span>`);
+    L.push(`<span class="ln"><span class="dim">walter@MacBook ~ %</span> <span class="caret"></span></span>`);
+  }
+  return L.join("");
+}
+function termWindow(compact) {
+  return `<div class="term ${compact ? "compact" : ""}"><div class="bar"><span class="lights"><i></i><i></i><i></i></span><span class="ttl">Terminal — ${esc(S.term.cmd.split(" ").slice(0, 2).join(" "))}</span></div>
+    <div class="scr" id="scr" tabindex="0" role="application" aria-label="Terminal: use as setas, espaço e enter">${termLines(S.term, compact)}</div></div>`;
+}
+function termKey(e) {
+  const T = S.term; if (!T) return;
+  const k = e.key;
+  if (!["ArrowUp", "ArrowDown", " ", "Enter", "Escape", "j", "k"].includes(k)) return;
+  e.preventDefault();
+  if (T.step === "folders") {
+    const n = PICKABLE.length;
+    if (k === "ArrowDown" || k === "j") T.cur = (T.cur + 1) % n;
+    else if (k === "ArrowUp" || k === "k") T.cur = (T.cur - 1 + n) % n;
+    else if (k === " ") { const x = PICKABLE[T.cur]; if (x.other) { toast("No Terminal real, aqui você digita o caminho."); return; } T.picked.has(x.path) ? T.picked.delete(x.path) : T.picked.add(x.path); }
+    else if (k === "Enter") { if (T.picked.size) { T.step = "agents"; T.fi = 0; T.acur = 0; } else T.step = "done"; }
+    else if (k === "Escape") { T.step = "done"; T.picked.clear(); }
+  } else if (T.step === "agents") {
+    const ids = Object.keys(AGENTS), list = tPicked(T), f = list[T.fi];
+    if (k === "ArrowDown" || k === "j") T.acur = (T.acur + 1) % ids.length;
+    else if (k === "ArrowUp" || k === "k") T.acur = (T.acur - 1 + ids.length) % ids.length;
+    else if (k === " ") { const s = (T.assign[f.path] ??= new Set()); const id = ids[T.acur]; s.has(id) ? s.delete(id) : s.add(id); }
+    else if (k === "Enter") { if (T.fi + 1 < list.length) { T.fi++; T.acur = 0; } else T.step = "done"; }
+    else if (k === "Escape") { T.step = "folders"; }
+  } else if (k === "Enter" || k === "Escape") { Object.assign(T, newTerm(), { cmd: T.cmd }); }
+  if (S.view === "pair") { S.state = T.step === "done" ? "done" : T.picked.size ? "picking" : "waiting"; render({ keepFocus: true }); }
+  else { S.state = T.step; render({ keepFocus: true }); }
+}
+function viewTerminal() {
+  const cli = [
+    ["agentes-runner folders", "Abre a lista para marcar pastas e agentes."],
+    ["agentes-runner folders list", "Mostra o que está liberado e quem usa."],
+    ["agentes-runner folders allow <pasta> --agent <nome>", "Libera uma pasta direto (o --agent é opcional)."],
+    ["agentes-runner folders remove <pasta>", "Tira a pasta de todos os agentes."],
+    ["agentes-runner tools", "Liga e desliga Claude Code, Codex e comandos."],
+    ["agentes-runner tools enable codex", "Liga uma ferramenta (claude, codex ou commands)."],
+  ];
+  return `<div class="page"><div class="tpage">
+    <span class="eyebrow">No seu Mac</span>
+    <h1 style="margin-top:6px">Escolher pastas no Terminal</h1>
+    <p class="lead" style="margin-top:8px">O app agentes no seu Mac mostra os seus projetos para marcar. Só o que você marca chega ao site.</p>
+    <div class="tgrid">
+      <div class="col">${termWindow(false)}<span class="help" style="display:flex;gap:6px;align-items:center">${I("keyboard", "sm")}Clique no Terminal e use ↑ ↓, espaço, enter e esc.</span></div>
+      <section class="card">
+        <div class="ch"><h2>${I("terminal", "sm")}Comandos</h2></div>
+        <div class="cli">${cli.map(([c, d]) => `<div class="c"><code>${esc(c)}</code><span>${d}</span></div>`).join("")}</div>
+      </section>
+    </div>
+  </div></div>`;
+}
+
+/* ================= Render + events ================= */
+function render(opts = {}) {
+  const hadFocus = opts.keepFocus && document.activeElement?.id === "scr";
+  const y = scrollY;
+  $("#app").classList.toggle("bare", S.view === "terminal");
+  renderBar(); renderSide();
+  const main = $("#main");
+  main.innerHTML = S.view === "computer" ? viewComputer() : S.view === "pair" ? viewPair() : S.view === "agent" ? viewAgent() : S.view === "chat" ? viewChat() : viewTerminal();
+  if (S.view === "agent") {
+    const size = innerWidth <= 640 ? 78 : 112;
+    const cv = avatar(AGENTS.bento.look, size, 0.7, { tight: false });
+    cv.style.marginBottom = -size * RCH.bottom + size * 0.04 + "px";
+    $("#heroAgent").append(cv);
+  }
+  hydrate(main);
+  const L = $("#layer");
+  L.innerHTML = S.dialog === "change" ? dialogChange() : S.dialog === "remove" ? dialogRemove() : S.dialog === "other" ? dialogOther() : "";
+  hydrate(L);
+  renderSavebar();
+  placePills();
+  if (hadFocus) $("#scr")?.focus();
+  if (opts.keepScroll || opts.keepFocus) scrollTo(0, y);
+  setHash();
+}
+function renderSavebar() {
+  const sb = $("#savebar");
+  const dirty = S.view === "agent" && JSON.stringify([...S.agentUses].sort()) !== JSON.stringify([...S.agentSaved].sort());
+  sb.classList.toggle("on", dirty);
+  if (!dirty) { sb.innerHTML = ""; return; }
+  const added = S.agentUses.filter((x) => !S.agentSaved.includes(x)).map((id) => base(S.folders.find((f) => f.id === id).path));
+  const gone = S.agentSaved.filter((x) => !S.agentUses.includes(x)).map((id) => base(S.folders.find((f) => f.id === id).path));
+  const n = added.length + gone.length;
+  sb.innerHTML = `<span class="hint"><b>${n} ${n === 1 ? "alteração" : "alterações"}</b><span>${added.length ? "passa a usar " + esc(listNames(added)) : ""}${added.length && gone.length ? "; " : ""}${gone.length ? "deixa de usar " + esc(listNames(gone)) : ""}</span></span>
+    <button class="btn ghost sm" data-discard>Descartar</button><button class="btn primary sm" data-save>Salvar</button>`;
+}
+function setHash() {
+  const q = new URLSearchParams();
+  q.set("view", S.view);
+  if (STATES[S.view] && S.state) q.set("state", S.state);
+  if (ROLES[S.view]) q.set("role", S.role);
+  if (S.dialog) q.set("dialog", S.dialog);
+  if (S.view === "chat" && S.scope !== "project") q.set("scope", S.scope);
+  if (S.view === "computer" && S.tools.codex) q.set("codex", "on");
+  if (S.view === "computer" && !S.folders.some((f) => f.id === "site")) q.set("removed", "1");
+  const th = new URLSearchParams(location.hash.slice(1)).get("theme");
+  if (th) q.set("theme", th);
+  const h = "#" + q.toString();
+  if (location.hash !== h) history.replaceState(null, "", h);
+}
+function fromHash() {
+  const q = new URLSearchParams(location.hash.slice(1));
+  const v = q.get("view");
+  S.view = VIEWS.some(([x]) => x === v) ? v : "computer";
+  const roles = ROLES[S.view], states = STATES[S.view];
+  S.role = roles?.some(([r]) => r === q.get("role")) ? q.get("role") : roles?.[0][0] ?? "owner";
+  S.state = states?.some(([s]) => s === q.get("state")) ? q.get("state") : states?.[0][0] ?? "";
+  S.dialog = q.get("dialog");
+  S.scope = q.get("scope") === "folder" ? "folder" : "project";
+  S.folders = clone(FOLDERS0);
+  if (q.get("removed") === "1") S.folders = S.folders.filter((f) => f.id !== "site");
+  S.tools = { claude: true, codex: q.get("codex") === "on", commands: true };
+  S.removing = S.dialog === "remove" ? "viajolo" : null;
+  S.agentSaved = ["viajolo"]; S.agentUses = S.state === "dirty" ? ["viajolo", "roteiros"] : ["viajolo"];
+  S.pending = S.view === "agent" && S.state === "pending";
+  S.chat = S.state || "ask";
+  S.copied = null;
+  if (S.view === "pair") S.term = presetTerm(S.state, true);
+  else S.term = presetTerm(S.state || "folders");
+  if (S.view === "computer" && S.dialog === "change") S.change = ["pick", "one", "tools"].includes(q.get("tab")) ? q.get("tab") : "pick";
+}
+function go(patch) { Object.assign(S, patch); }
+
+document.addEventListener("click", async (e) => {
+  const el = e.target.closest("button, a, [data-close]");
+  if (!el) return;
+  if (el.matches("[data-noop]")) { e.preventDefault(); return; }
+  if (el.matches(".scrim") && e.target !== el) return;
+  if (el.dataset.close !== undefined) { S.dialog = null; S.removing = null; render({ keepScroll: true }); return; }
+  if (el.dataset.view) { const v = el.dataset.view; location.hash = `view=${v}`; return; }
+  if (el.dataset.state) {
+    const q = new URLSearchParams(location.hash.slice(1)); q.set("state", el.dataset.state); q.delete("dialog");
+    location.hash = q.toString(); return;
+  }
+  if (el.dataset.role) { S.role = el.dataset.role; render({ keepScroll: true }); return; }
+  if (el.id === "themeBtn") {
+    const th = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = th;
+    const q = new URLSearchParams(location.hash.slice(1)); q.set("theme", th); history.replaceState(null, "", "#" + q.toString());
+    render({ keepScroll: true }); return;
+  }
+  if (el.dataset.path) { const p = el.dataset.path; S.full.has(p) ? S.full.delete(p) : S.full.add(p); render({ keepScroll: true }); return; }
+  if (el.matches("[data-copy]")) {
+    const box = el.closest(".cmd"), text = box.dataset.cmd;
+    try { await navigator.clipboard.writeText(text); } catch {}
+    S.copied = text;
+    el.innerHTML = I("check", "sm") + "Copiado"; box.classList.add("copied");
+    toast("Comando copiado. Cole no Terminal do Mac.");
+    /* In the chat, copying the command moves the card to "waiting"; the Mac then reports the access by itself. */
+    if (box.dataset.after === "waiting" && S.chat === "ask") {
+      setTimeout(() => { S.chat = S.state = "waiting"; render({ keepScroll: true }); }, 700);
+      setTimeout(() => { if (S.view === "chat" && S.chat === "waiting") { S.chat = S.state = "done"; toast("Walter liberou viajolo-v5. O Bento continuou."); render({ keepScroll: true }); } }, 4200);
+    }
+    return;
+  }
+  if (el.dataset.dialog) { S.dialog = el.dataset.dialog; if (S.dialog === "change") S.change = "pick"; render({ keepScroll: true }); return; }
+  if (el.dataset.change) { S.change = el.dataset.change; render({ keepScroll: true }); return; }
+  if (el.dataset.allowagent) { const k = el.dataset.allowagent; S.allowAgents = S.allowAgents.includes(k) ? S.allowAgents.filter((x) => x !== k) : [...S.allowAgents, k]; render({ keepScroll: true }); return; }
+  if (el.dataset.remove) { S.removing = el.dataset.remove; S.dialog = "remove"; render({ keepScroll: true }); return; }
+  if (el.dataset.confirmremove) {
+    const f = S.folders.find((x) => x.id === el.dataset.confirmremove);
+    S.folders = S.folders.filter((x) => x !== f); S.dialog = null; S.removing = null;
+    toast(`${base(f.path)} não está mais liberada.`); render({ keepScroll: true }); return;
+  }
+  if (el.dataset.tooloff) {
+    const tl = TOOLS.find((x) => x.id === el.dataset.tooloff); S.tools[tl.id] = false;
+    toast(`${tl.name} desligado. Para ligar de novo, é no Mac.`); render({ keepScroll: true }); return;
+  }
+  if (el.dataset.use) { const id = el.dataset.use; S.agentUses = S.agentUses.includes(id) ? S.agentUses.filter((x) => x !== id) : [...S.agentUses, id]; render({ keepScroll: true }); return; }
+  if (el.matches("[data-save]")) {
+    const added = S.agentUses.filter((x) => !S.agentSaved.includes(x));
+    S.agentSaved = [...S.agentUses];
+    for (const f of S.folders) { const has = f.agents.includes("bento"), on = S.agentUses.includes(f.id); if (on && !has) f.agents.push("bento"); if (!on && has) f.agents = f.agents.filter((x) => x !== "bento"); }
+    toast(added.length ? `Salvo. O Bento já usa ${listNames(added.map((id) => base(S.folders.find((f) => f.id === id).path)))}.` : "Salvo.");
+    S.state = "saved"; render({ keepScroll: true }); return;
+  }
+  if (el.matches("[data-discard]")) { S.agentUses = [...S.agentSaved]; render({ keepScroll: true }); return; }
+  if (el.matches("[data-pending]")) { S.pending = true; S.dialog = null; S.state = "pending"; toast("Pedido enviado ao Walter com o comando pronto."); render({ keepScroll: true }); return; }
+  if (el.matches("[data-cancelpending]")) { S.pending = false; S.state = "saved"; render({ keepScroll: true }); return; }
+  if (el.dataset.scope) { S.scope = el.dataset.scope; S.copied = null; render({ keepScroll: true }); return; }
+  if (el.matches("[data-letuse]")) { S.chat = S.state = "done"; toast("O Bento já usa viajolo-v5."); render({ keepScroll: true }); return; }
+  if (el.matches("[data-skip]")) { toast("Cada agente fica só com a própria pasta. Dá para liberar depois."); return; }
+  if (el.matches("[data-continue]")) { if (el.getAttribute("aria-disabled") === "true") { toast("Confirme no Terminal com enter."); return; } toast("Próximo passo: ferramentas."); return; }
+});
+document.addEventListener("input", (e) => {
+  if (e.target.id === "allowPath") { S.allowPath = e.target.value; $("#allowCmd").innerHTML = cmdBlock(allowCmd(S.allowPath.trim() || "~/caminho/da/pasta", S.allowAgents)); }
+  if (e.target.id === "otherPath") { S.otherPath = e.target.value; $("#otherCmd").innerHTML = otherCmd(); $("[data-pending]").toggleAttribute("hidden", Boolean(grantedAt(S.otherPath))); }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && S.dialog) { S.dialog = null; render({ keepScroll: true }); return; }
+  if (document.activeElement?.id === "scr") termKey(e);
+});
+addEventListener("hashchange", () => { fromHash(); render(); scrollTo(0, 0); });
+addEventListener("resize", () => placePills());
+fromHash();
+render();
+document.fonts?.ready.then(() => placePills());
+</script>
+</body>
+</html>
