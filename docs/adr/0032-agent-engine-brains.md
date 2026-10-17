@@ -91,6 +91,15 @@ The engine is the same in both editions; only defaults differ: the Cloud encoura
 
 A mission's main session is simply the agent's run in the mission thread with the mission's brain; item work is runs/tasks of the same engine in their own branches or subfolders. The mission-specific runner path (its own MCP tool set, resume plumbing, inbox delivery as a special case) is replaced by engine features. Missions keep their data and UI (plan, decisions, reviews, deliveries, `.agentes/`); only the execution spine is shared.
 
+**As built, mission side (block 4, behind `MISSIONS_ON_ENGINE`, default off; `packages/engine/src/missions-engine.ts`):**
+
+- **Brain.** `missions.brain` when set (block 3a), else the executor: `claude` → `claude_code`, `codex` → `codex`, `agent` → `model`; model from `missions.brain_model`, else the brain's default. Computer brains get `BrainSession { id: main_session_id, resume, machineId: missions.machine_id, cwd: repo_dir }`; `resume` is true once an executor task ran that session or an earlier engine turn started it (`mission_events` `engine_session`).
+- **Main session = runs.** Everything that resumed the executor's main session (a proposal's planning, Start, "Mudar algo", accepted suggestions, decisions, reviews, legacy approval outcomes, an item's end, the inbox) posts the agent-facing notice in the home thread (`meta.missionInbox`, as agent mode did) and calls `MissionEngine.startRun` in the same transaction (or joins the run already working there). A blocking decision or review answered while a run waits on it calls `MissionEngine.resumeRun` with `pause { kind: "input", id: <decision or review id> }` and the answer as the tool result; when nothing waits on it, the answer starts a turn. A person's message addressed to the agent in the thread still starts its run in the message insert; the engine resolves that run's brain with `missionTurnFor(run)`.
+- **Item work** stays machine tasks (own branch and session), started by the run through the gateway's `start_task`; their inbox and resumes stay on the old per-session path. The agent's own tasks in a mission thread end through the mission (notice + wake-up) for every brain.
+- **Gates.** Paused, closed, no computer, or a pre-switch executor task still holding the main session: the text waits in `missions.inbox`. The stuck-loop guard counts the mission's own wake-ups for every brain. Stop, close and a new executor before Start cancel the agent's runs in the thread (`MissionEngine.cancelRuns`).
+- **Default engine.** `runsMissionEngine`: start = today's run queue (`enqueueRunJob`), resume = none (a turn starts instead), cancel = the thread's active runs. The integrator replaces it with block 1's engine.
+- **Switching.** With the flag on, boot enqueues `mission.engine_migrate`: each open mission is marked once (`engine_migrated`, under the row lock) and its main-session inbox goes out as one engine turn, unless an executor task still runs that session (then it goes out when that task ends).
+
 ## Order
 
 1. Extract the engine and the `Brain` interface from `executor.ts`; the model brain is today's behaviour (existing tests guard it).
