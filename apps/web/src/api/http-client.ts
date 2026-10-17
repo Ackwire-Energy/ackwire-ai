@@ -34,6 +34,7 @@ import type {
   ForumSuggestion,
   ForumTopic,
   ForumTopicDetail,
+  GitHubAppInstallation,
   Health,
   Invitation,
   InvitationPreview,
@@ -300,6 +301,13 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
         ).authorizeUrl,
       disconnect: (orgId, connectionId) =>
         request<void>(`${org(orgId)}/connectors/${enc(connectionId)}`, { method: "DELETE" }),
+    },
+    githubApp: {
+      info: (orgId) =>
+        request<{ installable: boolean; installations: GitHubAppInstallation[] }>(`${org(orgId)}/github-app`),
+      install: async (orgId, returnTo) =>
+        (await request<{ installUrl: string }>(`${org(orgId)}/github-app/install`, { json: { returnTo } })).installUrl,
+      remove: (orgId, id) => request<void>(`${org(orgId)}/github-app/installations/${enc(id)}`, { method: "DELETE" }),
     },
     search: {
       query: async (orgId, input) =>

@@ -509,6 +509,25 @@ export function useStartOAuth(orgId: string) {
   });
 }
 
+export const useGitHubApp = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.githubApp(orgId), queryFn: () => api.githubApp.info(orgId), staleTime: 30_000 });
+};
+
+export function useInstallGitHubApp(orgId: string) {
+  const api = useApi();
+  return useMutation({ mutationFn: (returnTo: string) => api.githubApp.install(orgId, returnTo) });
+}
+
+export function useRemoveGitHubApp(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.githubApp.remove(orgId, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.githubApp(orgId) }),
+  });
+}
+
 export function useDisconnect(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
