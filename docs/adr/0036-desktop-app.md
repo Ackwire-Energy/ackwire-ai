@@ -27,7 +27,7 @@ That works for developers and servers. It does not work for the people the produ
 - **Desktop mode has no OS service.** The app starts at login (Tauri autostart) and spawns the runner; quitting the app stops it. If the runner exits unexpectedly the app restarts it with backoff (1 s, 2 s, 4 s… capped at 60 s) and shows the state in the tray.
 - Background tasks and missions are unaffected: they already run detached under a wrapper and survive runner restarts (ADR 0029), and Claude Code resumes with `--resume`.
 - Accepted trade-off: with the app closed, agents can't use the computer. The Quit dialog says so.
-- **Headless mode is unchanged**: the shell installer, Node/Bun and the OS service stay for servers and people who prefer the terminal.
+- **Both modes stay.** The app is the way for people on a Mac (Settings → Computers leads with "Baixar o app para Mac"). The shell installer, Node/Bun and the OS service stay for servers, computers without a screen, and Windows/Linux until the app gets there ("Outras formas: servidor ou Linux"). Later the installer can fetch the compiled binary instead of the `.mjs`, dropping the Node requirement and leaving one way to ship the runner.
 - Paths that pointed at "runtime + script" (the service definition, the `agentes-runner mcp` command written into Claude Code's MCP config) resolve to the compiled binary when there is no separate runtime (`process.execPath === script`).
 
 ### 3. App ↔ runner: stdio for live state, the config file for settings
@@ -45,11 +45,11 @@ That works for developers and servers. It does not work for the people the produ
 - **The config file stays the single source of settings.** The runner watches `config.json` and reloads on change, so `agentes-runner` commands in a terminal and the app edit the same thing. Writes stay atomic with mode 600.
 - The protocol has its own version in `hello` between app and runner; the app refuses a runner it doesn't understand (can't happen when both ship together, but guards development builds).
 
-### 4. Single instance and adopting a terminal install
+### 4. Single instance; no migration
 
 - One runner per OS user and runner home: a lock file (`~/.agentes-runner/runner.lock` with PID, checked for liveness) taken by `start` and `app`. A second one exits with a clear message. Tauri's single-instance plugin keeps one app.
-- On first launch the app looks for an existing install: a `config.json` and/or the OS service. If found, it stops and uninstalls the service, keeps the config (pairing, workspace, limits), marks `"managedBy": "desktop"` and starts its own runner. Nothing is re-paired.
-- With `managedBy: "desktop"`, `agentes-runner update` and `service install` from a terminal refuse and point to the app, so the two install modes can't fight.
+- The app never adopts a terminal install. We are building the MVP with a single user, so there is no migration: to move a computer to the app, disconnect it and connect again from the app.
+- Homes the app creates carry `"managedBy": "desktop"`; there `agentes-runner update` and `service install` from a terminal refuse and point to the app, so the two modes can't fight over the same home.
 
 ### 4b. More than one organization on one computer
 
@@ -57,7 +57,6 @@ That works for developers and servers. It does not work for the people the produ
 - **One runner per organization**, each with its own home and workspace: `~/.agentes-runner/orgs/<orgId>/` (config, token, lock, tasks, logs, activity) and `~/agentes/<org-slug>/` (agent folders). The app spawns one child per organization and shows them grouped in the popover. Today's runner code works unchanged per home (`AGENTES_RUNNER_HOME`).
 - Why not one process with several connections: separate processes keep one organization's ops, tasks and tokens out of another's memory and journal, and need no refactor of the runner.
 - "Adicionar organização" in the popover and in Preferences runs the same sign-in (section 5) into a new home. Leaving one organization stops and removes only its home (agent folders stay on disk).
-- Adopting a terminal install moves the existing single home into `orgs/<orgId>/`.
 - Honest limit: file tools keep each organization in its own folders, but commands run as the same OS user and can reach the other organization's folders (ADR 0030). Protected mode (ADR 0030 level 2) closes that; until then the Tools tab says so.
 - Limits (background tasks, Claude Code processes) apply per organization in v0.1. A computer-wide cap comes later if several organizations compete for the same machine.
 
@@ -112,7 +111,7 @@ The machine-side access model from `PastasComputador.html` (allowed folders, whi
 
 ### 12. Order
 
-- **v0.1 (Mac):** compiled runner, `agentes-runner app` with the stdio protocol, lock file, adoption of terminal installs, device-code sign-in (server + `/conectar` page), pause (protocol 9), activity log, the app (tray, popover, first run, Preferences without Folders), autostart, updater (server proxy of the private release), several organizations, CI and a download entry in Settings → Computers.
+- **v0.1 (Mac):** compiled runner, `agentes-runner app` with the stdio protocol, lock file, device-code sign-in (server + `/conectar` page), pause (protocol 9), activity log, the app (tray, popover, first run, Preferences without Folders), autostart, updater (server proxy of the private release), several organizations, CI and a download entry in Settings → Computers.
 - **v0.2:** folders and tools on the machine, access requests and notifications.
 - **v0.3:** Windows and Linux (tray quirks, WebView2 visual QA, SmartScreen), then signing and notarization.
 
