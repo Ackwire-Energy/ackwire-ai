@@ -107,7 +107,14 @@ export type Field = Exclude<keyof Edits, "levels"> | "levels";
 
 /** Who edits what (the server's rules): admins everything; the agent's owner its look, access, audience, computer and who thinks. */
 export type Viewer = "admin" | "owner" | "member";
-export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>(["look", "levels", "repos", "audience", "machine", "brain"]);
+export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>([
+  "look",
+  "levels",
+  "repos",
+  "audience",
+  "machine",
+  "brain",
+]);
 export const canEdit = (viewer: Viewer, field: Field) =>
   viewer === "admin" || (viewer === "owner" && OWNER_EDITS.has(field));
 

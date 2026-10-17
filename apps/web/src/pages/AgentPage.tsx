@@ -188,7 +188,18 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
         ? { brain: brain.data.brain, model: brain.data.model, fallback: brain.data.fallback }
         : undefined,
     };
-  }, [agent, admin, detail.data, settings.data, access.data, repos.data, library.data, computer.data, brain.data, visible]);
+  }, [
+    agent,
+    admin,
+    detail.data,
+    settings.data,
+    access.data,
+    repos.data,
+    library.data,
+    computer.data,
+    brain.data,
+    visible,
+  ]);
 
   /* ---------- The draft ---------- */
 
@@ -623,7 +634,10 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
       );
     else if (id === "memory" && pending > 0)
       badge = (
-        <span className="agp-badge agp-badge--ask ac-num" title={t("agentPage.memory.waitingCount", { count: pending })}>
+        <span
+          className="agp-badge agp-badge--ask ac-num"
+          title={t("agentPage.memory.waitingCount", { count: pending })}
+        >
           {pending}
         </span>
       );
