@@ -92,6 +92,27 @@ describe("agent page: tabs and the URL", () => {
   });
 });
 
+describe("agent page: who thinks on the overview", () => {
+  test("the API: its model and key in one line; Mudar opens Quem pensa", async () => {
+    const { router } = await go("?tab=overview");
+    const card = screen().getByRole("region", { name: "Quem pensa e orçamento" });
+    expect(card.textContent).not.toContain("Modelo e orçamento");
+    expect(card.querySelector(".ac-chip")?.textContent).toContain(" · ");
+    await click(within(card).getByRole("button", { name: "Mudar" }));
+    expect(router.state.location.search).toMatchObject({ tab: "settings", sec: "brain" });
+    expect(document.getElementById("agp-sec-brain")).not.toBeNull();
+  });
+
+  test("a computer thinks: the line from the DM header", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.brain = { kind: "claude_code", model: "Sonnet", computer: "mac" };
+    await go("?tab=overview", state);
+    const card = screen().getByRole("region", { name: "Quem pensa e orçamento" });
+    expect(card.textContent).toContain("Claude Code · Sonnet no mac");
+  });
+});
+
 describe("agent page: who edits what", () => {
   test("members read: values, not inputs; never money; no runs", async () => {
     await go("?tab=settings", asMember());
@@ -172,6 +193,8 @@ describe("agent page: inline editing and the save bar", () => {
       .find((r) => r.getAttribute("aria-checked") !== "true") as HTMLElement;
     await click(other);
     await openTab(/^Configurações/);
+    // The model cards sit under "Modelo (API)" in "Quem pensa", once it loads.
+    await settle(4);
     await click(screen().getByRole("button", { name: /^Claude Opus/ }));
     await type(screen().getByRole("textbox", { name: /^Orçamento mensal/ }), "55,5");
     await click(screen().getByRole("checkbox", { name: "#general" }));
@@ -371,5 +394,7 @@ describe("agent page rules", () => {
     expect(runMatches(run, "all", "eng", { where: "#eng", routine: false })).toBe(true);
     expect(lineChanges("a\nb", "a\nc\nb")).toEqual({ added: 1, removed: 0 });
     expect(agentSearch({ tab: "memory", sec: "nope" })).toEqual({ tab: "memory", sec: undefined });
+    // The old "Modelo e chave" anchor lands on "Quem pensa".
+    expect(agentSearch({ tab: "settings", sec: "model" })).toEqual({ tab: "settings", sec: "brain" });
   });
 });

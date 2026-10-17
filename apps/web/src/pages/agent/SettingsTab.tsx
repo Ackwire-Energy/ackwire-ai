@@ -25,7 +25,7 @@ import {
   useUsage,
 } from "@/api/queries";
 import { AudienceChoice } from "@/components/AgentAudience";
-import { AgentBrainChoice } from "@/components/AgentBrain";
+import { AgentBrainChoice, agentBrainLine } from "@/components/AgentBrain";
 import { AgentComputerPanel } from "@/components/AgentComputer";
 import {
   BudgetField,
@@ -53,7 +53,6 @@ import { ReadOnlyNote, useVisibleChannels } from "./pieces";
 
 const SECTION_ICON: Record<AgentSection, IconName> = {
   identity: "person",
-  model: "bolt",
   brain: "bulb",
   budget: "wallet",
   owner: "members",
@@ -106,7 +105,7 @@ function Section({
 /** A read-only value where an input would be (members, or what the owner can't change). */
 const ReadValue = ({ children }: { children: ReactNode }) => <span className="agp-ro">{children}</span>;
 
-/** Configurações: identity and look, model and key, budget, owner, who can talk, channels, the computer, archiving. */
+/** Configurações: identity and look, who thinks (and the API's model and key), budget, owner, audience, channels, computer. */
 export function SettingsTab({
   section,
   onSection,
@@ -148,6 +147,40 @@ export function SettingsTab({
   const month = formatMonth(locale, new Date());
   const visibleChannels = useVisibleChannels().list;
   const look = draft.look;
+  // A computer brain, for members (they don't load "Quem pensa"); the API shows its model and key.
+  const memberBrain = agent.brain && agent.brain.kind !== "model" ? agentBrainLine(t, agent, "") : null;
+  /** "Modelo (API)": its model and key (admins), or what it uses (everyone else). */
+  const apiFields = can("model") ? (
+    <>
+      <ModelCards choices={choices} value={draft.model} money onChange={(id) => set("model", id)} />
+      <WasLine changeKey="model" />
+      <div className="agp-field">
+        <span className="newag__label">{t("newAgent.key")}</span>
+        {draft.key === undefined ? (
+          <LoadingLine width={200} />
+        ) : (
+          <KeySelect value={draft.key} onChange={(k) => set("key", k)} options={keys} />
+        )}
+        <WasLine changeKey="key" />
+        <span className="small muted">
+          {t("brain.countsBudget", g)} {t("agentPage.settings.keySafe")}
+        </span>
+      </div>
+    </>
+  ) : (
+    <div className="newag__models">
+      {current ? <ModelCardView model={current} all={all} money={false} /> : <ReadValue>{draft.model}</ReadValue>}
+      <div className="newag__model newag__model--ro">
+        <span className="newag__model-head">
+          <Icon name="key" size={16} />
+          <b>{savedKeyLabel}</b>
+        </span>
+        <span className="newag__model-desc">
+          {t("brain.countsBudget", g)} {t("agentPage.settings.keySafe")}
+        </span>
+      </div>
+    </div>
+  );
   return (
     <>
       <ReadOnlyNote />
@@ -258,45 +291,20 @@ export function SettingsTab({
             )}
           </Section>
 
-          <Section id="model" title={t("agent.modelAndKey")} fields={["model", "key"]}>
-            {can("model") ? (
-              <>
-                <ModelCards choices={choices} value={draft.model} money onChange={(id) => set("model", id)} />
-                <WasLine changeKey="model" />
-                <div className="agp-field">
-                  <span className="newag__label">{t("newAgent.key")}</span>
-                  {draft.key === undefined ? (
-                    <LoadingLine width={200} />
-                  ) : (
-                    <KeySelect value={draft.key} onChange={(k) => set("key", k)} options={keys} />
-                  )}
-                  <WasLine changeKey="key" />
-                  <span className="small muted">{t("agentPage.settings.keySafe")}</span>
-                </div>
-              </>
-            ) : (
-              <div className="newag__models">
-                {current ? (
-                  <ModelCardView model={current} all={all} money={false} />
-                ) : (
-                  <ReadValue>{draft.model}</ReadValue>
-                )}
-                <div className="newag__model newag__model--ro">
-                  <span className="newag__model-head">
-                    <Icon name="key" size={16} />
-                    <b>{savedKeyLabel}</b>
-                  </span>
-                  <span className="newag__model-desc">{t("agentPage.settings.keySafe")}</span>
-                </div>
-              </div>
-            )}
-          </Section>
-
-          <Section id="brain" title={t("brain.title")} fields={["brain"]}>
+          <Section id="brain" title={t("brain.title")} fields={["brain", "model", "key"]}>
             {viewer === "member" ? (
-              <p className="small muted">
-                {ownerFirst ? t("brain.hidden", { owner: ownerFirst }) : t("brain.hiddenAdmins")}
-              </p>
+              <>
+                {memberBrain ? (
+                  <span className="agp-chips">
+                    <Chip icon={memberBrain.icon}>{memberBrain.text}</Chip>
+                  </span>
+                ) : (
+                  apiFields
+                )}
+                <p className="small muted">
+                  {ownerFirst ? t("brain.hidden", { owner: ownerFirst }) : t("brain.hiddenAdmins")}
+                </p>
+              </>
             ) : brain.data && draft.brain ? (
               <>
                 <span className="small muted">{t("brain.sub", g)}</span>
@@ -306,10 +314,13 @@ export function SettingsTab({
                   savedBrain={saved.brain?.brain}
                   onChange={can("brain") ? (v) => set("brain", v) : undefined}
                   g={g}
+                  apiFields={apiFields}
                 />
                 <WasLine changeKey="brain" />
               </>
-            ) : brain.isError ? null : (
+            ) : brain.isError ? (
+              apiFields
+            ) : (
               <LoadingLine width={220} />
             )}
           </Section>

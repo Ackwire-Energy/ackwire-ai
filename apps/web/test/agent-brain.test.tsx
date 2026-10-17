@@ -27,7 +27,7 @@ const group = (section: HTMLElement) => within(section).getByRole("radiogroup", 
 const radio = (section: HTMLElement, name: RegExp) => within(group(section)).getByRole("radio", { name });
 
 describe("Quem pensa (agent settings)", () => {
-  test("three rows with their marks; the API is the default; no model or fallback for it", async () => {
+  test("three rows with their marks; the API is the default, with its model and key under it", async () => {
     const { section } = await open();
     expect(section.textContent).toContain("Quem pensa");
     const rows = within(group(section)).getAllByRole("radio");
@@ -38,11 +38,20 @@ describe("Quem pensa (agent settings)", () => {
     ]);
     expect(rows[0]?.getAttribute("aria-checked")).toBe("true");
     expect(rows.map((r) => r.querySelector(".ac-icon") !== null)).toEqual([true, true, true]);
-    expect(rows[0]?.textContent).toContain("Conta no orçamento.");
+    expect(rows[0]?.textContent).toContain("Um modelo de IA pela API, com uma chave do workspace.");
     expect(within(section).queryByRole("switch")).toBeNull();
     expect(within(section).queryByRole("combobox", { name: "Modelo" })).toBeNull();
-    // Nav entry for the section.
-    expect(screen().getByRole("navigation", { name: "Seções das configurações" }).textContent).toContain("Quem pensa");
+    // "Modelo (API)" carries the model cards and the key, under its row.
+    const more = section.querySelector(".ac-optrow__more") as HTMLElement;
+    expect(within(more).getByRole("group", { name: "Modelo" })).toBeTruthy();
+    expect(within(more).getByRole("combobox", { name: "Chave" })).toBeTruthy();
+    expect(more.textContent).toContain("Conta no orçamento da Ada.");
+    expect(more.textContent).toContain("A chave fica cifrada no servidor; ninguém vê.");
+    // One section: no "Modelo e chave" in the index.
+    const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
+    expect(nav.textContent).toContain("Quem pensa");
+    expect(nav.textContent).not.toContain("Modelo e chave");
+    expect(document.getElementById("agp-sec-model")).toBeNull();
   });
 
   test("Claude Code asks first: the personal-plan warning; Cancelar keeps the API", async () => {
@@ -68,6 +77,9 @@ describe("Quem pensa (agent settings)", () => {
     );
     expect(radio(section, /^Claude Code no MacBook/).getAttribute("aria-checked")).toBe("true");
     expect(within(section).getByRole("combobox", { name: "Modelo" }).textContent).toContain("Sonnet");
+    // The API's model and key go with the API row.
+    expect(within(section).queryByRole("combobox", { name: "Chave" })).toBeNull();
+    expect(within(section).queryByRole("group", { name: "Modelo" })).toBeNull();
     const fallback = within(section).getByRole("switch", {
       name: "Se o computador não estiver disponível, responder pela API",
     });
@@ -159,6 +171,9 @@ describe("Quem pensa (agent settings)", () => {
     const seen = await open(member);
     expect(within(seen.section).queryByRole("radiogroup")).toBeNull();
     expect(seen.section.textContent).toContain("escolhe quem pensa");
+    // The model it uses, read-only.
+    expect(within(seen.section).queryByRole("combobox", { name: "Chave" })).toBeNull();
+    expect(seen.section.textContent).toContain("Conta no orçamento da Ada.");
   });
 });
 

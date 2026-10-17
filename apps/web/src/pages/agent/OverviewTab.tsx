@@ -13,6 +13,7 @@ import {
   useUsage,
 } from "@/api/queries";
 import { ResourceIcon, resourceName, useConnectedById } from "@/components/AccessLevels";
+import { agentBrainLine } from "@/components/AgentBrain";
 import { usd } from "@/components/AgentFields";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -24,7 +25,7 @@ import { CardHead, useAgentEdit } from "./context";
 import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
 import { useRepoSuffix } from "./Repos";
 
-/** Visão geral: what it does, its recent work, what it can use; who answers, where it works, model and budget. */
+/** Visão geral: what it does, its recent work, what it can use; who answers, where it works, who thinks and the budget. */
 export function OverviewTab() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
@@ -66,6 +67,8 @@ export function OverviewTab() {
       ? t("agent.withOrgKey", { org: org.name })
       : t("agent.withPlatformKey");
   const decides = viewer !== "member";
+  // Like the DM header: "Claude Code · Sonnet no mac", or the API's model and key.
+  const brainLine = agentBrainLine(t, agent, `${modelLabel} · ${keyLabel}`);
   return (
     <>
       <ReadOnlyNote />
@@ -357,22 +360,21 @@ export function OverviewTab() {
             )}
           </Card>
 
-          <Card as="section" className="agp-card" aria-labelledby="ov-model">
+          <Card as="section" className="agp-card" aria-labelledby="ov-brain">
             <CardHead
-              id="ov-model"
-              icon="bolt"
-              title={t("agentPage.overview.modelBudget")}
+              id="ov-brain"
+              icon="bulb"
+              title={t("agentPage.overview.brainBudget")}
               action={
-                can("model") ? (
-                  <Button size="sm" variant="ghost" icon="edit" onClick={() => goTo("settings", "model")}>
+                can("brain") || can("model") ? (
+                  <Button size="sm" variant="ghost" icon="edit" onClick={() => goTo("settings", "brain")}>
                     {t("agentPage.change")}
                   </Button>
                 ) : null
               }
             />
             <span className="agp-chips">
-              <Chip icon="bolt">{modelLabel}</Chip>
-              <Chip icon="key">{keyLabel}</Chip>
+              <Chip icon={brainLine.icon}>{brainLine.text}</Chip>
             </span>
             <div className="agp-budget">
               <span className="small muted">

@@ -12,7 +12,7 @@ import {
   Switch,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Agent, AgentBrain, BrainKind, BrainOption } from "@/api/types";
 import { type BrainChoice, needsPlanWarning } from "@/lib/agent-edit";
@@ -66,8 +66,9 @@ export function brainSummary(t: TFunction, choice: BrainChoice, options: BrainOp
 
 /**
  * "Quem pensa" in the agent's Configurações (ADR 0032): the model (API), or
- * Claude Code / Codex on its computer, as rows with their mark; the model
- * for a computer brain; the fallback to the API. Choosing a plan brain anew
+ * Claude Code / Codex on its computer, as rows with their mark. Under the
+ * chosen row, its settings: the API's model and key (`apiFields`), or a
+ * computer brain's model and the fallback to the API. Choosing a plan brain anew
  * asks for the warning to be confirmed first (the plan is personal); the
  * audience is never blocked.
  */
@@ -77,6 +78,7 @@ export function AgentBrainChoice({
   savedBrain,
   onChange,
   g,
+  apiFields,
 }: {
   view: AgentBrain;
   value: BrainChoice;
@@ -85,12 +87,13 @@ export function AgentBrainChoice({
   /** Absent: read-only. */
   onChange?: (next: BrainChoice) => void;
   g: ReturnType<typeof agentGrammar>;
+  /** Under "Modelo (API)" when chosen: its model and key. */
+  apiFields?: ReactNode;
 }) {
   const { t } = useTranslation();
   const [asking, setAsking] = useState<"claude_code" | "codex" | null>(null);
   const fallbackId = useId();
   const computer = view.computer?.name ?? null;
-  const option = view.options.find((o) => o.kind === value.brain);
   const editable = Boolean(onChange) && view.canEdit;
 
   const choose = (kind: BrainKind) => {
@@ -104,49 +107,34 @@ export function AgentBrainChoice({
 
   const reason = (o: BrainOption) => (o.reason ? t(`brain.reasons.${o.reason}`, { computer: computer ?? "" }) : null);
 
-  return (
+  /** Under the chosen row: why it can't run now, then its own settings. */
+  const settings = (o: BrainOption) => (
     <>
-      <OptionList
-        aria-label={t("brain.title")}
-        value={value.brain}
-        disabled={!editable}
-        onValueChange={choose}
-        options={view.options.map((o) => ({
-          value: o.kind,
-          title: (
-            <>
-              <Icon name={BRAIN_ICON[o.kind]} size={14} />
-              {brainName(t, o.kind, computer)}
-            </>
-          ),
-          tag: o.experimental ? t("brain.testing") : undefined,
-          description: o.available || o.kind === value.brain ? t(`brain.${o.kind}Text`) : reason(o),
-          disabled: !o.available && o.kind !== value.brain,
-        }))}
-      />
-      {option && !option.available && (
+      {!o.available && (
         <SettingNote icon="alert">
-          {t("brain.notAvailableNow")} {reason(option)}
+          {t("brain.notAvailableNow")} {reason(o)}
         </SettingNote>
       )}
-      {value.brain !== "model" && option?.available && view.computer && !view.computer.online && (
-        <SettingNote icon="pause">{t("brain.offline", { computer })}</SettingNote>
-      )}
-      {value.brain !== "model" && option && (
+      {o.kind === "model" ? (
+        apiFields
+      ) : (
         <>
+          {o.available && view.computer && !view.computer.online && (
+            <SettingNote icon="pause">{t("brain.offline", { computer })}</SettingNote>
+          )}
           <Field label={t("brain.modelLabel")} id="agp-brain-model" help={t("brain.modelHelp")}>
             <Select
-              value={value.model ?? option.defaultModel ?? undefined}
+              value={value.model ?? o.defaultModel ?? undefined}
               disabled={!editable}
-              onValueChange={(model) => onChange?.({ ...value, model: model === option.defaultModel ? null : model })}
+              onValueChange={(model) => onChange?.({ ...value, model: model === o.defaultModel ? null : model })}
               options={[
-                ...option.models.map((m) => ({
+                ...o.models.map((m) => ({
                   value: m.value,
                   label: m.label,
                   description: m.recommended ? t("brain.recommended") : undefined,
                 })),
                 // A model typed elsewhere (the API takes any Codex model) stays visible.
-                ...(value.model && !option.models.some((m) => m.value === value.model)
+                ...(value.model && !o.models.some((m) => m.value === value.model)
                   ? [{ value: value.model, label: value.model }]
                   : []),
               ]}
@@ -166,6 +154,30 @@ export function AgentBrainChoice({
           </SettingRow>
         </>
       )}
+    </>
+  );
+
+  return (
+    <>
+      <OptionList
+        aria-label={t("brain.title")}
+        value={value.brain}
+        disabled={!editable}
+        onValueChange={choose}
+        options={view.options.map((o) => ({
+          value: o.kind,
+          title: (
+            <>
+              <Icon name={BRAIN_ICON[o.kind]} size={14} />
+              {brainName(t, o.kind, computer)}
+            </>
+          ),
+          tag: o.experimental ? t("brain.testing") : undefined,
+          description: o.available || o.kind === value.brain ? t(`brain.${o.kind}Text`) : reason(o),
+          disabled: !o.available && o.kind !== value.brain,
+          children: o.kind === value.brain ? settings(o) : undefined,
+        }))}
+      />
 
       <PlanTermsDialog
         brain={asking}

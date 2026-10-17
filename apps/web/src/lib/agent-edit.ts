@@ -18,7 +18,6 @@ export const isAgentTab = (v: unknown): v is AgentTab => AGENT_TABS.includes(v a
 /** Configurações' sections, in order. */
 export const AGENT_SECTIONS = [
   "identity",
-  "model",
   "brain",
   "budget",
   "owner",
@@ -30,11 +29,12 @@ export const AGENT_SECTIONS = [
 export type AgentSection = (typeof AGENT_SECTIONS)[number];
 export const isAgentSection = (v: unknown): v is AgentSection => AGENT_SECTIONS.includes(v as AgentSection);
 
-/** `?tab=access&sec=model` (unknown values are dropped). */
+/** `?tab=settings&sec=brain` (unknown values are dropped; the old `sec=model` lands on "Quem pensa"). */
 export function agentSearch(search: Record<string, unknown>): { tab?: AgentTab; sec?: AgentSection } {
+  const sec = search.sec === "model" ? "brain" : search.sec;
   return {
     tab: isAgentTab(search.tab) ? search.tab : undefined,
-    sec: isAgentSection(search.sec) ? search.sec : undefined,
+    sec: isAgentSection(sec) ? sec : undefined,
   };
 }
 
@@ -127,8 +127,8 @@ export const FIELD_PLACE: Record<Field, { tab: AgentTab; sec?: AgentSection }> =
   levels: { tab: "access" },
   repos: { tab: "access" },
   skills: { tab: "access" },
-  model: { tab: "settings", sec: "model" },
-  key: { tab: "settings", sec: "model" },
+  model: { tab: "settings", sec: "brain" },
+  key: { tab: "settings", sec: "brain" },
   budget: { tab: "settings", sec: "budget" },
   owner: { tab: "settings", sec: "owner" },
   audience: { tab: "settings", sec: "audience" },

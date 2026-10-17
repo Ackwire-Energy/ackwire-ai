@@ -1,5 +1,5 @@
 import { RadioGroup as RRadioGroup } from "radix-ui";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { cx } from "../cx";
 
 export interface OptionListItem<V extends string> {
@@ -13,6 +13,8 @@ export interface OptionListItem<V extends string> {
   leading?: ReactNode;
   /** Shown but not choosable now (say why in `description`). */
   disabled?: boolean;
+  /** Its settings, under the row while it is the one chosen, aligned with the row's text. */
+  children?: ReactNode;
 }
 
 export interface OptionListProps<V extends string> {
@@ -31,6 +33,7 @@ export interface OptionListProps<V extends string> {
  * edge, neutral selection (telas/MissaoConfig.html: Autonomia, Quem faz o
  * trabalho). Radix RadioGroup: `role="radio"` rows, one tab stop, arrow
  * keys move and select. A row leads with its illustration, or a radio dot.
+ * The chosen row can carry its own settings (`children`) right under it.
  */
 export function OptionList<V extends string>({
   value,
@@ -51,25 +54,29 @@ export function OptionList<V extends string>({
       {...rest}
     >
       {options.map((o) => (
-        <RRadioGroup.Item
-          key={o.value}
-          value={o.value}
-          disabled={o.disabled}
-          className={cx("ac-optrow", o.leading ? "ac-optrow--lead" : undefined)}
-        >
-          {o.leading ? (
-            <span className="ac-optrow__lead">{o.leading}</span>
-          ) : (
-            <span className="ac-optrow__dot" aria-hidden="true" />
-          )}
-          <span className="ac-optrow__text">
-            <span className="ac-optrow__title">
-              {o.title}
-              {o.tag && <span className="ac-optrow__tag">{o.tag}</span>}
+        <Fragment key={o.value}>
+          <RRadioGroup.Item
+            value={o.value}
+            disabled={o.disabled}
+            className={cx("ac-optrow", o.leading ? "ac-optrow--lead" : undefined)}
+          >
+            {o.leading ? (
+              <span className="ac-optrow__lead">{o.leading}</span>
+            ) : (
+              <span className="ac-optrow__dot" aria-hidden="true" />
+            )}
+            <span className="ac-optrow__text">
+              <span className="ac-optrow__title">
+                {o.title}
+                {o.tag && <span className="ac-optrow__tag">{o.tag}</span>}
+              </span>
+              {o.description && <span className="ac-optrow__desc">{o.description}</span>}
             </span>
-            {o.description && <span className="ac-optrow__desc">{o.description}</span>}
-          </span>
-        </RRadioGroup.Item>
+          </RRadioGroup.Item>
+          {o.value === value && o.children && (
+            <div className={cx("ac-optrow__more", o.leading ? "ac-optrow__more--lead" : undefined)}>{o.children}</div>
+          )}
+        </Fragment>
       ))}
     </RRadioGroup.Root>
   );
