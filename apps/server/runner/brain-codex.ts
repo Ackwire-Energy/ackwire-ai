@@ -1,0 +1,579 @@
+import { type ChildProcess, spawn } from "node:child_process";
+import type { EventEmitter } from "node:events";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { createInterface } from "node:readline";
+import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
+import { RunnerError } from "./errors";
+import { killTree } from "./exec";
+import { cachedExecutors } from "./executors";
+import { CODEX_MCP_ENV, CODEX_MCP_SERVER } from "./mcp";
+import { agentWorkspace, isInside, resolveInWorkspace } from "./paths";
+import { agentSecrets } from "./secrets";
+
+/**
+ * The Codex branch of `brain.turn` (ADR 0032, ADR 0029 "Codex"): one agent
+ * turn as `codex exec --json`, its JSONL turned into brain events.
+ *
+ * - First turn of a session: `codex exec --json --skip-git-repo-check -C <cwd>
+ *   --sandbox workspace-write -c sandbox_workspace_write.network_access=true
+ *   -c developer_instructions=<system> <MCP bridge -c …> [-m <model>] -o
+ *   <last.txt> -`, the prompt on stdin. Next turns: the same options without
+ *   the instructions (the thread keeps them), then `resume <thread_id> -`.
+ * - Codex picks its thread id (`thread.started`): our session id → that
+ *   thread lives in `<runner home>/brain/codex-threads.json`. A runner that
+ *   lost it starts a new thread (with the instructions again).
+ * - Events: `agent_message` (exec has no deltas: the last completed one is
+ *   the answer, sent whole as one `text_delta`, `last.txt` when the stream had
+ *   none), `command_execution` / `file_change` (`tool_call` already executed,
+ *   for the transcript), `turn.completed` usage (the plan's), `turn.failed`
+ *   (the error; a usage limit is `limit` first). `error` events alone don't
+ *   end a turn (Codex retries after some); exit code and `turn.failed` decide.
+ *   Our MCP bridge's tool calls are not repeated: the engine ran them.
+ * - Commands run in Codex's own sandbox (`exec` forces approval_policy=never);
+ *   the MCP bridge needs `default_tools_approval_mode="approve"` or every tool
+ *   without `readOnlyHint` is denied. The token reaches the bridge through
+ *   the env (`env_vars`, or `bearer_token_env_var` for an HTTP bridge), never argv.
+ */
+
+/** Same as the engine's `CODEX_MIN_VERSION` (`packages/engine/src/missions.ts`): the release verified on a real machine. */
+export const CODEX_MIN_VERSION = "0.163.0";
+/** What a `tool_call` keeps of a command's output. */
+export const CODEX_TOOL_OUTPUT_MAX = 4000;
+/** Sessions remembered (oldest forgotten first). */
+export const CODEX_THREADS_MAX = 2000;
+const KILL_GRACE_MS = 5000;
+
+/** The engine's `BrainEvent` (ADR 0032 contract), as the runner sends it in `brain.event`. */
+export type CodexBrainEvent =
+  | { type: "text_delta"; text: string }
+  | {
+      type: "tool_call";
+      id: string;
+      name: string;
+      input: unknown;
+      executed?: { content: string; isError?: boolean };
+    }
+  | { type: "usage"; input: number; output: number; source: "api" | "plan"; model?: string }
+  | { type: "limit"; resetsAt?: string }
+  | { type: "done"; text: string; session?: { id: string } }
+  | { type: "error"; code: string; message: string; retryable?: boolean };
+
+/** `brain.turn` with `kind: "codex"` (contract: "Runner"). */
+export interface CodexBrainTurnRequest {
+  runId: string;
+  kind: "codex";
+  session: { id: string; resume: boolean };
+  /** Relative to the agent's folder. */
+  cwd?: string;
+  model?: string;
+  system: string;
+  prompt: string;
+  mcp: { token: string; url?: string };
+  agent?: AgentScope;
+}
+
+/** `codex-cli 0.163.0` → true from `CODEX_MIN_VERSION` on. */
+export function codexVersionOk(version: string | undefined): boolean {
+  const parse = (s: string | undefined) => {
+    const m = /(\d+)\.(\d+)\.(\d+)/.exec(s ?? "");
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  };
+  const have = parse(version);
+  const want = parse(CODEX_MIN_VERSION) as number[];
+  if (!have) return false;
+  for (let i = 0; i < 3; i++) if ((have[i] ?? 0) !== (want[i] ?? 0)) return (have[i] ?? 0) > (want[i] ?? 0);
+  return true;
+}
+
+/** Our session id → Codex thread id, kept across runner restarts (written whole, then renamed). */
+export class CodexThreads {
+  private map: Record<string, string> | null = null;
+
+  constructor(private readonly file: string) {}
+
+  private load(): Record<string, string> {
+    if (this.map) return this.map;
+    try {
+      const v = JSON.parse(readFileSync(this.file, "utf8")) as unknown;
+      this.map =
+        v && typeof v === "object"
+          ? Object.fromEntries(
+              Object.entries(v as Record<string, unknown>).filter(
+                (e): e is [string, string] => typeof e[1] === "string",
+              ),
+            )
+          : {};
+    } catch {
+      this.map = {};
+    }
+    return this.map;
+  }
+
+  get(session: string): string | undefined {
+    return this.load()[session];
+  }
+
+  set(session: string, thread: string) {
+    const map = this.load();
+    if (map[session] === thread) return;
+    delete map[session];
+    map[session] = thread;
+    const keys = Object.keys(map);
+    for (const k of keys.slice(0, Math.max(0, keys.length - CODEX_THREADS_MAX))) delete map[k];
+    mkdirSync(path.dirname(this.file), { recursive: true });
+    const tmp = `${this.file}.tmp`;
+    writeFileSync(tmp, JSON.stringify(map), { mode: 0o600 });
+    renameSync(tmp, this.file);
+  }
+}
+
+/** Where the threads live in the runner home. */
+export const codexThreadsFile = (runnerHome: string) => path.join(runnerHome, "brain", "codex-threads.json");
+
+/**
+ * Codex `-c` overrides for the run's MCP bridge (values are TOML; JSON
+ * strings and arrays are valid TOML). Stdio: `agentes-runner mcp --run
+ * <runId>` with the token, socket and home passed by name (`env_vars`).
+ * HTTP: the bridge URL with the token as a bearer from the env.
+ */
+export function codexBridgeOverrides(input: { runId: string; command?: string[]; url?: string }): string[] {
+  const key = `mcp_servers.${CODEX_MCP_SERVER}`;
+  const toml = (v: unknown) => JSON.stringify(v);
+  const where = input.url
+    ? [`${key}.url=${toml(input.url)}`, `${key}.bearer_token_env_var=${toml(CODEX_MCP_ENV[0])}`]
+    : (() => {
+        const [command, ...args] = input.command ?? [];
+        return [
+          `${key}.command=${toml(command ?? "agentes-runner")}`,
+          `${key}.args=${toml([...args, "mcp", "--run", input.runId])}`,
+          `${key}.env_vars=${toml(CODEX_MCP_ENV)}`,
+        ];
+      })();
+  return [
+    ...where,
+    `${key}.default_tools_approval_mode="approve"`,
+    `${key}.startup_timeout_sec=60`,
+    `${key}.tool_timeout_sec=300`,
+    `${key}.required=true`,
+  ];
+}
+
+/** The `codex` arguments for one turn (an argv: nothing goes through a shell). */
+export function codexTurnArgs(input: {
+  cwd: string;
+  lastFile: string;
+  runId: string;
+  model?: string;
+  /** Only when a thread starts. */
+  instructions?: string;
+  /** Resume this Codex thread. */
+  thread?: string;
+  mcp?: { command?: string[]; url?: string };
+}): string[] {
+  const instructions = input.instructions?.trim();
+  return [
+    "exec",
+    "--json",
+    "--skip-git-repo-check",
+    "-C",
+    input.cwd,
+    "--sandbox",
+    "workspace-write",
+    "-c",
+    "sandbox_workspace_write.network_access=true",
+    ...(instructions && !input.thread ? ["-c", `developer_instructions=${JSON.stringify(instructions)}`] : []),
+    ...(input.mcp ? codexBridgeOverrides({ runId: input.runId, ...input.mcp }).flatMap((o) => ["-c", o]) : []),
+    ...(input.model ? ["-m", input.model] : []),
+    "-o",
+    input.lastFile,
+    ...(input.thread ? ["resume", input.thread] : []),
+    "-",
+  ];
+}
+
+/** `/bin/zsh -lc "npm test"` → `npm test` (Codex wraps every command in the login shell). */
+function unwrapShell(command: string) {
+  const m = /^\S*(?:sh|bash|zsh)\s+-l?c\s+(["'])([\s\S]*)\1$/.exec(command.trim());
+  return (m ? (m[2] ?? "") : command).replace(/\s+/g, " ").trim();
+}
+
+const USAGE_LIMIT = /hit your usage limit|usage limit reached|usage_limit/i;
+
+/**
+ * `codex exec --json` lines → brain events, plus what the turn's end needs
+ * (the thread, the last answer, whether it completed or failed).
+ */
+export class CodexEventMapper {
+  thread?: string;
+  answer?: string;
+  completed = false;
+  failed?: string;
+  lastError?: string;
+
+  constructor(
+    private readonly opts: { cwd: string; model?: string; redact?: (text: string) => string } = { cwd: "" },
+  ) {}
+
+  private clean(text: string) {
+    return this.opts.redact ? this.opts.redact(text) : text;
+  }
+
+  private rel(p: string) {
+    if (!p || !this.opts.cwd) return p;
+    const abs = path.resolve(this.opts.cwd, p);
+    return isInside(this.opts.cwd, abs) ? path.relative(this.opts.cwd, abs).split(path.sep).join("/") : p;
+  }
+
+  /** One JSONL line (anything that isn't a JSON event is ignored). */
+  line(raw: string): CodexBrainEvent[] {
+    const text = raw.trim();
+    if (!text.startsWith("{")) return [];
+    let ev: Record<string, unknown>;
+    try {
+      ev = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return [];
+    }
+    return this.event(ev);
+  }
+
+  event(ev: Record<string, unknown>): CodexBrainEvent[] {
+    const str = (v: unknown) => (typeof v === "string" ? v : "");
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+    switch (ev.type) {
+      case "thread.started":
+        if (str(ev.thread_id)) this.thread = str(ev.thread_id);
+        return [];
+      case "turn.completed": {
+        this.completed = true;
+        const u = (ev.usage ?? {}) as Record<string, unknown>;
+        return [
+          {
+            type: "usage",
+            input: num(u.input_tokens),
+            output: num(u.output_tokens),
+            source: "plan",
+            ...(this.opts.model ? { model: this.opts.model } : {}),
+          },
+        ];
+      }
+      case "turn.failed":
+        this.failed = this.clean(str((ev.error as { message?: unknown } | undefined)?.message) || "The turn failed");
+        return [];
+      case "error":
+        this.lastError = this.clean(str(ev.message) || "error");
+        return [];
+      case "item.completed": {
+        const item = (ev.item ?? {}) as Record<string, unknown>;
+        const id = str(item.id) || `codex-${Math.random().toString(36).slice(2)}`;
+        switch (item.type) {
+          case "agent_message": {
+            const t = str(item.text);
+            if (t.trim()) this.answer = this.clean(t);
+            return [];
+          }
+          case "command_execution": {
+            const command = this.clean(unwrapShell(str(item.command)));
+            const code = typeof item.exit_code === "number" ? item.exit_code : null;
+            const declined = item.status === "declined";
+            const output = this.clean(str(item.aggregated_output));
+            const content = declined
+              ? "Not allowed by Codex's sandbox."
+              : output.length > CODEX_TOOL_OUTPUT_MAX
+                ? `${output.slice(0, CODEX_TOOL_OUTPUT_MAX)}\n…`
+                : output;
+            return [
+              {
+                type: "tool_call",
+                id,
+                name: "shell",
+                input: { command },
+                executed: {
+                  content,
+                  ...(declined || item.status === "failed" || (code !== null && code !== 0) ? { isError: true } : {}),
+                },
+              },
+            ];
+          }
+          case "file_change": {
+            const changes = (Array.isArray(item.changes) ? (item.changes as Record<string, unknown>[]) : []).flatMap(
+              (c) => (str(c?.path) ? [{ path: this.rel(str(c.path)), kind: str(c.kind) || "update" }] : []),
+            );
+            const failed = item.status === "failed";
+            return [
+              {
+                type: "tool_call",
+                id,
+                name: "file_change",
+                input: { changes },
+                executed: {
+                  content: failed
+                    ? "The change failed."
+                    : `Changed ${changes.map((c) => `${c.path} (${c.kind})`).join(", ") || "nothing"}`,
+                  ...(failed ? { isError: true } : {}),
+                },
+              },
+            ];
+          }
+          default:
+            return [];
+        }
+      }
+      default:
+        return [];
+    }
+  }
+
+  /** The turn's end: one `done`, or `error` (after `limit` when the plan ran out). */
+  finish(input: { exitCode: number | null; lastFile?: string; sessionId: string; stderr?: string }): CodexBrainEvent[] {
+    const problem =
+      this.failed ??
+      (this.completed
+        ? undefined
+        : (this.lastError ??
+          (input.exitCode === 0
+            ? "Codex ended without finishing the turn"
+            : `Codex exited with code ${input.exitCode ?? "?"}${input.stderr ? `: ${this.clean(input.stderr)}` : ""}`)));
+    if (problem) {
+      if (USAGE_LIMIT.test(problem)) {
+        return [{ type: "limit" }, { type: "error", code: "plan_limit", message: problem }];
+      }
+      return [{ type: "error", code: "codex_failed", message: problem, ...(this.failed ? {} : { retryable: true }) }];
+    }
+    const text = this.answer ?? this.clean(input.lastFile?.trim() ?? "");
+    return [
+      ...(text ? [{ type: "text_delta" as const, text }] : []),
+      { type: "done", text, session: { id: input.sessionId } },
+    ];
+  }
+}
+
+export interface CodexTurnOptions {
+  threads: CodexThreads;
+  /** A scratch folder for this turn (`last.txt`); removed afterwards. */
+  workDir: string;
+  emit: (event: CodexBrainEvent) => void;
+  signal: AbortSignal;
+  /** How to start `agentes-runner mcp` (runtime + script); the stdio bridge. */
+  mcpCommand?: string[];
+  /** The daemon's MCP socket and the runner home (stdio bridge env). */
+  socketPath?: string;
+  runnerHome?: string;
+  /** The agent's secrets: env for Codex, redaction for what leaves the machine (ADR 0027). */
+  env?: Record<string, string>;
+  redact?: (text: string) => string;
+  /** The first line of `codex --version` (default: the cached detection). */
+  codexVersion?: () => string | undefined;
+  /** Tests: the codex executable. */
+  bin?: string;
+  platform?: NodeJS.Platform;
+}
+
+const detected = cachedExecutors();
+
+/** Runs one Codex turn and emits its events; ends with exactly one `done` or `error`. Never throws. */
+export async function runCodexTurn(
+  input: {
+    runId: string;
+    sessionId: string;
+    cwd: string;
+    model?: string;
+    system: string;
+    prompt: string;
+    mcp: { token: string; url?: string };
+  },
+  opts: CodexTurnOptions,
+): Promise<void> {
+  const fail = (code: string, message: string, retryable?: boolean) =>
+    opts.emit({ type: "error", code, message, ...(retryable ? { retryable } : {}) });
+  if ((opts.platform ?? process.platform) === "win32") {
+    return fail("unsupported", "The Codex brain isn't supported on Windows yet.");
+  }
+  const version = (opts.codexVersion ?? (() => detected().codex?.version))();
+  if (!version) return fail("codex_missing", "Codex is not installed on this computer.");
+  if (!codexVersionOk(version)) {
+    return fail("codex_too_old", `Codex here is ${version}; agents need ${CODEX_MIN_VERSION} or newer.`);
+  }
+
+  const thread = opts.threads.get(input.sessionId);
+  mkdirSync(opts.workDir, { recursive: true });
+  const lastFile = path.join(opts.workDir, "last.txt");
+  rmSync(lastFile, { force: true });
+  const args = codexTurnArgs({
+    cwd: input.cwd,
+    lastFile,
+    runId: input.runId,
+    ...(input.model ? { model: input.model } : {}),
+    instructions: input.system,
+    ...(thread ? { thread } : {}),
+    mcp: input.mcp.url ? { url: input.mcp.url } : { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
+  });
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    ...(opts.env ?? {}),
+    [CODEX_MCP_ENV[0]]: input.mcp.token,
+    ...(opts.socketPath ? { [CODEX_MCP_ENV[1]]: opts.socketPath } : {}),
+    ...(opts.runnerHome ? { [CODEX_MCP_ENV[2]]: opts.runnerHome } : {}),
+  };
+  const mapper = new CodexEventMapper({
+    cwd: input.cwd,
+    ...(input.model ? { model: input.model } : {}),
+    ...(opts.redact ? { redact: opts.redact } : {}),
+  });
+
+  let child: ChildProcess;
+  try {
+    child = spawn(opts.bin ?? "codex", args, {
+      cwd: input.cwd,
+      env,
+      stdio: ["pipe", "pipe", "pipe"],
+      detached: true,
+    });
+  } catch (err) {
+    return fail("codex_failed", err instanceof Error ? err.message : String(err));
+  }
+
+  let stderr = "";
+  child.stderr?.on("data", (c: Buffer) => {
+    // Never a failure by itself (the person's own MCP servers log here); kept for a bad exit.
+    stderr = (stderr + c.toString("utf8")).slice(-2000);
+  });
+  const lines = createInterface({ input: child.stdout as NonNullable<ChildProcess["stdout"]> });
+  (lines as unknown as EventEmitter).on("line", (line: string) => {
+    for (const event of mapper.line(line)) opts.emit(event);
+    if (mapper.thread) opts.threads.set(input.sessionId, mapper.thread);
+  });
+  child.stdin?.on("error", () => {});
+  child.stdin?.end(input.prompt);
+
+  let killTimer: ReturnType<typeof setTimeout> | undefined;
+  const abort = () => {
+    killTree(child, "SIGTERM");
+    killTimer = setTimeout(() => killTree(child, "SIGKILL"), KILL_GRACE_MS);
+  };
+  if (opts.signal.aborted) abort();
+  else opts.signal.addEventListener("abort", abort, { once: true });
+
+  const exit = await new Promise<{ code: number | null; error?: Error }>((resolve) => {
+    let settled = false;
+    const proc = child as unknown as EventEmitter;
+    proc.on("error", (error: Error) => {
+      if (!settled) {
+        settled = true;
+        resolve({ code: null, error });
+      }
+    });
+    proc.on("close", (code: number | null) => {
+      if (!settled) {
+        settled = true;
+        resolve({ code });
+      }
+    });
+  });
+  opts.signal.removeEventListener("abort", abort);
+  if (killTimer) clearTimeout(killTimer);
+  lines.close();
+
+  let last: string | undefined;
+  try {
+    if (existsSync(lastFile)) last = readFileSync(lastFile, "utf8");
+  } catch {
+    // none
+  }
+  rmSync(opts.workDir, { recursive: true, force: true });
+
+  if (opts.signal.aborted) return fail("canceled", "The turn was canceled.");
+  if (exit.error) {
+    const missing = (exit.error as NodeJS.ErrnoException).code === "ENOENT";
+    return fail(
+      missing ? "codex_missing" : "codex_failed",
+      missing ? "Codex is not installed on this computer." : exit.error.message,
+    );
+  }
+  for (const event of mapper.finish({
+    exitCode: exit.code,
+    lastFile: last,
+    sessionId: input.sessionId,
+    stderr: stderr.trim(),
+  })) {
+    opts.emit(event);
+  }
+}
+
+/** What the runner's `brain.turn` handler hands the Codex branch. */
+export interface CodexBrainContext {
+  workspaceReal: string;
+  /** `false`: started with `--no-exec`. */
+  exec: boolean;
+  /** The runner home (threads file, per-turn scratch, bridge env). */
+  runnerHome: string;
+  secretsDir?: string;
+  /** The stdio MCP bridge: the daemon socket and how to start `agentes-runner mcp`. */
+  mcp?: { socketPath: string; command: string[] };
+  threads?: CodexThreads;
+  codexVersion?: () => string | undefined;
+  bin?: string;
+}
+
+const threadStores = new Map<string, CodexThreads>();
+
+/**
+ * The dispatch hook: `brain.turn` with `kind: "codex"` → resolves the folder
+ * in the agent's workspace, loads its secrets and runs the turn, emitting
+ * each event (the caller wraps them in `brain.event` and sends `brain.done`).
+ */
+export async function handleCodexBrainTurn(
+  ctx: CodexBrainContext,
+  req: CodexBrainTurnRequest,
+  scope: { signal: AbortSignal; emit: (event: CodexBrainEvent) => void },
+): Promise<void> {
+  if (!ctx.exec) {
+    throw new RunnerError(
+      "exec_disabled",
+      "Commands are turned off on this computer (the runner was paired with --no-exec)",
+    );
+  }
+  if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
+  if (typeof req.runId !== "string" || !/^[a-zA-Z0-9-]{8,64}$/.test(req.runId)) {
+    throw new RunnerError("bad_request", "runId is invalid");
+  }
+  if (typeof req.session?.id !== "string" || !/^[a-zA-Z0-9-]{8,64}$/.test(req.session.id)) {
+    throw new RunnerError("bad_request", "session.id is invalid");
+  }
+  if (typeof req.mcp?.token !== "string" || !req.mcp.token)
+    throw new RunnerError("bad_request", "mcp.token is required");
+  const folder = await agentWorkspace(ctx.workspaceReal, req.agent);
+  let cwd = folder;
+  if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
+    const resolved = await resolveInWorkspace(folder, req.cwd);
+    if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
+    cwd = resolved.abs;
+  }
+  const secrets = await agentSecrets(ctx.secretsDir, req.agent);
+  const file = codexThreadsFile(ctx.runnerHome);
+  const threads = ctx.threads ?? threadStores.get(file) ?? new CodexThreads(file);
+  threadStores.set(file, threads);
+  await runCodexTurn(
+    {
+      runId: req.runId,
+      sessionId: req.session.id,
+      cwd,
+      ...(typeof req.model === "string" && req.model ? { model: req.model } : {}),
+      system: typeof req.system === "string" ? req.system : "",
+      prompt: typeof req.prompt === "string" ? req.prompt : "",
+      mcp: { token: req.mcp.token, ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}) },
+    },
+    {
+      threads,
+      workDir: path.join(ctx.runnerHome, "brain", "turns", req.runId),
+      emit: scope.emit,
+      signal: scope.signal,
+      runnerHome: ctx.runnerHome,
+      ...(ctx.mcp ? { mcpCommand: ctx.mcp.command, socketPath: ctx.mcp.socketPath } : {}),
+      ...(secrets ? { env: secrets.env, redact: secrets.redact } : {}),
+      ...(ctx.codexVersion ? { codexVersion: ctx.codexVersion } : {}),
+      ...(ctx.bin ? { bin: ctx.bin } : {}),
+    },
+  );
+}
