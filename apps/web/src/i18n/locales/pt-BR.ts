@@ -2213,7 +2213,9 @@ export const ptBR = {
     plan: {
       cap: "Plano do {{executor}}",
       label: "Plano",
-      exploring: "O {{executor}} está explorando o repositório",
+      drafting: "O {{executor}} está lendo a pasta no {{computer}} e montando o plano",
+      empty: "Ainda sem itens. Dá para começar assim mesmo ou pedir um plano em “Mudar algo”.",
+      waitPlan: "Libera quando o plano chegar",
       adjusts: "o {{executor}} vai ajustando a lista conforme avança",
       switched: "Agora quem programa é {{executor}}. O plano recomeça.",
       more_one: "+{{count}} item",

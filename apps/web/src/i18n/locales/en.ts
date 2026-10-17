@@ -2201,7 +2201,9 @@ export const en: Translations = {
     plan: {
       cap: "{{executor}}'s plan",
       label: "Plan",
-      exploring: "{{executor}} is exploring the repository",
+      drafting: "{{executor}} is reading the folder on {{computer}} and drafting the plan",
+      empty: "No items yet. You can start anyway or ask for a plan with “Change something”.",
+      waitPlan: "Opens when the plan arrives",
       adjusts: "{{executor}} keeps adjusting the list as it goes",
       switched: "{{executor}} programs now. The plan starts over.",
       more_one: "+{{count}} item",

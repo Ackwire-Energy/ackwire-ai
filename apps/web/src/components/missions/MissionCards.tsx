@@ -39,7 +39,7 @@ import type {
   MissionReportMeta,
   MissionSuggestionMeta,
 } from "@/api/types";
-import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
@@ -60,6 +60,7 @@ import {
   viaText,
 } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
+import { useStreams } from "@/realtime/context";
 import {
   CommandApprovalSelect,
   ExecutorMark,
@@ -105,6 +106,12 @@ function useStamp() {
 
 // ── Plan card ─────────────────────────────────────────────────────────────────
 
+/** A title cut from the goal ("criar um arquivo… com 3 d…"): the goal under it would repeat it. */
+const sameAsTitle = (title: string, goal: string) => {
+  const head = title.replace(/…$/, "").trim().toLowerCase();
+  return head.length > 0 && goal.trim().toLowerCase().startsWith(head);
+};
+
 const PLAN_SHOWN = 5;
 
 export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
@@ -127,6 +134,11 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
   const choices = m?.role === "owner" && m.status === "proposed" ? (m.machine?.executors ?? []) : [];
   const items = (plan.data?.current?.items ?? []).filter((i) => i.status !== "dropped");
   const computer = m?.machine?.name ?? meta.computer;
+  // The main session is still drafting the plan (its run is live in the mission's thread).
+  const drafting = useStreams((st) =>
+    Object.values(st.runs).some((r) => r.agentId === m?.agentId && r.threadId === m?.threadId),
+  );
+  const waitPlan = drafting && items.length === 0;
   const seePlan = () => panel?.openFiles(meta.missionId, "mission.md");
   if (m && m.status !== "proposed") {
     return (
@@ -170,7 +182,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
           {t("missions.plan.cap", { executor })}
         </span>
         <h3>{meta.title}</h3>
-        <p>{firstSentence(meta.goal)}</p>
+        {!sameAsTitle(meta.title, meta.goal) && <p>{firstSentence(meta.goal)}</p>}
       </div>
       {plan.isPending ? (
         <div className="mi-plan__list" aria-hidden="true">
@@ -188,11 +200,23 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
             </li>
           ))}
         </ul>
+      ) : waitPlan ? (
+        <div className="mi-plan__drafting" role="status">
+          <p>
+            <AgentSpinner agentId={m?.agentId} />
+            {t("missions.plan.drafting", { executor, computer })}
+          </p>
+          <ul className="mi-plan__list mi-plan__list--ghost" aria-hidden="true">
+            {["58%", "44%", "51%"].map((w) => (
+              <li key={w}>
+                <span className="mi-box" />
+                <Skeleton width={w} />
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : (
-        <p className="mi-plan__note mi-plan__note--first">
-          {t("missions.plan.exploring", { executor })}
-          <span className="mi-cursor" aria-hidden="true" />
-        </p>
+        <p className="mi-plan__note mi-plan__note--empty">{t("missions.plan.empty", { executor })}</p>
       )}
       {items.length > 0 && (
         <p className="mi-plan__note">
@@ -202,8 +226,8 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
       )}
       <div className="mi-plan__metas">
         <div className="mi-plan__meta">
-          <Icon name="computer" size={14} />
-          <span>
+          <span className="mi-plan__label mi-plan__label--wide">
+            <Icon name="computer" size={14} />
             {t("missions.plan.on", {
               computer,
               state: m?.machine && !m.machine.online ? t("missions.offline") : t("missions.online"),
@@ -212,8 +236,10 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
         </div>
         {m && choices.length > 1 && (
           <div className="mi-plan__meta">
-            <Icon name="code" size={14} />
-            <span>{t("missions.new.who")}</span>
+            <span className="mi-plan__label">
+              <Icon name="code" size={14} />
+              {t("missions.new.who")}
+            </span>
             <Select
               size="sm"
               className="mi-plan__who"
@@ -235,18 +261,28 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
         )}
         {m?.canAct && (
           <div className="mi-plan__meta">
-            <Icon name="shield" size={14} />
-            <span>{t("missions.commandApproval.label")}</span>
+            <span className="mi-plan__label">
+              <Icon name="shield" size={14} />
+              {t("missions.commandApproval.label")}
+            </span>
             <PlanApprovalSelect mission={m} />
           </div>
         )}
       </div>
       <div className="mi-plan__foot">
         {m?.role === "owner" && (
-          <Button variant="primary" size="sm" icon="check" loading={control.isPending} onClick={start}>
+          <Button
+            variant="primary"
+            size="sm"
+            icon="check"
+            loading={control.isPending}
+            disabled={waitPlan}
+            onClick={start}
+          >
             {t("missions.plan.start")}
           </Button>
         )}
+        {m?.role === "owner" && waitPlan && <span className="mi-hint">{t("missions.plan.waitPlan")}</span>}
         {m?.canAct && actions?.replyToMission && (
           <Button
             size="sm"
