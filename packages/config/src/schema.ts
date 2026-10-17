@@ -284,6 +284,31 @@ export const envVars = {
     section: "Connectors",
     secret: true,
   },
+  GITHUB_APP_SLUG: {
+    schema: z.string().optional(),
+    description:
+      "URL name of that GitHub App (`github.com/apps/{slug}`). Organizations install it from the app; only installations made that way are used.",
+    section: "Connectors",
+  },
+  GITHUB_APP_CLIENT_ID: {
+    schema: z.string().optional(),
+    description:
+      "Client id of that GitHub App (user authorization during installation must be on). Callback URL: `{PUBLIC_URL}/api/app/github-app/callback`. Used to check that the person installing can see the installation.",
+    section: "Connectors",
+  },
+  GITHUB_APP_CLIENT_SECRET: {
+    schema: z.string().optional(),
+    description: "Client secret of that GitHub App.",
+    section: "Connectors",
+    secret: true,
+  },
+  GITHUB_APP_WEBHOOK_SECRET: {
+    schema: z.string().optional(),
+    description:
+      "Webhook secret of that GitHub App. Webhook URL: `{PUBLIC_URL}/api/github-app/webhook` (uninstalls, suspensions and repository changes).",
+    section: "Connectors",
+    secret: true,
+  },
   CONNECTOR_SENTRY_CLIENT_ID: {
     schema: z.string().optional(),
     description:

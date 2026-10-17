@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, index, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
 
@@ -148,4 +148,34 @@ export const customTools = pgTable(
     confirmedAt: timestamp({ withTimezone: true }),
   },
   (t) => [unique().on(t.connectionId, t.name), index().on(t.orgId)],
+);
+
+/**
+ * Installations of our GitHub App (git and pull requests), each bound to the
+ * one organization that installed it from the app. The app is public, so a
+ * repository's installation only yields tokens for the org it belongs to;
+ * an installation made outside our install flow binds to nobody.
+ */
+export const githubAppInstallations = pgTable(
+  "github_app_installations",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** GitHub's installation id: one installation belongs to one organization. */
+    installationId: bigint({ mode: "number" }).notNull().unique(),
+    /** The GitHub account it's installed on (user or organization), for display. */
+    accountLogin: text().notNull(),
+    /** `User` or `Organization`. */
+    accountType: text().notNull(),
+    /** `all` or `selected`. */
+    repositorySelection: text().notNull().default("selected"),
+    /** Suspended on GitHub: no tokens until it's unsuspended. */
+    suspendedAt: timestamp({ withTimezone: true }),
+    createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.orgId)],
 );

@@ -414,6 +414,13 @@
       "when": 1792280000000,
       "tag": "0058_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1792290000000,
+      "tag": "0059_github_app_installations",
+      "breakpoints": true
     }
   ]
 }
