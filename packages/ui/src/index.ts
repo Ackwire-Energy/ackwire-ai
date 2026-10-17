@@ -26,7 +26,16 @@ export {
   type Pose,
   spriteGrid,
 } from "./agent/engine.js";
-export { addLiveAgent, getGaze, setGaze } from "./agent/live";
+export {
+  type AgentReaction,
+  addLiveAgent,
+  agentReactionOf,
+  getGaze,
+  playAgentReaction,
+  REACTION_SECONDS,
+  reactionPose,
+  setGaze,
+} from "./agent/live";
 export {
   AGENT_ACCESSORIES,
   AGENT_COLORS,
@@ -115,6 +124,7 @@ export {
 } from "./components/ForumPixels";
 export { Kbd, modKey } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
+export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";
 export { Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "./components/Menu";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";

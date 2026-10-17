@@ -22,6 +22,7 @@ import { requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { isStopRequest, type Judge } from "./judge";
+import { type MessageMemory, memoriesFor } from "./message-memories";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
@@ -56,6 +57,8 @@ export interface MessageView {
   replies?: { count: number; lastAt: string | null; latest: MessageView[] };
   /** In message lists: reactions (`+1`/`-1` or an emoji) and who reacted. */
   reactions?: ReactionCount[];
+  /** People's messages: what agents saved to memory from them (the memory mark). */
+  memories?: MessageMemory[];
   createdAt: string;
 }
 
@@ -794,7 +797,7 @@ async function usageFor(db: Database, orgId: string, list: Message[]) {
 }
 
 async function withReceipts(db: Database, orgId: string, list: Message[]): Promise<MessageView[]> {
-  const [receipts, usage, reactions] = await Promise.all([
+  const [receipts, usage, reactions, memories] = await Promise.all([
     receiptsFor(
       db,
       orgId,
@@ -806,6 +809,7 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
       orgId,
       list.map((m) => m.id),
     ),
+    memoriesFor(db, orgId, list),
   ]);
   const views = list.map((m) => {
     const runUsage = m.agentRunId ? usage.get(m.agentRunId) : undefined;
@@ -815,6 +819,7 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
       ...(receipts.has(m.id) ? { receipts: receipts.get(m.id) } : {}),
       ...(runUsage ? { usage: runUsage } : {}),
       ...(reacted ? { reactions: reacted } : {}),
+      ...(memories.has(m.id) ? { memories: memories.get(m.id) } : {}),
     };
   });
   return withDeletedArtifacts(db, orgId, await withWikiLinks(db, orgId, views));

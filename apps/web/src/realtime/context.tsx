@@ -8,7 +8,7 @@ import { useApi } from "@/api/context";
 import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
 import { cacheTask, refreshMission } from "@/api/missions";
-import { cacheApproval, cacheForumSuggestion, cacheMessage } from "@/api/queries";
+import { applyReactions, cacheApproval, cacheForumSuggestion, cacheMessage, cacheMessageMemories } from "@/api/queries";
 import type {
   ActiveRun,
   Agent,
@@ -578,9 +578,10 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if (event.suggestion.topicId) void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
       }
       // Someone reacted: the pills under that message change for everyone.
-      if (event.type === "message.reactions") {
-        qc.setQueryData(keys.reactions(orgId, event.messageId), event.reactions);
-      }
+      if (event.type === "message.reactions") applyReactions(qc, orgId, event.messageId, event.reactions);
+      // An agent saved something from a person's message: the memory mark appears (or goes) live.
+      if (event.type === "message.memories")
+        cacheMessageMemories(qc, orgId, event.channelId, event.messageId, event.memories);
       if (event.type === "message.created") {
         if (event.message) cacheMessage(qc, orgId, event.message);
         else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });

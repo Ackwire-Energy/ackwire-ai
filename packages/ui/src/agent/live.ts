@@ -19,7 +19,76 @@ export interface LiveAgent {
     state: "idle" | "thinking" | "writing" | "waiting";
     expression?: Pose["expression"];
     seed: number;
+    /** Plays the transient face started by `playAgentReaction` with this key (e.g. a message id). */
+    reactionKey?: string;
   };
+}
+
+/** A person's 👍 (`up`) or 👎 (`down`) on what this agent wrote. */
+export type AgentReaction = "up" | "down";
+/** How long the face lasts before the agent goes back to idle. */
+export const REACTION_SECONDS = 1.6;
+const reactions = new Map<string, { kind: AgentReaction; t0: number }>();
+const clock = () => (typeof performance === "object" ? performance.now() : Date.now());
+
+/**
+ * The face for a reaction `e` seconds in (telas/ReacoesAgente.html): 👍 is
+ * happy, then hearts, with a small hop at the start; 👎 is surprised, then a
+ * thoughtful look up and aside. With reduced motion only the expression
+ * changes (no hop, no turn). `hop` is a fraction of the body's size.
+ */
+export function reactionPose(kind: AgentReaction, e: number, still: boolean): { pose: Pose; hop: number } {
+  if (kind === "up") {
+    const expression = e < 0.65 ? "happy" : "heart";
+    if (still) return { pose: { expression, blink: false, turn: [0, 0], squash: 0 }, hop: 0 };
+    return {
+      pose: {
+        expression,
+        blink: false,
+        turn: [0, -0.2],
+        squash: Math.sin(e * 13) * 0.8 * Math.max(0, 1 - e / 1.2),
+      },
+      hop: e < 0.6 ? Math.abs(Math.sin((e * Math.PI) / 0.3)) * 0.07 : 0,
+    };
+  }
+  if (e < 0.55)
+    return {
+      pose: { expression: "surprised", blink: false, turn: still ? [0, 0] : [0, -0.1], squash: still ? 0 : -0.6 },
+      hop: 0,
+    };
+  return {
+    pose: { expression: undefined, blink: false, look: [-0.28, -0.32], turn: still ? [0, 0] : [-0.4, -0.3], squash: 0 },
+    hop: 0,
+  };
+}
+
+/** The reaction playing for `key` and how far in it is (seconds), or null. */
+export function agentReactionOf(key: string | undefined): { kind: AgentReaction; elapsed: number } | null {
+  if (!key) return null;
+  const r = reactions.get(key);
+  if (!r) return null;
+  const elapsed = (clock() - r.t0) / 1000;
+  if (elapsed > REACTION_SECONDS) {
+    reactions.delete(key);
+    return null;
+  }
+  return { kind: r.kind, elapsed };
+}
+
+/**
+ * Every avatar drawn with `reactionKey === key` makes the reaction's face for
+ * ~1.6 s, then goes back to idle. With reduced motion the loop stands still,
+ * so the faces are drawn at each change.
+ */
+export function playAgentReaction(key: string, kind: AgentReaction) {
+  reactions.set(key, { kind, t0: clock() });
+  const redraw = () => {
+    for (const a of agents) if (a.look().reactionKey === key) drawLive(a, clock() / 1000);
+  };
+  redraw();
+  if (reduced()) {
+    for (const ms of [600, 700, (REACTION_SECONDS + 0.05) * 1000]) setTimeout(redraw, ms);
+  } else if (!raf && agents.size && typeof requestAnimationFrame === "function") raf = requestAnimationFrame(tick);
 }
 
 const agents = new Set<LiveAgent>();
@@ -94,8 +163,16 @@ export function drawLive(agent: LiveAgent, t: number) {
   const look = agent.look();
   const s = size * dpr;
   const gazing = !!gaze && !!box.closest("[data-gaze]");
-  const pose = poseFor(look, reduced() ? 0 : t, box, gazing);
-  drawAgent(ctx, R.left * s, R.top * s, s, {
+  const still = reduced();
+  let pose = poseFor(look, still ? 0 : t, box, gazing);
+  let hop = 0;
+  const playing = agentReactionOf(look.reactionKey);
+  if (playing) {
+    const face = reactionPose(playing.kind, playing.elapsed, still);
+    pose = { ...pose, ...face.pose };
+    hop = face.hop * s;
+  }
+  drawAgent(ctx, R.left * s, R.top * s - hop, s, {
     color: look.color,
     eyes: look.eyes,
     pose,

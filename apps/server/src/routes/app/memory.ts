@@ -1,5 +1,6 @@
 import { and, type Database, eq, inArray, schema } from "@agenteschat/db";
 import {
+  announceMessageMemories,
   type ContextItem,
   decideProposal,
   editContextItem,
@@ -305,6 +306,8 @@ export function memoryRoutes(deps: AppDeps) {
         pinned: input.pinned,
         archived: input.archived,
       });
+      // The memory mark on the message it came from changes for everyone in the channel.
+      await announceMessageMemories({ db, pubsub: deps.adapters.pubsub }, orgId, row).catch(() => {});
       const [view] = await memoryViews(db, [row]);
       return c.json(view, 200);
     },
@@ -323,6 +326,7 @@ export function memoryRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, memoryId } = c.req.valid("param");
       const row = await revertMemoryChange(db, c.get("user").id, orgId, memoryId);
+      await announceMessageMemories({ db, pubsub: deps.adapters.pubsub }, orgId, row).catch(() => {});
       const [view] = await memoryViews(db, [row]);
       return c.json(view, 200);
     },

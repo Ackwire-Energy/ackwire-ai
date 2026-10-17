@@ -1,6 +1,7 @@
 import { and, arrayContained, type Database, desc, eq, inArray, isNull, or, schema } from "@agenteschat/db";
 import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
+import { announceMessageMemories } from "../message-memories";
 import { can, getMembership } from "../organizations";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
@@ -197,6 +198,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             memoryJudging(deps, ctx.orgId),
           );
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: res.item.id }).catch(() => {});
+          await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, res.item).catch(() => {});
           if (res.action === "outweighed") {
             return {
               content: `Not saved as current: it contradicts memory ${res.item.id} ("${res.item.content.slice(0, 200)}"), which has stronger evidence (an observed outcome). It was kept as history. Tell the person what you have on record and ask them to confirm which is right; if they confirm, use update_memory on ${res.item.id}.`,
@@ -253,6 +255,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             }),
           );
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: next.id }).catch(() => {});
+          await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, next).catch(() => {});
           return memoryResult(ctx, `Updated (${next.id}).`, {
             action: "updated",
             itemId: next.id,
@@ -286,6 +289,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           .set({ status: "archived", updatedAt: new Date() })
           .where(eq(contextItems.id, item.id));
         await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: item.id }).catch(() => {});
+        await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, item).catch(() => {});
         return memoryResult(ctx, "Forgotten.", {
           action: "forgot",
           itemId: item.id,

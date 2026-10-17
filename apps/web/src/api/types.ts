@@ -182,6 +182,8 @@ export interface Message {
   receipts?: MessageReceipts;
   /** Reaction counts (expected from the backend in the message list; else loaded on hover). */
   reactions?: ReactionCount[];
+  /** People's messages: what agents saved to memory from them (the memory mark); live via `message.memories`. */
+  memories?: MessageMemory[];
   /** Client only: an optimistic message waiting for the server, or one that failed to send. */
   local?: "pending" | "failed";
   createdAt: string;
@@ -216,6 +218,7 @@ export type ChannelEvent =
   | { type: "message.created"; channelId: string; messageId: string; message?: Message }
   /** Someone reacted or took it back: the message's reactions now (replace). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
+  | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
   /**
    * A thread's state, title or context changed (ADR 0029). `thread` is the fresh view when the
    * server had it (its `canManage` is always false: read yours from the API). `messageIds`: messages
@@ -749,6 +752,15 @@ export interface ReplyRef {
   author: { type: AuthorType; id: string | null };
   authorName: string;
   excerpt: string;
+}
+
+/** Something an agent saved to its memory from a person's message (the memory mark). */
+export interface MessageMemory {
+  id: string;
+  agentId: string;
+  kind: "fact" | "preference" | "decision" | "note" | "lesson";
+  text: string;
+  createdAt: string;
 }
 
 export interface ReactionCount {

@@ -8,7 +8,7 @@ import {
   Reaction,
   Reactions,
 } from "@agenteschat/ui";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useReactions, useToggleReaction } from "@/api/queries";
 import type { ReactionCount } from "@/api/types";
@@ -108,11 +108,14 @@ export function MessageReactions({
   messageId,
   initial,
   feedback,
+  extra,
 }: {
   messageId: string;
   initial?: ReactionCount[];
   /** An agent's reply: 👍/👎 replace each other (they teach the agent). */
   feedback?: boolean;
+  /** After the pills (the memory mark): the row shows even without reactions. */
+  extra?: ReactNode;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -120,7 +123,7 @@ export function MessageReactions({
   const labels = useEmojiLabels();
   const { list, toggle, userId } = useMessageReactions(messageId, initial, { feedback });
   const shown = list.filter((r) => r.count > 0);
-  if (shown.length === 0) return null;
+  if (shown.length === 0 && !extra) return null;
   const nameOf = (id: string) =>
     id === userId ? t("reactions.you") : (dir.memberById.get(id)?.name ?? t("reactions.someone"));
   const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("reactions.someone");
@@ -169,6 +172,7 @@ export function MessageReactions({
           </button>
         }
       />
+      {extra}
     </Reactions>
   );
 }

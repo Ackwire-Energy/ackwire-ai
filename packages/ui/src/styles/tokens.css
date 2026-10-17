@@ -6,6 +6,9 @@
   --raised: #ffffff;
   --raised-2: #ffffff;
   --sunken: #ebebe7;
+  /* The open book of the memory mark (telas/ReacoesAgente.html). */
+  --book-page: #fffdf6;
+  --book-line: #cfc8b6;
   --glass: rgba(255, 255, 255, 0.72);
   --glass-solid: #fbfbf9;
   --line: rgba(23, 23, 22, 0.08);
@@ -37,6 +40,8 @@
   --raised: #1c1c1b;
   --raised-2: #242423;
   --sunken: #0a0a09;
+  --book-page: #ebe6d8;
+  --book-line: #a59e8c;
   --glass: rgba(30, 30, 28, 0.66);
   --glass-solid: #1e1e1c;
   --line: rgba(255, 255, 255, 0.1);

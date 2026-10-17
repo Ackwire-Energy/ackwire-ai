@@ -9207,3 +9207,122 @@ button.live-call__head:hover {
   flex: 1 1 200px;
   min-width: 0;
 }
+
+/* The memory mark (telas/ReacoesAgente.html): same height as a pill, another shape (not an emoji anyone can add) */
+.msg-mem__sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--line);
+}
+.msg-mem {
+  height: 26px;
+  padding: 0 5px 0 4px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--faint);
+  animation: msg-mem-in 0.5s var(--spring) both;
+  transition:
+    transform 0.2s var(--spring),
+    box-shadow 0.15s;
+}
+.msg-mem:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    0 4px 10px -4px rgba(0, 0, 0, 0.18);
+}
+.msg-mem:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-book-mark {
+  display: block;
+  width: 30px;
+  height: 24px;
+}
+@keyframes msg-mem-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    transform: none;
+  }
+}
+.msg-mem__tip {
+  max-width: min(300px, calc(100vw - 24px));
+  padding: 9px 10px 8px 12px;
+  font-size: 13px;
+}
+.msg-mem__tipbody p {
+  margin: 0;
+}
+.msg-mem__pop {
+  width: min(330px, calc(100vw - 24px));
+  padding: 14px;
+}
+.msg-mem__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.msg-mem__head b,
+.msg-mem__head small {
+  display: block;
+}
+.msg-mem__head small {
+  font-size: 12px;
+  color: var(--faint);
+}
+.msg-mem__fact {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--sunken);
+}
+.msg-mem__fact p {
+  margin: 0;
+}
+.msg-mem__fact small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--faint);
+}
+.msg-mem__card form {
+  margin-top: 12px;
+}
+.msg-mem__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.msg-mem__actions--end {
+  justify-content: flex-end;
+}
+.msg-mem__grow {
+  flex: 1;
+}
+.msg-mem__forget {
+  color: var(--danger);
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg-mem {
+    animation: none;
+    transition: none;
+  }
+}

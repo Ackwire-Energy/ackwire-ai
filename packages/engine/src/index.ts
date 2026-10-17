@@ -62,6 +62,7 @@ export * from "./machine-provider";
 export * from "./machine-tasks";
 export * from "./machines";
 export * from "./management";
+export * from "./message-memories";
 export * from "./messages";
 export * from "./mission-brief";
 export * from "./mission-command-rules";

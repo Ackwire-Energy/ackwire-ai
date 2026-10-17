@@ -1,4 +1,5 @@
 import { and, type Database, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { announceMessageMemories } from "../message-memories";
 import {
   type ConsolidateResult,
   changesPermissions,
@@ -266,6 +267,7 @@ export async function reflectThread(
         memoryJudging(deps, input.orgId),
       );
       out.results.push(res);
+      await announceMessageMemories(deps, input.orgId, res.item).catch(() => {});
       const proposal = await proposeFromItem(deps, res.item);
       if (proposal) out.proposals.push(proposal.id);
     } catch {

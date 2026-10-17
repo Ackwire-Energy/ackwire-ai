@@ -82,6 +82,7 @@ import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfM
 import { LiveCodeToggle, LiveWorkList } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
+import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageMoreMenu, PersonMessageActions, QuoteReplyButton } from "@/components/MessageMore";
 import { MessageReceipts } from "@/components/MessageReceipts";
@@ -2080,7 +2081,8 @@ export const TimelineMessage = memo(function TimelineMessage({
           <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
             {agent ? (
               // A saved message: the agent at rest (its live state shows on the live row).
-              <AgentAvatar agentId={agent.id} name={name} state="idle" />
+              // A person's 👍/👎 on this message plays a face on it (`applyReactions`).
+              <AgentAvatar agentId={agent.id} name={name} state="idle" reactionKey={m.id} />
             ) : (
               <Avatar kind="person" name={name} imageUrl={person?.image} />
             )}
@@ -2199,7 +2201,14 @@ export const TimelineMessage = memo(function TimelineMessage({
         </div>
       )}
       {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
-      {!m.local && <MessageReactions messageId={m.id} initial={m.reactions} feedback={feedback} />}
+      {!m.local && (
+        <MessageReactions
+          messageId={m.id}
+          initial={m.reactions}
+          feedback={feedback}
+          extra={m.memories?.length ? <MemoryMarks message={m} /> : undefined}
+        />
+      )}
       {feedback && (
         <MessageFeedback
           messageId={m.id}

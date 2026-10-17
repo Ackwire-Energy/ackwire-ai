@@ -4,6 +4,7 @@ import type { ArtifactView } from "./artifacts";
 import type { CalendarEventView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
 import type { MachineTaskView } from "./machine-tasks";
+import type { MessageMemory } from "./message-memories";
 import type { MessageView, ReactionCount } from "./messages";
 
 /** What a memory tool changed, for the "memory updated" card (persisted in the reply's `meta.memoryUpdates`). */
@@ -234,6 +235,8 @@ export type ChannelEvent =
     }
   /** Someone reacted or took a reaction back: the message's reactions now (replace, don't merge). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
+  /** An agent saved something to memory from this person's message: its current memory marks. */
+  | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
   /**
    * A background task on a connected computer started, reported progress
    * (last line, files, elapsed), ended, was interrupted or resumed (ADR 0029).

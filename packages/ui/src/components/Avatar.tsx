@@ -33,6 +33,8 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   labelled?: boolean;
   /** A held expression (agents only), e.g. "happy" for a moment of joy. */
   expression?: Expression;
+  /** Agents only: plays the face started by `playAgentReaction(reactionKey, …)` (a message id). */
+  reactionKey?: string;
 }
 
 /** A steady number per name, so agents next to each other move out of step. */
@@ -51,11 +53,13 @@ function AgentBody({
   state,
   expression,
   name,
+  reactionKey,
 }: {
   appearance: AgentAppearance | undefined;
   state: AgentState;
   expression: Expression | undefined;
   name: string;
+  reactionKey?: string;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const look = useRef<ReturnType<LiveAgent["look"]>>({ state, seed: 0 });
@@ -66,6 +70,7 @@ function AgentBody({
     state,
     expression,
     seed: seedOf(name),
+    reactionKey,
   };
   const live = useRef<LiveAgent | null>(null);
   useLayoutEffect(() => {
@@ -115,6 +120,7 @@ export function Avatar({
   presence,
   labelled,
   expression,
+  reactionKey,
   className,
   style,
   ...rest
@@ -143,7 +149,7 @@ export function Avatar({
       {...rest}
     >
       {agent ? (
-        <AgentBody appearance={appearance} state={mood} expression={expression} name={name} />
+        <AgentBody appearance={appearance} state={mood} expression={expression} name={name} reactionKey={reactionKey} />
       ) : imageUrl ? (
         <img src={imageUrl} alt="" />
       ) : (

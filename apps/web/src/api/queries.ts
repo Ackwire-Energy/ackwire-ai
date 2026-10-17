@@ -1,3 +1,4 @@
+import { playAgentReaction } from "@agenteschat/ui";
 import {
   queryOptions,
   useInfiniteQuery,
@@ -34,7 +35,9 @@ import type {
   IssuePatch,
   Machine,
   Message,
+  MessageMemory,
   OrgSettings,
+  ReactionCount,
   Role,
   RoutineInput,
   RoutinePatch,
@@ -686,7 +689,58 @@ export function useToggleReaction(orgId: string, messageId: string) {
   return useMutation({
     mutationFn: ({ reaction, on }: { reaction: string; on: boolean }) =>
       on ? api.chat.react(orgId, messageId, reaction) : api.chat.unreact(orgId, messageId, reaction),
-    onSuccess: (reactions) => qc.setQueryData(keys.reactions(orgId, messageId), reactions),
+    onSuccess: (reactions) => applyReactions(qc, orgId, messageId, reactions),
+  });
+}
+
+/** A message's reactions as this client knows them: the reactions cache, else the message in a cached list. */
+function knownReactions(qc: ReturnType<typeof useQueryClient>, orgId: string, messageId: string) {
+  const cached = qc.getQueryData<ReactionCount[]>(keys.reactions(orgId, messageId));
+  if (cached) return cached;
+  for (const [, data] of qc.getQueriesData({ queryKey: ["org", orgId, "channel"] })) {
+    if (!Array.isArray(data)) continue;
+    const m = (data as Message[]).find((x) => x && x.id === messageId);
+    if (m) return m.reactions ?? [];
+  }
+  return [];
+}
+
+/**
+ * New reactions for a message (the reactor's response or `message.reactions`,
+ * whichever comes first): the pills, and when a person just gave 👍/👎 the
+ * agent who wrote it makes a face for everyone watching (`playAgentReaction`:
+ * only agent messages' avatars carry the message id as their reaction key).
+ */
+export function applyReactions(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  messageId: string,
+  next: ReactionCount[],
+) {
+  const before = knownReactions(qc, orgId, messageId);
+  for (const [reaction, kind] of [
+    ["+1", "up"],
+    ["-1", "down"],
+  ] as const) {
+    const had = new Set(before.find((r) => r.reaction === reaction)?.userIds ?? []);
+    if (next.find((r) => r.reaction === reaction)?.userIds.some((u) => !had.has(u))) playAgentReaction(messageId, kind);
+  }
+  qc.setQueryData(keys.reactions(orgId, messageId), next);
+}
+
+/** `message.memories`: the memory marks of one message, in every cached list of that channel. */
+export function cacheMessageMemories(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  messageId: string,
+  memories: MessageMemory[],
+) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === messageId)) return data;
+    return list.map((m) => (m.id === messageId ? { ...m, memories } : m));
   });
 }
 

@@ -168,6 +168,21 @@ const MessageBase = z.object({
       description:
         "In lists: reactions (`+1`/`-1` or an emoji) and who reacted (people in `userIds`, agents in `agentIds`); live via `message.reactions`.",
     }),
+  memories: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        agentId: z.uuid(),
+        kind: z.enum(["fact", "preference", "decision", "note", "lesson"]),
+        text: z.string(),
+        createdAt: z.string(),
+      }),
+    )
+    .optional()
+    .openapi({
+      description:
+        "People's messages: what agents saved to memory from them (the memory mark); live via `message.memories`.",
+    }),
   createdAt: z.string(),
 });
 
