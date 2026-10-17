@@ -285,11 +285,13 @@ describe("mission tools through the bridge", () => {
     expect(off.map((t) => t.name)).toEqual(["permission_prompt"]);
     const prompt = off[0];
     // Code's own rules decide (`runPermissionPrompt`), not the mission's command flow.
-    const answer = await prompt?.execute({ tool_name: "Bash", input: { command: "npm install" } }, ctx);
-    expect(answer?.content).toContain("may not run commands");
-    expect(answer?.content).not.toContain("plan isn't approved");
+    const npm = { tool_name: "Bash", input: { command: "npm install" } };
+    expect((await prompt?.execute(npm, ctx))?.content).not.toContain("plan isn't approved");
     const on = await createMissionRunToolSource({ ...deps, missionsOnEngine: true }).tools(ctx);
     expect(on.map((t) => t.name).sort()).toEqual(["get_context", "permission_prompt", "start_task", "upload_artifact"]);
+    // Flag on: the mission's command flow (a proposed mission only reads).
+    const onPrompt = on.find((t) => t.name === "permission_prompt");
+    expect((await onPrompt?.execute(npm, ctx))?.content).toContain("plan isn't approved");
   });
 
   test("a mission task's token: its own tools (permission_prompt included), bound to that task and machine", async () => {

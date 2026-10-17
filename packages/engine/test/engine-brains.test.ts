@@ -128,6 +128,17 @@ test("availability: no computer, offline, old runner, not logged in, Codex missi
   ).toBeNull();
 });
 
+test("a computer brain's model: the mission's, else the agent's only for the same brain, else the brain's default", () => {
+  const agent = { brain: "claude_code", brainModel: "opus" };
+  expect(brainModelFor("claude_code", agent)).toBe("opus");
+  // The agent's Claude Code model means nothing to Codex (a mission on Codex): Codex's own default.
+  expect(brainModelFor("codex", agent)).toBeUndefined();
+  expect(brainModelFor("codex", agent, { model: "gpt-6.1-codex" })).toBe("gpt-6.1-codex");
+  expect(brainModelFor("claude_code", { brain: "codex", brainModel: "gpt-6.1-codex" })).toBe("sonnet");
+  expect(brainModelFor("claude_code", { brain: "claude_code", brainModel: null }, { model: "haiku" })).toBe("haiku");
+  expect(brainModelFor("model", agent)).toBeUndefined();
+});
+
 test("a computer-brain turn ends after the tools it ran through the bridge (never sent again); plan usage at no cost", async () => {
   f = await setup();
   const machineId = await computerAgent(f);
@@ -622,7 +633,8 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   f = await setup({ toolSources: [gh.source] });
   await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
   const machineId = await computerAgent(f);
-  const question = await post(f, "@dev merge os dois");
+  // No mention: the run row below is the only one for this message.
+  const question = await post(f, "merge os dois");
   const run = await runningRun(f, question);
   const deps = { db: f.db, pubsub: f.pubsub, tools: f.tools };
   const id = { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId };
@@ -654,17 +666,6 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   const [third] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.toolUseId, "m-3"));
   expect(third?.status).toBe("canceled");
   expect(gh.executed).toEqual([]);
-});
-
-test("a computer brain's model: the mission's, else the agent's only for the same brain, else the brain's default", () => {
-  const agent = { brain: "claude_code", brainModel: "opus" };
-  expect(brainModelFor("claude_code", agent)).toBe("opus");
-  // The agent's Claude Code model means nothing to Codex (a mission on Codex): Codex's own default.
-  expect(brainModelFor("codex", agent)).toBeUndefined();
-  expect(brainModelFor("codex", agent, { model: "gpt-6.1-codex" })).toBe("gpt-6.1-codex");
-  expect(brainModelFor("claude_code", { brain: "codex", brainModel: "gpt-6.1-codex" })).toBe("sonnet");
-  expect(brainModelFor("claude_code", { brain: "claude_code", brainModel: null }, { model: "haiku" })).toBe("haiku");
-  expect(brainModelFor("model", agent)).toBeUndefined();
 });
 
 test("the missions' boot migration is enqueued once per version, however many replicas boot", async () => {
