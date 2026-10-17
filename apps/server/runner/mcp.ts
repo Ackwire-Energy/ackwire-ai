@@ -71,6 +71,12 @@ export interface McpTaskInfo {
    * from `brain.turn`.
    */
   runId?: string;
+  /**
+   * A brain process between turns: alive, but no run is thinking, so nothing
+   * is relayed. Its MCP server's background list refresh is answered quietly
+   * (no ended run's token is ever sent, nothing is logged).
+   */
+  idle?: boolean;
 }
 
 /** Every string inside `value` through `redact` (keys kept). */
@@ -130,7 +136,7 @@ export interface IpcRequest {
 /** `transient`: the link to the runner or to agentes.chat was down; asking again later may work. `tools`: a list's answer. */
 export type IpcReply =
   | { ok: true; text: string; tools?: McpToolInfo[] }
-  | { ok: false; error: string; transient?: boolean };
+  | { ok: false; error: string; transient?: boolean; idle?: boolean };
 
 /** What a tool name may look like (the Tool Gateway's rule). */
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -299,7 +305,12 @@ export class McpBridge {
     if (!info || typeof req.token !== "string" || !sameToken(info.token, req.token)) {
       return { ok: false, error: "Not allowed: this task has no agentes tools." };
     }
-    if (!info.running) return { ok: false, error: "This task has ended." };
+    if (!info.running) {
+      // A brain process between turns: its background refresh waits for the next turn, quietly.
+      if (info.idle)
+        return { ok: false, error: "No turn is running right now; try again in your next turn.", idle: true };
+      return { ok: false, error: "This task has ended." };
+    }
     if (req.kind === "list") {
       // An older server gave no token: the fixed mission tools.
       if (!info.serverToken) return { ok: true, text: "", tools: [...MISSION_MCP_TOOLS] };
@@ -393,7 +404,7 @@ export class McpBridge {
         return;
       }
       void this.handle(req).then((reply) => {
-        if (reply.ok === false) this.opts.log?.(`mcp ${String(req.tool)} refused: ${reply.error}`);
+        if (reply.ok === false && !reply.idle) this.opts.log?.(`mcp ${String(req.tool)} refused: ${reply.error}`);
         socket.end(`${JSON.stringify(reply)}\n`);
       });
     });
@@ -498,6 +509,8 @@ export class McpToolCache {
   /** Asks the server; true when the list differs from the one before (not on the first load). */
   async refresh(): Promise<boolean> {
     const reply = await this.fetch().catch(() => null);
+    // A brain process between turns: the next turn is another run, so the list is asked again then.
+    if (reply && !reply.ok && reply.idle) this.loadedAt = 0;
     if (!reply?.ok || !reply.tools) return false;
     const key = JSON.stringify(reply.tools);
     const changed = this.list !== null && key !== this.key;

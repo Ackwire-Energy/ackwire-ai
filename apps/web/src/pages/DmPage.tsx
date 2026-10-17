@@ -1,4 +1,4 @@
-import { Avatar, Button } from "@agenteschat/ui";
+import { Avatar, Button, Icon } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -8,6 +8,7 @@ import { useModels } from "@/api/queries";
 import type { DmTarget } from "@/api/types";
 import { AudienceChip } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { agentBrainLine } from "@/components/AgentBrain";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
@@ -54,6 +55,8 @@ export function DmPage({ target }: { target: DmTarget }) {
 
   const owner = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const model = agent ? (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model) : "";
+  // Who thinks: a computer brain ("Claude Code · Sonnet no mac") instead of the API model.
+  const brainLine = agent ? agentBrainLine(t, agent, model) : null;
   const role = agent ? agent.role || `@${agent.handle}` : "";
   const header = (
     <header className="channel__header">
@@ -66,7 +69,16 @@ export function DmPage({ target }: { target: DmTarget }) {
         </h1>
         {agent && (
           <span className="channel__topic">
-            {owner ? t("dm.subtitle", { role, owner: owner.name, model }) : t("dm.subtitleNoOwner", { role, model })}
+            {owner ? t("dm.subtitle", { role, owner: owner.name }) : t("dm.subtitleNoOwner", { role })}
+            {brainLine?.text && (
+              <>
+                {" · "}
+                <span className="channel__brain">
+                  <Icon name={brainLine.icon} size={14} />
+                  {brainLine.text}
+                </span>
+              </>
+            )}
           </span>
         )}
         {person && <span className="channel__topic">{person.email}</span>}

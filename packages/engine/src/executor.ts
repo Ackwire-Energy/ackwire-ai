@@ -25,7 +25,14 @@ import {
 } from "./cancel";
 import { describeCapabilities } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
-import { buildRunContext, getChannelCached, isNoReply, ROUTINE_NO_REPLY, taskNotice } from "./context";
+import {
+  buildRunContext,
+  getChannelCached,
+  isNoReply,
+  ROUTINE_NO_REPLY,
+  restatesReaction,
+  taskNotice,
+} from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
@@ -1259,10 +1266,10 @@ async function executeRunInner(
       const saved = (transcript.artifacts ?? []).length > 0 ? "File saved." : "";
       const anythingPosted = transcript.postedCount > 0;
       // A routine with nothing to report ends here without posting (its instructions asked for silence).
-      // Or it reacted (`react`) instead of replying and wrote nothing more: the reaction is the answer.
+      // Or it reacted (`react`) instead of replying and wrote nothing more (or only the emoji again):
+      // the reaction is the answer.
       const silent =
-        (Boolean(viaRoutine) && isNoReply(turnText)) ||
-        (Boolean(transcript.reacted) && (!turnText.trim() || isNoReply(turnText)));
+        (Boolean(viaRoutine) && isNoReply(turnText)) || (Boolean(transcript.reacted) && restatesReaction(turnText));
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
       const text = silent
         ? ""
@@ -1382,6 +1389,10 @@ function createBrain(
   });
 }
 
+/** For computer brains: a reaction through the bridge is the whole answer. */
+export const COMPUTER_REACT_NOTE =
+  "# Reacting\nWhen you call the agentes `react` tool, the reaction is your whole answer: end your turn right after it with an empty final reply (no text, no emoji, no confirmation that you reacted).";
+
 /**
  * The turn as every brain receives it. The text view of the conversation is
  * computed only when a brain reads it (the model brain reads the exact
@@ -1403,7 +1414,11 @@ function brainTurnOf(
     channelId: run.channelId,
     threadRootId: run.threadRootId,
     get system() {
-      return t.system.map((b) => b.text).join("\n\n");
+      const text = t.system.map((b) => b.text).join("\n\n");
+      // A computer brain sees `react` as an MCP tool and tends to echo the emoji as its final text.
+      return plan.kind !== "model" && tools.some((d) => d.name === REACT_TOOL)
+        ? `${text}\n\n${COMPUTER_REACT_NOTE}`
+        : text;
     },
     get messages() {
       return t.messages.map((m) => ({ role: m.role, content: flattenContent(m.content) }));

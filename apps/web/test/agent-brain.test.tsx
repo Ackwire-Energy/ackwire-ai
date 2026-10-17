@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { type BrainChoice, changedKeys, needsPlanWarning, type Saved, sameBrain } from "@/lib/agent-edit";
+import { type BrainChoice, changedKeys, needsPlanWarning, type Saved, sameBrain, termsPending } from "@/lib/agent-edit";
 import { ADA_ID, createFakeApi, fakeAgentBrain, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -107,6 +107,23 @@ describe("Quem pensa (agent settings)", () => {
     expect(screen().queryByRole("dialog", { name: "Usar o seu plano para o agente?" })).toBeNull();
   });
 
+  test("the save never sends acceptPlanTerms without the warning confirmed; choosing again asks again", async () => {
+    const { section, state } = await open();
+    await click(radio(section, /^Claude Code no MacBook/));
+    await click(
+      within(screen().getByRole("dialog", { name: "Usar o seu plano para o agente?" })).getByRole("button", {
+        name: "Entendi, usar mesmo assim",
+      }),
+    );
+    // Back to the API and to Claude Code again: the warning again (nothing confirmed for the new pick yet).
+    await click(radio(section, /^Modelo \(API\)/));
+    await click(radio(section, /^Claude Code no MacBook/));
+    const again = screen().getByRole("dialog", { name: "Usar o seu plano para o agente?" });
+    await click(within(again).getByRole("button", { name: "Cancelar" }));
+    expect(radio(section, /^Modelo \(API\)/).getAttribute("aria-checked")).toBe("true");
+    expect(brainCalls(state)).toEqual([]);
+  });
+
   test("the warning for Codex names OpenAI", async () => {
     const { section } = await open();
     await click(radio(section, /^Codex no MacBook/));
@@ -169,5 +186,18 @@ describe("Quem pensa: the draft", () => {
     expect(needsPlanWarning("claude_code", "claude_code")).toBe(false);
     expect(needsPlanWarning("claude_code", "codex")).toBe(true);
     expect(needsPlanWarning("codex", "model")).toBe(false);
+  });
+
+  test("acceptPlanTerms only after the person confirmed: an unconfirmed switch blocks the save", () => {
+    const cc: BrainChoice = { brain: "claude_code", model: null, fallback: true };
+    expect(termsPending("model", cc)).toBe(true);
+    expect(termsPending("model", { ...cc, termsAccepted: false })).toBe(true);
+    expect(termsPending("model", { ...cc, termsAccepted: true })).toBe(false);
+    // Already saved, or back to the API: nothing to confirm.
+    expect(termsPending("claude_code", cc)).toBe(false);
+    expect(termsPending("claude_code", api)).toBe(false);
+    expect(termsPending("model", undefined)).toBe(false);
+    // The confirmation doesn't count as a change.
+    expect(sameBrain(cc, { ...cc, termsAccepted: true })).toBe(true);
   });
 });

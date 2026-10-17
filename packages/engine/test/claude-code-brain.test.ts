@@ -16,11 +16,15 @@ import {
   brainSessionId,
   claudeCodeAvailability,
   createClaudeCodeBrain,
+  createJobHandlers,
   createMachinePairing,
+  drainOutbox,
+  listMessages,
   type MachineCallOptions,
   MachineOfflineError,
   MachineRequestError,
   type MachineStatus,
+  postPersonMessage,
   recordPlanUsage,
   redeemMachinePairing,
 } from "../src";
@@ -339,4 +343,89 @@ test("end to end through the real hub: the runner's brain.event frames reach the
     inputTokens: 9,
     outputTokens: 3,
   });
+});
+
+test("live text end to end: the runner's partial deltas reach the channel as agent.delta while the run thinks", async () => {
+  f = await setup({ machines: true });
+  const fx = f;
+  const hub = fx.machineHub;
+  if (!hub) throw new Error("no hub");
+  const deps = { db: fx.db, pubsub: fx.pubsub, publicUrl: "https://agentes.chat" };
+  const { code } = await createMachinePairing(deps, fx.owner.id, fx.org.id, { name: "MacBook" });
+  const RUNNER = {
+    hostname: "mac",
+    os: "darwin" as const,
+    arch: "arm64",
+    version: "0.8.0",
+    protocol: MACHINE_PROTOCOL_VERSION,
+    workspace: "/Users/w/agentes",
+  };
+  const paired = await redeemMachinePairing(deps, { code, ...RUNNER, exec: true });
+  await fx.db
+    .update(schema.agents)
+    .set({ machineId: paired.machineId, brain: "claude_code" })
+    .where(eq(schema.agents.id, fx.agent.id));
+  const events = fx.listen(fx.general.id);
+  /** What the channel had seen when the runner sent its last delta (before the answer). */
+  let seenBeforeDone: string[] = [];
+  const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
+  const conn = hub.open({
+    send(text: string) {
+      const frame = JSON.parse(text) as ServerFrame;
+      if (frame.type !== "request" || frame.op !== "brain.turn") return;
+      setTimeout(async () => {
+        // Claude Code's `--include-partial-messages`, batched by the runner: three pieces.
+        for (const piece of ["Olá, ", "tudo ", "certo."]) {
+          await reply({ type: "brain.event", runId: frame.runId, event: { type: "text_delta", text: piece } });
+          await new Promise((r) => setTimeout(r, 30));
+        }
+        seenBeforeDone = events.flatMap((e) =>
+          e.type === "agent.delta" ? [(e as unknown as { text: string }).text] : [],
+        );
+        const final = { type: "done", text: "Olá, tudo certo.", session: { id: frame.session.id } };
+        await reply({ type: "brain.event", runId: frame.runId, event: final });
+        await reply({ type: "brain.done", runId: frame.runId });
+        await reply({ type: "result", id: frame.id, ok: true, data: { runId: frame.runId, final } });
+      }, 1);
+    },
+    close() {},
+  });
+  await hub.message(
+    conn,
+    JSON.stringify({
+      type: "hello",
+      token: paired.token,
+      ...RUNNER,
+      exec: true,
+      executors: { claude: { version: "2.1.300", loggedIn: true } },
+    }),
+  );
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    deltaFlushMs: 0,
+    machines: hub,
+    brains: {
+      claude_code: (_agent, _run, s) =>
+        createClaudeCodeBrain({
+          hub,
+          pubsub: fx.pubsub,
+          agentScope: async (t) => ({ id: t.agentId, handle: fx.agent.handle }),
+          mcpToken: () => s.mcpToken(),
+          finalGraceMs: 20,
+        }),
+    },
+  });
+  const question = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
+    body: "@dev oi",
+  });
+  await drainOutbox(fx.db, handlers);
+
+  // Streamed live, piece by piece, before the turn ended.
+  expect(seenBeforeDone.join("")).toBe("Olá, tudo certo.");
+  expect(seenBeforeDone.length).toBeGreaterThanOrEqual(2);
+  expect(events.findIndex((e) => e.type === "agent.typing")).toBeLessThan(
+    events.findIndex((e) => e.type === "agent.delta"),
+  );
+  const thread = await listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id, { threadId: question.id });
+  expect(thread.map((m) => m.body)).toEqual(["@dev oi", "Olá, tudo certo."]);
 });

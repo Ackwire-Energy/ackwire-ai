@@ -30,6 +30,16 @@ export const ROUTINE_NO_REPLY = "NO_REPLY";
 /** True when a reply is the routine's "nothing to report" (tolerates spacing and a trailing period). */
 export const isNoReply = (text: string) => text.trim().replace(/\.$/, "") === ROUTINE_NO_REPLY;
 
+/**
+ * True when the text after a `react` only restates the reaction: empty, the
+ * no-reply word, or nothing but emoji and punctuation ("👍", "🙌!", "✅ ✅").
+ * Any letter or digit makes it a real reply.
+ */
+export const restatesReaction = (text: string) => {
+  const t = text.trim();
+  return !t || isNoReply(t) || !/[\p{L}\p{N}]/u.test(t);
+};
+
 type ActionRow = {
   data: unknown;
   created_at: string | Date;
@@ -327,7 +337,7 @@ export async function buildRunContext(
             ? "- When a request is ambiguous, key information is missing, or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait. Don't ask about simple requests you can just do, and never ask more than you need."
             : "",
           options.react
-            ? '- When the message only acknowledges or thanks and needs no answer ("thanks", "perfect", "ok, go ahead"; in Portuguese "valeu", "perfeito", "ok, pode seguir"), don\'t reply: react with one fitting emoji using `react` and end your turn with no text. Never react and also reply with redundant text; if something still needs saying, just reply.'
+            ? '- When the message only acknowledges or thanks and needs no answer ("thanks", "perfect", "ok, go ahead"; in Portuguese "valeu", "perfeito", "ok, pode seguir"), don\'t reply: react with one fitting emoji using `react` and end your turn with an empty reply: no text at all, not even the emoji again. Never react and also reply with redundant text; if something still needs saying, just reply.'
             : "",
           options.toolsAvailable
             ? "- Before saying something was done, or correcting it, check the current state with the matching tool (`list_issues`, `read_artifact`, `list_events`…), not with `search_context`."

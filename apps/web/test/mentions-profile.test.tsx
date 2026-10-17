@@ -139,6 +139,18 @@ describe("profile card", () => {
     );
   });
 
+  test("agent thinking with Claude Code: the card says so instead of the API model", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.brain = { kind: "claude_code", model: "Opus", computer: "MacBook" };
+    await go(`c/${ENG_ID}`, state);
+    await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
+    await settle(6);
+    const c = card();
+    expect(c.textContent).toContain("Claude Code · Opus no MacBook");
+    expect(c.textContent).not.toContain("sonnet 5.5");
+  });
+
   test("an agent without owner says so; members don't see spend", async () => {
     const state = seedState();
     const ada = state.agents.find((a) => a.id === ADA_ID);

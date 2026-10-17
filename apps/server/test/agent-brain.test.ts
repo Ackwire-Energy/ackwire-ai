@@ -183,6 +183,28 @@ test("agent brain: defaults, who may, the plan warning, what the computer has, m
   expect(await back.json()).toMatchObject({ brain: "model", model: null, fallback: false });
 });
 
+test("the agent list says who thinks: the brain, its model's label, the computer only for admins and the owner", async () => {
+  const { api, asBia, agentId } = await workspace();
+  type Listed = { id: string; model: string; brain?: { kind: string; model: string | null; computer?: string } };
+  const listed = async (as: typeof api) =>
+    ((await (await as("/agents")).json()) as { agents: Listed[] }).agents.find((a) => a.id === agentId);
+  expect((await listed(api))?.brain).toEqual({ kind: "model", model: null });
+
+  const mac = await pairMac(api);
+  await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
+  await api(`/agents/${agentId}/brain`, { method: "PUT", json: { brain: "claude_code", acceptPlanTerms: true } });
+  expect((await listed(api))?.brain).toEqual({ kind: "claude_code", model: "Sonnet", computer: "mac" });
+  // A member: the brain and its model, not the computer.
+  expect((await listed(asBia))?.brain).toEqual({ kind: "claude_code", model: "Sonnet" });
+  await api(`/agents/${agentId}/brain`, { method: "PUT", json: { model: "opus" } });
+  expect((await listed(api))?.brain?.model).toBe("Opus");
+  // An edit answers with it too.
+  const edited = (await (
+    await api(`/agents/${agentId}`, { method: "PATCH", json: { role: "Marketing" } })
+  ).json()) as Listed;
+  expect(edited.brain).toEqual({ kind: "claude_code", model: "Opus", computer: "mac" });
+});
+
 test("mission brain: from the executor by default; the brain before Start, the model any time; who may", async () => {
   const { api, asBia, agentId, channelId } = await workspace();
   const mac = await pairMac(api);

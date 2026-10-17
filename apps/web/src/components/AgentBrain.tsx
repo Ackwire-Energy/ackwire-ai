@@ -14,7 +14,7 @@ import {
 import type { TFunction } from "i18next";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentBrain, BrainKind, BrainOption } from "@/api/types";
+import type { Agent, AgentBrain, BrainKind, BrainOption } from "@/api/types";
 import { type BrainChoice, needsPlanWarning } from "@/lib/agent-edit";
 import type { agentGrammar } from "@/lib/grammar";
 
@@ -28,6 +28,25 @@ const BRAIN_ICON: Record<BrainKind, IconName> = {
 export function brainName(t: TFunction, kind: BrainKind, computer: string | null | undefined) {
   if (kind === "model") return t("brain.model");
   return computer ? t(`brain.${kind}`, { computer }) : t(`brain.${kind}NoComputer`);
+}
+
+/**
+ * What thinks for an agent, wherever its model is shown (DM header, profile,
+ * cards): "Claude Code · Sonnet no mac", "Codex · GPT-6 Sol", or the API
+ * model's label, with the matching mark.
+ */
+export function agentBrainLine(
+  t: TFunction,
+  agent: Pick<Agent, "brain">,
+  apiModelLabel: string,
+): { text: string; icon: IconName } {
+  const b = agent.brain;
+  if (!b || b.kind === "model") return { text: apiModelLabel, icon: BRAIN_ICON.model };
+  const model = b.model ?? "";
+  const text = b.computer
+    ? t(`brain.line.${b.kind}`, { model, computer: b.computer })
+    : t(`brain.line.${b.kind}NoComputer`, { model });
+  return { text, icon: BRAIN_ICON[b.kind] };
 }
 
 /** The model's label for a brain ("Opus"), or the value as typed. */
@@ -80,7 +99,7 @@ export function AgentBrainChoice({
       setAsking(kind);
       return;
     }
-    onChange({ ...value, brain: kind, model: null });
+    onChange({ ...value, brain: kind, model: null, termsAccepted: false });
   };
 
   const reason = (o: BrainOption) => (o.reason ? t(`brain.reasons.${o.reason}`, { computer: computer ?? "" }) : null);
@@ -148,29 +167,51 @@ export function AgentBrainChoice({
         </>
       )}
 
-      <Dialog
-        open={asking !== null}
-        onOpenChange={(open) => {
-          if (!open) setAsking(null);
+      <PlanTermsDialog
+        brain={asking}
+        onCancel={() => setAsking(null)}
+        onConfirm={() => {
+          if (asking) onChange?.({ ...value, brain: asking, model: null, termsAccepted: true });
+          setAsking(null);
         }}
-        title={t("brain.warning.title")}
-        description={asking ? t(`brain.warning.${asking}`) : undefined}
-        closeLabel={t("common.close")}
-        width={440}
-      >
-        <DialogFooter>
-          <Button onClick={() => setAsking(null)}>{t("brain.warning.cancel")}</Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              if (asking) onChange?.({ ...value, brain: asking, model: null });
-              setAsking(null);
-            }}
-          >
-            {t("brain.warning.confirm")}
-          </Button>
-        </DialogFooter>
-      </Dialog>
+      />
     </>
+  );
+}
+
+/**
+ * The plan warning (the subscription is personal; answering other people with
+ * it may go against the provider's terms). Shown when Claude Code or Codex is
+ * chosen, and again on save if a switch reached the draft unconfirmed.
+ */
+export function PlanTermsDialog({
+  brain,
+  onCancel,
+  onConfirm,
+}: {
+  /** The brain being confirmed; null = closed. */
+  brain: "claude_code" | "codex" | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Dialog
+      open={brain !== null}
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+      title={t("brain.warning.title")}
+      description={brain ? t(`brain.warning.${brain}`) : undefined}
+      closeLabel={t("common.close")}
+      width={440}
+    >
+      <DialogFooter>
+        <Button onClick={onCancel}>{t("brain.warning.cancel")}</Button>
+        <Button variant="primary" onClick={onConfirm}>
+          {t("brain.warning.confirm")}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }

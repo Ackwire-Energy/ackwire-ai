@@ -1,5 +1,5 @@
 import { BRAIN_PROTOCOL } from "@agenteschat/adapters";
-import { and, type Database, eq, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { MODEL_CATALOG } from "@agenteschat/providers";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
@@ -18,7 +18,7 @@ import {
   requireMission,
   requireOpen,
 } from "./missions";
-import { can, requirePermission } from "./organizations";
+import { can, getMembership, requirePermission } from "./organizations";
 
 /*
  * "Quem pensa" (ADR 0032 §5): the brain an agent thinks with, its model and
@@ -426,4 +426,64 @@ export async function setMissionBrain(
   const current = row ?? { ...mission, brain: brain ?? null, brainModel: model };
   await publishMissionEvent(deps, current, "settings", { brain: brain ?? null, brainModel: model });
   return missionBrainView(deps, current, role);
+}
+
+/**
+ * What thinks for an agent, for wherever the agent is shown (DM header,
+ * profile, cards): the brain, its model's label ("Sonnet"; null for the
+ * model brain, which shows the agent's model) and the computer's name, only
+ * for those who may see it (admins and the agent's owner, like Quem pensa).
+ */
+export interface AgentBrainSummary {
+  kind: BrainKind;
+  model: string | null;
+  computer?: string;
+}
+
+/** The label of a computer brain's model ("opus" → "Opus"; a typed Codex model as is). */
+export function brainModelLabel(kind: BrainKind, model: string | null | undefined): string | null {
+  if (kind === "model") return null;
+  const value = model ?? defaultBrainModel(kind);
+  if (!value) return null;
+  return brainModelOptions(kind).find((o) => o.value === value)?.label ?? value;
+}
+
+/** Each agent's brain summary for this viewer (one query for the computers' names). */
+export async function agentBrainSummaries(
+  db: Database,
+  viewerId: string,
+  orgId: string,
+  agents: readonly {
+    id: string;
+    brain: string;
+    brainModel: string | null;
+    machineId: string | null;
+    ownerUserId: string | null;
+  }[],
+): Promise<Map<string, AgentBrainSummary>> {
+  const out = new Map<string, AgentBrainSummary>();
+  const computerIds = [
+    ...new Set(agents.filter((a) => brainOf(a.brain) !== "model" && a.machineId).map((a) => a.machineId as string)),
+  ];
+  const [membership, machines] = await Promise.all([
+    computerIds.length ? getMembership(db, viewerId, orgId) : Promise.resolve(null),
+    computerIds.length
+      ? db
+          .select({ id: schema.machines.id, name: schema.machines.name, deletedAt: schema.machines.deletedAt })
+          .from(schema.machines)
+          .where(and(eq(schema.machines.orgId, orgId), inArray(schema.machines.id, computerIds)))
+      : Promise.resolve([]),
+  ]);
+  const names = new Map(machines.filter((m) => !m.deletedAt).map((m) => [m.id, m.name]));
+  const manages = membership !== null && can(membership.role, "manage_agents");
+  for (const a of agents) {
+    const kind = brainOf(a.brain);
+    const computer = a.machineId && (manages || a.ownerUserId === viewerId) ? names.get(a.machineId) : undefined;
+    out.set(a.id, {
+      kind,
+      model: brainModelLabel(kind, a.brainModel),
+      ...(kind !== "model" && computer ? { computer } : {}),
+    });
+  }
+  return out;
 }

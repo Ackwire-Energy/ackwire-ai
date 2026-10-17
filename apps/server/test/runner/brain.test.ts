@@ -21,6 +21,7 @@ import {
 } from "../../runner/brain";
 import { claudeAuth } from "../../runner/executors";
 import { handleRequest } from "../../runner/handlers";
+import { type IpcReply, McpBridge, McpToolCache } from "../../runner/mcp";
 import { agentWorkspace } from "../../runner/paths";
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
@@ -330,6 +331,74 @@ test.if(posix)("our tool calls arrive executed; the bridge relays them for the r
   ]);
   expect(m.mcpTask(bridgeId)).toMatchObject({ running: false });
   expect(m.mcpTask(bridgeId)?.runId).toBeUndefined();
+});
+
+test.if(posix)(
+  "two turns on one process: each turn's calls carry its own run and token; between turns the list waits quietly",
+  async () => {
+    const { m, spawns, turn } = setup();
+    const logs: string[] = [];
+    const bridge = new McpBridge({
+      socketPath: "unused",
+      task: (id) => m.mcpTask(id),
+      log: (l) => logs.push(l),
+      callTimeoutMs: 2000,
+    });
+    const frames: RunnerFrame[] = [];
+    bridge.attach((f) => {
+      frames.push(f);
+      if (f.type === "mcp.call") bridge.result({ type: "mcp.result", callId: f.callId, ok: true, text: "ok" });
+    });
+    const bridgeInfo = () => {
+      const args = spawns()[0]?.args ?? [];
+      const config = JSON.parse(readFileSync(args[args.indexOf("--mcp-config") + 1] as string, "utf8")) as {
+        mcpServers: { agentes: { args: string[]; env: { AGENTES_MCP_TOKEN: string } } };
+      };
+      return {
+        id: config.mcpServers.agentes.args.at(-1) as string,
+        token: config.mcpServers.agentes.env.AGENTES_MCP_TOKEN,
+      };
+    };
+    const callDuring = async (n: number) => {
+      const pending = turn(n, "SLOW");
+      await waitFor(() => spawns().length === 1 && m.mcpTask(bridgeInfo().id)?.runId === RUN(n));
+      const { id, token } = bridgeInfo();
+      const reply = await bridge.handle({ taskId: id, token, tool: "search_context", args: { query: "x" } });
+      await pending;
+      return reply;
+    };
+    expect(await callDuring(1)).toEqual({ ok: true, text: "ok" });
+    // Between turns: the MCP server's background refresh is answered quietly, nothing relayed.
+    const { id, token } = bridgeInfo();
+    const idle = await bridge.handle({ taskId: id, token, tool: "", args: {}, kind: "list" });
+    expect(idle).toMatchObject({ ok: false, idle: true });
+    expect(await callDuring(2)).toEqual({ ok: true, text: "ok" });
+    const calls = frames.filter((f) => f.type === "mcp.call") as Extract<RunnerFrame, { type: "mcp.call" }>[];
+    expect(calls.map((c) => [c.taskId, c.token])).toEqual([
+      [RUN(1), `agr_${"t".repeat(24)}1`],
+      [RUN(2), `agr_${"t".repeat(24)}2`],
+    ]);
+    expect(frames.filter((f) => f.type === "mcp.list")).toHaveLength(0);
+    expect(spawns()).toHaveLength(1);
+    expect(logs.filter((l) => l.includes("refused"))).toEqual([]);
+    await bridge.close();
+  },
+);
+
+test("the MCP process's tool cache: an idle answer between turns makes the next turn ask again", async () => {
+  let n = 0;
+  const replies: IpcReply[] = [
+    { ok: true, text: "", tools: [{ name: "a", description: "", inputSchema: { type: "object" } }] },
+    { ok: false, error: "No turn", idle: true },
+    { ok: true, text: "", tools: [{ name: "b", description: "", inputSchema: { type: "object" } }] },
+  ];
+  const cache = new McpToolCache(async () => replies[n++] as IpcReply, { ttlMs: 60_000 });
+  expect((await cache.get()).map((t) => t.name)).toEqual(["a"]);
+  // Fresh: answered from the cache.
+  expect((await cache.get()).map((t) => t.name)).toEqual(["a"]);
+  expect(await cache.refresh()).toBe(false);
+  // The next turn's first look asks the server again (for that turn's run).
+  expect((await cache.get()).map((t) => t.name)).toEqual(["b"]);
 });
 
 test.if(posix)("idle processes close after the idle time", async () => {

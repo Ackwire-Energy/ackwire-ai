@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useAgentDetail, useChannels, useDms, useMemory, useModels, useRuns, useUsage } from "@/api/queries";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { agentBrainLine } from "@/components/AgentBrain";
 import { usd } from "@/components/AgentFields";
 import { useMediaQuery } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
@@ -170,6 +171,8 @@ export function AgentHero({ onArchive }: { onArchive: () => void }) {
   const name = draft.name.trim() || agent.name;
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const modelLabel = models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model;
+  // Who thinks: "Claude Code · Sonnet no mac" when a computer brain answers, else the API model.
+  const thinks = agentBrainLine(t, agent, modelLabel);
   const channelNames = (detail.data?.channels ?? []).filter((c) => saved.channels?.includes(c.id) ?? true);
   const home = channelNames[0];
   const g = agentGrammar(t, agent.name);
@@ -206,7 +209,7 @@ export function AgentHero({ onArchive }: { onArchive: () => void }) {
           </div>
           <div className="agp-meta">
             <Chip icon="person">{owner ? t("agent.ownerLine", { name: owner.name }) : t("agent.noOwnerLine")}</Chip>
-            <Chip icon="bolt">{modelLabel}</Chip>
+            <Chip icon={thinks.icon}>{thinks.text}</Chip>
             <Chip icon="message">{audienceSummary(t, agent, (id) => dir.memberById.get(id)?.name)}</Chip>
             {channelNames.slice(0, 2).map((c) => (
               <Chip key={c.id} icon="channel">

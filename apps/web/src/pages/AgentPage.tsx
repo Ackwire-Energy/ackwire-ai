@@ -33,7 +33,7 @@ import {
 import type { Agent, AgentAudience, AgentBrain, AgentDetail, AgentInput, AgentSkill } from "@/api/types";
 import { resourceName, useConnectedById, useSetLevels } from "@/components/AccessLevels";
 import { audienceValid } from "@/components/AgentAudience";
-import { brainSummary } from "@/components/AgentBrain";
+import { brainSummary, PlanTermsDialog } from "@/components/AgentBrain";
 import { CLOUD, machineOf } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, NO_OWNER, usd } from "@/components/AgentFields";
 import { LoadingPage } from "@/components/Loading";
@@ -57,6 +57,7 @@ import {
   lineChanges,
   revertKey,
   type Saved,
+  termsPending,
   thisMonth,
   type Viewer,
 } from "@/lib/agent-edit";
@@ -377,10 +378,23 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
 
   /* ---------- Saving ---------- */
 
-  const save = async () => {
+  /** A switch to Claude Code or Codex that reached the draft unconfirmed: the warning, before anything is saved. */
+  const [termsAsk, setTermsAsk] = useState<"claude_code" | "codex" | null>(null);
+
+  const save = async (opts: { termsAccepted?: boolean } = {}) => {
     if (saving || !dirty) return;
     if (problem) {
       toast.show(problem, "error");
+      return;
+    }
+    const brainDraft = draft.brain && opts.termsAccepted ? { ...draft.brain, termsAccepted: true } : draft.brain;
+    if (
+      fields.has("brain") &&
+      brainDraft &&
+      brainDraft.brain !== "model" &&
+      termsPending(saved.brain?.brain, brainDraft)
+    ) {
+      setTermsAsk(brainDraft.brain);
       return;
     }
     setSaving(true);
@@ -495,17 +509,21 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
       }
     }
     // 6. Who thinks (after the computer: what it offers depends on it).
-    if (!failed && fields.has("brain") && draft.brain) {
-      const next: BrainChoice = draft.brain;
+    if (!failed && fields.has("brain") && brainDraft) {
+      const next: BrainChoice = brainDraft;
       try {
         const view = await api.agents.setBrain(org.id, agent.id, {
           brain: next.brain,
           model: next.brain === "model" ? null : next.model,
           fallback: next.fallback,
-          // The warning was confirmed when the brain was chosen (needsPlanWarning).
-          ...(next.brain !== "model" && next.brain !== saved.brain?.brain ? { acceptPlanTerms: true } : {}),
+          // Only once the person confirmed the warning (when choosing it, or on save).
+          ...(next.brain !== "model" && next.brain !== saved.brain?.brain && next.termsAccepted === true
+            ? { acceptPlanTerms: true }
+            : {}),
         });
         qc.setQueryData<AgentBrain>(keys.agentBrain(org.id, agent.id), view);
+        // Headers and cards show who thinks (`Agent.brain`).
+        void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
         done.push("brain");
       } catch (e) {
         fail(e, true);
@@ -645,6 +663,17 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
         </div>
         <SaveBar saving={saving} onSave={() => void save()} onDiscard={discard} onJump={(c) => goTo(c.tab, c.sec)} />
       </div>
+
+      <PlanTermsDialog
+        brain={termsAsk}
+        onCancel={() => setTermsAsk(null)}
+        onConfirm={() => {
+          const draftBrain = draft.brain;
+          setTermsAsk(null);
+          if (draftBrain) set("brain", { ...draftBrain, termsAccepted: true });
+          void save({ termsAccepted: true });
+        }}
+      />
 
       <Dialog
         open={blocker.status === "blocked"}

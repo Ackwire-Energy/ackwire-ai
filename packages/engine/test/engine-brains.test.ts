@@ -8,6 +8,7 @@ import {
   brainFor,
   brainModelFor,
   brainSessionId,
+  COMPUTER_REACT_NOTE,
   clearPlanLimits,
   computerBrainUnavailable,
   createJobHandlers,
@@ -24,6 +25,7 @@ import {
   notePlanLimit,
   postPersonMessage,
   redeemMachinePairing,
+  restatesReaction,
   resumeRunsWaitingForMachine,
   runWhere,
   type ToolSource,
@@ -493,6 +495,61 @@ test("bridged side effects reach the engine: a bridged react ends the turn silen
   expect(thread.map((m) => m.body)).toEqual(["@dev valeu!"]);
   // Taken by the engine: nothing left over on the run.
   expect(JSON.stringify(run?.transcript)).not.toContain("bridgeEffects");
+});
+
+test("a bridged react followed by the emoji as text posts nothing (no 👍 message); a real reply still posts", async () => {
+  const fx = effectTools(() => f);
+  f = await setup({ toolSources: [fx.source] });
+  const machineId = await computerAgent(f);
+  const finals = ["👍", "Valeu! Qualquer coisa me chama."];
+  const { brain } = scriptedComputerBrain(async function* (n, turn) {
+    const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId };
+    const result = await executeToolForRun(f.jobDeps, id, { id: `r-${n}`, name: "react_now", input: {} });
+    yield { type: "tool_call", id: `r-${n}`, name: "react_now", input: {}, executed: result };
+    yield { type: "text_delta", text: finals[n] ?? "" };
+    yield { type: "done", text: finals[n] ?? "" };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const first = await post(f, "@dev valeu, perfeito!");
+  await drainOutbox(f.db, handlers);
+  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: first.id });
+  expect(thread.map((m) => m.body)).toEqual(["@dev valeu, perfeito!"]);
+  const second = await post(f, "@dev valeu, e o deploy?");
+  await drainOutbox(f.db, handlers);
+  const other = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: second.id });
+  expect(other.map((m) => m.body)).toEqual(["@dev valeu, e o deploy?", "Valeu! Qualquer coisa me chama."]);
+});
+
+test("restatesReaction: empty, NO_REPLY or only emoji and punctuation; any letter or digit is a reply", () => {
+  for (const t of ["", "  ", "👍", "👍🏽", "🙌!", "✅ ✅", "❤️", "NO_REPLY", "👍👍👍👍👍👍👍👍"])
+    expect(restatesReaction(t)).toBe(true);
+  for (const t of ["ok", "👍 feito", "Pronto!", "42", "valeu"]) expect(restatesReaction(t)).toBe(false);
+});
+
+test("a computer brain with the react tool is told to end with an empty reply after reacting", async () => {
+  f = await setup({ react: true });
+  await computerAgent(f);
+  const systems: string[] = [];
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(turn) {
+      systems.push(turn.system);
+      yield { type: "done", text: "Oi." };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  expect(systems[0]).toContain(COMPUTER_REACT_NOTE);
+  expect(systems[0]).toContain("not even the emoji again");
 });
 
 test("bridged side effects reach the engine: artifacts and memory cards on the reply, memory.updated published", async () => {

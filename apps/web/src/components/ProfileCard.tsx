@@ -1,10 +1,11 @@
-import { Avatar, Button, Meter, Popover } from "@agenteschat/ui";
+import { Avatar, Button, Icon, Meter, Popover } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAgentDetail, useAgentScopes, useModels, usePeople, useSettings } from "@/api/queries";
 import type { Actor, Agent } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { agentBrainLine } from "@/components/AgentBrain";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useScopeGroups } from "@/hooks/useScopeGroups";
@@ -187,6 +188,7 @@ function AgentCardBody({ agent }: { agent: Agent }) {
   const seesSpend = can(org.role, "view_usage") || agent.ownerUserId === me.user.id;
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : null;
   const model = models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model;
+  const thinks = agent.brain && agent.brain.kind !== "model" ? agentBrainLine(t, agent, model) : null;
   const summary = groups && grants.data ? scopeSummary(groups, grants.data, t("agent.noPermission")) : null;
   const allowed = summary?.rows.filter((r) => r.granted !== t("agent.noPermission")).slice(0, 3) ?? [];
   return (
@@ -210,7 +212,16 @@ function AgentCardBody({ agent }: { agent: Agent }) {
           </>
         )}
         <dt>{t("profile.model")}</dt>
-        <dd>{shortModel(model)}</dd>
+        <dd>
+          {thinks ? (
+            <span className="profile-card__brain">
+              <Icon name={thinks.icon} size={14} />
+              {thinks.text}
+            </span>
+          ) : (
+            shortModel(model)
+          )}
+        </dd>
         <dt>{t("profile.can")}</dt>
         <dd>
           {summary === null

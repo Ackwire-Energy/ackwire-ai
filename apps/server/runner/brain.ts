@@ -603,6 +603,8 @@ export class BrainManager {
       token: b.token,
       missionId: "",
       running: b.runId !== null,
+      // Between turns the process lives on, but nothing is relayed (never with an ended run's token).
+      ...(b.runId === null ? { idle: true } : {}),
       cwd: b.cwd,
       folder: b.folder,
       ...(b.runId ? { runId: b.runId } : {}),

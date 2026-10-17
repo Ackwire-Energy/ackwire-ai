@@ -109,6 +109,16 @@ export interface Agent {
   canTalk?: boolean;
   /** Its look (color, eyes, accessory), from the backend's allow-list. */
   appearance?: AgentLookInput;
+  /** Who thinks for it (ADR 0032): the brain, a computer brain's model label, its computer (owner and admins). */
+  brain?: AgentBrainLine;
+}
+
+/** `Agent.brain`: shown next to its name instead of the API model when a computer thinks. */
+export interface AgentBrainLine {
+  kind: BrainKind;
+  /** A computer brain's model ("Sonnet"); null for the model brain. */
+  model: string | null;
+  computer?: string;
 }
 
 /** `appearance` as stored: the UI only draws known values. */

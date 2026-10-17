@@ -607,6 +607,14 @@ p {
   line-height: 18px;
   color: var(--ink-muted);
 }
+/* Who thinks, after the owner: "Claude Code · Sonnet no mac" with its mark. */
+.channel__brain,
+.profile-card__brain {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: bottom;
+}
 .channel__messages {
   flex: 1;
   min-height: 0;

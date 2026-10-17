@@ -44,11 +44,16 @@ export interface BrainChoice {
   brain: BrainKind;
   model: string | null;
   fallback: boolean;
+  /** The person confirmed the plan warning for this brain in this edit (never sent; gates `acceptPlanTerms`). */
+  termsAccepted?: boolean;
 }
 export const sameBrain = (a: BrainChoice, b: BrainChoice) =>
   a.brain === b.brain && (a.brain === "model" || a.model === b.model) && a.fallback === b.fallback;
 /** Choosing Claude Code or Codex anew needs the warning confirmed (the plan is personal). */
 export const needsPlanWarning = (saved: BrainKind | undefined, next: BrainKind) => next !== "model" && next !== saved;
+/** Saving a switch to Claude Code or Codex the person hasn't confirmed yet: the warning blocks the save first. */
+export const termsPending = (saved: BrainKind | undefined, next: BrainChoice | undefined) =>
+  Boolean(next && needsPlanWarning(saved, next.brain) && next.termsAccepted !== true);
 
 /** What can be edited, as the server has it now. Parts not loaded yet are absent. */
 export interface Saved {

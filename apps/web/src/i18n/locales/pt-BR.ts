@@ -519,8 +519,8 @@ export const ptBR = {
     retry: "Tentar de novo",
   },
   dm: {
-    subtitle: "{{role}} · responde a {{owner}} · {{model}}",
-    subtitleNoOwner: "{{role}} · sem responsável · {{model}}",
+    subtitle: "{{role}} · responde a {{owner}}",
+    subtitleNoOwner: "{{role}} · sem responsável",
     profile: "Ver perfil",
     emptyAgent:
       "Converse direto com {{article}} {{name}}. Peça para lembrar ou esquecer algo, ou para mudar como {{pronoun}} trabalha.",
@@ -4133,6 +4133,12 @@ export const ptBR = {
   brain: {
     title: "Quem pensa",
     sub: "Quem escreve as respostas {{of}} {{name}}. Vale para todas as conversas.",
+    line: {
+      claude_code: "Claude Code · {{model}} no {{computer}}",
+      claude_codeNoComputer: "Claude Code · {{model}}",
+      codex: "Codex · {{model}} no {{computer}}",
+      codexNoComputer: "Codex · {{model}}",
+    },
     model: "Modelo (API)",
     modelText: "Usa o modelo e a chave de Modelo e chave. Conta no orçamento.",
     claude_code: "Claude Code no {{computer}}",

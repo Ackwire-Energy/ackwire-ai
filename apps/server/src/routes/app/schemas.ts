@@ -104,6 +104,17 @@ export const Agent = z
     audienceMode: z.enum(["everyone", "people", "owner"]),
     canTalk: z.boolean().openapi({ description: "Whether the current person can talk to it (mentions, DMs)." }),
     appearance: AgentAppearance.nullable().openapi({ description: "Its look; null = the default." }),
+    brain: z
+      .object({
+        kind: z.enum(["model", "claude_code", "codex"]),
+        model: z
+          .string()
+          .nullable()
+          .openapi({ description: "A computer brain's model label (Sonnet); null = the agent's model." }),
+        computer: z.string().optional().openapi({ description: "Its computer's name (admins and the agent's owner)." }),
+      })
+      .optional()
+      .openapi({ description: "Who thinks for it (ADR 0032), to show next to its name." }),
   })
   .openapi("Agent");
 

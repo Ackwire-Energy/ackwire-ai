@@ -513,8 +513,8 @@ export const en: Translations = {
     retry: "Try again",
   },
   dm: {
-    subtitle: "{{role}} · answers to {{owner}} · {{model}}",
-    subtitleNoOwner: "{{role}} · no owner · {{model}}",
+    subtitle: "{{role}} · answers to {{owner}}",
+    subtitleNoOwner: "{{role}} · no owner",
     profile: "View profile",
     emptyAgent:
       "Talk to {{name}} directly. Ask {{pronoun}} to remember or forget something, or to change how {{pronoun}} works.",
@@ -4125,6 +4125,12 @@ export const en: Translations = {
   brain: {
     title: "Who thinks",
     sub: "Who writes {{name}}'s answers. It applies to every conversation.",
+    line: {
+      claude_code: "Claude Code · {{model}} on {{computer}}",
+      claude_codeNoComputer: "Claude Code · {{model}}",
+      codex: "Codex · {{model}} on {{computer}}",
+      codexNoComputer: "Codex · {{model}}",
+    },
     model: "Model (API)",
     modelText: "Uses the model and key from Model and key. Counts against the budget.",
     claude_code: "Claude Code on {{computer}}",

@@ -1,5 +1,7 @@
 import {
+  type AgentBrainSummary,
   type Agent as AgentRow,
+  agentBrainSummaries,
   agentBudgetsThisMonth,
   agentView,
   archiveAgent,
@@ -41,11 +43,18 @@ import { Agent, AgentAppearance, AgentAudience, AgentBrain, BrainKind, Credentia
 const tags = ["Agents"];
 
 /** An agent as this person may see it: its budget is money, so admins only (`seesCost`). */
-const toAgent = (a: AgentRow, viewerId: string, seesCost: boolean, budgetUsedPercent?: number) => {
+const toAgent = (
+  a: AgentRow,
+  viewerId: string,
+  seesCost: boolean,
+  budgetUsedPercent?: number,
+  brain?: AgentBrainSummary,
+) => {
   const v = agentView(a);
   const { monthlyBudgetNanoUsd, ...rest } = v;
   return {
     ...rest,
+    ...(brain ? { brain } : {}),
     ...(budgetUsedPercent !== undefined ? { budgetUsedPercent } : {}),
     ...(seesCost
       ? { monthlyBudgetUsd: monthlyBudgetNanoUsd === null ? null : nanoUsdToUsd(monthlyBudgetNanoUsd) }
@@ -216,12 +225,16 @@ export function agentRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const actor = c.get("user").id;
       const list = await listAgents(db, actor, orgId);
-      const [seesCost, budgets] = await Promise.all([canViewCost(db, actor, orgId), agentBudgetsThisMonth(db, orgId)]);
+      const [seesCost, budgets, brains] = await Promise.all([
+        canViewCost(db, actor, orgId),
+        agentBudgetsThisMonth(db, orgId),
+        agentBrainSummaries(db, actor, orgId, list),
+      ]);
       const percent = (id: string) => {
         const b = budgets.get(id);
         return b ? budgetPercent(b.spentNanoUsd, b.budgetNanoUsd) : 0;
       };
-      return c.json({ agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id))) }, 200);
+      return c.json({ agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id))) }, 200);
     },
   );
 
@@ -280,7 +293,11 @@ export function agentRoutes(deps: AppDeps) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");
       }
-      return c.json(toAgent(agent, actor, await canViewCost(db, actor, orgId)), 200);
+      const [seesCost, brains] = await Promise.all([
+        canViewCost(db, actor, orgId),
+        agentBrainSummaries(db, actor, orgId, [agent]),
+      ]);
+      return c.json(toAgent(agent, actor, seesCost, undefined, brains.get(agent.id)), 200);
     },
   );
 
