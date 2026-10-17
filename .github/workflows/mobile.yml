@@ -1,7 +1,7 @@
 name: Mobile build (EAS)
 
-# Builds the phone app on EAS (never on a developer's machine). Runs by hand, and on pull requests that
-# touch apps/mobile, only when the EXPO_TOKEN secret exists (forks and repos without it skip quietly).
+# Builds the phone app on EAS (never on a developer's machine). Runs only by hand (Actions → Run workflow),
+# so builds spend the EAS quota on purpose; skips quietly without the EXPO_TOKEN secret.
 # Verification of the app's code (lint, typecheck, unit tests) runs in ci.yml like everything else.
 on:
   workflow_dispatch:
@@ -16,9 +16,6 @@ on:
         type: choice
         options: [all, ios, android]
         default: all
-  pull_request:
-    paths:
-      - "apps/mobile/**"
 
 concurrency:
   group: mobile-${{ github.ref }}

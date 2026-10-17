@@ -12,7 +12,7 @@ unit tests of the pure logic in `apps/mobile/test`). Builds and installs go thro
    already exists; its ID is in `app.config.ts` (`EAS_PROJECT_ID` overrides it).
 2. In GitHub → Settings → Secrets and variables → Actions: secret `EXPO_TOKEN` = the access token.
 3. Run the workflow **Mobile build (EAS)** (Actions → Run workflow), profile `preview`, platform `all`.
-   Pull requests that touch `apps/mobile/**` also build `preview` when the secret exists.
+   Builds run only by hand, so the EAS quota is spent on purpose. The button appears once this workflow is on `main`.
 4. Open the build on expo.dev from the phone:
    - Android: the `preview` profile makes an APK; install it from the link.
    - iOS: `preview` is an internal (ad hoc) build. Register the iPhone once on expo.dev
