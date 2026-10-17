@@ -12,6 +12,7 @@ export * from "./brain-settings";
 export * from "./brains/claude-code";
 export * from "./brains/codex";
 export * from "./brains/model";
+export * from "./brains/prompt";
 export * from "./brains/select";
 export * from "./brains/types";
 export * from "./cache";

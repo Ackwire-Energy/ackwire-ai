@@ -12,6 +12,7 @@ import { type Database, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineOfflineError } from "../machines";
+import { computerPrompt } from "./prompt";
 import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
 
 /**
@@ -209,7 +210,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           cwd: session.cwd,
           ...(turn.model ? { model: turn.model } : {}),
           system: turn.system,
-          prompt: turn.trigger,
+          prompt: computerPrompt(turn),
           mcp: { token: deps.mcpToken?.(turn) ?? randomBytes(24).toString("base64url") },
           keepAlive: deps.keepAlive !== false,
           personalMcp,

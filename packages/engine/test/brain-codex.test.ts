@@ -1,11 +1,6 @@
 import { expect, test } from "bun:test";
-import {
-  type BrainTurnRequest,
-  CodexBrain,
-  type ComputerBrainLink,
-  codexPrompt,
-  codexVersionOk,
-} from "../src/brains/codex";
+import { type BrainTurnRequest, CodexBrain, type ComputerBrainLink, codexVersionOk } from "../src/brains/codex";
+import { computerPrompt } from "../src/brains/prompt";
 import type { BrainEvent, BrainTurn } from "../src/brains/types";
 
 const SESSION = "0193aaaa-0000-7000-8000-00000000c0de";
@@ -118,10 +113,10 @@ test("a resumed turn sends only what came after the brain's last reply", () => {
       { role: "user", content: "run the tests" },
     ],
   });
-  expect(codexPrompt(t)).toBe(
+  expect(computerPrompt(t)).toBe(
     "New messages since your last reply:\n\nUser: also check lint\n\nNow answer this:\n\nrun the tests",
   );
-  expect(codexPrompt({ ...t, messages: t.messages.filter((m) => m.content !== "also check lint") })).toBe(
+  expect(computerPrompt({ ...t, messages: t.messages.filter((m) => m.content !== "also check lint") })).toBe(
     "run the tests",
   );
 });
