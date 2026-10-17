@@ -1,6 +1,6 @@
 {
-  "id": "d925b057-d662-4929-9bc7-6f893caafaec",
-  "prevId": "ddeb082e-09f5-4be8-b740-1e391553f527",
+  "id": "ddeb082e-09f5-4be8-b740-1e391553f527",
+  "prevId": "8f7c5721-69fe-4c3f-8da5-558a4d15cde9",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6323,101 +6323,6 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.push_devices": {
-      "name": "push_devices",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "token": {
-          "name": "token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "locale": {
-          "name": "locale",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "last_seen_at": {
-          "name": "last_seen_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "push_devices_user_id_index": {
-          "name": "push_devices_user_id_index",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "push_devices_user_id_users_id_fk": {
-          "name": "push_devices_user_id_users_id_fk",
-          "tableFrom": "push_devices",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "push_devices_token_unique": {
-          "name": "push_devices_token_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
-        }
-      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -13039,12 +12944,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "monthly_budget_nano_usd": {
-          "name": "monthly_budget_nano_usd",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_by_user_id": {
           "name": "created_by_user_id",
           "type": "text",
@@ -13256,39 +13155,39 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.message_pins": {
-      "name": "message_pins",
+    "public.push_devices": {
+      "name": "push_devices",
       "schema": "",
       "columns": {
-        "org_id": {
-          "name": "org_id",
+        "id": {
+          "name": "id",
           "type": "uuid",
-          "primaryKey": false,
+          "primaryKey": true,
           "notNull": true
         },
-        "channel_id": {
-          "name": "channel_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "message_id": {
-          "name": "message_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "message_created_at": {
-          "name": "message_created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "pinned_by_user_id": {
-          "name": "pinned_by_user_id",
+        "user_id": {
+          "name": "user_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "locale": {
+          "name": "locale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
@@ -13296,20 +13195,21 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
-        "message_pins_channel_id_created_at_index": {
-          "name": "message_pins_channel_id_created_at_index",
+        "push_devices_user_id_index": {
+          "name": "push_devices_user_id_index",
           "columns": [
             {
-              "expression": "channel_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -13322,96 +13222,9 @@
         }
       },
       "foreignKeys": {
-        "message_pins_pinned_by_user_id_users_id_fk": {
-          "name": "message_pins_pinned_by_user_id_users_id_fk",
-          "tableFrom": "message_pins",
-          "tableTo": "users",
-          "columnsFrom": [
-            "pinned_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "message_pins_org_id_channel_id_channels_org_id_id_fk": {
-          "name": "message_pins_org_id_channel_id_channels_org_id_id_fk",
-          "tableFrom": "message_pins",
-          "tableTo": "channels",
-          "columnsFrom": [
-            "org_id",
-            "channel_id"
-          ],
-          "columnsTo": [
-            "org_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "message_pins_channel_id_message_id_pk": {
-          "name": "message_pins_channel_id_message_id_pk",
-          "columns": [
-            "channel_id",
-            "message_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.thread_follows": {
-      "name": "thread_follows",
-      "schema": "",
-      "columns": {
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "channel_id": {
-          "name": "channel_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "root_message_id": {
-          "name": "root_message_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "following": {
-          "name": "following",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "thread_follows_user_id_users_id_fk": {
-          "name": "thread_follows_user_id_users_id_fk",
-          "tableFrom": "thread_follows",
+        "push_devices_user_id_users_id_fk": {
+          "name": "push_devices_user_id_users_id_fk",
+          "tableFrom": "push_devices",
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
@@ -13421,33 +13234,18 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "thread_follows_org_id_channel_id_channels_org_id_id_fk": {
-          "name": "thread_follows_org_id_channel_id_channels_org_id_id_fk",
-          "tableFrom": "thread_follows",
-          "tableTo": "channels",
-          "columnsFrom": [
-            "org_id",
-            "channel_id"
-          ],
-          "columnsTo": [
-            "org_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {
-        "thread_follows_root_message_id_user_id_pk": {
-          "name": "thread_follows_root_message_id_user_id_pk",
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "push_devices_token_unique": {
+          "name": "push_devices_token_unique",
+          "nullsNotDistinct": false,
           "columns": [
-            "root_message_id",
-            "user_id"
+            "token"
           ]
         }
       },
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

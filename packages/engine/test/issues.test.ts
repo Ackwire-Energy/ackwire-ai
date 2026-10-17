@@ -7,6 +7,7 @@ import {
   commentIssue,
   createChannel,
   createIssue,
+  createIssueToolSource,
   drainOutbox,
   getIssue,
   grantScopes,
@@ -233,6 +234,47 @@ describe("issues", () => {
     await expect(
       commentIssue(deps, person(f.owner.id), f.org.id, issue.id, "olha", { attachmentIds: [theirs] }),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  test("update_issue and create_issue set the assignee: me, a handle, none; an unknown name fails", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId: f.general.id,
+      threadRootId: crypto.randomUUID(),
+      triggerMessageId: crypto.randomUUID(),
+    };
+    const tools = await createIssueToolSource(deps).tools(ctx);
+    const run = (name: string, input: Record<string, unknown>) => {
+      const tool = tools.find((t) => t.name === name);
+      if (!tool) throw new Error(`no ${name}`);
+      return tool.execute(input, ctx);
+    };
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, {
+      title: "N+1 no offline-map",
+      assignee: { type: "person", id: f.owner.id },
+    });
+    expect((await run("update_issue", { issue: `#${issue.number}`, assignee: "me" })).isError).toBeUndefined();
+    expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id })).assignee).toEqual({
+      type: "agent",
+      id: f.agent.id,
+    });
+    await run("update_issue", { issue: issue.id, assignee: "none" });
+    expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id })).assignee).toBeNull();
+    const failed = await run("update_issue", { issue: issue.id, assignee: "@nobody" });
+    expect(failed.isError).toBe(true);
+    expect(failed.content).toContain("Nobody called");
+
+    const created = await run("create_issue", { title: "Contar o rate limit uma vez", assignee: "@dev" });
+    const [row] = (await listIssues(f.db, person(f.owner.id), f.org.id, { q: "rate limit" })).filter(
+      (i) => i.title === "Contar o rate limit uma vez",
+    );
+    expect(created.isError).toBeUndefined();
+    expect(row?.assignee).toEqual({ type: "agent", id: f.agent.id });
   });
 
   test("an agent without issues:write can't create issues; one in another channel can't see private ones", async () => {

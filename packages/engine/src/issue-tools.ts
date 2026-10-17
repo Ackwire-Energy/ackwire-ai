@@ -1,3 +1,4 @@
+import { and, eq, isNull, schema, sql } from "@agenteschat/db";
 import {
   commentIssue,
   createIssue,
@@ -10,7 +11,9 @@ import {
   listIssues,
   setCriterion,
   updateIssue,
+  type WorkActor,
 } from "./issues";
+import { listMembers } from "./organizations";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -46,6 +49,43 @@ async function find(deps: IssueDeps, ctx: ToolContext, ref: string) {
   const n = /^#?(\d+)$/.exec(ref.trim());
   return getIssue(deps.db, actorOf(ctx), ctx.orgId, n ? { number: Number(n[1]) } : { id: ref.trim() });
 }
+
+/**
+ * Resolves `assignee`: "me" (the calling agent), "none" (nobody), an agent's or
+ * a person's handle (`@ada`), or a person's name or email.
+ */
+async function assigneeOf(deps: IssueDeps, ctx: ToolContext, ref: string): Promise<WorkActor | null> {
+  const value = ref.trim().replace(/^@/, "").toLowerCase();
+  if (value === "me") return { type: "agent", id: ctx.agentId };
+  if (value === "none" || value === "") return null;
+  const [agent] = await deps.db
+    .select({ id: schema.agents.id })
+    .from(schema.agents)
+    .where(
+      and(
+        eq(schema.agents.orgId, ctx.orgId),
+        isNull(schema.agents.archivedAt),
+        sql`lower(${schema.agents.handle}) = ${value}`,
+      ),
+    );
+  if (agent) return { type: "agent", id: agent.id };
+  const people = (await listMembers(deps.db, ctx.orgId)).filter((m) =>
+    [m.handle, m.email, m.name].some((v) => v?.toLowerCase() === value),
+  );
+  if (people.length === 1 && people[0]) return { type: "person", id: people[0].userId };
+  throw new Error(
+    people.length > 1
+      ? `"${ref}" matches more than one person; use their handle`
+      : `Nobody called "${ref}" in this organization (use "me", "none", or an agent's or person's handle)`,
+  );
+}
+
+const assigneeField = {
+  type: "string",
+  minLength: 1,
+  maxLength: 200,
+  description: 'Who owns the issue: "me", "none", or an agent\'s or person\'s handle (@ana).',
+};
 
 const STATUSES = ["todo", "in_progress", "in_review", "done", "canceled"];
 const PRIORITIES = ["low", "normal", "high"];
@@ -98,6 +138,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
           criteria: { type: "array", items: { type: "string", maxLength: 500 }, maxItems: 30 },
           priority: { enum: PRIORITIES },
           labels: { type: "array", items: { type: "string", maxLength: 40 }, maxItems: 10 },
+          assignee: assigneeField,
         },
         required: ["title"],
         additionalProperties: false,
@@ -110,6 +151,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             criteria: Array.isArray(input.criteria) ? input.criteria.map(String) : [],
             priority: (input.priority as IssuePriority | undefined) ?? undefined,
             labels: Array.isArray(input.labels) ? input.labels.map(String) : undefined,
+            ...(str(input.assignee) ? { assignee: await assigneeOf(deps, ctx, str(input.assignee)) } : {}),
           });
           return { content: `Created ${line(i)}`, data: { issue: { id: i.id, number: i.number } } };
         } catch (error) {
@@ -120,7 +162,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
     {
       name: "update_issue",
       description:
-        "Change an issue's status, priority, title or description, check acceptance criteria you met, or link a pull request to it. Linking a PR moves the issue to review on its own.",
+        "Change an issue's status, priority, title, description or assignee, check acceptance criteria you met, or link a pull request to it. Linking a PR moves the issue to review on its own.",
       scope: "issues:write",
       inputSchema: {
         type: "object",
@@ -130,6 +172,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
           priority: { enum: PRIORITIES },
           title: { type: "string", maxLength: 300 },
           description: { type: "string", maxLength: 20000 },
+          assignee: assigneeField,
           pull_request_url: { type: "string", maxLength: 500 },
           pull_request_number: { type: "integer", minimum: 1 },
           done_criteria: {
@@ -154,6 +197,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
             priority: (input.priority as IssuePriority | undefined) ?? undefined,
             title: str(input.title) || undefined,
             description: typeof input.description === "string" ? input.description : undefined,
+            ...(str(input.assignee) ? { assignee: await assigneeOf(deps, ctx, str(input.assignee)) } : {}),
             ...(url && prNumber ? { addPullRequest: { number: prNumber, url } } : {}),
           });
           const done = Array.isArray(input.done_criteria) ? input.done_criteria.map(Number) : [];

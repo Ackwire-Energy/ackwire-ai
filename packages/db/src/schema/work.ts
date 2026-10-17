@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
-  bigint,
   boolean,
   date,
   index,
@@ -135,8 +134,6 @@ export const routines = pgTable(
     active: boolean().notNull().default(true),
     nextRunAt: timestamp({ withTimezone: true }),
     lastRunAt: timestamp({ withTimezone: true }),
-    /** Spend cap of this routine's runs per calendar month (UTC), nano-USD; null = only the agent's budget. */
-    monthlyBudgetNanoUsd: bigint({ mode: "number" }),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

@@ -1,18 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import {
-  and,
-  type Database,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNotNull,
-  isNull,
-  lte,
-  rowsOf,
-  schema,
-  sql,
-} from "@agenteschat/db";
+import { and, type Database, desc, eq, inArray, isNotNull, isNull, lte, rowsOf, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import type { ArtifactDeps } from "./artifacts";
 import { audienceError, audienceNotice, canTalkTo } from "./audience";
@@ -41,7 +28,6 @@ import {
 } from "./rrule";
 import { runErrorDetail } from "./runs";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
-import { budgetPercent, monthStartUtc } from "./usage";
 
 const { routines, routineRuns, agentRuns, usageRecords, channelMembers, channels } = schema;
 
@@ -109,10 +95,6 @@ export interface RoutineView {
   lastRun: RoutineRunView | null;
   /** The last runs, newest first (at most RECENT_RUNS). */
   recentRuns: RoutineRunView[];
-  /** Spend cap of this routine per calendar month; null = only the agent's own budget. Routes send it to admins only. */
-  budgetUsd: number | null;
-  /** This month's share of `budgetUsd` used; null without a routine budget. No money for members. */
-  budgetUsedPercent: number | null;
   createdAt: string;
 }
 
@@ -123,8 +105,6 @@ export interface RoutineInput {
   target: RoutineTarget;
   /** `timezone`: IANA zone the phrase is read in; default: the creator's, then the org's, then UTC. */
   trigger: RoutineTriggerInput;
-  /** Monthly spend cap of this routine, in USD (null/absent = none). */
-  budgetUsd?: number | null;
 }
 
 export type RoutineTriggerInput =
@@ -232,7 +212,6 @@ function runView(
 /** The summaries we write (English fallback text), by their stable code; the app translates the code. */
 const RUN_SUMMARY = {
   "routine_run.deleted": "Routine deleted",
-  "routine_run.routine_budget": "Routine budget used up this month",
   "routine_run.paused": "Routine paused",
   "routine_run.creator_left": "The routine's creator left the organization",
   "routine_run.agent_archived": "The agent was archived",
@@ -259,7 +238,6 @@ const FAILED_PREFIX = "Failed: ";
  */
 const LEGACY_SUMMARY_CODES: Record<string, RunSummaryCode> = {
   "Rotina apagada": "routine_run.deleted",
-  "Orçamento da rotina esgotado neste mês": "routine_run.routine_budget",
   "Rotina pausada": "routine_run.paused",
   "Quem criou a rotina saiu da organização": "routine_run.creator_left",
   "O agente foi arquivado": "routine_run.agent_archived",
@@ -339,23 +317,15 @@ function recentViews(runs: RunRow[], details: Awaited<ReturnType<typeof runDetai
 async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const monthStart = monthStartUtc(new Date());
-  const [runs, recentIds] = await Promise.all([
-    db
-      .select()
-      .from(routineRuns)
-      .where(and(inArray(routineRuns.routineId, ids), gte(routineRuns.createdAt, monthStart)))
-      .orderBy(desc(routineRuns.createdAt)),
-    // The last RECENT_RUNS of each routine, whatever the month (one query, ranked per routine).
-    db.execute(sql`
-      select id from (
-        select ${routineRuns.id} as id,
-          row_number() over (partition by ${routineRuns.routineId} order by ${routineRuns.createdAt} desc) as n
-        from ${routineRuns}
-        where ${inArray(routineRuns.routineId, ids)}
-      ) ranked
-      where n <= ${RECENT_RUNS}`),
-  ]);
+  // The last RECENT_RUNS of each routine (one query, ranked per routine).
+  const recentIds = await db.execute(sql`
+    select id from (
+      select ${routineRuns.id} as id,
+        row_number() over (partition by ${routineRuns.routineId} order by ${routineRuns.createdAt} desc) as n
+      from ${routineRuns}
+      where ${inArray(routineRuns.routineId, ids)}
+    ) ranked
+    where n <= ${RECENT_RUNS}`);
   const recentRunIds = rowsOf<{ id: string }>(recentIds).map((r) => r.id);
   const recentRows =
     recentRunIds.length === 0
@@ -367,16 +337,13 @@ async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
           .orderBy(desc(routineRuns.createdAt));
   const recent = new Map<string, RunRow[]>();
   for (const r of recentRows) recent.set(r.routineId, [...(recent.get(r.routineId) ?? []), r]);
-  // The last run is the newest recent one (older months included).
+  // The last run is the newest recent one.
   const latest = new Map<string, RunRow>();
   for (const [id, list] of recent) if (list[0]) latest.set(id, list[0]);
-  const details = await runDetails(db, [...runs, ...recentRows]);
+  const details = await runDetails(db, recentRows);
   return rows.map((r) => {
     const last = latest.get(r.id);
     const agentRun = last?.agentRunId ? details.agentRunsById.get(last.agentRunId) : undefined;
-    const monthCost = runs
-      .filter((x) => x.routineId === r.id && x.agentRunId)
-      .reduce((sum, x) => sum + (details.costById.get(x.agentRunId ?? "") ?? 0), 0);
     const running =
       last?.status === "queued" ||
       (last?.status === "started" && !!agentRun && !["done", "failed", "canceled"].includes(agentRun.status));
@@ -392,8 +359,6 @@ async function views(db: Database, rows: RoutineRow[]): Promise<RoutineView[]> {
       running,
       lastRun: last ? runView(last, agentRun) : null,
       recentRuns: recentViews(recent.get(r.id) ?? [], details),
-      budgetUsd: r.monthlyBudgetNanoUsd === null ? null : r.monthlyBudgetNanoUsd / 1e9,
-      budgetUsedPercent: r.monthlyBudgetNanoUsd === null ? null : budgetPercent(monthCost, r.monthlyBudgetNanoUsd),
       createdAt: r.createdAt.toISOString(),
     };
   });
@@ -437,14 +402,6 @@ export async function parseScheduleForOrg(
   const zone = await routineTimezone(deps.db, actorId, orgId, timezone);
   return parseSchedule(readerOf(deps), { orgId, phrase, timezone: zone });
 }
-
-const budgetNano = (usd: number | null | undefined) => {
-  if (usd === undefined) return undefined;
-  if (usd === null) return null;
-  if (!Number.isFinite(usd) || usd < 0 || usd > 100_000)
-    throw new ValidationError("Invalid budget", "routine.invalid_budget");
-  return Math.round(usd * 1e9);
-};
 
 /** The trigger columns of a routine, validated like on create; `nextRunAt` computed from now. */
 async function resolveTrigger(deps: RoutineDeps, actorId: string, orgId: string, trigger: RoutineTriggerInput) {
@@ -570,7 +527,6 @@ export async function createRoutine(
       prompt,
       target: input.target as unknown as Record<string, unknown>,
       ...trigger,
-      monthlyBudgetNanoUsd: budgetNano(input.budgetUsd) ?? null,
       createdByUserId: actorId,
     })
     .returning();
@@ -624,7 +580,6 @@ export interface RoutinePatch {
   agentId?: string;
   trigger?: RoutineTriggerInput;
   target?: RoutineTarget;
-  budgetUsd?: number | null;
   active?: boolean;
 }
 
@@ -669,8 +624,6 @@ export async function updateRoutine(
     if (patch.target !== undefined) set.target = target as unknown as Record<string, unknown>;
   }
   if (patch.trigger !== undefined) Object.assign(set, await resolveTrigger(deps, actorId, orgId, patch.trigger));
-  const budget = budgetNano(patch.budgetUsd);
-  if (budget !== undefined) set.monthlyBudgetNanoUsd = budget;
   const active = patch.active ?? current.active;
   if (patch.active !== undefined) set.active = active;
   // Next slot: from the (new) trigger, only while active; paused routines have none.
@@ -908,16 +861,6 @@ export async function fireRoutineEvent(
   return fired;
 }
 
-/** What this routine's runs cost this calendar month (UTC), nano-USD. */
-async function routineMonthCost(db: Database, routineId: string) {
-  const [row] = await db
-    .select({ cost: sql<number>`coalesce(sum(${usageRecords.costNanoUsd}), 0)::bigint` })
-    .from(usageRecords)
-    .innerJoin(routineRuns, eq(routineRuns.agentRunId, usageRecords.runId))
-    .where(and(eq(routineRuns.routineId, routineId), gte(usageRecords.createdAt, monthStartUtc(new Date()))));
-  return Number(row?.cost ?? 0);
-}
-
 async function finishRun(db: Database, runId: string, status: "skipped" | "failed", summary: string) {
   await db.update(routineRuns).set({ status, summary }).where(eq(routineRuns.id, runId));
 }
@@ -933,12 +876,6 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
   if (run?.status !== "queued") return;
   const [routine] = await db.select().from(routines).where(eq(routines.id, run.routineId));
   if (!routine || routine.deletedAt) return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.deleted"]);
-  if (
-    routine.monthlyBudgetNanoUsd !== null &&
-    (await routineMonthCost(db, routine.id)) >= routine.monthlyBudgetNanoUsd
-  ) {
-    return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.routine_budget"]);
-  }
   if (!routine.active && run.trigger !== "manual")
     return finishRun(db, run.id, "skipped", RUN_SUMMARY["routine_run.paused"]);
   const creator = routine.createdByUserId;

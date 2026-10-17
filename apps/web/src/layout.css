@@ -8398,12 +8398,13 @@ button.live-call__head:hover {
 }
 .agp-ch {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px 10px;
 }
+/* A long title wraps on its own line; the action stays on the right. */
 .agp-ch h2 {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -8414,6 +8415,7 @@ button.live-call__head:hover {
 }
 .agp-ch__act {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 6px;
   margin-left: auto;

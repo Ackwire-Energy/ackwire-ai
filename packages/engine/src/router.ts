@@ -2,6 +2,7 @@ import { and, type Database, desc, eq, inArray, isNull, lte, ne, schema, sql } f
 import { cheapModelOf, ProviderError } from "@agenteschat/providers";
 import { audienceSql } from "./audience";
 import { summarizeScopes } from "./capabilities";
+import { quotedLine } from "./context";
 import { createAgentRuns, requesterOf } from "./dispatch";
 import { MissingCredentialError, ValidationError } from "./errors";
 import type { ModelGateway } from "./gateway";
@@ -424,7 +425,8 @@ export async function routeMessage(
         eq(messages.orgId, message.orgId),
         eq(messages.channelId, message.channelId),
         isNull(messages.deletedAt),
-        message.threadId ? eq(messages.threadId, message.threadId) : isNull(messages.threadId),
+        // A top-level message: the channel as people see it, replies under earlier messages included.
+        message.threadId ? eq(messages.threadId, message.threadId) : undefined,
         ne(messages.id, message.id),
         // Only what came before this message.
         lte(messages.createdAt, message.createdAt),
@@ -485,6 +487,16 @@ export async function routeMessage(
   if (!continuityAgentId && !byAgent) {
     continuityAgentId = recent.find((m) => m.authorAgentId && candidateIds.has(m.authorAgentId))?.authorAgentId ?? null;
   }
+  // A person's quote reply to an agent's message is for that agent (like a follow-up, whatever its length).
+  const replyTo = message.meta.replyTo as { author?: { type?: unknown; id?: unknown } } | undefined;
+  const quotedAgentId =
+    !byAgent &&
+    replyTo?.author?.type === "agent" &&
+    typeof replyTo.author.id === "string" &&
+    candidateIds.has(replyTo.author.id)
+      ? replyTo.author.id
+      : null;
+  if (quotedAgentId) continuityAgentId = quotedAgentId;
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
 
   let result: RoutingResult;
@@ -492,7 +504,11 @@ export async function routeMessage(
     result = await deps.strategy.decide({
       orgId: message.orgId,
       channel,
-      message: { id: message.id, author: author?.name ?? "someone", body: message.body },
+      message: {
+        id: message.id,
+        author: author?.name ?? "someone",
+        body: `${quotedLine(message.meta)}${message.body}`,
+      },
       thread: history.reverse().map((m) => ({
         author: m.agentHandle ? `@${m.agentHandle}` : (m.userName ?? "someone"),
         body: m.body,
@@ -522,9 +538,10 @@ export async function routeMessage(
 
   // The router's own pick; when it picks several agents, the message speaks to several.
   const picked = selectAgents(candidates, result, policy, { continuityAgentId });
-  // A short follow-up without a mention ("and now?") goes only to the agent the person was talking to,
-  // unless the router heard it as for several agents.
-  const followUp = continuityAgentId !== null && isShortFollowUp(message.body) && picked.length < 2;
+  // A short follow-up without a mention ("and now?"), or a quote reply to an agent, goes only to the agent
+  // the person was talking to, unless the router heard it as for several agents.
+  const followUp =
+    continuityAgentId !== null && (quotedAgentId !== null || isShortFollowUp(message.body)) && picked.length < 2;
   // Another agent already answered this in the thread: don't pile on with a second answer.
   const duplicate = !followUp && (result.alreadyAnswered ?? 0) >= ALREADY_ANSWERED_THRESHOLD;
   const selected = followUp && continuityAgentId ? [continuityAgentId] : duplicate ? [] : picked;

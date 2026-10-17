@@ -8,6 +8,7 @@ import {
 } from "@agenteschat/adapters";
 import type { MachineCaller } from "../machine-hub";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
+import { computerPrompt } from "./prompt";
 import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
 
 /**
@@ -60,29 +61,6 @@ export function codexVersionOk(version: string | undefined): boolean {
   if (!have) return false;
   for (let i = 0; i < 3; i++) if ((have[i] ?? 0) !== (want[i] ?? 0)) return (have[i] ?? 0) > (want[i] ?? 0);
   return true;
-}
-
-/**
- * What Codex reads this turn. A new thread gets the conversation so far
- * (its context; the system text goes as developer instructions) and the
- * trigger; a resumed thread already has everything up to its own last reply,
- * so it gets only what people said after it.
- */
-export function codexPrompt(turn: BrainTurn): string {
-  const messages = turn.messages;
-  const trigger = turn.trigger.trim();
-  const last = messages[messages.length - 1];
-  const before = last && last.role === "user" && last.content.trim() === trigger ? messages.slice(0, -1) : messages;
-  const render = (m: { role: string; content: string }) => `${m.role === "user" ? "User" : "You"}: ${m.content}`;
-  if (turn.session?.resume) {
-    let i = before.length;
-    while (i > 0 && before[i - 1]?.role === "user") i--;
-    const fresh = before.slice(i);
-    if (!fresh.length) return trigger;
-    return `New messages since your last reply:\n\n${fresh.map(render).join("\n\n")}\n\nNow answer this:\n\n${trigger}`;
-  }
-  if (!before.length) return trigger;
-  return `The conversation so far:\n\n${before.map(render).join("\n\n")}\n\nNow answer this:\n\n${trigger}`;
 }
 
 /** Events pushed by a callback, read as an async iterable. */
@@ -174,7 +152,7 @@ export class CodexBrain implements Brain {
       cwd: session.cwd,
       ...(turn.model ? { model: turn.model } : {}),
       system: turn.system,
-      prompt: codexPrompt(turn),
+      prompt: computerPrompt(turn),
       mcp,
       ...(agent ? { agent } : {}),
     };

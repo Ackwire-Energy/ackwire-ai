@@ -184,6 +184,43 @@ describe("routeMessage", () => {
     );
   });
 
+  test("a quote reply to an agent goes to that agent, who the router saw answer under the earlier message", async () => {
+    f = await setup();
+    const ops = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "ops", handle: "ops" },
+      { model: "claude-sonnet-5-5" },
+    );
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ops.id });
+    const question = await post("clone the repo and look at the error");
+    const answer = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: question.id,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+      body: "I couldn't read the code: the clone of the repo hung.",
+    });
+    const inputs: { body: string; thread: string[] }[] = [];
+    const strategy: RouterStrategy = {
+      name: "fixed",
+      async decide(input) {
+        inputs.push({ body: input.message.body, thread: input.thread.map((m) => m.body) });
+        // The router alone would pick ops (it talks about infrastructure).
+        return { agents: input.candidates.map((c) => ({ agentId: c.agentId, score: c.handle === "ops" ? 0.9 : 0.2 })) };
+      },
+    };
+    const why = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "why did the clone of the repo hang? was it a timeout, permissions or the network?",
+      replyTo: answer.id,
+    });
+    const result = await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: why.id });
+    expect(result.selected).toEqual([f.agent.id]);
+    expect(inputs[0]?.thread).toContain("I couldn't read the code: the clone of the repo hung.");
+    expect(inputs[0]?.body).toStartWith("(replying to Dev:");
+  });
+
   test("no candidates: no strategy call", async () => {
     f = await setup();
     await f.db

@@ -17,7 +17,7 @@ import {
   useRuleDescribe,
   useRuleParse,
 } from "@agenteschat/client";
-import { formatPercent, relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
+import { relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { browserTimezone, onceParts, timezoneLabel, timezoneName } from "@agenteschat/client/lib/routines";
@@ -781,7 +781,7 @@ function AgentFace({ agentId }: { agentId: string }) {
   return actors.avatar({ type: "agent", id: agentId }, "xs");
 }
 
-/** The routine's details: what it does, when, where it delivers, budget and the run history. */
+/** The routine's details: what it does, when, where it delivers and the run history. */
 function RoutineDetails({
   routine: r,
   now,
@@ -904,16 +904,6 @@ function RoutineDetails({
           </span>
         </div>
       </DetailsSection>
-      {r.budgetUsedPercent != null && (
-        <DetailsSection title={t("routines.panel.budget")}>
-          <p className="routine-details__meter-row">
-            <span>{t("routines.budgetUsed", { percent: formatPercent(i18n.language, r.budgetUsedPercent) })}</span>
-          </p>
-          <span className="routine-details__meter" aria-hidden="true">
-            <i style={{ width: `${Math.min(100, r.budgetUsedPercent * 100)}%` }} />
-          </span>
-        </DetailsSection>
-      )}
       <DetailsSection title={t("routines.panel.runs")}>
         {runs.isLoading && <LoadingList count={3} avatar={false} />}
         {(r.running || (runs.data?.length ?? 0) > 0) && (
@@ -1052,7 +1042,6 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   const [event, setEvent] = useState<RoutineEvent>(
     routine?.trigger.type === "event" ? routine.trigger.event : "sentry.issue_created",
   );
-  const [budget, setBudget] = useState(routine?.budgetUsd ? String(routine.budgetUsd) : "");
   const [active, setActive] = useState(routine?.active ?? true);
   const [touched, setTouched] = useState(false);
   // One source of truth for "when": the rule (the picker), with the phrase kept in step.
@@ -1107,8 +1096,6 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   const phraseFailed = phraseTyped && typed.length > 0 && parsed.data?.ok === false;
   const shownZone = zone;
   const scheduleOk = kind === "event" || once || !phraseFailed;
-  const budgetValue = budget.trim() ? Number(budget.replace(",", ".")) : null;
-  const budgetOk = budgetValue === null || (Number.isFinite(budgetValue) && budgetValue > 0);
   const targetValue = (): RoutineTargetInput =>
     target === TARGET_FORUM
       ? { type: "forum", agentIds: forumAgents.length > 0 ? forumAgents : [agentId], rounds: Number(forumRounds) }
@@ -1148,7 +1135,6 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             JSON.stringify(trigger()) !== JSON.stringify({ type: "once", at: r.trigger.at, timezone: savedZone })
           : r.trigger.type !== "schedule" || JSON.stringify(toApiRule(rule)) !== savedRule;
     if (triggerChanged) patch.trigger = trigger();
-    if (can(org.role, "view_usage") && budgetValue !== (r.budgetUsd ?? null)) patch.budgetUsd = budgetValue;
     if (active !== r.active) patch.active = active;
     return patch;
   };
@@ -1177,7 +1163,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   };
   const submit = () => {
     setTouched(true);
-    if (!prompt.trim() || !agentId || !scheduleOk || !budgetOk) return;
+    if (!prompt.trim() || !agentId || !scheduleOk) return;
     if (routine) {
       const patch = changes(routine);
       if (Object.keys(patch).length === 0) {
@@ -1209,7 +1195,6 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
           prompt: prompt.trim(),
           target: targetValue(),
           trigger: trigger(),
-          ...(budgetValue !== null && can(org.role, "view_usage") ? { budgetUsd: budgetValue } : {}),
         },
       },
       {
@@ -1217,7 +1202,6 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
           toast.show(t("routines.form.created"));
           setPrompt("");
           setName("");
-          setBudget("");
           setTouched(false);
           onClose();
         },
@@ -1419,23 +1403,12 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
               <span>{t("routines.form.active")}</span>
             </label>
           )}
-          {/* A routine's own cap is money: admins only (members' routines use the agent's budget). */}
-          {can(org.role, "view_usage") && (
-            <Field
-              label={t("routines.form.budget")}
-              id="nr-budget"
-              help={budgetOk ? t("routines.form.budgetHelp") : undefined}
-              error={budgetOk ? undefined : t("routines.form.budgetInvalid")}
-            >
-              <Input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="5" />
-            </Field>
-          )}
         </DialogBody>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("routines.form.cancel")}
           </Button>
-          <Button type="submit" variant="primary" disabled={action.isPending || !agentId || !scheduleOk || !budgetOk}>
+          <Button type="submit" variant="primary" disabled={action.isPending || !agentId || !scheduleOk}>
             {editing ? t("routines.form.save") : t("routines.form.create")}
           </Button>
         </DialogFooter>

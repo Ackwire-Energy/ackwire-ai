@@ -1239,6 +1239,8 @@ function ChannelView({
                   <div className="channel__empty">
                     <EmptyState
                       icon="message"
+                      // A DM with an agent: the light sky, like the other empty screens about agents.
+                      sky={Boolean(chrome?.dmAgentId)}
                       title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
                       actions={
                         emptySuggestions.length > 0 ? (

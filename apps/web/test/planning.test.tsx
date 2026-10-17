@@ -196,7 +196,7 @@ describe("Rotinas", () => {
     expect(weekly.textContent).toContain("entrega em #eng");
     expect(weekly.textContent).toContain("Toda semana, seg, às 09:00");
     expect(weekly.textContent).toMatch(/Próxima/);
-    // No money on the rows (the routine's budget lives in its details).
+    // No money on the rows.
     expect(weekly.textContent).not.toContain("US$");
     // The last runs as a pixel strip, said in words.
     expect(within(weekly).getByRole("img", { name: /^(Últimas execuções|Nenhuma execução)/ })).toBeTruthy();

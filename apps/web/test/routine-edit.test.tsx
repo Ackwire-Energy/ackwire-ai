@@ -45,14 +45,12 @@ describe("Rotinas: editar, duplicar, apagar", () => {
     expect((within(dialog).getByLabelText("Frequência") as HTMLInputElement).value).toBe("toda segunda às 9h");
     expect(dialog.textContent).toContain("Toda semana, seg, às 09:00 · horário de Brasília (UTC−3)");
     await type(within(dialog).getByLabelText("Frequência"), "dias úteis às 8h30");
-    await type(within(dialog).getByLabelText("Orçamento por mês (US$, opcional)"), "3");
     await settle(4);
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(6);
     const call = state.calls.find((c) => c.method === "routines.update");
-    const patch = call?.args[1] as { budgetUsd?: number; trigger?: { type: string; rule?: unknown } };
-    expect(Object.keys(patch).sort()).toEqual(["budgetUsd", "trigger"]);
-    expect(patch.budgetUsd).toBe(3);
+    const patch = call?.args[1] as { trigger?: { type: string; rule?: unknown } };
+    expect(Object.keys(patch)).toEqual(["trigger"]);
     // The phrase filled the picker; the rule is what's sent.
     expect(patch.trigger).toMatchObject({
       type: "schedule",

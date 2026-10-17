@@ -163,6 +163,21 @@ test("a turn goes to the agent's computer as brain.turn and streams its events b
   expect(sent?.mcp?.token?.length ?? 0).toBeGreaterThan(20);
 });
 
+test("a new session reads the conversation so far, not only the message that called it", async () => {
+  const pubsub = createMemoryPubSub();
+  const { hub, calls } = fakeHub(pubsub, { events: [] });
+  const messages = [
+    { role: "user" as const, content: "[Atlas]: New Sentry error: VIAJOLO-BACKEND-2X" },
+    { role: "user" as const, content: "what error is this? can you find it in the code?" },
+  ];
+  await collect(
+    brainWith(pubsub, hub).run(turn({ messages, trigger: "what error is this? can you find it in the code?" }), io()),
+  );
+  expect((calls[0]?.request as { prompt?: string } | undefined)?.prompt).toBe(
+    "The conversation so far:\n\nUser: [Atlas]: New Sentry error: VIAJOLO-BACKEND-2X\n\nNow answer this:\n\nwhat error is this? can you find it in the code?",
+  );
+});
+
 test("events lost on the way: the reply's final event still ends the turn; another machine can't speak for the run", async () => {
   const pubsub = createMemoryPubSub();
   const silent = fakeHub(pubsub, { silent: true });
