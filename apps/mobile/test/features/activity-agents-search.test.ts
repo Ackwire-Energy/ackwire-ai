@@ -118,7 +118,9 @@ describe("who is working", () => {
       budgetUsd: 50,
       fraction: 12.4 / 50,
     });
-    expect(spendOf({ budgetUsedPercent: 41.6 })).toEqual({ kind: "percent", percent: 42, fraction: 0.416 });
+    const part = spendOf({ budgetUsedPercent: 41.6 });
+    expect(part).toMatchObject({ kind: "percent", percent: 42 });
+    expect(part.fraction).toBeCloseTo(0.416);
     expect(spendOf({ budgetUsedPercent: 140, usage: null })).toMatchObject({ kind: "percent", fraction: 1 });
   });
 

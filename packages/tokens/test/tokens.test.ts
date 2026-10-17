@@ -103,32 +103,32 @@ describe("@agenteschat/tokens equals tokens.css", () => {
     ["dark", dark, darkVars],
   ] as [string, ThemeColors, Vars][]) {
     test(`${name} colors`, () => {
-      expect({ ...colors }).toEqual(expectedColors(vars));
+      expect<unknown>({ ...colors }).toEqual(expectedColors(vars));
     });
 
     test(`${name} shadows`, () => {
       const theme = name === "light" ? shadows.light : shadows.dark;
-      for (const s of SHADOWS) expect(theme[s]).toEqual(parseShadow(vars.get(s) ?? "", vars));
+      for (const s of SHADOWS) expect<unknown>(theme[s]).toEqual(parseShadow(vars.get(s) ?? "", vars));
     });
   }
 
   test("radius, space, text and tracking", () => {
-    for (const [key, value] of Object.entries(radius)) expect(value).toBe(px(`radius-${key}`));
+    for (const [key, value] of Object.entries(radius)) expect<unknown>(value).toBe(px(`radius-${key}`));
     const cssRadii = [...sharedVars.keys()].filter((k) => k.startsWith("radius-") && k !== "radius-agent");
-    expect(cssRadii.map((k) => k.slice("radius-".length)).sort()).toEqual(Object.keys(radius).sort());
-    expect(agentRadius.map((v) => `${Math.round(v * 100)}%`).join(" ")).toBe(sharedVars.get("radius-agent") ?? "");
-    for (const [key, value] of Object.entries(space)) expect(value).toBe(px(`space-${key}`));
-    for (const [key, value] of Object.entries(text)) expect(value).toBe(px(`text-${key}`));
-    for (const [key, value] of Object.entries(tracking)) expect(value).toBe(px(`track-${key}`));
+    expect<unknown>(cssRadii.map((k) => k.slice("radius-".length)).sort()).toEqual(Object.keys(radius).sort());
+    expect<unknown>(agentRadius.map((v) => `${Math.round(v * 100)}%`).join(" ")).toBe(sharedVars.get("radius-agent") ?? "");
+    for (const [key, value] of Object.entries(space)) expect<unknown>(value).toBe(px(`space-${key}`));
+    for (const [key, value] of Object.entries(text)) expect<unknown>(value).toBe(px(`text-${key}`));
+    for (const [key, value] of Object.entries(tracking)) expect<unknown>(value).toBe(px(`track-${key}`));
   });
 
   test("fonts and motion", () => {
     const first = (stack: string) => (stack.split(",")[0] ?? "").trim().replace(/^"|"$/g, "");
-    expect(fonts.sans).toBe(first(sharedVars.get("font-sans") ?? ""));
-    expect(fonts.mono).toBe(first(sharedVars.get("font-mono") ?? ""));
+    expect<unknown>(fonts.sans).toBe(first(sharedVars.get("font-sans") ?? ""));
+    expect<unknown>(fonts.mono).toBe(first(sharedVars.get("font-mono") ?? ""));
     const bezier = (name: string) =>
       (/cubic-bezier\(([^)]*)\)/.exec(sharedVars.get(name) ?? "")?.[1] ?? "").split(",").map((n) => Number(n.trim()));
-    expect([...motion.spring]).toEqual(bezier("spring"));
-    expect([...motion.out]).toEqual(bezier("out"));
+    expect<unknown>([...motion.spring]).toEqual(bezier("spring"));
+    expect<unknown>([...motion.out]).toEqual(bezier("out"));
   });
 });

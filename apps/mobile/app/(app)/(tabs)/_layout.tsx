@@ -21,7 +21,14 @@ export default function TabsLayout() {
       tabBar={(props) => (
         <TabBar
           state={props.state as unknown as BarProps["state"]}
-          navigation={props.navigation as unknown as BarProps["navigation"]}
+          // expo-router 58's bar gets an emitter and navigateToTab(key) instead of `navigation`.
+          navigation={{
+            emit: (e) => props.emitter.emit(e as never) as unknown as { defaultPrevented: boolean },
+            navigate: (name) => {
+              const route = props.state.routes.find((r) => r.name === name);
+              if (route) props.navigateToTab(route.key);
+            },
+          }}
         />
       )}
     >

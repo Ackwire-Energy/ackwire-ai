@@ -2,6 +2,7 @@ import { useIsFocused } from "expo-router";
 import type { ReactElement, ReactNode } from "react";
 import { type RefreshControlProps, Text as RNText, StyleSheet, View } from "react-native";
 import Animated, {
+  Extrapolation,
   interpolate,
   useAnimatedScrollHandler,
   useAnimatedStyle,

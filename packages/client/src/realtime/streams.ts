@@ -266,7 +266,7 @@ function upsert(
 ) {
   const provisional = state.runs[provisionalId(event.agentId, event.threadId)];
   const base = settleProvisional(state, event.agentId, event.threadId);
-  const current = base.runs[event.runId];
+  const current: LiveRun | undefined = base.runs[event.runId];
   const next: LiveRun = {
     runId: event.runId,
     agentId: event.agentId,

@@ -1,6 +1,6 @@
 import { useAuthConfig } from "@agenteschat/client";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
+import { type ComponentRef, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TextInput } from "react-native";
 import { authClient } from "@/lib/auth";
@@ -22,7 +22,7 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const passwordRef = useRef<TextInput>(null);
+  const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   const next = () => {
     if (!isEmail(email)) return setError(t("mobile.auth.email.invalid"));

@@ -130,7 +130,7 @@ export function createFileRequester(options: TransportOptions = {}) {
       return parseResponse<T>(res);
     },
     /** The bytes of a download. */
-    async blob(path: string): Promise<Blob> {
+    async blob(path: string): Promise<Awaited<ReturnType<Response["blob"]>>> {
       const res = await t.fetch(t.base + path, {
         method: "GET",
         headers: t.headers ? await t.headers() : {},

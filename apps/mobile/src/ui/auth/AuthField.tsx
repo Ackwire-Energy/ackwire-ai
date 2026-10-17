@@ -1,9 +1,9 @@
-import { forwardRef } from "react";
+import { type ComponentRef, forwardRef } from "react";
 import { TextInput, type TextInputProps } from "react-native";
 import { useTheme } from "../theme";
 
 /** The one input of an auth screen: raised, large, 16-point text (no zoom on iOS). */
-export const AuthField = forwardRef<TextInput, Omit<TextInputProps, "style">>(function AuthField(props, ref) {
+export const AuthField = forwardRef<ComponentRef<typeof TextInput>, Omit<TextInputProps, "style">>(function AuthField(props, ref) {
   const { colors, fonts, shadows } = useTheme();
   return (
     <TextInput

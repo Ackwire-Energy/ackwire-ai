@@ -6,7 +6,6 @@ export default function AuthLayout() {
   const { colors } = useTheme();
   return (
     <Stack
-      initialRouteName="sign-in"
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.bg },
