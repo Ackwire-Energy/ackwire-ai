@@ -2249,6 +2249,65 @@ export interface MissionSettings {
   agentDefault: { commandApproval: CommandApproval; canSet: boolean; ownerId: string | null };
 }
 
+/** "Quem pensa" (ADR 0032): the API, or Claude Code / Codex on the agent's computer with a person's plan. */
+export type BrainKind = "model" | "claude_code" | "codex";
+
+/** Why a computer brain can't be chosen now. */
+export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "not_installed" | "outdated";
+
+export interface BrainModelOption {
+  /** What is stored (`opus`, `sonnet`, `haiku`, a Codex model). */
+  value: string;
+  label: string;
+  modelId?: string;
+  recommended?: boolean;
+}
+
+export interface BrainOption {
+  kind: BrainKind;
+  available: boolean;
+  reason?: BrainUnavailable;
+  /** "Em teste" (Codex). */
+  experimental: boolean;
+  models: BrainModelOption[];
+  defaultModel: string | null;
+}
+
+/** `GET …/agents/{id}/brain` (its owner or an admin). */
+export interface AgentBrain {
+  agentId: string;
+  brain: BrainKind;
+  /** As stored; null = the brain's default. */
+  model: string | null;
+  effectiveModel: string | null;
+  /** If the computer isn't available, answer through the API (counts against the budget). */
+  fallback: boolean;
+  computer: { machineId: string; name: string; online: boolean } | null;
+  options: BrainOption[];
+  canEdit: boolean;
+}
+
+export interface AgentBrainInput {
+  brain?: BrainKind;
+  model?: string | null;
+  fallback?: boolean;
+  /** The person confirmed the personal-subscription warning (switching to Claude Code or Codex). */
+  acceptPlanTerms?: boolean;
+}
+
+/** `GET …/missions/{id}/brain`: who does the work and with which model. */
+export interface MissionBrain {
+  missionId: string;
+  /** The override; null = from the executor. */
+  brain: BrainKind | null;
+  model: string | null;
+  effectiveBrain: BrainKind;
+  effectiveModel: string | null;
+  options: BrainOption[];
+  canSetBrain: boolean;
+  canSetModel: boolean;
+}
+
 /** "Ver saída": the last lines of a task, from the computer or what the server kept. */
 export interface TaskOutput {
   taskId: string;

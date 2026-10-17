@@ -2292,7 +2292,15 @@ export async function setMissionExecutor(
   await cancelMissionTasks(deps, mission, actorId);
   const [row] = await deps.db
     .update(missions)
-    .set({ executor, mainSessionId: crypto.randomUUID(), inbox: [], idleWakeups: 0, updatedAt: new Date() })
+    // A model chosen for the old executor doesn't carry over (ADR 0032: `brain_model`).
+    .set({
+      executor,
+      brainModel: null,
+      mainSessionId: crypto.randomUUID(),
+      inbox: [],
+      idleWakeups: 0,
+      updatedAt: new Date(),
+    })
     .where(and(eq(missions.id, mission.id), eq(missions.status, "proposed")))
     .returning();
   if (!row) throw new ConflictError("The mission changed meanwhile", "mission.wrong_status");

@@ -3,26 +3,33 @@ import {
   Button,
   Chip,
   DetailsDialog,
+  Field,
   Icon,
   OptionList,
+  Select,
   SettingNote,
   SettingRow,
   SettingsMore,
   SettingsSection,
   Switch,
 } from "@agenteschat/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { keys } from "@/api/keys";
 import {
+  useMissionBrain,
   useMissionSettings,
   useRemoveCommandRule,
   useSetAgentMissionDefault,
   useSetCommandApproval,
+  useSetMissionBrain,
   useSetMissionExecutor,
   useSetResumeTasks,
 } from "@/api/missions";
 import type { CommandApproval, Mission, MissionExecutor } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { brainModelLabel } from "@/components/AgentBrain";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { errorText } from "@/lib/errors";
@@ -110,8 +117,13 @@ function SettingsBody({
   const setDefault = useSetAgentMissionDefault(org.id, m.id, m.agentId);
   const setResume = useSetResumeTasks(org.id, m.id);
   const setExecutor = useSetMissionExecutor(org.id);
+  const qc = useQueryClient();
   const [more, setMore] = useState(false);
+  // Who does the work and its model sit under Mais opções: loaded when it opens.
+  const brain = useMissionBrain(org.id, m.id, more);
+  const setBrain = useSetMissionBrain(org.id, m.id);
   const resumeId = useId();
+  const modelId = useId();
   const mode = m.commandApproval;
   const name = (v: CommandApproval) => t(`missions.commandApproval.${v}` as const);
   const fail = (error: unknown) => toast.show(errorText(t, error), "error");
@@ -157,6 +169,8 @@ function SettingsBody({
   const executors: MissionExecutor[] = [
     ...new Set([...(m.machine?.executors ?? []), m.executor as MissionExecutor]),
   ].filter((e): e is MissionExecutor => e === "claude" || e === "codex" || e === "agent");
+  const brainView = brain.data;
+  const brainOption = brainView?.options.find((o) => o.kind === brainView.effectiveBrain);
   const executorName = (e: MissionExecutor) =>
     e === "agent" ? agentName : e === "codex" ? t("missions.settings.executor.codex") : t("missions.executor.claude");
 
@@ -280,7 +294,11 @@ function SettingsBody({
               setExecutor.mutate(
                 { missionId: m.id, executor: v },
                 {
-                  onSuccess: () => saved(t("missions.settings.executor.saved", { name: executorName(v) })),
+                  onSuccess: () => {
+                    // Its model follows who does the work.
+                    void qc.invalidateQueries({ queryKey: keys.missionPart(org.id, m.id, "brain") });
+                    saved(t("missions.settings.executor.saved", { name: executorName(v) }));
+                  },
                   onError: fail,
                 },
               )
@@ -300,6 +318,33 @@ function SettingsBody({
                   : t(`missions.settings.executor.${e}Text` as const),
             }))}
           />
+          {brainView && brainOption && brainOption.models.length > 0 && (
+            <Field label={t("brain.mission.modelLabel")} id={modelId} help={t("brain.mission.modelHint")}>
+              <Select
+                value={brainView.effectiveModel ?? undefined}
+                disabled={!brainView.canSetModel || setBrain.isPending}
+                onValueChange={(model) =>
+                  setBrain.mutate(
+                    { model },
+                    {
+                      onSuccess: () => saved(t("brain.mission.saved", { model: brainModelLabel(brainOption, model) })),
+                      onError: fail,
+                    },
+                  )
+                }
+                options={[
+                  ...brainOption.models.map((o) => ({
+                    value: o.value,
+                    label: o.label,
+                    description: o.recommended ? t("brain.recommended") : undefined,
+                  })),
+                  ...(brainView.effectiveModel && !brainOption.models.some((o) => o.value === brainView.effectiveModel)
+                    ? [{ value: brainView.effectiveModel, label: brainView.effectiveModel }]
+                    : []),
+                ]}
+              />
+            </Field>
+          )}
           <ul className="ac-setlist mi-cfg__computer">
             <li className="ac-setlist__row ac-setlist__row--pad">
               <span className="ac-setlist__text">

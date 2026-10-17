@@ -11,6 +11,8 @@ export interface OptionListItem<V extends string> {
   description?: ReactNode;
   /** Before the text: an illustration (`AutonomyPixels`), an icon, an avatar. Without it, a radio dot. */
   leading?: ReactNode;
+  /** Shown but not choosable now (say why in `description`). */
+  disabled?: boolean;
 }
 
 export interface OptionListProps<V extends string> {
@@ -52,6 +54,7 @@ export function OptionList<V extends string>({
         <RRadioGroup.Item
           key={o.value}
           value={o.value}
+          disabled={o.disabled}
           className={cx("ac-optrow", o.leading ? "ac-optrow--lead" : undefined)}
         >
           {o.leading ? (
