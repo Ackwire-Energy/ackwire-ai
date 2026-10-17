@@ -231,7 +231,7 @@ export function ApprovalsPage() {
   const pill = (f: Filter) => (
     <button key={f} type="button" className="ap-pill" aria-pressed={filter === f} onClick={() => setFilter(f)}>
       {t(`approvals.filter.${f}`)}
-      <span className="ap-pill__count" aria-hidden="true">
+      <span className="ap-pill__count ac-num" aria-hidden="true">
         {f === "all"
           ? all.length
           : all.filter((a) => bucketOf(approvalPhase(a)) === f).length + (f === "pending" ? commands : 0)}
@@ -366,7 +366,7 @@ export function ApprovalsPage() {
               <section key={key} className="ap-history">
                 <div className="ap-section-head">
                   <h2>{t(`approvals.groups.${key}`)}</h2>
-                  <span className="ap-section-head__count">{list.length}</span>
+                  <span className="ap-section-head__count ac-num">{list.length}</span>
                 </div>
                 <div className="ap-list">
                   {list.map((a) => (

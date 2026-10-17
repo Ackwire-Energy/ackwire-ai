@@ -289,7 +289,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
         )}
         {group === "channel" && <Icon name={s.key ? "channel" : "drive"} size={16} />}
         <h2 className="drive-group__title">{sectionTitle(s)}</h2>
-        <span className="drive-count tabular">{s.items.length}</span>
+        <span className="drive-count ac-num">{s.items.length}</span>
         {group === "channel" && (
           <span className="drive-group__stack" aria-hidden="true">
             {[...people.values()].slice(0, STACK_MAX).map((p) => (

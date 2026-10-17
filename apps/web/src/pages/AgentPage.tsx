@@ -616,20 +616,20 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
     let badge: ReactNode = null;
     if (n > 0)
       badge = (
-        <span className="agp-badge agp-badge--edit" title={t("agentPage.changesCount", { count: n })}>
+        <span className="agp-badge agp-badge--edit ac-num" title={t("agentPage.changesCount", { count: n })}>
           <Icon name="edit" size={14} />
           {n}
         </span>
       );
     else if (id === "memory" && pending > 0)
       badge = (
-        <span className="agp-badge agp-badge--ask" title={t("agentPage.memory.waitingCount", { count: pending })}>
+        <span className="agp-badge agp-badge--ask ac-num" title={t("agentPage.memory.waitingCount", { count: pending })}>
           {pending}
         </span>
       );
     else if (id === "activity" && failures > 0)
       badge = (
-        <span className="agp-badge" title={t("agentPage.activity.failuresCount", { count: failures })}>
+        <span className="agp-badge ac-num" title={t("agentPage.activity.failuresCount", { count: failures })}>
           {failures}
         </span>
       );

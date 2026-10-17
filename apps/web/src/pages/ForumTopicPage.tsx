@@ -1409,7 +1409,7 @@ function Standing({
         </dl>
         <Button size="sm" icon="members" onClick={() => setPeople(true)} className="forum-ps__btn">
           {t("forum.side.participants")}
-          <span className="forum-seg-n">{topic.agentIds.length + topic.userIds.length}</span>
+          <span className="forum-seg-n ac-num">{topic.agentIds.length + topic.userIds.length}</span>
         </Button>
         <ParticipantsDialog topic={topic} open={people} onClose={() => setPeople(false)} />
       </div>

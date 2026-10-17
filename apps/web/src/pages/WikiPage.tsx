@@ -250,7 +250,7 @@ function WikiNav({
           <Icon name="chevronDown" size={14} className="wiki-row__car" />
           <Icon name="drive" size={14} />
           <span className="wiki-row__t">{f.name}</span>
-          <span className="wiki-row__n">{count(f)}</span>
+          <span className="wiki-row__n ac-num">{count(f)}</span>
         </button>
         {isOpen && (
           <div className="wiki-sub">
@@ -307,7 +307,7 @@ function WikiNav({
         >
           <Icon name="diagram" size={14} />
           <span className="wiki-row__t">{t("wiki.graph")}</span>
-          <span className="wiki-row__n">{pages.length}</span>
+          <span className="wiki-row__n ac-num">{pages.length}</span>
         </button>
       </div>
       {!filtering && pinned.length > 0 && (
@@ -498,7 +498,7 @@ function WikiHome({
                   <span className="wiki-read__bar" aria-hidden="true">
                     <i style={{ width: `${Math.round((r.total / max) * 100)}%` }} />
                   </span>
-                  <span className="dot-num wiki-read__n" title={t("wiki.uses.count", { count: r.total })}>
+                  <span className="ac-num wiki-read__n" title={t("wiki.uses.count", { count: r.total })}>
                     {r.total}
                   </span>
                 </Link>

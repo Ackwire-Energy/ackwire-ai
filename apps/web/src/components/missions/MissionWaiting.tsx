@@ -46,7 +46,7 @@ export function MissionCommandsPending({ missions, query = "" }: { missions: Mis
     <section className="ap-mi" aria-label={t("approvals.missions.commands")}>
       <div className="ap-section-head">
         <h2>{t("approvals.missions.commands")}</h2>
-        <span className="ap-section-head__count">{pendingCommandCount(asking)}</span>
+        <span className="ap-section-head__count ac-num">{pendingCommandCount(asking)}</span>
       </div>
       <div className="ap-cards">
         {asking.map((m) => (

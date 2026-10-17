@@ -1557,7 +1557,7 @@ export function NotificationsPage() {
             <div className="nt-wh__t">
               <h2>
                 {t("notifications.wait.title")}
-                <span className="nt-n">{waiting.length}</span>
+                <span className="nt-n ac-num">{waiting.length}</span>
               </h2>
               {waiters.length > 0 && (
                 <small>

@@ -142,7 +142,7 @@ export function ForumPage() {
             <section className="forum-group" aria-labelledby="forum-live-h">
               <div className="forum-gh">
                 <h2 id="forum-live-h">{t("forum.liveNow")}</h2>
-                <span className="forum-gh__n">{lives.length}</span>
+                <span className="forum-gh__n ac-num">{lives.length}</span>
               </div>
               <div className="forum-lvs">
                 {lives.map((tp) => (
@@ -155,7 +155,7 @@ export function ForumPage() {
             <section className="forum-group" aria-labelledby="forum-needs-h">
               <div className="forum-gh">
                 <h2 id="forum-needs-h">{t("forum.needsYou")}</h2>
-                <span className="forum-gh__n">{needs.length}</span>
+                <span className="forum-gh__n ac-num">{needs.length}</span>
               </div>
               <div className="forum-list">
                 {needs.map((n) => (
@@ -199,7 +199,7 @@ export function ForumPage() {
             <section className="forum-group" aria-labelledby="forum-list-h">
               <div className="forum-gh">
                 <h2 id="forum-list-h">{t(`forum.listTitle.${filter}`)}</h2>
-                <span className="forum-gh__n">{shown.length}</span>
+                <span className="forum-gh__n ac-num">{shown.length}</span>
               </div>
               <div className="forum-list">
                 {shown.map((tp) => (

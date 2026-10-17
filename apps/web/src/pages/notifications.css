@@ -117,6 +117,9 @@
   font-weight: 500;
   color: var(--faint);
 }
+.nt-n.ac-num {
+  font-weight: 600;
+}
 
 /* ── "Esperando você": what blocks an agent or a decision ───────────────── */
 .nt-wait {

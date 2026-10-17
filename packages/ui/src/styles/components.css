@@ -788,8 +788,6 @@ textarea.ac-input {
   background: var(--attention-soft);
   color: var(--attention);
   font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 
 /* Logo: the agent mark + the wordmark set in Onest */
@@ -1275,9 +1273,6 @@ textarea.ac-input {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-}
-.ac-tab__count {
-  font-variant-numeric: tabular-nums;
 }
 
 /* Dialog (from telas/Agente): radius-lg, overlay shadow, scrim */
@@ -1909,7 +1904,6 @@ a.ac-list__row:focus-visible {
 }
 .ac-msg__reaction-count {
   font-size: 12px;
-  font-variant-numeric: tabular-nums;
 }
 
 /* Tiny avatar (receipts under a message): same shapes, 18px */
@@ -2828,6 +2822,22 @@ a.ac-list__row:focus-visible {
   flex: none;
   white-space: nowrap;
 }
+/*
+ * Counts in Doto (dot matrix, rounded dots): every number that counts
+ * something shares this face. Screens put `ac-num` on their own count spans;
+ * content numbers (dates, #123, prices, code) keep the text face.
+ */
+.ac-num,
+.ac-count,
+.ac-countchip,
+.ac-tab__count,
+.ac-msg__reaction-count {
+  font-family: var(--font-dot, var(--font-mono));
+  font-variation-settings: "ROND" 100;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
 /* A count inside a segment ("Missões 1"): neutral chip, the segment grows to fit. */
 /* The count chip (CountChip): one look for every neutral count. */
 .ac-countchip {
@@ -2845,11 +2855,8 @@ a.ac-list__row:focus-visible {
   background: var(--sunken);
   color: var(--muted);
   font-size: 11.5px;
-  font-weight: 650;
   /* Centered on its box, not on the label's baseline. */
   line-height: 1;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
   white-space: nowrap;
 }
 .ac-countchip--sm {

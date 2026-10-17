@@ -143,7 +143,7 @@ export function VaultDropZone({
   );
 }
 
-/** "14 notas · 4 pastas · 18 links · 3 anexos" in Doto. */
+/** "14 notas · 4 pastas · 18 links · 3 anexos" in Doto (`ac-num`). */
 export function VaultStats({ report }: { report: VaultReport }) {
   const { t } = useTranslation();
   const stats: [number, string][] = [
@@ -159,7 +159,7 @@ export function VaultStats({ report }: { report: VaultReport }) {
     <div className="vault-stats">
       {stats.map(([n, label]) => (
         <div key={label} className="vault-stats__item">
-          <b className="dot-num">{n}</b>
+          <b className="ac-num">{n}</b>
           <span>{label}</span>
         </div>
       ))}
@@ -290,7 +290,7 @@ export function VaultReading({
 }) {
   return (
     <div className="vault-reading" role="status">
-      <b className="dot-num">{done}</b>
+      <b className="ac-num">{done}</b>
       <span className="muted">{label}</span>
       <span className="vault-reading__bar" aria-hidden="true">
         <i style={{ width: `${total ? (done / total) * 100 : 6}%` }} />

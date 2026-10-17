@@ -230,7 +230,7 @@ function AgentUses({ page }: { page: WikiPageData }) {
           {reads && reads.total > 0 ? (
             <>
               <p className="wiki-uses__row">
-                <b className="dot-num wiki-uses__big">{reads.total}</b>
+                <b className="ac-num wiki-uses__big">{reads.total}</b>
                 <span>{t("wiki.uses.count", { count: reads.total })}</span>
               </p>
               {last && lastAgent && (
@@ -263,7 +263,7 @@ function Backlinks({ page }: { page: WikiPageData }) {
   return (
     <section className="wiki-aside__block" aria-label={t("wiki.backlinks")}>
       <span className="wiki-label">
-        {t("wiki.backlinks")} <span className="wiki-label__n">{page.backlinks.length}</span>
+        {t("wiki.backlinks")} <span className="wiki-label__n ac-num">{page.backlinks.length}</span>
       </span>
       {page.backlinks.length === 0 ? (
         <p className="small muted">{t("wiki.noBacklinksHint", { title: page.title })}</p>

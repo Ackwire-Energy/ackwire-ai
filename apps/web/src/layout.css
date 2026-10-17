@@ -1317,7 +1317,6 @@ p {
 }
 .drive-count {
   font-size: 12.5px;
-  font-weight: 500;
   color: var(--faint);
   letter-spacing: 0;
   text-transform: none;
@@ -7332,10 +7331,7 @@ button.live-call__head:hover {
   font-size: 12.5px;
 }
 .newag__count {
-  font-family: var(--font-dot);
-  font-variation-settings: "ROND" 100;
   font-size: 12.5px;
-  font-weight: 600;
   color: var(--faint);
 }
 .newag__tips {
@@ -8351,10 +8347,7 @@ button.live-call__head:hover {
   border-radius: 999px;
   background: var(--plate);
   color: var(--muted);
-  font-family: var(--font-dot);
-  font-variation-settings: "ROND" 100;
   font-size: 11.5px;
-  font-weight: 600;
 }
 .agp-badge--edit {
   background: var(--ink);

@@ -683,7 +683,7 @@ function NewAgentFlow() {
                 </Button>
               )}
             </span>
-            <span className="newag__count">
+            <span className="newag__count ac-num">
               <span aria-hidden="true">{instructions.length}</span>
               <span className="ac-visually-hidden">{t("newAgent.characters", { count: instructions.length })}</span>
             </span>

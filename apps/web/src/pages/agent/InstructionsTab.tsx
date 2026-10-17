@@ -50,7 +50,7 @@ export function InstructionsTab() {
                 />
                 <div className="newag__ta-meta">
                   <span className="small muted">{t("agent.instructionsHelp", { org: org.name })}</span>
-                  <span className="newag__count">
+                  <span className="newag__count ac-num">
                     <span aria-hidden="true">{draft.instructions.length}</span>
                     <span className="ac-visually-hidden">
                       {t("newAgent.characters", { count: draft.instructions.length })}

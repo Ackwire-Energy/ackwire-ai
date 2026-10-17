@@ -2,12 +2,6 @@
  * Importing an Obsidian vault: the wiki's dialog and the onboarding card
  * (prototypes: docs/design/telas/Wiki.html, OnboardingV2.html).
  */
-.dot-num {
-  font-family: var(--font-dot);
-  font-variation-settings: "ROND" 100;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
 /* ── Obsidian import ────────────────────────────────────────────────────── */
 .vault-dialog {
   display: flex;
