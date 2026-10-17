@@ -165,7 +165,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
             return { content: "The mission is closed: stop here.", isError: true, data: { code: "mission.closed" } };
           }
           if (mission.status === "proposed" && !whileProposed) {
-            return { content: "The plan isn't approved yet: wait for the people to press Start.", isError: true };
+            return { content: "The plan isn't approved yet: wait for the people to start the mission.", isError: true };
           }
           if (!(await runActsForMission(ctx, run))) {
             return {
