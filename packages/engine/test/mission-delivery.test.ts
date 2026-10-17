@@ -388,7 +388,10 @@ describe("mission delivery and awaiting_close (ADR 0029)", () => {
     const { view, runner, main } = await started();
     const bia = await decider(view.id);
     const heard: Record<string, unknown>[] = [];
-    f.pubsub.subscribe(userTopic(f.org.id, bia.id), (e) => heard.push(e as Record<string, unknown>));
+    // Only mission.needs_you: the same delivery also raises notification.* events on this topic.
+    f.pubsub.subscribe(userTopic(f.org.id, bia.id), (e) => {
+      if ((e as { type?: string }).type === "mission.needs_you") heard.push(e as Record<string, unknown>);
+    });
     await setCommandApproval(md(), f.owner.id, f.org.id, view.id, "always");
     const asked = JSON.parse(
       ok(await runner.mcp(main.taskId, "permission_prompt", { tool_name: "Bash", input: { command: "swift build" } })),
