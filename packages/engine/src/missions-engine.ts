@@ -428,6 +428,14 @@ export interface MissionMigration {
 }
 
 /**
+ * The boot job's dedupe key (`mission.engine_migrate`, enqueued while
+ * `MISSIONS_ON_ENGINE` is on): one job per deployed version, however many
+ * replicas boot. Turning the flag off and on again within the same version
+ * doesn't run it again (the next deploy does).
+ */
+export const engineMigrateDedupeKey = (version: string) => `mission.engine_migrate:${version}`;
+
+/**
  * Moves one open mission onto the engine (idempotent: a `engine_migrated`
  * event marks it, taken under the mission's row lock):
  *

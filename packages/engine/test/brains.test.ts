@@ -188,15 +188,21 @@ test("a gated tool call from a fake brain pauses the run; approving resumes it o
   expect(gh.executed).toEqual([{ tool: "github_merge_pr", input: { repo: "acme/app", pr: 42 } }]);
   expect(seen[1]?.messages.at(-1)?.content).toContain("github_merge_pr ok: acme/app#42");
 
-  // The bridge seam (block 2) reports the same gate as a pause, without running it.
+  // The bridge seam (block 2, the same path as the runner bridge): a gated call for a run that already
+  // ended is refused without posting a card (nothing would ever resume it), and never runs.
   const id = { orgId: f.org.id, agentId: f.agent.id, runId: run?.id ?? "", machineId: "m-1" };
   const gated = await executeToolForRun(f.jobDeps, id, {
     id: "call-x",
     name: "github_merge_pr",
     input: { repo: "acme/app", pr: 7 },
   });
-  expect(gated.pause?.kind).toBe("approval");
+  expect(gated.isError).toBe(true);
+  expect(gated.pause).toBeUndefined();
   expect(gh.executed.length).toBe(1);
+  const [late] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.toolUseId, "call-x"));
+  expect(late?.status).toBe("canceled");
+  const cards = (await f.db.select().from(schema.messages)).filter((m) => m.meta.approvalId === late?.id);
+  expect(cards).toEqual([]);
 });
 
 test("a brain's error event fails the run with its code", async () => {

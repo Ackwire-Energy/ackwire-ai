@@ -5387,6 +5387,7 @@ export const ptBR = {
       machine_task_resumed: "{{computer}} voltou: “{{title}}” retomou de onde parou.",
       machine_offline: "{{computer}} ficou offline.",
       brain_unavailable: "O {{brain}} não está disponível agora; respondo quando ele voltar.",
+      brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",
       file_saved: "Arquivo salvo.",

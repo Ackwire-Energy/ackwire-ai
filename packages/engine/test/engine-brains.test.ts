@@ -6,6 +6,7 @@ import {
   type BrainEvent,
   type BrainTurn,
   brainFor,
+  brainModelFor,
   brainSessionId,
   clearPlanLimits,
   computerBrainUnavailable,
@@ -14,8 +15,11 @@ import {
   createMissionEngine,
   decideApproval,
   drainOutbox,
+  engineMigrateDedupeKey,
+  enqueue,
   executeToolForRun,
   grantScopes,
+  invokeToolForRun,
   listApprovals,
   listMessages,
   type MachineStatus,
@@ -23,6 +27,8 @@ import {
   postPersonMessage,
   redeemMachinePairing,
   resumeRunsWaitingForMachine,
+  runWhere,
+  type ToolSource,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
@@ -284,11 +290,20 @@ test("with no model credential, an offline computer: the agent says so once and 
     brainUnavailable: { brain: "claude_code", code: "machine_offline" },
   });
 
+  // The computer it waits for is on the row (indexed), not only in the transcript.
+  expect(run?.waitingMachineId).toBe(machineId);
   online = true;
   expect(await resumeRunsWaitingForMachine(f.db, machineId)).toEqual([run?.id ?? ""]);
+  // Reconnecting again before the job ran: still one job for this wait.
+  expect(await resumeRunsWaitingForMachine(f.db, machineId)).toEqual([run?.id ?? ""]);
+  const back = (await f.db.select().from(schema.outbox)).filter((j) => j.dedupeKey?.includes(":brain_back:"));
+  expect(back.length).toBe(1);
   await drainOutbox(f.db, handlers);
   [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
+  expect(run?.waitingMachineId).toBeNull();
+  // Nothing waits for that computer anymore.
+  expect(await resumeRunsWaitingForMachine(f.db, machineId)).toEqual([]);
   expect(seen.length).toBe(1);
   thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
   expect(thread.at(-1)?.body).toBe("Voltei e respondo.");
@@ -348,4 +363,316 @@ test("the mission engine: one run per agent and notice; a resume answers the cal
   expect(
     await engine.resumeRun({ run: identity, pause: { kind: "input", id: "decision-1" }, result: { content: "y" } }),
   ).toBeNull();
+});
+
+// ── Review fixes (PR #9) ─────────────────────────────────────────────────────
+
+/** A run row that is running now, with the transcript the engine keeps (as before a computer turn). */
+async function runningRun(fx: Fixture, trigger: { id: string }, threadRootId = trigger.id) {
+  const [run] = await fx.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      channelId: fx.general.id,
+      threadRootId,
+      triggerMessageId: trigger.id,
+      trigger: "mention",
+      hop: 1,
+      status: "running",
+      startedAt: new Date(),
+      transcript: { system: [], messages: [], postedUpTo: 0, postedCount: 0, deltaSeq: 0 },
+    })
+    .returning();
+  if (!run) throw new Error("no run");
+  return run;
+}
+
+/** Tools whose results carry side effects for the reply (`data`), like `react`, artifacts and memory tools. */
+function effectTools(fx: () => Fixture) {
+  const artifactId = crypto.randomUUID();
+  const source: ToolSource = {
+    name: "effects",
+    tools: async () => [
+      {
+        name: "react_now",
+        description: "React to the message",
+        scope: "",
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        execute: async () => ({ content: "Reacted.", data: { reacted: true } }),
+      },
+      {
+        name: "save_note",
+        description: "Save a note as a file and remember it",
+        scope: "",
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        execute: async () => ({
+          content: "Saved.",
+          data: {
+            artifact: { id: artifactId, version: 1 },
+            memoryUpdate: {
+              action: "remembered",
+              itemId: "item-1",
+              text: "Deploys happen on Fridays",
+              requestedByUserId: fx().owner.id,
+            },
+          },
+        }),
+      },
+      {
+        name: "check_env",
+        description: "Check the environment",
+        scope: "",
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        execute: async () => ({ content: "go: not found" }),
+      },
+    ],
+  };
+  return { source, artifactId };
+}
+
+test("a routine's run: a bridged gated call posts its card and events in the main timeline, like its replies", async () => {
+  const gh = fakeGithub();
+  f = await setup({ toolSources: [gh.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+  const machineId = await computerAgent(f);
+  const call = await post(f, "Daily PR check");
+  await f.db
+    .update(schema.messages)
+    .set({ meta: { routine: { id: crypto.randomUUID(), name: "Daily" } } })
+    .where(eq(schema.messages.id, call.id));
+  const run = await runningRun(f, call);
+  expect((await runWhere(f.db, run)).threadId).toBeNull();
+  const events = f.listen(f.general.id);
+
+  const out = await invokeToolForRun(
+    { db: f.db, pubsub: f.pubsub, tools: f.tools },
+    { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId },
+    { id: "call-1", name: "github_merge_pr", input: { repo: "acme/app", pr: 1 } },
+  );
+  expect(out.result.pause?.kind).toBe("approval");
+  const card = (await f.db.select().from(schema.messages)).find((m) => typeof m.meta.approvalId === "string");
+  expect(card?.threadId).toBeNull();
+  const waiting = events.find((e) => e.type === "agent.run") as { threadId?: string | null; status?: string };
+  expect(waiting).toMatchObject({ status: "waiting_approval", threadId: null });
+  const chips = events.filter((e) => e.type === "agent.tool") as { threadId?: string | null }[];
+  expect(chips.length).toBeGreaterThan(0);
+  expect(chips.every((e) => e.threadId === null)).toBe(true);
+});
+
+test("bridged side effects reach the engine: a bridged react ends the turn silently (no Done.)", async () => {
+  const fx = effectTools(() => f);
+  f = await setup({ toolSources: [fx.source] });
+  const machineId = await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* (_n, turn) {
+    const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId };
+    const result = await executeToolForRun(f.jobDeps, id, { id: "r-1", name: "react_now", input: {} });
+    yield { type: "tool_call", id: "r-1", name: "react_now", input: {}, executed: result };
+    yield { type: "done", text: "" };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const question = await post(f, "@dev valeu!");
+  await drainOutbox(f.db, handlers);
+
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+  expect(thread.map((m) => m.body)).toEqual(["@dev valeu!"]);
+  // Taken by the engine: nothing left over on the run.
+  expect(JSON.stringify(run?.transcript)).not.toContain("bridgeEffects");
+});
+
+test("bridged side effects reach the engine: artifacts and memory cards on the reply, memory.updated published", async () => {
+  const fx = effectTools(() => f);
+  f = await setup({ toolSources: [fx.source] });
+  const machineId = await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* (_n, turn) {
+    const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId };
+    const result = await executeToolForRun(f.jobDeps, id, { id: "s-1", name: "save_note", input: {} });
+    yield { type: "tool_call", id: "s-1", name: "save_note", input: {}, executed: result };
+    yield { type: "done", text: "Anotado." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const events = f.listen(f.general.id);
+  const question = await post(f, "@dev anota que deploy é na sexta");
+  await drainOutbox(f.db, handlers);
+
+  const reply = (await f.db.select().from(schema.messages)).find((m) => m.body === "Anotado.");
+  expect(reply?.threadId).toBe(question.id);
+  expect(reply?.meta.artifacts).toEqual([{ id: fx.artifactId, version: 1 }]);
+  expect(reply?.meta.memoryUpdates).toMatchObject([{ action: "remembered", text: "Deploys happen on Fridays" }]);
+  expect(events.some((e) => e.type === "memory.updated")).toBe(true);
+});
+
+test("a computer brain that fails after a bridged tool ran: no fallback, what it did is posted, nothing runs twice", async () => {
+  let checks = 0;
+  const env: ToolSource = {
+    name: "env",
+    tools: async () => [
+      {
+        name: "check_env",
+        description: "Check the environment",
+        scope: "",
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        execute: async () => {
+          checks++;
+          return { content: "go: not found" };
+        },
+      },
+    ],
+  };
+  f = await setup({ toolSources: [env], reply: () => ({ chunks: ["Respondi pela API."] }) });
+  const machineId = await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain(async function* (_n, turn) {
+    const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId };
+    const result = await executeToolForRun(f.jobDeps, id, { id: "c-1", name: "check_env", input: {} });
+    yield { type: "text_delta", text: "Verifiquei o ambiente." };
+    yield { type: "tool_call", id: "c-1", name: "check_env", input: {}, executed: result };
+    yield { type: "error", code: "executor_crashed", message: "Claude Code exited", retryable: true };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const question = await post(f, "@dev tem Go aí?");
+  await drainOutbox(f.db, handlers);
+
+  expect(seen.length).toBe(1);
+  expect(checks).toBe(1);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  // The model brain never redid the turn.
+  const usage = await f.db
+    .select()
+    .from(schema.usageRecords)
+    .where(eq(schema.usageRecords.runId, run?.id ?? ""));
+  expect(usage.some((u) => u.provider === "anthropic")).toBe(false);
+  const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
+  const last = thread.at(-1);
+  expect(last?.body).toContain("Verifiquei o ambiente.");
+  expect(last?.meta.brainInterrupted).toMatchObject({
+    brain: "claude_code",
+    code: "executor_crashed",
+    text: "Verifiquei o ambiente.",
+    tools: ["check_env"],
+  });
+  expect(last?.meta.brainFallback).toBeUndefined();
+});
+
+test("a computer brain that fails after a bridged pause: the run keeps waiting with its pending call, then resumes", async () => {
+  const gh = fakeGithub();
+  f = await setup({ toolSources: [gh.source], reply: () => ({ chunks: ["Respondi pela API."] }) });
+  await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+  const machineId = await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain(async function* (n, turn) {
+    if (n === 0) {
+      const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId };
+      const result = await executeToolForRun(f.jobDeps, id, {
+        id: "call-1",
+        name: "github_merge_pr",
+        input: { repo: "acme/app", pr: 42 },
+      });
+      yield { type: "tool_call", id: "call-1", name: "github_merge_pr", input: {}, executed: result };
+      yield { type: "error", code: "executor_crashed", message: "Claude Code exited", retryable: true };
+      return;
+    }
+    yield { type: "done", text: "Merge feito." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev faz o merge do PR 42");
+  await drainOutbox(f.db, handlers);
+
+  let [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_approval");
+  expect(run?.error).toBeNull();
+  const transcript = run?.transcript as { pending?: { calls: { toolUseId: string; bridged?: boolean }[] } };
+  expect(transcript.pending?.calls).toMatchObject([{ toolUseId: "call-1", bridged: true }]);
+  const usage = await f.db
+    .select()
+    .from(schema.usageRecords)
+    .where(eq(schema.usageRecords.runId, run?.id ?? ""));
+  expect(usage.some((u) => u.provider === "anthropic")).toBe(false);
+
+  const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+  await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
+    decision: "approve",
+  });
+  await drainOutbox(f.db, handlers);
+  [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  expect(seen.length).toBe(2);
+  expect(gh.executed).toEqual([{ tool: "github_merge_pr", input: { repo: "acme/app", pr: 42 } }]);
+});
+
+test("two gated bridged calls in one turn both wait; a gated call for a run that isn't running posts nothing", async () => {
+  const gh = fakeGithub();
+  f = await setup({ toolSources: [gh.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+  const machineId = await computerAgent(f);
+  const question = await post(f, "@dev merge os dois");
+  const run = await runningRun(f, question);
+  const deps = { db: f.db, pubsub: f.pubsub, tools: f.tools };
+  const id = { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId };
+  const [first, second] = await Promise.all([
+    invokeToolForRun(deps, id, { id: "m-1", name: "github_merge_pr", input: { repo: "acme/app", pr: 1 } }),
+    invokeToolForRun(deps, id, { id: "m-2", name: "github_merge_pr", input: { repo: "acme/app", pr: 2 } }),
+  ]);
+  expect(first.result.pause?.kind).toBe("approval");
+  expect(second.result.pause?.kind).toBe("approval");
+  const [after] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, run.id));
+  expect(after?.status).toBe("waiting_approval");
+  const pending =
+    (after?.transcript as { pending?: { calls: { toolUseId: string }[] } } | undefined)?.pending?.calls ?? [];
+  expect(pending.map((c) => c.toolUseId).sort()).toEqual(["m-1", "m-2"]);
+  const cards = (await f.db.select().from(schema.messages)).filter((m) => typeof m.meta.approvalId === "string");
+  expect(cards.length).toBe(2);
+
+  // The run ended: the gated call is refused before anything is posted, and its request canceled.
+  await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, run.id));
+  const late = await invokeToolForRun(deps, id, {
+    id: "m-3",
+    name: "github_merge_pr",
+    input: { repo: "acme/app", pr: 3 },
+  });
+  expect(late).toMatchObject({ code: "bridge.run_not_running", result: { isError: true } });
+  expect(late.result.pause).toBeUndefined();
+  const all = (await f.db.select().from(schema.messages)).filter((m) => typeof m.meta.approvalId === "string");
+  expect(all.length).toBe(2);
+  const [third] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.toolUseId, "m-3"));
+  expect(third?.status).toBe("canceled");
+  expect(gh.executed).toEqual([]);
+});
+
+test("a computer brain's model: the mission's, else the agent's only for the same brain, else the brain's default", () => {
+  const agent = { brain: "claude_code", brainModel: "opus" };
+  expect(brainModelFor("claude_code", agent)).toBe("opus");
+  // The agent's Claude Code model means nothing to Codex (a mission on Codex): Codex's own default.
+  expect(brainModelFor("codex", agent)).toBeUndefined();
+  expect(brainModelFor("codex", agent, { model: "gpt-6.1-codex" })).toBe("gpt-6.1-codex");
+  expect(brainModelFor("claude_code", { brain: "codex", brainModel: "gpt-6.1-codex" })).toBe("sonnet");
+  expect(brainModelFor("claude_code", { brain: "claude_code", brainModel: null }, { model: "haiku" })).toBe("haiku");
+  expect(brainModelFor("model", agent)).toBeUndefined();
+});
+
+test("the missions' boot migration is enqueued once per version, however many replicas boot", async () => {
+  f = await setup();
+  const job = { orgId: null, kind: "mission.engine_migrate", payload: {}, maxAttempts: 3 };
+  await enqueue(f.db, { ...job, dedupeKey: engineMigrateDedupeKey("1.2.3") });
+  await enqueue(f.db, { ...job, dedupeKey: engineMigrateDedupeKey("1.2.3") });
+  await enqueue(f.db, { ...job, dedupeKey: engineMigrateDedupeKey("1.2.4") });
+  const jobs = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "mission.engine_migrate"));
+  expect(jobs.map((j) => j.dedupeKey).sort()).toEqual(["mission.engine_migrate:1.2.3", "mission.engine_migrate:1.2.4"]);
 });

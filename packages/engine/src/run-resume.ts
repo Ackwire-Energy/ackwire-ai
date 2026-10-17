@@ -1,4 +1,4 @@
-import { and, type Database, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
 import type { ToolResult } from "./brains/types";
 import { enqueue } from "./outbox";
 
@@ -9,7 +9,7 @@ interface StoredTranscript {
   pending?: {
     calls: { toolUseId: string; name: string; waitId?: string; result?: { content: string; isError: boolean } }[];
   };
-  waitingForBrain?: { kind: string; machineId: string; code: string };
+  waitingForBrain?: { kind: string; machineId: string; code: string; waitId?: string };
   [key: string]: unknown;
 }
 
@@ -55,25 +55,28 @@ export async function resumeRunWithResult(
 /**
  * The agent's computer is back (ADR 0032 §5): runs that waited for its
  * computer brain (no model credential to fall back on) are queued again.
+ * Found by `agent_runs.waiting_machine_id` (indexed, set only while a run
+ * waits for its computer); one job per wait (`waitingForBrain.waitId`), so
+ * reconnects while the job is still queued don't add more.
  */
 export async function resumeRunsWaitingForMachine(db: Executor, machineId: string): Promise<string[]> {
   const rows = await db
-    .select({ id: agentRuns.id, orgId: agentRuns.orgId })
+    .select({
+      id: agentRuns.id,
+      orgId: agentRuns.orgId,
+      waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+      updatedAt: agentRuns.updatedAt,
+    })
     .from(agentRuns)
-    .where(
-      and(
-        inArray(agentRuns.status, ["waiting_input"]),
-        sql`${agentRuns.transcript}->'waitingForBrain'->>'machineId' = ${machineId}`,
-      ),
-    )
+    .where(and(eq(agentRuns.waitingMachineId, machineId), eq(agentRuns.status, "waiting_input")))
     .limit(200);
-  const at = Date.now();
   for (const r of rows) {
     await enqueue(db, {
       orgId: r.orgId,
       kind: "agent_run.execute",
       payload: { runId: r.id },
-      dedupeKey: `agent_run.execute:${r.id}:brain_back:${at}`,
+      // The wait's own id (older waits: when the run started waiting, which no reconnect changes).
+      dedupeKey: `agent_run.execute:${r.id}:brain_back:${r.waitId ?? r.updatedAt.getTime()}`,
       maxAttempts: 4,
     });
   }

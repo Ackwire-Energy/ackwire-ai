@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { MISSION_PROTOCOL } from "@agenteschat/adapters";
+import { BRAIN_PROTOCOL, MISSION_PROTOCOL } from "@agenteschat/adapters";
 import {
   brainModelId,
   brainOf,
@@ -12,7 +12,7 @@ import {
 const mac = (patch: Record<string, unknown> = {}) => ({
   id: "m1",
   name: "mac",
-  protocol: MISSION_PROTOCOL,
+  protocol: BRAIN_PROTOCOL,
   execAllowed: true,
   executors: { claude: { version: "2.1.0" }, detectedAt: "2026-10-17" },
   online: true,
@@ -62,6 +62,12 @@ describe("brain settings", () => {
     ]);
     expect(reasons(mac({ execAllowed: false }))[1]).toEqual(["claude_code", false, "exec_off"]);
     expect(reasons(mac({ protocol: MISSION_PROTOCOL - 1 }))[1]).toEqual(["claude_code", false, "runner_old"]);
+    // A runner with missions (protocol 5–7) but without `brain.turn`: the engine would refuse every run.
+    expect(reasons(mac({ protocol: BRAIN_PROTOCOL - 1 })).slice(1)).toEqual([
+      ["claude_code", false, "runner_old"],
+      ["codex", false, "runner_old"],
+    ]);
+    expect(reasons(mac({ protocol: BRAIN_PROTOCOL }))[1]).toEqual(["claude_code", true, null]);
     const oldCodex = mac({ executors: { codex: { version: "codex-cli 0.100.0" }, detectedAt: "x" } });
     expect(reasons(oldCodex).slice(1)).toEqual([
       ["claude_code", false, "not_installed"],

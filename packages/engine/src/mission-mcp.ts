@@ -34,7 +34,7 @@ import {
   startSessionTask,
   updatePlan,
 } from "./missions";
-import { missionBrain } from "./missions-engine";
+import { missionBrain, missionsOnEngine } from "./missions-engine";
 import { resumeRunsWaitingForMachine } from "./run-resume";
 import { type BridgeIdentity, verifyRunToolToken } from "./run-tool-tokens";
 import { bridgeToolsFor, invokeToolForRun } from "./run-tools";
@@ -235,16 +235,27 @@ const RUN_MISSION_TOOLS = ["get_context", "upload_artifact", "start_task"] as co
  *   `start_task` (the main session's machine tools), so a mission on the
  *   engine works with every brain. Listed before the sandbox tools: these win
  *   a name clash for bridge calls.
+ *
+ * The mission side (those tools and the mission's command card flow) exists
+ * only with `MISSIONS_ON_ENGINE`, like the engine's mission permissions: with
+ * the flag off a run in a mission thread is an ordinary run (the mission's
+ * main session is its executor task).
  */
 export function createMissionRunToolSource(deps: Omit<MissionDeps, "db">): ToolSource {
+  const onEngine = missionsOnEngine(deps);
+  /** The agent's open mission in this thread, when missions run on the engine. */
+  const missionOfRun = async (c: { db: MissionDeps["db"]; orgId: string; agentId: string; threadRootId: string }) => {
+    if (!onEngine || !c.threadRootId) return null;
+    const m = await missionOfThread(c.db, c.orgId, c.threadRootId);
+    return m && m.agentId === c.agentId && OPEN.includes(m.status) ? m : null;
+  };
   return {
     name: "mission-run-bridge",
     async tools(ctx) {
       const bridge = ctx.bridge;
       if (!bridge || bridge.taskId || !ctx.runId) return [];
       const machineId = bridge.machineId;
-      const mission = ctx.threadRootId ? await missionOfThread(ctx.db, ctx.orgId, ctx.threadRootId) : null;
-      const ours = mission && mission.agentId === ctx.agentId && OPEN.includes(mission.status) ? mission : null;
+      const ours = await missionOfRun(ctx);
       /** The run as the mission sees it: its main session, on the computer that holds the bridge. */
       const asTask = (m: MissionRow) =>
         ({
@@ -258,8 +269,7 @@ export function createMissionRunToolSource(deps: Omit<MissionDeps, "db">): ToolS
       const call = async (tool: string, input: Record<string, unknown>, c: typeof ctx): Promise<ToolOutput> => {
         const d = { ...deps, db: c.db };
         // Read again: the mission may have moved since the list.
-        const m = await missionOfThread(c.db, c.orgId, c.threadRootId);
-        const live = m && m.agentId === c.agentId && OPEN.includes(m.status) ? m : null;
+        const live = await missionOfRun(c);
         try {
           if (tool === PERMISSION_TOOL) {
             if (live) return { content: await handlePermissionPrompt(d, live, asTask(live), masked(input) as never) };

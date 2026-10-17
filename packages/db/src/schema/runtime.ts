@@ -118,6 +118,12 @@ export const agentRuns = pgTable(
     issueId: uuid(),
     /** Bumped by the worker while it executes the run; a stale one means the worker died (recovered on boot). */
     heartbeatAt: timestamp({ withTimezone: true }),
+    /**
+     * The computer this run waits for (`waiting_input` with a computer brain
+     * and nothing to fall back on, ADR 0032 §5): queued again when it comes
+     * back (`resumeRunsWaitingForMachine`). Null otherwise.
+     */
+    waitingMachineId: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),
@@ -132,6 +138,8 @@ export const agentRuns = pgTable(
     // An agent's recent work across conversations (context: "Seu trabalho recente").
     index().on(t.orgId, t.agentId, t.createdAt),
     index().on(t.issueId, t.createdAt),
+    // Runs waiting for a computer, found when it reconnects (only those rows are indexed).
+    index("agent_runs_waiting_machine_idx").on(t.waitingMachineId).where(sql`${t.waitingMachineId} is not null`),
   ],
 );
 

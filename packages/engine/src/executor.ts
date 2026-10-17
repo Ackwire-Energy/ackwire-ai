@@ -51,12 +51,23 @@ import {
   syncQuestionMessage,
 } from "./questions";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
-import { suspendRunForTool, waitOf } from "./run-tools";
+import {
+  absorbToolData,
+  bodyCode,
+  brainToolOf,
+  bridgeToolsFor,
+  invokeToolForRun,
+  invokeWithChip,
+  mergeToolEffects,
+  type RunToolScope,
+  replyThreadOf,
+  takeBridgeEffects,
+  waitOf,
+} from "./run-tools";
 import { type AgentRun, addRunStep, isTerminal, type RunStatus, runErrorDetail, transitionRun } from "./runs";
 import { SANDBOX_SCOPE } from "./sandbox";
 import { publishSecret, type SecretRequestRow, secretRequestView, secretResult, syncSecretMessage } from "./secrets";
 import { enabledSkills } from "./skills";
-import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
 import type { Approval, InvokeResult, ToolGateway } from "./tools/gateway";
 import { grantedScopeKeys, grantKey } from "./tools/scopes";
 import type { ToolContext, ToolDefinition } from "./tools/types";
@@ -138,7 +149,7 @@ export interface Transcript {
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
-  waitingForBrain?: { kind: BrainKind; machineId: string; code: string };
+  waitingForBrain?: { kind: BrainKind; machineId: string; code: string; waitId?: string };
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
   brainNotice?: string;
   /** Tool calls of the last assistant turn while some wait for approval or an answer. */
@@ -709,19 +720,9 @@ async function executeRunInner(
 
   /** Moves what a tool returned onto the transcript (cards for the next post) and tells the channel about memory. */
   const absorbToolOutcome = async (outcome: InvokeResult) => {
-    const t = transcript as Transcript;
-    const update =
-      outcome.type === "result" ? (outcome.output.data?.memoryUpdate as MemoryUpdate | undefined) : undefined;
-    const data = outcome.type === "result" ? outcome.output.data : undefined;
-    const artifact = data?.artifact as { id: string; version: number } | undefined;
-    if (artifact) t.artifacts = [...(t.artifacts ?? []), artifact];
-    const link = data?.missionLink as { missionId: string; threadId: string } | undefined;
-    if (link?.missionId && link.threadId) t.missionLink = link;
-    if (data?.reacted) t.reacted = true;
-    if (update) {
-      t.memoryUpdates = [...(t.memoryUpdates ?? []), update];
-      await publishChannelEvent(deps.pubsub, { type: "memory.updated", ...where, update });
-    }
+    if (outcome.type !== "result") return;
+    const update = absorbToolData(transcript as Transcript, outcome.output.data);
+    if (update) await publishChannelEvent(deps.pubsub, { type: "memory.updated", ...where, update });
   };
 
   // The brain that thinks for this run (ADR 0032). It only thinks: the loop below owns everything else.
@@ -774,10 +775,12 @@ async function executeRunInner(
       : null;
     t.postedUpTo = t.messages.length;
     t.brainNotice = u.code;
-    t.waitingForBrain = { kind: from, machineId, code: u.code };
+    // `waitId`: one wait (its "computer is back" job is queued once per wait, `resumeRunsWaitingForMachine`).
+    t.waitingForBrain = { kind: from, machineId, code: u.code, waitId: Bun.randomUUIDv7() };
     await addRunStep(db, run, "error", { reason: "brain_unavailable", code: u.code, message: u.message });
     const moved = await transitionRun(db, run.id, "running", "waiting_input", {
       transcript: t as unknown as Record<string, unknown>,
+      waitingMachineId: machineId,
     });
     if (!moved) throw new PermanentJobError("run changed state while executing");
     if (note) {
@@ -827,6 +830,52 @@ async function executeRunInner(
     await finished(status);
   };
 
+  /**
+   * A computer brain failed mid-turn after tools already ran (ADR 0032 §5):
+   * no fallback (the model brain would redo them). What it said, and which
+   * tools it used, are posted (`meta.brainInterrupted`, the app adds the note
+   * in the person's language) and the run ends there.
+   */
+  const interruptedAfterTools = async (
+    from: BrainKind,
+    failure: { code: string; message: string },
+    executed: string[],
+    partial: string,
+  ) => {
+    await deferred;
+    const t = transcript as Transcript;
+    const name = from === "codex" ? "Codex" : "Claude Code";
+    const said = partial.trim();
+    const note = `_${name} stopped before finishing (${failure.message}). Already done, not repeated: ${executed.join(", ")}._`;
+    await addRunStep(db, run, "error", {
+      reason: "brain_interrupted",
+      code: failure.code,
+      message: failure.message,
+      executed,
+    });
+    const reply = await db.transaction(async (tx) => {
+      const m = await post(tx, replyThreadId, said ? `${said}\n\n${note}` : note, {
+        ...(takeMemoryUpdates(t) ?? {}),
+        brainInterrupted: { brain: from, code: failure.code, message: failure.message, text: said, tools: executed },
+      });
+      t.postedUpTo = t.messages.length;
+      t.postedCount++;
+      await addRunStep(tx, run, "message", { messageId: m.id });
+      const done = await transitionRun(tx, run.id, "running", "done", {
+        replyMessageId: m.id,
+        error: null,
+        transcript: t as unknown as Record<string, unknown>,
+      });
+      if (!done) throw new PermanentJobError("run changed state while executing");
+      return m;
+    });
+    const [view] = await withWikiLinks(db, run.orgId, [messageView(reply)]);
+    if (view) await publishMessageCreated(deps.pubsub, view);
+    await publishChannelEvent(deps.pubsub, event("done"));
+    await finished("done");
+    await redispatchPending();
+  };
+
   if (plan.unavailable) {
     const handled = await brainUnavailable(plan.unavailable);
     if (handled === "waited") return;
@@ -845,7 +894,7 @@ async function executeRunInner(
       if (run.turns >= maxTurns) return fail("too_many_tool_calls");
       const turnTools = firstTurn ? tools : await listRunTools(deps, ctx);
       firstTurn = false;
-      const toolScope = deps.tools ? { deps, tools: deps.tools, ctx, where, turnTools } : null;
+      const toolScope: RunToolScope | null = deps.tools ? { deps, tools: deps.tools, ctx, where, turnTools } : null;
 
       const turn = run.turns + 1;
       const deltas = createDeltaPublisher(
@@ -864,14 +913,10 @@ async function executeRunInner(
       const io: BrainIO = {
         signal,
         // Brains that run a tool inline (not by yielding `tool_call`). The model brain doesn't; computer
-        // brains go through the runner bridge. A gated call suspends the run like a bridged one.
-        executeTool: async (call) => {
-          if (!toolScope) return { content: "No tools are available in this run.", isError: true };
-          const outcome = await invokeRunTool(toolScope, call);
-          await absorbToolOutcome(outcome);
-          if (outcome.type === "result") return toolResultOf(outcome);
-          return suspendRunForTool(deps, run, { id: call.id, name: call.name }, outcome);
-        },
+        // brains go through the runner bridge. Both take the bridge's path: a gated call suspends the run,
+        // side effects wait for the end of the turn (`takeBridgeEffects`).
+        executeTool: (call) =>
+          executeToolForRun(deps, { orgId: run.orgId, agentId: run.agentId, runId: run.id, machineId: "" }, call),
       };
       // A computer brain's turn: the transcript is saved (the bridge's pauses join it), and the turn's
       // tool token goes in `brain.turn.mcp.token` so the runner bridge maps its calls to this run.
@@ -886,6 +931,10 @@ async function executeRunInner(
       }
       const prompt = plan.kind === "model" ? triggerText : (nextPrompt ?? triggerText);
       const turnPlan = plan;
+      // Where this computer turn's steps start (the bridge records a step per tool it runs).
+      const turnStepSeq = plan.kind !== "model" ? await lastStepSeq(db, run.id) : 0;
+      /** Calls the computer brain said it ran in this turn (through the bridge or on its own). */
+      const executedNow: { id: string; name: string }[] = [];
       let result: BrainStep;
       try {
         result = await thinkOnce(
@@ -912,6 +961,7 @@ async function executeRunInner(
               const machineId = turnPlan.session?.machineId;
               if (machineId && turnPlan.kind !== "model") notePlanLimit(machineId, turnPlan.kind, resetsAt);
             },
+            onExecuted: (call) => executedNow.push(call),
           },
         );
         if (turnPlan.kind !== "model") {
@@ -927,7 +977,35 @@ async function executeRunInner(
         if (await isCanceled()) return stopCanceled(deltas.text());
         // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
         transcript.deltaSeq = deltas.seq();
-        await saveTranscript(db, transcript).catch(() => {});
+        if (turnPlan.kind !== "model") {
+          // What the bridge kept during this turn (cards, a reaction) is the engine's now.
+          mergeToolEffects(transcript, await takeBridgeEffects(db, run.id).catch(() => null));
+          // A bridged call paused the run before the brain failed: the run waits for the person, with the
+          // pending calls the bridge wrote (no fallback, no failure; the decision resumes the session).
+          const [row] = await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id));
+          if (row?.status === "waiting_approval" || row?.status === "waiting_input") {
+            return suspendedByBridge(row.status, deltas.text().trim());
+          }
+        }
+        // Only while the run is running: never over the pending calls of a bridged pause.
+        await db
+          .update(agentRuns)
+          .set({ transcript: transcript as unknown as Record<string, unknown>, updatedAt: new Date() })
+          .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")))
+          .catch(() => {});
+        // Tools already ran in this computer turn (their side effects happened; they aren't in the
+        // transcript): neither the model brain (fallback) nor a retried job may redo the turn from scratch,
+        // they would run them again. Post what the brain said and what it did instead, and end the run there.
+        if (turnPlan.kind !== "model") {
+          const executed = await executedSince(db, run.id, turnStepSeq, executedNow);
+          if (executed.length > 0) {
+            const failure =
+              error instanceof BrainFailure
+                ? { code: error.code, message: error.message }
+                : { code: "brain_failed", message: error instanceof Error ? error.message : String(error) };
+            return interruptedAfterTools(turnPlan.kind, failure, executed, deltas.text());
+          }
+        }
         // A computer brain that can't answer now (offline, not logged in, plan limit, a retryable failure):
         // the model brain retries the turn, or the run waits for the computer.
         if (
@@ -953,6 +1031,8 @@ async function executeRunInner(
       prof.mark(`model#${run.turns + 1}`);
       await deferred;
       transcript.deltaSeq = deltas.seq();
+      // Side effects of the tools a computer brain ran through the bridge (cards, a `react`): for this reply.
+      if (turnPlan.kind !== "model") mergeToolEffects(transcript, await takeBridgeEffects(db, run.id));
       // A computer brain's turn with nothing to say (its tools ran through the bridge) adds no empty message.
       if (result.content.length > 0) transcript.messages.push({ role: "assistant", content: result.content });
       // Text before tool calls is narration of the work: kept on the model call's step, not part of the answer.
@@ -1006,7 +1086,7 @@ async function executeRunInner(
         for (const use of toolUses) {
           // Canceled during a tool: the rest never run.
           if (signal.aborted) break;
-          const outcome = await invokeRunTool(toolScope, use);
+          const outcome = await invokeWithChip(toolScope, use);
           await absorbToolOutcome(outcome);
           if (outcome.type === "approval") {
             calls.push({ toolUseId: use.id, name: use.name, approvalId: outcome.approval.id });
@@ -1274,21 +1354,6 @@ async function executeRunInner(
   }
 }
 
-/**
- * Where the run's replies go. DMs are flat (a reply to a top-level DM message
- * goes in the main timeline), and so are forum posts and a routine's answer;
- * everything else answers in the thread.
- */
-function replyThreadOf(
-  run: Pick<AgentRun, "threadRootId" | "triggerMessageId">,
-  channelKind: string | undefined,
-  topTrigger: Pick<Message, "meta"> | null,
-): string | null {
-  const topLevel = run.threadRootId === run.triggerMessageId;
-  const flat = topLevel && (channelKind === "dm" || channelKind === "forum" || Boolean(topTrigger?.meta.routine));
-  return flat ? null : run.threadRootId;
-}
-
 /** Builds the brain of this kind (`resolveBrain` picks it): a registered factory, else the built-in model brain. */
 function createBrain(
   deps: EngineDeps,
@@ -1370,12 +1435,6 @@ const flattenContent = (content: string | ContentBlock[]): string =>
         .filter(Boolean)
         .join("\n");
 
-const brainToolOf = (t: ToolDefinition): BrainTool => ({
-  name: t.name,
-  description: t.description,
-  inputSchema: t.inputSchema,
-});
-
 /** One brain turn, collected: what the engine needs to extend the transcript and record the step. */
 interface BrainStep {
   /** The assistant message appended to the transcript. */
@@ -1405,6 +1464,8 @@ async function thinkOnce(
     /** Usage on a person's plan (computer brains): recorded with cost zero (`recordPlanUsage`). */
     onUsage?(usage: { input: number; output: number; model?: string }): void;
     onLimit?(resetsAt?: string): void;
+    /** A call the brain already ran (through the bridge, or its own tools). */
+    onExecuted?(call: { id: string; name: string }): void;
   } = {},
 ): Promise<BrainStep> {
   let text: string | null = null;
@@ -1415,8 +1476,10 @@ async function thinkOnce(
     if (event.type === "text_delta") onDelta(event.text);
     else if (event.type === "tool_call") {
       // Executed elsewhere (a computer brain through the runner bridge, which recorded its steps): shown only.
-      if (event.executed) executedCount++;
-      else toolCalls.push({ id: event.id, name: event.name, input: (event.input ?? {}) as Record<string, unknown> });
+      if (event.executed) {
+        executedCount++;
+        hooks.onExecuted?.({ id: event.id, name: event.name });
+      } else toolCalls.push({ id: event.id, name: event.name, input: (event.input ?? {}) as Record<string, unknown> });
     } else if (event.type === "usage") {
       usage = event;
       if (event.source === "plan") hooks.onUsage?.(event);
@@ -1464,66 +1527,48 @@ async function thinkOnce(
   };
 }
 
-/** What `invokeRunTool` needs: the run's tool context, where its events go and the tools of this turn. */
-interface RunToolScope {
-  deps: Pick<EngineDeps, "db" | "pubsub">;
-  tools: ToolGateway;
-  ctx: ToolContext;
-  where: { channelId: string; threadId: string | null; agentId: string; runId: string };
-  /** The run's tool list (for the connector label of the live tool chip). */
-  turnTools: ToolDefinition[];
-}
-
 /** The tools the run may use now (Tool Gateway, scopes applied). */
 function listRunTools(deps: Pick<EngineDeps, "tools">, ctx: ToolContext): Promise<ToolDefinition[]> {
   return deps.tools ? deps.tools.list(ctx) : Promise.resolve([]);
 }
 
-/**
- * One tool call through the Tool Gateway, with the live tool chip
- * (`agent.tool` before and after). The gateway checks the scope, validates the
- * input, records the steps and gates sensitive calls (approval / question /
- * secret outcomes).
- */
-async function invokeRunTool(
-  scope: RunToolScope,
-  use: { id: string; name: string; input: unknown },
-): Promise<InvokeResult> {
-  const { deps, ctx, where } = scope;
-  const def = scope.turnTools.find((t) => t.name === use.name);
-  const connector = def?.connectorLabel;
-  // A short label for the UI (skill, issue, file); built-in tools only, never connector inputs.
-  const input = use.input as Record<string, unknown> | undefined;
-  const detail =
-    connector || def?.connectionId
-      ? undefined
-      : (toolDetail(use.name, input) ??
-        (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)));
-  await publishChannelEvent(deps.pubsub, {
-    type: "agent.tool",
-    ...where,
-    tool: use.name,
-    ...(connector ? { connector } : {}),
-    ...(detail ? { detail } : {}),
-    toolUseId: use.id,
-    ...(!(connector || def?.connectionId) && toolCode(use.name, input) ? { code: toolCode(use.name, input) } : {}),
-  });
-  return scope.tools
-    .invoke(ctx, { toolUseId: use.id, name: use.name, input: (use.input ?? {}) as Record<string, unknown> })
-    .finally(() => publishChannelEvent(deps.pubsub, { type: "agent.tool", ...where, tool: null }));
+/** The run's last step number (0 without steps). */
+async function lastStepSeq(db: Executor, runId: string): Promise<number> {
+  const [row] = await db
+    .select({ seq: sql<number>`coalesce(max(${schema.agentRunSteps.seq}), 0)` })
+    .from(schema.agentRunSteps)
+    .where(eq(schema.agentRunSteps.runId, runId));
+  return Number(row?.seq ?? 0);
 }
 
-/** A gateway outcome in the brain's terms: a result, or a pause on a person's decision. */
-function toolResultOf(outcome: InvokeResult, questionId?: string): ToolResult {
-  if (outcome.type === "result") return { content: outcome.output.content, isError: outcome.output.isError === true };
-  if (outcome.type === "approval")
-    return {
-      content: `Waiting for a person to approve: ${outcome.approval.title}`,
-      pause: { kind: "approval", id: outcome.approval.id },
-    };
-  if (outcome.type === "secret")
-    return { content: "Waiting for a person to provide the secret.", pause: { kind: "input", id: outcome.requestId } };
-  return { content: outcome.text, pause: { kind: "input", id: questionId ?? Bun.randomUUIDv7() } };
+/**
+ * The tools a computer-brain turn already ran: the bridge's successful calls
+ * after `fromSeq` (the gateway records a `tool_result` step for each) and the
+ * calls the brain reported as executed. Names, once per call.
+ */
+async function executedSince(
+  db: Executor,
+  runId: string,
+  fromSeq: number,
+  reported: { id: string; name: string }[],
+): Promise<string[]> {
+  const steps = await db
+    .select({ data: schema.agentRunSteps.data })
+    .from(schema.agentRunSteps)
+    .where(
+      and(
+        eq(schema.agentRunSteps.runId, runId),
+        eq(schema.agentRunSteps.kind, "tool_result"),
+        sql`${schema.agentRunSteps.seq} > ${fromSeq}`,
+      ),
+    );
+  const calls = new Map<string, string>();
+  for (const { data } of steps) {
+    if (data.isError === true || typeof data.name !== "string") continue;
+    calls.set(typeof data.toolUseId === "string" ? data.toolUseId : `step:${calls.size}`, data.name);
+  }
+  for (const c of reported) calls.set(c.id, c.name);
+  return [...new Set(calls.values())];
 }
 
 /** Identity of a run for tool access from outside the model loop (the runner MCP bridge). */
@@ -1534,83 +1579,32 @@ export interface RunIdentity {
   machineId: string;
 }
 
-/** The run row and its tool context, for calls from outside the engine loop. */
-async function runToolContext(deps: EngineDeps, id: RunIdentity) {
-  const [run] = await deps.db
-    .select()
-    .from(agentRuns)
-    .where(and(eq(agentRuns.id, id.runId), eq(agentRuns.orgId, id.orgId), eq(agentRuns.agentId, id.agentId)));
-  if (!run) throw new NotFoundError("Run not found");
-  const ctx: ToolContext = {
-    db: deps.db,
-    orgId: run.orgId,
-    agentId: run.agentId,
-    runId: run.id,
-    channelId: run.channelId,
-    threadRootId: run.threadRootId,
-    triggerMessageId: run.triggerMessageId,
-    // A call through the runner bridge: computer-brain tools (mission tools in a mission thread) apply.
-    ...(id.machineId ? { bridge: { machineId: id.machineId } } : {}),
-  };
-  return { run, ctx };
-}
-
 /**
  * The tools this run may use, as `BrainTool[]` (Tool Gateway list with the
- * run's scopes). The engine loop uses the same list (`listRunTools`); the
- * runner MCP bridge (ADR 0032 block 2) answers `tools/list` with it.
- * `machineId` is checked by the bridge (block 2), not here.
+ * run's scopes): the runner MCP bridge's `tools/list` (`bridgeToolsFor`, the
+ * one implementation). A `machineId` marks the context as a bridge call
+ * (computer-brain tools apply).
  */
-export async function toolsForRun(deps: EngineDeps, id: RunIdentity): Promise<BrainTool[]> {
-  if (!deps.tools) return [];
-  const { ctx } = await runToolContext(deps, id);
-  return (await listRunTools(deps, ctx)).map(brainToolOf);
+export function toolsForRun(deps: EngineDeps, id: RunIdentity): Promise<BrainTool[]> {
+  return bridgeToolsFor({ db: deps.db, pubsub: deps.pubsub, tools: deps.tools ?? null }, id);
 }
 
 /**
- * Executes one tool call for the run through the Tool Gateway (levels,
- * approvals, audit, live tool chip), the same path the engine loop uses
- * (`invokeRunTool`). A gated call suspends the run like the loop does
- * (`suspendRunForTool`: the card is posted, the call joins the transcript's
- * pending calls, the run moves to `waiting_*`) and returns `pause`; the
- * engine loop sees the state after the brain's turn and stops there.
+ * Executes one tool call for the run outside the engine loop, through the one
+ * shared path (`invokeToolForRun`, also the runner bridge's): the live tool
+ * chip where the run's replies go, the Tool Gateway (levels, approvals,
+ * audit), side effects kept for the engine's next post, and a gated call
+ * suspends the run (`suspendRunForTool`: the card, the pending call,
+ * `waiting_*`) and returns `pause`; the engine sees the state after the
+ * brain's turn and stops there.
  */
 export async function executeToolForRun(
   deps: EngineDeps,
   id: RunIdentity,
   call: { id: string; name: string; input: unknown },
 ): Promise<ToolResult> {
-  const tools = deps.tools;
-  if (!tools) return { content: "No tools are available in this run.", isError: true };
-  const { run, ctx } = await runToolContext(deps, id);
-  const topLevel = run.threadRootId === run.triggerMessageId;
-  const [channelRow, topTrigger, turnTools] = await Promise.all([
-    getChannelCached(deps.db, run.orgId, run.channelId),
-    topLevel ? getMessage(deps.db, run.orgId, run.triggerMessageId) : Promise.resolve(null),
-    listRunTools(deps, ctx),
-  ]);
-  const where = {
-    channelId: run.channelId,
-    threadId: replyThreadOf(run, channelRow?.kind, topTrigger),
-    agentId: run.agentId,
-    runId: run.id,
-  };
-  const outcome = await invokeRunTool({ deps, tools, ctx, where, turnTools }, call);
-  if (outcome.type === "result") {
-    const wait = outcome.output.isError ? null : waitOf(outcome.output.data);
-    if (!wait) return toolResultOf(outcome);
-    return suspendRunForTool(
-      deps,
-      run,
-      { id: call.id, name: call.name },
-      {
-        type: "wait",
-        id: wait.id,
-        content: outcome.output.content,
-      },
-    );
-  }
-  return suspendRunForTool(deps, run, { id: call.id, name: call.name }, outcome);
+  const { result } = await invokeToolForRun({ db: deps.db, pubsub: deps.pubsub, tools: deps.tools ?? null }, id, call);
+  return { ...result, isError: result.isError === true };
 }
 
 /**
@@ -1750,13 +1744,6 @@ const describeUpdate = (u: MemoryUpdate) =>
 
 /** The closing line of a run that used tools and wrote nothing (the app shows it as `chat.body.done`). */
 const DONE_TEXT = "Done.";
-
-/**
- * A body the server writes for an agent message (approval and secret cards,
- * closing lines): its code and params, so the app shows it in the person's
- * language (`chat.body.{code}`); the English body is the fallback.
- */
-const bodyCode = (code: string, params: Record<string, string> = {}) => ({ bodyCode: code, bodyParams: params });
 
 const withCode = (meta: Record<string, unknown> | undefined, code: ReturnType<typeof bodyCode> | undefined) =>
   code ? { ...(meta ?? {}), ...code } : meta;

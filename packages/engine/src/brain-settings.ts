@@ -1,4 +1,4 @@
-import { MISSION_PROTOCOL } from "@agenteschat/adapters";
+import { BRAIN_PROTOCOL } from "@agenteschat/adapters";
 import { and, type Database, eq, schema, sql } from "@agenteschat/db";
 import { MODEL_CATALOG } from "@agenteschat/providers";
 import { getAgent } from "./agents";
@@ -120,14 +120,19 @@ type MachineLike = Parameters<typeof machineExecutors>[0] & { id: string; name: 
     typeof machineOnline
   >[0];
 
-/** What the agent's computer can think with (protocol 7 detection); the model brain always. */
+/**
+ * What the agent's computer can think with; the model brain always. A
+ * computer brain needs the runner's `brain.turn` (`BRAIN_PROTOCOL`, the same
+ * check the engine makes per run): an older runner is `runner_old`.
+ * (Missions' legacy executor tasks keep their own check, `machineExecutors`.)
+ */
 export function brainOptions(machine: MachineLike | null): BrainOption[] {
   const found = machine ? machineExecutors(machine) : null;
   const computer = (kind: "claude_code" | "codex", executor: "claude" | "codex"): BrainOption => {
     let reason: BrainUnavailable | undefined;
     if (!machine) reason = "no_computer";
     else if (!machine.execAllowed) reason = "exec_off";
-    else if (machine.protocol < MISSION_PROTOCOL) reason = "runner_old";
+    else if (machine.protocol < BRAIN_PROTOCOL) reason = "runner_old";
     else if (!found?.available.includes(executor))
       reason = executor === "codex" && found?.codexTooOld ? "outdated" : "not_installed";
     return {

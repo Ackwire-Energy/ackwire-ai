@@ -126,6 +126,21 @@ export interface BrainPlan {
 const DEFAULT_MODELS: Partial<Record<BrainKind, string>> = { claude_code: "sonnet" };
 
 /**
+ * The model a computer brain thinks with: the mission's choice, else the
+ * agent's own model when the agent thinks with this same brain (an Opus
+ * chosen for Claude Code means nothing to Codex), else the brain's default.
+ */
+export function brainModelFor(
+  kind: BrainKind,
+  agent: Pick<Agent, "brain" | "brainModel">,
+  mission?: Pick<MissionTurn, "model"> | null,
+): string | undefined {
+  if (kind === "model") return undefined;
+  const agentModel = kindOf(agent.brain) === kind ? (agent.brainModel ?? undefined) : undefined;
+  return mission?.model ?? agentModel ?? DEFAULT_MODELS[kind];
+}
+
+/**
  * Whether this agent already thought with this brain in this conversation
  * (plan usage is recorded per run): then the session exists on the machine
  * and the turn resumes it. A hint: the runner checks its own disk.
@@ -173,7 +188,7 @@ export async function resolveBrain(
   const kind = brainFor(agent, run, mission);
   const base = mission ? { missionId: mission.missionId } : {};
   if (kind === "model") return { kind, ...base };
-  const model = mission?.model ?? agent.brainModel ?? DEFAULT_MODELS[kind];
+  const model = brainModelFor(kind, agent, mission);
   const machineId = mission?.session?.machineId ?? agent.machineId ?? null;
   const status = machineId && deps.machines ? await deps.machines.status(machineId).catch(() => null) : null;
   const unavailable = machineId && !deps.machines ? null : computerBrainUnavailable(kind, machineId, status);

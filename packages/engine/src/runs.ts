@@ -88,7 +88,13 @@ export async function transitionRun(
   runId: string,
   from: RunStatus,
   to: RunStatus,
-  patch: { error?: string | null; replyMessageId?: string; transcript?: Record<string, unknown> } = {},
+  patch: {
+    error?: string | null;
+    replyMessageId?: string;
+    transcript?: Record<string, unknown>;
+    /** Waiting for this computer to come back (ADR 0032 §5); cleared by any move out of `waiting_input`. */
+    waitingMachineId?: string | null;
+  } = {},
 ): Promise<AgentRun | null> {
   if (!canTransition(from, to)) throw new InvalidRunTransitionError(from, to);
   const now = new Date();
@@ -101,6 +107,8 @@ export async function transitionRun(
         ? { startedAt: sql`coalesce(${agentRuns.startedAt}, ${now.toISOString()}::timestamptz)`, heartbeatAt: now }
         : {}),
       ...(isTerminal(to) ? { finishedAt: now } : {}),
+      // Only a run waiting for its computer keeps the machine it waits for.
+      ...(to === "waiting_input" ? {} : { waitingMachineId: null }),
       ...patch,
     })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, from)))
