@@ -754,8 +754,12 @@ export interface ReplyRef {
 export interface ReactionCount {
   /** `+1` / `-1` on agent replies are feedback for the agent. */
   reaction: string;
+  /** People and agents together. */
   count: number;
+  /** People who reacted. */
   userIds: string[];
+  /** Agents who reacted instead of replying (the `react` tool). Older payloads may lack it. */
+  agentIds?: string[];
 }
 
 /** A memory change an agent made because a person asked, or a proposal it made (`memory.updated`). */

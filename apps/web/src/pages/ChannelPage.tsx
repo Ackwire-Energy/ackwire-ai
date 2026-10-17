@@ -76,6 +76,7 @@ import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
+import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { LiveCodeToggle, LiveWorkList } from "@/components/LiveCode";
@@ -1100,6 +1101,15 @@ function ChannelView({
     quoteReply: (message) => {
       setQuote(message);
       composer.current?.focus();
+    },
+    requestCorrection: (message, text) => {
+      const handle = message.author.type === "agent" ? dir.agentById.get(message.author.id ?? "")?.handle : undefined;
+      toBottom(true);
+      send(
+        handle ? `@${handle} ${text}` : text,
+        thread ? thread.id : (message.threadId ?? null),
+        localMeta(message, dir.authorName(message.author), []),
+      );
     },
     jumpTo,
     // "Criar thread a partir daqui": the suggested range becomes a thread's context (not in a thread view).
@@ -2200,6 +2210,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           more={<MessageMoreMenu message={m} channelName={channelName ?? ""} />}
         />
       )}
+      {feedback && <CorrectionAsk message={m} agentName={agent?.name ?? t("channel.unknownAgent")} />}
       {steeredAgent && (
         <p className="msg-steered small muted">
           {t("run.steered", { name: dir.agentById.get(steeredAgent)?.name ?? t("channel.unknownAgent") })}

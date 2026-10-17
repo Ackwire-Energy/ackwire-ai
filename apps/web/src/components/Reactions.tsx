@@ -14,6 +14,8 @@ import { useReactions, useToggleReaction } from "@/api/queries";
 import type { ReactionCount } from "@/api/types";
 import { useDirectory } from "@/hooks/useDirectory";
 import { joinNames } from "@/lib/format";
+import { AgentAvatar } from "./AgentAvatar";
+import { useCorrectionAsk } from "./CorrectionAsk";
 import { useOrg } from "./org-context";
 
 /** 👍/👎 are stored as `+1`/`-1`: on an agent's reply they are feedback that teaches it. */
@@ -56,7 +58,8 @@ export function useEmojiLabels(): EmojiPickerLabels {
 /**
  * A message's reactions: the list from the message (server) until this
  * client loaded or heard newer ones (`message.reactions`), and `toggle`.
- * On an agent's reply (`feedback`), 👍 and 👎 are one opinion: one replaces the other.
+ * On an agent's reply (`feedback`), 👍 and 👎 are one opinion: one replaces the other,
+ * and my 👎 opens the private "refaça ou explique" card under it (`CorrectionAsk`).
  */
 export function useMessageReactions(
   messageId: string,
@@ -66,12 +69,17 @@ export function useMessageReactions(
   const { org, me } = useOrg();
   const loaded = useReactions(org.id, messageId, Boolean(options.load));
   const mutation = useToggleReaction(org.id, messageId);
+  const ask = useCorrectionAsk();
   const list = loaded.data ?? initial ?? [];
   const toggle = (reaction: string) => {
     const mine = reactionState(list, reaction, me.user.id).mine;
     if (options.feedback && !mine && (reaction === UP || reaction === DOWN)) {
       const other = reaction === UP ? DOWN : UP;
       if (reactionState(list, other, me.user.id).mine) mutation.mutate({ reaction: other, on: false });
+    }
+    if (options.feedback && (reaction === UP || reaction === DOWN)) {
+      if (reaction === DOWN && !mine) ask.open(messageId);
+      else ask.clear(messageId);
     }
     mutation.mutate({ reaction, on: !mine });
   };
@@ -115,13 +123,15 @@ export function MessageReactions({
   if (shown.length === 0) return null;
   const nameOf = (id: string) =>
     id === userId ? t("reactions.you") : (dir.memberById.get(id)?.name ?? t("reactions.someone"));
+  const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("reactions.someone");
   return (
     <Reactions label={t("channel.reactions")}>
       {shown.map((r) => {
         const emoji = reactionEmoji(r.reaction);
+        const agentIds = r.agentIds ?? [];
         const who = t("reactions.who", {
           count: r.count,
-          names: joinNames(r.userIds.map(nameOf), t("newAgent.and")),
+          names: joinNames([...r.userIds.map(nameOf), ...agentIds.map(agentName)], t("newAgent.and")),
           emoji,
         });
         return (
@@ -136,6 +146,14 @@ export function MessageReactions({
             <span className="ac-react__emoji" aria-hidden="true">
               {emoji}
             </span>
+            {agentIds.length > 0 && (
+              // Agents that reacted instead of replying: their mini avatars, in the same pill.
+              <span className="msg-react__agents" aria-hidden="true">
+                {agentIds.slice(0, 3).map((id) => (
+                  <AgentAvatar key={id} agentId={id} name={agentName(id)} size="xs" state="idle" />
+                ))}
+              </span>
+            )}
           </Reaction>
         );
       })}

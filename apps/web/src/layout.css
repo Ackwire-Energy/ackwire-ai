@@ -9174,3 +9174,36 @@ button.live-call__head:hover {
     animation: none;
   }
 }
+
+/* Agents that reacted instead of replying: mini avatars inside the reaction pill */
+.msg-react__agents {
+  display: inline-flex;
+  align-items: center;
+}
+.msg-react__agents > * + * {
+  margin-left: -5px;
+}
+
+/* After my 👎 on an agent's reply: a private "redo or explain?" under it */
+.correction-ask {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--sunken);
+  max-width: 560px;
+}
+.correction-ask__title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.correction-ask__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.correction-ask__row > :first-child {
+  flex: 1 1 200px;
+  min-width: 0;
+}

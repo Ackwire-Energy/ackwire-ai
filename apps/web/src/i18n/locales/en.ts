@@ -3075,6 +3075,14 @@ export const en: Translations = {
       symbols: "Symbols",
     },
   },
+  correctionAsk: {
+    title: "Want {{name}} to redo it or explain what was missing?",
+    label: "What was missing",
+    placeholder: "What was missing? (optional)",
+    send: "Ask for a fix",
+    notNow: "Not now",
+    defaultText: "This answer wasn't quite right. Can you redo it or explain what was missing?",
+  },
   reactions: {
     react: "React",
     add: "Add reaction",
@@ -5001,6 +5009,7 @@ export const en: Translations = {
         checkingCalendar: "Checked the calendar",
         schedulingEvent: "Scheduled on the calendar",
         askingQuestion: "Asked a question",
+        reacting: "Reacted to the message",
         openingSkill: "Opened the skill {{app}}",
         consultingSkill: "Checked a skill",
         runningCode: "Ran code on the PC",
@@ -5057,6 +5066,7 @@ export const en: Translations = {
       checkingCalendar: "checking the calendar",
       schedulingEvent: "scheduling an event",
       askingQuestion: "preparing a question",
+      reacting: "reacting",
       openingSkill: "opening the skill {{app}}",
       consultingSkill: "looking at a skill",
       runningCode: "running code",
@@ -5501,6 +5511,10 @@ export const en: Translations = {
     ask_user: {
       label: "Ask the person",
       description: "Asks a short question and waits for the answer.",
+    },
+    react: {
+      label: "React",
+      description: "Reacts with an emoji instead of replying to a simple thanks or ok.",
     },
     search_context: {
       label: "Search context",

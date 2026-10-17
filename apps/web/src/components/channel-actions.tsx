@@ -17,6 +17,8 @@ export interface ChannelActions {
   replyInThread?: (message: MessageType) => void;
   /** "Responder": the next message quotes this one (same conversation, `meta.replyTo`). */
   quoteReply?: (message: MessageType) => void;
+  /** "Pedir correção" after my 👎: my reply in the same conversation, quoting that message and mentioning its agent. */
+  requestCorrection?: (message: MessageType, text: string) => void;
   /** A quote was clicked: scroll to the original and highlight it (paging back if needed). */
   jumpTo?: (messageId: string) => void;
   /** "Criar thread a partir daqui": a thread whose context is the conversation from this message on. */

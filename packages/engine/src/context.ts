@@ -42,6 +42,7 @@ type ActionRow = {
 /** Reads that would crowd "your recent work" (the actions themselves are what matters). */
 const QUIET_TOOLS = [
   "ask_user",
+  "react",
   "search_context",
   "get_summary",
   "expand",
@@ -87,6 +88,8 @@ export async function buildRunContext(
     maxMessages: number;
     toolsAvailable?: boolean;
     askUser?: boolean;
+    /** The built-in `react` tool is available: acknowledge with an emoji instead of a reply. */
+    react?: boolean;
     /** "What you can do", built from the granted tools (`describeCapabilities`). */
     capabilities?: string;
     /** Skills enabled for the agent (name and description; the body loads on demand). */
@@ -322,6 +325,9 @@ export async function buildRunContext(
             : "- You can only write chat messages for now; you cannot run tools or take actions outside this conversation. Say so if asked.",
           options.askUser
             ? "- When a request is ambiguous, key information is missing, or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait. Don't ask about simple requests you can just do, and never ask more than you need."
+            : "",
+          options.react
+            ? '- When the message only acknowledges or thanks and needs no answer ("thanks", "perfect", "ok, go ahead"; in Portuguese "valeu", "perfeito", "ok, pode seguir"), don\'t reply: react with one fitting emoji using `react` and end your turn with no text. Never react and also reply with redundant text; if something still needs saying, just reply.'
             : "",
           options.toolsAvailable
             ? "- Before saying something was done, or correcting it, check the current state with the matching tool (`list_issues`, `read_artifact`, `list_events`…), not with `search_context`."

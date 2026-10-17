@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   customType,
   foreignKey,
   index,
@@ -13,6 +14,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   vector,
 } from "drizzle-orm/pg-core";
@@ -233,19 +235,24 @@ export const outcomes = pgTable(
 );
 
 /** Reactions on messages (thumbs up/down on agent replies feed agent lessons and relevance). */
+/** Reactions on messages: by a person (`user_id`) or by an agent (`agent_id`, the `react` tool), never both. */
 export const messageReactions = pgTable(
   "message_reactions",
   {
     orgId: uuid().notNull(),
     messageId: uuid().notNull(),
-    userId: text()
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: text().references(() => users.id, { onDelete: "cascade" }),
+    agentId: uuid().references(() => agents.id, { onDelete: "cascade" }),
     /** `+1`, `-1` or an emoji. */
     reaction: text().notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.messageId, t.userId, t.reaction] }), index().on(t.orgId, t.messageId)],
+  (t) => [
+    uniqueIndex("message_reactions_user").on(t.messageId, t.userId, t.reaction).where(sql`${t.userId} is not null`),
+    uniqueIndex("message_reactions_agent").on(t.messageId, t.agentId, t.reaction).where(sql`${t.agentId} is not null`),
+    index().on(t.orgId, t.messageId),
+    check("message_reactions_one_reactor", sql`(${t.userId} is null) <> (${t.agentId} is null)`),
+  ],
 );
 
 /** Reflection bookkeeping per thread: bounded runs, never twice over the same messages. */

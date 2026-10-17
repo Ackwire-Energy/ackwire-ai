@@ -170,9 +170,9 @@ export async function reflectThread(
   const refs = new Map<string, { message?: (typeof thread.messages)[number]; outcome?: Outcome }>();
   const lines = thread.messages.map((m, i) => {
     refs.set(`m${i + 1}`, { message: m });
-    const r = reactions.filter((x) => x.messageId === m.id && (x.reaction === "+1" || x.reaction === "-1"));
+    const r = reactions.filter((x) => x.messageId === m.id && x.userId && (x.reaction === "+1" || x.reaction === "-1"));
     const reacted = r.length
-      ? ` (${r.map((x) => `${x.reaction === "+1" ? "👍" : "👎"} by ${thread.names.get(x.userId) ?? "someone"}`).join(", ")})`
+      ? ` (${r.map((x) => `${x.reaction === "+1" ? "👍" : "👎"} by ${thread.names.get(x.userId ?? "") ?? "someone"}`).join(", ")})`
       : "";
     return `m${i + 1} ${isTrustedMessage(m) ? "" : "[untrusted] "}[${authorOf(thread, m)}]: ${m.body.slice(0, 1500)}${reacted}`;
   });

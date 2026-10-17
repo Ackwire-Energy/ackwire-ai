@@ -21,6 +21,7 @@ export type ActivityKind =
   | "checkingCalendar"
   | "schedulingEvent"
   | "askingQuestion"
+  | "reacting"
   | "openingSkill"
   | "consultingSkill"
   | "runningCode"
@@ -88,6 +89,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   find_free_time: "checkingCalendar",
   propose_event: "schedulingEvent",
   ask_user: "askingQuestion",
+  react: "reacting",
   // The agent's PC (sandbox).
   run_code: "runningCode",
   write_file: "pcFiles",

@@ -95,7 +95,9 @@ const toItem = (i: ContextItem) => ({
   updatedAt: i.updatedAt.toISOString(),
 });
 
-const Reactions = z.array(z.object({ reaction: z.string(), count: z.number(), userIds: z.array(z.string()) }));
+const Reactions = z.array(
+  z.object({ reaction: z.string(), count: z.number(), userIds: z.array(z.string()), agentIds: z.array(z.string()) }),
+);
 
 /**
  * Search, the org's context items, outcomes, and feedback on agent replies

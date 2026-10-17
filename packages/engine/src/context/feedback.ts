@@ -4,7 +4,7 @@ import { requireChannelAccess } from "../channels";
 import { NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent } from "../events";
 import type { Judge } from "../judge";
-import { getMessage } from "../messages";
+import { getMessage, groupReactions } from "../messages";
 import { enqueue } from "../outbox";
 import type { Approval } from "../tools/gateway";
 import {
@@ -115,6 +115,18 @@ export async function correctAgentMessage(
   return res;
 }
 
+/** `+1`, `-1` or one emoji (no spaces, short). */
+export const isValidReaction = (reaction: string) =>
+  reaction === "+1" ||
+  reaction === "-1" ||
+  (/\p{Extended_Pictographic}/u.test(reaction) && !/\s/.test(reaction) && reaction.length <= 16);
+
+/** How an agent's emoji is stored: 👍/👎 as `+1`/`-1`, like the app does for people. */
+export const normalizeReaction = (emoji: string) => {
+  const e = emoji.trim().replace(/\uFE0F/g, "");
+  return e === "👍" ? "+1" : e === "👎" ? "-1" : emoji.trim();
+};
+
 /** Adds a reaction. 👍/👎 on an agent's reply adjust the relevance of the context it used, via a job. */
 export async function addReaction(
   db: Database,
@@ -127,9 +139,7 @@ export async function addReaction(
   const message = await getMessage(db, orgId, messageId);
   if (!message || message.deletedAt) throw new NotFoundError("Message not found");
   await requireChannelAccess(db, userId, orgId, message.channelId);
-  const emoji = /\p{Extended_Pictographic}/u.test(reaction) && !/\s/.test(reaction) && reaction.length <= 16;
-  if (reaction !== "+1" && reaction !== "-1" && !emoji)
-    throw new ValidationError("reaction must be +1, -1 or an emoji");
+  if (!isValidReaction(reaction)) throw new ValidationError("reaction must be +1, -1 or an emoji");
   await db.transaction(async (tx) => {
     const inserted = await tx
       .insert(messageReactions)
@@ -170,16 +180,40 @@ export async function removeReaction(
   return reactions;
 }
 
-/** Reactions on a message, in the order they were first given, with who reacted. */
+/** Reactions on a message, in the order they were first given, with who reacted (people and agents). */
 export async function listReactions(db: Database, orgId: string, messageId: string) {
   const rows = await db
-    .select({ reaction: messageReactions.reaction, userId: messageReactions.userId })
+    .select({ reaction: messageReactions.reaction, userId: messageReactions.userId, agentId: messageReactions.agentId })
     .from(messageReactions)
     .where(and(eq(messageReactions.orgId, orgId), eq(messageReactions.messageId, messageId)))
     .orderBy(asc(messageReactions.createdAt));
-  const byReaction = new Map<string, string[]>();
-  for (const r of rows) byReaction.set(r.reaction, [...(byReaction.get(r.reaction) ?? []), r.userId]);
-  return [...byReaction].map(([reaction, userIds]) => ({ reaction, count: userIds.length, userIds }));
+  return groupReactions(rows);
+}
+
+/**
+ * A reaction by an agent (the `react` tool): an acknowledgement instead of a
+ * reply. Never feedback: only people's 👍/👎 teach an agent (`context.feedback`).
+ */
+export async function addAgentReaction(
+  db: Database,
+  input: { orgId: string; agentId: string; messageId: string; reaction: string },
+  pubsub?: PubSub,
+) {
+  const message = await getMessage(db, input.orgId, input.messageId);
+  if (!message || message.deletedAt) throw new NotFoundError("Message not found");
+  if (!isValidReaction(input.reaction)) throw new ValidationError("reaction must be one emoji");
+  await db
+    .insert(messageReactions)
+    .values({ orgId: input.orgId, messageId: input.messageId, agentId: input.agentId, reaction: input.reaction })
+    .onConflictDoNothing();
+  const reactions = await listReactions(db, input.orgId, input.messageId);
+  await publishChannelEvent(pubsub, {
+    type: "message.reactions",
+    channelId: message.channelId,
+    messageId: input.messageId,
+    reactions,
+  });
+  return { message, reactions };
 }
 
 /**

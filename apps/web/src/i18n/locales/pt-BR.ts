@@ -3085,6 +3085,14 @@ export const ptBR = {
       symbols: "Símbolos",
     },
   },
+  correctionAsk: {
+    title: "Quer que {{name}} refaça ou explique o que faltou?",
+    label: "O que faltou",
+    placeholder: "O que faltou? (opcional)",
+    send: "Pedir correção",
+    notNow: "Agora não",
+    defaultText: "Essa resposta não ficou boa. Pode refazer ou explicar o que faltou?",
+  },
   reactions: {
     react: "Reagir",
     add: "Adicionar reação",
@@ -5013,6 +5021,7 @@ export const ptBR = {
         checkingCalendar: "Olhou a agenda",
         schedulingEvent: "Marcou na agenda",
         askingQuestion: "Fez uma pergunta",
+        reacting: "Reagiu à mensagem",
         openingSkill: "Abriu a skill {{app}}",
         consultingSkill: "Consultou uma skill",
         runningCode: "Rodou código no PC",
@@ -5069,6 +5078,7 @@ export const ptBR = {
       checkingCalendar: "olhando a agenda",
       schedulingEvent: "marcando na agenda",
       askingQuestion: "preparando uma pergunta",
+      reacting: "reagindo",
       openingSkill: "abrindo a skill {{app}}",
       consultingSkill: "consultando uma skill",
       runningCode: "rodando código",
@@ -5513,6 +5523,10 @@ export const ptBR = {
     ask_user: {
       label: "Perguntar à pessoa",
       description: "Faz uma pergunta curta e espera a resposta.",
+    },
+    react: {
+      label: "Reagir",
+      description: "Reage com um emoji em vez de responder a um simples obrigado ou ok.",
     },
     search_context: {
       label: "Buscar no contexto",

@@ -2,12 +2,14 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, eq, isNull, schema } from "@agenteschat/db";
 import { type ArtifactDeps, shareArtifact } from "./artifacts";
 import { recordAudit } from "./audit";
+import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
 import { publishMessageCreated } from "./events";
-import { insertMessage, MAX_MESSAGE_LENGTH, messageView } from "./messages";
+import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView } from "./messages";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
 export const POST_MESSAGE_TOOL = "post_message";
+export const REACT_TOOL = "react";
 const MAX_FILES = 10;
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -148,4 +150,53 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
     },
   ];
   return { name: "chat", tools: async () => tools };
+}
+
+/**
+ * The built-in `react` tool: no scope needed (every agent may react, like
+ * `ask_user`). Adds a reaction by the agent to the message that started the
+ * run (or another message of this conversation) instead of replying to a
+ * plain "thanks" / "ok". The executor ends such a run without posting text
+ * (`data.reacted`). Never feedback: only people's 👍/👎 teach agents.
+ */
+export function createReactToolSource(deps: { pubsub?: PubSub }): ToolSource {
+  const tool: ToolDefinition = {
+    name: REACT_TOOL,
+    description:
+      'React with one emoji instead of replying, when the message only acknowledges or thanks ("valeu", "perfeito", "ok, pode seguir") and needs no answer. Reacts to the message you are answering unless you give `message_id` (a message of this conversation). After reacting, end your turn without any text: nothing else is posted. Never react and also reply.',
+    scope: "",
+    inputSchema: {
+      type: "object",
+      properties: {
+        emoji: { type: "string", minLength: 1, maxLength: 16 },
+        message_id: { type: "string", minLength: 36, maxLength: 36 },
+      },
+      required: ["emoji"],
+      additionalProperties: false,
+    },
+    describe: (input) => ({ title: `React with ${str(input.emoji)}` }),
+    async execute(input, ctx) {
+      try {
+        const reaction = normalizeReaction(str(input.emoji));
+        if (!isValidReaction(reaction)) return { content: "Give exactly one emoji, e.g. 🙌.", isError: true };
+        const messageId = str(input.message_id) || ctx.triggerMessageId;
+        const target = await getMessage(ctx.db, ctx.orgId, messageId);
+        if (!target || target.deletedAt || target.channelId !== ctx.channelId) {
+          return { content: "No such message in this conversation.", isError: true };
+        }
+        await addAgentReaction(
+          ctx.db,
+          { orgId: ctx.orgId, agentId: ctx.agentId, messageId: target.id, reaction },
+          deps.pubsub,
+        );
+        return {
+          content: "Reaction added. End your turn now without any text.",
+          data: { reacted: { messageId: target.id, reaction } },
+        };
+      } catch (error) {
+        return failed(error);
+      }
+    },
+  };
+  return { name: "reactions", tools: async () => [tool] };
 }

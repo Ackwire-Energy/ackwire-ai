@@ -36,6 +36,7 @@ import {
   createMissionToolSource,
   createModelGateway,
   createOrganization,
+  createReactToolSource,
   createSandboxToolSource,
   createScheduleToolSource,
   createSkillToolSource,
@@ -116,6 +117,8 @@ export async function setup(
     contextTools?: boolean;
     /** Add the built-in `ask_user` tool. */
     askUser?: boolean;
+    /** Add the built-in `react` tool. */
+    react?: boolean;
     /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
     artifactTools?: boolean;
     chatTools?: boolean;
@@ -237,6 +240,7 @@ export async function setup(
   const sources = [
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
     ...(options.askUser ? [createAskUserToolSource()] : []),
+    ...(options.react ? [createReactToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),

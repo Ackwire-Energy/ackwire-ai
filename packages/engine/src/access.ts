@@ -24,9 +24,9 @@ import {
 
 const { agentScopes, connectorConnections, agents } = schema;
 
-/** Built-in tools by scope (what the built-in sources offer). `ask_user` needs no scope. */
+/** Built-in tools by scope (what the built-in sources offer). `ask_user` and `react` need no scope. */
 export const BUILTIN_TOOLS: Record<string, string[]> = {
-  "": ["ask_user"],
+  "": ["ask_user", "react"],
   "context:read": ["search_context", "get_summary", "expand"],
   "memory:write": ["remember", "update_memory", "forget", "propose_instruction_change"],
   "drive:read": ["read_artifact", "list_artifacts", "share_artifact"],
@@ -94,6 +94,7 @@ export interface AccessTool {
  */
 export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: string }> = {
   ask_user: { label: "Ask the person", description: "Asks a short question and waits for the answer." },
+  react: { label: "React", description: "Reacts with an emoji instead of replying to a simple thanks or ok." },
   search_context: { label: "Search context", description: "Searches messages, summaries, facts and lessons." },
   get_summary: { label: "Read summary", description: "Reads the summary of a thread or period." },
   expand: { label: "Open item", description: "Opens a memory or message in full." },

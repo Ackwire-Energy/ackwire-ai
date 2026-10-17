@@ -21,6 +21,7 @@ import {
   createMissionHooks,
   createMissionToolSource,
   createModelGateway,
+  createReactToolSource,
   createSandboxToolSource,
   createScheduleToolSource,
   createSkillToolSource,
@@ -189,6 +190,7 @@ export function buildEngine(o: EngineOptions) {
   const tools = createToolGateway({
     sources: [
       createAskUserToolSource(),
+      createReactToolSource({ pubsub: adapters.pubsub }),
       createArtifactToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),

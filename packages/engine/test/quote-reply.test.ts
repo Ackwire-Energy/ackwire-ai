@@ -127,7 +127,9 @@ test("reactions: listed with the messages and published live to the channel", as
   const m = await post("bom dia");
   await addReaction(f.db, f.owner.id, f.org.id, m.id, "🎉", f.pubsub);
   const listed = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
-  expect(listed.find((x) => x.id === m.id)?.reactions).toEqual([{ reaction: "🎉", count: 1, userIds: [f.owner.id] }]);
+  expect(listed.find((x) => x.id === m.id)?.reactions).toEqual([
+    { reaction: "🎉", count: 1, userIds: [f.owner.id], agentIds: [] },
+  ]);
   expect(events.find((e) => e.type === "message.reactions")).toMatchObject({
     type: "message.reactions",
     channelId: f.general.id,

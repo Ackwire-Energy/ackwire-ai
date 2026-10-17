@@ -61,8 +61,28 @@ export interface MessageView {
 
 export interface ReactionCount {
   reaction: string;
+  /** People and agents together. */
   count: number;
+  /** People who reacted. */
   userIds: string[];
+  /** Agents who reacted (the `react` tool). */
+  agentIds: string[];
+}
+
+/** Rows (oldest first) → one entry per reaction, in the order each was first given. */
+export function groupReactions(rows: { reaction: string; userId: string | null; agentId: string | null }[]) {
+  const out: ReactionCount[] = [];
+  for (const row of rows) {
+    let found = out.find((x) => x.reaction === row.reaction);
+    if (!found) {
+      found = { reaction: row.reaction, count: 0, userIds: [], agentIds: [] };
+      out.push(found);
+    }
+    found.count += 1;
+    if (row.userId) found.userIds.push(row.userId);
+    else if (row.agentId) found.agentIds.push(row.agentId);
+  }
+  return out;
 }
 
 /** `meta.replyTo` of a quote reply: the message it answers, as it was when quoted. */
@@ -652,19 +672,13 @@ async function reactionsFor(db: Database, orgId: string, ids: string[]): Promise
   if (ids.length === 0) return out;
   const r = schema.messageReactions;
   const rows = await db
-    .select({ messageId: r.messageId, reaction: r.reaction, userId: r.userId })
+    .select({ messageId: r.messageId, reaction: r.reaction, userId: r.userId, agentId: r.agentId })
     .from(r)
     .where(and(eq(r.orgId, orgId), inArray(r.messageId, ids)))
     .orderBy(asc(r.createdAt));
-  for (const row of rows) {
-    const list = out.get(row.messageId) ?? [];
-    const found = list.find((x) => x.reaction === row.reaction);
-    if (found) {
-      found.count += 1;
-      found.userIds.push(row.userId);
-    } else list.push({ reaction: row.reaction, count: 1, userIds: [row.userId] });
-    out.set(row.messageId, list);
-  }
+  const byMessage = new Map<string, typeof rows>();
+  for (const row of rows) byMessage.set(row.messageId, [...(byMessage.get(row.messageId) ?? []), row]);
+  for (const [id, list] of byMessage) out.set(id, groupReactions(list));
   return out;
 }
 

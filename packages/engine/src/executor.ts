@@ -20,6 +20,7 @@ import {
   unregisterRunAbort,
 } from "./cancel";
 import { describeCapabilities } from "./capabilities";
+import { REACT_TOOL } from "./chat-tools";
 import { buildRunContext, getChannelCached, isNoReply, ROUTINE_NO_REPLY, taskNotice } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
@@ -96,6 +97,8 @@ export interface Transcript {
   artifacts?: { id: string; version: number }[];
   /** A mission proposed with its home elsewhere (a flat DM's new thread): the reply carries its link card (`meta.missionLink`). */
   missionLink?: { missionId: string; threadId: string } | null;
+  /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
+  reacted?: boolean;
   /** Tool calls of the last assistant turn while some wait for approval or an answer. */
   pending?: {
     calls: {
@@ -383,6 +386,7 @@ async function executeRunInner(
         maxMessages: deps.contextMessages,
         toolsAvailable: tools.length > 0,
         askUser: tools.some((t) => t.name === ASK_USER_TOOL),
+        react: tools.some((t) => t.name === REACT_TOOL),
         capabilities: describeCapabilities(tools, pending),
         skills: skillList,
         trigger,
@@ -739,6 +743,7 @@ async function executeRunInner(
           if (artifact) transcript.artifacts = [...(transcript.artifacts ?? []), artifact];
           const link = data?.missionLink as { missionId: string; threadId: string } | undefined;
           if (link?.missionId && link.threadId) transcript.missionLink = link;
+          if (data?.reacted) transcript.reacted = true;
           if (update) {
             transcript.memoryUpdates = [...(transcript.memoryUpdates ?? []), update];
             await publishChannelEvent(deps.pubsub, { type: "memory.updated", ...where, update });
@@ -909,7 +914,10 @@ async function executeRunInner(
       const saved = (transcript.artifacts ?? []).length > 0 ? "File saved." : "";
       const anythingPosted = transcript.postedCount > 0;
       // A routine with nothing to report ends here without posting (its instructions asked for silence).
-      const silent = Boolean(viaRoutine) && isNoReply(turnText);
+      // Or it reacted (`react`) instead of replying and wrote nothing more: the reaction is the answer.
+      const silent =
+        (Boolean(viaRoutine) && isNoReply(turnText)) ||
+        (Boolean(transcript.reacted) && (!turnText.trim() || isNoReply(turnText)));
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
       const text = silent
         ? ""
