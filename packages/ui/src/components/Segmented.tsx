@@ -8,6 +8,10 @@ export interface SegmentedOption<V extends string> {
   label: ReactNode;
   /** A small neutral count chip after the label (e.g. Missões 1); hidden when 0 or absent. */
   count?: number;
+  /** A small mark before the label (a level's pixel swatch). */
+  mark?: ReactNode;
+  /** Hover text (e.g. what the option means). */
+  title?: string;
 }
 
 /**
@@ -91,8 +95,10 @@ export function Segmented<V extends string>({
           tabIndex={o.value === value ? 0 : -1}
           className="ac-seg__item"
           data-on={o.value === value || undefined}
+          title={o.title}
           onClick={() => onValueChange(o.value)}
         >
+          {o.mark}
           {o.label}
           {o.count ? <CountChip size={size === "sm" ? "sm" : undefined}>{o.count}</CountChip> : null}
         </button>

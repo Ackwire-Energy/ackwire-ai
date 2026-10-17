@@ -193,6 +193,17 @@ export {
   type SearchFieldProps,
   Toolbar,
 } from "./components/Toolbar";
+export {
+  AskPixels,
+  HappyAgent,
+  SuggestSpark,
+  TOOL_LEVEL_ORDER,
+  ToolLevelBar,
+  type ToolLevelKind,
+  ToolLevelStrip,
+  ToolLevelSwatch,
+  toolLevelTones,
+} from "./components/ToolPixels";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { cx } from "./cx";
 export {
