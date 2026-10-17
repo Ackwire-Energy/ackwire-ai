@@ -1,3 +1,4 @@
+import { agentStateIn } from "@agenteschat/client";
 import {
   type AgentAppearance,
   type AgentState,
@@ -11,7 +12,6 @@ import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 import { useStreams } from "@/realtime/context";
-import { agentStateIn } from "@/realtime/streams";
 
 type AgentAvatarProps = Omit<AvatarProps, "kind" | "running" | "state" | "appearance"> & {
   /** A real agent: its look from the directory, its live state from the run store. */

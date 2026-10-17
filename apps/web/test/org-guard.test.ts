@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import type { ApiClient, Me } from "@agenteschat/client";
+import { keys } from "@agenteschat/client";
 import { QueryClient } from "@tanstack/react-query";
-import type { ApiClient } from "@/api/client";
-import { keys } from "@/api/keys";
-import type { Me } from "@/api/types";
 import { requireUserIn } from "@/app/guards";
 
 const user = { id: "u1", name: "Walter", email: "w@example.com", image: null };

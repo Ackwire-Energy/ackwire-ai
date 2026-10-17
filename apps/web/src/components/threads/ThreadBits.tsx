@@ -1,15 +1,14 @@
+import type { ThreadAction, ThreadInfo } from "@agenteschat/client";
+import { keys, useThreadMutation } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { type ThreadStatus, threadStatus, threadTitle } from "@agenteschat/client/lib/threads";
 import { Button, Chip, Dialog, DialogFooter, type IconName } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useThreadMutation } from "@/api/queries";
-import type { ThreadAction, ThreadInfo } from "@/api/types";
 import { useOrg } from "@/components/org-context";
-import { errorText } from "@/lib/errors";
-import { type ThreadStatus, threadStatus, threadTitle } from "@/lib/threads";
 import { useToast } from "@/lib/toast";
 
 /**

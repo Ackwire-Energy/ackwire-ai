@@ -1,3 +1,20 @@
+import type { Artifact, ArtifactFilters, ArtifactKind } from "@agenteschat/client";
+import { useArtifacts, useChannels } from "@agenteschat/client";
+import { ARTIFACT_KINDS, isArtifactKind, KIND_ICON } from "@agenteschat/client/lib/artifacts";
+import {
+  byWho,
+  DRIVE_GROUPS,
+  DRIVE_SORTS,
+  type DriveGroup,
+  type DriveSection,
+  type DriveSort,
+  type DriveView,
+  type DriveWho,
+  groupArtifacts,
+  isDriveView,
+  rangeOf,
+  sortArtifacts,
+} from "@agenteschat/client/lib/drive";
 import {
   Button,
   cx,
@@ -17,8 +34,6 @@ import {
 } from "@agenteschat/ui";
 import { type MouseEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useArtifacts, useChannels } from "@/api/queries";
-import type { Artifact, ArtifactFilters, ArtifactKind } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useArtifactDownload, useDeleteArtifact } from "@/components/artifacts/ArtifactActions";
 import { artifactLink, useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
@@ -30,21 +45,6 @@ import { DropOverlay, UploadProgress, useFileDrop } from "@/components/drive/Dri
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { ARTIFACT_KINDS, isArtifactKind, KIND_ICON } from "@/lib/artifacts";
-import {
-  byWho,
-  DRIVE_GROUPS,
-  DRIVE_SORTS,
-  type DriveGroup,
-  type DriveSection,
-  type DriveSort,
-  type DriveView,
-  type DriveWho,
-  groupArtifacts,
-  isDriveView,
-  rangeOf,
-  sortArtifacts,
-} from "@/lib/drive";
 import { useOpenParam } from "@/lib/open-param";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";

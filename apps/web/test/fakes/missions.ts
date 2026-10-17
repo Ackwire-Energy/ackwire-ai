@@ -4,9 +4,8 @@
  * `seedMission` from the returned helpers). Reads are not logged (cards read
  * them on every render); changes are.
  */
-import type { ApiClient } from "@/api/client";
-import { ApiError } from "@/api/http";
 import type {
+  ApiClient,
   BrainKind,
   BrainOption,
   CommandApproval,
@@ -21,7 +20,8 @@ import type {
   MissionPlanVersion,
   MissionReview,
   MissionSettings,
-} from "@/api/types";
+} from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
 import { clone, type MockContext, mockId, perOrg } from "./context";
 
 interface Store {

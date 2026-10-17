@@ -1,16 +1,15 @@
+import type { Mission } from "@agenteschat/client";
+import { useChannels, useMissionList } from "@agenteschat/client";
+import { formatShortDate, relativeTime } from "@agenteschat/client/lib/format";
+import { isOpenMission, missionCells, missionCellTitles, waitingText } from "@agenteschat/client/lib/missions";
 import { Button, EmptyState, Icon, Menu, MenuItem } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useMissionList } from "@/api/missions";
-import { useChannels } from "@/api/queries";
-import type { Mission } from "@/api/types";
 import { AgentSpinner } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { formatShortDate, relativeTime } from "@/lib/format";
-import { isOpenMission, missionCells, missionCellTitles, waitingText } from "@/lib/missions";
 import { ExecutorChip, MachineChip, MissionHead, MissionStatusChip, MissionStrip } from "./MissionBits";
 import { CloseMissionDialog } from "./MissionDialogs";
 

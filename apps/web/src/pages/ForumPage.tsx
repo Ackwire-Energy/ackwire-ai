@@ -1,3 +1,20 @@
+import type { ForumFilter, ForumTopic } from "@agenteschat/client";
+import { useForumAction, useForumTopics } from "@agenteschat/client";
+import { relativeTime } from "@agenteschat/client/lib/format";
+import {
+  byActivity,
+  decisionLine,
+  type ForumNeed,
+  filterTopics,
+  isEnded,
+  liveNow,
+  matchTopic,
+  needsOf,
+  nextSeat,
+  ownerOf,
+  turnNow,
+} from "@agenteschat/client/lib/forum";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   Avatar,
   Button,
@@ -12,8 +29,6 @@ import {
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useForumAction, useForumTopics } from "@/api/queries";
-import type { ForumFilter, ForumTopic } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import {
   deadlineLabel,
@@ -29,24 +44,9 @@ import {
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { relativeTime } from "@/lib/format";
-import {
-  byActivity,
-  decisionLine,
-  type ForumNeed,
-  filterTopics,
-  isEnded,
-  liveNow,
-  matchTopic,
-  needsOf,
-  nextSeat,
-  ownerOf,
-  turnNow,
-} from "@/lib/forum";
-import { can } from "@/lib/permissions";
 import "./forum.css";
 
-export { filterTopics } from "@/lib/forum";
+export { filterTopics } from "@agenteschat/client/lib/forum";
 
 const FILTERS: ForumFilter[] = ["open", "done", "mine"];
 

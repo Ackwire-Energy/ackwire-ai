@@ -3,18 +3,16 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { AgentComputer, Machine } from "@agenteschat/client";
+import { ApiError, applyComputerEvent, applyMachineEvent, keys } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { fileIcon, formatBytes, MAX_UPLOAD_BYTES, previewKind } from "@agenteschat/client/lib/files";
 import { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ApiError } from "@/api/http";
-import { keys } from "@/api/keys";
-import type { AgentComputer, Machine } from "@/api/types";
 import { fileSaver } from "@/components/artifacts/ArtifactViewer";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { countdown } from "@/components/Machines";
 import { createI18n } from "@/i18n";
-import { errorText } from "@/lib/errors";
-import { fileIcon, formatBytes, MAX_UPLOAD_BYTES, previewKind } from "@/lib/files";
-import { applyComputerEvent, applyMachineEvent } from "@/realtime/machines";
 import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

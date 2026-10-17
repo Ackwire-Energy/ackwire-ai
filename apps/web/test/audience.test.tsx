@@ -3,10 +3,10 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { Agent } from "@agenteschat/client";
+import { audienceNotice, audienceSummary, canEditAudience, canTalk } from "@agenteschat/client/lib/audience";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { Agent } from "@/api/types";
 import { createI18n } from "@/i18n";
-import { audienceNotice, audienceSummary, canEditAudience, canTalk } from "@/lib/audience";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";

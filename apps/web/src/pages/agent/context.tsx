@@ -1,11 +1,11 @@
+import type { Agent, AgentAudience } from "@agenteschat/client";
+import type { AccessResource, Level, LevelState } from "@agenteschat/client/lib/access-levels";
+import type { agentGrammar } from "@agenteschat/client/lib/grammar";
+import type { RepoChoice } from "@agenteschat/client/lib/repos";
 import { Button, Icon, type IconName } from "@agenteschat/ui";
 import { createContext, type ReactNode, useContext } from "react";
 import { useTranslation } from "react-i18next";
-import type { Agent, AgentAudience } from "@/api/types";
-import type { AccessResource, Level, LevelState } from "@/lib/access-levels";
 import type { AgentSection, AgentTab, BrainChoice, Edits, Field, Look, Saved, Viewer } from "@/lib/agent-edit";
-import type { agentGrammar } from "@/lib/grammar";
-import type { RepoChoice } from "@/lib/repos";
 
 /** One unsaved change, as the save bar and the cards say it. */
 export interface Change {

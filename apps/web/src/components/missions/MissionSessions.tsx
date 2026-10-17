@@ -1,12 +1,19 @@
+import type { MachineTask, Mission } from "@agenteschat/client";
+import { useTaskOutput } from "@agenteschat/client";
+import { formatTime } from "@agenteschat/client/lib/format";
+import {
+  appendOutputLine,
+  formatSpan,
+  type SessionState,
+  sessionState,
+  taskPr,
+  taskSeconds,
+} from "@agenteschat/client/lib/missions";
 import { Button, DetailsDialog, Icon, type IconName, Segmented } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useTaskOutput } from "@/api/missions";
-import type { MachineTask, Mission } from "@/api/types";
 import { AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
-import { formatTime } from "@/lib/format";
-import { appendOutputLine, formatSpan, type SessionState, sessionState, taskPr, taskSeconds } from "@/lib/missions";
 import { useNow } from "./MissionBits";
 
 /**

@@ -1,3 +1,4 @@
+import { ApiError } from "@agenteschat/client";
 import {
   Button,
   EmptyState,
@@ -12,7 +13,6 @@ import {
 import { useIsFetching } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/http";
 
 /** Placeholder rows for a list (members, routines, PCs, search results…). */
 export function LoadingList({

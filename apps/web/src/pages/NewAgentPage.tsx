@@ -1,3 +1,23 @@
+import type { Agent, AgentAudience } from "@agenteschat/client";
+import {
+  useAgents,
+  useChannels,
+  useCreateAgent,
+  useCredentials,
+  useDms,
+  useMembers,
+  useModels,
+  usePlatformKey,
+  useSettings,
+  useSkills,
+} from "@agenteschat/client";
+import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
+import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
+import { joinNames } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { can } from "@agenteschat/client/lib/permissions";
+import { modelChoices } from "@agenteschat/client/lib/providers";
+import { scopeText } from "@agenteschat/client/lib/scopes";
 import {
   AffixInput,
   type AgentAppearance,
@@ -19,23 +39,9 @@ import {
   Textarea,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import {
-  useAgents,
-  useChannels,
-  useCreateAgent,
-  useCredentials,
-  useDms,
-  useMembers,
-  useModels,
-  usePlatformKey,
-  useSettings,
-  useSkills,
-} from "@/api/queries";
-import type { Agent, AgentAudience } from "@/api/types";
 import { LevelRow, useConnectedById } from "@/components/AccessLevels";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -56,10 +62,6 @@ import { useMediaQuery } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { AgentBornSky, AgentPreviewSky, OnboardingHorizon } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
-import { LEVELS, type Level, saveLevels } from "@/lib/access-levels";
-import { type ConnectedItem, itemName } from "@/lib/connected";
-import { joinNames } from "@/lib/format";
-import { agentGrammar } from "@/lib/grammar";
 import {
   BLANK_LOOK,
   cleanHandle,
@@ -80,9 +82,6 @@ import {
   readBudget,
   stepErrors,
 } from "@/lib/new-agent";
-import { can } from "@/lib/permissions";
-import { modelChoices } from "@/lib/providers";
-import { scopeText } from "@/lib/scopes";
 
 /** How long the preview keeps writing after a keystroke. */
 const TYPING_MS = 700;

@@ -3,14 +3,14 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { WikiGraph } from "@agenteschat/client";
+import { outlineOf, resolveWikiLink, splitSection, wikiSlug, wikiTree } from "@agenteschat/client/lib/wiki";
+import { readZip } from "@agenteschat/client/lib/zip";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
-import type { WikiGraph } from "@/api/types";
 import { prefixLines, wikiQuery, wrapSelection } from "@/components/WikiEditor";
 import { layoutGraph, neighborsOf } from "@/components/WikiGraph";
 import { headingId, Markdown, parseWikiToken, wikiLinksIn } from "@/lib/markdown";
 import { filesFromList, homeOf, parseNote, readVault, type VaultFile } from "@/lib/obsidian";
-import { outlineOf, resolveWikiLink, splitSection, wikiSlug, wikiTree } from "@/lib/wiki";
-import { readZip } from "@/lib/zip";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

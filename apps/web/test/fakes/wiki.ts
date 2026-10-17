@@ -4,10 +4,9 @@
  * `…/rename`, `…/history`, `…/versions/{n}`, `…/append`, `GET …/wiki/graph`,
  * `GET …/wiki/search?q=`. A stale `baseVersion` → 409 `version_conflict`.
  */
-import type { ApiClient } from "@/api/client";
-import { ApiError } from "@/api/http";
-import type { WikiAuthor, WikiBacklink, WikiPage, WikiPageSummary, WikiVersion } from "@/api/types";
-import { resolveWikiLink, wikiLinksIn, wikiSlug } from "@/lib/wiki";
+import type { ApiClient, WikiAuthor, WikiBacklink, WikiPage, WikiPageSummary, WikiVersion } from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
+import { resolveWikiLink, wikiLinksIn, wikiSlug } from "@agenteschat/client/lib/wiki";
 import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg } from "./context";
 
 interface Stored {

@@ -3,14 +3,20 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { ApiClient, Artifact } from "@agenteschat/client";
+import {
+  documentPreview,
+  parsePatch,
+  patchCounts,
+  sideBySide,
+  sortRows,
+  toCsv,
+} from "@agenteschat/client/lib/artifacts";
+import { daysLeft, groupArtifacts, rangeOf, sortArtifacts } from "@agenteschat/client/lib/drive";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
-import type { ApiClient } from "@/api/client";
-import type { Artifact } from "@/api/types";
 import { fileSaver } from "@/components/artifacts/ArtifactViewer";
 import { HTML_SANDBOX } from "@/components/artifacts/HtmlFrame";
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
-import { documentPreview, parsePatch, patchCounts, sideBySide, sortRows, toCsv } from "@/lib/artifacts";
-import { daysLeft, groupArtifacts, rangeOf, sortArtifacts } from "@/lib/drive";
 import { Markdown, parseMarkdown } from "@/lib/markdown";
 import { ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -729,7 +735,7 @@ describe("deleting a file", () => {
   test("a chat card for a deleted file is a quiet 'Arquivo removido'", async () => {
     const { ArtifactCard } = await import("@/components/artifacts/ArtifactCard");
     expect(ArtifactCard).toBeTruthy();
-    const { artifactRefs } = await import("@/lib/artifacts");
+    const { artifactRefs } = await import("@agenteschat/client/lib/artifacts");
     expect(artifactRefs({ artifacts: [{ id: "x", deleted: true, title: "Relatório" }] })).toEqual([
       { id: "x", deleted: true, title: "Relatório" },
     ]);

@@ -1,14 +1,13 @@
+import type { Message, MessageMemory } from "@agenteschat/client";
+import { cacheMessageMemories, keys } from "@agenteschat/client";
+import { formatTime } from "@agenteschat/client/lib/format";
 import { AgentReadingBook, Button, Input, Popover } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type PointerEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { cacheMessageMemories } from "@/api/queries";
-import type { Message, MessageMemory } from "@/api/types";
 import { useDirectory } from "@/hooks/useDirectory";
-import { formatTime } from "@/lib/format";
 import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
 import { AgentAvatar } from "./AgentAvatar";

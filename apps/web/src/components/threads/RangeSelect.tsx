@@ -1,3 +1,18 @@
+import type { Message, ThreadInfo } from "@agenteschat/client";
+import { useThreadMutation } from "@agenteschat/client";
+import { errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { formatTime, joinNames } from "@agenteschat/client/lib/format";
+import {
+  excludedRuns,
+  moveEdge,
+  pickRow,
+  type RangeSelection,
+  selectionInfo,
+  selectionOf,
+  stepEdge,
+  threadTitle,
+  timeSpan,
+} from "@agenteschat/client/lib/threads";
 import { Button, Checkbox, Chip, cx, Icon } from "@agenteschat/ui";
 import {
   type KeyboardEvent,
@@ -10,23 +25,8 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { useThreadMutation } from "@/api/queries";
-import type { Message, ThreadInfo } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { errorCode, errorText } from "@/lib/errors";
-import { formatTime, joinNames } from "@/lib/format";
-import {
-  excludedRuns,
-  moveEdge,
-  pickRow,
-  type RangeSelection,
-  selectionInfo,
-  selectionOf,
-  stepEdge,
-  threadTitle,
-  timeSpan,
-} from "@/lib/threads";
 import { useToast } from "@/lib/toast";
 import { useThreadFlows } from "./ThreadBits";
 import "./threads.css";

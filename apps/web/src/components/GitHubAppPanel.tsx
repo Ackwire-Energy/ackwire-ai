@@ -1,10 +1,10 @@
+import { useGitHubApp, useInstallGitHubApp, useRemoveGitHubApp } from "@agenteschat/client";
+import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Chip, List } from "@agenteschat/ui";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { useGitHubApp, useInstallGitHubApp, useRemoveGitHubApp } from "@/api/queries";
 import { useOrg } from "@/components/org-context";
 import { navigateAway } from "@/lib/navigate";
-import { can } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
 
 /**

@@ -1,13 +1,13 @@
+import type { Message, ThreadInfo, ThreadStartMeta } from "@agenteschat/client";
+import { useChannelThreads } from "@agenteschat/client";
+import { formatTime, relativeTime } from "@agenteschat/client/lib/format";
+import { threadMessageCount, threadTitle } from "@agenteschat/client/lib/threads";
 import { Button, CountChip, Icon, Popover } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, useContext, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useChannelThreads } from "@/api/queries";
-import type { Message, ThreadInfo, ThreadStartMeta } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { formatTime, relativeTime } from "@/lib/format";
-import { threadMessageCount, threadTitle } from "@/lib/threads";
 import { ThreadStatusChip } from "./ThreadBits";
 import "./threads.css";
 

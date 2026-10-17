@@ -1,16 +1,15 @@
+import type { Proposal } from "@agenteschat/client";
+import { ApiError, useDecideProposal, useProposals } from "@agenteschat/client";
+import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Alert, Button, Card, Chip, Diff, diffLines, EmptyState, Field, Icon, Textarea } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { ApiError } from "@/api/http";
-import { useDecideProposal, useProposals } from "@/api/queries";
-import type { Proposal } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { relativeTime, whenAt } from "@/lib/format";
-import { agentGrammar } from "@/lib/grammar";
 import { useToast } from "@/lib/toast";
 
 /** Pending first, then decided; newest first inside each. */

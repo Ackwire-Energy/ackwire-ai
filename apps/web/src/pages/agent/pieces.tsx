@@ -1,8 +1,8 @@
+import type { Channel, Run } from "@agenteschat/client";
+import { useChannels, useDms } from "@agenteschat/client";
 import { Chip, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { useChannels, useDms } from "@/api/queries";
-import type { Channel, Run } from "@/api/types";
 import { AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import type { Field } from "@/lib/agent-edit";

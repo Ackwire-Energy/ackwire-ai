@@ -3,13 +3,13 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { AgentAccess } from "@agenteschat/client";
+import { inputWithLevels, levelsOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
+import { activityText, toolActivity } from "@agenteschat/client/lib/activity";
+import { busyView, ELAPSED_AFTER_MS, GIVE_UP_MS, PREPARE_AFTER_MS, reached } from "@agenteschat/client/lib/computer";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { AgentAccess } from "@/api/types";
 import { isDomain } from "@/components/AgentComputer";
 import { createI18n } from "@/i18n";
-import { inputWithLevels, levelsOf, resourcesOf } from "@/lib/access-levels";
-import { activityText, toolActivity } from "@/lib/activity";
-import { busyView, ELAPSED_AFTER_MS, GIVE_UP_MS, PREPARE_AFTER_MS, reached } from "@/lib/computer";
 import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

@@ -3,8 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ApiError } from "@/api/http";
 import { createFakeApi, type FakeState, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

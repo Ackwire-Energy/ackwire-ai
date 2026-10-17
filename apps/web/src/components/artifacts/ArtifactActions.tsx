@@ -1,14 +1,13 @@
+import type { Artifact, ArtifactContent, ArtifactKind } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
+import { fileName } from "@agenteschat/client/lib/artifacts";
 import { Button, Dialog, DialogFooter, type IconName, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { ApiError } from "@/api/http";
-import { keys } from "@/api/keys";
-import type { Artifact, ArtifactContent, ArtifactKind } from "@/api/types";
 import { useOrg } from "@/components/org-context";
-import { fileName } from "@/lib/artifacts";
 import { useToast } from "@/lib/toast";
 import { artifactLink } from "./ArtifactViewer";
 import { fileSaver } from "./fileSaver";

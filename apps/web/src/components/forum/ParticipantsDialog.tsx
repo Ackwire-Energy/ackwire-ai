@@ -1,12 +1,12 @@
+import type { ForumTopicDetail } from "@agenteschat/client";
+import { useForumAction } from "@agenteschat/client";
+import { canTalk } from "@agenteschat/client/lib/audience";
+import { isEnded, ownerOf, seatsOf } from "@agenteschat/client/lib/forum";
 import { Avatar, Button, Checkbox, Dialog, DialogBody, DialogFooter, Icon, SearchInput, Switch } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useForumAction } from "@/api/queries";
-import type { ForumTopicDetail } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
-import { canTalk } from "@/lib/audience";
-import { isEnded, ownerOf, seatsOf } from "@/lib/forum";
 import { useToast } from "@/lib/toast";
 import { useForumWho } from "./pieces";
 

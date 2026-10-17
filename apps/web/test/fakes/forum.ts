@@ -4,8 +4,8 @@
  * actions (post, conclude, cancel, pass, resume, participants, issues,
  * suggestions). The track is rebuilt from the posts on every read.
  */
-import type { ApiClient } from "@/api/client";
 import type {
+  ApiClient,
   ForumPost,
   ForumSeat,
   ForumSuggestion,
@@ -13,7 +13,7 @@ import type {
   ForumTopic,
   ForumTopicDetail,
   ForumTrack,
-} from "@/api/types";
+} from "@agenteschat/client";
 import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg } from "./context";
 
 const origin = (over: Partial<ForumTopic["origin"]> = {}): ForumTopic["origin"] => ({

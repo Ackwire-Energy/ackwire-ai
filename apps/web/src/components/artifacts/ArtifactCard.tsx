@@ -1,9 +1,9 @@
+import type { ArtifactContent, ArtifactRef } from "@agenteschat/client";
+import { useArtifact } from "@agenteschat/client";
+import { documentPreview, KIND_ICON, patchCounts } from "@agenteschat/client/lib/artifacts";
 import { Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
-import { useArtifact } from "@/api/queries";
-import type { ArtifactContent, ArtifactRef } from "@/api/types";
 import { useOrg } from "@/components/org-context";
-import { documentPreview, KIND_ICON, patchCounts } from "@/lib/artifacts";
 import { useArtifactViewer, useAuthorName } from "./ArtifactViewer";
 import { FileCardPreview } from "./FileView";
 import { MermaidDiagram } from "./Mermaid";

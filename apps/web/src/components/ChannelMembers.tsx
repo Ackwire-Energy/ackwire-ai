@@ -1,13 +1,12 @@
+import type { Agent, Member } from "@agenteschat/client";
+import { agentStateIn, usePeople, useRoster } from "@agenteschat/client";
 import { Avatar, AvatarStack, Button, Popover } from "@agenteschat/ui";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { usePeople, useRoster } from "@/api/queries";
-import type { Agent, Member } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { useStreams } from "@/realtime/context";
-import { agentStateIn } from "@/realtime/streams";
 
 /** Opening on hover waits a little (a pointer just passing by doesn't open it). */
 export const MEMBERS_OPEN_MS = 150;

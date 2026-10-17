@@ -3,8 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { GitHubRepositories, Run } from "@/api/types";
+import type { GitHubRepositories, Run } from "@agenteschat/client";
 import {
   ALL_REPOS,
   applyPick,
@@ -14,7 +13,8 @@ import {
   repoListOf,
   sameRepoChoice,
   toggleRepo,
-} from "@/lib/repos";
+} from "@agenteschat/client/lib/repos";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

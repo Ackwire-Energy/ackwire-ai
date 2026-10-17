@@ -1,9 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { TFunction } from "i18next";
-import type { Message } from "@/api/types";
-import { buildTimeline, groupsWith, messageKey } from "@/chat/timeline";
-import { createI18n } from "@/i18n";
-import { type ActivityEntry, activityText, barEntries, toolActivity } from "@/lib/activity";
+import type { Message } from "@agenteschat/client";
+import { applyChannelEvent, emptyStreams, runsInChannel } from "@agenteschat/client";
+import { type ActivityEntry, activityText, barEntries, toolActivity } from "@agenteschat/client/lib/activity";
 import {
   entersWithMotion,
   greetingSuggestions,
@@ -11,11 +9,13 @@ import {
   nearBottom,
   suggestionTopic,
   usageLine,
-} from "@/lib/chat";
-import { dayLabel } from "@/lib/format";
-import { initialReveal, REVEAL_MAX_LAG_MS, rebaseReveal, revealStep, wordEnd } from "@/lib/reveal";
-import { stepLabel } from "@/lib/work";
-import { applyChannelEvent, emptyStreams, runsInChannel } from "@/realtime/streams";
+} from "@agenteschat/client/lib/chat";
+import { dayLabel } from "@agenteschat/client/lib/format";
+import { initialReveal, REVEAL_MAX_LAG_MS, rebaseReveal, revealStep, wordEnd } from "@agenteschat/client/lib/reveal";
+import { buildTimeline, groupsWith, messageKey } from "@agenteschat/client/lib/timeline";
+import { stepLabel } from "@agenteschat/client/lib/work";
+import type { TFunction } from "i18next";
+import { createI18n } from "@/i18n";
 
 const i18n = createI18n("pt-BR");
 const t = i18n.t.bind(i18n) as TFunction;

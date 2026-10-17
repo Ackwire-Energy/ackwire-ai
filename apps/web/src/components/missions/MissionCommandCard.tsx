@@ -1,16 +1,15 @@
+import type { MissionCommandMeta } from "@agenteschat/client";
+import { ApiError, useMission, useMissionAct, useMissionCommands } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { formatTime } from "@agenteschat/client/lib/format";
+import { executorName } from "@agenteschat/client/lib/missions";
 import { Button, Checkbox, Chip, DetailsDialog, DetailsSection, Icon, Skeleton } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { ApiError } from "@/api/http";
-import { useMission, useMissionAct, useMissionCommands } from "@/api/missions";
-import type { MissionCommandMeta } from "@/api/types";
 import { AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { errorText } from "@/lib/errors";
-import { formatTime } from "@/lib/format";
-import { executorName } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
 import "./missions.css";
 

@@ -1,3 +1,6 @@
+import type { Actor, CalendarEvent, CalendarEventPatch } from "@agenteschat/client";
+import { toYmd } from "@agenteschat/client/lib/format";
+import { browserTimezone } from "@agenteschat/client/lib/routines";
 import {
   Button,
   DatePicker,
@@ -15,14 +18,11 @@ import {
 } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Actor, CalendarEvent, CalendarEventPatch } from "@/api/types";
 import { useActors } from "@/components/actors";
 import { PeoplePicker, type PickKey } from "@/components/MemberPicker";
 import { useOrg } from "@/components/org-context";
 import { ZoneSelect } from "@/components/ZoneSelect";
-import { toYmd } from "@/lib/format";
 import { fromApiRule, recurrenceLabels, ruleSentence, toApiRule, upcomingLabels } from "@/lib/recurrence";
-import { browserTimezone } from "@/lib/routines";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const hm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;

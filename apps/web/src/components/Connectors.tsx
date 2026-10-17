@@ -1,17 +1,21 @@
-import { AvatarStack, Button, Card, Chip, Dialog, DialogFooter, List } from "@agenteschat/ui";
-import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { keys } from "@/api/keys";
+import type { Agent } from "@agenteschat/client";
 import {
+  keys,
   useAgents,
   useCatalog,
   useConnections,
   useCustomServerAction,
   useCustomServers,
   useDisconnect,
-} from "@/api/queries";
-import type { Agent } from "@/api/types";
+} from "@agenteschat/client";
+import { levelIn } from "@agenteschat/client/lib/access-levels";
+import { type ConnectedItem, connectedIds, connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { relativeTime } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
+import { AvatarStack, Button, Card, Chip, Dialog, DialogFooter, List } from "@agenteschat/ui";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorCatalogDialog, ConnectorIcon } from "@/components/ConnectorCatalog";
@@ -19,10 +23,6 @@ import { GitHubAppPanel } from "@/components/GitHubAppPanel";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
-import { levelIn } from "@/lib/access-levels";
-import { type ConnectedItem, connectedIds, connectedItems, itemName } from "@/lib/connected";
-import { relativeTime } from "@/lib/format";
-import { can } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
 
 /**

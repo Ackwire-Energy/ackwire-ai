@@ -1,12 +1,12 @@
+import type { Mission, MissionCommand } from "@agenteschat/client";
+import { useMissionCommands, useMissionDecisions, useMissionList, useMissionReviews } from "@agenteschat/client";
+import { relativeTime } from "@agenteschat/client/lib/format";
 import { Chip, type IconName } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { useMissionCommands, useMissionDecisions, useMissionList, useMissionReviews } from "@/api/missions";
-import type { Mission, MissionCommand } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { relativeTime } from "@/lib/format";
 import { ExecutorChip } from "./MissionBits";
 import { MissionCommandCard } from "./MissionCommandCard";
 import "./missions.css";

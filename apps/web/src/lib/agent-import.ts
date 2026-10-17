@@ -1,6 +1,6 @@
+import { handleFrom } from "@agenteschat/client/lib/text";
 import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES, type AgentAppearance, type AgentColor } from "@agenteschat/ui";
 import { parse as parseYaml } from "yaml";
-import { handleFrom } from "@/lib/text";
 
 /**
  * Bringing agents from another app (onboarding step "Trazer seus agentes").

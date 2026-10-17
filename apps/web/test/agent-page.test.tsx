@@ -3,8 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { Run } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { Run } from "@/api/types";
 import {
   agentSearch,
   changedKeys,

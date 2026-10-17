@@ -13,10 +13,10 @@ setupDom();
  * planning.test.tsx and floating.test.tsx once that step is green.
  */
 
+import { toYmd } from "@agenteschat/client/lib/format";
 import { DatePicker, Field, TimeSelect } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
-import { toYmd } from "@/lib/format";
 import { mondayOf } from "@/pages/CalendarPage";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";

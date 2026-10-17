@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { TFunction } from "i18next";
-import type { ChannelEvent, Message } from "@/api/types";
-import { createI18n } from "@/i18n";
-import { type ActivityEntry, activitySentence, activityText, barEntries, listNames } from "@/lib/activity";
-import { consultationsOf, previewOf } from "@/lib/consultations";
+import type { ChannelEvent, LiveRun, Message } from "@agenteschat/client";
 import {
   applyConsultEvent,
   CONSULT_ASKING_MAX_MS,
@@ -11,8 +7,17 @@ import {
   type ConsultsState,
   consultsIn,
   elapsedClock,
-} from "@/realtime/consults";
-import type { LiveRun } from "@/realtime/streams";
+} from "@agenteschat/client";
+import {
+  type ActivityEntry,
+  activitySentence,
+  activityText,
+  barEntries,
+  listNames,
+} from "@agenteschat/client/lib/activity";
+import { consultationsOf, previewOf } from "@agenteschat/client/lib/consultations";
+import type { TFunction } from "i18next";
+import { createI18n } from "@/i18n";
 
 const pt = createI18n("pt-BR");
 const t = pt.t.bind(pt) as TFunction;

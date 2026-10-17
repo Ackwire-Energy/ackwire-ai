@@ -3,11 +3,11 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { Routine } from "@agenteschat/client";
+import { activityText, toolActivity } from "@agenteschat/client/lib/activity";
+import { isRoutineCall, onceParts, reminderBody, routineOfMessage } from "@agenteschat/client/lib/routines";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { Routine } from "@/api/types";
 import { createI18n } from "@/i18n";
-import { activityText, toolActivity } from "@/lib/activity";
-import { isRoutineCall, onceParts, reminderBody, routineOfMessage } from "@/lib/routines";
 import { isDoneOnce } from "@/pages/RoutinesPage";
 import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";

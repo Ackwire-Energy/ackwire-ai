@@ -1,3 +1,27 @@
+import type { Agent, AgentAudience, AgentBrain, AgentDetail, AgentInput, AgentSkill } from "@agenteschat/client";
+import {
+  keys,
+  useAgentAccess,
+  useAgentBrain,
+  useAgentDetail,
+  useAgentRepos,
+  useAgentSkills,
+  useComputer,
+  useCredentials,
+  useMachines,
+  useModels,
+  useProposals,
+  useRuns,
+  useSetComputerTarget,
+  useSettings,
+  useUpdateAgent,
+} from "@agenteschat/client";
+import { type Level, levelsOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { joinNames } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { can } from "@agenteschat/client/lib/permissions";
+import { type RepoChoice, repoChoiceOf, repoListOf, reposText } from "@agenteschat/client/lib/repos";
 import {
   type AgentAppearance,
   Button,
@@ -14,24 +38,6 @@ import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import {
-  useAgentAccess,
-  useAgentBrain,
-  useAgentDetail,
-  useAgentRepos,
-  useAgentSkills,
-  useComputer,
-  useCredentials,
-  useMachines,
-  useModels,
-  useProposals,
-  useRuns,
-  useSetComputerTarget,
-  useSettings,
-  useUpdateAgent,
-} from "@/api/queries";
-import type { Agent, AgentAudience, AgentBrain, AgentDetail, AgentInput, AgentSkill } from "@/api/types";
 import { resourceName, useConnectedById, useSetLevels } from "@/components/AccessLevels";
 import { audienceValid } from "@/components/AgentAudience";
 import { brainSummary, PlanTermsDialog } from "@/components/AgentBrain";
@@ -40,7 +46,6 @@ import { DEFAULT_KEY, keyOptions, NO_OWNER, usd } from "@/components/AgentFields
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { type Level, levelsOf, resourcesOf } from "@/lib/access-levels";
 import {
   AGENT_TABS,
   type AgentSection,
@@ -62,13 +67,8 @@ import {
   thisMonth,
   type Viewer,
 } from "@/lib/agent-edit";
-import { errorText } from "@/lib/errors";
-import { joinNames } from "@/lib/format";
-import { agentGrammar } from "@/lib/grammar";
 import { lookOf } from "@/lib/look";
 import { BLANK_LOOK, readBudget } from "@/lib/new-agent";
-import { can } from "@/lib/permissions";
-import { type RepoChoice, repoChoiceOf, repoListOf, reposText } from "@/lib/repos";
 import { useToast } from "@/lib/toast";
 import { AccessTab } from "./agent/AccessTab";
 import { ActivityTab } from "./agent/ActivityTab";

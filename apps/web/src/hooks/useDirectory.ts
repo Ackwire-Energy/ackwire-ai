@@ -1,7 +1,7 @@
+import type { Agent, Member, Message } from "@agenteschat/client";
+import { useAgents, useMembers } from "@agenteschat/client";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useAgents, useMembers } from "@/api/queries";
-import type { Agent, Member, Message } from "@/api/types";
 
 /** People and agents of the organization, by id and handle, for names and avatars. */
 export function useDirectory(orgId: string) {

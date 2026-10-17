@@ -10,11 +10,19 @@
  * on resize or a theme change). Without a 2D context (tests, old browsers)
  * nothing is drawn and the element's CSS background shows.
  */
-import { spriteGrid } from "../agent/engine.js";
-import { pixelOf, spriteTone } from "./tones";
+import {
+  blobsAt,
+  type CalmZone,
+  calmAt,
+  ditherIndex,
+  drawSprite,
+  pixelOf,
+  type SkyBlob,
+  type SkyFrame,
+  spriteTone,
+} from "./math";
 
-/** A soft blob added to the field: [x, y, spread, strength] in 0..1 units of the panel. */
-export type SkyBlob = [x: number, y: number, spread: number, strength: number];
+export { drawSprite, type SkyBlob, type SkyFrame, SPRITE } from "./math";
 
 /** What a sky draws, read again on every frame (so it can change live). */
 export interface SkyOptions {
@@ -51,45 +59,7 @@ export interface SkyOptions {
   after?: (frame: SkyFrame) => void;
 }
 
-export interface SkyFrame {
-  buf: Uint32Array;
-  w: number;
-  h: number;
-  t: number;
-  tones: number[];
-}
-
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
-/** 9×9 pixel agent from the agent engine: the same shape and eyes as every agent ("X" body, "o" eye). */
-export const SPRITE = spriteGrid(9);
 const WHITE = pixelOf("#ffffff");
-
-/** Draws one pixel agent at (x, y), `k` sky pixels per sprite pixel, skipping pixels where `skip` says so. */
-export function drawSprite(
-  f: Pick<SkyFrame, "buf" | "w" | "h">,
-  x: number,
-  y: number,
-  k: number,
-  body: number,
-  eye: number,
-  closed = false,
-  skip?: (x: number, y: number) => boolean,
-) {
-  for (let sy = 0; sy < 9; sy++) {
-    const line = SPRITE[sy] as string;
-    for (let sx = 0; sx < 9; sx++) {
-      const c = line[sx];
-      if (c === ".") continue;
-      const col = c === "o" && !(closed && sy === 3) ? eye : body;
-      for (let ky = 0; ky < k; ky++)
-        for (let kx = 0; kx < k; kx++) {
-          const X = x + sx * k + kx;
-          const Y = y + sy * k + ky;
-          if (X >= 0 && X < f.w && Y >= 0 && Y < f.h && !skip?.(X, Y)) f.buf[Y * f.w + X] = col;
-        }
-    }
-  }
-}
 
 /* ---------- shared state: pointer, theme, motion, one loop ---------- */
 
@@ -259,7 +229,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     const ly = light.y * h;
     const lr = (o.lightR ?? 0.32) * h;
     const lr2 = 1 / (lr * lr);
-    const zones: [number, number, number, number][] = [];
+    const zones: CalmZone[] = [];
     for (const el of o.calm ? o.calm() : []) {
       if (!el) continue;
       const e = el.getBoundingClientRect();
@@ -268,47 +238,23 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     }
     const PAD = o.calmPad ?? 22;
     const calmV = o.calmV ?? 6 / 7;
-    const calmAt = (x: number, y: number) => {
-      let k = 0;
-      for (const z of zones) {
-        const dx = x < z[0] ? z[0] - x : x > z[2] ? x - z[2] : 0;
-        const dy = y < z[1] ? z[1] - y : y > z[3] ? y - z[3] : 0;
-        if (dx > PAD || dy > PAD) continue;
-        const d = Math.sqrt(dx * dx + dy * dy);
-        if (d < PAD) {
-          const q = 1 - d / PAD;
-          const s2 = q * q * (3 - 2 * q);
-          if (s2 > k) k = s2;
-        }
-      }
-      return k;
-    };
+    // Per pixel: the base field, the blobs, the pointer light, the calm zones; then the dither (./math).
     for (let y = 0; y < h; y++) {
       const v = y * inv;
       const row = y * w;
-      const by = (y & 3) << 2;
       for (let x = 0; x < w; x++) {
         let f = o.base(x / w, v, t);
-        for (let i = 0; i < nb; i++) {
-          const b = blobs[i] as SkyBlob;
-          const dx = (x - b[0] * w) * inv;
-          const dy = (y - b[1] * h) * inv;
-          f += b[3] * Math.exp(-(dx * dx + dy * dy) / b[2]);
-        }
+        if (nb) f = blobsAt(blobs, x, y, w, h, f);
         if (lk) {
           const ldx = x - lx;
           const ldy = y - ly;
           f += lk * Math.exp(-(ldx * ldx + ldy * ldy) * lr2);
         }
         if (zones.length) {
-          const k = calmAt(x, y);
+          const k = calmAt(zones, PAD, x, y);
           if (k) f += (calmV - f) * k;
         }
-        f = f < 0 ? 0 : f > 1 ? 1 : f;
-        const s = f * levels;
-        const lo = s | 0;
-        const idx = s - lo > (BAYER[by | (x & 3)] ?? 0.5) ? lo + 1 : lo;
-        buf[row + x] = tones[idx > levels ? levels : idx] as number;
+        buf[row + x] = tones[ditherIndex(f, levels, x, y)] as number;
       }
     }
     // Pixel agents drifting up, with a little parallax and an occasional blink.
@@ -320,7 +266,7 @@ export function startSky(canvas: HTMLCanvasElement, get: () => SkyOptions): () =
     const ghostBody = tones[Math.max(0, levels - 1)] as number;
     const rise = (o.rise ?? 1) * (o.speed ?? 1);
     const top = o.ceil ? h * o.ceil : 0;
-    const skip = zones.length ? (x: number, y: number) => calmAt(x, y) > 0.35 : undefined;
+    const skip = zones.length ? (x: number, y: number) => calmAt(zones, PAD, x, y) > 0.35 : undefined;
     const mx = tx - 0.5;
     for (let i = 0; i < flock.length; i++) {
       const p = flock[i] as Sprite;

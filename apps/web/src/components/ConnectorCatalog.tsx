@@ -1,10 +1,10 @@
+import type { ConnectorCategory, ConnectorDef } from "@agenteschat/client";
+import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
 import { Chip, Dialog, FilterToggle, Icon, initialsOf, SearchField, Toolbar } from "@agenteschat/ui";
 import { type CSSProperties, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ConnectorCategory, ConnectorDef } from "@/api/types";
 import { LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { connectorDescription, connectorName } from "@/lib/scopes";
 
 export const CATEGORIES: ConnectorCategory[] = [
   "dev",

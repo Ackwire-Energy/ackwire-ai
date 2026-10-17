@@ -1,4 +1,17 @@
 import {
+  useAgentBrain,
+  useAgentDetail,
+  useCredentials,
+  useModels,
+  usePlatformKey,
+  useSettings,
+  useUsage,
+} from "@agenteschat/client";
+import { audienceSummary } from "@agenteschat/client/lib/audience";
+import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
+import { can as canDo } from "@agenteschat/client/lib/permissions";
+import { modelChoices } from "@agenteschat/client/lib/providers";
+import {
   AffixInput,
   type AgentAppearance,
   Avatar,
@@ -15,15 +28,6 @@ import {
 } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  useAgentBrain,
-  useAgentDetail,
-  useCredentials,
-  useModels,
-  usePlatformKey,
-  useSettings,
-  useUsage,
-} from "@/api/queries";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentBrainChoice, agentBrainLine } from "@/components/AgentBrain";
 import { AgentComputerPanel } from "@/components/AgentComputer";
@@ -43,11 +47,7 @@ import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { AGENT_SECTIONS, type AgentSection, type Field as EditField, FIELD_PLACE } from "@/lib/agent-edit";
-import { audienceSummary } from "@/lib/audience";
-import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@/lib/format";
 import { BLANK_LOOK } from "@/lib/new-agent";
-import { can as canDo } from "@/lib/permissions";
-import { modelChoices } from "@/lib/providers";
 import { CardHead, useAgentEdit, WasLine } from "./context";
 import { ReadOnlyNote, useVisibleChannels } from "./pieces";
 

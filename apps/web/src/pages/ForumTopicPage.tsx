@@ -1,3 +1,23 @@
+import type { ForumPost, ForumSeat, ForumTopicDetail } from "@agenteschat/client";
+import { runsInChannel, useForumAction, useForumTopic } from "@agenteschat/client";
+import { formatTime, joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import {
+  convergence,
+  isEnded,
+  isFor,
+  isReopened,
+  MAX_ROUNDS,
+  nextSeat,
+  outOfBudget,
+  ownerOf,
+  postRounds,
+  postsByRound,
+  seatsOf,
+  standings,
+  stripStanceHeader,
+  trackGroups,
+  turnNow,
+} from "@agenteschat/client/lib/forum";
 import {
   Avatar,
   Button,
@@ -25,8 +45,6 @@ import {
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useForumAction, useForumTopic } from "@/api/queries";
-import type { ForumPost, ForumSeat, ForumTopicDetail } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import {
   agentMode,
@@ -48,31 +66,12 @@ import { useOrg } from "@/components/org-context";
 import { SaveToWikiDialog } from "@/components/SaveToWiki";
 import { isStoppable, StopButton, useStopRun } from "@/components/StopRun";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
-import { formatTime, joinNames, relativeTime } from "@/lib/format";
-import {
-  convergence,
-  isEnded,
-  isFor,
-  isReopened,
-  MAX_ROUNDS,
-  nextSeat,
-  outOfBudget,
-  ownerOf,
-  postRounds,
-  postsByRound,
-  seatsOf,
-  standings,
-  stripStanceHeader,
-  trackGroups,
-  turnNow,
-} from "@/lib/forum";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 import { useChannelRealtime, useStreams } from "@/realtime/context";
-import { runsInChannel } from "@/realtime/streams";
 import "./forum.css";
 
-export { postsByRound } from "@/lib/forum";
+export { postsByRound } from "@agenteschat/client/lib/forum";
 
 /** Scrolls to an element of the topic and flashes it (a post the track or a reply points at). */
 function go(id: string, flash = false) {

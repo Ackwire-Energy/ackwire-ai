@@ -1,3 +1,25 @@
+import type { Agent, AgentComputer, ComputerTarget, SandboxNetwork, SandboxSettings } from "@agenteschat/client";
+import {
+  useAgents,
+  useComputer,
+  useComputerAction,
+  useMachines,
+  useSandboxSettings,
+  useSaveSandboxSettings,
+} from "@agenteschat/client";
+import {
+  busyDisplay,
+  busyView,
+  type ComputerAction,
+  type ComputerDisplay,
+  POLL_MS,
+  READY_FLASH_MS,
+  reached,
+} from "@agenteschat/client/lib/computer";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { relativeTime } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
   Card,
@@ -23,32 +45,10 @@ import {
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  useAgents,
-  useComputer,
-  useComputerAction,
-  useMachines,
-  useSandboxSettings,
-  useSaveSandboxSettings,
-} from "@/api/queries";
-import type { Agent, AgentComputer, ComputerTarget, SandboxNetwork, SandboxSettings } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { LoadingCards, LoadingLine } from "@/components/Loading";
 import { MachineChip } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
-import {
-  busyDisplay,
-  busyView,
-  type ComputerAction,
-  type ComputerDisplay,
-  POLL_MS,
-  READY_FLASH_MS,
-  reached,
-} from "@/lib/computer";
-import { errorText } from "@/lib/errors";
-import { relativeTime } from "@/lib/format";
-import { agentGrammar } from "@/lib/grammar";
-import { can } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
 
 const STATUS_ICON: Record<ComputerDisplay, IconName> = {

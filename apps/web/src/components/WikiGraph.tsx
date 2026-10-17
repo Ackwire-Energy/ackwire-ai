@@ -1,9 +1,9 @@
+import type { WikiGraph } from "@agenteschat/client";
+import { useWikiGraph } from "@agenteschat/client";
 import { appearanceStyle, FilterToggle } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useWikiGraph } from "@/api/queries";
-import type { WikiGraph } from "@/api/types";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";

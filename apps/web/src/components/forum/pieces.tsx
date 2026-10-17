@@ -1,3 +1,8 @@
+import type { ForumSeat, ForumStance, ForumStanceKind, ForumTopic } from "@agenteschat/client";
+import { useChannels } from "@agenteschat/client";
+import { daysBetween, formatShortDate, formatTime } from "@agenteschat/client/lib/format";
+import { isEnded, spokenCount, statusShown, trackGroups, turnNow } from "@agenteschat/client/lib/forum";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   type AgentColor,
   type AgentState,
@@ -14,14 +19,9 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useChannels } from "@/api/queries";
-import type { ForumSeat, ForumStance, ForumStanceKind, ForumTopic } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { daysBetween, formatShortDate, formatTime } from "@/lib/format";
-import { isEnded, spokenCount, statusShown, trackGroups, turnNow } from "@/lib/forum";
-import { agentGrammar } from "@/lib/grammar";
 import { lookOf } from "@/lib/look";
 
 /** Names, looks and grammar of the people and agents at a table. */

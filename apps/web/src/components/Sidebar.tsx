@@ -1,3 +1,19 @@
+import type { Agent } from "@agenteschat/client";
+import {
+  agentStateIn,
+  keys,
+  runningAgents,
+  useChannels,
+  useDms,
+  useMissionList,
+  useNotificationCount,
+  useOverview,
+  usePrefetchMessages,
+} from "@agenteschat/client";
+import { audienceChip } from "@agenteschat/client/lib/audience";
+import { formatPercent } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
+import { browserTimezone } from "@agenteschat/client/lib/routines";
 import {
   AffixInput,
   Alert,
@@ -25,25 +41,16 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useMissionList } from "@/api/missions";
-import { useChannels, useDms, useNotificationCount, useOverview, usePrefetchMessages } from "@/api/queries";
-import type { Agent } from "@/api/types";
 import { useAuth } from "@/auth/context";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type LocaleCode, locales, setLocale } from "@/i18n";
-import { audienceChip } from "@/lib/audience";
-import { formatPercent } from "@/lib/format";
 import { markOpen } from "@/lib/perf";
-import { can } from "@/lib/permissions";
-import { browserTimezone } from "@/lib/routines";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/SettingsPage";
 import { useStreams } from "@/realtime/context";
-import { agentStateIn, runningAgents } from "@/realtime/streams";
 import { AudienceChip } from "./AgentAudience";
 import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";

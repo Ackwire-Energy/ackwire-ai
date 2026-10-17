@@ -14,9 +14,8 @@
  * (annotations, the verb; `close_ticket` is ambiguous: the judge suggests
  * "write" and it waits for a decision; `delete_customer` is sensitive).
  */
-import type { ApiClient } from "@/api/client";
-import type { CustomServer, CustomTool, ToolAccess } from "@/api/types";
-import { partsOf } from "@/lib/tool-review";
+import type { ApiClient, CustomServer, CustomTool, ToolAccess } from "@agenteschat/client";
+import { partsOf } from "@agenteschat/client/lib/tool-review";
 import { clone, type MockContext, MockNotFoundError, mockId } from "./context";
 
 const TOOLS: [name: string, description: string, readOnly: boolean | null][] = [

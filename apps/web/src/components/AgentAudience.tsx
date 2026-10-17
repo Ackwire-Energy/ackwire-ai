@@ -1,3 +1,6 @@
+import type { Agent, AgentAudience, AudienceMode } from "@agenteschat/client";
+import { audienceChip } from "@agenteschat/client/lib/audience";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   Avatar,
   Checkbox,
@@ -11,11 +14,8 @@ import {
 } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Agent, AgentAudience, AudienceMode } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { audienceChip } from "@/lib/audience";
-import { agentGrammar } from "@/lib/grammar";
 
 const MODES: AudienceMode[] = ["everyone", "people", "owner"];
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");

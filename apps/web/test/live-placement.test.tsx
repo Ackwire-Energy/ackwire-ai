@@ -3,14 +3,12 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { ActiveRun, ApiClient, Message } from "@agenteschat/client";
+import { ApiError, applyChannelEvent, emptyStreams, isQuiet, QUIET_AFTER_MS, reconcileRuns } from "@agenteschat/client";
+import type { TimelineItem } from "@agenteschat/client/lib/timeline";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { ApiClient } from "@/api/client";
-import { ApiError } from "@/api/http";
-import type { ActiveRun, Message } from "@/api/types";
-import type { TimelineItem } from "@/chat/timeline";
 import { liveAnchors } from "@/pages/ChannelPage";
 import { createStreamsStore, reconcileChannelRuns } from "@/realtime/context";
-import { applyChannelEvent, emptyStreams, isQuiet, QUIET_AFTER_MS, reconcileRuns } from "@/realtime/streams";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

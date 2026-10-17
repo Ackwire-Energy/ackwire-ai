@@ -1,9 +1,9 @@
+import { keys } from "@agenteschat/client";
 import { Avatar, Button, cx, Dialog, DialogBody, DialogFooter, LogoMark } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 

@@ -3,8 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { AgentQuestion, AppNotification } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { AgentQuestion, AppNotification } from "@/api/types";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
 import { renderApp, screen, settle } from "./render";

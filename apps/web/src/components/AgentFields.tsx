@@ -1,3 +1,5 @@
+import type { Credential, Member, Model } from "@agenteschat/client";
+import { type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
 import {
   AffixInput,
   AGENT_ACCESSORIES,
@@ -14,10 +16,8 @@ import {
 import type { TFunction } from "i18next";
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { Credential, Member, Model } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { QUICK_BUDGETS, readBudget } from "@/lib/new-agent";
-import { type ModelChoice, providerLabel } from "@/lib/providers";
 
 /*
  * The pieces "Criar agente" and the agent page share (same markup, same

@@ -3,9 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { modelChoices, suggestModel } from "@agenteschat/client/lib/providers";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { channelNameError, toChannelName } from "@/components/NewChannelDialog";
-import { modelChoices, suggestModel } from "@/lib/providers";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";

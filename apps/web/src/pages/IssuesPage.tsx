@@ -1,3 +1,7 @@
+import type { Issue, IssuePriority, IssueStatus } from "@agenteschat/client";
+import { useIssueAction, useIssues } from "@agenteschat/client";
+import { dueLabel, parseDayInput, relativeTime, toYmd } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   Button,
   Chip,
@@ -23,15 +27,11 @@ import {
 import { Link } from "@tanstack/react-router";
 import { type DragEvent, type MouseEvent, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useIssueAction, useIssues } from "@/api/queries";
-import type { Issue, IssuePriority, IssueStatus } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, NO_ACTOR, useActors } from "@/components/actors";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { dueLabel, parseDayInput, relativeTime, toYmd } from "@/lib/format";
-import { agentGrammar } from "@/lib/grammar";
 import {
   BOARD,
   isOpen,

@@ -1,12 +1,12 @@
+import type { WikiPageSummary } from "@agenteschat/client";
+import { useWikiPage, useWikiTree } from "@agenteschat/client";
+import { resolveWikiLink, splitSection } from "@agenteschat/client/lib/wiki";
 import { Popover } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useWikiPage, useWikiTree } from "@/api/queries";
-import type { WikiPageSummary } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { headingId, Markdown, type WikiLinkRenderer } from "@/lib/markdown";
-import { resolveWikiLink, splitSection } from "@/lib/wiki";
 
 /** The first lines of a page, for the hover card. */
 export const previewOf = (body: string, lines = 4) =>

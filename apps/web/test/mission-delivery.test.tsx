@@ -3,12 +3,12 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { Message, Mission, MissionDelivery } from "@agenteschat/client";
+import { isOpenMission, waitingText } from "@agenteschat/client/lib/missions";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { Message, Mission, MissionDelivery } from "@/api/types";
 import { MissionStatusChip, missionStatusKey, missionSummaryStatusKey } from "@/components/missions/MissionBits";
 import { MissionDeliveryCard } from "@/components/missions/MissionCards";
 import { createI18n } from "@/i18n";
-import { isOpenMission, waitingText } from "@/lib/missions";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderPage, screen, settle } from "./render";
 

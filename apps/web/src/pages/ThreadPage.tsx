@@ -1,15 +1,13 @@
+import { ApiError, useThreadInfo, useThreadMission } from "@agenteschat/client";
+import { isOpenMission } from "@agenteschat/client/lib/missions";
 import { EmptyState } from "@agenteschat/ui";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "@/api/http";
-import { useThreadMission } from "@/api/missions";
-import { useThreadInfo } from "@/api/queries";
 import { ErrorState } from "@/components/Loading";
 import { Main } from "@/components/Main";
 import { MissionJoinNote, MissionThreadHeader } from "@/components/missions/MissionHeader";
 import { useOrg } from "@/components/org-context";
 import { ArchivedNote, ContextBlock, ThreadHeader, ThreadOrigin } from "@/components/threads/ThreadView";
-import { isOpenMission } from "@/lib/missions";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
 /**

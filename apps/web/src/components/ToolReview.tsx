@@ -1,3 +1,14 @@
+import type { ToolDecision } from "@agenteschat/client";
+import {
+  bySubject,
+  countLevels,
+  levelSummary,
+  matchTool,
+  REVIEW_LEVELS,
+  type ReviewTool,
+  SENSITIVE_LEVELS,
+  subjectLabel,
+} from "@agenteschat/client/lib/tool-review";
 import {
   AskPixels,
   HappyAgent,
@@ -13,17 +24,6 @@ import {
 import type { TFunction } from "i18next";
 import { useDeferredValue, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import type { ToolDecision } from "@/api/types";
-import {
-  bySubject,
-  countLevels,
-  levelSummary,
-  matchTool,
-  REVIEW_LEVELS,
-  type ReviewTool,
-  SENSITIVE_LEVELS,
-  subjectLabel,
-} from "@/lib/tool-review";
 
 /**
  * The connector tool review (telas/ConectorFerramentas.html, approved): one

@@ -1,7 +1,7 @@
+import type { Agent, AgentAccess } from "@agenteschat/client";
+import { keys } from "@agenteschat/client";
 import { useQueries } from "@tanstack/react-query";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import type { Agent, AgentAccess } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 
 /**

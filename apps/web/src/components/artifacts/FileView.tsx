@@ -1,11 +1,11 @@
+import type { ArtifactFileContent } from "@agenteschat/client";
+import { useArtifactBlob } from "@agenteschat/client";
+import { fileIcon, formatBytes, MAX_PREVIEW_BYTES, previewKind, previewType } from "@agenteschat/client/lib/files";
 import { Button, Icon, Spinner } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { useArtifactBlob } from "@/api/queries";
-import type { ArtifactFileContent } from "@/api/types";
 import { useOrg } from "@/components/org-context";
-import { fileIcon, formatBytes, MAX_PREVIEW_BYTES, previewKind, previewType } from "@/lib/files";
 import { fileSaver } from "./fileSaver";
 
 /** Object URLs for blobs (swappable: test DOMs may lack `URL.createObjectURL`). */

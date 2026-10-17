@@ -5,8 +5,7 @@
  * - `GET/PUT …/agents/{id}/skills` → `{ skills: (Skill & { enabled })[] }`
  * Scripts are listed as `ignored` (never run).
  */
-import type { ApiClient } from "@/api/client";
-import type { SkillDetail } from "@/api/types";
+import type { ApiClient, SkillDetail } from "@agenteschat/client";
 import { clone, type MockContext, MockNotFoundError, mockId, perOrg } from "./context";
 
 export function createFakeSkills(

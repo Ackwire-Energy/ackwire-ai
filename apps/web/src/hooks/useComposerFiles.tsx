@@ -1,12 +1,12 @@
+import type { ArtifactRef } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { ComposerFile, type IconName } from "@agenteschat/ui";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import type { ArtifactRef } from "@/api/types";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { useOrg } from "@/components/org-context";
-import { errorText } from "@/lib/errors";
-import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@/lib/files";
 import { useToast } from "@/lib/toast";
 
 const MAX_ATTACHMENTS = 10;

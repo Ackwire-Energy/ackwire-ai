@@ -1,8 +1,8 @@
+import { sameDay } from "@agenteschat/client/lib/calendar";
+import { toYmd } from "@agenteschat/client/lib/format";
 import { Button, monthGrid } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { sameDay } from "@/lib/calendar";
-import { toYmd } from "@/lib/format";
 
 /** The small month in the side panel: pick a day; dots-free, today in a filled pill. */
 export function MiniMonth({

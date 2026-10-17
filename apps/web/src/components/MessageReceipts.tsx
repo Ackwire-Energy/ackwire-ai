@@ -1,11 +1,11 @@
+import type { Message } from "@agenteschat/client";
+import { type ReceiptPhase, type ReceiptView, receiptView } from "@agenteschat/client";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { Icon, type IconName, Popover } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
-import type { Message } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
-import { joinNames } from "@/lib/format";
 import { useLive } from "@/realtime/context";
-import { type ReceiptPhase, type ReceiptView, receiptView } from "@/realtime/receipts";
 import { CallAgentMenu, useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
 

@@ -1,3 +1,16 @@
+import type { Agent, Approval, Member } from "@agenteschat/client";
+import {
+  sendHelpers,
+  useApproval,
+  useApprovals,
+  useCatalog,
+  useChannels,
+  useDecideApproval,
+  usePostMessage,
+} from "@agenteschat/client";
+import { daysBetween, joinNames, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
   Button,
   Chip,
@@ -17,16 +30,6 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import {
-  sendHelpers,
-  useApproval,
-  useApprovals,
-  useCatalog,
-  useChannels,
-  useDecideApproval,
-  usePostMessage,
-} from "@/api/queries";
-import type { Agent, Approval, Member } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { approvalAction, approvalRisk, approvalTitle, approvalTraits, decisionLabel } from "@/components/ApprovalItem";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
@@ -41,10 +44,7 @@ import {
 import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
-import { daysBetween, joinNames, relativeTime, timeLeft } from "@/lib/format";
-import { agentGrammar } from "@/lib/grammar";
 import { useOpenParam } from "@/lib/open-param";
-import { connectorName } from "@/lib/scopes";
 import { useToast } from "@/lib/toast";
 import "./approvals.css";
 

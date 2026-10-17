@@ -3,11 +3,11 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import type { LiveRun } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import type { TFunction } from "i18next";
 import { runContext } from "@/components/StopRun";
 import { createI18n } from "@/i18n";
-import type { LiveRun } from "@/realtime/streams";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

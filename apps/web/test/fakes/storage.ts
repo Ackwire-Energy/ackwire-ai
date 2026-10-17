@@ -9,8 +9,14 @@
  * write step; with "lista" the list step; with "instavel" the copy stops at
  * half once (resume continues).
  */
-import type { ApiClient } from "@/api/client";
-import type { S3Input, StorageConfig, StorageMigration, StorageStep, StorageTestResult } from "@/api/types";
+import type {
+  ApiClient,
+  S3Input,
+  StorageConfig,
+  StorageMigration,
+  StorageStep,
+  StorageTestResult,
+} from "@agenteschat/client";
 import { clone } from "./context";
 
 const STEPS: StorageStep[] = ["write", "read", "list", "delete"];

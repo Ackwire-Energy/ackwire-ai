@@ -1,13 +1,13 @@
+import type { Artifact, ArtifactKind } from "@agenteschat/client";
+import { KIND_ICON } from "@agenteschat/client/lib/artifacts";
+import { fileIcon } from "@agenteschat/client/lib/files";
+import { relativeTime } from "@agenteschat/client/lib/format";
 import { Checkbox, cx, Icon, type IconName, MenuItem } from "@agenteschat/ui";
 import type { MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { Artifact, ArtifactKind } from "@/api/types";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { ArtifactMoreMenu } from "@/components/artifacts/ArtifactActions";
 import { useAuthorName } from "@/components/artifacts/ArtifactViewer";
-import { KIND_ICON } from "@/lib/artifacts";
-import { fileIcon } from "@/lib/files";
-import { relativeTime } from "@/lib/format";
 import { DrivePreview } from "./DrivePreview";
 
 /** The details panel's id (cards and rows control it). */

@@ -1,6 +1,6 @@
+import { meQuery } from "@agenteschat/client";
+import { safeRedirect } from "@agenteschat/client/lib/guards";
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { meQuery } from "@/api/queries";
-import { safeRedirect } from "@/lib/guards";
 import { SignupPage } from "@/pages/SignupPage";
 
 export const Route = createFileRoute("/signup")({

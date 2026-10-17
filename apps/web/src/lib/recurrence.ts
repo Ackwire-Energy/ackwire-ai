@@ -1,3 +1,6 @@
+import type { ApiRule } from "@agenteschat/client";
+import { joinNames } from "@agenteschat/client/lib/format";
+import { timezoneName } from "@agenteschat/client/lib/routines";
 import {
   BUSINESS_DAYS,
   nextOccurrences,
@@ -8,9 +11,6 @@ import {
   weekdayOfYmd,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import type { ApiRule } from "@/api/types";
-import { joinNames } from "./format";
-import { timezoneName } from "./routines";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const isBusiness = (days: Weekday[] | undefined) =>

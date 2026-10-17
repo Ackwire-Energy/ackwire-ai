@@ -1,6 +1,5 @@
-import type { ApiClient } from "@/api/client";
-import type { WikiImportNote, WikiImportResult, WikiPageSummary } from "@/api/types";
-import { readZip } from "./zip";
+import type { ApiClient, WikiImportNote, WikiImportResult, WikiPageSummary } from "@agenteschat/client";
+import { readZip } from "@agenteschat/client/lib/zip";
 
 /*
  * An Obsidian vault in the browser: a .zip, a folder (picked or dropped) or

@@ -1,13 +1,13 @@
+import type { Artifact, ArtifactContent, ArtifactFileContent } from "@agenteschat/client";
+import { useArtifact } from "@agenteschat/client";
+import { documentPreview, parsePatch, patchCounts } from "@agenteschat/client/lib/artifacts";
+import { previewKind } from "@agenteschat/client/lib/files";
 import { cx } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useArtifact } from "@/api/queries";
-import type { Artifact, ArtifactContent, ArtifactFileContent } from "@/api/types";
 import { MAX_THUMB_BYTES, usePreviewUrl } from "@/components/artifacts/FileView";
 import { MermaidDiagram } from "@/components/artifacts/Mermaid";
 import { useOrg } from "@/components/org-context";
-import { documentPreview, parsePatch, patchCounts } from "@/lib/artifacts";
-import { previewKind } from "@/lib/files";
 
 const DOC_LINES = 8;
 const TABLE_ROWS = 5;

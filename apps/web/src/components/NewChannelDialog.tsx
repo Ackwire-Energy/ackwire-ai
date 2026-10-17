@@ -1,3 +1,4 @@
+import { keys, useChannels } from "@agenteschat/client";
 import {
   Button,
   Dialog,
@@ -14,8 +15,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useChannels } from "@/api/queries";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "./MemberPicker";
 import { useOrg } from "./org-context";
 

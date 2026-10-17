@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { isWriting } from "@agenteschat/client/lib/activity";
 import { setupDom } from "@agenteschat/ui/testing/dom";
-import { isWriting } from "@/lib/activity";
 
 setupDom();
 
+import type { Message, RunStep } from "@agenteschat/client";
+import { applyChannelEvent, emptyStreams, narrationOf, reconcileRuns, type StreamsState } from "@agenteschat/client";
+import { splitCanceled, workFromSteps } from "@agenteschat/client/lib/work";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { Message, RunStep } from "@/api/types";
-import { splitCanceled, workFromSteps } from "@/lib/work";
-import { applyChannelEvent, emptyStreams, narrationOf, reconcileRuns, type StreamsState } from "@/realtime/streams";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 

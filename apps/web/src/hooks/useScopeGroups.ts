@@ -1,7 +1,7 @@
+import { useCatalog, useConnections, useCustomServers } from "@agenteschat/client";
+import { type ScopeGroup, scopeGroups } from "@agenteschat/client/lib/scopes";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useCatalog, useConnections, useCustomServers } from "@/api/queries";
-import { type ScopeGroup, scopeGroups } from "@/lib/scopes";
 
 /** Built-in scopes, one group per active connection, then the reviewed custom MCP servers. */
 export function useScopeGroups(orgId: string): ScopeGroup[] | undefined {

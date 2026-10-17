@@ -1,10 +1,10 @@
+import type { ChannelMember } from "@agenteschat/client";
+import { canTalk } from "@agenteschat/client/lib/audience";
 import { Avatar, type ComposerSuggestion } from "@agenteschat/ui";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import type { ChannelMember } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
-import { canTalk } from "@/lib/audience";
 import { useDirectory } from "./useDirectory";
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");

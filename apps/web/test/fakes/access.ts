@@ -3,8 +3,15 @@
  * backend (packages/engine/src/access.ts): deny > tool > connector > scope > all.
  * - `GET/PUT /api/app/organizations/{orgId}/agents/{agentId}/access`
  */
-import type { ApiClient } from "@/api/client";
-import type { AccessInput, AccessScope, AccessState, AgentAccess, Connection, CustomServer } from "@/api/types";
+import type {
+  AccessInput,
+  AccessScope,
+  AccessState,
+  AgentAccess,
+  ApiClient,
+  Connection,
+  CustomServer,
+} from "@agenteschat/client";
 
 type FakeTool = { name: string; label: string; description: string; sensitive: boolean; readOnly: boolean };
 const tool = (name: string, label: string, description: string, readOnly = false, sensitive = false): FakeTool => ({

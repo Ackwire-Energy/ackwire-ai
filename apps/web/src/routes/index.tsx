@@ -1,6 +1,6 @@
+import { meQuery } from "@agenteschat/client";
+import { landingFor } from "@agenteschat/client/lib/guards";
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { meQuery } from "@/api/queries";
-import { landingFor } from "@/lib/guards";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { LandingPage } from "@/pages/landing/LandingPage";
 

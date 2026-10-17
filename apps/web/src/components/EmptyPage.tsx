@@ -1,8 +1,8 @@
+import { useChannels } from "@agenteschat/client";
 import { Button, EmptyState, type IconName } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useChannels } from "@/api/queries";
 import { useOrg } from "./org-context";
 
 /**

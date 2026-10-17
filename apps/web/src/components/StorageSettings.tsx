@@ -1,3 +1,12 @@
+import type { S3Input, StorageConfig, StorageTestResult } from "@agenteschat/client";
+import {
+  useSaveStorage,
+  useStartMigration,
+  useStorage,
+  useStorageMigration,
+  useTestStorage,
+} from "@agenteschat/client";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   Alert,
   Button,
@@ -17,11 +26,8 @@ import {
 } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSaveStorage, useStartMigration, useStorage, useStorageMigration, useTestStorage } from "@/api/queries";
-import type { S3Input, StorageConfig, StorageTestResult } from "@/api/types";
 import { LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { can } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
 
 type Choice = "agentes" | "s3";

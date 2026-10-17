@@ -1,3 +1,5 @@
+import type { Agent, AgentBrain, BrainKind, BrainOption } from "@agenteschat/client";
+import type { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   Button,
   Dialog,
@@ -14,9 +16,7 @@ import {
 import type { TFunction } from "i18next";
 import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Agent, AgentBrain, BrainKind, BrainOption } from "@/api/types";
 import { type BrainChoice, needsPlanWarning } from "@/lib/agent-edit";
-import type { agentGrammar } from "@/lib/grammar";
 
 const BRAIN_ICON: Record<BrainKind, IconName> = {
   model: "bolt",

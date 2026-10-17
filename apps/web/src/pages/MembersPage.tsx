@@ -1,3 +1,15 @@
+import type { InvitationWithStatus, Role } from "@agenteschat/client";
+import {
+  useAllInvitations,
+  useChangeRole,
+  useInviteMany,
+  usePeople,
+  useResendInvitation,
+  useRevokeInvitation,
+} from "@agenteschat/client";
+import { formatMonth, formatPercent, formatShortDate, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
+import { parseEmails } from "@agenteschat/client/lib/text";
 import {
   Avatar,
   Button,
@@ -13,23 +25,11 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  useAllInvitations,
-  useChangeRole,
-  useInviteMany,
-  usePeople,
-  useResendInvitation,
-  useRevokeInvitation,
-} from "@/api/queries";
-import type { InvitationWithStatus, Role } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useFilterCopy } from "@/components/filters";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { formatMonth, formatPercent, formatShortDate, relativeTime, timeLeft } from "@/lib/format";
-import { can } from "@/lib/permissions";
-import { parseEmails } from "@/lib/text";
 import { useToast } from "@/lib/toast";
 
 /** "Enviado há 2 dias · expira em 5 dias" / "Expirou ontem". */

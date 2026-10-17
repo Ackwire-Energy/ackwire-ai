@@ -3,8 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { keys } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { keys } from "@/api/keys";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { createMockStorage } from "./fakes/storage";
 import { renderApp, screen, settle } from "./render";

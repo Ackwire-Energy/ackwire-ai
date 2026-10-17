@@ -1,3 +1,23 @@
+import type { Machine, MachinePairing, Role } from "@agenteschat/client";
+import { keys, useMachines, useModels, useSandboxSettings } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { joinNames } from "@agenteschat/client/lib/format";
+import {
+  addInvites,
+  type InviteDraft,
+  ONBOARDING_STEPS,
+  type OnboardingStepId,
+  validInvites,
+} from "@agenteschat/client/lib/onboarding";
+import {
+  keyLooksValid,
+  PROVIDERS,
+  type ProviderId,
+  providerLabel,
+  suggestModel,
+} from "@agenteschat/client/lib/providers";
+import { browserTimezone } from "@agenteschat/client/lib/routines";
+import { handleFrom } from "@agenteschat/client/lib/text";
 import {
   type AgentAppearance,
   Avatar,
@@ -19,9 +39,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { type ClipboardEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import { useMachines, useModels, useSandboxSettings } from "@/api/queries";
-import type { Machine, MachinePairing, Role } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { CommandBlock, countdown, NO_EXEC_FLAG, osOf, PAIR_POLL_MS, useNow } from "@/components/Machines";
 import { type ImportChoice, OnboardingImport } from "@/components/OnboardingImport";
@@ -39,13 +56,7 @@ import {
   parseImport,
   uniqueHandle,
 } from "@/lib/agent-import";
-import { errorText } from "@/lib/errors";
-import { joinNames } from "@/lib/format";
 import { importVault } from "@/lib/obsidian";
-import { addInvites, type InviteDraft, ONBOARDING_STEPS, type OnboardingStepId, validInvites } from "@/lib/onboarding";
-import { keyLooksValid, PROVIDERS, type ProviderId, providerLabel, suggestModel } from "@/lib/providers";
-import { browserTimezone } from "@/lib/routines";
-import { handleFrom } from "@/lib/text";
 import { useToast } from "@/lib/toast";
 
 export const PRESETS = ["theo", "ada", "lia", "atlas"] as const;

@@ -1,3 +1,41 @@
+import type {
+  Message,
+  Mission,
+  MissionDecision,
+  MissionExecutor,
+  MissionLinkMeta,
+  MissionPlanMeta,
+  MissionReportMeta,
+  MissionSuggestionMeta,
+} from "@agenteschat/client";
+import {
+  keys,
+  useMission,
+  useMissionAct,
+  useMissionControl,
+  useMissionDecisions,
+  useMissionDeliveries,
+  useMissionPlan,
+  useMissionReviews,
+  useSetCommandApproval,
+  useSetMissionExecutor,
+  useThreadTasks,
+} from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { formatTime } from "@agenteschat/client/lib/format";
+import {
+  executorName,
+  formatSpan,
+  machineTaskOf,
+  missionAutoApprovedOf,
+  missionCardRef,
+  missionPlanChangeOf,
+  planChangeParts,
+  planCounts,
+  summaryParts,
+  taskNoticeOf,
+  viaText,
+} from "@agenteschat/client/lib/missions";
 import {
   Button,
   Checkbox,
@@ -16,49 +54,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import {
-  useMission,
-  useMissionAct,
-  useMissionControl,
-  useMissionDecisions,
-  useMissionDeliveries,
-  useMissionPlan,
-  useMissionReviews,
-  useSetCommandApproval,
-  useSetMissionExecutor,
-  useThreadTasks,
-} from "@/api/missions";
-import type {
-  Message,
-  Mission,
-  MissionDecision,
-  MissionExecutor,
-  MissionLinkMeta,
-  MissionPlanMeta,
-  MissionReportMeta,
-  MissionSuggestionMeta,
-} from "@/api/types";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { errorText } from "@/lib/errors";
-import { formatTime } from "@/lib/format";
-import {
-  executorName,
-  formatSpan,
-  machineTaskOf,
-  missionAutoApprovedOf,
-  missionCardRef,
-  missionPlanChangeOf,
-  planChangeParts,
-  planCounts,
-  summaryParts,
-  taskNoticeOf,
-  viaText,
-} from "@/lib/missions";
 import { useToast } from "@/lib/toast";
 import { useStreams } from "@/realtime/context";
 import {

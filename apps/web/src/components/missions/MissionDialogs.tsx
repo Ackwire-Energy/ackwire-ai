@@ -1,3 +1,19 @@
+import type { CommandApproval, Mission, MissionExecutor, MissionParticipantRole } from "@agenteschat/client";
+import {
+  cacheMission,
+  keys,
+  refreshMission,
+  useChannels,
+  useCloseMission,
+  useCreateMission,
+  useDecideJoin,
+  useEligibleAgents,
+  useMissionJoinRequests,
+  useMissionParticipants,
+} from "@agenteschat/client";
+import { canTalk } from "@agenteschat/client/lib/audience";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { executorName } from "@agenteschat/client/lib/missions";
 import {
   Button,
   Dialog,
@@ -21,25 +37,9 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { keys } from "@/api/keys";
-import {
-  cacheMission,
-  refreshMission,
-  useCloseMission,
-  useCreateMission,
-  useDecideJoin,
-  useEligibleAgents,
-  useMissionJoinRequests,
-  useMissionParticipants,
-} from "@/api/missions";
-import { useChannels } from "@/api/queries";
-import type { CommandApproval, Mission, MissionExecutor, MissionParticipantRole } from "@/api/types";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { canTalk } from "@/lib/audience";
-import { errorText } from "@/lib/errors";
-import { executorName } from "@/lib/missions";
 import { useToast } from "@/lib/toast";
 import { CommandApprovalSelect, executorOptions } from "./MissionBits";
 import "./missions.css";

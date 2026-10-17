@@ -1,9 +1,9 @@
+import { ApiError } from "@agenteschat/client";
 import { type AgentState, Button, cx, Logo, Segmented, setGaze } from "@agenteschat/ui";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { ApiError } from "@/api/http";
 import { type LocaleCode, setLocale } from "@/i18n";
 import { loadAnalytics, track } from "@/lib/analytics";
 import { STORAGE_KEYS, storage } from "@/lib/storage";

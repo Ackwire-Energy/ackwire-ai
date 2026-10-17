@@ -1,6 +1,6 @@
+import type { Actor } from "@agenteschat/client";
 import type { SelectOption } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
-import type { Actor } from "@/api/types";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";

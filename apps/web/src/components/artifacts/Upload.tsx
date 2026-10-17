@@ -1,11 +1,11 @@
+import type { ArtifactDetail } from "@agenteschat/client";
+import { useUploadFile } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { fitsUpload, MAX_UPLOAD_MB } from "@agenteschat/client/lib/files";
 import { Button, type ButtonProps } from "@agenteschat/ui";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useUploadFile } from "@/api/queries";
-import type { ArtifactDetail } from "@/api/types";
 import { useOrg } from "@/components/org-context";
-import { errorText } from "@/lib/errors";
-import { fitsUpload, MAX_UPLOAD_MB } from "@/lib/files";
 import { useToast } from "@/lib/toast";
 
 /** One file of an upload batch, for the progress toast. */

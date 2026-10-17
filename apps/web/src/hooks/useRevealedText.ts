@@ -1,5 +1,5 @@
+import { initialReveal, rebaseReveal, revealStep } from "@agenteschat/client/lib/reveal";
 import { useEffect, useRef, useState } from "react";
-import { initialReveal, rebaseReveal, revealStep } from "@/lib/reveal";
 
 const REDUCE = "(prefers-reduced-motion: reduce)";
 

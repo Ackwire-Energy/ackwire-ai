@@ -9,7 +9,12 @@
     ".": "./src/index.ts",
     "./styles.css": "./src/styles/index.css",
     "./testing": "./testing/index.ts",
-    "./testing/dom": "./testing/dom.ts"
+    "./testing/dom": "./testing/dom.ts",
+    "./agent/engine": {
+      "types": "./src/agent/engine.d.ts",
+      "default": "./src/agent/engine.js"
+    },
+    "./sky/math": "./src/sky/math.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

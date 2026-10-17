@@ -1,19 +1,17 @@
+import type { LiveRun, Message } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
+import { activityVerb, toolActivity } from "@agenteschat/client/lib/activity";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Spinner } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { ApiError } from "@/api/http";
-import { keys } from "@/api/keys";
-import type { Message } from "@/api/types";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { activityVerb, toolActivity } from "@/lib/activity";
-import { agentGrammar } from "@/lib/grammar";
-import { can } from "@/lib/permissions";
 import { useLiveStore } from "@/realtime/context";
-import type { LiveRun } from "@/realtime/streams";
 
 /** Still working (thinking, writing or running a tool), not stopped yet. */
 export const isStoppable = (r: LiveRun) =>

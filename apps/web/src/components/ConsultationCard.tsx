@@ -1,13 +1,13 @@
+import type { MessageConsultation } from "@agenteschat/client";
+import { CONSULTATION_MINUTES, previewOf } from "@agenteschat/client/lib/consultations";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { cx, Icon } from "@agenteschat/ui";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { MessageConsultation } from "@/api/types";
 import { MessageBody } from "@/chat/MessageBody";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { CONSULTATION_MINUTES, previewOf } from "@/lib/consultations";
-import { agentGrammar } from "@/lib/grammar";
 
 /**
  * What another agent told this one before it answered (`meta.consulted`,

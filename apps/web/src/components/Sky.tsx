@@ -1,3 +1,6 @@
+import type { Agent, Message } from "@agenteschat/client";
+import { useOverview } from "@agenteschat/client";
+import { joinNames, whenAt } from "@agenteschat/client/lib/format";
 import {
   type AgentColor,
   agentGradient,
@@ -15,12 +18,9 @@ import {
 } from "@agenteschat/ui";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useOverview } from "@/api/queries";
-import type { Agent, Message } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { joinNames, whenAt } from "@/lib/format";
 import { lookOf } from "@/lib/look";
 import { agentActivitySince, dayPart, isNewDay, lastVisit, markVisit } from "@/lib/welcome";
 

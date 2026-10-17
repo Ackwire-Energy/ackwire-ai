@@ -1,3 +1,6 @@
+import type { ReactionCount } from "@agenteschat/client";
+import { useReactions, useToggleReaction } from "@agenteschat/client";
+import { joinNames } from "@agenteschat/client/lib/format";
 import {
   Button,
   EMOJI_CATEGORIES,
@@ -10,10 +13,7 @@ import {
 } from "@agenteschat/ui";
 import { type ReactNode, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useReactions, useToggleReaction } from "@/api/queries";
-import type { ReactionCount } from "@/api/types";
 import { useDirectory } from "@/hooks/useDirectory";
-import { joinNames } from "@/lib/format";
 import { AgentAvatar } from "./AgentAvatar";
 import { useCorrectionAsk } from "./CorrectionAsk";
 import { useOrg } from "./org-context";

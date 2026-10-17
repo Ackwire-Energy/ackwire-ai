@@ -1,11 +1,11 @@
+import { elapsedClock } from "@agenteschat/client";
+import { type ActivityEntry, activitySentence, type MarkName } from "@agenteschat/client/lib/activity";
 import { Avatar, Icon } from "@agenteschat/ui";
 import { Fragment, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { type ActivityEntry, activitySentence, type MarkName } from "@/lib/activity";
-import { elapsedClock } from "@/realtime/consults";
 
 /**
  * The working line's pieces (docs/design/telas/ConversaAgentes.html): the

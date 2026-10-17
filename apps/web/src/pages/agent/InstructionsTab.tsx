@@ -1,7 +1,7 @@
+import { useProposals } from "@agenteschat/client";
 import { Button, Card, Diff, diffLines, Icon, Textarea } from "@agenteschat/ui";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useProposals } from "@/api/queries";
 import { InstructionTips } from "@/components/AgentFields";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";

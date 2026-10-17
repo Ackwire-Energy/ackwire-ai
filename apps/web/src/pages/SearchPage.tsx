@@ -1,12 +1,12 @@
+import type { SearchHit, SearchKind } from "@agenteschat/client";
+import { useChannels, useSearch } from "@agenteschat/client";
+import { relativeTime } from "@agenteschat/client/lib/format";
 import { EmptyState, List, SearchField, TabPanel, Tabs } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useChannels, useSearch } from "@/api/queries";
-import type { SearchHit, SearchKind } from "@/api/types";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { relativeTime } from "@/lib/format";
 
 type Filter = "all" | "message" | "context_item";
 const KINDS: Record<Filter, SearchKind[]> = {

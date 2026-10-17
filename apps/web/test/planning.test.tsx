@@ -3,8 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { toYmd } from "@agenteschat/client/lib/format";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { toYmd } from "@/lib/format";
 import { mondayOf } from "@/pages/CalendarPage";
 import { splitCriteria } from "@/pages/IssuesPage";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";

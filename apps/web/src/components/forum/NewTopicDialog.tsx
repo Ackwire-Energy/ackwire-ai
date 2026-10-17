@@ -1,3 +1,18 @@
+import type { ForumFormat, ForumSeat, ForumTopicDetail, ForumTopicInput } from "@agenteschat/client";
+import { useForumAction } from "@agenteschat/client";
+import { canTalk } from "@agenteschat/client/lib/audience";
+import {
+  addAgentSeat,
+  type DeadlineChoice,
+  deadlineChoices,
+  MAX_AGENTS,
+  MIN_AGENTS,
+  moveSeat,
+  ROUND_CHOICES,
+  seatKey,
+  tableInput,
+  toggleSeat,
+} from "@agenteschat/client/lib/forum";
 import {
   Avatar,
   Button,
@@ -15,23 +30,8 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { type DragEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useForumAction } from "@/api/queries";
-import type { ForumFormat, ForumSeat, ForumTopicDetail, ForumTopicInput } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
-import { canTalk } from "@/lib/audience";
-import {
-  addAgentSeat,
-  type DeadlineChoice,
-  deadlineChoices,
-  MAX_AGENTS,
-  MIN_AGENTS,
-  moveSeat,
-  ROUND_CHOICES,
-  seatKey,
-  tableInput,
-  toggleSeat,
-} from "@/lib/forum";
 import { useToast } from "@/lib/toast";
 import { useForumWho } from "./pieces";
 import "@/pages/forum.css";

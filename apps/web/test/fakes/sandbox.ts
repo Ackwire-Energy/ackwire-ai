@@ -3,9 +3,8 @@
  * (apps/server/src/routes/app/sandboxes.ts) and the expected
  * `GET …/agents/{id}/computer`, `POST …/computer/stop|start`, `DELETE …/computer`.
  */
-import type { ApiClient } from "@/api/client";
-import { ApiError } from "@/api/http";
-import type { AgentComputer, ComputerTarget, SandboxSettings } from "@/api/types";
+import type { AgentComputer, ApiClient, ComputerTarget, SandboxSettings } from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
 import { clone, type MockContext } from "./context";
 import type { FakeMachines } from "./machines";
 

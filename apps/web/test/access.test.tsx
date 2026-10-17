@@ -3,8 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { AccessInput } from "@/api/types";
+import type { AccessInput } from "@agenteschat/client";
 import {
   asksAt,
   inputWithLevels,
@@ -14,7 +13,8 @@ import {
   nextLevel,
   resourcesOf,
   toolsAt,
-} from "@/lib/access-levels";
+} from "@agenteschat/client/lib/access-levels";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { fakeAccessTree } from "./fakes/access";
 import { proceed, startAs } from "./new-agent-flow";

@@ -1,3 +1,9 @@
+import type { WikiAuthor, WikiPage as WikiPageData, WikiPageSummary, WikiVersion } from "@agenteschat/client";
+import { ApiError, keys, useWikiAction, useWikiHistory, useWikiPage } from "@agenteschat/client";
+import { fileIcon } from "@agenteschat/client/lib/files";
+import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
+import { leafTitle, outlineOf } from "@agenteschat/client/lib/wiki";
 import {
   Avatar,
   Button,
@@ -21,10 +27,6 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { ApiError } from "@/api/http";
-import { keys } from "@/api/keys";
-import { useWikiAction, useWikiHistory, useWikiPage } from "@/api/queries";
-import type { WikiAuthor, WikiPage as WikiPageData, WikiPageSummary, WikiVersion } from "@/api/types";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { usePreviewUrl } from "@/components/artifacts/FileView";
 import { ErrorState, LoadingList, LoadingPage } from "@/components/Loading";
@@ -33,13 +35,9 @@ import { WikiSky } from "@/components/Sky";
 import { WikiEditor } from "@/components/WikiEditor";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useDirectory } from "@/hooks/useDirectory";
-import { fileIcon } from "@/lib/files";
-import { relativeTime, whenAt } from "@/lib/format";
 import { type EmbedRenderer, Markdown } from "@/lib/markdown";
 import { isAttachmentName } from "@/lib/obsidian";
-import { can } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
-import { leafTitle, outlineOf } from "@/lib/wiki";
 import { ObsidianMark } from "./ObsidianMark";
 
 /** Typing in a field: single-key shortcuts stay off. */
