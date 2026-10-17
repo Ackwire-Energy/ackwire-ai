@@ -3,7 +3,7 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 /**
  * The app's Expo config. Builds run on EAS only (see README.md).
  * - `EXPO_PUBLIC_API_URL`: the backend the app talks to (default: production).
- * - `EAS_PROJECT_ID`: the EAS project (push tokens need it); set once after `eas init`.
+ * - `EAS_PROJECT_ID`: overrides the EAS project (push tokens need it); defaults to ours on expo.dev.
  * - `APP_VARIANT`: "development" | "preview" | "production" (from eas.json), so the three install side by side.
  *
  * The New Architecture is the only one since SDK 55, so there is no `newArchEnabled` flag any more
@@ -12,7 +12,8 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 const variant = process.env.APP_VARIANT ?? "production";
 const suffix = variant === "production" ? "" : `.${variant}`;
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://agentes.chat";
-const projectId = process.env.EAS_PROJECT_ID;
+// Our EAS project on expo.dev (not a secret: it only names the project).
+const projectId = process.env.EAS_PROJECT_ID ?? "8514d5b3-87e0-4980-89a0-4c692f6f4702";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,

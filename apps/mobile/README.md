@@ -8,12 +8,9 @@ unit tests of the pure logic in `apps/mobile/test`). Builds and installs go thro
 
 ## Get a build on a phone (EAS only)
 
-1. One time, on expo.dev: create the project `agentes` in your account, copy its **project ID**, and create an
-   access token (Account settings → Access tokens).
-2. In GitHub → Settings → Secrets and variables → Actions:
-   - secret `EXPO_TOKEN` = the access token.
-   - Add `EAS_PROJECT_ID` to the EAS project's environment variables on expo.dev (all profiles), so
-     `app.config.ts` puts it in `extra.eas.projectId` (push tokens need it).
+1. One time, on expo.dev: create an access token (Account settings → Access tokens). The EAS project
+   already exists; its ID is in `app.config.ts` (`EAS_PROJECT_ID` overrides it).
+2. In GitHub → Settings → Secrets and variables → Actions: secret `EXPO_TOKEN` = the access token.
 3. Run the workflow **Mobile build (EAS)** (Actions → Run workflow), profile `preview`, platform `all`.
    Pull requests that touch `apps/mobile/**` also build `preview` when the secret exists.
 4. Open the build on expo.dev from the phone:
@@ -30,7 +27,7 @@ Set per profile in `eas.json` (`build.<profile>.env`) or on expo.dev (EAS enviro
 | Variable | What | Default |
 | --- | --- | --- |
 | `EXPO_PUBLIC_API_URL` | The backend. **Must be the server's `PUBLIC_URL` host** (see below). | `https://agentes.chat` |
-| `EAS_PROJECT_ID` | EAS project, for push tokens. | none |
+| `EAS_PROJECT_ID` | EAS project, for push tokens. | ours (`8514d5b3-…`) |
 | `APP_VARIANT` | `development` / `preview` / `production`: name and bundle id suffix, so all three install side by side. | `production` |
 
 Why the API URL must equal the public URL: React Native's WebSocket adds an `Origin` derived from the URL
