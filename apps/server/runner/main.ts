@@ -12,7 +12,7 @@ import { configPath, connectUrl, expandHome, normalizeServerUrl, readConfig, run
 import { RunnerConnection } from "./connection";
 import { RUNNER_VERSION } from "./errors";
 import { cachedExecutors } from "./executors";
-import { MCP_TOKEN_FILE, McpBridge, mcpSocketPath, runMcpServer } from "./mcp";
+import { MCP_TOKEN_FILE, McpBridge, type McpTaskInfo, mcpSocketPath, runMcpServer } from "./mcp";
 import { agentWorkspace } from "./paths";
 import { agentSecrets } from "./secrets";
 import { installService, serviceStatus, uninstallService } from "./service";
@@ -32,7 +32,7 @@ Usage:
   agentes-runner update
       Downloads the latest runner from the server and restarts the service (keeps the pairing).
   agentes-runner status
-  agentes-runner mcp --task <taskId>
+  agentes-runner mcp --task <taskId> | --run <runId>
       The agentes MCP server of a mission task (started by Claude Code or Codex, not by people).
   agentes-runner --help | --version
 
@@ -212,10 +212,12 @@ async function start(): Promise<number> {
     ...(config.brainMaxProcesses ? { maxProcesses: config.brainMaxProcesses } : {}),
     log,
   });
+  // Codex brain turns in flight: their MCP servers (`mcp --run <runId>`) are relayed for the run.
+  const codexRuns = new Map<string, McpTaskInfo>();
   // The local endpoint of mission tasks' and brain processes' MCP servers (protocol 5).
   const mcp = new McpBridge({
     socketPath,
-    task: (taskId) => tasks.mcpTask(taskId) ?? brains.mcpTask(taskId),
+    task: (taskId) => tasks.mcpTask(taskId) ?? brains.mcpTask(taskId) ?? codexRuns.get(taskId) ?? null,
     log,
   });
   await mcp
@@ -229,7 +231,15 @@ async function start(): Promise<number> {
     url: connectUrl(config.server),
     token: config.token,
     info,
-    context: { workspaceReal, exec: config.exec, token: config.token, secretsDir, tasks, brains },
+    context: {
+      workspaceReal,
+      exec: config.exec,
+      token: config.token,
+      secretsDir,
+      tasks,
+      brains,
+      codex: { runnerHome: runnerHome(), mcp: { socketPath, command: [process.execPath, script] }, runs: codexRuns },
+    },
     log,
   });
   const stop = () => {
@@ -338,16 +348,19 @@ async function main(argv: string[]): Promise<number> {
     case "status":
       return status();
     case "mcp": {
-      const taskId = flagString(p, "task");
+      // `--task <taskId>`: a mission task's or a Claude Code brain process's server.
+      // `--run <runId>`: a Codex brain turn's (its token only in the env).
+      const runId = flagString(p, "run");
+      const taskId = runId ?? flagString(p, "task");
       if (!taskId || !/^[a-zA-Z0-9-]{8,64}$/.test(taskId)) {
-        console.error("Usage: agentes-runner mcp --task <taskId>");
+        console.error("Usage: agentes-runner mcp --task <taskId> | --run <runId>");
         return 1;
       }
       return runMcpServer({
         taskId,
         socketPath: process.env.AGENTES_MCP_SOCKET || mcpSocketPath(runnerHome()),
         token: process.env.AGENTES_MCP_TOKEN || null,
-        tokenFile: path.join(runnerHome(), "tasks", taskId, MCP_TOKEN_FILE),
+        ...(runId ? {} : { tokenFile: path.join(runnerHome(), "tasks", taskId, MCP_TOKEN_FILE) }),
       });
     }
     case "update":

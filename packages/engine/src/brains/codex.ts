@@ -1,4 +1,12 @@
-import type { AgentScope } from "@agenteschat/adapters";
+import {
+  type AgentScope,
+  BRAIN_PROTOCOL,
+  type BrainTurnRequest,
+  brainTopic,
+  type PubSub,
+  parseBrainEvent,
+} from "@agenteschat/adapters";
+import type { MachineCaller } from "../machine-hub";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
 import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
 
@@ -17,28 +25,16 @@ import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
  * only). Usage is the person's plan (`source: "plan"`, cost zero).
  */
 
-/** `brain.turn` as the server sends it to the runner (contract: "Runner"). */
-export interface BrainTurnRequest {
-  runId: string;
-  kind: "claude_code" | "codex";
-  /** Our session id; `resume` is the server's hint (the runner keeps the Codex thread id). */
-  session: { id: string; resume: boolean };
-  /** Relative to the agent's folder ("" = the folder itself). */
-  cwd: string;
-  model?: string;
-  /** The engine-built context; Codex gets it as `developer_instructions` when a thread starts. */
-  system: string;
-  /** What Codex reads this turn (stdin). */
-  prompt: string;
-  /** The per-run MCP bridge: its token (never on a command line) and, optionally, an HTTP endpoint. */
-  mcp: { token: string; url?: string };
-}
+/** `brain.turn` as the server sends it to the runner (the shared wire type, `machine-protocol.ts`). */
+export type { BrainTurnRequest };
 
 /** What the brain needs from the machine hub (the integrator wires it to `brain.turn` / `brain.event`). */
 export interface ComputerBrainLink {
   status(machineId: string): Promise<{
     online: boolean;
     execAllowed: boolean;
+    /** The runner's protocol (absent: not checked). */
+    protocol?: number;
     executors: { codex?: { version: string }; claude?: { version: string } };
   } | null>;
   /** Sends `brain.turn` and calls `onEvent` per `brain.event`; resolves on `brain.done`. */
@@ -137,12 +133,22 @@ export class CodexBrain implements Brain {
         type: "error",
         code: "exec_disabled",
         message: "Commands are turned off on the computer (its runner was started with --no-exec).",
+        retryable: true,
+      };
+      return;
+    }
+    if (status.protocol !== undefined && status.protocol < BRAIN_PROTOCOL) {
+      yield {
+        type: "error",
+        code: "runner_outdated",
+        message: "The runner on the computer is too old for agents that think with Codex; update it.",
+        retryable: true,
       };
       return;
     }
     const codex = status.executors.codex;
     if (!codex) {
-      yield { type: "error", code: "codex_missing", message: "Codex is not installed on the computer." };
+      yield { type: "error", code: "codex_missing", message: "Codex is not installed on the computer.", retryable: true };
       return;
     }
     if (!codexVersionOk(codex.version)) {
@@ -150,6 +156,7 @@ export class CodexBrain implements Brain {
         type: "error",
         code: "codex_too_old",
         message: `Codex on the computer is ${codex.version}; agents need ${CODEX_MIN_VERSION} or newer (update it there).`,
+        retryable: true,
       };
       return;
     }
@@ -204,4 +211,61 @@ export class CodexBrain implements Brain {
       yield { type: "done", text, session: { id: session.id } };
     }
   }
+}
+
+/**
+ * The `ComputerBrainLink` over the machine hub: `brain.turn` goes to the
+ * machine (whichever replica holds its socket), `brain.event` frames come
+ * back on `brainTopic(runId)`; the request's result repeats the final event,
+ * so the turn ends even if a published event is lost.
+ */
+export function hubBrainLink(deps: {
+  hub: Pick<MachineCaller, "call" | "status">;
+  pubsub: PubSub;
+  timeoutMs?: number;
+  /** After the request's result, how long to wait for the stream's last events (default 1.5 s). */
+  finalGraceMs?: number;
+}): ComputerBrainLink {
+  return {
+    status: (machineId) => deps.hub.status(machineId).catch(() => null),
+    async turn(machineId, request, options) {
+      let streamEnded = false;
+      let finalSeen = false;
+      let wake: (() => void) | null = null;
+      const off = deps.pubsub.subscribe(brainTopic(request.runId), (e) => {
+        if (e.machineId !== machineId) return;
+        if (e.type === "brain.done") {
+          streamEnded = true;
+          wake?.();
+          return;
+        }
+        if (e.type !== "brain.event") return;
+        const event = parseBrainEvent(e.event);
+        if (!event) return;
+        if (event.type === "done" || event.type === "error") finalSeen = true;
+        options.onEvent(event as BrainEvent);
+      });
+      try {
+        const reply = await deps.hub.call<"brain.turn">(
+          machineId,
+          { op: "brain.turn", ...request },
+          { signal: options.signal, ...(deps.timeoutMs ? { timeoutMs: deps.timeoutMs } : {}) },
+        );
+        if (!streamEnded) {
+          await new Promise<void>((resolve) => {
+            const timer = setTimeout(resolve, deps.finalGraceMs ?? 1500);
+            wake = () => {
+              clearTimeout(timer);
+              resolve();
+            };
+          });
+        }
+        // The stream lost its last event: the reply carries it.
+        const final = parseBrainEvent(reply?.final);
+        if (!finalSeen && final && (final.type === "done" || final.type === "error")) options.onEvent(final as BrainEvent);
+      } finally {
+        off();
+      }
+    },
+  };
 }

@@ -10,11 +10,13 @@ import {
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
 import type { BrainManager } from "./brain";
+import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
 import { agentWorkspace, isInside, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
 import { agentSecrets, handleSecret } from "./secrets";
+import type { McpTaskInfo } from "./mcp";
 import type { TaskManager } from "./tasks";
 
 export const MAX_CONCURRENT_REQUESTS = 8;
@@ -34,6 +36,16 @@ export interface HandlerContext {
   tasks?: TaskManager;
   /** Brain turns (protocol 8); without it the runner refuses `brain.turn`. */
   brains?: BrainManager;
+  /**
+   * Codex brain turns (ADR 0032 block 6): the runner home (threads file,
+   * scratch), how Codex starts our MCP server, and the live Codex runs the
+   * MCP bridge looks up by run id (`agentes-runner mcp --run <runId>`).
+   */
+  codex?: {
+    runnerHome: string;
+    mcp?: { socketPath: string; command: string[] };
+    runs: Map<string, McpTaskInfo>;
+  };
 }
 
 export interface RequestScope {
@@ -245,9 +257,10 @@ async function doBrainTurn(
       "Commands are turned off on this computer (the runner was paired with --no-exec)",
     );
   }
-  if (!ctx.brains) throw new RunnerError("bad_request", "This runner runs no brain turns");
   if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
   const runId = requireString(req.runId, "runId");
+  if (req.kind === "codex") return doCodexTurn(ctx, req, scope, runId);
+  if (!ctx.brains) throw new RunnerError("bad_request", "This runner runs no brain turns");
   const final = await ctx.brains.turn(req, {
     agent: req.agent,
     folder: ctx.workspaceReal,
@@ -255,6 +268,63 @@ async function doBrainTurn(
     signal: scope.signal,
     emit: (event) => scope.emit?.({ type: "brain.event", runId, event }),
   });
+  scope.emit?.({ type: "brain.done", runId });
+  return { runId, final };
+}
+
+/**
+ * The Codex branch of `brain.turn`: `codex exec --json` per turn
+ * (`brain-codex.ts`). While it runs, its MCP server (`mcp --run <runId>`,
+ * the run's server token in its env) is relayed for the run.
+ */
+async function doCodexTurn(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "brain.turn" }>,
+  scope: RequestScope,
+  runId: string,
+): Promise<MachineReplies["brain.turn"]> {
+  const codex = ctx.codex;
+  if (!codex) throw new RunnerError("bad_request", "This runner runs no Codex brain turns");
+  let final: CodexBrainEvent = { type: "error", code: "codex_failed", message: "Codex ended without an answer." };
+  let ended = false;
+  const token = req.mcp?.token;
+  if (req.agent && typeof token === "string" && token) {
+    const folder = await agentWorkspace(ctx.workspaceReal, req.agent);
+    codex.runs.set(runId, {
+      token,
+      missionId: "",
+      running: true,
+      cwd: folder,
+      folder,
+      runId,
+      serverToken: token,
+    });
+  }
+  try {
+    await handleCodexBrainTurn(
+      {
+        workspaceReal: ctx.workspaceReal,
+        exec: ctx.exec,
+        runnerHome: codex.runnerHome,
+        ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+        ...(codex.mcp ? { mcp: codex.mcp } : {}),
+      },
+      req as unknown as CodexBrainTurnRequest,
+      {
+        signal: scope.signal,
+        emit: (event) => {
+          if (ended) return;
+          if (event.type === "done" || event.type === "error") {
+            final = event;
+            ended = true;
+          }
+          scope.emit?.({ type: "brain.event", runId, event });
+        },
+      },
+    );
+  } finally {
+    codex.runs.delete(runId);
+  }
   scope.emit?.({ type: "brain.done", runId });
   return { runId, final };
 }
