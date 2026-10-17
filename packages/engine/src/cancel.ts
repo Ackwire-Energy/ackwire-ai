@@ -112,7 +112,25 @@ export async function cancelRun(
   if (!allowed)
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
-  let run = row.run;
+  return stopRun(deps, orgId, row.run, row.channelKind, { type: "person", id: userId });
+}
+
+/**
+ * Ends a run that hasn't finished: its pending approvals, questions and
+ * secret requests close, its queued jobs are dropped, the worker running it
+ * aborts, and the app hears it stopped. `actor`: the person who stopped it,
+ * or the system (a consultation nobody waits for anymore, ADR 0034).
+ */
+export async function stopRun(
+  deps: { db: Database; pubsub?: PubSub },
+  orgId: string,
+  start: typeof agentRuns.$inferSelect,
+  channelKind: string | null,
+  actor: { type: "person"; id: string } | { type: "system"; reason: string },
+): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus }> {
+  const { db } = deps;
+  const error = actor.type === "person" ? `canceled_by:${actor.id}` : actor.reason;
+  let run = start;
   let previous: RunStatus = run.status;
   for (let attempt = 0; ; attempt++) {
     if (isTerminal(run.status)) throw new ConflictError("This task already ended", "run_finished");
@@ -120,7 +138,7 @@ export async function cancelRun(
     const status = run.status;
     let closedSecrets: SecretRequestRow[] = [];
     const done = await db.transaction(async (tx) => {
-      const moved = await transitionRun(tx, run.id, status, "canceled", { error: `canceled_by:${userId}` });
+      const moved = await transitionRun(tx, run.id, status, "canceled", { error });
       if (!moved) return null;
       const now = new Date();
       await tx
@@ -146,7 +164,7 @@ export async function cancelRun(
         );
       await recordAudit(tx, {
         orgId,
-        actor: { type: "person", id: userId },
+        actor: actor.type === "person" ? actor : { type: "system", id: "consultations" },
         action: "run.canceled",
         target: { type: "agent_run", id: run.id },
         details: { agentId: run.agentId, from: status },
@@ -168,14 +186,15 @@ export async function cancelRun(
   abortLocalRun(run.id);
   if (deps.pubsub) await deps.pubsub.publish(RUN_CANCEL_TOPIC, { type: "run.cancel", runId: run.id }).catch(() => {});
   // The app drops "pensando…" right away.
-  const flat = (row.channelKind === "dm" || row.channelKind === "forum") && run.threadRootId === run.triggerMessageId;
+  const flat = (channelKind === "dm" || channelKind === "forum") && run.threadRootId === run.triggerMessageId;
   const where = {
     channelId: run.channelId,
     threadId: flat ? null : run.threadRootId,
     agentId: run.agentId,
     runId: run.id,
   };
-  await publishChannelEvent(deps.pubsub, { type: "run.canceled", ...where, byUserId: userId });
+  if (actor.type === "person")
+    await publishChannelEvent(deps.pubsub, { type: "run.canceled", ...where, byUserId: actor.id });
   await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, status: "canceled" });
   if (previous !== "running") {
     // Nobody is executing it: finish it for the app here.
@@ -190,7 +209,7 @@ export async function cancelRun(
       status: "canceled",
     });
     // A forum turn that never ran: the topic moves on.
-    if (row.channelKind === "forum") {
+    if (channelKind === "forum") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, orgId, run.channelId, run.id).catch(() => {});
     }
   }

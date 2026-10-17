@@ -216,6 +216,11 @@ describe("ask_agent", () => {
     expect(await expireConsultations({ db: f.db }, new Date(Date.now() + CONSULTATION_TTL_MS + 1000))).toBe(1);
     await drainOutbox(f.db, handlers);
     expect((await consultations())[0]?.status).toBe("expired");
+    // Nobody waits for @infra anymore: its run stops instead of holding the DM.
+    expect((await runs()).find((r) => r.agentId === infra.id)).toMatchObject({
+      status: "canceled",
+      error: "consultation_expired",
+    });
     expect((await runs()).find((r) => r.id === asker?.id)?.status).toBe("done");
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("didn't answer within 15 minutes");
   });

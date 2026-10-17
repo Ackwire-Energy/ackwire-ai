@@ -1,11 +1,13 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, isNull, lt, schema } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { canTalkTo } from "./audience";
+import { stopRun } from "./cancel";
 import { createAgentRuns, requesterOf } from "./dispatch";
 import { openAgentDm } from "./dms";
 import { publishChannelEvent } from "./events";
 import { getMessage, insertMessage } from "./messages";
 import { resumeRunWithResult } from "./run-resume";
+import { isTerminal } from "./runs";
 import type { ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 const { agentConsultations, agentRuns, agents, messages } = schema;
@@ -94,7 +96,26 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
           body: question,
           meta: { consultation: { id: consultationId } },
         });
-        const [targetRun] = await createAgentRuns(tx, message, [target.id], "dm");
+        // A run of the consulted agent still active in this DM reads the question at its next step
+        // (one run per agent and conversation): the consultation waits on that run then.
+        const [created] = await createAgentRuns(tx, message, [target.id], "dm");
+        const targetRun =
+          created ??
+          (
+            await tx
+              .select({ id: agentRuns.id })
+              .from(agentRuns)
+              .where(
+                and(
+                  eq(agentRuns.orgId, ctx.orgId),
+                  eq(agentRuns.agentId, target.id),
+                  eq(agentRuns.channelId, channel.id),
+                  inArray(agentRuns.status, ["queued", "running", "waiting_approval", "waiting_input"]),
+                ),
+              )
+              .orderBy(desc(agentRuns.createdAt))
+              .limit(1)
+          )[0];
         const [row] = await tx
           .insert(agentConsultations)
           .values({
@@ -208,8 +229,9 @@ export async function onConsultedRunFinished(
   status: "done" | "failed" | "canceled" | "waiting_approval" | "waiting_input",
   error?: string,
 ) {
-  if (status === "waiting_approval" || status === "waiting_input") return null;
-  const [row] = await deps.db
+  if (status === "waiting_approval" || status === "waiting_input") return [];
+  // Several questions may have reached the same run (it read the later ones at its next step).
+  const rows = await deps.db
     .select()
     .from(agentConsultations)
     .where(
@@ -219,17 +241,27 @@ export async function onConsultedRunFinished(
         eq(agentConsultations.status, "open"),
       ),
     );
-  if (!row) return null;
-  if (status !== "done") return closeConsultation(deps, row, "failed", error?.slice(0, 500) ?? status);
-  const [reply] = await deps.db
-    .select({ body: messages.body })
-    .from(agentRuns)
-    .innerJoin(messages, and(eq(messages.orgId, agentRuns.orgId), eq(messages.id, agentRuns.replyMessageId)))
-    .where(eq(agentRuns.id, run.id));
+  if (rows.length === 0) return [];
+  const [reply] =
+    status === "done"
+      ? await deps.db
+          .select({ body: messages.body })
+          .from(agentRuns)
+          .innerJoin(messages, and(eq(messages.orgId, agentRuns.orgId), eq(messages.id, agentRuns.replyMessageId)))
+          .where(eq(agentRuns.id, run.id))
+      : [];
   const answer = reply?.body?.trim() || null;
-  return answer
-    ? closeConsultation(deps, row, "answered", answer.slice(0, 16_000))
-    : closeConsultation(deps, row, "failed", "no reply");
+  const closed: AgentConsultationRow[] = [];
+  for (const row of rows) {
+    const c =
+      status !== "done"
+        ? await closeConsultation(deps, row, "failed", error?.slice(0, 500) ?? status)
+        : answer
+          ? await closeConsultation(deps, row, "answered", answer.slice(0, 16_000))
+          : await closeConsultation(deps, row, "failed", "no reply");
+    if (c) closed.push(c);
+  }
+  return closed;
 }
 
 /** Closes consultations past their deadline and resumes the asking runs (worker, every minute). */
@@ -240,8 +272,34 @@ export async function expireConsultations(deps: { db: Database; pubsub?: PubSub 
     .where(and(eq(agentConsultations.status, "open"), lt(agentConsultations.expiresAt, now)))
     .limit(200);
   let closed = 0;
-  for (const row of rows) if (await closeConsultation(deps, row, "expired", null)) closed++;
+  for (const row of rows) {
+    if (!(await closeConsultation(deps, row, "expired", null))) continue;
+    closed++;
+    if (row.targetRunId) await stopUnwantedRun(deps, row.orgId, row.targetRunId);
+  }
   return closed;
+}
+
+/** Nobody waits for this consulted run anymore (every consultation on it closed): it stops, approvals and all. */
+async function stopUnwantedRun(deps: { db: Database; pubsub?: PubSub }, orgId: string, runId: string) {
+  const [stillWaited] = await deps.db
+    .select({ id: agentConsultations.id })
+    .from(agentConsultations)
+    .where(
+      and(
+        eq(agentConsultations.orgId, orgId),
+        eq(agentConsultations.targetRunId, runId),
+        eq(agentConsultations.status, "open"),
+      ),
+    )
+    .limit(1);
+  if (stillWaited) return;
+  const [run] = await deps.db
+    .select()
+    .from(agentRuns)
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
+  if (!run || isTerminal(run.status)) return;
+  await stopRun(deps, orgId, run, "dm", { type: "system", reason: "consultation_expired" }).catch(() => null);
 }
 
 /**
@@ -260,7 +318,10 @@ export async function consultationOrigin(
     const [row] = await db
       .select({ askerRunId: agentConsultations.askerRunId })
       .from(agentConsultations)
-      .where(and(eq(agentConsultations.orgId, orgId), eq(agentConsultations.targetRunId, current)));
+      .where(and(eq(agentConsultations.orgId, orgId), eq(agentConsultations.targetRunId, current)))
+      // The latest question this run is answering.
+      .orderBy(desc(agentConsultations.createdAt))
+      .limit(1);
     if (!row) break;
     const [asker] = await db
       .select({ channelId: agentRuns.channelId, threadRootId: agentRuns.threadRootId })
