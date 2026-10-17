@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ConfigError, envVars, loadConfig, redactConfig, testConfig } from "./index";
+import { parsePemKey } from "./pem";
 
 const valid = {
   DATABASE_URL: "postgres://u:p@localhost:5432/db",
@@ -81,4 +82,22 @@ test(".env.example is up to date with the schema", async () => {
   const proc = Bun.spawnSync(["bun", `${import.meta.dir}/../scripts/generate-docs.ts`, "--check"]);
   expect(proc.stderr.toString()).toBe("");
   expect(proc.exitCode).toBe(0);
+});
+
+describe("GITHUB_APP_PRIVATE_KEY", () => {
+  const pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIEabc\ndef==\n-----END RSA PRIVATE KEY-----";
+
+  test("accepts the PEM, the PEM with \\n, and base64 of the PEM file", () => {
+    expect(parsePemKey(`${pem}\n`)).toBe(pem);
+    expect(parsePemKey(pem.replace(/\n/g, "\\n"))).toBe(pem);
+    expect(parsePemKey(Buffer.from(`${pem}\n`).toString("base64"))).toBe(pem);
+    expect(
+      loadConfig({ ...valid, GITHUB_APP_PRIVATE_KEY: Buffer.from(pem).toString("base64") }).GITHUB_APP_PRIVATE_KEY,
+    ).toBe(pem);
+  });
+
+  test("anything else fails the config with a clear message", () => {
+    expect(() => parsePemKey("not-a-key")).toThrow("base64 of the PEM file");
+    expect(() => loadConfig({ ...valid, GITHUB_APP_PRIVATE_KEY: "not-a-key" })).toThrow("GITHUB_APP_PRIVATE_KEY");
+  });
 });

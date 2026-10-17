@@ -12,3 +12,16 @@ export function connectorOAuthApps(
     drive: pair(config.CONNECTOR_GOOGLE_CLIENT_ID, config.CONNECTOR_GOOGLE_CLIENT_SECRET),
   };
 }
+
+/** Our GitHub App (git and PRs; ADR 0033), or null when `GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` aren't set. */
+export function githubAppConfig(config: Config) {
+  if (!config.GITHUB_APP_ID || !config.GITHUB_APP_PRIVATE_KEY) return null;
+  return {
+    appId: config.GITHUB_APP_ID,
+    privateKey: config.GITHUB_APP_PRIVATE_KEY,
+    slug: config.GITHUB_APP_SLUG,
+    clientId: config.GITHUB_APP_CLIENT_ID,
+    clientSecret: config.GITHUB_APP_CLIENT_SECRET,
+    webhookSecret: config.GITHUB_APP_WEBHOOK_SECRET,
+  };
+}
