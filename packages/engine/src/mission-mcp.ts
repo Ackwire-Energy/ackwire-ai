@@ -500,14 +500,6 @@ async function run(
         failed.length ? `; not uploaded: ${failed.join(", ")}` : ""
       }. Stop now and wait for the person to check it.`;
     }
-    case "request_approval":
-      // Merges, deploys and rollbacks are the main session's (its run asks through the Tool Gateway, ADR 0015).
-      throw Object.assign(
-        new Error(
-          "Item tasks don't merge, deploy or roll back: report what is ready (branch, PR) and stop; the mission's main session asks for approval.",
-        ),
-        { code: "mission.not_allowed" },
-      );
     case "upload_artifact": {
       const done = await uploadFromTask(deps, mission, task, str(args.path), str(args.title).trim() || null);
       await recordMissionEvent(deps.db, mission, "artifact_uploaded", { artifactId: done.id, taskId: task.id });

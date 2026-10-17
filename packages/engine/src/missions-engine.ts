@@ -165,8 +165,10 @@ export async function missionSession(
  */
 export async function missionTurnFor(
   db: Executor,
-  run: { id?: string | null; orgId: string; agentId: string; threadRootId: string },
+  run: { id?: string | null; orgId: string; agentId: string; threadRootId: string; triggerMessageId?: string },
 ): Promise<{ missionId: string; brain: BrainKind; model?: string; session?: BrainSession } | null> {
+  // A run started by a top-level message can't be a mission's (its home thread exists only after it): no query.
+  if (!run.threadRootId || run.threadRootId === run.triggerMessageId) return null;
   const mission = await missionOfThread(db, run.orgId, run.threadRootId);
   if (!mission || mission.agentId !== run.agentId || !OPEN_MISSION_STATUSES.includes(mission.status)) return null;
   const choice = missionBrain(mission as MissionRow & BrainOverride);

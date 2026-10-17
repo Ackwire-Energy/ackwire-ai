@@ -532,7 +532,7 @@ describe("missions (ADR 0029)", () => {
       target: "PR #12",
       detail: "Navigation",
     });
-    expect(refused).toMatchObject({ ok: false, error: { code: "mission.not_allowed" } });
+    expect(refused).toMatchObject({ ok: false, error: { code: "mission.unknown_tool" } });
     expect(await f.db.select().from(schema.approvals)).toHaveLength(0);
     const [row] = await f.db.select().from(schema.machineTasks).where(eq(schema.machineTasks.id, task.taskId));
     expect(row?.waitingFor ?? null).toBeNull();
@@ -554,7 +554,9 @@ describe("missions (ADR 0029)", () => {
     });
     expect(item.session).not.toBe(plan.session);
     // Only the main session starts tasks; an item session is told so.
-    expect(ok(await runner.mcp(plan.taskId, "start_task", { title: "x", prompt: "y" }))).toContain("main session");
+    expect(ok(await runner.mcp(plan.taskId, "start_task", { title: "x", prompt: "y", branch: "x" }))).toContain(
+      "main session",
+    );
     expect(runner.started.at(-1)).toBe(item);
     await pauseMission(md(), f.owner.id, f.org.id, view.id);
     const refused = await mainCall("start_task", { title: "Auth", prompt: "Sign-in", branch: "auth" });
