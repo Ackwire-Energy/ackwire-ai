@@ -130,14 +130,15 @@ export function createFileRequester(options: TransportOptions = {}) {
       return parseResponse<T>(res);
     },
     /** The bytes of a download. */
-    async blob(path: string): Promise<Awaited<ReturnType<Response["blob"]>>> {
+    async blob(path: string): Promise<Blob> {
       const res = await t.fetch(t.base + path, {
         method: "GET",
         headers: t.headers ? await t.headers() : {},
         credentials: t.credentials,
       });
       if (!res.ok) await parseResponse<never>(res);
-      return res.blob();
+      // Bun's and React Native's Blob types differ from the DOM's; the value is the platform's Blob.
+      return (await res.blob()) as unknown as Blob;
     },
   };
 }

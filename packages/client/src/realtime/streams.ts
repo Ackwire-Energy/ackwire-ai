@@ -266,7 +266,8 @@ function upsert(
 ) {
   const provisional = state.runs[provisionalId(event.agentId, event.threadId)];
   const base = settleProvisional(state, event.agentId, event.threadId);
-  const current: LiveRun | undefined = base.runs[event.runId];
+  // Partial: under some tsconfigs the index type isn't `| undefined`, and the spread below must stay optional.
+  const current: Partial<LiveRun> | undefined = base.runs[event.runId];
   const next: LiveRun = {
     runId: event.runId,
     agentId: event.agentId,
