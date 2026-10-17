@@ -218,6 +218,7 @@ export async function handleGitProxy(
     ? await appTokenForRepo(
         deps.app,
         { fetch: upstream.fetch, apiUrl: upstream.apiUrl },
+        { db: deps.db, orgId: claims.orgId },
         parsed.owner,
         parsed.repo,
         write ? { contents: "write" } : { contents: "read" },
