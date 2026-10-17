@@ -17,6 +17,7 @@ import { agentGrammar } from "@/lib/grammar";
 import { useToast } from "@/lib/toast";
 import { useStreams } from "@/realtime/context";
 import { useAgentEdit } from "./context";
+import { RepoHeaderChip } from "./Repos";
 
 const LIVE = new Set(["running", "queued", "thinking", "waiting_approval"]);
 
@@ -216,6 +217,7 @@ export function AgentHero({ onArchive }: { onArchive: () => void }) {
                 {c.name}
               </Chip>
             ))}
+            <RepoHeaderChip />
           </div>
         </div>
         <div className="agp-acts">

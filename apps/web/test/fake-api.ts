@@ -15,6 +15,7 @@ import type {
   ConnectorDef,
   Credential,
   GitHubAppInstallation,
+  GitHubRepositories,
   InvitationWithStatus,
   Me,
   Member,
@@ -68,6 +69,10 @@ export interface FakeState {
   connections: Connection[];
   /** GitHub App installations bound to the org (`githubApp.info`); undefined = none, app not installable. */
   githubApp?: { installable: boolean; installations: GitHubAppInstallation[] };
+  /** What the organization's GitHub reaches (`githubApp.repositories`); unset = not connected. */
+  githubRepos?: GitHubRepositories;
+  /** Agents' GitHub repositories, in order (`repositories.get`); unset = every repository. */
+  agentRepos?: Record<string, string[]>;
   scopes: Record<string, ScopeGrant[]>;
   runs: Run[];
   /** `GET …/channels/{id}/active-runs`; unset = the endpoint doesn't exist yet (404). */
@@ -1206,6 +1211,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (state.githubApp)
           state.githubApp.installations = state.githubApp.installations.filter((i) => i.id !== installId);
       },
+      repositories: async () =>
+        structuredClone(state.githubRepos ?? { connected: false, accounts: [], truncated: false }),
     },
     search: {
       query: async (orgId, input) => {
@@ -1348,6 +1355,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           canDecide: false,
         });
         return structuredClone(p);
+      },
+    },
+    repositories: {
+      get: async (_orgId, agentId) => structuredClone(state.agentRepos?.[agentId] ?? []),
+      set: async (orgId, agentId, repositories) => {
+        log("repositories.set", orgId, agentId, repositories);
+        state.agentRepos = { ...(state.agentRepos ?? {}), [agentId]: [...repositories] };
+        return structuredClone(repositories);
       },
     },
     scopes: {

@@ -21,6 +21,8 @@ export const keys = {
   catalog: ["connector-catalog"] as const,
   connections: (orgId: string) => ["org", orgId, "connections"] as const,
   githubApp: (orgId: string) => ["org", orgId, "github-app"] as const,
+  githubRepos: (orgId: string) => ["org", orgId, "github-repositories"] as const,
+  agentRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "repositories"] as const,
   customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
   runs: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs"] as const,

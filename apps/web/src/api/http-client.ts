@@ -36,6 +36,7 @@ import type {
   ForumTopic,
   ForumTopicDetail,
   GitHubAppInstallation,
+  GitHubRepositories,
   Health,
   Invitation,
   InvitationPreview,
@@ -313,6 +314,7 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       install: async (orgId, returnTo) =>
         (await request<{ installUrl: string }>(`${org(orgId)}/github-app/install`, { json: { returnTo } })).installUrl,
       remove: (orgId, id) => request<void>(`${org(orgId)}/github-app/installations/${enc(id)}`, { method: "DELETE" }),
+      repositories: (orgId) => request<GitHubRepositories>(`${org(orgId)}/github/repositories`),
     },
     search: {
       query: async (orgId, input) =>
@@ -768,6 +770,17 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       accept: (orgId, id, text) =>
         request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/accept`, { json: text === undefined ? {} : { text } }),
       refuse: (orgId, id) => request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/refuse`, { json: {} }),
+    },
+    repositories: {
+      get: async (orgId, agentId) =>
+        (await request<{ repositories: string[] }>(`${org(orgId)}/agents/${enc(agentId)}/repositories`)).repositories,
+      set: async (orgId, agentId, repositories) =>
+        (
+          await request<{ repositories: string[] }>(`${org(orgId)}/agents/${enc(agentId)}/repositories`, {
+            method: "PUT",
+            json: { repositories },
+          })
+        ).repositories,
     },
     scopes: {
       get: async (orgId, agentId) =>

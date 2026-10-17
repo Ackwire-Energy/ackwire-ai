@@ -17,6 +17,7 @@ import {
   formatTokensShort,
   formatUsd,
 } from "@/lib/format";
+import { covers } from "@/lib/repos";
 import { useAgentEdit } from "./context";
 import { RunChip, runWhere } from "./pieces";
 
@@ -40,7 +41,7 @@ export function ActivityTab() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { org } = useOrg();
-  const { agent, viewer, ownerFirst } = useAgentEdit();
+  const { agent, g, viewer, ownerFirst, saved, can, pickRepos } = useAgentEdit();
   const allowed = viewer !== "member";
   const runs = useRuns(org.id, agent.id, allowed);
   const detail = useAgentDetail(org.id, agent.id);
@@ -209,6 +210,7 @@ export function ActivityTab() {
                             <Chip icon={x.where.startsWith("#") ? "channel" : "person"}>
                               {x.where.replace(/^#/, "")}
                             </Chip>
+                            {r.repo && <Chip icon="repo">{r.repo}</Chip>}
                             {x.routine && <Chip icon="routines">{t("agentPage.activity.routine")}</Chip>}
                           </span>
                           {r.status === "failed" && (
@@ -217,6 +219,22 @@ export function ActivityTab() {
                               {failure(t, r)}
                             </span>
                           )}
+                          {r.deniedRepo && saved.repos?.mode === "some" && !covers(saved.repos.list, r.deniedRepo) && (
+                            <span className="agp-run__fail">
+                              <Icon name="alert" size={14} />
+                              {t("repos.deniedRun", { repo: r.deniedRepo, ...g })}
+                            </span>
+                          )}
+                          {r.deniedRepo &&
+                            can("repos") &&
+                            saved.repos?.mode === "some" &&
+                            !covers(saved.repos.list, r.deniedRepo) && (
+                              <span>
+                                <Button size="sm" icon="plus" onClick={() => pickRepos(r.deniedRepo ?? undefined)}>
+                                  {t("repos.allow", { repo: r.deniedRepo })}
+                                </Button>
+                              </span>
+                            )}
                         </span>
                         <span className="agp-run__r">
                           {t("agent.runTokens", { tokens: formatInt(locale, r.inputTokens + r.outputTokens) })}

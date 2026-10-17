@@ -5,6 +5,7 @@ import type { Agent, AgentAudience } from "@/api/types";
 import type { AccessResource, Level, LevelState } from "@/lib/access-levels";
 import type { AgentSection, AgentTab, BrainChoice, Edits, Field, Look, Saved, Viewer } from "@/lib/agent-edit";
 import type { agentGrammar } from "@/lib/grammar";
+import type { RepoChoice } from "@/lib/repos";
 
 /** One unsaved change, as the save bar and the cards say it. */
 export interface Change {
@@ -30,6 +31,7 @@ export interface Draft {
   owner: string;
   audience: AgentAudience;
   levels: Record<string, LevelState>;
+  repos: RepoChoice | undefined;
   skills: string[] | undefined;
   channels: string[] | undefined;
   machine: string | undefined;
@@ -51,11 +53,13 @@ export interface AgentEdit {
   /** The change for a key (a field, or `levels:{id}`). */
   changeOf: (key: string) => Change | undefined;
   can: (field: Field) => boolean;
-  errors: { name?: string; budget?: string; audience?: string };
+  errors: { name?: string; budget?: string; audience?: string; repos?: string };
   /** The access tree's resources (empty while loading or unavailable). */
   resources: AccessResource[];
   accessState: "loading" | "ready" | "unavailable";
   goTo: (tab: AgentTab, sec?: AgentSection) => void;
+  /** Opens the repositories picker (on Ferramentas e acesso), with `add` already checked ("Liberar"). */
+  pickRepos: (add?: string) => void;
   /** "João" (the saved owner's first name), or null. */
   ownerFirst: string | null;
 }
@@ -116,7 +120,12 @@ export function LockNote({ field }: { field: Field }) {
   const { t } = useTranslation();
   const { viewer, ownerFirst } = useAgentEdit();
   const ownerToo =
-    field === "look" || field === "levels" || field === "audience" || field === "machine" || field === "brain";
+    field === "look" ||
+    field === "levels" ||
+    field === "repos" ||
+    field === "audience" ||
+    field === "machine" ||
+    field === "brain";
   return (
     <span className="agp-lock">
       <Icon name="lock" size={14} />

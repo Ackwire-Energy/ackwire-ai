@@ -348,4 +348,14 @@ export const extraIcons = {
   ],
   /** Forum.html: move up in the table. */
   chevronUp: [["path", { d: "m6 12 4-4 4 4" }]],
+  /** RepositoriosAgente.html: a GitHub repository. */
+  repo: [
+    ["path", { d: "M5 4.3A1.3 1.3 0 0 1 6.3 3H15v11.5H6.3A1.3 1.3 0 0 0 5 15.8Z" }],
+    ["path", { d: "M5 15.8A1.3 1.3 0 0 0 6.3 17H15v-2.5M8 6.5h4" }],
+  ],
+  /** RepositoriosAgente.html: every repository; a public one. */
+  globe: [
+    ["circle", { cx: "10", cy: "10", r: "7" }],
+    ["path", { d: "M3 10h14M10 3a10.5 10.5 0 0 1 0 14M10 3a10.5 10.5 0 0 0 0 14" }],
+  ],
 } satisfies Record<string, IconShape[]>;

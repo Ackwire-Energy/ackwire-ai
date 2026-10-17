@@ -2,6 +2,7 @@ import type { AgentAppearance } from "@agenteschat/ui";
 import type { AgentAudience, BrainKind, Run } from "@/api/types";
 import type { Level, LevelState } from "./access-levels";
 import { readBudget } from "./new-agent";
+import { type RepoChoice, sameRepoChoice } from "./repos";
 
 /*
  * The agent page (docs/design/telas/AgentePerfil.html): one draft over
@@ -71,6 +72,8 @@ export interface Saved {
   audience: AgentAudience;
   /** Resource id → level (from the access tree). */
   levels?: Record<string, LevelState>;
+  /** Its GitHub repositories (all, or some in order). */
+  repos?: RepoChoice;
   /** Enabled skill ids, sorted. */
   skills?: string[];
   /** Channels it is in that the viewer can pick (no DMs), sorted. */
@@ -93,6 +96,7 @@ export interface Edits {
   owner?: string;
   audience?: AgentAudience;
   levels?: Record<string, Level>;
+  repos?: RepoChoice;
   skills?: string[];
   channels?: string[];
   machine?: string;
@@ -103,7 +107,7 @@ export type Field = Exclude<keyof Edits, "levels"> | "levels";
 
 /** Who edits what (the server's rules): admins everything; the agent's owner its look, access, audience, computer and who thinks. */
 export type Viewer = "admin" | "owner" | "member";
-export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>(["look", "levels", "audience", "machine", "brain"]);
+export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>(["look", "levels", "repos", "audience", "machine", "brain"]);
 export const canEdit = (viewer: Viewer, field: Field) =>
   viewer === "admin" || (viewer === "owner" && OWNER_EDITS.has(field));
 
@@ -114,6 +118,7 @@ export const FIELD_PLACE: Record<Field, { tab: AgentTab; sec?: AgentSection }> =
   look: { tab: "settings", sec: "identity" },
   instructions: { tab: "instructions" },
   levels: { tab: "access" },
+  repos: { tab: "access" },
   skills: { tab: "access" },
   model: { tab: "settings", sec: "model" },
   key: { tab: "settings", sec: "model" },
@@ -159,6 +164,7 @@ export function changedKeys(saved: Saved, edits: Edits): ChangeKey[] {
         out.push({ key: `levels:${id}`, field: "levels", resource: id });
     }
   }
+  if (edits.repos && saved.repos && !sameRepoChoice(edits.repos, saved.repos)) add("repos");
   if (edits.skills && saved.skills && !sameList(edits.skills, saved.skills)) add("skills");
   if (edits.model !== undefined && edits.model !== saved.model) add("model");
   if (edits.key !== undefined && saved.key !== undefined && edits.key !== saved.key) add("key");

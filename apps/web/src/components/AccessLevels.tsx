@@ -143,6 +143,7 @@ export function LevelRow({
   onChange,
   tag,
   extra,
+  below,
   changed,
 }: {
   icon: ReactNode;
@@ -156,6 +157,8 @@ export function LevelRow({
   tag?: ReactNode;
   /** Under the description (what it was before). */
   extra?: ReactNode;
+  /** A full-width part under the row (GitHub: which repositories). */
+  below?: ReactNode;
   /** Marked as changed and not saved yet. */
   changed?: boolean;
 }) {
@@ -199,6 +202,7 @@ export function LevelRow({
           {t(`access.level.${value}`)}
         </Chip>
       )}
+      {below && <div className="level-row__below">{below}</div>}
     </li>
   );
 }

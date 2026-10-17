@@ -49,6 +49,7 @@ import type {
   ForumTopicDetail,
   ForumTopicInput,
   GitHubAppInstallation,
+  GitHubRepositories,
   Health,
   Invitation,
   InvitationPreview,
@@ -311,6 +312,8 @@ export interface ApiClient {
     install(orgId: string, returnTo: string): Promise<string>;
     /** Unbinds an installation (it stays installed on GitHub). */
     remove(orgId: string, id: string): Promise<void>;
+    /** Repositories the organization's GitHub reaches, by account. */
+    repositories(orgId: string): Promise<GitHubRepositories>;
   };
   search: {
     query(orgId: string, input: { q: string; kinds?: SearchKind[]; limit?: number }): Promise<SearchHit[]>;
@@ -356,6 +359,11 @@ export interface ApiClient {
     /** The agent's tool tree with each node's state. 404 while the backend doesn't have it. */
     get(orgId: string, agentId: string): Promise<AgentAccess>;
     set(orgId: string, agentId: string, input: AccessInput): Promise<AgentAccess>;
+  };
+  /** The GitHub repositories an agent may use, in order (`owner/name` or `owner/*`); empty = every repository. */
+  repositories: {
+    get(orgId: string, agentId: string): Promise<string[]>;
+    set(orgId: string, agentId: string, repositories: string[]): Promise<string[]>;
   };
   scopes: {
     get(orgId: string, agentId: string): Promise<ScopeGrant[]>;

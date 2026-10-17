@@ -22,6 +22,7 @@ import { proposalTitle } from "@/pages/ProposalsPage";
 import { AgentAsksLine, agentConnectorTools } from "./AgentTools";
 import { CardHead, useAgentEdit } from "./context";
 import { ReadOnlyNote, RunIcon, runWhere } from "./pieces";
+import { useRepoSuffix } from "./Repos";
 
 /** Visão geral: what it does, its recent work, what it can use; who answers, where it works, model and budget. */
 export function OverviewTab() {
@@ -40,6 +41,7 @@ export function OverviewTab() {
   const usage = useUsage(org.id);
   const settings = useSettings(org.id);
   const items = useConnectedById();
+  const repoSuffix = useRepoSuffix();
   const pending = (proposals.data ?? []).filter(
     (p) => p.agentId === agent.id && p.status === "pending" && p.target.type === "agent_instructions",
   );
@@ -163,7 +165,10 @@ export function OverviewTab() {
                     <RunIcon run={r} />
                     <span className="agp-li__t">
                       <b>{r.what || t("agent.runNoText")}</b>
-                      <span>{runWhere(t, r, channels.data ?? [])}</span>
+                      <span>
+                        {runWhere(t, r, channels.data ?? [])}
+                        {r.repo ? ` · ${r.repo}` : ""}
+                      </span>
                     </span>
                     <span className="agp-li__when">{whenAt(t, locale, r.createdAt)}</span>
                   </li>
@@ -206,6 +211,7 @@ export function OverviewTab() {
                                 : "agentPage.overview.levelRead",
                             { name: n },
                           )}
+                          {r.connector === "github" && repoSuffix}
                         </span>
                       );
                     })}

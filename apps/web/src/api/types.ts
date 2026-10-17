@@ -476,6 +476,23 @@ export interface GitHubAppInstallation {
   createdAt: string;
 }
 
+/** A repository the organization's GitHub reaches. */
+export interface GitHubRepository {
+  /** `owner/name`. */
+  fullName: string;
+  owner: string;
+  name: string;
+  private: boolean;
+  updatedAt: string | null;
+}
+
+/** The repositories the organization's GitHub reaches (its connection and the app's installations), by account. */
+export interface GitHubRepositories {
+  connected: boolean;
+  accounts: { login: string; type: string; repositories: GitHubRepository[] }[];
+  truncated: boolean;
+}
+
 /** One permission of an agent: a built-in scope (`connectionId: null`) or a connection's scope. */
 export interface ScopeGrant {
   connectionId: string | null;
@@ -644,6 +661,10 @@ export interface Run {
   outputTokens: number;
   createdAt: string;
   finishedAt: string | null;
+  /** The GitHub repository it worked in (`owner/name`). */
+  repo?: string | null;
+  /** A GitHub repository it was refused (not in the agent's repositories). */
+  deniedRepo?: string | null;
 }
 
 export interface RunStep {

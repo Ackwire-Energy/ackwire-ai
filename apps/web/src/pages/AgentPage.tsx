@@ -19,6 +19,7 @@ import {
   useAgentAccess,
   useAgentBrain,
   useAgentDetail,
+  useAgentRepos,
   useAgentSkills,
   useComputer,
   useCredentials,
@@ -67,6 +68,7 @@ import { agentGrammar } from "@/lib/grammar";
 import { lookOf } from "@/lib/look";
 import { BLANK_LOOK, readBudget } from "@/lib/new-agent";
 import { can } from "@/lib/permissions";
+import { type RepoChoice, repoChoiceOf, repoListOf, reposText } from "@/lib/repos";
 import { useToast } from "@/lib/toast";
 import { AccessTab } from "./agent/AccessTab";
 import { ActivityTab } from "./agent/ActivityTab";
@@ -76,6 +78,7 @@ import { InstructionsTab } from "./agent/InstructionsTab";
 import { MemoryTab } from "./agent/MemoryTab";
 import { OverviewTab } from "./agent/OverviewTab";
 import { useVisibleChannels } from "./agent/pieces";
+import { RepoDialog } from "./agent/Repos";
 import { SaveBar } from "./agent/SaveBar";
 import { SettingsTab } from "./agent/SettingsTab";
 
@@ -132,6 +135,7 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
   const settings = useSettings(org.id);
   const credentials = useCredentials(org.id, can(org.role, "manage_credentials"));
   const access = useAgentAccess(org.id, agent.id);
+  const repos = useAgentRepos(org.id, agent.id);
   const library = useAgentSkills(org.id, agent.id);
   const computer = useComputer(org.id, agent.id, viewer !== "member");
   const machines = useMachines(org.id, viewer !== "member");
@@ -146,6 +150,8 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
   const [edits, setEdits] = useState<Edits>({});
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  /** The repositories picker: open, with a repository to add ("Liberar"). */
+  const [picking, setPicking] = useState<{ add?: string } | null>(null);
   const top = useRef<HTMLDivElement>(null);
 
   /* ---------- What the server has ---------- */
@@ -173,6 +179,7 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
         ? { mode: agent.audience.mode, userIds: agent.audience.userIds ?? [] }
         : { mode: agent.audienceMode ?? "everyone", userIds: [] },
       levels: access.data ? levelsOf(access.data) : undefined,
+      repos: repos.data ? repoChoiceOf(repos.data) : undefined,
       skills: library.data ? sortIds(library.data.filter((s) => s.enabled).map((s) => s.id)) : undefined,
       channels:
         d && visible.ready ? sortIds(d.channels.map((c) => c.id).filter((id) => visibleIds.has(id))) : undefined,
@@ -181,7 +188,7 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
         ? { brain: brain.data.brain, model: brain.data.model, fallback: brain.data.fallback }
         : undefined,
     };
-  }, [agent, admin, detail.data, settings.data, access.data, library.data, computer.data, brain.data, visible]);
+  }, [agent, admin, detail.data, settings.data, access.data, repos.data, library.data, computer.data, brain.data, visible]);
 
   /* ---------- The draft ---------- */
 
@@ -200,6 +207,7 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
     owner: edits.owner ?? saved.owner,
     audience: edits.audience ?? saved.audience,
     levels: { ...(saved.levels ?? {}), ...(edits.levels ?? {}) },
+    repos: edits.repos ?? saved.repos,
     skills: edits.skills ?? saved.skills,
     channels: edits.channels ?? saved.channels,
     machine: edits.machine ?? saved.machine,
@@ -280,6 +288,13 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
           now: t(`access.level.${draft.levels[resource ?? ""] ?? "none"}`),
         };
       }
+      case "repos":
+        return {
+          ...base,
+          label: label("repos"),
+          was: saved.repos ? reposText(t, saved.repos) : "",
+          now: draft.repos ? reposText(t, draft.repos) : "",
+        };
       case "skills":
         return {
           ...base,
@@ -349,8 +364,12 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
           ? t("audience.modeText.noOwner")
           : t("audience.pickSomeone")
         : undefined,
+    repos:
+      fields.has("repos") && draft.repos?.mode === "some" && draft.repos.list.length === 0
+        ? t("repos.emptyError")
+        : undefined,
   };
-  const problem = errors.name ?? errors.budget ?? errors.audience;
+  const problem = errors.name ?? errors.budget ?? errors.audience ?? errors.repos;
   const dirty = changes.length > 0;
 
   /* ---------- Editing ---------- */
@@ -460,6 +479,16 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
         done.push("levels");
       } catch (e) {
         fail(e, false);
+      }
+    }
+    // 2b. GitHub repositories: the whole ordered list (empty = every repository).
+    if (!failed && fields.has("repos") && draft.repos) {
+      try {
+        const next = await api.repositories.set(org.id, agent.id, repoListOf(draft.repos));
+        qc.setQueryData<string[]>(keys.agentRepos(org.id, agent.id), next);
+        done.push("repos");
+      } catch (e) {
+        fail(e, true);
       }
     }
     // 3. Skills: the whole library with on/off.
@@ -629,6 +658,10 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
     resources,
     accessState: access.isLoading ? "loading" : access.data ? "ready" : "unavailable",
     goTo,
+    pickRepos: (add) => {
+      goTo("access");
+      setPicking({ add });
+    },
     ownerFirst,
   };
 
@@ -663,6 +696,16 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
         </div>
         <SaveBar saving={saving} onSave={() => void save()} onDiscard={discard} onJump={(c) => goTo(c.tab, c.sec)} />
       </div>
+      {picking && (
+        <RepoDialog
+          add={picking.add}
+          onClose={() => setPicking(null)}
+          onUse={(next: RepoChoice) => {
+            set("repos", next);
+            setPicking(null);
+          }}
+        />
+      )}
 
       <PlanTermsDialog
         brain={termsAsk}

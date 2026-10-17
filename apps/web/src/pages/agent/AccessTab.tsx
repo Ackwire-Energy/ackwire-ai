@@ -16,6 +16,7 @@ import { useOrg } from "@/components/org-context";
 import { type AccessResource, asksAt, type Level } from "@/lib/access-levels";
 import { CardHead, ChangedTag, useAgentEdit, WasLine } from "./context";
 import { ReadOnlyNote } from "./pieces";
+import { ReposBlock } from "./Repos";
 
 type AccessFilter = "all" | "on" | "ask";
 
@@ -30,6 +31,7 @@ export function AccessTab() {
   const [filter, setFilter] = useState<AccessFilter>("all");
   const editable = can("levels");
   const level = (r: AccessResource) => draft.levels[r.id] ?? "none";
+  const isGithub = (r: AccessResource) => r.kind === "connector" && r.connector === "github";
   const asksOf = (r: AccessResource) => asksAt(r, level(r)).map((x) => toolLabel(t, r, x));
   const needle = q.trim().toLowerCase();
   const shown = resources.filter((r) => {
@@ -59,9 +61,10 @@ export function AccessTab() {
         levels={r.levels}
         value={level(r)}
         onChange={editable ? (l) => setLevel(r.id, l) : undefined}
-        changed={changed}
+        changed={changed || (isGithub(r) && Boolean(changeOf("repos")))}
         tag={changed ? <ChangedTag changeKey={key} /> : undefined}
         extra={changed ? <WasLine changeKey={key} /> : undefined}
+        below={isGithub(r) && level(r) !== "none" ? <ReposBlock /> : undefined}
       />
     );
   };
@@ -177,6 +180,14 @@ export function AccessTab() {
           )}
         </div>
         <div className="agp-col">
+          {resources.some(isGithub) && (
+            <p className="newag__note">
+              <Icon name="repo" size={16} />
+              <span>
+                <b>{t("repos.realTitle")}</b> {t("repos.realText", g)}
+              </span>
+            </p>
+          )}
           <p className="newag__note">
             <Icon name="shield" size={16} />
             <span>

@@ -519,6 +519,29 @@ export function useInstallGitHubApp(orgId: string) {
   return useMutation({ mutationFn: (returnTo: string) => api.githubApp.install(orgId, returnTo) });
 }
 
+/** The repositories the organization's GitHub reaches (the picker of an agent's repositories). */
+export const useGitHubRepos = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.githubRepos(orgId),
+    queryFn: () => api.githubApp.repositories(orgId),
+    enabled,
+    staleTime: 60_000,
+    retry: false,
+  });
+};
+
+/** The GitHub repositories an agent may use, in order (empty = every repository). */
+export const useAgentRepos = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentRepos(orgId, agentId),
+    queryFn: () => api.repositories.get(orgId, agentId),
+    enabled,
+    retry: false,
+  });
+};
+
 export function useRemoveGitHubApp(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
