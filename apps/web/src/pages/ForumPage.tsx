@@ -171,12 +171,8 @@ export function ForumPage() {
               onValueChange={setFilter}
               options={FILTERS.map((f) => ({
                 value: f,
-                label: (
-                  <>
-                    {t(`forum.filter.${f}`)}
-                    <span className="forum-seg-n">{counts[f]}</span>
-                  </>
-                ),
+                label: t(`forum.filter.${f}`),
+                hint: counts[f],
               }))}
             />
             <FilterChip

@@ -12,6 +12,8 @@ export interface SegmentedOption<V extends string> {
   mark?: ReactNode;
   /** Hover text (e.g. what the option means). */
   title?: string;
+  /** A quiet number after the label, no chip (filters: "Tudo 14"); shown as given, hidden when absent. */
+  hint?: number | string;
 }
 
 /**
@@ -100,6 +102,7 @@ export function Segmented<V extends string>({
         >
           {o.mark}
           {o.label}
+          {o.hint != null && o.hint !== "" ? <span className="ac-seg__hint">{o.hint}</span> : null}
           {o.count ? <CountChip size={size === "sm" ? "sm" : undefined}>{o.count}</CountChip> : null}
         </button>
       ))}

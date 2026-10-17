@@ -126,7 +126,7 @@ export { Kbd, modKey } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";
-export { Menu, MenuItem, MenuRadioGroup, MenuSeparator } from "./components/Menu";
+export { Menu, MenuHeading, MenuItem, MenuRadioGroup, MenuSeparator } from "./components/Menu";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
 export { OptionList, type OptionListItem, type OptionListProps } from "./components/OptionList";
 export { glowOptions, PixelSky, SkyGlow } from "./components/PixelSky";

@@ -98,6 +98,11 @@ export function MenuRadioGroup({
   );
 }
 
+/** A small uppercase heading over a group of items ("Lembrar de novo"). */
+export function MenuHeading({ children }: { children: ReactNode }) {
+  return <DropdownMenu.Label className="ac-menu__heading">{children}</DropdownMenu.Label>;
+}
+
 export function MenuSeparator() {
   return <DropdownMenu.Separator className="ac-menu__separator" />;
 }
