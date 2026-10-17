@@ -358,4 +358,15 @@ export const extraIcons = {
     ["circle", { cx: "10", cy: "10", r: "7" }],
     ["path", { d: "M3 10h14M10 3a10.5 10.5 0 0 1 0 14M10 3a10.5 10.5 0 0 0 0 14" }],
   ],
+  /** ConversaAgentes.html: a talk only between two agents (the consultation card's footer). */
+  eyeOff: [
+    ["path", { d: "M3.3 3.3 16.7 16.7" }],
+    [
+      "path",
+      {
+        d: "M8.25 4.33A8 8 0 0 1 10 4.17c4.17 0 7.08 3.75 7.5 5.83a9 9 0 0 1-2 3M5.33 5.5C3.58 6.67 2.67 8.42 2.5 10c.42 2.08 3.33 5.83 7.5 5.83a7.75 7.75 0 0 0 3.5-.83",
+      },
+    ],
+    ["path", { d: "M8.33 8.5a2.17 2.17 0 0 0 3.08 3.08" }],
+  ],
 } satisfies Record<string, IconShape[]>;

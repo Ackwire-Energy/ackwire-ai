@@ -2005,7 +2005,53 @@ a.ac-list__row:focus-visible {
 }
 .ac-typing__avatars {
   display: inline-flex;
-  gap: 2px;
+  align-items: center;
+  flex: none;
+}
+/* The working line (telas/ConversaAgentes.html): stacked mini bodies, each on a plate so overlaps stay readable */
+.ac-typing__tok {
+  display: inline-flex;
+  padding: 1.5px;
+  border-radius: 7px;
+  background: var(--glass-solid);
+  position: relative;
+}
+.ac-typing__tok + .ac-typing__tok {
+  margin-left: -5px;
+}
+/* Dev → Infra: the arrow between the one asking and the one asked */
+.ac-typing__to {
+  display: inline-flex;
+  color: var(--faint);
+  margin: 0 1px;
+}
+.ac-typing__text b {
+  color: var(--ink);
+  font-weight: 650;
+}
+/* How long the question has been out (Doto, like every count) */
+.ac-typing__clock {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-typing__tok {
+    animation: ac-typing-pop 0.4s var(--spring) both;
+  }
+}
+@keyframes ac-typing-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    transform: none;
+  }
 }
 .ac-typing__dots {
   display: inline-flex;
@@ -5220,4 +5266,181 @@ label.ac-setrow__title {
   display: block;
   font-size: 12.5px;
   color: var(--muted);
+}
+
+/* ── Agents asking agents (telas/ConversaAgentes.html, variant B) ── */
+/* What the other agent said, folded into one neutral line at the top of the reply; it opens to the exchange. */
+.ac-consult {
+  margin: 6px 0 8px;
+  max-width: 520px;
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  overflow: hidden;
+}
+.ac-consult__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px 6px 10px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink2);
+  border-radius: 12px;
+}
+.ac-consult__head:hover {
+  background: rgba(127, 127, 127, 0.05);
+}
+.ac-consult__head:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-consult__head b {
+  font-weight: 650;
+  color: var(--ink);
+  flex: none;
+}
+.ac-consult__pv {
+  flex: 1;
+  min-width: 0;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-consult--open .ac-consult__pv {
+  visibility: hidden;
+}
+.ac-consult__chev {
+  display: inline-flex;
+  flex: none;
+  color: var(--faint);
+  transition: transform 0.2s var(--out);
+}
+.ac-consult--open .ac-consult__chev {
+  transform: rotate(180deg);
+}
+/* Expired / couldn't answer: an icon chip where the agent would be (no colored dot) */
+.ac-consult__ic {
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  background: var(--sunken);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.ac-consult__body {
+  padding: 2px 12px 12px 38px;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.ac-consult__body small {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+  margin-top: 8px;
+}
+.ac-consult__body small:first-child {
+  margin-top: 0;
+}
+.ac-consult__text {
+  margin: 1px 0 0;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+.ac-consult__text p {
+  margin: 0;
+}
+.ac-consult__text p + p {
+  margin-top: 6px;
+}
+.ac-consult__text--q {
+  color: var(--muted);
+}
+.ac-consult__foot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-consult__body {
+    animation: ac-consult-in 0.22s var(--out) both;
+  }
+}
+@keyframes ac-consult-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 760px) {
+  .ac-consult__body {
+    padding-left: 12px;
+  }
+}
+
+/* An agent's reply nobody asked for: a faint word next to the time; a glass tip on hover/focus says why */
+.ac-msg__note {
+  position: relative;
+  font-size: 12px;
+  color: var(--faint);
+  border-bottom: 1px dotted var(--line2);
+  cursor: default;
+}
+.ac-msg__note:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 4px;
+}
+.ac-msg__note-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  z-index: var(--z-sticky);
+  width: max-content;
+  max-width: min(260px, 70vw);
+  border-radius: 12px;
+  padding: 7px 11px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink2);
+  display: none;
+}
+.ac-msg__note:hover .ac-msg__note-tip,
+.ac-msg__note:focus .ac-msg__note-tip {
+  display: block;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-msg__note:hover .ac-msg__note-tip,
+  .ac-msg__note:focus .ac-msg__note-tip {
+    animation: ac-note-tip-in 0.18s var(--spring) both;
+  }
+}
+@keyframes ac-note-tip-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
 }

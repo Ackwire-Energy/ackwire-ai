@@ -13,6 +13,11 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
    * hover or keyboard focus of the time (and read by screen readers).
    */
   meta?: ReactNode;
+  /**
+   * A faint word next to the time with a glass tip that says why (on hover
+   * or keyboard focus): "entrou na conversa" on a reply nobody asked for.
+   */
+  note?: { label: ReactNode; tip: ReactNode };
   /** A person-facing state on the header line, with an icon: "enviando…". */
   status?: { icon: IconName; label: ReactNode };
   /** A new row: slides in (opacity/transform only; none with reduced motion). */
@@ -53,6 +58,7 @@ export function Message({
   author,
   time,
   meta,
+  note,
   status,
   entering,
   grouped,
@@ -66,6 +72,7 @@ export function Message({
   ...rest
 }: MessageProps) {
   const tipId = useId();
+  const noteId = useId();
   const tip = meta ? (
     <span className="ac-msg__meta ac-msg__tip" role="tooltip" id={tipId}>
       {meta}
@@ -111,6 +118,15 @@ export function Message({
             </span>
           ) : (
             <span className="ac-msg__time">{time}</span>
+          )}
+          {note && (
+            // Focusable so the reason is reachable without a mouse.
+            <span className="ac-msg__note" tabIndex={grouped ? -1 : 0} aria-describedby={noteId}>
+              {note.label}
+              <span className="ac-msg__note-tip ac-glass" role="tooltip" id={noteId}>
+                {note.tip}
+              </span>
+            </span>
           )}
           {status && (
             <span className="ac-msg__status">
