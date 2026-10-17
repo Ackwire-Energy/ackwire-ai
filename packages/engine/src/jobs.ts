@@ -16,7 +16,8 @@ import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine
 import { getMessage } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
 import { onMissionApprovalDecided, onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
-import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
+import { deliverSessionsInbox, type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
+import { type MissionEngine, migrateOpenMissions } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import {
@@ -62,6 +63,10 @@ export interface JobDeps extends RunExecutorDeps {
   artifacts?: ArtifactDeps;
   /** Agents' computers (jobs `sandbox.start`, `sandbox.stop`). */
   sandbox?: SandboxDeps | null;
+  /** `MISSIONS_ON_ENGINE` (ADR 0032 §6): missions' main sessions are engine runs (missions-engine.ts). */
+  missionsOnEngine?: boolean;
+  /** The engine missions start, resume and cancel runs with (default: today's run queue). */
+  missionEngine?: MissionEngine | null;
   router?: {
     /** Off = only @mentions start runs. */
     enabled: boolean;
@@ -194,6 +199,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     artifacts: deps.artifacts,
     search: deps.context,
     publicUrl: deps.sandbox?.publicUrl,
+    missionsOnEngine: deps.missionsOnEngine === true,
+    missionEngine: deps.missionEngine ?? null,
   };
 
   return {
@@ -363,9 +370,11 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     // A background task on a connected computer ended: its conversation wakes (ADR 0029).
     "machine.task_done": async (job) => {
-      const woke = await wakeConversationForTask({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.taskId), {
-        maxHops: deps.maxHops,
-      });
+      const woke = await wakeConversationForTask(
+        { db: deps.db, pubsub: deps.pubsub, missionsOnEngine: deps.missionsOnEngine === true },
+        String(job.payload.taskId),
+        { maxHops: deps.maxHops },
+      );
       // A mission's task: its notes come back, its main session hears, queued messages go out.
       if (woke && "missionTask" in woke) await onMissionTaskEnded(missions, String(job.payload.taskId));
     },
@@ -376,6 +385,11 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A mission's plan finished or its work stopped: is everything done (then it waits to be concluded)?
     "mission.check_done": async (job) => {
       await checkMissionDone(missions, String(job.payload.missionId), Number(job.payload.attempt ?? 0) || 0);
+    },
+    // `MISSIONS_ON_ENGINE` was turned on (enqueued at boot): open missions move onto the engine (idempotent).
+    "mission.engine_migrate": async () => {
+      if (!missions.missionsOnEngine) return;
+      await migrateOpenMissions(missions, deliverSessionsInbox);
     },
     // An approval asked by a mission's executor was decided or expired: its session is resumed.
     "mission.approval_decided": async (job) => {

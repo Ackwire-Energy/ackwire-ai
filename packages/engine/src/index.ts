@@ -82,6 +82,7 @@ export * from "./mission-settings";
 export * from "./mission-sync";
 export * from "./mission-tools";
 export * from "./missions";
+export * from "./missions-engine";
 export * from "./net-guard";
 export * from "./notification-producers";
 export * from "./notifications";

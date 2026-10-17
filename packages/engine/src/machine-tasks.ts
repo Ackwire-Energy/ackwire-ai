@@ -148,6 +148,8 @@ export type TaskCall = <Op extends "task.start" | "task.status" | "task.cancel">
 export interface TaskDeps {
   db: Database;
   pubsub?: PubSub;
+  /** `MISSIONS_ON_ENGINE` (ADR 0032 §6): a mission's main session is a run, so the agent's own tasks end through the mission. */
+  missionsOnEngine?: boolean;
 }
 
 export interface StartTaskInput {
@@ -797,7 +799,9 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
       .select({ executor: schema.missions.executor })
       .from(schema.missions)
       .where(eq(schema.missions.id, row.missionId));
-    if (mission?.executor === "agent" || !isAgentTask(row)) return claimMissionTaskEnd(deps, row);
+    if (mission?.executor === "agent" || deps.missionsOnEngine || !isAgentTask(row)) {
+      return claimMissionTaskEnd(deps, row);
+    }
   }
   // A task the agent canceled itself wakes nobody.
   if (row.canceledBy?.startsWith("agent:")) {
@@ -870,11 +874,11 @@ async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
         .from(schema.missions)
         .where(eq(schema.missions.id, row.missionId))
     : [];
+  // On the engine the agent's own task (its run's start_task) ends like agent mode: the mission's wake-up is the notice.
+  const agentLike = mission?.executor === "agent" || (deps.missionsOnEngine === true && isAgentTask(row));
   // Commands it was refused: the people see them and can allow them ("Liberar e repetir").
-  const blocked =
-    row.missionId && mission?.executor !== "agent" ? await blockedOfTask(deps.db, row.missionId, row.id) : [];
-  const notice =
-    mission?.executor !== "agent" && (row.status === "failed" || row.status === "interrupted" || blocked.length > 0);
+  const blocked = row.missionId && !agentLike ? await blockedOfTask(deps.db, row.missionId, row.id) : [];
+  const notice = !agentLike && (row.status === "failed" || row.status === "interrupted" || blocked.length > 0);
   const claimed = await deps.db.transaction(async (tx) => {
     const [won] = await tx
       .update(machineTasks)

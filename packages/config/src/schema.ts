@@ -192,6 +192,12 @@ export const envVars = {
     description: "Maximum model calls in one agent run (each tool round trip is one). Stops runaway tool loops.",
     section: "Agents",
   },
+  MISSIONS_ON_ENGINE: {
+    schema: z.stringbool().default(false),
+    description:
+      "Run missions on the agent engine: a mission's main session is the agent's run in the mission thread with the mission's brain (API model, Claude Code or Codex). Off (default) keeps the previous path (executor tasks on the computer). Open missions move over by themselves when it is turned on.",
+    section: "Agents",
+  },
   AGENT_CONTEXT_MESSAGES: {
     schema: z.coerce.number().int().min(1).max(500).default(30),
     description: "How many recent channel (or thread) messages are included in an agent's context.",

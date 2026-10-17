@@ -16,7 +16,7 @@ import {
 } from "@agenteschat/adapters";
 import { type Config, ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
 import { createDatabase, type Database, ensureMessagePartitions, MigrationMismatchError } from "@agenteschat/db";
-import { createLocalKeyWrapper, drainLocalRuns, enableCaches } from "@agenteschat/engine";
+import { createLocalKeyWrapper, drainLocalRuns, enableCaches, enqueue } from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
 import { createAnthropicProvider, createOpenAIProvider } from "@agenteschat/providers";
@@ -121,6 +121,10 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
     onTiming: (name, ms, attrs) => log.info("latency", { metric: name, ms, ...attrs }),
     onRunProfile: (p) => log.debug("run profile", p),
   });
+  // Missions on the engine (ADR 0032 §6): open missions move over once the flag is on (idempotent per mission).
+  if (config.MISSIONS_ON_ENGINE) {
+    await enqueue(database.db, { orgId: null, kind: "mission.engine_migrate", payload: {}, maxAttempts: 3 });
+  }
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
