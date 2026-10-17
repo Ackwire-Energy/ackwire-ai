@@ -1302,14 +1302,12 @@ async function executeRunInner(
       // A routine with nothing to report ends here without posting (its instructions asked for silence).
       // Or it reacted (`react`) instead of replying and wrote nothing more (or only the emoji again):
       // the reaction is the answer.
-      // Or it posted a mission report and wrote nothing more, with no card left to attach: the report is the answer.
+      // Or it posted a mission report and has no card left to attach: the report is the answer. Coding CLIs
+      // always close with a summary that repeats it, whatever the prompt says, so the text is dropped too.
       const silent =
         (Boolean(viaRoutine) && isNoReply(turnText)) ||
         (Boolean(transcript.reacted) && restatesReaction(turnText)) ||
-        (Boolean(transcript.reported) &&
-          !turnText.trim() &&
-          !transcript.artifacts?.length &&
-          !transcript.memoryUpdates?.length);
+        (Boolean(transcript.reported) && !transcript.artifacts?.length && !transcript.memoryUpdates?.length);
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
       const text = silent
         ? ""

@@ -202,13 +202,13 @@ describe("missions with executor agent (ADR 0029)", () => {
     expect(mission.inbox).toEqual([]);
   });
 
-  test("a report is the answer: an empty final reply after it posts nothing more", async () => {
+  test("a report is the answer: the final reply after it (empty or a summary) posts nothing more", async () => {
     f = await setup({
       machines: true,
       missionTools: true,
       reply: (req) => {
         const last = lastText(req);
-        if (last.includes("Reported in the mission's thread")) return { chunks: [] };
+        if (last.includes("Reported in the mission's thread")) return { chunks: ["I made the plan: 2 steps."] };
         return agentScript(req);
       },
     });
@@ -223,7 +223,7 @@ describe("missions with executor agent (ADR 0029)", () => {
     const fromAgent = (await threadMessages(ask.id)).filter((m) => m.authorAgentId === f.agent.id);
     expect(fromAgent.some((m) => m.meta.missionReport)).toBe(true);
     // The planning turn left only its cards: no reply repeating the report, no empty or failed one.
-    expect(fromAgent.map((m) => m.body)).not.toContain("Plan ready: press Start.");
+    expect(fromAgent.map((m) => m.body)).not.toContain("I made the plan: 2 steps.");
     expect(fromAgent.filter((m) => m.body.trim() === "" && !m.meta.missionReport && !m.meta.missionPlan)).toEqual([]);
     const runs = await f.db.select().from(schema.agentRuns);
     expect(runs.map((r) => r.status)).not.toContain("failed");
