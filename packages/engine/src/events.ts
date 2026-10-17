@@ -84,6 +84,19 @@ export type ChannelEvent =
    * before the run exists.
    */
   | { type: "agent.thinking"; channelId: string; threadId: string | null; agentId: string; runId: string | null }
+  /**
+   * An agent's question to another agent (`ask_agent`, ADR 0034) came back:
+   * `status` answered, expired or failed. The asking run resumes.
+   */
+  | {
+      type: "agent.consulted";
+      channelId: string;
+      threadId: string | null;
+      runId: string;
+      agentId: string;
+      consultedAgentId: string;
+      status: "answered" | "expired" | "failed";
+    }
   /** The agent started a tool call (`tool` = its name; `connector` = the app, for MCP tools) or finished (`tool: null`). */
   | {
       type: "agent.tool";

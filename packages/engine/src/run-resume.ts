@@ -10,6 +10,7 @@ interface StoredTranscript {
     calls: { toolUseId: string; name: string; waitId?: string; result?: { content: string; isError: boolean } }[];
   };
   waitingForBrain?: { kind: string; machineId: string; code: string; waitId?: string };
+  consulted?: { agentId: string; consultationId: string; status: string }[];
   [key: string]: unknown;
 }
 
@@ -23,7 +24,13 @@ interface StoredTranscript {
  */
 export async function resumeRunWithResult(
   db: Database,
-  input: { runId: string; waitId: string; result: ToolResult },
+  input: {
+    runId: string;
+    waitId: string;
+    result: ToolResult;
+    /** An agent it consulted (`ask_agent`): its reply's `meta.consulted` card. */
+    consulted?: { agentId: string; consultationId: string; status: string };
+  },
 ): Promise<{ runId: string } | null> {
   const resumed = await db.transaction(async (tx) => {
     const [row] = await tx
@@ -36,6 +43,7 @@ export async function resumeRunWithResult(
     const call = t?.pending?.calls.find((c) => c.waitId === input.waitId && !c.result);
     if (!t || !call) return null;
     call.result = { content: input.result.content, isError: input.result.isError === true };
+    if (input.consulted) t.consulted = [...(t.consulted ?? []), input.consulted];
     await tx
       .update(agentRuns)
       .set({ transcript: t as Record<string, unknown>, updatedAt: new Date() })

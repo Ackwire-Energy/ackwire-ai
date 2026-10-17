@@ -29,6 +29,7 @@ export * from "./connectors/listing";
 export * from "./connectors/mcp";
 export * from "./connectors/oauth-mcp";
 export * from "./connectors/presets";
+export * from "./consultations";
 export * from "./context";
 export * from "./context/consolidate";
 export * from "./context/feedback";

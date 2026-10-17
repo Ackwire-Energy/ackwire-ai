@@ -5,7 +5,9 @@ import {
   createAgent,
   createJobHandlers,
   createLlmRouterStrategy,
+  DEFAULT_ROUTER_POLICY,
   drainOutbox,
+  insertMessage,
   listMessages,
   parseRouterOutput,
   postPersonMessage,
@@ -41,6 +43,32 @@ describe("selectAgents (policy)", () => {
 
   test("a low need-any-agent score means nobody", () => {
     expect(selectAgents([cand("a")], { agents: [{ agentId: "a", score: 0.9 }], needsAgent: 0.1 }, policy)).toEqual([]);
+  });
+
+  test("a clear pick answers even when the need-any-agent score disagrees", () => {
+    // "theo, tell everyone our best TikTok campaign": Theo 1.0, needs_agent 0.22 (2026-10-17).
+    const result = {
+      agents: [
+        { agentId: "theo", score: 1 },
+        { agentId: "iris", score: 0.025 },
+      ],
+      needsAgent: 0.22,
+    };
+    expect(selectAgents([cand("theo"), cand("iris")], result, policy)).toEqual([]);
+    expect(selectAgents([cand("theo"), cand("iris")], result, { ...policy, clearPickScore: 0.8 })).toEqual(["theo"]);
+    expect(
+      selectAgents(
+        [cand("theo"), cand("iris")],
+        { ...result, agents: [{ agentId: "theo", score: 0.7 }] },
+        { ...policy, clearPickScore: 0.8 },
+      ),
+    ).toEqual([]);
+  });
+
+  test("a message to the room may wake up to four agents by default", () => {
+    const candidates = ["a", "b", "c", "d", "e"].map(cand);
+    const result = { agents: candidates.map((c) => ({ agentId: c.agentId, score: 0.9 })), needsAgent: 0.9 };
+    expect(selectAgents(candidates, result, { ...DEFAULT_ROUTER_POLICY, maxHops: 3 })).toHaveLength(4);
   });
 });
 
@@ -108,6 +136,44 @@ describe("routeMessage", () => {
       (await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: message.id })).skipped,
     ).toBe("already_routed");
     expect(seen).toHaveLength(1);
+  });
+
+  test("an agent's message brings in one more agent only on a clear pick, never itself, never from an answer to an answer", async () => {
+    f = await setup();
+    const make = async (handle: string) => {
+      const a = await createAgent(f.db, f.owner.id, f.org.id, { name: handle, handle }, { model: "claude-sonnet-5-5" });
+      await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: a.id });
+      return a;
+    };
+    const infra = await make("infra");
+    await make("qa");
+    const question = await post("why is staging slow?");
+    const byDev = (body: string, hop: number) =>
+      insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        threadId: question.id,
+        author: { type: "agent", agentId: f.agent.id, runId: null, hop },
+        body,
+      });
+
+    const { strategy, seen } = fixedStrategy({ dev: 1, infra: 0.9, qa: 0.85 });
+    const answer = await byDev("Looks like the database; infra would know.", 1);
+    const result = await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: answer.id });
+    expect(seen[0]?.map((c) => c.handle).sort()).toEqual(["infra", "qa"]);
+    expect(result.runs.map((r) => [r.agentId, r.hop])).toEqual([[infra.id, 2]]);
+
+    const lukewarm = fixedStrategy({ infra: 0.7, qa: 0.6 });
+    const second = await byDev("Also the cache was cold.", 1);
+    expect(
+      (await routeMessage({ db: f.db, strategy: lukewarm.strategy, policy }, { orgId: f.org.id, messageId: second.id }))
+        .selected,
+    ).toEqual([]);
+
+    const deep = await byDev("answer to an answer", 2);
+    expect((await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: deep.id })).skipped).toBe(
+      "hop_limit",
+    );
   });
 
   test("no candidates: no strategy call", async () => {

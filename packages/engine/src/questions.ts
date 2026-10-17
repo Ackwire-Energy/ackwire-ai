@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, lt, schema, sql } from "@agenteschat/db";
 import { requireChannelAccess } from "./channels";
+import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { resolveQuestionNotifications } from "./notification-producers";
@@ -65,7 +66,18 @@ export function createAskUserToolSource(): ToolSource {
       required: ["question"],
       additionalProperties: false,
     },
-    async execute(input) {
+    async execute(input, ctx) {
+      const [channel] = await ctx.db
+        .select({ kind: schema.channels.kind, dmKey: schema.channels.dmKey })
+        .from(schema.channels)
+        .where(and(eq(schema.channels.id, ctx.channelId), eq(schema.channels.orgId, ctx.orgId)));
+      if (channel && isAgentOnlyDm(channel)) {
+        return {
+          content:
+            "No person reads this conversation: you are answering another agent. Answer with what you know and say in your answer what is missing.",
+          isError: true,
+        };
+      }
       const text = typeof input.question === "string" ? input.question.trim() : "";
       const choices = Array.isArray(input.choices)
         ? [...new Set((input.choices as unknown[]).map((c) => String(c).trim()).filter(Boolean))]

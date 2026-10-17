@@ -6,6 +6,7 @@ import {
   enqueue,
   enqueueIdleReflections,
   expireApprovals,
+  expireConsultations,
   expireQuestions,
   expireSecretRequests,
   fireDueRoutines,
@@ -124,6 +125,11 @@ export function startWorkers(deps: WorkerDeps) {
   every("questions", WORKER_INTERVALS_MS.approvals, async () => {
     const expired = await expireQuestions({ db, pubsub: deps.pubsub });
     if (expired > 0) log.info("agent questions expired", { expired });
+  });
+
+  every("consultations", WORKER_INTERVALS_MS.approvals, async () => {
+    const expired = await expireConsultations({ db, pubsub: deps.pubsub });
+    if (expired > 0) log.info("agent consultations expired", { expired });
   });
 
   every("secrets", WORKER_INTERVALS_MS.approvals, async () => {

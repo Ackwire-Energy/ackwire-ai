@@ -1,4 +1,4 @@
-import { and, type Database, desc, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import type { Agent } from "./agents";
 import { audienceError, canTalkTo } from "./audience";
 import { caches } from "./cache";
@@ -79,6 +79,55 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
   const channel = created ?? (await existing()); // a concurrent open won the race
   if (!channel) throw new Error("could not open the conversation");
   return channel;
+}
+
+/** The DM key of a conversation between two agents (`ask_agent`, ADR 0034): no person in it. */
+export const agentDmKey = (a: string, b: string) => keyOf([`a:${a}`, `a:${b}`]);
+
+/** A DM between agents only: no person reads it, so nobody there can answer a question. */
+export const isAgentOnlyDm = (channel: { kind: string; dmKey: string | null }) =>
+  channel.kind === "dm" && channel.dmKey !== null && !channel.dmKey.includes("u:");
+
+/**
+ * Opens the private conversation between two agents (creates it the first
+ * time): a `dm` channel with both agents as its only members. Where one
+ * agent consults another; no person is a member.
+ */
+export async function openAgentDm(db: Executor, orgId: string, a: string, b: string) {
+  const dmKey = agentDmKey(a, b);
+  const existing = async () =>
+    (
+      await db
+        .select()
+        .from(channels)
+        .where(and(eq(channels.orgId, orgId), eq(channels.dmKey, dmKey)))
+    )[0];
+  const found = await existing();
+  if (found) {
+    if (found.archivedAt) await db.update(channels).set({ archivedAt: null }).where(eq(channels.id, found.id));
+    return found;
+  }
+  const [channel] = await db
+    .insert(channels)
+    .values({
+      orgId,
+      name: `dm-${sha256(`${orgId}|${dmKey}`).slice(0, 20)}`,
+      visibility: "private",
+      kind: "dm",
+      dmKey,
+    })
+    .onConflictDoNothing()
+    .returning();
+  if (channel) {
+    await db.insert(channelMembers).values([
+      { orgId, channelId: channel.id, agentId: a },
+      { orgId, channelId: channel.id, agentId: b },
+    ]);
+    return channel;
+  }
+  const raced = await existing(); // a concurrent open won the race
+  if (!raced) throw new Error("could not open the conversation");
+  return raced;
 }
 
 export interface DmSummary {

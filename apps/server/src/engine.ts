@@ -7,6 +7,7 @@ import {
   CodexBrain,
   type ContextDeps,
   createArtifactToolSource,
+  createAskAgentToolSource,
   createAskUserToolSource,
   createBlobStoreResolver,
   createCalendarToolSource,
@@ -194,6 +195,7 @@ export function buildEngine(o: EngineOptions) {
   const tools = createToolGateway({
     sources: [
       createAskUserToolSource(),
+      createAskAgentToolSource(),
       createReactToolSource({ pubsub: adapters.pubsub }),
       createArtifactToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),

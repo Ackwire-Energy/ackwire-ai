@@ -7,6 +7,7 @@ import { applyReactionFeedback } from "./context/feedback";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
 import { dispatchDm, dispatchMentions, requesterOf } from "./dispatch";
+import { isAgentOnlyDm } from "./dms";
 import { sendQueuedEmail } from "./email";
 import { publishChannelEvent } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
@@ -246,6 +247,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         }
       }
       if (message.authorType !== "person") {
+        // Between agents only (`ask_agent`, ADR 0034): the consultation runs are started by the tool.
+        if (where && isAgentOnlyDm(where)) return;
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
         if (message.mentionedAgentIds.length > 0) {
@@ -270,7 +273,15 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
             ? await dispatchMentions(deps.db, input, { maxHops: deps.maxHops, onlyAgentIds: allowed })
             : { runs: [] };
           await routed("mention", message.mentionedAgentIds, res.runs, allowed.length ? undefined : "reference_only");
+          return;
         }
+        // No mention: another agent may chime in when it clearly should (D5, revised). Only in
+        // channels, never in a mission's thread (the mission's own turns run it).
+        if (!router.enabled || where?.kind !== "channel") return;
+        if (message.threadId && (await missionOfThread(deps.db, message.orgId, message.threadId))) return;
+        const res = await routeMessage({ db: deps.db, strategy, policy }, input, ctx);
+        // Receipts only when someone answers: an agent's message isn't waiting for anyone.
+        if (res.runs.length > 0) await routed("router", res.seenBy ?? [], res.runs, res.reason);
         return;
       }
       if (message.mentionedAgentIds.length > 0) {

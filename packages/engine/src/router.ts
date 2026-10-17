@@ -2,7 +2,7 @@ import { and, type Database, desc, eq, inArray, isNull, lte, ne, schema, sql } f
 import { cheapModelOf, ProviderError } from "@agenteschat/providers";
 import { audienceSql } from "./audience";
 import { summarizeScopes } from "./capabilities";
-import { createAgentRuns } from "./dispatch";
+import { createAgentRuns, requesterOf } from "./dispatch";
 import { MissingCredentialError, ValidationError } from "./errors";
 import type { ModelGateway } from "./gateway";
 import { getMessage } from "./messages";
@@ -81,11 +81,18 @@ export interface RouterPolicy {
   singleAgentMinScore?: number;
   /** How recent the exchange must be to count as continuity. */
   continuityWindowMs?: number;
+  /**
+   * A clear pick: an agent this sure is meant answers even when the
+   * need-any-agent score is low (the two can disagree; the pick names someone).
+   */
+  clearPickScore?: number;
 }
 
 export const DEFAULT_ROUTER_POLICY = {
   minScore: 0.5,
-  maxAgents: 2,
+  /** A message to the room ("congratulate Mark, everyone") may wake several agents. */
+  maxAgents: 4,
+  clearPickScore: 0.8,
   continuityMinScore: 0.3,
   singleAgentMinScore: 0.35,
   /** How recent the exchange must be to count as continuity. */
@@ -96,7 +103,8 @@ export const DEFAULT_ROUTER_POLICY = {
  * Applies policy to a strategy's scores (all in code): candidates only, a
  * threshold per agent (lower for the agent the person was just talking to,
  * and for the only agent of the channel), best first, at most `maxAgents`.
- * A low need-any-agent score means nobody, unless continuity holds.
+ * A low need-any-agent score means nobody, unless continuity holds or an
+ * agent is a clear pick (`clearPickScore`).
  */
 export function selectAgents(
   candidates: RoutingCandidate[],
@@ -119,8 +127,9 @@ export function selectAgents(
   }
   const continuing =
     context.continuityAgentId && (best.get(context.continuityAgentId) ?? 0) >= thresholdOf(context.continuityAgentId);
+  const clearPick = [...best.values()].some((score) => score >= (policy.clearPickScore ?? Number.POSITIVE_INFINITY));
   const needGate = single ? Math.min(policy.minScore, policy.singleAgentMinScore ?? policy.minScore) : policy.minScore;
-  if (result.needsAgent !== undefined && result.needsAgent < needGate && !continuing) return [];
+  if (result.needsAgent !== undefined && result.needsAgent < needGate && !continuing && !clearPick) return [];
   return [...best]
     .filter(([agentId, score]) => score >= thresholdOf(agentId))
     .sort((a, b) => b[1] - a[1])
@@ -296,12 +305,20 @@ export interface RouteResult {
   reason?: string;
 }
 
+/** An agent's message may bring in one more agent, only when it clearly should (D5, revised 2026-10-17). */
+export const AGENT_CHIME_IN_SCORE = 0.75;
+/** An agent's message at this hop (an answer to an answer) brings in nobody. */
+export const AGENT_CHIME_IN_MAX_HOP = 2;
+
 /**
  * Router for a message without mentions (job `message.posted`). Code picks
  * the candidates: active agents that are members of the channel with
  * auto-reply on. The strategy only scores them; policy picks at most
- * `maxAgents` above `minScore`. Agent messages never go through the router
- * (D5). One decision per message (unique), stored with every score.
+ * `maxAgents` above `minScore`. An agent's message goes through it too (D5,
+ * revised): the author is never a candidate, at most one agent is picked,
+ * only a clear pick (`AGENT_CHIME_IN_SCORE`), and never from an answer to an
+ * answer (`AGENT_CHIME_IN_MAX_HOP`). One decision per message (unique),
+ * stored with every score.
  *
  * Transient strategy failures rethrow (the outbox retries); on the final
  * attempt, or for permanent ones (no credential, invalid output), the
@@ -315,9 +332,23 @@ export async function routeMessage(
   const { db } = deps;
   const message = await getMessage(db, input.orgId, input.messageId);
   if (!message) return { runs: [], skipped: "message_missing" };
-  if (message.authorType !== "person") return { runs: [], skipped: "not_a_person" };
+  const byAgent = message.authorType === "agent" && message.authorAgentId !== null;
+  if (message.authorType !== "person" && !byAgent) return { runs: [], skipped: "not_a_person" };
   if (message.mentionedAgentIds.length > 0) return { runs: [], skipped: "has_mentions" };
   if (message.hop >= deps.policy.maxHops) return { runs: [], skipped: "hop_limit" };
+  if (byAgent && message.hop >= AGENT_CHIME_IN_MAX_HOP) return { runs: [], skipped: "hop_limit" };
+  const policy: RouterPolicy = byAgent
+    ? {
+        ...deps.policy,
+        minScore: Math.max(deps.policy.minScore, AGENT_CHIME_IN_SCORE),
+        maxAgents: 1,
+        clearPickScore: AGENT_CHIME_IN_SCORE,
+        continuityMinScore: undefined,
+        singleAgentMinScore: undefined,
+      }
+    : deps.policy;
+  // The person behind it: the author, or for an agent's message whoever started its run.
+  const personId = byAgent ? await requesterOf(db, message) : message.authorUserId;
   const [already] = await db
     .select({ id: routingDecisions.id })
     .from(routingDecisions)
@@ -342,11 +373,13 @@ export async function routeMessage(
         eq(agents.orgId, message.orgId),
         isNull(agents.archivedAt),
         eq(channelMembers.autoReply, true),
+        // Never the agent that wrote it.
+        byAgent && message.authorAgentId ? ne(agents.id, message.authorAgentId) : undefined,
         // Never an agent this person can't talk to (D31): not as a pick, not as "the last agent" of a follow-up.
-        audienceSql("agents", sql`${message.authorUserId}::text`),
+        audienceSql("agents", sql`${personId}::text`),
       ),
     );
-  const candidates: RoutingCandidate[] = rows.map((r) => ({
+  let candidates: RoutingCandidate[] = rows.map((r) => ({
     agentId: r.agentId,
     handle: r.handle,
     name: r.name,
@@ -399,9 +432,20 @@ export async function routeMessage(
     )
     .orderBy(desc(messages.createdAt))
     .limit(6);
+  if (byAgent) {
+    // Bringing someone in: agents that already spoke here aren't new voices.
+    const spoke = new Set(history.flatMap((m) => (m.authorAgentId ? [m.authorAgentId] : [])));
+    candidates = candidates.filter((c) => !spoke.has(c.agentId));
+    if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
+  }
   const [author] = message.authorUserId
     ? await db.select({ name: users.name }).from(users).where(eq(users.id, message.authorUserId))
-    : [];
+    : message.authorAgentId
+      ? await db
+          .select({ name: sql<string>`'@' || ${agents.handle}` })
+          .from(agents)
+          .where(eq(agents.id, message.authorAgentId))
+      : [];
 
   // Conversation continuity: within the window, the agent that spoke last here, or the one this
   // person addressed in their previous message, is who a follow-up without a mention is for.
@@ -411,7 +455,8 @@ export async function routeMessage(
   // The agent this person last talked to: the one they addressed in their previous message, else the
   // first agent that answered it (in its thread, for top-level messages), else whoever spoke last here.
   let continuityAgentId: string | null = null;
-  const previous = recent.find((m) => m.authorUserId && m.authorUserId === message.authorUserId);
+  // Continuity is a person's: an agent's message has none.
+  const previous = byAgent ? undefined : recent.find((m) => m.authorUserId && m.authorUserId === message.authorUserId);
   if (previous) {
     const addressed = previous.mentionedAgentIds.filter((id) => candidateIds.has(id));
     if (addressed.length === 1) continuityAgentId = addressed[0] ?? null;
@@ -437,7 +482,7 @@ export async function routeMessage(
       continuityAgentId = first?.authorAgentId ?? null;
     }
   }
-  if (!continuityAgentId) {
+  if (!continuityAgentId && !byAgent) {
     continuityAgentId = recent.find((m) => m.authorAgentId && candidateIds.has(m.authorAgentId))?.authorAgentId ?? null;
   }
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
@@ -476,7 +521,7 @@ export async function routeMessage(
   }
 
   // The router's own pick; when it picks several agents, the message speaks to several.
-  const picked = selectAgents(candidates, result, deps.policy, { continuityAgentId });
+  const picked = selectAgents(candidates, result, policy, { continuityAgentId });
   // A short follow-up without a mention ("and now?") goes only to the agent the person was talking to,
   // unless the router heard it as for several agents.
   const followUp = continuityAgentId !== null && isShortFollowUp(message.body) && picked.length < 2;

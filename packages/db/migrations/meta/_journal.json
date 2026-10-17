@@ -449,6 +449,13 @@
       "when": 1792330000000,
       "tag": "0063_agent_repositories",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1792252370410,
+      "tag": "0064_agent_consultations",
+      "breakpoints": true
     }
   ]
 }

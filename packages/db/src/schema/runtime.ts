@@ -455,6 +455,55 @@ export const agentQuestions = pgTable(
   ],
 );
 
+export const agentConsultationStatusEnum = pgEnum("agent_consultation_status", [
+  "open",
+  "answered",
+  "expired",
+  "failed",
+]);
+
+/**
+ * One agent asking another (`ask_agent`, ADR 0034): the question goes to a
+ * private DM between the two agents, the consulted agent runs there, and its
+ * reply resumes the asking run (the tool call's `waitId`).
+ */
+export const agentConsultations = pgTable(
+  "agent_consultations",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    /** The asking run, paused on `waitId` until the answer. */
+    askerRunId: uuid()
+      .notNull()
+      .references(() => agentRuns.id, { onDelete: "cascade" }),
+    askerAgentId: uuid().notNull(),
+    targetAgentId: uuid().notNull(),
+    /** The private DM between the two agents. */
+    channelId: uuid().notNull(),
+    /** The question as posted there (the consulted run's trigger). */
+    messageId: uuid().notNull(),
+    targetRunId: uuid(),
+    waitId: text().notNull(),
+    question: text().notNull(),
+    /** Agents already in this chain of consultations (no cycles). */
+    chain: uuid().array().notNull(),
+    status: agentConsultationStatusEnum().notNull().default("open"),
+    answer: text(),
+    answeredAt: timestamp({ withTimezone: true }),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.askerAgentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.orgId, t.targetAgentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    unique().on(t.messageId),
+    index().on(t.askerRunId),
+    index().on(t.expiresAt).where(sql`${t.status} = 'open'`),
+  ],
+);
+
 export const secretRequestStatusEnum = pgEnum("secret_request_status", [
   "pending",
   "delivered",

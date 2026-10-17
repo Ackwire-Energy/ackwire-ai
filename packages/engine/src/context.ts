@@ -17,6 +17,7 @@ import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
+import { isAgentOnlyDm } from "./dms";
 import type { Message } from "./messages";
 import { missionBrief } from "./mission-brief";
 import type { AgentRun } from "./runs";
@@ -345,7 +346,7 @@ export async function buildRunContext(
           options.toolsAvailable
             ? '- You work in several conversations (channels, DMs, threads). "In the DM", "in private" or "over in #channel" (in Portuguese "no privado", "na DM", "lá no #canal") point to one of them, not to where you should answer: find what they mean in "Your recent work" or with `list_artifacts` (`createdByMe`) before saying you have no record of it, and bring a file here with `share_artifact`. Never say you only answer in this channel or can\'t see the DM. To post in another channel ("post it in #general", "manda no #geral"), use `post_message` with the files, then say here where you posted. When someone asks for a PDF of a document, share it: its card has "Download PDF".'
             : "",
-          "- Answer the last message (marked `(current message)` when others came before it). Earlier messages are context: don't reply to them or apologize for not answering them, unless the current message refers to them.",
+          '- Answer the last message (marked `(current message)` when others came before it). Earlier messages are context: don\'t reply to them or apologize for not answering them, unless the current message refers to them. When the current message only calls you (just your @handle or name, or a nudge like "and?" / "e aí?"), it points at the same person\'s message just before it: answer that one.',
           "- Reply with the message text only, without an author prefix. Mention another agent with @handle only when you need it to act.",
         ]
           .filter(Boolean)
@@ -395,13 +396,15 @@ export async function buildRunContext(
       text:
         channel.kind === "forum"
           ? `# Where you are\nThe forum topic "${channel.topic}": an asynchronous discussion in rounds among ${memberList}. You speak once per round, when it's your turn (the latest "[Forum]" message says the round and the goal). Bring your own view and data from your tools; agree or disagree with reasons, and address the others with @ (they answer in their turn; mentions start nobody). Don't repeat what was already said; if you have nothing new, say so in one line. Write your post as the reply text.`
-          : channel.kind === "dm"
-            ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
-            : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying in a thread. Members: ${memberList}.${
-                otherAgents
-                  ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or suggest asking it (e.g. "ask @${others[0]?.agentHandle}").`
-                  : ""
-              }`,
+          : isAgentOnlyDm(channel)
+            ? `# Where you are\nA private conversation between agents: ${memberList}. Another agent is asking you for help with a task it is doing for ${requesterName} (\`ask_agent\`); your reply goes back to it, and no person reads this conversation. Answer its question directly and completely with your own knowledge and tools, as one agent briefing another (facts, values, steps; no greetings). Don't ask questions back: if something is missing, say what in your answer. Anything sensitive still needs a person's approval.`
+            : channel.kind === "dm"
+              ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
+              : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying in a thread. Members: ${memberList}.${
+                  otherAgents
+                    ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself with \`ask_agent\` when you need its help for the task.`
+                    : ""
+                }`,
     },
     ...(range
       ? [

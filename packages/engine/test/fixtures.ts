@@ -19,6 +19,7 @@ import {
   type ContextDeps,
   createAgent,
   createArtifactToolSource,
+  createAskAgentToolSource,
   createAskUserToolSource,
   createBlobStoreResolver,
   createCalendarToolSource,
@@ -117,6 +118,8 @@ export async function setup(
     contextTools?: boolean;
     /** Add the built-in `ask_user` tool. */
     askUser?: boolean;
+    /** Add the built-in `ask_agent` tool. */
+    askAgent?: boolean;
     /** Add the built-in `react` tool. */
     react?: boolean;
     /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
@@ -239,6 +242,7 @@ export async function setup(
   const sources = [
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
     ...(options.askUser ? [createAskUserToolSource()] : []),
+    ...(options.askAgent ? [createAskAgentToolSource()] : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),

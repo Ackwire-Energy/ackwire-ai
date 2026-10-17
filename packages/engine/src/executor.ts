@@ -25,6 +25,7 @@ import {
 } from "./cancel";
 import { describeCapabilities } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
+import { onConsultedRunFinished } from "./consultations";
 import {
   buildRunContext,
   getChannelCached,
@@ -37,6 +38,7 @@ import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
 import { createAgentRuns } from "./dispatch";
+import { isAgentOnlyDm } from "./dms";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import { onForumRunFinished } from "./forum";
@@ -150,6 +152,8 @@ export interface Transcript {
   artifacts?: { id: string; version: number }[];
   /** A mission proposed with its home elsewhere (a flat DM's new thread): the reply carries its link card (`meta.missionLink`). */
   missionLink?: { missionId: string; threadId: string } | null;
+  /** Agents it consulted (`ask_agent`, ADR 0034), not yet shown on a posted message (`meta.consulted`). */
+  consulted?: { agentId: string; consultationId: string; status: string }[];
   /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
   reacted?: boolean;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
@@ -359,6 +363,9 @@ async function executeRunInner(
     if (channelRow?.kind === "forum" && status !== "waiting_approval") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
     }
+    // It answered another agent's question (ADR 0034): the asking run resumes with the reply.
+    if (channelRow && isAgentOnlyDm(channelRow))
+      await onConsultedRunFinished({ db, pubsub: deps.pubsub }, run, status, error).catch(() => {});
     // A routine's run ended: its creator hears it (D46).
     if (routineOfRun && (status === "done" || status === "failed")) {
       const routine = routineOfRun;
@@ -1737,22 +1744,25 @@ function createDeltaPublisher(
 }
 
 /**
- * Moves pending memory updates, artifacts and a proposed mission's link onto
- * the message being posted (the "memory updated", file preview and mission
- * link cards).
+ * Moves pending memory updates, artifacts, a proposed mission's link and the
+ * agents it consulted onto the message being posted (the "memory updated",
+ * file preview, mission link and "message from @agent" cards).
  */
 function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const updates = t.memoryUpdates ?? [];
   const files = t.artifacts ?? [];
   const link = t.missionLink ?? null;
-  if (updates.length === 0 && files.length === 0 && !link) return undefined;
+  const consulted = t.consulted ?? [];
+  if (updates.length === 0 && files.length === 0 && !link && consulted.length === 0) return undefined;
   t.memoryUpdates = [];
   t.artifacts = [];
   t.missionLink = null;
+  t.consulted = [];
   const meta: Record<string, unknown> = {};
   if (updates.length > 0) meta.memoryUpdates = updates;
   if (files.length > 0) meta.artifacts = files;
   if (link) meta.missionLink = link;
+  if (consulted.length > 0) meta.consulted = consulted;
   return meta;
 }
 
