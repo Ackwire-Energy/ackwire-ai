@@ -220,7 +220,11 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           missionReport: { missionId: mission.id, taskId: null, status, executor: "agent", computer, main: true },
         });
         await recordMissionEvent(ctx.db, mission, "report", { runId: ctx.runId, status });
-        return { content: "Reported in the mission's thread (no need to repeat it in your answer)." };
+        return {
+          content:
+            "Reported in the mission's thread: the people read it there. Don't repeat it; end your turn with an empty final reply unless you have something new to say.",
+          data: { reported: true },
+        };
       },
     }),
     bound(run, {

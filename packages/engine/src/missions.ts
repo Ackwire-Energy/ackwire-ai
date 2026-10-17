@@ -217,7 +217,7 @@ export function planPrompt(mission: Pick<MissionRow, "title" | "goal">) {
   return [
     `Mission proposed: ${mission.title}. Goal: ${mission.goal}`,
     "PLAN MODE: explore the mission folder on the computer (a code repository or plain files) read-only: don't change any file and don't run anything that writes.",
-    "Then call update_plan with the first items of the plan (a checklist; short, stable ids) and report the goal in one sentence for the people. Then end your turn: the people review the plan and start the mission (never name the button).",
+    "Then call update_plan with the first items of the plan (a checklist; short, stable ids) and report the goal in one sentence for the people. Then end your turn with an empty final reply (the report is what they read): the people review the plan and start the mission (never name the button).",
     "Write the plan items, reports, decisions and reviews in the language of the goal (the people's language).",
   ].join("\n");
 }

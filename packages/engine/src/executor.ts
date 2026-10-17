@@ -156,6 +156,8 @@ export interface Transcript {
   consulted?: { agentId: string; consultationId: string; status: string; question?: string; answer?: string | null }[];
   /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
   reacted?: boolean;
+  /** A mission `report` card was posted this run: it is the answer, an empty final reply posts nothing. */
+  reported?: boolean;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
@@ -1300,8 +1302,14 @@ async function executeRunInner(
       // A routine with nothing to report ends here without posting (its instructions asked for silence).
       // Or it reacted (`react`) instead of replying and wrote nothing more (or only the emoji again):
       // the reaction is the answer.
+      // Or it posted a mission report and wrote nothing more, with no card left to attach: the report is the answer.
       const silent =
-        (Boolean(viaRoutine) && isNoReply(turnText)) || (Boolean(transcript.reacted) && restatesReaction(turnText));
+        (Boolean(viaRoutine) && isNoReply(turnText)) ||
+        (Boolean(transcript.reacted) && restatesReaction(turnText)) ||
+        (Boolean(transcript.reported) &&
+          !turnText.trim() &&
+          !transcript.artifacts?.length &&
+          !transcript.memoryUpdates?.length);
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
       const text = silent
         ? ""

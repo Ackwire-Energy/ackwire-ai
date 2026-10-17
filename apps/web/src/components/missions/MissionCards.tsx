@@ -282,7 +282,6 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
             {t("missions.plan.start")}
           </Button>
         )}
-        {m?.role === "owner" && waitPlan && <span className="mi-hint">{t("missions.plan.waitPlan")}</span>}
         {m?.canAct && actions?.replyToMission && (
           <Button
             size="sm"
@@ -292,6 +291,7 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
             {t("missions.plan.change")}
           </Button>
         )}
+        {m?.role === "owner" && waitPlan && <span className="mi-hint">{t("missions.plan.waitPlan")}</span>}
         {m && m.role !== "owner" && owner && (
           <span className="mi-hint">{t("missions.plan.ownerStarts", { name: owner })}</span>
         )}

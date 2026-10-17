@@ -202,6 +202,33 @@ describe("missions with executor agent (ADR 0029)", () => {
     expect(mission.inbox).toEqual([]);
   });
 
+  test("a report is the answer: an empty final reply after it posts nothing more", async () => {
+    f = await setup({
+      machines: true,
+      missionTools: true,
+      reply: (req) => {
+        const last = lastText(req);
+        if (last.includes("Reported in the mission's thread")) return { chunks: [] };
+        return agentScript(req);
+      },
+    });
+    const paired = await pairedMachine(f);
+    const runner = missionRunner(f.machineHub as MachineHub, { executors: {} });
+    await runner.hello(paired.token);
+    const ask = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev build the app",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect((await missionRow()).planTotal).toBe(2);
+    const fromAgent = (await threadMessages(ask.id)).filter((m) => m.authorAgentId === f.agent.id);
+    expect(fromAgent.some((m) => m.meta.missionReport)).toBe(true);
+    // The planning turn left only its cards: no reply repeating the report, no empty or failed one.
+    expect(fromAgent.map((m) => m.body)).not.toContain("Plan ready: press Start.");
+    expect(fromAgent.filter((m) => m.body.trim() === "" && !m.meta.missionReport && !m.meta.missionPlan)).toEqual([]);
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs.map((r) => r.status)).not.toContain("failed");
+  });
+
   test("stuck guard: 5 wake-ups without the plan moving pause the mission (mission.paused_stuck); a person's word or a moving plan resets it", async () => {
     const { view } = await agentMission();
     await startMission(md(), f.owner.id, f.org.id, view.id);
