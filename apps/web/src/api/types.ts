@@ -2204,7 +2204,7 @@ export interface TaskOutput {
   truncated: boolean;
 }
 
-/** "Pedir aprovação de comandos": every command, only the risky ones (Jev allows the low-risk ones), or never (but the blocked ones). */
+/** "Pedir aprovação de comandos": every command, only the risky ones (low-risk ones allowed automatically), or never (but the blocked ones). */
 export type CommandApproval = "always" | "low_risk_auto" | "never";
 
 /** `meta.missionAutoApproved`: a command allowed without a card (one quiet line, Revogar). */

@@ -23,7 +23,7 @@ export const PEOPLE = {
 export type PersonKey = keyof typeof PEOPLE;
 
 export const ORG = { name: "Acme", initial: "A" };
-export const MODELS = { sonnet: "sonnet 5.5", haiku: "haiku 5.5", router: "jev" } as const;
+export const MODELS = { sonnet: "sonnet 5.5", haiku: "haiku 5.5", router: "router" } as const;
 
 /** The landing page's looks: the user rejected "headphones" and "cap" here. */
 export const LP_COLORS: AgentColor[] = ["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"];

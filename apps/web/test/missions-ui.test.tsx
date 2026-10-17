@@ -142,7 +142,7 @@ describe("Missões (Threads.html)", () => {
     expect(atlas.textContent).toContain("No mac");
   });
 
-  test("Nova missão: Pedir aprovação de comandos starts at 'Só os arriscados' (Jev approves the low-risk ones)", async () => {
+  test("Nova missão: Pedir aprovação de comandos starts at "Só os arriscados" (low-risk ones allowed automatically)", async () => {
     const api = createFakeApi(seedState());
     api.missions.eligibleAgents = async () => [pick(ADA_ID, "Ada")];
     await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
@@ -151,7 +151,7 @@ describe("Missões (Threads.html)", () => {
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Nova missão" });
     const select = within(dialog).getByRole("combobox", { name: "Pedir aprovação de comandos" });
-    expect(select.textContent).toContain("Só os arriscados (Jev aprova os de baixo risco)");
+    expect(select.textContent).toContain("Só os arriscados");
   });
 
   test("Nova missão: an agent that can't run one is listed disabled with the reason, and a link for its owner", async () => {

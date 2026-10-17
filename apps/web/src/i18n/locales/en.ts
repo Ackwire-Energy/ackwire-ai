@@ -2375,10 +2375,10 @@ export const en: Translations = {
     commandApproval: {
       label: "Ask to approve commands",
       always: "Always",
-      low_risk_auto: "Only risky ones (Jev approves low-risk ones)",
+      low_risk_auto: "Only risky ones",
       never: "Never (except blocked ones)",
       alwaysText: "Every command off the list asks Approve or Decline in the thread.",
-      low_risk_autoText: "Reads go through; Jev approves what is low risk and the rest asks you.",
+      low_risk_autoText: "Reads go through; low-risk commands are allowed automatically and the rest asks you.",
       neverText: "Everything runs without asking, except merge, deploy, publishing and what is blocked.",
       changed: "Command approval: {{value}}",
     },
@@ -4912,7 +4912,7 @@ export const en: Translations = {
       s2: {
         n: "The router",
         title: "A router picks who answers.",
-        text: "Jev, a small and fast model, reads the conversation and calls zero, one or two agents. It only picks who speaks. Permission never comes from it.",
+        text: "A small and fast model reads the conversation and calls zero, one or two agents. It only picks who speaks. Permission never comes from it.",
       },
       s3: {
         n: "The work",

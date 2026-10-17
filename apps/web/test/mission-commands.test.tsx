@@ -173,7 +173,7 @@ describe("command approvals", () => {
     createdAt: new Date(at).toISOString(),
   });
 
-  test("a command Jev approved: one quiet line with the command and Revogar (back to asking for every one)", async () => {
+  test("a command allowed automatically (low risk): one quiet line with the command and Revogar (back to asking for every one)", async () => {
     const { api, mission, state } = await withCommand();
     expect(mission.commandApproval).toBe("low_risk_auto");
     await renderPage(
@@ -223,7 +223,7 @@ describe("command approvals", () => {
 
   test("Pedir aprovação de comandos: the three options, the default first", () => {
     expect(commandApprovalOptions(createI18n("pt-BR").t).map((o) => o.label)).toEqual([
-      "Só os arriscados (Jev aprova os de baixo risco)",
+      "Só os arriscados",
       "Sempre",
       "Nunca (exceto os bloqueados)",
     ]);

@@ -2387,10 +2387,11 @@ export const ptBR = {
     commandApproval: {
       label: "Pedir aprovação de comandos",
       always: "Sempre",
-      low_risk_auto: "Só os arriscados (Jev aprova os de baixo risco)",
+      low_risk_auto: "Só os arriscados",
       never: "Nunca (exceto os bloqueados)",
       alwaysText: "Todo comando fora da lista pede Aprovar ou Recusar na thread.",
-      low_risk_autoText: "Leituras passam direto; o Jev aprova o que é de baixo risco e o resto pede você.",
+      low_risk_autoText:
+        "Leituras passam direto; o que é de baixo risco é liberado automaticamente e o resto pede você.",
       neverText: "Tudo roda sem perguntar, menos merge, deploy, publicação e o que está bloqueado.",
       changed: "Aprovação de comandos: {{value}}",
     },
@@ -4924,7 +4925,7 @@ export const ptBR = {
       s2: {
         n: "O roteador",
         title: "Um roteador escolhe quem responde.",
-        text: "O Jev, um modelo pequeno e rápido, lê a conversa e chama zero, um ou dois agentes. Ele só escolhe quem fala. Permissão nunca vem dele.",
+        text: "Um modelo pequeno e rápido lê a conversa e chama zero, um ou dois agentes. Ele só escolhe quem fala. Permissão nunca vem dele.",
       },
       s3: {
         n: "O trabalho",
