@@ -454,12 +454,15 @@ export async function routeMessage(
   const windowMs = deps.policy.continuityWindowMs ?? DEFAULT_ROUTER_POLICY.continuityWindowMs;
   const recent = history.filter((m) => message.createdAt.getTime() - m.createdAt.getTime() <= windowMs);
   const candidateIds = new Set(candidates.map((c) => c.agentId));
-  // The agent this person last talked to: the one they addressed in their previous message, else the
+  // The agent this person last talked to: the agent whose message is right before this one ("did you
+  // check?" is for whoever just spoke), else the one they addressed in their previous message, else the
   // first agent that answered it (in its thread, for top-level messages), else whoever spoke last here.
   let continuityAgentId: string | null = null;
   // Continuity is a person's: an agent's message has none.
+  const justSpoke = byAgent ? null : recent[0]?.authorAgentId;
   const previous = byAgent ? undefined : recent.find((m) => m.authorUserId && m.authorUserId === message.authorUserId);
-  if (previous) {
+  if (justSpoke && candidateIds.has(justSpoke)) continuityAgentId = justSpoke;
+  else if (previous) {
     const addressed = previous.mentionedAgentIds.filter((id) => candidateIds.has(id));
     if (addressed.length === 1) continuityAgentId = addressed[0] ?? null;
     else {
