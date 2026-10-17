@@ -132,10 +132,11 @@ describe("ask_agent", () => {
       reply: (req) => {
         const last = lastText(req);
         if (last.includes("tool_result")) return { chunks: ["fine"] };
-        if (last.includes("ghost"))
-          return { chunks: [], toolUses: [{ name: "ask_agent", input: { agent: "@ghost", question: "hi?" } }] };
+        // The second run also reads the first message (replies go to threads): newest request first.
         if (last.includes("self"))
           return { chunks: [], toolUses: [{ name: "ask_agent", input: { agent: "@dev", question: "hi?" } }] };
+        if (last.includes("ghost"))
+          return { chunks: [], toolUses: [{ name: "ask_agent", input: { agent: "@ghost", question: "hi?" } }] };
         return { chunks: ["ok"] };
       },
     });

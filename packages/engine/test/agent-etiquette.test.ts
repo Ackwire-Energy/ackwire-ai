@@ -184,7 +184,7 @@ test("an agent knows what the other agents here can do and points to them", asyn
   const prompt = systemText(ctx.system);
   expect(prompt).toContain("Other agents here and what they can do: QA (@qa, Testes):");
   expect(prompt).toContain("Files (Drive)");
-  expect(prompt).toContain("ask @qa");
+  expect(prompt).toContain("ask it yourself with `ask_agent`");
   expect(prompt).not.toMatch(/Dev \(@dev, [^)]*\):/); // not itself
 });
 
