@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   type Adapters,
   createDaytonaSandboxProvider,
+  createExpoPushSender,
   createLogEmailSender,
   createMemoryPresence,
   createMemoryRateLimiter,
@@ -100,6 +101,8 @@ export async function startServer({ edition, modules = [] }: StartOptions) {
           snapshot: config.SANDBOX_SNAPSHOT,
         })
       : null,
+    // Phone app push (ADR 0035): only devices that registered get anything.
+    push: createExpoPushSender({ accessToken: config.EXPO_ACCESS_TOKEN }),
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("code sandbox", { provider: defaults.sandbox?.id ?? "off" });

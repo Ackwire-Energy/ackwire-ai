@@ -1,6 +1,7 @@
 import {
   type Adapters,
   createFakeEmailSender,
+  createFakePushSender,
   createMemoryBlobStore,
   createMemoryPresence,
   createMemoryPubSub,
@@ -79,6 +80,7 @@ export async function createTestServer(
   });
   const log = createLogger("error");
   const email = createFakeEmailSender();
+  const push = createFakePushSender();
   const platformBlobs = createMemoryBlobStore();
   const adapters: Adapters = {
     search: createPostgresSearchResolver(db),
@@ -90,6 +92,7 @@ export async function createTestServer(
     platformCredentials: noPlatformCredentials,
     email,
     platformBlobs,
+    push,
   };
   const provider = createFakeProvider(options.reply);
   const embeddings = createFakeEmbeddings();
@@ -155,6 +158,7 @@ export async function createTestServer(
     provider,
     embeddings,
     email,
+    push,
     platformBlobs,
     engine,
     app,

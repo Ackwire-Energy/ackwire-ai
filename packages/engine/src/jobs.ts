@@ -1,4 +1,4 @@
-import type { EmailSender, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
+import type { EmailSender, PushSender, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
 import { and, count, eq, inArray, queryTrace, schema } from "@agenteschat/db";
 import type { ArtifactDeps } from "./artifacts";
 import { getChannelCached } from "./context";
@@ -21,6 +21,7 @@ import { type MissionDeps, missionOfThread, missionRole, reactivateMission } fro
 import type { MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
+import { deliverPush } from "./push";
 import {
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
@@ -58,6 +59,8 @@ export interface JobDeps extends RunExecutorDeps {
   search?: SearchIndexResolver;
   /** Transactional email (job `email.send`). */
   email?: EmailSender;
+  /** Push to the phone app (job `push.send`); absent = push off. */
+  push?: PushSender | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
   /** Drive (job `forum.advance` saves the forum synthesis). */
@@ -399,6 +402,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // In-app notifications of a message (D46): mentions, thread replies, DMs.
     "notifications.message": async (job) => {
       await notifyMessage({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
+    },
+    // A notification for a person's phones (ADR 0035): skipped if read, done or snoozed meanwhile.
+    "push.send": async (job) => {
+      await deliverPush({ db: deps.db, push: deps.push }, String(job.payload.notificationId));
     },
     "context.consolidate": async (job) => {
       if (!deps.context) return;

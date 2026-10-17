@@ -30,19 +30,22 @@ The approved flows and look are in `docs/design/telas/Mobile.html`.
 - The server adds Better Auth's Expo plugin (`@better-auth/expo`) and trusts the app scheme `agenteschat://`. The app signs in with `expoClient` (session in SecureStore, social sign-in through the system browser and a deep link back).
 - The app calls `/api/app/*` and `/api/ws` with the session cookie read from SecureStore (`authClient.getCookie()`) in a `Cookie` header, plus `X-Agentes-Client: mobile`, and no `Origin`.
 - The CSRF rule in `routes/app/context.ts` becomes: with an `Origin`, it must be one of ours (unchanged). Without an `Origin`, the request must carry `X-Agentes-Client: mobile`. A browser cannot send that custom header cross-site without a CORS preflight, and we never allow one. Plain HTML forms always send an `Origin`. The WebSocket upgrade follows the same rule.
+- React Native's WebSocket sends an `Origin` derived from the URL. It passes because the app's API URL is the server's `PUBLIC_URL`; a foreign `Origin` is refused even with the app header.
 - Nothing new reaches the client: provider keys and MCP stay server-side (ADR 0007).
 
 **4. Push notifications.**
-- `push_devices` (per user, not per org: `user_id`, `token`, `platform` ios|android, `locale`, timestamps) with `POST /api/app/push/devices` (upsert) and `DELETE /api/app/push/devices/:token`.
+- `push_devices` (migration 0065; per user, not per org: `user_id`, `token`, `platform` ios|android, `locale`, timestamps) with `POST /api/app/push/devices` (upsert, 204; the token moves to whoever is signed in; 10 devices per person, 30 registrations an hour) and `DELETE /api/app/push/devices/:token` (204, own tokens only).
 - Delivery goes through the outbox as a `push.send` job, via a `PushSender` adapter (Expo Push API; a fake in tests). Unregistered tokens are removed.
 - What pushes (D46 kinds): everything in "Esperando você" (approval, agent question, forum turn), mention, DM from a person, and mission or routine stopped or failed. Muted or read items do not push. Grouped items push once per group while unread.
 - Push text is the one exception to "server strings in English": the OS shows it as is. A small catalog (`push-messages.ts`, pt-BR and en, picked by the device locale) renders it. The payload carries `{ orgId, kind, notificationId, channelId?, threadId?, approvalId?, missionId? }` for the deep link.
 - A high-risk approval is never approved from the notification. It opens the app, which asks to hold.
 
 **5. Store requirements.**
-- `DELETE /api/app/account` deletes the person's account (App Store 5.1.1(v)). It is refused while they are the only owner of an organization that has other members, and the app says what to do.
+- `DELETE /api/app/account` deletes the person's account (App Store 5.1.1(v)). It returns 204, or 409 `sole_owner` (with `params.organizations`) while they are the only owner of an organization that has other members, and the app says what to do. Organizations where they are the only member are deleted with them; their messages stay without an author.
 - Sign in with Apple is a social provider when `APPLE_CLIENT_ID`/`APPLE_TEAM_ID`/`APPLE_KEY_ID`/`APPLE_PRIVATE_KEY` are set, and `authConfig` lists it (App Store 4.8, required because we offer Google).
 - The app sells nothing. Plans are bought on the web.
+
+**Known gaps (follow-ups):** Expo push receipts are not read yet (only immediate tickets remove dead tokens); deleting an account that signed in with Apple does not revoke the Apple token yet; the Apple client secret is signed at boot and lasts 150 days, so the server must restart within that window.
 
 ## Consequences
 

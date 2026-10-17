@@ -5,6 +5,7 @@ import {
   countUsers,
   createInvitation,
   createOrganization,
+  deleteAccount,
   getOrganization,
   isValidTimeZone,
   listInvitations,
@@ -51,6 +52,7 @@ export function accountRoutes(deps: AppDeps) {
   const session = requireSession(deps.auth);
   for (const path of [
     "/me",
+    "/account",
     "/avatars/*",
     "/org-logos/*",
     "/organizations",
@@ -69,7 +71,7 @@ export function accountRoutes(deps: AppDeps) {
       responses: {
         200: json(
           z.object({
-            socialProviders: z.object({ google: z.boolean(), github: z.boolean() }),
+            socialProviders: z.object({ google: z.boolean(), github: z.boolean(), apple: z.boolean() }),
             signupOpen: z
               .boolean()
               .openapi({ description: "Offer the sign-up form (invited people can always sign up)." }),
@@ -145,6 +147,33 @@ export function accountRoutes(deps: AppDeps) {
         },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/account",
+      tags,
+      security,
+      summary: "Delete your account",
+      description:
+        "Deletes the signed-in person, their sessions, phones and memberships, and the organizations where they are the only member. Messages they wrote stay without an author. Refused with `sole_owner` (params: `organizations`, their names) while they are the only owner of an organization that has other members.",
+      responses: {
+        204: { description: "Deleted; the session cookies are cleared" },
+        401: errors[401],
+        409: errorResponse("Only owner of an organization with other members (`sole_owner`)"),
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      await deleteAccount(db, user.id, { pubsub: deps.adapters.pubsub });
+      // Their photo files (best effort: the account is already gone).
+      const blobs = deps.adapters.platformBlobs;
+      const photos = await blobs.list(`avatars/${user.id}/`).catch(() => [] as string[]);
+      await Promise.all(photos.map((key) => blobs.delete(key).catch(() => undefined)));
+      for (const cookie of expiredSessionCookies()) c.header("set-cookie", cookie, { append: true });
+      return c.body(null, 204);
     },
   );
 
@@ -539,4 +568,15 @@ export function accountRoutes(deps: AppDeps) {
   );
 
   return app;
+}
+
+/** Better Auth's session cookies, expired (plain and `__Secure-` names, as on http and https). */
+function expiredSessionCookies() {
+  const cookies: string[] = [];
+  for (const prefix of ["", "__Secure-"]) {
+    const secure = prefix ? "; Secure" : "";
+    for (const name of ["session_token", "session_data", "dont_remember"])
+      cookies.push(`${prefix}better-auth.${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure}`);
+  }
+  return cookies;
 }

@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, gt, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
 import { randomToken, sha256 } from "./crypto";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
@@ -378,6 +378,63 @@ export async function removeMember(
   });
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId });
+}
+
+/**
+ * Deletes a person's account (App Store 5.1.1(v), ADR 0035). Refused while
+ * they are the only owner of an organization that has other members
+ * (`sole_owner`, with the organizations' names: make someone else an owner
+ * first). Organizations where they are the only member go with them, with
+ * everything in them. The rest follows the foreign keys: sessions, sign-in
+ * methods, memberships, channel memberships, notifications and phones are
+ * deleted; messages and records they authored stay without an author (the
+ * same as any deleted user).
+ */
+export async function deleteAccount(
+  db: Database,
+  userId: string,
+  options: { pubsub?: PubSub } = {},
+): Promise<{ deletedOrgIds: string[] }> {
+  const { left, deleted } = await db.transaction(async (tx) => {
+    const mine = await tx
+      .select({ orgId: organizations.id, orgName: organizations.name, role: organizationMembers.role })
+      .from(organizationMembers)
+      .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+      .where(eq(organizationMembers.userId, userId))
+      .orderBy(asc(organizations.id));
+    // Same lock as role changes and removals, in a fixed order.
+    for (const m of mine) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${m.orgId}`}))`);
+    const alone: string[] = [];
+    const leaving: string[] = [];
+    const blocking: string[] = [];
+    for (const m of mine) {
+      const [row] = await tx
+        .select({
+          members: sql<number>`count(*)::int`,
+          owners: sql<number>`(count(*) filter (where ${organizationMembers.role} = 'owner'))::int`,
+        })
+        .from(organizationMembers)
+        .where(eq(organizationMembers.orgId, m.orgId));
+      if (Number(row?.members ?? 0) <= 1) alone.push(m.orgId);
+      else {
+        if (m.role === "owner" && Number(row?.owners ?? 0) <= 1) blocking.push(m.orgName);
+        leaving.push(m.orgId);
+      }
+    }
+    if (blocking.length > 0) {
+      throw new ConflictError(
+        "You are the only owner of an organization that has other members. Make someone else an owner first.",
+        "sole_owner",
+        { organizations: blocking },
+      );
+    }
+    if (alone.length > 0) await tx.delete(organizations).where(inArray(organizations.id, alone));
+    await tx.delete(users).where(eq(users.id, userId));
+    return { left: leaving, deleted: alone };
+  });
+  // Their open WebSocket connections lose every subscription now.
+  for (const orgId of left) await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId });
+  return { deletedOrgIds: deleted };
 }
 
 // ── Invitations ──────────────────────────────────────────────────────────────

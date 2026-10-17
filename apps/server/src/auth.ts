@@ -1,6 +1,8 @@
+import { sign as signWithKey } from "node:crypto";
 import type { Config } from "@agenteschat/config";
 import { type Database, schema } from "@agenteschat/db";
 import { deriveSecret, emailLocale, isSignupAllowed, onUserCreated, queueEmail, sha256 } from "@agenteschat/engine";
+import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -14,7 +16,10 @@ import type { Logger } from "./logger";
  * See docs/adr/0006-auth-and-tenancy.md.
  *
  * Mounted at `/api/auth/*`. The web app is served from the same origin, so
- * the session is an HttpOnly cookie — no tokens in the browser.
+ * the session is an HttpOnly cookie — no tokens in the browser. The phone
+ * app (ADR 0035) signs in through the Expo plugin: its scheme
+ * `agenteschat://` is trusted, it keeps the cookie in the device's secure
+ * store and sends it back in a `Cookie` header with `X-Agentes-Client: mobile`.
  */
 export function createAuth(deps: { db: Database; config: Config; log: Logger; emailDelivers?: boolean }) {
   const { db, config, log } = deps;
@@ -37,6 +42,9 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
   };
 
   const devOrigins = config.NODE_ENV === "development" ? ["http://localhost:5173"] : [];
+  // The phone app (ADR 0035); Expo Go and dev builds use `exp://` outside production.
+  const appOrigins = [APP_SCHEME, ...(config.NODE_ENV !== "production" ? ["exp://", "exp://**"] : [])];
+  const apple = appleSignIn(config);
 
   return betterAuth({
     appName: "agentes.chat",
@@ -44,7 +52,9 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
     basePath: "/api/auth",
     // Derived from AGENTES_SECRET so self-hosters manage a single secret.
     secret: deriveSecret(config.AGENTES_SECRET, "sessions"),
-    trustedOrigins: [config.PUBLIC_URL, ...devOrigins],
+    // Apple posts the sign-in result back from its own origin (`response_mode=form_post`).
+    trustedOrigins: [config.PUBLIC_URL, ...devOrigins, ...appOrigins, ...(apple ? [APPLE_ORIGIN] : [])],
+    plugins: [expo()],
     database: drizzleAdapter(db, {
       provider: "pg",
       schema: {
@@ -122,6 +132,7 @@ export function createAuth(deps: { db: Database; config: Config; log: Logger; em
       ...(config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET
         ? { github: { clientId: config.GITHUB_CLIENT_ID, clientSecret: config.GITHUB_CLIENT_SECRET } }
         : {}),
+      ...(apple ? { apple } : {}),
     },
     rateLimit: {
       enabled: config.NODE_ENV !== "test",
@@ -189,6 +200,64 @@ export function authUiConfig(config: Config) {
     socialProviders: {
       google: Boolean(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET),
       github: Boolean(config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET),
+      apple: appleConfigured(config),
     },
   };
+}
+
+/** The phone app's URL scheme (deep links back from social sign-in). */
+export const APP_SCHEME = "agenteschat://";
+export const APPLE_ORIGIN = "https://appleid.apple.com";
+/** Apple accepts a client secret valid for at most 6 months; we sign one per boot for 150 days. */
+const APPLE_SECRET_TTL_S = 150 * 24 * 3600;
+
+const appleConfigured = (config: Config) =>
+  Boolean(config.APPLE_CLIENT_ID && config.APPLE_TEAM_ID && config.APPLE_KEY_ID && config.APPLE_PRIVATE_KEY);
+
+/**
+ * "Sign in with Apple" (App Store 4.8), when its four variables are set. The
+ * client secret Apple wants is an ES256 JWT signed with the Sign in with
+ * Apple key (iss = team, sub = services id, aud = appleid.apple.com).
+ * `APPLE_APP_BUNDLE_ID` lets the iOS app sign in natively (its id tokens
+ * carry the bundle id as audience).
+ */
+export function appleSignIn(config: Config, now = Date.now()) {
+  if (!appleConfigured(config)) return null;
+  const clientId = config.APPLE_CLIENT_ID as string;
+  return {
+    clientId,
+    clientSecret: appleClientSecret({
+      clientId,
+      teamId: config.APPLE_TEAM_ID as string,
+      keyId: config.APPLE_KEY_ID as string,
+      privateKey: config.APPLE_PRIVATE_KEY as string,
+      now,
+    }),
+    ...(config.APPLE_APP_BUNDLE_ID ? { appBundleIdentifier: config.APPLE_APP_BUNDLE_ID } : {}),
+  };
+}
+
+/** The ES256 client secret JWT for Apple's token endpoint. */
+export function appleClientSecret(input: {
+  clientId: string;
+  teamId: string;
+  keyId: string;
+  privateKey: string;
+  now?: number;
+}): string {
+  const iat = Math.floor((input.now ?? Date.now()) / 1000);
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const signingInput = `${encode({ alg: "ES256", kid: input.keyId, typ: "JWT" })}.${encode({
+    iss: input.teamId,
+    iat,
+    exp: iat + APPLE_SECRET_TTL_S,
+    aud: APPLE_ORIGIN,
+    sub: input.clientId,
+  })}`;
+  // JWS wants the raw r||s signature, not DER.
+  const signature = signWithKey("sha256", Buffer.from(signingInput), {
+    key: input.privateKey,
+    dsaEncoding: "ieee-p1363",
+  });
+  return `${signingInput}.${signature.toString("base64url")}`;
 }

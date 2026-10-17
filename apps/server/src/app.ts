@@ -25,6 +25,7 @@ import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
 import { missionRoutes } from "./routes/app/missions";
 import { notificationRoutes } from "./routes/app/notifications";
+import { pushRoutes } from "./routes/app/push";
 import { questionRoutes } from "./routes/app/questions";
 import { routineRoutes } from "./routes/app/routines";
 import { sandboxRoutes } from "./routes/app/sandboxes";
@@ -62,7 +63,7 @@ export interface AppOptions {
  * Layout:
  * - `/api/health`         health probe
  * - `/api/auth/*`         Better Auth (sign-up, sign-in, sessions, OAuth callbacks)
- * - `/api/app/*`          private API of the web app (cookie session + CSRF)
+ * - `/api/app/*`          private API of the web and phone apps (cookie session + CSRF, ADR 0035)
  * - `/api/webhooks/*`     incoming webhooks (GitHub, Sentry), signature-checked
  * - `/api/github-app/webhook` our GitHub App's events (installs, suspensions), signature-checked
  * - `/api/git/*`          git proxy for agents' computers (their own credential, D35)
@@ -107,6 +108,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", dmRoutes(deps));
     api.route("/app", questionRoutes(deps));
     api.route("/app", notificationRoutes(deps));
+    api.route("/app", pushRoutes(deps));
     api.route("/app", secretRoutes(deps));
     api.route("/app", inviteRoutes(deps));
     api.route("/app", storageRoutes(deps));
