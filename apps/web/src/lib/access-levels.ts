@@ -186,8 +186,7 @@ const key = (connectionId: string | null, scope: string) => `${connectionId ?? "
  * The agent's current grants as a PUT body, read back from the tree: explicit
  * scopes, connectors and per-tool allows/denials (what's only inherited is
  * left out, as it comes from a broader grant that is kept). `raw` (the
- * agent's grant rows) keeps scopes the tree doesn't show, such as GitHub
- * repository limits.
+ * agent's grant rows) keeps scopes the tree doesn't show.
  */
 export function inputFromAccess(access: AgentAccess, raw: ScopeGrant[] = []): AccessInput {
   const input: AccessInput = { all: access.all, connectors: {}, scopes: [], tools: { allow: [], deny: [] } };
@@ -221,10 +220,7 @@ export function inputFromAccess(access: AgentAccess, raw: ScopeGrant[] = []): Ac
 /** Replaces what a resource grants with a level (or, for `custom`, the tools it has on now). */
 function apply(input: AccessInput, r: AccessResource, level: LevelState) {
   const owns = (connectionId: string | null, scope: string) =>
-    r.kind === "connector"
-      ? // Repository limits (`github:git.repo:owner/name`) narrow access whatever the level: they stay.
-        connectionId === r.connectionId && !scope.includes(":git.repo:")
-      : connectionId === null && r.scopes.includes(scope);
+    r.kind === "connector" ? connectionId === r.connectionId : connectionId === null && r.scopes.includes(scope);
   const names = new Set(r.tools.map((t) => t.name));
   const ownsTool = (t: ToolRef) =>
     r.kind === "connector" ? t.connectionId === r.connectionId : t.connectionId === null && names.has(t.name);
@@ -252,7 +248,7 @@ function apply(input: AccessInput, r: AccessResource, level: LevelState) {
 
 /**
  * The PUT body that sets some resources to a level and keeps everything
- * else (other connectors, built-ins, repository limits). "All tools" is
+ * else (other connectors, built-ins). "All tools" is
  * spelled out per resource first, so lowering one doesn't leave it granted.
  */
 export function inputWithLevels(access: AgentAccess, raw: ScopeGrant[], changes: Record<string, Level>): AccessInput {

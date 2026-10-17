@@ -106,7 +106,7 @@ describe("one level per connector and built-in area", () => {
     expect(nextLevel(by("area:skills"), "read")).toBe("none");
   });
 
-  test("setting a level replaces that resource's grants and keeps the rest (repository limits too)", () => {
+  test("setting a level replaces that resource's grants and keeps the rest", () => {
     const access = fakeAccessTree(
       input({
         scopes: [builtin("memory:write")],
@@ -114,26 +114,17 @@ describe("one level per connector and built-in area", () => {
       }),
       conns,
     );
-    const raw = [
-      { connectionId: "conn-gh", scope: "github:git.repo:acme/app" },
-      { connectionId: "gone", scope: "github:repo.read" },
-    ];
+    const raw = [{ connectionId: "gone", scope: "github:repo.read" }];
     const read = inputWithLevels(access, raw, { "connector:conn-gh": "read" });
     expect(read).toEqual({
       all: false,
       connectors: {},
-      scopes: [
-        builtin("memory:write"),
-        { connectionId: "conn-gh", scope: "github:git.repo:acme/app" },
-        { connectionId: "conn-gh", scope: "github:repo.read" },
-      ],
+      scopes: [builtin("memory:write"), { connectionId: "conn-gh", scope: "github:repo.read" }],
       tools: { allow: [], deny: [] },
     });
     const write = inputWithLevels(access, raw, { "connector:conn-gh": "write" });
     expect(write.connectors).toEqual({ "conn-gh": true });
-    expect(write.scopes.filter((s) => s.connectionId === "conn-gh")).toEqual([
-      { connectionId: "conn-gh", scope: "github:git.repo:acme/app" },
-    ]);
+    expect(write.scopes.filter((s) => s.connectionId === "conn-gh")).toEqual([]);
     const none = inputWithLevels(access, raw, { "connector:conn-gh": "none" });
     expect(none.tools).toEqual({ allow: [], deny: [] });
     // Built-in areas: their scopes.

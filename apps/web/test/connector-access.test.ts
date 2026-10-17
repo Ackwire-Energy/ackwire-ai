@@ -187,7 +187,7 @@ describe("one level per agent and connection", () => {
     expect(server?.readScopes).toEqual(["custom:s1:read"]);
   });
 
-  test("setting a level keeps every other grant (built-ins, other connections, repository limits)", () => {
+  test("setting a level keeps every other grant (built-ins, other connections)", () => {
     const access = tree((a) => {
       const s1 = a.connectors[1];
       if (s1) s1.state = "granted";
@@ -201,7 +201,6 @@ describe("one level per agent and connection", () => {
       tools: { allow: [], deny: [{ connectionId: "conn-gh", name: "github_merge" }] },
     });
     const raw = [
-      { connectionId: "conn-gh", scope: "github:git.repo:acme/app" },
       { connectionId: "gone", scope: "github:repo.read" },
       { connectionId: "s1", scope: "connector:*" },
     ];
@@ -209,7 +208,6 @@ describe("one level per agent and connection", () => {
     expect(read.connectors).toEqual({ s1: true });
     expect(read.scopes).toEqual([
       { connectionId: null, scope: "memory:write" },
-      { connectionId: "conn-gh", scope: "github:git.repo:acme/app" },
       { connectionId: "conn-gh", scope: "github:repo.read" },
     ]);
     // A level says it all: the connection's own denials go with it.
