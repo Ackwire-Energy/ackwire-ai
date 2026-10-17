@@ -487,10 +487,23 @@ export async function suspendRunForTool(
     let question: AgentQuestionRow | null = null;
     let secret: SecretRequestRow | null = null;
     if (gated.type === "approval") {
-      const message = await post(tx, `Approval request: ${gated.approval.title}`, {
+      const cardText = `Approval request: ${gated.approval.title}`;
+      const cardMeta = {
         ...bodyCode("approval_request", { title: gated.approval.title }),
         approvalId: gated.approval.id,
-      });
+      };
+      // A consulted agent's request goes to the conversation of whoever asked (ADR 0034).
+      const message =
+        gated.approval.channelId === run.channelId
+          ? await post(tx, cardText, cardMeta)
+          : await insertMessage(tx, {
+              orgId: run.orgId,
+              channelId: gated.approval.channelId,
+              threadId: gated.approval.threadRootId,
+              author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
+              body: cardText,
+              meta: cardMeta,
+            });
       messages.push(message);
       const [linked] = await tx
         .update(approvals)
