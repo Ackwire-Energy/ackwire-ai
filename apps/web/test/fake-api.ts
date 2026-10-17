@@ -5,6 +5,7 @@ import type {
   Agent,
   AgentQuestion,
   AgentSecret,
+  AppNotification,
   Approval,
   Channel,
   ChannelMember,
@@ -31,6 +32,7 @@ import { createMockCustomConnectors } from "./fakes/custom-connectors";
 import { createFakeForum } from "./fakes/forum";
 import { createFakeMachines, type FakeMachines } from "./fakes/machines";
 import { createFakeMissions } from "./fakes/missions";
+import { createFakeNotifications } from "./fakes/notifications";
 import { createMockPlanning } from "./fakes/planning";
 import { createFakeSandbox } from "./fakes/sandbox";
 import { createFakeSkills } from "./fakes/skills";
@@ -80,6 +82,8 @@ export interface FakeState {
   defaultCredentialId?: string | null;
   /** The workspace default agent budget (US$); 50 when unset. */
   defaultAgentBudgetUsd?: number;
+  /** My inbox (`notifications.*`); empty unless a test fills it. */
+  notifications?: AppNotification[];
   /** Make `chat.post` fail (optimistic send tests). */
   failPosts?: boolean;
   /** `chat.post` waits for this (to see the pending state). */
@@ -567,6 +571,7 @@ const id = (prefix: string) => `${prefix}-${++n}`;
 type FakedParts =
   | "wiki"
   | "forum"
+  | "notifications"
   | "sandbox"
   | "machines"
   | "skills"
@@ -1375,6 +1380,15 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
     machines: machines.client,
     forum: createFakeForum(ctx, (method, ...args) => state.calls.push({ method, args })),
+    notifications: createFakeNotifications(
+      {
+        get items() {
+          state.notifications ??= [];
+          return state.notifications;
+        },
+      },
+      (method, ...args) => state.calls.push({ method, args }),
+    ),
     wiki: createFakeWiki(ctx, (method, ...args) => state.calls.push({ method, args })),
     threads: createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args })),
     missions: createFakeMissions(ctx, (method, ...args) => state.calls.push({ method, args })),

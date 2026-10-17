@@ -8,7 +8,15 @@ import { useApi } from "@/api/context";
 import { ApiError } from "@/api/http";
 import { keys } from "@/api/keys";
 import { cacheTask, refreshMission } from "@/api/missions";
-import { applyReactions, cacheApproval, cacheForumSuggestion, cacheMessage, cacheMessageMemories } from "@/api/queries";
+import {
+  applyNotificationEvent,
+  applyReactions,
+  cacheApproval,
+  cacheForumSuggestion,
+  cacheMessage,
+  cacheMessageMemories,
+  isNotificationEvent,
+} from "@/api/queries";
 import type {
   ActiveRun,
   Agent,
@@ -326,6 +334,8 @@ export function RealtimeProvider({
     const offReconnect = conn.onReconnect(() => {
       // Reactions heard live may be stale now: the refetched message lists carry them again.
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
+      // Notifications that arrived while offline: the inbox and the badge catch up.
+      void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
     });
     // Approvals I can decide arrive here even when I'm not in that channel (sidebar badge, Aprovações).
@@ -336,6 +346,8 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
       }
       if (isAgentUnavailable(event)) streams.unavailable(event);
+      // My inbox: new or merged items, auto-resolved ones, and the badge's numbers.
+      if (isNotificationEvent(event)) applyNotificationEvent(qc, orgId, event);
       // A mission waits for me (a decision, a review, an approval): the lists and the sidebar's count.
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string") {
         refreshMission(qc, orgId, event.missionId);

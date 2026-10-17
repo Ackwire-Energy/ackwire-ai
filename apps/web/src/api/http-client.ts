@@ -11,6 +11,7 @@ import type {
   AgentSecret,
   AgentSkill,
   AgentUsage,
+  AppNotification,
   Approval,
   Artifact,
   ArtifactDetail,
@@ -61,6 +62,8 @@ import type {
   MissionSettings,
   MissionSummary,
   Model,
+  NotificationCount,
+  NotificationPage,
   Organization,
   OrgOverview,
   OrgSettings,
@@ -646,6 +649,21 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
       import: (orgId, input) => request<WikiImportResult>(`${org(orgId)}/wiki/import`, { json: input }),
       append: (orgId, slug, input) =>
         request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/append`, { json: input }),
+    },
+    notifications: {
+      list: (orgId, query = {}) =>
+        request<NotificationPage>(`${org(orgId)}/notifications`, {
+          query: { filter: query.filter, cursor: query.cursor, limit: query.limit },
+        }),
+      count: (orgId) => request<NotificationCount>(`${org(orgId)}/notifications/count`),
+      read: (orgId, id, read) =>
+        request<AppNotification>(`${org(orgId)}/notifications/${enc(id)}/read`, { json: { read } }),
+      done: (orgId, id, done) =>
+        request<AppNotification>(`${org(orgId)}/notifications/${enc(id)}/done`, { json: { done } }),
+      snooze: (orgId, id, until) =>
+        request<AppNotification>(`${org(orgId)}/notifications/${enc(id)}/snooze`, { json: { until } }),
+      readAll: (orgId, filter) =>
+        request<{ ids: string[] }>(`${org(orgId)}/notifications/read-all`, { json: filter ? { filter } : {} }),
     },
     forum: {
       list: async (orgId) => (await request<{ topics: ForumTopic[] }>(`${org(orgId)}/forum/topics`)).topics,

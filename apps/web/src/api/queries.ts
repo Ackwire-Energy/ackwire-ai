@@ -10,6 +10,15 @@ import {
 import { useCallback } from "react";
 import { upsertMessage } from "@/chat/timeline";
 import { artifactRefs } from "@/lib/artifacts";
+import {
+  allItems,
+  matchesFilter,
+  type NotificationPages,
+  type ReplyTarget,
+  removeFromPages,
+  upsertInPages,
+  withServerCounts,
+} from "@/lib/notifications";
 import { replyOf } from "@/lib/reply";
 import type { ApiClient } from "./client";
 import { useApi } from "./context";
@@ -18,6 +27,7 @@ import type {
   AgentComputer,
   AgentInput,
   ApiRule,
+  AppNotification,
   Approval,
   ArtifactContent,
   ArtifactDetail,
@@ -36,6 +46,9 @@ import type {
   Machine,
   Message,
   MessageMemory,
+  NotificationCount,
+  NotificationEvent,
+  NotificationFilter,
   OrgSettings,
   ReactionCount,
   Role,
@@ -1674,5 +1687,216 @@ export function useThreadMutation(orgId: string) {
     },
     // The view a change came back with (its `canManage` is ours); a deleted thread leaves the cache.
     onSuccess: (thread, change) => refreshThread(qc, orgId, thread ?? change.thread, change.type === "delete"),
+  });
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+type QC = ReturnType<typeof useQueryClient>;
+
+/** One filter's list (pages of 50), with the counts of every filter on the first page. */
+export function useNotifications(orgId: string, filter: NotificationFilter) {
+  const api = useApi();
+  return useInfiniteQuery({
+    queryKey: keys.notificationList(orgId, filter),
+    queryFn: ({ pageParam }) =>
+      api.notifications.list(orgId, { filter, limit: 50, ...(pageParam ? { cursor: pageParam } : {}) }),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: (prev) => prev,
+    staleTime: 30_000,
+  });
+}
+
+/** The badge on the bell: unread (and how many wait on me). Live via `notification.counts`. */
+export const useNotificationCount = (orgId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.notificationCount(orgId),
+    queryFn: () => api.notifications.count(orgId),
+    staleTime: 60_000,
+    meta: { quiet: true },
+  });
+};
+
+const listCaches = (qc: QC, orgId: string) =>
+  qc.getQueriesData<NotificationPages>({ queryKey: [...keys.notifications(orgId), "list"] });
+
+const knownNotification = (qc: QC, orgId: string, id: string) => {
+  for (const [, data] of listCaches(qc, orgId)) {
+    const hit = allItems(data).find((n) => n.id === id);
+    if (hit) return hit;
+  }
+  return undefined;
+};
+
+/** The badge follows one item's change (read, done, snoozed, new) until the server's numbers arrive. */
+function moveCount(qc: QC, orgId: string, before: AppNotification | undefined, after: AppNotification | undefined) {
+  const delta = (f: "unread" | "waiting") =>
+    (after && matchesFilter(after, f) ? 1 : 0) - (before && matchesFilter(before, f) ? 1 : 0);
+  qc.setQueryData<NotificationCount>(keys.notificationCount(orgId), (c) =>
+    c ? { unread: Math.max(0, c.unread + delta("unread")), waiting: Math.max(0, c.waiting + delta("waiting")) } : c,
+  );
+}
+
+/** A fresh notification (event, server answer or my optimistic change) in every loaded list and the badge. */
+export function cacheNotification(qc: QC, orgId: string, item: AppNotification) {
+  const before = knownNotification(qc, orgId, item.id);
+  for (const [key, data] of listCaches(qc, orgId)) {
+    if (!data) continue;
+    const filter = key[4] as NotificationFilter;
+    qc.setQueryData<NotificationPages>(key, upsertInPages(data, filter, item, before));
+  }
+  moveCount(qc, orgId, before, item);
+}
+
+/** Resolved on its own (question answered, approval decided, turn passed): out of every list. */
+export function dropNotification(qc: QC, orgId: string, id: string) {
+  const before = knownNotification(qc, orgId, id);
+  for (const [key, data] of listCaches(qc, orgId)) {
+    if (data) qc.setQueryData<NotificationPages>(key, removeFromPages(data, id, before));
+  }
+  moveCount(qc, orgId, before, undefined);
+}
+
+/** `notification.upserted` / `removed` / `counts` (user scope). */
+export function applyNotificationEvent(qc: QC, orgId: string, event: NotificationEvent) {
+  if (event.type === "notification.upserted") cacheNotification(qc, orgId, event.notification);
+  else if (event.type === "notification.removed") dropNotification(qc, orgId, event.id);
+  else {
+    const count = { unread: event.unread, waiting: event.waiting };
+    qc.setQueryData<NotificationCount>(keys.notificationCount(orgId), count);
+    for (const [key, data] of listCaches(qc, orgId))
+      if (data) qc.setQueryData<NotificationPages>(key, withServerCounts(data, count.unread, count.waiting));
+  }
+}
+
+export const isNotificationEvent = (e: { type: string }): e is NotificationEvent =>
+  e.type === "notification.upserted" || e.type === "notification.removed" || e.type === "notification.counts";
+
+export type NotificationAction =
+  | { type: "read"; item: AppNotification; read: boolean }
+  | { type: "done"; item: AppNotification; done: boolean }
+  | { type: "snooze"; item: AppNotification; until: string }
+  | { type: "readAll"; filter: NotificationFilter }
+  /** Undo of "Marcar tudo como lido": the ids it changed. */
+  | { type: "unreadMany"; ids: string[] };
+
+/** The changed items as the server sent them, and the ids "Marcar tudo como lido" touched. */
+export interface NotificationActionResult {
+  items: AppNotification[];
+  ids: string[];
+}
+
+/** What an action does to the items we have, for the optimistic copy. */
+function optimistic(qc: QC, orgId: string, action: NotificationAction, now: string): AppNotification[] {
+  switch (action.type) {
+    case "read":
+      return [{ ...action.item, readAt: action.read ? (action.item.readAt ?? now) : null }];
+    case "done":
+      return [{ ...action.item, doneAt: action.done ? now : null, ...(action.done ? {} : { snoozedUntil: null }) }];
+    case "snooze":
+      return [{ ...action.item, snoozedUntil: action.until }];
+    case "readAll": {
+      const loaded = allItems(qc.getQueryData<NotificationPages>(keys.notificationList(orgId, action.filter)));
+      return loaded.filter((n) => n.readAt === null).map((n) => ({ ...n, readAt: now }));
+    }
+    case "unreadMany":
+      return action.ids.flatMap((id) => {
+        const known = knownNotification(qc, orgId, id);
+        return known ? [{ ...known, readAt: null }] : [];
+      });
+  }
+}
+
+/**
+ * Read, Feito, Lembrar depois, Marcar tudo como lido (and their undo): the
+ * lists and the badge change at once; a refusal puts them back.
+ */
+export function useNotificationAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (action: NotificationAction): Promise<NotificationActionResult> => {
+      switch (action.type) {
+        case "read":
+          return { items: [await api.notifications.read(orgId, action.item.id, action.read)], ids: [action.item.id] };
+        case "done":
+          return { items: [await api.notifications.done(orgId, action.item.id, action.done)], ids: [action.item.id] };
+        case "snooze":
+          return {
+            items: [await api.notifications.snooze(orgId, action.item.id, action.until)],
+            ids: [action.item.id],
+          };
+        case "readAll":
+          return { items: [], ids: (await api.notifications.readAll(orgId, action.filter)).ids };
+        case "unreadMany":
+          return {
+            items: await Promise.all(action.ids.map((id) => api.notifications.read(orgId, id, false))),
+            ids: action.ids,
+          };
+      }
+    },
+    onMutate: async (action) => {
+      await qc.cancelQueries({ queryKey: keys.notifications(orgId) });
+      const lists = listCaches(qc, orgId);
+      const count = qc.getQueryData<NotificationCount>(keys.notificationCount(orgId));
+      for (const item of optimistic(qc, orgId, action, new Date().toISOString())) cacheNotification(qc, orgId, item);
+      return { lists, count };
+    },
+    onError: (_error, _action, ctx) => {
+      if (!ctx) return;
+      for (const [key, data] of ctx.lists) qc.setQueryData(key, data);
+      qc.setQueryData(keys.notificationCount(orgId), ctx.count);
+    },
+    onSuccess: (result) => {
+      for (const item of result.items) cacheNotification(qc, orgId, item);
+    },
+    onSettled: (_r, _e, action) => {
+      void qc.invalidateQueries({ queryKey: keys.notificationCount(orgId) });
+      // Marking everything read touches items beyond the loaded pages.
+      if (action.type === "readAll" || action.type === "unreadMany")
+        void qc.invalidateQueries({ queryKey: [...keys.notifications(orgId), "list"] });
+    },
+  });
+}
+
+/**
+ * "Responder" in the inbox, through the endpoints that already exist: a
+ * message (channel, thread or DM), an issue comment, an answer to an agent's
+ * question, or my turn at the forum table.
+ */
+export function useNotificationReply(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ target, text, choice }: { target: ReplyTarget; text: string; choice?: boolean }) => {
+      switch (target.kind) {
+        case "message": {
+          const message = await api.chat.post(orgId, target.channelId, {
+            body: text,
+            clientId: newClientId(),
+            ...(target.threadId ? { threadId: target.threadId } : {}),
+          });
+          cacheMessage(qc, orgId, message);
+          return { kind: "message" as const, message };
+        }
+        case "issue":
+          await api.issues.comment(orgId, target.issueId, text);
+          void qc.invalidateQueries({ queryKey: keys.issueActivity(orgId, target.issueId) });
+          void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
+          return { kind: "issue" as const };
+        case "question":
+          return {
+            kind: "question" as const,
+            question: await api.questions.answer(orgId, target.questionId, choice ? { choice: text } : { text }),
+          };
+        case "forum":
+          await api.forum.post(orgId, target.topicId, { body: text });
+          void qc.invalidateQueries({ queryKey: keys.forumTopic(orgId, target.topicId) });
+          void qc.invalidateQueries({ queryKey: keys.forum(orgId), exact: true });
+          return { kind: "forum" as const };
+      }
+    },
   });
 }

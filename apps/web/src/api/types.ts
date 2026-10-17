@@ -347,6 +347,7 @@ export type ChannelEvent =
 export type UserEvent =
   | { type: "approval.created" | "approval.decided"; approval: Approval }
   | BudgetEvent
+  | NotificationEvent
   | { type: string };
 
 // ── Approvals, connectors, scopes ─────────────────────────────────────────────
@@ -2530,3 +2531,108 @@ export interface MissionCommand {
   createdAt: string;
   expiresAt: string;
 }
+
+// ── Notifications (contract: one inbox per person per organization) ─────────────
+
+export type NotificationKind =
+  | "mention"
+  | "thread_reply"
+  | "dm"
+  | "agent_question"
+  | "issue_assigned"
+  | "issue_comment"
+  | "issue_status"
+  | "forum_turn"
+  | "forum_synthesis"
+  | "approval"
+  | "mission_finished"
+  | "mission_stopped"
+  | "routine_finished"
+  | "routine_failed"
+  | "reaction";
+
+/** Who did it; names and avatars come from the directory. */
+export interface NotificationActor {
+  type: "user" | "agent";
+  id: string;
+}
+
+/** Where it lives: only the relevant ids are set. */
+export interface NotificationSource {
+  channelId?: string;
+  threadId?: string;
+  messageId?: string;
+  dmId?: string;
+  issueId?: string;
+  issueNumber?: number;
+  topicId?: string;
+  approvalId?: string;
+  questionId?: string;
+  missionId?: string;
+  routineId?: string;
+  /** Channel name, thread title, issue title, topic title, mission or routine name. */
+  label?: string;
+}
+
+/** What the card shows (plain text; only @mentions are highlighted). */
+export interface NotificationLatest {
+  /** Snippet of the latest message, comment, question or summary (≤ 280 chars). */
+  text?: string;
+  /** Issue title, the approval's action title, the topic's question. */
+  title?: string;
+  /** Reactions: distinct emojis (≤ 5) and my message's snippet. */
+  emojis?: string[];
+  quote?: string;
+  statusFrom?: string;
+  statusTo?: string;
+  /** Missions and routines. */
+  steps?: { done: number; total: number; failedAt?: number };
+  /** An agent's question with options. */
+  suggestions?: string[];
+  /** Approvals. */
+  expiresAt?: string;
+  /** Forum turns. */
+  round?: number;
+  rounds?: number;
+}
+
+export interface AppNotification {
+  id: string;
+  kind: NotificationKind;
+  /** Goes into "Esperando você": it blocks an agent or a decision. */
+  waiting: boolean;
+  /** Most recent first, at most 10. */
+  actors: NotificationActor[];
+  /** Events merged into it (replies, comments, reactions). */
+  count: number;
+  source: NotificationSource;
+  latest: NotificationLatest;
+  readAt: string | null;
+  doneAt: string | null;
+  snoozedUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type NotificationFilter = "all" | "mentions" | "waiting" | "unread" | "reactions";
+
+export type NotificationCounts = Record<NotificationFilter, number>;
+
+/** `GET …/notifications`: visible ones (not done, not snoozed), waiting first, then newest. */
+export interface NotificationPage {
+  items: AppNotification[];
+  counts: NotificationCounts;
+  nextCursor: string | null;
+}
+
+/** The sidebar badge (`GET …/notifications/count`, `notification.counts`). */
+export interface NotificationCount {
+  unread: number;
+  waiting: number;
+}
+
+/** Per person (user scope): created or merged, auto-resolved, and the new counts. */
+export type NotificationEvent =
+  | { type: "notification.upserted"; notification: AppNotification }
+  | { type: "notification.removed"; id: string }
+  | ({ type: "notification.counts" } & NotificationCount);

@@ -84,6 +84,10 @@ export const keys = {
   storageMigration: (orgId: string) => ["org", orgId, "storage", "migration"] as const,
   search: (orgId: string, q: string, kinds: string) => ["org", orgId, "search", q, kinds] as const,
   reactions: (orgId: string, messageId: string) => ["org", orgId, "reactions", messageId] as const,
+  /** Every notification read (prefix): lists per filter and the badge count. */
+  notifications: (orgId: string) => ["org", orgId, "notifications"] as const,
+  notificationList: (orgId: string, filter: string) => ["org", orgId, "notifications", "list", filter] as const,
+  notificationCount: (orgId: string) => ["org", orgId, "notifications", "count"] as const,
   forum: (orgId: string) => ["org", orgId, "forum"] as const,
   forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,

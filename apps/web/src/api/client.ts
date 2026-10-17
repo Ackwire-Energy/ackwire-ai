@@ -12,6 +12,7 @@ import type {
   AgentSkill,
   AgentUsage,
   ApiRule,
+  AppNotification,
   Approval,
   Artifact,
   ArtifactContent,
@@ -79,6 +80,9 @@ import type {
   MissionSettings,
   MissionSummary,
   Model,
+  NotificationCount,
+  NotificationFilter,
+  NotificationPage,
   Organization,
   OrgOverview,
   OrgSettings,
@@ -636,6 +640,23 @@ export interface ApiClient {
     ): Promise<{ topic: ForumTopicDetail; suggestion: ForumSuggestion }>;
     /** "Agora não": the card stays, marked dismissed. */
     dismissSuggestion(orgId: string, messageId: string): Promise<{ suggestion: ForumSuggestion }>;
+  };
+  /** My inbox in this organization: mentions, replies, what waits on me (telas/Notificacoes.html). */
+  notifications: {
+    /** Visible ones (not done, not snoozed), waiting first, then the newest; counts for every filter. */
+    list(
+      orgId: string,
+      query?: { filter?: NotificationFilter; cursor?: string; limit?: number },
+    ): Promise<NotificationPage>;
+    /** The sidebar badge. */
+    count(orgId: string): Promise<NotificationCount>;
+    read(orgId: string, id: string, read: boolean): Promise<AppNotification>;
+    /** "Feito" (`false` undoes it). */
+    done(orgId: string, id: string, done: boolean): Promise<AppNotification>;
+    /** "Lembrar depois": hidden until `until` (ISO). */
+    snooze(orgId: string, id: string, until: string): Promise<AppNotification>;
+    /** "Marcar tudo como lido": the ids it changed (undo marks them unread again). */
+    readAll(orgId: string, filter?: NotificationFilter): Promise<{ ids: string[] }>;
   };
   calendar: {
     /** Events, routine runs, issue deadlines and proposals between `from` and `to` (ISO). */
