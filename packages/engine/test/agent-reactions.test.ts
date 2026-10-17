@@ -113,11 +113,13 @@ describe("react (reaction instead of reply)", () => {
     f = await setup();
     const m = await post("bom dia");
     const r = schema.messageReactions;
-    await expect(f.db.insert(r).values({ orgId: f.org.id, messageId: m.id, reaction: "🎉" })).rejects.toThrow();
+    // Drizzle builders are thenables, not promises: `rejects` needs a real promise.
+    const insert = async (values: typeof r.$inferInsert) => {
+      await f.db.insert(r).values(values);
+    };
+    await expect(insert({ orgId: f.org.id, messageId: m.id, reaction: "🎉" })).rejects.toThrow();
     await expect(
-      f.db
-        .insert(r)
-        .values({ orgId: f.org.id, messageId: m.id, userId: f.owner.id, agentId: f.agent.id, reaction: "🎉" }),
+      insert({ orgId: f.org.id, messageId: m.id, userId: f.owner.id, agentId: f.agent.id, reaction: "🎉" }),
     ).rejects.toThrow();
     await f.db.insert(r).values({ orgId: f.org.id, messageId: m.id, userId: f.owner.id, reaction: "🎉" });
     await f.db.insert(r).values({ orgId: f.org.id, messageId: m.id, agentId: f.agent.id, reaction: "🎉" });
