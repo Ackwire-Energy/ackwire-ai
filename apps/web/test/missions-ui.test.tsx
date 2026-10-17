@@ -142,7 +142,7 @@ describe("Missões (Threads.html)", () => {
     expect(atlas.textContent).toContain("No mac");
   });
 
-  test("Nova missão: Pedir aprovação de comandos starts at "Só os arriscados" (low-risk ones allowed automatically)", async () => {
+  test("Nova missão: Pedir aprovação de comandos starts at 'Só os arriscados' (low-risk ones allowed automatically)", async () => {
     const api = createFakeApi(seedState());
     api.missions.eligibleAgents = async () => [pick(ADA_ID, "Ada")];
     await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
