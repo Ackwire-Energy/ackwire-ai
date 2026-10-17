@@ -450,7 +450,7 @@ export async function appleSignInTokens(
     .select({ refreshToken: schema.accounts.refreshToken, accessToken: schema.accounts.accessToken })
     .from(schema.accounts)
     .where(and(eq(schema.accounts.userId, userId), eq(schema.accounts.providerId, "apple")));
-  return rows.flatMap((r) =>
+  return rows.flatMap((r): { value: string; hint: "refresh_token" | "access_token" }[] =>
     r.refreshToken
       ? [{ value: r.refreshToken, hint: "refresh_token" as const }]
       : r.accessToken

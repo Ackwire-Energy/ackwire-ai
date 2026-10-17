@@ -205,7 +205,7 @@ describe("pins", () => {
     const listed = await listMessages(f.db, bia.id, f.org.id, f.general.id);
     expect(listed.find((m) => m.id === a.id)?.pinned).toBe(true);
     expect(
-      events.filter((e) => e.type === "message.pinned").map((e) => (e as { messageId: string }).messageId),
+      events.filter((e) => e.type === "message.pinned").map((e) => (e as unknown as { messageId: string }).messageId),
     ).toEqual([a.id, b.id]);
 
     await unpinMessage(deps(), bia.id, f.org.id, f.general.id, a.id);

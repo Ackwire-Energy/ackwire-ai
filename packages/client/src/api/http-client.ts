@@ -153,7 +153,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     threadFollows: {
       follow: (orgId, threadId) =>
-        request<ThreadFollow>(`${org(orgId)}/threads/${enc(threadId)}/follow`, { method: "PUT" }),
+        request<ThreadFollow>(`${org(orgId)}/threads/${enc(threadId)}/follow`, { method: "PUT", json: {} }),
       unfollow: (orgId, threadId) =>
         request<ThreadFollow>(`${org(orgId)}/threads/${enc(threadId)}/follow`, { method: "DELETE" }),
     },

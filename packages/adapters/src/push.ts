@@ -25,7 +25,7 @@ export interface PushResult {
 }
 
 /** What happened to a sent message, asked some minutes later (Expo push receipts). */
-export interface PushReceipt {
+export interface PushDeliveryReceipt {
   ticketId: string;
   ok: boolean;
   /** The device is gone (`DeviceNotRegistered`): delete its token. */
@@ -42,7 +42,7 @@ export interface PushSender {
    * Tickets without a receipt yet (or anymore) are left out. Throws
    * `PushError` when the request failed. Absent: the sender has none.
    */
-  receipts?(ticketIds: string[]): Promise<PushReceipt[]>;
+  receipts?(ticketIds: string[]): Promise<PushDeliveryReceipt[]>;
 }
 
 /** A request failure; `retryable` drives the outbox retry. */
@@ -137,7 +137,7 @@ export function createExpoPushSender(
       return results;
     },
     async receipts(ticketIds) {
-      const out: PushReceipt[] = [];
+      const out: PushDeliveryReceipt[] = [];
       for (let i = 0; i < ticketIds.length; i += EXPO_RECEIPTS_BATCH) {
         const ids = ticketIds.slice(i, i + EXPO_RECEIPTS_BATCH);
         let res: Response;
@@ -195,7 +195,7 @@ export function createFakePushSender(options: { unregistered?: Iterable<string>;
     goneLater: Set<string>;
     tickets: Map<string, string>;
     receiptRequests: string[][];
-    receipts(ticketIds: string[]): Promise<PushReceipt[]>;
+    receipts(ticketIds: string[]): Promise<PushDeliveryReceipt[]>;
   } = {
     id: "fake",
     sent,
@@ -214,7 +214,7 @@ export function createFakePushSender(options: { unregistered?: Iterable<string>;
     },
     async receipts(ticketIds) {
       receiptRequests.push([...ticketIds]);
-      return ticketIds.flatMap((ticketId) => {
+      return ticketIds.flatMap((ticketId): PushDeliveryReceipt[] => {
         const token = tickets.get(ticketId);
         if (!token) return [];
         return goneLater.has(token)

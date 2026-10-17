@@ -77,7 +77,7 @@ describe("threads: follow", () => {
     const view = async () =>
       ((await (await fromApp(bia, `${org}/threads/${root.id}`)).json()) as { following: boolean }).following;
     expect(await view()).toBe(false);
-    const put = await fromApp(bia, followPath, { method: "PUT" });
+    const put = await fromApp(bia, followPath, { method: "PUT", json: {} });
     expect(put.status).toBe(200);
     expect(await put.json()).toEqual({ threadId: root.id, channelId, following: true });
     expect(await view()).toBe(true);
@@ -87,7 +87,7 @@ describe("threads: follow", () => {
 
     const stranger = browser(t);
     await signUp(stranger, "zed@example.com");
-    expect((await fromApp(stranger, followPath, { method: "PUT" })).status).toBe(403);
+    expect((await fromApp(stranger, followPath, { method: "PUT", json: {} })).status).toBe(403);
   });
 });
 
