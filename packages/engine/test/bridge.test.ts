@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MISSION_MCP_TOOLS, type ServerFrame } from "@agenteschat/adapters";
+import { MCP_TOOLS_MAX, MISSION_MCP_TOOLS, type ServerFrame } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   createMachinePairing,
@@ -275,6 +275,45 @@ describe("mission tools through the bridge", () => {
     const outside = names(await runner.list(await tokenOf(elsewhere.id)));
     expect(outside).not.toContain("update_plan");
     expect(outside).not.toContain("report");
+  });
+
+  test("a connector with hundreds of tools never pushes the mission tools out of the capped list", async () => {
+    const connectionId = crypto.randomUUID();
+    const many: ToolSource = {
+      name: "big-connector",
+      tools: async () =>
+        Array.from({ length: MCP_TOOLS_MAX + 50 }, (_, i) => ({
+          name: `ads_tool_${i}`,
+          description: "An ads tool",
+          scope: "ads:read",
+          connectionId,
+          inputSchema: { type: "object", properties: {} },
+          execute: async () => ({ content: "ok" }),
+        })),
+    };
+    f = await setup({ machines: true, missionTools: true, toolSources: [many], reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine(f);
+    const runner = bridgeRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId, scope: "connector:*" }]);
+    const view = await createMission(f.missionDeps, f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      goal: "Write three TikTok tips",
+      title: "Tips",
+      repoDir: "tips",
+    });
+    const run = await runningRun(view.threadId as string);
+    const listed = await runner.list(
+      await issueRunToolToken(f.db, {
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        machineId: paired.machineId,
+        runId: run.id,
+      }),
+    );
+    expect(listed.ok && listed.tools.length).toBe(MCP_TOOLS_MAX);
+    expect(names(listed)).toEqual(expect.arrayContaining(["update_plan", "report", "complete_mission"]));
   });
 
   test("a computer-brain run's machine mission tools (start_task, upload_artifact, get_context) only in its mission's thread", async () => {

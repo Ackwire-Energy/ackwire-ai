@@ -320,7 +320,9 @@ async function locate(db: Database, id: BridgeIdentity): Promise<Located> {
 export async function bridgeToolsFor(deps: RunToolsDeps, id: BridgeIdentity): Promise<BrainTool[]> {
   if (!deps.tools) return [];
   const { ctx } = await locate(deps.db, id);
-  return (await deps.tools.list(ctx)).map(brainToolOf);
+  const tools = await deps.tools.list(ctx);
+  // Our own tools before the connectors': a cap on the list (`MCP_TOOLS_MAX`) only ever drops connector tools.
+  return [...tools.filter((t) => !t.connectionId), ...tools.filter((t) => t.connectionId)].map(brainToolOf);
 }
 
 /** The gateway's own refusals, as codes (the gateway returns them as plain error text). */
