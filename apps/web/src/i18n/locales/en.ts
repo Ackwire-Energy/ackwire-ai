@@ -5278,6 +5278,34 @@ export const en: Translations = {
   chat: {
     doing_one: "{{names}} is {{doing}}",
     doing_other: "{{names}} are {{doing}}",
+    /** "Theo, Iris and 2 more" (3 or more names in the working line). */
+    namesMore: "{{first}}, {{second}} and {{count}} more",
+    /** The working line while an agent asks another one (names come in bold). */
+    consult: {
+      asking: "{{from}} is asking {{to}}",
+      answered: "{{to}} answered. {{from}} is writing",
+      writing: "{{from}} is writing",
+      clock: "Waiting for {{time}}",
+    },
+    /** The card on top of a reply when the agent asked another agent (`meta.consulted`). */
+    consultation: {
+      answered: "{{name}} answered",
+      expired: "{{name}} didn't answer in time",
+      failed: "{{name}} couldn't answer",
+      waited: "Waited {{minutes}} min",
+      wentOn: "Went on without the answer",
+      asked: "{{name}} asked",
+      answerOf: "{{name}}'s answer",
+      answer: "Answer",
+      noAnswer: "No answer in {{minutes}} min. {{from}} answered without it.",
+      couldNot: "{{to}} couldn't answer. {{from}} went on without it.",
+      private: "A talk only between {{from}} and {{to}}",
+    },
+    /** Next to the time on a reply of an agent nobody called. */
+    joined: {
+      label: "joined in",
+      tip: "Nobody called {{name}}. It joined to help.",
+    },
     work: {
       see: "See what it did",
       steps_one: "{{count}} step",
@@ -5347,7 +5375,7 @@ export const en: Translations = {
       schedulingReminder: "scheduling a reminder",
       creatingRoutine: "creating a routine",
       updatingRoutine: "changing a routine",
-      thinking: "thinking",
+      thinking: "working",
       typing: "typing",
       consulting: "checking {{app}}",
       creatingIssue: "creating an issue",

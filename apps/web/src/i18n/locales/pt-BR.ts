@@ -5291,6 +5291,34 @@ export const ptBR = {
     /** Typing bar: "{{names}} está {{doing}}" (agents' verbs come from their tool calls). */
     doing_one: "{{names}} está {{doing}}",
     doing_other: "{{names}} estão {{doing}}",
+    /** "Theo, Iris e mais 2" (3 or more names in the working line). */
+    namesMore: "{{first}}, {{second}} e mais {{count}}",
+    /** The working line while an agent asks another one (names come in bold). */
+    consult: {
+      asking: "{{from}} está perguntando {{prep}} {{to}}",
+      answered: "{{to}} respondeu. {{from}} está escrevendo",
+      writing: "{{from}} está escrevendo",
+      clock: "Esperando há {{time}}",
+    },
+    /** The card on top of a reply when the agent asked another agent (`meta.consulted`). */
+    consultation: {
+      answered: "{{name}} respondeu",
+      expired: "{{The}} {{name}} não respondeu a tempo",
+      failed: "{{The}} {{name}} não conseguiu responder",
+      waited: "Esperou {{minutes}} min",
+      wentOn: "Seguiu sem a resposta",
+      asked: "{{name}} perguntou",
+      answerOf: "Resposta {{of}} {{name}}",
+      answer: "Resposta",
+      noAnswer: "Sem resposta em {{minutes}} min. {{theFrom}} {{from}} respondeu sem ela.",
+      couldNot: "{{theTo}} {{to}} não conseguiu responder. {{theFrom}} {{from}} seguiu sem ela.",
+      private: "Conversa só entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
+    },
+    /** Next to the time on a reply of an agent nobody called. */
+    joined: {
+      label: "entrou na conversa",
+      tip: "Ninguém chamou {{article}} {{name}}. {{Pronoun}} entrou para ajudar.",
+    },
     work: {
       see: "Ver o que {{pronoun}} fez",
       steps_one: "{{count}} passo",
@@ -5360,7 +5388,7 @@ export const ptBR = {
       schedulingReminder: "agendando um lembrete",
       creatingRoutine: "criando uma rotina",
       updatingRoutine: "alterando uma rotina",
-      thinking: "pensando",
+      thinking: "trabalhando",
       typing: "digitando",
       consulting: "consultando o {{app}}",
       creatingIssue: "criando uma issue",

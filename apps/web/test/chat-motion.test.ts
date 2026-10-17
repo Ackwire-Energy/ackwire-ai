@@ -121,7 +121,7 @@ describe("humanized activity", () => {
 
   test("the bar's sentence (pt-BR)", () => {
     expect(activityText(t, [])).toBe("");
-    expect(activityText(t, [entry("Theo", { kind: "thinking" })])).toBe("Theo está pensando…");
+    expect(activityText(t, [entry("Theo", { kind: "thinking" })])).toBe("Theo está trabalhando…");
     expect(activityText(t, [entry("Theo", toolActivity("himetrica_get_events"))])).toBe(
       "Theo está consultando o himetrica…",
     );
@@ -134,7 +134,7 @@ describe("humanized activity", () => {
         entry("Ada", { kind: "thinking" }),
         entry("Marina", { kind: "typing" }, "person"),
       ]),
-    ).toBe("Theo e Ada estão pensando · Marina está digitando…");
+    ).toBe("Theo e Ada estão trabalhando · Marina está digitando…");
   });
 
   test("runs carry the tool from `agent.tool`; writing runs leave the bar", () => {
@@ -146,12 +146,12 @@ describe("humanized activity", () => {
         t,
         barEntries(runsInChannel(s, "c"), ["u1"], names, (id) => (id === "u1" ? "Marina" : undefined)),
       );
-    expect(bar()).toBe("Theo está pensando · Marina está digitando…");
+    expect(bar()).toBe("Theo está trabalhando · Marina está digitando…");
     s = applyChannelEvent(s, { type: "agent.tool", ...base, tool: "github_list_prs" });
     expect(runsInChannel(s, "c")[0]?.status).toBe("thinking");
     expect(bar()).toBe("Theo está consultando o GitHub · Marina está digitando…");
     s = applyChannelEvent(s, { type: "agent.tool", ...base, tool: null });
-    expect(bar()).toBe("Theo está pensando · Marina está digitando…");
+    expect(bar()).toBe("Theo está trabalhando · Marina está digitando…");
     s = applyChannelEvent(s, { type: "agent.delta", ...base, seq: 1, text: "Achei" });
     expect(bar()).toBe("Marina está digitando…");
     // After the final message, a late tool event is ignored.

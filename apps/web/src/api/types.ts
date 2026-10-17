@@ -199,6 +199,19 @@ export interface Message {
   createdAt: string;
 }
 
+/** How an agent's question to another agent (`ask_agent`) ended. */
+export type ConsultationStatus = "answered" | "expired" | "failed";
+
+/** `message.meta.consulted` on the asking agent's reply: one entry per agent it asked. */
+export interface MessageConsultation {
+  agentId: string;
+  consultationId: string;
+  status: ConsultationStatus;
+  question: string;
+  /** Only when answered. */
+  answer: string | null;
+}
+
 /** Which agents saw a person's message, picked it up, and how their runs ended. */
 export interface MessageReceipts {
   seenBy: string[];
@@ -279,6 +292,25 @@ export type ChannelEvent =
   // ── Chat latency batch (packages/engine/src/events.ts) ──────────────────────
   /** An agent will answer: show "thinking" at once. `runId` is null when announced at post time. */
   | { type: "agent.thinking"; channelId: string; threadId: string; agentId: string; runId: string | null }
+  /** An agent asked another agent (`ask_agent`) and waits for it: "Dev está perguntando ao Infra…". */
+  | {
+      type: "agent.consulting";
+      channelId: string;
+      threadId: string;
+      runId: string;
+      agentId: string;
+      consultedAgentId: string;
+    }
+  /** That question came back (answered, expired or failed): the asking run resumes and writes. */
+  | {
+      type: "agent.consulted";
+      channelId: string;
+      threadId: string;
+      runId: string;
+      agentId: string;
+      consultedAgentId: string;
+      status: ConsultationStatus;
+    }
   /** The agent's first words arrived. */
   | { type: "agent.typing"; channelId: string; threadId: string; agentId: string; runId: string }
   /** The agent stopped (done, failed or waiting for approval). */

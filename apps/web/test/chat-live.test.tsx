@@ -94,18 +94,20 @@ const bar = () => ({ textContent: typingBar().querySelector(".ac-typing__text")?
 const lastPerson = (state: ReturnType<typeof seedState>) => state.messages[state.messages.length - 1];
 
 describe("typing bar above the composer", () => {
-  test("mention → 'Atlas está pensando…' in the bar (not a message row); first words → message at the end; bar clears", async () => {
+  test("mention → 'Atlas está trabalhando…' in the bar (not a message row); first words → message at the end; bar clears", async () => {
     const { socket, state } = await open();
     await sendText("@atlas olha o deploy");
-    expect(bar().textContent).toBe("Atlas está pensando…");
-    expect(typingBar().querySelectorAll(".ac-typing__dots span")).toHaveLength(3);
+    expect(bar().textContent).toBe("Atlas está trabalhando…");
+    // Agents at work: the pixel orbit (the dots are for people typing).
+    expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
+    expect(typingBar().querySelector(".ac-typing__dots")).toBeNull();
     expect(typingBar().querySelector(".ac-avatar--agent")).not.toBeNull();
     // Not a row in the timeline.
     expect(rowsWith("Atlas está")).toHaveLength(0);
     await settle(4);
     const run = { threadId: lastPerson(state)?.id, runId: "r-live", agentId: ATLAS_ID };
     await push(socket, { type: "agent.thinking", ...run });
-    expect(bar().textContent).toBe("Atlas está pensando…");
+    expect(bar().textContent).toBe("Atlas está trabalhando…");
     await push(socket, { type: "agent.typing", ...run });
     await push(socket, { type: "agent.delta", ...run, seq: 1, text: "Deploy ok" });
     await settle();
@@ -120,13 +122,13 @@ describe("typing bar above the composer", () => {
     expect(document.querySelector(".ac-msg--streaming")).toBeNull();
   });
 
-  test("groups agents and people: 'Atlas está pensando · João está digitando…'; our typing frames are throttled", async () => {
+  test("groups agents and people: 'Atlas está trabalhando · João está digitando…'; our typing frames are throttled", async () => {
     const { socket, state } = await open();
     await sendText("@atlas tudo certo?");
     await settle(2);
     await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
     await settle();
-    expect(bar().textContent).toBe("Atlas está pensando · João está digitando…");
+    expect(bar().textContent).toBe("Atlas está trabalhando · João está digitando…");
     await push(socket, {
       type: "agent.delta",
       threadId: lastPerson(state)?.id,
@@ -270,7 +272,7 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
     await sendText("oi @ada");
     await settle(4);
     const first = lastPerson(state);
-    expect(bar().textContent).toBe("Ada está pensando…");
+    expect(bar().textContent).toBe("Ada está trabalhando…");
     const run = { threadId: first?.id, runId: "r-1st", agentId: ADA_ID };
     await pushG({ type: "agent.delta", ...run, seq: 1, text: "Oi!" });
     await pushG({
@@ -365,7 +367,7 @@ describe("direct messages with an agent", () => {
         .map((l) => l.getAttribute("href")),
     ).toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
     await sendText("lembra que deploy é só de segunda a quinta");
-    expect(bar().textContent).toBe("Ada está pensando…");
+    expect(bar().textContent).toBe("Ada está trabalhando…");
   });
 });
 

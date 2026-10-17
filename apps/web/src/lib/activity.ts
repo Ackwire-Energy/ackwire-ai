@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next";
+import type { LiveConsult, LiveConsultStatus } from "@/realtime/consults";
 import type { LiveRun } from "@/realtime/streams";
 import { joinNames } from "./format";
+import { agentGrammar } from "./grammar";
 
 /**
  * What the typing bar says someone is doing: "Theo está pensando…", "Theo
@@ -232,17 +234,45 @@ export interface ActivityEntry {
   type: "agent" | "person";
   name: string;
   activity: Activity;
+  /** The agent is asking another agent (or just heard back): its own phrase, never grouped. */
+  consult?: EntryConsult;
 }
 
-/** Who shows in the bar, in order: agents about to answer (not yet writing), then people typing. */
+export interface EntryConsult {
+  /** The agent it asked. */
+  to: string;
+  toName: string;
+  status: LiveConsultStatus;
+  /** When the question went out (the clock). */
+  since: number;
+}
+
+/**
+ * Who shows in the bar, in order: agents asking another agent (`consults`),
+ * agents about to answer (not yet writing), then people typing.
+ */
 export function barEntries(
   runs: LiveRun[],
   typingUserIds: string[],
   agentName: (id: string) => string,
   personName: (id: string) => string | undefined,
+  consults: LiveConsult[] = [],
 ): ActivityEntry[] {
   const out: ActivityEntry[] = [];
   const seen = new Set<string>();
+  for (const c of consults) {
+    if (seen.has(c.agentId)) continue;
+    // Its words are on screen already: the reply's row says it.
+    if (runs.some((r) => r.runId === c.runId && isWriting(r))) continue;
+    seen.add(c.agentId);
+    out.push({
+      id: c.agentId,
+      type: "agent",
+      name: agentName(c.agentId),
+      activity: { kind: "thinking" },
+      consult: { to: c.consultedAgentId, toName: agentName(c.consultedAgentId), status: c.status, since: c.since },
+    });
+  }
   for (const r of runs) {
     if (isWriting(r) || r.status === "waiting_approval" || seen.has(r.agentId)) continue;
     seen.add(r.agentId);
@@ -263,29 +293,69 @@ export function barEntries(
 export interface ActivityGroup {
   names: string[];
   activity: Activity;
+  consult?: EntryConsult;
 }
 
-/** People doing the same thing share a phrase: "Ada e Atlas estão pensando". */
+/** People doing the same thing share a phrase: "Ada e Atlas estão trabalhando". A consultation is its own. */
 export function groupActivities(entries: ActivityEntry[]): ActivityGroup[] {
   const groups: ActivityGroup[] = [];
   for (const e of entries) {
-    const same = groups.find((g) => g.activity.kind === e.activity.kind && g.activity.app === e.activity.app);
+    if (e.consult) {
+      groups.push({ names: [e.name], activity: e.activity, consult: e.consult });
+      continue;
+    }
+    const same = groups.find(
+      (g) => !g.consult && g.activity.kind === e.activity.kind && g.activity.app === e.activity.app,
+    );
     if (same) same.names.push(e.name);
     else groups.push({ names: [e.name], activity: e.activity });
   }
   return groups;
 }
 
-/** "pensando", "consultando o GitHub". */
+/** "trabalhando", "consultando o GitHub". */
 export const activityVerb = (t: TFunction, a: Activity) => t(`chat.activity.${a.kind}`, { app: a.app ?? "" });
 
-/** The bar's sentence: "Theo está consultando o GitHub · Marina está digitando…"; "" when nobody. */
-export function activityText(t: TFunction, entries: ActivityEntry[]) {
+/** Wraps a name in the sentence (the bar shows names in bold); plain text by default. */
+export type MarkName = (name: string) => string;
+const plain: MarkName = (name) => name;
+
+/** "Theo", "Theo e Iris", "Theo, Iris e mais 2". */
+export function listNames(t: TFunction, names: string[], mark: MarkName = plain) {
+  if (names.length <= 2) return joinNames(names.map(mark), t("newAgent.and"));
+  return t("chat.namesMore", {
+    first: mark(names[0] ?? ""),
+    second: mark(names[1] ?? ""),
+    count: names.length - 2,
+  });
+}
+
+/** One consultation's phrase: "Dev está perguntando ao Infra", "Infra respondeu. Dev está escrevendo". */
+function consultPhrase(t: TFunction, from: string, c: EntryConsult, mark: MarkName) {
+  const g = agentGrammar(t, c.toName);
+  if (c.status === "asking") return t("chat.consult.asking", { from: mark(from), to: mark(c.toName), prep: g.to });
+  if (c.status === "answered") return t("chat.consult.answered", { from: mark(from), to: mark(c.toName) });
+  return t("chat.consult.writing", { from: mark(from) });
+}
+
+/**
+ * The bar's sentence: "Theo, Iris e mais 2 estão trabalhando · Marina está
+ * digitando…"; "" when nobody. `mark` wraps each name (for bold).
+ */
+export function activitySentence(t: TFunction, entries: ActivityEntry[], mark: MarkName = plain) {
   const groups = groupActivities(entries);
   if (groups.length === 0) return "";
-  const and = t("newAgent.and");
   const phrases = groups.map((g) =>
-    t("chat.doing", { count: g.names.length, names: joinNames(g.names, and), doing: activityVerb(t, g.activity) }),
+    g.consult
+      ? consultPhrase(t, g.names[0] ?? "", g.consult, mark)
+      : t("chat.doing", {
+          count: g.names.length,
+          names: listNames(t, g.names, mark),
+          doing: activityVerb(t, g.activity),
+        }),
   );
   return `${phrases.join(" · ")}…`;
 }
+
+/** The bar's sentence as plain text (see `activitySentence`). */
+export const activityText = (t: TFunction, entries: ActivityEntry[]) => activitySentence(t, entries);

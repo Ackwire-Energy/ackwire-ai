@@ -70,12 +70,13 @@ import type {
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
 import { buildTimeline, mergeTimeline, type TimelineItem, threadRootsToLoad } from "@/chat/timeline";
-import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
+import { ConsultationCard } from "@/components/ConsultationCard";
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
@@ -123,6 +124,7 @@ import {
   useChannelThreadsView,
 } from "@/components/threads/ThreadLines";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
+import { ConsultClock, WorkingStack, WorkingWords } from "@/components/WorkingLine";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
@@ -130,6 +132,7 @@ import { activityText, activityVerb, barEntries, isWriting, toolActivity } from 
 import { artifactRefs } from "@/lib/artifacts";
 import { audienceNotice, canTalk } from "@/lib/audience";
 import { entersWithMotion, greetingSuggestions, messageUsage, nearBottom, usageLine } from "@/lib/chat";
+import { consultationsOf } from "@/lib/consultations";
 import { clearDraft, peekDraft } from "@/lib/drafts";
 import { errorCode, errorText } from "@/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@/lib/files";
@@ -154,6 +157,7 @@ import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from 
 import { contextMarks, hiddenByThreads, rangeCandidates, suggestRange, threadStartOf } from "@/lib/threads";
 import { useToast } from "@/lib/toast";
 import { splitCanceled } from "@/lib/work";
+import { consultsIn } from "@/realtime/consults";
 import {
   reconcileChannelRuns,
   useChannelRealtime,
@@ -199,6 +203,7 @@ export interface ChannelChrome {
 }
 
 const sameRuns = (a: LiveRun[], b: LiveRun[]) => a.length === b.length && a.every((r, i) => r === b[i]);
+const sameList = <T,>(a: T[], b: T[]) => a.length === b.length && a.every((r, i) => r === b[i]);
 
 /** `?m=`: how many older pages to look through for the message, and how long it stays highlighted. */
 const FOCUS_MAX_PAGES = 10;
@@ -413,7 +418,7 @@ function ChannelView({
       ]),
     [threadList, channelMessages.data],
   );
-  const runVisible = useRef<(r: LiveRun) => boolean>(() => true);
+  const runVisible = useRef<(r: { threadId: string }) => boolean>(() => true);
   runVisible.current = thread ? (r) => r.threadId === thread.id : (r) => !hiddenRunThreads.has(r.threadId);
   const scopedRuns = (s: StreamsState) => runsInChannel(s, channel.id).filter((r) => runVisible.current(r));
   const live = useLiveStore();
@@ -1836,30 +1841,39 @@ function ActivityBar({
 }: {
   channelId: string;
   /** Which runs belong here (a thread view shows only its own). */
-  visible?: { current: (r: LiveRun) => boolean };
+  visible?: { current: (r: { threadId: string }) => boolean };
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const [now, setNow] = useState(() => Date.now());
   const runs = useStreams((s) => runsInChannel(s, channelId).filter((r) => visible?.current(r) ?? true), sameRuns);
+  // An agent asking another one: "Dev está perguntando ao Infra… 0:12" (its run pauses meanwhile).
+  const consults = useLive(
+    (s) => consultsIn(s.consults, channelId, now).filter((c) => visible?.current(c) ?? true),
+    sameList,
+  );
   const typing = useLive((s) => s.typing[channelId]);
   const ids = typingIn({ [channelId]: typing ?? {} }, channelId, now, me.user.id);
+  const ticking = Boolean(typing) || consults.length > 0;
   useEffect(() => {
-    if (!typing) return;
+    if (!ticking) return;
+    setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [typing]);
+  }, [ticking]);
   const entries = barEntries(
     runs,
     ids,
     (id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent"),
     (id) => dir.memberById.get(id)?.name,
+    consults,
   );
   const text = activityText(t, entries);
   const active = entries.length > 0;
-  // The strip behind the bar takes the color of the first agent at work.
-  const skyAgent = entries.find((e) => e.type === "agent");
+  // The strip behind the bar (and the orbit) take the color of the first agent at work.
+  const firstAgent = entries.find((e) => e.type === "agent");
+  const skyAgent = firstAgent;
   const { canStop, stop } = useStopRun();
   // "Parar" in the bar for the runs not writing yet that I may stop.
   const barStoppable = runs.filter((r) => !isWriting(r) && isStoppable(r) && canStop(r));
@@ -1913,24 +1927,21 @@ function ActivityBar({
         {active && (
           <>
             {skyAgent && <ActivitySky color={colorOf(dir.agentById.get(skyAgent.id))} />}
-            <span className="ac-typing__avatars" aria-hidden="true">
-              {entries.map((e) =>
-                e.type === "agent" ? (
-                  <AgentAvatar key={`a:${e.id}`} agentId={e.id} size="xs" name={e.name} state="thinking" />
-                ) : (
-                  <Avatar key={`p:${e.id}`} size="xs" name={e.name} imageUrl={dir.memberById.get(e.id)?.image} />
-                ),
-              )}
-            </span>
-            {/* Keyed by the words: a new activity fades in. */}
+            {/* Agents at work: the pixel orbit in the first one's color (people only typing: the dots). */}
+            {firstAgent && <AgentSpinner agentId={firstAgent.id} size={14} />}
+            <WorkingStack entries={entries} />
+            {/* Keyed by the words: a new activity fades in. Names in ink. */}
             <span key={text} className="ac-typing__text">
-              {text}
+              <WorkingWords entries={entries} />
             </span>
-            <span className="ac-typing__dots" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </span>
+            <ConsultClock entries={entries} now={now} />
+            {!firstAgent && (
+              <span className="ac-typing__dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            )}
             {barStoppable.length > 0 && <span className="ac-typing__sep" aria-hidden="true" />}
             {barStoppable.map((r) => (
               <StopButton key={r.runId} run={r} onStop={stop} place="bar" />
@@ -2048,6 +2059,16 @@ export const TimelineMessage = memo(function TimelineMessage({
   const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.replyInThread !== undefined;
   // An agent suggests a topic ("Vale um fórum?"): only a person opens it.
   const forumSuggestion = m.author.type === "agent" ? forumSuggestionOf(meta) : null;
+  // It asked other agents before answering (`meta.consulted`): one card per agent, on top of the reply.
+  const consulted = useMemo(() => (m.author.type === "agent" ? consultationsOf(m.meta) : []), [m.author.type, m.meta]);
+  // Nobody called it: it joined the conversation on its own (`meta.joined`).
+  const joined = m.author.type === "agent" && meta.joined === true;
+  const joinedTip = joined
+    ? (() => {
+        const g = agentGrammar(t, name);
+        return t("chat.joined.tip", { name, article: g.article, Pronoun: capitalize(g.pronoun) });
+      })()
+    : null;
   const card =
     approvalId || proposalId || memoryUpdates.length > 0 || question || secretRequest || missionCard || forumSuggestion;
   const feedback = m.author.type === "agent" && !card && !m.local;
@@ -2127,6 +2148,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       }
       time={<time dateTime={m.createdAt}>{formatTime(i18n.language, m.createdAt)}</time>}
       meta={m.local ? undefined : details}
+      note={joinedTip ? { label: t("chat.joined.label"), tip: joinedTip } : undefined}
       status={m.local === "pending" ? { icon: "waiting", label: t("channel.sending") } : undefined}
       aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} /> : undefined}
       stacked={Boolean(card)}
@@ -2150,6 +2172,8 @@ export const TimelineMessage = memo(function TimelineMessage({
         </p>
       )}
       {quoted && <QuotedMessage reply={quoted} />}
+      {m.author.id &&
+        consulted.map((c) => <ConsultationCard key={c.consultationId} consultation={c} askerId={m.author.id ?? ""} />)}
       {(!routine || routineOpen) &&
         !missionCard &&
         !forumSuggestion &&

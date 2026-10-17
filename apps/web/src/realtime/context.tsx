@@ -33,6 +33,7 @@ import type {
 import { formatPercent } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { type ConnectionStatus, RealtimeConnection, realtimeUrl, type SocketFactory } from "./connection";
+import { applyConsultEvent, type ConsultsState } from "./consults";
 import { applyComputerEvent, applyMachineEvent } from "./machines";
 import { applyReceiptEvent, guessReceipt, type ReceiptsState, seedReceipt } from "./receipts";
 import {
@@ -68,6 +69,8 @@ export interface LiveState {
   notices: Record<string, LiveNotice[]>;
   /** Messages that went into a running task (`agent.run.steered`): message id → agent id. */
   steered: Record<string, string>;
+  /** Agents asking other agents right now (`agent.consulting` / `agent.consulted`), by the asking run. */
+  consults: ConsultsState;
 }
 
 export interface LiveNotice {
@@ -124,6 +127,7 @@ export function createStreamsStore(
     secrets: {},
     notices: {},
     steered: {},
+    consults: {},
   };
   const listeners = new Set<() => void>();
   const set = (next: LiveState) => {
@@ -135,7 +139,8 @@ export function createStreamsStore(
       next.questions === state.questions &&
       next.secrets === state.secrets &&
       next.notices === state.notices &&
-      next.steered === state.steered
+      next.steered === state.steered &&
+      next.consults === state.consults
     )
       return;
     state = next;
@@ -192,6 +197,7 @@ export function createStreamsStore(
         secrets,
         memory,
         streams: applyChannelEvent(state.streams, event, now()),
+        consults: applyConsultEvent(state.consults, event, now()),
         receipts: applyReceiptEvent(
           event.type === "message.created" && event.message
             ? seedReceipt(state.receipts, event.message)

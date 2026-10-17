@@ -1,0 +1,186 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { setupDom } from "@agenteschat/ui/testing/dom";
+
+setupDom();
+
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { renderApp, screen, settle } from "./render";
+
+afterEach(() => cleanup());
+
+const open = async (state = seedState()) => {
+  const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+  await settle(5);
+  const socket = r.sockets.last();
+  await act(async () => socket.open());
+  await settle(2);
+  return { ...r, socket, state };
+};
+const push = (socket: { push: (f: unknown) => void }, event: Record<string, unknown>, channelId = ENG_ID) =>
+  act(async () => socket.push({ type: "event", channelId, event: { channelId, ...event } }));
+const rowWith = (text: string) =>
+  screen()
+    .getAllByRole("article")
+    .find((a) => a.textContent?.includes(text)) as HTMLElement;
+const typingBar = () => document.querySelector(".ac-typing") as HTMLElement;
+const bar = () => typingBar().querySelector(".ac-typing__text")?.textContent ?? "";
+
+const QUESTION = "Como subo um fix em staging hoje?";
+const ANSWER = "**Staging** sobe sozinho quando o PR entra.\n\nHoje use a fila reserva.";
+
+function withReply(meta: Record<string, unknown>, body = "Já subi o fix em staging.") {
+  const state = seedState();
+  state.messages.push({
+    id: "msg-reply",
+    channelId: ENG_ID,
+    threadId: null,
+    author: { type: "agent", id: ADA_ID },
+    body,
+    mentionedAgentIds: [],
+    agentRunId: "r-reply",
+    meta,
+    createdAt: new Date().toISOString(),
+  });
+  return state;
+}
+
+describe("the consultation card (meta.consulted)", () => {
+  test("answered: one line 'Atlas respondeu' with a preview; opens to the question, the answer and who saw it", async () => {
+    await open(
+      withReply({
+        consulted: [
+          { agentId: ATLAS_ID, consultationId: "k1", status: "answered", question: QUESTION, answer: ANSWER },
+        ],
+      }),
+    );
+    const row = rowWith("Já subi o fix");
+    const card = row.querySelector(".ac-consult") as HTMLElement;
+    expect(card).not.toBeNull();
+    // On top of the reply's text.
+    expect(
+      card.compareDocumentPosition(row.querySelector(".ac-msg__text") as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    const head = within(card).getByRole("button", { name: /Atlas respondeu/ });
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    expect(card.querySelector(".ac-avatar--agent")).not.toBeNull();
+    expect(card.querySelector(".ac-consult__pv")?.textContent).toBe(
+      "Staging sobe sozinho quando o PR entra. Hoje use a fila reserva.",
+    );
+    expect(card.querySelector(".ac-consult__body")).toBeNull();
+    await act(async () => fireEvent.click(head));
+    expect(head.getAttribute("aria-expanded")).toBe("true");
+    const body = card.querySelector(".ac-consult__body") as HTMLElement;
+    expect(head.getAttribute("aria-controls")).toBe(body.id);
+    expect(body.textContent).toContain("Ada perguntou");
+    expect(body.textContent).toContain(QUESTION);
+    expect(body.textContent).toContain("Resposta do Atlas");
+    expect(body.querySelector("strong")?.textContent).toBe("Staging");
+    expect(body.querySelector(".ac-consult__foot")?.textContent).toBe("Conversa só entre a Ada e o Atlas");
+    await act(async () => fireEvent.click(head));
+    expect(card.querySelector(".ac-consult__body")).toBeNull();
+  });
+
+  test("expired: calm, a clock icon, 'O Atlas não respondeu a tempo' / 'Esperou 15 min'; opened, the question", async () => {
+    await open(
+      withReply(
+        {
+          consulted: [{ agentId: ATLAS_ID, consultationId: "k2", status: "expired", question: QUESTION, answer: null }],
+        },
+        "O Atlas não respondeu. Quer que eu suba do jeito de sempre?",
+      ),
+    );
+    const card = rowWith("do jeito de sempre").querySelector(".ac-consult") as HTMLElement;
+    expect(card.querySelector(".ac-avatar")).toBeNull();
+    expect(card.querySelector(".ac-consult__ic svg")).not.toBeNull();
+    const head = within(card).getByRole("button", { name: /O Atlas não respondeu a tempo/ });
+    expect(card.querySelector(".ac-consult__pv")?.textContent).toBe("Esperou 15 min");
+    await act(async () => fireEvent.click(head));
+    const body = card.querySelector(".ac-consult__body") as HTMLElement;
+    expect(body.textContent).toContain(QUESTION);
+    expect(body.textContent).toContain("Sem resposta em 15 min. A Ada respondeu sem ela.");
+  });
+
+  test("failed, and one card per agent asked", async () => {
+    await open(
+      withReply({
+        consulted: [
+          { agentId: ATLAS_ID, consultationId: "k3", status: "failed", question: QUESTION, answer: null },
+          {
+            agentId: ATLAS_ID,
+            consultationId: "k4",
+            status: "answered",
+            question: "E o banco?",
+            answer: "Em manutenção.",
+          },
+        ],
+      }),
+    );
+    const cards = rowWith("Já subi o fix").querySelectorAll(".ac-consult");
+    expect(cards).toHaveLength(2);
+    expect(cards[0]?.textContent).toContain("O Atlas não conseguiu responder");
+    expect(cards[0]?.textContent).toContain("Seguiu sem a resposta");
+    expect(cards[1]?.textContent).toContain("Atlas respondeu");
+  });
+});
+
+describe("an agent that joined on its own (meta.joined)", () => {
+  test("a faint 'entrou na conversa' next to the time, with a tip that says why", async () => {
+    await open(withReply({ joined: true }, "Só um ponto: o vídeo fica pronto no dia 26."));
+    const row = rowWith("o vídeo fica pronto");
+    const note = row.querySelector(".ac-msg__note") as HTMLElement;
+    expect(note.getAttribute("tabindex")).toBe("0");
+    expect(note.textContent).toContain("entrou na conversa");
+    expect(row.querySelector(".ac-msg__note-tip")?.textContent).toBe("Ninguém chamou a Ada. Ela entrou para ajudar.");
+    expect(note.getAttribute("aria-describedby")).toBe(row.querySelector(".ac-msg__note-tip")?.id ?? "");
+    // Others' replies don't say it.
+    expect(rowWith("Achei a causa")?.querySelector(".ac-msg__note") ?? null).toBeNull();
+  });
+});
+
+describe("the working line while an agent asks another", () => {
+  test("'Ada está perguntando ao Atlas…' with both bodies and a clock → 'Atlas respondeu. Ada está escrevendo…' → the reply", async () => {
+    const { socket } = await open();
+    const run = { threadId: "m-1", runId: "r-ask", agentId: ADA_ID };
+    await push(socket, { type: "agent.thinking", ...run });
+    await settle();
+    expect(bar()).toBe("Ada está trabalhando…");
+    await push(socket, { type: "agent.tool", ...run, tool: "ask_agent" });
+    await push(socket, { type: "agent.consulting", ...run, consultedAgentId: ATLAS_ID });
+    // The asking run pauses while it waits.
+    await push(socket, { type: "agent.idle", ...run });
+    await push(socket, { type: "run.finished", ...run, status: "waiting_input" });
+    await settle();
+    expect(bar()).toBe("Ada está perguntando ao Atlas…");
+    expect(typingBar().querySelectorAll(".ac-typing__text b")).toHaveLength(2);
+    expect(typingBar().querySelectorAll(".ac-typing__tok .ac-avatar--agent")).toHaveLength(2);
+    expect(typingBar().querySelector(".ac-typing__to svg")).not.toBeNull();
+    // The one asked is thinking.
+    expect(typingBar().querySelectorAll(".ac-typing__tok")[1]?.querySelector(".ac-avatar--thinking")).not.toBeNull();
+    const clock = typingBar().querySelector(".ac-typing__clock") as HTMLElement;
+    expect(clock.className).toContain("ac-num");
+    expect(clock.textContent).toMatch(/^\d+:\d\d$/);
+    expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
+    await push(socket, { type: "agent.consulted", ...run, consultedAgentId: ATLAS_ID, status: "answered" });
+    await push(socket, { type: "agent.thinking", ...run });
+    await settle();
+    expect(bar()).toBe("Atlas respondeu. Ada está escrevendo…");
+    expect(typingBar().querySelector(".ac-typing__clock")).toBeNull();
+    await push(socket, { type: "agent.delta", ...run, seq: 0, text: "O Atlas me passou" });
+    await settle();
+    expect(bar()).toBe("");
+  });
+
+  test("several agents: one line, stacked, 'Ada e Atlas estão trabalhando…'; it shrinks as each one finishes", async () => {
+    const { socket } = await open();
+    await push(socket, { type: "agent.thinking", threadId: "m-1", runId: "r-a", agentId: ADA_ID });
+    await push(socket, { type: "agent.thinking", threadId: "m-1", runId: "r-b", agentId: ATLAS_ID });
+    await settle();
+    expect(bar()).toBe("Ada e Atlas estão trabalhando…");
+    expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(2);
+    await push(socket, { type: "agent.idle", threadId: "m-1", runId: "r-b", agentId: ATLAS_ID });
+    await settle();
+    expect(bar()).toBe("Ada está trabalhando…");
+    expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(1);
+  });
+});
