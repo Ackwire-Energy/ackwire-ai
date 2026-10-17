@@ -225,6 +225,13 @@ test("snoozed notifications leave the inbox and come back on top when their time
   expect((await inbox(bia.id)).items).toHaveLength(1);
   expect((await inbox(bia.id)).counts.all).toBe(1);
 
+  // Undo: back now, with `upserted` and the counts.
+  const undone = await snoozeNotification(deps(), bia.id, f.org.id, first?.id ?? "", null);
+  expect(undone.snoozedUntil).toBeNull();
+  expect(events.map((e) => e.type).slice(2)).toEqual(["notification.upserted", "notification.counts"]);
+  expect((await inbox(bia.id)).counts.all).toBe(2);
+  await snoozeNotification(deps(), bia.id, f.org.id, first?.id ?? "", until);
+
   expect(await wakeSnoozedNotifications(deps())).toBe(0); // not yet
   expect(await wakeSnoozedNotifications({ ...deps(), now: () => new Date(until.getTime() + 1000) })).toBe(1);
   const back = await inbox(bia.id);

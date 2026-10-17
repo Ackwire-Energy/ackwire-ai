@@ -147,6 +147,12 @@ test("notifications API: read, done and undo, snooze, read-all; session, CSRF an
   expect(((await (await api("/notifications")).json()) as Page).counts.all).toBe(2);
   expect((await api(`/notifications/${id}/snooze`, { json: { until: "2001-01-01T00:00:00Z" } })).status).toBe(400);
 
+  // Undo the snooze: back in the inbox, nothing else changed; then snooze it again.
+  const unsnoozed = (await (await api(`/notifications/${id}/snooze`, { json: { until: null } })).json()) as Item;
+  expect(unsnoozed).toMatchObject({ id, snoozedUntil: null, readAt: null, doneAt: null });
+  expect(((await (await api("/notifications")).json()) as Page).counts.all).toBe(3);
+  expect((await api(`/notifications/${id}/snooze`, { json: { until } })).status).toBe(200);
+
   const all = (await (await api("/notifications/read-all", { json: {} })).json()) as { ids: string[] };
   expect(all.ids).toHaveLength(2); // the snoozed one is not in the inbox
   expect(await (await api("/notifications/count")).json()).toEqual({ unread: 0, waiting: 0 });

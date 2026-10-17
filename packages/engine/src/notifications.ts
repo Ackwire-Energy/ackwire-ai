@@ -560,14 +560,27 @@ export async function markNotificationDone(
   return view;
 }
 
-/** "Lembrar depois": hidden until `until`, then back on top (`notification.upserted`). */
+/**
+ * "Lembrar depois": hidden until `until`, then back on top (`notification.upserted`).
+ * `until: null` undoes it: back in the inbox now, nothing else changes.
+ */
 export async function snoozeNotification(
   deps: NotificationDeps,
   userId: string,
   orgId: string,
   id: string,
-  until: Date,
+  until: Date | null,
 ): Promise<NotificationView> {
+  if (until === null) {
+    const row = await mine(deps, userId, orgId, id);
+    const updated = await change(deps, row, { snoozedUntil: null });
+    const view = notificationView(updated);
+    if (!updated.doneAt) {
+      await publishUserEvent(deps.pubsub, orgId, userId, { type: "notification.upserted", notification: view });
+    }
+    await publishCounts(deps, orgId, userId);
+    return view;
+  }
   if (Number.isNaN(until.getTime())) throw new ValidationError("Invalid date", "notifications.bad_snooze");
   const now = nowOf(deps);
   if (until.getTime() <= now.getTime())

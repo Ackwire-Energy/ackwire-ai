@@ -181,14 +181,20 @@ export function notificationRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/notifications/{notificationId}/snooze",
       tags,
       security,
-      summary: "Hide it until a time; it comes back on top",
-      request: { params: NotificationParams, body: body(z.object({ until: z.iso.datetime({ offset: true }) })) },
+      summary: "Hide it until a time (it comes back on top); `until: null` undoes it",
+      request: {
+        params: NotificationParams,
+        body: body(z.object({ until: z.iso.datetime({ offset: true }).nullable() })),
+      },
       responses: { 200: json(Notification), ...errors },
     }),
     async (c) => {
       const { orgId, notificationId } = c.req.valid("param");
       const { until } = c.req.valid("json");
-      return c.json(await snoozeNotification(nd, c.get("user").id, orgId, notificationId, new Date(until)), 200);
+      return c.json(
+        await snoozeNotification(nd, c.get("user").id, orgId, notificationId, until === null ? null : new Date(until)),
+        200,
+      );
     },
   );
 
