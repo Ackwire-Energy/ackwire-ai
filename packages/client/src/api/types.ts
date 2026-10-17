@@ -10,7 +10,7 @@ export interface Health {
 }
 
 export interface AuthConfig {
-  socialProviders: { google: boolean; github: boolean };
+  socialProviders: { google: boolean; github: boolean; apple?: boolean };
   signupOpen: boolean;
   firstRun: boolean;
 }
