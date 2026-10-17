@@ -1235,8 +1235,12 @@ export function NotificationsPage() {
         : choice === "tomorrow"
           ? t("notifications.snoozeMenu.toastTomorrow")
           : t("notifications.snoozeMenu.toastNextWeek");
-    // No "Desfazer" here: the API has no way to end a snooze early (a time in the past is refused).
-    toast.show(title, "info", undefined, { detail: n.latest.title ?? n.latest.text ?? n.latest.quote ?? "" });
+    toast.show(
+      title,
+      "info",
+      { label: t("notifications.toast.undo"), run: () => action.mutate({ type: "snooze", item: n, until: null }) },
+      { detail: n.latest.title ?? n.latest.text ?? n.latest.quote ?? "" },
+    );
   };
 
   const openItem = (n: AppNotification) => {

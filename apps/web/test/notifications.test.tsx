@@ -217,6 +217,26 @@ describe("Notificações", () => {
     expect(document.querySelector('[data-n="n-rx"]')).toBeNull();
   });
 
+  test("Lembrar depois, then Desfazer brings it back (snooze with until null)", async () => {
+    const { state } = await go();
+    const row = document.querySelector('[data-n="n-rx"]') as HTMLElement;
+    const later = within(row).getByRole("button", { name: "Lembrar depois" });
+    later.focus();
+    await act(async () => {
+      fireEvent.keyDown(later, { key: "Enter" });
+      fireEvent.keyUp(later, { key: "Enter" });
+    });
+    await settle(2);
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: /Amanhã às 9h/ }));
+    await settle(4);
+    expect(document.querySelector('[data-n="n-rx"]')).toBeNull();
+    await click(screen().getByRole("button", { name: "Desfazer" }));
+    await settle(6);
+    const calls = state.calls.filter((c) => c.method === "notifications.snooze").map((c) => c.args[2]);
+    expect(calls.at(-1)).toBeNull();
+    expect(document.querySelector('[data-n="n-rx"]')).not.toBeNull();
+  });
+
   test("Marcar tudo como lido, then Desfazer marks the same ones unread", async () => {
     const { state } = await go();
     await click(screen().getByRole("button", { name: "Marcar tudo como lido" }));

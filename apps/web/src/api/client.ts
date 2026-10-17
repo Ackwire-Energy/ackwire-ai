@@ -654,7 +654,8 @@ export interface ApiClient {
     /** "Feito" (`false` undoes it). */
     done(orgId: string, id: string, done: boolean): Promise<AppNotification>;
     /** "Lembrar depois": hidden until `until` (ISO). */
-    snooze(orgId: string, id: string, until: string): Promise<AppNotification>;
+    /** `until: null` ends a snooze early (undo). */
+    snooze(orgId: string, id: string, until: string | null): Promise<AppNotification>;
     /** "Marcar tudo como lido": the ids it changed (undo marks them unread again). */
     readAll(orgId: string, filter?: NotificationFilter): Promise<{ ids: string[] }>;
   };

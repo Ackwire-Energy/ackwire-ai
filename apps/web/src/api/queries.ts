@@ -1777,7 +1777,8 @@ export const isNotificationEvent = (e: { type: string }): e is NotificationEvent
 export type NotificationAction =
   | { type: "read"; item: AppNotification; read: boolean }
   | { type: "done"; item: AppNotification; done: boolean }
-  | { type: "snooze"; item: AppNotification; until: string }
+  /** `until: null` undoes a snooze ("Desfazer"). */
+  | { type: "snooze"; item: AppNotification; until: string | null }
   | { type: "readAll"; filter: NotificationFilter }
   /** Undo of "Marcar tudo como lido": the ids it changed. */
   | { type: "unreadMany"; ids: string[] };
@@ -1794,7 +1795,7 @@ function optimistic(qc: QC, orgId: string, action: NotificationAction, now: stri
     case "read":
       return [{ ...action.item, readAt: action.read ? (action.item.readAt ?? now) : null }];
     case "done":
-      return [{ ...action.item, doneAt: action.done ? now : null, ...(action.done ? {} : { snoozedUntil: null }) }];
+      return [{ ...action.item, doneAt: action.done ? now : null }];
     case "snooze":
       return [{ ...action.item, snoozedUntil: action.until }];
     case "readAll": {
