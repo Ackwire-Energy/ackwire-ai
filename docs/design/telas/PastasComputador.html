@@ -225,7 +225,12 @@ canvas.orbit{display:inline-block;flex:none;image-rendering:pixelated;vertical-a
 .undo:hover{background:var(--plate);color:var(--ink)}
 .who{display:inline-flex;align-items:center;gap:6px;min-width:0}
 .who .avs{display:inline-flex;align-items:center}
-.who .avs{gap:3px}
+.who .avs{gap:4px}
+/* Rows with a description of several lines: the tile sits with the name, not in the middle. */
+.crow.top{align-items:flex-start}
+.crow.top .logo{margin-top:2px}
+.crow.top .end{align-self:center}
+.crow .d.ag{margin-top:4px}
 
 /* ---------- Paths and commands (the only mono on the page) ---------- */
 .path{all:unset;cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--ink2);overflow-wrap:anywhere;border-radius:6px;padding:1px 4px;margin:0 -4px;transition:background .15s}
@@ -787,17 +792,17 @@ function renderSide() {
 const SUBNAV = [["Geral", "settings"], ["Membros e convites", "users"], ["Agentes e acesso", "shield"], ["Conectores", "plug"], ["Chaves de API", "key"], ["Sandbox", "cloud"], ["Computadores", "computer"], ["Orçamento e uso", "wallet"]];
 function viewComputer() {
   const own = isOwner();
-  const folderRow = (f) => `<div class="crow">
+  const folderRow = (f) => `<div class="crow top">
       <span class="logo soft">${I("folder")}</span>
       <div class="t"><div class="n">${esc(base(f.path))}</div>
         <div class="d">${pathEl(f.path)}</div>
-        <div class="d">${agentChips(f.agents)}</div></div>
+        <div class="d ag">${agentChips(f.agents)}</div></div>
       ${own ? `<div class="end"><button class="btn ghost sm danger" data-remove="${f.id}">${I("x", "sm")}Remover</button></div>` : ""}
     </div>`;
   const toolRow = (tl) => {
     const on = S.tools[tl.id];
     const cmd = `agentes-runner tools enable ${tl.id}`;
-    return `<div class="crow">
+    return `<div class="crow top">
       <span class="logo">${I(tl.icon)}</span>
       <div class="t"><div class="n">${tl.name}</div><div class="d">${tl.d}</div></div>
       <div class="end">${on ? `<span class="chip ok">${I("check", "sm")}Ligado</span>${own ? `<button class="btn ghost sm" data-tooloff="${tl.id}">${I("power", "sm")}Desligar</button>` : ""}` : `<span class="chip line">${I("dash", "sm")}Desligado</span>`}</div>
