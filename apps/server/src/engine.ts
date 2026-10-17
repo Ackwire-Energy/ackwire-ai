@@ -174,6 +174,8 @@ export function buildEngine(o: EngineOptions) {
     search: context,
     publicUrl: config.PUBLIC_URL,
     judge: context.judge,
+    // ADR 0032 §6: missions' main sessions as engine runs (the engine itself is wired at integration; default: run queue).
+    missionsOnEngine: config.MISSIONS_ON_ENGINE,
   };
   machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps }));
   const githubApp =
@@ -234,6 +236,7 @@ export function buildEngine(o: EngineOptions) {
     artifacts,
     sandbox,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
+    missionsOnEngine: config.MISSIONS_ON_ENGINE,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
     maxHops: config.AGENT_MAX_HOPS,

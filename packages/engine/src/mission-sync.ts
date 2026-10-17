@@ -4,7 +4,7 @@ import { getAgentCached } from "./agents";
 import { publishApproval } from "./approvals";
 import { recordAudit } from "./audit";
 import { publishMessageCreated, publishUserEvent } from "./events";
-import { formatDuration, getTask, type MachineTaskRow, taskEndNotice, taskSeconds } from "./machine-tasks";
+import { formatDuration, getTask, isAgentTask, type MachineTaskRow, taskEndNotice, taskSeconds } from "./machine-tasks";
 import { getMachineById } from "./machines";
 import { messageView } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
@@ -314,7 +314,10 @@ export async function onMissionTaskEnded(deps: MissionDeps, taskId: string) {
   if (!mission) return;
   await readNotesBack(deps, mission, task).catch(() => null);
   const open = ["proposed", "active", "paused", "awaiting_close"].includes(mission.status);
-  if (mission.executor === "agent") {
+  // On the engine (ADR 0032 §6) a task the main session's run started itself ends like agent mode; executor item
+  // sessions still tell the main session below (now a run, through tellSession).
+  const onEngine = deps.missionsOnEngine === true;
+  if (mission.executor === "agent" || (onEngine && isAgentTask(task))) {
     if (open) await wakeAgentForTask(deps, mission, task);
   } else {
     const main = task.sessionId === mission.mainSessionId;
@@ -336,7 +339,7 @@ export async function onMissionTaskEnded(deps: MissionDeps, taskId: string) {
   await publishMissionEvent(deps, mission, "task", { taskId: task.id });
   // The last task ended with every item done: the mission waits to be concluded (agent mode: a bit later,
   // its run may still deliver by itself).
-  if (mission.executor === "agent") await scheduleDoneCheck(deps.db, mission);
+  if (mission.executor === "agent" || onEngine) await scheduleDoneCheck(deps.db, mission);
   else await checkMissionDone(deps, mission.id).catch(() => null);
 }
 

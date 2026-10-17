@@ -424,8 +424,10 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           if (available.length > 0) out.push(proposeTool(status.name, available));
         }
       }
-      if (mission && mission.executor !== "agent") out.push(sendTool);
-      if (mission && mission.executor === "agent") {
+      // On the engine (ADR 0032 §6) the run in the mission thread IS the main session, whatever its brain.
+      const doesTheWork = Boolean(mission && (mission.executor === "agent" || deps.missionsOnEngine));
+      if (mission && !doesTheWork) out.push(sendTool);
+      if (mission && doesTheWork) {
         const status = mission.machineId ? await deps.hub.status(mission.machineId) : null;
         out.push(...agentTools(mission, status?.name ?? "the computer"));
       }

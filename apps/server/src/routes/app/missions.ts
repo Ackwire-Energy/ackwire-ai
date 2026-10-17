@@ -307,6 +307,7 @@ export function missionRoutes(deps: AppDeps) {
     search: deps.extras?.context,
     publicUrl: config.PUBLIC_URL,
     judge: deps.extras?.context?.judge,
+    missionsOnEngine: config.MISSIONS_ON_ENGINE,
   });
   const after = <T>(value: T) => {
     deps.wakeWorkers?.();

@@ -18,7 +18,12 @@ const {
  * and how to pass requests on. Only when the thread has a mission (the run's
  * context learns that from the same lookup as the thread's range).
  */
-export async function missionBrief(db: Database, missionId: string): Promise<string | null> {
+export async function missionBrief(
+  db: Database,
+  missionId: string,
+  /** `MISSIONS_ON_ENGINE` (ADR 0032 §6): the run in the thread is the main session whatever its brain. */
+  options: { onEngine?: boolean } = {},
+): Promise<string | null> {
   const [mission] = await db.select().from(missions).where(eq(missions.id, missionId));
   if (!mission) return null;
   const [people, plan, running, decisions, reviews, machine] = await Promise.all([
@@ -73,7 +78,8 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
   const deciders = people.filter((p) => p.role === "decide").map((p) => p.name);
   const commenters = people.filter((p) => p.role === "comment").map((p) => p.name);
   const computer = machine[0]?.name ?? "the computer";
-  const agentMode = mission.executor === "agent";
+  // On the engine every brain does the work itself in the thread (the main session is this run).
+  const agentMode = mission.executor === "agent" || options.onEngine === true;
   const executor = mission.executor === "codex" ? "Codex" : "Claude Code";
   const pending = decisions.filter((d) => d.status === "pending");
   const provisional = decisions.filter((d) => d.status === "provisional");
@@ -103,7 +109,7 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
     .replace(/<\/?mission-data>/gi, "");
   const guidance = agentMode
     ? [
-        `You do this mission's work yourself on ${computer} (no Claude Code or Codex here). Use start_task for anything long (it runs in the background and wakes you here when it ends; don't wait or poll) and run_code for short commands; files with read_file and write_file. Keep the plan with update_plan (mark items doing, done or waiting_you as they move), report milestones with report, ask decisions only with ask_decision (blocking when you can't go on), request_review when there is something to show, and request_approval before any merge, deploy or rollback, then wait. When every plan item is done, call complete_mission with what you delivered and what the person should check (files with upload_file first), then stop. Before the people press Start, only read and plan.`,
+        `You do this mission's work yourself on ${computer}${mission.executor === "agent" ? " (no Claude Code or Codex here)" : ""}. Use start_task for anything long (it runs in the background and wakes you here when it ends; don't wait or poll) and run_code for short commands; files with read_file and write_file. Keep the plan with update_plan (mark items doing, done or waiting_you as they move), report milestones with report, ask decisions only with ask_decision (blocking when you can't go on), request_review when there is something to show, and request_approval before any merge, deploy or rollback, then wait. When every plan item is done, call complete_mission with what you delivered and what the person should check (files with upload_file first), then stop. Before the people press Start, only read and plan.`,
         `Mission rules: ${MISSION_RULES} When the mission folder is not a git repository (images, documents, files), skip branches, commits and pushes: work in plain folders and deliver results with the Drive or request_review.`,
         "Commands people have: /stop, /pause, /summary, /plan.",
       ]
