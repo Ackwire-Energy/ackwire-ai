@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          bun test apps/web packages/ui 2>&1 | tee -a test.log
+          bun test apps/web packages/ui apps/mobile/test 2>&1 | tee -a test.log
       # GitHub's log storage sometimes loses logs; keep the errors as an artifact and in the summary.
       - name: Keep errors
         if: always()

@@ -1,0 +1,58 @@
+import type { ReactNode } from "react";
+import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import { haptics } from "./haptics";
+import { useTheme } from "./theme";
+
+export interface PressScaleProps extends Omit<PressableProps, "style" | "children"> {
+  /** Scale while pressed (default 0.97). */
+  to?: number;
+  /** Also sink half a point (buttons). */
+  sink?: boolean;
+  /** A light haptic on press in (default true). */
+  haptic?: boolean;
+  style?: StyleProp<ViewStyle>;
+  children?: ReactNode;
+}
+
+/**
+ * The design system's tactile press: a spring down on press in and back on release (no spring with
+ * reduced motion), with a light haptic. Everything pressable in src/ui uses it.
+ */
+export function PressScale({
+  to = 0.97,
+  sink = false,
+  haptic = true,
+  style,
+  children,
+  onPressIn,
+  onPressOut,
+  disabled,
+  ...rest
+}: PressScaleProps) {
+  const { motion, reducedMotion } = useTheme();
+  const k = useSharedValue(0);
+  const animated = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 - (1 - to) * k.value }, { translateY: sink ? 0.5 * k.value : 0 }],
+  }));
+  return (
+    <Animated.View style={[style, animated]}>
+      <Pressable
+        {...rest}
+        disabled={disabled}
+        style={{ flexGrow: 1 }}
+        onPressIn={(e) => {
+          k.value = reducedMotion ? withTiming(1, { duration: 0 }) : withSpring(1, motion.press);
+          if (haptic && !disabled) haptics.light();
+          onPressIn?.(e);
+        }}
+        onPressOut={(e) => {
+          k.value = reducedMotion ? withTiming(0, { duration: 0 }) : withSpring(0, motion.press);
+          onPressOut?.(e);
+        }}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+}

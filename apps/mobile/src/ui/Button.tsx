@@ -1,0 +1,107 @@
+import { mixHex } from "@agenteschat/ui/agent/engine";
+import { LinearGradient } from "expo-linear-gradient";
+import { Text as RNText, StyleSheet, View } from "react-native";
+import { Icon, type IconName } from "./Icon";
+import { PressScale } from "./PressScale";
+import { type Theme, useTheme } from "./theme";
+
+export type ButtonVariant = "primary" | "secondary" | "ghost";
+
+export interface ButtonProps {
+  variant: ButtonVariant;
+  size?: "md" | "sm";
+  icon?: IconName;
+  label: string;
+  onPress: () => void;
+  /** Full width. */
+  wide?: boolean;
+  disabled?: boolean;
+}
+
+export const BUTTON_SIZES = {
+  md: { height: 48, radius: 15, padding: 20, font: 15, icon: 18 },
+  sm: { height: 36, radius: 12, padding: 14, font: 14, icon: 16 },
+} as const;
+
+/** Primary's tonal gradient (ink 82% → ink) and its shadow, as on the web (`.b1`). */
+export function primaryLook(theme: Pick<Theme, "colors">) {
+  const { ink, bg } = theme.colors;
+  return {
+    gradient: [mixHex(ink, bg, 0.18), ink] as const,
+    shadow: "0px 1px 2px 0px rgba(0, 0, 0, 0.18), 0px 6px 14px -6px rgba(0, 0, 0, 0.45)",
+    highlight: "rgba(255, 255, 255, 0.18)",
+    lowlight: "rgba(0, 0, 0, 0.3)",
+    text: bg,
+  };
+}
+
+/** The tactile button: tonal gradient, a lit top edge, a spring press and a light haptic. */
+export function Button({ variant, size = "md", icon, label, onPress, wide = false, disabled = false }: ButtonProps) {
+  const theme = useTheme();
+  const { colors, shadows, fonts } = theme;
+  const s = BUTTON_SIZES[size];
+  const primary = variant === "primary";
+  const look = primaryLook(theme);
+  const textColor = primary ? look.text : variant === "ghost" ? colors.muted : colors.ink;
+  return (
+    <PressScale
+      onPress={onPress}
+      disabled={disabled}
+      sink
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      style={[
+        {
+          height: s.height,
+          borderRadius: s.radius,
+          alignSelf: wide ? "stretch" : "flex-start",
+          opacity: disabled ? 0.5 : 1,
+        },
+        primary ? { boxShadow: look.shadow } : variant === "secondary" ? { boxShadow: shadows.e1 } : null,
+      ]}
+    >
+      <View
+        style={[
+          styles.face,
+          { borderRadius: s.radius, paddingHorizontal: s.padding },
+          variant === "secondary" ? { backgroundColor: colors.raised } : null,
+        ]}
+      >
+        {primary ? (
+          <>
+            <LinearGradient colors={look.gradient} style={StyleSheet.absoluteFill} />
+            <View style={[styles.edge, { top: 0, backgroundColor: look.highlight }]} />
+            <View style={[styles.edge, { bottom: 0, backgroundColor: look.lowlight }]} />
+          </>
+        ) : variant === "secondary" ? (
+          <View
+            style={[
+              styles.edge,
+              { top: 0, backgroundColor: theme.scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.9)" },
+            ]}
+          />
+        ) : null}
+        {icon ? <Icon name={icon} size={s.icon} color={textColor} /> : null}
+        <RNText
+          numberOfLines={1}
+          style={{ fontFamily: fonts.semibold, fontSize: s.font, letterSpacing: -0.075, color: textColor }}
+        >
+          {label}
+        </RNText>
+      </View>
+    </PressScale>
+  );
+}
+
+const styles = StyleSheet.create({
+  face: {
+    flexGrow: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    overflow: "hidden",
+  },
+  edge: { position: "absolute", left: 0, right: 0, height: 1 },
+});
