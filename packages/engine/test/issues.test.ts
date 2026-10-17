@@ -258,7 +258,10 @@ describe("issues", () => {
       title: "N+1 no offline-map",
       assignee: { type: "person", id: f.owner.id },
     });
-    expect((await run("update_issue", { issue: `#${issue.number}`, assignee: "me" })).isError).toBeUndefined();
+    const mine = await run("update_issue", { issue: `#${issue.number}`, assignee: "me" });
+    expect(mine.isError).toBeUndefined();
+    // The agent reads who it is, not an id.
+    expect(mine.content).toContain("(assignee: @dev (you))");
     expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id })).assignee).toEqual({
       type: "agent",
       id: f.agent.id,

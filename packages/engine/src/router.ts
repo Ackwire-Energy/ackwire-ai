@@ -306,6 +306,9 @@ export interface RouteResult {
   reason?: string;
 }
 
+/** A follow-up goes to another agent than the one just spoken to only when the router is this much surer of it. */
+export const NAMED_OVER_CONTINUITY = 0.3;
+
 /** An agent's message may bring in one more agent, only when it clearly should (D5, revised 2026-10-17). */
 export const AGENT_CHIME_IN_SCORE = 0.75;
 // An agent's message at this hop (an answer to an answer) brings in nobody; defined next to the outbox insert.
@@ -542,9 +545,23 @@ export async function routeMessage(
   // The router's own pick; when it picks several agents, the message speaks to several.
   const picked = selectAgents(candidates, result, policy, { continuityAgentId });
   // A short follow-up without a mention ("and now?"), or a quote reply to an agent, goes only to the agent
-  // the person was talking to, unless the router heard it as for several agents.
+  // the person was talking to, unless the router heard it as for several agents, or (not quoting) clearly
+  // for another one ("tem sim ada, tenta dnv" right after Theo spoke: a name beats who spoke last).
+  const scoreOf = (agentId: string | null) =>
+    Math.max(0, ...result.agents.filter((a) => a.agentId === agentId).map((a) => a.score));
+  const clearlyAnother =
+    quotedAgentId === null &&
+    picked.some(
+      (id) =>
+        id !== continuityAgentId &&
+        scoreOf(id) >= (policy.clearPickScore ?? DEFAULT_ROUTER_POLICY.clearPickScore) &&
+        scoreOf(id) >= scoreOf(continuityAgentId) + NAMED_OVER_CONTINUITY,
+    );
   const followUp =
-    continuityAgentId !== null && (quotedAgentId !== null || isShortFollowUp(message.body)) && picked.length < 2;
+    continuityAgentId !== null &&
+    (quotedAgentId !== null || isShortFollowUp(message.body)) &&
+    picked.length < 2 &&
+    !clearlyAnother;
   // Another agent already answered this in the thread: don't pile on with a second answer.
   const duplicate = !followUp && (result.alreadyAnswered ?? 0) >= ALREADY_ANSWERED_THRESHOLD;
   const selected = followUp && continuityAgentId ? [continuityAgentId] : duplicate ? [] : picked;

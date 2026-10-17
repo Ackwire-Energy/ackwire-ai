@@ -165,7 +165,7 @@ describe("short follow-ups without a mention", () => {
     expect(several.runs.map((r) => r.agentId).sort()).toEqual([f.agent.id, qa.id].sort());
   });
 
-  test("go to the agent that spoke right before, even when the person had addressed another", async () => {
+  test("go to the agent that spoke right before; a name the router is sure of goes to that agent", async () => {
     f = await setup({ reply: () => ({ chunks: ["Deploy feito."] }) });
     const qa = await addQa();
     const question = await post("@dev status do deploy?");
@@ -177,12 +177,27 @@ describe("short follow-ups without a mention", () => {
       author: { type: "agent", agentId: qa.id, runId: null, hop: 1 },
       body: "Os testes de integração falharam no deploy.",
     });
-    const followUp = await post("você confirmou no código?");
-    const routed = await routeMessage(
-      { db: f.db, strategy: scoreAll, policy },
-      { orgId: f.org.id, messageId: followUp.id },
-    );
-    expect(routed.runs.map((r) => r.agentId)).toEqual([qa.id]);
+    // "você" is ambiguous to the router (Dev a bit ahead): it's for QA, who just spoke.
+    // "dev, tenta de novo" names Dev: the router is sure, so it goes to Dev.
+    const strategy: RouterStrategy = {
+      name: "fixed",
+      async decide(input) {
+        const named = input.message.body.startsWith("dev,");
+        return {
+          agents: input.candidates.map((c) => ({
+            agentId: c.agentId,
+            score: c.handle === "dev" ? (named ? 0.95 : 0.6) : 0.3,
+          })),
+          needsAgent: 0.9,
+        };
+      },
+    };
+    const route = async (body: string) =>
+      (
+        await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: (await post(body)).id })
+      ).runs.map((r) => r.agentId);
+    expect(await route("você confirmou no código?")).toEqual([qa.id]);
+    expect(await route("dev, tenta de novo")).toEqual([f.agent.id]);
   });
 
   test("a short follow-up is judged by length and mentions, not by words", () => {
