@@ -282,47 +282,6 @@ describe("LLM strategy (end to end through the outbox)", () => {
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id });
     const byDev = thread.find((m) => m.author.id === f.agent.id);
     const byQa = thread.find((m) => m.author.id === qa.id);
-    // TEMP diagnostics (CI only): remove once green.
-    console.log(
-      "DIAG thread",
-      JSON.stringify(
-        thread.map((m) => [
-          m.author.type,
-          m.author.id === qa.id ? "qa" : m.author.id === f.agent.id ? "dev" : "?",
-          m.body,
-          m.hop,
-          m.meta,
-        ]),
-      ),
-    );
-    console.log(
-      "DIAG decisions",
-      JSON.stringify(
-        (await f.db.select().from(schema.routingDecisions)).map((d) => [
-          d.messageId === question.id ? "question" : "other",
-          d.selectedAgentIds.length,
-          d.reason,
-          d.needsAgentScore,
-          d.error,
-        ]),
-      ),
-    );
-    console.log(
-      "DIAG runs",
-      JSON.stringify(
-        (await f.db.select().from(schema.agentRuns)).map((r) => [
-          r.agentId === qa.id ? "qa" : "dev",
-          r.trigger,
-          r.status,
-          r.hop,
-          r.error,
-        ]),
-      ),
-    );
-    console.log(
-      "DIAG outbox",
-      JSON.stringify((await f.db.select().from(schema.outbox)).map((o) => [o.kind, o.status, o.lastError])),
-    );
     expect(byDev?.meta.joined).toBeUndefined();
     expect(byQa?.meta.joined).toBe(true);
     // QA's answer to an answer brings in nobody else.

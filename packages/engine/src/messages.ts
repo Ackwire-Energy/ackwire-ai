@@ -187,6 +187,9 @@ export function parseMentionHandles(body: string): string[] {
   return [...found];
 }
 
+/** An agent's message may bring in one more agent only up to this hop (D49); `router.ts` enforces it too. */
+export const AGENT_CHIME_IN_MAX_HOP = 2;
+
 export type MessageAuthor =
   | { type: "person"; userId: string }
   | { type: "agent"; agentId: string; runId: string | null; hop: number };
@@ -421,7 +424,9 @@ export async function insertMessageWithRuns(
         union all
         select gen_random_uuid(), ${input.orgId}::uuid, 'message.posted', jsonb_build_object('messageId', m.id),
           'message.posted:' || m.id, 8 from m
+          -- An agent's message without a mention goes to the router too: another agent may chime in (D49).
           where m.author_type = 'person' or cardinality(m.mentioned_agent_ids) > 0
+            or m.hop < ${AGENT_CHIME_IN_MAX_HOP}
         union all
         -- In-app notifications (D46): people mentioned, a reply in a thread, a person's DM.
         select gen_random_uuid(), ${input.orgId}::uuid, 'notifications.message', jsonb_build_object('messageId', m.id),

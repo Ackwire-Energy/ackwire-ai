@@ -5,7 +5,7 @@ import { summarizeScopes } from "./capabilities";
 import { createAgentRuns, requesterOf } from "./dispatch";
 import { MissingCredentialError, ValidationError } from "./errors";
 import type { ModelGateway } from "./gateway";
-import { getMessage } from "./messages";
+import { AGENT_CHIME_IN_MAX_HOP, getMessage } from "./messages";
 import type { AgentRun } from "./runs";
 
 const { agents, agentScopes, channelMembers, channels, messages, users, routingDecisions, organizationSettings } =
@@ -307,8 +307,8 @@ export interface RouteResult {
 
 /** An agent's message may bring in one more agent, only when it clearly should (D5, revised 2026-10-17). */
 export const AGENT_CHIME_IN_SCORE = 0.75;
-/** An agent's message at this hop (an answer to an answer) brings in nobody. */
-export const AGENT_CHIME_IN_MAX_HOP = 2;
+// An agent's message at this hop (an answer to an answer) brings in nobody; defined next to the outbox insert.
+export { AGENT_CHIME_IN_MAX_HOP };
 
 /**
  * Router for a message without mentions (job `message.posted`). Code picks
