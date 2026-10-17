@@ -13,10 +13,10 @@ import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
+import type { McpTaskInfo } from "./mcp";
 import { agentWorkspace, isInside, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
 import { agentSecrets, handleSecret } from "./secrets";
-import type { McpTaskInfo } from "./mcp";
 import type { TaskManager } from "./tasks";
 
 export const MAX_CONCURRENT_REQUESTS = 8;

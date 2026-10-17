@@ -3,6 +3,7 @@ import { and, desc, type Executor, eq, inArray, rowsOf, schema, sql } from "@age
 import type { BrainKind, BrainSession, BrainTurn, ToolResult } from "./brains/types";
 import { abortLocalRun, RUN_CANCEL_TOPIC } from "./cancel";
 import { publishChannelEvent, publishMessageCreated } from "./events";
+import type { RunIdentity } from "./executor";
 import { insertMessage, messageView } from "./messages";
 import { enqueueRunJob } from "./mission-runs";
 import {
@@ -23,6 +24,8 @@ import {
   sessionTask,
   type WakeKind,
 } from "./missions";
+import { resumeRunWithResult } from "./run-resume";
+import { revokeRunToolTokens } from "./run-tool-tokens";
 import { isTerminal, type RunStatus, transitionRun } from "./runs";
 
 const { missions, machineTasks, missionEvents, agentRuns, approvals, agentQuestions, outbox } = schema;
@@ -48,13 +51,8 @@ const { missions, machineTasks, missionEvents, agentRuns, approvals, agentQuesti
 
 // ── The engine, as the mission side needs it ─────────────────────────────────
 
-/** Same shape as the engine's `RunIdentity` (contract, executor.ts/engine.ts): import it from there at integration. */
-export interface MissionRunIdentity {
-  orgId: string;
-  agentId: string;
-  runId: string;
-  machineId: string;
-}
+/** The engine's `RunIdentity` (executor.ts). */
+export type MissionRunIdentity = RunIdentity;
 
 /** A run of the mission's agent in its home thread, on a notice already in the thread. */
 export interface MissionRunStart
@@ -83,10 +81,9 @@ export interface MissionRunResume {
 }
 
 /**
- * The thin interface the integrator wires to the engine (block 1). The
- * default (`runsMissionEngine`) works on today's run queue: a new or joined
- * `agent_runs` row, executed by whatever brain the engine resolves for the run
- * (`missionTurnFor`); no resume of paused runs (answers start a new turn).
+ * How missions start, resume and cancel runs of the agent engine
+ * (`createMissionEngine`; tests pass fakes). The brain is the one the engine
+ * resolves for the run (`missionTurnFor` first).
  */
 export interface MissionEngine {
   /**
@@ -111,7 +108,7 @@ export interface MissionEngine {
 /** Whether this mission side runs on the engine (`MISSIONS_ON_ENGINE`). */
 export const missionsOnEngine = (deps: Pick<MissionDeps, "missionsOnEngine">) => deps.missionsOnEngine === true;
 
-export const engineOf = (deps: MissionDeps): MissionEngine => deps.missionEngine ?? runsMissionEngine(deps);
+export const engineOf = (deps: MissionDeps): MissionEngine => deps.missionEngine ?? createMissionEngine(deps);
 
 // ── Which brain, which session ───────────────────────────────────────────────
 
@@ -173,7 +170,7 @@ export async function missionSession(
 }
 
 /**
- * The resolver hook for block 1 (`brainFor(agent, run, mission?)`): a run of
+ * The first step of `resolveBrain` (`brainFor(agent, run, mission?)`): a run of
  * the mission's agent in an open mission's home thread thinks with the
  * mission's brain, in its main session. Null: not a mission run (the agent's
  * own brain applies). A person's message in the thread starts its run in the
@@ -523,17 +520,33 @@ export async function migrateOpenMissions(
   return out;
 }
 
-// ── The default engine: today's run queue ────────────────────────────────────
+// ── The engine missions use ──────────────────────────────────────────────────
 
 /**
- * `MissionEngine` over today's run queue (until block 1 wires its own): a run
- * row and its `agent_run.execute` job (`enqueueRunJob`), or the notice joins
- * the run already working in the thread. The brain is resolved when the run
- * executes (`missionTurnFor`). No paused-run resume: answers start a turn.
+ * `MissionEngine` on the agent engine (ADR 0032): a start is a run row and its
+ * `agent_run.execute` job in the caller's transaction (`enqueueRunJob`; one
+ * run per agent and trigger message: a second start for the same notice is a
+ * no-op), or the notice joins the run already working in the thread. The
+ * engine resolves the mission's brain and session when the run executes
+ * (`resolveBrain` → `missionTurnFor`). A resume answers the run's waiting
+ * call (`resumeRunWithResult`, pause id = the decision's or review's id);
+ * cancel stops the agent's runs in the thread and revokes their tool tokens.
  */
-export function runsMissionEngine(deps: { pubsub?: PubSub; db: MissionDeps["db"] }): MissionEngine {
+export function createMissionEngine(deps: { pubsub?: PubSub; db: MissionDeps["db"] }): MissionEngine {
   return {
     async startRun(tx, input) {
+      const [existing] = await tx
+        .select({ id: agentRuns.id })
+        .from(agentRuns)
+        .where(
+          and(
+            eq(agentRuns.orgId, input.orgId),
+            eq(agentRuns.agentId, input.agentId),
+            eq(agentRuns.triggerMessageId, input.triggerMessageId),
+          ),
+        )
+        .limit(1);
+      if (existing) return null;
       const out = await enqueueRunJob(
         tx,
         {
@@ -549,11 +562,13 @@ export function runsMissionEngine(deps: { pubsub?: PubSub; db: MissionDeps["db"]
       if (out.steered) return { runId: out.steered, steered: true };
       return null;
     },
-    async resumeRun() {
-      return null;
+    async resumeRun(input) {
+      return resumeRunWithResult(deps.db, { runId: input.run.runId, waitId: input.pause.id, result: input.result });
     },
     async cancelRuns(input) {
-      return cancelThreadRuns(deps, input);
+      const ids = await cancelThreadRuns(deps, input);
+      for (const runId of ids) await revokeRunToolTokens(deps.db, { runId }).catch(() => undefined);
+      return ids;
     },
   };
 }

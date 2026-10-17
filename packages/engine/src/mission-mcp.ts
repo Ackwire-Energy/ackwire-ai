@@ -13,7 +13,7 @@ import { recordAudit } from "./audit";
 import { ValidationError } from "./errors";
 import type { MachineMissionHooks } from "./machine-hub";
 import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./machine-tasks";
-import { handlePermissionPrompt } from "./mission-commands";
+import { handlePermissionPrompt, runPermissionPrompt } from "./mission-commands";
 import { completeMission } from "./mission-delivery";
 import { createMissionApproval, onMachineOnline } from "./mission-sync";
 import {
@@ -24,6 +24,7 @@ import {
   type MissionDeps,
   type MissionRow,
   missionBranchPrefix,
+  missionOfThread,
   noMentions,
   postMissionMessage,
   publishMissionEvent,
@@ -33,12 +34,16 @@ import {
   startSessionTask,
   updatePlan,
 } from "./missions";
+import { missionBrain } from "./missions-engine";
+import { resumeRunsWaitingForMachine } from "./run-resume";
 import { type BridgeIdentity, verifyRunToolToken } from "./run-tool-tokens";
 import { bridgeToolsFor, invokeToolForRun } from "./run-tools";
+import { SANDBOX_SCOPE } from "./sandbox";
 import { agentSearchChannels, searchVisible } from "./search";
 import { maskSecrets } from "./tool-detail";
 import { createToolGateway, type ToolGateway } from "./tools/gateway";
 import { toBrainSchema } from "./tools/schema-compat";
+import { grantedScopeKeys, grantKey } from "./tools/scopes";
 import type { ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { createUpload, failUpload, uploadedFile, waitForUpload } from "./uploads";
 
@@ -209,6 +214,86 @@ export function createMissionBridgeToolSource(deps: Omit<MissionDeps, "db">): To
           scope: "",
           execute: (input, c) =>
             runTaskTool({ ...deps, db: c.db }, bridge.machineId, taskId, tool.name, input, c.toolUseId ?? ""),
+        }),
+      );
+    },
+  };
+}
+
+/** The mission tools a computer-brain run in its mission's thread also needs (they act on the machine). */
+const RUN_MISSION_TOOLS = ["get_context", "upload_artifact", "start_task"] as const;
+
+/**
+ * Tools only computer-brain runs get through the runner bridge (ADR 0032),
+ * as gateway tools:
+ *
+ * - `permission_prompt` (Claude Code's `--permission-prompt-tool`) for every
+ *   such run: in the agent's open mission thread it is the mission's command
+ *   card flow, keyed by the run (no task); elsewhere `runPermissionPrompt`
+ *   (deny list, reads, and what code allows when the agent may run commands).
+ * - In the agent's open mission thread, `get_context`, `upload_artifact` and
+ *   `start_task` (the main session's machine tools), so a mission on the
+ *   engine works with every brain. Listed before the sandbox tools: these win
+ *   a name clash for bridge calls.
+ */
+export function createMissionRunToolSource(deps: Omit<MissionDeps, "db">): ToolSource {
+  return {
+    name: "mission-run-bridge",
+    async tools(ctx) {
+      const bridge = ctx.bridge;
+      if (!bridge || bridge.taskId || !ctx.runId) return [];
+      const machineId = bridge.machineId;
+      const mission = ctx.threadRootId ? await missionOfThread(ctx.db, ctx.orgId, ctx.threadRootId) : null;
+      const ours = mission && mission.agentId === ctx.agentId && OPEN.includes(mission.status) ? mission : null;
+      /** The run as the mission sees it: its main session, on the computer that holds the bridge. */
+      const asTask = (m: MissionRow) =>
+        ({
+          id: ctx.runId,
+          sessionId: m.mainSessionId,
+          executor: missionBrain(m).brain === "codex" ? "codex" : "claude",
+          machineId,
+          cwd: m.repoDir,
+          missionId: m.id,
+        }) as unknown as MachineTaskRow;
+      const call = async (tool: string, input: Record<string, unknown>, c: typeof ctx): Promise<ToolOutput> => {
+        const d = { ...deps, db: c.db };
+        // Read again: the mission may have moved since the list.
+        const m = await missionOfThread(c.db, c.orgId, c.threadRootId);
+        const live = m && m.agentId === c.agentId && OPEN.includes(m.status) ? m : null;
+        try {
+          if (tool === PERMISSION_TOOL) {
+            if (live) return { content: await handlePermissionPrompt(d, live, asTask(live), masked(input) as never) };
+            const granted = await grantedScopeKeys(c.db, c.orgId, c.agentId).catch(() => new Set<string>());
+            return { content: runPermissionPrompt(input, { canRun: granted.has(grantKey(null, SANDBOX_SCOPE)) }) };
+          }
+          if (!live) return refused("mission.not_allowed", "This conversation has no open mission.");
+          return {
+            content: await run(
+              d,
+              live,
+              asTask(live),
+              tool,
+              masked(input) as Record<string, unknown>,
+              c.toolUseId ?? "",
+            ),
+          };
+        } catch (error) {
+          const code = (error as { code?: unknown }).code;
+          return refused(
+            typeof code === "string" ? code : "mission.failed",
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      };
+      const names: string[] = [PERMISSION_TOOL, ...(ours ? RUN_MISSION_TOOLS : [])];
+      return MISSION_MCP_TOOLS.filter((t) => names.includes(t.name)).map(
+        (tool): ToolDefinition => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+          // Bound to the run's own mission (or, for prompts, to code's rules): not an agent scope.
+          scope: "",
+          execute: (input, c) => call(tool.name, input, c),
         }),
       );
     },
@@ -507,6 +592,10 @@ export function createMissionHooks(deps: HookDeps): MachineMissionHooks {
   return {
     mcp: (machineId, frame) => handleMissionMcpCall(deps, machineId, frame),
     mcpList: (machineId, frame) => handleMissionMcpList(deps, machineId, frame),
-    online: (machineId) => onMachineOnline(deps, machineId),
+    online: async (machineId) => {
+      await onMachineOnline(deps, machineId);
+      // Runs that waited for this computer's brain (ADR 0032 §5) try again.
+      await resumeRunsWaitingForMachine(deps.db, machineId).catch(() => undefined);
+    },
   };
 }

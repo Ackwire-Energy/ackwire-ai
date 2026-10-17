@@ -286,7 +286,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
       inputSchema: mcpSchema("ask_decision"),
       async run(input, ctx, mission) {
         const blocking = input.blocking === true;
-        await askDecision(missionDeps(ctx), mission, null, {
+        const decision = await askDecision(missionDeps(ctx), mission, null, {
           question: input.question,
           options: input.options,
           recommendation: input.recommendation,
@@ -298,6 +298,10 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           content: blocking
             ? "Recorded. End your turn now; you'll be woken here with the decision."
             : "Recorded as provisional: continue with your recommendation.",
+          // On the engine (ADR 0032 §6) the run waits on this decision and resumes with the answer.
+          ...(blocking && deps.missionsOnEngine && decision?.id
+            ? { data: { pause: { kind: "input", id: decision.id } } }
+            : {}),
         };
       },
     }),
@@ -336,6 +340,8 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           content: `Review requested${found.length ? ` with ${found.length} file(s)` : ""}${
             found.length < asked.length ? `; ${asked.length - found.length} id(s) not found in the Drive` : ""
           } (${review.id}). End your turn; you'll be woken with the people's answer.`,
+          // On the engine (ADR 0032 §6) the run waits on this review and resumes with the answer.
+          ...(deps.missionsOnEngine ? { data: { pause: { kind: "input", id: review.id } } } : {}),
         };
       },
     }),
@@ -427,8 +433,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
       // The run in the mission thread does the work: agent mode, missions on the engine (ADR 0032 §6,
       // the main session whatever its brain), or a computer brain through the runner bridge.
       const doesTheWork = Boolean(
-        mission &&
-          (mission.executor === "agent" || deps.missionsOnEngine || Boolean(ctx.bridge && !ctx.bridge.taskId)),
+        mission && (mission.executor === "agent" || deps.missionsOnEngine || Boolean(ctx.bridge && !ctx.bridge.taskId)),
       );
       if (mission && !doesTheWork) out.push(sendTool);
       if (mission && doesTheWork) {

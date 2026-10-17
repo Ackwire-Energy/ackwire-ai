@@ -96,6 +96,7 @@ export * from "./router";
 export * from "./router-jev";
 export * from "./routines";
 export * from "./rrule";
+export * from "./run-resume";
 export * from "./run-tool-tokens";
 export * from "./run-tools";
 export * from "./runs";

@@ -63,8 +63,6 @@ export interface JobDeps extends RunExecutorDeps {
   artifacts?: ArtifactDeps;
   /** Agents' computers (jobs `sandbox.start`, `sandbox.stop`). */
   sandbox?: SandboxDeps | null;
-  /** `MISSIONS_ON_ENGINE` (ADR 0032 §6): missions' main sessions are engine runs (missions-engine.ts). */
-  missionsOnEngine?: boolean;
   /** The engine missions start, resume and cancel runs with (default: today's run queue). */
   missionEngine?: MissionEngine | null;
   router?: {

@@ -142,7 +142,7 @@ export async function commandLowRisk(
 async function autoApproved(
   deps: MissionDeps,
   mission: MissionRow,
-  task: MachineTaskRow,
+  task: PromptAsker,
   call: { tool: string; command: string },
   reason: "low_risk" | "never",
   probability: number | null,
@@ -272,10 +272,17 @@ const deny = (message: string) => JSON.stringify({ behavior: "deny", message });
  * or the state of one it made (`request_id`). Answers JSON: `{behavior}`
  * when decided, `{status: "pending", request_id}` while it waits.
  */
+/**
+ * Who asks to run a command: a mission task, or (ADR 0032) a computer-brain
+ * run in the mission's thread, keyed by its run id (`id`) with the mission's
+ * main session.
+ */
+export type PromptAsker = Pick<MachineTaskRow, "id" | "sessionId" | "executor">;
+
 export async function handlePermissionPrompt(
   deps: MissionDeps,
   mission: MissionRow,
-  task: MachineTaskRow,
+  task: PromptAsker,
   args: Record<string, unknown>,
 ): Promise<string> {
   const requestId = str(args.request_id);
@@ -498,4 +505,35 @@ export async function setCommandApproval(
   });
   await publishMissionEvent(deps, mission, "settings", { commandApproval: value });
   return { commandApproval: value };
+}
+
+/**
+ * A computer-brain run outside a mission (ADR 0032): Claude Code's
+ * permission prompt with no mission to post a card in. The deny list is
+ * refused; plain reads are allowed; anything else is allowed only when the
+ * agent may run commands on its computer (`canRun`: the sandbox scope) and
+ * code allows it (`forbiddenReason`: no sudo, no deletes or writes outside its
+ * folder, no uploads, remote shells or global installs). The rest is denied
+ * with what to do instead (nothing waits for a person here).
+ */
+export function runPermissionPrompt(args: Record<string, unknown>, opts: { canRun: boolean }): string {
+  if (str(args.request_id)) return deny("That request is unknown.");
+  const tool = str(args.tool_name).slice(0, 64);
+  const input =
+    typeof args.input === "object" && args.input !== null && !Array.isArray(args.input)
+      ? (args.input as Record<string, unknown>)
+      : {};
+  const command = commandOf(tool, input);
+  if (!tool || !command) return deny("Unknown tool.");
+  if (deniedInMissions(tool, input)) {
+    return deny("This command is never allowed for agents (merges, pushes to the default branch, deploys).");
+  }
+  const scope = scopeOf(args.scope);
+  if (scope && readOnlyCall(tool, input, scope)) return allow();
+  if (opts.canRun && forbiddenReason(tool, input, scope ?? NO_SCOPE) === null) return allow();
+  return deny(
+    opts.canRun
+      ? "This command is outside what agents may run on this computer. Say which command you need and why; a person can run it or start a mission."
+      : "This agent may not run commands on this computer here. Say which command you need and why; a person can run it or start a mission.",
+  );
 }

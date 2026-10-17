@@ -3,12 +3,15 @@ import { type Config, connectorOAuthApps } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
   type ArtifactDeps,
+  agentScopeFromDb,
+  CodexBrain,
   type ContextDeps,
   createArtifactToolSource,
   createAskUserToolSource,
   createBlobStoreResolver,
   createCalendarToolSource,
   createChatToolSource,
+  createClaudeCodeBrain,
   createConnectorToolSource,
   createContextToolSource,
   createForumToolSource,
@@ -19,6 +22,7 @@ import {
   createLlmJudge,
   createMachineHub,
   createMissionHooks,
+  createMissionRunToolSource,
   createMissionToolSource,
   createModelGateway,
   createReactToolSource,
@@ -28,8 +32,12 @@ import {
   createToolGateway,
   createWikiToolSource,
   type GitProxyDeps,
+  hubBrainLink,
   type Judge,
   type McpConnect,
+  missionAllowRules,
+  missionBranchPrefix,
+  missionOfThread,
   notifyOwnerOnBudget,
   queueBudgetEmail,
   type ResolveHost,
@@ -174,7 +182,7 @@ export function buildEngine(o: EngineOptions) {
     search: context,
     publicUrl: config.PUBLIC_URL,
     judge: context.judge,
-    // ADR 0032 §6: missions' main sessions as engine runs (the engine itself is wired at integration; default: run queue).
+    // ADR 0032 §6: missions' main sessions as engine runs (`createMissionEngine`), behind the flag.
     missionsOnEngine: config.MISSIONS_ON_ENGINE,
   };
   const githubApp =
@@ -203,6 +211,9 @@ export function buildEngine(o: EngineOptions) {
       createContextToolSource(context),
       createConnectorToolSource(connectorDeps),
       createMissionToolSource(missionDeps),
+      // Computer-brain runs only (calls through the runner bridge): before the sandbox tools, so these
+      // win a name clash (`start_task`) there.
+      createMissionRunToolSource(missionDeps),
       createSandboxToolSource({
         ...sandbox,
         artifacts,
@@ -225,6 +236,33 @@ export function buildEngine(o: EngineOptions) {
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
   machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
+  // Computer brains (ADR 0032): Claude Code and Codex on the agent's computer, through the hub. Each turn's
+  // run tool token (issued by the engine) goes in `brain.turn.mcp.token`, so the runner bridge maps calls to the run.
+  const agentScope = agentScopeFromDb(db);
+  const brainLink = hubBrainLink({ hub: machineHub, pubsub: adapters.pubsub });
+  /** A mission run's command policy (plan before Start, work after; its branches and allowed commands). */
+  const missionPermissions = async (turn: { orgId: string; agentId: string; threadRootId: string | null }) => {
+    if (!config.MISSIONS_ON_ENGINE || !turn.threadRootId) return undefined;
+    const mission = await missionOfThread(db, turn.orgId, turn.threadRootId).catch(() => null);
+    if (!mission || mission.agentId !== turn.agentId) return undefined;
+    return {
+      mode: mission.status === "proposed" ? ("plan" as const) : ("work" as const),
+      branchPrefix: missionBranchPrefix(mission.id),
+      allow: await missionAllowRules(db, mission.id),
+    };
+  };
+  const brains: RunExecutorDeps["brains"] = {
+    claude_code: (_agent, _run, setup) =>
+      createClaudeCodeBrain({
+        hub: machineHub,
+        pubsub: adapters.pubsub,
+        agentScope,
+        mcpToken: () => setup.mcpToken(),
+        permissions: missionPermissions,
+      }),
+    codex: (_agent, _run, setup) =>
+      new CodexBrain({ link: brainLink, mcp: async () => ({ token: setup.mcpToken() }), agent: agentScope }),
+  };
   const handlers = createJobHandlers({
     db,
     gateway,
@@ -238,6 +276,8 @@ export function buildEngine(o: EngineOptions) {
     sandbox,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     missionsOnEngine: config.MISSIONS_ON_ENGINE,
+    brains,
+    machines: machineHub,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
     maxHops: config.AGENT_MAX_HOPS,

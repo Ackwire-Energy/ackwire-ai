@@ -147,6 +147,21 @@ export async function invokeToolForRun(
   } finally {
     if (where) await publishChannelEvent(deps.pubsub, { type: "agent.tool", ...where, tool: null });
   }
+  const wait = outcome.type === "result" && !outcome.output.isError ? waitOf(outcome.output.data) : null;
+  if (wait && run) {
+    return {
+      result: await suspendRunForTool(
+        deps,
+        run,
+        { id: call.id, name: call.name },
+        {
+          type: "wait",
+          id: wait.id,
+          content: outcome.type === "result" ? outcome.output.content : "",
+        },
+      ),
+    };
+  }
   if (outcome.type === "result") {
     const isError = outcome.output.isError === true;
     return {
@@ -159,6 +174,20 @@ export async function invokeToolForRun(
   }
   return { result: await suspendRunForTool(deps, run, { id: call.id, name: call.name }, outcome) };
 }
+
+/**
+ * A mission tool's own wait (ADR 0032 §6): a blocking `ask_decision` or a
+ * `request_review` on the engine returns `data.pause` with the decision's or
+ * review's id; the run waits on it (`waiting_input`) and resumes with the
+ * answer (`resumeRunWithResult`).
+ */
+export function waitOf(data: Record<string, unknown> | undefined): { id: string } | null {
+  const pause = data?.pause as { kind?: unknown; id?: unknown } | undefined;
+  return pause && typeof pause.id === "string" && pause.id ? { id: pause.id } : null;
+}
+
+/** A gated call the run pauses on: the gateway's (approval, question, secret) or a mission tool's wait. */
+export type RunPause = Exclude<InvokeResult, { type: "result" }> | { type: "wait"; id: string; content: string };
 
 /** Where a run's events and cards go: its thread, or the main timeline of a flat DM or forum turn. */
 async function whereOf(db: Database, run: AgentRun) {
@@ -187,7 +216,7 @@ export async function suspendRunForTool(
   deps: RunToolsDeps,
   run: AgentRun,
   call: { id: string; name: string },
-  gated: Exclude<InvokeResult, { type: "result" }>,
+  gated: RunPause,
 ): Promise<ToolResult> {
   const { db } = deps;
   const where = await whereOf(db, run);
@@ -293,6 +322,7 @@ export async function suspendRunForTool(
       ...(gated.type === "approval" ? { approvalId: gated.approval.id } : {}),
       ...(questionId ? { questionId } : {}),
       ...(gated.type === "secret" ? { secretRequestId: gated.requestId } : {}),
+      ...(gated.type === "wait" ? { waitId: gated.id } : {}),
     };
     const patch = transcript
       ? {
@@ -347,6 +377,12 @@ export async function suspendRunForTool(
     return {
       content: "Waiting for a person to provide the secret. Stop now and end your turn; you'll be resumed.",
       pause: { kind: "input", id: gated.requestId },
+    };
+  }
+  if (gated.type === "wait") {
+    return {
+      content: `${gated.content} Stop now and end your turn; you'll be resumed with the answer.`.trim(),
+      pause: { kind: "input", id: gated.id },
     };
   }
   return {

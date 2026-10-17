@@ -5373,6 +5373,7 @@ export const en: Translations = {
       machine_task_interrupted: "“{{title}}” was interrupted on {{computer}}.",
       machine_task_resumed: "{{computer}} is back: “{{title}}” resumed where it stopped.",
       machine_offline: "{{computer}} went offline.",
+      brain_unavailable: "{{brain}} can't answer right now. I'll answer when it's back.",
       approval_request: "Approval request: {{title}}",
       secret_request: "Secret request: {{name}}",
       file_saved: "File saved.",

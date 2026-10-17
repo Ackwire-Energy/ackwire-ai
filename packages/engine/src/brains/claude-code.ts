@@ -49,7 +49,9 @@ export interface ClaudeCodeBrainDeps {
   /** Also load the machine owner's own MCP servers (default false: only our bridge). */
   personalMcp?: (turn: BrainTurn) => boolean | Promise<boolean>;
   /** Command policy for the turn (missions pass plan/work, branch prefix, allowed rules). */
-  permissions?: (turn: BrainTurn) => BrainTurnRequest["permissions"] | undefined;
+  permissions?: (
+    turn: BrainTurn,
+  ) => BrainTurnRequest["permissions"] | undefined | Promise<BrainTurnRequest["permissions"] | undefined>;
   /** The run's MCP bridge token (default: random per run). */
   mcpToken?: (turn: BrainTurn) => string;
   /** How long a turn may take (default: the hub's, 3 h). */
@@ -199,7 +201,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           deps.agentScope(turn),
           Promise.resolve(deps.personalMcp?.(turn) ?? false),
         ]);
-        const permissions = deps.permissions?.(turn);
+        const permissions = await deps.permissions?.(turn);
         const request: BrainTurnRequest = {
           runId: turn.runId,
           kind: "claude_code",

@@ -148,7 +148,12 @@ export class CodexBrain implements Brain {
     }
     const codex = status.executors.codex;
     if (!codex) {
-      yield { type: "error", code: "codex_missing", message: "Codex is not installed on the computer.", retryable: true };
+      yield {
+        type: "error",
+        code: "codex_missing",
+        message: "Codex is not installed on the computer.",
+        retryable: true,
+      };
       return;
     }
     if (!codexVersionOk(codex.version)) {
@@ -262,7 +267,8 @@ export function hubBrainLink(deps: {
         }
         // The stream lost its last event: the reply carries it.
         const final = parseBrainEvent(reply?.final);
-        if (!finalSeen && final && (final.type === "done" || final.type === "error")) options.onEvent(final as BrainEvent);
+        if (!finalSeen && final && (final.type === "done" || final.type === "error"))
+          options.onEvent(final as BrainEvent);
       } finally {
         off();
       }
