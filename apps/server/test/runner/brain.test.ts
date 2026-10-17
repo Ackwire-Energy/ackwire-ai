@@ -266,8 +266,11 @@ function setup(over: Partial<BrainManagerOptions> = {}) {
       return [];
     }
   };
+  // One lookup shared by every turn: turns started together reach the manager in the order they started.
+  let folderOnce: Promise<string> | null = null;
   const turn = async (n: number, prompt: string, extra: Partial<BrainTurnRequest> = {}, signal?: AbortSignal) => {
-    const folder = await agentWorkspace(ws, AGENT);
+    folderOnce ??= agentWorkspace(ws, AGENT);
+    const folder = await folderOnce;
     const events: WireBrainEvent[] = [];
     const final = await m.turn(
       {
