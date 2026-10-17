@@ -12,6 +12,7 @@ import {
   createToolGateway,
   ForbiddenError,
   getAgentRepositories,
+  invokeToolForRun,
   listOrgRepositories,
   listRuns,
   normalizeRepoEntry,
@@ -22,6 +23,7 @@ import {
   setAgentRepositories,
   setAgentScopes,
   type ToolContext,
+  takeBridgeEffects,
   ValidationError,
 } from "../src";
 import { fakeGithubMcp } from "./fake-mcp";
@@ -215,6 +217,48 @@ describe("enforcement in the Tool Gateway", () => {
       "get_pull_request acme/app",
       "get_pull_request walt/anything",
     ]);
+  });
+
+  test("a computer brain's calls through the runner bridge get the same limits, and the run keeps the refusal", async () => {
+    f = await setup();
+    const mcp = fakeGithubMcp();
+    const c = await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_secret_123456",
+    });
+    await setAgentScopes(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      f.agent.id,
+      [{ connectionId: c.id, scope: "github:pr.read" }],
+      connectorGrantValidator,
+    );
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    const tools = createToolGateway({ sources: [createConnectorToolSource({ ...depsOf(f), connect: mcp.connect })] });
+    const ctx = await runContext(f);
+    // The engine builds the transcript before a computer turn; the bridge keeps effects on it.
+    await f.db.update(schema.agentRuns).set({ transcript: {} }).where(eq(schema.agentRuns.id, ctx.runId));
+    const deps = { db: f.db, pubsub: f.pubsub, tools };
+    const id = { orgId: f.org.id, agentId: f.agent.id, runId: ctx.runId, machineId: "m-1" };
+    const pr = (owner: string, repo: string) => ({ owner, repo, pullNumber: 4 });
+
+    const denied = await invokeToolForRun(deps, id, {
+      id: "b-1",
+      name: "github_get_pull_request",
+      input: pr("acme", "infra"),
+    });
+    expect(denied).toMatchObject({ result: { isError: true }, code: "tool.not_allowed" });
+    expect(denied.result.content).toContain("acme/infra isn't one of your GitHub repositories");
+    const allowed = await invokeToolForRun(deps, id, {
+      id: "b-2",
+      name: "github_get_pull_request",
+      input: pr("acme", "app"),
+    });
+    expect(allowed.result.isError).toBeUndefined();
+    expect(mcp.calls.map((x) => `${x.tool} ${x.args.owner}/${x.args.repo}`)).toEqual(["get_pull_request acme/app"]);
+    // What the engine takes at the end of the turn: the refused repository and the one it worked in.
+    expect(await takeBridgeEffects(f.db, ctx.runId)).toMatchObject({ deniedRepo: "acme/infra", repo: "acme/app" });
   });
 
   test("open_pull_request outside the list never reaches GitHub", async () => {
