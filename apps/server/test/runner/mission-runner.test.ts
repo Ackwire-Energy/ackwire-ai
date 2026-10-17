@@ -77,10 +77,11 @@ test("protocol 7: hello carries the coding CLIs found; detection is best effort 
   const cached = cachedExecutors(() => now, run);
   cached();
   cached();
-  expect(calls.filter((c) => c === "claude")).toHaveLength(2);
+  // `claude --version` and (protocol 8) `claude auth status` per look.
+  expect(calls.filter((c) => c === "claude")).toHaveLength(4);
   now = 11 * 60_000;
   cached();
-  expect(calls.filter((c) => c === "claude")).toHaveLength(3);
+  expect(calls.filter((c) => c === "claude")).toHaveLength(6);
 });
 
 test("permission profile: work allows git, tests and pushes to the mission's branches; merges, other pushes and deploys are denied", () => {
@@ -167,36 +168,28 @@ test("permission profile: work allows git, tests and pushes to the mission's bra
   }
 });
 
-test.skipIf(!posix)("a mission task's Claude Code gets the settings file; the plan turn runs read only", async () => {
-  const ws = tempDir("ws-");
-  const home = tempDir("home-");
-  dirs.push(ws, home);
-  const tasks = manager(home, ws);
-  await tasks.init();
-  const work = await tasks.start(AGENT, {
-    taskId: id(1),
-    executor: "claude",
-    prompt: "Do the item",
-    session: "0193aaaa-0000-7000-8000-0000000000aa",
-    mission: { id: MISSION, rules: "Rules.", mode: "work", branchPrefix: "agentes/0193aaaa/" },
-  });
-  expect(work.command).toContain("--permission-mode acceptEdits");
-  expect(work.command).toContain(`--settings '${path.join(home, "tasks", id(1), "settings.json")}'`);
-  const settings = JSON.parse(readFileSync(path.join(home, "tasks", id(1), "settings.json"), "utf8"));
-  expect(settings.permissions.allow).toContain("Bash(git push origin agentes/0193aaaa/*)");
-  expect(settings.permissions.deny).toContain("Bash(git merge *)");
-
-  const plan = await tasks.start(AGENT, {
-    taskId: id(2),
-    executor: "claude",
-    prompt: "Plan it",
-    session: "0193aaaa-0000-7000-8000-0000000000ab",
-    mission: { id: MISSION, rules: "Rules.", mode: "plan" },
-  });
-  expect(plan.command).toContain("--permission-mode dontAsk");
-  const planSettings = JSON.parse(readFileSync(path.join(home, "tasks", id(2), "settings.json"), "utf8"));
-  expect(planSettings.permissions.deny).toContain("Edit");
-});
+test.skipIf(!posix)(
+  "a mission task's Claude Code gets the settings file and works (items never run in plan mode)",
+  async () => {
+    const ws = tempDir("ws-");
+    const home = tempDir("home-");
+    dirs.push(ws, home);
+    const tasks = manager(home, ws);
+    await tasks.init();
+    const work = await tasks.start(AGENT, {
+      taskId: id(1),
+      executor: "claude",
+      prompt: "Do the item",
+      session: "0193aaaa-0000-7000-8000-0000000000aa",
+      mission: { id: MISSION, rules: "Rules.", branchPrefix: "agentes/0193aaaa/" },
+    });
+    expect(work.command).toContain("--permission-mode acceptEdits");
+    expect(work.command).toContain(`--settings '${path.join(home, "tasks", id(1), "settings.json")}'`);
+    const settings = JSON.parse(readFileSync(path.join(home, "tasks", id(1), "settings.json"), "utf8"));
+    expect(settings.permissions.allow).toContain("Bash(git push origin agentes/0193aaaa/*)");
+    expect(settings.permissions.deny).toContain("Bash(git merge *)");
+  },
+);
 
 test("paths the executor gives: relative stay, absolute inside the task folder become relative, elsewhere in the agent folder get a prefix, outside is refused", () => {
   const info = { cwd: "/w/dev-1/.worktrees/t1", folder: "/w/dev-1" };
@@ -354,7 +347,7 @@ test.skipIf(!posix)(
       prompt: "Make the contact sheet",
       session: "0193aaaa-0000-7000-8000-0000000000c1",
       branch: "agentes/000000bb/contact-sheet",
-      mission: { id: MISSION, rules: MISSION_RULES, mode: "work", branchPrefix: "agentes/000000bb/" },
+      mission: { id: MISSION, rules: MISSION_RULES, branchPrefix: "agentes/000000bb/" },
     });
     expect(started.branch).toBeUndefined();
     expect(started.cwd).toBe("work/contact-sheet");
@@ -379,7 +372,7 @@ test.skipIf(!posix)(
       prompt: "Again",
       session: "0193aaaa-0000-7000-8000-0000000000c2",
       branch: "contact-sheet",
-      mission: { id: MISSION, rules: MISSION_RULES, mode: "work" },
+      mission: { id: MISSION, rules: MISSION_RULES },
     });
     expect(again.cwd).toBe(`work/contact-sheet-${id(21).replace(/-/g, "").slice(-8)}`);
     // A shell task still needs a repository for a branch.
@@ -415,7 +408,7 @@ test.skipIf(!posix || !hasGit)(
       prompt: "Build the tabs",
       session: "0193aaaa-0000-7000-8000-0000000000c3",
       branch: "agentes/000000bb/nav",
-      mission: { id: MISSION, rules: MISSION_RULES, mode: "work", branchPrefix: "agentes/000000bb/" },
+      mission: { id: MISSION, rules: MISSION_RULES, branchPrefix: "agentes/000000bb/" },
     });
     expect(started).toMatchObject({ branch: "agentes/000000bb/nav", cwd: `.worktrees/${id(23)}` });
     expect(started.command).toContain("own branch");

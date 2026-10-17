@@ -283,6 +283,10 @@ Runner isolation (ADR 0030) interleaves: its level 1 before parallel tasks, shor
 - **Runner isolation**: ADR 0030. Until it lands, "merge needs approval" is enforced by instructions only on connected machines, since the executor may hold the owner's own git credentials.
 - **Missions on the agent's cloud computer** (ADR 0021): the same model works once that computer runs an executor (D38 path 2: the person signs Claude Code in through the computer's terminal); it needs longer command limits there and counts computer time against the agent's budget.
 
+### Missions run only on the agent engine (2026-10-17, ADR 0032 §6)
+
+This supersedes the parts above where the executor's main session is a machine task. The main session is now the agent's run in the home thread with the mission's brain (the API model, Claude Code or Codex); proposing, Start, people's messages, suggestions, decisions, reviews and items' ends are notices that start or join its run (the executor-agent flow, now for every brain). Item sessions stay machine tasks (work mode only) with their own MCP tools, without `request_approval` (merges, deploys and rollbacks are the main session's ADR 0015 approvals). `send_to_mission`, the `plan` mode of `task.start`, the task-bound approvals (`mission.approval_decided`) and the `MISSIONS_ON_ENGINE` flag are gone. MVP decision: missions open before this change are not migrated (they may stop or need a new message). Details in ADR 0032, "Missions on the engine".
+
 ## Consequences
 
 - Long work costs us almost nothing in model tokens: the executor thinks, our code renders and guards.

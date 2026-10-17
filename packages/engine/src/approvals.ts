@@ -234,25 +234,14 @@ export async function publishApproval(
   }
 }
 
-/**
- * What a decision wakes: the run that asked, or, for an approval asked by a
- * mission's executor (ADR 0029, no run), the task's session on the machine.
- */
-async function enqueueResume(tx: Executor, row: Pick<Approval, "id" | "orgId" | "runId" | "missionId">) {
+/** What a decision wakes: the run that asked. */
+async function enqueueResume(tx: Executor, row: Pick<Approval, "id" | "orgId" | "runId">) {
   if (row.runId) {
     await enqueue(tx, {
       orgId: row.orgId,
       kind: "agent_run.execute",
       payload: { runId: row.runId },
       dedupeKey: `agent_run.execute:${row.runId}:approval:${row.id}`,
-      maxAttempts: 4,
-    });
-  } else if (row.missionId) {
-    await enqueue(tx, {
-      orgId: row.orgId,
-      kind: "mission.approval_decided",
-      payload: { approvalId: row.id },
-      dedupeKey: `mission.approval_decided:${row.id}`,
       maxAttempts: 4,
     });
   }

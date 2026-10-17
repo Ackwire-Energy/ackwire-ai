@@ -1288,6 +1288,17 @@ export function useSaveSandboxSettings(orgId: string) {
 }
 
 /** `pollMs`: refetch this often (while starting or stopping); `false` = no polling. */
+/** "Quem pensa" (its owner or an admin; members don't load it). */
+export const useAgentBrain = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentBrain(orgId, agentId),
+    queryFn: () => api.agents.brain(orgId, agentId),
+    enabled,
+    retry: false,
+  });
+};
+
 export const useComputer = (orgId: string, agentId: string, enabled = true, pollMs: number | false = false) => {
   const api = useApi();
   return useQuery({

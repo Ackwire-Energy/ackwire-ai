@@ -118,6 +118,12 @@ export const agentRuns = pgTable(
     issueId: uuid(),
     /** Bumped by the worker while it executes the run; a stale one means the worker died (recovered on boot). */
     heartbeatAt: timestamp({ withTimezone: true }),
+    /**
+     * The computer this run waits for (`waiting_input` with a computer brain
+     * and nothing to fall back on, ADR 0032 §5): queued again when it comes
+     * back (`resumeRunsWaitingForMachine`). Null otherwise.
+     */
+    waitingMachineId: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),
@@ -132,6 +138,8 @@ export const agentRuns = pgTable(
     // An agent's recent work across conversations (context: "Seu trabalho recente").
     index().on(t.orgId, t.agentId, t.createdAt),
     index().on(t.issueId, t.createdAt),
+    // Runs waiting for a computer, found when it reconnects (only those rows are indexed).
+    index("agent_runs_waiting_machine_idx").on(t.waitingMachineId).where(sql`${t.waitingMachineId} is not null`),
   ],
 );
 
@@ -577,4 +585,37 @@ export const machineTasks = pgTable(
       .on(t.missionId, t.sessionId)
       .where(sql`${t.missionId} is not null and ${t.sessionId} is not null and ${t.endedAt} is null`),
   ],
+);
+
+/**
+ * Tokens of the runner's `agentes` MCP bridge (ADR 0032): issued when a
+ * computer-brain run or a mission task starts, bound to the org, agent,
+ * machine and that run (or task). The runner sends it with every tool call;
+ * the server checks the hash, the machine, the expiry and that the run (or
+ * task) is still live. Stored as SHA-256 only.
+ */
+export const runToolTokens = pgTable(
+  "run_tool_tokens",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    agentId: uuid().notNull(),
+    machineId: uuid()
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    /** The run it acts for (a computer-brain turn); null for a mission task started by the server. */
+    runId: uuid().references(() => agentRuns.id, { onDelete: "cascade" }),
+    /** The mission task it acts for (its tools are the mission's); null for a run. */
+    taskId: uuid().references(() => machineTasks.id, { onDelete: "cascade" }),
+    /** SHA-256 (hex) of `agr_…`. */
+    tokenHash: text().notNull().unique(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    revokedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.runId), index().on(t.taskId)],
 );

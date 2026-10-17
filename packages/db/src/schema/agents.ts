@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, foreignKey, index, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, foreignKey, index, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { machines } from "./machines";
 import { organizations } from "./tenancy";
@@ -89,6 +89,15 @@ export const agents = pgTable(
      * never`, validated in code; "Usar como padrão"). Null = `low_risk_auto`.
      */
     missionCommandApproval: text(),
+    /**
+     * Who thinks for it (ADR 0032): `model` (the API, default), `claude_code`
+     * or `codex` on its computer; validated in code (`brain-settings.ts`).
+     */
+    brain: text().notNull().default("model"),
+    /** The computer brain's model (`opus`, `sonnet`, `haiku`, a Codex model); null = the brain's default. */
+    brainModel: text(),
+    /** When the computer brain can't answer, answer through the API (counts against the budget). */
+    brainFallback: boolean().notNull().default(true),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),

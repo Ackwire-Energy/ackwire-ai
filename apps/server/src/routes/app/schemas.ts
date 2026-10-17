@@ -230,3 +230,55 @@ export const Model = z
     outputUsdPerMTok: z.number(),
   })
   .openapi("Model");
+
+/** ADR 0032: who thinks for an agent. */
+export const BrainKind = z.enum(["model", "claude_code", "codex"]).openapi("BrainKind");
+
+export const BrainOption = z
+  .object({
+    kind: BrainKind,
+    available: z.boolean(),
+    reason: z
+      .enum(["no_computer", "exec_off", "runner_old", "not_installed", "outdated"])
+      .optional()
+      .openapi({ description: "Why it can't be chosen now (computer brains)." }),
+    experimental: z.boolean().openapi({ description: 'Still being tested ("Em teste"): Codex.' }),
+    models: z.array(
+      z.object({
+        value: z.string().openapi({ description: "What is stored and passed to the CLI (`opus`, `gpt-…`)." }),
+        label: z.string(),
+        modelId: z.string().optional().openapi({ description: "The model id behind an alias." }),
+        recommended: z.boolean().optional(),
+      }),
+    ),
+    defaultModel: z.string().nullable(),
+  })
+  .openapi("BrainOption");
+
+export const AgentBrain = z
+  .object({
+    agentId: z.uuid(),
+    brain: BrainKind,
+    model: z.string().nullable().openapi({ description: "As stored; null = the brain's default." }),
+    effectiveModel: z.string().nullable(),
+    fallback: z
+      .boolean()
+      .openapi({ description: "When the computer can't answer, answer through the API (agent's budget)." }),
+    computer: z.object({ machineId: z.uuid(), name: z.string(), online: z.boolean() }).nullable(),
+    options: z.array(BrainOption),
+    canEdit: z.boolean(),
+  })
+  .openapi("AgentBrain");
+
+export const MissionBrain = z
+  .object({
+    missionId: z.uuid(),
+    brain: BrainKind.nullable().openapi({ description: "The override; null = from the executor." }),
+    model: z.string().nullable(),
+    effectiveBrain: BrainKind,
+    effectiveModel: z.string().nullable(),
+    options: z.array(BrainOption),
+    canSetBrain: z.boolean().openapi({ description: "Before Start, the owner or someone who decides." }),
+    canSetModel: z.boolean().openapi({ description: "While open, the owner or someone who decides." }),
+  })
+  .openapi("MissionBrain");

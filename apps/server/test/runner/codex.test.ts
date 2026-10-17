@@ -164,7 +164,7 @@ test.skipIf(!posix)(
     await tasks.init();
     tasks.attach((f) => frames.push(f));
     const session = "0193cccc-0000-7000-8000-0000000000c1";
-    const mission = { id: "0193aaaa-0000-7000-8000-0000000000bb", rules: "Rules.", mode: "work" as const };
+    const mission = { id: "0193aaaa-0000-7000-8000-0000000000bb", rules: "Rules." };
     const first = await tasks.start(AGENT, { taskId: TASK, executor: "codex", prompt: "ping", session, mission });
     expect(first.command).not.toContain("resume");
     const done = (id: string) =>

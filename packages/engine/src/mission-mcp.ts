@@ -1,13 +1,21 @@
-import { findPullRequestUrl, MISSION_MCP_TOOLS, type RunnerFrame, workspacePath } from "@agenteschat/adapters";
+import {
+  findPullRequestUrl,
+  MCP_TOOLS_MAX,
+  type McpToolInfo,
+  MISSION_MCP_TOOLS,
+  PERMISSION_TOOL,
+  type RunnerFrame,
+  workspacePath,
+} from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { ValidationError } from "./errors";
 import type { MachineMissionHooks } from "./machine-hub";
 import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./machine-tasks";
-import { handlePermissionPrompt } from "./mission-commands";
+import { handlePermissionPrompt, runPermissionPrompt } from "./mission-commands";
 import { completeMission } from "./mission-delivery";
-import { createMissionApproval, onMachineOnline } from "./mission-sync";
+import { onMachineOnline } from "./mission-sync";
 import {
   askDecision,
   checkMissionToolRate,
@@ -16,6 +24,7 @@ import {
   type MissionDeps,
   type MissionRow,
   missionBranchPrefix,
+  missionOfThread,
   noMentions,
   postMissionMessage,
   publishMissionEvent,
@@ -25,9 +34,17 @@ import {
   startSessionTask,
   updatePlan,
 } from "./missions";
+import { missionBrain } from "./missions-engine";
+import { resumeRunsWaitingForMachine } from "./run-resume";
+import { type BridgeIdentity, verifyRunToolToken } from "./run-tool-tokens";
+import { bridgeToolsFor, invokeToolForRun } from "./run-tools";
+import { SANDBOX_SCOPE } from "./sandbox";
 import { agentSearchChannels, searchVisible } from "./search";
 import { maskSecrets } from "./tool-detail";
-import { validateJson } from "./tools/json-schema";
+import { createToolGateway, type ToolGateway } from "./tools/gateway";
+import { toBrainSchema } from "./tools/schema-compat";
+import { grantedScopeKeys, grantKey } from "./tools/scopes";
+import type { ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { createUpload, failUpload, uploadedFile, waitForUpload } from "./uploads";
 
 const { machineTasks } = schema;
@@ -41,6 +58,10 @@ const { machineTasks } = schema;
  */
 export type McpCallFrame = Extract<RunnerFrame, { type: "mcp.call" }>;
 export type McpOutcome = { ok: true; text: string } | { ok: false; error: { code: string; message: string } };
+export type McpListFrame = Extract<RunnerFrame, { type: "mcp.list" }>;
+export type McpListOutcome =
+  | { ok: true; tools: McpToolInfo[] }
+  | { ok: false; error: { code: string; message: string } };
 
 const refuse = (code: string, message: string): McpOutcome => ({ ok: false, error: { code, message } });
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -116,50 +137,266 @@ async function uploadFromTask(
   return done;
 }
 
-/** Runs one `mcp.call` from the machine holding the socket. */
-export async function handleMissionMcpCall(
+/** A refusal as the tool's output (the bridge answers `mcp.result` with its code). */
+const refused = (code: string, message: string): ToolOutput => ({ content: message, isError: true, data: { code } });
+
+/**
+ * One mission tool of a task's executor (ADR 0029), as a Tool Gateway tool
+ * (ADR 0032): the task must be this machine's and belong to an open mission;
+ * then the call is masked, rate limited, run and audited, as before.
+ */
+async function runTaskTool(
   deps: MissionDeps,
   machineId: string,
-  frame: McpCallFrame,
-): Promise<McpOutcome> {
-  const task = /^[0-9a-f-]{36}$/i.test(frame.taskId) ? await getTask(deps.db, frame.taskId) : null;
+  taskId: string,
+  tool: string,
+  input: Record<string, unknown>,
+): Promise<ToolOutput> {
+  const task = await getTask(deps.db, taskId);
   if (!task || task.machineId !== machineId || !task.missionId) {
-    return refuse("mission.not_allowed", "This task has no agentes mission tools.");
+    return refused("mission.not_allowed", "This task has no agentes mission tools.");
   }
   const mission = await getMissionRow(deps.db, task.missionId);
   if (!mission || mission.id !== task.missionId || mission.machineId !== machineId) {
-    return refuse("mission.not_allowed", "This task's mission is not on this computer.");
+    return refused("mission.not_allowed", "This task's mission is not on this computer.");
   }
-  if (!["proposed", "active", "paused", "awaiting_close"].includes(mission.status)) {
-    return refuse("mission.closed", "The mission is closed: stop here.");
-  }
-  if (task.endedAt) return refuse("mission.task_ended", "This task already ended.");
-  const tool = MISSION_MCP_TOOLS.find((t) => t.name === frame.tool);
-  if (!tool) return refuse("mission.unknown_tool", `Unknown tool ${frame.tool}.`);
-  const problems = validateJson(tool.inputSchema, frame.args);
-  if (problems.length > 0) return refuse("mission.invalid_input", `Invalid input: ${problems.slice(0, 5).join("; ")}`);
+  if (!OPEN.includes(mission.status)) return refused("mission.closed", "The mission is closed: stop here.");
+  if (task.endedAt) return refused("mission.task_ended", "This task already ended.");
   // The runner masked the agent's secrets; anything that still looks like a key is masked here too.
-  const args = masked(frame.args) as Record<string, unknown>;
+  const args = masked(input) as Record<string, unknown>;
   try {
     // Command prompts have their own limit (and the runner asks again while one waits).
-    if (tool.name !== "permission_prompt") await checkMissionToolRate(deps.db, mission, tool.name, task.id);
-    const text = await run(deps, mission, task, tool.name, args, frame.callId);
+    if (tool !== PERMISSION_TOOL) await checkMissionToolRate(deps.db, mission, tool, task.id);
+    const text = await run(deps, mission, task, tool, args);
     // The runner's follow-ups on a waiting command aren't new actions.
-    if (tool.name !== "permission_prompt" || !args.request_id)
+    if (tool !== PERMISSION_TOOL || !args.request_id)
       await recordAudit(deps.db, {
         orgId: mission.orgId,
         actor: { type: "agent", id: mission.agentId },
-        action: `mission.tool_${tool.name}`,
+        action: `mission.tool_${tool}`,
         target: { type: "mission", id: mission.id },
         details: { taskId: task.id, machineId },
       }).catch(() => undefined);
-    return { ok: true, text };
+    return { content: text };
   } catch (error) {
     const code = (error as { code?: unknown }).code;
-    return refuse(
+    return refused(
       typeof code === "string" ? code : "mission.failed",
       error instanceof Error ? error.message : String(error),
     );
+  }
+}
+
+const OPEN = ["proposed", "active", "paused", "awaiting_close"];
+
+/**
+ * The mission tools of a task's executor as an ordinary tool source (ADR
+ * 0032): only for a call that came through the runner bridge for a mission
+ * task (`ctx.bridge.taskId`); `permission_prompt` exists only there (it is
+ * Claude Code's prompt tool: computer brains only); `request_approval` is
+ * not one of them (approvals are the main session's). The gateway looks each
+ * one up, validates its input against the same JSON Schema the executor
+ * sees, then runs it bound to that task's mission.
+ */
+export function createMissionBridgeToolSource(deps: Omit<MissionDeps, "db">): ToolSource {
+  return {
+    name: "mission-bridge",
+    async tools(ctx) {
+      const bridge = ctx.bridge;
+      const taskId = bridge?.taskId;
+      if (!bridge || !taskId) return [];
+      // Approvals (merge, deploy, rollback) are the main session's: its run asks through the Tool Gateway.
+      return MISSION_MCP_TOOLS.filter((tool) => tool.name !== "request_approval").map(
+        (tool): ToolDefinition => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+          // The mission's own tools: the mission authorizes them, not the agent's scopes.
+          scope: "",
+          execute: (input, c) => runTaskTool({ ...deps, db: c.db }, bridge.machineId, taskId, tool.name, input),
+        }),
+      );
+    },
+  };
+}
+
+/** The mission tools a computer-brain run in its mission's thread also needs (they act on the machine). */
+const RUN_MISSION_TOOLS = ["get_context", "upload_artifact", "start_task"] as const;
+
+/**
+ * Tools only computer-brain runs get through the runner bridge (ADR 0032),
+ * as gateway tools:
+ *
+ * - `permission_prompt` (Claude Code's `--permission-prompt-tool`) for every
+ *   such run: in the agent's open mission thread it is the mission's command
+ *   card flow, keyed by the run (no task); elsewhere `runPermissionPrompt`
+ *   (deny list, reads, and what code allows when the agent may run commands).
+ * - In the agent's open mission thread, `get_context`, `upload_artifact` and
+ *   `start_task` (the main session's machine tools), so a mission works
+ *   with every brain. Listed before the sandbox tools: these win a name clash
+ *   for bridge calls.
+ */
+export function createMissionRunToolSource(deps: Omit<MissionDeps, "db">): ToolSource {
+  /** The agent's open mission in this thread (the run is its main session). */
+  const missionOfRun = async (c: { db: MissionDeps["db"]; orgId: string; agentId: string; threadRootId: string }) => {
+    if (!c.threadRootId) return null;
+    const m = await missionOfThread(c.db, c.orgId, c.threadRootId);
+    return m && m.agentId === c.agentId && OPEN.includes(m.status) ? m : null;
+  };
+  return {
+    name: "mission-run-bridge",
+    async tools(ctx) {
+      const bridge = ctx.bridge;
+      if (!bridge || bridge.taskId || !ctx.runId) return [];
+      const machineId = bridge.machineId;
+      const ours = await missionOfRun(ctx);
+      /** The run as the mission sees it: its main session, on the computer that holds the bridge. */
+      const asTask = (m: MissionRow) =>
+        ({
+          id: ctx.runId,
+          sessionId: m.mainSessionId,
+          executor: missionBrain(m).brain === "codex" ? "codex" : "claude",
+          machineId,
+          cwd: m.repoDir,
+          missionId: m.id,
+        }) as unknown as MachineTaskRow;
+      const call = async (tool: string, input: Record<string, unknown>, c: typeof ctx): Promise<ToolOutput> => {
+        const d = { ...deps, db: c.db };
+        // Read again: the mission may have moved since the list.
+        const live = await missionOfRun(c);
+        try {
+          if (tool === PERMISSION_TOOL) {
+            if (live) return { content: await handlePermissionPrompt(d, live, asTask(live), masked(input) as never) };
+            const granted = await grantedScopeKeys(c.db, c.orgId, c.agentId).catch(() => new Set<string>());
+            return { content: runPermissionPrompt(input, { canRun: granted.has(grantKey(null, SANDBOX_SCOPE)) }) };
+          }
+          if (!live) return refused("mission.not_allowed", "This conversation has no open mission.");
+          return {
+            content: await run(d, live, asTask(live), tool, masked(input) as Record<string, unknown>),
+          };
+        } catch (error) {
+          const code = (error as { code?: unknown }).code;
+          return refused(
+            typeof code === "string" ? code : "mission.failed",
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      };
+      const names: string[] = [PERMISSION_TOOL, ...(ours ? RUN_MISSION_TOOLS : [])];
+      return MISSION_MCP_TOOLS.filter((t) => names.includes(t.name)).map(
+        (tool): ToolDefinition => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+          // Bound to the run's own mission (or, for prompts, to code's rules): not an agent scope.
+          scope: "",
+          execute: (input, c) => call(tool.name, input, c),
+        }),
+      );
+    },
+  };
+}
+
+type HookDeps = MissionDeps & {
+  /**
+   * The agents' Tool Gateway: a computer-brain run's tools through the bridge
+   * (ADR 0032). Without it a run's token gets no tools.
+   */
+  tools?: ToolGateway | null;
+};
+
+/** The task's mission tools on their own gateway: a task's executor never gets the agent's other tools. */
+const taskGateways = new WeakMap<object, ToolGateway>();
+function taskGatewayOf(deps: HookDeps) {
+  let gateway = taskGateways.get(deps);
+  if (!gateway) {
+    gateway = createToolGateway({ sources: [createMissionBridgeToolSource(deps)] });
+    taskGateways.set(deps, gateway);
+  }
+  return gateway;
+}
+
+/** Who a frame acts for: its token's run or task, or (older runners, no token) the task it names. */
+async function identityOf(
+  deps: HookDeps,
+  machineId: string,
+  frame: { taskId: string; token?: string },
+): Promise<{ ok: true; identity: BridgeIdentity } | { ok: false; error: { code: string; message: string } }> {
+  if (frame.token) return verifyRunToolToken(deps.db, machineId, frame.token);
+  // Legacy (protocol 5 to 7): the runner's own token check proves the call came from the task's MCP process.
+  const task = /^[0-9a-f-]{36}$/i.test(frame.taskId) ? await getTask(deps.db, frame.taskId) : null;
+  if (!task || task.machineId !== machineId || !task.missionId) {
+    return { ok: false, error: { code: "mission.not_allowed", message: "This task has no agentes mission tools." } };
+  }
+  return {
+    ok: true,
+    identity: { orgId: task.orgId, agentId: task.agentId, runId: task.runId ?? "", machineId, taskId: task.id },
+  };
+}
+
+/** The gateway's refusals in a mission task's words (codes its executor and our tests know). */
+const TASK_CODES: Record<string, string> = {
+  "tool.invalid_input": "mission.invalid_input",
+  "tool.unknown": "mission.unknown_tool",
+};
+
+/**
+ * Runs one `mcp.call` from the machine holding the socket: through the Tool
+ * Gateway with the identity of its token (ADR 0032), or of the task it
+ * names for runners without tokens.
+ */
+export async function handleMissionMcpCall(
+  deps: HookDeps,
+  machineId: string,
+  frame: McpCallFrame,
+): Promise<McpOutcome> {
+  const who = await identityOf(deps, machineId, frame);
+  if (!who.ok) return refuse(who.error.code, who.error.message);
+  const id = who.identity;
+  const tools = id.taskId ? taskGatewayOf(deps) : (deps.tools ?? null);
+  try {
+    const out = await invokeToolForRun({ db: deps.db, pubsub: deps.pubsub, tools }, id, {
+      id: frame.callId,
+      name: frame.tool,
+      input: frame.args,
+    });
+    if (!out.result.isError) return { ok: true, text: out.result.content };
+    const code = out.code ?? "tool.failed";
+    return refuse((id.taskId && TASK_CODES[code]) || code, out.result.content);
+  } catch (error) {
+    const code = (error as { code?: unknown }).code;
+    return refuse(typeof code === "string" ? code : "internal", error instanceof Error ? error.message : String(error));
+  }
+}
+
+/**
+ * `mcp.list` (protocol 8): the tools of the token's run (its Tool Gateway
+ * list with its scopes; mission tools in a mission thread) or of its mission
+ * task, with schemas the coding CLIs accept (`toBrainSchema`).
+ */
+export async function handleMissionMcpList(
+  deps: HookDeps,
+  machineId: string,
+  frame: McpListFrame,
+): Promise<McpListOutcome> {
+  const who = await identityOf(deps, machineId, frame);
+  if (!who.ok) return { ok: false, error: who.error };
+  const id = who.identity;
+  try {
+    const tools = await bridgeToolsFor(
+      { db: deps.db, tools: id.taskId ? taskGatewayOf(deps) : (deps.tools ?? null) },
+      id,
+    );
+    return {
+      ok: true,
+      tools: tools.slice(0, MCP_TOOLS_MAX).map((t) => ({
+        name: t.name,
+        description: t.description.slice(0, 4000),
+        inputSchema: toBrainSchema(t.inputSchema),
+      })),
+    };
+  } catch (error) {
+    return { ok: false, error: { code: "internal", message: error instanceof Error ? error.message : String(error) } };
   }
 }
 
@@ -169,7 +406,6 @@ async function run(
   task: MachineTaskRow,
   tool: string,
   args: Record<string, unknown>,
-  callId: string,
 ): Promise<string> {
   const main = task.sessionId === mission.mainSessionId;
   switch (tool) {
@@ -264,17 +500,6 @@ async function run(
         failed.length ? `; not uploaded: ${failed.join(", ")}` : ""
       }. Stop now and wait for the person to check it.`;
     }
-    case "request_approval": {
-      const action = str(args.action) as "merge" | "deploy" | "rollback";
-      const approval = await createMissionApproval(deps, mission, task, {
-        action,
-        target: noMentions(str(args.target).trim()).slice(0, 300),
-        detail: noMentions(str(args.detail).trim()).slice(0, 1000),
-        callId,
-      });
-      await markWaiting(deps, task.id, "approval");
-      return `Approval requested (${approval.id}); you'll be resumed with the outcome. Stop now and wait.`;
-    }
     case "upload_artifact": {
       const done = await uploadFromTask(deps, mission, task, str(args.path), str(args.title).trim() || null);
       await recordMissionEvent(deps.db, mission, "artifact_uploaded", { artifactId: done.id, taskId: task.id });
@@ -336,17 +561,26 @@ async function run(
 }
 
 /** A blocking ask: the task's end means "waiting for people", not "done" (ADR 0029). */
-async function markWaiting(deps: MissionDeps, taskId: string, what: "decision" | "review" | "approval") {
+async function markWaiting(deps: MissionDeps, taskId: string, what: "decision" | "review") {
   await deps.db
     .update(machineTasks)
     .set({ waitingFor: what, updatedAt: new Date() })
     .where(eq(machineTasks.id, taskId));
 }
 
-/** What the machine hub calls for missions (`setMissionHooks`). */
-export function createMissionHooks(deps: MissionDeps): MachineMissionHooks {
+/**
+ * What the machine hub calls for missions and the MCP bridge
+ * (`setMissionHooks`). Pass the agents' Tool Gateway (`tools`) so a
+ * computer-brain run's token reaches its tools.
+ */
+export function createMissionHooks(deps: HookDeps): MachineMissionHooks {
   return {
     mcp: (machineId, frame) => handleMissionMcpCall(deps, machineId, frame),
-    online: (machineId) => onMachineOnline(deps, machineId),
+    mcpList: (machineId, frame) => handleMissionMcpList(deps, machineId, frame),
+    online: async (machineId) => {
+      await onMachineOnline(deps, machineId);
+      // Runs that waited for this computer's brain (ADR 0032 §5) try again.
+      await resumeRunsWaitingForMachine(deps.db, machineId).catch(() => undefined);
+    },
   };
 }

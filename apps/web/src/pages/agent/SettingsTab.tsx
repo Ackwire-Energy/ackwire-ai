@@ -15,8 +15,17 @@ import {
 } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useAgentDetail, useCredentials, useModels, usePlatformKey, useSettings, useUsage } from "@/api/queries";
+import {
+  useAgentBrain,
+  useAgentDetail,
+  useCredentials,
+  useModels,
+  usePlatformKey,
+  useSettings,
+  useUsage,
+} from "@/api/queries";
 import { AudienceChoice } from "@/components/AgentAudience";
+import { AgentBrainChoice } from "@/components/AgentBrain";
 import { AgentComputerPanel } from "@/components/AgentComputer";
 import {
   BudgetField,
@@ -45,6 +54,7 @@ import { ReadOnlyNote, useVisibleChannels } from "./pieces";
 const SECTION_ICON: Record<AgentSection, IconName> = {
   identity: "person",
   model: "bolt",
+  brain: "bulb",
   budget: "wallet",
   owner: "members",
   audience: "message",
@@ -118,6 +128,7 @@ export function SettingsTab({
   const settings = useSettings(org.id);
   const detail = useAgentDetail(org.id, agent.id);
   const usage = useUsage(org.id);
+  const brain = useAgentBrain(org.id, agent.id, viewer !== "member");
   const all = models.data?.models ?? [];
   const choices = modelChoices(all, credentials.data ?? [], platform.data ?? false);
   const current = all.find((m) => m.id === draft.model);
@@ -278,6 +289,28 @@ export function SettingsTab({
                   <span className="newag__model-desc">{t("agentPage.settings.keySafe")}</span>
                 </div>
               </div>
+            )}
+          </Section>
+
+          <Section id="brain" title={t("brain.title")} fields={["brain"]}>
+            {viewer === "member" ? (
+              <p className="small muted">
+                {ownerFirst ? t("brain.hidden", { owner: ownerFirst }) : t("brain.hiddenAdmins")}
+              </p>
+            ) : brain.data && draft.brain ? (
+              <>
+                <span className="small muted">{t("brain.sub", g)}</span>
+                <AgentBrainChoice
+                  view={brain.data}
+                  value={draft.brain}
+                  savedBrain={saved.brain?.brain}
+                  onChange={can("brain") ? (v) => set("brain", v) : undefined}
+                  g={g}
+                />
+                <WasLine changeKey="brain" />
+              </>
+            ) : brain.isError ? null : (
+              <LoadingLine width={220} />
             )}
           </Section>
 

@@ -17,6 +17,7 @@ import { useApi } from "@/api/context";
 import { keys } from "@/api/keys";
 import {
   useAgentAccess,
+  useAgentBrain,
   useAgentDetail,
   useAgentSkills,
   useComputer,
@@ -29,9 +30,10 @@ import {
   useSettings,
   useUpdateAgent,
 } from "@/api/queries";
-import type { Agent, AgentAudience, AgentDetail, AgentInput, AgentSkill } from "@/api/types";
+import type { Agent, AgentAudience, AgentBrain, AgentDetail, AgentInput, AgentSkill } from "@/api/types";
 import { resourceName, useConnectedById, useSetLevels } from "@/components/AccessLevels";
 import { audienceValid } from "@/components/AgentAudience";
+import { brainSummary } from "@/components/AgentBrain";
 import { CLOUD, machineOf } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, NO_OWNER, usd } from "@/components/AgentFields";
 import { LoadingPage } from "@/components/Loading";
@@ -42,6 +44,7 @@ import {
   AGENT_TABS,
   type AgentSection,
   type AgentTab,
+  type BrainChoice,
   budgetValue,
   canEdit,
   changedKeys,
@@ -131,6 +134,7 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
   const library = useAgentSkills(org.id, agent.id);
   const computer = useComputer(org.id, agent.id, viewer !== "member");
   const machines = useMachines(org.id, viewer !== "member");
+  const brain = useAgentBrain(org.id, agent.id, viewer !== "member");
   const proposals = useProposals(org.id);
   const runs = useRuns(org.id, agent.id, viewer !== "member");
   const visible = useVisibleChannels();
@@ -172,8 +176,11 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
       channels:
         d && visible.ready ? sortIds(d.channels.map((c) => c.id).filter((id) => visibleIds.has(id))) : undefined,
       machine: computer.data ? machineOf(computer.data) : undefined,
+      brain: brain.data
+        ? { brain: brain.data.brain, model: brain.data.model, fallback: brain.data.fallback }
+        : undefined,
     };
-  }, [agent, admin, detail.data, settings.data, access.data, library.data, computer.data, visible]);
+  }, [agent, admin, detail.data, settings.data, access.data, library.data, computer.data, brain.data, visible]);
 
   /* ---------- The draft ---------- */
 
@@ -195,6 +202,7 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
     skills: edits.skills ?? saved.skills,
     channels: edits.channels ?? saved.channels,
     machine: edits.machine ?? saved.machine,
+    brain: edits.brain ?? saved.brain,
   };
 
   /* ---------- What changed, said in words ---------- */
@@ -311,6 +319,13 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
           label: label("channels"),
           was: channelText(saved.channels ?? []),
           now: channelText(draft.channels ?? []),
+        };
+      case "brain":
+        return {
+          ...base,
+          label: label("brain"),
+          was: saved.brain ? brainSummary(t, saved.brain, brain.data?.options) : "",
+          now: draft.brain ? brainSummary(t, draft.brain, brain.data?.options) : "",
         };
       default:
         return {
@@ -479,6 +494,25 @@ function AgentProfile({ agent, tab, section, onNavigate }: AgentPageProps & { ag
         fail(e, true);
       }
     }
+    // 6. Who thinks (after the computer: what it offers depends on it).
+    if (!failed && fields.has("brain") && draft.brain) {
+      const next: BrainChoice = draft.brain;
+      try {
+        const view = await api.agents.setBrain(org.id, agent.id, {
+          brain: next.brain,
+          model: next.brain === "model" ? null : next.model,
+          fallback: next.fallback,
+          // The warning was confirmed when the brain was chosen (needsPlanWarning).
+          ...(next.brain !== "model" && next.brain !== saved.brain?.brain ? { acceptPlanTerms: true } : {}),
+        });
+        qc.setQueryData<AgentBrain>(keys.agentBrain(org.id, agent.id), view);
+        done.push("brain");
+      } catch (e) {
+        fail(e, true);
+      }
+    }
+    // A new computer changes what can think.
+    if (done.includes("machine")) void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, agent.id) });
     setEdits((e) => dropFields(e, done));
     setSaving(false);
     if (!failed) toast.show(t("agent.savedToast", agentGrammar(t, draft.name.trim() || agent.name)));

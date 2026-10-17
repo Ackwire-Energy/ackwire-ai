@@ -18,14 +18,11 @@ import {
   type MissionExecutor,
   type MissionRow,
   machineExecutors,
-  missionOfThread,
-  missionRole,
   noMentions,
   postMissionMessage,
   proposeMission,
   recordMissionEvent,
   requestReview,
-  sendToMainSession,
   updatePlan,
 } from "./missions";
 import { SANDBOX_SCOPE } from "./sandbox";
@@ -38,7 +35,6 @@ const failed = (error: unknown): ToolOutput => ({
   isError: true,
   ...((error as { code?: unknown }).code ? { data: { code: (error as { code: string }).code } } : {}),
 });
-const EXECUTOR_NAMES: Record<MissionExecutor, string> = { claude: "Claude Code", codex: "Codex", agent: "you" };
 
 /** The same JSON Schemas the executor's MCP tools have (one contract for both). */
 const mcpSchema = (name: string) =>
@@ -46,13 +42,12 @@ const mcpSchema = (name: string) =>
 
 /**
  * The agent's side of missions (ADR 0029), scope `sandbox:run`:
- * `propose_mission` (the work is planned before the person presses Start) and
- * `send_to_mission` (passes what the owner or a decider asks to the
- * executor's main session). In agent mode the agent IS the executor: in its
- * mission's thread it gets the mission tools the executor would have
+ * `propose_mission` (the work is planned before the person presses Start).
+ * The agent's run in its mission's thread is the mission's main session,
+ * whatever its brain (ADR 0032 §6): there it gets the mission tools
  * (`update_plan`, `report`, `ask_decision`, `request_review`,
- * `request_approval`; files go to the Drive with `upload_file`), bound to
- * that mission. Each call needs the person behind the run to be the owner or
+ * `complete_mission`, `request_approval`; files go to the Drive with
+ * `upload_file`), bound to that mission. Each call needs the person behind the run to be the owner or
  * a decider, or the mission itself to have woken the run.
  */
 export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSource {
@@ -60,11 +55,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
 
   const proposeTool = (computer: string, executors: MissionExecutor[]): ToolDefinition => ({
     name: "propose_mission",
-    description: `Propose a mission when a request is long work on the computer "${computer}" (several deliverables, days, product decisions). ${
-      executors.includes("claude")
-        ? "By default Claude Code there explores the repository and plans it;"
-        : "You explore the repository there and plan it yourself;"
-    } the people get a plan card to start it. Nothing changes until the person who asked starts it. For one task, use start_task instead.`,
+    description: `Propose a mission when a request is long work on the computer "${computer}" (several deliverables, days, product decisions). It is planned first (read only) in its thread; the people get a plan card to start it. Nothing changes until the person who asked starts it. For one task, use start_task instead.`,
     scope: SANDBOX_SCOPE,
     inputSchema: {
       type: "object",
@@ -123,9 +114,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           goal: str(input.goal),
           repoDir: str(input.folder) || null,
           executor: (str(input.executor) || null) as MissionExecutor | null,
-          runId: ctx.runId,
         });
-        const who = EXECUTOR_NAMES[mission.executor as MissionExecutor] ?? "Claude Code";
         // Its home is a new thread (a flat DM): the reply here gets a link card to it.
         const elsewhere = home !== ctx.threadRootId;
         const shown = elsewhere
@@ -135,9 +124,10 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           "Reply briefly (one or two lines) in the person's language; don't name buttons or other parts of the app.";
         return {
           content:
-            mission.executor === "agent"
-              ? `Mission ${mission.id} proposed: you program it yourself on ${computer}. Plan it now in its thread (read only: read_file, list_files, read-only commands), then update_plan with the first items and report the goal, in the person's language; the person who asked starts it when the plan looks right. ${shown}`
-              : `Mission ${mission.id} proposed: ${who} on ${computer} is planning it now (read only); nothing changes until the person who asked starts it. ${shown} ${reply} Then end your turn.`,
+            // The plan notice joins this run when the mission lives in this thread; a new thread gets its own run.
+            elsewhere
+              ? `Mission ${mission.id} proposed on ${computer}: it is being planned in its own thread now (read only); nothing changes until the person who asked starts it. ${shown} ${reply} Then end your turn.`
+              : `Mission ${mission.id} proposed on ${computer}. Plan it now in this thread (read only: explore the folder, change nothing), then update_plan with the first items and report the goal, in the person's language; the person who asked starts it when the plan looks right. ${shown}`,
           data: {
             missionId: mission.id,
             threadId: home,
@@ -151,54 +141,8 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
     },
   });
 
-  const sendTool: ToolDefinition = {
-    name: "send_to_mission",
-    description:
-      "Pass a request, a change or an answer to the mission of this thread: its executor's main session gets it (now, or as soon as it can). Use it when the mission's owner or someone who can decide asks for work; don't start tasks yourself in a mission thread.",
-    scope: SANDBOX_SCOPE,
-    inputSchema: {
-      type: "object",
-      properties: { text: { type: "string", minLength: 1, maxLength: MISSION_LIMITS.sendText } },
-      required: ["text"],
-      additionalProperties: false,
-    },
-    describe: (input) => ({ title: "Send to the mission", detail: str(input.text).slice(0, 500) }),
-    async execute(input, ctx) {
-      try {
-        const mission = await missionOfThread(ctx.db, ctx.orgId, ctx.threadRootId);
-        if (!mission || mission.agentId !== ctx.agentId) {
-          return { content: "This thread has no mission of yours.", isError: true };
-        }
-        const person = await taskRequester(ctx);
-        const role = person ? await missionRole(ctx.db, mission, person) : "none";
-        if (role !== "owner" && role !== "decide") {
-          return {
-            content: "Only the mission's owner or someone who can decide can ask for work on the computer.",
-            isError: true,
-            data: { code: "mission.not_allowed" },
-          };
-        }
-        const [who] = person
-          ? await ctx.db.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, person))
-          : [];
-        const out = await sendToMainSession(missionDeps(ctx), mission, str(input.text), {
-          name: who?.name ?? "someone",
-          userId: person,
-        });
-        return {
-          content: out.delivered
-            ? "Sent: the executor's main session is working on it now. Tell the people you passed it on."
-            : "Queued: the main session gets it as soon as it can (its current turn ends, the mission resumes or the computer is back). Tell the people.",
-          data: { delivered: out.delivered },
-        };
-      } catch (error) {
-        return failed(error);
-      }
-    },
-  };
-
   /**
-   * One agent-mode mission tool: the mission is re-read (it may have paused
+   * One mission tool of the main session: the mission is re-read (it may have paused
    * or closed), the run must act for it, and the hourly rate holds.
    */
   const bound = (
@@ -286,7 +230,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
       inputSchema: mcpSchema("ask_decision"),
       async run(input, ctx, mission) {
         const blocking = input.blocking === true;
-        await askDecision(missionDeps(ctx), mission, null, {
+        const decision = await askDecision(missionDeps(ctx), mission, null, {
           question: input.question,
           options: input.options,
           recommendation: input.recommendation,
@@ -298,6 +242,8 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           content: blocking
             ? "Recorded. End your turn now; you'll be woken here with the decision."
             : "Recorded as provisional: continue with your recommendation.",
+          // The run waits on this decision and resumes with the answer.
+          ...(blocking && decision?.id ? { data: { pause: { kind: "input", id: decision.id } } } : {}),
         };
       },
     }),
@@ -336,6 +282,8 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           content: `Review requested${found.length ? ` with ${found.length} file(s)` : ""}${
             found.length < asked.length ? `; ${asked.length - found.length} id(s) not found in the Drive` : ""
           } (${review.id}). End your turn; you'll be woken with the people's answer.`,
+          // The run waits on this review and resumes with the answer.
+          data: { pause: { kind: "input", id: review.id } },
         };
       },
     }),
@@ -403,15 +351,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
     name: "missions",
     async tools(ctx) {
       const keys = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-      const names = [
-        "propose_mission",
-        "send_to_mission",
-        "update_plan",
-        "report",
-        "ask_decision",
-        "request_review",
-        "complete_mission",
-      ];
+      const names = ["propose_mission", "update_plan", "report", "ask_decision", "request_review", "complete_mission"];
       const granted =
         keys.has(grantKey(null, SANDBOX_SCOPE)) || names.some((n) => keys.has(grantKey(null, toolAllowScope(n))));
       if (!granted || !deps.hub) return [];
@@ -424,8 +364,8 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
           if (available.length > 0) out.push(proposeTool(status.name, available));
         }
       }
-      if (mission && mission.executor !== "agent") out.push(sendTool);
-      if (mission && mission.executor === "agent") {
+      // The run in the mission thread is its main session and does the work (ADR 0032 §6).
+      if (mission) {
         const status = mission.machineId ? await deps.hub.status(mission.machineId) : null;
         out.push(...agentTools(mission, status?.name ?? "the computer"));
       }
@@ -434,7 +374,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
   };
 }
 
-/** Tells the mission's owner an approval waits (agent mode: the approval belongs to the run). */
+/** Tells the mission's owner an approval waits (the approval belongs to the main session's run). */
 export async function notifyMissionApproval(
   deps: Pick<MissionDeps, "db" | "pubsub">,
   approval: { id: string; orgId: string; missionId: string | null },

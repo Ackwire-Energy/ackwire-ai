@@ -3,7 +3,7 @@ import { createContext, type ReactNode, useContext } from "react";
 import { useTranslation } from "react-i18next";
 import type { Agent, AgentAudience } from "@/api/types";
 import type { AccessResource, Level, LevelState } from "@/lib/access-levels";
-import type { AgentSection, AgentTab, Edits, Field, Look, Saved, Viewer } from "@/lib/agent-edit";
+import type { AgentSection, AgentTab, BrainChoice, Edits, Field, Look, Saved, Viewer } from "@/lib/agent-edit";
 import type { agentGrammar } from "@/lib/grammar";
 
 /** One unsaved change, as the save bar and the cards say it. */
@@ -33,6 +33,7 @@ export interface Draft {
   skills: string[] | undefined;
   channels: string[] | undefined;
   machine: string | undefined;
+  brain: BrainChoice | undefined;
 }
 
 export interface AgentEdit {
@@ -114,7 +115,8 @@ export function WasLine({ changeKey }: { changeKey: string }) {
 export function LockNote({ field }: { field: Field }) {
   const { t } = useTranslation();
   const { viewer, ownerFirst } = useAgentEdit();
-  const ownerToo = field === "look" || field === "levels" || field === "audience" || field === "machine";
+  const ownerToo =
+    field === "look" || field === "levels" || field === "audience" || field === "machine" || field === "brain";
   return (
     <span className="agp-lock">
       <Icon name="lock" size={14} />

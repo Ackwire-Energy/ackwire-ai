@@ -1,10 +1,12 @@
 import {
+  brainTopic,
   HEARTBEAT_MS,
   HELLO_TIMEOUT_MS,
   type MachineErrorCode,
   type MachineOp,
   type MachineReplies,
   type MachineRequest,
+  type McpToolInfo,
   MIN_RUNNER_PROTOCOL,
   machineRpcReplyTopic,
   machineRpcTopic,
@@ -52,6 +54,9 @@ const { machines, machineRpc } = schema;
  * - `call` sends a `request` and resolves on its `result`, forwarding
  *   `output`; aborting sends `cancel`. A machine held by another replica is
  *   reached through a `machine_rpc` row plus a pub/sub signal both ways.
+ * - Brain turns (protocol 8, ADR 0032): `brain.turn` is a request like any
+ *   other; its `brain.event` / `brain.done` frames are published on
+ *   `brainTopic(runId)` (with the machine id) for the replica running the turn.
  * - Background tasks (protocol 4, `machine-tasks.ts`): this replica persists
  *   the `task.event` and `task.done` frames of the sockets it holds and acks
  *   each `task.done`; `hello` reconciles the runner's journal; a socket that
@@ -152,6 +157,8 @@ export interface MachineHubDeps {
 export function requestTimeoutMs(request: MachineRequest) {
   if (request.op === "exec") return (request.timeoutSeconds + 30) * 1000;
   if (request.op === "push") return 330_000;
+  // A brain turn may wait on a person (a command approval) for up to 30 minutes, more than once.
+  if (request.op === "brain.turn") return 3 * 3600_000;
   return 120_000;
 }
 
@@ -166,6 +173,11 @@ export interface MachineMissionHooks {
     machineId: string,
     frame: Extract<RunnerFrame, { type: "mcp.call" }>,
   ): Promise<{ ok: true; text: string } | { ok: false; error: { code: string; message: string } }>;
+  /** `mcp.list` (protocol 8, ADR 0032): the tools of the token's run or task. */
+  mcpList?(
+    machineId: string,
+    frame: Extract<RunnerFrame, { type: "mcp.list" }>,
+  ): Promise<{ ok: true; tools: McpToolInfo[] } | { ok: false; error: { code: string; message: string } }>;
   online?(machineId: string): Promise<void>;
 }
 
@@ -341,6 +353,30 @@ export function createMachineHub(deps: MachineHubDeps) {
           out.ok
             ? { type: "mcp.result", callId: frame.callId, ok: true, text: out.text.slice(0, 50_000) }
             : { type: "mcp.result", callId: frame.callId, ok: false, error: out.error },
+        ),
+      );
+  }
+
+  /** `mcp.list` (protocol 8): answered with `mcp.tools`; never blocks other frames. */
+  function mcpList(conn: MachineConnection, frame: Extract<RunnerFrame, { type: "mcp.list" }>) {
+    const machineId = conn.machineId as string;
+    const run = hooks.mcpList
+      ? hooks.mcpList(machineId, frame)
+      : Promise.resolve({
+          ok: false as const,
+          error: { code: "bridge.unavailable", message: "Tools are not available on this server." },
+        });
+    void run
+      .catch((error: unknown) => ({
+        ok: false as const,
+        error: { code: "internal", message: error instanceof Error ? error.message : String(error) },
+      }))
+      .then((out) =>
+        send(
+          conn,
+          out.ok
+            ? { type: "mcp.tools", callId: frame.callId, ok: true, tools: out.tools }
+            : { type: "mcp.tools", callId: frame.callId, ok: false, error: out.error },
         ),
       );
   }
@@ -592,6 +628,17 @@ export function createMachineHub(deps: MachineHubDeps) {
         await applyTaskEvent({ db, pubsub }, conn.machineId, frame).catch(() => undefined);
       } else if (frame.type === "mcp.call") {
         mcpCall(conn, frame);
+      } else if (frame.type === "mcp.list") {
+        mcpList(conn, frame);
+      } else if (frame.type === "brain.event" || frame.type === "brain.done") {
+        // Brain turns (protocol 8, ADR 0032): to whichever replica runs the turn; it checks the machine.
+        await pubsub
+          .publish(brainTopic(frame.runId), {
+            type: frame.type,
+            machineId: conn.machineId,
+            ...(frame.type === "brain.event" ? { event: frame.event } : {}),
+          })
+          .catch(() => undefined);
       } else if (frame.type === "task.done") {
         // Not acknowledged on failure: the runner sends it again after its next reconnect.
         await taskDone(conn, frame).catch((error) =>

@@ -15,7 +15,8 @@ const {
 /**
  * The compact mission brief a run in a mission's thread gets (ADR 0029 §8):
  * plan progress, what runs, what waits for people, who may ask for work,
- * and how to pass requests on. Only when the thread has a mission (the run's
+ * and how the work is done. The run in the thread is the mission's main
+ * session, whatever its brain (ADR 0032 §6). Only when the thread has a mission (the run's
  * context learns that from the same lookup as the thread's range).
  */
 export async function missionBrief(db: Database, missionId: string): Promise<string | null> {
@@ -73,8 +74,6 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
   const deciders = people.filter((p) => p.role === "decide").map((p) => p.name);
   const commenters = people.filter((p) => p.role === "comment").map((p) => p.name);
   const computer = machine[0]?.name ?? "the computer";
-  const agentMode = mission.executor === "agent";
-  const executor = mission.executor === "codex" ? "Codex" : "Claude Code";
   const pending = decisions.filter((d) => d.status === "pending");
   const provisional = decisions.filter((d) => d.status === "provisional");
   // Titles, lines and questions come from the executor (or the agent's own tools): data, never instructions.
@@ -101,15 +100,11 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
   ]
     .join("\n")
     .replace(/<\/?mission-data>/gi, "");
-  const guidance = agentMode
-    ? [
-        `You do this mission's work yourself on ${computer} (no Claude Code or Codex here). Use start_task for anything long (it runs in the background and wakes you here when it ends; don't wait or poll) and run_code for short commands; files with read_file and write_file. Keep the plan with update_plan (mark items doing, done or waiting_you as they move), report milestones with report, ask decisions only with ask_decision (blocking when you can't go on), request_review when there is something to show, and request_approval before any merge, deploy or rollback, then wait. When every plan item is done, call complete_mission with what you delivered and what the person should check (files with upload_file first), then stop. Before the people press Start, only read and plan.`,
-        `Mission rules: ${MISSION_RULES} When the mission folder is not a git repository (images, documents, files), skip branches, commits and pushes: work in plain folders and deliver results with the Drive or request_review.`,
-        "Commands people have: /stop, /pause, /summary, /plan.",
-      ]
-    : [
-        `${executor} on ${computer} does the work in its main session; you route and relay. When the owner or someone who can decide asks for work, a change or something only the executor knows, pass it on with send_to_mission (their words, briefly) and say so; don't start tasks yourself here. Answer questions about progress from this brief. Commands people have: /stop, /pause, /summary, /plan.`,
-      ];
+  const guidance = [
+    `You do this mission's work yourself on ${computer}. Use start_task for anything long (it runs in the background and wakes you here when it ends; don't wait or poll) and run_code for short commands; files with read_file and write_file. Keep the plan with update_plan (mark items doing, done or waiting_you as they move), report milestones with report, ask decisions only with ask_decision (blocking when you can't go on), request_review when there is something to show, and request_approval before any merge, deploy or rollback, then wait. When every plan item is done, call complete_mission with what you delivered and what the person should check (files with upload_file first), then stop. Before the people press Start, only read and plan.`,
+    `Mission rules: ${MISSION_RULES} When the mission folder is not a git repository (images, documents, files), skip branches, commits and pushes: work in plain folders and deliver results with the Drive or request_review.`,
+    "Commands people have: /stop, /pause, /summary, /plan.",
+  ];
   return [
     "# Mission in this thread",
     `Who can ask for work: ${owner?.name ?? "the owner"} (owner)${deciders.length ? `, ${deciders.join(", ")} (can decide)` : ""}.${

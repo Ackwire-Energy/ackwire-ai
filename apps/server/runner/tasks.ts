@@ -21,6 +21,7 @@ import {
   type AgentScope,
   commandOf,
   findPullRequestUrl,
+  isRunToolToken,
   type MachineReplies,
   MISSION_RULES_NO_GIT,
   PERMISSION_WAIT_MS,
@@ -131,6 +132,8 @@ interface Entry {
   /** Protocol 5: the mission this task works for, and its token for the local `agentes` MCP server. */
   missionId?: string;
   mcpToken?: string;
+  /** Protocol 8: the server's token for its tools (ADR 0032), sent with each relayed call. */
+  serverToken?: string;
   /** Set by `task.cancel` (a canceled task that vanished is canceled, not interrupted). */
   canceling?: boolean;
   done?: TaskDone;
@@ -829,7 +832,6 @@ export class TaskManager {
     let extra: string[] = [];
     let mcpToken: string | undefined;
     const input = where ? `${where}\n\n${prompt}` : prompt;
-    const mode = req.mission?.mode === "plan" ? "plan" : "work";
     if (missionId && this.opts.mcp) {
       mcpToken = newMcpToken();
       writeFileSync(path.join(dir, MCP_TOKEN_FILE), mcpToken, { mode: 0o600 });
@@ -848,14 +850,14 @@ export class TaskManager {
           folders: [...new Set([cwd, missionRoot])],
         });
         writeFileSync(configFile, JSON.stringify(config), { mode: 0o600 });
-        // What it may run without asking (protocol 7; older servers send no mode: work).
+        // What it may run without asking: item tasks work (the main session plans as an engine run, ADR 0032).
         const prefix = missionBranchPrefix(missionId, req.mission?.branchPrefix);
         const allow = Array.isArray(req.mission?.allow) ? req.mission.allow.filter((r) => typeof r === "string") : [];
         // An item in its own worktree or subfolder: the mission folder too (its .agentes/, shared inputs).
         const away = missionTask && path.resolve(cwd) !== path.resolve(missionRoot);
         writeFileSync(
           settingsFile,
-          JSON.stringify(claudePermissionSettings(mode, prefix, allow, away ? path.resolve(missionRoot) : undefined)),
+          JSON.stringify(claudePermissionSettings("work", prefix, allow, away ? path.resolve(missionRoot) : undefined)),
           { mode: 0o600 },
         );
       }
@@ -868,7 +870,7 @@ export class TaskManager {
         ...(executor === "claude"
           ? {
               settingsFile,
-              promptTool: mode === "work",
+              promptTool: true,
               ...(missionTask && path.resolve(cwd) !== path.resolve(missionRoot)
                 ? { addDirs: [path.resolve(missionRoot)] }
                 : {}),
@@ -883,12 +885,11 @@ export class TaskManager {
       session,
       resume,
       extra,
-      ...(missionId && executor === "claude" && mode === "plan" ? { permissionMode: "dontAsk" as const } : {}),
       ...(executor === "codex"
         ? {
             codex: {
               cwd,
-              sandbox: missionId && mode === "plan" ? ("read-only" as const) : ("workspace-write" as const),
+              sandbox: "workspace-write" as const,
               lastFile: path.join(dir, "last.txt"),
               ...(codexThread ? { thread: codexThread } : {}),
             },
@@ -957,6 +958,7 @@ export class TaskManager {
       ...(session ? { session } : {}),
       ...(missionId ? { missionId } : {}),
       ...(mcpToken ? { mcpToken } : {}),
+      ...(mcpToken && isRunToolToken(req.mission?.mcpToken) ? { serverToken: req.mission.mcpToken } : {}),
       status: "running",
       pid,
       startedAt: new Date(this.now()).toISOString(),
@@ -980,6 +982,7 @@ export class TaskManager {
       missionId: t.missionId,
       running: t.status === "running",
       cwd: t.cwd,
+      ...(t.serverToken ? { serverToken: t.serverToken } : {}),
       ...(t.folder ? { folder: t.folder } : {}),
       ...(this.watches.get(t.taskId)?.redact ? { redact: this.watches.get(t.taskId)?.redact } : {}),
     };

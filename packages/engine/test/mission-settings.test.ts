@@ -16,6 +16,7 @@ import {
   setMissionResumeTasks,
   setParticipant,
   startMission,
+  startSessionTask,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { type McpResult, missionRunner, pairedMachine, type TaskStartRequest } from "./mission-helpers";
@@ -35,7 +36,10 @@ const ok = (r: McpResult) => {
 };
 const audits = (action: string) => f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, action));
 
-/** A started Claude Code mission whose main session works, and a way to ask for a command. */
+/**
+ * A started Claude Code mission (its main session is the agent's run), one item session running on the
+ * computer (`main`: Claude Code's prompts come from it), and a way to ask for a command.
+ */
 async function working(judge?: NonNullable<Parameters<typeof setup>[0]>["judge"]) {
   f = await setup({
     machines: true,
@@ -53,10 +57,10 @@ async function working(judge?: NonNullable<Parameters<typeof setup>[0]>["judge"]
     title: "Mobile app",
     repoDir: "app",
   });
-  const plan = runner.started[0] as TaskStartRequest;
-  await startMission(md(), f.owner.id, f.org.id, view.id);
-  await runner.done(plan.taskId);
   await drainOutbox(f.db, f.handlers);
+  await startMission(md(), f.owner.id, f.org.id, view.id);
+  await drainOutbox(f.db, f.handlers);
+  await startItem("Navigation");
   const main = runner.started.at(-1) as TaskStartRequest;
   const prompt = async (args: Record<string, unknown>) =>
     JSON.parse(ok(await runner.mcp(main.taskId, "permission_prompt", args))) as {
@@ -65,6 +69,19 @@ async function working(judge?: NonNullable<Parameters<typeof setup>[0]>["judge"]
       request_id?: string;
     };
   return { view, runner, main, prompt };
+}
+
+/** A new item session of the mission on the computer (what the main session's `start_task` starts). */
+async function startItem(title: string) {
+  const [mission] = await f.db.select().from(schema.missions);
+  if (!mission) throw new Error("no mission");
+  return startSessionTask(md(), mission, {
+    title,
+    prompt: "Build it",
+    sessionId: crypto.randomUUID(),
+    cwd: mission.repoDir,
+    resume: false,
+  });
 }
 
 /** A member of #general; `decide` makes them a decider of the mission. */
@@ -77,7 +94,7 @@ async function member(name: string, missionId?: string) {
 
 describe("Configurações da missão (telas/MissaoConfig.html)", () => {
   test("removing an allowed rule: owner or deciders, audited, the command asks again, the next task's list drops it", async () => {
-    const { view, runner, main, prompt } = await working();
+    const { view, runner, prompt } = await working();
     const asked = await prompt({ tool_name: "Bash", input: { command: "swift build -c release" } });
     await decideCommand(md(), f.owner.id, f.org.id, view.id, asked.request_id as string, "always");
     const settings = await getMissionSettings(md(), f.owner.id, f.org.id, view.id);
@@ -111,7 +128,7 @@ describe("Configurações da missão (telas/MissaoConfig.html)", () => {
     expect(await prompt({ tool_name: "Bash", input: { command: "swift build" } })).toMatchObject({
       status: "pending",
     });
-    ok(await runner.mcp(main.taskId, "start_task", { title: "Release", prompt: "Build it", branch: "release" }));
+    await startItem("Release");
     expect((runner.started.at(-1) as TaskStartRequest).mission?.allow).toEqual([]);
 
     // Aprovar sempre again brings it back (a new rule).

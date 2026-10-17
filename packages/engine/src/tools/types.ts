@@ -15,6 +15,13 @@ export interface ToolContext {
   toolUseId?: string;
   /** Aborted when a person cancels the run: long tools (running code) stop early. */
   signal?: AbortSignal;
+  /**
+   * The call came through the runner's `agentes` MCP bridge (ADR 0032): a
+   * computer brain (Claude Code, Codex) on this machine. `taskId`: a mission
+   * task's executor (its tools are the mission's, bound to that task). Tools
+   * only for computer brains (`permission_prompt`) look at this.
+   */
+  bridge?: { machineId: string; taskId?: string };
 }
 
 export interface ToolOutput {

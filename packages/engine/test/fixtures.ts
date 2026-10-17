@@ -140,7 +140,7 @@ export async function setup(
     sandbox?: SandboxProvider;
     /** Add the sandbox tools with connected machines (a machine hub on this db; with or without `sandbox`). */
     machines?: boolean;
-    /** With `machines`: the mission tools (propose_mission, send_to_mission). The hub's mission hooks are always set. */
+    /** With `machines`: the mission tools (propose_mission and, in a mission thread, its tools). The hub's mission hooks are always set. */
     missionTools?: boolean;
     /** Answers of the fake judge (judge.ts): by judgment kind and question id. Default: every Noul 0. */
     judge?: Parameters<typeof createFakeJudge>[0];
@@ -236,7 +236,6 @@ export async function setup(
     publicUrl: "http://localhost:3000",
     judge: context.judge,
   };
-  machineHub?.setMissionHooks(createMissionHooks({ db, ...missionDeps }));
   const sources = [
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
     ...(options.askUser ? [createAskUserToolSource()] : []),
@@ -263,6 +262,7 @@ export async function setup(
     ...(options.toolSources ?? []),
   ];
   const tools = sources.length > 0 ? createToolGateway({ sources }) : undefined;
+  machineHub?.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
   const jobDeps = {
     db,
     gateway,

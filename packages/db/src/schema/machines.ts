@@ -4,7 +4,8 @@ import { organizations } from "./tenancy";
 
 /** What `hello` says about the coding CLIs on the machine (ADR 0025, protocol 7). */
 export interface MachineExecutors {
-  claude?: { version: string };
+  /** `loggedIn`/`authMethod`/`plan`: from `claude auth status` (protocol 8; absent = unknown). */
+  claude?: { version: string; loggedIn?: boolean; authMethod?: string; plan?: string };
   codex?: { version: string };
   detectedAt?: string;
 }

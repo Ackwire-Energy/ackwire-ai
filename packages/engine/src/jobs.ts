@@ -15,8 +15,9 @@ import { mentionHandoffs } from "./judge";
 import { interruptOfflineMachineTasks, wakeConversationForTask } from "./machine-tasks";
 import { getMessage } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
-import { onMissionApprovalDecided, onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
+import { onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
+import type { MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import {
@@ -62,6 +63,8 @@ export interface JobDeps extends RunExecutorDeps {
   artifacts?: ArtifactDeps;
   /** Agents' computers (jobs `sandbox.start`, `sandbox.stop`). */
   sandbox?: SandboxDeps | null;
+  /** The engine missions start, resume and cancel runs with (default: today's run queue). */
+  missionEngine?: MissionEngine | null;
   router?: {
     /** Off = only @mentions start runs. */
     enabled: boolean;
@@ -194,6 +197,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     artifacts: deps.artifacts,
     search: deps.context,
     publicUrl: deps.sandbox?.publicUrl,
+    missionEngine: deps.missionEngine ?? null,
   };
 
   return {
@@ -376,10 +380,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A mission's plan finished or its work stopped: is everything done (then it waits to be concluded)?
     "mission.check_done": async (job) => {
       await checkMissionDone(missions, String(job.payload.missionId), Number(job.payload.attempt ?? 0) || 0);
-    },
-    // An approval asked by a mission's executor was decided or expired: its session is resumed.
-    "mission.approval_decided": async (job) => {
-      await onMissionApprovalDecided(missions, String(job.payload.approvalId));
     },
     // A machine went offline a grace ago: if still offline, its running tasks are interrupted (one notice per thread).
     "machine.tasks_offline": async (job) => {

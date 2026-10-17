@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, PERMISSION_TIMEOUT_MESSAGE, type ServerFrame } from "@agenteschat/adapters";
-import { and, eq, isNull, schema, sql } from "@agenteschat/db";
+import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   addChannelMember,
   approveProvisionalDecisions,
@@ -10,7 +10,7 @@ import {
   createAgent,
   createMachinePairing,
   createMission,
-  decideApproval,
+  createMissionRunToolSource,
   decideCommand,
   decideJoinRequest,
   decideReview,
@@ -31,7 +31,6 @@ import {
   machineExecutors,
   missionBranchPrefix,
   missionSummary,
-  onMissionApprovalDecided,
   openDm,
   opineDecision,
   pauseMission,
@@ -41,13 +40,13 @@ import {
   requestToJoin,
   retryBlockedCommand,
   START_PROMPT,
-  sendMissionMessage,
   setAgentAudience,
   setAgentComputerTarget,
   setCommandApproval,
   setParticipant,
   startMachineTask,
   startMission,
+  startSessionTask,
   stopMission,
   syncMissionFiles,
 } from "../src";
@@ -172,7 +171,10 @@ const ok = (r: McpResult) => {
   return r.text;
 };
 
-/** A mission made from the web (`/mission`), its runner connected, its plan task running. */
+/**
+ * A mission made from the web (`/mission`), its runner connected, its planning turn (the main session's run,
+ * ADR 0032 §6) answered, and one item session of it running on the computer (`task`).
+ */
 async function proposed(
   options: {
     reply?: NonNullable<Parameters<typeof setup>[0]>["reply"];
@@ -195,9 +197,65 @@ async function proposed(
     title: "Mobile app",
     repoDir: "app",
   });
-  const plan = runner.started[0] as TaskStartRequest;
-  return { view, runner, plan, paired };
+  await drainOutbox(f.db, f.handlers);
+  const mission = await missionRow();
+  await startSessionTask(md(), mission, {
+    title: "Explore",
+    prompt: "Map the repo",
+    sessionId: crypto.randomUUID(),
+    cwd: mission.repoDir,
+    resume: false,
+  });
+  const task = runner.started[0] as TaskStartRequest;
+  return { view, runner, task, paired };
 }
+
+/**
+ * The main session (the agent's run in the mission thread, a computer brain through the runner bridge) calls
+ * one of its machine tools (`start_task`, `upload_artifact`, `get_context`, `permission_prompt`).
+ */
+async function mainCall(tool: string, args: Record<string, unknown>) {
+  const mission = await missionRow();
+  const [run] = await f.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: mission.channelId,
+      threadRootId: mission.threadRootId,
+      triggerMessageId: crypto.randomUUID(),
+      trigger: "mention",
+      hop: 1,
+      status: "running",
+      startedAt: new Date(),
+    })
+    .returning();
+  const ctx = {
+    db: f.db,
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    runId: run?.id as string,
+    channelId: mission.channelId,
+    threadRootId: mission.threadRootId,
+    triggerMessageId: run?.triggerMessageId as string,
+    bridge: { machineId: mission.machineId as string },
+  };
+  const { db: _db, ...deps } = f.missionDeps;
+  const found = (await createMissionRunToolSource(deps).tools(ctx)).find((t) => t.name === tool);
+  if (!found) throw new Error(`the main session has no ${tool}`);
+  return found.execute(args, ctx);
+}
+const done = (out: { content: string; isError?: boolean }) => {
+  if (out.isError) throw new Error(`refused: ${out.content}`);
+  return out.content;
+};
+
+/** The notices the mission posted in its thread for the main session (`meta.missionInbox`). */
+const notices = async (threadId: string) =>
+  (await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, threadId)))
+    .map((m) => m.meta.missionInbox as { text?: string } | undefined)
+    .filter((x): x is { text?: string } => Boolean(x))
+    .map((x) => x.text ?? "");
 
 describe("missions (ADR 0029)", () => {
   test("proposed from a flat DM: its home is a new thread and the agent's reply in the DM carries the link card", async () => {
@@ -230,13 +288,15 @@ describe("missions (ADR 0029)", () => {
     expect(linked).toHaveLength(1);
     expect(linked[0]?.threadId).toBeNull();
     expect(linked[0]?.meta.missionLink).toEqual({ missionId: mission.id, threadId: mission.threadRootId });
-    // The tool told the model not to name the app's buttons.
-    const toolResult = JSON.stringify(f.provider.calls.at(-1)?.request.messages ?? []);
-    expect(toolResult).toContain("don't name buttons");
+    // The tool told the model not to name the app's buttons (the DM run's turn after the tool).
+    const toolResult = f.provider.calls
+      .map((c) => JSON.stringify(c.request.messages))
+      .find((m) => m.includes("don't name buttons"));
+    expect(toolResult).toBeTruthy();
     expect(toolResult).not.toContain("press Start");
   });
 
-  test("the agent proposes (plan mode on the machine, plan card); only the owner starts; the start waits for the plan turn", async () => {
+  test("the agent proposes (plan card, the planning is the main session's run); only the owner starts", async () => {
     f = await setup({
       machines: true,
       missionTools: true,
@@ -246,7 +306,7 @@ describe("missions (ADR 0029)", () => {
               chunks: ["Planning it."],
               toolUses: [{ name: "propose_mission", input: { title: "Mobile app", goal: "Build our mobile app" } }],
             }
-          : { chunks: ["Claude Code is planning; press Start when the plan looks right."] },
+          : { chunks: ["Planning; the plan card shows when it is ready."] },
     });
     const paired = await pairedMachine();
     const runner = missionRunner(f.machineHub as MachineHub);
@@ -261,13 +321,11 @@ describe("missions (ADR 0029)", () => {
       ownerId: f.owner.id,
       threadRootId: ask.id,
       title: "Mobile app",
+      executor: "claude",
     });
-    const plan = runner.started[0] as TaskStartRequest;
-    expect(plan).toMatchObject({ executor: "claude", session: mission.mainSessionId, mission: { id: mission.id } });
-    expect(plan.mission?.rules).toBe(MISSION_RULES);
-    // Before Start the executor only reads (runner protocol 7 permission profile).
-    expect(plan.mission?.mode).toBe("plan");
-    expect(plan.prompt).toContain("PLAN MODE");
+    // No executor task: the main session is the agent's run in the thread, told to plan.
+    expect(runner.started).toHaveLength(0);
+    expect((await notices(ask.id)).some((t) => t.includes("PLAN MODE"))).toBe(true);
     const thread = await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, ask.id));
     const card = thread.find((m) => m.meta.missionPlan);
     expect(card?.meta).toMatchObject({ missionPlan: { missionId: mission.id }, bodyCode: "mission_plan" });
@@ -280,25 +338,20 @@ describe("missions (ADR 0029)", () => {
     await expect(startMission(md(), bia.id, f.org.id, mission.id)).rejects.toMatchObject({ code: "mission.not_owner" });
     const started = await startMission(md(), f.owner.id, f.org.id, mission.id);
     expect(started.status).toBe("active");
-    // The plan turn still runs: "proceed" waits for it, then goes out as a resume of the main session.
-    expect(runner.started).toHaveLength(1);
-    expect((await missionRow()).inbox).toHaveLength(1);
-    await runner.done(plan.taskId);
-    await drainOutbox(f.db, f.handlers);
-    const proceed = runner.started[1] as TaskStartRequest;
-    expect(proceed).toMatchObject({
-      session: mission.mainSessionId,
-      resume: true,
-      prompt: START_PROMPT,
-      mission: { mode: "work", branchPrefix: missionBranchPrefix(mission.id) },
-    });
+    // "Proceed" is a notice that starts (or joins) the main session's run; nothing goes to the computer by itself.
+    const after = await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, ask.id));
+    const notice = after.find((m) => (m.meta.missionInbox as { text?: string } | undefined)?.text === START_PROMPT);
+    expect(notice).toBeTruthy();
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(
+      runs.some((r) => r.triggerMessageId === notice?.id || r.pendingMessageIds.includes(notice?.id as string)),
+    ).toBe(true);
+    expect(runner.started).toHaveLength(0);
     expect((await missionRow()).inbox).toHaveLength(0);
-    // A mission task's end wakes no agent run.
-    expect((await f.db.select().from(schema.agentRuns)).length).toBe(1);
   });
 
   test("update_plan versions the plan; changes after the first post one line; mission brief in the run's context", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view, runner, task: plan } = await proposed();
     const first = ok(
       await runner.mcp(plan.taskId, "update_plan", {
         items: [
@@ -339,11 +392,13 @@ describe("missions (ADR 0029)", () => {
     const system = JSON.stringify(f.provider.calls.at(-1)?.request.system ?? "");
     expect(system).toContain("# Mission in this thread");
     expect(system).toContain("Plan: 1 of 2 done");
-    expect(system).toContain("send_to_mission");
+    // The run is the main session, whatever its brain: it does the work itself.
+    expect(system).toContain("You do this mission's work yourself");
+    expect(system).not.toContain("send_to_mission");
   });
 
   test("roles: a non-participant's or commenter's mention is a suggestion (no run); a decider's starts a run; accept forwards it", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view } = await proposed();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     const caio = await addMember(f.db, f.org.id, "member", "caio");
     const duda = await addMember(f.db, f.org.id, "member", "duda");
@@ -364,26 +419,28 @@ describe("missions (ADR 0029)", () => {
     expect(fromCaio.meta.missionSuggestion).toEqual({ status: "pending", missionId: view.id });
     await drainOutbox(f.db, f.handlers);
     const runs = () => f.db.select().from(schema.agentRuns);
-    expect((await runs()).length).toBe(0);
+    const by = async (ids: string[]) => (await runs()).filter((r) => ids.includes(r.triggerMessageId));
+    expect(await by([fromBia.id, fromCaio.id])).toHaveLength(0);
     const fromDuda = await post(duda.id, "@dev what's the status?");
     expect(fromDuda.meta.missionSuggestion).toBeUndefined();
-    expect((await runs()).filter((r) => r.triggerMessageId === fromDuda.id)).toHaveLength(1);
+    expect(await by([fromDuda.id])).toHaveLength(1);
     expect((await getMission(md(), bia.id, f.org.id, view.id)).role).toBe("none");
 
-    // A commenter can't decline; the owner accepts: the main session gets it (queued while its plan turn runs).
+    // A commenter can't decline; the owner accepts: the main session gets it (a notice for its run).
     await expect(decideSuggestion(md(), caio.id, f.org.id, view.id, fromBia.id, "declined")).rejects.toMatchObject({
       code: "mission.not_allowed",
     });
     await decideSuggestion(md(), f.owner.id, f.org.id, view.id, fromCaio.id, "declined");
     await decideSuggestion(md(), f.owner.id, f.org.id, view.id, fromBia.id, "accepted");
-    expect((await missionRow()).inbox[0]?.text).toContain("Suggestion from bia, accepted by ana: @dev add a dark mode");
-    await runner.done(plan.taskId);
-    await drainOutbox(f.db, f.handlers);
-    expect(runner.started.at(-1)?.prompt).toContain("Suggestion from bia");
+    const told = await notices(view.threadId);
+    expect(told.some((t) => t.includes("Suggestion from bia, accepted by ana:") && t.includes("add a dark mode"))).toBe(
+      true,
+    );
+    expect(told.some((t) => t.includes("use tabs"))).toBe(false);
   });
 
-  test("blocking decision: the session waits; commenters only give opinions; the choice resumes the asking session", async () => {
-    const { view, runner, plan } = await proposed();
+  test("blocking decision: the item session waits; commenters only give opinions; the choice resumes it", async () => {
+    const { view, runner, task: plan } = await proposed();
     await startMission(md(), f.owner.id, f.org.id, view.id);
     const caio = await addMember(f.db, f.org.id, "member", "caio");
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: caio.id });
@@ -406,9 +463,6 @@ describe("missions (ADR 0029)", () => {
     expect(card?.meta.missionDecision).toEqual({ id: decision?.id, missionId: view.id });
     await runner.done(plan.taskId);
     await drainOutbox(f.db, f.handlers);
-    // The main session's "proceed" turn (queued by Start) went out; it ends too.
-    await runner.done((runner.started.at(-1) as TaskStartRequest).taskId);
-    await drainOutbox(f.db, f.handlers);
     const before = runner.started.length;
 
     const id = decision?.id as string;
@@ -429,7 +483,7 @@ describe("missions (ADR 0029)", () => {
   });
 
   test("provisional decisions go on with the recommendation and are approved together", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view, runner, task: plan } = await proposed();
     await startMission(md(), f.owner.id, f.org.id, view.id);
     const text = ok(
       await runner.mcp(plan.taskId, "ask_decision", {
@@ -448,12 +502,9 @@ describe("missions (ADR 0029)", () => {
     expect(runner.started.length).toBe(before);
   });
 
-  test("reviews: approve or ask for changes resumes the session with the outcome", async () => {
-    const { view, runner, plan } = await proposed();
+  test("reviews: approve or ask for changes resumes the item session with the outcome", async () => {
+    const { view, runner, task: main } = await proposed();
     await startMission(md(), f.owner.id, f.org.id, view.id);
-    await runner.done(plan.taskId);
-    await drainOutbox(f.db, f.handlers);
-    const main = runner.started.at(-1) as TaskStartRequest;
     ok(await runner.mcp(main.taskId, "request_review", { title: "Navigation prototypes", summary: "Three screens" }));
     const [review] = await f.db.select().from(schema.missionReviews);
     const card = (await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, view.threadId))).find(
@@ -473,42 +524,25 @@ describe("missions (ADR 0029)", () => {
     expect(runner.started.at(-1)?.prompt).toBe('Changes requested on "Navigation prototypes" (by ana): Bigger buttons');
   });
 
-  test("request_approval creates an ADR 0015 approval; deciding it resumes the session", async () => {
-    const { view, runner, plan } = await proposed();
+  test("an item task can't ask for approvals: merges, deploys and rollbacks are the main session's", async () => {
+    const { view, runner, task } = await proposed();
     await startMission(md(), f.owner.id, f.org.id, view.id);
-    const text = ok(
-      await runner.mcp(plan.taskId, "request_approval", { action: "merge", target: "PR #12", detail: "Navigation" }),
-    );
-    expect(text).toContain("Approval requested");
-    const [approval] = await f.db.select().from(schema.approvals);
-    expect(approval).toMatchObject({
-      runId: null,
-      missionId: view.id,
-      missionTaskId: plan.taskId,
-      status: "pending",
-      title: "Merge PR #12",
-      ownerUserId: f.owner.id,
+    const refused = await runner.mcp(task.taskId, "request_approval", {
+      action: "merge",
+      target: "PR #12",
+      detail: "Navigation",
     });
-    const card = (await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, view.threadId))).find(
-      (m) => m.meta.approvalId,
-    );
-    expect(card?.meta.approvalId).toBe(approval?.id);
-    await runner.done(plan.taskId);
-    await drainOutbox(f.db, f.handlers);
-    await runner.done((runner.started.at(-1) as TaskStartRequest).taskId);
-    await drainOutbox(f.db, f.handlers);
-    await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id as string, {
-      decision: "approve",
-    });
-    await drainOutbox(f.db, f.handlers);
-    expect(runner.started.at(-1)?.prompt).toBe("Approval for Merge PR #12: approved by ana. Go ahead.");
+    expect(refused).toMatchObject({ ok: false, error: { code: "mission.unknown_tool" } });
+    expect(await f.db.select().from(schema.approvals)).toHaveLength(0);
+    const [row] = await f.db.select().from(schema.machineTasks).where(eq(schema.machineTasks.id, task.taskId));
+    expect(row?.waitingFor ?? null).toBeNull();
   });
 
   test("pause refuses new tasks (mission.paused); stop cancels the running ones", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view, runner, task: plan } = await proposed();
     await startMission(md(), f.owner.id, f.org.id, view.id);
-    const started = ok(
-      await runner.mcp(plan.taskId, "start_task", { title: "Navigation", prompt: "Build the tabs", branch: "nav" }),
+    const started = done(
+      await mainCall("start_task", { title: "Navigation", prompt: "Build the tabs", branch: "nav" }),
     );
     // Item branches live under the mission's prefix (the only ones its executors may push).
     expect(started).toContain(`on branch ${missionBranchPrefix(view.id)}nav`);
@@ -516,19 +550,24 @@ describe("missions (ADR 0029)", () => {
     expect(item).toMatchObject({
       branch: `${missionBranchPrefix(view.id)}nav`,
       cwd: "app",
-      mission: { id: view.id, mode: "work", branchPrefix: missionBranchPrefix(view.id) },
+      mission: { id: view.id, rules: MISSION_RULES, branchPrefix: missionBranchPrefix(view.id) },
     });
     expect(item.session).not.toBe(plan.session);
+    // Only the main session starts tasks; an item session is told so.
+    expect(ok(await runner.mcp(plan.taskId, "start_task", { title: "x", prompt: "y", branch: "x" }))).toContain(
+      "main session",
+    );
+    expect(runner.started.at(-1)).toBe(item);
     await pauseMission(md(), f.owner.id, f.org.id, view.id);
-    const refused = await runner.mcp(plan.taskId, "start_task", { title: "Auth", prompt: "Sign-in", branch: "auth" });
-    expect(refused).toMatchObject({ ok: false, error: { code: "mission.paused" } });
+    const refused = await mainCall("start_task", { title: "Auth", prompt: "Sign-in", branch: "auth" });
+    expect(refused).toMatchObject({ isError: true, data: { code: "mission.paused" } });
     const stopped = await stopMission(md(), f.owner.id, f.org.id, view.id);
     expect(stopped.canceledTasks).toBe(2);
     expect(runner.canceled.sort()).toEqual([plan.taskId, item.taskId].sort());
   });
 
   test("mcp.call is refused for a task of another machine or with no mission", async () => {
-    const { runner, plan } = await proposed();
+    const { runner, task: plan } = await proposed();
     const plain = await startMachineTask(
       { db: f.db, pubsub: f.pubsub, call: (f.machineHub as MachineHub).call },
       {
@@ -566,11 +605,11 @@ describe("missions (ADR 0029)", () => {
     expect(ok(await runner.mcp(plan.taskId, "report", { summary: "Mapped the repo @ana" }))).toContain("Reported");
     const report = (await f.db.select().from(schema.messages)).find((m) => m.meta.missionReport);
     expect(report?.mentionedUserIds).toEqual([]);
-    expect(report?.meta.missionReport).toMatchObject({ taskId: plan.taskId, computer: "MacBook", main: true });
+    expect(report?.meta.missionReport).toMatchObject({ taskId: plan.taskId, computer: "MacBook", main: false });
   });
 
   test(".agentes files: written to the machine; an edit there is recorded and overwritten; notes come back after a task", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view, runner, task: plan } = await proposed();
     ok(await runner.mcp(plan.taskId, "update_plan", { items: [{ id: "nav", title: "Navigation", status: "doing" }] }));
     await syncMissionFiles(md(), view.id);
     const mission = runner.files.get("app/.agentes/mission.md") ?? "";
@@ -594,7 +633,7 @@ describe("missions (ADR 0029)", () => {
   });
 
   test("summary from the database; closing with saveToWiki makes a page", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view, runner, task: plan } = await proposed();
     await startMission(md(), f.owner.id, f.org.id, view.id);
     ok(
       await runner.mcp(plan.taskId, "update_plan", {
@@ -640,7 +679,7 @@ describe("missions (ADR 0029)", () => {
   });
 
   test("a task's output: the computer's lines when online; the kept ring when offline; only for who reads the thread", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view, runner, task: plan } = await proposed();
     runner.outputs.set(plan.taskId, ["Reading app/package.json", "Editing app/src/nav.tsx", "Running: bun test"]);
     const online = await getTaskOutput(md(), f.owner.id, f.org.id, plan.taskId, { tail: 2 });
     expect(online).toMatchObject({ source: "computer", lines: ["Editing app/src/nav.tsx", "Running: bun test"] });
@@ -666,7 +705,7 @@ describe("missions (ADR 0029)", () => {
   });
 
   test("pull requests: from a task's output line, the runner's prUrl, report and request_review", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view, runner, task: plan } = await proposed();
     await startMission(md(), f.owner.id, f.org.id, view.id);
     const prOf = async (id: string) =>
       (await f.db.select().from(schema.machineTasks).where(eq(schema.machineTasks.id, id)))[0]?.prUrl ?? null;
@@ -686,7 +725,7 @@ describe("missions (ADR 0029)", () => {
     });
     expect(await prOf(plan.taskId)).toBe("https://github.com/acme/app/pull/431");
 
-    ok(await runner.mcp(plan.taskId, "start_task", { title: "Navigation", prompt: "Build the tabs", branch: "nav" }));
+    done(await mainCall("start_task", { title: "Navigation", prompt: "Build the tabs", branch: "nav" }));
     const item = runner.started.at(-1) as TaskStartRequest;
     await runner.frame({
       type: "task.event",
@@ -696,7 +735,7 @@ describe("missions (ADR 0029)", () => {
     });
     expect(await prOf(item.taskId)).toBe("https://github.com/acme/app/pull/12");
 
-    ok(await runner.mcp(plan.taskId, "start_task", { title: "Auth", prompt: "Sign-in", branch: "auth" }));
+    done(await mainCall("start_task", { title: "Auth", prompt: "Sign-in", branch: "auth" }));
     const auth = runner.started.at(-1) as TaskStartRequest;
     ok(
       await runner.mcp(auth.taskId, "report", {
@@ -706,7 +745,7 @@ describe("missions (ADR 0029)", () => {
     );
     expect(await prOf(auth.taskId)).toBe("https://github.com/acme/app/pull/13");
 
-    ok(await runner.mcp(plan.taskId, "start_task", { title: "Build", prompt: "Dev build", branch: "build" }));
+    done(await mainCall("start_task", { title: "Build", prompt: "Dev build", branch: "build" }));
     const build = runner.started.at(-1) as TaskStartRequest;
     ok(
       await runner.mcp(build.taskId, "request_review", {
@@ -718,7 +757,7 @@ describe("missions (ADR 0029)", () => {
   });
 
   test("the view carries plan items and what is in progress", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view, runner, task: plan } = await proposed();
     ok(
       await runner.mcp(plan.taskId, "update_plan", {
         items: [
@@ -881,7 +920,7 @@ describe("missions (ADR 0029)", () => {
   });
 
   test("list filters (status, conversation, agent, words) and counts (active, waiting for you, closed)", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view, runner, task: plan } = await proposed();
     const counts = (await listMissions(md(), f.owner.id, f.org.id, { status: "open" })).counts;
     expect(counts).toEqual({ active: 1, waitingYou: 0, closed: 0 });
     ok(await runner.mcp(plan.taskId, "update_plan", { items: [{ id: "push", title: "Push", status: "waiting_you" }] }));
@@ -909,12 +948,9 @@ describe("missions (ADR 0029)", () => {
   });
 
   test("an item that stops to wait is told to the main session as waiting, not done", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view, runner } = await proposed();
     await startMission(md(), f.owner.id, f.org.id, view.id);
-    await runner.done(plan.taskId);
-    await drainOutbox(f.db, f.handlers);
-    const main = runner.started.at(-1) as TaskStartRequest;
-    ok(await runner.mcp(main.taskId, "start_task", { title: "Navigation", prompt: "Build the tabs", branch: "nav" }));
+    done(await mainCall("start_task", { title: "Navigation", prompt: "Build the tabs", branch: "nav" }));
     const item = runner.started.at(-1) as TaskStartRequest;
     ok(
       await runner.mcp(item.taskId, "ask_decision", {
@@ -927,40 +963,15 @@ describe("missions (ADR 0029)", () => {
     expect(row?.waitingFor).toBe("decision");
     await runner.done(item.taskId);
     await drainOutbox(f.db, f.handlers);
-    // The main session still runs: the news waits in the inbox, as "waiting".
-    const inbox = (await missionRow()).inbox.map((e) => e.text).join("\n");
-    expect(inbox).toContain('"Navigation"');
-    expect(inbox).toContain("is waiting for a decision");
-    expect(inbox).not.toContain("done after");
-  });
-
-  test("two resumes of one session never run at once: the second waits in the inbox", async () => {
-    const { view, runner, plan } = await proposed();
-    await startMission(md(), f.owner.id, f.org.id, view.id);
-    await runner.done(plan.taskId);
-    await drainOutbox(f.db, f.handlers);
-    await runner.done((runner.started.at(-1) as TaskStartRequest).taskId);
-    await drainOutbox(f.db, f.handlers);
-    const before = runner.started.length;
-    const mission = await missionRow();
-    const out = await Promise.all([
-      sendMissionMessage(md(), f.owner.id, f.org.id, view.id, "first"),
-      sendMissionMessage(md(), f.owner.id, f.org.id, view.id, "second"),
-    ]);
-    expect(out.filter((o) => o.delivered)).toHaveLength(1);
-    expect(runner.started.length).toBe(before + 1);
-    const live = await f.db
-      .select()
-      .from(schema.machineTasks)
-      .where(and(eq(schema.machineTasks.sessionId, mission.mainSessionId), isNull(schema.machineTasks.endedAt)));
-    expect(live).toHaveLength(1);
-    expect((await missionRow()).inbox).toHaveLength(1);
-    const audits = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "mission.message_sent"));
-    expect(audits).toHaveLength(2);
+    // The main session (its run) hears it as "waiting".
+    const told = (await notices(view.threadId)).filter((t) => t.includes('"Navigation"'));
+    expect(told).toHaveLength(1);
+    expect(told[0]).toContain("is waiting for a decision");
+    expect(told[0]).not.toContain("done after");
   });
 
   test("mission tools are rate limited per task, and what looks like a secret never reaches a card", async () => {
-    const { view, runner, plan } = await proposed();
+    const { view, runner, task: plan } = await proposed();
     await startMission(md(), f.owner.id, f.org.id, view.id);
     ok(await runner.mcp(plan.taskId, "report", { summary: "Pushed with token ghp_abcdefghijklmnopqrstuvwxyz0123" }));
     const report = (await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, view.threadId))).find(
@@ -968,30 +979,10 @@ describe("missions (ADR 0029)", () => {
     );
     expect(report?.body).not.toContain("ghp_abcdefghijklmnopqrstuvwxyz0123");
     expect(report?.body).toContain("••••");
-    for (let i = 0; i < 5; i++) {
-      ok(await runner.mcp(plan.taskId, "request_approval", { action: "deploy", target: `build ${i}` }));
-    }
-    const sixth = await runner.mcp(plan.taskId, "request_approval", { action: "deploy", target: "build 6" });
-    expect(sixth).toMatchObject({ ok: false, error: { code: "mission.rate_limited" } });
-  });
-
-  test("an approval's outcome is told to the session once, even when the job runs again", async () => {
-    const { view, runner, plan } = await proposed();
-    await startMission(md(), f.owner.id, f.org.id, view.id);
-    ok(await runner.mcp(plan.taskId, "request_approval", { action: "merge", target: "PR #9" }));
-    const [approval] = await f.db.select().from(schema.approvals);
-    await runner.done(plan.taskId);
-    await drainOutbox(f.db, f.handlers);
-    await runner.done((runner.started.at(-1) as TaskStartRequest).taskId);
-    await drainOutbox(f.db, f.handlers);
-    await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id as string, {
-      decision: "approve",
-    });
-    await drainOutbox(f.db, f.handlers);
-    const count = runner.started.length;
-    await onMissionApprovalDecided(md(), approval?.id as string);
-    expect(runner.started.length).toBe(count);
-    expect(runner.started.at(-1)?.prompt).toContain("Approval for Merge PR #9: approved by ana");
+    const ask = (i: number) =>
+      runner.mcp(plan.taskId, "ask_decision", { question: `Icon ${i}?`, options: ["A", "B"], blocking: false });
+    for (let i = 0; i < 10; i++) ok(await ask(i));
+    expect(await ask(10)).toMatchObject({ ok: false, error: { code: "mission.rate_limited" } });
   });
 
   test("hello stores the coding CLIs; Codex counts only from the minimum version; Claude Code is required to choose it", async () => {
@@ -1042,13 +1033,10 @@ describe("missions (ADR 0029)", () => {
   });
 
   describe("command approvals (Claude Code's permission prompts)", () => {
-    /** An active mission whose main session is running. */
+    /** An active mission with one item session running (Claude Code's prompts come from it). */
     async function working(judge?: NonNullable<Parameters<typeof setup>[0]>["judge"]) {
-      const { view, runner, plan } = await proposed(judge ? { judge } : {});
+      const { view, runner, task: main } = await proposed(judge ? { judge } : {});
       await startMission(md(), f.owner.id, f.org.id, view.id);
-      await runner.done(plan.taskId);
-      await drainOutbox(f.db, f.handlers);
-      const main = runner.started.at(-1) as TaskStartRequest;
       const prompt = async (taskId: string, args: Record<string, unknown>) =>
         JSON.parse(ok(await runner.mcp(taskId, "permission_prompt", args))) as {
           behavior?: string;
@@ -1105,7 +1093,7 @@ describe("missions (ADR 0029)", () => {
       });
       expect((await listMissionCommands(md(), f.owner.id, f.org.id, view.id)).rules).toEqual(["Bash(swift build *)"]);
       // A new task's settings carry it.
-      ok(await runner.mcp(main.taskId, "start_task", { title: "Release", prompt: "Build it", branch: "release" }));
+      done(await mainCall("start_task", { title: "Release", prompt: "Build it", branch: "release" }));
       expect((runner.started.at(-1) as TaskStartRequest).mission?.allow).toEqual(["Bash(swift build *)"]);
     });
 
@@ -1259,8 +1247,8 @@ describe("missions (ADR 0029)", () => {
     });
 
     test("refused commands reach the task's end notice; Liberar e repetir adds the rule and resumes the session", async () => {
-      const { view, runner, main } = await working();
-      ok(await runner.mcp(main.taskId, "start_task", { title: "Photos", prompt: "Resize them", branch: "photos" }));
+      const { view, runner } = await working();
+      done(await mainCall("start_task", { title: "Photos", prompt: "Resize them", branch: "photos" }));
       const item = runner.started.at(-1) as TaskStartRequest;
       const command = "python3 -c 'import PIL'";
       await runner.done(item.taskId, { denials: [{ tool: "Bash", command }] });
@@ -1285,8 +1273,8 @@ describe("missions (ADR 0029)", () => {
     });
 
     test("Liberar e repetir for several blocked commands at once: one resume; refused while paused", async () => {
-      const { view, runner, main } = await working();
-      ok(await runner.mcp(main.taskId, "start_task", { title: "Photos", prompt: "Resize them", branch: "photos" }));
+      const { view, runner } = await working();
+      done(await mainCall("start_task", { title: "Photos", prompt: "Resize them", branch: "photos" }));
       const item = runner.started.at(-1) as TaskStartRequest;
       const blocked = ["python3 -c 'import PIL'", "swift build"];
       await runner.done(item.taskId, { denials: blocked.map((command) => ({ tool: "Bash", command })) });

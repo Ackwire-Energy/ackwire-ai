@@ -4,6 +4,7 @@ import type {
   ActiveRun,
   Agent,
   AgentAccess,
+  AgentBrain,
   AgentChannel,
   AgentComputer,
   AgentDetail,
@@ -49,6 +50,7 @@ import type {
   Memory,
   Message,
   Mission,
+  MissionBrain,
   MissionCommand,
   MissionCommandRule,
   MissionDecision,
@@ -219,6 +221,9 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
             json: { channels },
           })
         ).channels,
+      brain: (orgId, agentId) => request<AgentBrain>(`${org(orgId)}/agents/${enc(agentId)}/brain`),
+      setBrain: (orgId, agentId, input) =>
+        request<AgentBrain>(`${org(orgId)}/agents/${enc(agentId)}/brain`, { method: "PUT", json: input }),
       runs: async (orgId, filter = {}) =>
         (await request<{ runs: Run[] }>(`${org(orgId)}/runs`, { query: filter })).runs,
       run: (orgId, runId) => request<{ run: Run; steps: RunStep[] }>(`${org(orgId)}/runs/${enc(runId)}`),
@@ -548,6 +553,9 @@ export function createHttpApi(fetchImpl?: FetchLike): HttpApi {
             json: { commandApproval },
           }),
         settings: (orgId, missionId) => request<MissionSettings>(`${one(orgId, missionId)}/settings`),
+        brain: (orgId, missionId) => request<MissionBrain>(`${one(orgId, missionId)}/brain`),
+        setBrain: (orgId, missionId, input) =>
+          request<MissionBrain>(`${one(orgId, missionId)}/brain`, { method: "PUT", json: input }),
         removeCommandRule: (orgId, missionId, ruleId) =>
           request<{ rules: MissionCommandRule[] }>(`${one(orgId, missionId)}/command-rules/${enc(ruleId)}`, {
             method: "DELETE",

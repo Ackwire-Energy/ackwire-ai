@@ -11,12 +11,14 @@ import {
   createCredential,
   deleteCredential,
   getAgent,
+  getAgentBrain,
   listAgents,
   listCredentials,
   NotFoundError,
   revokeCredential,
   setAgentAppearance,
   setAgentAudience,
+  setAgentBrain,
   updateAgent,
   usageSummary,
 } from "@agenteschat/engine";
@@ -34,7 +36,7 @@ import {
   requireSession,
   security,
 } from "./context";
-import { Agent, AgentAppearance, AgentAudience, Credential, Model, Usage } from "./schemas";
+import { Agent, AgentAppearance, AgentAudience, AgentBrain, BrainKind, Credential, Model, Usage } from "./schemas";
 
 const tags = ["Agents"];
 
@@ -315,6 +317,53 @@ export function agentRoutes(deps: AppDeps) {
         { usage: rows.map(({ costNanoUsd, ...r }) => ({ ...r, costUsd: nanoUsdToUsd(costNanoUsd) })) },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agents/{agentId}/brain",
+      tags,
+      security,
+      summary:
+        '"Quem pensa" (ADR 0032): the model (API), Claude Code or Codex on its computer, the model and the fallback, with what its computer offers. An admin or the agent\'s owner.',
+      request: { params: AgentParams },
+      responses: { 200: json(AgentBrain), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      return c.json(await getAgentBrain({ db }, c.get("user").id, orgId, agentId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/agents/{agentId}/brain",
+      tags,
+      security,
+      summary:
+        "Choose who thinks for the agent (an admin or the agent's owner; audited). Switching to Claude Code or Codex needs `acceptPlanTerms: true` (the person read that the subscription is personal and takes the risk); only what its computer has can be chosen.",
+      request: {
+        params: AgentParams,
+        body: body(
+          z.object({
+            brain: BrainKind.optional(),
+            model: z.string().max(80).nullable().optional().openapi({
+              description:
+                "Claude Code: `opus`, `sonnet`, `haiku`; Codex: a model name. Null = the brain's default; omitted = keep (reset when the brain changes).",
+            }),
+            fallback: z.boolean().optional(),
+            acceptPlanTerms: z.boolean().optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(AgentBrain), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      return c.json(await setAgentBrain({ db }, c.get("user").id, orgId, agentId, c.req.valid("json")), 200);
     },
   );
 

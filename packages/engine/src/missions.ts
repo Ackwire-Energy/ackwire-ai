@@ -35,7 +35,13 @@ import { MachineOfflineError, machineOnline } from "./machines";
 import { insertMessage, type Message, messageView } from "./messages";
 import { missionAllowRules, pendingCommandCounts, pendingCommandsSql } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
-import { enqueueRunJob } from "./mission-runs";
+import {
+  cancelMainRuns,
+  deliverMissionInbox,
+  type MissionEngine,
+  type TellOptions,
+  tellMainSession,
+} from "./missions-engine";
 import { notifyMissionEnded } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -61,22 +67,23 @@ const {
 } = schema;
 
 /**
- * Missions (ADR 0029): the control layer of long work. The executor on the
- * person's connected computer (Claude Code, Codex) is the brain: its main
- * session planned the mission, hears what people send and splits the work
- * into tasks; our side shows, stores, asks for approval and delivers, with
- * code and no model.
+ * Missions (ADR 0029): the control layer of long work. The mission's main
+ * session is the agent's run in the home thread with the mission's brain (the
+ * API model, Claude Code or Codex; ADR 0032 §6, missions-engine.ts): it plans
+ * the mission, hears what people send and splits the work into item tasks on
+ * the connected computer; our side shows, stores, asks for approval and
+ * delivers, with code and no model.
  *
  * - One mission per thread (its home). Seeing is inherited from the home;
  *   acting (work on the machine, decisions, reviews, controls) is the
  *   owner's and the `decide` participants'. `comment` participants give
  *   opinions on decisions; everyone else is read only, and their messages to
  *   the agent there become suggestions (decided in the message insert).
- * - Talking to a session = resuming it on the machine (`claude -p --resume`)
- *   with the text as the prompt, as a new machine task. A session whose task
- *   still runs, a paused mission or an offline computer can't hear it now:
- *   the text waits in `missions.inbox` and goes out when the session's task
- *   ends, the mission resumes or the computer comes back.
+ * - Talking to the main session = a notice in the home thread that starts
+ *   (or joins) its run. Talking to an item session = resuming it on the
+ *   machine (`claude -p --resume`) as a new machine task. A session that
+ *   can't hear now (an item's task still runs, a paused mission, an offline
+ *   computer) gets the text in `missions.inbox` later.
  * - `.agentes/` files (mission.md, decisions.md) are written to the machine
  *   after every change (debounced job `mission.sync_files`); notes.md is read
  *   back after each mission task.
@@ -199,38 +206,25 @@ export interface MissionDeps {
   publicUrl?: string;
   /** Semantic judgments (judge.ts): low-risk commands in `low_risk_auto` missions. */
   judge?: Judge;
+  /** The engine the mission side starts, resumes and cancels runs with (default: today's run queue). */
+  missionEngine?: MissionEngine | null;
 }
 
-// ── Prompts the executor gets (English, plain) ───────────────────────────────
+// ── Prompts the main session gets (English, plain; the same for every brain) ──
 
+/** What the main session is told when its mission is proposed: it plans it (read only). */
 export function planPrompt(mission: Pick<MissionRow, "title" | "goal">) {
   return [
-    `Mission: ${mission.title}`,
-    `Goal: ${mission.goal}`,
-    "",
-    "PLAN MODE. Explore the mission folder (a code repository or plain files) read-only: don't change any file and don't run anything that writes.",
-    "Then call the agentes tool update_plan with the first items of the plan (a checklist; short, stable ids),",
-    "and call report with the goal in one sentence for the people. Then end your turn: the people review the plan and press Start.",
-    "Write the plan items, reports, decisions and reviews in the language of the goal (the people's language).",
-  ].join("\n");
-}
-
-/** Agent mode: what our agent is told when its mission is proposed (it plans it itself). */
-export function agentPlanPrompt(mission: Pick<MissionRow, "title" | "goal">) {
-  return [
     `Mission proposed: ${mission.title}. Goal: ${mission.goal}`,
-    "PLAN MODE: explore the mission folder on the computer read-only (read_file, list_files, run_code with read-only commands); don't change anything yet.",
-    "Then call update_plan with the first items (a checklist; short, stable ids) and report the goal in one sentence. Then end your turn: the people review the plan and press Start.",
+    "PLAN MODE: explore the mission folder on the computer (a code repository or plain files) read-only: don't change any file and don't run anything that writes.",
+    "Then call update_plan with the first items of the plan (a checklist; short, stable ids) and report the goal in one sentence for the people. Then end your turn: the people review the plan and press Start.",
     "Write the plan items, reports, decisions and reviews in the language of the goal (the people's language).",
   ].join("\n");
 }
 
-/** Agent mode: what our agent is told when the owner presses Start. */
-export const AGENT_START_PROMPT =
-  "The person approved the plan. Do the work now on the computer: start_task for anything long (it wakes you when it ends), run_code for short commands; keep the plan with update_plan, report milestones, ask decisions with ask_decision, request_review when there is something to show, and request_approval before any merge, deploy or rollback.";
-
+/** What the main session is told when the owner presses Start. */
 export const START_PROMPT =
-  "The person approved the plan. Proceed: split the work into tasks with start_task (each gets its own branch in a git repository, its own subfolder otherwise; small work you can do yourself) using the agentes tools; keep the plan updated; ask for a review when you have something to show.";
+  "The person approved the plan. Do the work now on the computer: start_task for anything long (each gets its own branch in a git repository, its own subfolder otherwise; it wakes you when it ends), small work yourself; keep the plan with update_plan, report milestones, ask decisions with ask_decision, request_review when there is something to show, and request_approval before any merge, deploy or rollback.";
 
 // ── Small helpers ────────────────────────────────────────────────────────────
 
@@ -879,7 +873,6 @@ export interface ProposeInput {
   executor?: MissionExecutor | null;
   /** Default: the agent's (`agents.mission_command_approval`), else `low_risk_auto`. */
   commandApproval?: CommandApproval | null;
-  runId?: string | null;
 }
 
 const cleanRepoDir = (dir: string | null | undefined) => {
@@ -896,7 +889,7 @@ const cleanRepoDir = (dir: string | null | undefined) => {
 
 /**
  * Proposes a mission (status `proposed`): the row, the home thread's row,
- * the main session started on the machine in plan mode, and the plan card
+ * the plan card, and the main session's first run in plan mode
  * in the thread (`meta.missionPlan`; the web shows Start / Change something).
  */
 export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
@@ -969,35 +962,18 @@ export async function proposeMission(deps: MissionDeps, input: ProposeInput) {
     });
     return row;
   });
-  if (mission.executor !== "agent") {
-    try {
-      await startSessionTask(deps, mission, {
-        title: `Plan: ${title}`,
-        prompt: planPrompt(mission),
-        sessionId: mission.mainSessionId,
-        cwd: repoDir,
-        resume: false,
-        runId: input.runId ?? null,
-      });
-    } catch (error) {
-      // Nothing started: no mission either.
-      await db.delete(missions).where(eq(missions.id, mission.id));
-      throw error;
-    }
-  }
   await postMissionMessage(deps, mission, `Plan for "${title}": ${goal}`, {
     missionPlan: { missionId: mission.id, title, goal, computer: machine.name, executor: mission.executor },
     bodyCode: "mission_plan",
     bodyParams: { title, computer: machine.name },
   });
-  // Agent mode: the agent itself explores (read only) and writes the plan, in the thread.
-  if (mission.executor === "agent") {
-    await wakeMissionAgent(deps, mission, agentPlanPrompt(mission), {
-      from: "the mission",
-      kind: "system",
-      requestedBy: input.ownerId,
-    });
-  }
+  // The main session (the agent's run in the thread) explores read only and writes the plan.
+  await tellMainSession(deps, mission, planPrompt(mission), {
+    from: "the mission",
+    kind: "system",
+    requestedBy: input.ownerId,
+    freshSession: true,
+  });
   await requestFilesSync(db, mission);
   await publishMissionEvent(deps, mission, "proposed");
   return mission;
@@ -1122,7 +1098,7 @@ export async function homeThreadForDm(
 
 const ACTIVE_TASK: MachineTaskRow["status"][] = ["queued", "running", "interrupted"];
 
-/** Starts (or resumes) one executor session of the mission as a machine task. */
+/** Starts (or resumes) one item session of the mission as a machine task (the main session is a run). */
 export async function startSessionTask(
   deps: MissionDeps,
   mission: MissionRow,
@@ -1166,8 +1142,7 @@ export async function startSessionTask(
       mission: {
         id: mission.id,
         rules: MISSION_RULES,
-        // Before Start the executor only reads; after it, it works on the mission's branches (runner protocol 7).
-        mode: mission.status === "proposed" ? "plan" : "work",
+        // Item tasks work on the mission's branches (runner protocol 7).
         branchPrefix: missionBranchPrefix(mission.id),
         // Commands a person allowed for the whole mission ("Aprovar sempre nesta missão").
         allow: await missionAllowRules(deps.db, mission.id),
@@ -1177,7 +1152,7 @@ export async function startSessionTask(
 }
 
 /** The latest task of a session (where it runs, whether it still does). */
-async function sessionTask(db: Executor, missionId: string, sessionId: string) {
+export async function sessionTask(db: Executor, missionId: string, sessionId: string) {
   const [row] = await db
     .select()
     .from(machineTasks)
@@ -1188,8 +1163,10 @@ async function sessionTask(db: Executor, missionId: string, sessionId: string) {
 }
 
 const isLive = (t: MachineTaskRow | null) => Boolean(t && ACTIVE_TASK.includes(t.status) && !t.endedAt);
+/** Whether a session's latest task still holds it (queued, running, or interrupted and may come back). */
+export const isLiveTask = isLive;
 
-async function queueForSession(db: Executor, mission: MissionRow, entry: schema.MissionInboxEntry) {
+export async function queueForSession(db: Executor, mission: MissionRow, entry: schema.MissionInboxEntry) {
   await db
     .update(missions)
     .set({
@@ -1201,17 +1178,25 @@ async function queueForSession(db: Executor, mission: MissionRow, entry: schema.
 }
 
 /**
- * Tells a session something: it is resumed on the machine with the text as
- * its prompt. When it can't hear now (its task runs, the mission is paused,
- * the computer is offline or full) the text waits in the inbox. Returns
- * whether it went out now.
+ * Tells a session something. The main session is the agent's run in the home
+ * thread (`tellMainSession`); an item session is resumed on the machine with
+ * the text as its prompt. When it can't hear now (its task runs, the mission
+ * is paused, the computer is offline or full) the text waits in the inbox.
+ * Returns whether it went out now.
  */
 export async function tellSession(
   deps: MissionDeps,
   mission: MissionRow,
   target: { sessionId: string; cwd?: string | null },
   text: string,
-  options: { title?: string; requestedBy?: string | null; from?: string; kind?: WakeKind } = {},
+  options: {
+    title?: string;
+    requestedBy?: string | null;
+    from?: string;
+    kind?: WakeKind;
+    /** The answer to a blocking call (decision, review): the paused run resumes with it. */
+    resume?: TellOptions["resume"];
+  } = {},
 ): Promise<{ delivered: boolean; taskId?: string; runId?: string }> {
   if (!OPEN.includes(mission.status)) return { delivered: false };
   // A person's word is new work: a mission waiting to be concluded goes back to active. (The
@@ -1223,12 +1208,13 @@ export async function tellSession(
   if (options.requestedBy && !(await agentAnswers(deps.db, mission, options.requestedBy))) {
     throw new ForbiddenError("The mission's agent doesn't answer this person", "mission.agent_unavailable");
   }
-  // Agent mode: the main session is the agent's own runs in the home thread.
-  if (mission.executor === "agent") {
-    return wakeMissionAgent(deps, mission, text, {
+  // The main session is the agent's own runs in the home thread; item sessions stay machine tasks, resumed below.
+  if (target.sessionId === mission.mainSessionId) {
+    return tellMainSession(deps, mission, text, {
       requestedBy: options.requestedBy ?? null,
       from: options.from ?? "the mission",
       kind: options.kind ?? (options.requestedBy ? "person" : "system"),
+      ...(options.resume ? { resume: options.resume } : {}),
     });
   }
   const last = await sessionTask(deps.db, mission.id, target.sessionId);
@@ -1239,19 +1225,15 @@ export async function tellSession(
     text: text.slice(0, MISSION_LIMITS.sendText),
     at: new Date().toISOString(),
   };
-  // The main session may talk while the plan is only proposed; everything else waits for an active mission.
-  const canTalk =
-    mission.status === "active" ||
-    mission.status === "awaiting_close" ||
-    (mission.status === "proposed" && target.sessionId === mission.mainSessionId);
+  // Item sessions talk only while the mission is active.
+  const canTalk = mission.status === "active" || mission.status === "awaiting_close";
   if (!canTalk || isLive(last)) {
     await queueForSession(deps.db, mission, entry);
     return { delivered: false };
   }
   try {
     const row = await startSessionTask(deps, mission, {
-      title:
-        options.title ?? (target.sessionId === mission.mainSessionId ? mission.title : (last?.title ?? mission.title)),
+      title: options.title ?? last?.title ?? mission.title,
       prompt: entry.text,
       sessionId: target.sessionId,
       cwd: entry.cwd,
@@ -1274,104 +1256,13 @@ export async function tellSession(
 }
 
 /**
- * Why the agent wakes (agent mode): a person's message or answer (resets the
- * stuck guard), its own task's end, or anything else the mission says.
+ * Why the main session wakes: a person's message or answer (resets the stuck
+ * guard), its own task's end, or anything else the mission says.
  */
 export type WakeKind = "person" | "task" | "system";
 
-/** Agent mode: whether the agent may be woken now (an active mission, or a proposed one being planned). */
-const agentCanWork = (mission: Pick<MissionRow, "status" | "machineId">) =>
-  Boolean(mission.machineId) &&
-  (mission.status === "active" || mission.status === "awaiting_close" || mission.status === "proposed");
-
 /**
- * Agent mode (ADR 0029, "Executor agent"): the mission's "main session" is
- * the agent's own runs in the home thread. Telling it something posts an
- * agent-facing notice there (`meta.missionInbox`, or a task's end as
- * `meta.machineTask`) and starts a run of the agent on it, or joins the run
- * already working in the thread. These wake-ups are hop 0: inside a mission
- * the agent's own tasks and inbox don't count toward the agent-to-agent
- * limit; its budget is the brake, plus the stuck-loop guard (5 wake-ups in a
- * row with no plan item changing state pause the mission). Paused, closed or
- * without a computer: the text stays in the inbox.
- */
-export async function wakeMissionAgent(
-  deps: MissionDeps,
-  mission: MissionRow,
-  text: string,
-  options: {
-    requestedBy?: string | null;
-    from?: string;
-    kind?: WakeKind;
-    /** The notice's own body and meta (a task's end); default: the text as `meta.missionInbox`. */
-    notice?: { body: string; meta: Record<string, unknown> };
-  } = {},
-): Promise<{ delivered: boolean; runId?: string }> {
-  const body = text.slice(0, MISSION_LIMITS.sendText);
-  let fresh = (await getMissionRow(deps.db, mission.id)) ?? mission;
-  if (!OPEN.includes(fresh.status)) return { delivered: false };
-  if (fresh.status === "awaiting_close" && (options.requestedBy || options.kind === "person")) {
-    fresh = await reactivateMission(deps, fresh, "message");
-  }
-  const entry = { sessionId: fresh.mainSessionId, cwd: fresh.repoDir, text: body, at: new Date().toISOString() };
-  if (!agentCanWork(fresh)) {
-    await queueForSession(deps.db, fresh, entry);
-    return { delivered: false };
-  }
-  const kind = options.kind ?? "system";
-  // The stuck-loop guard: a person's word resets it; other wake-ups count until the plan moves.
-  const [counted] = await deps.db
-    .update(missions)
-    .set({ idleWakeups: kind === "person" ? 0 : sql`${missions.idleWakeups} + 1` })
-    .where(eq(missions.id, fresh.id))
-    .returning({ idle: missions.idleWakeups });
-  if (fresh.status === "active" && (counted?.idle ?? 0) > MISSION_STUCK.idleWakeups) {
-    await queueForSession(deps.db, fresh, entry);
-    await pauseStuck(deps, fresh, "no_progress");
-    return { delivered: false };
-  }
-  const requester = options.requestedBy ?? fresh.ownerId;
-  const answers = requester ? await agentAnswers(deps.db, fresh, requester) : false;
-  const from = options.from ?? "the mission";
-  const out = await deps.db.transaction(async (tx) => {
-    const message = await insertMessage(tx, {
-      orgId: fresh.orgId,
-      channelId: fresh.channelId,
-      threadId: fresh.threadRootId,
-      author: { type: "agent", agentId: fresh.agentId, runId: null, hop: 0 },
-      body: options.notice?.body ?? (noMentions(body).slice(0, 39_000) || "…"),
-      meta: options.notice?.meta ?? {
-        missionInbox: { missionId: fresh.id, from, text: noMentions(body), requestedBy: requester, kind },
-        bodyCode: "mission_inbox",
-        bodyParams: { from },
-      },
-    });
-    const started = answers ? await enqueueRunJob(tx, message, fresh.agentId) : { run: null, steered: null };
-    return { message, ...started };
-  });
-  if (deps.pubsub) {
-    await publishMessageCreated(deps.pubsub, messageView(out.message));
-    if (out.run) {
-      await publishChannelEvent(deps.pubsub, {
-        type: "agent.thinking",
-        channelId: fresh.channelId,
-        threadId: fresh.threadRootId,
-        agentId: fresh.agentId,
-        runId: out.run.id,
-      });
-    }
-  }
-  await recordMissionEvent(deps.db, fresh, "agent_woken", {
-    kind,
-    messageId: out.message.id,
-    runId: out.run?.id ?? out.steered,
-  });
-  const runId = out.run?.id ?? out.steered ?? undefined;
-  return { delivered: Boolean(runId), ...(runId ? { runId } : {}) };
-}
-
-/**
- * The stuck-loop guard fired (agent mode): the mission pauses with a code
+ * The stuck-loop guard fired: the mission pauses with a code
  * (`mission.paused_stuck`) and a notice asking the owner what to do.
  */
 export async function pauseStuck(
@@ -1427,19 +1318,23 @@ export async function pauseStuck(
  * ends, when the mission resumes and when its computer comes back.
  */
 export async function deliverInbox(deps: MissionDeps, missionId: string) {
-  const mission = await getMissionRow(deps.db, missionId);
-  if (!mission || mission.inbox.length === 0) return 0;
-  if (mission.executor === "agent") return deliverAgentInbox(deps, mission);
+  return deliverMissionInbox(deps, missionId, deliverSessionsInbox);
+}
+
+/**
+ * The item sessions' inbox (one machine-task resume per session, the texts
+ * together). `except`: the main session (delivered as a run).
+ */
+export async function deliverSessionsInbox(deps: MissionDeps, mission: MissionRow, except?: string) {
   if (!deps.hub) return 0;
   const bySession = new Map<string, schema.MissionInboxEntry[]>();
-  for (const e of mission.inbox) bySession.set(e.sessionId, [...(bySession.get(e.sessionId) ?? []), e]);
+  for (const e of mission.inbox) {
+    if (e.sessionId === except) continue;
+    bySession.set(e.sessionId, [...(bySession.get(e.sessionId) ?? []), e]);
+  }
   let sent = 0;
   for (const [sessionId, entries] of bySession) {
-    const canTalk =
-      mission.status === "active" ||
-      mission.status === "awaiting_close" ||
-      (mission.status === "proposed" && sessionId === mission.mainSessionId);
-    if (!canTalk) continue;
+    if (mission.status !== "active" && mission.status !== "awaiting_close") continue;
     if (isLive(await sessionTask(deps.db, mission.id, sessionId))) continue;
     // Claim these entries first (another delivery may run at the same time).
     const ats = entries.map((e) => e.at);
@@ -1470,23 +1365,6 @@ export async function deliverInbox(deps: MissionDeps, missionId: string) {
     if (out.delivered) sent++;
   }
   return sent;
-}
-
-/** Agent mode: everything waiting goes to the agent at once (one notice, one run or steer). */
-async function deliverAgentInbox(deps: MissionDeps, mission: MissionRow) {
-  if (!agentCanWork(mission) || (mission.status !== "active" && mission.status !== "awaiting_close")) return 0;
-  const [claimed] = await deps.db
-    .update(missions)
-    .set({ inbox: [] })
-    .where(and(eq(missions.id, mission.id), sql`jsonb_array_length(${missions.inbox}) > 0`))
-    .returning({ id: missions.id });
-  if (!claimed) return 0;
-  const text = mission.inbox.map((e) => e.text).join("\n\n");
-  const out = await wakeMissionAgent(deps, mission, text, { from: "the mission", kind: "system" }).catch(async () => {
-    for (const e of mission.inbox) await queueForSession(deps.db, mission, e);
-    return { delivered: false };
-  });
-  return out.delivered ? 1 : 0;
 }
 
 /** What people (or the agent) send to the mission: to its main session. */
@@ -1575,13 +1453,11 @@ export async function startMission(deps: MissionDeps, userId: string, orgId: str
     { status: "active", startedAt: new Date() },
     "mission.started",
   );
-  await tellSession(
-    deps,
-    row,
-    { sessionId: row.mainSessionId, cwd: row.repoDir },
-    row.executor === "agent" ? AGENT_START_PROMPT : START_PROMPT,
-    { requestedBy: userId, from: await nameOf(deps.db, userId), kind: "person" },
-  );
+  await tellSession(deps, row, { sessionId: row.mainSessionId, cwd: row.repoDir }, START_PROMPT, {
+    requestedBy: userId,
+    from: await nameOf(deps.db, userId),
+    kind: "person",
+  });
   await requestFilesSync(deps.db, row);
   await publishMissionEvent(deps, row, "started");
   return viewFor(deps, (await getMissionRow(deps.db, row.id)) ?? row, userId, isAdmin);
@@ -1678,6 +1554,8 @@ export async function stopMission(deps: MissionDeps, userId: string, orgId: stri
   const { mission, role, isAdmin } = await requireMission(deps, userId, orgId, missionId);
   requireAct(role, "stop it");
   requireOpen(mission);
+  // The main session is a run: it stops too.
+  await cancelMainRuns(deps, mission, userId, "stopped");
   const canceled = await cancelMissionTasks(deps, mission, userId);
   const row =
     mission.status === "active" || mission.status === "awaiting_close"
@@ -1738,6 +1616,7 @@ export async function concludeMission(
   input: { outcome: "done" | "canceled"; saveToWiki?: boolean; note?: string | null },
 ) {
   const orgId = mission.orgId;
+  await cancelMainRuns(deps, mission, userId, "closed");
   await cancelMissionTasks(deps, mission, userId);
   const note = clean(input.note, 500);
   let row = await setStatus(
@@ -2289,10 +2168,19 @@ export async function setMissionExecutor(
   }
   if (executor === mission.executor) return viewFor(deps, mission, actorId, isAdmin);
   await usableMachine(deps, orgId, mission.machineId, executor);
+  await cancelMainRuns(deps, mission, actorId, "executor_changed");
   await cancelMissionTasks(deps, mission, actorId);
   const [row] = await deps.db
     .update(missions)
-    .set({ executor, mainSessionId: crypto.randomUUID(), inbox: [], idleWakeups: 0, updatedAt: new Date() })
+    // A model chosen for the old executor doesn't carry over (ADR 0032: `brain_model`).
+    .set({
+      executor,
+      brainModel: null,
+      mainSessionId: crypto.randomUUID(),
+      inbox: [],
+      idleWakeups: 0,
+      updatedAt: new Date(),
+    })
     .where(and(eq(missions.id, mission.id), eq(missions.status, "proposed")))
     .returning();
   if (!row) throw new ConflictError("The mission changed meanwhile", "mission.wrong_status");
@@ -2304,22 +2192,13 @@ export async function setMissionExecutor(
     target: { type: "mission", id: row.id },
     details: { from: mission.executor, to: executor },
   });
-  if (executor === "agent") {
-    await wakeMissionAgent(deps, row, agentPlanPrompt(row), {
-      requestedBy: actorId,
-      from: "the mission",
-      kind: "system",
-    });
-  } else {
-    await startSessionTask(deps, row, {
-      title: `Plan: ${row.title}`,
-      prompt: planPrompt(row),
-      sessionId: row.mainSessionId,
-      cwd: row.repoDir,
-      resume: false,
-      requestedBy: actorId,
-    });
-  }
+  // A new main session plans again with the new brain.
+  await tellMainSession(deps, row, planPrompt(row), {
+    requestedBy: actorId,
+    from: "the mission",
+    kind: "system",
+    freshSession: true,
+  });
   await requestFilesSync(deps.db, row);
   await publishMissionEvent(deps, row, "executor", { executor });
   return viewFor(deps, row, actorId, isAdmin);
@@ -2357,7 +2236,6 @@ export const MISSION_TOOL_NAMES = [
   "start_task",
   "complete_mission",
   "permission_prompt",
-  "send_to_mission",
   "propose_mission",
   "run_code",
   "upload_file",
@@ -2734,6 +2612,8 @@ export async function chooseDecision(
   if (d.status === "pending") {
     await tellSession(deps, mission, askerOf(mission, d), `Decision: ${d.question} → ${option} (by ${name})`, {
       requestedBy: userId,
+      // The run paused on this blocking ask_decision resumes with the answer (an item task is resumed).
+      resume: { kind: "input", id: d.id },
     });
   } else if (d.chosen !== option) {
     await tellSession(
@@ -2937,7 +2817,11 @@ export async function decideReview(
     input.outcome === "approved"
       ? `Review approved: "${row.title}" (by ${name}).${note ? ` Note: ${note}` : ""} Go on with the plan.`
       : `Changes requested on "${row.title}" (by ${name}): ${note}`;
-  await tellSession(deps, mission, askerOf(mission, row), text, { requestedBy: userId });
+  await tellSession(deps, mission, askerOf(mission, row), text, {
+    requestedBy: userId,
+    // The run paused on this request_review resumes with the answer (an item task is resumed).
+    resume: { kind: "input", id: row.id },
+  });
   await publishMissionEvent(deps, mission, "review", { review: reviewView(row) });
   return reviewView(row);
 }

@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 7;
+export const MACHINE_PROTOCOL_VERSION = 8;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -34,6 +34,26 @@ export const TASK_OUTPUT_PROTOCOL = 6;
  * `--settings` file with what it may run without asking (ADR 0029).
  */
 export const EXECUTORS_PROTOCOL = 7;
+/**
+ * From this protocol on, the `agentes` MCP server is a bridge (ADR 0032): a
+ * mission task (or a computer-brain run) carries a server-issued token
+ * (`mission.mcpToken`), the runner sends it with every `mcp.call`, and
+ * `tools/list` is asked from the server (`mcp.list` / `mcp.tools`): the
+ * tools are the run's Tool Gateway tools, not a fixed list.
+ */
+export const BRIDGE_PROTOCOL = 8;
+/** Server-issued run tool tokens (ADR 0032): `agr_` + 32 random bytes in base64url. */
+export const RUN_TOOL_TOKEN_PREFIX = "agr_";
+export const isRunToolToken = (v: unknown): v is string =>
+  typeof v === "string" && v.length <= 100 && /^agr_[A-Za-z0-9_-]{20,96}$/.test(v);
+/**
+ * From this protocol on, the runner runs conversational brain turns
+ * (`brain.turn`, ADR 0032): Claude Code thinks for an agent on the machine,
+ * streaming `brain.event` frames, and keeps one process per thread alive.
+ * `hello.executors.claude` also says whether Claude Code is logged in. The
+ * server never sends `brain.turn` to an older runner.
+ */
+export const BRAIN_PROTOCOL = 8;
 
 /** No valid `hello` within this time closes the socket. */
 export const HELLO_TIMEOUT_MS = 10_000;
@@ -102,18 +122,14 @@ export interface TaskStart {
   /** Killed (the whole process group) after this long; default and cap are the runner's. */
   maxSeconds?: number;
   /**
-   * Protocol 5: the task works for a mission. The runner gives the executor
-   * the local `agentes` MCP server (bound to this task) and the mission's rules.
+   * Protocol 5: the task works for a mission (an item session: it works on
+   * the mission's branches; merges, pushes to other branches and deploys are
+   * denied). The runner gives the executor the local `agentes` MCP server
+   * (bound to this task) and the mission's rules.
    */
   mission?: {
     id: string;
     rules?: string;
-    /**
-     * Protocol 7: `plan` (read only, before the people press Start) or `work`
-     * (edits, git on the mission's branches, tests and builds; merges, pushes
-     * to other branches and deploys denied: they go through `request_approval`).
-     */
-    mode?: "plan" | "work";
     /** Protocol 7: the mission's branches start with this (`agentes/<id>/`); only these may be pushed. */
     branchPrefix?: string;
     /**
@@ -122,6 +138,12 @@ export interface TaskStart {
      * a work turn's allow list (the deny list still wins).
      */
     allow?: string[];
+    /**
+     * Protocol 8: the server's token for this task's tools (ADR 0032). The
+     * runner sends it with each `mcp.call` and `mcp.list`; the server checks
+     * it is this machine's, for this task, and still live.
+     */
+    mcpToken?: string;
   };
 }
 
@@ -129,7 +151,69 @@ export interface TaskStart {
 export interface RunnerExecutorInfo {
   /** The first line of `<cli> --version`. */
   version: string;
+  /** Protocol 8, `claude` only: `claude auth status` says it is logged in (absent: unknown). */
+  loggedIn?: boolean;
+  /** Protocol 8, `claude` only: how it is logged in (`claude.ai`, `api_key`…) and the plan (`pro`, `max`, `team`…). */
+  authMethod?: string;
+  plan?: string;
 }
+
+/**
+ * One event of a brain turn on the wire (`brain.event`), the same shape as
+ * the engine's `BrainEvent` (packages/engine/src/brains/types.ts; this file
+ * imports nothing).
+ */
+export type WireBrainEvent =
+  | { type: "text_delta"; text: string }
+  | {
+      type: "tool_call";
+      id: string;
+      name: string;
+      input: unknown;
+      executed?: { content: string; isError?: boolean };
+    }
+  | { type: "usage"; input: number; output: number; source: "api" | "plan"; model?: string }
+  | { type: "limit"; resetsAt?: string }
+  | { type: "done"; text: string; session?: { id: string } }
+  | { type: "error"; code: string; message: string; retryable?: boolean };
+
+/**
+ * `brain.turn` (protocol 8, ADR 0032): one conversational turn of an agent
+ * whose brain is Claude Code on this machine. The runner streams
+ * `brain.event` frames (by `runId`), then `brain.done`, then the request's
+ * `result` with the final event (a `done` or an `error`).
+ */
+export interface BrainTurnRequest {
+  runId: string;
+  kind: "claude_code" | "codex";
+  /** The executor's session (a UUID, stable per thread); `resume`: the server knows it ran before (a hint). */
+  session: { id: string; resume: boolean };
+  /** Relative to the agent's folder ("" = the folder). */
+  cwd: string;
+  /** `opus`, `sonnet`, a full model id; absent: the CLI's default. */
+  model?: string;
+  /** The engine-built context, appended to Claude Code's system prompt when a session starts. */
+  system: string;
+  /** What this turn says (the new user message). */
+  prompt: string;
+  /** The MCP bridge for this run: `token` identifies the run to the server (per run). */
+  mcp: { token: string; url?: string };
+  /** Keep one process per (agent, session) alive between turns (default true). */
+  keepAlive?: boolean;
+  /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`). */
+  personalMcp?: boolean;
+  /** Command policy (as missions): `work` (default) edits and asks a person for the rest; `plan` reads only. */
+  permissions?: { mode?: "plan" | "work"; branchPrefix?: string; allow?: string[] };
+}
+
+/** Largest strings of a `brain.event` (tool inputs and results are cut, text deltas are small). */
+export const BRAIN_LIMITS = {
+  delta: 16_000,
+  toolText: 4000,
+  toolName: 128,
+  doneText: 100_000,
+  message: 2000,
+} as const;
 
 /** A task as the runner's journal has it (in `hello` and `task.status`). */
 export interface RunnerTask {
@@ -252,6 +336,8 @@ export type MachineRequest = (
   | { op: "task.cancel"; taskId: string }
   /** Protocol 6: the last `tail` human lines of a task's output (redacted), as the watcher derives them. */
   | { op: "task.output"; taskId: string; tail: number }
+  /** Protocol 8: one brain turn (ADR 0032); streams `brain.event` frames while it runs. */
+  | ({ op: "brain.turn" } & BrainTurnRequest)
   | {
       op: "push";
       path: string;
@@ -275,6 +361,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "task.status",
   "task.cancel",
   "task.output",
+  "brain.turn",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -295,6 +382,8 @@ export interface MachineReplies {
   "task.cancel": { canceled: boolean };
   /** Oldest first; `truncated`: the log had more than was read. */
   "task.output": { lines: string[]; truncated: boolean };
+  /** `final`: the turn's last event (`done` or `error`), also streamed. */
+  "brain.turn": { runId: string; final: WireBrainEvent };
 }
 
 /** Error codes the runner reports; the message is for people. */
@@ -320,6 +409,9 @@ export type ServerFrame =
   /** Protocol 5: the answer to an `mcp.call` (the text the executor's tool call returns). */
   | { type: "mcp.result"; callId: string; ok: true; text: string }
   | { type: "mcp.result"; callId: string; ok: false; error: { code: string; message: string } }
+  /** Protocol 8: the answer to an `mcp.list`: the tools this run may use (JSON Schemas simplified for the CLIs). */
+  | { type: "mcp.tools"; callId: string; ok: true; tools: McpToolInfo[] }
+  | { type: "mcp.tools"; callId: string; ok: false; error: { code: string; message: string } }
   /** The server closes after sending this (bad token, revoked, outdated runner). */
   | { type: "refused"; reason: "invalid_token" | "revoked" | "outdated" | "replaced"; message: string };
 
@@ -347,7 +439,31 @@ export type RunnerFrame =
    * `agentes` MCP server. The server checks the task belongs to this machine
    * and to a mission, runs the tool and answers `mcp.result`.
    */
-  | { type: "mcp.call"; callId: string; taskId: string; tool: string; args: Record<string, unknown> };
+  | {
+      type: "mcp.call";
+      callId: string;
+      taskId: string;
+      tool: string;
+      args: Record<string, unknown>;
+      /** Protocol 8: the server-issued token of the task or run (ADR 0032); without it, the legacy mission path. */
+      token?: string;
+    }
+  /** Protocol 8: the bridge asks which tools this run may use (`tools/list`); answered with `mcp.tools`. */
+  | { type: "mcp.list"; callId: string; taskId: string; token: string }
+  /** Protocol 8: one event of a running `brain.turn`. */
+  | { type: "brain.event"; runId: string; event: WireBrainEvent }
+  /** Protocol 8: a `brain.turn` sent its last event. */
+  | { type: "brain.done"; runId: string };
+
+/** A tool as `mcp.tools` lists it (what MCP `tools/list` returns). */
+export interface McpToolInfo {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+/** Most tools one `mcp.tools` frame carries. */
+export const MCP_TOOLS_MAX = 200;
 
 /** Largest `mcp.call` arguments (JSON characters). */
 export const MCP_ARGS_MAX_CHARS = 64 * 1024;
@@ -378,14 +494,85 @@ const denialList = (v: unknown): TaskDenial[] => {
   return out;
 };
 
-/** `hello.executors`: only `claude` and `codex`, each with a short version line. */
+/** `hello.executors`: only `claude` and `codex`, each with a short version line (and Claude Code's login). */
 export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerInfo["executors"]> {
   const out: NonNullable<RunnerInfo["executors"]> = {};
+  const word = (x: unknown) => (isString(x) && /^[\w.-]{1,40}$/.test(x) ? x : undefined);
   for (const name of ["claude", "codex"] as const) {
     const e = v[name];
-    if (isObject(e) && isString(e.version)) out[name] = { version: e.version.replace(/\s+/g, " ").trim().slice(0, 80) };
+    if (!isObject(e) || !isString(e.version)) continue;
+    const authMethod = word(e.authMethod);
+    const plan = word(e.plan);
+    out[name] = {
+      version: e.version.replace(/\s+/g, " ").trim().slice(0, 80),
+      ...(typeof e.loggedIn === "boolean" ? { loggedIn: e.loggedIn } : {}),
+      ...(authMethod ? { authMethod } : {}),
+      ...(plan ? { plan } : {}),
+    };
   }
   return out;
+}
+
+const cutJson = (v: unknown, max: number): unknown => {
+  try {
+    const text = JSON.stringify(v ?? null);
+    return text.length <= max ? v : { truncated: text.slice(0, max) };
+  } catch {
+    return null;
+  }
+};
+
+/** One `brain.event` event, checked and cut; null when it isn't one. */
+export function parseBrainEvent(v: unknown): WireBrainEvent | null {
+  if (!isObject(v) || !isString(v.type)) return null;
+  const num = (x: unknown) => Math.max(0, Math.round(finite(x) ?? 0));
+  switch (v.type) {
+    case "text_delta":
+      return isString(v.text) ? { type: "text_delta", text: v.text.slice(0, BRAIN_LIMITS.delta) } : null;
+    case "tool_call": {
+      if (!isString(v.id) || !isString(v.name)) return null;
+      const ex = isObject(v.executed) && isString(v.executed.content) ? v.executed : null;
+      return {
+        type: "tool_call",
+        id: v.id.slice(0, 128),
+        name: v.name.slice(0, BRAIN_LIMITS.toolName),
+        input: cutJson(v.input, BRAIN_LIMITS.toolText),
+        ...(ex
+          ? {
+              executed: {
+                content: String(ex.content).slice(0, BRAIN_LIMITS.toolText),
+                ...(ex.isError === true ? { isError: true } : {}),
+              },
+            }
+          : {}),
+      };
+    }
+    case "usage":
+      return {
+        type: "usage",
+        input: num(v.input),
+        output: num(v.output),
+        source: v.source === "api" ? "api" : "plan",
+        ...(isString(v.model) ? { model: v.model.slice(0, 100) } : {}),
+      };
+    case "limit":
+      return { type: "limit", ...(isString(v.resetsAt) ? { resetsAt: v.resetsAt.slice(0, 40) } : {}) };
+    case "done": {
+      if (!isString(v.text)) return null;
+      const session = isObject(v.session) && isString(v.session.id) ? { id: v.session.id.slice(0, 64) } : undefined;
+      return { type: "done", text: v.text.slice(0, BRAIN_LIMITS.doneText), ...(session ? { session } : {}) };
+    }
+    case "error":
+      if (!isString(v.code)) return null;
+      return {
+        type: "error",
+        code: v.code.slice(0, 64),
+        message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message),
+        ...(typeof v.retryable === "boolean" ? { retryable: v.retryable } : {}),
+      };
+    default:
+      return null;
+  }
 }
 
 /** A journal entry from `hello` or `task.status`; null when malformed. */
@@ -509,8 +696,19 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         taskId: f.taskId.slice(0, 64),
         tool: f.tool.slice(0, 64),
         args,
+        ...(isRunToolToken(f.token) ? { token: f.token } : {}),
       };
     }
+    case "mcp.list":
+      if (!isString(f.callId) || !isString(f.taskId) || !isRunToolToken(f.token)) return null;
+      return { type: "mcp.list", callId: f.callId.slice(0, 64), taskId: f.taskId.slice(0, 64), token: f.token };
+    case "brain.event": {
+      if (!isString(f.runId)) return null;
+      const event = parseBrainEvent(f.event);
+      return event ? { type: "brain.event", runId: f.runId.slice(0, 64), event } : null;
+    }
+    case "brain.done":
+      return isString(f.runId) ? { type: "brain.done", runId: f.runId.slice(0, 64) } : null;
     default:
       return null;
   }
@@ -532,8 +730,10 @@ export function parseServerFrame(raw: string): ServerFrame | null {
   }
   if ((f.type === "cancel" || f.type === "request") && !isString(f.id)) return null;
   if (f.type === "task.ack" && !isString(f.taskId)) return null;
-  if (f.type === "mcp.result" && !isString(f.callId)) return null;
-  if (!["welcome", "request", "cancel", "ping", "refused", "task.ack", "mcp.result"].includes(f.type)) return null;
+  if ((f.type === "mcp.result" || f.type === "mcp.tools") && !isString(f.callId)) return null;
+  if (f.type === "mcp.tools" && f.ok === true && !Array.isArray(f.tools)) return null;
+  if (!["welcome", "request", "cancel", "ping", "refused", "task.ack", "mcp.result", "mcp.tools"].includes(f.type))
+    return null;
   return f as ServerFrame;
 }
 

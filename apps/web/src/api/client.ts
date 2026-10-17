@@ -3,6 +3,8 @@ import type {
   ActiveRun,
   Agent,
   AgentAccess,
+  AgentBrain,
+  AgentBrainInput,
   AgentChannel,
   AgentComputer,
   AgentDetail,
@@ -21,6 +23,7 @@ import type {
   ArtifactVersion,
   AuthConfig,
   BatchInviteResult,
+  BrainKind,
   CalendarEvent,
   CalendarEventInput,
   CalendarEventPatch,
@@ -62,6 +65,7 @@ import type {
   Memory,
   Message,
   Mission,
+  MissionBrain,
   MissionCommand,
   MissionCommandRule,
   MissionControl,
@@ -224,6 +228,9 @@ export interface ApiClient {
       agentId: string,
       channels: { channelId: string; autoReply?: boolean }[],
     ): Promise<AgentChannel[]>;
+    /** "Quem pensa": the API, Claude Code or Codex on its computer (its owner or an admin). */
+    brain(orgId: string, agentId: string): Promise<AgentBrain>;
+    setBrain(orgId: string, agentId: string, input: AgentBrainInput): Promise<AgentBrain>;
     runs(
       orgId: string,
       filter?: { agentId?: string; status?: string; before?: string; since?: string; limit?: number },
@@ -499,6 +506,13 @@ export interface ApiClient {
     ): Promise<{ commandApproval: CommandApproval }>;
     /** "Configurações da missão": the allowed rules, the command stats, the agent's default. */
     settings(orgId: string, missionId: string): Promise<MissionSettings>;
+    /** "Quem faz o trabalho": the brain and its model (the brain before Start, the model any time). */
+    brain(orgId: string, missionId: string): Promise<MissionBrain>;
+    setBrain(
+      orgId: string,
+      missionId: string,
+      input: { brain?: BrainKind | null; model?: string | null },
+    ): Promise<MissionBrain>;
     /** The × in "O que já foi liberado" (owner or deciders). */
     removeCommandRule(orgId: string, missionId: string, ruleId: string): Promise<{ rules: MissionCommandRule[] }>;
     /** "Retomar sozinho quando ele voltar" (owner or deciders). */
