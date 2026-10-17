@@ -307,6 +307,22 @@ export async function buildRunContext(
       return `${m.agentName} (@${m.agentHandle}${m.agentRole ? `, ${m.agentRole}` : ""}): ${summarizeScopes(scopes)}`;
     })
     .join("; ");
+  // The router sent this message to several agents (D49): each answers its own part, at the same time.
+  const [routed] =
+    run.trigger === "router" && others.length > 0
+      ? await db
+          .select({ selected: schema.routingDecisions.selectedAgentIds })
+          .from(schema.routingDecisions)
+          .where(
+            and(
+              eq(schema.routingDecisions.orgId, run.orgId),
+              eq(schema.routingDecisions.messageId, run.triggerMessageId),
+            ),
+          )
+      : [];
+  const alsoAnswering = others
+    .filter((m) => m.agentId && routed?.selected.includes(m.agentId))
+    .map((m) => `@${m.agentHandle}`);
   const memberList = members
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
     .join(", ");
@@ -402,7 +418,11 @@ export async function buildRunContext(
               ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
               : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying in a thread. Members: ${memberList}.${
                   otherAgents
-                    ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself with \`ask_agent\` when you need its help for the task.`
+                    ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its help for the task. Never name your tools to people.`
+                    : ""
+                }${
+                  alsoAnswering.length > 0
+                    ? `\n${alsoAnswering.join(", ")} also got this message and ${alsoAnswering.length > 1 ? "are" : "is"} answering right now, each for their own part. Answer only yours; don't speak for them, mention them or say what they will answer.`
                     : ""
                 }`,
     },

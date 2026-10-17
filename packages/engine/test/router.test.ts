@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { ProviderError, textOf } from "@agenteschat/providers";
+import { ProviderError, systemText, textOf } from "@agenteschat/providers";
 import {
+  buildRunContext,
   createAgent,
   createJobHandlers,
   createLlmRouterStrategy,
@@ -130,6 +131,13 @@ describe("routeMessage", () => {
       { agentId: qa.id, score: 0.95 },
       { agentId: f.agent.id, score: 0.7 },
     ]);
+
+    // Each picked agent knows who else answers, so it speaks only for itself.
+    const devRun = result.runs.find((r) => r.agentId === f.agent.id);
+    if (!devRun) throw new Error("no run");
+    const devPrompt = systemText((await buildRunContext(f.db, devRun, f.agent, { maxMessages: 10 })).system);
+    expect(devPrompt).toContain("@qa also got this message and is answering right now");
+    expect(devPrompt).not.toContain("@ops also got");
 
     // One decision per message: a redelivered job does nothing.
     expect(
