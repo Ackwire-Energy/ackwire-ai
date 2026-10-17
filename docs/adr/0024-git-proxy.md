@@ -25,7 +25,7 @@ Agents use real `git clone/commit/push` against private repositories from their 
 
 **Policy (checked in the proxy on every request):**
 - The agent needs `github:git.read` (fetch/clone) or `github:git.write` (push, which implies read) on that GitHub connection. These are grants of the connection, deniable like any other.
-- Optional repository list: `github:git.repo:owner/name` or `owner/*`. When an agent has any, only those repositories work.
+- Optional repository list (`agent_repositories`, D48): `owner/name` or `owner/*`, in order. When an agent has any, only those repositories work, here and in the Tool Gateway for every GitHub tool (reads included). It replaced the `github:git.repo:…` grants (migration 0063).
 - Push commands are read from the receive-pack request (pkt-lines) before anything is sent:
   - only `refs/heads/agentes/{handle}/…`;
   - no tags and no deletes;
