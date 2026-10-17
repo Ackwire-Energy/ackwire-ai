@@ -6,6 +6,21 @@
  * from @agenteschat/ui (their holders are `position: relative`). Cards are
  * neutral; the brand blue is only the agents' own.
  */
+/* The raised forum cards are elevation contexts too (see components.css). */
+:where(
+  .forum-list,
+  .forum-lv,
+  .forum-tpl,
+  .forum-mesa,
+  .forum-livep,
+  .forum-seatbox,
+  .forum-pin,
+  .forum-syn,
+  .forum-sugc
+) > * {
+  --raised: var(--raised-2);
+  --surface-raised: var(--raised-2);
+}
 .forum,
 .forum-topic {
   padding-bottom: 120px;
@@ -537,19 +552,6 @@
 .forum-order__grip {
   display: flex;
   color: var(--faint);
-}
-.forum-order__no {
-  width: 20px;
-  height: 20px;
-  border-radius: 7px;
-  background: var(--ink);
-  color: var(--bg);
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
 }
 .forum-order__t {
   flex: 1;

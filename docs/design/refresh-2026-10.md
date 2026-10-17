@@ -11,17 +11,18 @@ As regras não mudam: cards neutros (estado em chip com ícone, nunca card tingi
 | Token | Claro | Escuro | Uso |
 | --- | --- | --- | --- |
 | `bg` | `#f4f4f1` | `#0f0f0e` | Fundo do app |
-| `raised` | `#ffffff` | `#191918` | Cards, composer, botão secundário, diálogos |
+| `raised` | `#ffffff` | `#1c1c1b` | Cards, composer, botão secundário, diálogos |
+| `raised-2` | `#ffffff` | `#242423` | O que fica dentro de algo elevado (linha ou card num diálogo, card ou lista): um degrau acima. Os contêineres aplicam sozinhos (`--raised` vira `--raised-2` dentro deles) |
 | `sunken` | `#ebebe7` | `#0a0a09` | Trilhos, segmentado, pílulas, esqueletos |
 | `glass` | `rgba(255,255,255,.72)` | `rgba(30,30,28,.66)` | Menus, popovers, select, toasts, ⌘K |
 | `glass-solid` | `#fbfbf9` | `#1e1e1c` | Vidro sem `backdrop-filter` |
-| `line` | `rgba(23,23,22,.08)` | `rgba(255,255,255,.07)` | Hairline |
-| `line2` | `rgba(23,23,22,.14)` | `rgba(255,255,255,.12)` | Separadores fortes, borda de e3 |
-| `line-strong` | `#82827d` | `#6b6b67` | Borda de controle (3:1) |
+| `line` | `rgba(23,23,22,.08)` | `rgba(255,255,255,.10)` | Hairline |
+| `line2` | `rgba(23,23,22,.14)` | `rgba(255,255,255,.15)` | Separadores fortes, borda de e3 |
+| `line-strong` | `#82827d` | `#71716c` | Borda de controle (3:1) |
 | `ink` | `#151514` | `#efefec` | Texto e ação primária |
 | `ink2` | `#2a2a28` | `#d6d6d2` | Corpo de mensagem |
 | `muted` | `#5c5c58` | `#a3a39e` | Texto secundário |
-| `faint` | `#6f6f6a` | `#8b8b85` | Metadados |
+| `faint` | `#6f6f6a` | `#8f8f89` | Metadados |
 | `agent` / `agent2` | `#0063d1` / `#3d8bff` | `#5aa8ff` / `#8cc3ff` | Identidade de agente (degradê do avatar, halo) |
 | `agent-soft` | `#e3eefd` | `#11253f` | Pílula do agente alvo no composer |
 | `ok` | `#1f7a45` | `#5fc48a` | Check de passo concluído, presença |

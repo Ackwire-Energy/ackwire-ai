@@ -1,6 +1,7 @@
 import {
   Avatar,
   Button,
+  CountChip,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -334,7 +335,7 @@ export function NewTopicDialog({
                       <span className="forum-order__grip" aria-hidden="true">
                         <Icon name="grip" size={16} />
                       </span>
-                      <span className="forum-order__no">{i + 1}</span>
+                      <CountChip>{i + 1}</CountChip>
                       {person ? (
                         <Avatar
                           kind="person"

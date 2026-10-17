@@ -28,6 +28,31 @@ pre,
 samp {
   font-family: var(--font-mono);
 }
+
+/*
+ * Elevation context: whatever sits inside a raised container (a row or card
+ * in a dialog, a secondary button on a card, a file chip in the composer) is
+ * one step up (`--raised-2`), so it never melts into its container in dark
+ * mode. Set on the children (custom properties inherit), so the container
+ * keeps its own level and a card inside a dialog lifts once. Light mode is
+ * unchanged (`--raised-2` is white there). App containers that hold raised
+ * pieces add the same pair of declarations to their children.
+ */
+:where(
+  .ac-dialog,
+  .ac-details,
+  .ac-card,
+  .ac-list,
+  .ac-menu,
+  .ac-toast,
+  .ac-glass,
+  .ac-composer,
+  .ac-approval,
+  .ac-alert
+) > * {
+  --raised: var(--raised-2);
+  --surface-raised: var(--raised-2);
+}
 .ac-visually-hidden {
   position: absolute;
   width: 1px;
