@@ -1247,10 +1247,6 @@ export interface Routine {
   lastRun: RoutineRun | null;
   /** The last runs, newest first (at most 14): the row's pixel strip and the horizon. */
   recentRuns?: RoutineRun[];
-  /** Admins only: monthly cap for this routine (US$); null/absent = only the agent's own budget. */
-  budgetUsd?: number | null;
-  /** This month's share of the routine's cap used; null without a cap. */
-  budgetUsedPercent?: number | null;
   /** Event routines that can be triggered by a webhook: the URL to call. */
   webhookUrl?: string | null;
   createdAt: string;
@@ -1280,7 +1276,6 @@ export interface RoutineInput {
     | { type: "schedule"; rule: ApiRule }
     | { type: "event"; event: RoutineEvent }
     | { type: "once"; at: string; timezone?: string };
-  budgetUsd?: number | null;
 }
 
 /** `PATCH …/routines/{id}`: only what changed. */

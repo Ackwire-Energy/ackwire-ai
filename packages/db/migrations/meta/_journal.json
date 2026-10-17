@@ -456,6 +456,13 @@
       "when": 1792340000000,
       "tag": "0064_agent_consultations",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1792270835577,
+      "tag": "0065_drop_routine_budget",
+      "breakpoints": true
     }
   ]
 }

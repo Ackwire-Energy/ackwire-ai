@@ -35,7 +35,7 @@ const daily = () =>
   });
 
 describe("editing routines", () => {
-  test("a new schedule is parsed again and nextRunAt follows; fields and budget change; audited", async () => {
+  test("a new schedule is parsed again and nextRunAt follows; fields change; audited", async () => {
     f = await setup({ reply: () => ({ chunks: ["ok"] }) });
     const routine = await daily();
     expect(routine.nextRunAt?.endsWith("T09:00:00.000Z")).toBe(true);
@@ -44,13 +44,11 @@ describe("editing routines", () => {
       name: "Resumo da tarde",
       prompt: "Resuma a tarde.",
       trigger: { type: "schedule", phrase: "todo dia às 18h", timezone: "America/Sao_Paulo" },
-      budgetUsd: 2,
     });
     expect(edited).toMatchObject({
       name: "Resumo da tarde",
       prompt: "Resuma a tarde.",
       trigger: { type: "schedule", cron: "0 18 * * *", timezone: "America/Sao_Paulo" },
-      budgetUsd: 2,
     });
     expect(edited.nextRunAt?.endsWith("T21:00:00.000Z")).toBe(true); // 18:00 in São Paulo
 
@@ -140,18 +138,5 @@ describe("editing routines", () => {
       NotFoundError,
     );
     await expect(runRoutineNow(deps(), f.owner.id, f.org.id, routine.id)).rejects.toBeInstanceOf(NotFoundError);
-  });
-
-  test("a routine over its monthly budget skips its run", async () => {
-    f = await setup({ reply: () => ({ chunks: ["ok"], usage: { inputTokens: 1000, outputTokens: 100 } }) });
-    const routine = await daily();
-    await updateRoutine(deps(), f.owner.id, f.org.id, routine.id, { budgetUsd: 0.000001 });
-    await runRoutineNow(deps(), f.owner.id, f.org.id, routine.id);
-    await drainOutbox(f.db, f.handlers);
-    await runRoutineNow(deps(), f.owner.id, f.org.id, routine.id);
-    await drainOutbox(f.db, f.handlers);
-    const runs = await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id);
-    expect(runs.map((r) => r.status)).toEqual(["skipped", "ok"]);
-    expect(runs[0]?.summary).toContain("Routine budget used up this month");
   });
 });

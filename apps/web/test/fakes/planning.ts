@@ -246,7 +246,6 @@ export function createMockPlanning(
         running: false,
         lastRun: null,
         recentRuns: [],
-        budgetUsedPercent: null,
         createdAt: minutesAgo(now, 20000),
         ...over,
       };
@@ -497,8 +496,6 @@ export function createMockPlanning(
           running: false,
           lastRun: null,
           recentRuns: [],
-          budgetUsd: input.budgetUsd ?? null,
-          budgetUsedPercent: input.budgetUsd == null ? null : 0,
           createdAt: ctx.now().toISOString(),
         };
         s.routines.push(r);
@@ -511,7 +508,6 @@ export function createMockPlanning(
         if (patch.prompt !== undefined) r.prompt = patch.prompt;
         if (patch.agentId !== undefined) r.agentId = patch.agentId;
         if (patch.target !== undefined) r.target = patch.target;
-        if (patch.budgetUsd !== undefined) r.budgetUsd = patch.budgetUsd;
         if (patch.active !== undefined) r.active = patch.active;
         if (patch.trigger?.type === "schedule") r.trigger = scheduleOf(patch.trigger);
         else if (patch.trigger?.type === "once")
