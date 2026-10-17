@@ -7,7 +7,7 @@
  * - Hierarchical lookup stays ON: Bun's hoisted layout nests conflicting versions under the package that
  *   needs them (`node_modules/a/node_modules/b`), and turning it off would hand those packages the wrong
  *   version. Expo's monorepo guide no longer asks for `disableHierarchicalLookup` since SDK 52.
- * - React and React Native are singletons: the web app may resolve a newer React at the root, while
+ * - React, React Native, React Query and i18next are singletons: the web app may resolve a newer React at the root, while
  *   React Native's renderer needs the exact React this app pins. Every import of them, from any package,
  *   resolves from this app's folder, so the bundle never carries two Reacts.
  */
@@ -27,7 +27,9 @@ config.resolver.nodeModulesPaths = [
 config.resolver.disableHierarchicalLookup = false;
 config.resolver.unstable_enablePackageExports = true;
 
-const SINGLETONS = ["react", "react-native"];
+// Libraries with module-level state (contexts, instances): one copy for the app and the shared packages,
+// or a hook from one copy can't see the provider of the other ("No QueryClient set").
+const SINGLETONS = ["react", "react-native", "@tanstack/react-query", "react-i18next", "i18next"];
 const fromApp = path.join(projectRoot, "package.json");
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
