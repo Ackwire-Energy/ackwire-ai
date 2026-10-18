@@ -16,10 +16,15 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@agenteschat/db": "workspace:*"
+    "@agenteschat/db": "workspace:*",
+    "imapflow": "^2.5.5",
+    "mailparser": "^3.9.46",
+    "nodemailer": "^10.1.7"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.8"
+    "@electric-sql/pglite": "0.5.8",
+    "@types/mailparser": "^3.9.0",
+    "@types/nodemailer": "^8.0.2"
   },
   "license": "UNLICENSED"
 }
