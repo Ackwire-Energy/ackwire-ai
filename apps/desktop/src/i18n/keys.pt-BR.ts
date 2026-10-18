@@ -102,6 +102,7 @@ export const desktopPtBR = {
     noAccount: "Ainda não tem conta?",
     createAccount: "Criar em agentes.chat",
     codeTitle: "Confirme no navegador",
+    codeLeadPreparing: "Estamos gerando o código. O navegador abre sozinho em seguida.",
     codeLead:
       "Abrimos o agentes.chat. Veja se o código lá é o mesmo daqui, escolha a organização e clique em Conectar.",
     codeAria: "Código {{code}}",
@@ -112,7 +113,7 @@ export const desktopPtBR = {
     failedExpired: "O código expirou.",
     failedDenied: "A conexão foi recusada no navegador.",
     failedNetwork: "Sem conexão com o agentes.chat. Confira a internet.",
-    failedInternal: "Algo deu errado.",
+    failedInternal: "Não conseguimos começar a conexão. Tente de novo.",
     newCode: "Gerar outro código",
     connected: "Conectado: {{org}}",
     orgTitle: "Conecte outra organização",

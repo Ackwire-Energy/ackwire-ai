@@ -99,6 +99,7 @@ export const desktopEn: DesktopTranslations = {
     noAccount: "No account yet?",
     createAccount: "Create one at agentes.chat",
     codeTitle: "Confirm in the browser",
+    codeLeadPreparing: "Getting a code. Your browser opens by itself right after.",
     codeLead:
       "We opened agentes.chat. Check that the code there matches this one, pick the organization and click Connect.",
     codeAria: "Code {{code}}",
@@ -109,7 +110,7 @@ export const desktopEn: DesktopTranslations = {
     failedExpired: "The code expired.",
     failedDenied: "The connection was declined in the browser.",
     failedNetwork: "Can't reach agentes.chat. Check the internet.",
-    failedInternal: "Something went wrong.",
+    failedInternal: "We couldn't start connecting. Try again.",
     newCode: "Get a new code",
     connected: "Connected: {{org}}",
     orgTitle: "Connect another organization",
