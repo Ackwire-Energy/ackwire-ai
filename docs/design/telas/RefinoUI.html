@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refino da UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Funnel+Display:wght@300;400&display=swap">
+<script>
+  { const h = new URLSearchParams(location.hash.slice(1));
+    document.documentElement.dataset.theme = h.get("theme") || "light"; }
+</script>
+<style>
+/*
+  Prototype (RefinoUI): three refinements on the web app, shown on the real chat screen and on a control board.
+  1. Light mode less gray: the work area is white, the sidebar is a near-white paper, gray stays only in fields
+     and in the chosen state.
+  2. Agents inside frames: every avatar (agent and person) is a tile of one shape; the agent stands inside it.
+     Three frame options to choose from (neutral, the agent's color, the agent's pixel sky).
+  3. One control ruler: 3 heights (32 compact, 40 default, 48 large) and one shape (radius = 30% of the
+     height: 10/12/14). Buttons, inputs, selects, search, filters, segmented, icon buttons all follow it, so a
+     button next to an input always matches. Pills stay only for labels you don't type in (status, counters,
+     mentions).
+  "Antes" shows today's app (tokens.css + components.css values) for comparison.
+  Agents come from packages/ui/src/agent/engine.js (serve the repo root over http).
+*/
+:root,[data-theme="light"]{
+  --bg:#f4f4f1;--side:#f4f4f1;--pane:#efefec;--raised:#fff;--sunken:#ebebe7;
+  --line:rgba(23,23,22,.08);--line2:rgba(23,23,22,.14);
+  --ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;
+  --plate:rgba(127,127,127,.1);--plate-soft:rgba(127,127,127,.06);
+  --field-bg:color-mix(in srgb,var(--sunken) 40%,var(--raised));--field-line:transparent;
+  --chosen:#ffffff;--chosen-shadow:0 1px 2px rgba(23,23,22,.06),0 0 0 1px var(--line);
+  --e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);
+  --e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.1),0 0 0 1px var(--line);
+  --top:inset 0 1px 0 rgba(255,255,255,.9);
+  --ok:#1f7a45;--warn:#9a5b00;--danger:#b42a20;
+  --guide:rgba(220,60,40,.45);
+}
+/* Depois, light: white work area, near-white paper sidebar, gray only in fields and chosen states. */
+[data-theme="light"][data-v="depois"]{
+  --bg:#fbfbfa;--side:#f8f8f6;--pane:#ffffff;--sunken:#f3f3f0;
+  --line:rgba(23,23,22,.07);--line2:rgba(23,23,22,.12);
+  --field-bg:#ffffff;--field-line:rgba(23,23,22,.13);
+  --chosen:#ffffff;--chosen-shadow:0 1px 2px rgba(23,23,22,.07),0 0 0 1px rgba(23,23,22,.09);
+}
+[data-theme="dark"]{
+  --bg:#0f0f0e;--side:#0f0f0e;--pane:#151514;--raised:#1c1c1b;--sunken:#0a0a09;
+  --line:rgba(255,255,255,.1);--line2:rgba(255,255,255,.15);
+  --ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8f8f89;
+  --plate:rgba(127,127,127,.14);--plate-soft:rgba(127,127,127,.08);
+  --field-bg:color-mix(in srgb,var(--sunken) 40%,var(--raised));--field-line:transparent;
+  --chosen:color-mix(in srgb,#fff 7%,var(--raised));--chosen-shadow:0 0 0 1px rgba(255,255,255,.1),inset 0 1px 0 rgba(255,255,255,.1);
+  --e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);
+  --e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);
+  --top:inset 0 1px 0 rgba(255,255,255,.08);
+  --ok:#5fc48a;--warn:#e0a84a;--danger:#f08a80;
+  --guide:rgba(255,120,100,.5);
+}
+[data-theme="dark"][data-v="depois"]{--field-line:rgba(255,255,255,.1)}
+:root{
+  --sans:"Onest","Segoe UI",system-ui,sans-serif;--display:"Funnel Display",var(--sans);
+  --spring:cubic-bezier(.34,1.4,.5,1);--out:cubic-bezier(.2,.8,.2,1);
+  /* The ruler. */
+  --h-sm:32px;--h-md:40px;--h-lg:48px;
+  --r-sm:10px;--r-md:12px;--r-lg:14px;
+  --px-sm:12px;--px-md:14px;--px-lg:16px;
+  --fs-sm:13px;--fs-md:14px;--fs-lg:15px;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--sans);-webkit-font-smoothing:antialiased;transition:background .25s}
+button,input{font:inherit;color:inherit}
+.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sm .i,.i.s16{width:16px;height:16px}
+.lg>.i{width:20px;height:20px}
+
+/* ---------- prototype bar (built with the new controls) ---------- */
+.proto{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:10px 16px;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(14px) saturate(1.4);border-bottom:1px solid var(--line)}
+.proto h1{font:300 20px/1 var(--display);letter-spacing:-.02em;margin-right:auto}
+.proto label{font-size:12px;color:var(--faint);margin-right:-8px}
+
+/* ---------- controls: the ruler ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:var(--h-md);padding:0 var(--px-md);border-radius:var(--r-md);border:0;background:var(--raised);color:var(--ink);font-size:var(--fs-md);font-weight:550;white-space:nowrap;cursor:pointer;box-shadow:var(--e1),var(--top);transition:transform .2s var(--spring),background-color .15s,box-shadow .15s}
+.btn:hover{background:color-mix(in srgb,var(--plate-soft) 100%,var(--raised))}
+.btn:active{transform:scale(.97)}
+.btn:focus-visible,.fld:focus-within,.seg button:focus-visible,.tog:focus-visible{outline:none;box-shadow:0 0 0 2px var(--raised),0 0 0 4px var(--ink)}
+.btn.primary{background:linear-gradient(180deg,color-mix(in srgb,var(--ink) 86%,#fff),var(--ink));color:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.18)}
+.btn.ghost{background:transparent;box-shadow:none;color:var(--muted)}
+.btn.ghost:hover{background:var(--plate-soft);color:var(--ink)}
+.btn.icon{width:var(--h-md);padding:0}
+.btn.sm{height:var(--h-sm);padding:0 var(--px-sm);border-radius:var(--r-sm);font-size:var(--fs-sm);gap:6px}
+.btn.sm.icon{width:var(--h-sm);padding:0}
+.btn.lg{height:var(--h-lg);padding:0 var(--px-lg);border-radius:var(--r-lg);font-size:var(--fs-lg);gap:10px}
+.btn.lg.icon{width:var(--h-lg);padding:0}
+.btn.block{width:100%;justify-content:flex-start}
+.kbd{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:6px;background:var(--plate);color:var(--faint);font-size:11px;font-weight:600}
+.sm .kbd{min-width:18px;height:18px;font-size:10.5px;border-radius:5px}
+
+.fld{display:flex;align-items:center;gap:8px;height:var(--h-md);padding:0 var(--px-md);border-radius:var(--r-md);background:var(--field-bg);box-shadow:inset 0 0 0 1px var(--field-line),inset 0 1px 2px rgba(23,23,22,.03);color:var(--faint);font-size:var(--fs-md);min-width:0;transition:box-shadow .15s}
+.fld:hover{box-shadow:inset 0 0 0 1px var(--line2)}
+.fld input{flex:1;min-width:0;border:0;background:none;outline:none;color:var(--ink);font-size:inherit}
+.fld input::placeholder{color:var(--faint)}
+.fld.sm{height:var(--h-sm);padding:0 var(--px-sm);border-radius:var(--r-sm);font-size:var(--fs-sm);gap:6px}
+.fld.lg{height:var(--h-lg);padding:0 var(--px-lg);border-radius:var(--r-lg);font-size:var(--fs-lg)}
+.fld .end{margin-left:auto;display:flex;gap:3px;align-items:center}
+.fld.select{cursor:pointer;color:var(--ink)}
+.fld.select .end{color:var(--faint)}
+
+/* Segmented: the track is a field of the same height; items sit 4px inside, radius concentric (outer − 4). */
+.seg{display:inline-flex;gap:2px;height:var(--h-md);padding:4px;border-radius:var(--r-md);background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line)}
+.seg button{height:100%;padding:0 12px;border:0;border-radius:calc(var(--r-md) - 4px);background:none;color:var(--muted);font-size:var(--fs-sm);font-weight:550;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background-color .15s,color .15s}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--chosen);color:var(--ink);box-shadow:var(--chosen-shadow)}
+.seg.sm{height:var(--h-sm);padding:3px;border-radius:var(--r-sm)}
+.seg.sm button{padding:0 10px;font-size:12.5px;border-radius:calc(var(--r-sm) - 3px)}
+
+/* Filter toggle: a button of the ruler that can stay pressed (no pill). */
+.tog{display:inline-flex;align-items:center;gap:6px;height:var(--h-md);padding:0 var(--px-md);border-radius:var(--r-md);border:0;background:var(--field-bg);box-shadow:inset 0 0 0 1px var(--field-line);color:var(--muted);font-size:var(--fs-sm);font-weight:550;cursor:pointer}
+.tog.sm{height:var(--h-sm);padding:0 var(--px-sm);border-radius:var(--r-sm)}
+.tog[aria-pressed="true"]{background:var(--sunken);color:var(--ink);box-shadow:inset 0 1px 3px rgba(23,23,22,.12),inset 0 0 0 1px var(--line)}
+.tog.lg{height:var(--h-lg);padding:0 var(--px-lg);border-radius:var(--r-lg);font-size:var(--fs-md)}
+.seg.lg{height:var(--h-lg);border-radius:var(--r-lg)}
+.seg.lg button{padding:0 14px;font-size:var(--fs-md);border-radius:calc(var(--r-lg) - 4px)}
+.cnt{font-size:12px;font-weight:500;color:var(--faint);font-variant-numeric:tabular-nums}
+
+/* Labels you don't type in nor press: pills. */
+.pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;background:var(--plate);color:var(--muted);font-size:12px;font-weight:550}
+.pill .i{width:14px;height:14px}
+
+/* ---------- Antes: today's values ---------- */
+[data-v="antes"] .scr .btn{height:40px;border-radius:12px;padding:0 16px}
+[data-v="antes"] .scr .btn.sm{height:32px;border-radius:10px}
+[data-v="antes"] .scr .btn.lg{height:56px;border-radius:16px;font-size:15px}
+[data-v="antes"] .scr .btn.send{width:44px;height:44px;border-radius:999px;background:var(--plate);box-shadow:none;color:var(--faint)}
+[data-v="antes"] .scr .fld{background:transparent;box-shadow:none;padding:0 8px;height:40px}
+[data-v="antes"] .scr .fld .kbd{border-radius:6px;min-width:26px;height:26px}
+[data-v="antes"] .scr .tools .btn{width:36px;height:36px;border-radius:8px}
+
+/* ---------- avatars: one tile for agents and people ---------- */
+.av{position:relative;display:inline-grid;place-items:center;flex:none;width:var(--s);height:var(--s)}
+.av canvas{display:block;width:100%;height:100%}
+.av.framed{border-radius:calc(var(--s) * .3);overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+.av.framed::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px var(--line),inset 0 1px 0 rgba(255,255,255,.55);pointer-events:none}
+[data-theme="dark"] .av.framed::after{box-shadow:inset 0 0 0 1px var(--line),inset 0 1px 0 rgba(255,255,255,.07)}
+.av.fa{background:var(--sunken)}
+[data-theme="light"][data-v="depois"] .av.fa{background:#f1f1ee}
+.av.person{background:var(--plate);color:var(--muted);font-weight:600;font-size:calc(var(--s) * .42);border-radius:50%}
+.av.person.framed{border-radius:calc(var(--s) * .3)}
+.av.person img{width:100%;height:100%;object-fit:cover}
+
+/* ---------- screen ---------- */
+.tabs{display:flex;justify-content:center;padding:16px 16px 0}
+.scr{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - 140px);min-height:640px;margin:16px;border-radius:20px;overflow:hidden;background:var(--side);box-shadow:var(--e2);transition:background .25s}
+.side{display:flex;flex-direction:column;gap:6px;padding:12px;overflow:auto;min-height:0}
+.org{display:flex;align-items:center;gap:10px;padding:10px;border-radius:16px;background:var(--raised);box-shadow:var(--e1),var(--top)}
+.org .logo{width:36px;height:36px;border-radius:11px;background:linear-gradient(#3bbf8a,#1f8a5c);display:grid;place-items:center;color:#fff}
+.org b{display:block;font-size:15px;line-height:1.2}
+.org small{color:var(--muted);font-size:12.5px}
+.org .grow{flex:1;min-width:0}
+.goto{margin:6px 0 4px}
+.nav{display:flex;flex-direction:column;gap:1px}
+.it{display:flex;align-items:center;gap:10px;height:var(--h-md);padding:0 10px;border-radius:var(--r-md);color:var(--ink2);font-size:14.5px;cursor:pointer}
+.it:hover{background:var(--plate-soft)}
+.it .i{color:var(--muted)}
+.it .meta{margin-left:auto;color:var(--faint);font-size:12.5px}
+.it.on{background:var(--chosen);box-shadow:var(--chosen-shadow);font-weight:600}
+.it.on .meta{color:var(--ink2);font-weight:550}
+.sec{display:flex;align-items:center;justify-content:space-between;padding:14px 10px 4px;color:var(--faint);font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.sec .btn{margin-right:-6px}
+.side .foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:12px}
+.me{display:flex;align-items:center;gap:10px;padding:10px;border-radius:16px;background:var(--raised);box-shadow:var(--e1),var(--top)}
+.me .grow{flex:1;min-width:0}
+.me b{font-size:14.5px;display:block}
+.bar{display:flex;align-items:center;gap:8px;color:var(--faint);font-size:11.5px;font-variant-numeric:tabular-nums}
+.bar i{flex:1;height:4px;border-radius:2px;background:var(--plate);position:relative;overflow:hidden}
+.bar i::before{content:"";position:absolute;inset:0 84% 0 0;background:var(--ink)}
+
+.main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--pane);border-left:1px solid var(--line);transition:background .25s}
+[data-v="antes"][data-theme="light"] .main{margin:8px 8px 8px 0;border-radius:18px;border:0}
+.head{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
+.head .grow{flex:1;min-width:0}
+.head b{font-size:19px;font-weight:650;letter-spacing:-.01em}
+.head small{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;color:var(--muted);font-size:13.5px}
+.head small .i{width:14px;height:14px}
+.feed{flex:1;overflow:auto;padding:16px 28px 8px;min-height:0}
+.msg{display:grid;grid-template-columns:40px 1fr;gap:12px;max-width:960px;padding:8px 0}
+.msg .who{display:flex;align-items:baseline;gap:8px}
+.msg .who b{font-size:15px}
+.msg .who time{color:var(--faint);font-size:12.5px}
+.msg p,.msg li{font-size:15px;line-height:1.6;color:var(--ink2)}
+.msg h4{font-size:15px;margin:10px 0 2px}
+.msg ul{padding-left:22px;margin:2px 0}
+.msg p+p{margin-top:6px}
+.work{margin-top:10px;max-width:640px}
+.work .btn{width:100%;justify-content:flex-start;color:var(--ink2)}
+.compose{padding:8px 20px 18px}
+.box{border-radius:18px;background:var(--raised);box-shadow:var(--e2),var(--top);padding:12px 12px 10px}
+.box textarea{display:block;width:100%;min-height:44px;resize:none;border:0;background:none;outline:none;padding:4px 6px;font:15px/1.5 var(--sans);color:var(--ink)}
+.box textarea::placeholder{color:var(--faint)}
+.box .row{display:flex;align-items:center;gap:6px;margin-top:6px}
+.tools{display:flex;align-items:center;gap:2px}
+.tools .sep{width:1px;height:16px;background:var(--line2);margin:0 4px}
+.box .send{margin-left:auto}
+.ctx{display:inline-flex;align-items:center;gap:6px;height:var(--h-sm);padding:0 10px 0 4px;border-radius:var(--r-sm);background:var(--plate-soft);box-shadow:inset 0 0 0 1px var(--line);font-size:13px;font-weight:550}
+[data-v="antes"] .ctx{border-radius:999px;height:30px;background:var(--plate)}
+
+/* ---------- board (the ruler) ---------- */
+.board{max-width:1180px;margin:0 auto;padding:24px 16px 80px;display:flex;flex-direction:column;gap:20px}
+.card{background:var(--raised);border-radius:20px;box-shadow:var(--e2);padding:24px}
+.card h2{font:300 26px/1.15 var(--display);letter-spacing:-.02em}
+.card h3{font-size:15px;font-weight:650;margin-bottom:4px}
+.card p.lead{color:var(--muted);max-width:68ch;margin-top:6px}
+.rules{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+.rule{padding:16px;border-radius:14px;background:var(--plate-soft);box-shadow:inset 0 0 0 1px var(--line)}
+.rule .num{font:300 32px/1 var(--display);letter-spacing:-.02em}
+.rule .num small{font-size:14px;color:var(--faint)}
+.rule p{color:var(--muted);font-size:13.5px;margin-top:8px}
+.rule dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin-top:10px;font-size:12.5px}
+.rule dt{color:var(--faint)}
+.lanes{overflow-x:auto}
+.lane{position:relative;display:flex;align-items:center;gap:8px;width:max-content;min-width:100%;padding:18px 0 18px 64px;border-top:1px solid var(--line)}
+.lane>*{flex:none}
+.lane:first-of-type{border-top:0}
+.lane .tag{position:absolute;left:0;top:50%;transform:translateY(-50%);font-size:15px;font-weight:600;line-height:1;color:var(--ink2);font-variant-numeric:tabular-nums}
+.lane .tag small{display:block;font:500 11px var(--sans);margin-top:3px}
+.lane.guides::before,.lane.guides::after{content:"";position:absolute;left:56px;right:0;height:0;border-top:1px dashed var(--guide);pointer-events:none;opacity:0;transition:opacity .2s}
+.lane.guides::before{top:calc(50% - var(--lh) / 2)}
+.lane.guides::after{top:calc(50% + var(--lh) / 2)}
+.showguides .lane.guides::before,.showguides .lane.guides::after{opacity:1}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+.cmp>div{padding:18px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--line)}
+.cmp .lbl{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--faint);margin-bottom:14px;text-transform:uppercase;letter-spacing:.05em}
+.old-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
+.old{display:flex;flex-direction:column;align-items:center;gap:6px}
+.old em{font-style:normal;font-size:11.5px;font-weight:500;color:var(--danger);font-variant-numeric:tabular-nums}
+.new em{color:var(--ok)}
+/* Today's controls, drawn with today's numbers. */
+.o-btn{height:40px;padding:0 16px;border-radius:12px;background:var(--raised);box-shadow:var(--e1);display:inline-flex;align-items:center;font-size:14px;font-weight:550}
+.o-btn.sm{height:32px;border-radius:10px;padding:0 12px;font-size:13px}
+.o-btn.big{height:56px;border-radius:16px;padding:0 20px;gap:10px}
+.o-in{height:40px;width:170px;padding:0 14px;border-radius:10px;background:color-mix(in srgb,var(--sunken) 40%,var(--raised));box-shadow:inset 0 0 0 1px var(--line);display:flex;align-items:center;color:var(--faint);font-size:15px}
+.o-search{height:36px;width:170px;padding:0 12px;border-radius:999px;background:color-mix(in srgb,var(--sunken) 40%,var(--raised));display:flex;gap:6px;align-items:center;color:var(--faint);font-size:13px}
+.o-chip{height:36px;padding:0 12px;border-radius:999px;background:color-mix(in srgb,var(--sunken) 40%,var(--raised));display:flex;align-items:center;font-size:13px;color:var(--muted)}
+.o-seg{height:36px;padding:3px;border-radius:12px;background:var(--sunken);display:flex}
+.o-seg span{height:30px;padding:0 14px;border-radius:9px;display:flex;align-items:center;font-size:13px;color:var(--muted)}
+.o-seg span:first-child{background:var(--raised);color:var(--ink);box-shadow:var(--e1)}
+.o-send{width:44px;height:44px;border-radius:999px;background:var(--plate);display:grid;place-items:center;color:var(--faint)}
+.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+.fopt{display:flex;flex-direction:column;gap:14px;padding:18px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--line);cursor:pointer;transition:box-shadow .15s,background .15s}
+.fopt:hover{background:var(--plate-soft)}
+.fopt[aria-pressed="true"]{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.fopt .row{display:flex;align-items:flex-end;gap:12px}
+.fopt b{font-size:14.5px}
+.fopt p{font-size:13px;color:var(--muted);margin-top:2px}
+.list{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+.form .grp{display:flex;flex-direction:column;gap:6px}
+.form label{font-size:13px;font-weight:550;color:var(--ink2)}
+.inline{display:flex;gap:8px}
+.inline .fld{flex:1}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:18px;padding:12px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--line)}
+.toolbar .fld{width:240px}
+.toolbar .sp{flex:1}
+.note{font-size:13px;color:var(--muted);margin-top:12px}
+
+/* ---------- Nova leitura: same markdown, styled for reading ----------
+   One centered column (~68 characters a line), the composer on the same column, more air between turns,
+   no bubbles (one message style everywhere; turns are told apart by space, name and face), headings that
+   open a section, lists with room between items, bold lighter (it marks, it doesn't shout). */
+.day,.wmeta{display:none}
+.code,.md code{font:12.5px/1 "Martian Mono",ui-monospace,Menlo,monospace}
+[data-read="nova"] .feed{padding:8px 24px 16px}
+[data-read="nova"] .col{max-width:740px;margin-inline:auto;width:100%}
+[data-read="nova"] .compose{padding:8px 24px 20px}
+[data-read="nova"] .day{display:flex;align-items:center;gap:12px;margin:12px 0 4px;color:var(--faint);font-size:12.5px;font-weight:550}
+[data-read="nova"] .day::before,[data-read="nova"] .day::after{content:"";flex:1;height:1px;background:var(--line)}
+[data-read="nova"] .msg{grid-template-columns:32px 1fr;gap:12px;max-width:none;padding:0;margin-top:28px}
+[data-read="nova"] .msg .who{margin-bottom:4px;line-height:32px}
+[data-read="nova"] .msg .who b{font-size:14.5px;font-weight:650}
+[data-read="nova"] .msg .who time{font-size:12px}
+[data-read="nova"] .msg p,[data-read="nova"] .msg li{font-size:15.5px;line-height:1.7;color:var(--ink)}
+[data-read="nova"] .md{max-width:68ch}
+[data-read="nova"] .md p+p,[data-read="nova"] .md ul+p{margin-top:14px}
+[data-read="nova"] .md h4{font-size:15.5px;font-weight:650;margin:22px 0 6px;letter-spacing:-.005em}
+[data-read="nova"] .md b{font-weight:600}
+[data-read="nova"] .md ul{list-style:none;padding-left:0;margin:0}
+[data-read="nova"] .md li{position:relative;padding-left:22px}
+[data-read="nova"] .md li+li{margin-top:8px}
+[data-read="nova"] .md li::before{content:"";position:absolute;left:6px;top:.78em;width:5px;height:5px;border-radius:1px;background:var(--faint)}
+[data-read="nova"] .md a{color:inherit;text-decoration:underline;text-decoration-color:var(--line-strong,#82827d);text-underline-offset:3px}
+[data-read="nova"] .md code{padding:2px 6px;border-radius:6px;background:var(--plate);color:var(--ink2)}
+[data-read="nova"] .box textarea{min-height:32px}
+[data-read="nova"] .box .row{margin-top:4px}
+.vsep{width:1px;height:16px;background:var(--line2);margin:0 4px}
+[data-read="nova"] .pending{color:var(--faint) !important}
+[data-read="nova"] .work{margin-top:16px;max-width:none}
+[data-read="nova"] .work .btn{width:auto;height:var(--h-sm);padding:0 12px 0 8px;border-radius:var(--r-sm);font-size:13px;color:var(--muted);background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+[data-read="nova"] .work .btn:hover{background:var(--plate-soft);color:var(--ink)}
+[data-read="nova"] .wmeta{display:inline;color:var(--faint);font-weight:400;margin-left:2px}
+[data-read="nova"] .wmeta::before{content:"· "}
+
+/* ---------- conversation v2: two places, grouping, hover actions, long answers open at their start ---------- */
+.main{position:relative}
+.feed{position:relative}
+.chanic{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--plate);color:var(--muted);flex:none}
+.chanic .i{width:22px;height:22px}
+.mention{font-weight:600;color:var(--ink);background:var(--plate);border-radius:6px;padding:1px 5px}
+.ctime{display:none}
+.rx,.thr{display:none}
+.acts{display:none}
+.jump{position:absolute;left:50%;bottom:var(--jb,150px);transform:translateX(-50%);box-shadow:var(--e2),var(--top);z-index:3}
+.jump[hidden]{display:none}
+[data-read="nova"] .main.dm{--jb:122px}
+[data-read="nova"] .main.canal{--jb:136px}
+[data-read="nova"] .md p+ul{margin-top:8px}
+[data-read="nova"] .msg{position:relative;padding:6px 10px;margin:16px -10px 0;border-radius:14px;transition:background-color .12s}
+[data-read="nova"] .msg:hover{background:var(--plate-soft)}
+[data-read="nova"] .msg.cont{margin-top:0;padding-top:2px}
+[data-read="nova"] .ctime{display:block;visibility:hidden;font-size:11px;color:var(--faint);text-align:right;line-height:26px;font-variant-numeric:tabular-nums}
+[data-read="nova"] .msg.cont:hover .ctime{visibility:visible}
+[data-read="nova"] .msg .mb{min-width:0}
+[data-read="nova"] .acts{display:flex;gap:2px;position:absolute;top:-14px;right:10px;padding:3px;border-radius:13px;background:var(--raised);box-shadow:var(--e2);opacity:0;transform:translateY(4px);transition:opacity .12s,transform .16s var(--out);pointer-events:none}
+[data-read="nova"] .msg:hover .acts,[data-read="nova"] .msg:focus-within .acts{opacity:1;transform:none;pointer-events:auto}
+[data-read="nova"] .rx{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+[data-read="nova"] .rxb{gap:6px;font-size:14px}
+[data-read="nova"] .rxadd{opacity:0;transition:opacity .12s}
+[data-read="nova"] .msg:hover .rxadd{opacity:1}
+[data-read="nova"] .thr{display:inline-flex;margin:6px 0 0 -8px;gap:8px;color:var(--muted);font-weight:400}
+[data-read="nova"] .thr .av{margin-right:-4px}
+[data-read="nova"] .thr b{color:var(--ink);font-weight:600}
+[data-read="nova"] .thr span{color:var(--faint)}
+[data-read="nova"] .msg.fresh{animation:fresh 2.4s var(--out)}
+@keyframes fresh{0%,40%{background:var(--plate)}100%{background:transparent}}
+/* DM with an agent: the reading column. Channel: left-aligned like a team chat, the line still capped. */
+[data-read="nova"] .main.canal .col{max-width:none}
+[data-read="nova"] .main.canal .feed{padding:8px 28px 16px}
+[data-read="nova"] .main.canal .compose{padding:8px 28px 20px}
+[data-read="nova"] .main.canal .msg p,[data-read="nova"] .main.canal .md{max-width:72ch}
+[data-read="nova"] .main.canal .msg{margin-top:10px}
+[data-read="nova"] .main.canal .msg.cont{margin-top:0}
+
+@media (max-width:900px){
+  .scr{grid-template-columns:1fr}.side{display:none}
+  .rules,.frames,.cmp,.form{grid-template-columns:1fr}
+  .feed{padding:12px 16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+<div class="proto">
+  <h1>Refino da UI</h1>
+  <label>Versão</label>
+  <div class="seg sm" data-k="v"><button data-o="antes">Antes</button><button data-o="depois">Depois</button></div>
+  <label>Moldura</label>
+  <div class="seg sm" data-k="frame"><button data-o="a">Neutra</button><button data-o="b">Cor</button><button data-o="c">Céu</button></div>
+  <label>Conversa</label>
+  <div class="seg sm" data-k="read"><button data-o="hoje">Hoje</button><button data-o="nova">Nova leitura</button></div>
+  <button class="btn sm" id="replay">Simular resposta longa</button>
+  <label>Tema</label>
+  <div class="seg sm" data-k="theme"><button data-o="light">Claro</button><button data-o="dark">Escuro</button></div>
+</div>
+<div class="tabs"><div class="seg" data-k="tab"><button data-o="tela">Na tela</button><button data-o="regua">Régua de controles</button><button data-o="molduras">Molduras</button></div></div>
+<div id="view"></div>
+
+<script type="module">
+import { drawAgent, idlePose, drawAccessory, AGENT_GRADIENTS, mixHex } from "../../../packages/ui/src/agent/engine.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const h = new URLSearchParams(location.hash.slice(1));
+const S = { v: h.get("v") || "depois", frame: h.get("frame") || "c", theme: document.documentElement.dataset.theme, tab: h.get("tab") || "tela", read: h.get("read") || "nova", place: h.get("place") || "dm" };
+
+/* ---------- icons ---------- */
+const sv = (d, c = "") => `<svg class="i ${c}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const I = {
+  cal: sv('<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>'),
+  forum: sv('<path d="M3.5 5h11v8H8l-4.5 3.5V5Z"/><path d="M17.5 9h3v10.5L17 17h-6.5v-2"/>'),
+  wiki: sv('<path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5Z"/><path d="M12 6.5v13"/>'),
+  drive: sv('<path d="M3.5 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/>'),
+  hash: sv('<path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/>'),
+  plus: sv('<path d="M12 5v14M5 12h14"/>'),
+  search: sv('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>'),
+  panel: sv('<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M15 4.5v15"/>'),
+  chev: sv('<path d="m6 9 6 6 6-6"/>'),
+  right: sv('<path d="m9 6 6 6-6 6"/>'),
+  sliders: sv('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>'),
+  send: sv('<path d="M12 19V5M6 11l6-6 6 6"/>'),
+  bold: sv('<path d="M7 5h6a3.5 3.5 0 0 1 0 7H7Zm0 7h7a3.5 3.5 0 0 1 0 7H7Z"/>'),
+  ital: sv('<path d="M10 5h8M6 19h8M14 5l-4 14"/>'),
+  strike: sv('<path d="M4 12h16M16 7c-.7-1.4-2.2-2-4-2-2.3 0-4 1.2-4 3 0 1.3.8 2.2 2.4 2.8M8 17c.7 1.4 2.2 2 4 2 2.3 0 4-1.2 4-3"/>'),
+  code: sv('<path d="m9 8-4 4 4 4M15 8l4 4-4 4"/>'),
+  link: sv('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
+  list: sv('<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>'),
+  emoji: sv('<circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.5c1.8 2 5.2 2 7 0M9 9.5h.01M15 9.5h.01"/>'),
+  clip: sv('<path d="m20 11-8.2 8.2a5 5 0 0 1-7-7L13 4a3.3 3.3 0 0 1 4.7 4.7l-8.2 8.1a1.7 1.7 0 0 1-2.3-2.3L14.5 7"/>'),
+  laptop: sv('<rect x="5" y="5" width="14" height="10" rx="1.5"/><path d="M3 19h18"/>'),
+  user: sv('<circle cx="12" cy="8.5" r="3.5"/><path d="M5 19.5c1.2-3.3 3.8-5 7-5s5.8 1.7 7 5"/>'),
+  bag: sv('<path d="M5 8h14l-1 12H6Z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>'),
+  filter: sv('<path d="M4 6h16M7 12h10M10 18h4"/>'),
+  check: sv('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
+  x: sv('<path d="M6 6l12 12M18 6 6 18"/>'),
+  grid: sv('<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>'),
+  reply: sv('<path d="M10 8 5 12.5l5 4.5"/><path d="M5 12.5h9a5 5 0 0 1 5 5V19"/>'),
+  more: sv('<path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="2.6"/>'),
+  rows: sv('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+};
+const ic = (n, c) => (c ? I[n].replace('class="i "', `class="i ${c}"`) : I[n]);
+
+/* ---------- agents ---------- */
+const AG = {
+  theo: { name: "Theo", role: "Marketing", color: "amber", eyes: "round", acc: "cap" },
+  atlas: { name: "Atlas", role: "Ops", color: "violet", eyes: "round", acc: "antenna" },
+  ada: { name: "Ada", role: "Dev", color: "rose", eyes: "round", acc: "headphones" },
+  lisa: { name: "Lisa", role: "Support", color: "rose", eyes: "dots", acc: "headset" },
+  nina: { name: "Nina", role: "Dados", color: "teal", eyes: "round", acc: "bow" },
+  sol: { name: "Sol", role: "Vendas", color: "sky", eyes: "round", acc: "" },
+};
+const av = (id, size, mode = "idle", f = "") => `<span class="avs" data-a="${id}" data-s="${size}" data-m="${mode}" data-f="${f}"></span>`;
+const person = (name, size, img) => `<span class="av person ${S.v === "depois" ? "framed" : ""}" style="--s:${size}px" role="img" aria-label="${name}">${img ? `<img src="${img}" alt="">` : name[0]}</span>`;
+
+const live = [];
+const seedOf = (id) => [...id].reduce((s, c) => s + c.charCodeAt(0), 0) % 7;
+const skyCache = new Map();
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* The agent's own pixel sky: a Bayer dither from a soft tone (top) to a light one (bottom). */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+function skyOf(color, px, dark) {
+  const key = `${color}|${px}|${dark}`;
+  if (skyCache.has(key)) return skyCache.get(key);
+  const [lt, dp] = AGENT_GRADIENTS[color];
+  const base = dark ? "#1c1c1b" : "#ffffff";
+  const a = dark ? mixHex(dp, base, .78) : mixHex(lt, base, .86);
+  const b = dark ? mixHex(dp, base, .55) : mixHex(lt, base, .62);
+  const c = document.createElement("canvas");
+  c.width = c.height = px;
+  const g = c.getContext("2d");
+  const n = Math.max(8, Math.round(px / 4)), cell = px / n;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const t = Math.min(1, Math.max(0, (y / (n - 1)) * 1.15 - .1));
+    g.fillStyle = t * 16 > BAYER[(y % 4) * 4 + (x % 4)] ? b : a;
+    g.fillRect(Math.floor(x * cell), Math.floor(y * cell), Math.ceil(cell), Math.ceil(cell));
+  }
+  skyCache.set(key, c);
+  return c;
+}
+
+function mount(root) {
+  for (const el of $$(".avs", root)) {
+    const id = el.dataset.a, size = +el.dataset.s, a = AG[id];
+    const framed = S.v === "depois";
+    const w = document.createElement("span");
+    const fr = el.dataset.f || S.frame;
+    w.className = `av ${framed ? `framed f${fr}` : ""}`;
+    w.style.setProperty("--s", size + "px");
+    w.setAttribute("role", "img");
+    w.setAttribute("aria-label", `${a.name}, agente`);
+    const cv = document.createElement("canvas");
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    cv.width = cv.height = Math.round(size * dpr);
+    w.append(cv);
+    el.replaceWith(w);
+    live.push({ cv, a, size, seed: seedOf(id) + Math.random(), mode: el.dataset.m, framed, fr });
+  }
+}
+
+function draw(t) {
+  const dark = S.theme === "dark";
+  for (let i = live.length - 1; i >= 0; i--) {
+    const it = live[i];
+    if (!it.cv.isConnected) { live.splice(i, 1); continue; }
+    const g = it.cv.getContext("2d"), s = it.cv.width;
+    g.clearRect(0, 0, s, s);
+    const acc = it.size >= 26 && it.a.acc;
+    let x, y, inner;
+    if (it.framed) {
+      if (it.fr === "b") {
+        const [lt, dp] = AGENT_GRADIENTS[it.a.color];
+        g.fillStyle = dark ? mixHex(dp, "#1c1c1b", .7) : mixHex(lt, "#ffffff", .78);
+        g.fillRect(0, 0, s, s);
+      } else if (it.fr === "c") {
+        g.imageSmoothingEnabled = false;
+        g.drawImage(skyOf(it.a.color, s, dark), 0, 0, s, s);
+      }
+      // Standing in the frame: a little room above for the accessory, feet near the bottom edge.
+      inner = s * (acc ? .6 : .66);
+      x = (s - inner) / 2;
+      y = s - inner - s * (acc ? .1 : .14);
+    } else {
+      inner = s * (acc ? .74 : .86);
+      x = (s - inner) / 2; y = s - inner;
+    }
+    let pose;
+    if (REDUCED) pose = {};
+    else if (it.mode === "run") { pose = idlePose(t, it.seed, { active: true, expressions: [] }); pose.writing = true; }
+    else pose = idlePose(t, it.seed, { every: 14, expressions: ["happy", "wink"] });
+    drawAgent(g, x, y, inner, {
+      color: it.a.color, eyes: it.a.eyes, cells: it.size <= 32 ? 12 : undefined, pose,
+      after: acc ? (gg, side, frame) => drawAccessory(gg, side, it.a.acc, frame, t, it.mode === "run") : undefined,
+    });
+  }
+}
+function loop(ms) { draw(ms / 1000); if (!REDUCED) requestAnimationFrame(loop); }
+
+/* ---------- view: the chat screen ---------- */
+const ME = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#c9cfd6"/><circle cx="20" cy="16" r="7" fill="#7b8794"/><path d="M6 40c2-9 8-13 14-13s12 4 14 13Z" fill="#4b5563"/></svg>');
+/* People (agents are in AG). */
+const P = { walter: { name: "Walter", img: ME }, ana: { name: "Ana" }, bruno: { name: "Bruno" }, thay: { name: "thay" } };
+const hm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+const LISA_1 = `<p>Consigo. Essa caixa (<a href="#">weslcld@icloud.com</a>) não tem nenhum e-mail de cliente do Viajolo nos últimos dias. Os 20 mais recentes, de 15 a 18/10, são estes:</p>
+  <h4>Relevantes</h4>
+  <ul><li><b>18/10, Sentry:</b> <code>VIAJOLO-15K</code>, <i>Fatal App Hang Fully Blocked</i>. O app travou a main thread até o OS ou o usuário encerrar. É um alerta novo.</li>
+  <li><b>18/10, Himetrica:</b> o viajolo-portal chegou a 1K visitantes em 30 dias.</li>
+  <li><b>18/10, Apple:</b> foi gerada uma senha específica de app na sua Apple Account. Provavelmente foi a conexão do agentes com este e-mail. Se não foi você, vale revogar.</li></ul>
+  <h4>Suspeito</h4>
+  <ul><li><b>17/10:</b> "Customer Care / Security Policy Overview", com aviso de que o Cloud+ ia ser apagado. É phishing, com remetente de domínio japonês e marroquino. Não clique nele.</li></ul>
+  <h4>Ruído</h4>
+  <ul><li>Notificações do TikTok</li><li>Temu, Farm Rio, OKX, Mycapital, Airalo</li><li>Claude Team</li></ul>
+  <p>Não vi pedido de suporte, reclamação nem dúvida de usuário. Posso olhar o <code>VIAJOLO-15K</code> no Sentry, mas o conector do Sentry não está habilitado para mim. Um admin precisa liberar em Agents e access.</p>`;
+const LISA_2 = `<p>Achei 3 e-mails com "viajolo" no corpo. Todos são de ferramentas, nenhum de cliente:</p>
+  <ul><li><b>18/10, Sentry:</b> o alerta <code>VIAJOLO-15K</code> voltou, agora com 14 ocorrências em 2 horas.</li>
+  <li><b>17/10, Himetrica:</b> o relatório semanal do viajolo-portal.</li>
+  <li><b>16/10, App Store Connect:</b> a versão 2.3 do Viajolo foi aprovada.</li></ul>
+  <p>Os e-mails de clientes devem estar chegando em outra caixa. Se você me disser qual (por exemplo suporte@viajolo.example), peço a um admin para conectar e passo a olhar todo dia de manhã.</p>
+  <h4>O que eu faria agora</h4>
+  <ul><li>Abrir o <code>VIAJOLO-15K</code>: 14 ocorrências em 2 horas é muito para um alerta novo.</li>
+  <li>Revogar a senha de app da Apple, se não foi você quem criou.</li>
+  <li>Marcar o e-mail de phishing de 17/10 como lixo, para não cair nele depois.</li></ul>
+  <p>Quer que eu abra uma issue para o <code>VIAJOLO-15K</code> e passe para a Ada?</p>`;
+const dmStart = () => [
+  { id: "d1", who: "walter", at: 1150, html: "Lisa, chegou algum e-mail de cliente do Viajolo nos últimos dias?" },
+  { id: "d2", who: "lisa", at: 1152, md: true, html: LISA_1, work: "7 passos · 38 s" },
+  { id: "d3", who: "walter", at: 1154, html: "Busca \"viajolo\" no corpo dos e-mails, por favor." },
+  { id: "d4", who: "lisa", at: 1154, run: true, html: "Buscando na caixa…" },
+];
+let DM = dmStart();
+const CH = [
+  { id: "c1", who: "ana", at: 542, html: "Bom dia! Quem pega o bug do checkout que o Grupo Andrade reportou?" },
+  { id: "c2", who: "ana", at: 542, html: "Parece o mesmo timeout do frete da semana passada." },
+  { id: "c3", who: "ada", at: 543, md: true, html: `<p>Eu pego. Reproduzi em staging: o frete passa de 8 s quando o CEP é de área rural. Abri a <a href="#">#142</a> e mando a correção até o meio-dia.</p>`,
+    rx: [["👍", 2, true], ["🙏", 1]], thread: { n: 3, who: ["ada", "bruno"], last: "última há 10 min" } },
+  { id: "c4", who: "bruno", at: 550, html: "Valeu, Ada." },
+  { id: "c5", who: "walter", at: 552, html: `<span class="mention">@Atlas</span> consegue colocar um alerta para frete acima de 5 s?` },
+  { id: "c6", who: "atlas", at: 552, md: true, html: `<p>Coloquei. O alerta avisa em <a href="#">#incidentes</a> quando o p95 do frete passar de 5 s por 10 min. Hoje está em 3,4 s.</p>` },
+  { id: "c7", who: "atlas", at: 553, html: "Se disparar fora do horário, aviso a Ada também." },
+  { id: "c8", who: "thay", at: 560, html: "Subiu o hotfix? O cliente perguntou de novo." },
+];
+
+function msgHTML(m, cont, fs) {
+  const a = AG[m.who], pp = P[m.who];
+  const nova = S.read === "nova";
+  const face = a ? av(m.who, fs, m.run ? "run" : "idle") : person(pp.name, fs, pp.img);
+  const body = m.run ? `<p class="pending">${m.html}</p>` : m.md ? `<div class="md">${m.html}</div>` : `<p>${m.html}</p>`;
+  const work = m.work ? `<div class="work"><button class="btn">${ic("right", "s16")}See what it did<span class="wmeta">${m.work}</span></button></div>` : "";
+  const rx = m.rx ? `<div class="rx">${m.rx.map(([e, n, me]) => `<button class="tog sm rxb" aria-pressed="${!!me}">${e}<span class="cnt">${n}</span></button>`).join("")}<button class="btn ghost sm icon rxadd" aria-label="Reagir">${ic("emoji", "s16")}</button></div>` : "";
+  const thr = m.thread ? `<button class="btn ghost sm thr">${m.thread.who.map((w) => (AG[w] ? av(w, 20) : person(P[w].name, 20, P[w].img))).join("")}<b>${m.thread.n} respostas</b><span>${m.thread.last}</span></button>` : "";
+  const acts = nova && !m.run ? `<div class="acts" role="toolbar" aria-label="Ações da mensagem">
+      <button class="btn ghost sm icon" aria-label="Reagir">${ic("emoji", "s16")}</button>
+      <button class="btn ghost sm icon" aria-label="Responder em thread">${ic("reply", "s16")}</button>
+      <button class="btn ghost sm icon" aria-label="Mais">${ic("more", "s16")}</button></div>` : "";
+  return `<div class="msg ${m.who === "walter" ? "mine" : ""} ${cont ? "cont" : ""}" data-id="${m.id}">
+    ${cont ? `<time class="ctime">${hm(m.at)}</time>` : face}<div class="mb">
+    ${cont ? "" : `<div class="who"><b>${a ? a.name : pp.name}</b><time>${hm(m.at)}</time></div>`}
+    ${body}${work}${rx}${thr}</div>${acts}</div>`;
+}
+// Grouping: the same author within 5 min continues the message above (name and face once).
+function feedHTML() {
+  const list = S.place === "dm" ? DM : CH, nova = S.read === "nova", fs = nova ? 32 : 40;
+  return `<div class="day"><span>Hoje</span></div>` + list.map((m, i) => {
+    const prev = list[i - 1];
+    const cont = nova && prev && prev.who === m.who && m.at - prev.at <= 5 && !m.run && !prev.run;
+    return msgHTML(m, cont, fs);
+  }).join("");
+}
+
+function screen() {
+  const d = S.v === "depois";
+  const dm = S.place === "dm";
+  const agentRow = (id, on) => `<div class="it ${on ? "on" : ""}" ${id === "lisa" ? 'data-go="dm"' : ""}>${av(id, d ? 28 : 32)}<span>${AG[id].name}</span><span class="meta">${AG[id].role}</span></div>`;
+  return `
+<div class="scr">
+  <aside class="side">
+    <div class="org">
+      <span class="logo">${I.bag}</span>
+      <span class="grow"><b>Viajolo</b><small>2 members · 4 agents</small></span>
+      <button class="btn ghost sm icon" aria-label="Trocar organização">${ic("chev", "s16")}</button>
+      <button class="btn ghost sm icon" aria-label="Buscar">${ic("search", "s16")}</button>
+    </div>
+    <div class="goto">
+      <div class="fld">${I.search}<input placeholder="Go to…" aria-label="Go to"><span class="end"><span class="kbd">⌘</span><span class="kbd">K</span></span></div>
+    </div>
+    <nav class="nav">
+      <div class="it">${I.cal}Calendar</div><div class="it">${I.forum}Forum</div>
+      <div class="it">${I.wiki}Wiki</div><div class="it">${I.drive}Drive</div>
+    </nav>
+    <div class="sec">Channels <button class="btn ghost sm icon" aria-label="Novo canal">${ic("plus", "s16")}</button></div>
+    <div class="nav"><div class="it">${I.hash}general</div><div class="it ${dm ? "" : "on"}" data-go="canal">${I.hash}tech</div></div>
+    <div class="sec">Agents</div>
+    <div class="nav">${agentRow("theo")}${agentRow("atlas")}${agentRow("ada")}${agentRow("lisa", dm)}</div>
+    <div class="sec">Direct messages</div>
+    <div class="nav"><div class="it">${person("thay", d ? 28 : 32)}<span>thay</span></div></div>
+    <div class="foot">
+      <button class="btn ${d ? "" : "lg"} block">${I.plus}Create agent</button>
+      <div class="me">${person("Walter", 40, ME)}<span class="grow"><b>Walter</b><span class="bar"><i></i>16%</span></span>
+        <button class="btn ghost sm icon" aria-label="Preferências">${ic("sliders", "s16")}</button></div>
+    </div>
+  </aside>
+  <main class="main ${S.place}">
+    <header class="head">
+      ${dm ? av("lisa", 48) : `<span class="chanic">${I.hash}</span>`}
+      <span class="grow">${dm ? `<b>Lisa</b><small>Support · answers to Walter · ${I.laptop} Claude Code · Sonnet on macbook air</small>`
+        : `<b>tech</b><small>Bugs, deploys e alertas · 4 pessoas · 2 agentes</small>`}</span>
+      <button class="btn">${d ? (dm ? I.user : I.user) : ""}${dm ? "View profile" : "Membros"}</button>
+    </header>
+    <div class="feed"><div class="col">${feedHTML()}</div></div>
+    <button class="btn sm jump" hidden>${ic("chev", "s16")}Fim da resposta</button>
+    <div class="compose"><div class="box col">
+      <textarea rows="1" placeholder="${dm ? "Message Lisa" : "Message #tech"}" aria-label="Mensagem"></textarea>
+      ${S.read === "nova" || !dm ? "" : `<div class="row"><span class="ctx">${av("lisa", 24)}Lisa</span></div>`}
+      <div class="row">
+        ${S.read === "nova" && dm ? `<span class="ctx">${av("lisa", 20)}Lisa</span><span class="vsep"></span>` : ""}
+        <span class="tools">
+          <button class="btn ghost sm icon" aria-label="Negrito">${I.bold}</button>
+          <button class="btn ghost sm icon" aria-label="Itálico">${I.ital}</button>
+          <button class="btn ghost sm icon" aria-label="Riscado">${I.strike}</button>
+          <span class="sep"></span>
+          <button class="btn ghost sm icon" aria-label="Código">${I.code}</button>
+          <button class="btn ghost sm icon" aria-label="Link">${I.link}</button>
+          <span class="sep"></span>
+          <button class="btn ghost sm icon" aria-label="Lista">${I.list}</button>
+          <button class="btn ghost sm icon" aria-label="Emoji">${I.emoji}</button>
+          <button class="btn ghost sm icon" aria-label="Anexar">${I.clip}</button>
+        </span>
+        <button class="btn ${d ? "primary sm" : ""} icon send" aria-label="Enviar">${d ? ic("send", "s16") : I.send}</button>
+      </div>
+    </div></div>
+  </main>
+</div>`;
+}
+
+/* ---------- view: the ruler ---------- */
+function ruler() {
+  const lane = (k, lh, label) => `
+  <div class="lane guides" style="--lh:${lh}px"><span class="tag">${lh}<small>${label}</small></span>
+    <button class="btn primary ${k}">${I.plus}Criar agente</button>
+    <button class="btn ${k}">Salvar</button>
+    <button class="btn ${k} icon" aria-label="Filtros">${I.sliders}</button>
+    <div class="fld ${k}" style="width:150px"><input placeholder="Nome" aria-label="Nome"></div>
+    <div class="fld ${k} select" style="width:136px" role="button" tabindex="0">Sonnet 5.5<span class="end">${ic("chev", "s16")}</span></div>
+    <div class="fld ${k}" style="width:150px">${I.search}<input placeholder="Buscar" aria-label="Buscar"></div>
+    <div class="seg ${k}" data-k="demo"><button aria-pressed="true">Lista</button><button>Grade</button></div>
+    <button class="tog ${k}" aria-pressed="true">Abertas<span class="cnt">12</span></button>
+  </div>`;
+  return `
+<div class="board">
+  <section class="card">
+    <h2>Uma régua: 3 alturas, 1 forma</h2>
+    <p class="lead">Tudo que se clica ou digita é um retângulo arredondado de uma destas alturas. O raio é 30% da altura, então botão, campo, busca, seletor e filtro do mesmo tamanho têm sempre o mesmo formato. Pílula fica só para etiqueta (status, contador, menção).</p>
+    <div class="rules">
+      <div class="rule"><div class="num">32<small> px</small></div><p>Compacto. Barras de ferramentas, filtros de lista, ações dentro de uma linha ou card, o composer.</p>
+        <dl><dt>raio</dt><dd>10</dd><dt>lado</dt><dd>12</dd><dt>texto</dt><dd>13</dd><dt>ícone</dt><dd>16</dd></dl></div>
+      <div class="rule"><div class="num">40<small> px</small></div><p>Padrão. Formulários, botões de página e de diálogo, busca, seletores, itens do menu lateral.</p>
+        <dl><dt>raio</dt><dd>12</dd><dt>lado</dt><dd>14</dd><dt>texto</dt><dd>14</dd><dt>ícone</dt><dd>18</dd></dl></div>
+      <div class="rule"><div class="num">48<small> px</small></div><p>Grande. Só a ação principal de uma tela inteira: cadastro, primeiro uso, onboarding.</p>
+        <dl><dt>raio</dt><dd>14</dd><dt>lado</dt><dd>16</dd><dt>texto</dt><dd>15</dd><dt>ícone</dt><dd>20</dd></dl></div>
+    </div>
+  </section>
+
+  <section class="card" id="lanes">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between">
+      <div><h3>Lado a lado</h3><p class="lead" style="margin-top:0">Cada linha é uma altura. As guias mostram que nada passa da linha.</p></div>
+      <button class="tog sm" id="guides" aria-pressed="true">Guias</button>
+    </div>
+    <div class="lanes" style="margin-top:8px">${lane("sm", 32, "compacto")}${lane("", 40, "padrão")}${lane("lg", 48, "grande")}</div>
+    <p class="note">Segmentado: o trilho tem a altura da régua e os itens ficam 4px para dentro, com raio de dentro = raio de fora − 4 (cantos paralelos).</p>
+  </section>
+
+  <section class="card">
+    <h3>Hoje vs régua</h3>
+    <div class="cmp">
+      <div><div class="lbl">${ic("x", "s16")}Hoje: 7 alturas, 4 formatos</div>
+        <div class="old-row">
+          <span class="old"><span class="o-btn">Salvar</span><em>40 · r12</em></span>
+          <span class="old"><span class="o-in">Nome</span><em>40 · r10</em></span>
+          <span class="old"><span class="o-search">${ic("search", "s16")}Buscar</span><em>36 · pílula</em></span>
+          <span class="old"><span class="o-chip">Abertas</span><em>36 · pílula</em></span>
+          <span class="old"><span class="o-seg"><span>Lista</span><span>Grade</span></span><em>36 · r12 / 30</em></span>
+          <span class="old"><span class="o-btn sm">Editar</span><em>32 · r10</em></span>
+          <span class="old"><span class="o-send">${I.send}</span><em>44 · círculo</em></span>
+          <span class="old"><span class="o-btn big">${I.plus}Create agent</span><em>56 · r16</em></span>
+        </div></div>
+      <div class="new"><div class="lbl">${ic("check", "s16")}Régua: 3 alturas, 1 formato</div>
+        <div class="old-row">
+          <span class="old"><button class="btn">Salvar</button><em>40 · r12</em></span>
+          <span class="old"><div class="fld" style="width:150px"><input placeholder="Nome" aria-label="Nome"></div><em>40 · r12</em></span>
+          <span class="old"><div class="fld" style="width:150px">${I.search}<input placeholder="Buscar" aria-label="Buscar"></div><em>40 · r12</em></span>
+          <span class="old"><button class="tog" aria-pressed="true">Abertas</button><em>40 · r12</em></span>
+          <span class="old"><div class="seg"><button aria-pressed="true">Lista</button><button>Grade</button></div><em>40 · r12 / 8</em></span>
+          <span class="old"><button class="btn sm">Editar</button><em>32 · r10</em></span>
+          <span class="old"><button class="btn primary sm icon" aria-label="Enviar">${ic("send", "s16")}</button><em>32 · r10</em></span>
+          <span class="old"><button class="btn">${I.plus}Create agent</button><em>40 · r12</em></span>
+        </div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>Em uso</h3>
+    <p class="lead" style="margin-top:0">Campo e botão na mesma linha, barra de filtros e um formulário: tudo encaixa sem ajuste por tela.</p>
+    <div class="toolbar">
+      <div class="fld sm">${ic("search", "s16")}<input placeholder="Buscar issues" aria-label="Buscar issues"><span class="end"><span class="kbd">/</span></span></div>
+      <button class="tog sm" aria-pressed="true">Abertas<span class="cnt">12</span></button>
+      <button class="tog sm" aria-pressed="false">Minhas<span class="cnt">3</span></button>
+      <button class="tog sm" aria-pressed="false">${ic("filter", "s16")}Mais filtros</button>
+      <span class="sp"></span>
+      <div class="seg sm"><button aria-pressed="true" aria-label="Lista">${ic("rows", "s16")}</button><button aria-label="Grade">${ic("grid", "s16")}</button></div>
+      <button class="btn primary sm">${ic("plus", "s16")}Nova issue</button>
+    </div>
+    <div class="form">
+      <div class="grp"><label>Nome</label><div class="fld"><input value="Lisa" aria-label="Nome"></div></div>
+      <div class="grp"><label>Modelo</label><div class="fld select" role="button" tabindex="0">${av("lisa", 22)}Sonnet 5.5<span class="end">${ic("chev", "s16")}</span></div></div>
+      <div class="grp"><label>Convidar por e-mail</label><div class="inline"><div class="fld"><input placeholder="nome@empresa.com" aria-label="E-mail"></div><button class="btn primary">Convidar</button></div></div>
+      <div class="grp"><label>Orçamento por mês</label><div class="inline"><div class="fld"><input value="US$ 40" aria-label="Orçamento"></div><div class="seg"><button aria-pressed="true">Avisar</button><button>Parar</button></div></div></div>
+    </div>
+  </section>
+</div>`;
+}
+
+/* ---------- view: frames ---------- */
+function frames() {
+  const opt = (k, title, desc) => `
+  <div class="fopt" role="button" tabindex="0" data-frame="${k}" aria-pressed="${S.frame === k}">
+    <div class="row">${av("lisa", 56, "idle", k)}${av("atlas", 40, "idle", k)}${av("theo", 32, "idle", k)}${av("nina", 28, "idle", k)}${av("sol", 24, "idle", k)}${person("Walter", 28, ME)}</div>
+    <div><b>${title}</b><p>${desc}</p></div>
+  </div>`;
+  return `
+<div class="board">
+  <section class="card">
+    <h2>O agente dentro de uma moldura</h2>
+    <p class="lead">Agente e pessoa passam a ter o mesmo quadro (raio 30% do lado), então listas, menções e cabeçalhos ficam alinhados. O agente fica em pé dentro do quadro, com espaço para o acessório. Pessoa é o mesmo quadro com foto ou inicial.</p>
+    <div class="frames">
+      ${opt("a", "Neutra", "Quadro cinza claro. Mais discreto, a cor fica só no corpo do agente.")}
+      ${opt("b", "Cor do agente", "Fundo no tom claro da cor do agente. Reconhece quem é de longe.")}
+      ${opt("c", "Céu em pixel", "O céu do agente em dither, claro em cima. Liga o avatar ao céu da marca.")}
+    </div>
+    <p class="note">A moldura vale para os tamanhos 24, 28, 32, 40, 48 e 56. No recibo de 18 px o agente continua sem quadro.</p>
+  </section>
+  <section class="card">
+    <h3>Numa lista</h3>
+    <div class="list" style="max-width:360px">
+      ${["theo", "atlas", "ada", "lisa", "nina"].map((id, i) => `<div class="it ${i === 3 ? "on" : ""}">${av(id, 28)}<span>${AG[id].name}</span><span class="meta">${AG[id].role}</span></div>`).join("")}
+      <div class="it">${person("thay", 28)}<span>thay</span></div>
+    </div>
+  </section>
+</div>`;
+}
+
+/* ---------- render ---------- */
+function render() {
+  const root = document.documentElement;
+  root.dataset.theme = S.theme;
+  root.dataset.v = S.v;
+  root.dataset.read = S.read;
+  for (const seg of $$(".proto .seg,.tabs .seg")) for (const b of $$("button", seg)) b.setAttribute("aria-pressed", String(S[seg.dataset.k] === b.dataset.o));
+  // Frames only exist in "Depois": show the frames tab with it on.
+  const view = $("#view");
+  view.innerHTML = S.tab === "tela" ? screen() : S.tab === "regua" ? ruler() : frames();
+  if (S.tab === "molduras" && S.v === "antes") { S.v = "depois"; return render(); }
+  mount(view);
+  $("#lanes")?.classList.add("showguides");
+  setupFeed();
+  history.replaceState(null, "", `#v=${S.v}&frame=${S.frame}&theme=${S.theme}&tab=${S.tab}&read=${S.read}&place=${S.place}`);
+  if (REDUCED) draw(0);
+}
+/* ---------- the feed: open at the end; a long answer opens at its start ---------- */
+let arriveTimer = 0;
+function setupFeed() {
+  const feed = $(".feed");
+  if (!feed) return;
+  feed.scrollTop = feed.scrollHeight;
+  feed.addEventListener("scroll", syncJump, { passive: true });
+  syncJump();
+  clearTimeout(arriveTimer);
+  if (S.place === "dm" && DM.at(-1).run) arriveTimer = setTimeout(arrive, 2200);
+}
+function syncJump() {
+  const feed = $(".feed"), j = $(".jump");
+  if (!feed || !j) return;
+  j.hidden = S.read !== "nova" || feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 48;
+}
+function arrive() {
+  if (S.tab !== "tela" || S.place !== "dm") return;
+  const m = DM.at(-1);
+  Object.assign(m, { run: false, md: true, html: LISA_2, work: "5 passos · 21 s", at: 1155 });
+  const feed = $(".feed"), col = $(".feed .col");
+  col.innerHTML = feedHTML();
+  mount(col);
+  if (REDUCED) draw(0);
+  const el = $(`.msg[data-id="${m.id}"]`, col);
+  if (S.read === "nova") {
+    // Land on the first line of the answer (minus a little air), not on its last paragraph.
+    const top = el.getBoundingClientRect().top - feed.getBoundingClientRect().top + feed.scrollTop - 12;
+    feed.scrollTo({ top: Math.min(top, feed.scrollHeight), behavior: REDUCED ? "auto" : "smooth" });
+    el.classList.add("fresh");
+  } else feed.scrollTop = feed.scrollHeight;
+  setTimeout(syncJump, 450);
+}
+function replay() { DM = dmStart(); S.place = "dm"; S.tab = "tela"; render(); }
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest("#replay")) return replay();
+  const go = e.target.closest("[data-go]");
+  if (go) { S.place = go.dataset.go; return render(); }
+  if (e.target.closest(".jump")) { const f = $(".feed"); f.scrollTo({ top: f.scrollHeight, behavior: REDUCED ? "auto" : "smooth" }); return; }
+  const b = e.target.closest(".proto .seg button,.tabs .seg button");
+  if (b) { S[b.parentElement.dataset.k] = b.dataset.o; return render(); }
+  const f = e.target.closest(".fopt");
+  if (f) { S.frame = f.dataset.frame; return render(); }
+  if (e.target.closest("#guides")) { const g = $("#guides"); const on = g.getAttribute("aria-pressed") !== "true"; g.setAttribute("aria-pressed", on); $("#lanes").classList.toggle("showguides", on); return; }
+  const s = e.target.closest(".seg button");
+  if (s) for (const x of $$("button", s.parentElement)) x.setAttribute("aria-pressed", String(x === s));
+  const t = e.target.closest(".tog:not(#guides)");
+  if (t) t.setAttribute("aria-pressed", String(t.getAttribute("aria-pressed") !== "true"));
+});
+document.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.closest(".fopt")) { e.preventDefault(); e.target.click(); } });
+render();
+if (!REDUCED) requestAnimationFrame(loop);
+</script>
+</body>
+</html>
