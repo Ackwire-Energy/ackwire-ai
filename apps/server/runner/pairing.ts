@@ -1,0 +1,271 @@
+import { existsSync, readdirSync } from "node:fs";
+import path from "node:path";
+
+/**
+ * Connecting a computer with a device code (ADR 0036 §5), the client half.
+ * The runner asks our server for a code (`POST /api/machines/device`), shows
+ * it with the confirmation URL, and polls `POST /api/machines/device/token`
+ * until the person confirms on the site with their normal session. The
+ * token goes straight into the config; nobody types a code.
+ */
+
+export interface DeviceCode {
+  deviceCode: string;
+  /** 6 characters (`K7Q4ZP`); shown as `K7Q·4ZP`. */
+  userCode: string;
+  verificationUrl: string;
+  /** Seconds. */
+  expiresIn: number;
+  /** Seconds between polls. */
+  interval: number;
+}
+
+export interface DeviceGrant {
+  token: string;
+  machineId: string;
+  name: string;
+  org: { id: string; name: string };
+}
+
+export type PairingFailure = "expired" | "denied" | "network" | "internal" | "canceled";
+
+export class PairingError extends Error {
+  constructor(
+    readonly code: PairingFailure,
+    message: string,
+  ) {
+    super(message);
+    this.name = "PairingError";
+  }
+}
+
+export type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
+
+export interface DeviceInfo {
+  name?: string;
+  os: string;
+  arch: string;
+  hostname: string;
+  version: string;
+}
+
+/** `K7Q4ZP` → `K7Q·4ZP`. */
+export function formatUserCode(code: string): string {
+  const c = code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return c.length === 6 ? `${c.slice(0, 3)}·${c.slice(3)}` : c;
+}
+
+/** The error word of an OAuth-style answer: `{ error: "slow_down" }` or `{ error: { code } }`. */
+function errorWord(body: unknown): string {
+  if (typeof body !== "object" || body === null) return "";
+  const e = (body as { error?: unknown }).error;
+  if (typeof e === "string") return e;
+  if (typeof e === "object" && e !== null) {
+    const code = (e as { code?: unknown }).code;
+    if (typeof code === "string") return code;
+  }
+  return "";
+}
+
+function errorMessage(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+  const e = (body as { error?: unknown; message?: unknown }).error;
+  if (typeof e === "object" && e !== null && typeof (e as { message?: unknown }).message === "string") {
+    return (e as { message: string }).message;
+  }
+  const m = (body as { message?: unknown }).message;
+  return typeof m === "string" ? m : undefined;
+}
+
+async function postJson(fetchFn: FetchFn, url: string, body: unknown, signal?: AbortSignal) {
+  let res: Response;
+  try {
+    res = await fetchFn(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
+    });
+  } catch (err) {
+    if (signal?.aborted) throw new PairingError("canceled", "Canceled");
+    throw new PairingError(
+      "network",
+      `Couldn't reach ${new URL(url).origin}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  const text = await res.text().catch(() => "");
+  let json: unknown = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    // not JSON
+  }
+  return { status: res.status, ok: res.ok, json };
+}
+
+/** Asks the server for a device code. */
+export async function requestDeviceCode(
+  server: string,
+  info: DeviceInfo,
+  opts: { fetch?: FetchFn; signal?: AbortSignal } = {},
+): Promise<DeviceCode> {
+  const fetchFn: FetchFn = opts.fetch ?? ((u, i) => fetch(u, i));
+  const res = await postJson(fetchFn, `${server}/api/machines/device`, info, opts.signal);
+  if (!res.ok) {
+    throw new PairingError(
+      res.status === 429 ? "network" : "internal",
+      errorMessage(res.json) ??
+        (res.status === 429
+          ? "Too many connection attempts from this network; try again in a few minutes"
+          : `The server refused to start the connection (HTTP ${res.status})`),
+    );
+  }
+  const d = res.json as Partial<DeviceCode> | null;
+  if (
+    !d ||
+    typeof d.deviceCode !== "string" ||
+    typeof d.userCode !== "string" ||
+    typeof d.verificationUrl !== "string"
+  ) {
+    throw new PairingError("internal", "The server's answer was not understood");
+  }
+  const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : fallback);
+  return {
+    deviceCode: d.deviceCode,
+    userCode: d.userCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase(),
+    verificationUrl: d.verificationUrl,
+    expiresIn: num(d.expiresIn, 600),
+    interval: num(d.interval, 3),
+  };
+}
+
+const abortableSleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(new PairingError("canceled", "Canceled"));
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(new PairingError("canceled", "Canceled"));
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+
+/**
+ * Polls for the token every `interval` seconds (5 more after each
+ * `slow_down`, as OAuth's device flow says) until the person confirms, says
+ * "Não fui eu" (`denied`) or the code expires. A network hiccup is retried
+ * until the code expires.
+ */
+export async function pollDeviceToken(
+  server: string,
+  code: DeviceCode,
+  opts: {
+    fetch?: FetchFn;
+    signal?: AbortSignal;
+    sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+    now?: () => number;
+  } = {},
+): Promise<DeviceGrant> {
+  const fetchFn: FetchFn = opts.fetch ?? ((u, i) => fetch(u, i));
+  const sleep = opts.sleep ?? abortableSleep;
+  const now = opts.now ?? Date.now;
+  const deadline = now() + code.expiresIn * 1000;
+  let interval = code.interval;
+  let lastNetwork: string | null = null;
+  for (;;) {
+    await sleep(interval * 1000, opts.signal);
+    if (opts.signal?.aborted) throw new PairingError("canceled", "Canceled");
+    let res: Awaited<ReturnType<typeof postJson>>;
+    try {
+      res = await postJson(
+        fetchFn,
+        `${server}/api/machines/device/token`,
+        { deviceCode: code.deviceCode },
+        opts.signal,
+      );
+      lastNetwork = null;
+    } catch (err) {
+      if (err instanceof PairingError && err.code === "network") {
+        lastNetwork = err.message;
+        if (now() >= deadline) throw err;
+        continue;
+      }
+      throw err;
+    }
+    if (res.ok) {
+      const g = res.json as Partial<DeviceGrant> | null;
+      if (!g || typeof g.token !== "string" || typeof g.machineId !== "string") {
+        throw new PairingError("internal", "The server's answer was not understood");
+      }
+      const org =
+        g.org && typeof g.org.id === "string" ? { id: g.org.id, name: String(g.org.name ?? "") } : { id: "", name: "" };
+      return { token: g.token, machineId: g.machineId, name: typeof g.name === "string" ? g.name : "", org };
+    }
+    const word = errorWord(res.json);
+    if (word === "authorization_pending") {
+      // keep waiting
+    } else if (word === "slow_down" || res.status === 429) {
+      interval += 5;
+    } else if (word === "access_denied") {
+      throw new PairingError("denied", "The connection was refused on the site");
+    } else if (word === "expired_token") {
+      throw new PairingError("expired", "The code expired; start again");
+    } else if (res.status >= 500) {
+      lastNetwork = `The server answered HTTP ${res.status}`;
+    } else {
+      throw new PairingError("internal", errorMessage(res.json) ?? `Connecting failed (HTTP ${res.status})`);
+    }
+    if (now() >= deadline) {
+      throw lastNetwork
+        ? new PairingError("network", lastNetwork)
+        : new PairingError("expired", "The code expired; start again");
+    }
+  }
+}
+
+/** The whole flow: a code (shown through `onCode`), then the token. */
+export async function devicePair(
+  server: string,
+  info: DeviceInfo,
+  onCode: (code: DeviceCode) => void,
+  opts: Parameters<typeof pollDeviceToken>[2] = {},
+): Promise<DeviceGrant> {
+  const code = await requestDeviceCode(server, info, opts);
+  onCode(code);
+  return pollDeviceToken(server, code, opts);
+}
+
+/** `Ação & Cia` → `acao-cia`. */
+export function orgSlug(name: string): string {
+  const slug = name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/-+$/, "");
+  return slug || "org";
+}
+
+/**
+ * The desktop app's workspace for an organization: `<base>/<org-slug>`, or
+ * `<slug>-2`, `<slug>-3`… when a folder of that name already has something
+ * in it (another organization with the same name, or files of the person's).
+ */
+export function uniqueWorkspace(base: string, orgName: string): string {
+  const slug = orgSlug(orgName);
+  for (let i = 1; i < 1000; i++) {
+    const dir = path.join(base, i === 1 ? slug : `${slug}-${i}`);
+    if (!existsSync(dir)) return dir;
+    try {
+      if (readdirSync(dir).length === 0) return dir;
+    } catch {
+      // not a folder we can use
+    }
+  }
+  return path.join(base, `${slug}-${Date.now()}`);
+}

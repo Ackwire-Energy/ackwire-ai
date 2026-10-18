@@ -1,32 +1,33 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { runnerHome } from "./config";
+import { thisRunner } from "./launch";
 
 export const SERVICE_NAME = "agentes-runner";
 export const LAUNCHD_LABEL = "chat.agentes.runner";
 export const WINDOWS_TASK = "agentes-runner";
 
-/** How the service starts the runner: this runtime (node or bun) and this script, absolute. */
+/**
+ * How the service starts the runner: this runtime (node or bun) and this
+ * script, absolute; or a compiled runner alone (`script` absent, ADR 0036).
+ */
 export interface Launch {
   runtime: string;
-  script: string;
+  script?: string;
   home: string;
   /** The PATH services get (default: the installing shell's). */
   path?: string;
 }
 
 export function currentLaunch(): Launch {
-  const script = process.argv[1] ? path.resolve(process.argv[1]) : "";
-  let real = script;
-  try {
-    real = realpathSync(script);
-  } catch {
-    // keep the given path
-  }
-  return { runtime: process.execPath, script: real, home: runnerHome() };
+  const [runtime, script] = thisRunner();
+  return { runtime: runtime as string, ...(script ? { script } : {}), home: runnerHome() };
 }
+
+/** The command line people can run themselves (shown when no service can be installed). */
+const plainCommand = (launch: Launch) => [launch.runtime, ...(launch.script ? [launch.script] : [])].join(" ");
 
 /** systemd's quoting: double quotes, backslash and `$`/`%` escaped. */
 function systemdQuote(s: string) {
@@ -64,7 +65,7 @@ export function systemdUnit(launch: Launch): string {
     "Wants=network-online.target",
     "",
     "[Service]",
-    `ExecStart=${systemdQuote(launch.runtime)} ${systemdQuote(launch.script)} start`,
+    `ExecStart=${[launch.runtime, ...(launch.script ? [launch.script] : [])].map(systemdQuote).join(" ")} start`,
     `Environment=${systemdEnv("AGENTES_RUNNER_HOME", launch.home)}`,
     "Environment=AGENTES_RUNNER_SERVICE=systemd",
     // The install-time PATH (like the launchd plist): tasks find claude, codex, git, node, gh.
@@ -96,9 +97,7 @@ export function launchdPlist(launch: Launch): string {
   ${s(LAUNCHD_LABEL)}
   <key>ProgramArguments</key>
   <array>
-    ${s(launch.runtime)}
-    ${s(launch.script)}
-    ${s("start")}
+    ${[launch.runtime, ...(launch.script ? [launch.script] : []), "start"].map(s).join("\n    ")}
   </array>
   <key>EnvironmentVariables</key>
   <dict>
@@ -131,7 +130,7 @@ export function launchdPlist(launch: Launch): string {
 
 /** cmd.exe quoting for one argument inside `/TR "…"`. */
 export function windowsTaskCommand(launch: Launch): { install: string; run: string; uninstall: string } {
-  const tr = `\\"${launch.runtime}\\" \\"${launch.script}\\" start`;
+  const tr = `${[launch.runtime, ...(launch.script ? [launch.script] : [])].map((a) => `\\"${a}\\"`).join(" ")} start`;
   return {
     install: `schtasks /Create /TN ${WINDOWS_TASK} /SC ONLOGON /RL LIMITED /F /TR "${tr}"`,
     run: `schtasks /Run /TN ${WINDOWS_TASK}`,
@@ -173,7 +172,7 @@ export function installService(io: ServiceIo): number {
   if (process.platform === "linux") {
     if (!systemdUserAvailable(run)) {
       print("systemd (user session) isn't available here. Start the runner yourself, for example in tmux:");
-      print(`  ${launch.runtime} ${launch.script} start`);
+      print(`  ${plainCommand(launch)} start`);
       return 1;
     }
     const file = systemdUnitPath();
@@ -232,7 +231,7 @@ export function installService(io: ServiceIo): number {
     print(`To remove it: ${cmd.uninstall}`);
     return 0;
   }
-  print(`No service support on ${process.platform}. Run: ${launch.runtime} ${launch.script} start`);
+  print(`No service support on ${process.platform}. Run: ${plainCommand(launch)} start`);
   return 1;
 }
 

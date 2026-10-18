@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { EventEmitter } from "node:events";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { createConnection, createServer, type Server, type Socket } from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import {
@@ -158,12 +159,21 @@ function isToolInfo(v: unknown): v is McpToolInfo {
   );
 }
 
-/** Where the daemon listens: `<runner home>/mcp.sock`, or a named pipe on Windows. */
-export function mcpSocketPath(home: string, platform: NodeJS.Platform = process.platform) {
-  if (platform === "win32") {
-    return `\\\\.\\pipe\\agentes-runner-${createHash("sha256").update(home).digest("hex").slice(0, 16)}`;
-  }
-  return path.join(home, "mcp.sock");
+/** Unix socket paths longer than this don't fit `sun_path` (104 bytes on macOS, 108 on Linux). */
+const MAX_SOCKET_PATH = 100;
+
+/**
+ * Where the daemon listens: `<runner home>/mcp.sock`, or a named pipe on
+ * Windows. A home whose path is too long for a unix socket (the desktop
+ * app's `~/.agentes-runner/orgs/<id>/` with a long user name) gets one in
+ * the temp folder, named after the home.
+ */
+export function mcpSocketPath(home: string, platform: NodeJS.Platform = process.platform, tmp = os.tmpdir()) {
+  const id = createHash("sha256").update(home).digest("hex").slice(0, 16);
+  if (platform === "win32") return `\\\\.\\pipe\\agentes-runner-${id}`;
+  const inHome = path.join(home, "mcp.sock");
+  if (Buffer.byteLength(inHome) <= MAX_SOCKET_PATH) return inHome;
+  return path.join(tmp, `agentes-runner-${id}.sock`);
 }
 
 export const newMcpToken = () => randomBytes(24).toString("base64url");
@@ -945,6 +955,15 @@ export function claudePermissionSettings(
       deny: [...MISSION_DENY_RULES],
     },
   };
+}
+
+/**
+ * Codex's `-c` override for folders it may write besides its `-C` folder
+ * (protocol 10: the agent's allowed folders; its workspace-write sandbox's
+ * `writable_roots`). The value is TOML; a JSON array of strings is valid TOML.
+ */
+export function codexWritableRoots(dirs: string[]) {
+  return `sandbox_workspace_write.writable_roots=${JSON.stringify(dirs)}`;
 }
 
 /**

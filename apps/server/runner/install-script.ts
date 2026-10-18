@@ -6,17 +6,21 @@ export function shQuote(value: string): string {
 /**
  * The installer served at `GET /api/machines/install.sh`:
  *
- *   curl -fsSL <publicUrl>/api/machines/install.sh | sh -s -- --code XXXX-XXXX [--dir DIR] [--no-exec] [--name NAME] [--no-service]
+ *   curl -fsSL <publicUrl>/api/machines/install.sh | sh -s -- [--dir DIR] [--no-exec] [--name NAME] [--no-service]
  *
  * Finds Node.js 22+ (or Bun), downloads the runner bundle from
  * `<publicUrl>/runner/agentes-runner.mjs`, writes a launcher in
- * `~/.agentes-runner/bin`, pairs this computer and installs the service.
+ * `~/.agentes-runner/bin`, connects this computer with a device code
+ * (`agentes-runner pair` prints a code and a link and waits for someone to
+ * confirm it on the site, ADR 0036 §5) and installs the service. A home
+ * that is already connected keeps its connection (running it again updates
+ * the runner).
  */
 export function installScript(publicUrl: string): string {
   const server = shQuote(publicUrl.trim().replace(/\/+$/, ""));
   return `#!/bin/sh
 # agentes.chat runner installer: connects this computer to your organization.
-# Usage: curl -fsSL <server>/api/machines/install.sh | sh -s -- --code XXXX-XXXX [--dir DIR] [--no-exec] [--name NAME] [--no-service]
+# Usage: curl -fsSL <server>/api/machines/install.sh | sh -s -- [--dir DIR] [--no-exec] [--name NAME] [--no-service]
 set -eu
 
 SERVER=${server}
@@ -24,7 +28,6 @@ RUNNER_HOME="\${AGENTES_RUNNER_HOME:-$HOME/.agentes-runner}"
 BUNDLE="$RUNNER_HOME/agentes-runner.mjs"
 LAUNCHER="$RUNNER_HOME/bin/agentes-runner"
 
-CODE=""
 DIR=""
 NAME=""
 NO_EXEC=0
@@ -37,8 +40,6 @@ quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\\\\\''/g")"; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --code) need_value "$1" $#; CODE="$2"; shift 2 ;;
-    --code=*) CODE="\${1#--code=}"; shift ;;
     --dir) need_value "$1" $#; DIR="$2"; shift 2 ;;
     --dir=*) DIR="\${1#--dir=}"; shift ;;
     --name) need_value "$1" $#; NAME="$2"; shift 2 ;;
@@ -46,13 +47,15 @@ while [ $# -gt 0 ]; do
     --no-exec) NO_EXEC=1; shift ;;
     --no-service) NO_SERVICE=1; shift ;;
     -h|--help)
-      say "Usage: sh install.sh --code XXXX-XXXX [--dir DIR] [--no-exec] [--name NAME] [--no-service]"
+      say "Usage: sh install.sh [--dir DIR] [--no-exec] [--name NAME] [--no-service]"
       exit 0 ;;
     *) die "unknown option: $1" ;;
   esac
 done
 
-[ -n "$CODE" ] || die "missing --code (create one in agentes.chat: Settings > Computers > Connect a computer)"
+if [ -f "$RUNNER_HOME/config.json" ] && grep -q '"managedBy": *"desktop"' "$RUNNER_HOME/config.json" 2>/dev/null; then
+  die "this computer is connected by the agentes app; manage it there (or set AGENTES_RUNNER_HOME to another folder)"
+fi
 
 # Node.js 22+ or Bun.
 RUNTIME=""
@@ -93,11 +96,16 @@ mv "$TMP" "$BUNDLE"
 } > "$LAUNCHER"
 chmod 755 "$LAUNCHER"
 
-set -- pair --server "$SERVER" --code "$CODE"
-if [ -n "$DIR" ]; then set -- "$@" --dir "$DIR"; fi
-if [ -n "$NAME" ]; then set -- "$@" --name "$NAME"; fi
-if [ "$NO_EXEC" -eq 1 ]; then set -- "$@" --no-exec; fi
-"$LAUNCHER" "$@" || die "pairing failed"
+if [ -f "$RUNNER_HOME/config.json" ] && grep -q '"token"' "$RUNNER_HOME/config.json" 2>/dev/null; then
+  say "This computer is already connected (runner updated). To connect it again: $LAUNCHER pair --server $SERVER"
+else
+  # Prints a code and a link, and waits until someone confirms it on the site.
+  set -- pair --server "$SERVER"
+  if [ -n "$DIR" ]; then set -- "$@" --dir "$DIR"; fi
+  if [ -n "$NAME" ]; then set -- "$@" --name "$NAME"; fi
+  if [ "$NO_EXEC" -eq 1 ]; then set -- "$@" --no-exec; fi
+  "$LAUNCHER" "$@" || die "connecting this computer failed"
+fi
 
 SERVICE=0
 if [ "$NO_SERVICE" -eq 0 ]; then

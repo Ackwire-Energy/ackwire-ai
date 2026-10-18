@@ -7,8 +7,8 @@ import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { cachedExecutors } from "./executors";
-import { CODEX_MCP_ENV, CODEX_MCP_SERVER } from "./mcp";
-import { agentWorkspace, isInside, resolveInWorkspace } from "./paths";
+import { CODEX_MCP_ENV, CODEX_MCP_SERVER, codexWritableRoots } from "./mcp";
+import { agentWorkspace, isInside, resolveForAgent } from "./paths";
 import { agentSecrets } from "./secrets";
 
 /**
@@ -170,6 +170,8 @@ export function codexTurnArgs(input: {
   /** Resume this Codex thread. */
   thread?: string;
   mcp?: { command?: string[]; url?: string };
+  /** Protocol 10: folders allowed for the agent besides its own (its sandbox's writable roots). */
+  writableRoots?: string[];
 }): string[] {
   const instructions = input.instructions?.trim();
   return [
@@ -182,6 +184,7 @@ export function codexTurnArgs(input: {
     "workspace-write",
     "-c",
     "sandbox_workspace_write.network_access=true",
+    ...(input.writableRoots?.length ? ["-c", codexWritableRoots(input.writableRoots)] : []),
     ...(instructions && !input.thread ? ["-c", `developer_instructions=${JSON.stringify(instructions)}`] : []),
     ...(input.mcp ? codexBridgeOverrides({ runId: input.runId, ...input.mcp }).flatMap((o) => ["-c", o]) : []),
     ...(input.model ? ["-m", input.model] : []),
@@ -382,6 +385,8 @@ export async function runCodexTurn(
     system: string;
     prompt: string;
     mcp: { token: string; url?: string };
+    /** Protocol 10: folders allowed for the agent besides its own. */
+    writableRoots?: string[];
   },
   opts: CodexTurnOptions,
 ): Promise<void> {
@@ -408,6 +413,7 @@ export async function runCodexTurn(
     instructions: input.system,
     ...(thread ? { thread } : {}),
     mcp: input.mcp.url ? { url: input.mcp.url } : { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
+    ...(input.writableRoots?.length ? { writableRoots: input.writableRoots } : {}),
   });
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -514,6 +520,8 @@ export interface CodexBrainContext {
   threads?: CodexThreads;
   codexVersion?: () => string | undefined;
   bin?: string;
+  /** Protocol 10: folders allowed for the agent besides its own (real paths). */
+  grants?: string[];
 }
 
 const threadStores = new Map<string, CodexThreads>();
@@ -546,10 +554,11 @@ export async function handleCodexBrainTurn(
   const folder = await agentWorkspace(ctx.workspaceReal, req.agent);
   let cwd = folder;
   if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
-    const resolved = await resolveInWorkspace(folder, req.cwd);
+    const resolved = await resolveForAgent(folder, ctx.grants, req.cwd);
     if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
     cwd = resolved.abs;
   }
+  const writableRoots = (ctx.grants ?? []).filter((g) => !isInside(g, cwd));
   const secrets = await agentSecrets(ctx.secretsDir, req.agent);
   const file = codexThreadsFile(ctx.runnerHome);
   const threads = ctx.threads ?? threadStores.get(file) ?? new CodexThreads(file);
@@ -563,6 +572,7 @@ export async function handleCodexBrainTurn(
       system: typeof req.system === "string" ? req.system : "",
       prompt: typeof req.prompt === "string" ? req.prompt : "",
       mcp: { token: req.mcp.token, ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}) },
+      ...(writableRoots.length ? { writableRoots } : {}),
     },
     {
       threads,

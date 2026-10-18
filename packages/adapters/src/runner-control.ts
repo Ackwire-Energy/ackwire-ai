@@ -123,7 +123,16 @@ export type ControlRequest =
    * comes at once; progress comes as `pair.code`, then `pair.done` or
    * `pair.failed` events.
    */
-  | { type: "pair.start"; server: string; name?: string }
+  | {
+      type: "pair.start";
+      server: string;
+      name?: string;
+      /**
+       * Which coding CLIs the person chose at first run (ADR 0036 §8: off
+       * unless chosen). Commands always start off from the app. Absent: both off.
+       */
+      tools?: { claude?: boolean; codex?: boolean };
+    }
   | { type: "pair.cancel" }
   /** Forgets the pairing (the token is deleted; the server side is the site's "Desconectar"). */
   | { type: "unpair" }

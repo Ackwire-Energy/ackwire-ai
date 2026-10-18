@@ -722,8 +722,10 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
   }
   if (!isObject(f)) return null;
   switch (f.type) {
-    case "hello":
+    case "hello": {
       if (!isString(f.token) || !isString(f.version) || typeof f.protocol !== "number") return null;
+      const paused = parsePause(f.paused);
+      const access = parseAccess(f.access);
       return {
         type: "hello",
         token: f.token,
@@ -743,7 +745,30 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
                 .filter((t): t is RunnerTask => t !== null),
             }
           : {}),
+        ...(paused ? { paused } : {}),
+        ...(access ? { access } : {}),
       };
+    }
+    case "runner.state": {
+      const paused = parsePause(f.paused);
+      return paused ? { type: "runner.state", paused } : null;
+    }
+    case "access.changed": {
+      const access = parseAccess(f.access);
+      return access ? { type: "access.changed", access } : null;
+    }
+    case "access.decided": {
+      if (!isString(f.requestId)) return null;
+      const decision = (["granted", "denied", "expired"] as const).find((d) => d === f.decision);
+      if (!decision) return null;
+      const scope = (["agent", "all"] as const).find((s) => s === f.scope);
+      return {
+        type: "access.decided",
+        requestId: f.requestId.slice(0, 64),
+        decision,
+        ...(scope ? { scope } : {}),
+      };
+    }
     case "output":
       if (!isString(f.id) || !isString(f.chunk) || (f.stream !== "stdout" && f.stream !== "stderr")) return null;
       return { type: "output", id: f.id, stream: f.stream, chunk: f.chunk };
@@ -829,6 +854,18 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
   }
 }
 
+const SERVER_FRAME_TYPES = [
+  "welcome",
+  "request",
+  "cancel",
+  "ping",
+  "refused",
+  "task.ack",
+  "mcp.result",
+  "mcp.tools",
+  "agents",
+];
+
 /** Parses a server frame (runner side); null when it isn't one. */
 export function parseServerFrame(raw: string): ServerFrame | null {
   if (raw.length > MAX_FRAME_BYTES) return null;
@@ -847,8 +884,8 @@ export function parseServerFrame(raw: string): ServerFrame | null {
   if (f.type === "task.ack" && !isString(f.taskId)) return null;
   if ((f.type === "mcp.result" || f.type === "mcp.tools") && !isString(f.callId)) return null;
   if (f.type === "mcp.tools" && f.ok === true && !Array.isArray(f.tools)) return null;
-  if (!["welcome", "request", "cancel", "ping", "refused", "task.ack", "mcp.result", "mcp.tools"].includes(f.type))
-    return null;
+  if (f.type === "agents" && !Array.isArray(f.agents)) return null;
+  if (!SERVER_FRAME_TYPES.includes(f.type)) return null;
   return f as ServerFrame;
 }
 
@@ -1240,7 +1277,10 @@ export function parseAccess(v: unknown): RunnerAccess | undefined {
   for (const f of v.folders.slice(0, ACCESS_LIMITS.folders)) {
     if (!isObject(f) || !isString(f.path) || !f.path) continue;
     const agents = Array.isArray(f.agents)
-      ? f.agents.filter(isString).slice(0, ACCESS_LIMITS.agentsPerFolder).map((a) => a.slice(0, 64))
+      ? f.agents
+          .filter(isString)
+          .slice(0, ACCESS_LIMITS.agentsPerFolder)
+          .map((a) => a.slice(0, 64))
       : [];
     folders.push({ path: f.path.slice(0, ACCESS_LIMITS.path), agents });
   }

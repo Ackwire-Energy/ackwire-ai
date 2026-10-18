@@ -13,6 +13,7 @@ import {
   rmSync,
   statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -39,6 +40,7 @@ import {
   CODEX_MCP_ENV,
   claudeMcpConfig,
   claudePermissionSettings,
+  codexWritableRoots,
   MCP_TOKEN_FILE,
   type McpTaskInfo,
   missionBranchPrefix,
@@ -46,7 +48,7 @@ import {
   newMcpToken,
   shellArg,
 } from "./mcp";
-import { isInside, resolveInWorkspace } from "./paths";
+import { isInside, resolveForAgent } from "./paths";
 
 /**
  * Background tasks (protocol 4, ADR 0029): commands that outlive a request,
@@ -163,6 +165,20 @@ export interface TaskSecrets {
   redact: (text: string) => string;
 }
 
+/** A task as the desktop app sees it (running, or just ended). */
+export interface SettledTask {
+  taskId: string;
+  agentId: string;
+  agentHandle: string;
+  executor: TaskExecutor;
+  /** The command line (prompts are never on it). */
+  command: string;
+  /** Absolute. */
+  cwd: string;
+  startedAt: string;
+  done?: TaskDone;
+}
+
 export interface TaskManagerOptions {
   /** `<runner home>/tasks`. */
   root: string;
@@ -174,6 +190,14 @@ export interface TaskManagerOptions {
   agentFolder: (agent: AgentScope) => Promise<string>;
   /** The agent's secrets: env for the command, redaction for what leaves the machine. */
   secrets?: (agent: AgentScope) => Promise<TaskSecrets | null>;
+  /**
+   * How the wrapper starts, before the task folder: default this runtime and
+   * `wrap.mjs` next to the journal. A compiled runner (ADR 0036) has no
+   * runtime to hand a script to and passes `[binary, "task-wrapper"]`.
+   */
+  wrapperCommand?: string[];
+  /** A task ended (once per task, after `task.done` was queued): the desktop app's jobs and activity log. */
+  onSettled?: (task: SettledTask) => void;
   /** Tests: shorter intervals. */
   watchMs?: number;
   eventEveryMs?: number;
@@ -192,13 +216,26 @@ export interface TaskManagerOptions {
   now?: () => number;
 }
 
-/** The wrapper every task runs under (written next to the journal; plain JS for Node and Bun). */
-export const WRAPPER_SOURCE = `// agentes-runner task wrapper: runs one task and records how it ended.
-import { spawn } from "node:child_process";
-import { existsSync, openSync, readFileSync, renameSync, utimesSync, writeFileSync } from "node:fs";
-import path from "node:path";
-const dir = process.argv[2];
-const spec = JSON.parse(readFileSync(path.join(dir, "spec.json"), "utf8"));
+/**
+ * The wrapper's body: plain JavaScript that uses `dir` (the task folder),
+ * `spawn`, `path` and the fs functions below as free names. Bundled runners
+ * write it into `wrap.mjs` (with the imports) and start it with the same
+ * runtime; a compiled runner has no runtime for a script and runs it in
+ * `agentes-runner task-wrapper <dir>` (`runTaskWrapper`). One source either way.
+ */
+const WRAPPER_NAMES = [
+  "spawn",
+  "existsSync",
+  "openSync",
+  "readFileSync",
+  "renameSync",
+  "utimesSync",
+  "writeFileSync",
+  "path",
+  "dir",
+] as const;
+
+const WRAPPER_BODY = `const spec = JSON.parse(readFileSync(path.join(dir, "spec.json"), "utf8"));
 const file = (n) => path.join(dir, n);
 let reason = null;
 let ended = false;
@@ -256,6 +293,24 @@ child.on("error", (e) => { clearInterval(beat); clearInterval(poll); finish({ ex
 // A command stopped by us ends by our signal even when its shell reports none (or exits with 143).
 child.on("exit", (code, signal) => { clearInterval(beat); clearInterval(poll); finish(reason && (signal || code === null || code === 143) ? { exitCode: null, signal: signal ?? "SIGTERM" } : { exitCode: code, signal: signal ?? null }); });
 `;
+
+/** The wrapper every task runs under (written next to the journal; plain JS for Node and Bun). */
+export const WRAPPER_SOURCE = `// agentes-runner task wrapper: runs one task and records how it ended.
+import { spawn } from "node:child_process";
+import { existsSync, openSync, readFileSync, renameSync, utimesSync, writeFileSync } from "node:fs";
+import path from "node:path";
+const dir = process.argv[2];
+${WRAPPER_BODY}`;
+
+/**
+ * `agentes-runner task-wrapper <dir>` (compiled runners): the same wrapper,
+ * in this process. It exits on its own when the task ends (`process.exit`),
+ * so the caller must not exit after it returns.
+ */
+export function runTaskWrapper(dir: string) {
+  const run = new Function(...WRAPPER_NAMES, WRAPPER_BODY) as (...args: unknown[]) => void;
+  run(spawn, existsSync, openSync, readFileSync, renameSync, utimesSync, writeFileSync, path, dir);
+}
 
 const clampInt = (n: unknown, min: number, max: number, fallback: number) => {
   const v = typeof n === "number" && Number.isFinite(n) ? Math.floor(n) : fallback;
@@ -324,9 +379,15 @@ export function executorCommand(
     permissionMode?: "acceptEdits" | "dontAsk";
     /** Codex: where it works (`-C`), its sandbox, the file for its last message, the thread to resume. */
     codex?: { cwd: string; sandbox: "read-only" | "workspace-write"; lastFile: string; thread?: string };
+    /**
+     * Protocol 10: the folders allowed for the agent besides its own. Claude
+     * Code gets `--add-dir` for each, Codex its sandbox's writable roots.
+     */
+    addDirs?: string[];
     platform?: NodeJS.Platform;
   },
 ): string {
+  const addDirs = (options.addDirs ?? []).filter((d) => typeof d === "string" && d);
   if (executor === "shell") {
     const command = (options.command ?? "").trim();
     if (!command) throw new RunnerError("bad_request", "A shell task needs a command");
@@ -346,6 +407,7 @@ export function executorCommand(
       "--skip-git-repo-check",
       ...(c ? ["-C", q(c.cwd), "--sandbox", c.sandbox] : []),
       ...(c?.sandbox === "workspace-write" ? ["-c", q("sandbox_workspace_write.network_access=true")] : []),
+      ...(c?.sandbox === "workspace-write" && addDirs.length ? ["-c", q(codexWritableRoots(addDirs))] : []),
       ...(options.extra ?? []),
       ...(c ? ["-o", q(c.lastFile)] : []),
       ...(c?.thread ? ["resume", c.thread] : []),
@@ -362,6 +424,7 @@ export function executorCommand(
     options.permissionMode ?? "acceptEdits",
   ];
   parts.push(...(options.extra ?? []));
+  for (const d of addDirs) parts.push("--add-dir", shellArg(d, options.platform));
   if (options.session) parts.push(options.resume ? "--resume" : "--session-id", options.session);
   return parts.join(" ");
 }
@@ -765,7 +828,52 @@ export class TaskManager {
     return this.journal.tasks.filter((t) => t.status === "running").length;
   }
 
-  async start(agent: AgentScope, req: TaskStart): Promise<MachineReplies["task.start"]> {
+  /** Running tasks, for the desktop app's "now" (they survive runner restarts). */
+  runningTasks(): SettledTask[] {
+    return this.journal.tasks.filter((t) => t.status === "running").map((t) => this.settled(t));
+  }
+
+  private settled(t: Entry): SettledTask {
+    return {
+      taskId: t.taskId,
+      agentId: t.agentId,
+      agentHandle: t.agentHandle,
+      executor: t.executor,
+      command: t.command,
+      cwd: t.cwd,
+      startedAt: t.startedAt,
+      ...(t.done ? { done: t.done } : {}),
+    };
+  }
+
+  /** New limits from the config (the app's Preferences, or an edit): they apply to the next start. */
+  setLimits(limits: { maxConcurrent?: number; defaultMaxSeconds?: number }) {
+    if (limits.maxConcurrent !== undefined) this.opts.maxConcurrent = limits.maxConcurrent;
+    if (limits.defaultMaxSeconds !== undefined) this.opts.defaultMaxSeconds = limits.defaultMaxSeconds;
+  }
+
+  /** Starts the wrapper for a task folder, detached (it outlives this runner). */
+  private spawnWrapper(dir: string, env: NodeJS.ProcessEnv): ChildProcess {
+    let command = this.opts.wrapperCommand;
+    if (!command?.length) {
+      const wrapper = path.join(this.opts.root, "wrap.mjs");
+      writeFileSync(wrapper, WRAPPER_SOURCE, { mode: 0o600 });
+      command = [this.opts.runtime ?? process.execPath, wrapper];
+    }
+    const [file, ...args] = command;
+    return spawn(file as string, [...args, dir], { cwd: dir, env, stdio: "ignore", detached: true, windowsHide: true });
+  }
+
+  /**
+   * Starts a task. `allowed.grants` (protocol 10): the folders allowed for the
+   * agent besides its own (real paths): `cwd` may be absolute inside one,
+   * and Claude Code / Codex get them all (`--add-dir`, writable roots).
+   */
+  async start(
+    agent: AgentScope,
+    req: TaskStart,
+    allowed?: { grants?: string[] },
+  ): Promise<MachineReplies["task.start"]> {
     if (this.closed) throw new RunnerError("internal", "The runner is stopping");
     const taskId = String(req.taskId ?? "");
     const dir = this.dirOf(taskId);
@@ -785,7 +893,7 @@ export class TaskManager {
     const folder = await this.opts.agentFolder(agent);
     let cwd = folder;
     if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
-      const resolved = await resolveInWorkspace(folder, req.cwd);
+      const resolved = await resolveForAgent(folder, allowed?.grants, req.cwd);
       if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
       if (!statSync(resolved.abs).isDirectory()) throw new RunnerError("bad_request", `${req.cwd} is not a folder`);
       cwd = resolved.abs;
@@ -885,6 +993,7 @@ export class TaskManager {
       session,
       resume,
       extra,
+      ...(allowed?.grants?.length ? { addDirs: allowed.grants.filter((g) => !isInside(g, cwd)) } : {}),
       ...(executor === "codex"
         ? {
             codex: {
@@ -911,8 +1020,6 @@ export class TaskManager {
       maxSeconds,
     });
     if (executor !== "shell") writeFileSync(path.join(dir, "stdin.txt"), input, { mode: 0o600 });
-    const wrapper = path.join(this.opts.root, "wrap.mjs");
-    writeFileSync(wrapper, WRAPPER_SOURCE, { mode: 0o600 });
     const secrets = (await this.opts.secrets?.(agent)) ?? null;
     let child: ChildProcess;
     try {
@@ -928,14 +1035,8 @@ export class TaskManager {
             ? // A permission prompt waits for a person (up to PERMISSION_WAIT_MS): our tool call may take that long.
               { MCP_TOOL_TIMEOUT: String(PERMISSION_WAIT_MS + 5 * 60_000) }
             : {};
-      child = spawn(this.opts.runtime ?? process.execPath, [wrapper, dir], {
-        cwd: dir,
-        // The agent's secrets (ADR 0027) through the environment only, never on disk here.
-        env: { ...process.env, ...(secrets?.env ?? {}), ...mcpEnv },
-        stdio: "ignore",
-        detached: true,
-        windowsHide: true,
-      });
+      // The agent's secrets (ADR 0027) through the environment only, never on disk here.
+      child = this.spawnWrapper(dir, { ...process.env, ...(secrets?.env ?? {}), ...mcpEnv });
     } catch (err) {
       throw new RunnerError("internal", `Couldn't start the task: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -943,7 +1044,8 @@ export class TaskManager {
     child.unref();
     const pid = child.pid;
     if (!pid) throw new RunnerError("internal", "Couldn't start the task");
-    const rel = path.relative(folder, cwd).split(path.sep).join("/");
+    // An allowed folder outside the agent's own (protocol 10) is reported by its absolute path.
+    const rel = isInside(folder, cwd) ? path.relative(folder, cwd).split(path.sep).join("/") : cwd;
     const entry: Entry = {
       taskId,
       agentId: String(agent.id),
@@ -1246,13 +1348,7 @@ export class TaskManager {
       for (const f of ["exit.json", "alive", "child.pid", "cancel"]) rmSync(path.join(dir, f), { force: true });
       for (const f of ["stdout.log", "stderr.log"]) writeFileSync(path.join(dir, f), "", { mode: 0o600 });
       const secrets = (await this.opts.secrets?.({ id: t.agentId, handle: t.agentHandle }).catch(() => null)) ?? null;
-      const child = spawn(this.opts.runtime ?? process.execPath, [path.join(this.opts.root, "wrap.mjs"), dir], {
-        cwd: dir,
-        env: secrets ? { ...process.env, ...secrets.env } : process.env,
-        stdio: "ignore",
-        detached: true,
-        windowsHide: true,
-      });
+      const child = this.spawnWrapper(dir, secrets ? { ...process.env, ...secrets.env } : process.env);
       (child as unknown as EventEmitter).on("error", () => {});
       child.unref();
       if (!child.pid) throw new Error("no pid");
@@ -1312,6 +1408,11 @@ export class TaskManager {
       `[${t.agentHandle}] task ${t.taskId} ${interrupted ? "was interrupted" : canceled ? "was canceled" : `ended (exit ${exit?.exitCode ?? "?"})`}`,
     );
     this.emit({ type: "task.done", ...t.done });
+    try {
+      this.opts.onSettled?.(this.settled(t));
+    } catch {
+      // an observer never breaks the journal
+    }
   }
 
   /** macOS: hold off idle sleep while any task runs (released when the runner exits, `-w`). */

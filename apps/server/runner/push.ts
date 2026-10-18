@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import type { MachineReplies } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
-import { resolveInWorkspace } from "./paths";
+import { type Resolved, resolveInWorkspace } from "./paths";
 import { zipFolder } from "./zip";
 
 export const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
@@ -51,6 +51,8 @@ export interface PushOptions {
   maxBytes: number;
   fetch?: FetchLike;
   signal?: AbortSignal;
+  /** How the request path is resolved (protocol 10: absolute inside an allowed folder); default: in the workspace. */
+  resolve?: (p: string) => Promise<Resolved>;
 }
 
 /** What the upload's error body says, for people. */
@@ -74,7 +76,7 @@ async function serverMessage(res: Response): Promise<string> {
 export async function pushPath(opts: PushOptions): Promise<MachineReplies["push"]> {
   if (!/^https?:\/\//i.test(opts.url)) throw new RunnerError("bad_request", "The upload URL must be http(s)");
   const maxBytes = Math.max(0, Math.floor(opts.maxBytes));
-  const target = await resolveInWorkspace(opts.workspaceReal, opts.path);
+  const target = opts.resolve ? await opts.resolve(opts.path) : await resolveInWorkspace(opts.workspaceReal, opts.path);
   if (!target.exists) throw new RunnerError("not_found", `${opts.path} doesn't exist`);
   const st = await stat(target.abs);
   let bytes: Uint8Array;
@@ -82,7 +84,11 @@ export async function pushPath(opts: PushOptions): Promise<MachineReplies["push"
   if (st.isDirectory()) {
     const folder = target.rel === "" ? path.basename(opts.workspaceReal) : (target.rel.split("/").pop() as string);
     name = `${folder || "workspace"}.zip`;
-    bytes = await zipFolder(target.abs, { prefix: folder || "workspace", maxBytes, workspaceReal: opts.workspaceReal });
+    bytes = await zipFolder(target.abs, {
+      prefix: folder || "workspace",
+      maxBytes,
+      workspaceReal: target.root ?? opts.workspaceReal,
+    });
   } else if (st.isFile()) {
     if (st.size > maxBytes) throw new RunnerError("too_large", `The file has ${st.size} bytes (max ${maxBytes})`);
     name = path.basename(target.rel);
