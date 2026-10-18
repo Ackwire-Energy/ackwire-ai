@@ -63,6 +63,17 @@ test("system prompt carries org context, agent instructions and channel; history
   expect(systemText(ctx.system)).toContain("Answer briefly.");
   expect(systemText(ctx.system)).toContain("#general");
   expect(systemText(ctx.system)).toContain("Dev (@dev, agent)");
+  // No tools: nothing to investigate with, so no "How you work".
+  expect(systemText(ctx.system)).not.toContain("# How you work");
+  const withTools = systemText(
+    (await buildRunContext(f.db, run, f.agent, { maxMessages: 30, toolsAvailable: true, askUser: true })).system,
+  );
+  // Investigate first (ADR 0037): look before answering, reads need no ok, ask only for decisions.
+  expect(withTools).toContain("# How you work");
+  expect(withTools).toContain("Reading never needs anyone's ok.");
+  expect(withTools).toContain("Never ask permission to look");
+  expect(withTools).toContain("ambiguous after you have looked with your tools");
+  expect(withTools).not.toContain("Use your tools when they help");
   expect(ctx.messages).toEqual([
     {
       role: "user",

@@ -237,7 +237,13 @@ export const en: Translations = {
     presets: {
       theo: { name: "Theo", role: "PM", desc: "Organizes tasks, summarizes conversations and runs the forum." },
       ada: { name: "Ada", role: "Dev", desc: "Codes in branches, reviews PRs and investigates bugs." },
-      lia: { name: "Lia", role: "Research", desc: "Researches the market, competitors and feedback." },
+      lia: {
+        name: "Lia",
+        role: "Research",
+        desc: "Researches the market, competitors and feedback.",
+        instructions:
+          "Researches the market, competitors and feedback.\nLooks at the sources first (feedback, analytics, the web, earlier research) and cites them: links, numbers and dates.\nEnds with what it recommends, not just a summary.",
+      },
       atlas: { name: "Atlas", role: "Ops", desc: "Watches errors, queues and deploys." },
     },
     workspaceKeyTitle: "Model key",
@@ -1413,28 +1419,28 @@ export const en: Translations = {
         agent: "Ada",
         desc: "Codes, reviews PRs and investigates bugs.",
         instructions:
-          "Codes in branches and opens small PRs, with a test for each fix.\nBefore touching something big, describes the plan in the channel and waits for an ok.\nNever merges alone: asks a person for review.",
+          "Investigates first: reads the code and the related issues and errors before answering, and comes back with what it found and a concrete PR proposal with a test.\nWorks in branches and opens small PRs; for big changes opens the PR as a draft and explains the plan there.\nNever merges alone: asks a person for review.",
       },
       ops: {
         name: "Ops",
         agent: "Atlas",
         desc: "Watches errors, queues and deploys.",
         instructions:
-          "Follows errors and deploys and writes incident reports.\nWhen an alert fires, investigates first and posts in the channel what it already knows.\nRollback and deploy only with approval.",
+          "Follows errors and deploys and writes incident reports.\nWhen an alert fires, investigates first (errors, logs, recent deploys) and posts in the channel what it found: since when, how big, the likely cause and the next step.\nRollback and deploy only with approval.",
       },
       qa: {
         name: "QA",
         agent: "Iris",
         desc: "Tests flows and reproduces reported bugs.",
         instructions:
-          "Reproduces every reported bug before opening an issue. Writes clear steps and attaches evidence.\nIf it can't reproduce, asks in the channel for the environment and version.\nPrioritizes what blocks customers.",
+          "Reproduces every reported bug before opening an issue. Writes clear steps and attaches evidence.\nIf it can't reproduce, first checks the errors, recent changes and related issues; asks for the environment and version only if they aren't there.\nPrioritizes what blocks customers.",
       },
       pm: {
         name: "PM",
         agent: "Theo",
         desc: "Organizes tasks, summaries and the forum.",
         instructions:
-          "Organizes tasks, summarizes long discussions and keeps the roadmap up to date.\nEvery Friday, posts the week's summary on the forum.\nWhen context is missing, asks whoever requested before deciding.",
+          "Looks things up first (issues, threads, wiki, feedback) and only asks what's left.\nOrganizes tasks, summarizes long discussions and keeps the roadmap up to date.\nEvery Friday, posts the week's summary on the forum.",
       },
       custom: { name: "From scratch", desc: "You write everything. No access until you grant it.", instructions: "" },
     },

@@ -125,7 +125,8 @@ describe("ask_user", () => {
     expect(await questions()).toEqual([]);
     const request = f.provider.calls[0]?.request as ModelRequest;
     expect(request.tools?.map((t) => t.name)).toContain("ask_user");
-    expect(systemText(request.system)).toContain("Don't ask about simple requests");
+    expect(systemText(request.system)).toContain("don't ask about simple requests");
+    expect(systemText(request.system)).toContain("ambiguous after you have looked with your tools");
   });
 
   test("with no answer in 24 hours the run goes on and the model is told", async () => {

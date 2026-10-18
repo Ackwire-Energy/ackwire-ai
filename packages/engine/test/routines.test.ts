@@ -269,7 +269,11 @@ describe("routines", () => {
     const [first] = await agentMessages();
     expect(first?.threadId).toBeNull();
     expect(first?.meta.viaRoutine).toEqual({ id: routine.id, name: "Avaliações" });
-    expect(systemText(f.provider.calls.at(-1)?.request.system ?? "")).toContain("answer with exactly NO_REPLY");
+    const routinePrompt = systemText(f.provider.calls.at(-1)?.request.system ?? "");
+    expect(routinePrompt).toContain("answer with exactly NO_REPLY");
+    // Not a status post: check the sources, compare with the last run, end with a recommendation.
+    expect(routinePrompt).toContain("Don't just restate status: check the real sources with your tools");
+    expect(routinePrompt).toContain("you checked and nothing changed");
 
     answer = "NO_REPLY";
     await runRoutineNow(routineDeps(), f.owner.id, f.org.id, routine.id);

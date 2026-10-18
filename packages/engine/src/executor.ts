@@ -23,7 +23,7 @@ import {
   registerRunAbort,
   unregisterRunAbort,
 } from "./cancel";
-import { describeCapabilities } from "./capabilities";
+import { describeCapabilities, forComputerBrain } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
 import { onConsultedRunFinished } from "./consultations";
 import {
@@ -1559,10 +1559,11 @@ function brainTurnOf(
     threadRootId: run.threadRootId,
     get system() {
       const text = t.system.map((b) => b.text).join("\n\n");
-      // A computer brain sees `react` as an MCP tool and tends to echo the emoji as its final text.
-      return plan.kind !== "model" && tools.some((d) => d.name === REACT_TOOL)
-        ? `${text}\n\n${COMPUTER_REACT_NOTE}`
-        : text;
+      if (plan.kind === "model") return text;
+      // A computer brain has its own tools (read, search, shell, git) besides ours.
+      const computer = forComputerBrain(text);
+      // It also sees `react` as an MCP tool and tends to echo the emoji as its final text.
+      return tools.some((d) => d.name === REACT_TOOL) ? `${computer}\n\n${COMPUTER_REACT_NOTE}` : computer;
     },
     get messages() {
       return t.messages.map((m) => ({ role: m.role, content: flattenContent(m.content) }));

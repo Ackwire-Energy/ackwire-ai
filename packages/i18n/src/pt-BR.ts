@@ -242,7 +242,13 @@ export const ptBR = {
     presets: {
       theo: { name: "Theo", role: "PM", desc: "Organiza tarefas, resume conversas e cuida do fórum." },
       ada: { name: "Ada", role: "Dev", desc: "Programa em branches, revisa PRs e investiga bugs." },
-      lia: { name: "Lia", role: "Pesquisa", desc: "Pesquisa mercado, concorrentes e feedback." },
+      lia: {
+        name: "Lia",
+        role: "Pesquisa",
+        desc: "Pesquisa mercado, concorrentes e feedback.",
+        instructions:
+          "Pesquisa mercado, concorrentes e feedback.\nOlha as fontes primeiro (feedback, analytics, a web, pesquisas anteriores) e cita: links, números e datas.\nTermina com o que recomenda, não só com um resumo.",
+      },
       atlas: { name: "Atlas", role: "Ops", desc: "Monitora erros, filas e deploys." },
     },
     workspaceKeyTitle: "Chave do modelo",
@@ -1420,28 +1426,28 @@ export const ptBR = {
         agent: "Ada",
         desc: "Programa, revisa PRs e investiga bugs.",
         instructions:
-          "Programa em branches e abre PRs pequenos, com teste para cada correção.\nAntes de mexer em algo grande, descreve o plano no canal e espera um ok.\nNunca faz merge sozinho: pede revisão de uma pessoa.",
+          "Investiga primeiro: lê o código e as issues e erros relacionados antes de responder, e volta com o que encontrou e uma proposta concreta de PR com teste.\nTrabalha em branches e abre PRs pequenos; em mudanças grandes, abre o PR como rascunho e explica o plano nele.\nNunca faz merge sozinho: pede revisão de uma pessoa.",
       },
       ops: {
         name: "Ops",
         agent: "Atlas",
         desc: "Monitora erros, filas e deploys.",
         instructions:
-          "Acompanha erros e deploys e escreve relatórios de incidente.\nQuando um alerta dispara, investiga primeiro e avisa no canal com o que já sabe.\nRollback e deploy só com aprovação.",
+          "Acompanha erros e deploys e escreve relatórios de incidente.\nQuando um alerta dispara, investiga primeiro (erros, logs, deploys recentes) e avisa no canal com o que encontrou: desde quando, o tamanho, a causa provável e o próximo passo.\nRollback e deploy só com aprovação.",
       },
       qa: {
         name: "QA",
         agent: "Iris",
         desc: "Testa fluxos e reproduz bugs relatados.",
         instructions:
-          "Reproduz cada bug relatado antes de abrir issue. Escreve passos claros e anexa evidências.\nSe não conseguir reproduzir, pergunta no canal o ambiente e a versão.\nPrioriza o que bloqueia cliente.",
+          "Reproduz cada bug relatado antes de abrir issue. Escreve passos claros e anexa evidências.\nSe não conseguir reproduzir, olha primeiro os erros, as mudanças recentes e as issues relacionadas; só pergunta o ambiente e a versão se não estiverem lá.\nPrioriza o que bloqueia cliente.",
       },
       pm: {
         name: "PM",
         agent: "Theo",
         desc: "Organiza tarefas, resumos e o fórum.",
         instructions:
-          "Organiza tarefas, resume discussões longas e mantém o roadmap atualizado.\nToda sexta, posta no fórum o resumo da semana.\nQuando faltar contexto, pergunta a quem pediu antes de decidir.",
+          "Procura primeiro (issues, conversas, wiki, feedback) e só pergunta o que faltar.\nOrganiza tarefas, resume discussões longas e mantém o roadmap atualizado.\nToda sexta, posta no fórum o resumo da semana.",
       },
       custom: { name: "Do zero", desc: "Você escreve tudo. Sem acessos até você liberar.", instructions: "" },
     },

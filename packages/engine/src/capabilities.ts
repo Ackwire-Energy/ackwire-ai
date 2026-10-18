@@ -96,8 +96,27 @@ export function describeCapabilities(
       "If someone asks for something from these connectors, say exactly what is missing and who can fix it. Never say the connector doesn't exist.",
     );
   }
-  lines.push(
-    "Beyond this, you can't. Never say you did or can do something that isn't on this list, and don't deny what is on it. If you can't do something, say so clearly and suggest who can: a person in the channel or another agent (mention them with @).",
-  );
+  lines.push(CAPABILITIES_LIMIT);
   return lines.join("\n");
+}
+
+/** The last line of "What you can do": nothing beyond the list. */
+export const CAPABILITIES_LIMIT =
+  "Beyond this, you can't. Never say you did or can do something that isn't on this list, and don't deny what is on it. If you can't do something, say so clearly and suggest who can: a person in the channel or another agent (mention them with @).";
+
+/** The same line for a computer brain: its computer's own tools are not on the list but are allowed. */
+const COMPUTER_CAPABILITIES_LIMIT =
+  "Beyond this list and your computer's own tools, you can't. Never say you did or can do something that isn't on this list or among those tools, and don't deny what is. If you can't do something, say so clearly and suggest who can: a person in the channel or another agent (mention them with @).";
+
+/** What a computer brain (Claude Code, Codex) is told about its own tools. */
+export const COMPUTER_TOOLS_NOTE =
+  "# Your computer's tools\nYou also have your computer's own tools (read files, search, shell and git in your folder and allowed folders). Use them freely to read and investigate; that needs no approval. Actions that change things for others (push, merge, deploy) still follow the rules above.";
+
+/**
+ * The system prompt as a computer brain reads it (ADR 0037): the limit line
+ * counts its computer's own tools, and a note says it may use them to look.
+ * The transcript keeps the model brain's text, since a run can fall back to it.
+ */
+export function forComputerBrain(system: string) {
+  return `${system.replace(CAPABILITIES_LIMIT, COMPUTER_CAPABILITIES_LIMIT)}\n\n${COMPUTER_TOOLS_NOTE}`;
 }

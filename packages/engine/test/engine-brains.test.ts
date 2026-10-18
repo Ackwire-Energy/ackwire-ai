@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { channelTopic, MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
+import { systemText } from "@agenteschat/providers";
 import {
   type Brain,
   type BrainEvent,
@@ -9,6 +10,7 @@ import {
   brainModelFor,
   brainSessionId,
   COMPUTER_REACT_NOTE,
+  COMPUTER_TOOLS_NOTE,
   clearPlanLimits,
   computerBrainUnavailable,
   createJobHandlers,
@@ -158,16 +160,18 @@ test("a computer brain's model: the mission's, else the agent's only for the sam
 test("a computer-brain turn ends after the tools it ran through the bridge (never sent again); plan usage at no cost", async () => {
   f = await setup();
   const machineId = await computerAgent(f);
-  const { brain, seen } = scriptedComputerBrain((n) =>
-    n === 0
+  let system = "";
+  const { brain, seen } = scriptedComputerBrain((n, turn) => {
+    system ||= turn.system;
+    return n === 0
       ? [
           { type: "text_delta", text: "Rodei os testes." },
           { type: "tool_call", id: "t1", name: "Bash", input: { command: "bun test" }, executed: { content: "ok" } },
           { type: "usage", input: 40, output: 9, source: "plan", model: "claude-sonnet-5-5" },
           { type: "done", text: "Rodei os testes: tudo verde." },
         ]
-      : [{ type: "done", text: "SENT TWICE" }],
-  );
+      : [{ type: "done", text: "SENT TWICE" }];
+  });
   const handlers = createJobHandlers({
     ...f.jobDeps,
     brains: { claude_code: () => brain },
@@ -178,6 +182,9 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
 
   expect(seen.length).toBe(1);
   expect(seen[0]?.trigger).toBe("@dev roda os testes");
+  // A computer brain is told it may read and investigate with its own tools (ADR 0037).
+  expect(system).toContain(COMPUTER_TOOLS_NOTE);
+  expect(system).not.toContain("Beyond this, you can't.");
   expect(seen[0]?.model).toBe("sonnet");
   expect(seen[0]?.session).toEqual({
     id: brainSessionId(f.agent.id, question.id, "claude_code"),
@@ -284,6 +291,10 @@ test("a plan limit falls back to the model brain; the reply carries a quiet note
   const reply = thread.at(-1);
   expect(reply?.body).toBe("Respondi pela API.");
   expect(reply?.meta.brainFallback).toMatchObject({ from: "claude_code", code: "plan_limit" });
+  // The model brain that stood in has no computer tools: no computer note in its prompt.
+  const fallbackPrompt = systemText(f.provider.calls.at(-1)?.request.system ?? "");
+  expect(fallbackPrompt).not.toContain(COMPUTER_TOOLS_NOTE);
+  expect(fallbackPrompt).toContain("Beyond this, you can't.");
   // That turn ran on the API (the agent's budget) and the limit is remembered for the next turns.
   const usage = await f.db
     .select()

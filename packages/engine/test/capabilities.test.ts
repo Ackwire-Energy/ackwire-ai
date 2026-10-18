@@ -1,7 +1,15 @@
 import { afterEach, expect, test } from "bun:test";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
-import { describeCapabilities, drainOutbox, grantScopes, postPersonMessage, setAgentScopes } from "../src";
+import {
+  COMPUTER_TOOLS_NOTE,
+  describeCapabilities,
+  drainOutbox,
+  forComputerBrain,
+  grantScopes,
+  postPersonMessage,
+  setAgentScopes,
+} from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
@@ -29,6 +37,17 @@ test("capabilities come from the granted tools, grouped, with what needs approva
   const none = describeCapabilities([]);
   expect(none).toContain("You only write messages in this chat");
   expect(none).not.toContain("Download PDF");
+});
+
+test("a computer brain's prompt: its own tools are allowed and the limit line counts them", () => {
+  const text = describeCapabilities([{ name: "read_artifact", description: "Read an artifact.", scope: "drive:read" }]);
+  expect(text).toContain("Beyond this, you can't.");
+  expect(text).not.toContain(COMPUTER_TOOLS_NOTE);
+  const computer = forComputerBrain(`# Org\n\n${text}`);
+  expect(computer).not.toContain("Beyond this, you can't.");
+  expect(computer).toContain("Beyond this list and your computer's own tools, you can't.");
+  expect(computer).toContain("Use them freely to read and investigate; that needs no approval.");
+  expect(computer.startsWith("# Org")).toBe(true);
 });
 
 const promptOf = (req: ModelRequest | undefined) => systemText(req?.system ?? "");

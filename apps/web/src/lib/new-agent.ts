@@ -34,7 +34,7 @@ export const ROLE_PRESETS: Record<RoleId, RolePreset> = {
     look: { color: "amber", eyes: "round", accessory: "antenna" },
     levels: { sentry: "write", github: "read", cloudflare: "read", linear: "read" },
     channels: ["ops", "incidentes", "incidents", "infra", "alertas", "alerts"],
-    model: "haiku",
+    model: "sonnet",
   },
   qa: {
     icon: "checks",

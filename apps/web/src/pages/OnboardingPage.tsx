@@ -314,7 +314,7 @@ export function OnboardingPage() {
           name: info.name,
           handle: handleFrom(info.name),
           role: info.role,
-          instructions: role ? t(`newAgent.roles.${role}.instructions`) : info.desc,
+          instructions: role ? t(`newAgent.roles.${role}.instructions`) : t("onboarding.presets.lia.instructions"),
           model: suggestModel(list.models, provider, list.defaultModel),
           // null = the workspace default key.
           credentialId: null,
