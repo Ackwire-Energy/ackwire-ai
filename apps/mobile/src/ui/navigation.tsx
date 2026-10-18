@@ -103,23 +103,24 @@ function useScrollUnderBar(): NativeStackNavigationOptions {
   }, [colors.bg, scheme]);
 }
 
-/** A tab's stack root: a large title in Funnel Display Light that collapses into the bar on scroll. */
+/**
+ * A tab's stack root: a clear bar whose title fades in on scroll; the large title is drawn by the screen
+ * (`LargeTitleScreen`), not the native one, which stayed expanded over the list inside the system tabs.
+ */
 export function useLargeTitleOptions(): NativeStackNavigationOptions {
-  const { colors, fonts } = useTheme();
-  const bar = useScrollUnderBar();
+  const { colors } = useTheme();
   return useMemo<NativeStackNavigationOptions>(
     () => ({
-      ...bar,
       headerShown: true,
-      headerLargeTitleEnabled: true,
-      headerLargeTitleShadowVisible: false,
+      headerTransparent: true,
+      headerStyle: { backgroundColor: "transparent" },
       headerShadowVisible: false,
-      headerLargeTitleStyle: { fontFamily: fonts.display, color: colors.ink },
+      headerLargeTitleEnabled: false,
       headerTitleStyle: { color: colors.ink },
       headerTintColor: colors.ink,
       contentStyle: { backgroundColor: colors.bg },
     }),
-    [bar, colors, fonts],
+    [colors],
   );
 }
 

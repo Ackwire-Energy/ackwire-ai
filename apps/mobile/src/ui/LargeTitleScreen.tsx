@@ -1,18 +1,21 @@
 import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-router";
+import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ReactElement, type ReactNode, useMemo } from "react";
-import { Platform, type RefreshControlProps, ScrollView, StyleSheet, View } from "react-native";
+import { Platform, type RefreshControlProps, StyleSheet, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { LivePause } from "@/agent/live";
+import { CoverBarBackdrop, FadingHeaderTitle, useCoverScroll, useScrollFade } from "./cover";
 import { type HeaderAction, useHeaderActionOptions } from "./headerActions";
 import { Text } from "./Text";
 import { useTheme } from "./theme";
 
 export interface LargeTitleScreenProps {
   title: string;
-  /** A line under the large title (the native bar has no subtitle; it scrolls with the content). */
+  /** A line under the large title (it scrolls with the content). */
   subtitle?: string;
   /** Buttons in the bar (native bar buttons on iOS). */
   actions?: HeaderAction[];
-  /** The bar's leading item, a custom view (Android; on iOS it stops the large title collapsing). */
+  /** The bar's leading item (the person's avatar, which opens Você). */
   left?: ReactNode;
   /** Native buttons on the bar's leading side (iOS). */
   leftActions?: HeaderAction[];
@@ -30,13 +33,12 @@ export interface LargeTitleScreenProps {
 }
 
 /**
- * A tab's root screen with the native large title (it collapses into the bar as the content scrolls),
- * inside the tab's stack (`useLargeTitleOptions`). This only sets the screen's header options and lays
- * out the scroll view: `contentInsetAdjustmentBehavior="automatic"` lets iOS place the content under the
- * large title and above the tab bar; it must stay the first view of the screen (nothing laid over it) for
- * the large title to follow its scroll. Nothing React goes inside the bar either (no custom header views, no
- * native search bar): on iOS 26 any of them keeps the large title expanded with the list scrolling under it.
- * Agents inside stop moving while the screen is not showing.
+ * A tab's root screen (Conversas, Agentes, Atividade): the large title in Funnel Display is part of the
+ * content and scrolls away with it; the bar's own title fades in as it goes (like Mail's, and like the
+ * prototype). We draw it rather than using the native large title: on iOS 26 inside the system tabs the
+ * native one stayed expanded while the list scrolled under it. The bar is clear over the large title and
+ * turns into the system glass (iOS 26 scroll edge; a blur before; opaque on Android) once content passes
+ * under it. Agents inside stop moving while the screen is not showing.
  */
 export function LargeTitleScreen({
   title,
@@ -52,41 +54,68 @@ export function LargeTitleScreen({
 }: LargeTitleScreenProps) {
   const { colors } = useTheme();
   const focused = useIsFocused();
+  const headerHeight = useHeaderHeight();
+  // iOS insets the scroll view by the clear bar (it rests at minus the header height); Android lays it out
+  // from the top of the screen, under the bar.
+  const { y, onScroll } = useCoverScroll(IOS ? headerHeight : 0);
+  const titleFade = useScrollFade(y, 0, TITLE_GONE);
   const actionOptions = useHeaderActionOptions({ right: actions, left, leftActions });
   // Stable options: `setOptions` runs when the title or the actions change, not on every render.
-  const options = useMemo<NativeStackNavigationOptions>(() => ({ title, ...actionOptions }), [title, actionOptions]);
+  const options = useMemo<NativeStackNavigationOptions>(
+    () => ({
+      ...actionOptions,
+      title,
+      headerTitle: () => <FadingHeaderTitle y={y} from={BAR_TITLE_FROM} to={BAR_TITLE_TO} text={title} />,
+    }),
+    [actionOptions, title, y],
+  );
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <Stack.Screen options={options} />
       <LivePause paused={!focused}>
-        <ScrollView
+        <Animated.ScrollView
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           refreshControl={refreshControl}
           contentInsetAdjustmentBehavior="automatic"
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: bottomInset }}
+          contentContainerStyle={{ paddingTop: IOS ? 0 : headerHeight, paddingBottom: bottomInset }}
         >
           {pullDown && IOS ? (
             <View style={[styles.pullDown, { top: -pullDownHeight, height: pullDownHeight }]} pointerEvents="box-none">
               {pullDown}
             </View>
           ) : null}
-          {subtitle ? (
-            <Text variant="small" tone="muted" style={styles.subtitle}>
-              {subtitle}
+          <Animated.View style={[styles.head, titleFade]}>
+            <Text variant="display" accessibilityRole="header" numberOfLines={1}>
+              {title}
             </Text>
-          ) : null}
+            {subtitle ? (
+              <Text variant="small" tone="muted" style={styles.subtitle}>
+                {subtitle}
+              </Text>
+            ) : null}
+          </Animated.View>
           {children}
-        </ScrollView>
+        </Animated.ScrollView>
       </LivePause>
+      <CoverBarBackdrop y={y} from={0} to={12} height={headerHeight} />
     </View>
   );
 }
 
 const IOS = Platform.OS === "ios";
 
+/** Scroll (from rest) by which the large title has faded out under the bar. */
+const TITLE_GONE = 40;
+/** The bar's title fades in over this stretch, as the large title leaves. */
+const BAR_TITLE_FROM = 28;
+const BAR_TITLE_TO = 48;
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  subtitle: { paddingHorizontal: 20, paddingBottom: 12 },
+  head: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 10 },
+  subtitle: { marginTop: 2 },
   pullDown: { position: "absolute", left: 0, right: 0, overflow: "hidden" },
 });
