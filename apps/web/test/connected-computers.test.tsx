@@ -572,7 +572,8 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     await renderApp(`/org/${ORG_ID}/settings/computers/nope`, { api });
     await settle(8);
     expect(screen().getByText("Computador não encontrado")).toBeTruthy();
-    expect(screen().getByRole("link", { name: "Computadores" })).toBeTruthy();
+    // The way back: the page's own link (the settings menu has one too).
+    expect(document.querySelector("a.machine-page__back")?.textContent).toContain("Computadores");
   });
 
   test("agent page: the folders of its computer this agent may use", async () => {

@@ -247,7 +247,8 @@ export function watchConfig(
     watcher = watch(home, { persistent: false }, (_event, name) => {
       if (!name || String(name) === "config.json") soon();
     });
-    watcher.on("error", () => {
+    // A watcher that dies (the folder was removed) falls back to the poll below.
+    (watcher as unknown as { on?: (event: "error", fn: () => void) => void }).on?.("error", () => {
       watcher?.close();
       watcher = null;
     });

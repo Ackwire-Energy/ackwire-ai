@@ -217,8 +217,8 @@ export function machineAppRoutes(deps: AppDeps) {
       },
       responses: {
         200: json(z.object({ access: MachineAccess })),
-        409: errorResponse("The computer is offline (`machine.offline`)"),
         ...errors,
+        409: errorResponse("The computer is offline (`machine.offline`)"),
       },
     }),
     async (c) => {

@@ -646,7 +646,7 @@ describe("folders and tools on the machine (protocol 10)", () => {
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: ctx.threadRootId });
     const requested = thread.find((m) => m.meta.bodyCode === "machine_access_requested");
     expect(requested).toMatchObject({
-      authorAgentId: f.agent.id,
+      author: { type: "agent", id: f.agent.id },
       meta: {
         bodyParams: {
           path: "/Users/ana/Documents",
@@ -658,7 +658,7 @@ describe("folders and tools on the machine (protocol 10)", () => {
     });
     const note = thread.find((m) => m.meta.bodyCode === "machine_access_granted");
     expect(note).toMatchObject({
-      authorAgentId: f.agent.id,
+      author: { type: "agent", id: f.agent.id },
       body: "The owner allowed /Users/ana/Documents on MacBook.",
       meta: {
         bodyCode: "machine_access_granted",

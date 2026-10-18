@@ -134,9 +134,11 @@ test("tools: commands off refuses exec and shell tasks; Claude Code and Codex ne
   const { ctx, setAccess } = setup({ commands: false });
   const tasks = { start: async () => ({ taskId: "t" }) } as unknown as TaskManager;
   const withTasks = { ...ctx, tasks };
-  expect(await errorCode(() => handleRequest(ctx, { op: "exec", command: "echo hi", agent: AGENT }, scope()))).toBe(
-    "exec_disabled",
-  );
+  expect(
+    await errorCode(() =>
+      handleRequest(ctx, { op: "exec", command: "echo hi", timeoutSeconds: 10, stream: false, agent: AGENT }, scope()),
+    ),
+  ).toBe("exec_disabled");
   const task = (executor: "shell" | "claude" | "codex"): MachineRequest => ({
     op: "task.start",
     taskId: "0193aaaa-0000-7000-8000-000000000001",
@@ -170,15 +172,17 @@ test("paused: new work is refused with `paused`; status and output still answer"
   const tasks = { status: () => ({ tasks: [] }) } as unknown as TaskManager;
   for (const req of [
     read("notes.txt"),
-    { op: "list", path: "", agent: AGENT },
-    { op: "exec", command: "echo hi", agent: AGENT },
+    { op: "list", path: "", depth: 1, agent: AGENT },
+    { op: "exec", command: "echo hi", timeoutSeconds: 10, stream: false, agent: AGENT },
     { op: "write", path: "a.txt", base64: "", agent: AGENT },
   ] as MachineRequest[]) {
     expect(await errorCode(() => handleRequest(ctx, req, scope()))).toBe("paused");
   }
   expect(await handleRequest({ ...ctx, tasks }, { op: "task.status", agent: AGENT }, scope())).toEqual({ tasks: [] });
   pause(false);
-  expect(await errorCode(() => handleRequest(ctx, { op: "list", path: "", agent: AGENT }, scope()))).toBe("ok");
+  expect(await errorCode(() => handleRequest(ctx, { op: "list", path: "", depth: 1, agent: AGENT }, scope()))).toBe(
+    "ok",
+  );
 });
 
 test("system folders, the home itself and the runner's own folder can't be allowed", () => {

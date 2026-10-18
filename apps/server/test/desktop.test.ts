@@ -3,8 +3,16 @@ import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapter
 import { parseReleaseBody, parseSha256 } from "../src/routes/desktop";
 import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
-let t: TestServer;
-afterEach(() => t.close());
+let t: TestServer | null = null;
+afterEach(() => {
+  t?.close();
+  t = null;
+});
+/** The current test's server (set by the test). */
+const server = () => {
+  if (!t) throw new Error("no server");
+  return t;
+};
 
 const SUM = "a".repeat(64);
 const ASSETS = "https://api.github.com/repos/wescld/agents.chat/releases/assets";
@@ -20,7 +28,7 @@ const release = (version: string, extra: Record<string, unknown> = {}) => ({
 /** A fake GitHub: releases newest first; assets redirect to a "signed" URL that must not get our token. */
 function fakeGithub(releases: Record<string, unknown>[]) {
   const calls: { url: string; auth: string | null }[] = [];
-  const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     const auth = new Headers(init?.headers).get("authorization");
     calls.push({ url, auth });
@@ -58,8 +66,8 @@ test("release body and checksum parsing", () => {
 test("without a token the desktop endpoints answer 404", async () => {
   const github = fakeGithub([release("0.2.0")]);
   t = await createTestServer({ desktopFetch: github.fetch });
-  expect((await t.app.request("/api/desktop/latest?target=darwin&arch=arm64")).status).toBe(404);
-  expect((await t.app.request("/api/desktop/download/0.2.0/agentes_0.2.0_universal.dmg")).status).toBe(404);
+  expect((await server().app.request("/api/desktop/latest?target=darwin&arch=arm64")).status).toBe(404);
+  expect((await server().app.request("/api/desktop/download/0.2.0/agentes_0.2.0_universal.dmg")).status).toBe(404);
   expect(github.calls).toEqual([]);
 });
 
@@ -71,7 +79,7 @@ test("latest: the newest desktop-v* release with its dmg and checksum, cached, o
     release("0.1.0"),
   ]);
   t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: github.fetch });
-  const res = await t.app.request("/api/desktop/latest?target=darwin&arch=arm64", {
+  const res = await server().app.request("/api/desktop/latest?target=darwin&arch=arm64", {
     headers: { origin: "tauri://localhost" },
   });
   expect(res.status).toBe(200);
@@ -86,16 +94,16 @@ test("latest: the newest desktop-v* release with its dmg and checksum, cached, o
   });
   // Both architecture spellings; one universal build.
   for (const arch of ["aarch64", "x64", "x86_64"]) {
-    expect((await t.app.request(`/api/desktop/latest?target=darwin&arch=${arch}`)).status).toBe(200);
+    expect((await server().app.request(`/api/desktop/latest?target=darwin&arch=${arch}`)).status).toBe(200);
   }
-  expect((await t.app.request("/api/desktop/latest?target=windows&arch=x64")).status).toBe(404);
+  expect((await server().app.request("/api/desktop/latest?target=windows&arch=x64")).status).toBe(404);
   // Cached: GitHub's release list was read once.
   expect(github.calls.filter((c) => c.url.endsWith("/releases?per_page=30"))).toHaveLength(1);
   // The signed asset URL never gets our token.
   expect(github.calls.filter((c) => c.url.startsWith("https://signed.example/")).every((c) => c.auth === null)).toBe(
     true,
   );
-  const preflight = await t.app.request("/api/desktop/latest", { method: "OPTIONS" });
+  const preflight = await server().app.request("/api/desktop/latest", { method: "OPTIONS" });
   expect(preflight.status).toBe(204);
   expect(preflight.headers.get("access-control-allow-origin")).toBe("*");
 });
@@ -103,19 +111,19 @@ test("latest: the newest desktop-v* release with its dmg and checksum, cached, o
 test("download streams an asset of a desktop-v* release, as an attachment; nothing else", async () => {
   const github = fakeGithub([release("0.2.0"), { tag_name: "v1.0.0", assets: [asset("secret.txt")] }]);
   t = await createTestServer({ env: { DESKTOP_RELEASES_TOKEN: "ghp_test" }, desktopFetch: github.fetch });
-  const res = await t.app.request("/api/desktop/download/0.2.0/agentes_0.2.0_universal.dmg");
+  const res = await server().app.request("/api/desktop/download/0.2.0/agentes_0.2.0_universal.dmg");
   expect(res.status).toBe(200);
   expect(res.headers.get("content-disposition")).toBe('attachment; filename="agentes_0.2.0_universal.dmg"');
   expect(res.headers.get("content-type")).toBe("application/x-apple-diskimage");
   expect(await res.text()).toBe("DMG-BYTES");
-  expect((await t.app.request("/api/desktop/download/0.2.0/other.dmg")).status).toBe(404);
-  expect((await t.app.request("/api/desktop/download/1.0.0/secret.txt")).status).toBe(404);
-  expect((await t.app.request("/api/desktop/download/..%2F..%2Fx/a.dmg")).status).toBe(404);
+  expect((await server().app.request("/api/desktop/download/0.2.0/other.dmg")).status).toBe(404);
+  expect((await server().app.request("/api/desktop/download/1.0.0/secret.txt")).status).toBe(404);
+  expect((await server().app.request("/api/desktop/download/..%2F..%2Fx/a.dmg")).status).toBe(404);
 });
 
 test("reduce over HTTP: admins or the pairer, only removing or turning off", async () => {
   t = await createTestServer({ env: { ALLOW_SIGNUP: "true" }, reply: () => ({ chunks: ["ok"] }) });
-  const owner = browser(t);
+  const owner = browser(server());
   await signUp(owner, "owner@example.com");
   const { orgId } = await seedOrg(owner);
   const api = (path: string, init?: Parameters<typeof owner>[1]) =>
@@ -128,12 +136,12 @@ test("reduce over HTTP: admins or the pairer, only removing or turning off", asy
     protocol: MACHINE_PROTOCOL_VERSION,
     workspace: "/Users/a/agentes",
   };
-  const paired = await pairComputer(t, api, { ...RUNNER, exec: true });
+  const paired = await pairComputer(server(), api, { ...RUNNER, exec: true });
   let access = {
     folders: [{ path: "/Users/a/Projects", agents: [] as string[] }],
     tools: { claude: true, codex: false, commands: true },
   };
-  const hub = t.engine.machineHub;
+  const hub = server().engine.machineHub;
   const sent: ServerFrame[] = [];
   const conn = hub.open({
     send(text: string) {

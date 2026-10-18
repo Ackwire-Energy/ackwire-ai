@@ -194,7 +194,7 @@ test("paired: status and hello carry pause and access; pause/resume persist, go 
   expect(c.events("activity").some((e) => e.kind === "activity" && e.entry.kind === "pause")).toBe(true);
 
   // While paused, new work from the server is refused; the runner says why.
-  s.frame({ type: "request", id: "q1", op: "list", path: "", agent: AGENT });
+  s.frame({ type: "request", id: "q1", op: "list", path: "", depth: 1, agent: AGENT });
   await waitFor(() => s.sent.some((f) => f.id === "q1"));
   expect(s.sent.find((f) => f.id === "q1")).toMatchObject({ ok: false, error: { code: "paused" } });
 
@@ -244,7 +244,15 @@ test("jobs and the activity log: each request is a job while it runs and a line 
   expect(all.entries.map((e) => e.summary)).toEqual(["read notes.txt", "wrote notes.txt"]);
   expect(readFileSync(path.join(home, "activity.jsonl"), "utf8")).not.toContain(TOKEN);
   // Commands are off on a new app pairing: refused, and the log says so.
-  s.frame({ type: "request", id: "x1", op: "exec", command: "echo hi", agent: AGENT });
+  s.frame({
+    type: "request",
+    id: "x1",
+    op: "exec",
+    command: "echo hi",
+    timeoutSeconds: 10,
+    stream: false,
+    agent: AGENT,
+  });
   await waitFor(() => s.sent.some((f) => f.id === "x1"));
   expect(s.sent.find((f) => f.id === "x1")).toMatchObject({ ok: false, error: { code: "exec_disabled" } });
   await waitFor(() => c.events("activity").some((e) => e.kind === "activity" && e.entry.result === "refused"));

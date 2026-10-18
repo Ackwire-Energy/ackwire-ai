@@ -5,7 +5,7 @@ export type TrayState = "idle" | "working" | "paused" | "offline" | "update";
 
 export interface TrayInput {
   running: boolean;
-  status?: ControlStatus;
+  status?: ControlStatus | null;
   jobs: readonly ControlJob[];
 }
 
