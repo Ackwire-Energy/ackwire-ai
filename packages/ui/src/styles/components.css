@@ -5864,7 +5864,8 @@ label.ac-setrow__title {
   position: fixed;
   inset: 0;
   z-index: var(--z-scrim);
-  background: var(--scrim);
+  /* The page's own color over the blurred app (light in light mode), not the dialogs' dark scrim. */
+  background: color-mix(in srgb, var(--bg) 58%, transparent);
 }
 .ac-mo {
   position: fixed;
@@ -5918,6 +5919,12 @@ label.ac-setrow__title {
   display: grid;
   width: 64px;
   height: 64px;
+}
+/* Photos and marks at the header's size (an xl avatar is bigger). */
+.ac-mo__mark > .ac-avatar {
+  width: 64px;
+  height: 64px;
+  font-size: 24px;
 }
 .ac-mo__titles {
   min-width: 0;
