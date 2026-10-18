@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
-import { mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -17,7 +17,7 @@ import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
 import { isInside, resolveForAgent } from "./paths";
-import { claudeSessionExists, type TaskSecrets, WRONG_SESSION_FLAG } from "./tasks";
+import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION_FLAG } from "./tasks";
 
 /**
  * Brain turns (protocol 8, ADR 0032): Claude Code thinks for an agent on
@@ -569,6 +569,34 @@ export interface BrainTurnContext {
   grants?: string[];
 }
 
+/**
+ * A conversation that moves to another folder (the agent's folder, then its
+ * checkout `repos/owner/name` once cloned) keeps its Claude Code session:
+ * Claude Code resumes only from the folder's own project, so the newest copy
+ * of the session is copied there first. Best effort.
+ */
+export function carryClaudeSession(claudeHome: string, cwd: string, session: string) {
+  const projects = path.join(claudeHome, "projects");
+  const target = claudeSessionFile(claudeHome, cwd, session);
+  let newest: { file: string; mtime: number } | null = null;
+  try {
+    for (const dir of readdirSync(projects)) {
+      const file = path.join(projects, dir, `${session}.jsonl`);
+      try {
+        const mtime = statSync(file).mtimeMs;
+        if (!newest || mtime > newest.mtime) newest = { file, mtime };
+      } catch {
+        // not in this project
+      }
+    }
+    if (!newest || newest.file === target) return;
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(newest.file, target);
+  } catch {
+    // no projects folder, or unreadable: Claude Code decides as before
+  }
+}
+
 const errorEvent = (code: string, message: string, retryable: boolean): WireBrainEvent => ({
   type: "error",
   code,
@@ -711,6 +739,7 @@ export class BrainManager {
 
   private resumeFor(cwd: string, session: string, req: BrainTurnRequest, ranBefore = false) {
     const home = this.opts.claudeHome ?? process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
+    carryClaudeSession(home, cwd, session);
     const found = claudeSessionExists(home, cwd, session);
     if (found !== null) return found;
     return ranBefore || this.ran.has(session) || req.session?.resume === true;
@@ -838,6 +867,11 @@ export class BrainManager {
       ),
       { mode: 0o600 },
     );
+    // Starting in one of its checkouts (`repos/owner/name`), the agent keeps its whole folder (its other checkouts).
+    const addDirs = [
+      ...(cwd !== ctx.folder ? [ctx.folder] : []),
+      ...(ctx.grants ?? []).filter((g) => !isInside(g, cwd)),
+    ];
     const args = claudeBrainArgs({
       session,
       resume,
@@ -848,7 +882,7 @@ export class BrainManager {
       strictMcp: req.personalMcp !== true,
       promptTool: mode === "work",
       permissionMode: mode === "plan" ? "dontAsk" : "acceptEdits",
-      ...(ctx.grants?.length ? { addDirs: ctx.grants.filter((g) => !isInside(g, cwd)) } : {}),
+      ...(addDirs.length ? { addDirs } : {}),
     });
     const proc = new ClaudeProcess(this.opts.claudeCommand ?? ["claude"], args, cwd, env);
     const live: Live = { key, id, proc, sig, busy: false, lastUsed: Date.now(), idleTimer: null, persistent };

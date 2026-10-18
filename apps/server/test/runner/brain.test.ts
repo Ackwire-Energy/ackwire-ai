@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   BRAIN_PROTOCOL,
@@ -15,6 +15,7 @@ import {
   BrainManager,
   type BrainManagerOptions,
   ClaudeStreamParser,
+  carryClaudeSession,
   claudeBrainArgs,
   fallbackModelFor,
   userMessageLine,
@@ -550,3 +551,32 @@ test.if(posix)(
     ).rejects.toThrow(/turned off/);
   },
 );
+
+test.if(posix)("a turn in one of its checkouts keeps the agent's whole folder (--add-dir)", async () => {
+  const { spawns, turn, ws } = setup();
+  const folder = await agentWorkspace(ws, AGENT);
+  mkdirSync(path.join(folder, "repos", "acme", "app"), { recursive: true });
+  const r = await turn(1, "hi", { cwd: "repos/acme/app" });
+  expect(r.final).toMatchObject({ type: "done" });
+  const args = spawns()[0]?.args ?? [];
+  expect(args[args.indexOf("--add-dir") + 1]).toBe(folder);
+});
+
+test("a conversation that moves to a checkout keeps its Claude Code session (the newest copy)", () => {
+  const home = tempDir("claude-home-");
+  dirs.push(home);
+  const session = "11111111-2222-4333-8444-555555555555";
+  const project = (cwd: string) => path.join(home, "projects", cwd.replace(/[^a-zA-Z0-9]/g, "-"));
+  mkdirSync(project("/w/dev"), { recursive: true });
+  writeFileSync(path.join(project("/w/dev"), `${session}.jsonl`), "old\nnew\n");
+  carryClaudeSession(home, "/w/dev/repos/acme/app", session);
+  const moved = path.join(project("/w/dev/repos/acme/app"), `${session}.jsonl`);
+  expect(readFileSync(moved, "utf8")).toBe("old\nnew\n");
+  // Back in the folder after more turns in the checkout: the newer one goes back.
+  writeFileSync(moved, "old\nnew\nmore\n");
+  utimesSync(path.join(project("/w/dev"), `${session}.jsonl`), new Date(1000), new Date(1000));
+  carryClaudeSession(home, "/w/dev", session);
+  expect(readFileSync(path.join(project("/w/dev"), `${session}.jsonl`), "utf8")).toBe("old\nnew\nmore\n");
+  // No projects folder: nothing happens.
+  carryClaudeSession(path.join(home, "nope"), "/w", session);
+});

@@ -46,3 +46,25 @@ Agents use real `git clone/commit/push` against private repositories from their 
 - A fast-forward to an existing upstream commit that isn't in the pack needs the compare API; if GitHub can't answer, the push is refused (safe side).
 - Deltified commits in a pack (rare for pushes) are not read. A walk that depends on them falls back to the compare API.
 - The proxy holds a whole push in memory (up to the limit) to inspect it.
+
+## Addendum (2026-10-18): the proxy on connected machines
+
+ADR 0025 left connected machines out ("we never set up git on a person's machine"): an agent thinking with Claude Code on someone's Mac had no checkout, `git_clone` refused there, and a raw `git clone` used the machine's own credentials (and waited on a permission prompt). Our proxy is the safer path on a person's machine too: only the agent's repositories, GitHub's token never leaves the server, revocable at once, pushes only to `agentes/<handle>/…`. So connected machines use it, without touching the machine's global git config.
+
+**Credential.** The same `agtgit1` HMAC with `kind: "machine"` (`k: "m"`): `sandboxId` is the machine id and the generation is a number from the machine token's hash (`machineGitGen`). The proxy accepts it only while the machine is paired with that token (not deleted, not re-paired) and the agent still uses that machine (`agents.machine_id`); scopes and the repository list are checked live, as for cloud computers. Lifetime 6 h; a fresh one goes with every `git.sync`.
+
+**Runner op `git.sync` (protocol 11).** The server sends the proxy base URL, the credential, the commit author and a list of `{ repo, dir, clone }` (default `repos/<owner>/<name>` in the agent's folder), plus `existing` (also every checkout already under `repos/`) and a deadline. The runner:
+- writes the credential to `<runner home>/git/<agent id>.token` (mode 600, outside the agent's folder);
+- clones with `git clone --filter=blob:none --progress` (progress streamed as `output` frames), git spawned with an argv, `GIT_TERMINAL_PROMPT=0`;
+- sets each checkout's local config: `remote.origin.url` = the proxy URL, `credential.helper` reset (empty) then a helper that prints the token file, the agent as author, `push.autoSetupRemote`. Nothing global changes; no GitHub token is ever written;
+- on an existing checkout: `fetch --prune`, then fast-forward the default branch (checked out and clean: `merge --ff-only`; on another branch: its ref only if it is an ancestor). Never a merge, never over local work;
+- answers per repository: `cloned`, `updated`, `missing` (not cloned, not asked) or `failed` (offline, refused by the proxy…, with `head` when the checkout is there but stale). Only a bad request fails the whole op.
+Older runners drop unknown ops, so the server never sends `git.sync` below protocol 11 (`git_clone` tells the agent to update the app).
+
+**`git_clone` on a connected machine.** Scope `github:git.read` only (no `sandbox:run`, no approval); the Tool Gateway checks the repository list as for every GitHub tool. Long timeout (30 min), progress as `agent.tool.output`. In a mission's thread it refuses: the mission has its own folder.
+
+**Before each chat turn of a computer brain** (Claude Code, Codex; not missions): `prepareAgentCode` sends `git.sync` with the agent's explicit repositories (`clone: false`) and `existing: true`, bounded to 20 s; any failure leaves the turn as before. The turn's `cwd` becomes the checkout the conversation names (newest message first, `owner/name` or a bare name), else the agent's first repository, else its first checkout; the agent's folder stays reachable (`--add-dir`, Codex `writable_roots`). The runner carries the Claude Code session file to the new folder's project, so a conversation keeps its session when its folder changes. The "# Your code" block (`codePrompt`, `git/repos.ts`) lists the checkouts with their paths and default branches, the branch rule and `open_pull_request`, and the granted repositories not cloned yet ("call git_clone first; it needs no approval").
+
+**Permissions of the brain.** Outside missions the turn's branch prefix is `agentes/<handle>/` (what the proxy accepts). `git clone <https url> [dir]`, `git fetch` and `git pull` whose target is inside the agent's folders count as read-only calls (no person asked, `readOnlyCall`), unless they carry options that run programs or read other config (`-c`, `-u`, `--upload-pack`, `--config`, `--template`…) or name local paths and `ext::`/`file:` transports. The deny list is unchanged: no push to the default branch, no force push, no `gh pr merge`, no deploys.
+
+**Machine access (ADR 0036).** The checkouts live inside the agent's own folder, which the runner always allows; no folder is widened on the server's word. The token file is in the runner's home, which agents can't read through the file tools.

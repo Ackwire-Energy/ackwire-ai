@@ -201,6 +201,8 @@ export const BRAIN_IDLE_TIMEOUT_MS = 15 * 60_000;
 export function requestTimeoutMs(request: MachineRequest) {
   if (request.op === "exec") return (request.timeoutSeconds + 30) * 1000;
   if (request.op === "push") return 330_000;
+  // A clone of a big repository on a slow link: its own deadline plus slack.
+  if (request.op === "git.sync") return (Math.max(1, request.timeoutSeconds) + 30) * 1000;
   // A brain turn may wait on a person (a command approval) for up to 30 minutes, more than once.
   if (request.op === "brain.turn") return 3 * 3600_000;
   return 120_000;

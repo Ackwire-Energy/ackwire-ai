@@ -40,6 +40,7 @@ import {
   missionBranchPrefix,
   missionOfThread,
   notifyOwnerOnBudget,
+  prepareAgentCode,
   queueBudgetEmail,
   type ResolveHost,
   type RunExecutorDeps,
@@ -217,17 +218,15 @@ export function buildEngine(o: EngineOptions) {
         skills: { blobs: artifacts.blobs },
         pubsub: adapters.pubsub,
       }),
-      // Git through our proxy needs cloud computers (we never set up git on a person's machine).
-      ...(sandboxProvider
-        ? [
-            createGitToolSource({
-              sandbox,
-              connectors: connectorDeps,
-              app: githubApp,
-              github: o.github ? { apiUrl: o.github.apiUrl, fetch: o.github.fetch } : undefined,
-            }),
-          ]
-        : []),
+      // Git through our proxy: cloud computers, and connected machines through the runner's `git.sync`
+      // (only our credential reaches the machine; nothing global changes there).
+      createGitToolSource({
+        sandbox,
+        connectors: connectorDeps,
+        app: githubApp,
+        github: o.github ? { apiUrl: o.github.apiUrl, fetch: o.github.fetch } : undefined,
+        pubsub: adapters.pubsub,
+      }),
       ...(o.toolSources ?? []),
     ],
   });
@@ -248,6 +247,16 @@ export function buildEngine(o: EngineOptions) {
       allow: await missionAllowRules(db, mission.id),
     };
   };
+  // Before a chat turn on a connected machine: the agent's checkouts updated through the git proxy, the turn
+  // started in the repository it is about, and the "# Your code" block (ADR 0024 addendum).
+  const prepareCode = (turn: Parameters<typeof prepareAgentCode>[1], signal: AbortSignal) =>
+    prepareAgentCode(
+      { db, hub: machineHub, git: { publicUrl: config.PUBLIC_URL, secret: config.AGENTES_SECRET } },
+      turn,
+      {
+        signal,
+      },
+    );
   const brains: RunExecutorDeps["brains"] = {
     claude_code: (_agent, _run, setup) =>
       createClaudeCodeBrain({
@@ -255,10 +264,21 @@ export function buildEngine(o: EngineOptions) {
         pubsub: adapters.pubsub,
         agentScope,
         mcpToken: () => setup.mcpToken(),
-        permissions: missionPermissions,
+        // Outside missions: its own branches are agentes/<handle>/… (what the git proxy accepts).
+        permissions: async (turn) =>
+          (await missionPermissions(turn)) ?? {
+            mode: "work" as const,
+            branchPrefix: `agentes/${(await agentScope(turn)).handle}/`,
+          },
+        prepare: prepareCode,
       }),
     codex: (_agent, _run, setup) =>
-      new CodexBrain({ link: brainLink, mcp: async () => ({ token: setup.mcpToken() }), agent: agentScope }),
+      new CodexBrain({
+        link: brainLink,
+        mcp: async () => ({ token: setup.mcpToken() }),
+        agent: agentScope,
+        prepare: prepareCode,
+      }),
   };
   const handlers = createJobHandlers({
     db,

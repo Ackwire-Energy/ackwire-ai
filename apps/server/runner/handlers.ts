@@ -17,6 +17,7 @@ import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
+import { gitSync } from "./git";
 import type { McpTaskInfo } from "./mcp";
 import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
 import { type FetchLike, pushPath } from "./push";
@@ -35,6 +36,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "push",
   "task.start",
   "brain.turn",
+  "git.sync",
 ]);
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -52,6 +54,14 @@ export interface HandlerContext {
   secretsDir?: string;
   /** Background tasks (protocol 4); without it the runner refuses `task.*`. */
   tasks?: TaskManager;
+  /**
+   * Protocol 11: where the agents' git proxy credentials are kept
+   * (`<runner home>/git`, outside their folders); without it the runner
+   * refuses `git.sync`.
+   */
+  gitDir?: string;
+  /** Tests: the git command (default `git` on the PATH). */
+  gitCommand?: string;
   /** Brain turns (protocol 8); without it the runner refuses `brain.turn`. */
   brains?: BrainManager;
   /**
@@ -277,6 +287,21 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   switch (req.op) {
     case "brain.turn":
       return doBrainTurn(ctx, req, scope, secrets);
+    case "git.sync":
+      // The runner's own git in the agent's folder (not the agent's shell): no "commands" switch needed.
+      if (!req.agent) throw new RunnerError("bad_request", "A git sync belongs to an agent");
+      if (!ctx.gitDir) throw new RunnerError("bad_request", "This runner keeps no git credentials");
+      return gitSync(
+        {
+          folder: ctx.workspaceReal,
+          gitDir: ctx.gitDir,
+          agent: req.agent,
+          signal: scope.signal,
+          ...(req.stream === true ? { output: scope.output } : {}),
+          ...(ctx.gitCommand ? { gitCommand: ctx.gitCommand } : {}),
+        },
+        req,
+      );
     case "exec":
       return doExec(ctx, req, scope, secrets);
     case "read":
@@ -452,6 +477,10 @@ function describeOp(req: MachineRequest): string {
       return `task.output ${String(req.taskId ?? "")}`;
     case "brain.turn":
       return `brain.turn ${String(req.runId ?? "")} (${String(req.kind ?? "")}${req.model ? `, ${String(req.model)}` : ""})`;
+    case "git.sync": {
+      const repos = Array.isArray(req.repos) ? req.repos.map((r) => String(r?.repo ?? "")).join(", ") : "";
+      return `git.sync ${repos || "(existing checkouts)"}`;
+    }
     case "access.request":
       return `access.request ${String(req.path ?? "")}`;
     case "access.reduce":

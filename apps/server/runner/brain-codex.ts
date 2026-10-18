@@ -558,7 +558,8 @@ export async function handleCodexBrainTurn(
     if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
     cwd = resolved.abs;
   }
-  const writableRoots = (ctx.grants ?? []).filter((g) => !isInside(g, cwd));
+  // Starting in one of its checkouts (`repos/owner/name`), the agent keeps its whole folder (its other checkouts).
+  const writableRoots = [...(cwd !== folder ? [folder] : []), ...(ctx.grants ?? []).filter((g) => !isInside(g, cwd))];
   const secrets = await agentSecrets(ctx.secretsDir, req.agent);
   const file = codexThreadsFile(ctx.runnerHome);
   const threads = ctx.threads ?? threadStores.get(file) ?? new CodexThreads(file);

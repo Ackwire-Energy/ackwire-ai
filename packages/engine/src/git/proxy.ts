@@ -4,12 +4,12 @@ import { recordAudit } from "../audit";
 import { connectorScope } from "../connectors/catalog";
 import { type ConnectorDeps, connectionHeaders } from "../connectors/connections";
 import { CONNECTOR_ALL, freshGrantedKeys, grantKey } from "../tools/scopes";
-import { verifyGitToken } from "./credential";
+import { machineGitGen, verifyGitToken } from "./credential";
 import { appTokenForRepo, type GitHubAppConfig } from "./github-app";
 import { parseReceivePackRequest, pkt, type RefCommand, readPack, walkToOld, ZERO_OID } from "./pack";
 import { agentRepositoryList, repoInList } from "./repos";
 
-const { sandboxes, agents, connectorConnections } = schema;
+const { sandboxes, machines, agents, connectorConnections } = schema;
 
 export const GIT_SCOPES = {
   read: connectorScope("github", "git.read"),
@@ -166,17 +166,32 @@ export async function handleGitProxy(
       "www-authenticate": 'Basic realm="agentes git"',
     });
   }
-  const [computer] = await deps.db
-    .select()
-    .from(sandboxes)
-    .where(and(eq(sandboxes.id, claims.sandboxId), eq(sandboxes.orgId, claims.orgId), isNull(sandboxes.deletedAt)));
-  if (!computer || computer.agentId !== claims.agentId || computer.gitTokenGen !== claims.gen) {
-    return text(401, "agentes: this credential was revoked", { "www-authenticate": 'Basic realm="agentes git"' });
-  }
+  const revoked = () =>
+    text(401, "agentes: this credential was revoked", { "www-authenticate": 'Basic realm="agentes git"' });
   const [agent] = await deps.db
-    .select({ id: agents.id, handle: agents.handle, archivedAt: agents.archivedAt })
+    .select({ id: agents.id, handle: agents.handle, archivedAt: agents.archivedAt, machineId: agents.machineId })
     .from(agents)
     .where(and(eq(agents.id, claims.agentId), eq(agents.orgId, claims.orgId)));
+  /** What the audit names as the computer. */
+  let where: { sandboxId: string } | { machineId: string };
+  if (claims.kind === "machine") {
+    // A connected machine (ADR 0024 addendum): still paired, same token, and still this agent's computer.
+    const [machine] = await deps.db
+      .select({ id: machines.id, tokenHash: machines.tokenHash })
+      .from(machines)
+      .where(and(eq(machines.id, claims.sandboxId), eq(machines.orgId, claims.orgId), isNull(machines.deletedAt)));
+    if (!machine?.tokenHash || machineGitGen(machine.tokenHash) !== claims.gen || agent?.machineId !== machine.id) {
+      return revoked();
+    }
+    where = { machineId: machine.id };
+  } else {
+    const [computer] = await deps.db
+      .select()
+      .from(sandboxes)
+      .where(and(eq(sandboxes.id, claims.sandboxId), eq(sandboxes.orgId, claims.orgId), isNull(sandboxes.deletedAt)));
+    if (!computer || computer.agentId !== claims.agentId || computer.gitTokenGen !== claims.gen) return revoked();
+    where = { sandboxId: computer.id };
+  }
   if (!agent || agent.archivedAt) return text(403, "agentes: this agent is archived");
 
   // 2. Which GitHub connection, and what this agent may do with it.
@@ -257,7 +272,7 @@ export async function handleGitProxy(
         actor: { type: "agent", id: claims.agentId },
         action: "git.fetch",
         target: { type: "git_repo", id: repoName },
-        details: { connectionId: connection.id, sandboxId: computer.id },
+        details: { connectionId: connection.id, ...where },
       }).catch(() => undefined);
     }
     return relay(res, limits.fetchBytes);
@@ -327,7 +342,7 @@ export async function handleGitProxy(
       target: { type: "git_repo", id: repoName },
       details: {
         connectionId: connection.id,
-        sandboxId: computer.id,
+        ...where,
         refs: request.commands.map((c) => ({ ref: c.ref, from: c.oldOid, to: c.newOid })),
         commits,
       },

@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 10;
+export const MACHINE_PROTOCOL_VERSION = 11;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -74,6 +74,67 @@ export const PAUSE_PROTOCOL = 9;
  * (`access.reduce`).
  */
 export const ACCESS_PROTOCOL = 10;
+
+/**
+ * From this protocol on (ADR 0024 addendum): `git.sync` clones or updates an
+ * agent's checkouts of GitHub repositories inside its own folder
+ * (`repos/<owner>/<name>`), through our git proxy. The request carries our
+ * short-lived proxy credential (never a GitHub token); the runner keeps it
+ * outside the agent's folder and points each checkout's remote and
+ * credential helper at it. The server never sends `git.sync` to an older runner.
+ */
+export const GIT_PROTOCOL = 11;
+
+/** Where an agent's checkouts live inside its folder. */
+export const GIT_CHECKOUTS_DIR = "repos";
+/** `owner/name` → `repos/owner/name` (relative to the agent's folder). */
+export const gitCheckoutDir = (repo: string) => `${GIT_CHECKOUTS_DIR}/${repo}`;
+/** `owner/name` as GitHub allows it (no `.` or `..` names). */
+export const isGitRepoName = (v: unknown): v is string =>
+  typeof v === "string" &&
+  /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(v) &&
+  v.split("/").every((part) => part !== "." && part !== "..");
+
+/** Largest pieces of a `git.sync`. */
+export const GIT_SYNC_LIMITS = {
+  repos: 50,
+  /** A clone may take this long (big repositories on a slow link). */
+  maxSeconds: 3600,
+  message: 1000,
+} as const;
+
+/** `git.sync` (protocol 11): clone or update an agent's checkouts through our proxy. */
+export interface GitSyncRequest {
+  /** Our proxy for the org's GitHub connection (`…/api/git/{orgId}/{connectionId}/`) and this agent's credential there. */
+  proxy: { base: string; token: string };
+  /** The commit author set in each checkout ("Theo (agentes)", "theo@agents.agentes.chat"). */
+  author: { name: string; email: string };
+  /** `clone: false`: update it only when it is already there. `dir` is relative to the agent's folder. */
+  repos: { repo: string; dir: string; clone: boolean }[];
+  /** Also update every checkout already under `repos/` (one `owner/name` level). */
+  existing?: boolean;
+  /** For the whole request; each fetch stops at the deadline (a slow or offline network never blocks). */
+  timeoutSeconds: number;
+  /** Send git's progress as `output` frames. */
+  stream?: boolean;
+}
+
+export interface GitSyncRepo {
+  repo: string;
+  /** Relative to the agent's folder. */
+  dir: string;
+  /** Absolute path on the machine. */
+  path?: string;
+  /** `missing`: not cloned (and not asked to); `failed`: see `message` (offline, refused by the proxy…). */
+  status: "cloned" | "updated" | "missing" | "failed";
+  /** The branch checked out now, and the remote's default branch. */
+  branch?: string;
+  defaultBranch?: string;
+  /** Short commit id of HEAD. */
+  head?: string;
+  /** Why it failed, or a warning (local changes kept the default branch from moving). */
+  message?: string;
+}
 
 /** No valid `hello` within this time closes the socket. */
 export const HELLO_TIMEOUT_MS = 10_000;
@@ -411,6 +472,8 @@ export type MachineRequest = (
   | { op: "task.output"; taskId: string; tail: number }
   /** Protocol 8: one brain turn (ADR 0032); streams `brain.event` frames while it runs. */
   | ({ op: "brain.turn" } & BrainTurnRequest)
+  /** Protocol 11: clone or update the agent's checkouts through our git proxy. */
+  | ({ op: "git.sync" } & GitSyncRequest)
   /**
    * Protocol 10: the request's agent asks for a folder outside its own. The
    * runner shows it to the person and answers right away (`pending`, or
@@ -448,6 +511,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "task.cancel",
   "task.output",
   "brain.turn",
+  "git.sync",
   "access.request",
   "access.reduce",
 ];
@@ -472,6 +536,7 @@ export interface MachineReplies {
   "task.output": { lines: string[]; truncated: boolean };
   /** `final`: the turn's last event (`done` or `error`), also streamed. */
   "brain.turn": { runId: string; final: WireBrainEvent };
+  "git.sync": { repos: GitSyncRepo[] };
   "access.request": { requestId: string; status: "pending" | "granted" };
   "access.reduce": { access: RunnerAccess };
 }

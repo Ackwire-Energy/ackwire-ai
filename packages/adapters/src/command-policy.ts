@@ -512,6 +512,60 @@ function readOnlyWget(argv: string[], scope: CommandScope) {
   return urls > 0 && (!savesHere || insideFolders(scope, "."));
 }
 
+/** Options of `git clone/fetch/pull` that could run a program or read another config: never without a person. */
+const GIT_FETCH_UNSAFE =
+  /^(-c|-u|--config|--upload-pack|--receive-pack|--template|--separate-git-dir|--exec|--reference|--server-option|-o)(=|$)/;
+
+/**
+ * `git clone <https url> [dir]`, `git fetch` and `git pull` that only bring
+ * code into the agent's (or mission's) folders: allowed without a person (ADR
+ * 0024 addendum). In the agent's checkouts the remote is our git proxy (its
+ * credential, its repositories); the deny list still stops pushes to the
+ * default branch, force pushes and merges of pull requests.
+ */
+function fetchIntoFolders(argv: string[], scope: CommandScope) {
+  let i = 1;
+  let where = ".";
+  for (; i < argv.length; i++) {
+    const a = argv[i] as string;
+    if (a === "-C") {
+      const dir = argv[++i];
+      if (!dir) return false;
+      where = where === "." ? dir : path.join(where, dir);
+    } else if (a === "--no-pager") continue;
+    else break;
+  }
+  const sub = argv[i];
+  const rest = argv.slice(i + 1);
+  if (rest.some((a) => GIT_FETCH_UNSAFE.test(a))) return false;
+  // Remotes and refspecs only: no local paths, no `ext::`/`file:` transports.
+  const plain = rest.filter((a) => !a.startsWith("-"));
+  const local = (a: string) => a.includes("::") || /^(file:|\/|~|\.\.?(\/|$))/.test(a);
+  const base = resolveIn(scope, where);
+  if (base === null) return false;
+  const at = { ...scope, cwd: base };
+  switch (sub) {
+    case "fetch":
+    case "pull":
+      return plain.every((a) => !local(a)) && insideFolders(scope, where);
+    case "clone": {
+      const [url, dir, ...extra] = plain;
+      if (!url || extra.length > 0 || !/^https:\/\/[^/\s@]+\/\S+$/.test(url)) return false;
+      const name =
+        dir ??
+        url
+          .replace(/\/+$/, "")
+          .replace(/\.git$/, "")
+          .split("/")
+          .at(-1) ??
+        "";
+      return Boolean(name) && insideFolders(at, name);
+    }
+    default:
+      return false;
+  }
+}
+
 function readOnlySimple(s: Simple, scope: CommandScope): boolean {
   const [cmd, ...args] = s.argv;
   if (!cmd) return false;
@@ -537,7 +591,7 @@ function readOnlySimple(s: Simple, scope: CommandScope): boolean {
     case "exiftool":
       return !args.some((a) => EXIF_WRITE.test(a));
     case "git":
-      return readOnlyGit(s.argv);
+      return readOnlyGit(s.argv) || fetchIntoFolders(s.argv, scope);
     case "curl":
       return readOnlyCurl(s.argv, scope);
     case "wget":

@@ -82,7 +82,7 @@ describe("the list", () => {
     expect(text).toContain("# Your GitHub repositories");
     expect(text).toContain("acme/app, every repository of walt (walt/*)");
     expect(text).toContain("When nobody names a repository, work in acme/app.");
-    expect(repositoriesPrompt(["walt/*"])).toContain("ask which repository of walt to use");
+    expect(repositoriesPrompt(["walt/*"])).toContain("search the repositories of walt first (search_code)");
   });
 });
 

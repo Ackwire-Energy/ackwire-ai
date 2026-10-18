@@ -1,10 +1,15 @@
+import type { PubSub } from "@agenteschat/adapters";
 import { getAgentCached } from "../agents";
 import { connectorScope } from "../connectors/catalog";
 import { activeConnections, type ConnectorDeps, connectionHeaders } from "../connectors/connections";
+import { getChannelCached } from "../context";
+import { publishChannelEvent } from "../events";
+import { missionOfRun } from "../mission-context";
 import { SANDBOX_SCOPE, type SandboxDeps, truncateOutput, withSandbox } from "../sandbox";
 import { grantedScopeKeys, grantKey } from "../tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { appTokenForRepo, type GitHubAppConfig } from "./github-app";
+import { cloneOnMachine } from "./machine";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
@@ -31,12 +36,56 @@ export interface GitToolDeps {
   app?: GitHubAppConfig | null;
   /** GitHub's REST API (tests: a fake). */
   github?: { apiUrl: string; fetch: typeof fetch };
+  /** Live clone progress on a connected machine (`agent.tool.output`). */
+  pubsub?: PubSub;
+}
+
+/** git's progress lines (`\r`-separated) as a few live lines: at most one per second, the last one wins. */
+function progressPublisher(pubsub: PubSub | undefined, c: ToolContext) {
+  if (!pubsub || !c.toolUseId) return undefined;
+  const toolUseId = c.toolUseId;
+  let last = "";
+  let sentAt = 0;
+  let sent = 0;
+  return (_stream: "stdout" | "stderr", chunk: string) => {
+    const line = chunk
+      .split(/[\r\n]+/)
+      .filter((l) => l.trim())
+      .at(-1);
+    if (line) last = line.trim();
+    const now = Date.now();
+    if (!last || now - sentAt < 1000 || sent > 300) return;
+    sentAt = now;
+    sent++;
+    const text = `${last}\n`;
+    last = "";
+    void getChannelCached(c.db, c.orgId, c.channelId)
+      .then((channel) => {
+        const flat = (channel?.kind === "dm" || channel?.kind === "forum") && c.threadRootId === c.triggerMessageId;
+        return publishChannelEvent(pubsub, {
+          type: "agent.tool.output",
+          channelId: c.channelId,
+          threadId: flat ? null : c.threadRootId,
+          runId: c.runId,
+          agentId: c.agentId,
+          toolUseId,
+          stream: "stderr",
+          text,
+        });
+      })
+      .catch(() => undefined);
+  };
 }
 
 /**
  * Git in the agent's computer (D35), through our proxy:
- * - `git_clone` (`github:git.read`): `git clone https://github.com/owner/repo`
- *   in the workspace; pushes from there go through the proxy too;
+ * - `git_clone` (`github:git.read`): on a cloud computer, `git clone
+ *   https://github.com/owner/repo` in the workspace (the computer's git is
+ *   set up for the proxy; it needs the computer, `sandbox:run`); on a
+ *   connected machine, the runner's `git.sync` (protocol 11) clones it into
+ *   the agent's folder (`repos/owner/name`) with our proxy credential, no
+ *   other scope and no approval (ADR 0024 addendum). Pushes from there go
+ *   through the proxy too;
  * - `open_pull_request` (`github:pr.write`): opens a PR from a pushed branch
  *   with the org's GitHub credential (server side). Merging stays approval-gated.
  * Offered only when GitHub is connected in the organization.
@@ -53,7 +102,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
         {
           name: "git_clone",
           description:
-            "Clone a GitHub repository into your computer's workspace (real git: commit and push from there; push only to branches agentes/<your handle>/…, then open_pull_request).",
+            "Clone a GitHub repository into your computer (on a connected computer: into your folder, repos/<owner>/<name>; already there: it is updated). No approval needed. Real git through our proxy: commit and push from there, only to branches agentes/<your handle>/…, then open_pull_request.",
           scope: connectorScope("github", "git.read"),
           connectionId: connection.id,
           connectorLabel: connection.label,
@@ -61,7 +110,12 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
             type: "object",
             properties: {
               repo: repoInput,
-              dir: { type: "string", maxLength: 200, description: "Folder in the workspace (default: the repo name)" },
+              dir: {
+                type: "string",
+                maxLength: 200,
+                description:
+                  "Folder in your workspace (default: the repo name; on a connected computer repos/<owner>/<name>)",
+              },
             },
             required: ["repo"],
             additionalProperties: false,
@@ -70,6 +124,47 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
             try {
               const repo = parseRepo(str(input.repo));
               if (!repo) return { content: "repo must be owner/name", isError: true };
+              const given = str(input.dir).trim();
+              if (given.startsWith("/") || given.split(/[\\/]/).includes("..") || /^[A-Za-z]:/.test(given))
+                return { content: "dir must stay in the workspace", isError: true };
+              const [agent, mission] = await Promise.all([getAgentCached(c.db, c.orgId, c.agentId), missionOfRun(c)]);
+              // A connected machine (not in a mission's own folder): through the proxy with our credential.
+              if (agent?.machineId && !mission) {
+                const machines = deps.sandbox.machines;
+                const git = deps.sandbox.git;
+                if (!machines || !git) return { content: "Connected computers are not available here.", isError: true };
+                const r = await cloneOnMachine(
+                  { db: c.db, hub: machines.hub, git, ...(deps.sandbox.now ? { now: deps.sandbox.now } : {}) },
+                  { orgId: c.orgId, agentId: c.agentId, machineId: agent.machineId },
+                  {
+                    repo: `${repo.owner}/${repo.repo}`,
+                    ...(given ? { dir: given } : {}),
+                    ...(c.signal ? { signal: c.signal } : {}),
+                    onOutput: progressPublisher(deps.pubsub, c),
+                  },
+                );
+                const where = r.path ?? r.dir;
+                if (r.status === "failed" && !r.head) {
+                  return { content: `git clone failed: ${r.message ?? "unknown error"}`, isError: true };
+                }
+                const what =
+                  r.status === "cloned"
+                    ? `Cloned ${r.repo} into ${where}`
+                    : r.status === "failed"
+                      ? `${r.repo} is already at ${where}, but it couldn't be updated (${r.message ?? "unknown error"})`
+                      : `${r.repo} was already at ${where}; updated it`;
+                return {
+                  content: `${what} (branch ${r.branch ?? "?"}${r.head ? ` at ${r.head}` : ""}${r.message && r.status !== "failed" ? `; ${r.message}` : ""}).\nWork there (cd ${where}); create a branch agentes/${agent.handle}/<topic> to push, then open_pull_request.`,
+                  data: { repo: r.repo, dir: r.dir, machineId: agent.machineId, status: r.status },
+                };
+              }
+              if (mission?.machineId) {
+                return {
+                  content:
+                    "In a mission, work in the mission's own folder on its computer (its repository is set up there).",
+                  isError: true,
+                };
+              }
               const keys = await grantedScopeKeys(c.db, c.orgId, c.agentId);
               if (!keys.has(grantKey(null, SANDBOX_SCOPE))) {
                 return {
@@ -77,17 +172,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
                   isError: true,
                 };
               }
-              const agent = await getAgentCached(c.db, c.orgId, c.agentId);
-              if (agent?.machineId) {
-                return {
-                  content:
-                    "Your computer is a connected machine: git_clone works only on cloud computers (through our proxy). Run git there with run_code; it uses that machine's own credentials.",
-                  isError: true,
-                };
-              }
-              const dir = str(input.dir).trim() || repo.repo;
-              if (dir.startsWith("/") || dir.split("/").includes(".."))
-                return { content: "dir must stay in the workspace", isError: true };
+              const dir = given || repo.repo;
               const result = await withSandbox(deps.sandbox, c, 300, (computer) =>
                 computer.provider.exec(computer.id, {
                   command: `git clone --quiet https://github.com/${repo.owner}/${repo.repo} ${quote(dir)} 2>&1 && cd ${quote(dir)} && git log --oneline -1 && git branch --show-current`,

@@ -55,6 +55,12 @@ export interface ClaudeCodeBrainDeps {
   ) => BrainTurnRequest["permissions"] | undefined | Promise<BrainTurnRequest["permissions"] | undefined>;
   /** The run's MCP bridge token (default: random per run). */
   mcpToken?: (turn: BrainTurn) => string;
+  /**
+   * Before a chat turn (ADR 0024 addendum): updates the agent's checkouts on
+   * the machine and says where the turn starts and what to add to the
+   * system text ("# Your code"). Null or a failure: the turn runs as before.
+   */
+  prepare?: (turn: BrainTurn, signal: AbortSignal) => Promise<{ cwd: string; prompt: string } | null>;
   /** How long a turn may take (default: the hub's, 3 h). */
   timeoutMs?: number;
   /** After the request's result, how long to wait for the stream's last events (default 1.5 s). */
@@ -231,13 +237,14 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           Promise.resolve(deps.personalMcp?.(turn) ?? false),
         ]);
         const permissions = await deps.permissions?.(turn);
+        const code = await deps.prepare?.(turn, io.signal).catch(() => null);
         const request: BrainTurnRequest = {
           runId: turn.runId,
           kind: "claude_code",
           session: { id: session.id, resume: session.resume },
-          cwd: session.cwd,
+          cwd: code?.cwd || session.cwd,
           ...(turn.model ? { model: turn.model } : {}),
-          system: turn.system,
+          system: code?.prompt ? `${turn.system}\n\n${code.prompt}` : turn.system,
           prompt: computerPrompt(turn),
           mcp: { token: deps.mcpToken?.(turn) ?? randomBytes(24).toString("base64url") },
           keepAlive: deps.keepAlive !== false,

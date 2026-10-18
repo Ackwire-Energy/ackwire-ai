@@ -9,10 +9,16 @@ import { deriveSecret } from "../crypto";
 export interface GitTokenClaims {
   orgId: string;
   agentId: string;
-  /** `sandboxes.id` of the computer it was issued to. */
+  /** `sandboxes.id` of the computer it was issued to (a connected machine: `machines.id`). */
   sandboxId: string;
-  /** `sandboxes.git_token_gen` when issued: bumping it revokes every token of that computer. */
+  /**
+   * `sandboxes.git_token_gen` when issued: bumping it revokes every token of
+   * that computer. A connected machine: a number from its machine token's
+   * hash (`machineGitGen`), so re-pairing or deleting it revokes them.
+   */
   gen: number;
+  /** `machine`: issued to a connected machine (ADR 0024 addendum); absent: a cloud computer. */
+  kind?: "machine";
   /** Unix seconds. */
   exp: number;
 }
@@ -29,7 +35,14 @@ function key(masterSecret: string) {
 
 export function issueGitToken(masterSecret: string, claims: GitTokenClaims): string {
   const body = Buffer.from(
-    JSON.stringify({ o: claims.orgId, a: claims.agentId, s: claims.sandboxId, g: claims.gen, e: claims.exp }),
+    JSON.stringify({
+      o: claims.orgId,
+      a: claims.agentId,
+      s: claims.sandboxId,
+      g: claims.gen,
+      e: claims.exp,
+      ...(claims.kind === "machine" ? { k: "m" } : {}),
+    }),
   ).toString("base64url");
   const mac = createHmac("sha256", key(masterSecret)).update(`${PREFIX}.${body}`).digest("base64url");
   return `${PREFIX}.${body}.${mac}`;
@@ -51,6 +64,7 @@ export function verifyGitToken(masterSecret: string, token: string, now = new Da
       sandboxId: String(c.s),
       gen: Number(c.g),
       exp: Number(c.e),
+      ...(c.k === "m" ? { kind: "machine" as const } : {}),
     };
     if (!Number.isFinite(claims.exp) || claims.exp * 1000 <= now.getTime()) return null;
     return claims;
@@ -58,6 +72,9 @@ export function verifyGitToken(masterSecret: string, token: string, now = new Da
     return null;
   }
 }
+
+/** A connected machine's revocation generation: from its token's hash (re-pairing or deleting it changes it). */
+export const machineGitGen = (tokenHash: string) => Number.parseInt(tokenHash.slice(0, 8), 16);
 
 /** The proxy's base URL for one org's GitHub connection: `https://HOST/api/git/{orgId}/{connectionId}/`. */
 export const gitProxyBase = (publicUrl: string, orgId: string, connectionId: string) =>

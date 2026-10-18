@@ -58,6 +58,8 @@ export interface CodexBrainDeps {
   mcp(turn: BrainTurn): Promise<{ token: string; url?: string }>;
   /** The agent's folder scope on the machine (id + handle). */
   agent?(turn: BrainTurn): Promise<AgentScope | undefined>;
+  /** Before a chat turn: the agent's checkouts updated, where it starts and the "# Your code" block (`prepareAgentCode`). */
+  prepare?(turn: BrainTurn, signal: AbortSignal): Promise<{ cwd: string; prompt: string } | null>;
 }
 
 /** `codex-cli 0.163.0` is new enough (`CODEX_MIN_VERSION`). */
@@ -162,14 +164,18 @@ export class CodexBrain implements Brain {
       return;
     }
 
-    const [mcp, agent] = await Promise.all([this.deps.mcp(turn), this.deps.agent?.(turn)]);
+    const [mcp, agent, code] = await Promise.all([
+      this.deps.mcp(turn),
+      this.deps.agent?.(turn),
+      this.deps.prepare?.(turn, io.signal).catch(() => null),
+    ]);
     const request: BrainTurnRequest & { agent?: AgentScope } = {
       runId: turn.runId,
       kind: "codex",
       session: { id: session.id, resume: session.resume },
-      cwd: session.cwd,
+      cwd: code?.cwd || session.cwd,
       ...(turn.model ? { model: turn.model } : {}),
-      system: turn.system,
+      system: code?.prompt ? `${turn.system}\n\n${code.prompt}` : turn.system,
       prompt: computerPrompt(turn),
       mcp,
       ...(agent ? { agent } : {}),

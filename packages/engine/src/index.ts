@@ -59,6 +59,7 @@ export * from "./git/credential";
 export * from "./git/github-app";
 export * from "./git/github-app-installs";
 export * from "./git/inflate";
+export * from "./git/machine";
 export * from "./git/pack";
 export * from "./git/proxy";
 export * from "./git/repo-listing";

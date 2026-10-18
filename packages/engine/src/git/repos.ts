@@ -189,8 +189,57 @@ export function repositoriesPrompt(list: readonly string[]): string {
     "# Your GitHub repositories",
     `You may only use these GitHub repositories, reading included: ${list.map(say).join(", ")}.`,
     first.endsWith("/*")
-      ? `When nobody names a repository, ask which repository of ${first.slice(0, -2)} to use.`
+      ? `When nobody names a repository, search the repositories of ${first.slice(0, -2)} first (search_code) and pick the one that fits; ask only if it stays unclear.`
       : `When nobody names a repository, work in ${first}.`,
     "Anything else is refused: say which repository you would need and that whoever can edit you can add it in your access settings.",
   ].join("\n");
+}
+
+/** A checkout of a repository on the agent's connected machine, as `git.sync` reported it. */
+export interface CodeCheckout {
+  /** `owner/name`. */
+  repo: string;
+  /** Where it is on the machine (absolute when the runner said, else relative to the agent's folder). */
+  path: string;
+  defaultBranch?: string;
+  /** Why it couldn't be updated before this turn (offline, refused…); absent when it was. */
+  stale?: string;
+}
+
+/**
+ * The "# Your code" prompt block for an agent whose computer is a connected
+ * machine (English): its checkouts (updated before the turn), how to change
+ * code (its own branch, a push through our proxy, a pull request), and the
+ * granted repositories not cloned yet. Empty when there is nothing to say.
+ */
+export function codePrompt(input: {
+  handle: string;
+  checkouts: readonly CodeCheckout[];
+  /** Granted repositories (`owner/name`) with no checkout yet. */
+  notCloned: readonly string[];
+  /** Where this turn starts (a checkout's path), when it is one. */
+  cwd?: string | null;
+}): string {
+  if (input.checkouts.length === 0 && input.notCloned.length === 0) return "";
+  const lines = ["# Your code"];
+  for (const c of input.checkouts) {
+    const branch = c.defaultBranch ? `default branch ${c.defaultBranch}` : "default branch";
+    lines.push(
+      c.stale
+        ? `${c.repo} is checked out at ${c.path} (${branch}; it couldn't be updated before this turn: ${c.stale}).`
+        : `${c.repo} is checked out at ${c.path} (${branch}, updated before this turn).`,
+    );
+  }
+  if (input.cwd && input.checkouts.some((c) => c.path === input.cwd)) lines.push(`You start in ${input.cwd}.`);
+  if (input.checkouts.length > 0) {
+    lines.push(
+      `Read it freely; to change code, create a branch agentes/${input.handle}/<topic> there, push it (git push -u origin agentes/${input.handle}/<topic>) and open a PR with open_pull_request.`,
+    );
+  }
+  if (input.notCloned.length > 0) {
+    lines.push(
+      `Not cloned yet: ${input.notCloned.join(", ")}. To work on one, call git_clone first; it needs no approval.`,
+    );
+  }
+  return lines.join("\n");
 }

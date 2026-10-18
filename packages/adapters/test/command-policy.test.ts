@@ -196,3 +196,47 @@ describe("what code never lets the judge approve", () => {
     }
   });
 });
+
+describe("bringing code into the agent's folders (git clone, fetch, pull)", () => {
+  const agent = {
+    cwd: "/Users/w/agentes/dev-0193aaaa/repos/acme/app",
+    folders: ["/Users/w/agentes/dev-0193aaaa/repos/acme/app", "/Users/w/agentes/dev-0193aaaa"],
+    home: "/Users/w",
+  };
+  const ok = (command: string) => readOnlyCall("Bash", { command }, agent);
+  test("allowed without a person inside its folders", () => {
+    for (const command of [
+      "git fetch",
+      "git fetch --prune origin",
+      "git pull --ff-only",
+      "git pull origin main",
+      "git -C /Users/w/agentes/dev-0193aaaa/repos/acme/web fetch origin",
+      "git -C .. pull",
+      "git clone https://github.com/acme/web ../web",
+      "git clone --filter=blob:none https://github.com/acme/web.git /Users/w/agentes/dev-0193aaaa/repos/acme/web",
+      "git clone https://agentes.chat/api/git/o/c/acme/web.git",
+    ]) {
+      expect([command, ok(command)]).toEqual([command, true]);
+    }
+  });
+  test("never outside them, from local paths, or with options that run programs", () => {
+    for (const command of [
+      "git -C /Users/w/code/other pull",
+      "git clone https://github.com/acme/web /Users/w/code/web",
+      "git clone https://github.com/acme/web ~/web",
+      "git clone /Users/w/secret-repo here",
+      "git clone file:///etc here",
+      "git clone ext::sh -c x here",
+      "git clone git@github.com:acme/web.git",
+      "git clone -u 'sh -c x' https://github.com/acme/web",
+      "git clone --upload-pack=x https://github.com/acme/web",
+      "git clone --config core.hooksPath=/tmp https://github.com/acme/web",
+      "git -c core.sshCommand=x fetch",
+      "git fetch --upload-pack=x origin",
+      "git fetch ../../other",
+      "git push origin agentes/dev/x",
+    ]) {
+      expect([command, ok(command)]).toEqual([command, false]);
+    }
+  });
+});

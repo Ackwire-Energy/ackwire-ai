@@ -542,6 +542,7 @@ export class RunnerDaemon implements RequestObserver {
       },
       token: config.token,
       secretsDir,
+      gitDir: path.join(home, "git"),
       tasks,
       brains,
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns },
@@ -1154,6 +1155,13 @@ export class RunnerDaemon implements RequestObserver {
       }
       case "brain.turn":
         return { kind: "brain", summary: req.kind === "codex" ? "thinking with Codex" : "thinking with Claude Code" };
+      case "git.sync": {
+        // Clones are work people see; the quick update before each turn is not.
+        const clones = Array.isArray(req.repos) ? req.repos.filter((r) => r?.clone === true) : [];
+        if (clones.length === 0) return null;
+        const repos = clones.map((r) => String(r.repo ?? "")).join(", ");
+        return { kind: "exec", summary: `git clone ${repos}`, command: `git clone ${repos}` };
+      }
       default:
         return null;
     }

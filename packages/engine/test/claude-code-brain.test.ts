@@ -162,6 +162,40 @@ test("a turn goes to the agent's computer as brain.turn and streams its events b
   expect(sent?.mcp?.token?.length ?? 0).toBeGreaterThan(20);
 });
 
+test("before a chat turn: the agent's checkouts set where it starts and add # Your code; a failure changes nothing", async () => {
+  const pubsub = createMemoryPubSub();
+  const { hub, calls } = fakeHub(pubsub);
+  const seen: BrainTurn[] = [];
+  const brain = (prepare: (t: BrainTurn) => Promise<{ cwd: string; prompt: string } | null>) =>
+    createClaudeCodeBrain({
+      hub,
+      pubsub,
+      agentScope: async (t) => ({ id: t.agentId, handle: "dev" }),
+      finalGraceMs: 20,
+      prepare: async (t) => {
+        seen.push(t);
+        return prepare(t);
+      },
+    });
+  await collect(
+    brain(async () => ({
+      cwd: "repos/acme/app",
+      prompt: "# Your code\nacme/app is checked out at /w/repos/acme/app",
+    })).run(turn(), io()),
+  );
+  expect(seen).toHaveLength(1);
+  expect(calls[0]?.request).toMatchObject({
+    cwd: "repos/acme/app",
+    system: "You are dev.\n\n# Your code\nacme/app is checked out at /w/repos/acme/app",
+  });
+  await collect(
+    brain(async () => {
+      throw new Error("offline");
+    }).run(turn(), io()),
+  );
+  expect(calls[1]?.request).toMatchObject({ cwd: "", system: "You are dev." });
+});
+
 test("a new session reads the conversation so far, not only the message that called it", async () => {
   const pubsub = createMemoryPubSub();
   const { hub, calls } = fakeHub(pubsub, { events: [] });
