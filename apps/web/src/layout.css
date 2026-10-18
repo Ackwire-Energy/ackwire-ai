@@ -9853,3 +9853,7 @@ a.machine-row__name:hover {
 .agp-spent__stats .ac-icon {
   color: var(--faint);
 }
+.look-dialog__body {
+  gap: 12px;
+  padding-bottom: 12px;
+}

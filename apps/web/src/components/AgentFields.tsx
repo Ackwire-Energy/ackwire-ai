@@ -10,6 +10,7 @@ import {
   agentGradient,
   Button,
   Dialog,
+  DialogBody,
   DialogFooter,
   type Expression,
   Field,
@@ -267,29 +268,31 @@ export function LookDialog({
       className="look-dialog"
     >
       {/* One column: the agent big on its sky, then every choice in view (no tabs), each one live. */}
-      <div className="look-dialog__hero">
-        <SkyGlow color={draft.color} surface="--surface-raised" className="look-dialog__sky" />
-        <AgentAvatar size="xl" name={name} appearance={draft} expression={face} />
-      </div>
-      <div className="look-dialog__who">
-        <span className="look-dialog__id">
-          <b>{name}</b>
-          <span className="small muted">{lookSummary(t, draft)}</span>
-        </span>
-        <Button
-          size="sm"
-          icon="shuffle"
-          onClick={() => {
-            setDraft((d) => ({ ...d, ...randomAppearance(d) }) as Required<AgentAppearance>);
-            react("dizzy", 1000);
-          }}
-        >
-          {t("newAgent.shuffle")}
-        </Button>
-      </div>
-      <div className="look-dialog__rows newag__look">
-        <LookPicker look={draft} onPick={pick} />
-      </div>
+      <DialogBody className="look-dialog__body">
+        <div className="look-dialog__hero">
+          <SkyGlow color={draft.color} surface="--surface-raised" className="look-dialog__sky" />
+          <AgentAvatar size="xl" name={name} appearance={draft} expression={face} />
+        </div>
+        <div className="look-dialog__who">
+          <span className="look-dialog__id">
+            <b>{name}</b>
+            <span className="small muted">{lookSummary(t, draft)}</span>
+          </span>
+          <Button
+            size="sm"
+            icon="shuffle"
+            onClick={() => {
+              setDraft((d) => ({ ...d, ...randomAppearance(d) }) as Required<AgentAppearance>);
+              react("dizzy", 1000);
+            }}
+          >
+            {t("newAgent.shuffle")}
+          </Button>
+        </div>
+        <div className="look-dialog__rows newag__look">
+          <LookPicker look={draft} onPick={pick} />
+        </div>
+      </DialogBody>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
