@@ -59,3 +59,13 @@ test("a migrated test database matches this build; tampering is refused before m
     await close();
   }
 });
+
+test("journal dates only grow (the migrator skips a migration dated before the last applied one)", () => {
+  const files = knownMigrations(migrationsFolder);
+  for (let i = 1; i < files.length; i++) {
+    const prev = files[i - 1];
+    const cur = files[i];
+    if (!prev || !cur) continue;
+    expect({ tag: cur.tag, after: cur.when > prev.when }).toEqual({ tag: cur.tag, after: true });
+  }
+});
