@@ -22,11 +22,7 @@ export function progress(y: number, from: number, to: number): number {
  * down: it grows from its bottom edge so its top stays at the top of the gap the pull opens (a stretchy
  * header). Never more than the cover's height either way, so a long fling stays sane.
  */
-export function coverTransform(
-  y: number,
-  height: number,
-  factor?: number,
-): { translateY: number; scale: number } {
+export function coverTransform(y: number, height: number, factor?: number): { translateY: number; scale: number } {
   "worklet";
   // A literal, not PARALLAX: the worklet plugin doesn't capture a module constant used as a default
   // parameter, and reading it on the UI thread throws (a crash on the first scroll).
