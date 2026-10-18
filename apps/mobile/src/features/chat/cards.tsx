@@ -11,7 +11,7 @@ import { toolLabel, workFromSteps } from "@agenteschat/client/lib/work";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Linking, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { Button, Chip, Count, Fuse, HoldButton, Icon, Text, useToast } from "@/ui";
 import { approvalFacts, approvalRisk } from "../approvals/logic";
 import { chatHref } from "../links/logic";
@@ -25,7 +25,7 @@ import { threadFaces } from "./logic";
 
 /**
  * The cards inside a message: the steps it took (collapsed), the agent it
- * consulted, a file, the approval it asks for, an agent's question, and the
+ * consulted, the approval it asks for, an agent's question, and the
  * link to its thread.
  */
 
@@ -172,55 +172,6 @@ export function ConsultationCard({
         </View>
       ) : null}
     </View>
-  );
-}
-
-// ── File ─────────────────────────────────────────────────────────────────────
-
-/** A file on a message: tapping opens it (a short-lived link from the server). */
-export function FileCard({
-  id,
-  version,
-  title,
-  deleted,
-}: {
-  id: string;
-  version?: number;
-  title: string;
-  deleted: boolean;
-}) {
-  const { t } = useTranslation();
-  const api = useApi();
-  const orgId = useOrgId();
-  const c = useColors();
-  const surface = useSurface();
-  const toast = useToast();
-  const open = () => {
-    if (deleted) return;
-    api.artifacts
-      .download(orgId, id, version)
-      .then(({ url }) => Linking.openURL(url))
-      .catch(() => toast({ title: t("mobile.chat.fileFailed"), icon: "x" }));
-  };
-  return (
-    <Pressable
-      onPress={open}
-      disabled={deleted}
-      accessibilityRole="button"
-      style={({ pressed }) => [styles.art, surface, pressed && styles.pressed]}
-    >
-      <View style={[styles.thumb, { backgroundColor: c.sunken }]}>
-        <Icon name="doc" size={19} color={c.muted} />
-      </View>
-      <View style={styles.grow}>
-        <Text variant="body" style={styles.bold} numberOfLines={1}>
-          {title || t("mobile.chat.file")}
-        </Text>
-        <Text variant="caption" tone="faint">
-          {deleted ? t("mobile.chat.fileDeleted") : t("mobile.chat.fileOpen")}
-        </Text>
-      </View>
-    </Pressable>
   );
 }
 
@@ -526,16 +477,6 @@ const styles = StyleSheet.create({
   hidden: { opacity: 0 },
   flip: { transform: [{ rotate: "180deg" }] },
   pressed: { opacity: 0.85 },
-  art: {
-    marginTop: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 20,
-  },
-  thumb: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   done: {
     marginTop: 8,
     flexDirection: "row",

@@ -104,6 +104,13 @@ export const ICONS = {
     p("M16.5 4.5a2 2 0 0 1 3 3L12 15l-3.5.5L9 12Z"),
   ],
   checkc: [c(12, 12, 8.5), p("m8.5 12 2.5 2.5 4.5-5")],
+  // From MobileRefinos.html ("Arquivos"): the file viewer's actions.
+  share: [
+    p("M12 3.5v11M8 7.5l4-4 4 4"),
+    p("M6.5 11H6a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 18 11h-.5"),
+  ],
+  photos: [r(3.5, 5, 17, 14, 3), c(9, 10, 1.6), p("m4 17 5-4.5 4 3.5 3-2.5 4 3.5")],
+  drive: [p("M3.5 7.5A2 2 0 0 1 5.5 5.5h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z")],
 } satisfies Record<string, IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

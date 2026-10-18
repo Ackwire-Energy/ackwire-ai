@@ -83,6 +83,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         cameraPermission: "To take pictures and send them in your conversations.",
       },
     ],
+    [
+      // Salvar em Fotos: add-only access (the read text matches expo-image-picker's).
+      "expo-media-library",
+      {
+        photosPermission: "To send pictures in your conversations.",
+        savePhotosPermission: "To save pictures from your conversations to Photos.",
+        granularPermissions: ["photo"],
+      },
+    ],
   ],
   experiments: { typedRoutes: false },
   extra: {

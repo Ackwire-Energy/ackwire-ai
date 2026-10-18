@@ -49,6 +49,18 @@ function AppStack() {
       <Stack.Screen name="new-agent" options={formSheet} />
       <Stack.Screen name="new-channel" options={channelSheet} />
       <Stack.Screen name="new-chat" options={formSheet} />
+      <Stack.Screen
+        name="images"
+        options={{
+          presentation: "transparentModal",
+          animation: "fade",
+          contentStyle: { backgroundColor: "transparent" },
+        }}
+      />
+      <Stack.Screen
+        name="file/[id]"
+        options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
+      />
     </Stack>
   );
 }

@@ -6,11 +6,12 @@ import { memo, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { CHROME_MAX_SCALE, Count, Icon, Text } from "@/ui";
+import { MessageFiles } from "../files/MessageFiles";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard } from "../missions/cards";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
-import { ApprovalInline, ConsultationCard, FileCard, QuestionCard, StepsCard, ThreadLink } from "./cards";
+import { ApprovalInline, ConsultationCard, QuestionCard, StepsCard, ThreadLink } from "./cards";
 import {
   approvalIdOf,
   artifactsOf,
@@ -165,15 +166,7 @@ export const MessageRow = memo(function MessageRow({
         ))}
         {body ? <MessageText body={body} muted={m.local === "pending"} /> : null}
         {steps && m.agentRunId ? <StepsCard runId={m.agentRunId} steps={steps} /> : null}
-        {files.map((f) => (
-          <FileCard
-            key={f.id}
-            id={f.id}
-            {...(f.version !== undefined ? { version: f.version } : {})}
-            title={f.title}
-            deleted={f.deleted}
-          />
-        ))}
+        {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
         {thread && !meta?.missionStart ? <ThreadLink thread={thread} /> : null}
