@@ -211,6 +211,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       const message = await getMessage(deps.db, input.orgId, input.messageId);
       if (!message) return;
       if (deps.context && message.threadId) await maybeEnqueueReflection(deps, message.orgId, message.threadId);
+      // An issue's work card, its start (the run is already started) and the "took issue #N" line route to nobody.
+      if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
       const routed = async (
         strategy: "mention" | "dm" | "router" | "none",
         seenBy: string[],

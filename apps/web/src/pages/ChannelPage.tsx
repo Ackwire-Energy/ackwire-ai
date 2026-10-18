@@ -60,6 +60,7 @@ import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
   isOpenMission,
@@ -130,6 +131,7 @@ import { ConsultationCard } from "@/components/ConsultationCard";
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
+import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { LiveCodeToggle, LiveWorkList } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
@@ -1521,6 +1523,8 @@ const Timeline = memo(function Timeline({
     // A mission's automatic lines (the plan changed, the computer went offline, a task ended): not a voice.
     if (missionPlanChangeOf(m.meta)) return <MissionPlanChangeLine key={key} message={m} />;
     if (taskNoticeOf(m.meta)) return <TaskNoticeLine key={key} message={m} />;
+    // An agent took an issue made from this conversation: one quiet line with its link.
+    if (issueTakenOf(m.meta)) return <IssueTakenLine key={key} message={m} />;
     if (autoApproved.hidden.has(m.id)) return <Fragment key={key} />;
     const autoGroup = autoApproved.groups.get(m.id);
     if (autoGroup) return <AutoApprovedLine key={key} messages={autoGroup} />;
@@ -2104,8 +2108,17 @@ export const TimelineMessage = memo(function TimelineMessage({
         return t("chat.joined.tip", { name, article: g.article, Pronoun: capitalize(g.pronoun) });
       })()
     : null;
+  // The root of an issue's work thread (the person asked the agent to implement it): the issue card, no text.
+  const issueWork = issueWorkOf(meta);
   const card =
-    approvalId || proposalId || memoryUpdates.length > 0 || question || secretRequest || missionCard || forumSuggestion;
+    approvalId ||
+    proposalId ||
+    memoryUpdates.length > 0 ||
+    question ||
+    secretRequest ||
+    missionCard ||
+    forumSuggestion ||
+    issueWork;
   const feedback = m.author.type === "agent" && !card && !m.local;
   // People see name, time and text; the date, model and tokens wait behind the time.
   const usage = m.author.type === "agent" ? messageUsage(m) : null;
@@ -2212,6 +2225,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       {(!routine || routineOpen) &&
         !missionCard &&
         !forumSuggestion &&
+        !issueWork &&
         (body.trim() || (!card && !canceledNote && artifacts.length === 0)) && (
           <MessageText>
             <MessageBody
@@ -2253,6 +2267,9 @@ export const TimelineMessage = memo(function TimelineMessage({
       {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
       {missionStart && <MissionStartLink message={m} />}
       {missionLink && <MissionLinkCard link={missionLink} />}
+      {issueWork && (
+        <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
+      )}
       {artifacts.length > 0 && (
         <div className="artifact-cards">
           {artifacts.map((r) => (

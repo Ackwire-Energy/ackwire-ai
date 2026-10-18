@@ -450,7 +450,7 @@ function AskAgent({ issue }: { issue: Issue }) {
 
 function Activity({ issue }: { issue: Issue }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const activity = useIssueActivity(org.id, issue.id);
   const action = useIssueAction(org.id);
   const actors = useActors();
@@ -501,6 +501,19 @@ function Activity({ issue }: { issue: Issue }) {
                 </Chip>
               )}{" "}
               · {whenAt(t, i18n.language, a.createdAt)}
+              {/* Asked an agent to implement it: the work conversation is in the asker's DM (only they open it). */}
+              {a.event === "agent_asked" && a.textParams?.threadId && a.author.id === me.user.id && (
+                <>
+                  {" · "}
+                  <Link
+                    to="/org/$orgId/threads/$threadId"
+                    params={{ orgId: org.id, threadId: a.textParams.threadId }}
+                    className="ac-link"
+                  >
+                    {t("issues.openConversation")}
+                  </Link>
+                </>
+              )}
             </span>
           </div>
         ) : (

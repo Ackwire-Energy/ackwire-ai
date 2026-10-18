@@ -23,6 +23,7 @@ import {
   useThreadMission,
   useThreads,
 } from "@agenteschat/client";
+import { issueTakenOf } from "@agenteschat/client/lib/issues";
 import { can } from "@agenteschat/client/lib/permissions";
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef } from "@legendapp/list/react-native";
@@ -47,6 +48,7 @@ import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { IssueTakenLine } from "./issue-work";
 import { StreamingRow, WorkingLine, writingRuns } from "./LiveRows";
 import { useChatLive } from "./live";
 import { buildRows, type ChatRow, mayStopRun, mergeTimeline, parseSlash, pinTarget, threadRootsToLoad } from "./logic";
@@ -640,6 +642,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             </Animated.View>
           );
         case "message":
+          // An agent took an issue made from this conversation: one quiet line, not a voice.
+          if (issueTakenOf(item.message.meta)) return <IssueTakenLine message={item.message} />;
           return (
             // A finished reply replaces its streaming row in place: it doesn't rise in again.
             <Animated.View entering={isFresh(item.key) && !item.message.agentRunId ? ENTER : undefined}>

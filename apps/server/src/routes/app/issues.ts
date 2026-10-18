@@ -302,7 +302,7 @@ export function issueRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/issues/{issueId}/ask-agent",
       tags,
       security,
-      summary: '"Ask Ada to implement": assigns the agent and starts a run on the issue',
+      summary: '"Ask Ada to implement": assigns the agent and starts its work in a thread of the requester DM',
       request: { params: IssueParams, body: body(z.object({ agentId: z.uuid() })) },
       responses: { 200: json(Issue), ...errors },
     }),

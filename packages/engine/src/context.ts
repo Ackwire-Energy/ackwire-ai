@@ -18,6 +18,7 @@ import type { Agent } from "./agents";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { isAgentOnlyDm } from "./dms";
+import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import type { Message } from "./messages";
 import { missionBrief } from "./mission-brief";
 import type { AgentRun } from "./runs";
@@ -363,6 +364,13 @@ export async function buildRunContext(
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
     .join(", ");
 
+  // An issue's work thread (asked to implement it): the task, read from the issue now, never shown in the chat.
+  const issueWork = root ? issueWorkOf(root.meta) : null;
+  const issueBrief =
+    issueWork && issueWork.agentId === agent.id
+      ? await issueWorkBrief(db, run.orgId, issueWork.issueId).catch(() => null)
+      : null;
+
   // Most stable first, so prompt-cache prefixes are shared: the org context is
   // the same for every agent of the organization, the agent block per agent.
   const system: SystemBlock[] = [
@@ -481,6 +489,7 @@ export async function buildRunContext(
         ]
       : []),
     ...(briefing ? await briefing.then((text) => (text ? [{ text }] : [])) : []),
+    ...(issueBrief ? [{ text: issueBrief }] : []),
     ...(machineAccess ? await machineAccess.then((a) => (a ? [{ text: machineAccessText(a) }] : [])) : []),
     ...(trigger.meta.routine
       ? [

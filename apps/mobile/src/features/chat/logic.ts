@@ -70,6 +70,8 @@ export function standsAlone(m: Message) {
       meta.missionStart ||
       meta.missionLink ||
       meta.threadStart ||
+      meta.issueWork ||
+      meta.issueTaken ||
       questionOf(meta) ||
       consultationsOf(meta).length > 0 ||
       routineOfMessage(meta),
@@ -203,6 +205,7 @@ export const hidesBody = (m: Message) =>
     approvalIdOf(m.meta) ||
       m.meta?.missionStart ||
       m.meta?.threadStart ||
+      m.meta?.issueWork ||
       questionOf(m.meta)?.text.trim() === m.body.trim(),
   );
 

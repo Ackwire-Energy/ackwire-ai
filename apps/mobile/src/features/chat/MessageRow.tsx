@@ -1,4 +1,5 @@
 import { type Message, type ThreadInfo, useReactions, useToggleReaction } from "@agenteschat/client";
+import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { isReminderMessage, reminderBody, routineOfMessage, viaRoutineOf } from "@agenteschat/client/lib/routines";
 import { splitCanceled } from "@agenteschat/client/lib/work";
@@ -12,6 +13,7 @@ import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { ApprovalInline, ConsultationCard, QuestionCard, StepsCard, ThreadLink } from "./cards";
+import { IssueWorkCard } from "./issue-work";
 import {
   approvalIdOf,
   artifactsOf,
@@ -80,6 +82,8 @@ export const MessageRow = memo(function MessageRow({
   const link = missionLinkOf(meta);
   const files = artifactsOf(meta);
   const question = isAgent ? questionOf(meta) : null;
+  // The root of an issue's work thread (asked an agent to implement it): the issue card.
+  const issueWork = issueWorkOf(meta);
 
   return (
     <Pressable
@@ -171,6 +175,9 @@ export const MessageRow = memo(function MessageRow({
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
+        {issueWork ? (
+          <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
+        ) : null}
         {thread && !meta?.missionStart ? <ThreadLink thread={thread} /> : null}
         {meta?.missionStart ? <MissionCard threadId={m.id} /> : null}
         {link ? <MissionCard missionId={link.missionId} /> : null}

@@ -1,10 +1,14 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
+import { audienceError, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
+import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishChannelEvent, publishOrgEvent } from "./events";
-import { getMessage, postPersonMessage } from "./messages";
+import { publishChannelEvent, publishMessageCreated, publishOrgEvent } from "./events";
+import type { IssueWorkMeta } from "./issue-work";
+import { getMessage, insertMessage, messageView } from "./messages";
+import { enqueueRunJob } from "./mission-runs";
 import { notifyIssueChanged, notifyIssueComment } from "./notification-producers";
 import { can, getMembership } from "./organizations";
 import { fireRoutineEvent } from "./routines";
@@ -157,10 +161,35 @@ async function checkAssignee(db: Database, orgId: string, a: WorkActor | null | 
   }
 }
 
-async function canSee(db: Database, actor: IssueActor, orgId: string, channelId: string | null) {
+async function canSee(
+  db: Database,
+  actor: IssueActor,
+  orgId: string,
+  channelId: string | null,
+  /** The issue's assignee: an agent working on it from a DM sees what the person there sees. */
+  assignee?: { type: string | null; id: string | null },
+) {
   if (!channelId) return true;
-  if (actor.type === "agent")
-    return (await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(channelId);
+  if (actor.type === "agent") {
+    if ((await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(channelId)) return true;
+    if (assignee?.type !== "agent" || assignee.id !== actor.agentId) return false;
+    // Asked to implement it (its work lives in the requester's DM): visible when that person can see its channel.
+    const [row] = await db
+      .select({ id: channelMembers.id })
+      .from(channelMembers)
+      .innerJoin(channels, and(eq(channels.id, channelMembers.channelId), eq(channels.kind, "dm")))
+      .where(
+        and(
+          eq(channelMembers.channelId, actor.channelId),
+          eq(channelMembers.orgId, orgId),
+          sql`${channelMembers.userId} is not null`,
+          sql`exists (select 1 from ${channelMembers} cm2 where cm2.channel_id = ${channelId}::uuid
+            and cm2.user_id = ${channelMembers.userId})`,
+        ),
+      )
+      .limit(1);
+    return Boolean(row);
+  }
   const [row] = await db
     .select({ visibility: channels.visibility, kind: channels.kind, memberId: channelMembers.id })
     .from(channels)
@@ -364,7 +393,13 @@ function eventDetail(event: string | null, data: Record<string, unknown>) {
         ? out(data.done ? "criterion_checked" : "criterion_unchecked", { text: s(data.text) as string })
         : {};
     case "agent_asked":
-      return s(data.agentName) ? out(event, { name: s(data.agentName) as string }) : {};
+      // `threadId`: the requester's DM thread where the work lives (only they can open it).
+      return s(data.agentName)
+        ? out(event, {
+            name: s(data.agentName) as string,
+            ...(s(data.threadId) ? { threadId: s(data.threadId) as string } : {}),
+          })
+        : {};
     case "forum_opened":
     case "forum_evaluated":
       return s(data.title) ? out(event, { title: s(data.title) as string, topicId: s(data.topicId) ?? "" }) : {};
@@ -474,7 +509,8 @@ async function findVisible(db: Database, actor: IssueActor, orgId: string, where
         where.number !== undefined ? eq(issues.number, where.number) : undefined,
       ),
     );
-  if (!row || !(await canSee(db, actor, orgId, row.channelId))) throw new NotFoundError("Issue not found");
+  if (!row || !(await canSee(db, actor, orgId, row.channelId, { type: row.assigneeType, id: row.assigneeId })))
+    throw new NotFoundError("Issue not found");
   return row;
 }
 
@@ -871,10 +907,14 @@ export async function issueFromMessage(
 }
 
 /**
- * "Ask Ada to implement": assigns the agent and asks it in a channel
- * it works in (the issue's channel, else #general, else its first channel).
- * The run reports progress as issue comments (`comment_issue`); its final
- * reply is mirrored as a comment. Sensitive actions still need approval.
+ * "Ask Ada to implement": assigns the agent and starts its work in the
+ * requester's DM with it, as a thread whose root is a compact card
+ * (`meta.issueWork`); the run starts on a short line in that thread. The
+ * instructions never show in the chat: the run's context builds them from
+ * the issue (`issueWorkBrief`). The issue stays the public record: progress
+ * comments (`comment_issue`), the final reply mirrored as a comment, criteria,
+ * PR, status. An issue made from a channel message gets one discreet line
+ * there (`meta.issueTaken`); nothing else is posted in channels.
  */
 export async function askAgentToImplement(
   deps: IssueDeps,
@@ -884,59 +924,52 @@ export async function askAgentToImplement(
   agentId: string,
 ): Promise<IssueView> {
   const { db } = deps;
+  if (!deps.pubsub) throw new Error("askAgentToImplement needs pub/sub");
+  const pubsub = deps.pubsub;
   const actor: IssueActor = { type: "person", userId };
   const issue = await findVisible(db, actor, orgId, { id: issueId });
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  const memberships = await db
-    .select({ channelId: channelMembers.channelId, name: channels.name })
-    .from(channelMembers)
-    .innerJoin(channels, eq(channels.id, channelMembers.channelId))
-    .where(and(eq(channelMembers.agentId, agentId), eq(channels.kind, "channel"), isNull(channels.archivedAt)));
-  const candidates = [
-    ...memberships.filter((m) => m.channelId === issue.channelId),
-    ...memberships.filter((m) => m.name === "general"),
-    ...memberships,
-  ];
-  let channelId: string | null = null;
-  for (const c of candidates) {
-    const [mine] = await db
-      .select({ id: channelMembers.id })
-      .from(channelMembers)
-      .where(and(eq(channelMembers.channelId, c.channelId), eq(channelMembers.userId, userId)));
-    if (mine) {
-      channelId = c.channelId;
-      break;
-    }
-  }
-  if (!channelId) throw new ValidationError("Add the agent to a channel you are in first");
+  // The person must be able to talk to the agent (D31); the DM needs nothing else.
+  if (!canTalkTo(agent, userId)) throw await audienceError(db, agent);
+  const dm = await openDm(db, userId, orgId, { agentId });
   const updated = await updateIssue(deps, actor, orgId, issue.id, { assignee: { type: "agent", id: agentId } });
-  const criteria = issue.criteria.map((c) => `- [${c.done ? "x" : " "}] ${c.text}`).join("\n");
-  const body = [
-    `@${agent.handle} implement issue #${issue.number}: ${issue.title}`,
-    issue.description.trim(),
-    criteria ? `Acceptance criteria:\n${criteria}` : "",
-    `Report progress on the issue with comment_issue (issue_id ${issue.id}), check the criteria you meet with update_issue (done_criteria), and link the PR with update_issue. The issue's status follows your work on its own.`,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-  if (!deps.pubsub) throw new Error("askAgentToImplement needs pub/sub");
-  const message = await postPersonMessage({ db, pubsub: deps.pubsub }, userId, orgId, channelId, {
-    body,
-    meta: { issueId: issue.id },
+  const card: IssueWorkMeta = { issueId: issue.id, number: issue.number, title: issue.title, agentId };
+  const { root, start, runId } = await db.transaction(async (tx) => {
+    // The thread's root: the card (written directly, it routes to no agent).
+    const root = await insertMessage(tx, {
+      orgId,
+      channelId: dm.id,
+      author: { type: "person", userId },
+      body: `Issue #${issue.number}: ${issue.title}`.slice(0, 2_000),
+      meta: { issueWork: card },
+    });
+    // What starts the run, inside the thread: short and human (shown in the person's language).
+    const start = await insertMessage(tx, {
+      orgId,
+      channelId: dm.id,
+      threadId: root.id,
+      author: { type: "person", userId },
+      body: `Please implement issue #${issue.number}.`,
+      meta: {
+        issueId: issue.id,
+        issueWorkStart: true,
+        bodyCode: "issue_work_start",
+        bodyParams: { number: issue.number },
+      },
+    });
+    const { run } = await enqueueRunJob(tx, start, agentId);
+    return { root, start, runId: run?.id ?? null };
   });
-  // The message started the agent's run: it works on this issue from now on.
-  const runs = await db
-    .select({ id: agentRuns.id })
-    .from(agentRuns)
-    .where(and(eq(agentRuns.triggerMessageId, message.id), eq(agentRuns.agentId, agentId)));
+  await publishMessageCreated(pubsub, messageView(root));
+  await publishMessageCreated(pubsub, messageView(start));
   await db.transaction(async (tx) => {
     await addActivity(tx, issue, {
       kind: "event",
       author: { type: "person", id: userId },
       text: `asked ${agent.name} to implement`,
       event: "agent_asked",
-      data: { agentId, agentName: agent.name, channelId, messageId: message.id },
+      data: { agentId, agentName: agent.name, channelId: dm.id, messageId: root.id, threadId: root.id },
     });
     await recordAudit(tx, {
       orgId,
@@ -946,17 +979,35 @@ export async function askAgentToImplement(
       details: { agentId },
     });
   });
-  await startedWork(
-    deps,
-    issue,
-    agentId,
-    runs.map((r) => r.id),
-  );
+  await announceTaken(deps, issue, card);
+  await startedWork(deps, issue, agentId, runId ? [runId] : []);
   const fresh = await reload(db, issue);
   if (!fresh) return updated;
   const view = await one(db, fresh);
-  await announce(deps.pubsub, orgId, view, "issue.updated");
+  await announce(pubsub, orgId, view, "issue.updated");
   return view;
+}
+
+/** An issue made from a channel message: one discreet line there ("Ada took issue #24"), never a thread. */
+async function announceTaken(deps: IssueDeps, issue: IssueRow, card: IssueWorkMeta) {
+  const source = issue.source as IssueSource;
+  if (source.type !== "message" || !deps.pubsub) return;
+  const origin = await getMessage(deps.db, issue.orgId, source.messageId);
+  if (!origin || origin.channelId !== source.channelId) return;
+  const [channel] = await deps.db
+    .select({ kind: channels.kind, archivedAt: channels.archivedAt })
+    .from(channels)
+    .where(eq(channels.id, origin.channelId));
+  if (!channel || channel.archivedAt || channel.kind === "forum") return;
+  const line = await insertMessage(deps.db, {
+    orgId: issue.orgId,
+    channelId: origin.channelId,
+    threadId: origin.threadId,
+    author: { type: "agent", agentId: card.agentId, runId: null, hop: 0 },
+    body: `Took issue #${card.number}: ${card.title}`.slice(0, 2_000),
+    meta: { issueTaken: card, bodyCode: "issue_taken", bodyParams: { number: card.number } },
+  });
+  await publishMessageCreated(deps.pubsub, messageView(line));
 }
 
 /** Mirrors an agent's final reply to the issue it was asked to implement (trigger `meta.issueId`). */

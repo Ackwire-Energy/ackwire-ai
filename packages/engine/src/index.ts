@@ -69,6 +69,7 @@ export * from "./git/repos";
 export * from "./git/tools";
 export * from "./invite-requests";
 export * from "./issue-tools";
+export * from "./issue-work";
 export * from "./issues";
 export * from "./jobs";
 export * from "./judge";

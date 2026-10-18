@@ -29,3 +29,28 @@ export const isWorking = (i: Pick<Issue, "work">) => Boolean(i.work && i.work.st
 /** In progress with an agent and no run alive: the agent took it but nobody is working. */
 export const isStalled = (i: Pick<Issue, "work">) => i.work?.state === "stalled";
 export const isOpen = (i: Pick<Issue, "status">) => i.status !== "done" && i.status !== "canceled";
+
+/** An issue someone asked an agent to implement, as a message carries it. */
+export interface IssueWorkRef {
+  issueId: string;
+  number: number;
+  title: string;
+  agentId: string;
+}
+
+function workRef(v: unknown): IssueWorkRef | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.issueId !== "string" || typeof o.number !== "number" || typeof o.title !== "string") return null;
+  return {
+    issueId: o.issueId,
+    number: o.number,
+    title: o.title,
+    agentId: typeof o.agentId === "string" ? o.agentId : "",
+  };
+}
+
+/** `meta.issueWork`: the root of the work thread in the requester's DM with the agent (shown as a card). */
+export const issueWorkOf = (meta: Record<string, unknown> | null | undefined) => workRef(meta?.issueWork);
+/** `meta.issueTaken`: the one line where the issue came from ("Ada took issue #24"). */
+export const issueTakenOf = (meta: Record<string, unknown> | null | undefined) => workRef(meta?.issueTaken);

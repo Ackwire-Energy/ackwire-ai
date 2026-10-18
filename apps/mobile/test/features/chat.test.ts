@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, Message } from "@agenteschat/client";
+import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import {
   artifactsOf,
   buildRows,
@@ -370,5 +371,28 @@ describe("an agent's question (ask_user)", () => {
       false,
       false,
     ]);
+  });
+});
+
+describe("asking an agent to implement an issue", () => {
+  const work = { issueId: "iss_1", number: 24, title: "Checkout quebra", agentId: "dev" };
+  test("the DM thread's root is the issue card: no text, it stands alone", () => {
+    const root = message({ id: "root", body: "Issue #24: Checkout quebra", meta: { issueWork: work } });
+    expect(issueWorkOf(root.meta)).toEqual(work);
+    expect(hidesBody(root)).toBe(true);
+    expect(standsAlone(root)).toBe(true);
+  });
+
+  test("the line where the issue came from is its own row; anything else is not an issue line", () => {
+    const line = message({
+      id: "line",
+      author: { type: "agent", id: "dev" },
+      body: "Took issue #24: Checkout quebra",
+      meta: { issueTaken: work, bodyCode: "issue_taken", bodyParams: { number: 24 } },
+    });
+    expect(issueTakenOf(line.meta)).toEqual(work);
+    expect(standsAlone(line)).toBe(true);
+    expect(issueTakenOf({ issueTaken: { issueId: "x" } })).toBeNull();
+    expect(issueWorkOf(message({ id: "plain" }).meta)).toBeNull();
   });
 });

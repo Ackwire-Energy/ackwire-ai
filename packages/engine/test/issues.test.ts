@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
   addChannelMember,
@@ -9,12 +9,14 @@ import {
   createIssue,
   createIssueToolSource,
   drainOutbox,
+  ForbiddenError,
   getIssue,
   grantScopes,
   issueFromMessage,
   listIssueActivity,
   listIssues,
   NotFoundError,
+  openDm,
   postPersonMessage,
   searchVisible,
   setCriterion,
@@ -110,18 +112,18 @@ describe("issues", () => {
     expect((await listIssues(f.db, person(bia.id), f.org.id)).map((i) => i.id)).toEqual([fromGeneral.id]);
   });
 
-  test("asking an agent to implement: assigned, a run starts, progress and the reply land on the issue", async () => {
+  test("asking an agent to implement: work in the requester's DM thread, instructions only in the run's context", async () => {
     let step = 0;
+    let system = "";
     f = await setup({
       issueTools: true,
       reply: (req: ModelRequest) => {
         step++;
-        const last = JSON.stringify(req.messages.at(-1)?.content);
-        const id = /issue_id ([0-9a-f-]{36})/.exec(last)?.[1];
-        if (step === 1 && id) {
+        system = JSON.stringify(req.system);
+        if (step === 1 && system.includes("# Your task: issue #1")) {
           return {
             chunks: [],
-            toolUses: [{ name: "comment_issue", input: { issue: id, text: "Comecei: reproduzi o bug." } }],
+            toolUses: [{ name: "comment_issue", input: { issue: "#1", text: "Comecei: reproduzi o bug." } }],
           };
         }
         return { chunks: ["Corrigido no PR #7."] };
@@ -131,23 +133,103 @@ describe("issues", () => {
     const deps = { db: f.db, pubsub: f.pubsub };
     const issue = await createIssue(deps, person(f.owner.id), f.org.id, {
       title: "Login quebra",
+      description: "Safari não entra.",
       criteria: ["Funciona no Safari"],
     });
     const asked = await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
     expect(asked.assignee).toEqual({ type: "agent", id: f.agent.id });
-    const [message] = (await f.db.select().from(schema.messages)).filter((m) => m.body.includes("#1"));
-    expect(message?.body).toContain("@dev implement issue #1: Login quebra");
-    expect(message?.body).toContain("- [ ] Funciona no Safari");
-    expect(message?.meta).toMatchObject({ issueId: issue.id });
+
+    // The DM with the agent: a root card and the start inside its thread; nothing in #general.
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const all = await f.db.select().from(schema.messages);
+    expect(all.filter((m) => m.channelId === f.general.id)).toEqual([]);
+    const root = all.find((m) => m.channelId === dm.id && !m.threadId);
+    expect(root?.meta).toMatchObject({ issueWork: { issueId: issue.id, number: 1, title: "Login quebra" } });
+    const start = all.find((m) => m.threadId === root?.id && m.authorType === "person");
+    expect(start?.meta).toMatchObject({ issueId: issue.id, bodyCode: "issue_work_start" });
+    for (const m of [root, start]) {
+      expect(m?.body).not.toContain(issue.id);
+      expect(m?.body).not.toContain("comment_issue");
+      expect(m?.body).not.toContain("Safari não entra");
+    }
+    const [run] = await f.db.select().from(schema.agentRuns);
+    expect(run).toMatchObject({ channelId: dm.id, threadRootId: root?.id, triggerMessageId: start?.id });
 
     await drainOutbox(f.db, f.handlers);
+    // The run read its task from the issue (description, criteria, how to report).
+    expect(system).toContain("Safari não entra.");
+    expect(system).toContain("1. [ ] Funciona no Safari");
+    expect(system).toContain("comment_issue");
+    expect(system).toContain("private between you and the person who asked");
+    // Its reply stays in the DM thread; progress and the reply land on the issue.
+    const replies = (await f.db.select().from(schema.messages)).filter((m) => m.authorType === "agent");
+    expect(replies.map((m) => [m.channelId, m.threadId])).toEqual([[dm.id, root?.id ?? ""]]);
     const activity = await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id);
     const comments = activity.filter((a) => a.kind === "comment").map((a) => [a.author.type, a.text]);
     expect(comments).toEqual([
       ["agent", "Comecei: reproduzi o bug."],
       ["agent", "Corrigido no PR #7."],
     ]);
-    expect(activity.some((a) => a.event === "agent_asked")).toBe(true);
+    const askedEvent = activity.find((a) => a.event === "agent_asked");
+    expect(askedEvent?.textParams).toMatchObject({ threadId: root?.id });
+  });
+
+  test("asking to implement an issue from a channel message: one line there, a private issue still works", async () => {
+    let system = "";
+    let step = 0;
+    f = await setup({
+      issueTools: true,
+      reply: (req: ModelRequest) => {
+        step++;
+        system = JSON.stringify(req.system);
+        if (step === 1)
+          return { chunks: [], toolUses: [{ name: "comment_issue", input: { issue: "#1", text: "Vou olhar." } }] };
+        return { chunks: ["Feito."] };
+      },
+    });
+    await grantScopes(f.db, f.org.id, f.agent.id, ISSUES);
+    const deps = { db: f.db, pubsub: f.pubsub };
+    // A private channel the agent is not in: the issue keeps its visibility.
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secreto", visibility: "private" });
+    const said = await postPersonMessage(deps, f.owner.id, f.org.id, secret.id, { body: "Checkout quebra" });
+    const issue = await issueFromMessage(deps, f.owner.id, f.org.id, said.id);
+    expect(issue.channelId).toBe(secret.id);
+    await drainOutbox(f.db, f.handlers);
+    const before = (await f.db.select().from(schema.messages)).length;
+    await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+    const added = (await f.db.select().from(schema.messages)).slice(before);
+    const line = added.filter((m) => m.channelId === secret.id);
+    expect(line).toHaveLength(1);
+    expect(line[0]).toMatchObject({ authorType: "agent", authorAgentId: f.agent.id, threadId: null });
+    expect(line[0]?.meta).toMatchObject({ issueTaken: { issueId: issue.id, number: 1 }, bodyCode: "issue_taken" });
+    expect(added.filter((m) => m.channelId === f.general.id)).toEqual([]);
+    await drainOutbox(f.db, f.handlers);
+    // Nobody answered the line; the agent (not in #secreto) still read and commented the issue from the DM.
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs).toHaveLength(1);
+    expect(system).toContain("# Your task: issue #1");
+    const comments = (await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id))
+      .filter((a) => a.kind === "comment")
+      .map((a) => a.text);
+    expect(comments).toEqual(["Vou olhar.", "Feito."]);
+  });
+
+  test("asking to implement a manual issue posts nothing in channels; an agent the person can't talk to refuses", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Sem origem" });
+    await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+    const channelsWithMessages = new Set((await f.db.select().from(schema.messages)).map((m) => m.channelId));
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    expect([...channelsWithMessages]).toEqual([dm.id]);
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    await f.db
+      .update(schema.agents)
+      .set({ audienceMode: "owner", ownerUserId: f.owner.id })
+      .where(eq(schema.agents.id, f.agent.id));
+    await expect(askAgentToImplement(deps, bia.id, f.org.id, issue.id, f.agent.id)).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
   });
 
   test("the issue follows the agent's work: in progress when it starts, working while the run lives, stalled after, review with a PR", async () => {
@@ -156,10 +238,8 @@ describe("issues", () => {
       issueTools: true,
       reply: (req: ModelRequest) => {
         step++;
-        const last = JSON.stringify(req.messages.at(-1)?.content);
-        const id = /issue_id ([0-9a-f-]{36})/.exec(last)?.[1];
-        if (step === 1 && id)
-          return { chunks: [], toolUses: [{ name: "update_issue", input: { issue: id, done_criteria: [1] } }] };
+        if (step === 1 && JSON.stringify(req.system).includes("# Your task: issue #1"))
+          return { chunks: [], toolUses: [{ name: "update_issue", input: { issue: "#1", done_criteria: [1] } }] };
         return { chunks: ["Plano escrito; falta o teste."] };
       },
     });

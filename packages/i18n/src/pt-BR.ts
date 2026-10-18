@@ -1942,7 +1942,7 @@ export const ptBR = {
     askText: "{{The}} {{name}} lê o código, comenta o plano aqui e abre um PR. O merge continua pedindo sua aprovação.",
     askButton: "Pedir {{to}} {{name}}",
     askSection: "Pedir a um agente",
-    asked: "Pedido enviado. {{The}} {{name}} vai comentar o plano aqui.",
+    asked: "Pedido enviado. {{The}} {{name}} comenta o andamento aqui; a conversa com você fica no privado.",
     activity: "Atividade",
     noActivity: "Nada ainda.",
     comment: "Comentar na issue",
@@ -1958,6 +1958,7 @@ export const ptBR = {
     prBy: "PR #{{number}} · aberto por {{name}}",
     artifactBy: "{{title}} ({{name}})",
     noLinks: "Nada ligado ainda.",
+    openConversation: "Ver conversa",
     labels: "Etiquetas",
     event: {
       created: "criou a issue",
@@ -5704,6 +5705,15 @@ export const ptBR = {
       general2: "Resume o que rolou hoje",
       general3: "Me ajuda a organizar a semana?",
     },
+    /** "Ask Ada to implement": the card at the root of the work thread in the DM, and the line where the issue came from. */
+    issueWork: {
+      label: "Issue pedida",
+      asked: "Você pediu a issue",
+      askedBy: "{{name}} pediu a issue",
+      view: "Ver issue",
+      taken: "{{name}} pegou a issue",
+      agent: "Com {{name}}",
+    },
     body: {
       mission_plan: "Plano para “{{title}}” no {{computer}}",
       mission_decision: "Decisão: {{question}}",
@@ -5728,6 +5738,8 @@ export const ptBR = {
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",
       file_saved: "Arquivo salvo.",
+      issue_work_start: "Pode implementar a issue #{{number}}.",
+      issue_taken: "Peguei a issue #{{number}}.",
       done: "Pronto.",
       memory: {
         proposed: "Proposta criada: {{text}}",

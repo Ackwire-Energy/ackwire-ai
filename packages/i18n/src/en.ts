@@ -1929,7 +1929,7 @@ export const en: Translations = {
     askText: "{{name}} reads the code, comments the plan here and opens a PR. Merging still asks for your approval.",
     askButton: "Ask {{name}}",
     askSection: "Ask an agent",
-    asked: "Request sent. {{name}} will comment the plan here.",
+    asked: "Request sent. {{name}} posts progress here; your conversation stays in your DM.",
     activity: "Activity",
     noActivity: "Nothing yet.",
     comment: "Comment on the issue",
@@ -1945,6 +1945,7 @@ export const en: Translations = {
     prBy: "PR #{{number}} · opened by {{name}}",
     artifactBy: "{{title}} ({{name}})",
     noLinks: "Nothing linked yet.",
+    openConversation: "View conversation",
     labels: "Labels",
     event: {
       created: "created the issue",
@@ -5690,6 +5691,15 @@ export const en: Translations = {
       general2: "Summarize what happened today",
       general3: "Help me plan the week?",
     },
+    /** "Ask Ada to implement": the card at the root of the work thread in the DM, and the line where the issue came from. */
+    issueWork: {
+      label: "Requested issue",
+      asked: "You asked for issue",
+      askedBy: "{{name}} asked for issue",
+      view: "View issue",
+      taken: "{{name}} took issue",
+      agent: "With {{name}}",
+    },
     body: {
       mission_plan: "Plan for “{{title}}” on {{computer}}",
       mission_decision: "Decision: {{question}}",
@@ -5714,6 +5724,8 @@ export const en: Translations = {
       approval_request: "Approval request: {{title}}",
       secret_request: "Secret request: {{name}}",
       file_saved: "File saved.",
+      issue_work_start: "Please implement issue #{{number}}.",
+      issue_taken: "Took issue #{{number}}.",
       done: "Done.",
       memory: {
         proposed: "Proposal created: {{text}}",
