@@ -2432,7 +2432,7 @@ export interface MissionSettings {
 export type BrainKind = "model" | "claude_code" | "codex";
 
 /** Why a computer brain can't be chosen now. */
-export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "not_installed" | "outdated";
+export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
 
 export interface BrainModelOption {
   /** What is stored (`opus`, `sonnet`, `haiku`, a Codex model). */

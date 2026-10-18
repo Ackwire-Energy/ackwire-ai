@@ -104,7 +104,7 @@ export function normalizeBrainModel(kind: BrainKind, value: unknown): string | n
 }
 
 /** Why a computer brain can't be chosen right now. */
-export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "not_installed" | "outdated";
+export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
 
 export interface BrainOption {
   kind: BrainKind;
@@ -116,9 +116,12 @@ export interface BrainOption {
   defaultModel: string | null;
 }
 
-type MachineLike = Parameters<typeof machineExecutors>[0] & { id: string; name: string } & Parameters<
-    typeof machineOnline
-  >[0];
+type MachineLike = Parameters<typeof machineExecutors>[0] & {
+  id: string;
+  name: string;
+  /** Protocol 10: what the machine allows (the app's Ferramentas); absent on older runners. */
+  access?: { tools?: { claude?: boolean; codex?: boolean } } | null;
+} & Parameters<typeof machineOnline>[0];
 
 /**
  * What the agent's computer can think with; the model brain always. A
@@ -133,6 +136,7 @@ export function brainOptions(machine: MachineLike | null): BrainOption[] {
     if (!machine) reason = "no_computer";
     else if (!machine.execAllowed) reason = "exec_off";
     else if (machine.protocol < BRAIN_PROTOCOL) reason = "runner_old";
+    else if (machine.access?.tools && machine.access.tools[executor] === false) reason = "tool_off";
     else if (!found?.available.includes(executor))
       reason = executor === "codex" && found?.codexTooOld ? "outdated" : "not_installed";
     return {

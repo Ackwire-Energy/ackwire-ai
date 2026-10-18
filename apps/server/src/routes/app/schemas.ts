@@ -272,7 +272,7 @@ export const BrainOption = z
     kind: BrainKind,
     available: z.boolean(),
     reason: z
-      .enum(["no_computer", "exec_off", "runner_old", "not_installed", "outdated"])
+      .enum(["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated"])
       .optional()
       .openapi({ description: "Why it can't be chosen now (computer brains)." }),
     experimental: z.boolean().openapi({ description: 'Still being tested ("Em teste"): Codex.' }),

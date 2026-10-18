@@ -4165,6 +4165,7 @@ export const en: Translations = {
       no_computer: "Choose a connected computer under Computer to use it.",
       exec_off: "The computer was connected without permission to run programs.",
       runner_old: "Update the agentes.chat program on the computer to use it.",
+      tool_off: "Turned off on {{computer}}. Turn it on in Tools, in the agentes app on that computer.",
       not_installed: "It isn't installed on {{computer}}.",
       outdated: "The version on {{computer}} is old. Update Codex to use it.",
     },

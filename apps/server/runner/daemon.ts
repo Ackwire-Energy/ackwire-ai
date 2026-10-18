@@ -621,9 +621,8 @@ export class RunnerDaemon implements RequestObserver {
     };
   }
 
-  /** The coding CLIs for `hello`: only the ones turned on here. */
+  /** The coding CLIs for `hello`: the ones installed (whether each may run is `access.tools`). */
   private helloExecutors(): NonNullable<RunnerInfo["executors"]> {
-    const tools = this.access().tools;
     const found = this.executors();
     // Claude Code installed or logged in since the last look: the app shows it.
     const seen = JSON.stringify(found);
@@ -631,10 +630,9 @@ export class RunnerDaemon implements RequestObserver {
       this.lastExecutors = seen;
       this.queueStatus();
     }
-    return {
-      ...(tools.claude && found.claude ? { claude: found.claude } : {}),
-      ...(tools.codex && found.codex ? { codex: found.codex } : {}),
-    };
+    // Not filtered by the tools turned on: those reach the server on every change (`access.changed`),
+    // while `hello` only goes out on connect, so a tool turned on later looked "not installed".
+    return found;
   }
 
   private send(frame: RunnerFrame) {

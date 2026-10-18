@@ -76,5 +76,12 @@ describe("brain settings", () => {
     const both = mac({ executors: { claude: { version: "2" }, codex: { version: "0.170.0" }, detectedAt: "x" } });
     expect(brainOptions(both).every((o) => o.available)).toBe(true);
     expect(brainOptions(both).find((o) => o.kind === "codex")?.experimental).toBe(true);
+    // Installed but turned off in the app's Tools: says so (not "not installed"); turned on, available.
+    const off = mac({ ...both, access: { tools: { claude: false, codex: true } } });
+    expect(reasons(off).slice(1)).toEqual([
+      ["claude_code", false, "tool_off"],
+      ["codex", true, null],
+    ]);
+    expect(reasons(mac({ access: { tools: { claude: true } } }))[1]).toEqual(["claude_code", true, null]);
   });
 });

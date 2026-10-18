@@ -4173,6 +4173,7 @@ export const ptBR = {
       no_computer: "Escolha um computador conectado em Computador para usar.",
       exec_off: "O computador foi conectado sem permissão para rodar programas.",
       runner_old: "Atualize o programa do agentes.chat no computador para usar.",
+      tool_off: "Desligado no {{computer}}. Ligue em Ferramentas, no app agentes do computador.",
       not_installed: "Não está instalado no {{computer}}.",
       outdated: "A versão no {{computer}} é antiga. Atualize o Codex para usar.",
     },
