@@ -22,7 +22,8 @@
       "types": "./src/computer/portrait.d.ts",
       "default": "./src/computer/portrait.js"
     },
-    "./sky/math": "./src/sky/math.ts"
+    "./sky/math": "./src/sky/math.ts",
+    "./timezones": "./src/timezones.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

@@ -50,7 +50,9 @@ import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { StreamingRow, WorkingLine, writingRuns } from "./LiveRows";
 import { useChatLive } from "./live";
 import { buildRows, type ChatRow, mayStopRun, mergeTimeline, parseSlash, pinTarget, threadRootsToLoad } from "./logic";
+import { MentionPicker, useMentionMembers } from "./MentionPicker";
 import { MessageRow } from "./MessageRow";
+import { insertMention, mentionQuery } from "./mentions";
 import { PinsSheet } from "./PinsSheet";
 import {
   appendedKeys,
@@ -116,6 +118,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const member = dm ? true : (channel?.isMember ?? true);
   const roster = useRoster(orgId, channelId, Boolean(channel?.isMember) && !isThread);
   const join = useJoinChannel(orgId, channelId);
+  // The "@" picker's sections: a channel's members (also in its threads); a DM has none.
+  const mentionMembers = useMentionMembers(channelId, !dm && Boolean(channel?.isMember));
 
   // ── Messages ──
   const top = useMessages(orgId, channelId, member && !isThread);
@@ -591,8 +595,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const placeholder = isThread
     ? t("mobile.chat.reply")
     : dm
-      ? t("mobile.chat.writeTo", { name: dm.with.name })
-      : t("mobile.chat.writeTo", { name: channel ? `#${channel.name}` : "" });
+      ? t("mobile.chat.messageTo", { name: dm.with.name })
+      : t("mobile.chat.messageIn", { channel: channel ? `#${channel.name}` : "" });
   const suggestions =
     !isThread && list.length < 6
       ? dmAgentId
@@ -759,6 +763,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 onPlus={() => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)}
                 inputNativeID={COMPOSER_INPUT_ID}
                 {...(suggestions.length > 0 ? { suggestions } : {})}
+                {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
+                mentionAt={mentionQuery}
+                insertMention={insertMention}
+                mention={({ query, pick }) => (
+                  <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
+                )}
               />
             ) : (
               <Button
