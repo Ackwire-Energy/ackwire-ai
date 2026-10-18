@@ -220,24 +220,13 @@ impl Runners {
             let app = app.clone();
             let id = home_id.to_string();
             tauri::async_runtime::spawn(async move {
-                let mut buf: Vec<u8> = Vec::new();
+                let mut lines = LineSplitter::default();
                 let mut exit_code: Option<i32> = None;
                 while let Some(event) = rx.recv().await {
                     match event {
                         CommandEvent::Stdout(bytes) => {
-                            buf.extend_from_slice(&bytes);
-                            while let Some(pos) = buf.iter().position(|b| *b == b'\n') {
-                                let line: Vec<u8> = buf.drain(..=pos).collect();
+                            for line in lines.push(&bytes) {
                                 handle_line(&app, &id, generation, &line);
-                            }
-                            // The shell plugin may hand over lines without their newline:
-                            // a complete JSON object is a whole line too.
-                            if !buf.is_empty() && serde_json::from_slice::<serde_json::Value>(&buf).is_ok() {
-                                let line = std::mem::take(&mut buf);
-                                handle_line(&app, &id, generation, &line);
-                            }
-                            if buf.len() > MAX_LINE {
-                                buf.clear();
                             }
                         }
                         CommandEvent::Terminated(payload) => {
@@ -418,6 +407,56 @@ impl Runner {
     }
 }
 
+/// Cuts the runner's stdout into lines. The shell plugin hands over one line per event with its
+/// newline stripped, but a chunk may also be part of a line or several lines, so both are handled:
+/// a newline ends a line, and so does a left-over that is a complete JSON object.
+///
+/// A left-over that never became JSON (stray output on stdout) used to stay in the buffer and glue
+/// itself to every line after it, so no line got through until the buffer outgrew `MAX_LINE`. Now
+/// it is dropped as soon as a chunk arrives that is a whole JSON line on its own.
+#[derive(Default)]
+struct LineSplitter {
+    buf: Vec<u8>,
+}
+
+/// A whole protocol line: every message is one JSON object (a bare number or string could be the
+/// tail of a line cut in two).
+fn is_json(bytes: &[u8]) -> bool {
+    bytes.iter().find(|b| !b.is_ascii_whitespace()) == Some(&b'{')
+        && matches!(serde_json::from_slice::<serde_json::Value>(bytes), Ok(serde_json::Value::Object(_)))
+}
+
+impl LineSplitter {
+    fn push(&mut self, chunk: &[u8]) -> Vec<Vec<u8>> {
+        let mut out = Vec::new();
+        if !self.buf.is_empty() {
+            let first = match chunk.iter().position(|b| *b == b'\n') {
+                Some(pos) => &chunk[..pos],
+                None => chunk,
+            };
+            if is_json(first) {
+                let mut joined = self.buf.clone();
+                joined.extend_from_slice(first);
+                if !is_json(&joined) {
+                    self.buf.clear();
+                }
+            }
+        }
+        self.buf.extend_from_slice(chunk);
+        while let Some(pos) = self.buf.iter().position(|b| *b == b'\n') {
+            let line: Vec<u8> = self.buf.drain(..=pos).collect();
+            out.push(line);
+        }
+        if is_json(&self.buf) {
+            out.push(std::mem::take(&mut self.buf));
+        }
+        if self.buf.len() > MAX_LINE {
+            self.buf.clear();
+        }
+        out
+    }
+}
+
 fn handle_line(app: &AppHandle, home_id: &str, generation: u64, raw: &[u8]) {
     let text = String::from_utf8_lossy(raw);
     let line = text.trim();
@@ -453,4 +492,41 @@ fn paired_home(dir: &std::path::Path) -> bool {
         .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
         .and_then(|v| v.get("token").and_then(|t| t.as_str()).map(|t| !t.is_empty()))
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LineSplitter;
+
+    fn texts(lines: Vec<Vec<u8>>) -> Vec<String> {
+        lines.into_iter().map(|l| String::from_utf8(l).unwrap().trim().to_string()).collect()
+    }
+
+    #[test]
+    fn whole_lines_without_newlines() {
+        let mut s = LineSplitter::default();
+        assert_eq!(texts(s.push(br#"{"a":1}"#)), vec![r#"{"a":1}"#]);
+        assert_eq!(texts(s.push(br#"{"b":2}"#)), vec![r#"{"b":2}"#]);
+    }
+
+    #[test]
+    fn several_lines_and_pieces() {
+        let mut s = LineSplitter::default();
+        assert_eq!(texts(s.push(b"{\"a\":1}\n{\"b\":")), vec![r#"{"a":1}"#]);
+        assert_eq!(texts(s.push(b"2}\n")), vec![r#"{"b":2}"#]);
+        assert_eq!(texts(s.push(b"{\"c\":{\"d\":")), Vec::<String>::new());
+        assert_eq!(texts(s.push(b"3}}")), vec![r#"{"c":{"d":3}}"#]);
+        // A tail that is valid JSON on its own (a number) is still a tail.
+        assert_eq!(texts(s.push(b"{\"n\":12")), Vec::<String>::new());
+        assert_eq!(texts(s.push(b"3")), Vec::<String>::new());
+        assert_eq!(texts(s.push(b"}")), vec![r#"{"n":123}"#]);
+    }
+
+    #[test]
+    fn stray_output_does_not_swallow_later_lines() {
+        let mut s = LineSplitter::default();
+        assert_eq!(texts(s.push(b"warning: something")), Vec::<String>::new());
+        assert_eq!(texts(s.push(br#"{"type":"event"}"#)), vec![r#"{"type":"event"}"#]);
+        assert_eq!(texts(s.push(br#"{"type":"reply"}"#)), vec![r#"{"type":"reply"}"#]);
+    }
 }

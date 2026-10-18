@@ -74,6 +74,11 @@ export class DesktopStore {
   /** Logos already fetched, by `homeId + etag` (a new etag means a new logo). */
   private readonly logos = new Map<string, string | null>();
   private readonly askingLogo = new Set<string>();
+  /**
+   * The newest `status.seq` seen per home (runner process). A reply asked before an event can be
+   * read after it; whatever is older than what we have is dropped. Forgotten when the runner restarts.
+   */
+  private readonly statusSeq = new Map<string, number>();
 
   constructor(
     private readonly host: Host,
@@ -91,11 +96,15 @@ export class DesktopStore {
       this.host.onLine((homeId, line) => this.client.receive(homeId, line)),
       this.host.onRunnerState((c) => {
         if (c.removed) {
+          this.statusSeq.delete(c.homeId);
           this.client.closeHome(c.homeId);
           this.set({ homes: this.snap.homes.filter((h) => h.homeId !== c.homeId) });
           return;
         }
-        if (!c.running) this.client.closeHome(c.homeId);
+        if (!c.running) {
+          this.statusSeq.delete(c.homeId);
+          this.client.closeHome(c.homeId);
+        }
         const known = this.home(c.homeId);
         if (known) this.patch(c.homeId, { running: c.running, ...(c.running ? {} : { jobs: [] }) });
         else
@@ -105,6 +114,8 @@ export class DesktopStore {
       }),
       this.client.subscribe((homeId, message) => {
         if (message.kind === "hello") {
+          // A new runner process: its seq starts over.
+          this.statusSeq.delete(homeId);
           if (!this.home(homeId))
             this.set({ homes: [...this.snap.homes, emptyHome({ homeId, dir: "", running: true, hello: null })] });
           this.patch(homeId, { hello: message.hello, running: true });
@@ -114,6 +125,15 @@ export class DesktopStore {
         this.apply(homeId, message.event);
       }),
     );
+    // Brought up (windows start hidden and stay alive): read everything again, so nothing missed
+    // while hidden or before this window was listening stays on screen.
+    if (typeof this.host.onShown === "function") {
+      this.stops.push(
+        this.host.onShown((name) => {
+          if (name === this.host.window) void this.reload();
+        }),
+      );
+    }
     void this.reload();
     return () => {
       for (const s of this.stops) s();
@@ -142,9 +162,13 @@ export class DesktopStore {
   /** Status, jobs, requests and access of one home. */
   async refresh(homeId: string): Promise<void> {
     try {
-      const status = await this.client.request(homeId, { type: "status" });
-      this.patch(homeId, { status, access: status.access ?? this.home(homeId)?.access ?? null });
-      void this.syncLogo(homeId, status);
+      const reply = await this.client.request(homeId, { type: "status" });
+      if (this.acceptStatus(homeId, reply)) {
+        this.patch(homeId, { status: reply, access: reply.access ?? this.home(homeId)?.access ?? null });
+        void this.syncLogo(homeId, reply);
+      }
+      // A newer status may have arrived meanwhile: go on with whichever is current.
+      const status = this.home(homeId)?.status ?? reply;
       if (!status.paired) {
         this.patch(homeId, { jobs: [], requests: [] });
         return;
@@ -214,6 +238,7 @@ export class DesktopStore {
     const home = this.home(homeId);
     switch (event.kind) {
       case "status":
+        if (!this.acceptStatus(homeId, event.status)) return; // older than what is on screen
         this.patch(homeId, { status: event.status, ...(event.status.access ? { access: event.status.access } : {}) });
         void this.syncLogo(homeId, event.status);
         if (!event.status.paired) this.patch(homeId, { jobs: [], requests: [] });
@@ -250,6 +275,15 @@ export class DesktopStore {
         // Keep the others going.
       }
     }
+  }
+
+  /** True when `status` is not older than the newest this home reported (and records it). */
+  private acceptStatus(homeId: string, status: ControlStatus): boolean {
+    if (typeof status.seq !== "number") return true; // an older runner: no order to keep
+    const last = this.statusSeq.get(homeId);
+    if (last !== undefined && status.seq < last) return false;
+    this.statusSeq.set(homeId, status.seq);
+    return true;
   }
 
   /** Asks the runner for the logo when its etag is one this store hasn't fetched for the home. */

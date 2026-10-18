@@ -55,6 +55,11 @@ export interface ControlStatus {
   agents: ControlAgent[];
   /** Protocol 10: folders and tools allowed on this machine. */
   access?: RunnerAccess;
+  /**
+   * Grows by one for every status the runner reports (events and `status` replies alike), from 1
+   * when the process starts; the app keeps the newest and drops anything older. Absent: older runner.
+   */
+  seq?: number;
 }
 
 /** Something running now on behalf of an agent. */

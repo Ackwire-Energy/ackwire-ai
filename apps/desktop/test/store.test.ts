@@ -82,3 +82,132 @@ test("the org logo: asked once per etag, again when it changes, cleared when the
   await settle();
   expect(store.home("h1")?.logo).toBeNull();
 });
+
+/** A home whose runner's replies wait until the test lets them out (in any order with events). */
+function heldSetup() {
+  const held: { type: string; send: () => void }[] = [];
+  let onLine: (homeId: string, line: string) => void = () => {};
+  let onShown: (name: string) => void = () => {};
+  const asked: string[] = [];
+  const reply = { status: { ...status(), seq: 1 } as ControlStatus };
+  const host = {
+    window: "prefs",
+    fake: true,
+    listRunners: async () => [{ homeId: "h1", dir: "/tmp/h1", running: true, hello: null }],
+    onLine: (cb: typeof onLine) => {
+      onLine = cb;
+      return () => {};
+    },
+    onRunnerState: () => () => {},
+    onShown: (cb: typeof onShown) => {
+      onShown = cb;
+      return () => {};
+    },
+    send: async (homeId: string, line: string) => {
+      const req = JSON.parse(line) as { id: string; type: string };
+      asked.push(req.type);
+      let data: unknown = {};
+      // The runner answers with the status it has when it reads the request.
+      if (req.type === "status") data = reply.status;
+      if (req.type === "jobs") data = { jobs: [] };
+      if (req.type === "access.pending") data = { requests: [] };
+      if (req.type === "access.get") data = { folders: [], tools: { claude: false, codex: false, commands: false } };
+      const text = JSON.stringify({ type: "reply", id: req.id, ok: true, data });
+      held.push({ type: req.type, send: () => onLine(homeId, text) });
+    },
+  } as unknown as Host;
+  const store = new DesktopStore(host, { idPrefix: "t" });
+  const line = (out: unknown) => onLine("h1", JSON.stringify(out));
+  const event = (e: ControlEvent) => line({ type: "event", event: e });
+  const release = (type?: string) => {
+    for (let i = 0; i < held.length; ) {
+      const h = held[i] as (typeof held)[number];
+      if (!type || h.type === type) {
+        held.splice(i, 1);
+        h.send();
+      } else i++;
+    }
+  };
+  const drain = async () => {
+    for (let i = 0; i < 5; i++) {
+      release();
+      await settle();
+    }
+  };
+  return { store, reply, event, line, release, drain, asked, shown: (name: string) => onShown(name) };
+}
+
+const at = (seq: number, connection: ControlStatus["connection"]): ControlStatus => ({ ...status(), connection, seq });
+
+test("status: a reply asked before a newer event never overwrites it, even when both are read in one go", async () => {
+  const { store, reply, event, release, drain } = heldSetup();
+  reply.status = at(3, "connecting");
+  store.start();
+  await drain();
+  expect(store.home("h1")?.status?.connection).toBe("connecting");
+
+  // Asked while connecting (the reply carries seq 4); the runner comes online right after answering
+  // and both lines are read in the same task: the reply's promise settles after the event.
+  reply.status = at(4, "connecting");
+  void store.refresh("h1");
+  await settle();
+  release("status");
+  event({ kind: "status", status: at(5, "online") });
+  await drain();
+  expect(store.home("h1")?.status).toMatchObject({ connection: "online", seq: 5 });
+
+  // The same reply read on its own, after the event.
+  reply.status = at(5, "online");
+  void store.refresh("h1");
+  await settle();
+  event({ kind: "status", status: at(7, "offline") });
+  await settle();
+  release("status");
+  await drain();
+  expect(store.home("h1")?.status).toMatchObject({ connection: "offline", seq: 7 });
+
+  // An older event is dropped too.
+  event({ kind: "status", status: at(6, "online") });
+  await settle();
+  expect(store.home("h1")?.status?.connection).toBe("offline");
+});
+
+test("status: a restarted runner (new hello) starts its seq over; an older runner without seq is taken as is", async () => {
+  const { store, reply, event, line, drain } = heldSetup();
+  reply.status = at(40, "online");
+  store.start();
+  await drain();
+  expect(store.home("h1")?.status?.seq).toBe(40);
+
+  reply.status = at(1, "connecting");
+  line({ type: "hello", control: 1, version: "0.1.0", protocol: 10, home: "/tmp/h1" });
+  await drain();
+  expect(store.home("h1")?.status).toMatchObject({ connection: "connecting", seq: 1 });
+  event({ kind: "status", status: at(2, "online") });
+  await settle();
+  expect(store.home("h1")?.status?.connection).toBe("online");
+
+  const { seq: _drop, ...legacy } = at(0, "offline");
+  event({ kind: "status", status: legacy });
+  await settle();
+  expect(store.home("h1")?.status?.connection).toBe("offline");
+});
+
+test("status: showing this window reads every home again; another window being shown does not", async () => {
+  const { store, reply, asked, shown, drain } = heldSetup();
+  reply.status = at(1, "connecting");
+  store.start();
+  await drain();
+  expect(store.home("h1")?.status?.connection).toBe("connecting");
+  const before = asked.filter((t) => t === "status").length;
+
+  // An event was missed while hidden; the runner now says online.
+  reply.status = at(9, "online");
+  shown("popover");
+  await drain();
+  expect(asked.filter((t) => t === "status").length).toBe(before);
+  shown("prefs");
+  await drain();
+  expect(asked.filter((t) => t === "status").length).toBe(before + 1);
+  expect(store.home("h1")?.status?.connection).toBe("online");
+});

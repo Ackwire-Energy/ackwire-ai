@@ -234,6 +234,8 @@ export class RunnerDaemon implements RequestObserver {
   /** Job and activity events, in order (redaction is async). */
   private chain: Promise<void> = Promise.resolve();
   private statusQueued = false;
+  /** Stamps every status (events and replies) so the app can tell the newest (`ControlStatus.seq`). */
+  private statusSeq = 0;
   private lastExecutors = "";
   /** The organization's logo cached in `<home>/org-logo.json` (app mode, refreshed on each `welcome`). */
   private logo: CachedLogo | null = null;
@@ -739,6 +741,7 @@ export class RunnerDaemon implements RequestObserver {
       ...(c ? { workspace: this.session?.workspaceReal ?? c.workspace } : {}),
       agents: this.agents.map((a) => ({ ...a })),
       access: this.access(),
+      seq: ++this.statusSeq,
     };
   }
 

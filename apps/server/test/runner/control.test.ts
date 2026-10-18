@@ -228,6 +228,28 @@ test("paired: status and hello carry pause and access; pause/resume persist, go 
   expect(s.closed).toBe(true);
 });
 
+test("every status (events and replies) carries a seq that only grows, in the order written", async () => {
+  const { home } = pairedHome();
+  const c = control(home);
+  const s = await c.connect();
+  await waitFor(() => c.events("status").some((e) => e.kind === "status" && e.status.connection === "online"));
+  s.frame({ type: "agents", agents: [{ id: AGENT.id, handle: "dev", name: "Dev", look: { color: "amber" } }] });
+  await waitFor(() => c.events("status").some((e) => e.kind === "status" && e.status.agents.length === 1));
+  await c.data({ type: "status" });
+  await c.data({ type: "status" });
+  const seqs = c.out.flatMap((o) => {
+    if (o.type === "event" && o.event.kind === "status") return [o.event.status.seq];
+    if (o.type === "reply" && o.ok && (o.data as { connection?: unknown }).connection !== undefined)
+      return [(o.data as { seq?: number }).seq];
+    return [];
+  });
+  expect(seqs.length).toBeGreaterThanOrEqual(4);
+  for (const seq of seqs) expect(typeof seq).toBe("number");
+  for (let i = 1; i < seqs.length; i++) expect(seqs[i] as number).toBeGreaterThan(seqs[i - 1] as number);
+  expect(await c.data({ type: "shutdown" })).toEqual({ stopping: true });
+  expect(await c.done).toBe(0);
+});
+
 test("jobs and the activity log: each request is a job while it runs and a line after, newest first", async () => {
   const { home } = pairedHome();
   const c = control(home);
